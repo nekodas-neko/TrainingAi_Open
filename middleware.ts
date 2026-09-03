@@ -31,5 +31,17 @@ export default auth((req) => {
 })
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|sw.js|manifest.webmanifest|icon|apple-icon).*)"],
+  // `monitoring` is BF-92's Sentry tunnel (`tunnelRoute` in next.config.ts) and MUST be excluded, or
+  // the gate 307s it to /sign-in and the browser's error report is dropped — the same silent drop,
+  // moved from the CSP to here. Excluded rather than added to PUBLIC_PATHS because there is no page
+  // to gate: the SDK installs it as a Next *rewrite* to `*.ingest.sentry.io`, so no handler of ours
+  // ever runs and nothing of ours is reachable through it.
+  //
+  // ⚠ It is therefore reachable unauthenticated, which is the point and is also the cost: the
+  // errors most worth having are the ones from the sign-in path, where by definition there is no
+  // session, and where this app's own comment above records how fragile first-run APK sign-in is —
+  // `/api/client-error` requires auth and has never captured any of them. What it opens is a relay
+  // that can forward an envelope to some other Sentry project via this domain. No data of ours, no
+  // auth surface, no database.
+  matcher: ["/((?!api|monitoring|_next/static|_next/image|favicon.ico|sw.js|manifest.webmanifest|icon|apple-icon).*)"],
 }

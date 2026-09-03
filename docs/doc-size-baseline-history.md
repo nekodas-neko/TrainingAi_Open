@@ -7182,3 +7182,29 @@ just deleting it is what stops a later session restoring it from the prose that 
 
 The `Math.round` note in the journal is the third thing worth its length: a surviving mutation that
 turned out to be a real off-by-one on some values, not a gap in the tests.
+
+---
+
+## 2026-09-03 — `docs/implementation-backlog.md` 16398 → 16432 (BF-92, Lane A)
+
+Thirty-four lines onto BF-92, recording that the code half of the Sentry client blackout shipped and
+what specifically is still owed. They earn the space because **the entry named one gate and there
+were three**: `connect-src`, then the auth matcher in `middleware.ts` (which would have 307'd an
+unauthenticated report to `/sign-in`), then the service worker's catch-all branch (which would have
+`cache.put()` a POST and raised an unhandled rejection on every successful report). Only the first
+had been found by reading. Recording all three is what stops the next session "fixing the CSP" and
+declaring it done, which is precisely the shape of the original failure.
+
+Two of those lines are the note that the tunnel rewrite lands in `routes-manifest.json` under
+**`afterFiles`**, not `beforeFiles`. The first verification here read the empty `beforeFiles` and
+concluded the change had not taken effect at all. A wrong "it didn't work" costs more than a wrong
+"it worked" in a repo that gates on device verification, because it invites reverting a correct fix.
+
+The owner-visible trade-off — excluding the tunnel path from the auth gate widens it to
+unauthenticated callers — is written on the entry rather than only in the journal, because that is
+the file a session reads before deciding whether the item is finished.
+
+Also `projectOverview.md` 9725 → 9726, for the **Waiting on the owner** row that carries the same
+trade-off. It belongs in that table rather than only on the entry because the widening is the one
+thing here a session must not decide on the owner's behalf, and that table is the place the owner
+reads rather than the queue.
