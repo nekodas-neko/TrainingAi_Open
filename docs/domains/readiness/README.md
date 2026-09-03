@@ -260,6 +260,14 @@ Live at the time of writing (2026-07-30):
 ## History
 
 
+- **[`../../reviews/2026-09-03-acwr-ewma-day-shift.md`](../../reviews/2026-09-03-acwr-ewma-day-shift.md)**
+  — 🆕 **Q-279: what the uncoupled-EWMA switch would actually change, measured before writing it.**
+  Over 95 comparable days of real history the **scales agree** (mean 0.919 → 0.955), so **no
+  threshold has to move with the switch** — the result that keeps this a small change. But ~20% of
+  days flip at the early-deload boundary (12/95 → 15/95 firing, **19 days change**), and the
+  over-exertion taper goes from **4 firings to 1** because the EWMA damps the single-heavy-session
+  spike it reacts to. Also refines the entry: chronic divides by the **observed span in weeks**, not
+  a flat 4, so there is no `/ 4` to go looking for. Now `Gate: owner`.
 - **[`../../reviews/2026-09-02-recovery-index-bin-occupancy.md`](../../reviews/2026-09-02-recovery-index-bin-occupancy.md)**
   — 🆕 **Q-509, continued: two of the three remaining candidates are closed.** Bin occupancy does
   **nothing** — across 575 night bins not one falls below `MIN_BEATS_PER_BIN`, the argmin carried
