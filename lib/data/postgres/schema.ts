@@ -1757,6 +1757,10 @@ export const colmiRawFrames = pgTable('colmi_raw_frames', {
   /** Command byte (v1) or big-data type (v2), so a query can filter without re-parsing the hex. */
   tag:        integer('tag'),
   hex:        text('hex').notNull(),
+  /** Index within the request that carried it. All frames of one sync share a `received_at` (one
+   *  insert, one transaction clock), so this is the only record of the order the ring sent them —
+   *  which the heart-rate log's carried anchor needs to replay correctly. */
+  seq:        integer('seq').notNull().default(0),
   createdAt:  timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [unique('colmi_raw_frames_unique').on(t.userId, t.channel, t.hex)])
 

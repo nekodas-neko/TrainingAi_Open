@@ -7,10 +7,14 @@ import { scrubEvent } from '@/lib/observability/sentry-scrub'
 // key by design, and it ships inside every client bundle of every Sentry install. It is not a
 // secret in the sense the auth token is.
 //
-// **The CSP note from the original decision is live, not stale.** The APK is a WebView loading the
-// Railway URL, so a `connect-src` that does not include the ingest host silently drops every client
-// event — the exact failure mode this item exists to avoid. Verify on the device, not just in a
-// browser.
+// **That CSP hazard was real and it happened — BF-92.** The note used to end "verify on the device";
+// nobody did, and for 13 days `connect-src` had no ingest host while this SDK reported nothing and
+// the same-origin homegrown reporter logged 9 client faults from the same device. The fix is NOT a
+// second host in the header: `next.config.ts` sets `tunnelRoute: '/monitoring'`, so events POST
+// same-origin — which `connect-src 'self'` already permits and no future CSP edit can revoke —
+// and `middleware.ts` excludes that path so a report from the sign-in screen is not 307'd away.
+// `lib/security/__tests__/sentry-tunnel-reachability.test.ts` holds both halves, because a comment
+// predicting a hazard is what failed here.
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
   // `sendDefaultPii: false` is the SDK-level switch; `beforeSend` is the app-level one. Both, because

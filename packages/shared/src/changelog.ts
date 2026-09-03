@@ -6,11 +6,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.436.4",
+    version: "1.436.6",
     date: "2026-09-03",
     changes: [
       "About no longer looks like it is contradicting itself. The app version and the Android build version are different things and both were right, so a green tick appeared to vouch for the smaller one; each now says what it governs.",
       "The Android build row names the version actually installed on your phone and the date it was built, so you can tell whether a native fix has reached the device without looking it up.",
+    ],
+  },
+  {
+    version: "1.436.4",
+    date: "2026-09-03",
+    changes: [
+      "The Colmi ring now sends its raw readings to the server and the server reads them, instead of the app reading them on the phone. Nothing about a sync looks different, but a decoding fix can now be applied to readings already collected \u2014 three of this week's ring fixes had to be, and each one needed the app to be up to date first.",
+      "The order the ring sent its readings in was not being recorded. It is now, and a sync stored before today can still be re-read correctly.",
     ],
   },
   {

@@ -1,0 +1,50 @@
+# Q-250. Signs the emulator's app in, which is the ONE thing standing between this job and the
+# assertion it exists for.
+#
+# Why a UI flow at all: `getLocalStore(userId)` requires a signed-in user, so on the sign-in screen
+# no local SQLite database is ever created and `emulator-local-db-smoke.sh` polls 90 s for a file
+# that cannot appear. Steps 1–14 of that job have passed on a real runner since 2026-08-17; only
+# this was missing.
+#
+# Why Maestro rather than `adb shell input tap`: the app is a WebView, and taps would need pixel
+# coordinates that change with every layout edit — a check that breaks on unrelated UI work teaches
+# people to ignore it, which is the same failure the disabled `pull_request` trigger was avoiding.
+# Maestro selects by accessibility label, and `email-sign-in.tsx` gives both inputs an explicit
+# `aria-label` ("Email", "Password") — added there for screen readers, and load-bearing here.
+#
+# Credentials are the seeded local pair from `scripts/local-db/seed.sql`, against a Postgres and a
+# Next server that are destroyed with the runner. Nothing here is a secret.
+appId: com.trainingai.app
+---
+- launchApp:
+    clearState: true
+
+# The WebView has to fetch the document from the host loopback and run React before anything is
+# tappable, so this waits on the form rather than on the app process.
+# 180 s, not 120: the emulator is software-rendered and the WebView is fetching a remote document
+# over the host-loopback alias. Run 3 timed out here at 120 s with the server up and healthy — the
+# workflow now warms /sign-in on the host as well, and this is the belt to that braces.
+- extendedWaitUntil:
+    visible: "Sign in with email"
+    timeout: 180000
+
+- tapOn: "Email"
+- inputText: "test@local.dev"
+# Dismiss the IME: it covers the submit button on a pixel_6 profile, and Maestro taps screen
+# coordinates it cannot see are occluded.
+- hideKeyboard
+
+- tapOn: "Password"
+- inputText: "testpass123"
+- hideKeyboard
+
+- tapOn: "Sign in with email"
+
+# Assert the form is GONE rather than that any particular screen arrived. The home screen's text is
+# time-of-day and data dependent ("Good evening, …"), and pinning a greeting here would make this
+# flow fail at midnight for reasons that have nothing to do with sign-in. The form disappearing is
+# the narrow claim this flow is entitled to make; the smoke script's `PRAGMA user_version` is what
+# proves the local store actually opened.
+- extendedWaitUntil:
+    notVisible: "Sign in with email"
+    timeout: 120000
