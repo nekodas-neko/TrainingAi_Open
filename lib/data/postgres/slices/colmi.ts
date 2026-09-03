@@ -28,6 +28,9 @@ export interface ColmiRawFrameInput {
   hex: string
 }
 
+/** Position within the posted batch — see `colmiRawFrames.seq`. Assigned by the writer, not the
+ *  caller, so it cannot disagree with the order the frames were actually decoded in. */
+
 export interface ColmiSleepSegmentInput {
   localDate: string
   startedAt: Date
@@ -139,7 +142,7 @@ export async function getColmiLatestReadingAt(db: Db, userId: string): Promise<D
 export async function insertColmiRawFrames(db: Db, userId: string, rows: ColmiRawFrameInput[]): Promise<number> {
   if (rows.length === 0) return 0
   const inserted = await db.insert(s.colmiRawFrames)
-    .values(rows.map(r => ({ userId, channel: r.channel, tag: r.tag, hex: r.hex })))
+    .values(rows.map((r, seq) => ({ userId, channel: r.channel, tag: r.tag, hex: r.hex, seq })))
     .onConflictDoNothing()
     .returning({ id: s.colmiRawFrames.id })
   return inserted.length
