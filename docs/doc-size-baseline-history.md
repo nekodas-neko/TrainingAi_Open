@@ -7320,3 +7320,18 @@ are stated explicitly, since the natural readings of "mostly superseded" are *de
 
 Also recorded: the entry's premise — that `error_events` cannot say what preceded a throw — is the
 wrong problem while BF-92 has Sentry receiving nothing from the browser at all.
+
+---
+
+## 2026-09-03 — `docs/implementation-backlog.md` 16680 → 16687 (Q-511, Lane A)
+
+Seven lines adding a `Reference:` field to Q-511. It was standing at **#3 READY** in Lane A's list
+while its own **First action** reads *"none in scoring"* — a "do nothing unless" entry sitting where
+an implementer working top-down picks it up and builds it anyway. `Reference:` is the field for
+exactly this ("nothing to BUILD"), and it moves the entry into its own section without hiding it.
+
+The lines say *why* rather than just setting the field, because the entry's real value is the
+**⚠️ PROTECT THIS** warning it carries — that sleep and readiness being on comparable scales is now
+load-bearing for Body Battery — and a reader who sees only "Reference: nothing to build" would skip
+the one thing worth reading. The re-promotion condition is stated so the field is reversible by rule
+rather than by judgement.
