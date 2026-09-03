@@ -7116,6 +7116,31 @@ says it was abandoned. And the synchronous workaround has **no in-flight guard**
 is two concurrent full-history passes, which is the starvation that took production down on
 2026-08-13.
 
+## 2026-09-03 — Review sweep 44 (RV-41)
+
+`docs/implementation-backlog.md` → 16363 (+40 on top of whatever landed while this was open; the
+baseline was rebased twice mid-PR), `projectOverview.md` 9683 → 9700 (+17),
+`docs/agents/state/review.md` 184 → 194 (+10).
+
+RV-41's length is one table and one quotation, and neither compresses. The quotation is the finding:
+the schema's own comment names *"set my calories to 26000"* as the thing its bound refuses, and the
+bound accepts it — without the sentence the entry is an opinion about a number, and with it the
+implementer can see the guarantee that was intended. The table is the seven fields with both
+validators' bounds side by side, which is what turns "the Coach bound is loose" into "one column has
+two validators and the LLM writes through the looser one" — a different fix, and the reason the entry
+says to import the user routes' bounds rather than pick new constants.
+
+Two lines exist to stop the wrong fix. One says not to widen the user routes to match, because the
+direction is not obvious from the numbers alone. The other records that `stepsGoal` is the single
+field where the Coach is *tighter*, so a sweep that assumes one direction throughout gets that one
+backwards.
+
+**The baton grew because it now carries four sweeps.** It was compressed at every previous raise this
+session, and this one folds rather than appends: the new method note absorbed the payload-assertion
+bullet, the contrast list took a seventh instance on the same line, and the "still owed" block merged
+three sentences into one. What remains is state — the five closed lenses, the surfaces that are
+unverified rather than clean, and the four method notes that each cost a sweep.
+
 ## 2026-09-02 — `docs/implementation-backlog.md` → 16316 (BF-110, BF-111, and a correction to BF-80)
 
 Two entries plus eight lines onto BF-80. The owner added one detail to a months-old report — the blank
@@ -7129,7 +7154,7 @@ thing that changes is that its `Gate: device` now waits on evidence that may nev
 the APK-versus-web version ambiguity found while writing that caveat — small, and load-bearing exactly
 because BF-110 needed to ask which native build is installed and the app could not say.
 
-## 2026-09-03 — `projectOverview.md` → 9697, `docs/implementation-backlog.md` → 16343 (Q-516 + BF-94)
+## 2026-09-03 — `projectOverview.md` → 9714, `docs/implementation-backlog.md` → 16383 (Q-516 + BF-94)
 
 Both grow for one reason, and it is not the feature. The lines that earn their space record **how the
 entry became invisible**: two bare lane mentions that disagreed, so `laneFromLines` returned `?` and

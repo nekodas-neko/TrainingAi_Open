@@ -1612,6 +1612,23 @@ Last swept **2026-09-02**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [nutrition][workouts] 🟡 The Coach can write goal numbers the user's own screens refuse (RV-41, 2026-09-03)
+
+The patch schema bounds every goal number at `max(100_000)`, under a comment saying *"'set my calories
+to 26000' should be refused by the schema rather than survive to a confirmation card that looks
+legitimate."* It is not: 26,000 applies, 100,000 applies, only 100,001 is refused — and the card renders
+*"Calories 0 kcal → 26,000 kcal"*.
+
+One column, two validators, and the looser one is the path an LLM writes through. Measured by sending
+the same value to both surfaces: `calories` 20,000 vs 100,000, `proteinG`/`carbsG`/`fatG` 2,000 vs
+100,000 (**50×**), `waterGoalMl` 20,000 vs 100,000, `calorieGoal` 30,000 vs 100,000; `stepsGoal` is the
+one that is tighter. `stepsGoal` also loses its `.int()`, so a fractional value is a clean 400 on the
+user route and `500 "Apply failed"` on the Coach's. **The fix is to import the user routes' bounds, not
+to pick new constants.** The apply path itself is clean — all four previously-undriven handlers write,
+undo, refuse another account (404) and refuse a stale proposal (409 with a drift array).
+[`Review sweep 44`](docs/reviews/2026-09-03-coach-write-bounds-vs-user-routes.md). **Web build, local
+database; the model was never in the loop.**
+
 ### [workouts][platform] 🟡 The malformed-id guard was only pointed at path params; two body-id routes 500 (RV-40, 2026-09-03)
 
 `invalidUuidResponse` exists because Q-482 measured 21 route/method pairs answering 5xx on
