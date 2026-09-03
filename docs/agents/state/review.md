@@ -5,8 +5,8 @@
 > 🔴 handed on) and is the only part that moves. A session self-titles 🟢 on its first instruction and
 > flips itself to 🔴 as the last step of its handoff, after the baton and every PR have landed.
 
-**Updated:** 2026-09-03 · **By:** forty-two sweeps (2026-08-17 ×2, 2026-08-18 ×37, 2026-08-20 ×1,
-2026-09-03 ×2) · **Next ID: `RV-40`.**
+**Updated:** 2026-09-03 · **By:** forty-three sweeps (2026-08-17 ×2, 2026-08-18 ×37, 2026-08-20 ×1,
+2026-09-03 ×3) · **Next ID: `RV-41`.**
 
 > **Sweep 40's run is closed and nothing is owed from it** — RV-32, RV-33, RV-34 all shipped, verified
 > in source rather than taken from the closure note, and their `projectOverview.md` row is in
@@ -38,22 +38,26 @@ From sweeps 29–39
 worker claims the page), **Q-556** (`DELETE /api/activity-logs` reports success for a row it did not
 delete). From sweeps 41-42: **RV-37** and **RV-39**, both needing the device.
 
-**One surface is explicitly unverified, not clean:** `PATCH /api/activity-logs/<id>/metrics` — its
-probe payload was rejected by Zod before the ownership check ran, so its cross-user behaviour is
-**unknown**. Neither sweep 40 nor 41 reached it.
+**Three surfaces are explicitly unverified, not clean** — each a probe rejected on some *other* field
+before the guard under test ran: `PATCH /api/activity-logs/<id>/metrics` (cross-user behaviour
+unknown), and RV-40's `POST /api/complete-workout` and `POST /api/log-exercise` (malformed-id
+behaviour unknown). **A 4xx is not evidence the guard fired** — read which field it names.
 
-## Now — sweeps 41 and 42 filed (2026-09-03). **Next ID: `RV-40`.**
+## Now — sweeps 41, 42, 43 filed (2026-09-03). **Next ID: `RV-41`.**
 
-Both ran the owner's lens (mobile UI: safe area and back-and-return scroll; plus cache staleness),
-not the Next list. **41** →
+41 and 42 ran the owner's lens (mobile UI: safe area and back-and-return scroll; cache staleness);
+43 took the Next list's rule (a). **41** →
 [write-up](../../reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md), RV-35/36/37.
 **42** → [write-up](../../reviews/2026-09-03-first-run-honesty-and-instant-paint.md), RV-38/39.
+**43** → [write-up](../../reviews/2026-09-03-ownership-rule-a-and-body-supplied-ids.md), RV-40.
 
-- **A guard that exists is not a guard that reaches — all five findings are this.** `useLocalDay()`
+- **A guard that exists is not a guard that reaches — all six findings are this.** `useLocalDay()`
   (BF-86) has 3 consumers; `useScrollRestoration` (BF-100) rides `pull-to-sync.tsx`, which 3 screens
   use; `tabs-instant-paint.spec.ts` guards the 5 screens that never unmount and none of the ~20 that
-  do; the "Limited data" badge is gated on `hasData`, so the no-data case cannot reach it. **Grep the
-  call sites; never infer coverage from a mechanism's existence.**
+  do; the "Limited data" badge is gated on `hasData`, so the no-data case cannot reach it; and
+  `invalidUuidResponse` is used by 27 route files, **27 of 27 of them dynamic `[id]` routes and zero
+  body-id routes**. **Grep the call sites, and read the guard's own comment for the population it
+  assumed** — that last one names its scope outright and nobody noticed the gap it implies.
 - **The zero-data account reaches a state nothing else can** and was pointed at 2 screens. All 22 took
   one loop and found RV-38 at once. Re-run it whenever a scoring surface changes — the seeded user has
   data for everything, so a fabrication is invisible there.
@@ -64,17 +68,20 @@ not the Next list. **41** →
 
 **Closed clean, do not re-sweep:** the seven `freshWithinTtl` sites (every writer is in a group);
 `check-fetch-once-effects.js`'s CAN-BITE group (empty); instant paint on the sub-routes (13 of 14);
-the first-run render (21 of 22 routes). **Still owed:** RV-37 and RV-39 need the device, RV-38's
-stronger-treatment question needs the owner.
+the first-run render (21 of 22 routes); **and ownership rule (a) — all three rules now have
+evidence.** **Still owed:** RV-37 and RV-39 need the device, RV-38's stronger-treatment question needs
+the owner, and RV-40 leaves `POST /api/complete-workout` and `POST /api/log-exercise` **unverified,
+not clean**.
 
 ## Carried from sweep 40 ([write-up](../../reviews/2026-08-20-non-workout-write-surface-ownership.md))
 
-- **✅ Ownership rule (b) is clean with evidence** — 116 mutating routes, 325 `.set()` sites, all built
-  field by field. **Rule (a) is the only one of the three still with none.**
-- **A cheap contrast beats a long argument.** RV-32 was one table row: *same value, same resource, same
-  session — PUT 400, POST 201.* Sweeps 41–42 used the move four more times (`/more` restores 840 and
-  `/nutrition` returns 0; Home rolls the day over and Nutrition does not; streak says `—` and Body
-  Battery says 50). Find the surface that already does it right before arguing that it should.
+- **✅ All three write-path ownership rules now have evidence.** (b): 116 mutating routes, 325
+  `.set()` sites, all built field by field (sweep 40). (c): produced RV-32. (a): 21 unscoped child
+  deletes across 12 functions, all guarded, both source incidents reproduced and refused (sweep 43).
+- **A cheap contrast beats a long argument**, used six times now: *PUT 400, POST 201* (RV-32);
+  `/more` restores 840 and `/nutrition` returns 0; Home rolls the day over and Nutrition does not;
+  streak says `—` and Body Battery says 50; three routes say `400 Invalid id` and two say 500. Find
+  the surface that already does it right before arguing that it should.
 
 ## Next — in the order they are worth doing
 
@@ -85,10 +92,9 @@ left three CI checks behind (`check-known-issue-duplication`, `check-index-doc-p
 - **The other 23 FK edges into user-scoped tables.** `meal_plan_meals.saved_meal_id`,
   `saved_meal_items.food_item_id`, `prescribed_runs.plan_id`, `supplement_logs.supplement_id` first.
   The query that produces the inventory is in sweep 40's write-up §7.
-- **Ownership rule (a)** — after a user-scoped UPDATE whose row id came from the client, is the affected-row
-  count checked before the dependent child write? Never audited. Rules (b) and (c) both now have evidence.
-- **The 62 mutating routes that *do* carry a `try {`** were checked only for whether they map a refusal at
-  all, never for whether they map it to the *right* status.
+- **The 62 mutating routes that *do* carry a `try {`** were checked only for whether they map a refusal
+  at all, never for whether they map it to the *right* status. Sweep 43 did this for eight body-id
+  routes and found two wrong; the other ~54 are untouched, and it is now the top lens.
 - **A clean clone, actually built.** Nobody has done `git clone` into an empty container and run
   `pnpm install && pnpm build && pnpm test`. It is the one check that would settle `NOTICE`'s claim outright,
   and Q-313 (no `next build` gate in the publish dry-run) is why it is worth doing.

@@ -1598,6 +1598,23 @@ Last swept **2026-09-02**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [workouts][platform] 🟡 The malformed-id guard was only pointed at path params; two body-id routes 500 (RV-40, 2026-09-03)
+
+`invalidUuidResponse` exists because Q-482 measured 21 route/method pairs answering 5xx on
+`not-a-uuid`. Its own comment calls it *"the guard every dynamic `[id]` route runs"* — and that is the
+population it got: **27 route files use it, 27 of 27 are dynamic `[id]` routes, zero take the id from
+a body.** All eight unguarded body-id candidates were probed: `POST /api/progression-styles` answers
+**500 with `Content-Length: 0`**, `POST /api/workout-templates` answers **500 `{"error":"Save
+failed"}`**, four are clean, and two are **unverified** (the probe was rejected on other fields).
+Three sibling routes answer the same mistake with `400 {"error":"Invalid id"}`.
+
+The empty body is on a route RV-33 already fixed — RV-33 wrapped the *ownership refusal* in
+`withRouteErrors`, and the malformed-id path throws from the driver before reaching it. Both routes
+also write an `error_events` row carrying the raw SQL for what is a client input error, filling the
+fault channel every session is told to read first.
+[`Review sweep 43 §4`](docs/reviews/2026-09-03-ownership-rule-a-and-body-supplied-ids.md).
+**Web build, local database.**
+
 ### [readiness][app-shell] 🟡 Body Battery prints 50 and calls it "Good" for an account with no data (RV-38, 2026-09-03)
 
 The route is honest and the card ignores it. For the zero-data account `GET /api/body-battery`

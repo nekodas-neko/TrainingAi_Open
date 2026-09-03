@@ -450,6 +450,52 @@ daytime values. Readiness for the 27th was computed from a nap that did not happ
 **Back-fill is required, not optional:** the 27th's stored summary is wrong on disk, so a corrective
 recompute has to run over the affected days once the selection is fixed.
 
+### [workouts][platform] RV-40 — the malformed-id guard was only ever pointed at path params, and two body-id routes 500
+
+- **Lane:** A — `app/api/progression-styles/route.ts` and `app/api/workout-templates/route.ts`.
+- **Added:** 2026-09-03, Review sweep 43 —
+  [`write-up §4`](reviews/2026-09-03-ownership-rule-a-and-body-supplied-ids.md)
+- **The structural fact.** `invalidUuidResponse` (`lib/api/route-errors.ts:83`) exists because Q-482
+  measured 21 route/method pairs answering 5xx on `not-a-uuid`. Its own comment calls it *"the guard
+  every dynamic `[id]` route runs"* — and that is the population it got: **27 route files use it, 27
+  of 27 are dynamic `[id]` routes, zero take the id from a body.** An id in a request body is the
+  same hazard and was never swept.
+- **Measured, all eight body-id candidates probed live** (13 route files take a body id without the
+  guard; 8 of those have no `z.string().uuid()` either):
+
+  | Route | malformed body id | |
+  |---|---|---|
+  | `POST /api/progression-styles` | **500, `Content-Length: 0`** | broken |
+  | `POST /api/workout-templates` | **500** `{"error":"Save failed"}` | broken |
+  | `POST /api/phase-sets/clone` | 404 JSON | clean |
+  | `POST /api/workout-sessions/rpe` | 400 JSON | clean |
+  | `POST /api/confirm-early-deload` | 403 JSON | clean |
+  | `GET /api/coach/options` | 400 JSON | clean |
+  | `POST /api/complete-workout` | — | **unverified**, probe rejected on other fields |
+  | `POST /api/log-exercise` | — | **unverified**, same |
+
+  Three sibling routes answer the identical mistake with `400 {"error":"Invalid id"}`.
+- **The empty body is the worse half, and it is on a route RV-33 already fixed.** RV-33 wrapped
+  `POST /api/progression-styles`'s *ownership refusal* in `withRouteErrors`; the malformed-id path
+  throws from the driver before reaching it, so the fix and the gap sit in one file. A client calling
+  `res.json()` on a zero-byte 500 gets a parse exception on top of the real fault — RV-33's own
+  rationale.
+- **Third consequence, measured not argued:** both routes write an `error_events` row for what is a
+  client input error, and the message carries the raw SQL — `update "progression_styles" set "name" =
+  $1, "updated_at" = $2 where ("progression_styles"."id" = $3 and "progression_styles"."user_id" =
+  $4)`. Five probe requests produced five rows. That is the Q-483 class one step removed: not
+  disclosed to the caller, but stored in the fault channel every session is told to read first.
+- **Fix:** guard the body id the same way the path routes do, before it reaches the repository. **Do
+  not reach for `z.string().uuid()` on these two schemas alone** — the point of the entry is the
+  population, so sweep the 13 body-id routes and settle the two unverified ones while there.
+- **⚠ Do not claim the offline-outbox consequence.** An earlier draft did: 5xx means retry and 4xx
+  means quarantine (`lib/local-store/sync-engine.ts:868`), but `workout_log` and `activity_logs` are
+  the only outbox domains, so program and style saves never take that path.
+- **How to test locally:** two signed-in accounts and one curl each; assert `Content-Length` as well
+  as the status, and query `error_events` afterwards — the fault row is invisible from the response.
+- **Verify:** owner — nothing user-visible changes, so this needs no device pass; a green local gate
+  plus the probe table above is the bar.
+
 ### [readiness][app-shell] RV-38 — Body Battery prints 50 and calls it "Good" for an account that has never worn anything
 
 - **Lane:** B — `components/body-battery-card.tsx` only. The route needs no change; it is already correct.

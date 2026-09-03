@@ -7058,3 +7058,29 @@ cut first: the sweep-40 narrative went to two bullets, the ID-trap paragraph los
 "where the sweeps live" section lost the parts the pillar indexes already answer, and the Now section
 was rewritten from four bullets to three. What is left is state — which lenses are closed, which are
 owed, and the four method notes that cost a sweep each to learn.
+
+## 2026-09-03 — Review sweep 43 (RV-40)
+
+`docs/implementation-backlog.md` 16095 → 16141 (+46), `projectOverview.md` 9666 → 9683 (+17),
+`docs/agents/state/review.md` 178 → 184 (+6).
+
+Most of RV-40's length is one table: eight routes probed for a malformed body id, with four clean,
+two broken and **two explicitly unverified**. Compressing it to "two routes 500 on a bad id" would
+delete the part that makes it actionable — the implementer needs to know which six were checked so
+they are not re-probed, and which two were not so they are not assumed. The `27 of 27` line is the
+finding itself rather than context: it says the guard's population was dynamic `[id]` routes and
+nothing else, which is why the fix is a sweep of the thirteen body-id routes and not two `z.uuid()`
+calls.
+
+Two lines exist to stop a wrong conclusion being drawn twice. The one refusing the offline-outbox
+consequence is there because an earlier draft asserted it and it is false — `workout_log` and
+`activity_logs` are the only outbox domains — and the next reader will reach for the same argument.
+The `error_events` line carries the raw stored SQL because "it logs an error" and "it stores the
+query text and column names in the channel every session reads first" call for different priorities.
+
+**The baton grew because it now carries three sweeps rather than one.** It was compressed three times
+in this session before the raise: the sweep-40 carry went from two bullets to a one-line
+three-rules-now-have-evidence summary, the cheap-contrast note absorbed four new instances without
+adding a line, and rule (a) was deleted from the Next list rather than marked done. What is left is
+state — the four closed lenses, the three surfaces that are unverified rather than clean, and the
+method notes that cost a sweep each.
