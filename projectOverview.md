@@ -1598,6 +1598,30 @@ Last swept **2026-09-02**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [readiness][app-shell] 🟡 Body Battery prints 50 and calls it "Good" for an account with no data (RV-38, 2026-09-03)
+
+The route is honest and the card ignores it. For the zero-data account `GET /api/body-battery`
+answers `hasData: false`, `sampleCount: 0`, `samplesPerHour: 0`, `sufficient: false`,
+`anchorSource: "default"` — and the card renders **Good / Steady / 50** with a colour-coded label, a
+bar filled to 50%, and no "Limited data" badge. The badge is gated on `hasData`
+(`body-battery-card.tsx:95`), so the qualification gets *weaker* as the data gets worse: too few
+samples shows the warning, none at all shows nothing.
+
+Everything else on that screen degrades correctly for the same account — streak `—days`, the week grid
+`—` on all seven days, the score chip row absent, and `/health/readiness` reading `—`. Readiness is the
+number Body Battery opens at, by the card's own explainer. **This does not reopen Q-43** (degrade
+rather than blank): the app already computes "I cannot support this number" and already has the
+component to say so. [`Review sweep 42 §2`](docs/reviews/2026-09-03-first-run-honesty-and-instant-paint.md).
+**Web build only.**
+
+### [devices][app-shell] ⚠️ The `/more/devices` ring card flashes a skeleton on a warm repeat visit (RV-39, 2026-09-03)
+
+Measured on a second visit to an already-compiled route: `[1,1,0,0]` skeletons at 250/600/1200/2500 ms,
+against `[0,0,0,0]` on all 13 other sub-routes. Under a second, and filed because the rule has no
+threshold. The existing `expectNoSkeleton` helper polls to 20 s, so it catches *never seeds* and is
+blind to this class. **Needs the device** — the ring card's real state is BLE, unreachable on web.
+[`§3`](docs/reviews/2026-09-03-first-run-honesty-and-instant-paint.md).
+
 ### [nutrition][app-shell] 🔴 Nutrition never asks what day it is on resume, so a log after midnight lands on yesterday (RV-35, 2026-09-03)
 
 The tab shell is persistent, and Nutrition's midnight branch keys on `tabEpoch` — which the shell

@@ -450,6 +450,57 @@ daytime values. Readiness for the 27th was computed from a nap that did not happ
 **Back-fill is required, not optional:** the 27th's stored summary is wrong on disk, so a corrective
 recompute has to run over the affected days once the selection is fixed.
 
+### [readiness][app-shell] RV-38 — Body Battery prints 50 and calls it "Good" for an account that has never worn anything
+
+- **Lane:** B — `components/body-battery-card.tsx` only. The route needs no change; it is already correct.
+- **Added:** 2026-09-03, Review sweep 42 —
+  [`write-up §2`](reviews/2026-09-03-first-run-honesty-and-instant-paint.md)
+- **The route is honest and the card ignores it.** `GET /api/body-battery` for the zero-data account:
+  `{"current":50,"label":"Good","trend":"steady","hasData":false,`
+  `"confidence":{"sampleCount":0,"samplesPerHour":0,"sufficient":false},"anchor":50,`
+  `"anchorSource":"default"}`. Four fields say it has nothing. The card renders **Good / Steady / 50**
+  with a colour-coded label, a bar filled to 50%, and **no "Limited data" badge** (asserted: count 0).
+- **Why the guard misses.** `body-battery-card.tsx:95` — `const lowData = battery.hasData && conf !=
+  null && !conf.sufficient`. The badge is gated on `hasData`, so the qualification gets *weaker* as
+  the data gets worse: enough samples → no badge (right); too few → "Limited data" (right); **none at
+  all → no badge**. `hasData` is otherwise used only to gate the expanded chart (line 164), so the
+  collapsed card has no path that can say there is nothing behind the number.
+- **The contrast is on the same screen, same account.** Streak `—days`; the week grid `—` on all seven
+  days; the Readiness/HR/Sleep chip row absent entirely; `/health/readiness` reads `—`. Only Body
+  Battery prints a figure — and Readiness is the number it *opens at*, per the card's own explainer.
+- **Do not reopen Q-43.** That decision (degrade rather than blank) stands and this does not depend on
+  it. The narrow point: the app already computes "I cannot support this number", already has a
+  component that says so, and does not use it in the case where it is most true. Minimum fix is
+  dropping `battery.hasData &&` from line 95. **Whether no-data deserves something stronger than the
+  "Limited data" badge — an `—` like Readiness — is the owner's call**, so put it to them rather than
+  picking one. `/health/heart-rate` is the reference for the stronger posture: it prints `—` for
+  min/avg/max and names the estimate outright (*"Working max: 190 bpm (age-estimated)"*).
+- **While in this file:** the comment at lines 134–139 says the explainer paragraph *"only renders in
+  the NO-DATA state"*, two lines below the Q-276 note saying it is *"always visible"*. The JSX is
+  unconditional and it was observed rendering for the seeded user too. Delete the stale half.
+- **How to test locally:** the harness's `ZERO_DATA_STORAGE_STATE` account, `/`, asserting the API's
+  `hasData: false` beside what the card renders. Assert the **payload next to the text** — a rendered
+  50 alone cannot distinguish a bug from a fixture.
+- **Verify:** owner — whether the no-data treatment reads right to them on Home.
+
+### [devices][app-shell] RV-39 — the `/more/devices` ring card flashes a skeleton on a warm repeat visit
+
+- **Lane:** B — the ring card on `/more/devices`.
+- **Added:** 2026-09-03, Review sweep 42 —
+  [`write-up §3`](reviews/2026-09-03-first-run-honesty-and-instant-paint.md)
+- Measured on a second visit to an already-compiled route, skeletons in the viewport at
+  250/600/1200/2500 ms: **`/more/devices` = `[1,1,0,0]`**. All 13 other sub-routes measured
+  `[0,0,0,0]`. The element is `rounded-2xl bg-muted/40 border border-border h-[68px] animate-pulse`
+  under the `RING` heading, resolving to *"Oura Ring 5 — No data yet"* in ~1.2 s.
+- **Under a second, and filed anyway** because `CLAUDE.md` states the rule without a threshold — *"A
+  skeleton flash on a repeat visit is a bug"* — and the fix is the one the rule names: seed from
+  `readCacheSync` before first paint.
+- **Note the existing guard cannot see this class.** `expectNoSkeleton` polls to a 20 s budget, so it
+  catches *never seeds* and is blind to *flashes for a second*. Sampling at fixed early offsets sees
+  both; if this is guarded, guard it that way.
+- **Verify:** device — the ring card's real state is BLE, which the web build cannot reach at all, so
+  a web-green paint says nothing about what the APK shows here.
+
 ### [nutrition][app-shell] RV-35 — Nutrition never asks what day it is on resume, so it files breakfast against yesterday
 
 - **Lane:** B — `app/nutrition/nutrition-content.tsx` only.

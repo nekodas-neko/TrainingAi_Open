@@ -7032,3 +7032,29 @@ one). A one-line version of that entry would read as a confirmed bug.
 
 The correction folded into BF-100's existing entry adds six lines and removes a false statement that
 would otherwise tell the next session Nutrition is already covered.
+
+## 2026-09-03 — Review sweep 42 (RV-38, RV-39)
+
+`docs/implementation-backlog.md` 16044 → 16095 (+51), `projectOverview.md` 9642 → 9666 (+24),
+`docs/agents/state/review.md` 173 → 178 (+5).
+
+RV-38's length is the evidence and cannot be shortened without becoming an assertion. The finding is
+not "the card shows a wrong number" — 50 could be right — it is that the **route reports `hasData:
+false`, `sampleCount: 0`, `sufficient: false` and `anchorSource: "default"` while the card prints
+Good / Steady / 50**, so the payload has to sit in the entry beside the rendering. The line naming
+`body-battery-card.tsx:95` and the three-row table of how the badge behaves as data gets worse is
+what stops the implementer re-deriving why an existing guard does not fire; without it the obvious
+reading is that no guard exists. The paragraph refusing to reopen Q-43 is there because
+degrade-rather-than-blank is a settled owner decision that this entry sits next to and does not touch.
+
+RV-39 is under a second of skeleton and would be easy to file as one line. The two lines that earn
+their place are the measurement (`[1,1,0,0]` against `[0,0,0,0]` on thirteen siblings — a single
+number proves nothing) and the note that `expectNoSkeleton` polls to 20 s and is structurally blind
+to this class, which is the difference between "add a guard" and "add a guard the existing helper
+cannot express".
+
+**The baton grew because it now carries two sweeps rather than one**, and everything compressible was
+cut first: the sweep-40 narrative went to two bullets, the ID-trap paragraph lost its history, the
+"where the sweeps live" section lost the parts the pillar indexes already answer, and the Now section
+was rewritten from four bullets to three. What is left is state — which lenses are closed, which are
+owed, and the four method notes that cost a sweep each to learn.

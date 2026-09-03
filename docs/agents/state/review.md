@@ -5,8 +5,8 @@
 > 🔴 handed on) and is the only part that moves. A session self-titles 🟢 on its first instruction and
 > flips itself to 🔴 as the last step of its handoff, after the baton and every PR have landed.
 
-**Updated:** 2026-09-03 · **By:** forty-one sweeps (2026-08-17 ×2, 2026-08-18 ×37, 2026-08-20 ×1,
-2026-09-03 ×1) · **Next ID: `RV-38`.**
+**Updated:** 2026-09-03 · **By:** forty-two sweeps (2026-08-17 ×2, 2026-08-18 ×37, 2026-08-20 ×1,
+2026-09-03 ×2) · **Next ID: `RV-40`.**
 
 > **Sweep 40's run is closed and nothing is owed from it** — RV-32, RV-33, RV-34 all shipped, verified
 > in source rather than taken from the closure note, and their `projectOverview.md` row is in
@@ -25,10 +25,9 @@ files, and every finding is a `projectOverview.md` row or a queue entry.
 `RV-<n>`, counting up forever. No band, no pointer, no ledger.
 `grep -rhoE '\bRV-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`.
 
-Two traps in that command, both hit: `docs/agents/README.md` and `docs/implementation-backlog.md` carry
-**`RV-31` as a prose example**, not an entry. Sweep 40 started at **RV-32** anyway rather than at the
-`RV-1` its predecessor recorded — following the documented lookup beats being clever about it, and
-skipped numbers cost nothing. Legacy `Q-` numbers stay valid where already used and are never renumbered.
+One trap in that command: `docs/agents/README.md` and `docs/implementation-backlog.md` carry
+**`RV-31` as a prose example**, not an entry. Follow the lookup anyway — skipped numbers cost nothing.
+Legacy `Q-` numbers stay valid where already used and are never renumbered.
 
 ## Still open — do not re-file these
 
@@ -37,41 +36,45 @@ From sweeps 29–39
 **Q-499** (self-fetching cards vanish on a failed fetch — its ten unverified candidates are a
 *worklist*, not a defect count), **Q-555** (offline, a tab tap is a silent no-op before the service
 worker claims the page), **Q-556** (`DELETE /api/activity-logs` reports success for a row it did not
-delete). From sweep 41: **RV-37**, which needs the device.
+delete). From sweeps 41-42: **RV-37** and **RV-39**, both needing the device.
 
 **One surface is explicitly unverified, not clean:** `PATCH /api/activity-logs/<id>/metrics` — its
 probe payload was rejected by Zod before the ownership check ran, so its cross-user behaviour is
 **unknown**. Neither sweep 40 nor 41 reached it.
 
-## Now — sweep 41 filed (2026-09-03)
+## Now — sweeps 41 and 42 filed (2026-09-03). **Next ID: `RV-40`.**
 
-**Lens:** the owner's, not the Next list — *"mobile UI like safe spaces and pressing back and
-returning to scroll location, as well as caching; and loading saved caches which should be changing"*.
-Write-up:
-[`2026-09-03-nutrition-day-rollover-and-scroll-coverage.md`](../../reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md).
-**RV-35, RV-36, RV-37 filed. Next ID: `RV-38`.**
+Both ran the owner's lens (mobile UI: safe area and back-and-return scroll; plus cache staleness),
+not the Next list. **41** →
+[write-up](../../reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md), RV-35/36/37.
+**42** → [write-up](../../reviews/2026-09-03-first-run-honesty-and-instant-paint.md), RV-38/39.
 
-Three things from it that are *state*, not story:
+- **A guard that exists is not a guard that reaches — all five findings are this.** `useLocalDay()`
+  (BF-86) has 3 consumers; `useScrollRestoration` (BF-100) rides `pull-to-sync.tsx`, which 3 screens
+  use; `tabs-instant-paint.spec.ts` guards the 5 screens that never unmount and none of the ~20 that
+  do; the "Limited data" badge is gated on `hasData`, so the no-data case cannot reach it. **Grep the
+  call sites; never infer coverage from a mechanism's existence.**
+- **The zero-data account reaches a state nothing else can** and was pointed at 2 screens. All 22 took
+  one loop and found RV-38 at once. Re-run it whenever a scoring surface changes — the seeded user has
+  data for everything, so a fabrication is invisible there.
+- **Assert the payload beside the rendered text, and count requests by the DATE they carry.** "The card
+  shows 50" is not a finding; "the route says `hasData: false` and the card shows 50" is. Health
+  reissued 11 requests on resume and only 3 carried the new day — a raw count would have been wrong
+  three ways.
 
-- **The persistent shell is the bug generator, and both findings are the same shape:** a hook built
-  once, wired into one place, described as global. `useLocalDay()` (BF-86) has **3** consumers;
-  `useScrollRestoration` (BF-100) is called from `pull-to-sync.tsx`, which **3** screens use. Assume
-  nothing about a tab is covered because a mechanism for it exists — grep the call sites.
-- **Count requests by the DATE they carry, never by how many there are.** Health reissued 11 requests
-  on resume and only 3 carried the new day. A raw count would have produced three wrong conclusions.
-- **Two lenses closed clean:** all seven `freshWithinTtl` sites have every writer in a group (the
-  baton had these unaudited), and `check-fetch-once-effects.js`'s CAN-BITE group is **empty**.
-
-**Still open from this sweep:** RV-37 needs the device and cannot be settled here.
+**Closed clean, do not re-sweep:** the seven `freshWithinTtl` sites (every writer is in a group);
+`check-fetch-once-effects.js`'s CAN-BITE group (empty); instant paint on the sub-routes (13 of 14);
+the first-run render (21 of 22 routes). **Still owed:** RV-37 and RV-39 need the device, RV-38's
+stronger-treatment question needs the owner.
 
 ## Carried from sweep 40 ([write-up](../../reviews/2026-08-20-non-workout-write-surface-ownership.md))
 
 - **✅ Ownership rule (b) is clean with evidence** — 116 mutating routes, 325 `.set()` sites, all built
   field by field. **Rule (a) is the only one of the three still with none.**
-- **A cheap contrast beats a long argument.** All of RV-32 was one row of a table: *same value, same
-  resource, same session — PUT 400, POST 201.* Sweep 41 used the same move twice (`/more` restores
-  840, `/nutrition` returns 0; Home rolls the day over, Nutrition does not). Find the surface that
-  already does the thing correctly before writing a paragraph about why it should.
+- **A cheap contrast beats a long argument.** RV-32 was one table row: *same value, same resource, same
+  session — PUT 400, POST 201.* Sweeps 41–42 used the move four more times (`/more` restores 840 and
+  `/nutrition` returns 0; Home rolls the day over and Nutrition does not; streak says `—` and Body
+  Battery says 50). Find the surface that already does it right before arguing that it should.
 
 ## Next — in the order they are worth doing
 
@@ -91,8 +94,10 @@ left three CI checks behind (`check-known-issue-duplication`, `check-index-doc-p
   and Q-313 (no `next build` gate in the publish dry-run) is why it is worth doing.
 - **The sync/outbox under a server that fails mid-push, on the device half.** Sweep 10 drove the
   server half; the local SQLite outbox has never been exercised, and it needs hardware.
-- **Q-452's siblings** — only the four `AiInsightCard` sections were checked for absent-vs-zero;
-  `weekly-digest` and the coach were not.
+- **Q-452's siblings — partly done by sweep 42, and what remains is narrower.** All 22 routes were
+  driven as the zero-data account and are honest bar RV-38, so the *rendering* half is swept. Still
+  untouched: `weekly-digest` and the coach, neither of which produces output for a zero-data account
+  and so cannot be reached that way — they need a **partial**-data fixture, which does not exist yet.
 
 ## Blocked
 
@@ -112,9 +117,9 @@ None. This role's PRs are docs-only.
 
 - Authority limits and the lane contract are settled in [`docs/agents/README.md`](../README.md).
 - **Queue position is priority; the ID is not.** An `RV-32` above a `Q-331` is deliberate.
-- **Before writing a surface off as unreachable, spend ten minutes trying.** Three separate "structurally
-  untested" items on this baton's own list turned out to need one env var, one `context.setOffline(true)`,
-  and an account the harness already had. **Three for three.**
+- **Before writing a surface off as unreachable, spend ten minutes trying. Five for five now** — one env
+  var, one `context.setOffline(true)`, an account the harness already had, `page.clock` for crossing
+  midnight (sweep 41), and that same zero-data account pointed at 22 routes instead of 2 (sweep 42).
 
 ## Method notes — do not re-derive these
 
