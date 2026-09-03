@@ -121,28 +121,6 @@ jobs:
       - name: Seed the test user and program
         run: psql "$DATABASE_URL" -f scripts/local-db/seed.sql
 
-      # Q-250. `next start` sets NODE_ENV=production, and `instrumentation-node.ts` HARD-FAILS the
-      # boot there when the Oura model constants are absent — deliberately, and the gate is
-      # NODE_ENV rather than "are the storage credentials set", so that a production deploy which
-      # lost its bucket variables fails instead of quietly serving nothing. That gate is right and
-      # must not be relaxed: the fixtures fallback is production-gated for the same reason.
-      #
-      # So this job satisfies the check honestly rather than defeating it — it stages the committed
-      # SYNTHETIC fixtures into the tree path the loader already reads. Every key is real and every
-      # number is fake, which is irrelevant here: this job asserts SQLite migration behaviour and
-      # never reads a model output.
-      #
-      # Without this the server booted, threw in the instrumentation hook, and answered every
-      # request with a 500 — so the WebView showed an error page, the sign-in form never rendered,
-      # and the failure read as "Maestro cannot see the form".
-      - name: Stage synthetic model constants (the boot gate is production-hard)
-        run: |
-          mkdir -p lib/oura-models/constants
-          cp lib/oura-models/__fixtures__/constants/* lib/oura-models/constants/
-          echo "staged $(ls lib/oura-models/constants | wc -l) synthetic constant files"
-
-      # 10.0.2.2 is the emulator's alias for the host loopback. cleartext is required because this
-      # is plain http; it is set only on this throwaway build and never on the shipped config.
       - name: Point the build at the host loopback instead of Railway
         run: |
           node - <<'EOF'
@@ -162,6 +140,8 @@ jobs:
           EOF
           grep -n "url:\|cleartext:" capacitor.config.ts
 
+      # Still built, because `npx cap sync` copies `www/` into the APK. The SERVER below is `pnpm
+      # dev`, not this build's output — see the step's own note.
       - name: Build the app
         run: pnpm build
 
@@ -173,9 +153,27 @@ jobs:
       # here that must not be used: it awaits lookupLatestApkRelease(), an outbound call to the
       # GitHub Releases API, before it responds. With no GITHUB_RELEASES_TOKEN in CI that call is
       # slow or hangs, so the probe timed out against a server that had been up for a minute.
+      # Q-250: `pnpm dev`, NOT `pnpm start`, and this is the load-bearing choice in the whole job.
+      #
+      # `next start` sets NODE_ENV=production, and `instrumentation-node.ts` has TWO gates that are
+      # fatal there: model constants, and model assets. The first has an honest local substitute
+      # (committed synthetic fixtures). **The second does not** — `checkModelAssets` asks object
+      # storage and has no tree fallback at all, so a production-mode server cannot boot on a runner
+      # with no bucket credentials. Measured across two runs: constants staged, assets still fatal.
+      #
+      # Both gates are correct and neither is relaxed. They key on NODE_ENV rather than on whether
+      # credentials are set, precisely so a production deploy that lost its storage variables fails
+      # instead of quietly serving degraded sleep staging — the fail-open shape CLAUDE.md forbids.
+      # Adding a CI escape hatch to `fatalOrLoud` would be exactly that shape and is not done here.
+      #
+      # A dev server sidesteps both without touching either: outside production the same gates say
+      # so loudly and continue, and `ensureConstantsAvailable` reaches its documented fixtures
+      # fallback on its own. Nothing this job asserts is affected — it checks that local SQLite
+      # migrations apply inside a real Android WebView, which is identical either way. The cost is a
+      # slower first paint, which the 120 s probe and the flow's 120 s waits already absorb.
       - name: Start the server
         run: |
-          pnpm start > /tmp/next-server.log 2>&1 &
+          pnpm dev > /tmp/next-server.log 2>&1 &
           SERVER_PID=$!
           for i in $(seq 1 120); do
             if ! kill -0 "$SERVER_PID" 2>/dev/null; then
