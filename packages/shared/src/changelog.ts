@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.2",
+    date: "2026-09-03",
+    changes: [
+      "A night from the Colmi ring was recorded as 19 hours of sleep. The ring tells us how long its sleep record is, and that length can be longer than the record \u2014 the leftover bytes decoded as three stretches of four and a quarter hours each, through the middle of a working day. The night was 8.9 hours. Readings that came from those leftover bytes have been removed, and the ring's sleep now stops where the real record does.",
+    ],
+  },
+  {
     version: "1.436.1",
     date: "2026-09-02",
     changes: [
