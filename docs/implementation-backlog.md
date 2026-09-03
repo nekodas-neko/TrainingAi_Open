@@ -10502,6 +10502,52 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   (Recovery Index anchor) both feed `sr`. All 13 rows predate both, and the direction is *downward* on
   the term that is currently saturating. See Q-501 for why stored rows have not moved yet.
 
+### [platform][devices] LA-56 — the full-history redecode has never once completed, and "abandoned" is a guess
+
+- **Branch:** `fix/redecode-job-heartbeat` · **Lane:** A
+- **Added:** 2026-09-02 · found when the owner ran the pass TN-1 and Q-525 have been waiting on.
+- **Measured — every attempt that has ever existed has failed the same way.** `oura_redecode_jobs`
+  holds exactly two rows, both `fullHistory: true`, both `result: null`:
+
+  | job | started | finished | elapsed | error |
+  |---|---|---|---|---|
+  | 1 | 2026-08-30 05:14:03 | 05:44:47 | **30m44s** | abandoned |
+  | 2 | 2026-09-03 02:30:47 | 03:00:57 | **30m10s** | abandoned |
+
+  Both land on `REDECODE_JOB_STALE_MS = 30 * 60_000` to within a poll interval, which is what a
+  deadline looks like rather than what a crash looks like.
+- **Neither wrote anything.** Across job 2's window (02:30 → 03:05), rows updated in
+  `oura_daily_summary`: **0**; in `oura_daily_derived`: **0**. The summary's last write was 02:21 —
+  *before* the job started — and the derived table's next was 03:11, after it closed, with **0** raw
+  rows ingested between 02:50 and 03:15, so that was a page load rather than the job finishing late.
+- **"Abandoned" is inferred from age, never observed.** `reapStaleRedecodeJobs` is a pure
+  `startedAt < now − 30min AND finished_at IS NULL` update. **There is no heartbeat**, so a healthy
+  run at minute 31 and a process that died at minute 2 are the same row. The message it writes —
+  *"the process most likely restarted mid-run"* — is the reaper's guess, and this entry exists
+  because it has been read as a fact twice.
+- **⚠ And a reaped job can never record a late success.** `finishRedecodeJob` filters
+  `isNull(finishedAt)`, which the reaper has already set. So if a run DOES complete after being
+  reaped, its result is discarded and the work lands with the job row still saying it was abandoned —
+  the one state that is worse than either truth.
+- **The 30-minute window is plausibly just too short.** The synchronous path's own measured note
+  records a completed run at **`scanned=1098158`** — 1.1M rows re-decoded, with every
+  `sleep_sessions` row stamped *after* the gateway had already returned 502. That is the scale this
+  window is guarding, and nothing has ever shown the work fitting inside it.
+- **⚠ The synchronous path has NO in-flight guard.** It bypasses `startRedecodeJob` entirely, so the
+  one-at-a-time partial unique index does not apply to it. Two sync runs are two concurrent
+  full-history passes — the event-loop starvation the async path's own comment names as what took
+  production down on 2026-08-13. **Anyone using the sync path as a workaround must run it once.**
+- **First action: make the reaper able to tell slow from dead**, before touching the window. A
+  heartbeat the worker stamps (a `last_beat_at` column, reaped on beat age rather than start age)
+  turns an inference into an observation, and is the same shape as TN-1 — persist the thing that
+  makes the failure visible before changing the behaviour it hides. Then let `finishRedecodeJob`
+  close a row the reaper already closed, so a late success is recorded instead of discarded.
+- **Do NOT simply raise `REDECODE_JOB_STALE_MS`.** Without a heartbeat that trades a false failure
+  for a longer false success, and the one-at-a-time index means a genuinely dead job then blocks
+  every retry for the new window instead of the old one.
+- **Verify:** device
+- **Gate:** owner
+
 ### [devices][readiness] Q-509 — the BLE-era Recovery Index refit lands at 3.31 h against a shipped anchor of 5: the input moved, not the physiology
 
 - **Branch:** `fix/ble-recovery-index-hours-bias`

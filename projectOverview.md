@@ -1555,7 +1555,7 @@ Last swept **2026-09-02**.
 
 | What | Why it needs you | Where it is recorded |
 |---|---|---|
-| **Run a `fullHistory` rollup pass** | It is the only path that reaches the chronic-stress model, so `chronic_stress_granular_nights` (TN-1) stays NULL until one runs — and that column is the only thing that can say *why* chronic stress has never scored. **≥ 21 with a null score puts the fault inside the vendored model; < 21 names the granular stash.** | TN-1, Q-525 |
+| **Run a `fullHistory` rollup pass** | ⚠ **ATTEMPTED 2026-09-03 AND IT CANNOT COMPLETE — see LA-56.** Both attempts that have ever existed were reaped as "abandoned" after exactly 30 minutes having written nothing. The workaround is the **synchronous** path (`POST /api/oura-ble/samples/redecode` with no `async=1`), which its own measured note says completes at `scanned=1098158` while the gateway 502s — **run it once only**, it has no in-flight guard. | TN-1, Q-525, LA-56 |
 | **Decide the rest/active HR anchor** | **Freeze at a dated constant (recommended) or move to a 90-day trailing mean.** The 90-day option moves the at-rest share **14.9% → 25.9% on 56 of 57 days** — a Body Battery re-levelling, not a stability fix. Structural: a longer window always sits above a shorter one while fitness improves. | Q-515, [review](docs/reviews/2026-09-02-hr-rest-anchor-level-shift.md) |
 | **An S25 smoke run** | Local SQLite **v34 + v35 + v36** have never been opened on a device. v35 and v36 are plain ADD COLUMNs, but they sit behind v34's table rebuild, so a device upgrading from v33 runs all three in one pass. | Known Issues, three rows |
 | **The PS-17 back-fill** | `POST /api/oura-ble/samples/redecode` is admin-session gated. Also recovers two of PS-19's seven nights. | PS-17, PS-19 |
