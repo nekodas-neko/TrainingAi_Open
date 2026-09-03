@@ -7521,3 +7521,29 @@ sweep, and BF-86's caution is vindicated rather than overturned. The length that
 worth more than they cost: `localDay` is seeded synchronously so a naive effect double-fetches on
 every launch, and `sleep-sessions` is explicitly outside the tick (Q-91), which would leave last
 night's sleep stale on exactly the rollover where it matters most.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17278 (BF-118, the User Information section)
+
+A feature request rather than a fault, and the length is mostly the trace that changes what the work
+is. The owner asked for a place to put documents and free text that every AI surface then reads; five
+of the six things he listed already have stores (`injuries`, `dexa_scans`, `measured_rmr`,
+`blood_panels`, `blood_analytes`), the upload pipeline is already queued as BF-41, and the flagship
+example he gave — a lumbar constraint stopping the builder programming deadlifts — **shipped on
+2026-08-31 as BF-68**, from a near-identical sentence. He has not seen it because BF-68's UI half was
+deferred. So the entry's job is to say that the missing piece is not storage but a single shared
+assembler, with `formatInjuryContext` as the working prototype and the measured fact that nutrition
+and the AI routes import none of these stores. The rest is the design decision the entry exists to
+force — structured records can be enforced by filtering the candidate list, prose can only be handed
+to a model, and BF-68 already measured that as "luck rather than a rule" — plus three traps that would
+otherwise be discovered late: crop-before-upload on an X-ray that carries more identifiers than an RMR
+printout, BF-41's standing decision that no source document is stored, and the existing `schedules`
+table being training structure rather than availability.
+
+The +50 that followed came from the owner refining the intake to a blurb router in the same sitting,
+and it earns its lines by being traced fragment by fragment against his own example sentence: of the
+four things in it, the injury and the food exclusion have structured homes (and the injury is
+*enforced*, not merely stored), while work availability and training experience have none. That ratio
+is the finding — a router is worth exactly as much as its destination registry, and "other notes" is
+the honest fallback rather than the target. The sharpest line recorded is that enforcement cuts both
+ways: because an injury removes exercises from the candidate list, a wrongly-routed one silently
+deletes training options, which makes the confirm step load-bearing rather than polite.
