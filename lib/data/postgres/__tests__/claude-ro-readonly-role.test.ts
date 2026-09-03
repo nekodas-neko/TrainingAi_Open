@@ -9,7 +9,8 @@
 //   4. ROW SCOPING — a second user's health data is invisible. Production holds several real
 //      accounts with months of sleep/weight/food data; they cannot consent on the owner's behalf.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { Client } from 'pg'
+import { Client, Pool } from 'pg'
+import { migrationTestLock } from './migration-test-lock'
 import { readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
 
@@ -79,7 +80,26 @@ async function errorFrom(sql: string): Promise<string | null> {
 }
 
 describe.skipIf(!canRun)('claude_readonly role — the read-only guarantee', () => {
+  // PS-23. This file applies a whole views migration, and every one of them opens with
+  // `DROP SCHEMA IF EXISTS claude_ro CASCADE`. That is a global, table-wide rewrite in exactly the
+  // sense `migrationTestLock` was built for — it destroys the schema and every GRANT on it,
+  // including grants held by a *different* test's role, mid-run. The symptom in
+  // `db-snapshot-integration.test.ts` was `permission denied for schema claude_ro`, and worse, a
+  // **false schema-drift error naming an innocent column**: `information_schema.columns` is
+  // privilege-filtered, so losing the grant mid-read does not raise — the columns just stop being
+  // listed and `checkDrift` blames whatever it reaches first.
+  //
+  // ⚠ The rename in that file (its own `claude_ro_snapshot_test` role) was necessary and is NOT
+  // sufficient, which is where PS-23's own proposed fix stopped: renaming removes the role as a
+  // shared resource, but the *schema* is shared too and no rename reaches it. Measured — with the
+  // rename alone, 3 of 5 paired runs still failed on the grant.
+  const lock = migrationTestLock(() => pool)
+  let pool: Pool
+
   beforeAll(async () => {
+    const { getPool } = await import('@/lib/data/postgres/client')
+    pool = getPool()
+    await lock.acquire()
     await exec(ADMIN_URL!, DROP_ROLE_SQL)
     await exec(ADMIN_URL!, `
       CREATE ROLE claude_readonly LOGIN PASSWORD '${RO_PASSWORD}';
@@ -121,6 +141,9 @@ describe.skipIf(!canRun)('claude_readonly role — the read-only guarantee', () 
 
   afterAll(async () => {
     if (canRun) await exec(ADMIN_URL!, DROP_ROLE_SQL).catch(() => {})
+    // Released last, and after the teardown: the schema this file rebuilt must stay excluded until
+    // its own role is gone, or the next file in can observe the half-torn-down state instead.
+    await lock.release()
   })
 
   it('returns ZERO rows when the owner setting is absent — fail-closed (Q-456)', async () => {
