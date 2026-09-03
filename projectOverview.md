@@ -1753,6 +1753,18 @@ evening sync. BLE does not exist in the sandbox, so the timer, the visibility li
 where Sync is not pressed and that day's stress still reaches the database past 18:00 — the previous
 days stop dead at 06:30 and 17:30.
 
+### [devices] ⚠️ The Colmi ring's decode moved to the server and has not run on the device (PS-21 Stage A, 2026-09-03)
+
+v1.436.4 posts the ring's raw frames and decodes them server-side. Proved equivalent to the old
+client decode over a real 31-frame sync — 209 received, 167 accepted, **166 stored rows identical
+field for field** between the two paths — but against the local dev database, over frames replayed
+from the archive rather than a ring.
+- **What has not run:** an actual sync from the phone. The pairing card's counts now come from
+  response fields (`received`, `decodedBy`) that did not exist before, so a WebView holding an older
+  bundle than the deploy would show zeros while the rows still land. `decodedBy` says which side read
+  the bytes, which is how to tell those apart rather than guessing from counts.
+- **The check:** one Sync on the S25. Readings stored > 0, and `decodedBy` reads `server`.
+
 ### [nutrition][devices] ⚠️ The Coach plan card's save took the web fallback, not the offline-first path (LA-47, 2026-09-02)
 
 **Shipped and exercised end-to-end; one half of the write is unseen.** A real Gemini turn called
