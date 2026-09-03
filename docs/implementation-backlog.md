@@ -6930,6 +6930,25 @@ without a queue entry is a dropped finding.*
 
 ### [sleep][platform] LB-53 — `oura_daily_derived` is written in occasional bulk passes, not per night
 
+> **✅ THE QUESTION THIS ENTRY SAID TO MEASURE FIRST IS ANSWERED (2026-09-03): the scores go STALE,
+> they are not ABSENT.** `created_at` on `oura_daily_derived` runs one row per day, each created the
+> day after the night it describes — 2026-08-22 created day 08-23, 08-23 created 08-24, unbroken
+> through 2026-09-02 creating 09-03 — with one catch-up of 5 rows on 2026-08-17. So a row exists from
+> the morning after, and it then holds its first value until a bulk pass rewrites it. Nothing was
+> missing during the nine-day gap. **That settles which of the two failure modes this is**, and it is
+> the less alarming one: no screen was ever blank, but a screen could show a days-old score.
+>
+> **The "four stamps in the whole history" reading is stale and the shape is different now.** As of
+> 2026-09-03 there is a bulk pass at **07:00:15Z** rewriting ~30 days in a single ~50 ms burst, and a
+> single-row write at **08:00:09Z** for that day only. So both cadences exist — an incremental
+> per-day write and an occasional whole-history rewrite. Re-read the stamps before building; this
+> entry's table was one snapshot.
+>
+> **The deploy hypothesis is NOT confirmed and should not be carried as if it were.** The 21:55 pass
+> landing minutes after #827 is one coincidence, and today's 07:00:15 bulk pass does not line up with
+> a merge (#838 merged 07:49, #839 later). Whatever schedules the bulk pass, a deploy is not
+> obviously it. Establish the trigger before designing around it.
+
 - **Lane:** A — the rollup (`lib/oura-ble/rollup/**`) and whatever schedules it. Found from Lane B
   while checking Q-529's own caveat; filing rather than building, per the lane rule.
 - **Added:** 2026-09-02 · measured against production while answering Q-529's *"re-read `computed_at`
@@ -11006,6 +11025,91 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [platform][devices] LA-56 — the full-history redecode has never once completed, and "abandoned" is a guess
 
+> **⚠ MEASURED 2026-09-03 — "abandoned" is NO LONGER a guess, and the workaround does not work
+> either.** The entry hedged because `reapStaleRedecodeJobs` is a pure `started_at` age check with no
+> heartbeat, so a reaped job might have been slow rather than dead. Production settles it.
+>
+> **`replaceOuraDailySummary` — the full-history write path — is `DELETE` all rows + `INSERT` all
+> rows in one transaction.** So a completed full-history pass leaves every row sharing ONE
+> `created_at`. That is the measurement this entry was missing, and it needs no instrumentation.
+>
+> | reading, 2026-09-03 08:35Z | value |
+> |---|---|
+> | `min(created_at)` on `oura_daily_summary` | **2026-08-17 07:50:31Z** |
+> | distinct `created_at` stamps across 59 rows | **17**, not 1 |
+> | `max(updated_at)` | 2026-09-03 06:59:31Z — *before* the 08:00 attempt started |
+>
+> Seventeen stamps means the table has been assembled night by night by `upsertOuraDailySummary`
+> ever since. **The last full-history redecode that completed was 2026-08-17**, which is exactly the
+> pass Q-535 measured at `scanned=1098158`. Since then there have been **three attempts and three
+> nothings**: the async jobs of 2026-08-30 and 2026-09-03 03:00 (both reaped at 30 minutes, no rows),
+> and the owner's **synchronous** run at ~08:00 on 2026-09-03, which had written nothing 35 minutes
+> later. The synchronous path is the documented workaround, and it is now measured not to work.
+>
+> **⚠ This retires the standing advice.** Both this entry and `projectOverview.md`'s
+> **Waiting on the owner** row told the owner to run the synchronous path "once only" because its own
+> note recorded it completing behind the 502. That note was true **on 2026-08-17** and is not true
+> now. Do not send anyone to that workaround again until this is understood.
+>
+> **The regression window is one day wide, and there is a candidate.** The last success was
+> 2026-08-17; the packing work landed **2026-08-18** — `oura_raw_packed`'s first pack carries that
+> date, and Q-541 Task 7 made `measured_at`/`event_name` derived the same day, removing the row-walk
+> that used to dominate. So the re-aggregate now reads a store that did not exist when it last
+> succeeded. **State this as a lead, not a cause** — it is a correlation across a model change, which
+> is the trap `docs/data-layer-rules.md` names; nothing here has profiled the re-aggregate.
+> **The next step is a measurement, not a fix:** run the full-history re-aggregate against a copy
+> with timing per phase, or add phase timings behind the existing job row, and find where it stops.
+> The heartbeat this entry already owes would answer "is it alive?" for free, which is now the more
+> valuable half of it rather than the optional one.
+>
+> **Not yet checked:** whether the process is alive and slow, or dead. Distinguishing those is
+> precisely the heartbeat, and until it exists this measurement says only that the work does not
+> land, never why.
+> **✅ ANSWERED THE SAME SESSION — the rollup worker is losing its DATABASE CONNECTION, and
+> `error_events` had it the whole time.** The session-start ritual read turned up a live fault four
+> minutes after the owner's 08:00 attempt:
+>
+> ```
+> url:     /api/oura-ble/samples#aggregate
+> at:      2026-09-03 08:04:43Z
+> message: Failed query: select "started_at", "completed_at" from "workout_sessions" …
+>            caused by: Connection terminated due to connection timeout
+>            caused by: Connection terminated unexpectedly
+> stack:   at Worker.<anonymous> (/app/.next/server/chunks/1706.js)
+> ```
+>
+> `at Worker.<anonymous>` places it **inside the rollup worker thread**. The only other fault ever
+> recorded at that url is **2026-08-17 11:33** — the same cause chain, hours after the last
+> full-history pass that ever completed. Two data points, both bracketing the regression.
+>
+> **The cause chain is the diagnostic, and it exists because someone already fixed the blind spot.**
+> `rollup-worker-entry.ts`'s `msg()` walks `.cause` precisely because on 2026-08-17 a redecode failed
+> three times and the only recoverable detail was the SQL text. Without that walk this entry would
+> still be guessing.
+>
+> **Two candidate mechanisms, and this does NOT choose between them:**
+> 1. **The worker's event loop is blocked long enough for the connection to die.** The full-history
+>    pass decodes ~1M samples in JS *inside the worker*; a pg client that cannot service its socket
+>    gets dropped, and the next query finds a dead connection. `Connection terminated unexpectedly`
+>    is that shape, not a statement timeout (which reports as *canceling statement*).
+> 2. **Pool self-contention.** `connectionTimeoutMillis: 5_000` against `max: 10`, and the worker
+>    has its **own** pool — a worker thread carries its own module registry, so `getPool()` there is
+>    a second Pool, not the main process's.
+>
+> **Ruled out: the Postgres server.** `max_connections` is **500** with **11** in use. This is
+> client-side, inside our own pool, not the instance.
+>
+> **What this changes about the fix.** The heartbeat this entry owes would report the run as dead
+> rather than merely stale — worth having — but it treats the symptom. The pass is dying on
+> infrastructure ceilings (`statement_timeout: 15_000`, `idle_in_transaction_session_timeout: 15_000`,
+> `connectionTimeoutMillis: 5_000`) that a whole-archive walk cannot respect. ⚠ **Those three
+> settings are load-bearing and must not simply be raised** — `CLAUDE.md`'s pool section records that
+> both took production down in session 165. The direction is to make the pass fit the ceilings
+> (chunk the read, release the connection between chunks) rather than raise them for everyone.
+>
+> **Still not checked:** which of the two mechanisms it is. That wants a timed run, and it is the
+> next measurement.
+
 - **Branch:** `fix/redecode-job-heartbeat` · **Lane:** A
 - **Added:** 2026-09-02 · found when the owner ran the pass TN-1 and Q-525 have been waiting on.
 - **Measured — every attempt that has ever existed has failed the same way.** `oura_redecode_jobs`
@@ -11065,7 +11169,54 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Verify:** device
 - **Gate:** owner
 
+### [readiness][devices] LA-57 — night HRV roughly DOUBLED at the re-key, and only its presence was ever checked
+
+- **Lane:** A — `lib/oura-ble/rollup/**` and the decoder that produces `hrv_avg_ms`.
+- **Added:** 2026-09-03 · found while closing Q-509's candidate 3 ·
+  [`review`](reviews/2026-09-03-recovery-index-remainder-and-hrv-step.md)
+- **Measured.** `claude_ro.body_metrics` either side of the 2026-07-07 re-key: mean HRV
+  **26.9 ms (Cloud, n=14) → 55.9 ms (BLE, n=59)**. Per night, pre-boundary values run **20–39** and
+  post-boundary **40–56**, with no return and no overlap to speak of. A doubling within days is a
+  measurement-definition change, not physiology.
+- **Why it survived six weeks of looking.** The BLE input-drift review
+  ([2026-08-18](reviews/2026-08-18-ble-era-input-drift.md)) checked `hrv_avg_ms` for **presence**
+  (18/18 rows) and never for **scale**. A column that is populated on every night looks healthy.
+- **Why it matters.** `hrv_avg_ms` feeds the readiness composite's `hrvBalance` **and** the rolling
+  personal baseline. The baseline absorbs a level shift eventually — but for the weeks it took, a
+  Cloud-scaled baseline was compared against BLE-scaled inputs, which produces systematically high
+  HRV z-scores. **Whether that happened, and over how many nights, is not answered.** That is the
+  first thing to establish.
+- **The likely mechanism is already a named trap in `CLAUDE.md`:** *"HRV used `Sdnn` instead of
+  `Rmssd`"*. Verify which statistic each side computes against the pinned sources — the `open_oura`
+  Rust source for the BLE decoder, the archived Cloud field for the other — rather than assuming.
+- **⚠ Do NOT "correct" the BLE scale to match Cloud without deciding which is right.** RMSSD and SDNN
+  are both legitimate; the defect is two scales behind one column and one baseline, not the value of
+  either. A rescale is also a rewrite of stored history, which is the destructive half.
+- **Not yet checked:** the mechanism, the number of nights affected, and whether
+  `sleep_sessions.average_hrv_ms` and `oura_daily_derived` carry the same step.
+- **Verify:** device
+
 ### [devices][readiness] Q-509 — the BLE-era Recovery Index refit lands at 3.31 h against a shipped anchor of 5: the input moved, not the physiology
+
+> **⚑ CANDIDATE 3's NATURAL READING IS REFUTED (2026-09-03) —**
+> [`review`](reviews/2026-09-03-recovery-index-remainder-and-hrv-step.md). If the remaining ~0.39 h
+> were *a real change over the six weeks*, the series would be moving. Over **58 BLE-era nights** it
+> is flat: OLS slope **−0.0055 h/night**, Pearson **r = −0.060** (r² = 0.004), halves 2.803 → 2.612
+> against a per-night sd of ~1.59. The remainder was there on the first BLE night and has not grown.
+> **This needed no reconstruction harness** — the question is about a series, not a night.
+> ⚠ It does **not** refute candidate 3 outright: a change that happened **at** the re-key and then
+> held reads flat too. What is excluded is a *gradual* six-week change.
+>
+> **And the inputs did step at the re-key.** `body_metrics` either side of 2026-07-07: RHR
+> **65.7 → 53.8 bpm**, HRV **26.9 → 55.9 ms**. Per night, pre-boundary HRV runs **20–39** and
+> post-boundary **40–56**, never returning. ⚠ **The RHR half is NOT clean** — it was already falling
+> through late June (70 → 61), so some of that is plausibly real; the **HRV** step is the sharp one
+> and the one coincident with the device change.
+>
+> **Both prohibitions are strengthened, not weakened: do not widen `MEDIAN_WINDOW`, do not move
+> `RECOVERY_INDEX_OPTIMAL_HOURS`.** The entry's title is now supported by a second independent
+> measurement rather than the anchor-ratio argument alone, and a constant moved to absorb an
+> input-scale change bakes the change in.
 
 - **Branch:** `fix/ble-recovery-index-hours-bias`
 - **⚑ TWO OF THE THREE REMAINING CANDIDATES ARE NOW CLOSED (2026-09-02)** —
@@ -12415,6 +12566,34 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 
 ### [platform][readiness] Q-278 — a score that could not be computed is rendered identically to a score of 76
+
+> **✅ THE OPEN QUESTION IS ANSWERED (2026-09-03, Lane A) — and the answer is that it is the wrong
+> question to encode.** The ⚠ below asks *"decide whether they are pillars before generalising a
+> coverage representation over five of them"*. **Don't decide. Key the representation on the metric
+> the caller is rendering, not on a fixed pillar list.** A tile asking "why is there no daytime-stress
+> value today?" gets an answer without anyone having to rule on whether daytime stress is a pillar,
+> and a sixth metric later costs nothing. Enumerating pillars in a type forces a taxonomy ruling that
+> has no consequence for the user and would have to be re-litigated the next time a metric is added.
+> Cheap to reverse — it is a type shape, not a schema.
+>
+> **Verified against the code, so the implementer does not repeat it:**
+> - `lib/health/score-availability.ts` is **74 lines** and readiness-only, exactly as the entry says.
+>   `scoreAvailability(present)` reports which *inputs* fed a score that **was** computed; there is no
+>   representation for "no score exists for this day". The premise holds.
+> - **Its only real consumer is `lib/health/readiness-payload.ts:708`**, which flattens it into four
+>   response fields (`inputsAvailable`/`inputsMissing`/`scoreConfidence`/`limited`).
+>   `components/health/readiness-breakdown.tsx` imports the `ReadinessInputKey` *type* only. So the
+>   blast radius of generalising it is one route payload, not a sweep — smaller again than the ⚠
+>   already made it.
+> - **Scope item 3 is half-built already.** `provisional` (computed from a cold baseline) exists
+>   **per contributor** in `readiness-composite` and is read by `packages/shared/src/health/score-audit/readiness.ts`.
+>   The absent/provisional distinction therefore needs promoting to the metric level, not inventing.
+>
+> **⚠ The real risk on this entry is a taxonomy nothing can populate.** The obvious design is an
+> absence-reason enum (`no_source` / `awaiting_baseline` / `below_gate` / `not_yet`). Before writing
+> one, check that each producer can actually distinguish those cases at the point it returns null —
+> for the activity score it is not obvious that it can. **Build the enum from what the producers can
+> report, not from what reads well**, or the UI gains a "why" field that always says the same thing.
 
 - **Branch:** `feat/score-coverage-surfacing`
 - **Plan:** none yet

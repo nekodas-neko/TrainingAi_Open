@@ -7183,6 +7183,46 @@ just deleting it is what stops a later session restoring it from the prose that 
 The `Math.round` note in the journal is the third thing worth its length: a surviving mutation that
 turned out to be a real off-by-one on some values, not a gap in the tests.
 
+---
+
+## 2026-09-03 — `docs/implementation-backlog.md` 16398 → 16458 (LA-56 + LB-53 measurements, Lane A)
+
+Two production measurements, onto two entries, on the same branch because they came from the same
+half-hour of queries and neither is code.
+
+**LA-56 (+43).** The entry hedged that "abandoned" was an inference, because the reaper is a pure
+start-age check with no heartbeat. It is now a measurement, and the lines that earn their space are
+the *method*: `replaceOuraDailySummary` deletes and reinserts every row, so a completed full-history
+pass leaves one shared `created_at`. There are 17, and the oldest is 2026-08-17. That is a way of
+dating the last successful pass that needs no instrumentation and would otherwise have to be
+rediscovered, and it is the reason the entry can now state three failed attempts rather than suspect
+them.
+
+The rest is a **retraction**, which is why it is emphatic rather than brief: both this entry and the
+owner-facing table told the owner to run the synchronous path as a workaround, on the strength of a
+note that was true on 2026-08-17 and is not true now. A workaround that silently does nothing is
+worse than none, because the 502 looks identical either way. Retractions get written at the length it
+takes for the next reader not to re-adopt the advice.
+
+**LB-53 (+17).** Its own "measure this first" question — stale scores or absent rows — is answered
+(stale; rows are created the morning after, unbroken). Also two corrections: its four-stamp table is a
+stale snapshot, and the deploy hypothesis it floats does not survive today's data. Recording that a
+hypothesis failed is worth more than the lines it costs, because the alternative is the next session
+building around it.
+
+`projectOverview.md` is unchanged in length — the **Waiting on the owner** row was rewritten in place
+from "run it once only" to "do not attempt".
+
+Same day, `docs/implementation-backlog.md` 16458 → 16502: the root cause turned up in `error_events`
+an hour after the entry above was written, so LA-56 gained the fault verbatim (url, cause chain,
+`at Worker.<anonymous>`) rather than a paraphrase. The cause chain is the whole value — the message
+alone says only which query failed — and it exists because `rollup-worker-entry.ts`'s `msg()` walks
+`.cause` after 2026-08-17's three failures recovered nothing but SQL text. Quoting it in full is what
+lets the next session match a new fault against it without re-querying production.
+
+The two candidate mechanisms are written as candidates, and the warning not to simply raise
+`statement_timeout`/`connectionTimeoutMillis` is written beside them, because that is the obvious fix
+and `CLAUDE.md` records that those settings took production down in session 165.
 ## 2026-09-03 — Review sweep 45 (RV-42)
 
 `docs/implementation-backlog.md` 16398 → 16429 (+31), `projectOverview.md` 9725 → 9742 (+17),
@@ -7206,7 +7246,7 @@ state. **The next session that touches it should make a structural cut rather th
 incremental one**: the "Now" section's method bullets and the standing "Method notes" section are
 converging on the same list and should become one.
 
-## 2026-09-03 — `docs/implementation-backlog.md` 16429 → 16500 (+71), `projectOverview.md` 9742 → 9765 (+23), PS-21 Stage A / PS-22 / PS-23
+## 2026-09-03 — `docs/implementation-backlog.md` 16429 → 16680 (+71 here, rebased onto a larger main), `projectOverview.md` 9742 → 9765 (+23), PS-21 Stage A / PS-22 / PS-23
 
 Two additions and one edit. The new backlog entry is PS-22 — a fifth of every Colmi sync's
 heart-rate log is discarded as future-dated. The lines that earn their place are the ones separating
@@ -7232,3 +7272,41 @@ and a revoked grant reads as a missing column rather than an error. Those lines 
 symptom is worth more than the fix, which is a rename.
 
 Both raised slightly above the exact count so a small follow-up does not need its own note.
+---
+
+## 2026-09-03 — `docs/implementation-backlog.md` 16561 → 16580 (Q-509 + LA-57, Lane A)
+
+A new entry (LA-57) plus Q-509's candidate-3 result. The measurement worth its lines is the negative
+one: over 58 BLE-era nights `recovery_index_hours` has OLS slope −0.0055 h/night and r = −0.060, so
+the remaining 0.39 h was there on the first BLE night and has not grown. Recording *how* that was
+established matters as much as the number — the previous two rounds built a frame-decoding
+reconstruction harness because they were asking about individual nights, and a question about a
+series needs two aggregate queries instead.
+
+The caveat that it does **not** refute candidate 3 outright — a change that happened AT the re-key
+and then held reads flat too — is one line and prevents the entry being closed on this evidence.
+
+LA-57's length is mostly prohibition. The obvious response to "BLE HRV is double Cloud HRV" is to
+rescale it, and that is wrong twice over: RMSSD and SDNN are both legitimate so the defect is two
+scales behind one column, and a rescale rewrites stored history. Both are written down beside the
+finding rather than left to be re-derived by whoever picks it up.
+
+Also recorded: the 2026-08-18 input-drift review checked HRV for **presence** and never for
+**scale**, which is how a doubled input survived six weeks of review in its own area. That sentence
+is the transferable one.
+## 2026-09-03 — `docs/implementation-backlog.md` 16533 → 16561 (Q-278, Lane A)
+
+Twenty-eight lines answering the open question Q-278 could not start without — *are daytime stress
+and resilience "pillars"?* — with the finding that it is the wrong question to encode: key the
+representation on the metric being rendered and the ruling never has to be made.
+
+The rest is measurement that stops the next implementer repeating an hour of reading:
+`score-availability.ts` is 74 lines with exactly **one** real consumer (`readiness-payload.ts:708`,
+flattening it into four response fields), so generalising it is a one-payload change rather than the
+sweep the entry implies — the second time this entry has turned out smaller on inspection. And
+scope item 3's absent/provisional split is already half-built, per-contributor, in
+`readiness-composite`.
+
+The warning about building an absence-reason enum from what reads well rather than from what the
+producers can report is the line most likely to save real work: it is the failure mode that turns a
+"why" field into a constant.
