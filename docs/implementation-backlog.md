@@ -896,8 +896,53 @@ on either screen says a word about it, so the more prominent number is the one t
 
 ### [sleep] BF-115 — the hypnogram is missing from the sleep tile's detail, and there are three sleep rows for that date
 
-- **Lane:** A — the duplicate rows are the storage half and have to be understood before the surface
-  is touched. The render condition is B's, but it may need nothing.
+> **✅ ROOT CAUSE FOUND (2026-09-03, Lane A). The three rows are CORRECT DATA, the storage is fine,
+> and the remaining fix is one import in a Lane B file.**
+>
+> **1. The rows are a night and two naps, not duplicates.** Converted to Brisbane, 2026-09-03 holds
+> `ble:51136441` **22:16 → 06:21** (7.67 h, phase 97 — the real night), `ble:51614985` **11:33 →
+> 13:58** (2.00 h, phase 29) and `ble:51827985` **17:28 → 19:35** (1.83 h, phase 26). A midday and an
+> early-evening sleep. Nothing is wrong with storing them. **19 dates carry more than one row,
+> spanning 2026-05-29 → 09-03**, so this is longstanding, not a regression — and 2026-08-27 in that
+> list is PS-17's own phantom date.
+> ⚠ **These are NOT PS-17's mechanism.** PS-17 blames `ALWAYS_NIGHT_MIN_HOURS = 4` short-circuiting
+> the circadian check; both fragments here are **under** 4 h, so that escape hatch never fired. Same
+> family, different cause — do not close one on the other's evidence.
+>
+> **2. The route is already correct.** `/api/sleep-sessions` runs `mergeByDate`, whose
+> `primaryCluster` keeps the longest row plus anything within `CONTIGUOUS_GAP_MS` (1 h). The 11:33
+> nap sits ~8 h from the night and the 17:28 one ~2 h 41 m before it, so **both are dropped** and the
+> route returns the 7.67 h row with its 97-character phase string. Nothing to fix here.
+>
+> **3. The defect is the LOCAL-FIRST read path, which bypasses that merge entirely.**
+> `health-content.tsx:230` reads `store.getSleepSessions(cutoffStr)` and line 299 pushes the result
+> straight into state — `setSleepRows(localSleep as unknown as SleepRow[])`. **Raw per-cluster rows,
+> never merged.** So the sheet receives all three, finds the entry for the date, and lands on a
+> fragment whose 29- or 26-character phase string and tiny stage hours fail both the hypnogram
+> condition and the proportion-bar fallback. That is exactly the reported symptom.
+>
+> **This is also why it is device-only and why two surfaces disagree.** `getLocalStore` returns null
+> in the web sandbox, so on `pnpm dev` the sheet only ever sees the merged server rows and the bug is
+> invisible; on the APK the local seed paints first. The Body tab's card is fed through a path that
+> does merge, which is the "two surfaces, same date, different rows" the entry noticed.
+> **The `as unknown as SleepRow[]` double cast the entry flagged is the enabling mistake** — it
+> silences the fact that a local row and a merged `SleepRow` are different things with different
+> semantics, not just different shapes.
+>
+> **The fix, and it is small: run the local rows through the same `mergeByDate` before setting
+> state.** It is already exported from `lib/sleep/merge-sessions.ts` and importable from client code,
+> so no Lane A change is needed — this is One Formula, One Place, with the second caller simply
+> missing. **Re-laned to B**: the only edit is in `app/health/health-content.tsx`.
+> ⚠ Check the other three consumers of `/api/sleep-sessions` for the same local-seed shape while
+> there — `session-select-content.tsx` (3 sites) and `health/sleep/sleep-content.tsx` (2 sites) —
+> that is the sibling sweep this belongs to.
+>
+> **Not verified:** the device. The reasoning above is read from source and from production rows;
+> that the sheet renders correctly once merged is BF-115's own device check, unchanged.
+
+- **Lane:** B — **re-laned 2026-09-03.** It was A while the duplicate rows were unexplained; they
+  now are, the storage is correct and the route is correct, and the only edit left is one import in
+  `app/health/health-content.tsx`.
 - **Added:** 2026-09-03 · owner: *"the sleep hypnogram still does not work on days when accessed from
   the sleep tile."* Screenshot: the detail sheet for 2026-09-03 showing every stat and **no Sleep
   Stages section at all** — neither the hypnogram nor the proportion-bar fallback.

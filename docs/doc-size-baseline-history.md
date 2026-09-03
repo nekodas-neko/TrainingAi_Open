@@ -7414,3 +7414,22 @@ top-down skips it. Same shape as the `Verify:` misuse corrected the day before: 
 BF-69 gains a pointer to it. Worth recording that BF-112 was itself first filed with a `Reference:`
 bullet — which files an entry as *"read by other entries, never next"* — and landed in the REFERENCE
 section, the exact failure it was written to correct; the plan link moved into prose.
+
+---
+
+## 2026-09-03 — `docs/implementation-backlog.md` 16923 → 16968 (BF-115, Lane A)
+
+Forty-five lines on a root cause, and they replace an investigation rather than adding to one. BF-115
+asked why a date carried three sleep rows before anyone touched the sheet — the right question, and
+the answer is that **the rows are correct**: a night plus two naps, on one of 19 dates spanning
+2026-05-29 → 09-03. The route is correct too; `mergeByDate`'s `primaryCluster` already drops both
+fragments. The defect is that the local-first seed pushes raw rows into state without that merge.
+
+The three lines most worth their space are the ones that stop a wrong fix: **do not treat this as
+PS-17** (its `ALWAYS_NIGHT_MIN_HOURS = 4` short-circuit cannot have fired — both fragments are under
+4 h, and 2026-08-27 appearing in both lists invites exactly that conflation); **do not "fix" the
+sheet's selection**, which would paper over a missing merge; and **do not fix storage**, which is
+doing the right thing. Each is a plausible next step that the measurement rules out.
+
+Also recorded: this is device-only because `getLocalStore` returns null in the sandbox, so a green
+`pnpm dev` proves nothing about it — the reason the entry keeps its device check.
