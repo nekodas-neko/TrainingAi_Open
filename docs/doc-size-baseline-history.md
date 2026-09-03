@@ -7058,3 +7058,17 @@ cut first: the sweep-40 narrative went to two bullets, the ID-trap paragraph los
 "where the sweeps live" section lost the parts the pillar indexes already answer, and the Now section
 was rewritten from four bullets to three. What is left is state — which lenses are closed, which are
 owed, and the four method notes that cost a sweep each to learn.
+
+## 2026-09-02 — `docs/implementation-backlog.md` → (see .size), `projectOverview.md` → (see .size) (LA-56)
+
+A new entry, filed the moment the owner ran the pass three docs had been waiting on and it failed.
+The lines that earn their place are the ones separating what was observed from what was inferred:
+both jobs stopped at the staleness window to within a poll interval, neither wrote a row, and the
+reaper's *"the process most likely restarted mid-run"* is a **guess** — it is a pure age check with
+no heartbeat. That sentence has now been read as a fact twice.
+
+Two warnings are load-bearing rather than cautious. `finishRedecodeJob` filters `isNull(finishedAt)`,
+so a run that completes after being reaped discards its own result — the work lands while the record
+says it was abandoned. And the synchronous workaround has **no in-flight guard**, so a second press
+is two concurrent full-history passes, which is the starvation that took production down on
+2026-08-13.
