@@ -7547,3 +7547,17 @@ is the finding — a router is worth exactly as much as its destination registry
 the honest fallback rather than the target. The sharpest line recorded is that enforcement cuts both
 ways: because an injury removes exercises from the candidate list, a wrongly-routed one silently
 deletes training options, which makes the confirm step load-bearing rather than polite.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17318 (BF-118, the capture pattern and prompts)
+
++40 onto BF-118, and the reason they are worth it is that they **correct the entry's own earlier
+recommendation**. It had said to ship the typed blurb before the image path because the image half
+needs an upload surface; tracing the surface the owner pointed at shows that half is already built —
+`/api/nutrition/scan` takes image, mimeType and text in one call and sanitises the text, and
+`capture-actions.tsx` has camera, gallery and a note field, complete with a `CameraSource.Camera`
+detail fixed once already under BF-50. What the image path actually owes is the **crop step**, which
+exists nowhere in the app and is the owner's own PII rule. The ship order stands and its reason does
+not, which is the kind of thing worth writing down rather than quietly leaving. Also recorded: do not
+add an `imageKind` and route medical images through the food scan route — same surface, different
+sensitivity class and different retention decision — and the prompts are best generated from the
+destinations that are still empty, since a fixed chip row is decoration by the second visit.

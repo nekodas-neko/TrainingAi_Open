@@ -886,6 +886,46 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
 >   forms (BF-71) already exist and the router should *prefill* them, exactly as BF-41 specifies for
 >   extraction — the router is another way into the same forms, never a parallel write path.
 
+> **⚑ REFINED AGAIN 2026-09-04 — copy the food capture surface, and add prompts.** Owner: *"id like
+> it to be like the ai food upload where I can upload images and then type the text. maybe some
+> promps would be good like 'when can you train?' etc."*
+>
+> **The pattern he is pointing at exists and is proven, which CORRECTS this entry's earlier
+> sequencing note.** That note said to ship the typed blurb first because the image path needs an
+> upload surface; the upload surface is the cheap part:
+> - **`/api/nutrition/scan` already takes `image` + `mimeType` + `text` in ONE call** — an image with
+>   an optional note, or text alone, which is exactly the shape asked for. It also **sanitises the
+>   free text**: control characters stripped, capped at 500. Copy that hardening rather than
+>   re-deriving it.
+> - **`components/nutrition/capture-actions.tsx`** is the UI — camera, gallery, and a `photoNote`
+>   field beside the image. It carries an owner-driven detail worth keeping: `CameraSource.Camera`,
+>   **not `Prompt`** (BF-50 ③), because the prompt variant *"first opens the screen for /From…"*.
+>   Re-deriving that would reintroduce a papercut already fixed once.
+>
+> **So the real cost of the image path is the CROP STEP, which does not exist anywhere.** BF-1's rule
+> is the owner's own — crop before upload, because extraction sends the image to Google and redacting
+> afterwards is too late — and no surface in the app implements it today. That, not the picker, is
+> what the image half owes. **Ship order is unchanged, but for a corrected reason:** typed blurb
+> first because it needs no crop step, not because the upload UI is expensive.
+>
+> **⚠ Do not route medical images through `/api/nutrition/scan`.** It discriminates on `imageKind`
+> and adding one more looks like the cheap path, but a food label and a spinal X-ray are different
+> sensitivity classes with different retention rules, and BF-41's *"no source document is stored"*
+> decision belongs to the clinical pipeline rather than the food one. Copy the surface; do not share
+> the route.
+>
+> **The prompts are the destination registry made visible, and that is the argument for them.**
+> *"When can you train?"* is the availability destination asking for itself; a blank box gets a blurb
+> about whatever is top of mind, and a prompt gets the field that is actually empty. **No
+> suggested-prompt pattern exists in the app today** — `mood-checkin-sheet.tsx`'s "suggestions" are
+> sore-muscle chips, a different thing — so this is new UI, but small.
+> - **Best value: prompt for what is MISSING, not a fixed list.** The section knows which destinations
+>   are empty, so *"When can you train?"* should appear while availability is unset and stop once it is
+>   answered. A static row of chips becomes decoration on the second visit.
+> - Seed set, matching the destinations that exist or are named in this entry: when you can train ·
+>   anything you cannot eat · injuries or pain to work around · how long you have trained · anything
+>   else the app should know.
+
 
 - **Lane:** A for the store and the assembler; B for the section itself. **Needs a plan document
   before implementation** — this is a feature spanning five pillars, not a fix, and the backlog
