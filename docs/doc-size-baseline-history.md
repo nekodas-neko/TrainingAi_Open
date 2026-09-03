@@ -7448,3 +7448,21 @@ The last two lines are the ones that stop the entry being closed on this: **it d
 redecode.** The worker still loses its database connection. What changes is that the next failure
 names itself rather than being reconstructed from `created_at` arithmetic — which is how this
 entry's diagnosis was reached and is not a method anyone should need twice.
+
+---
+
+## 2026-09-03 — `docs/implementation-backlog.md` 16980 → 17028 (Q-250, Lane A)
+
+Forty-eight lines for four real emulator runs. They earn it by replacing an account of where the job
+stops that is now wrong in every particular: the entry said the gap was sign-in driving, and the
+first run's *"Sign in with email is not visible"* looked like exactly that. It was a dead server.
+
+The run table is the shape worth keeping — each row records what that run *established*, not what it
+did, so the next reader inherits four measurements rather than four failures. The two lines most
+likely to save real work are the ones that rule out plausible next steps: **do not relax either boot
+gate** (they key on NODE_ENV specifically so a production deploy that lost its storage variables
+fails loudly), and **settle host reachability before touching Maestro**, because the smoke script's
+reachability check has always been advisory and has never once confirmed the hop.
+
+Also recorded, because it caps anyone else's attempt the same way: the evidence needed next lives in
+the run artifact, and a session with no artifact download cannot open it.
