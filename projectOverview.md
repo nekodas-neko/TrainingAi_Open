@@ -26,8 +26,22 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.436.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.436.4 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-03.
+
+**About stops looking like it contradicts itself (BF-111).** The screen showed **v1.436.2** and, two
+rows below, a green tick reading *"Up to date — v1.414.1 is the newest build."* Both were right — the
+first is the web app, advanced by every deploy; the second is the newest APK — and nothing said so, so
+the tick appeared to vouch for the smaller number. Both are labelled now, and **every state names the
+INSTALLED build**, which is what answers *"has that native fix reached my phone?"*: the update state
+used to name a version the device does not have and say nothing about the one it does.
+**The date was already in the payload** — `/api/version` has returned `nativeBuiltAt` all along and
+the card dropped it. **That is the third entry today of that shape** (Q-529's `provisional`, Q-516's
+`informativeShare`), which is a class worth watching rather than three coincidences. Rendered through
+`toAestDay`, not `toLocaleDateString`, which would use the *device's* zone.
+**Not device-verified, and here that is the whole surface** — the card returns early off-native, so
+none of its three states has ever been on a screen
+([journal](docs/overview/entries/2026-09-03-bf-111-version-labels.md)).
 
 **The HR Recovery Profile now says how much of it is signal (Q-516).** `aggregateHrRecoveryProfile`
 has returned `informativeShare` since the re-banding and **nothing rendered it** — the state the

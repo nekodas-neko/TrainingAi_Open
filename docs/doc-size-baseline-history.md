@@ -7182,3 +7182,15 @@ just deleting it is what stops a later session restoring it from the prose that 
 
 The `Math.round` note in the journal is the third thing worth its length: a surviving mutation that
 turned out to be a real off-by-one on some values, not a gap in the tests.
+
+## 2026-09-03 — `projectOverview.md` → 9739, `docs/implementation-backlog.md` → 16407 (BF-111)
+
+Short additions, and the line that earns its place in both is the pattern rather than the fix: this is
+the **third** entry in one day where a value was computed, served, and read by nothing — Q-529's
+per-night `provisional` flag, Q-516's `informativeShare`, and now `nativeBuiltAt`. Recording it once,
+where the next session's orientation read will meet it, is cheaper than each of them being rediscovered
+as a surprise. The server half tends to ship with its consumer assumed.
+
+The `Gate: device` note is longer than a gate usually needs because this card is invisible off-native:
+`UpdateCheckCard` returns early unless `Capacitor.isNativePlatform()`, so "it renders nothing in the
+harness" is not a test result and a later session should not read the green suite as coverage.
