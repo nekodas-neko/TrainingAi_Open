@@ -450,6 +450,88 @@ daytime values. Readiness for the 27th was computed from a nap that did not happ
 **Back-fill is required, not optional:** the 27th's stored summary is wrong on disk, so a corrective
 recompute has to run over the affected days once the selection is fixed.
 
+### [nutrition][app-shell] RV-35 — Nutrition never asks what day it is on resume, so it files breakfast against yesterday
+
+- **Lane:** B — `app/nutrition/nutrition-content.tsx` only.
+- **Batch:** nutrition-tab-day-and-scroll
+- **Added:** 2026-09-03, Review sweep 41 —
+  [`write-up §2`](reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md)
+- **Measured, not inferred.** Five tabs loaded at 23:50 Brisbane under a fixed clock, clock advanced
+  30 minutes, `visibilitychange` dispatched. Dated requests before → after:
+  Home 4 → **2**, Health 3 → **3**, Nutrition **5 → 0**, Workout and More issue none either side.
+  Nutrition is the only tab that is day-scoped *and* fails to roll over.
+- **The part that is not cosmetic.** The header reads `Today` because
+  `formatDateLabel(selectedDate, todayStr)` prints it only when the two agree — and both are frozen at
+  the launch day, so there is no visible tell. `selectedDate` is also what a new log is written with
+  (`logDate` at `nutrition-content.tsx:716`, `selectedDateRef.current` on the delete path), so a
+  breakfast logged after midnight lands on the finished day and feeds its calorie budget and adherence.
+- **The existing guard is correct and unreachable.** `nutrition-content.tsx:311–326` already compares
+  `lastVisibleDayRef` against a fresh `todayInTz(tz)` and follows the day. Its deps are
+  `[tabEpoch, fetchData, tz]`, and the shell increments `tabEpoch` only when a tab is **re-shown** —
+  never on a resume-in-place. Switching tabs away and back does fix it, so this reads as intermittent.
+- **The fix is the hook that already exists.** `useLocalDay()` (`components/shell/local-day-provider.tsx`,
+  BF-86) re-evaluates on `visibilitychange` and is what `session-select-content.tsx` uses — the surface
+  that measured correct above. Add it to the dependency array; do not hand-roll a second listener, and
+  do not reach for an interval (BF-86's comment records why).
+- **Do not "fix" this by reloading on `visibilitychange`** — BF-80 rules that out; it costs the
+  instant-paint behaviour.
+- **How to test locally:** the clock recipe in §7 of the write-up — `page.clock.install` at 23:50
+  Brisbane, `fastForward`, dispatch `visibilitychange` — asserting a request dated the *new* day. The
+  mechanism is fully web-testable, so no `Gate:` is set.
+- **Verify:** device — the owner's real case is leaving the app open overnight on the S25 and logging
+  breakfast; confirm the header follows the date and the log lands on the new day.
+
+### [app-shell][nutrition] RV-36 — scroll restoration reaches 3 of 5 tabs; BF-100's entry says it reaches all of them
+
+- **Lane:** B — `app/nutrition/nutrition-content.tsx`, plus a correction to BF-100's entry above.
+- **Batch:** nutrition-tab-day-and-scroll
+- **Added:** 2026-09-03, Review sweep 41 —
+  [`write-up §3`](reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md)
+- **⚠ Correct BF-100's claim in the same PR.** That entry and the call site both say the hook is called
+  from `pull-to-sync.tsx` *"so every screen using the shell inherits it"*. Three screens use
+  `PullToSync` — `health-content`, `more-content`, `session-select-content`. The Nutrition tab owns its
+  own scroller (`nutrition-content.tsx:563`) and inherits nothing. Left as written, the next session
+  reads Nutrition as already handled.
+- **Measured**, with BF-100's own verified recipe (wheel scroll → in-app `router.push` → `goBack`):
+  `/more` → *Profile details* → back restores **840**; `/nutrition` → `/coach` → back saves **no**
+  `ta_scroll:` key and returns **0**.
+- **The gap is one path, not many — this was counted.** Restoration only matters where a user pushes
+  deeper and returns. Every other routable screen that scrolls at the mobile viewport
+  (`/health/sleep` 1200 px, `/health/heart-rate` 661, `/cardio` 374, `/config` 148, `/program` 148)
+  contains **no** `router.push` or `<Link>` to a deeper route — they are leaves, and re-entering one is
+  a fresh arrival that correctly starts at the top. `/workout-select` does not scroll at all. So the
+  live gap is Nutrition's single deeper push, `/coach?scope=nutrition`.
+- **The fix is one hook call**, not a `PullToSync` wrap: `useScrollRestoration(ref)` takes a ref and
+  nothing about it is tab-specific. Wrapping Nutrition in `PullToSync` would also give it a
+  pull-to-refresh gesture nobody asked for.
+- **How to test locally:** extend `e2e/scroll-restoration.spec.ts` with the `/nutrition` → `/coach` →
+  back case. Keep its precondition assertions — BF-100 records four spec traps that all report
+  `expected 840, received 0`, and a fifth this sweep paid for: `page.goto()` is a hard navigation, so
+  React cleanup never runs and **no** screen saves an offset.
+- **Verify:** device — the system back gesture on the S25, which is the gesture BF-100 was reported
+  against and the one the harness cannot send.
+
+### [app-shell][platform] RV-37 — `/health/day` scrolls with no bottom padding (structural; NOT observed)
+
+- **Lane:** B — `app/health/day/day-detail-content.tsx:226`
+- **Gate:** device
+- **Added:** 2026-09-03, Review sweep 41 —
+  [`write-up §4`](reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md)
+- The container is `flex-1 space-y-4 overflow-y-auto scrollbar-hide px-4 pt-4` — no `pb-*` at all. It
+  is a sub-route, so no bottom nav and nothing anchored below it; the last card ends flush with the
+  viewport bottom, which on the S25's gesture navigation is the gesture bar.
+- **⚠ This was NOT observed and must not be closed as if it were.** The seeded fixture renders
+  *"Nothing logged on this day"*, so the container never became scrollable. The control on `/more`
+  measured `padding-bottom: 68px` (`pb-nav-safe`), which is what a covered scroller looks like.
+- **Why no CI rule caught it.** All four safe-area rules in the *Custom Rules* job fire on a **wrong**
+  utility (hand-rolled inset, `pt-safe` stacking, `pb-safe*` stacking, raw `bottom-N` on a fixed
+  element). None fires on an **absent** one. Worth considering a fifth rule, but only after the device
+  confirms the symptom — a check for "full-height scroller with no bottom pad" would need an
+  allow-list for the sheets and navless full-screens that legitimately have none.
+- **How to confirm the symptom:** open `/health/day` on the S25 on a day with enough logged to make
+  the container scroll, and check whether the last card clears the gesture bar. The `Gate: device`
+  above is exactly that — nothing here can start until the device says the symptom is real.
+
 ### [nutrition] BF-109 — the Review sheet's macro/calorie cross-check (shipped; a real scan and the device owed)
 
 - **Lane:** B — `components/nutrition/review-step.tsx` and `macro-calorie-warning.tsx`. The shared
@@ -849,6 +931,13 @@ feature and not a deletion like LB-41:
   `lib/hooks/use-scroll-restoration.ts`, called once from `pull-to-sync.tsx` so every screen using
   the shell inherits it rather than 62 separate fixes. `e2e/scroll-restoration.spec.ts` is **green**
   against a cold harness server.
+- **⚠ "every screen using the shell inherits it" is WRONG — corrected 2026-09-03 (Review sweep 41).**
+  Every screen using **`PullToSync`** inherits it, and three screens use it: `health-content`,
+  `more-content`, `session-select-content`. The **Nutrition tab owns its own scroller**
+  (`nutrition-content.tsx:563`) and inherits nothing — measured, `/nutrition` → `/coach` → back saves
+  no `ta_scroll:` key and returns 0, against `/more`'s 840. Filed as **RV-36**, which also records why
+  the live gap is only that one path. The hook itself is fine and takes a ref; it is simply not called
+  anywhere else.
 - **⚠ An earlier version of this entry claimed tab-to-tab was broken. Retracted.** A tab-to-tab move
   loses nothing: the shell keeps every tab screen mounted, so the container holds its own `scrollTop`
   unaided — measured, with Health's container still reading 840 while the URL was `/nutrition`. The

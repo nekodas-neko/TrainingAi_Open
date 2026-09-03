@@ -5,21 +5,18 @@
 > 🔴 handed on) and is the only part that moves. A session self-titles 🟢 on its first instruction and
 > flips itself to 🔴 as the last step of its handoff, after the baton and every PR have landed.
 
-**Updated:** 2026-08-24 (session closed) · **By:** forty sweeps (2026-08-17 ×2, 2026-08-18 ×37,
-2026-08-20 ×1) · **Next ID: `RV-35`.**
+**Updated:** 2026-09-03 · **By:** forty-one sweeps (2026-08-17 ×2, 2026-08-18 ×37, 2026-08-20 ×1,
+2026-09-03 ×1) · **Next ID: `RV-38`.**
 
-> **The run that produced sweep 40 is closed.** Its record, including the paste-ready pickup prompt,
-> is [`docs/handoff-2026-08-24-workouts-review-sweep-40-write-surface.md`](../../handoff-2026-08-24-workouts-review-sweep-40-write-surface.md).
-> **All three of its findings — RV-32, RV-33, RV-34 — shipped and are closed**, re-verified in source
-> on 2026-08-24 rather than taken from the closure note, and their `projectOverview.md` row was moved
-> whole to [`known-issues-resolved.md`](../../overview/known-issues-resolved.md). Nothing is owed from
-> that sweep.
+> **Sweep 40's run is closed and nothing is owed from it** — RV-32, RV-33, RV-34 all shipped, verified
+> in source rather than taken from the closure note, and their `projectOverview.md` row is in
+> [`known-issues-resolved.md`](../../overview/known-issues-resolved.md). Record, with its pickup
+> prompt: [`handoff-2026-08-24-…-sweep-40-write-surface.md`](../../handoff-2026-08-24-workouts-review-sweep-40-write-surface.md).
 
-**This baton was rewritten from 1,280 lines to this on sweep 40** (PS-4's complaint: no baton fits on a
-screen). Nothing was lost — every sweep's narrative is in its own `docs/reviews/` write-up, indexed from
-the eleven `docs/domains/*/README.md` files, and every finding is in `projectOverview.md` or the queue.
-**A baton carries state, not history.** Keep it this length: replace §Now each sweep, and let the
-write-up hold the story.
+**A baton carries state, not history** — it was 1,280 lines before sweep 40 cut it. Keep it to a
+screen: replace §Now each sweep and let the write-up hold the story. Nothing is lost by doing so —
+every sweep has its own `docs/reviews/` write-up, indexed from the eleven `docs/domains/*/README.md`
+files, and every finding is a `projectOverview.md` row or a queue entry.
 
 ---
 
@@ -33,45 +30,48 @@ Two traps in that command, both hit: `docs/agents/README.md` and `docs/implement
 `RV-1` its predecessor recorded — following the documented lookup beats being clever about it, and
 skipped numbers cost nothing. Legacy `Q-` numbers stay valid where already used and are never renumbered.
 
-## Previous run closed 2026-08-20 — read this before filing anything
+## Still open — do not re-file these
 
-The run of sweeps 29–39 (PRs #140–#151) was closed by its own wrap-up, and its record is
-[`docs/handoff-2026-08-20-platform-review-sweeps-29-39.md`](../../handoff-2026-08-20-platform-review-sweeps-29-39.md).
-**10 of its 13 findings have since shipped** (verified in source, not inferred from the queue's
-silence): Q-493, Q-494, Q-495, Q-496, Q-497, Q-498, Q-492, Q-552, Q-553, Q-554 — their
-`projectOverview.md` rows are in the resolved archive.
+From sweeps 29–39
+([record](../../handoff-2026-08-20-platform-review-sweeps-29-39.md); 10 of its 13 findings shipped):
+**Q-499** (self-fetching cards vanish on a failed fetch — its ten unverified candidates are a
+*worklist*, not a defect count), **Q-555** (offline, a tab tap is a silent no-op before the service
+worker claims the page), **Q-556** (`DELETE /api/activity-logs` reports success for a row it did not
+delete). From sweep 41: **RV-37**, which needs the device.
 
-**Three remain open — do not re-file them:** **Q-499** (self-fetching cards vanish on a failed fetch;
-its ten unverified candidates are a **worklist, not a defect count**), **Q-555** (offline, a tab tap
-is a silent no-op before the service worker claims the page), **Q-556** (`DELETE /api/activity-logs`
-reports success for a row it did not delete).
+**One surface is explicitly unverified, not clean:** `PATCH /api/activity-logs/<id>/metrics` — its
+probe payload was rejected by Zod before the ownership check ran, so its cross-user behaviour is
+**unknown**. Neither sweep 40 nor 41 reached it.
 
-**One surface that run left explicitly unverified, not clean:**
-`PATCH /api/activity-logs/<id>/metrics` — its probe payload was rejected by Zod before the ownership
-check ran, so that route's cross-user behaviour is **unknown**. Sweep 40 did not reach it either.
+## Now — sweep 41 filed (2026-09-03)
 
-## Now — nothing in flight
+**Lens:** the owner's, not the Next list — *"mobile UI like safe spaces and pressing back and
+returning to scroll location, as well as caching; and loading saved caches which should be changing"*.
+Write-up:
+[`2026-09-03-nutrition-day-rollover-and-scroll-coverage.md`](../../reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md).
+**RV-35, RV-36, RV-37 filed. Next ID: `RV-38`.**
 
-The next session is **awaiting the owner's instructions**, by the closing session's request: read the
-orientation docs, summarise where things stand, and wait rather than picking a lens. The sweep-40
-record below is history, kept because its Next list is still the best answer to "what is worth doing".
+Three things from it that are *state*, not story:
 
-## Sweep 40 (2026-08-20) — closed, all findings shipped
+- **The persistent shell is the bug generator, and both findings are the same shape:** a hook built
+  once, wired into one place, described as global. `useLocalDay()` (BF-86) has **3** consumers;
+  `useScrollRestoration` (BF-100) is called from `pull-to-sync.tsx`, which **3** screens use. Assume
+  nothing about a tab is covered because a mechanism for it exists — grep the call sites.
+- **Count requests by the DATE they carry, never by how many there are.** Health reissued 11 requests
+  on resume and only 3 carried the new day. A raw count would have produced three wrong conclusions.
+- **Two lenses closed clean:** all seven `freshWithinTtl` sites have every writer in a group (the
+  baton had these unaudited), and `check-fetch-once-effects.js`'s CAN-BITE group is **empty**.
 
-**Lens:** the non-workout write surface (program / phase-set / progression-style / template routes)
-plus ownership **rule (b)**. Write-up:
-[`2026-08-20-non-workout-write-surface-ownership.md`](../../reviews/2026-08-20-non-workout-write-surface-ownership.md);
-the narrative is in the handoff linked at the top. **RV-32, RV-33, RV-34 — all fixed and closed.**
+**Still open from this sweep:** RV-37 needs the device and cannot be settled here.
 
-Three things from it that are still *state*, not story:
+## Carried from sweep 40 ([write-up](../../reviews/2026-08-20-non-workout-write-surface-ownership.md))
 
-- **✅ Rule (b) is clean and now has evidence** — 116 mutating routes, 325 `.set()` sites, all built
-  field by field. **Rule (a) is the only one of the three left with none.**
-- **The FK inventory.** One `information_schema` query lists every foreign key into a user-scoped
-  table — **27 edges**. Four were probed; the remaining 23 are the cheapest next lens this role has.
+- **✅ Ownership rule (b) is clean with evidence** — 116 mutating routes, 325 `.set()` sites, all built
+  field by field. **Rule (a) is the only one of the three still with none.**
 - **A cheap contrast beats a long argument.** All of RV-32 was one row of a table: *same value, same
-  resource, same session — PUT 400, POST 201.* Find the surface that already does the thing correctly
-  before writing a paragraph about why it should.
+  resource, same session — PUT 400, POST 201.* Sweep 41 used the same move twice (`/more` restores
+  840, `/nutrition` returns 0; Home rolls the day over, Nutrition does not). Find the surface that
+  already does the thing correctly before writing a paragraph about why it should.
 
 ## Next — in the order they are worth doing
 
@@ -143,6 +143,14 @@ None. This role's PRs are docs-only.
   base that was provably current (`git merge-base --is-ancestor origin/main HEAD` passed). Resolve the
   conflict and the checks start within seconds; `unstable` means mergeable with checks still running.
   **Check `mergeable_state` before waiting on anything.**
+- **Crossing local midnight is one Playwright call** — `page.clock.install({time})`, `fastForward`,
+  then dispatch `visibilitychange`. That measured every tab's day-rollover in one run (sweep 41).
+  `faketime` neither helps nor is needed.
+- **`page.goto()` is a HARD navigation and makes every screen look broken:** React cleanup never runs,
+  so nothing saves its scroll offset — sweep 41's first table read `{}` for `/more`, the screen that
+  provably works. Drive a real in-app click. And a screen with nothing to scroll fails identically to
+  a broken one, so assert the precondition. Two more traps on BF-100's four, all reporting
+  `expected N, received 0`.
 - **Assert every probe reached a real route.** Next's HTML 404 for an unmatched path is indistinguishable
   from an access-control rejection by status alone — the tell is the body, HTML vs JSON. A 405 means the
   route is real and the verb is wrong; check the handler before concluding anything.
@@ -158,15 +166,7 @@ None. This role's PRs are docs-only.
   and has been done in duplicate twice. And when a durable doc cites a session, cite the **review or handoff
   doc**, never the loose journal entry: the linked-entry floor tracks durable-doc citations, not entry count.
 
-## Where the first 39 sweeps live
+## Where the earlier sweeps live
 
-All 39 write-ups are in `docs/reviews/` (`2026-08-17-*`, `2026-08-18-*`) and are linked, with a one-line
-summary each, from the pillar indexes in `docs/domains/*/README.md`. Every finding they produced is either
-a Known-Issues row in `projectOverview.md` or an open queue entry. Read them by subject through the pillar
-index rather than in sweep order — that is what the index is for.
-
-**All eleven pillars have been reviewed at least once.** `workouts` (write path, AI double-trips, write
-concurrency) · `nutrition`/`cardio`/`activity` (writes cross-user, not-found posture) ·
-`sleep`/`readiness`/`heart-rate`/`body`/`devices` (ingest auth, value validation, schema strictness) ·
-`app-shell`/`platform` (failure cells, repo-migration architecture, the Coach write path, offline reads,
-cross-user isolation).
+**All eleven pillars have been reviewed at least once.** Read the write-ups by *subject*, through
+`docs/domains/*/README.md`, rather than in sweep order — the pillar index is what that is for.

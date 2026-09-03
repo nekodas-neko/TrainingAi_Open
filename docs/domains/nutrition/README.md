@@ -59,6 +59,14 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   Part 2 §1.1 records that `fitDistance` (`packages/shared/src/nutrition/meal-macro-fit.ts`) is
   already the one place that ranks a meal against a target — do not write a second one — and §2 two
   live defects in `generate/route.ts` when pinned meals outnumber the slots.
+- [`docs/reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md`](../../reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md)
+  — **Nutrition never asks what day it is on resume, 2026-09-03** (sweep 41, RV-35). The tab's midnight
+  branch is correct and unreachable: its deps are `[tabEpoch, fetchData, tz]`, and the shell increments
+  `tabEpoch` only when a tab is **re-shown**. Measured across all five tabs under a fixed clock —
+  Nutrition issued 5 dated requests before midnight and **0** after, alone among the day-scoped tabs.
+  The header still reads `Today` (there is no visible tell), and `selectedDate` is what a new log is
+  written with, so **breakfast is filed against the finished day**. RV-36 covers the same file's
+  missing scroll restoration.
 - [`docs/reviews/2026-08-15-pillar-model-soundness-review.md`](../../reviews/2026-08-15-pillar-model-soundness-review.md)
   — §3: the energy model is sound (Schofield BMR + Mifflin factors + Compendium METs) and targets are
   internally consistent, but **adaptive TDEE has not fired once in 30 rolling windows** because food
