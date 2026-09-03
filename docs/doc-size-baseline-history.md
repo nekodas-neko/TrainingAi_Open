@@ -7061,7 +7061,8 @@ owed, and the four method notes that cost a sweep each to learn.
 
 ## 2026-09-03 — Review sweep 43 (RV-40)
 
-`docs/implementation-backlog.md` 16141 → 16187 (+46, rebased onto LA-56 which landed mid-PR),
+`docs/implementation-backlog.md` 16185 → 16226 (+41 after two mid-PR rebases — LA-56 and PS-21 both
+landed while this was open),
 `projectOverview.md` 9666 → 9683 (+17),
 `docs/agents/state/review.md` 178 → 184 (+6).
 
@@ -7085,6 +7086,21 @@ three-rules-now-have-evidence summary, the cheap-contrast note absorbed four new
 adding a line, and rule (a) was deleted from the Next list rather than marked done. What is left is
 state — the four closed lenses, the three surfaces that are unverified rather than clean, and the
 method notes that cost a sweep each.
+
+## 2026-09-03 — `docs/implementation-backlog.md` 16095 → 16140 (+45), PS-21
+
+One entry: the Colmi background sync service. It is long for one reason worth keeping — the entry
+has to carry the decision **not** to port the decoders to Kotlin, and the evidence for it. Three of
+this week's Colmi defects were decoder defects, each fixed once in TypeScript and applied
+retroactively by re-reading archived frames; a Kotlin copy makes each a double fix gated on an APK
+install. An implementer who reads only the heading would build the obvious thing, which is the
+2,208-line shape the plan exists to avoid.
+
+The measurement that motivates the work is also in the entry rather than only in the plan: last
+reading 11:45, checked 17:59, six hours missing because the app was not opened — and the four
+current-day-only metrics would have gone at midnight rather than back-filling.
+
+Raised to 16185 rather than the exact 16180 so a small follow-up entry does not need its own note.
 
 ## 2026-09-02 — `docs/implementation-backlog.md` → (see .size), `projectOverview.md` → (see .size) (LA-56)
 

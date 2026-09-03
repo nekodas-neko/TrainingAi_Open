@@ -450,6 +450,46 @@ daytime values. Readiness for the 27th was computed from a nap that did not happ
 **Back-fill is required, not optional:** the 27th's stored summary is wrong on disk, so a corrective
 recompute has to run over the affected days once the selection is fixed.
 
+### [devices][platform] PS-21 — the Colmi background sync service: Kotlin carries bytes, the server reads them
+
+- **Lane:** A (native, engine, and one route change)
+- **Gate:** device — Stages B and C need an APK and cannot be verified in the sandbox
+- **Plan:** [`2026-09-03-colmi-background-sync-service.md`](superpowers/plans/2026-09-03-colmi-background-sync-service.md)
+- **Added:** 2026-09-03 · owner asked for it after in-app auto-sync proved insufficient
+
+In-app auto-sync (v1.395.1) closed the evening gap and is still not enough. **Measured 2026-09-02:**
+last reading 11:45, checked at 17:59 — six hours missing because the app had not been opened, and
+HRV/stress/SpO₂/temperature are offered for the **current day only**, so they would have gone at
+midnight rather than back-filling. A second wearer will not open the app on our schedule, which is
+what actually blocks handing the ring over.
+
+**The plan's load-bearing decision: do NOT port the decoders to Kotlin.** `OuraRingService` is 2,208
+lines because it decodes on the phone. Three of this week's Colmi defects were decoder defects — the
+ten-hour heart-rate anchor, the dropped continuation packets, the sleep frame's junk tail — and each
+was fixed once in TypeScript and applied **retroactively** by re-reading `colmi_raw_frames`. A Kotlin
+copy means fixing each twice, and the phone's copy only improves when an APK is installed.
+
+Kotlin gets the ~10 command builders (small, already written in `protocol.ts`, each pinned to the
+same test vector as its TypeScript twin) and nothing else. ~400 lines against ~1,500.
+
+**Three stages, and the first ships without Android:**
+
+- **A — decode moves server-side.** `/api/colmi/samples` already accepts and stores `rawFrames`;
+  it gains the decode. Proven by replaying the ~90 archived frames and asserting the readings match
+  what the client produced for the same syncs. JS only, reversible, no APK.
+- **B — the Kotlin transport service.** Connect, run the command sequence, POST hex. Auth reuses the
+  WebView cookie exactly as `OuraRingService` does, so no new secret.
+- **C — cadence.** Periodic ~2 h plus one guaranteed evening sync before midnight discards the
+  current-day metrics.
+
+**Two hazards already learned on this hardware:** a peripheral takes one connection, so the service
+must share a lock with the in-app sync rather than fight it (the scale already caused this report);
+and Samsung does not honour `autoConnect = true`, so direct connect plus a bounded retry.
+
+**Out of scope on purpose:** this does not put the ring's data on any screen — learning-mode
+isolation stands and wiring it into scoring waits on the H10 session. It does not resolve steps,
+calories or the stage mapping (PS-16, PS-19).
+
 ### [workouts][platform] RV-40 — the malformed-id guard was only ever pointed at path params, and two body-id routes 500
 
 - **Lane:** A — `app/api/progression-styles/route.ts` and `app/api/workout-templates/route.ts`.
