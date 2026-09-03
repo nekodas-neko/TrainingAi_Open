@@ -13122,6 +13122,41 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [platform] Q-252 — error tracking with session replay, for the bug class that cannot be reproduced from source
 
+> **⚠ MOSTLY SUPERSEDED, AND ITS HEADLINE ASK WAS DECIDED AGAINST (2026-09-03, Lane A). Do not build
+> this as written.** Filed 2026-08-14, before the vendor was chosen. Checked line by line against
+> what shipped:
+>
+> | this entry asks for | status |
+> |---|---|
+> | error tracking beyond `error_events` | ✅ **shipped** — Sentry (Q-404): `@sentry/nextjs`, server/edge/client configs, `lib/observability/sentry-scrub.ts` |
+> | **session replay** | ⛔ **DECIDED AGAINST, in code, in three files** |
+> | source-mapped stack traces | 🚧 **in flight** — BF-92 wires `withSentryConfig` with sourcemap upload gated on `SENTRY_AUTH_TOKEN` |
+> | release tagging against `package.json` | ❌ **still owed — this is the real residue** |
+> | breadcrumbs | ✅ on by default in the SDK; nothing to build |
+> | *"decide before Q-49 lands"* (the DSN in the public repo) | ✅ answered — `instrumentation-client.ts` records that a DSN is a write-only ingest key and ships in every client bundle |
+>
+> **On session replay specifically:** `instrumentation-client.ts`, `sentry.server.config.ts` and
+> `sentry.edge.config.ts` all carry the same line — *"No session replay and no profiling: both
+> capture far more of a health screen than an alerting tool needs, and the reason this vendor was
+> accepted at all was alerting."* That is a deliberate privacy decision taken when the integration
+> was built, written in three places, and this entry predates it. **Building the entry as titled
+> would reverse a made decision without anyone noticing it had been made** — which is the specific
+> hazard the re-verify-before-implementing rule exists for.
+> ⚠ It is **not** re-opened here. If the owner wants replay, that is a fresh decision with the
+> privacy trade named, not a queue item carried forward from before the decision.
+>
+> **What genuinely remains is one thing: release tagging**, so a fault can be tied to a deploy.
+> Small, and it belongs with BF-92's `withSentryConfig` work rather than under this title.
+> ⚠ **And the premise beneath the whole entry is now the wrong problem.** Its argument is that
+> `error_events` cannot say what the user did before the throw. BF-92 measured something more basic:
+> **Sentry has received nothing from the browser at all** since setup, because `connect-src` never
+> named the ingest host. Richer client telemetry is not the next problem while client telemetry is
+> zero.
+>
+> **Recommended:** once BF-92 lands and a browser event is confirmed on the device, retitle this to
+> *"release tagging"* or fold it into BF-92 and strike it. Left queued rather than deleted because
+> the release-tagging half is real and unbuilt.
+
 - **Lane:** A
 - **Branch:** `feat/error-tracking-session-replay`
 - **Added:** 2026-08-14 · same owner ask (they named the Railway key as the model — this is the same
