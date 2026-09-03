@@ -3,7 +3,7 @@
 > **Successor sessions are titled `🚧 Implementation Agent (B) 🟢`** — exactly. A renamed successor
 > is a lost thread.
 
-**Updated:** 2026-09-02 · **By:** the twenty-second Lane B run · **Next ID:** `LB-52`
+**Updated:** 2026-09-03 · **By:** the twenty-second Lane B run · **Next ID:** `LB-54`
 
 > **A mistyped ID in this file silently advances the whole lane's numbering.** A previous baton
 > wrote an `LB-` number in the hundreds where it meant a `BF-` one, and
@@ -14,15 +14,20 @@
 
 ## Now
 
-**Merged this run:** BF-104 (#793), BF-109 (#796), LB-47 (#798), LB-38 analysis (#799), Q-407 (#804)
-and its routing (#805), LB-38 capture (#806) and refutation (#807), **LB-38 solved (#812)**, BF-107
-(#816), BF-108 (#818). `main` is at **v1.435.0**; `pnpm check:rules` read **Ran 67 of 67** all run.
+**Merged:** BF-104, BF-109, LB-47, LB-38 (#799/#806/#807, **solved #812**), Q-407 (#804/#805),
+BF-107, BF-108 (#818), BF-105 (#827), Q-529 (#829), Q-516 (#839), the LB-52 baton PR (#824).
+**Open and unmerged: #840 (BF-111) and #853 (BF-110).** `main` is at **v1.436.3**;
+`pnpm check:rules` read **Ran 67 of 67** throughout.
 
-**Nothing has been near a device** — ~35 screens owed.
+**Nothing has been near a device** — ~40 screens owed, and for BF-105, BF-110 and BF-111 the device
+is the whole verdict rather than a formality.
 
-Everything left in Lane B is `KEEP:` residue, `VERIFY:` device checks, or waiting on the owner. **A
-successor with no device should expect to reach the end of what can proceed and say so** rather than
-starting a KEEP entry. Start from `node scripts/next-item.js --lane B`, never a hand-scan.
+**READY is not the same as "the queue is empty".** Twice this run the list read READY (0) while real
+Lane B work sat in it: **Q-516** under UNCLASSIFIED, because two bare lane mentions disagreed and
+`laneFromLines` correctly refuses to guess; and **BF-94** behind a `Needs:` that had been discharged
+two days earlier while its live blocker sat in prose. When READY hits 0, audit the parked and
+unclassified rows before believing it. Start from `node scripts/next-item.js --lane B`, never a
+hand-scan.
 
 ### Waiting on the owner
 
@@ -39,22 +44,21 @@ starting a KEEP entry. Start from `node scripts/next-item.js --lane B`, never a 
 
 ### 1. Reproduce the failure AWAY from the system you suspect, first
 
-**This solved LB-38 after days.** The intermittent QR failure was chased through the renderer,
-the binarizer, ink density, a matrix diff and a render race — every one an expensive capture inside
-Playwright, and every conclusion wrong. What settled it in seconds was encoding and decoding 3000
-tokens in a plain script with no browser at all: **`@zxing/library` cannot read certain *valid* QR
-symbols upright.** 3.83% fail — deterministic per token, independent of ECC level, version, mask,
-module size and quiet zone — and 7 in 8 of those decode when the plane is turned. `decodeQrRotating`
-in `e2e/qr-decode.ts` tries four orientations and takes it to 0.13%. 3.83% ≈ 1 in 26, which is what
-the observed ~1 in 19 had been all along.
+**This solved LB-38 after days.** The failure was chased through the renderer, the binarizer, ink
+density, a matrix diff and a render race — every one an expensive capture inside Playwright, every
+conclusion wrong. What settled it in seconds was encoding and decoding 3000 tokens in a plain script
+with no browser: **`@zxing/library` cannot read certain *valid* QR symbols upright** (3.83%,
+deterministic per token, independent of ECC, version, mask and quiet zone; `decodeQrRotating` takes
+it to 0.13%).
 
-**The generalisation: before instrumenting the system you suspect, try to reproduce the failure
-without it.** Three confident readings died to this — the ink band (below), a matrix diff of 134/625
-between runs using *different meals*, and a render race needing payloads that never differ.
+**Before instrumenting the system you suspect, try to reproduce the failure without it.** Three
+confident readings died to this — the ink band below, a matrix diff across runs using *different
+meals*, and a race needing payloads that never differ.
 
 ### 2. An entry is often wrong about its OWN code — read the code before believing it
 
-**Three in a row this run**, each stated as settled fact in the backlog:
+**FIVE this run** — plus BF-105 (its "sibling has the same gap" was false) and **Q-516**, which asked
+for server work that had shipped the day before. Each stated as settled fact in the backlog:
 
 - **LB-47** measured production to the row and concluded the `Full` override "reverts nothing". The
   figures held exactly — but on that prescription the toggle **is not rendered at all**, so the fix it
@@ -77,8 +81,9 @@ against `{false ? "This prescription lowered…"`, because the unreachable branc
 file **and** the same condition appears in the heading ternary above.
 
 **Pin the condition and its consequent in ONE pattern.** Never as two assertions. Put a positive
-anchor before every absence check. **Verify the mutation applied** (`grep` for it) before recording
-that a test survived — a mutation that does not change the file is not a mutation.
+anchor before every absence check. **Verify the mutation changed THE THING UNDER TEST**, not merely
+that the file differs: a BF-111 mutation reported applied and hit the first match, which was inside a
+comment the test strips — green against a mutation that changed nothing.
 
 ### 4. `next-item.js` reads FIELDS, not prose — twice, two different ways
 
@@ -164,13 +169,21 @@ None held.
 - **Rebuild `package.json`/`changelog.ts` from `git show origin/main:…`; never splice a hunk.**
 - **`get_check_runs` lagged 15–25 minutes ALL RUN and read `total_count: 0` repeatedly.** When it
   looks frozen, **attempt the merge** — it validates against real branch protection and refuses if a
-  required check has not passed. `405 has merge conflicts` means `main` moved. **E2E is NOT
-  required** (making it so is branch protection, Q-297, the owner's call), and **Playwright needs
-  `DATABASE_URL` prefixed in**; the session-start hook unsets it.
+  required check has not passed. `405 has merge conflicts` means `main` moved. **E2E IS required now
+  — wait for SIX checks, not five.** The owner added it to `main`'s ruleset per LA-22; the old "E2E
+  is not required" fact was true until 2026-08-26 and was carried a day past its expiry. **Playwright
+  needs `DATABASE_URL` prefixed in**; the session-start hook unsets it.
+- **`enable_pr_auto_merge` DOES NOT WORK HERE and the reason is not what LB-52 first said.** *Allow
+  auto-merge* is on and `main` is protected — by a **Ruleset**, which GitHub's auto-merge API does
+  not recognise; it wants classic branch protection and reports *"Protected branch rules not
+  configured for this branch"*. Reproduced on two PRs. So every merge is hand-caught: **fourteen
+  attempts over seven PRs in two days**, each green on its own merits. Do not re-diagnose this from
+  the error string alone — that is how the entry got it wrong twice.
 - **A backgrounded shell dies when the tool call returns.** Long sweeps run in the foreground with an
   explicit timeout — and see lesson 6 for what a timeout leaves behind.
-- **A local full-suite failure that will not reproduce is usually the environment** — **CI's fresh
-  database is the adjudicator.** Record it as unexplained; never call it a flake without CI.
+- **A local full-suite failure that will not reproduce is usually the environment.** The one seen this
+  run was `DATABASE_URL` unset by the session hook, not a defect — prefix it back in before believing
+  a red. **CI's fresh database is the adjudicator.**
 - **Custom Rules catches real bugs in code COPIED from a passing file.** `check-hex-literals` refused
   `#f59e0b` copied out of `macro-targets-pane.tsx`. A grandfathered literal is not an allowed one;
   `--accent-amber` through `color-mix` is the token.

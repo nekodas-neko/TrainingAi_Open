@@ -7183,7 +7183,7 @@ just deleting it is what stops a later session restoring it from the prose that 
 The `Math.round` note in the journal is the third thing worth its length: a surviving mutation that
 turned out to be a real off-by-one on some values, not a gap in the tests.
 
-## 2026-09-03 — `projectOverview.md` → 9741, `docs/implementation-backlog.md` → 16418 (BF-110)
+## 2026-09-03 — `projectOverview.md` → 9741, `docs/implementation-backlog.md` → 16443 (BF-110)
 
 The index grows by two and the backlog by eleven, and both carry the same two sentences because both
 are read by different people at different times. The first is the retraction: **a scroll fixes it, so
@@ -7199,3 +7199,16 @@ any future trim — it is the observation that would disprove the entry.
 **Version 1.436.5, skipping .4**, which PR #840 (BF-111) is holding while the GitHub API is rate
 limited. A skipped patch number costs nothing; two branches claiming one costs a merge conflict in
 the file the repo says never to splice.
+
+## 2026-09-03 — `docs/agents/state/implementation-lane-b.md` → 192, plus BF-110's index growth (LB-52)
+
+**The baton is raised rather than trimmed, which is the exception it usually is not.** Three of the
+added lines correct facts a successor would otherwise act on and be wrong: **E2E IS a required check
+now** (true since 2026-08-26, and this file said the opposite for a day), **`enable_pr_auto_merge`
+does not work here and the reason is a Ruleset the API cannot see** — not the missing setting LB-52
+first claimed and asked the owner for twice — and **READY (0) is not an empty queue**, which happened
+twice in one run while real work sat under UNCLASSIFIED and behind a discharged `Needs:`.
+
+Every one of those is a fact that costs a session if it is absent, and the file was trimmed where it
+was narrative first: LB-38's blow-by-blow is now its finding, since the search is over and only the
+lesson travels. The merged list was stale by eleven PRs and is rewritten rather than extended.

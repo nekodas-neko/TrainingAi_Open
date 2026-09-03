@@ -6886,11 +6886,36 @@ without a queue entry is a dropped finding.*
 - **Caveats:** `claude_ro` is row-scoped to the owner, so this is one user's rows; and `computed_at`
   is the only evidence available from outside — the scheduling itself is not visible from a query.
 
-### [platform] LB-52 — `main` outpaces a CI cycle and auto-merge is unavailable, so every PR is a race
+### [platform] LB-52 — GitHub's auto-merge API does not see a Ruleset, so every PR is a hand-caught race
 
 - **Lane:** ? — neither. The fix is a repository *setting*, not code in either lane's paths.
-- **Gate:** owner — enabling branch-protection rules on `main` is the owner's call.
-- **Measured 2026-09-02, on BF-108 (#818): five merge rounds, four of them lost to the same race.**
+- **Gate:** owner — the remedy is a repo setting only the owner can make.
+- **⚠️ THIS ENTRY'S ORIGINAL DIAGNOSIS WAS WRONG, and the correction is the point (2026-09-03).** It
+  said *"turn on Allow auto-merge and add a branch protection rule"*. **Both were already on.** The
+  owner showed the settings: *Allow auto-merge* ticked, and `main` protected by a **Ruleset** with
+  six required checks (Lint, Tests, Build, Migration Check, Custom Rules, **E2E**). The entry was
+  written from a single error string, never tested, and asked the owner twice for work already done.
+- **What is actually happening, reproduced on a second PR.** `enable_pr_auto_merge` returns
+  *"Pull request Protected branch rules not configured for this branch"* — on PR #818 (2026-09-02)
+  and again on **PR #853 (2026-09-03)**, a fresh PR with checks in flight, against that same repo.
+  **GitHub's auto-merge API is looking for CLASSIC branch protection and does not recognise a
+  Ruleset.** That is a gap on GitHub's side, not a misconfiguration.
+- **Recommendation: add a classic branch-protection rule on `main` alongside the ruleset**, naming
+  the same six checks. The two coexist and GitHub takes the most restrictive, so enforcement does not
+  weaken — the classic rule exists only to give the auto-merge API the object it looks for. Reversal
+  cost is near zero: delete it and the repo is exactly where it is today.
+- **The alternative, if that is unwanted: reduce the conflict surface instead.** Move the version
+  bump and the doc-size baselines out of feature PRs — a changelog *fragment* per PR folded by the
+  compaction sweep, which CLAUDE.md already anticipates (*"a future changelog-fragment change could
+  remove that too"*). More work, and it only shrinks the race rather than ending it.
+- **⚠️ A rate limit is not a result.** Two attempts on 2026-09-03 returned *"API rate limit already
+  exceeded for user ID …"* — a different error that settles nothing. The polling this race forces is
+  itself what exhausted the budget, so the race now costs API quota as well as cycles.
+- **Related correction, same root:** *"E2E is not a required check"* was true until 2026-08-26 and is
+  now **false** — the owner added it per LA-22, whose `Keep:` is therefore satisfied. Sessions
+  carrying the old fact wait for five checks and merge into a sixth. Wait for **six**.
+- **Measured across 2026-09-02/03: fourteen merge attempts over seven PRs, every one green on its own merits.** BF-108 (#818) took five rounds and Q-516 (#839) took four.
+- **The original measurement, which still holds:**
   `main` moved roughly every ten minutes with six agents running; a CI cycle takes five to seven. So
   a PR opens green-in-waiting, `main` lands somebody else's merge, and the PR reads
   `mergeable_state: dirty` before its own checks finish. Merge, resolve, push, and the next cycle can
@@ -6905,9 +6930,9 @@ without a queue entry is a dropped finding.*
   mechanism this API does not see as a protection rule. Until it is available, an agent's only lever
   is to poll and merge the instant checks go green, which is what CLAUDE.md's 2–3 minute check-in is
   already for — and it does not close the window, it only narrows it.
-- **What to change, in order of value.** (1) Turn on *Allow auto-merge* and add a branch-protection
-  rule for `main` naming the five required checks, so `enable_pr_auto_merge` works and GitHub does the
-  waiting. (2) Failing that, take the version bump and the doc-size baselines out of the feature PR —
+- **⛔ The old "what to change" list is struck — see the correction at the top of this entry.** It
+  read: (1) turn on *Allow auto-merge* and add a branch-protection rule; (2) failing that, take the
+  version bump and the doc-size baselines out of the feature PR —
   a changelog *fragment* per PR, folded by the compaction sweep, removes the two files that conflict
   most, and CLAUDE.md already anticipates this (*"a future changelog-fragment change could remove that
   too"*). Either one alone would have made BF-108 a single round.
