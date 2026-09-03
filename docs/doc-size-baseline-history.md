@@ -7284,3 +7284,21 @@ scope item 3's absent/provisional split is already half-built, per-contributor, 
 The warning about building an absence-reason enum from what reads well rather than from what the
 producers can report is the line most likely to save real work: it is the failure mode that turns a
 "why" field into a constant.
+
+---
+
+## 2026-09-03 — `docs/implementation-backlog.md` 16580 → 16598 (Q-279, Lane A)
+
+Eighteen lines putting numbers behind a switch the entry describes as contained. The two that earn
+their space are the pair the decision turns on: **the scales agree** (mean 0.919 → 0.955), so no
+threshold moves with the switch — which is what keeps this a small change rather than a
+recalibration of three constants together — and **the taper goes from 4 firings to 1**, because the
+EWMA damps the single-heavy-session spike it reacts to. The second is the owner's question and could
+not have been guessed from the code.
+
+The warning not to read this as "the new number is more correct" is deliberate: the uncoupled form
+fixes the coupling and nothing else, and an entry that cites collapsed evidence is exactly where that
+over-reading would happen.
+
+Also the premise refinement — chronic divides by the observed span, not a flat 4 — so nobody goes
+looking for a `/ 4` that was deliberately removed.

@@ -12577,8 +12577,45 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [workouts][readiness] Q-279 — ACWR drives two user-facing behaviours on evidence that has substantially collapsed
 
+> **⚑ MEASURED BEFORE BUILDING (2026-09-03, Lane A) —**
+> [`review`](reviews/2026-09-03-acwr-ewma-day-shift.md). Piece 2 is *"a contained change to one
+> shared function"*, which is true of the code and not of the consequence: ACWR drives two
+> user-facing behaviours, so the standing rule applies — **a proposal is incomplete until it states
+> how many other days it moves.** Over the owner's real history, 95 comparable days:
+>
+> | | mean | median | max |
+> |---|---|---|---|
+> | coupled (current) | 0.919 | 0.955 | 1.594 |
+> | uncoupled EWMA | 0.955 | 0.967 | **1.512** |
+>
+> | threshold | coupled | uncoupled | days that **change** |
+> |---|---|---|---|
+> | early-deload 1.2 | 12/95 | 15/95 | **19** |
+> | taper 1.5 | 4/95 | **1/95** | 5 |
+> | band floor 0.8 | 67/95 | 74/95 | 13 |
+>
+> **The scales agree, which is the load-bearing result: no threshold has to move with the switch.**
+> A formulation change that shifted the mean would have forced `lowMax`, `EARLY_DELOAD_ACWR_MIN` and
+> `ACWR_TAPER_START` to be recalibrated together — a far larger proposal than this entry describes.
+> **But ~20% of days flip at the deload boundary**, in both directions.
+> **The sharpest question is the taper: 4 firings become 1.** The EWMA's max is 1.512 against 1.594
+> — its weighting damps exactly the single-heavy-session spike the taper reacts to. Whether that is
+> the fix or the loss is the owner's call and is not decidable from here.
+> ⚠ **Do not read this as "the new number is more correct".** The uncoupled form removes the
+> *mathematical coupling* — the one criticism not in dispute — and does **nothing** for ACWR's
+> predictive validity. It is not evidence the card should fire more or less often.
+>
+> **Premise refinement:** the entry says *"naive 7:28"*. Chronic divides by the **observed span in
+> weeks**, not a flat 4 (the flat ÷4 was retired for inflating ACWR ~2× on new programs); the 28-day
+> bound comes from the caller (`readiness-payload.ts:339`, `getWorkoutSessionsFrom(from28dDate)`).
+> The coupling criticism is unaffected — acute is still contained in chronic — but there is no `/ 4`
+> to go looking for.
+>
+
 - **Branch:** `feat/acwr-ewma-and-copy`
 - **Plan:** none yet · **has an owner-decision component** (the copy change)
+- **Gate:** owner — the EWMA switch moves ~20% of days at the deload boundary and turns 4 taper
+  firings into 1. Measured 2026-09-03, so this is a decision with numbers rather than a guess.
 - **Added:** 2026-08-15 · from the comprehensive review §2.2
 - **Lane:** A — derived 2026-08-31 by the path rule while selecting Lane B's next item: it names `lib/health/readiness-payload.ts`, which three API routes reach.
 - **Where it bites.** `computeVolumeAcwr` (`@trainingai/shared/ai-periodization/acwr`) implements the
