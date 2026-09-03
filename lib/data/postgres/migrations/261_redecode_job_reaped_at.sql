@@ -1,0 +1,12 @@
+-- LA-56: preserve the fact that the reaper gave up on a job, so a late result can be recorded
+-- without erasing it.
+--
+-- `finishRedecodeJob` used to filter `isNull(finished_at)`, which the reaper has already set — so a
+-- run completing after the 30-minute staleness window discarded its own result and the work landed
+-- while the record said "abandoned". Every full-history redecode that has ever run was reaped that
+-- way, so a late success has never had anywhere to go.
+--
+-- Letting the late result through on its own would trade one blind spot for another: it would
+-- overwrite the abandoned error and hide that the run exceeded the window at all. `reaped_at` keeps
+-- both facts — when the reaper gave up, and what eventually came back. NULL means never reaped.
+ALTER TABLE oura_redecode_jobs ADD COLUMN IF NOT EXISTS reaped_at TIMESTAMPTZ;

@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **261** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **263** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v36** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -10942,6 +10942,21 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   one-at-a-time partial unique index does not apply to it. Two sync runs are two concurrent
   full-history passes — the event-loop starvation the async path's own comment names as what took
   production down on 2026-08-13. **Anyone using the sync path as a workaround must run it once.**
+- **⚑ THE HALF THAT COULD BE VERIFIED HERE SHIPPED 2026-09-03** — migrations **261** (a `reaped_at`
+  column) + **262** (regenerated `claude_ro` views, without which the column is invisible to the
+  endpoint that found this). **A reaped job can now record a late result**, and `reaped_at` keeps the
+  fact it outran the window so the outcome arriving does not erase it. The immutability that already
+  existed is preserved exactly: only an open row, or a reaped row that never got an outcome, can be
+  closed — a job that genuinely finished and recorded a result is still untouchable, which an
+  existing test enforces and which a first, broader attempt at this broke.
+  **The gating on this entry was too wide and that is corrected:** `oura-redecode-job.test.ts`
+  already ran the reaper against a real local Postgres, so the storage semantics were verifiable in
+  the sandbox all along. Only the worker's heartbeat stamping needs the device.
+- **Keep — the heartbeat itself, and it is the risky half.** `reapStaleRedecodeJobs` is still a pure
+  `startedAt` age check, so slow and dead still look identical. A `last_beat_at` the worker stamps,
+  reaped on beat age, is what separates them — and it is `Verify: device` because if beats do not
+  stamp in production every job stays `running` forever and the one-at-a-time index blocks every
+  future redecode. Ship it with a total-runtime ceiling, never on its own.
 - **First action: make the reaper able to tell slow from dead**, before touching the window. A
   heartbeat the worker stamps (a `last_beat_at` column, reaped on beat age rather than start age)
   turns an inference into an observation, and is the same shape as TN-1 — persist the thing that

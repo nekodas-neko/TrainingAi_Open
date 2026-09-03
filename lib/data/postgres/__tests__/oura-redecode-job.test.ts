@@ -71,6 +71,40 @@ describe.skipIf(!canRun)('the redecode job row', () => {
     expect(second.job.id).not.toBe(first.job.id)
   })
 
+  // LA-56. Every full-history redecode that has ever run was reaped at the staleness window, and
+  // `finishRedecodeJob` filtered `isNull(finishedAt)` — which the reaper had already set. A run
+  // that finished late therefore discarded its own result, and the work landed while the record
+  // said it had been abandoned.
+  it('records a result that arrives AFTER the reaper gave up', async () => {
+    const { job } = await repo.startRedecodeJob(TEST_USER_ID, { fullHistory: true })
+    await pool.query(
+      `UPDATE oura_redecode_jobs SET started_at = now() - ($2::bigint || ' milliseconds')::interval WHERE id=$1`,
+      [job.id, REDECODE_JOB_STALE_MS + 60_000])
+    expect(await reapStaleRedecodeJobs(db, TEST_USER_ID)).toBe(1)
+
+    const reaped = await repo.getRedecodeJob(TEST_USER_ID, job.id)
+    expect(reaped!.error).toContain('abandoned')
+    expect(reaped!.reapedAt).not.toBeNull()
+
+    // The worker comes back with the outcome anyway — this must land, not vanish.
+    const phases = { redecoded: { scanned: 1098158, updated: 0, restamped: 0 }, redecodeError: null, aggregated: { sleepSessions: 59 }, aggregateError: null }
+    await repo.finishRedecodeJob(job.id, phases, null)
+
+    const done = await repo.getRedecodeJob(TEST_USER_ID, job.id)
+    expect(done!.result).toEqual(phases)
+    expect(done!.error).toBeNull()
+    // …and the fact it outran the window survives the outcome arriving.
+    expect(done!.reapedAt).not.toBeNull()
+  })
+
+  it('leaves reapedAt null on a job that finished inside the window', async () => {
+    const { job } = await repo.startRedecodeJob(TEST_USER_ID, {})
+    await repo.finishRedecodeJob(job.id, { ok: true }, null)
+    const done = await repo.getRedecodeJob(TEST_USER_ID, job.id)
+    expect(done!.reapedAt).toBeNull()
+    expect(done!.finishedAt).not.toBeNull()
+  })
+
   it('records a throw as an error rather than a result', async () => {
     const { job } = await repo.startRedecodeJob(TEST_USER_ID, {})
     await repo.finishRedecodeJob(job.id, null, 'worker exited')

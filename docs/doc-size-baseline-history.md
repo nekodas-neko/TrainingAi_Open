@@ -7154,7 +7154,21 @@ thing that changes is that its `Gate: device` now waits on evidence that may nev
 the APK-versus-web version ambiguity found while writing that caveat — small, and load-bearing exactly
 because BF-110 needed to ask which native build is installed and the app could not say.
 
-## 2026-09-03 — `projectOverview.md` → 9714, `docs/implementation-backlog.md` → 16383 (Q-516 + BF-94)
+## 2026-09-03 — `projectOverview.md` → (see .size), `docs/implementation-backlog.md` → (see .size) (LA-56)
+
+The lines that earn their place are the two corrections. **The gating was too wide** —
+`oura-redecode-job.test.ts` already exercised the reaper against a real local Postgres, so these
+storage semantics were verifiable in the sandbox all along, and calling the whole entry
+`Verify: device` parked work that did not need parking. And **the immutability guarantee is not
+incidental**: an existing test caught a broader first attempt that would have let a duplicate
+callback clobber a good result, so the narrow predicate is recorded rather than left to be
+rediscovered by breaking it again.
+
+The `Keep:` states why the heartbeat is the risky half rather than merely the unfinished half: if
+beats do not stamp in production, every job stays `running` and the one-at-a-time index blocks every
+future redecode — a worse failure than the one being fixed.
+
+## 2026-09-03 — `projectOverview.md` → 9725, `docs/implementation-backlog.md` → 16398 (Q-516 + BF-94)
 
 Both grow for one reason, and it is not the feature. The lines that earn their space record **how the
 entry became invisible**: two bare lane mentions that disagreed, so `laneFromLines` returned `?` and

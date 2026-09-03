@@ -193,6 +193,9 @@ export interface RedecodeJob {
   opts: Record<string, unknown>
   result: Record<string, unknown> | null
   error: string | null
+  /** LA-56: when the staleness reaper gave up. Non-null alongside a `result` means the run outran
+   *  the window and finished anyway — the case that used to be discarded. */
+  reapedAt: Date | null
 }
 
 const REDECODE_JOB_COLS = {
@@ -202,10 +205,12 @@ const REDECODE_JOB_COLS = {
   opts: s.ouraRedecodeJobs.opts,
   result: s.ouraRedecodeJobs.result,
   error: s.ouraRedecodeJobs.error,
+  reapedAt: s.ouraRedecodeJobs.reapedAt,
 }
 
 const asJob = (r: {
-  id: number; startedAt: Date; finishedAt: Date | null; opts: unknown; result: unknown; error: string | null
+  id: number; startedAt: Date; finishedAt: Date | null; opts: unknown; result: unknown
+  error: string | null; reapedAt: Date | null
 }): RedecodeJob => ({
   id: r.id,
   startedAt: r.startedAt,
@@ -213,6 +218,7 @@ const asJob = (r: {
   opts: (r.opts as Record<string, unknown>) ?? {},
   result: (r.result as Record<string, unknown> | null) ?? null,
   error: r.error,
+  reapedAt: r.reapedAt,
 })
 
 /** Returns the existing running job instead of starting a second — see the unique index. */
@@ -258,13 +264,38 @@ export async function getLatestRedecodeJob(db: Db, userId: string): Promise<Rede
   return row ? asJob(row) : null
 }
 
+/**
+ * Close a job with its outcome.
+ *
+ * **A REAPED ROW IS STILL CLOSED HERE (LA-56).** This used to filter `isNull(finishedAt)`, which the
+ * reaper has already set — so a run that finished after being declared abandoned discarded its own
+ * result, and the work landed while the record said it had failed. That is the one state worse than
+ * either truth, and it is not hypothetical: every full-history redecode that has ever run was
+ * reaped at the 30-minute window, so a late success has never had anywhere to go.
+ *
+ * `reapedAt` preserves what happened rather than papering over it: the row still carries the moment
+ * the reaper gave up on it, so "this took longer than the staleness window" stays legible next to
+ * the result that eventually arrived. A row that was never reaped keeps `reapedAt` null.
+ *
+ * A job that genuinely finished and recorded a result stays immutable: only an open row, or a
+ * reaped row that never got an outcome, can be closed here.
+ */
 export async function finishRedecodeJob(
   db: Db, id: number, result: Record<string, unknown> | null, error: string | null,
 ): Promise<void> {
   await db
     .update(s.ouraRedecodeJobs)
     .set({ finishedAt: new Date(), result, error })
-    .where(and(eq(s.ouraRedecodeJobs.id, id), isNull(s.ouraRedecodeJobs.finishedAt)))
+    .where(and(
+      eq(s.ouraRedecodeJobs.id, id),
+      // Open, or reaped-and-still-outcomeless. A job that genuinely finished and recorded a result
+      // stays immutable — that guarantee predates this change and a duplicate callback must not
+      // clobber a good result.
+      or(isNull(s.ouraRedecodeJobs.finishedAt), and(
+        isNotNull(s.ouraRedecodeJobs.reapedAt),
+        isNull(s.ouraRedecodeJobs.result),
+      )),
+    ))
 }
 
 /**
@@ -280,6 +311,7 @@ export async function reapStaleRedecodeJobs(db: Db, userId: string, nowMs = Date
     .update(s.ouraRedecodeJobs)
     .set({
       finishedAt: new Date(nowMs),
+      reapedAt: new Date(nowMs),
       error: 'abandoned — no result recorded before the staleness window elapsed (the process most likely restarted mid-run)',
     })
     .where(and(
