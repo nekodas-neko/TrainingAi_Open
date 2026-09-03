@@ -7302,3 +7302,21 @@ over-reading would happen.
 
 Also the premise refinement — chronic divides by the observed span, not a flat 4 — so nobody goes
 looking for a `/ 4` that was deliberately removed.
+
+---
+
+## 2026-09-03 — `docs/implementation-backlog.md` 16645 → 16680 (Q-252, Lane A)
+
+Thirty-five lines on an entry that is mostly already built. They are worth it because the entry's
+**title** asks for session replay and the codebase says no to session replay in three config files,
+with the privacy reasoning attached — so an implementer working the queue top-down would have
+reversed a made decision without ever learning it had been made. A status table line by line is the
+cheapest way to make that visible; prose would bury it.
+
+The entry is annotated rather than deleted because one piece (release tagging) is real and unbuilt,
+and rather than re-opened because replay's rejection is a decision, not an oversight. Both of those
+are stated explicitly, since the natural readings of "mostly superseded" are *delete it* and
+*reconsider it*, and both would be wrong.
+
+Also recorded: the entry's premise — that `error_events` cannot say what preceded a throw — is the
+wrong problem while BF-92 has Sentry receiving nothing from the browser at all.
