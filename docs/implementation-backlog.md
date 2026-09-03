@@ -11103,7 +11103,54 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Verify:** device
 - **Gate:** owner
 
+### [readiness][devices] LA-57 — night HRV roughly DOUBLED at the re-key, and only its presence was ever checked
+
+- **Lane:** A — `lib/oura-ble/rollup/**` and the decoder that produces `hrv_avg_ms`.
+- **Added:** 2026-09-03 · found while closing Q-509's candidate 3 ·
+  [`review`](reviews/2026-09-03-recovery-index-remainder-and-hrv-step.md)
+- **Measured.** `claude_ro.body_metrics` either side of the 2026-07-07 re-key: mean HRV
+  **26.9 ms (Cloud, n=14) → 55.9 ms (BLE, n=59)**. Per night, pre-boundary values run **20–39** and
+  post-boundary **40–56**, with no return and no overlap to speak of. A doubling within days is a
+  measurement-definition change, not physiology.
+- **Why it survived six weeks of looking.** The BLE input-drift review
+  ([2026-08-18](reviews/2026-08-18-ble-era-input-drift.md)) checked `hrv_avg_ms` for **presence**
+  (18/18 rows) and never for **scale**. A column that is populated on every night looks healthy.
+- **Why it matters.** `hrv_avg_ms` feeds the readiness composite's `hrvBalance` **and** the rolling
+  personal baseline. The baseline absorbs a level shift eventually — but for the weeks it took, a
+  Cloud-scaled baseline was compared against BLE-scaled inputs, which produces systematically high
+  HRV z-scores. **Whether that happened, and over how many nights, is not answered.** That is the
+  first thing to establish.
+- **The likely mechanism is already a named trap in `CLAUDE.md`:** *"HRV used `Sdnn` instead of
+  `Rmssd`"*. Verify which statistic each side computes against the pinned sources — the `open_oura`
+  Rust source for the BLE decoder, the archived Cloud field for the other — rather than assuming.
+- **⚠ Do NOT "correct" the BLE scale to match Cloud without deciding which is right.** RMSSD and SDNN
+  are both legitimate; the defect is two scales behind one column and one baseline, not the value of
+  either. A rescale is also a rewrite of stored history, which is the destructive half.
+- **Not yet checked:** the mechanism, the number of nights affected, and whether
+  `sleep_sessions.average_hrv_ms` and `oura_daily_derived` carry the same step.
+- **Verify:** device
+
 ### [devices][readiness] Q-509 — the BLE-era Recovery Index refit lands at 3.31 h against a shipped anchor of 5: the input moved, not the physiology
+
+> **⚑ CANDIDATE 3's NATURAL READING IS REFUTED (2026-09-03) —**
+> [`review`](reviews/2026-09-03-recovery-index-remainder-and-hrv-step.md). If the remaining ~0.39 h
+> were *a real change over the six weeks*, the series would be moving. Over **58 BLE-era nights** it
+> is flat: OLS slope **−0.0055 h/night**, Pearson **r = −0.060** (r² = 0.004), halves 2.803 → 2.612
+> against a per-night sd of ~1.59. The remainder was there on the first BLE night and has not grown.
+> **This needed no reconstruction harness** — the question is about a series, not a night.
+> ⚠ It does **not** refute candidate 3 outright: a change that happened **at** the re-key and then
+> held reads flat too. What is excluded is a *gradual* six-week change.
+>
+> **And the inputs did step at the re-key.** `body_metrics` either side of 2026-07-07: RHR
+> **65.7 → 53.8 bpm**, HRV **26.9 → 55.9 ms**. Per night, pre-boundary HRV runs **20–39** and
+> post-boundary **40–56**, never returning. ⚠ **The RHR half is NOT clean** — it was already falling
+> through late June (70 → 61), so some of that is plausibly real; the **HRV** step is the sharp one
+> and the one coincident with the device change.
+>
+> **Both prohibitions are strengthened, not weakened: do not widen `MEDIAN_WINDOW`, do not move
+> `RECOVERY_INDEX_OPTIMAL_HOURS`.** The entry's title is now supported by a second independent
+> measurement rather than the anchor-ratio argument alone, and a constant moved to absorb an
+> input-scale change bakes the change in.
 
 - **Branch:** `fix/ble-recovery-index-hours-bias`
 - **⚑ TWO OF THE THREE REMAINING CANDIDATES ARE NOW CLOSED (2026-09-02)** —

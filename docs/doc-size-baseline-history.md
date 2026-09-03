@@ -7245,3 +7245,26 @@ and rule (a) was deleted from the Next list rather than marked done. The content
 state. **The next session that touches it should make a structural cut rather than another
 incremental one**: the "Now" section's method bullets and the standing "Method notes" section are
 converging on the same list and should become one.
+
+---
+
+## 2026-09-03 — `docs/implementation-backlog.md` 16561 → 16580 (Q-509 + LA-57, Lane A)
+
+A new entry (LA-57) plus Q-509's candidate-3 result. The measurement worth its lines is the negative
+one: over 58 BLE-era nights `recovery_index_hours` has OLS slope −0.0055 h/night and r = −0.060, so
+the remaining 0.39 h was there on the first BLE night and has not grown. Recording *how* that was
+established matters as much as the number — the previous two rounds built a frame-decoding
+reconstruction harness because they were asking about individual nights, and a question about a
+series needs two aggregate queries instead.
+
+The caveat that it does **not** refute candidate 3 outright — a change that happened AT the re-key
+and then held reads flat too — is one line and prevents the entry being closed on this evidence.
+
+LA-57's length is mostly prohibition. The obvious response to "BLE HRV is double Cloud HRV" is to
+rescale it, and that is wrong twice over: RMSSD and SDNN are both legitimate so the defect is two
+scales behind one column, and a rescale rewrites stored history. Both are written down beside the
+finding rather than left to be re-derived by whoever picks it up.
+
+Also recorded: the 2026-08-18 input-drift review checked HRV for **presence** and never for
+**scale**, which is how a doubled input survived six weeks of review in its own area. That sentence
+is the transferable one.
