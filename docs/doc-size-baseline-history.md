@@ -7118,7 +7118,8 @@ is two concurrent full-history passes, which is the starvation that took product
 
 ## 2026-09-03 — Review sweep 44 (RV-41)
 
-`docs/implementation-backlog.md` 16227 → 16267 (+40), `projectOverview.md` 9683 → 9700 (+17),
+`docs/implementation-backlog.md` → 16363 (+40 on top of whatever landed while this was open; the
+baseline was rebased twice mid-PR), `projectOverview.md` 9683 → 9700 (+17),
 `docs/agents/state/review.md` 184 → 194 (+10).
 
 RV-41's length is one table and one quotation, and neither compresses. The quotation is the finding:
@@ -7139,3 +7140,16 @@ session, and this one folds rather than appends: the new method note absorbed th
 bullet, the contrast list took a seventh instance on the same line, and the "still owed" block merged
 three sentences into one. What remains is state — the five closed lenses, the surfaces that are
 unverified rather than clean, and the four method notes that each cost a sweep.
+
+## 2026-09-02 — `docs/implementation-backlog.md` → 16316 (BF-110, BF-111, and a correction to BF-80)
+
+Two entries plus eight lines onto BF-80. The owner added one detail to a months-old report — the blank
+screen **fixes itself on a scroll** — and it overturns the standing diagnosis: a killed WebView
+renderer leaves no document to scroll, so content that returns when dragged was present and unpainted.
+That is a compositor failure, and it wants the opposite fix from process-death recovery. BF-110 costs
+its length by carrying the caveat honestly — `error_events` holds zero renderer rows, but the handler
+that files them is native and the installed APK may predate it, so the silence corroborates and does
+not prove. BF-80 gains a warning rather than being struck: its handler is correct either way, and the
+thing that changes is that its `Gate: device` now waits on evidence that may never arrive. BF-111 is
+the APK-versus-web version ambiguity found while writing that caveat — small, and load-bearing exactly
+because BF-110 needed to ask which native build is installed and the app could not say.

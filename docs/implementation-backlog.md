@@ -767,6 +767,95 @@ calories or the stage mapping (PS-16, PS-19).
   would make the tile instant and work offline, but it duplicates a formula One Formula, One Place
   says lives once, and the `node:path` read is the coupling that keeps it server-side.
 
+### [app-shell][platform] BF-110 — the blank resume survives a scroll, which means the renderer never died
+
+- **Lane:** B — the DOM is alive, so the fix is a paint invalidation in the shell, not native. **No APK
+  needed**, which is the practical difference between this entry and BF-80.
+- **Added:** 2026-09-02 · owner: *"this screen still happens when tabbing back. I noticed it fixes
+  itself if you just scroll on it. but would like to fix."* Screenshots: About at v1.436.2, then the
+  same screen with the status bar, the nav bar and nothing between them.
+
+**⚠ One detail in that report overturns the standing diagnosis, and it is worth stating plainly
+before anyone builds on BF-80's hypothesis: a scroll fixes it.** A killed WebView renderer has no
+document left to scroll — the process is gone, the layer tree with it, and the only recovery is
+`recreate()` plus a reload. **Content that reappears when you drag it was there all along and simply
+was not painted.** That is a compositor failure, not a process death, and the two want opposite
+fixes.
+
+**Production agrees, with one caveat that must be carried.** `error_events` holds **zero** rows
+matching `renderer` / `reclaimed` / `RenderProcess` — the row BF-80's handler files on the next boot
+has never appeared, across every blank screen the owner has hit since 2026-08-31. **The caveat:** that
+handler is native, and the About screen reports the newest published APK as **v1.414.1** while the app
+runs **v1.436.2** (see BF-111), so it cannot be assumed the installed build even contains it. **The
+silence is therefore consistent with this entry but does not prove it on its own — the scroll does.**
+
+**BF-80 is not wrong and its handler must stay.** `onRenderProcessGone` returning `true` instead of
+letting the platform kill the process is correct whether or not it is what the owner is seeing, and
+`check-render-process-recovery.js` should keep failing CI if it goes. What changes is that BF-80 no
+longer explains **this** symptom, so its `Gate: device` is now waiting on a row that may never come.
+Treat them as two causes of one appearance.
+
+**The repo has already met this compositor.** [`docs/mobile-ui-and-performance.md`](mobile-ui-and-performance.md)
+records *"SVGs inside card grids can wipe sibling cards' gradient backgrounds on Samsung's WebView
+compositor. Promote siblings with `willChange: 'transform'`; prefer CSS `conic-gradient` over
+stroke-dash SVG donuts. Verify on the APK — Chrome renders fine."* Same family: correct DOM, absent
+paint, only on Samsung's WebView, invisible in Chrome and in `pnpm dev`.
+
+- **Recommendation: measure before patching, because the cheap fix and the wrong fix look identical.**
+  On `visibilitychange` → visible, record whether the shell's root has non-zero `getBoundingClientRect()`
+  and a non-empty child count, and file it. If layout is intact, the DOM is fine and it is paint —
+  which the scroll already implies but which nothing has yet recorded. That row is what turns this from
+  a good inference into a fact, and it costs one small effect.
+- **Then invalidate the layer on resume, scoped.** The scroll works because it forces the compositor to
+  re-raster; the cheapest honest equivalent is nudging the scroll container by a pixel and back, or
+  toggling a `will-change`/`transform` on the shell root for one frame. **Scope it to the resume
+  handler** — a permanent `will-change` on the app shell buys a memory cost on every screen forever to
+  fix a moment that lasts one frame.
+- **⚠ Do not fix this with a reload on `visibilitychange`.** BF-80 rules it out and
+  `local-day-provider.tsx:24` repeats the reason: it costs the instant-paint behaviour and *"would give
+  a blank screen two seconds long instead of an occasional one"* — trading an intermittent bug for a
+  guaranteed one.
+- **⚠ Do not assume it is the About screen.** That is where it was photographed. The report says
+  *"pages often"*, and BF-80's original said the same, so the reproduction must try several tabs;
+  fixing it in one component when it lives in the shell would look like a fix and hold for a day.
+- **Verification (device, and only device):** background the app for long enough to reproduce — the
+  original report had **battery at 10%** with Messenger running, and low memory is the likeliest
+  trigger for a compositor drop — then resume. The instrumentation row confirms the DOM is intact; with
+  the fix, the screen paints on its own without the scroll. Chrome and `pnpm dev` cannot show any of
+  this.
+
+
+### [app-shell] BF-111 — "Up to date — v1.414.1 is the newest build" sits under a v1.436.2 badge, and both are right
+
+- **Lane:** B — `components/more/update-check-card.tsx:81`.
+- **Added:** 2026-09-02 · noticed while tracing BF-110, not reported. The About screen shows the app as
+  **v1.436.2** and, two rows below, a green tick reading **"Up to date — v1.414.1 is the newest
+  build."**
+
+**Neither number is wrong, which is the whole problem.** `v1.436.2` is the web app — `package.json`,
+advanced by every Railway deploy. `v1.414.1` is the newest published **APK**, and the card compares the
+installed native build against that, so "up to date" is a true statement about the APK. The two
+legitimately diverge because most changes need no rebuild: the APK is a WebView loading the app from
+Railway. Nothing on the screen says that, so it reads as the app contradicting itself, with a green
+tick vouching for the smaller number.
+
+**This is not cosmetic, and BF-110 is the demonstration.** Asking *"does the phone have the native
+renderer fix that shipped on 2026-08-31?"* is a question about the **APK**, and this card is the only
+place in the app that answers it — but it answers with a bare version and no date, so it cannot settle
+whether a given native change is installed. That uncertainty had to be written into BF-110 as a caveat
+on a production measurement.
+
+- **Recommendation: label both, and say what each governs.** *"App v1.436.2 · Android build v1.414.1
+  (up to date)"* costs one line and removes the contradiction. Adding the build's **date** is what makes
+  it answer the real question — a version number cannot be compared against "shipped on 31 Aug" without
+  a lookup nobody will do.
+- **Not a version-scheme change.** The two version lines are independent by design and should stay that
+  way; forcing them into one number would mean cutting an APK per deploy, which is the thing this
+  architecture exists to avoid.
+- **Verification:** on a device whose APK is behind the web app, About names both, says which is which,
+  and the tick refers unambiguously to the Android build.
+
+
 ### [activity] BF-108 — a finished walk no longer arms the Start screen (shipped; device owed)
 
 - **Lane:** B — `lib/stores/activity-store.ts`, `components/guided-walk/walk-summary.tsx`.
@@ -1808,6 +1897,14 @@ labelling of stressful days, or agreement between our two producers once they ar
 
 ### [app-shell][platform] BF-80 — the app comes back blank after backgrounding, and nothing is recorded when it does
 
+- **⚠ 2026-09-02 — BF-110 refutes the hypothesis this entry rests on, and the handler still stays.**
+  The owner reports the blank screen **fixes itself on a scroll**, which a dead renderer cannot do:
+  the process is gone and there is no document left to scroll. The DOM is alive and unpainted, so the
+  live cause is the compositor, not process death — see BF-110, which owns that. `error_events` still
+  holds **zero** renderer rows. Keep the handler and its CI check regardless: returning `true` from
+  `onRenderProcessGone` is right whether or not it explains this symptom, and what it replaces is the
+  app being killed. **But the `Gate: device` below is now waiting on a row that may never arrive** —
+  do not read its absence as the fix working.
 - **Keep — THE HANDLER SHIPPED 2026-08-31; what is owed is the device check and the first row.**
   `RenderProcessRecovery` (a Capacitor `WebViewListener`) now handles `onRenderProcessGone`:
   returns `true`, records the death in SharedPreferences with `didCrash`, and posts
