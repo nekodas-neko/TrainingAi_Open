@@ -7508,3 +7508,16 @@ re-derive either half.
 The cost is written down too — sign-in-path errors remain uncaptured by anything, since
 `/api/client-error` requires auth — with the condition that would justify revisiting: a sign-in
 failure nobody can diagnose.
+## 2026-09-04 — `docs/implementation-backlog.md` → 17087 (BF-117, the day-rollover refresh)
+
+One entry plus six lines onto BF-86. The owner re-reported something BF-86 had deliberately left
+undone, and that entry's scope line is the reason this one is short rather than a sweep: it refused to
+subscribe ~30 today-scoped call sites *"blind… justified by a guess"* and said the question needed
+evidence. The evidence arrived as a report, and tracing it made the answer narrow — `useLocalDay()`
+has three consumers in the whole app and only two inside Home, while every data effect on that screen
+is gated on `refreshTick`, which is bumped by pull-to-refresh and by BLE-drain-settled and by nothing
+else. A day change bumps nothing. So the fix is one bump of an existing tick, not a subscription
+sweep, and BF-86's caution is vindicated rather than overturned. The length that remains is two traps
+worth more than they cost: `localDay` is seeded synchronously so a naive effect double-fetches on
+every launch, and `sleep-sessions` is explicitly outside the tick (Q-91), which would leave last
+night's sleep stale on exactly the rollover where it matters most.
