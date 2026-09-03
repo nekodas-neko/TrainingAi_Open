@@ -41,9 +41,20 @@ adb shell 'curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://10.0.2.2:3
 echo '--- install ---'
 adb install -r -g "$APK"
 
-echo '--- launch, and give the WebView time to boot and open the store ---'
+echo '--- sign in, which is what makes the local store exist at all ---'
+# `getLocalStore(userId)` requires a signed-in user, so an app sitting on the sign-in screen never
+# creates a database and the poll below waits 90 s for a file that cannot appear. That is exactly
+# how this job failed every run before Q-250's flow landed — steps 1-14 green, assertion impossible.
 adb logcat -c
-adb shell monkey -p "$PKG" -c android.intent.category.LAUNCHER 1 > /dev/null 2>&1
+maestro test .maestro/sign-in.yaml --format junit --output /tmp/maestro-report.xml || {
+  echo 'FAIL: the sign-in flow did not complete.'
+  echo '--- maestro debug output ---'
+  tail -60 ~/.maestro/tests/*/maestro.log 2>/dev/null || true
+  echo '--- app log tail ---'
+  adb logcat -d > /tmp/logcat.txt 2>&1 || true
+  grep -iE 'trainingai|chromium.*CONSOLE' /tmp/logcat.txt | tail -40 || tail -40 /tmp/logcat.txt
+  exit 1
+}
 
 # The store opens after the remote document loads and JS runs; poll rather than sleeping a fixed
 # span, so a fast run is fast and a slow one still passes.

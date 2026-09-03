@@ -180,6 +180,13 @@ jobs:
           npx cap sync android
           cd android && ./gradlew :app:assembleDebug --no-daemon
 
+      # Q-250. Maestro drives the sign-in the assertion depends on. Installed on the HOST, not in
+      # the emulator: it drives the device over adb from outside, the same way the smoke script does.
+      - name: Install Maestro
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
       # KVM has to be made available to the runner user before the emulator action runs.
       - name: Enable KVM
         run: |
@@ -212,5 +219,6 @@ jobs:
             /tmp/next-server.log
             /tmp/logcat.txt
             /tmp/pulled-local.db
+            /tmp/maestro-report.xml
           retention-days: 7
           if-no-files-found: ignore
