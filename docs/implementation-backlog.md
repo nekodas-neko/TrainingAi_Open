@@ -498,35 +498,6 @@ and Samsung does not honour `autoConnect = true`, so direct connect plus a bound
 isolation stands and wiring it into scoring waits on the H10 session. It does not resolve steps,
 calories or the stage mapping (PS-16, PS-19).
 
-### [platform] PS-23 — two test files fight over one global Postgres role, and lose in three ways
-
-- **Lane:** A — `lib/export/__tests__/db-snapshot-integration.test.ts` (test-only, no product code)
-- **Added:** 2026-09-03 · found while chasing a CI failure that turned out to be something else
-
-`claude-ro-readonly-role.test.ts` and `db-snapshot-integration.test.ts` each `CREATE ROLE
-claude_readonly` in `beforeAll` and `DROP OWNED BY` + `DROP ROLE` it in `afterAll`. Vitest runs files
-in parallel, so when the two land together they collide. **Reproduced 2026-09-03, 5 of 5 runs failed**
-when the two files are passed to one `vitest run`; each passes alone.
-
-Three distinct failures come out of it, which is what makes it expensive:
-- `duplicate key value violates unique constraint "pg_authid_rolname_index"` — both created the role.
-- `permission denied for schema claude_ro` — one file's teardown revoked the other's live grants.
-- **A false schema-drift error naming an innocent column.** `readTableColumns` reads
-  `information_schema.columns`, which is **privilege-filtered**, so a revocation mid-read does not
-  raise: the columns simply stop being listed, and `checkDrift` reports whichever table or column it
-  reaches first as drift. This one cost real time — it is indistinguishable from a genuine missing
-  view, and it points the reader at a column that has nothing wrong with it.
-
-**Why it has survived:** in a full 757-file run the two rarely land in the same window, so it fires
-rarely and never twice on the same file.
-
-**The fix is a rename, not a lock.** `db-snapshot-integration.test.ts` provisions and grants
-everything it needs itself, and the view predicates key off `app.claude_ro_owner`, which is set
-per-role rather than by name — so it can use its own role (`claude_ro_snapshot_test`) and lose
-nothing. The role that must literally be called `claude_readonly` is the one the migrations GRANT to,
-and `claude-ro-readonly-role.test.ts` keeps it. Written and verified during the PS-21 Stage A work,
-then reverted to keep that PR to one change.
-
 ### [nutrition][platform] RV-42 — a meal plan can point at another account's saved meal and meal type
 
 - **Lane:** A — `lib/data/postgres/slices/meal-plans.ts` (`replaceMealPlanStructure` and the create
