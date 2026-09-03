@@ -1469,6 +1469,9 @@ export const ouraRedecodeJobs = pgTable('oura_redecode_jobs', {
   opts:       jsonb('opts').notNull().default({}),
   result:     jsonb('result'),
   error:      text('error'),
+  /** LA-56: when the staleness reaper gave up on this job. NULL = never reaped. Kept alongside a
+   *  late `result` so "this outran the window" survives the outcome eventually arriving. */
+  reapedAt:   timestamp('reaped_at', { withTimezone: true }),
 })
 
 export const ouraBleRekeyDeclarations = pgTable('oura_ble_rekey_declarations', {
