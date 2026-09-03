@@ -12501,6 +12501,34 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [platform][readiness] Q-278 — a score that could not be computed is rendered identically to a score of 76
 
+> **✅ THE OPEN QUESTION IS ANSWERED (2026-09-03, Lane A) — and the answer is that it is the wrong
+> question to encode.** The ⚠ below asks *"decide whether they are pillars before generalising a
+> coverage representation over five of them"*. **Don't decide. Key the representation on the metric
+> the caller is rendering, not on a fixed pillar list.** A tile asking "why is there no daytime-stress
+> value today?" gets an answer without anyone having to rule on whether daytime stress is a pillar,
+> and a sixth metric later costs nothing. Enumerating pillars in a type forces a taxonomy ruling that
+> has no consequence for the user and would have to be re-litigated the next time a metric is added.
+> Cheap to reverse — it is a type shape, not a schema.
+>
+> **Verified against the code, so the implementer does not repeat it:**
+> - `lib/health/score-availability.ts` is **74 lines** and readiness-only, exactly as the entry says.
+>   `scoreAvailability(present)` reports which *inputs* fed a score that **was** computed; there is no
+>   representation for "no score exists for this day". The premise holds.
+> - **Its only real consumer is `lib/health/readiness-payload.ts:708`**, which flattens it into four
+>   response fields (`inputsAvailable`/`inputsMissing`/`scoreConfidence`/`limited`).
+>   `components/health/readiness-breakdown.tsx` imports the `ReadinessInputKey` *type* only. So the
+>   blast radius of generalising it is one route payload, not a sweep — smaller again than the ⚠
+>   already made it.
+> - **Scope item 3 is half-built already.** `provisional` (computed from a cold baseline) exists
+>   **per contributor** in `readiness-composite` and is read by `packages/shared/src/health/score-audit/readiness.ts`.
+>   The absent/provisional distinction therefore needs promoting to the metric level, not inventing.
+>
+> **⚠ The real risk on this entry is a taxonomy nothing can populate.** The obvious design is an
+> absence-reason enum (`no_source` / `awaiting_baseline` / `below_gate` / `not_yet`). Before writing
+> one, check that each producer can actually distinguish those cases at the point it returns null —
+> for the activity score it is not obvious that it can. **Build the enum from what the producers can
+> report, not from what reads well**, or the UI gains a "why" field that always says the same thing.
+
 - **Branch:** `feat/score-coverage-surfacing`
 - **Plan:** none yet
 - **Added:** 2026-08-15 · from the comprehensive review §1.1

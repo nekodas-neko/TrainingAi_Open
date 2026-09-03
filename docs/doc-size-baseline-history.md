@@ -7268,3 +7268,19 @@ finding rather than left to be re-derived by whoever picks it up.
 Also recorded: the 2026-08-18 input-drift review checked HRV for **presence** and never for
 **scale**, which is how a doubled input survived six weeks of review in its own area. That sentence
 is the transferable one.
+## 2026-09-03 — `docs/implementation-backlog.md` 16533 → 16561 (Q-278, Lane A)
+
+Twenty-eight lines answering the open question Q-278 could not start without — *are daytime stress
+and resilience "pillars"?* — with the finding that it is the wrong question to encode: key the
+representation on the metric being rendered and the ruling never has to be made.
+
+The rest is measurement that stops the next implementer repeating an hour of reading:
+`score-availability.ts` is 74 lines with exactly **one** real consumer (`readiness-payload.ts:708`,
+flattening it into four response fields), so generalising it is a one-payload change rather than the
+sweep the entry implies — the second time this entry has turned out smaller on inspection. And
+scope item 3's absent/provisional split is already half-built, per-contributor, in
+`readiness-composite`.
+
+The warning about building an absence-reason enum from what reads well rather than from what the
+producers can report is the line most likely to save real work: it is the failure mode that turns a
+"why" field into a constant.
