@@ -12,6 +12,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { MIN_PLAUSIBLE_BPM, MAX_PLAUSIBLE_BPM } from '@trainingai/shared/validation/plausibility'
+import { decodeRawFrames, framesToPayload, type ColmiPayload } from '@/lib/colmi-ble/frames-to-payload'
 import type { ColmiReadingKind, ColmiReadingInput, ColmiSleepSegmentInput } from '@/lib/data/postgres/slices/colmi'
 
 const MAX_BODY_BYTES = 512 * 1024
@@ -91,14 +92,34 @@ export async function POST(req: Request) {
   const now = Date.now()
   const inWindow = (at: number) => at >= now - PAST_TOLERANCE_MS && at <= now + FUTURE_TOLERANCE_MS
 
+  // Decode HERE when the client sent bytes and no samples (PS-21 Stage A). One decoder, server-side,
+  // is what lets a protocol fix reach data already archived — three of this integration's defects
+  // were repaired that way. The client keeps the option of sending decoded readings so a transport
+  // that predates this route's decode is not broken by deploying it.
+  //
+  // `todayStr` is resolved from the user's stored timezone, never sent by the client: it anchors
+  // every `daysAgo` the ring reports, so one writer deciding the day is what keeps the ring's
+  // relative time and the `local_date` column agreeing.
+  const posted = parsed.data.rawFrames ?? []
+  const decoded: ColmiPayload | null = posted.length > 0 && !parsed.data.readings && !parsed.data.sleep
+    ? framesToPayload(decodeRawFrames(posted), {
+        todayStr: formatInTimeZone(new Date(now), tz, 'yyyy-MM-dd'),
+        timezone: tz,
+      })
+    : null
+
+  const inputReadings = decoded?.readings ?? parsed.data.readings ?? []
+  const inputSleep = decoded?.sleep ?? parsed.data.sleep ?? []
+
   const readings: ColmiReadingInput[] = []
-  for (const r of parsed.data.readings ?? []) {
+  for (const r of inputReadings) {
     if (!inWindow(r.at)) continue
-    const range = RANGE[r.kind]
+    const range = RANGE[r.kind as ColmiReadingKind]
+    if (!range) continue
     if (!Number.isFinite(r.value) || r.value < range.min || r.value > range.max) continue
     const at = new Date(r.at)
     readings.push({
-      kind: r.kind,
+      kind: r.kind as ColmiReadingKind,
       measuredAt: at,
       localDate: formatInTimeZone(at, tz, 'yyyy-MM-dd'),
       value: r.value,
@@ -107,9 +128,15 @@ export async function POST(req: Request) {
   }
 
   const sleep: ColmiSleepSegmentInput[] = []
-  for (const seg of parsed.data.sleep ?? []) {
+  for (const seg of inputSleep) {
     if (!inWindow(seg.startedAt) || !inWindow(seg.endedAt)) continue
     if (seg.endedAt <= seg.startedAt) continue
+    // Restated here rather than left to the Zod schema, because a server-decoded segment never
+    // meets it. A junk tail on the sleep frame stored an 8.9-hour night as 19.1 (migration 260),
+    // and the decoder fix that stops it is one decoder away from this route — so the bound the
+    // client path has always had is applied to both paths at the point of the write.
+    if (!Number.isInteger(seg.minutes) || seg.minutes < 1 || seg.minutes > 24 * 60) continue
+    if (!Number.isInteger(seg.stage) || seg.stage < 0 || seg.stage > 255) continue
     const startedAt = new Date(seg.startedAt)
     sleep.push({
       // The night belongs to the day it STARTED in, which is what makes a 23:40 bedtime and a
@@ -125,7 +152,7 @@ export async function POST(req: Request) {
   const repo = await getRepositoryAsync()
   // Raw frames are written UNFILTERED and unconditionally. Every filter above discards something,
   // and what it discards is exactly what a later decoder fix needs to see.
-  const rawFrames = (parsed.data.rawFrames ?? []).map(f => ({
+  const rawFrames = posted.map(f => ({
     channel: f.channel, tag: f.tag ?? null, hex: f.hex,
   }))
   const [storedReadings, storedSleep, storedFrames] = await Promise.all([
@@ -138,7 +165,10 @@ export async function POST(req: Request) {
     ok: true,
     // `received` vs `stored` is the signal that a re-sync is deduping rather than failing — without
     // both numbers a repeat sync looks identical to a broken one.
-    received: { readings: parsed.data.readings?.length ?? 0, sleep: parsed.data.sleep?.length ?? 0 },
+    received: { readings: inputReadings.length, sleep: inputSleep.length, frames: posted.length },
+    // Says which side read the bytes, so a sync that silently fell back to the client's decode is
+    // visible on the card rather than looking identical to a server-decoded one.
+    decodedBy: decoded ? 'server' : 'client',
     accepted: { readings: readings.length, sleep: sleep.length },
     stored: { readings: storedReadings, sleep: storedSleep, frames: storedFrames },
   })

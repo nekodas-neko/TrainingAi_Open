@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { framesToPayload } from '@/lib/colmi-ble/ble'
+import { framesToPayload } from '@/lib/colmi-ble/frames-to-payload'
 import type { ColmiFrame } from '@/lib/colmi-ble/decode'
 import { formatInTimeZone } from 'date-fns-tz'
 

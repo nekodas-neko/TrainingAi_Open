@@ -23,10 +23,16 @@ describe('the Sentry tunnel stays reachable', () => {
     expect(matchers.length).toBeGreaterThan(0)
   })
 
-  it('the middleware matcher does not capture /monitoring', () => {
-    for (const m of matchers) {
-      expect(new RegExp(`^${m}$`).test('/monitoring'), `matcher ${m} must not capture the tunnel`).toBe(false)
-    }
+  // The tunnel sits BEHIND the auth gate, deliberately (BF-92, owner decision 2026-09-03). A
+  // signed-in request falls through the middleware without a redirect, so the tunnel works for every
+  // session — which is the defect that was reported. Excluding the path would additionally capture
+  // errors from the sign-in screen, and would make it an unauthenticated relay to any Sentry
+  // project; that trade was declined.
+  //
+  // Pinned so the exclusion cannot be reintroduced casually: putting it back is a real decision with
+  // a security cost, not a tidy-up.
+  it('the middleware matcher DOES capture /monitoring — it is gated on purpose', () => {
+    expect(matchers.some(m => new RegExp(`^${m}$`).test('/monitoring'))).toBe(true)
   })
 
   // Without this the test above passes against a matcher that captures nothing at all.

@@ -31,17 +31,25 @@ export default auth((req) => {
 })
 
 export const config = {
-  // `monitoring` is BF-92's Sentry tunnel (`tunnelRoute` in next.config.ts) and MUST be excluded, or
-  // the gate 307s it to /sign-in and the browser's error report is dropped — the same silent drop,
-  // moved from the CSP to here. Excluded rather than added to PUBLIC_PATHS because there is no page
-  // to gate: the SDK installs it as a Next *rewrite* to `*.ingest.sentry.io`, so no handler of ours
-  // ever runs and nothing of ours is reachable through it.
+  // BF-92. `monitoring` is the Sentry tunnel (`tunnelRoute` in next.config.ts) and is deliberately
+  // LEFT INSIDE this matcher — i.e. behind the auth gate. A signed-in request falls straight through
+  // (no redirect), so the tunnel works for every session, which is the whole of what BF-92 reported:
+  // Sentry heard nothing from the browser for 13 days while the owner was signed in.
   //
-  // ⚠ It is therefore reachable unauthenticated, which is the point and is also the cost: the
-  // errors most worth having are the ones from the sign-in path, where by definition there is no
-  // session, and where this app's own comment above records how fragile first-run APK sign-in is —
-  // `/api/client-error` requires auth and has never captured any of them. What it opens is a relay
-  // that can forward an envelope to some other Sentry project via this domain. No data of ours, no
-  // auth surface, no database.
-  matcher: ["/((?!api|monitoring|_next/static|_next/image|favicon.ico|sw.js|manifest.webmanifest|icon|apple-icon).*)"],
+  // Excluding it was written, measured and then reverted, and the reasoning is worth keeping. What
+  // exclusion buys is errors from the sign-in path, which has no session by definition and which
+  // `/api/client-error` (auth-gated) has therefore never captured — the first-run APK flow this
+  // file's own comment above records as fragile. What it costs is that the path becomes an
+  // unauthenticated relay: the SDK installs it as a Next *rewrite*, so `?o=<org>&p=<project>` are
+  // caller-supplied and anyone could forward an envelope to some other Sentry project via this
+  // domain.
+  //
+  // That is bandwidth and reputation, not data — and notably NOT extra exposure of our own project,
+  // whose DSN already ships in every client bundle by design. It was still judged not worth a new
+  // unauthenticated surface for a bonus, when the reported defect is fixed without it.
+  //
+  // ⚠ To revisit, the evidence to look for is a sign-in failure nobody can diagnose. Adding
+  // `monitoring|` to the negative lookahead below is the whole change; the service-worker branch and
+  // the tunnel config need nothing.
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|sw.js|manifest.webmanifest|icon|apple-icon).*)"],
 }

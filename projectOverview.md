@@ -1596,7 +1596,7 @@ Last swept **2026-09-03**.
 
 | What | Why it needs you | Where it is recorded |
 |---|---|---|
-| **Run a `fullHistory` rollup pass** | ⚠ **ATTEMPTED 2026-09-03 AND IT CANNOT COMPLETE — see LA-56.** Both attempts that have ever existed were reaped as "abandoned" after exactly 30 minutes having written nothing. The workaround is the **synchronous** path (`POST /api/oura-ble/samples/redecode` with no `async=1`), which its own measured note says completes at `scanned=1098158` while the gateway 502s — **run it once only**, it has no in-flight guard. | TN-1, Q-525, LA-56 |
+| **Run a `fullHistory` rollup pass** | ⛔ **DO NOT ATTEMPT — the workaround is measured not to work, 2026-09-03.** Three attempts have now produced nothing: the async jobs of 08-30 and 09-03 03:00 (reaped at 30 min), and the **synchronous** run at ~08:00 on 09-03, which had written nothing 35 minutes later. The full-history write path deletes and reinserts every row, so a completed pass leaves one shared `created_at` — there are **17 distinct stamps** and the oldest is **2026-08-17**, which dates the last success. The previous advice here ("run the sync path once only, it completes behind the 502") was true on 2026-08-17 and is not true now. **Nothing is owed by you.** ✅ **Diagnosed the same session:** the rollup worker loses its database connection mid-pass (`Connection terminated unexpectedly`, `at Worker.<anonymous>`, recorded in `error_events` at 08:04:43Z and once before, on 2026-08-17). Not the Postgres server — `max_connections` 500, 11 in use. Engine fix, no owner action. |  TN-1, Q-525, LA-56 |
 | **Decide the rest/active HR anchor** | **Freeze at a dated constant (recommended) or move to a 90-day trailing mean.** The 90-day option moves the at-rest share **14.9% → 25.9% on 56 of 57 days** — a Body Battery re-levelling, not a stability fix. Structural: a longer window always sits above a shorter one while fitness improves. | Q-515, [review](docs/reviews/2026-09-02-hr-rest-anchor-level-shift.md) |
 | **An S25 smoke run** | Local SQLite **v34 + v35 + v36** have never been opened on a device. v35 and v36 are plain ADD COLUMNs, but they sit behind v34's table rebuild, so a device upgrading from v33 runs all three in one pass. | Known Issues, three rows |
 | **The PS-17 back-fill** | `POST /api/oura-ble/samples/redecode` is admin-session gated. Also recovers two of PS-19's seven nights. | PS-17, PS-19 |
@@ -1606,7 +1606,7 @@ Last swept **2026-09-03**.
 | **The movement-per-hour boundary** | Same boundary as the anchor decision above, so it waits on it. Saturated at **856 of 857 waking hours** — it measures ring wear. | Q-522 |
 | **Body Battery's drain model** | The replacement is **already owner-confirmed and fitted** (goal-normalised `c`, BMR-proportional baseline). It is sequenced behind the anchor decision above, so that one release unblocks it. Today `0` means *"you wore the ring a long time"*, close to the opposite of what you asked for. | Q-521 |
 | **Whether to close Q-283** | Its "~11 MB of unused indexes" is now **800 kB** once primary keys and unique constraints are excluded, and its one real candidate was already dropped. Implementing it means a destructive migration for 0.4% of the database. | Q-283 |
-| **Approve (or revert) the Sentry tunnel's one widening** | BF-92's fix routes browser error reports same-origin through `/monitoring`, which had to be excluded from the auth gate — so that path is now reachable **without a session**. It buys the errors most worth having (the sign-in path has none by definition) and costs a relay that could forward an envelope to another Sentry project via this domain. No data, no auth surface, no database. **One line to revert.** Also needs the device check: a deliberate throw from the APK appearing in the dashboard. | BF-92 |
+| ~~Approve the Sentry tunnel's widening~~ | ✅ **DECIDED 2026-09-03 — delegated, and reverted.** The tunnel ships behind the auth gate: a signed-in request falls through, so BF-92's reported defect (13 days of browser silence while signed in) is fixed without it. Exclusion would only have added sign-in-screen errors, at the cost of an unauthenticated relay to any Sentry project via this domain. **Still owed: the device check** — a deliberate throw from the APK appearing in the dashboard. | BF-92 |
 | **Where "Exercise detected" gets its data** | Its only writer was the Oura Cloud sync. Either the BLE classifier feeds the existing review UI, or the card and its route retire. Either branch is a different feature. | Q-231 |
 
 ## ⚠️ Known Issues & Risks With Recently Shipped Features
@@ -1623,6 +1623,23 @@ Last swept **2026-09-03**.
 > An entry only leaves when **nothing is still owed**: no open work, no pending owner or device
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
+
+### [nutrition][platform] 🟡 A meal plan can point at another account's saved meal and meal type (RV-42, 2026-09-03)
+
+The plan is ownership-checked (`ownedPlan`); its child ids are not. `meal_plan_meals` rows take
+`savedMealId` and `mealTypeId` straight from the request — `z.string().uuid()` proves the shape and
+nothing about the owner — and the table has no `user_id`, so the FK is the only ownership link and it
+only proves the row exists. Driven as a second account through **both** doors:
+`POST /api/nutrition/meal-plans` (201) and `PATCH /api/nutrition/meal-plans/meals/[mealId]` (200),
+read back from Postgres pointing at the seeded user's rows.
+
+**No data leaks** — the meal-plan read joins neither table, so `savedMealName`/`mealTypeName` come back
+`null`; that is the half RV-32 had and this does not. **What it costs is a cross-account write:** both
+columns are `ON DELETE SET NULL`, so when the referenced row's owner deleted their own saved meal
+through their own API, the other account's plan row silently read `<NULLED>`. The fix is the pre-check
+`writeSavedMeal` already implements for its equivalents.
+[`Review sweep 45`](docs/reviews/2026-09-03-fk-edges-meal-plan-cross-user-refs.md). **Web build, local
+database.** The workout and device FK edges are **untouched, not clean**.
 
 ### [nutrition][workouts] 🟡 The Coach can write goal numbers the user's own screens refuse (RV-41, 2026-09-03)
 
@@ -1736,6 +1753,18 @@ evening sync. BLE does not exist in the sandbox, so the timer, the visibility li
 4-second resume delay are exercised by **unit tests and nothing else**. The check is one evening
 where Sync is not pressed and that day's stress still reaches the database past 18:00 — the previous
 days stop dead at 06:30 and 17:30.
+
+### [devices] ⚠️ The Colmi ring's decode moved to the server and has not run on the device (PS-21 Stage A, 2026-09-03)
+
+v1.436.4 posts the ring's raw frames and decodes them server-side. Proved equivalent to the old
+client decode over a real 31-frame sync — 209 received, 167 accepted, **166 stored rows identical
+field for field** between the two paths — but against the local dev database, over frames replayed
+from the archive rather than a ring.
+- **What has not run:** an actual sync from the phone. The pairing card's counts now come from
+  response fields (`received`, `decodedBy`) that did not exist before, so a WebView holding an older
+  bundle than the deploy would show zeros while the rows still land. `decodedBy` says which side read
+  the bytes, which is how to tell those apart rather than guessing from counts.
+- **The check:** one Sync on the S25. Readings stored > 0, and `decodedBy` reads `server`.
 
 ### [nutrition][devices] ⚠️ The Coach plan card's save took the web fallback, not the offline-first path (LA-47, 2026-09-02)
 

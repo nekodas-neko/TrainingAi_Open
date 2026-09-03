@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { runRedecodeOffLoop } from '@/lib/oura-ble/rollup-worker'
 import { rateLimit } from '@/lib/rate-limit'
+import { reportRollupStepErrors } from '@/lib/oura-ble/report-step-errors'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { getRepositoryAsync } from '@/lib/data'
 
@@ -86,6 +87,11 @@ export async function POST(req: Request) {
     )
     if (redecodeError) console.error('[oura-ble] redecode failed:', redecodeError)
     if (aggregateError) console.error('[oura-ble] re-aggregate failed:', aggregateError)
+    // The MOST blind of the three paths, not the least: this one holds the request open past the
+    // gateway timeout, so the 502 means the caller never receives the JSON that carries
+    // `stepErrors` at all. Q-535 is the record of that — work completing behind a response nobody
+    // sees. Reported before the return so it lands whether or not the response does.
+    reportRollupStepErrors(aggregated?.stepErrors, { userId, url: '/api/oura-ble/samples/redecode' })
     return NextResponse.json({ ...(redecoded ?? { scanned: 0, updated: 0, restamped: 0 }), redecodeError, aggregated, aggregateError })
   }
 
@@ -114,6 +120,10 @@ export async function POST(req: Request) {
     .then(async phases => {
       if (phases.redecodeError) console.error('[oura-ble] redecode failed:', phases.redecodeError)
       if (phases.aggregateError) console.error('[oura-ble] re-aggregate failed:', phases.aggregateError)
+      // Same blind spot as the ingest path: a step that failed did not throw, so it reaches neither
+      // this `.catch` nor `aggregateError`. The job row keeps the phases either way — this is what
+      // puts the failure somewhere queryable.
+      reportRollupStepErrors(phases.aggregated?.stepErrors, { userId, url: '/api/oura-ble/samples/redecode#aggregate' })
       await repo.finishRedecodeJob(job.id, phases as unknown as Record<string, unknown>, null)
     })
     .catch(async err => {

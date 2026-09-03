@@ -9,7 +9,7 @@
 // the Oura's continuous capture. That is why the WebView path's suspension while backgrounded does
 // not matter here.
 import { decodeV1, decodeBigData, bigDataPayloadLength, type ColmiFrame } from '@/lib/colmi-ble/decode'
-import { resolveRelative, resolveSleepWindow, resolveActivityBucket, localDayStartSeconds, wallClockSecondsToEpochMs } from '@/lib/colmi-ble/resolve-time'
+import { localDayStartSeconds } from '@/lib/colmi-ble/resolve-time'
 import {
   V1_SERVICE, V1_WRITE, V1_NOTIFY, V2_SERVICE, V2_WRITE, V2_NOTIFY, NAME_PREFIX,
   cmdBattery, cmdSetDateTime, cmdPhoneName, cmdSyncActivity, cmdSyncHeartRate,
@@ -41,6 +41,9 @@ export interface ColmiSyncOutcome {
   readings: number
   sleepSegments: number
   stored?: { readings: number; sleep: number }
+  /** Which side read the bytes. A sync that fell back to a client decode is a deploy skew worth
+   *  seeing on the card, not something to discover from row counts later. */
+  decodedBy?: 'server' | 'client'
   /** What the route kept after its per-sample window and range filters, before the de-dup insert.
    *  `readings` sent minus this is what the FILTERS dropped; this minus `stored` is what the unique
    *  key deduped. Without both, 223 sent reaching 17 rows has two explanations and no way to pick. */
@@ -263,40 +266,36 @@ export async function syncColmiRing(opts: SyncOptions): Promise<ColmiSyncOutcome
              message: 'The ring did not respond. Put it on or place it on the charger and try again.' }
   }
 
-  const payload = framesToPayload(frames, opts)
+  // The bytes are the payload (PS-21 Stage A). The client does NOT decode: the server does, over
+  // the same frames it archives, so a protocol fix reaches data already stored and there is one
+  // decoder rather than two that drift apart between APK installs. The counts the card shows come
+  // back from the response — they are what was written, not what was hoped for.
   try {
     const res = await fetch('/api/colmi/samples', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...payload, rawFrames }),
+      body: JSON.stringify({ rawFrames }),
       cache: 'no-store',
     })
     if (!res.ok) {
       return { ok: false, framesSeen, reason: 'post-failed', battery, autoPrefs, diagnostics,
-               readings: payload.readings.length, sleepSegments: payload.sleep.length,
+               readings: 0, sleepSegments: 0,
                message: `Upload failed (${res.status}).` }
     }
     const body = await res.json() as {
       stored?: { readings: number; sleep: number }
       accepted?: { readings: number; sleep: number }
+      received?: { readings: number; sleep: number }
+      decodedBy?: 'server' | 'client'
     }
     return { ok: true, framesSeen, battery, autoPrefs, diagnostics,
-             readings: payload.readings.length, sleepSegments: payload.sleep.length,
-             stored: body.stored, accepted: body.accepted }
+             readings: body.received?.readings ?? 0, sleepSegments: body.received?.sleep ?? 0,
+             stored: body.stored, accepted: body.accepted, decodedBy: body.decodedBy }
   } catch (e) {
     return { ok: false, framesSeen, reason: 'post-failed', battery, autoPrefs, diagnostics,
-             readings: payload.readings.length, sleepSegments: payload.sleep.length, message: describe(e) }
+             readings: 0, sleepSegments: 0, message: describe(e) }
   }
 }
-
-/** Heart-rate log packet numbering. Packet 0 is the header, packet 1 carries the start time and 9
- *  samples, and every packet after it carries 13 that continue the same series. */
-const HR_LOG_HEADER = 0
-const HR_LOG_ANCHOR = 1
-const HR_ANCHOR_SAMPLES = 9
-const HR_CONTINUATION_SAMPLES = 13
-/** Used only until the header names the real one — the ring's own default is 5 minutes. */
-const HR_DEFAULT_INTERVAL_MINUTES = 5
 
 /** Answers that ARE understood, and mean "nothing to send". They decode to `unknown` because they
  *  carry no sample, and counting them as not-understood made a healthy sync report frames it could
@@ -308,112 +307,6 @@ const SENTINEL_REASONS = new Set(['no activity history'])
 const MAX_RAW_FRAMES = 480
 
 const MAX_UNMAPPED_HEX = 8
-
-export interface ColmiPayload {
-  readings: { kind: string; at: number; value: number; valueHigh?: number }[]
-  sleep: { startedAt: number; endedAt: number; stage: number; minutes: number }[]
-}
-
-/** Pure: decoded frames in, ingest payload out. Split out so the mapping is testable without BLE. */
-export function framesToPayload(frames: ColmiFrame[], opts: Pick<SyncOptions, 'todayStr' | 'timezone'>): ColmiPayload {
-  const readings: ColmiPayload['readings'] = []
-  const sleepOut: ColmiPayload['sleep'] = []
-  const { todayStr, timezone: tz } = opts
-  // Carried across frames: the heart-rate log is one series split over numbered packets, and the
-  // clock it starts from is named once, in packet 1.
-  let hrAnchorSec: number | null = null
-  let hrIntervalMinutes = HR_DEFAULT_INTERVAL_MINUTES
-
-  for (const f of frames) {
-    switch (f.kind) {
-      case 'battery':
-        readings.push({ kind: 'battery', at: Date.now(), value: f.percent })
-        break
-
-      case 'autoPref':
-        break   // configuration state, surfaced on the outcome — not a sample
-
-      case 'realtimeHeartRate':
-        if (f.bpm > 0) readings.push({ kind: 'heart_rate', at: Date.now(), value: f.bpm })
-        break
-
-      case 'activity': {
-        if (f.isFinal && f.steps === 0 && f.year === 0) break     // end-of-sweep marker, not a bucket
-        const at = resolveActivityBucket(f.year, f.month, f.day, f.quarterHour, tz)
-        if (!at) break
-        const ms = at.getTime()
-        if (f.steps > 0) readings.push({ kind: 'steps', at: ms, value: f.steps })
-        if (f.calories > 0) readings.push({ kind: 'calories', at: ms, value: f.calories })
-        if (f.distanceMetres > 0) readings.push({ kind: 'distance', at: ms, value: f.distanceMetres })
-        break
-      }
-
-      case 'hrv':
-      case 'stress':
-        for (const p of f.points) {
-          readings.push({ kind: f.kind, at: resolveRelative(todayStr, 0, p.minuteOfDay, tz).getTime(), value: p.value })
-        }
-        break
-
-      case 'heartRateLog': {
-        if (f.isEmpty) break
-        // The ring answers one request with a numbered series covering the whole day. Packet 0 is a
-        // header, packet 1 names the clock, and packets 2..n continue from it — so only packet 1
-        // carries `startedAtUnixSec`, and dropping the rest for lack of one threw away 24 of 26
-        // packets. Worse, the 9 samples packet 1 does carry are the first 45 minutes after local
-        // midnight, which is exactly when nobody is awake to have a heart rate recorded: they came
-        // back as zeros, were filtered, and the whole log read as "the ring sent nothing".
-        if (f.subType === HR_LOG_HEADER) {
-          hrAnchorSec = null
-          if (f.intervalMinutes && f.intervalMinutes > 0) hrIntervalMinutes = f.intervalMinutes
-          break
-        }
-        if (f.subType === HR_LOG_ANCHOR) hrAnchorSec = f.startedAtUnixSec
-        if (hrAnchorSec === null) break
-        const index = f.subType === HR_LOG_ANCHOR
-          ? 0
-          : HR_ANCHOR_SAMPLES + (f.subType - HR_LOG_ANCHOR - 1) * HR_CONTINUATION_SAMPLES
-        const stepMs = hrIntervalMinutes * 60_000
-        f.values.forEach((bpm, i) => {
-          // A zero is "not measured", not a reading of zero — the ring stores a slot for every
-          // interval whether or not it sampled one.
-          // The anchor is the local-wall-clock-as-UTC value we sent, echoed back — not an epoch.
-          if (bpm > 0) readings.push({ kind: 'heart_rate', at: wallClockSecondsToEpochMs(hrAnchorSec!, tz) + (index + i) * stepMs, value: bpm })
-        })
-        break
-      }
-
-      case 'sleep':
-        for (const s of f.sessions) {
-          const win = resolveSleepWindow(todayStr, s.daysAgo, s.startMinute, s.endMinute, tz)
-          let cursor = win.startedAt.getTime()
-          for (const span of s.stages) {
-            const end = cursor + span.minutes * 60_000
-            sleepOut.push({ startedAt: cursor, endedAt: end, stage: span.stage, minutes: span.minutes })
-            cursor = end
-          }
-        }
-        break
-
-      case 'temperature':
-        for (const r of f.readings) {
-          readings.push({ kind: 'temperature', at: resolveRelative(todayStr, r.daysAgo, r.minuteOfDay, tz).getTime(), value: r.celsius })
-        }
-        break
-
-      case 'spo2':
-        for (const r of f.readings) {
-          readings.push({
-            kind: 'spo2',
-            at: resolveRelative(todayStr, r.daysAgo, r.hour * 60, tz).getTime(),
-            value: r.min, valueHigh: r.max,
-          })
-        }
-        break
-    }
-  }
-  return { readings, sleep: sleepOut }
-}
 
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
 
