@@ -450,6 +450,139 @@ daytime values. Readiness for the 27th was computed from a nap that did not happ
 **Back-fill is required, not optional:** the 27th's stored summary is wrong on disk, so a corrective
 recompute has to run over the affected days once the selection is fixed.
 
+### [readiness][app-shell] RV-38 — Body Battery prints 50 and calls it "Good" for an account that has never worn anything
+
+- **Lane:** B — `components/body-battery-card.tsx` only. The route needs no change; it is already correct.
+- **Added:** 2026-09-03, Review sweep 42 —
+  [`write-up §2`](reviews/2026-09-03-first-run-honesty-and-instant-paint.md)
+- **The route is honest and the card ignores it.** `GET /api/body-battery` for the zero-data account:
+  `{"current":50,"label":"Good","trend":"steady","hasData":false,`
+  `"confidence":{"sampleCount":0,"samplesPerHour":0,"sufficient":false},"anchor":50,`
+  `"anchorSource":"default"}`. Four fields say it has nothing. The card renders **Good / Steady / 50**
+  with a colour-coded label, a bar filled to 50%, and **no "Limited data" badge** (asserted: count 0).
+- **Why the guard misses.** `body-battery-card.tsx:95` — `const lowData = battery.hasData && conf !=
+  null && !conf.sufficient`. The badge is gated on `hasData`, so the qualification gets *weaker* as
+  the data gets worse: enough samples → no badge (right); too few → "Limited data" (right); **none at
+  all → no badge**. `hasData` is otherwise used only to gate the expanded chart (line 164), so the
+  collapsed card has no path that can say there is nothing behind the number.
+- **The contrast is on the same screen, same account.** Streak `—days`; the week grid `—` on all seven
+  days; the Readiness/HR/Sleep chip row absent entirely; `/health/readiness` reads `—`. Only Body
+  Battery prints a figure — and Readiness is the number it *opens at*, per the card's own explainer.
+- **Do not reopen Q-43.** That decision (degrade rather than blank) stands and this does not depend on
+  it. The narrow point: the app already computes "I cannot support this number", already has a
+  component that says so, and does not use it in the case where it is most true. Minimum fix is
+  dropping `battery.hasData &&` from line 95. **Whether no-data deserves something stronger than the
+  "Limited data" badge — an `—` like Readiness — is the owner's call**, so put it to them rather than
+  picking one. `/health/heart-rate` is the reference for the stronger posture: it prints `—` for
+  min/avg/max and names the estimate outright (*"Working max: 190 bpm (age-estimated)"*).
+- **While in this file:** the comment at lines 134–139 says the explainer paragraph *"only renders in
+  the NO-DATA state"*, two lines below the Q-276 note saying it is *"always visible"*. The JSX is
+  unconditional and it was observed rendering for the seeded user too. Delete the stale half.
+- **How to test locally:** the harness's `ZERO_DATA_STORAGE_STATE` account, `/`, asserting the API's
+  `hasData: false` beside what the card renders. Assert the **payload next to the text** — a rendered
+  50 alone cannot distinguish a bug from a fixture.
+- **Verify:** owner — whether the no-data treatment reads right to them on Home.
+
+### [devices][app-shell] RV-39 — the `/more/devices` ring card flashes a skeleton on a warm repeat visit
+
+- **Lane:** B — the ring card on `/more/devices`.
+- **Added:** 2026-09-03, Review sweep 42 —
+  [`write-up §3`](reviews/2026-09-03-first-run-honesty-and-instant-paint.md)
+- Measured on a second visit to an already-compiled route, skeletons in the viewport at
+  250/600/1200/2500 ms: **`/more/devices` = `[1,1,0,0]`**. All 13 other sub-routes measured
+  `[0,0,0,0]`. The element is `rounded-2xl bg-muted/40 border border-border h-[68px] animate-pulse`
+  under the `RING` heading, resolving to *"Oura Ring 5 — No data yet"* in ~1.2 s.
+- **Under a second, and filed anyway** because `CLAUDE.md` states the rule without a threshold — *"A
+  skeleton flash on a repeat visit is a bug"* — and the fix is the one the rule names: seed from
+  `readCacheSync` before first paint.
+- **Note the existing guard cannot see this class.** `expectNoSkeleton` polls to a 20 s budget, so it
+  catches *never seeds* and is blind to *flashes for a second*. Sampling at fixed early offsets sees
+  both; if this is guarded, guard it that way.
+- **Verify:** device — the ring card's real state is BLE, which the web build cannot reach at all, so
+  a web-green paint says nothing about what the APK shows here.
+
+### [nutrition][app-shell] RV-35 — Nutrition never asks what day it is on resume, so it files breakfast against yesterday
+
+- **Lane:** B — `app/nutrition/nutrition-content.tsx` only.
+- **Batch:** nutrition-tab-day-and-scroll
+- **Added:** 2026-09-03, Review sweep 41 —
+  [`write-up §2`](reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md)
+- **Measured, not inferred.** Five tabs loaded at 23:50 Brisbane under a fixed clock, clock advanced
+  30 minutes, `visibilitychange` dispatched. Dated requests before → after:
+  Home 4 → **2**, Health 3 → **3**, Nutrition **5 → 0**, Workout and More issue none either side.
+  Nutrition is the only tab that is day-scoped *and* fails to roll over.
+- **The part that is not cosmetic.** The header reads `Today` because
+  `formatDateLabel(selectedDate, todayStr)` prints it only when the two agree — and both are frozen at
+  the launch day, so there is no visible tell. `selectedDate` is also what a new log is written with
+  (`logDate` at `nutrition-content.tsx:716`, `selectedDateRef.current` on the delete path), so a
+  breakfast logged after midnight lands on the finished day and feeds its calorie budget and adherence.
+- **The existing guard is correct and unreachable.** `nutrition-content.tsx:311–326` already compares
+  `lastVisibleDayRef` against a fresh `todayInTz(tz)` and follows the day. Its deps are
+  `[tabEpoch, fetchData, tz]`, and the shell increments `tabEpoch` only when a tab is **re-shown** —
+  never on a resume-in-place. Switching tabs away and back does fix it, so this reads as intermittent.
+- **The fix is the hook that already exists.** `useLocalDay()` (`components/shell/local-day-provider.tsx`,
+  BF-86) re-evaluates on `visibilitychange` and is what `session-select-content.tsx` uses — the surface
+  that measured correct above. Add it to the dependency array; do not hand-roll a second listener, and
+  do not reach for an interval (BF-86's comment records why).
+- **Do not "fix" this by reloading on `visibilitychange`** — BF-80 rules that out; it costs the
+  instant-paint behaviour.
+- **How to test locally:** the clock recipe in §7 of the write-up — `page.clock.install` at 23:50
+  Brisbane, `fastForward`, dispatch `visibilitychange` — asserting a request dated the *new* day. The
+  mechanism is fully web-testable, so no `Gate:` is set.
+- **Verify:** device — the owner's real case is leaving the app open overnight on the S25 and logging
+  breakfast; confirm the header follows the date and the log lands on the new day.
+
+### [app-shell][nutrition] RV-36 — scroll restoration reaches 3 of 5 tabs; BF-100's entry says it reaches all of them
+
+- **Lane:** B — `app/nutrition/nutrition-content.tsx`, plus a correction to BF-100's entry above.
+- **Batch:** nutrition-tab-day-and-scroll
+- **Added:** 2026-09-03, Review sweep 41 —
+  [`write-up §3`](reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md)
+- **⚠ Correct BF-100's claim in the same PR.** That entry and the call site both say the hook is called
+  from `pull-to-sync.tsx` *"so every screen using the shell inherits it"*. Three screens use
+  `PullToSync` — `health-content`, `more-content`, `session-select-content`. The Nutrition tab owns its
+  own scroller (`nutrition-content.tsx:563`) and inherits nothing. Left as written, the next session
+  reads Nutrition as already handled.
+- **Measured**, with BF-100's own verified recipe (wheel scroll → in-app `router.push` → `goBack`):
+  `/more` → *Profile details* → back restores **840**; `/nutrition` → `/coach` → back saves **no**
+  `ta_scroll:` key and returns **0**.
+- **The gap is one path, not many — this was counted.** Restoration only matters where a user pushes
+  deeper and returns. Every other routable screen that scrolls at the mobile viewport
+  (`/health/sleep` 1200 px, `/health/heart-rate` 661, `/cardio` 374, `/config` 148, `/program` 148)
+  contains **no** `router.push` or `<Link>` to a deeper route — they are leaves, and re-entering one is
+  a fresh arrival that correctly starts at the top. `/workout-select` does not scroll at all. So the
+  live gap is Nutrition's single deeper push, `/coach?scope=nutrition`.
+- **The fix is one hook call**, not a `PullToSync` wrap: `useScrollRestoration(ref)` takes a ref and
+  nothing about it is tab-specific. Wrapping Nutrition in `PullToSync` would also give it a
+  pull-to-refresh gesture nobody asked for.
+- **How to test locally:** extend `e2e/scroll-restoration.spec.ts` with the `/nutrition` → `/coach` →
+  back case. Keep its precondition assertions — BF-100 records four spec traps that all report
+  `expected 840, received 0`, and a fifth this sweep paid for: `page.goto()` is a hard navigation, so
+  React cleanup never runs and **no** screen saves an offset.
+- **Verify:** device — the system back gesture on the S25, which is the gesture BF-100 was reported
+  against and the one the harness cannot send.
+
+### [app-shell][platform] RV-37 — `/health/day` scrolls with no bottom padding (structural; NOT observed)
+
+- **Lane:** B — `app/health/day/day-detail-content.tsx:226`
+- **Gate:** device
+- **Added:** 2026-09-03, Review sweep 41 —
+  [`write-up §4`](reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md)
+- The container is `flex-1 space-y-4 overflow-y-auto scrollbar-hide px-4 pt-4` — no `pb-*` at all. It
+  is a sub-route, so no bottom nav and nothing anchored below it; the last card ends flush with the
+  viewport bottom, which on the S25's gesture navigation is the gesture bar.
+- **⚠ This was NOT observed and must not be closed as if it were.** The seeded fixture renders
+  *"Nothing logged on this day"*, so the container never became scrollable. The control on `/more`
+  measured `padding-bottom: 68px` (`pb-nav-safe`), which is what a covered scroller looks like.
+- **Why no CI rule caught it.** All four safe-area rules in the *Custom Rules* job fire on a **wrong**
+  utility (hand-rolled inset, `pt-safe` stacking, `pb-safe*` stacking, raw `bottom-N` on a fixed
+  element). None fires on an **absent** one. Worth considering a fifth rule, but only after the device
+  confirms the symptom — a check for "full-height scroller with no bottom pad" would need an
+  allow-list for the sheets and navless full-screens that legitimately have none.
+- **How to confirm the symptom:** open `/health/day` on the S25 on a day with enough logged to make
+  the container scroll, and check whether the last card clears the gesture bar. The `Gate: device`
+  above is exactly that — nothing here can start until the device says the symptom is real.
+
 ### [nutrition] BF-109 — the Review sheet's macro/calorie cross-check (shipped; a real scan and the device owed)
 
 - **Lane:** B — `components/nutrition/review-step.tsx` and `macro-calorie-warning.tsx`. The shared
@@ -849,6 +982,13 @@ feature and not a deletion like LB-41:
   `lib/hooks/use-scroll-restoration.ts`, called once from `pull-to-sync.tsx` so every screen using
   the shell inherits it rather than 62 separate fixes. `e2e/scroll-restoration.spec.ts` is **green**
   against a cold harness server.
+- **⚠ "every screen using the shell inherits it" is WRONG — corrected 2026-09-03 (Review sweep 41).**
+  Every screen using **`PullToSync`** inherits it, and three screens use it: `health-content`,
+  `more-content`, `session-select-content`. The **Nutrition tab owns its own scroller**
+  (`nutrition-content.tsx:563`) and inherits nothing — measured, `/nutrition` → `/coach` → back saves
+  no `ta_scroll:` key and returns 0, against `/more`'s 840. Filed as **RV-36**, which also records why
+  the live gap is only that one path. The hook itself is fine and takes a ref; it is simply not called
+  anywhere else.
 - **⚠ An earlier version of this entry claimed tab-to-tab was broken. Retracted.** A tab-to-tab move
   loses nothing: the shell keeps every tab screen mounted, so the container holds its own `scrollTop`
   unaided — measured, with Health's container still reading 840 while the URL was `/nutrition`. The
@@ -6461,6 +6601,41 @@ because none of them is the change that review was for, and per **No orphaned fi
 without a queue entry is a dropped finding.*
 
 
+### [sleep][platform] LB-53 — `oura_daily_derived` is written in occasional bulk passes, not per night
+
+- **Lane:** A — the rollup (`lib/oura-ble/rollup/**`) and whatever schedules it. Found from Lane B
+  while checking Q-529's own caveat; filing rather than building, per the lane rule.
+- **Added:** 2026-09-02 · measured against production while answering Q-529's *"re-read `computed_at`
+  the next day"*.
+- **The whole table carries four distinct `computed_at` stamps.** Not four per day — four in its
+  entire history:
+
+  | stamp (UTC) | rows | day range touched |
+  |---|---|---|
+  | 2026-09-02 21:55 | 85 | 2026-05-07 → 2026-09-03 |
+  | 2026-08-24 13:42 | 1 | 2026-08-22 |
+  | 2026-08-17 07:50 | 21 | 2026-07-08 → 2026-08-04 |
+  | 2026-07-30 03:30 | 1 | 2026-07-07 |
+
+- **Nine days with no write at all**, 2026-08-24 13:42 → 2026-09-02 21:55, across which every night
+  happened as usual. Rows exist for all of them and every one now carries the 21:55 stamp, so the
+  question this cannot answer from outside is whether those days held a stale score in the meantime
+  or no row at all. **That is the thing to measure first** — it is the difference between "scores go
+  stale" and "scores are absent until something triggers a pass".
+- **The 21:55 pass is suspicious in itself.** It landed minutes after a Railway deploy (#827) and
+  rewrote 85 rows spanning the whole history. If a *deploy* is what recomputes scores, then the
+  refresh cadence is release frequency rather than anything to do with the data — which no one would
+  choose, and which would explain the nine-day gap exactly.
+- **What it changes for the user:** Q-529 reported a score of 47 on 2026-08-20 that should have
+  settled higher. It now reads **62**. So the recompute is real, but on this evidence it is not
+  nightly, and a night's score can sit at its mid-sync value for a long time rather than the
+  ~9-minute window Q-529 assumed. **That makes Q-529's client-side marking more load-bearing, not
+  less** — the marked state may persist far longer than a few minutes.
+- **Not a duplicate of Q-529.** That is "the number on screen does not say it can still change", and
+  its Lane B half shipped 2026-09-02. This is "the number may not be recomputed for days".
+- **Caveats:** `claude_ro` is row-scoped to the owner, so this is one user's rows; and `computed_at`
+  is the only evidence available from outside — the scheduling itself is not visible from a query.
+
 ### [platform] LB-52 — `main` outpaces a CI cycle and auto-merge is unavailable, so every PR is a race
 
 - **Lane:** ? — neither. The fix is a repository *setting*, not code in either lane's paths.
@@ -11334,6 +11509,28 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   `active`/`extra_active` 12,000) are unmeasured here — only `moderate` was exercised.
 
 ### [sleep] Q-529 — a provisional sleep score is displayed as final while the night is still syncing
+
+- **✅ THE CLIENT HALF SHIPPED 2026-09-02** (`fix/mark-provisional-sleep-score`). Link 3 below — *"do
+  not render a number that will change"* — was the only part shippable without an APK, and it is
+  done on all three surfaces: the Home score chip (the existing `lowWear`/`limited` glyph, now
+  driven by a shared predicate rather than three copies of one condition), the Body tab's sleep card,
+  and the `/health/sleep` detail screen the chip leads to.
+- **⚠️ THE ENTRY'S CENTRAL CLAIM WAS STALE BY THE TIME IT WAS PICKED UP.** It says *"sleep stores no
+  equivalent [provisional flag], so partial and finished scores are indistinguishable"*. True on
+  2026-08-20; **`lib/sleep/provisional.ts` shipped for BF-83 on 2026-09-01**, and
+  `/api/sleep-sessions` has returned a per-night `provisional` flag ever since. The flag was reaching
+  the client in the JSON and being dropped by four local `SleepRow` interface copies that never
+  declared it. So the server work the entry asks for was already done and the job was the UI.
+- **The caveat is answered, and the answer is bigger than the entry expected.** It asked for a
+  re-read of `computed_at` for 2026-08-20: the score has moved **47 → 62**, so this is latency rather
+  than a missing recompute, as the caveat's alternative predicted. **But the recompute is not
+  nightly** — the whole table holds four `computed_at` stamps and there was a nine-day gap with no
+  write at all. Filed as **LB-53** (Lane A). It makes this entry's marking MORE load-bearing: the
+  provisional state may last far longer than the ~9-minute window assumed here.
+- **Keep:** links 1 and 2 — the on-open drain (native Kotlin, new APK) and the immediate re-score
+  after it. Both are Lane A, and doing 2 without 1 makes the app faster at showing stale data.
+- **Gate:** device — links 1 and 2 need an APK, and the shipped marking needs a morning where the
+  ring is genuinely mid-upload to be seen at all.
 
 - **⚠️ SCOPE CORRECTED 2026-08-20, hours after filing — the original claim was WRONG. Read this first.**
   This entry originally said the score is *never* recomputed. **It is.** Re-checked at 06:59:32:

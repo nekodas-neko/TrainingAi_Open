@@ -6999,6 +6999,66 @@ keys and unique constraints come out, and its one real candidate was already tak
 migration 249. The `stats_reset = NULL` line is there because it cuts the *opposite* way to how it
 reads — it strengthens "never scanned" while leaving constraint indexes exactly as undroppable.
 
+## 2026-09-02 — `projectOverview.md` → 9607, `docs/implementation-backlog.md` → 15955 (Q-529 + LB-53)
+
+The backlog carries two additions and the index one. What earns the space in all three is the same
+correction: **the entry's premise was stale, and the flag it asks for already existed.** Without that
+written down, the next reader of Q-529 goes looking for the missing server-side concept that
+`lib/sleep/provisional.ts` has provided since BF-83 — and the actual defect, four local `SleepRow`
+copies silently dropping a field the API was already sending, is invisible from the entry.
+
+LB-53's table is the whole of its length and is not compressible: four `computed_at` stamps with
+their row counts and day ranges is the evidence, and "scores are not recomputed nightly" without it
+is a claim rather than a measurement. Its own caveats are kept for the same reason — `claude_ro` is
+row-scoped, and scheduling is not visible from a query, so a later session knows what the read could
+not settle.
+
+## 2026-09-03 — Review sweep 41 (RV-35, RV-36, RV-37)
+
+`docs/implementation-backlog.md` 15955 → 16043 (+88), `projectOverview.md` 9607 → 9641 (+34). Three
+queue entries and their three Known-Issues rows.
+
+What earns the space is the same thing in each: **the measurement, not the claim.** RV-35's table of
+dated requests across all five tabs (Home 4 → 2, Health 3 → 3, Nutrition 5 → 0) is what separates
+"Nutrition looks stale" from "Nutrition is the only day-scoped tab that fails to roll over" — and the
+count only means anything because the requests are counted *by the date they carry*, since Health
+reissued 11 on resume and only 3 carried the new day. RV-36's line about `/health/sleep`,
+`/health/heart-rate`, `/cardio`, `/config` and `/program` all being leaves with no deeper push is what
+shrank that finding from "many screens" to one path; without it the next session re-counts them.
+
+RV-37's length is almost entirely the caveat that it was **not observed** — the fixture had nothing to
+scroll — plus why four safe-area CI rules miss it (they all fire on a *wrong* utility, never an absent
+one). A one-line version of that entry would read as a confirmed bug.
+
+The correction folded into BF-100's existing entry adds six lines and removes a false statement that
+would otherwise tell the next session Nutrition is already covered.
+
+## 2026-09-03 — Review sweep 42 (RV-38, RV-39)
+
+`docs/implementation-backlog.md` 16044 → 16095 (+51), `projectOverview.md` 9642 → 9666 (+24),
+`docs/agents/state/review.md` 173 → 178 (+5).
+
+RV-38's length is the evidence and cannot be shortened without becoming an assertion. The finding is
+not "the card shows a wrong number" — 50 could be right — it is that the **route reports `hasData:
+false`, `sampleCount: 0`, `sufficient: false` and `anchorSource: "default"` while the card prints
+Good / Steady / 50**, so the payload has to sit in the entry beside the rendering. The line naming
+`body-battery-card.tsx:95` and the three-row table of how the badge behaves as data gets worse is
+what stops the implementer re-deriving why an existing guard does not fire; without it the obvious
+reading is that no guard exists. The paragraph refusing to reopen Q-43 is there because
+degrade-rather-than-blank is a settled owner decision that this entry sits next to and does not touch.
+
+RV-39 is under a second of skeleton and would be easy to file as one line. The two lines that earn
+their place are the measurement (`[1,1,0,0]` against `[0,0,0,0]` on thirteen siblings — a single
+number proves nothing) and the note that `expectNoSkeleton` polls to 20 s and is structurally blind
+to this class, which is the difference between "add a guard" and "add a guard the existing helper
+cannot express".
+
+**The baton grew because it now carries two sweeps rather than one**, and everything compressible was
+cut first: the sweep-40 narrative went to two bullets, the ID-trap paragraph lost its history, the
+"where the sweeps live" section lost the parts the pillar indexes already answer, and the Now section
+was rewritten from four bullets to three. What is left is state — which lenses are closed, which are
+owed, and the four method notes that cost a sweep each to learn.
+
 ## 2026-09-02 — `docs/implementation-backlog.md` → (see .size), `projectOverview.md` → (see .size) (LA-56)
 
 A new entry, filed the moment the owner ran the pass three docs had been waiting on and it failed.

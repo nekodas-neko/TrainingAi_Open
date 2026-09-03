@@ -83,16 +83,14 @@ import {
 } from "@/lib/home/home-prefs";
 import { chooseRestDay, withRestDayOverride } from "@/lib/home/rest-day";
 import { fetchWithRetry } from "@trainingai/shared/fetch-with-retry";
+import type { SleepRow } from "@/app/health/health-sections";
 import type { HrSleepWindow } from "@trainingai/shared/health/hr-sleep-band";
 
-interface SleepRow {
-  date: string
-  durationHours: number | null
-  deepSleepHours: number | null
-  remSleepHours: number | null
-  lightSleepHours: number | null
-  awakHours: number | null
-}
+// Derived from the canonical shape rather than restated as a sixth local copy: the fields Home
+// needs, plus `provisional`, which the local-store seed below cannot supply and which the Home
+// score chip reads. A `Pick` keeps the seed's narrow object literal assignable.
+type HomeSleepRow = Pick<SleepRow,
+  'date' | 'durationHours' | 'deepSleepHours' | 'remSleepHours' | 'lightSleepHours' | 'awakHours' | 'provisional'>;
 
 
 function getGreeting(name: string, tz: string): string {
@@ -143,7 +141,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   const dayKey = useCallback((daysAgo = 0) => dayKeyInTz(tz, daysAgo), [tz]);
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
-  const [sleepData, setSleepData] = useState<SleepRow[]>([]);
+  const [sleepData, setSleepData] = useState<HomeSleepRow[]>([]);
   const [stepsGoal, setStepsGoal] = useState(10000);
   const [stepsGoalType, setStepsGoalType] = useState<"daily" | "weekly">("daily");
   const [sleepGoal, setSleepGoal] = useState(8);
@@ -252,7 +250,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
       }
       // date mismatch — skip stale cache, let fetchMeta() hydrate from API
     }
-    const sleep = readCacheSync<SleepRow[]>('sleep-sessions');
+    const sleep = readCacheSync<HomeSleepRow[]>('sleep-sessions');
     if (sleep) setSleepData(Array.isArray(sleep) ? sleep : []);
 
     // Seed the HR chart from the same cache keys the Health → Body Oura section
@@ -639,7 +637,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     await Promise.allSettled([
       fetchMeta(),
       fetchWorkoutData(),
-      cachedFetch<SleepRow[]>('sleep-sessions', '/api/sleep-sessions', TTL_MEDIUM,
+      cachedFetch<HomeSleepRow[]>('sleep-sessions', '/api/sleep-sessions', TTL_MEDIUM,
         d => setSleepData(Array.isArray(d) ? d : [])),
       loadTodayMood(),
     ]);
@@ -709,7 +707,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
 
   // Was on the BLE event; the invalidation is wider (`invalidateBiometrics` clears this key too).
   useInvalidationRefetch('sleep-sessions', () => {
-    cachedFetch<SleepRow[]>('sleep-sessions', '/api/sleep-sessions', TTL_MEDIUM, d => setSleepData(Array.isArray(d) ? d : []));
+    cachedFetch<HomeSleepRow[]>('sleep-sessions', '/api/sleep-sessions', TTL_MEDIUM, d => setSleepData(Array.isArray(d) ? d : []));
   });
 
   // Q-359: synced into state, not derived — `goalsProfile` also takes optimistic local writes that
@@ -749,7 +747,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
         }).catch(() => { /* store unavailable — network path below still runs */ });
       }
     }
-    fetchWithRetry<SleepRow[]>(
+    fetchWithRetry<HomeSleepRow[]>(
       'sleep-sessions', '/api/sleep-sessions', TTL_MEDIUM,
       (data) => setSleepData(Array.isArray(data) ? data : []),
       () => cancelled,
@@ -1126,7 +1124,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
         )}
 
         {/* ── Oura Score Chips ── */}
-        {readiness && <OuraScoreChipRow readiness={readiness} />}
+        {readiness && <OuraScoreChipRow readiness={readiness} sleepProvisional={sleepData[0]?.provisional === true} />}
 
         {/* ── Illness advisory (elevated/fever only — self-hides otherwise) ── */}
         {readiness && <IllnessAdvisoryBanner readiness={readiness} />}

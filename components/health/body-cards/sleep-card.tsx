@@ -7,6 +7,7 @@ import { accentCardStyle } from "@trainingai/shared/utils";
 import { useTransitionRouter } from "@/lib/view-transition";
 import { actualSleepWindow } from "@/lib/sleep/actual-window";
 import type { SleepRow } from "@/app/health/health-sections";
+import { ProvisionalBadge } from "@/components/health/provisional-badge";
 
 interface Props {
   recentSleep: SleepRow | null;
@@ -63,6 +64,11 @@ export function SleepCard({ recentSleep, lastSleep, computedSleepScore, metaLoad
           </div>
         </div>
         <div className="flex items-center gap-1.5 flex-none">
+          {/* Q-529: every figure on this card — the duration, the score and all six stat chips —
+              is derived from a night the rollup may not have finished reading. Marking the card
+              once is the honest version: they move together, so badging each one would say the
+              same thing six times. */}
+          {recentSleep?.provisional && <ProvisionalBadge />}
           {(() => {
             const badgeScore = computedSleepScore ?? lastSleep?.sleepScore ?? null;
             return badgeScore != null ? (

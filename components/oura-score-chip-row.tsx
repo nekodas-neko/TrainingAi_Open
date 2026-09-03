@@ -2,6 +2,7 @@
 
 import { memo, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { useTransitionRouter } from "@/lib/view-transition";
+import { isQualified, qualifierPhrase } from "@/components/health/score-qualifier";
 import { Zap, Moon, Flame, HeartPulse, TriangleAlert, type LucideIcon } from "lucide-react";
 import { scoreBand } from "@trainingai/shared/health/score-band";
 import { restingHrCue } from "@trainingai/shared/health/resting-hr-cue";
@@ -13,6 +14,11 @@ import type { ReadinessScoreResponse } from "@/app/api/readiness-score/route";
 
 interface Props {
   readiness: ReadinessScoreResponse;
+  /** Last night has not finished syncing. Comes from `/api/sleep-sessions`, not from the readiness
+   *  payload the score itself arrives in — the flag describes the NIGHT, and it is recomputed per
+   *  request from the rollup's coverage rather than stored, because what it describes changes
+   *  without the row changing (see `lib/sleep/provisional.ts`). */
+  sleepProvisional?: boolean;
 }
 
 // State cue for a 0–100 score card (Readiness / Sleep / Activity). Only the "accentring" style
@@ -74,6 +80,9 @@ interface CellProps {
   /** Score computed from fewer than the usual inputs. Marked, not dimmed — the reading itself is
    *  trustworthy, there is just less behind it. */
   limited?: boolean;
+  /** The night behind this number is still syncing, so the number can still move. Marked but not
+   *  dimmed — it is the best reading available, it is simply not the last one. */
+  provisional?: boolean;
 }
 
 /** Warm the destination's RSC payload before it's tapped. Without this the fetch starts at tap
@@ -86,16 +95,16 @@ function useScoreNav(href: string) {
   return () => router.push(href);
 }
 
-function ariaLabelFor({ label, display, cue, lowWear, limited }: CellProps) {
-  return `${label}: ${display}${cue ? `, ${cue.word}` : ""}${lowWear ? " — ring wasn't worn enough hours today for a confident reading" : ""}${limited ? " — based on part of the usual inputs" : ""}`;
+function ariaLabelFor({ label, display, cue, lowWear, limited, provisional }: CellProps) {
+  return `${label}: ${display}${cue ? `, ${cue.word}` : ""}${qualifierPhrase({ lowWear, limited, provisional })}`;
 }
 
 /** The label line under a cell, plus the warning glyph when the reading is qualified. */
-function CellLabel({ label, lowWear, limited, display, className, style }: { label: string; lowWear?: boolean; limited?: boolean; display: string; className?: string; style?: CSSProperties }) {
+function CellLabel({ label, lowWear, limited, provisional, display, className, style }: { label: string; lowWear?: boolean; limited?: boolean; provisional?: boolean; display: string; className?: string; style?: CSSProperties }) {
   return (
     <span className={className ?? "flex items-center gap-0.5 text-[11px] leading-none text-muted-foreground"} style={style}>
       {label}
-      {(lowWear || limited) && display !== "—" && <TriangleAlert className="h-2.5 w-2.5" />}
+      {isQualified({ lowWear, limited, provisional }, display) && <TriangleAlert className="h-2.5 w-2.5" />}
     </span>
   );
 }
@@ -232,7 +241,7 @@ function MinimalNumber({ children, rem }: { children: string; rem: number }) {
  *  each differs only in stack order, what is deleted, and what mark (if any) closes the cell. */
 function ScoreMinimal({ props, first }: { props: CellProps; first: boolean }) {
   const { display, accent, Icon, ringStyle } = props;
-  const qualified = (props.lowWear || props.limited) && display !== "—";
+  const qualified = isQualified(props, display);
 
   if (ringStyle === "footnote") {
     return (
@@ -325,7 +334,7 @@ function ScorePill(props: CellProps) {
       <span className="font-black leading-none tabular-nums tracking-tight text-foreground" style={{ fontSize: "1.2rem" }}>
         {display}
       </span>
-      {(props.lowWear || props.limited) && display !== "—" && <TriangleAlert className="h-2.5 w-2.5 text-muted-foreground" />}
+      {isQualified(props, display) && <TriangleAlert className="h-2.5 w-2.5 text-muted-foreground" />}
     </CellButton>
   );
 }
@@ -358,7 +367,7 @@ function ScoreRailCell({ props, first }: { props: CellProps; first: boolean }) {
   );
 }
 
-export const OuraScoreChipRow = memo(function OuraScoreChipRow({ readiness }: Props) {
+export const OuraScoreChipRow = memo(function OuraScoreChipRow({ readiness, sleepProvisional }: Props) {
   const [ringStyle, setRingStyle] = useState<ScoreRingStyle>("default");
   useEffect(() => {
     setRingStyle(loadScoreRingStyle());
@@ -421,6 +430,10 @@ export const OuraScoreChipRow = memo(function OuraScoreChipRow({ readiness }: Pr
       href: "/health/sleep",
       Icon: Moon,
       ringStyle,
+      // Q-529: the score is derived from the night, so while the night can still grow this number
+      // can still move. Measured on 2026-08-20 — it read 47 during the sync and 62 once settled,
+      // and nothing on screen distinguished the two.
+      provisional: sleepProvisional,
     },
     {
       label: "Activity",

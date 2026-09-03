@@ -116,6 +116,7 @@ Q-29.
 Genuinely superseded, kept for the trail only: `docs/oura-on-device-handover.md` (the *audit* baton
 — superseded by the hybrid-handover doc above once the audit finished).
 
+- [`docs/reviews/2026-09-03-first-run-honesty-and-instant-paint.md`](../../reviews/2026-09-03-first-run-honesty-and-instant-paint.md) — **the ring card flashes a skeleton on a warm repeat visit, 2026-09-03** (sweep 42, RV-39). `/more/devices` measured `[1,1,0,0]` skeletons at 250/600/1200/2500 ms on a second visit to an already-compiled route, against `[0,0,0,0]` on all 13 other sub-routes; the element is the 68px ring placeholder, resolving to *"Oura Ring 5 — No data yet"* in ~1.2 s. Filed because the instant-paint rule carries no threshold, and because the repo's own `expectNoSkeleton` helper polls to 20 s and is structurally blind to a flash. **Needs the device** — the ring card's real state is BLE.
 - Reviews: [`docs/reviews/2026-08-07-full-app-review.md`](../../reviews/2026-08-07-full-app-review.md) — **full-app deep review, 2026-08-07** (saving/caching/performance/logic across all 201 routes and 40 pages; 53 findings queued as Q-117…Q-138, plus root cause for Q-73 and mechanisms for Q-72/Q-107)
 
 - [`docs/overview/entries/2026-08-18-ble-rekey-declared-not-inferred.md`](../../overview/entries/2026-08-18-ble-rekey-declared-not-inferred.md)
