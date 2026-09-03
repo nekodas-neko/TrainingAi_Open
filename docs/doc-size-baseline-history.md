@@ -7385,6 +7385,21 @@ tree locally, so a branch cut from an older `main` passes `pnpm check:rules` loc
 for reasons that have nothing to do with its diff. That happened here. Re-merging `origin/main`
 before the final local gate run is what makes the two agree.
 
+## 2026-09-03 — `docs/implementation-backlog.md` → 16885 (BF-113 … BF-116, four owner reports)
+
+Four entries from one batch, and three of them cost their length by naming the thing that would
+otherwise be re-derived. **BF-113** is a label: the BMI band is chosen from a DEXA-corrected body fat
+and the card says only "via body fat %", while the card beside it already states its calibration span
+— sibling-surface, one word short. **BF-114** carries the measurement that makes it real: 1,543 kcal
+from the scale against 1,325 from the clinical RMR, 218 apart, and the smaller one is what drives the
+targets. **BF-115** turned up something nobody had recorded — `sleep_sessions` holds **three rows for
+2026-09-03** — and the entry deliberately stops short of a fix, because whether the fragments are
+naps or artefacts decides between row selection and de-duplication; it also marks the part of the
+trace that was not finished rather than implying a complete one. **BF-116** is the most useful to
+have written down: the header overflow is caused by BF-96's own fix, which correctly made the weather
+chip unshrinkable and thereby left the row with no compressible item at all, one day before Q-111
+added a third chip. Without that history the obvious repair is to undo BF-96 and restore the
+two-line wrap.
 ## 2026-09-03 — `docs/implementation-backlog.md` → 16822 (BF-112, splitting stage 2 out of BF-69)
 
 The owner asked how retatrutide tracking had progressed. Tracing it produced a better answer than a

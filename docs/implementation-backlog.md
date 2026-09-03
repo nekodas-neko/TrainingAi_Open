@@ -864,6 +864,136 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
   would make the tile instant and work offline, but it duplicates a formula One Formula, One Place
   says lives once, and the `node:path` read is the coupling that keeps it server-side.
 
+### [body] BF-113 — the BMI band is computed from a DEXA-corrected body fat and the card only says "via body fat %"
+
+- **Lane:** B — `app/health/health-sections.tsx:499` (the caption) and `:507` (the info popover).
+- **Added:** 2026-09-03 · owner: *"bmi doesnt say its scaled to match dexa."*
+
+**He is right, and the card is one word short of true.** `latestBf` is
+`metaRecentReversed.map(displayBodyFat)` (`health-content.tsx:545`), and `displayBodyFat` returns
+`bodyFatCorrected ?? bodyFat` — the **DEXA-corrected** value. So the band shown (*High fat* at 27.9)
+is decided by a calibrated figure, and the only thing the card says about it is *"via body fat %"*.
+The info popover is no better: *"Category is based on your body fat % — more accurate for muscular
+builds."* Nothing names the calibration.
+
+**The sibling card already does this properly**, which makes it a sibling-surface gap rather than a
+missing feature. `components/health/body-fat-card.tsx:46` calls `correctedSpan(metaRecent)` and says
+how many of the window's readings carry a correction — a helper written for exactly this
+(`body-fat-display.ts`: *"the two numbers together are what lets a chart say 'the last 4 of 7' rather
+than imply all or none"*).
+
+- **Recommendation: `via body fat % (DEXA-calibrated)` in the caption, and one sentence in the
+  popover** saying the scale reading is corrected to the owner's DEXA before the band is chosen. The
+  value is already correct; this is a labelling change only.
+- **⚠ Use `isCorrectedReading()`, never `bodyFatCorrected !== bodyFat`.** `body-fat-display.ts` warns
+  that an offset can round to zero and *"corrected by 0.0" and "not corrected" are different claims* —
+  and two thirds of the owner's history is on instruments the calibration does not cover, so the label
+  must follow the flag on the reading actually used, not a comparison.
+- **Verification:** the caption names the calibration on a corrected reading and does **not** on an
+  uncorrected one; the number itself is unchanged.
+
+
+### [body][nutrition] BF-114 — two numbers called BMR, 218 kcal apart, on two screens, neither saying which is which
+
+- **Lane:** B for the labelling; no engine change — both values already exist and both are correct.
+- **Added:** 2026-09-03 · owner: *"the BMR in scale is different to home; should probably indicate the
+  difference?"*
+
+**Measured in production 2026-09-03:**
+
+| | value | source |
+|---|---|---|
+| Body tab, "BODY COMPOSITION (SCALE)" → **BMR** | **1,543 kcal** | `body_metrics.bmr_kcal` — the scale's own bioimpedance estimate, re-read every weigh-in (1,545 / 1,542 / 1,543 across three days) |
+| the energy model behind Home's targets | **1,325 kcal** | `measured_rmr`, a single clinical test on **2026-08-27** |
+
+**218 kcal apart — 16%** — and the one the app actually *uses* is the smaller, measured one. Nothing
+on either screen says a word about it, so the more prominent number is the one that governs nothing.
+
+- **Recommendation: label the source on both, and say which drives the targets.** *"BMR 1,543 kcal ·
+  scale estimate"* on the composition card, and wherever the energy baseline is shown, *"from your
+  measured RMR, 27 Aug"*. That is the whole fix: the numbers are right, their provenance is missing.
+- **A tolerance note is worth adding, not a reconciliation.** Bioimpedance BMR and an indirect
+  calorimetry RMR are different measurements of different things; 16% is unremarkable between them.
+  **Do not average them, and do not switch the model to the scale's figure** — the measured value is
+  the better input and Q-401's reasoning (measured beats self-reported or inferred) applies.
+- **⚠ Related but distinct from BF-99**, which was about the *base rate* reading lower than the RMR
+  because the recomp deficit had been subtracted. This is a second pair of numbers entirely; fixing
+  one does not touch the other.
+- **Verification:** both screens name their source; a reader can tell in one glance which figure the
+  calorie targets come from.
+
+
+### [sleep] BF-115 — the hypnogram is missing from the sleep tile's detail, and there are three sleep rows for that date
+
+- **Lane:** A — the duplicate rows are the storage half and have to be understood before the surface
+  is touched. The render condition is B's, but it may need nothing.
+- **Added:** 2026-09-03 · owner: *"the sleep hypnogram still does not work on days when accessed from
+  the sleep tile."* Screenshot: the detail sheet for 2026-09-03 showing every stat and **no Sleep
+  Stages section at all** — neither the hypnogram nor the proportion-bar fallback.
+
+**The lead, found while tracing and not previously recorded: `sleep_sessions` holds THREE rows for
+2026-09-03.** Phase-string lengths **97, 29 and 25**, deep-sleep hours 0.67 / 0.75 / 0.33. All three
+carry a `sleep_start`, a `sleep_end` and a non-null phase string. The 97 is the real night (7h40m ≈ 92
+five-minute buckets); the other two are short fragments.
+
+**So this is very likely a row-selection problem, not missing data.** The sheet takes
+`sleepReadings={[...sleepRows]}` and finds the entry for a date; with three rows sharing that date,
+which one it lands on decides what renders. **This was not confirmed from the sandbox** — the
+selection path was not read to the end, and it should be the first thing an implementer checks rather
+than assumed.
+
+- **The render condition is `r.sleepPhase5Min && r.sleepStart && r.sleepEnd`**
+  (`health-metric-sheet.tsx:246`), with a proportion-bar fallback at `stageTotal > 0`. **Both failed**,
+  which is the informative part: the chosen row had no usable phase string *and* no stage hours, while
+  the Body tab's own sleep card on the same screen shows Deep 0.7h / REM 2.1h / Light 4.9h / Awake
+  0.4h. Two surfaces, same date, different rows.
+- **⚠ Ask why there are three rows before making the sheet pick better.** A per-date duplicate is a
+  storage question — naps, a re-drain writing a second session, or an upsert key that does not hold —
+  and a UI that picks the longest row would hide it. Whether the fragments are real short sleeps or
+  artefacts decides whether the fix is selection or de-duplication.
+- **⚠ `health-content.tsx:299` seeds these rows from the local store through
+  `as unknown as SleepRow[]`** — a double cast that silences the type checker, so a shape mismatch
+  between the local table and `SleepRow` would be invisible at compile time. Worth checking as part of
+  this even if the duplicates turn out to be the whole story.
+- **Verification (device):** open the sleep tile on a date with more than one session — the hypnogram
+  renders and matches the stage hours the Body tab's card shows for the same night; a date with a
+  single session is unchanged; and a date whose only row genuinely lacks phase data falls back to the
+  proportion bar rather than showing nothing.
+
+
+### [app-shell] BF-116 — the header chips now overflow into the action buttons, because BF-96 made every item unshrinkable
+
+- **Lane:** B — `app/session-select/session-select-content.tsx:1058-1063` (the header row).
+- **Added:** 2026-09-03 · owner: *"the grid and battery pill still intersect."* Screenshot: `86%`
+  sitting under the reorder-sections grid icon.
+
+**"Still" is the important word, and the cause is the previous fix.** BF-96 shipped
+`whitespace-nowrap shrink-0` on the weather chip on 2026-09-01, correctly: it was the row's only
+compressible item and took 100% of any shortfall, so `UV 5` broke at its own space and the pill went
+two lines tall. `device-battery-chip.tsx:50` carries the same pair, and the date at `:1059` already
+did.
+
+**Every item in that row is now `shrink-0`, so the shortfall has nowhere to go.** It used to wrap;
+now it overflows. The row is `flex items-center gap-2` inside a `flex-1 min-w-0` column, with the
+action group beside it as `flex-none` — and `HeaderChips` returns a **bare fragment**, so there is no
+wrapper to constrain, truncate or scroll. Content spills past the column and crosses the buttons. On
+2026-09-03 that is `Thursday 3 September` + weather + a ring battery chip, which is one chip more than
+the row was ever laid out for (Q-111 added device chips on 2026-09-02, the day after BF-96).
+
+- **⚠ Do not solve it by removing `shrink-0`** — that restores the two-line wrap BF-96 fixed. The row
+  needs an **overflow strategy**, not more or less shrinking.
+- **Recommendation: let the date be the thing that gives.** It is the least informative item, it is
+  the longest, and its length is what varies — `EEEE d MMMM` runs 12–20 characters across the year,
+  which BF-96 already identified as the variable that runs the row out of width. Drop its `shrink-0`
+  and give it `truncate` with a `min-w-0` parent, so a long date shortens while the chips stay whole.
+  A shorter format on narrow widths is the alternative and reads worse.
+- **The chips will keep arriving** — ring and strap ship today, the scale deliberately has none
+  (`header-chips.tsx:17`), and anything else with a battery is a candidate. A row that only fits
+  today's count is the same bug scheduled for later, so whatever is chosen should hold for three
+  chips.
+- **Verification (device, at the S25 width):** on the longest weekday-plus-month combination
+  (`Wednesday 30 September`) with weather and two device chips present, nothing crosses the grid icon
+  and no chip wraps to a second line; with one chip and a short date, the layout is unchanged.
 ### [nutrition] BF-112 — enter an actual dose: the storage for retatrutide is finished and there is still no field to type it into
 
 - **Lane:** B — the supplements manage sheet and `supplements-section.tsx`. **Engine work: none.**
