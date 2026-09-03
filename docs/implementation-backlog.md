@@ -10968,6 +10968,50 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 > **Not yet checked:** whether the process is alive and slow, or dead. Distinguishing those is
 > precisely the heartbeat, and until it exists this measurement says only that the work does not
 > land, never why.
+> **✅ ANSWERED THE SAME SESSION — the rollup worker is losing its DATABASE CONNECTION, and
+> `error_events` had it the whole time.** The session-start ritual read turned up a live fault four
+> minutes after the owner's 08:00 attempt:
+>
+> ```
+> url:     /api/oura-ble/samples#aggregate
+> at:      2026-09-03 08:04:43Z
+> message: Failed query: select "started_at", "completed_at" from "workout_sessions" …
+>            caused by: Connection terminated due to connection timeout
+>            caused by: Connection terminated unexpectedly
+> stack:   at Worker.<anonymous> (/app/.next/server/chunks/1706.js)
+> ```
+>
+> `at Worker.<anonymous>` places it **inside the rollup worker thread**. The only other fault ever
+> recorded at that url is **2026-08-17 11:33** — the same cause chain, hours after the last
+> full-history pass that ever completed. Two data points, both bracketing the regression.
+>
+> **The cause chain is the diagnostic, and it exists because someone already fixed the blind spot.**
+> `rollup-worker-entry.ts`'s `msg()` walks `.cause` precisely because on 2026-08-17 a redecode failed
+> three times and the only recoverable detail was the SQL text. Without that walk this entry would
+> still be guessing.
+>
+> **Two candidate mechanisms, and this does NOT choose between them:**
+> 1. **The worker's event loop is blocked long enough for the connection to die.** The full-history
+>    pass decodes ~1M samples in JS *inside the worker*; a pg client that cannot service its socket
+>    gets dropped, and the next query finds a dead connection. `Connection terminated unexpectedly`
+>    is that shape, not a statement timeout (which reports as *canceling statement*).
+> 2. **Pool self-contention.** `connectionTimeoutMillis: 5_000` against `max: 10`, and the worker
+>    has its **own** pool — a worker thread carries its own module registry, so `getPool()` there is
+>    a second Pool, not the main process's.
+>
+> **Ruled out: the Postgres server.** `max_connections` is **500** with **11** in use. This is
+> client-side, inside our own pool, not the instance.
+>
+> **What this changes about the fix.** The heartbeat this entry owes would report the run as dead
+> rather than merely stale — worth having — but it treats the symptom. The pass is dying on
+> infrastructure ceilings (`statement_timeout: 15_000`, `idle_in_transaction_session_timeout: 15_000`,
+> `connectionTimeoutMillis: 5_000`) that a whole-archive walk cannot respect. ⚠ **Those three
+> settings are load-bearing and must not simply be raised** — `CLAUDE.md`'s pool section records that
+> both took production down in session 165. The direction is to make the pass fit the ceilings
+> (chunk the read, release the connection between chunks) rather than raise them for everyone.
+>
+> **Still not checked:** which of the two mechanisms it is. That wants a timed run, and it is the
+> next measurement.
 
 - **Branch:** `fix/redecode-job-heartbeat` · **Lane:** A
 - **Added:** 2026-09-02 · found when the owner ran the pass TN-1 and Q-525 have been waiting on.

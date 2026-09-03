@@ -69,3 +69,44 @@ Two corrections to the entry while there:
 
 Everything above is read through `claude_ro`, which is **row-scoped to the owner** — these are one
 user's rows. Nothing was run on a device, and no code changed in this PR.
+
+## Addendum, same session — the root cause was in `error_events` all along
+
+The session-start ritual read (`error_events`, last 7 days — five groups total) turned up a live
+fault **four minutes after the owner's 08:00 attempt**:
+
+```
+url:     /api/oura-ble/samples#aggregate
+at:      2026-09-03 08:04:43Z
+message: Failed query: select "started_at", "completed_at" from "workout_sessions" …
+           caused by: Connection terminated due to connection timeout
+           caused by: Connection terminated unexpectedly
+stack:   at Worker.<anonymous> (/app/.next/server/chunks/1706.js)
+```
+
+`at Worker.<anonymous>` places it inside the rollup worker thread. The **only** other fault ever
+recorded at that url is **2026-08-17 11:33** — same cause chain, hours after the last full-history
+pass that ever completed. Two points, both bracketing the regression window this PR identified from
+the other direction.
+
+**The diagnostic exists because someone already fixed the blind spot.** `rollup-worker-entry.ts`'s
+`msg()` walks the `.cause` chain precisely because on 2026-08-17 a redecode failed three times and
+all that survived was the SQL text — a `DrizzleQueryError`'s message is only `Failed query: <sql>`.
+Without that walk, this would still be a guess.
+
+**Two candidate mechanisms; this does not choose between them.** Either the worker's event loop is
+blocked long enough decoding ~1M samples that the pg client's socket is dropped (`Connection
+terminated unexpectedly` is that shape — a statement timeout reports as *canceling statement*), or
+it is pool self-contention (`connectionTimeoutMillis: 5_000` against `max: 10`, and the worker
+carries its **own** Pool, since a worker thread has its own module registry).
+
+**Ruled out: the Postgres server.** `max_connections` 500, 11 in use. Client-side, our own pool.
+
+**What it changes about the fix.** LA-56's heartbeat would correctly report the run as dead rather
+than stale, which is worth having — but it treats the symptom. The pass dies on ceilings a
+whole-archive walk cannot respect. ⚠ Those ceilings are load-bearing: `CLAUDE.md`'s pool section
+records that the timeouts and the error handler both took production down in session 165, so the
+direction is to make the pass fit them (chunk the read, release between chunks), not to raise them
+for every caller.
+
+**Still open:** which of the two mechanisms. That wants a timed run.

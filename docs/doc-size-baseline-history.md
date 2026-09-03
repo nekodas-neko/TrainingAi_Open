@@ -7212,3 +7212,14 @@ building around it.
 
 `projectOverview.md` is unchanged in length — the **Waiting on the owner** row was rewritten in place
 from "run it once only" to "do not attempt".
+
+Same day, `docs/implementation-backlog.md` 16458 → 16502: the root cause turned up in `error_events`
+an hour after the entry above was written, so LA-56 gained the fault verbatim (url, cause chain,
+`at Worker.<anonymous>`) rather than a paraphrase. The cause chain is the whole value — the message
+alone says only which query failed — and it exists because `rollup-worker-entry.ts`'s `msg()` walks
+`.cause` after 2026-08-17's three failures recovered nothing but SQL text. Quoting it in full is what
+lets the next session match a new fault against it without re-querying production.
+
+The two candidate mechanisms are written as candidates, and the warning not to simply raise
+`statement_timeout`/`connectionTimeoutMillis` is written beside them, because that is the obvious fix
+and `CLAUDE.md` records that those settings took production down in session 165.
