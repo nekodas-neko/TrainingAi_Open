@@ -6864,6 +6864,25 @@ without a queue entry is a dropped finding.*
 
 ### [sleep][platform] LB-53 — `oura_daily_derived` is written in occasional bulk passes, not per night
 
+> **✅ THE QUESTION THIS ENTRY SAID TO MEASURE FIRST IS ANSWERED (2026-09-03): the scores go STALE,
+> they are not ABSENT.** `created_at` on `oura_daily_derived` runs one row per day, each created the
+> day after the night it describes — 2026-08-22 created day 08-23, 08-23 created 08-24, unbroken
+> through 2026-09-02 creating 09-03 — with one catch-up of 5 rows on 2026-08-17. So a row exists from
+> the morning after, and it then holds its first value until a bulk pass rewrites it. Nothing was
+> missing during the nine-day gap. **That settles which of the two failure modes this is**, and it is
+> the less alarming one: no screen was ever blank, but a screen could show a days-old score.
+>
+> **The "four stamps in the whole history" reading is stale and the shape is different now.** As of
+> 2026-09-03 there is a bulk pass at **07:00:15Z** rewriting ~30 days in a single ~50 ms burst, and a
+> single-row write at **08:00:09Z** for that day only. So both cadences exist — an incremental
+> per-day write and an occasional whole-history rewrite. Re-read the stamps before building; this
+> entry's table was one snapshot.
+>
+> **The deploy hypothesis is NOT confirmed and should not be carried as if it were.** The 21:55 pass
+> landing minutes after #827 is one coincidence, and today's 07:00:15 bulk pass does not line up with
+> a merge (#838 merged 07:49, #839 later). Whatever schedules the bulk pass, a deploy is not
+> obviously it. Establish the trigger before designing around it.
+
 - **Lane:** A — the rollup (`lib/oura-ble/rollup/**`) and whatever schedules it. Found from Lane B
   while checking Q-529's own caveat; filing rather than building, per the lane rule.
 - **Added:** 2026-09-02 · measured against production while answering Q-529's *"re-read `computed_at`
@@ -10939,6 +10958,91 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   the term that is currently saturating. See Q-501 for why stored rows have not moved yet.
 
 ### [platform][devices] LA-56 — the full-history redecode has never once completed, and "abandoned" is a guess
+
+> **⚠ MEASURED 2026-09-03 — "abandoned" is NO LONGER a guess, and the workaround does not work
+> either.** The entry hedged because `reapStaleRedecodeJobs` is a pure `started_at` age check with no
+> heartbeat, so a reaped job might have been slow rather than dead. Production settles it.
+>
+> **`replaceOuraDailySummary` — the full-history write path — is `DELETE` all rows + `INSERT` all
+> rows in one transaction.** So a completed full-history pass leaves every row sharing ONE
+> `created_at`. That is the measurement this entry was missing, and it needs no instrumentation.
+>
+> | reading, 2026-09-03 08:35Z | value |
+> |---|---|
+> | `min(created_at)` on `oura_daily_summary` | **2026-08-17 07:50:31Z** |
+> | distinct `created_at` stamps across 59 rows | **17**, not 1 |
+> | `max(updated_at)` | 2026-09-03 06:59:31Z — *before* the 08:00 attempt started |
+>
+> Seventeen stamps means the table has been assembled night by night by `upsertOuraDailySummary`
+> ever since. **The last full-history redecode that completed was 2026-08-17**, which is exactly the
+> pass Q-535 measured at `scanned=1098158`. Since then there have been **three attempts and three
+> nothings**: the async jobs of 2026-08-30 and 2026-09-03 03:00 (both reaped at 30 minutes, no rows),
+> and the owner's **synchronous** run at ~08:00 on 2026-09-03, which had written nothing 35 minutes
+> later. The synchronous path is the documented workaround, and it is now measured not to work.
+>
+> **⚠ This retires the standing advice.** Both this entry and `projectOverview.md`'s
+> **Waiting on the owner** row told the owner to run the synchronous path "once only" because its own
+> note recorded it completing behind the 502. That note was true **on 2026-08-17** and is not true
+> now. Do not send anyone to that workaround again until this is understood.
+>
+> **The regression window is one day wide, and there is a candidate.** The last success was
+> 2026-08-17; the packing work landed **2026-08-18** — `oura_raw_packed`'s first pack carries that
+> date, and Q-541 Task 7 made `measured_at`/`event_name` derived the same day, removing the row-walk
+> that used to dominate. So the re-aggregate now reads a store that did not exist when it last
+> succeeded. **State this as a lead, not a cause** — it is a correlation across a model change, which
+> is the trap `docs/data-layer-rules.md` names; nothing here has profiled the re-aggregate.
+> **The next step is a measurement, not a fix:** run the full-history re-aggregate against a copy
+> with timing per phase, or add phase timings behind the existing job row, and find where it stops.
+> The heartbeat this entry already owes would answer "is it alive?" for free, which is now the more
+> valuable half of it rather than the optional one.
+>
+> **Not yet checked:** whether the process is alive and slow, or dead. Distinguishing those is
+> precisely the heartbeat, and until it exists this measurement says only that the work does not
+> land, never why.
+> **✅ ANSWERED THE SAME SESSION — the rollup worker is losing its DATABASE CONNECTION, and
+> `error_events` had it the whole time.** The session-start ritual read turned up a live fault four
+> minutes after the owner's 08:00 attempt:
+>
+> ```
+> url:     /api/oura-ble/samples#aggregate
+> at:      2026-09-03 08:04:43Z
+> message: Failed query: select "started_at", "completed_at" from "workout_sessions" …
+>            caused by: Connection terminated due to connection timeout
+>            caused by: Connection terminated unexpectedly
+> stack:   at Worker.<anonymous> (/app/.next/server/chunks/1706.js)
+> ```
+>
+> `at Worker.<anonymous>` places it **inside the rollup worker thread**. The only other fault ever
+> recorded at that url is **2026-08-17 11:33** — the same cause chain, hours after the last
+> full-history pass that ever completed. Two data points, both bracketing the regression.
+>
+> **The cause chain is the diagnostic, and it exists because someone already fixed the blind spot.**
+> `rollup-worker-entry.ts`'s `msg()` walks `.cause` precisely because on 2026-08-17 a redecode failed
+> three times and the only recoverable detail was the SQL text. Without that walk this entry would
+> still be guessing.
+>
+> **Two candidate mechanisms, and this does NOT choose between them:**
+> 1. **The worker's event loop is blocked long enough for the connection to die.** The full-history
+>    pass decodes ~1M samples in JS *inside the worker*; a pg client that cannot service its socket
+>    gets dropped, and the next query finds a dead connection. `Connection terminated unexpectedly`
+>    is that shape, not a statement timeout (which reports as *canceling statement*).
+> 2. **Pool self-contention.** `connectionTimeoutMillis: 5_000` against `max: 10`, and the worker
+>    has its **own** pool — a worker thread carries its own module registry, so `getPool()` there is
+>    a second Pool, not the main process's.
+>
+> **Ruled out: the Postgres server.** `max_connections` is **500** with **11** in use. This is
+> client-side, inside our own pool, not the instance.
+>
+> **What this changes about the fix.** The heartbeat this entry owes would report the run as dead
+> rather than merely stale — worth having — but it treats the symptom. The pass is dying on
+> infrastructure ceilings (`statement_timeout: 15_000`, `idle_in_transaction_session_timeout: 15_000`,
+> `connectionTimeoutMillis: 5_000`) that a whole-archive walk cannot respect. ⚠ **Those three
+> settings are load-bearing and must not simply be raised** — `CLAUDE.md`'s pool section records that
+> both took production down in session 165. The direction is to make the pass fit the ceilings
+> (chunk the read, release the connection between chunks) rather than raise them for everyone.
+>
+> **Still not checked:** which of the two mechanisms it is. That wants a timed run, and it is the
+> next measurement.
 
 - **Branch:** `fix/redecode-job-heartbeat` · **Lane:** A
 - **Added:** 2026-09-02 · found when the owner ran the pass TN-1 and Q-525 have been waiting on.
