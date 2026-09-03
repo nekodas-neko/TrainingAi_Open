@@ -8,6 +8,7 @@ import { formatHrChange } from '@trainingai/shared/health/hr-change-display'
 import { Sparkline } from '@/components/ui/sparkline'
 import type { HrRecoveryProfile } from '@trainingai/shared/health/hr-recovery-profile'
 import type { BandTrend } from '@trainingai/shared/health/hr-recovery-trend'
+import { informativeShareNote } from '@/components/health/hr-recovery-honesty'
 
 // HR Recovery Profile card (plan 2026-07-22-hr-recovery-profile.md, HRP-1/2/3) — recovery rate
 // bucketed by the HR being recovered FROM, across between-set rests AND completed-workout cooldowns
@@ -102,6 +103,27 @@ export function HrRecoveryProfileCard() {
       {profile.bands.some(b => b.lowSignal) && (
         <p className="text-[9px] text-muted-foreground">Dimmed band: HR barely elevated — recovery there is mostly noise, not signal.</p>
       )}
+
+      {/* Q-516's honesty half. The dimmed-band note above says WHICH rows are noise; it does not say
+          how much of your training lands in them, and four populated buckets read as a working
+          feature either way. Emphasised once the informative rests are a minority, because at that
+          point it is the headline about the table rather than a footnote under it. */}
+      {(() => {
+        const note = informativeShareNote(profile.informativeShare)
+        if (!note) return null
+        return (
+          <p
+            className="text-[9px] leading-tight"
+            style={note.minority
+              ? { color: 'var(--accent-amber)' }
+              : { color: 'var(--color-muted-foreground)' }}
+          >
+            {note.minority
+              ? `Only ${note.pct}% of your recorded rests get your heart rate high enough for this to read — the dimmed bands are the rest of them. Treat the table as a partial picture.`
+              : `${note.pct}% of your recorded rests get your heart rate high enough for this to read.`}
+          </p>
+        )
+      })()}
 
       {trendBands.length > 0 && (
         <div>

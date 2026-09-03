@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.3",
+    date: "2026-09-03",
+    changes: [
+      "Your HR Recovery Profile now says how much of your training it can actually read. Most lifting rests never get your heart rate high enough to measure recovery from, and four rows of numbers looked like a complete picture either way.",
+    ],
+  },
+  {
     version: "1.436.2",
     date: "2026-09-03",
     changes: [
