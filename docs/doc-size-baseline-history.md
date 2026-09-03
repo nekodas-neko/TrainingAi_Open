@@ -7182,3 +7182,26 @@ just deleting it is what stops a later session restoring it from the prose that 
 
 The `Math.round` note in the journal is the third thing worth its length: a surviving mutation that
 turned out to be a real off-by-one on some values, not a gap in the tests.
+
+## 2026-09-03 — Review sweep 45 (RV-42)
+
+`docs/implementation-backlog.md` 16398 → 16429 (+31), `projectOverview.md` 9725 → 9742 (+17),
+`docs/agents/state/review.md` 194 → 205 (+11).
+
+RV-42's length is mostly the two lines that set its severity *down*. "No data leaks — the meal-plan
+read joins neither table" is the difference between this entry and RV-32, which it otherwise resembles
+exactly, and without it the next reader treats a stored id as an exposed name. The `ON DELETE SET
+NULL` chain is the other half and has to be spelled out because the consequence is not visible from
+the defect: the account that loses data is not the one that made the bad request.
+
+The line naming `writeSavedMeal` as the fix earns its place by pointing at working code in the same
+repository rather than describing a check, and the line refusing a composite FK is there because that
+is the first idea a reader has and it would turn a four-line slice change into a migration on a table
+two routes write.
+
+**⚠ The baton has drifted 173 → 205 across five sweeps in one session**, and it was compressed at
+every one of those raises — the sweep-40 carry is two bullets, two method notes were merged into one,
+and rule (a) was deleted from the Next list rather than marked done. The content that remains is
+state. **The next session that touches it should make a structural cut rather than another
+incremental one**: the "Now" section's method bullets and the standing "Method notes" section are
+converging on the same list and should become one.
