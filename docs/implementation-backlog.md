@@ -994,6 +994,67 @@ the row was ever laid out for (Q-111 added device chips on 2026-09-02, the day a
 - **Verification (device, at the S25 width):** on the longest weekday-plus-month combination
   (`Wednesday 30 September`) with weather and two device chips present, nothing crosses the grid icon
   and no chip wraps to a second line; with one chip and a short date, the layout is unchanged.
+### [nutrition] BF-112 — enter an actual dose: the storage for retatrutide is finished and there is still no field to type it into
+
+- **Lane:** B — the supplements manage sheet and `supplements-section.tsx`. **Engine work: none.**
+  Stage 1 shipped 2026-09-01 (migrations 254 + 255, local SQLite v34) and every column this needs
+  already exists.
+- **Added:** 2026-09-03 · owner: *"i havent seen the retatrutide tracking section yet can you tell me
+  how its progressed?"* — a question, and the answer is that his half has never been built.
+- **The design is settled** in [`docs/superpowers/plans/2026-09-01-dosed-substance-exposure.md`](superpowers/plans/2026-09-01-dosed-substance-exposure.md)
+  §5 and §6 stage 2, and is not re-litigated here. This entry exists so the work is **startable**
+  rather than only described.
+
+**⚠ Why this is a new entry and not another line on BF-69.** BF-69 carries a `Keep:` and therefore
+prints under **KEEP — "shipped; only the stated residue is owed. Not new work."** That is true of the
+*storage*, and the residue it names is **stages 2, 3 and 4 — the entire user-facing feature**. An
+implementer working the queue top-down sees "not new work" and moves on, which is why two months of
+engine work has produced nothing the owner can use. Same failure shape as the `Verify:` misuse
+corrected on 2026-09-02: a field that means *finished* attached to something unfinished.
+
+**Measured in production 2026-09-03, and it is stark:**
+
+| | live |
+|---|---|
+| supplements defined | **2** — Fish Oil, Vitamin D |
+| `default_amount` / `unit` on either | **neither** |
+| `started_on` / `stopped_on` / `dose_prompt` | **null / null / false** on both |
+| `supplement_logs` rows, all time | **1** — Vitamin D, **2026-06-21** |
+| rows carrying an `amount` | **0** |
+| retatrutide | **not in the table** |
+
+The columns BF-3 and BF-69 added are all present and all empty, because nothing in the UI can write
+to them. The last supplement log of any kind is from June.
+
+**What stage 2 is, from the plan — this entry does not redesign it:**
+
+- an **amount + unit** on the supplement definition (the manage sheet has no such field today);
+- **`dose_prompt`** as a single boolean on the definition — the owner's *"selection first to choose
+  dosage"*. Creatine is 5 g every time; retatrutide titrates, so a prompted log asks for the number at
+  log time. **One flag, not a second flow**: a prompted log is still one contribution row, only the
+  source of the number differs;
+- `started_on` / `stopped_on`, so a drug that was started and stopped reads as a window rather than as
+  a gap in the logs — the plan's §2 presence model, where *"unknown is a real answer"*;
+- **`supplements-section.tsx` rendering `loggedAmount`**, which `listSupplements` already returns beside
+  `loggedDose`. The two are different questions — what a past log recorded against what the definition
+  says now — and freezing the first was the whole point of BF-3's gap 1.
+
+- **⚠ Do not touch `loggedToday`.** It tracks the **manual** contribution only, deliberately: it is the
+  tick's checked state, and a meal-sourced dose turning it on leaves a control that refuses to turn
+  off. Stage 1's comment says so; it is easy to "fix" and hard to notice.
+- **Stage 3 (meal attachment) is not part of this** and stage 4 (the trends overlay) is gated on data
+  the owner cannot produce until this ships — the plan says a series needs **~4 weeks** of real
+  amounts. **So this entry is the thing standing between the feature and its own evidence**, which is
+  the argument for its queue position rather than its size.
+- **Out of scope, and worth restating because the substance invites it:** the app records what was
+  taken. No dosing guidance, no interaction checking, no titration schedule generation. Any
+  correlation stays an observation on n=1 with a dozen confounders, shown as a number, never as a
+  claim about cause.
+- **Verification:** define a supplement with an amount and a unit; tick it and the log carries that
+  number; turn on `dose_prompt`, tick it, and it asks — the entered number lands on the log and not on
+  the definition; change the definition's amount afterwards and the earlier log still reads what it
+  recorded (BF-3 gap 1, and the reason the stamp is on the log); set `started_on`, and a date before it
+  reads as outside the window rather than as a missed dose.
 
 
 ### [app-shell][platform] BF-110 — the blank resume survives a scroll, which means the renderer never died
@@ -3419,6 +3480,12 @@ a finding — it does not by itself explain a plain `GET` hanging beside it.
 
 ### [nutrition][platform] BF-69 — dosed substances are stored but nothing reads them; make exposure an analysable variable
 
+- **⚠ 2026-09-03 — STAGE 2 IS NOW ITS OWN ENTRY, BF-112, because this one prints under KEEP.**
+  A `Keep:` line files an entry as *"shipped; not new work"*, which is true of the storage and false
+  of the feature: the residue named below is the entire user-facing half. The owner asked how
+  retatrutide tracking had progressed and the answer was that his part had never been built — two
+  months of engine work, and production still holds 2 supplements, no amounts, and one log from June.
+  Stage 2 is startable Lane B work and now says so. Stages 3 and 4 remain below.
 - **Keep — STAGE 1 SHIPPED 2026-09-01 (migrations 254 + 255, local SQLite v34). Stages 2-4 are what
   is owed, and stage 2 is the one that matters.** The storage half is done: `supplement_logs` is
   contribution-rows now (its whole-day `unique (supplement_id, log_date)` is gone, replaced by a

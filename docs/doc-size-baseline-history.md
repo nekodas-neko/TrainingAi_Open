@@ -7400,3 +7400,17 @@ have written down: the header overflow is caused by BF-96's own fix, which corre
 chip unshrinkable and thereby left the row with no compressible item at all, one day before Q-111
 added a third chip. Without that history the obvious repair is to undo BF-96 and restore the
 two-line wrap.
+## 2026-09-03 — `docs/implementation-backlog.md` → 16822 (BF-112, splitting stage 2 out of BF-69)
+
+The owner asked how retatrutide tracking had progressed. Tracing it produced a better answer than a
+status line: the storage is finished — BF-3's dose-on-log, then BF-69's stage 1 with migrations 254
+and 255 — and production holds **2 supplements, no amounts, one log from June, and no retatrutide**,
+because nothing in the UI can write to any of those columns. The reason it stalled is structural
+rather than anyone's oversight: BF-69 carries a `Keep:` line, so `next-item.js` prints it under
+*"shipped; only the stated residue is owed. Not new work"* — true of the storage, false of the
+feature, since the residue named is stages 2 to 4, the whole user-facing half. An implementer working
+top-down skips it. Same shape as the `Verify:` misuse corrected the day before: a field meaning
+*finished* attached to something unfinished. BF-112 lifts stage 2 into a startable Lane B entry and
+BF-69 gains a pointer to it. Worth recording that BF-112 was itself first filed with a `Reference:`
+bullet — which files an entry as *"read by other entries, never next"* — and landed in the REFERENCE
+section, the exact failure it was written to correct; the plan link moved into prose.
