@@ -7061,7 +7061,8 @@ owed, and the four method notes that cost a sweep each to learn.
 
 ## 2026-09-03 — Review sweep 43 (RV-40)
 
-`docs/implementation-backlog.md` 16095 → 16141 (+46), `projectOverview.md` 9666 → 9683 (+17),
+`docs/implementation-backlog.md` 16141 → 16187 (+46, rebased onto LA-56 which landed mid-PR),
+`projectOverview.md` 9666 → 9683 (+17),
 `docs/agents/state/review.md` 178 → 184 (+6).
 
 Most of RV-40's length is one table: eight routes probed for a malformed body id, with four clean,
@@ -7084,3 +7085,17 @@ three-rules-now-have-evidence summary, the cheap-contrast note absorbed four new
 adding a line, and rule (a) was deleted from the Next list rather than marked done. What is left is
 state — the four closed lenses, the three surfaces that are unverified rather than clean, and the
 method notes that cost a sweep each.
+
+## 2026-09-02 — `docs/implementation-backlog.md` → (see .size), `projectOverview.md` → (see .size) (LA-56)
+
+A new entry, filed the moment the owner ran the pass three docs had been waiting on and it failed.
+The lines that earn their place are the ones separating what was observed from what was inferred:
+both jobs stopped at the staleness window to within a poll interval, neither wrote a row, and the
+reaper's *"the process most likely restarted mid-run"* is a **guess** — it is a pure age check with
+no heartbeat. That sentence has now been read as a fact twice.
+
+Two warnings are load-bearing rather than cautious. `finishRedecodeJob` filters `isNull(finishedAt)`,
+so a run that completes after being reaped discards its own result — the work lands while the record
+says it was abandoned. And the synchronous workaround has **no in-flight guard**, so a second press
+is two concurrent full-history passes, which is the starvation that took production down on
+2026-08-13.

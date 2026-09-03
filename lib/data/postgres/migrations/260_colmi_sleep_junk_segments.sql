@@ -1,0 +1,19 @@
+-- Delete the Colmi sleep segments produced by a sleep frame's junk tail.
+--
+-- The V2 sleep frame carries a per-day byte count, and that count can OVER-count. Two captures of
+-- the night of 2026-09-02, 32 minutes apart: one declared 42 stage-bytes, the other 60. The first
+-- 42 were byte-identical; the extra 18 were
+-- `00 ff 00 ff 00 ff 00 aa 03 01 00 ff 00 ff 00 02 02 06` — trailing junk. The decoder trusted the
+-- declared length, so those bytes became spans of stage 0 lasting 255 minutes each, and a
+-- 8.9-hour night was stored as **19.1 hours**.
+--
+-- `decodeSleep` now stops at the first byte that is not a stage (2 light, 3 deep, 4 REM, 5 awake),
+-- which is the real end of a contiguous series. These rows are what it wrote before that.
+--
+-- Identified by shape rather than by date, so a junk span from any night is caught: stage 0 is not
+-- a sleep stage at all, and 255 is the sentinel that produced the 4.25-hour spans. Both conditions
+-- are impossible for a real segment, so this cannot remove one.
+--
+-- `colmi_sleep_segments` is learning-mode storage — nothing scores from it, and the ring's own
+-- history plus `colmi_raw_frames` make every deleted row re-derivable by a re-sync.
+DELETE FROM colmi_sleep_segments WHERE stage = 0 OR minutes = 255;
