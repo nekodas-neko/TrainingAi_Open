@@ -7205,3 +7205,24 @@ and rule (a) was deleted from the Next list rather than marked done. The content
 state. **The next session that touches it should make a structural cut rather than another
 incremental one**: the "Now" section's method bullets and the standing "Method notes" section are
 converging on the same list and should become one.
+
+## 2026-09-03 — `docs/implementation-backlog.md` 16429 → 16475 (+46), `projectOverview.md` 9742 → 9765 (+23), PS-21 Stage A / PS-22
+
+Two additions and one edit. The new backlog entry is PS-22 — a fifth of every Colmi sync's
+heart-rate log is discarded as future-dated. The lines that earn their place are the ones separating
+the measurement from the guess: 209 decoded, 167 accepted, 41 rejected as future-dated, and the
+packet numbering that puts them at 20:15 on a sync that ran at 07:12. The obvious explanation is
+written down **as a hypothesis with the instruction to check it against the archived bytes**, because
+this integration has had four diagnoses made from row counts of which three were wrong, and an entry
+that stated the guess as the cause would have produced a fifth.
+
+The PS-21 edit strikes Stage A and keeps B and C, which is the `Keep:` convention rather than a
+deletion — the entry still owes the APK work.
+
+`projectOverview.md` gains a Known-Issues row for the same reason every device change gets one: the
+server decode was proved equivalent against the local database and has never run from the phone. It
+names the tell (`decodedBy`) rather than only the risk, because the failure it guards against — a
+WebView older than the deploy — looks like "the sync stored nothing" and is otherwise indistinguishable
+from a broken ring.
+
+Both raised slightly above the exact count so a small follow-up does not need its own note.

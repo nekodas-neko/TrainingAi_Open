@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **263** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **265** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v36** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -456,6 +456,9 @@ recompute has to run over the affected days once the selection is fixed.
 - **Gate:** device — Stages B and C need an APK and cannot be verified in the sandbox
 - **Plan:** [`2026-09-03-colmi-background-sync-service.md`](superpowers/plans/2026-09-03-colmi-background-sync-service.md)
 - **Added:** 2026-09-03 · owner asked for it after in-app auto-sync proved insufficient
+- **Keep:** Stages B and C. **Stage A shipped 2026-09-03** — the server decodes, the client posts
+  bytes only, and the two paths were proved to write byte-identical rows over a real 31-frame sync
+  (166 rows, excluding the clock-stamped battery reading). What B and C still owe is the APK.
 
 In-app auto-sync (v1.395.1) closed the evening gap and is still not enough. **Measured 2026-09-02:**
 last reading 11:45, checked at 17:59 — six hours missing because the app had not been opened, and
@@ -474,9 +477,14 @@ same test vector as its TypeScript twin) and nothing else. ~400 lines against ~1
 
 **Three stages, and the first ships without Android:**
 
-- **A — decode moves server-side.** `/api/colmi/samples` already accepts and stores `rawFrames`;
-  it gains the decode. Proven by replaying the ~90 archived frames and asserting the readings match
-  what the client produced for the same syncs. JS only, reversible, no APK.
+- ~~**A — decode moves server-side.**~~ **Shipped 2026-09-03.** `framesToPayload` moved out of
+  `ble.ts` into `lib/colmi-ble/frames-to-payload.ts` (no BLE or DOM imports) and the route runs it
+  over the frames it archives. Two things the work turned up that the plan had not: the archive
+  could not restore ARRIVAL ORDER — every frame of a sync shares one `created_at`, so the
+  heart-rate log came back shuffled and a reversed replay kept 9 of 175 samples — fixed by
+  migration 263's `seq` for new frames and `sortFramesForReplay()` for the ones already stored; and
+  the Zod bounds on sleep `stage`/`minutes` only ever guarded the client's payload, so they are now
+  restated at the write where both paths meet.
 - **B — the Kotlin transport service.** Connect, run the command sequence, POST hex. Auth reuses the
   WebView cookie exactly as `OuraRingService` does, so no new secret.
 - **C — cadence.** Periodic ~2 h plus one guaranteed evening sync before midnight discards the
@@ -520,6 +528,35 @@ calories or the stage mapping (PS-16, PS-19).
   read `meal_plan_meals` back — the response body echoes the ids either way and proves nothing.
 - **Verify:** owner — nothing user-visible changes; a green local gate plus the two-account probe is
   the bar.
+### [devices] PS-22 — a fifth of the ring's heart-rate log is discarded as future-dated, every sync
+
+- **Lane:** A — `lib/colmi-ble/frames-to-payload.ts`, decode only; no schema change
+- **Reference:** the frames are already archived, so this is answerable from stored bytes
+- **Added:** 2026-09-03 · found while proving Stage A's server decode against a real sync
+
+**Measured on the 2026-09-02 21:12 UTC sync, 31 frames:** `framesToPayload` produces **209**
+readings and the route accepts **167**. Of the 42 dropped, **41 are rejected as future-dated** and
+one is a calories bucket over range. This is not new and is not a Stage A regression — the client
+path produced the identical 209/167 split — but the response now reports `received` beside
+`accepted`, which is what made it visible.
+
+**The shape of it.** That sync ran at 07:12 Brisbane. The heart-rate log arrived as packets 1–7 and
+then 20–23, with packets 8–19 absent. Packets 1–7 map to indices 0–87, which is 00:00–07:15 — the
+day so far, correct. Packets 20–23 map to indices 243–294 by the same formula, which is 20:15
+onwards, a time that had not happened yet. Their contents are plausible BPM (71, 97, 85, 85, 79,
+75, 72, 110, 100, 117), not zeros or padding.
+
+**What is NOT established:** why. The obvious reading is that the ring keeps a fixed 288-slot day
+array and packets 20–23 hold yesterday's tail, not yet overwritten — but that is a hypothesis from
+the timestamps, and this integration has already had four diagnoses made from counts of which three
+were wrong. Answer it from the bytes: pull several syncs' `colmi_raw_frames`, line the tail packets
+of consecutive days up against each other, and see whether the values repeat a day late.
+
+**Why it matters:** if the hypothesis holds, those are real readings for the previous day being
+thrown away rather than shifted back, and the ring's daytime coverage is meaningfully better than
+the 288/day currently stored. If it does not hold, the future-dated rejection is doing exactly its
+job and this closes as understood. Either way the rejection stays — a sample ahead of now is a bad
+clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
 
 ### [nutrition][workouts] RV-41 — the Coach can write goal numbers the user's own screens refuse
 
