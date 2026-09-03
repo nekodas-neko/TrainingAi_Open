@@ -193,6 +193,19 @@ jobs:
           done
           echo "server never accepted a connection in 120s:"; cat /tmp/next-server.log; exit 1
 
+      # Q-250. `next dev` compiles routes ON FIRST REQUEST, and the probe above only ever asks for
+      # `/`, which 307s to /sign-in WITHOUT compiling it. So the emulator's very first page load was
+      # paying for that compile inside Maestro's wait — run 3 failed with the emulator up, the
+      # server up, and the form simply not painted within 120 s. Warming it here moves the compile
+      # onto the host, where it costs seconds and is visible, instead of into a UI timeout that
+      # reads as "Maestro cannot see the form".
+      - name: Warm the routes the flow will actually load
+        run: |
+          for path in / /sign-in; do
+            CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 120 "http://localhost:3000$path" || true)
+            echo "warmed $path -> HTTP $CODE"
+          done
+
       - uses: actions/setup-java@v5
         with:
           distribution: temurin

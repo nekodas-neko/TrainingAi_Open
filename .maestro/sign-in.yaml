@@ -21,9 +21,12 @@ appId: com.trainingai.app
 
 # The WebView has to fetch the document from the host loopback and run React before anything is
 # tappable, so this waits on the form rather than on the app process.
+# 180 s, not 120: the emulator is software-rendered and the WebView is fetching a remote document
+# over the host-loopback alias. Run 3 timed out here at 120 s with the server up and healthy — the
+# workflow now warms /sign-in on the host as well, and this is the belt to that braces.
 - extendedWaitUntil:
     visible: "Sign in with email"
-    timeout: 120000
+    timeout: 180000
 
 - tapOn: "Email"
 - inputText: "test@local.dev"
