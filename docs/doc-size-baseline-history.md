@@ -7433,3 +7433,18 @@ doing the right thing. Each is a plausible next step that the measurement rules 
 
 Also recorded: this is device-only because `getLocalStore` returns null in the sandbox, so a green
 `pnpm dev` proves nothing about it — the reason the entry keeps its device check.
+
+---
+
+## 2026-09-03 — `docs/implementation-backlog.md` 16968 → 16980 (LA-56, Lane A)
+
+Twelve lines recording that the reporting gap which hid LA-56 is closed. Worth its length because it
+is the part a future reader will otherwise disbelieve: `step()` catches, therefore the rollup never
+throws, therefore the `.catch` that was the callers' only reporting could never fire for the failure
+mode that actually happens. The ingest route's own comment asserted the opposite, which is how it
+went unnoticed.
+
+The last two lines are the ones that stop the entry being closed on this: **it does not fix the
+redecode.** The worker still loses its database connection. What changes is that the next failure
+names itself rather than being reconstructed from `created_at` arithmetic — which is how this
+entry's diagnosis was reached and is not a method anyone should need twice.

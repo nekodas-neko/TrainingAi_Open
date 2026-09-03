@@ -10,6 +10,7 @@ import { shouldDropRawEvent } from '@/lib/oura-ble/raw-storage'
 import { runRollupOffLoop } from '@/lib/oura-ble/rollup-worker'
 import { createRollupDebouncer } from '@/lib/oura-ble/rollup-debounce'
 import { reportServerError } from '@/lib/observability'
+import { reportRollupStepErrors } from '@/lib/oura-ble/report-step-errors'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import type { OuraRawSampleInput, OuraRawAggregateResult } from '@/lib/data/repository'
 
@@ -162,6 +163,15 @@ function startRollup(userId: string, tz: string): void {
     const claimedSinceDs = pendingSinceDs.get(userId)
     pendingSinceDs.delete(userId)
     inflight = runRollupOffLoop(userId, tz, claimedSinceDs != null ? { sinceDs: claimedSinceDs } : undefined)
+      // A step that failed did NOT throw — `step()` catches, files the message into `stepErrors`
+      // and console.errors, so the `.catch` below can never see it. Without this the rollup's
+      // ordinary failure mode (a lost connection mid-pass takes whichever writes are in flight)
+      // reached Railway stdout and nothing else — not `error_events`, which is the table the
+      // session-start ritual actually reads.
+      .then((result) => {
+        reportRollupStepErrors(result?.stepErrors, { userId, url: '/api/oura-ble/samples#aggregate' })
+        return result
+      })
       .catch((err) => {
         // Put the claimed span back: this run did not cover it, and the next one must.
         if (claimedSinceDs != null) {
