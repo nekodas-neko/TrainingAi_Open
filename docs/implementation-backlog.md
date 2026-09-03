@@ -11325,6 +11325,18 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 > **Still not checked:** which of the two mechanisms it is. That wants a timed run, and it is the
 > next measurement.
 
+> **✅ THE REPORTING GAP THAT HID THIS IS CLOSED (2026-09-03, shipped).** Tracing why the 07:00 pass
+> rewrote 84 derived rows while leaving `oura_daily_summary` untouched found the reason there was no
+> trace at all: **`step()` catches, so the rollup never throws, so the callers' `.catch` — the only
+> reporting either had — can never fire.** A failed sleep/summary/illness/resilience write reached
+> Railway stdout and *nothing else*: not `error_events`, not Sentry, not the job row. `error_events`
+> saw rollup faults only when the whole worker died, which is the rarer half.
+> `lib/oura-ble/report-step-errors.ts` now reports `stepErrors` from **all three** callers — ingest,
+> async redecode, and the synchronous redecode, which is the most blind of them because its 502 means
+> the caller never receives the JSON carrying `stepErrors` at all.
+> **This does not fix the redecode**; it means the next failure names itself instead of being
+> reconstructed from `created_at` arithmetic, which is how this entry got here.
+
 - **Branch:** `fix/redecode-job-heartbeat` · **Lane:** A
 - **Added:** 2026-09-02 · found when the owner ran the pass TN-1 and Q-525 have been waiting on.
 - **Measured — every attempt that has ever existed has failed the same way.** `oura_redecode_jobs`
