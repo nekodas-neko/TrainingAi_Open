@@ -7346,3 +7346,41 @@ are stated explicitly, since the natural readings of "mostly superseded" are *de
 
 Also recorded: the entry's premise — that `error_events` cannot say what preceded a throw — is the
 wrong problem while BF-92 has Sentry receiving nothing from the browser at all.
+
+---
+
+## 2026-09-03 — `docs/implementation-backlog.md` 16680 → 16687 (Q-511, Lane A)
+
+Seven lines adding a `Reference:` field to Q-511. It was standing at **#3 READY** in Lane A's list
+while its own **First action** reads *"none in scoring"* — a "do nothing unless" entry sitting where
+an implementer working top-down picks it up and builds it anyway. `Reference:` is the field for
+exactly this ("nothing to BUILD"), and it moves the entry into its own section without hiding it.
+
+The lines say *why* rather than just setting the field, because the entry's real value is the
+**⚠️ PROTECT THIS** warning it carries — that sleep and readiness being on comparable scales is now
+load-bearing for Body Battery — and a reader who sees only "Reference: nothing to build" would skip
+the one thing worth reading. The re-promotion condition is stated so the field is reversible by rule
+rather than by judgement.
+
+---
+
+## 2026-09-03 — `docs/implementation-backlog.md` 16680 → 16753: **`main` was RED, and only 7 of the 66 lines are this PR's**
+
+`main` at `830f9983` failed its own doc-size check — 16,746 lines against a 16,680 baseline, over by
+**66**. Reproduced directly by checking out `origin/main` and running the script, not inferred from a
+PR's failure.
+
+**Cause is the merge race LB-52 describes.** #844 (Colmi server-side decode, the other lane) was
+checked by CI against a `main` that did not yet contain #848, and #848 landed between that check and
+that merge. Both PRs were green; their sum is not. **A green check on a PR is a statement about the
+merge base it ran against, and nothing about the `main` that results** — which is precisely why the
+doc-size gate can be green on every branch and red on the trunk.
+
+**The 66 lines are #844's; this PR adds 7 more.** Raised to 16,753 = main's 16,746 + Q-511's
+`Reference:` field, so the number is honest about both. This PR is the carrier only because it was
+already touching this baseline — the growth is not its own and it claims none of it.
+
+⚠️ **Worth noticing about the check itself:** it runs against the *merged* tree in CI and the *branch*
+tree locally, so a branch cut from an older `main` passes `pnpm check:rules` locally and fails in CI
+for reasons that have nothing to do with its diff. That happened here. Re-merging `origin/main`
+before the final local gate run is what makes the two agree.

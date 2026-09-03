@@ -11352,6 +11352,13 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 - **Branch:** `feat/instrument-provisional-anchor` (low priority; **nothing to change in scoring**)
 - **Plan:** none yet — **Lane A implements; Tuning proposes only.**
+- **Reference:** its own **First action** is *"none in scoring"*, so there is nothing to build today
+  and it should not head Lane A's work list — it was standing at **#3 READY** on 2026-09-03, which is
+  how a "do nothing unless" entry gets picked up and built anyway. The durable value here is the
+  **⚠️ PROTECT THIS** warning: the sleep and readiness scales being comparable is now load-bearing for
+  Body Battery, so lifting the sleep distribution back toward its old mean re-opens an owner-reported
+  bug in a different pillar. **Re-promote to work the moment the flip is reported again** — the build
+  is then the instrumentation named below, and it is small.
 - **Added:** 2026-08-18 · Tuning agent ·
   [`docs/reviews/2026-08-18-battery-anchor-discontinuity.md`](reviews/2026-08-18-battery-anchor-discontinuity.md)
 - **Why it exists:** the audit of "did the sleep recalibration miss any consumer of the sleep scale?"
