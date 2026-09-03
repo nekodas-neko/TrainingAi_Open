@@ -5,8 +5,8 @@
 > 🔴 handed on) and is the only part that moves. A session self-titles 🟢 on its first instruction and
 > flips itself to 🔴 as the last step of its handoff, after the baton and every PR have landed.
 
-**Updated:** 2026-09-03 · **By:** forty-four sweeps (2026-08-17 ×2, 2026-08-18 ×37, 2026-08-20 ×1,
-2026-09-03 ×4) · **Next ID: `RV-42`.**
+**Updated:** 2026-09-03 · **By:** forty-five sweeps (2026-08-17 ×2, 2026-08-18 ×37, 2026-08-20 ×1,
+2026-09-03 ×5) · **Next ID: `RV-43`.**
 
 > **Sweep 40's run is closed and nothing is owed from it** — RV-32, RV-33, RV-34 all shipped, verified
 > in source rather than taken from the closure note, and their `projectOverview.md` row is in
@@ -43,23 +43,24 @@ before the guard under test ran: `PATCH /api/activity-logs/<id>/metrics` (cross-
 unknown), and RV-40's `POST /api/complete-workout` and `POST /api/log-exercise` (malformed-id
 behaviour unknown). **A 4xx is not evidence the guard fired** — read which field it names.
 
-## Now — sweeps 41–44 filed (2026-09-03). **Next ID: `RV-42`.**
+## Now — sweeps 41–45 filed (2026-09-03). **Next ID: `RV-43`.**
 
 41–42 ran the owner's lens (mobile UI: safe area, back-and-return scroll, cache staleness); 43 took
-rule (a); 44 the owner's nutrition/workouts/coach ask. **41** →
+rule (a); 44 the owner's nutrition/workouts/coach ask; 45 the FK edges. **41** →
 [write-up](../../reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md), RV-35/36/37.
 **42** → [write-up](../../reviews/2026-09-03-first-run-honesty-and-instant-paint.md), RV-38/39.
 **43** → [write-up](../../reviews/2026-09-03-ownership-rule-a-and-body-supplied-ids.md), RV-40.
 **44** → [write-up](../../reviews/2026-09-03-coach-write-bounds-vs-user-routes.md), RV-41.
+**45** → [write-up](../../reviews/2026-09-03-fk-edges-meal-plan-cross-user-refs.md), RV-42.
 
-- **A guard that exists is not a guard that reaches — all seven findings are this.** `useLocalDay()`
+- **A guard that exists is not a guard that reaches — all eight findings are this.** `useLocalDay()`
   (BF-86) has 3 consumers; `useScrollRestoration` (BF-100) rides `pull-to-sync.tsx`, which 3 screens
   use; `tabs-instant-paint.spec.ts` guards the 5 screens that never unmount and none of the ~20 that
   do; the "Limited data" badge is gated on `hasData`, so the no-data case cannot reach it; and
-  `invalidUuidResponse` is used by 27 route files, **27 of 27 of them dynamic `[id]` routes and zero
-  body-id routes**; the Coach's goal bounds are a second validator on columns the user routes already
-  bound, five times looser. **Grep the call sites, and read the guard's own comment** — two of
-  these name their own scope or guarantee, and neither holds.
+  `invalidUuidResponse` covers **27 of 27 dynamic `[id]` routes and zero body-id routes**; the Coach's
+  goal bounds are a second validator five times looser than the user routes'; and `meal_plan_meals`
+  checks the plan's owner but not its child ids. **Grep the call sites, and read the guard's own
+  comment** — two of these name their own scope or guarantee, and neither holds.
 - **The zero-data account reaches a state nothing else can** and was pointed at 2 screens. All 22 took
   one loop and found RV-38 at once. Re-run it whenever a scoring surface changes — the seeded user has
   data for everything, so a fabrication is invisible there.
@@ -71,13 +72,20 @@ rule (a); 44 the owner's nutrition/workouts/coach ask. **41** →
   comment's own worked example (*"set my calories to 26000"*) sent as a request. Where two paths write
   one column, drive both in the same session — read from source, the divergence is invisible and its
   direction easy to get backwards.
+- **Pair every refusal with a control, and ask what the READ joins before calling a stored cross-user
+  reference a leak.** Three of sweep 45's four clean edges first returned a 400 for an *unrelated*
+  reason, which reads exactly like a guard firing; the pair differs by one field and nothing else
+  proves it. And RV-32's severity was an unscoped join returning another user's *name* — RV-42 is the
+  same write defect with a read carrying ids only, which is the difference between a report and an
+  alarm.
 
 **Closed clean, do not re-sweep:** the seven `freshWithinTtl` sites (every writer is in a group);
 `check-fetch-once-effects.js`'s CAN-BITE group (empty); instant paint on the sub-routes (13 of 14);
 the first-run render (21 of 22 routes); ownership rule (a) — **all three rules now have evidence**;
 and the Coach apply path's five domain handlers, now all driven end to end (write, undo, 404
-cross-user, 409 stale-with-drift). **Still owed:** RV-37 and RV-39 need the device; RV-38's and
-RV-41's bound questions need the owner; RV-40 leaves two routes **unverified, not clean**.
+cross-user, 409 stale-with-drift); and four nutrition FK edges, each with a control. **Still owed:**
+RV-37 and RV-39 need the device; RV-38's and RV-41's bound questions need the owner; RV-40 leaves two
+routes and sweep 45 the whole workout/device FK half **unverified, not clean**.
 
 ## Carried from sweep 40 ([write-up](../../reviews/2026-08-20-non-workout-write-surface-ownership.md))
 
@@ -96,9 +104,12 @@ RV-41's bound questions need the owner; RV-40 leaves two routes **unverified, no
 left three CI checks behind (`check-known-issue-duplication`, `check-index-doc-paths`,
 `check-module-map-symbols`). Pick a lens that runs the app.
 
-- **The other 23 FK edges into user-scoped tables.** `meal_plan_meals.saved_meal_id`,
-  `saved_meal_items.food_item_id`, `prescribed_runs.plan_id`, `supplement_logs.supplement_id` first.
-  The query that produces the inventory is in sweep 40's write-up §7.
+- **The remaining FK edges — the WORKOUT and DEVICE half.** Sweep 45 did the nutrition ones and found
+  RV-42; `program_phases`, `schedules`, `set_hr_stats`, `blood_analytes`, `dexa_scan_regions`,
+  `exercise_logs` and `prescribed_runs` are **untouched, not clean**. The inventory is **31 edges, not
+  27** — re-run the query in sweep 45's write-up §2 rather than any remembered count. **Check each
+  edge's `delete_rule` too**: `ON DELETE SET NULL` on an unverified FK is a cross-account write
+  primitive, and `CASCADE` on the same defect would delete rather than null.
 - **The 62 mutating routes that *do* carry a `try {`** were checked only for whether they map a refusal
   at all, never for whether they map it to the *right* status. Sweep 43 did this for eight body-id
   routes and found two wrong; the other ~54 are untouched, and it is now the top lens.
