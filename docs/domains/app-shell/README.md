@@ -30,6 +30,17 @@ split is "does it feel slow" vs "is it actually slow at the source".
 - Reviews: [`docs/reviews/2026-07-21-ui-responsiveness-audit.md`](../../reviews/2026-07-21-ui-responsiveness-audit.md) ·
   [`docs/reviews/2026-07-11-offline-feel-performance-review.md`](../../reviews/2026-07-11-offline-feel-performance-review.md) ·
   [`docs/reviews/2026-07-20-wiring-caching-perf-audit.md`](../../reviews/2026-07-20-wiring-caching-perf-audit.md)
+- [`docs/reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md`](../../reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md)
+  — **the persistent shell's two coverage gaps, 2026-09-03** (sweep 41). Both are hooks built once,
+  wired into one place, and recorded as global. **RV-35** — `useLocalDay()` (BF-86) has three
+  consumers, so Nutrition's midnight branch keys on `tabEpoch`, which the shell increments only on a
+  tab **re-show**, never on a resume-in-place: measured 5 dated requests before midnight, **0** after,
+  while Home and Health both roll over. **RV-36** — `useScrollRestoration` is called from
+  `pull-to-sync.tsx`, which **three** screens use, not five; BF-100's entry claiming otherwise is
+  corrected in the backlog. **RV-37** — `/health/day`'s scroller has no bottom padding, filed
+  structural and **not observed** (the fixture had nothing to scroll). §5 records two lenses that came
+  back clean: all seven `freshWithinTtl` sites have every writer in a group, and the fetch-once
+  CAN-BITE group is empty.
 - [`docs/handoff-phase-3-bundled-shell.md`](../../handoff-phase-3-bundled-shell.md) — the live
   Phase 3 baton (bundling the shell into the APK). Task 4 is now **decided** (option B).
 - [`docs/overview/entries/2026-08-19-cache-invalidation-signal.md`](../../overview/entries/2026-08-19-cache-invalidation-signal.md)

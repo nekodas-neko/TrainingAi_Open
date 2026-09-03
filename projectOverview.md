@@ -1598,6 +1598,41 @@ Last swept **2026-09-02**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [nutrition][app-shell] 🔴 Nutrition never asks what day it is on resume, so a log after midnight lands on yesterday (RV-35, 2026-09-03)
+
+The tab shell is persistent, and Nutrition's midnight branch keys on `tabEpoch` — which the shell
+increments only when a tab is **re-shown**, never on a resume-in-place. Measured across all five tabs
+at 23:50 Brisbane under a fixed clock, then +30 min and a `visibilitychange`: dated requests
+before → after were Home 4 → **2**, Health 3 → **3**, **Nutrition 5 → 0**; Workout and More issue none
+either side. Nutrition is the only tab that is day-scoped *and* fails to roll over.
+
+The header still reads `Today`, because `formatDateLabel` prints that only when `selectedDate` and
+`todayStr` agree — and both are frozen at the launch day, so there is no visible tell. `selectedDate`
+is what a new log is written with, so breakfast is filed against the finished day and feeds its
+calorie budget and adherence. Switching tabs away and back fixes it, which is why this would read as
+intermittent. The fix is the hook that already exists — `useLocalDay()` (BF-86), which
+`session-select-content.tsx` uses and which measured correct above.
+[`Review sweep 41 §2`](docs/reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md).
+**Web build only** — no device run.
+
+### [app-shell][nutrition] 🟡 Scroll restoration reaches 3 of the 5 tabs, and BF-100's entry says it reaches all (RV-36, 2026-09-03)
+
+BF-100 shipped `use-scroll-restoration.ts` and calls it from `pull-to-sync.tsx`, recorded as *"every
+screen using the shell inherits it"*. Every screen using **`PullToSync`** inherits it, and three use
+it. The Nutrition tab owns its own scroller and inherits nothing: `/nutrition` → `/coach` → back saves
+no `ta_scroll:` key and returns **0**, against `/more`'s **840**. The live gap is that one path — every
+other routable screen that scrolls (`/health/sleep`, `/health/heart-rate`, `/cardio`, `/config`,
+`/program`) is a leaf with no deeper push, counted rather than assumed. BF-100's entry is corrected in
+the backlog. [`§3`](docs/reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md).
+
+### [app-shell][platform] ⚠️ `/health/day` scrolls with no bottom padding — structural, NOT observed (RV-37, 2026-09-03)
+
+`day-detail-content.tsx:226` carries no `pb-*`, and the screen is a sub-route with nothing anchored
+below the scroller, so its last card ends flush with the gesture bar. **Not reproduced:** the seeded
+fixture renders *"Nothing logged on this day"*, so the container never scrolled; the `/more` control
+measured `padding-bottom: 68px`. The four safe-area CI rules all fire on a *wrong* utility, never on an
+**absent** one. Needs the device. [`§4`](docs/reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md).
+
 ### [sleep][platform] 🔴 A phantom afternoon "sleep" is scoring as a real night (PS-17, 2026-08-30)
 
 `aggregateOuraRawSamples` emits daytime sessions into `sleep_sessions`, and where a day has more

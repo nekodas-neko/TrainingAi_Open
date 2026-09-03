@@ -7012,3 +7012,23 @@ their row counts and day ranges is the evidence, and "scores are not recomputed 
 is a claim rather than a measurement. Its own caveats are kept for the same reason — `claude_ro` is
 row-scoped, and scheduling is not visible from a query, so a later session knows what the read could
 not settle.
+
+## 2026-09-03 — Review sweep 41 (RV-35, RV-36, RV-37)
+
+`docs/implementation-backlog.md` 15955 → 16043 (+88), `projectOverview.md` 9607 → 9641 (+34). Three
+queue entries and their three Known-Issues rows.
+
+What earns the space is the same thing in each: **the measurement, not the claim.** RV-35's table of
+dated requests across all five tabs (Home 4 → 2, Health 3 → 3, Nutrition 5 → 0) is what separates
+"Nutrition looks stale" from "Nutrition is the only day-scoped tab that fails to roll over" — and the
+count only means anything because the requests are counted *by the date they carry*, since Health
+reissued 11 on resume and only 3 carried the new day. RV-36's line about `/health/sleep`,
+`/health/heart-rate`, `/cardio`, `/config` and `/program` all being leaves with no deeper push is what
+shrank that finding from "many screens" to one path; without it the next session re-counts them.
+
+RV-37's length is almost entirely the caveat that it was **not observed** — the fixture had nothing to
+scroll — plus why four safe-area CI rules miss it (they all fire on a *wrong* utility, never an absent
+one). A one-line version of that entry would read as a confirmed bug.
+
+The correction folded into BF-100's existing entry adds six lines and removes a false statement that
+would otherwise tell the next session Nutrition is already covered.
