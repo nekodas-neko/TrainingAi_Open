@@ -7115,3 +7115,17 @@ so a run that completes after being reaped discards its own result — the work 
 says it was abandoned. And the synchronous workaround has **no in-flight guard**, so a second press
 is two concurrent full-history passes, which is the starvation that took production down on
 2026-08-13.
+
+## 2026-09-03 — `projectOverview.md` → (see .size), `docs/implementation-backlog.md` → (see .size) (LA-56)
+
+The lines that earn their place are the two corrections. **The gating was too wide** —
+`oura-redecode-job.test.ts` already exercised the reaper against a real local Postgres, so these
+storage semantics were verifiable in the sandbox all along, and calling the whole entry
+`Verify: device` parked work that did not need parking. And **the immutability guarantee is not
+incidental**: an existing test caught a broader first attempt that would have let a duplicate
+callback clobber a good result, so the narrow predicate is recorded rather than left to be
+rediscovered by breaking it again.
+
+The `Keep:` states why the heartbeat is the risky half rather than merely the unfinished half: if
+beats do not stamp in production, every job stays `running` and the one-at-a-time index blocks every
+future redecode — a worse failure than the one being fixed.

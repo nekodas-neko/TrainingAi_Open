@@ -29,6 +29,17 @@
 **Version:** v1.436.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-02.
 
+**A redecode that finishes late can now say so (LA-56).** The owner ran the `fullHistory` pass and
+it was reaped as *abandoned* after exactly 30 minutes having written nothing — the second such
+failure in four days, and every full-history redecode that has ever run ended the same way.
+`finishRedecodeJob` filtered `isNull(finishedAt)`, which the reaper has already set, so a late
+success could not record itself: **the work would land while the record said it failed.** Migrations
+**261 + 262** add `reaped_at` and let a reaped row be closed — keeping both facts, when the reaper
+gave up and what came back. Immutability is preserved exactly: a job that genuinely finished and
+recorded a result is still untouchable. **The heartbeat is still owed** — the reaper remains a pure
+`startedAt` age check, so slow and dead look identical
+([journal](docs/overview/entries/2026-09-03-la56-late-redecode-result.md)).
+
 **A still-syncing sleep score now says so (Q-529).** The owner saw a night scored **47** at 06:46
 while the ring was still uploading; it settled at **62**. **The entry's central claim was already
 stale:** it says sleep has no provisional concept, but `lib/sleep/provisional.ts` shipped for BF-83
