@@ -7522,7 +7522,7 @@ worth more than they cost: `localDay` is seeded synchronously so a naive effect 
 every launch, and `sleep-sessions` is explicitly outside the tick (Q-91), which would leave last
 night's sleep stale on exactly the rollover where it matters most.
 
-## 2026-09-04 — `docs/implementation-backlog.md` → 17228 (BF-118, the User Information section)
+## 2026-09-04 — `docs/implementation-backlog.md` → 17278 (BF-118, the User Information section)
 
 A feature request rather than a fault, and the length is mostly the trace that changes what the work
 is. The owner asked for a place to put documents and free text that every AI surface then reads; five
@@ -7538,3 +7538,12 @@ to a model, and BF-68 already measured that as "luck rather than a rule" — plu
 otherwise be discovered late: crop-before-upload on an X-ray that carries more identifiers than an RMR
 printout, BF-41's standing decision that no source document is stored, and the existing `schedules`
 table being training structure rather than availability.
+
+The +50 that followed came from the owner refining the intake to a blurb router in the same sitting,
+and it earns its lines by being traced fragment by fragment against his own example sentence: of the
+four things in it, the injury and the food exclusion have structured homes (and the injury is
+*enforced*, not merely stored), while work availability and training experience have none. That ratio
+is the finding — a router is worth exactly as much as its destination registry, and "other notes" is
+the honest fallback rather than the target. The sharpest line recorded is that enforcement cuts both
+ways: because an injury removes exercises from the candidate list, a wrongly-routed one silently
+deletes training options, which makes the confirm step load-bearing rather than polite.

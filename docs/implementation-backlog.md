@@ -837,6 +837,56 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
 
 ### [platform][workouts][nutrition] 🔵 BF-118 — "User Information": one place the app knows you from, and one assembler every AI route reads
 
+> **⚑ REFINED 2026-09-04 — the intake is a BLURB ROUTER, and the owner would rather talk than fill in
+> forms.** *"maybe like an AI chat that populates the sections as you talk to it… I want to be able to
+> just give it a blurb like: I work monday to friday from 8-6; i cant eat potato, my lower back hurts
+> from lumbarixation - so less loaded lower back, I have 3 years gym experience — and it will read
+> summarize and put into the correct sections. if a section isn't defined it goes under 'other notes'…
+> so you can fill in manually (like dexa/rmr etc) or you can type/upload images and the AI will do it
+> automatically."*
+>
+> **That one blurb is the whole specification, and it was traced field by field:**
+>
+> | fragment | destination | exists? |
+> |---|---|---|
+> | *"my lower back hurts from lumbarixation — less loaded lower back"* | `injuries` | **yes, and it is ENFORCED** — `excludeInjuredExercises` filters the candidate list (BF-68) |
+> | *"i cant eat potato"* | `user_dietary_restrictions` | **yes** — per-user by design (*"an allergy belongs to the person, so every plan inherits it"*), with a `dietary_restrictions` catalogue carrying **`synonyms`** |
+> | *"I work monday to friday from 8-6"* | availability | **no home.** Not `schedules` — that is which session runs on which day |
+> | *"3 years gym experience"* | experience level | **no home.** `users` has height, DOB, sex, `activityLevel`, `fitnessGoal` — no training age |
+>
+> **Two of four already have structured, queryable homes; two have none.** That ratio is the entry's
+> real content: **the router is worth exactly as much as its destination registry**. Routing into
+> `injuries` produces a rule the generator cannot ignore; routing into "other notes" produces prose a
+> model may or may not honour. So *"other notes"* is the honest fallback for what has no home yet — not
+> the design target, and every fragment that keeps landing there is an argument for giving that kind a
+> real column.
+>
+> **`dietary_restrictions.synonyms` is the proof this is with the grain**, not against it: a catalogue
+> of codes with alternative wordings is precisely what a text router needs to turn *"cant eat potato"*
+> into a stored code rather than a sentence.
+>
+> - **Shape: the model returns a LIST OF PROPOSED RECORDS, each with a destination — never one blob and
+>   never a direct write.** One blurb produced four items bound for four tables; a single free-text
+>   summary would collapse that into prose and lose the enforcement. Each proposal is shown with where
+>   it is going, and is individually editable, acceptable and rejectable.
+> - **⚠ Confirmation is mandatory, and the schema already says so.** BF-41 records that `source` is
+>   `'manual' | 'extracted'` with **no third value for a model's unconfirmed output**. The same rule
+>   binds here: nothing the router proposes may be written without the owner accepting it.
+> - **⚠ Enforcement cuts both ways, and this is the sharpest risk in the feature.** Because an injury
+>   *removes exercises from the candidate list*, a wrongly-routed or hallucinated injury **silently
+>   deletes training options** and the owner sees only that something is missing. A wrong note is
+>   cosmetic; a wrong injury is not. Injuries and dietary restrictions are the two destinations where a
+>   confirm step is load-bearing rather than polite.
+> - **⚠ A blurb is not a document.** Free text is cheap, reversible and carries only what the owner
+>   typed; an uploaded X-ray carries a name, a date of birth, an accession number and a referrer, and
+>   the extraction call sends it to Google. **Ship the typed blurb first** — it needs no upload surface,
+>   no crop step and no BF-41 dependency, and it covers three of the four fragments above. The image
+>   path is the second half and inherits every warning in this entry.
+> - **Manual entry stays the reference path, not a legacy one.** The owner asked for both. DEXA and RMR
+>   forms (BF-71) already exist and the router should *prefill* them, exactly as BF-41 specifies for
+>   extraction — the router is another way into the same forms, never a parallel write path.
+
+
 - **Lane:** A for the store and the assembler; B for the section itself. **Needs a plan document
   before implementation** — this is a feature spanning five pillars, not a fix, and the backlog
   protocol says plan first.
