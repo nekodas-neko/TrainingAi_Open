@@ -7115,3 +7115,16 @@ so a run that completes after being reaped discards its own result — the work 
 says it was abandoned. And the synchronous workaround has **no in-flight guard**, so a second press
 is two concurrent full-history passes, which is the starvation that took production down on
 2026-08-13.
+
+## 2026-09-02 — `docs/implementation-backlog.md` → 16316 (BF-110, BF-111, and a correction to BF-80)
+
+Two entries plus eight lines onto BF-80. The owner added one detail to a months-old report — the blank
+screen **fixes itself on a scroll** — and it overturns the standing diagnosis: a killed WebView
+renderer leaves no document to scroll, so content that returns when dragged was present and unpainted.
+That is a compositor failure, and it wants the opposite fix from process-death recovery. BF-110 costs
+its length by carrying the caveat honestly — `error_events` holds zero renderer rows, but the handler
+that files them is native and the installed APK may predate it, so the silence corroborates and does
+not prove. BF-80 gains a warning rather than being struck: its handler is correct either way, and the
+thing that changes is that its `Gate: device` now waits on evidence that may never arrive. BF-111 is
+the APK-versus-web version ambiguity found while writing that caveat — small, and load-bearing exactly
+because BF-110 needed to ask which native build is installed and the app could not say.
