@@ -7182,3 +7182,20 @@ just deleting it is what stops a later session restoring it from the prose that 
 
 The `Math.round` note in the journal is the third thing worth its length: a surviving mutation that
 turned out to be a real off-by-one on some values, not a gap in the tests.
+
+## 2026-09-03 — `projectOverview.md` → 9741, `docs/implementation-backlog.md` → 16418 (BF-110)
+
+The index grows by two and the backlog by eleven, and both carry the same two sentences because both
+are read by different people at different times. The first is the retraction: **a scroll fixes it, so
+the renderer never died** — a reader who starts from BF-80's hypothesis builds the wrong fix, and
+BF-80's entry is the one they are most likely to have read.
+
+The second is the departure from the entry's own instructions. It asks for a row on every resume;
+that was not built, and an unexplained absence reads as an oversight a later session will "correct".
+The reason is recorded where the instruction is: JS cannot tell whether the screen was blank, so the
+row it asks for evidences nothing. Keeping the `dom-lost` case uncapped is the part that must survive
+any future trim — it is the observation that would disprove the entry.
+
+**Version 1.436.5, skipping .4**, which PR #840 (BF-111) is holding while the GitHub API is rate
+limited. A skipped patch number costs nothing; two branches claiming one costs a merge conflict in
+the file the repo says never to splice.

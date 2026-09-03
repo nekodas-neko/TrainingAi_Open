@@ -769,6 +769,26 @@ calories or the stage mapping (PS-16, PS-19).
 
 ### [app-shell][platform] BF-110 — the blank resume survives a scroll, which means the renderer never died
 
+- **✅ SHIPPED 2026-09-03** (`fix/bf-110-resume-repaint`). Both halves, in the order this entry
+  insists on: `handleResume` measures the shell root's box and child count on every resume, then
+  promotes and releases a layer for one frame — the same instruction the manual scroll gives the
+  compositor, without touching scroll state. On `pull-to-sync.tsx`'s container, where BF-100 already
+  lives, because the report says *"pages often"* rather than naming a screen.
+- **⚠ THE ENTRY ASKS FOR A ROW PER RESUME AND THAT WAS NOT BUILT — deliberately.** `error_events`
+  prunes at 30 days and is the second-largest object in the database, the owner resumes many times a
+  day, and, decisively, **JS cannot tell whether the screen was actually blank**: the DOM is intact
+  either way, so a row per resume records nothing about the failure it is meant to evidence. What
+  ships instead: **a `dom-lost` sample always** — that is the observation that would disprove this
+  entry and must never be dropped — and **a `dom-intact` sample once per launch**, which is all the
+  positive case needs. The repaint itself runs on every resume; only the row is capped.
+- **Gate:** device — and here it is the whole verdict, not a formality. This is a Samsung WebView
+  compositor failure: Chrome and `pnpm dev` cannot show it, so the suite proves the effect RUNS and
+  nothing about whether it FIXES anything. Reproduce as the entry says (background the app on low
+  memory — the original report had battery at 10% with Messenger running), then resume and confirm
+  the screen paints without a scroll. Check `error_events` for `bf110 resume` afterwards: a
+  `dom-intact` row is the measurement this entry wanted, and a `dom-lost` row would put BF-80 back
+  in play.
+
 - **Lane:** B — the DOM is alive, so the fix is a paint invalidation in the shell, not native. **No APK
   needed**, which is the practical difference between this entry and BF-80.
 - **Added:** 2026-09-02 · owner: *"this screen still happens when tabbing back. I noticed it fixes

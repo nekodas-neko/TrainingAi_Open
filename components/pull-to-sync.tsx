@@ -7,6 +7,7 @@ import { cn } from '@trainingai/shared/utils';
 import { hapticLight, hapticSuccess } from '@/lib/haptics';
 import { syncOuraRing } from '@/lib/oura-ble/sync';
 import { useScrollRestoration } from '@/lib/hooks/use-scroll-restoration';
+import { useResumeRepaint } from '@/lib/hooks/use-resume-repaint';
 
 const THRESHOLD = 100;  // indicator px needed to trigger sync (200px physical drag)
 const MAX_PULL = 130;   // max indicator height
@@ -44,6 +45,10 @@ export function PullToSync({
   // it — measured: on a push-and-back the container reads 0 while the document reads 0 throughout.
   // Here rather than in 62 screens, because every screen using the shell inherits it.
   useScrollRestoration(scrollRef, scrollKey);
+  // BF-110. Same container and the same reason: the blank resume is in the shell, not a screen.
+  // A scroll fixes it by hand, so the DOM was never lost — this measures that once and forces the
+  // compositor to re-raster without one.
+  useResumeRepaint(scrollRef);
   const isPulling = useRef(false);
   const isSyncing = useRef(false);
   const phaseRef = useRef<Phase>('idle');

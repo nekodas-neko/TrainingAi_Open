@@ -6,6 +6,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.5",
+    date: "2026-09-03",
+    changes: [
+      "The blank screen when you come back to the app should now paint on its own. It was never a crash \u2014 scrolling fixed it, which means the page was there all along and just was not drawn, so the app now gives the screen the same nudge your finger did.",
+    ],
+  },
+  {
+    version: "1.436.4",
+    date: "2026-09-03",
+    changes: [
+      "The Colmi ring now sends its raw readings to the server and the server reads them, instead of the app reading them on the phone. Nothing about a sync looks different, but a decoding fix can now be applied to readings already collected \u2014 three of this week's ring fixes had to be, and each one needed the app to be up to date first.",
+      "The order the ring sent its readings in was not being recorded. It is now, and a sync stored before today can still be re-read correctly.",
+    ],
+  },
+  {
     version: "1.436.3",
     date: "2026-09-03",
     changes: [
