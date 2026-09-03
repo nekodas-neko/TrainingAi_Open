@@ -490,6 +490,37 @@ and Samsung does not honour `autoConnect = true`, so direct connect plus a bound
 isolation stands and wiring it into scoring waits on the H10 session. It does not resolve steps,
 calories or the stage mapping (PS-16, PS-19).
 
+### [nutrition][platform] RV-42 — a meal plan can point at another account's saved meal and meal type
+
+- **Lane:** A — `lib/data/postgres/slices/meal-plans.ts` (`replaceMealPlanStructure` and the create
+  path). Both routes go through it; the fix is one pre-check, not two.
+- **Added:** 2026-09-03, Review sweep 45 —
+  [`write-up §4`](reviews/2026-09-03-fk-edges-meal-plan-cross-user-refs.md)
+- **The plan is ownership-checked; its child ids are not.** `ownedPlan(db, id, userId)` guards the
+  plan, then `meal_plan_meals` rows are inserted with `mealTypeId: m.mealTypeId ?? null` and
+  `savedMealId: m.savedMealId ?? null` straight from the request. Both are `z.string().uuid()` at the
+  boundary, which proves the shape and nothing about the owner. `meal_plan_meals` has no `user_id`, so
+  the FK is the only ownership link — and it only proves the row exists. **This is rule (c).**
+- **Two doors, both driven as a second account against the seeded user's rows:**
+  `POST /api/nutrition/meal-plans` → 201 stored; `PATCH /api/nutrition/meal-plans/meals/[mealId]` →
+  200 stored. Read back from Postgres, B's plan meal points at A's `saved_meal_id` *and* A's
+  `meal_type_id`.
+- **No data leaks — check this before raising the severity.** The meal-plan read joins neither
+  `saved_meals` nor `meal_types`; the API returns raw ids and `savedMealName`/`mealTypeName` came back
+  `null`. That is the half RV-32 had and this does not.
+- **What it does cost: one account silently mutates another's.** Both columns are `ON DELETE SET
+  NULL`. Driven end to end — B's plan meal held A's `saved_meal_id`, A deleted their own saved meal
+  through A's own API (`200 {"success":true}`), and B's row read `<NULLED>`. Neither account can see
+  why. Same second-order consequence RV-32 recorded on the progression-style edges.
+- **The fix already exists in a sibling.** `writeSavedMeal` verifies both of its equivalent ids in the
+  same transaction and cites rule (c) while doing it — copy that shape and refuse with a 400 naming
+  the field. **Do not reach for a composite FK carrying `user_id`**: it would work, but it is a
+  migration on a table two routes write, where a four-line pre-check matches the sibling code.
+- **How to test locally:** two accounts, create a plan as B naming A's `savedMealId`/`mealTypeId`, and
+  read `meal_plan_meals` back — the response body echoes the ids either way and proves nothing.
+- **Verify:** owner — nothing user-visible changes; a green local gate plus the two-account probe is
+  the bar.
+
 ### [nutrition][workouts] RV-41 — the Coach can write goal numbers the user's own screens refuse
 
 - **Lane:** A — `lib/coach/patch.ts` (the bounds), with `app/api/nutrition/targets/route.ts` and

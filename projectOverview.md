@@ -1623,6 +1623,23 @@ Last swept **2026-09-02**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [nutrition][platform] 🟡 A meal plan can point at another account's saved meal and meal type (RV-42, 2026-09-03)
+
+The plan is ownership-checked (`ownedPlan`); its child ids are not. `meal_plan_meals` rows take
+`savedMealId` and `mealTypeId` straight from the request — `z.string().uuid()` proves the shape and
+nothing about the owner — and the table has no `user_id`, so the FK is the only ownership link and it
+only proves the row exists. Driven as a second account through **both** doors:
+`POST /api/nutrition/meal-plans` (201) and `PATCH /api/nutrition/meal-plans/meals/[mealId]` (200),
+read back from Postgres pointing at the seeded user's rows.
+
+**No data leaks** — the meal-plan read joins neither table, so `savedMealName`/`mealTypeName` come back
+`null`; that is the half RV-32 had and this does not. **What it costs is a cross-account write:** both
+columns are `ON DELETE SET NULL`, so when the referenced row's owner deleted their own saved meal
+through their own API, the other account's plan row silently read `<NULLED>`. The fix is the pre-check
+`writeSavedMeal` already implements for its equivalents.
+[`Review sweep 45`](docs/reviews/2026-09-03-fk-edges-meal-plan-cross-user-refs.md). **Web build, local
+database.** The workout and device FK edges are **untouched, not clean**.
+
 ### [nutrition][workouts] 🟡 The Coach can write goal numbers the user's own screens refuse (RV-41, 2026-09-03)
 
 The patch schema bounds every goal number at `max(100_000)`, under a comment saying *"'set my calories
