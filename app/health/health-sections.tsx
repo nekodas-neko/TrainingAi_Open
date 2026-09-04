@@ -123,6 +123,8 @@ export interface HealthSectionsCtx {
   bmi: number | null;
   bmiLabel: string | null;
   bmiUsesBf: boolean;
+  /** Whether the reading the BMI band was chosen from carried a DEXA calibration (BF-113). */
+  latestBfIsCorrected: boolean;
   weightTrendKgPerWeek: number | null;
   energyBalanceKcal: number | null;
   energyBalance: import('@/app/api/nutrition/energy-balance/route').EnergyBalanceResponse | null;
@@ -155,7 +157,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
     metaLoading, metaToday, metaRecent, latestWeight, latestWeightIsStale, latestWeightDate, latestBf, latestSteps,
     latestDistanceKm, targetWeightKg, targetBfPct, openInfo, toggleInfo, openLog,
     setMetricSheet, setWaterLogOpen, recentSleep, lastSleep, readiness,
-    todayWaterMl, waterGoalMl, activeEnergyKcalToday, bmi, bmiLabel, bmiUsesBf,
+    todayWaterMl, waterGoalMl, activeEnergyKcalToday, bmi, bmiLabel, bmiUsesBf, latestBfIsCorrected,
     weightTrendKgPerWeek, energyBalanceKcal, energyBalance, trainingLoad, sleepCorr, injuries,
     setInjuries, userId, recoveryMuscles, handleDayClick, weeklyStats,
     activeSessions, trainingGoal, muscleSets, strengthTrend, weekToDate, userGoals,
@@ -496,7 +498,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
                 <>
                   <p className="text-2xl font-bold tabular-nums" style={{ color: "#a78bfa" }}>{bmi.toFixed(1)}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">{bmiLabel}</p>
-                  {bmiUsesBf && <p className="text-[9px] text-muted-foreground/60 mt-0.5">via body fat %</p>}
+                  {bmiUsesBf && <p className="text-[9px] text-muted-foreground/60 mt-0.5">via body fat %{latestBfIsCorrected ? " (DEXA-calibrated)" : ""}</p>}
                 </>
               ) : (
                 <p className="text-xs text-muted-foreground">No data</p>
@@ -505,7 +507,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
                 <div className="mt-3 flex gap-2 rounded-xl bg-muted/50 p-2.5">
                   <p className="text-[10px] text-muted-foreground leading-relaxed">
                     {bmiUsesBf
-                      ? "Category is based on your body fat % — more accurate for muscular builds. Standard BMI categories assume average body composition and classify muscle as excess weight."
+                      ? `Category is based on your body fat % — more accurate for muscular builds. Standard BMI categories assume average body composition and classify muscle as excess weight.${latestBfIsCorrected ? " That reading is your scale's, corrected to your DEXA scan before the category is chosen." : ""}`
                       : "Weight ÷ height². Standard categories assume average body composition. Log body fat % to get a category adjusted for muscle mass."}
                   </p>
                 </div>

@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.10",
+    date: "2026-09-04",
+    changes: [
+      "The BMI card now says its category comes from a body fat reading corrected to your DEXA scan, rather than just \"via body fat %\". The number and the category are unchanged \u2014 the card was already using the corrected figure and only the label was short.",
+    ],
+  },
+  {
     version: "1.436.6",
     date: "2026-09-04",
     changes: [

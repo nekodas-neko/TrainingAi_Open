@@ -1166,35 +1166,6 @@ screen disagree about what day it is.
   queued outbox both survive the rollover untouched.
 
 
-### [body] BF-113 — the BMI band is computed from a DEXA-corrected body fat and the card only says "via body fat %"
-
-- **Lane:** B — `app/health/health-sections.tsx:499` (the caption) and `:507` (the info popover).
-- **Added:** 2026-09-03 · owner: *"bmi doesnt say its scaled to match dexa."*
-
-**He is right, and the card is one word short of true.** `latestBf` is
-`metaRecentReversed.map(displayBodyFat)` (`health-content.tsx:545`), and `displayBodyFat` returns
-`bodyFatCorrected ?? bodyFat` — the **DEXA-corrected** value. So the band shown (*High fat* at 27.9)
-is decided by a calibrated figure, and the only thing the card says about it is *"via body fat %"*.
-The info popover is no better: *"Category is based on your body fat % — more accurate for muscular
-builds."* Nothing names the calibration.
-
-**The sibling card already does this properly**, which makes it a sibling-surface gap rather than a
-missing feature. `components/health/body-fat-card.tsx:46` calls `correctedSpan(metaRecent)` and says
-how many of the window's readings carry a correction — a helper written for exactly this
-(`body-fat-display.ts`: *"the two numbers together are what lets a chart say 'the last 4 of 7' rather
-than imply all or none"*).
-
-- **Recommendation: `via body fat % (DEXA-calibrated)` in the caption, and one sentence in the
-  popover** saying the scale reading is corrected to the owner's DEXA before the band is chosen. The
-  value is already correct; this is a labelling change only.
-- **⚠ Use `isCorrectedReading()`, never `bodyFatCorrected !== bodyFat`.** `body-fat-display.ts` warns
-  that an offset can round to zero and *"corrected by 0.0" and "not corrected" are different claims* —
-  and two thirds of the owner's history is on instruments the calibration does not cover, so the label
-  must follow the flag on the reading actually used, not a comparison.
-- **Verification:** the caption names the calibration on a corrected reading and does **not** on an
-  uncorrected one; the number itself is unchanged.
-
-
 ### [body][nutrition] BF-114 — two numbers called BMR, 218 kcal apart, on two screens, neither saying which is which
 
 - **Lane:** B for the labelling; no engine change — both values already exist and both are correct.
