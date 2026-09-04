@@ -389,6 +389,53 @@ below threshold and left in place for next time.
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
 
+
+### [platform] LB-56 — E2E costs 26 minutes a UI PR and currently gates nothing; decide which of those to change
+
+- **Lane:** ? — neither. `.github/workflows/ci.yml`, `playwright.config.ts` and the required-checks
+  setting are the Orchestrator's and the owner's.
+- **Added:** 2026-09-04 · owner: *"why is e2e taking so long? can it be investigated or turned off if
+  not needed"*.
+- **Needs:** nothing to investigate — the measurement is below. What it needs is a decision.
+
+**Measured, not estimated.** A full local run against a CI-shaped database: **144 tests, 27.1 minutes
+of test time.** There is no single pathology — 28 tests finish under 5s and 16 take over 20s. The
+heaviest files are `meal-plan-library-surface` **136s**, `recipe-url-to-meal` **90s**,
+`touch-target-size` **69s**, `meal-label` **65s**, `training-load-day-flags` **55s**; `auth.setup`
+alone is **50s**. On CI the job ran ~50 minutes before LB-55's fixes and **26 minutes after**, because
+twelve specs stopped burning 45-second timeouts — which is also the CI-side evidence that those fixes
+landed.
+
+**It is slow because it is serial, and the serialism is deliberate.** `playwright.config.ts` sets
+`workers: 1, fullyParallel: false` with the reason written down: *"the specs share one seeded Postgres
+and one signed-in user, and writes in one spec are visible to another."* **That is still true and was
+re-proved on 2026-09-04** — three specs pass in isolation and fail in the full run (LB-55). So raising
+`workers` trades ~20 minutes for flakiness, which is the wrong direction.
+
+- **⚠️ The real problem is not the 26 minutes, it is that they buy nothing right now.** `main` itself
+  would not pass this suite, so E2E gates nothing — #868 merged with it red on 2026-09-04 — while
+  still costing 26 minutes on every UI PR. **A red check that nobody can act on is worse than either
+  alternative**, because it trains six concurrent agents to scroll past a failing gate, which is how a
+  real regression gets waved through later. Whatever else is decided, this state should not persist.
+- **Recommendation: make it advisory now, fix it next, re-require it when green.** Removing it from
+  the required set costs nothing, matches what is already true, and unblocks the PRs waiting on it.
+  The risk is that an advisory check decays unwatched — which is how it reached ten failures without
+  anyone noticing — so it wants the re-require step queued, not assumed.
+- **Alternatives, and what each is better at:**
+  - *Fix the four and keep it required* — the durable answer, and where this should end up. One needs
+    a fixture decision, three need a bisect (LB-55). A session's work, uncertain.
+  - *Drop it from PRs, run nightly against `main`* — saves the 26 minutes outright and finds breakage
+    once a day. Defensible for a single-user app whose real gate is the device, and it would need the
+    nightly's `if: github.event_name != 'schedule'` removed, which is the line that leaves `main`
+    with no baseline today.
+  - *Shard across parallel CI jobs* — ~26 min to ~8 while keeping serial order inside each shard.
+    **Blocked on the order-dependence question**: three specs are known to fail after an earlier
+    spec's writes, and nothing has established that no spec *depends* on one.
+- **Reversal cost is near zero** for the first three: required-check membership is a settings toggle
+  and the job trigger is one line. Sharding is the only option that is real work to undo.
+- Already working in the repo's favour: the job is gated on a UI-paths diff, so a docs-only PR skips
+  it entirely.
+
 ### [platform] LB-55 — E2E fails as a timeout, not as an error, and a red E2E does not actually block a merge
 
 - **Lane:** ? — neither. `.github/workflows/ci.yml`, `playwright.config.ts` and the branch ruleset are

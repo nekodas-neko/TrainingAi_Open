@@ -7753,3 +7753,16 @@ pass in isolation and fail in the full suite, which the duration-based triage ab
 would have sent the next session hunting a stale string that is not there. That is written down with
 the instruction not to run one alone and call it fixed — the isolation run is what proves the cause
 lies in a spec that ran earlier, so the question is which write, not which assertion.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17831 (LB-56)
+
+Forty-seven lines for a question the owner asked directly — *"why is e2e taking so long? can it be
+investigated or turned off if not needed"* — answered with the measurement rather than an impression:
+144 tests, 27.1 minutes of test time, no single pathology, and the per-file numbers that show it.
+
+The length is mostly the alternatives, and they are worth the room because the obvious one is wrong.
+Raising `workers` looks like the fix and would trade twenty minutes for flakiness: the serialism is
+deliberate, its reason is written in the config, and three specs were re-proved order-dependent the
+same day. Sharding is the option that would actually work and is the one blocked on a question nobody
+has answered. Recording which fixes are cheap to reverse — three of the four are a settings toggle or
+one line — is what lets this be decided quickly instead of deliberated again.
