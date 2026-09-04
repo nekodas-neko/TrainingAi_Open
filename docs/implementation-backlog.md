@@ -14166,6 +14166,28 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   as test fixtures. None of this has been done; the bands today are still the plan's initial
   priors. Grepped the backlog for a tracking entry — none exists; this gap has sat as a code
   comment only.
+- **Gate:** owner
+- **Why it is gated rather than READY (added 2026-09-04):** every path in this entry ends at data only
+  the owner can produce, and it was heading Lane A's READY list with nothing an implementer could
+  start. The classifier's own header forbids the one thing that looks implementable — *"do not
+  hand-tune further without real data"* — so tightening the bands from a desk is the explicitly
+  prohibited move, not the fallback.
+- **⚠ UNTESTED, but it may make the owner's ask much smaller — worth checking before booking four
+  physical captures.** The plan asks for fresh captures of a counted walk, a run, a lifting session
+  and idle. But the ring's frames are archived: `oura_raw_packed` holds **1,094 rows spanning the
+  full history** (measured 2026-09-04) and CLAUDE.md's rule is that `body_hex` is the archival source
+  of truth precisely so *"a decoder added later can back-fill by re-decoding stored hex"*. If the
+  motion frames the classifier reads are among them and decode to the three `GaitFeatures` inputs,
+  the **signal** for months of walking already exists, and what is actually missing is **labels** —
+  which windows were a real walk and which were sitting. Some labels are already in the database
+  (guided walks, GPS-tracked activities and workout sessions are all timestamped), and the owner's
+  three false-positive reports are themselves labelled idle windows. That would turn the ask from
+  *"do four counted sessions with the ring on"* into *"confirm these timestamps"*.
+  **Two things to check before believing any of it:** whether the packed archive actually contains
+  the motion/steps frame tag rather than only the HR/sleep ones, and whether re-decoding them yields
+  `strideHz`/`strideAmpFrac`/`totalAmplitudeMg` rather than a different column set. Also note
+  `step_live_windows` holds **8 rows in total** — the live step path has produced almost nothing, so
+  do not reach for that table as a shortcut.
 - **Needs the owner, not just an implementer** — the capture step is physical (an actual counted
   walk/run/lifting session with the ring on), via the plan's referenced admin device-data capture
   panel or an ad-hoc capture. No code review substitutes for real frames.
