@@ -270,6 +270,11 @@ jobs:
             echo 'tree=text-present' >> "$GITHUB_OUTPUT"
           elif [ -s /tmp/maestro-hierarchy.txt ]; then echo 'tree=no-text' >> "$GITHUB_OUTPUT"
           else echo 'tree=absent' >> "$GITHUB_OUTPUT"; fi
+          # Third axis: did the WebView ever ASK the server for the sign-in page? A tree with no form
+          # text means one of two things, and only the server's access log tells them apart.
+          if grep -qE 'server saw /sign-in requests: [1-9]' /tmp/q250-verdict.txt 2>/dev/null; then
+            echo 'page=served' >> "$GITHUB_OUTPUT"
+          else echo 'page=never-requested' >> "$GITHUB_OUTPUT"; fi
 
       # Q-250. The verdict is carried by these steps' NAMES, not by their output, and that is the
       # whole point. This job's log ends with the runner's own post-job blocks — artifact upload, git
@@ -298,6 +303,13 @@ jobs:
         run: 'true'
       - name: 'TREE — no hierarchy at all'
         if: always() && steps.verdict.outputs.answer == 'a' && steps.verdict.outputs.tree == 'absent'
+        run: 'true'
+
+      - name: 'PAGE — the server did serve /sign-in, so the form rendered and the driver cannot read it'
+        if: always() && steps.verdict.outputs.answer == 'a' && steps.verdict.outputs.page == 'served'
+        run: 'true'
+      - name: 'PAGE — the WebView never requested /sign-in, so there was no form to find'
+        if: always() && steps.verdict.outputs.answer == 'a' && steps.verdict.outputs.page == 'never-requested'
         run: 'true'
 
       - uses: actions/upload-artifact@v6

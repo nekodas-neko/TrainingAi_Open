@@ -86,6 +86,13 @@ fi
 echo 'no net:: errors after launch — the WebView reached the host'
 echo 'reachability: OK, the WebView loaded from the host' >> /tmp/q250-verdict.txt
 
+# "No net:: error" is weaker than it sounds, and the last run proved it matters: a hierarchy came
+# back carrying no sign-in text, which is equally consistent with the WebView being opaque to the
+# driver and with the page never having rendered the form. The server's own access log settles it —
+# it records what the WebView actually asked for. Nothing else in this job can see that.
+SIGNIN_HITS=$(grep -cE 'GET /sign-in|/sign-in ' /tmp/next-server.log 2>/dev/null || echo 0)
+echo "server saw /sign-in requests: ${SIGNIN_HITS}" >> /tmp/q250-verdict.txt
+
 echo '--- sign in, which is what makes the local store exist at all ---'
 # `getLocalStore(userId)` requires a signed-in user, so an app sitting on the sign-in screen never
 # creates a database and the poll below waits 90 s for a file that cannot appear. That is exactly
