@@ -7624,3 +7624,18 @@ Twelve lines onto the ownership-coverage Known-Issues row. The row's function is
 session what the two mutation mechanisms can and cannot see, so a third category they are both blind
 to belongs in it rather than only in the backlog — and it carries the finding (three methods that
 constrained ownership nowhere, one of them a bare `UPDATE`) plus the reason it is not automated.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17492 (LB-53, refuted and re-scoped)
+
+Net five lines: the entry's original evidence table and its three hypotheses came out, and a refutation
+plus the full writer map went in. The map is the part worth the length — five producers write this
+table and no single place held that list, which is how three sessions in a row read a per-score cadence
+out of a column that is stamped by all five on every write of any column. The `Keep:` is one line and
+is now the only thing the entry owes.
+
+## 2026-09-04 — `projectOverview.md` → 9770 (LB-53 refuted, Q-529's note corrected)
+
+Three lines net onto the Q-529 provisional-score row, which carried the refuted claim as fact — that
+the provisional state "may last far longer" than the ~9 minutes measured. The correction has to keep
+the conclusion (the marking is more load-bearing than 9 minutes) while replacing the reason and
+bounding it to the local day, because a reader who only sees "refuted" would drop the marking.

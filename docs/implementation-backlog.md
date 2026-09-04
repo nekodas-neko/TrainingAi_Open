@@ -7535,59 +7535,64 @@ because none of them is the change that review was for, and per **No orphaned fi
 without a queue entry is a dropped finding.*
 
 
-### [sleep][platform] LB-53 — `oura_daily_derived` is written in occasional bulk passes, not per night
+### [sleep][platform] LB-53 — `oura_daily_derived`: what actually writes it, and the one thing still owed
 
-> **✅ THE QUESTION THIS ENTRY SAID TO MEASURE FIRST IS ANSWERED (2026-09-03): the scores go STALE,
-> they are not ABSENT.** `created_at` on `oura_daily_derived` runs one row per day, each created the
-> day after the night it describes — 2026-08-22 created day 08-23, 08-23 created 08-24, unbroken
-> through 2026-09-02 creating 09-03 — with one catch-up of 5 rows on 2026-08-17. So a row exists from
-> the morning after, and it then holds its first value until a bulk pass rewrites it. Nothing was
-> missing during the nine-day gap. **That settles which of the two failure modes this is**, and it is
-> the less alarming one: no screen was ever blank, but a screen could show a days-old score.
+> **⛔ REFUTED AS FILED, 2026-09-04 — `computed_at` does not mean what this entry read it to mean, and
+> the fix it implied is not the fix.** The column is stamped `now()` by **every** write of **any** of
+> the 36 columns on the row (`upsertOuraDailyDerived` sets `computedAt: new Date()` unconditionally,
+> `lib/data/postgres/slices/oura.ts`). So it answers *"when was this row last touched by any of five
+> producers"*, never *"when was this score computed"*. Three sessions have now tried to read a
+> per-score cadence out of it.
 >
-> **The "four stamps in the whole history" reading is stale and the shape is different now.** As of
-> 2026-09-03 there is a bulk pass at **07:00:15Z** rewriting ~30 days in a single ~50 ms burst, and a
-> single-row write at **08:00:09Z** for that day only. So both cadences exist — an incremental
-> per-day write and an occasional whole-history rewrite. Re-read the stamps before building; this
-> entry's table was one snapshot.
+> **The "bulk pass rewriting 85 rows" is the body-comp backfill, and it touches no score.** Every
+> rollup run calls `persistBodyCompFromMetrics` (`rollup-io.ts` → `persistBodyComp`), which walks the
+> **entire** `body_metrics` history and upserts one derived row per day that has a weight and a body
+> fat — re-stamping `computed_at` on every one of them while writing only `body_comp`. Measured
+> 2026-09-04 in production: a burst at 02:16:37Z, one row per day, writes 3–4 ms apart, spanning the
+> whole history. That is the shape this entry read as "the scores were recomputed in a bulk pass".
+> They were not; only `body_comp` was.
 >
-> **The deploy hypothesis is NOT confirmed and should not be carried as if it were.** The 21:55 pass
-> landing minutes after #827 is one coincidence, and today's 07:00:15 bulk pass does not line up with
-> a merge (#838 merged 07:49, #839 later). Whatever schedules the bulk pass, a deploy is not
-> obviously it. Establish the trigger before designing around it.
+> **The scores are written per day, on the day, by the live route — and never revisited afterwards.**
+> `lib/health/readiness-payload.ts` persists readiness, sleep and activity on every
+> `/api/readiness-score` request, keyed to today (`latestSummary?.date ?? todayIso`, and `lastSleep.date`
+> for sleep). So a day's stored score is refreshed continuously *while that day is current* and frozen
+> the moment it ends. **Direct evidence, not inference:** `model_versions.readiness` is stamped by
+> that route and only that route. In production it is present on exactly the **10** most recent days
+> (2026-08-26 → 09-04) and absent from all **76** older rows — if any pass ever recomputed a past
+> day's readiness, those rows would have picked the stamp up. None did.
+>
+> **The 27 scores with no stamp came from the admin backfill route** — `app/api/admin/backfill-derived-scores`,
+> the only other writer of `readiness_score`, which was writing the score and contributors and **no
+> stamp at all**. Fixed here: it now writes `modelVersions: { readiness: READINESS_MODEL_VERSION }`,
+> matching the live route. Its own comment had claimed it could not, because `model_versions` was
+> "replaced wholesale" — that stopped being true when Q-273 made the column merge per pillar with
+> `||` inside the statement, and the comment was never updated. Covered by a new case in
+> `backfill.test.ts` (mutation-verified: dropping the stamp fails that one test and no other), which
+> also pins that writing readiness leaves another pillar's stamp in place.
+>
+> **The full writer map, since no single place held it:** (1) the live readiness route — readiness,
+> sleep, activity, today only, stamped; (2) the admin backfill — readiness and sleep across a ≤31-day
+> range, now stamped; (3) the rollup — recovery index, worn hours, night-HRV baseline, stress,
+> resilience, BDI, for the days it processes; (4) `persistBodyCompFromMetrics` inside the rollup —
+> `body_comp` for the whole history, every run; (5) the device push (`oura_daily_derived` outbox
+> domain, `adapter.ts`). All five stamp `computed_at`.
 
-- **Lane:** A — the rollup (`lib/oura-ble/rollup/**`) and whatever schedules it. Found from Lane B
-  while checking Q-529's own caveat; filing rather than building, per the lane rule.
+- **Lane:** A
+- **Branch:** `fix/backfill-readiness-model-stamp` (the stamp half, shipped 2026-09-04)
 - **Added:** 2026-09-02 · measured against production while answering Q-529's *"re-read `computed_at`
-  the next day"*.
-- **The whole table carries four distinct `computed_at` stamps.** Not four per day — four in its
-  entire history:
-
-  | stamp (UTC) | rows | day range touched |
-  |---|---|---|
-  | 2026-09-02 21:55 | 85 | 2026-05-07 → 2026-09-03 |
-  | 2026-08-24 13:42 | 1 | 2026-08-22 |
-  | 2026-08-17 07:50 | 21 | 2026-07-08 → 2026-08-04 |
-  | 2026-07-30 03:30 | 1 | 2026-07-07 |
-
-- **Nine days with no write at all**, 2026-08-24 13:42 → 2026-09-02 21:55, across which every night
-  happened as usual. Rows exist for all of them and every one now carries the 21:55 stamp, so the
-  question this cannot answer from outside is whether those days held a stale score in the meantime
-  or no row at all. **That is the thing to measure first** — it is the difference between "scores go
-  stale" and "scores are absent until something triggers a pass".
-- **The 21:55 pass is suspicious in itself.** It landed minutes after a Railway deploy (#827) and
-  rewrote 85 rows spanning the whole history. If a *deploy* is what recomputes scores, then the
-  refresh cadence is release frequency rather than anything to do with the data — which no one would
-  choose, and which would explain the nine-day gap exactly.
-- **What it changes for the user:** Q-529 reported a score of 47 on 2026-08-20 that should have
-  settled higher. It now reads **62**. So the recompute is real, but on this evidence it is not
-  nightly, and a night's score can sit at its mid-sync value for a long time rather than the
-  ~9-minute window Q-529 assumed. **That makes Q-529's client-side marking more load-bearing, not
-  less** — the marked state may persist far longer than a few minutes.
-- **Not a duplicate of Q-529.** That is "the number on screen does not say it can still change", and
-  its Lane B half shipped 2026-09-02. This is "the number may not be recomputed for days".
-- **Caveats:** `claude_ro` is row-scoped to the owner, so this is one user's rows; and `computed_at`
-  is the only evidence available from outside — the scheduling itself is not visible from a query.
+  the next day"* · refuted and re-scoped 2026-09-04
+- **Keep:** one thing, and it is not what this entry was filed for. **58 of the owner's 109 derived
+  rows carry no readiness score at all** — the history is more hole than trend, because the live
+  route only ever writes today and nothing has back-filled the rest. The tool to fix it already
+  exists and now stamps correctly; running it is a **`Gate: owner`** action, not a code change,
+  because it writes months of history in one pass and a re-scored trend is not silently reversible.
+- **Gate:** owner
+- **Not a defect, recorded so it is not re-opened:** a day's score freezing when the day ends is
+  correct behaviour, not staleness. The narrow real case is a day whose last app open happened
+  before the ring synced — that day's stored score is built from an incomplete night and nothing
+  revises it. The backfill route is the remedy for that too.
+- **Caveats on the measurement:** `claude_ro` is row-scoped to the owner, so every count above is one
+  user's rows. The writer map is read from source and is complete; the counts are not.
 
 ### [platform] LB-52 — `main` outpaces a CI cycle and auto-merge is unavailable, so every PR is a race
 

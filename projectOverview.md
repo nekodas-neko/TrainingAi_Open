@@ -63,10 +63,13 @@ sleep surface read it. Marked now on all three: the Home chip (via its existing 
 glyph, whose predicate was written out at three sites and is now one tested function), the Body
 tab's sleep card, and `/health/sleep`. An absent flag reads as **settled** — the local-store seed has
 no watermark, and badging every historical night would be worse than the bug.
-**⚠ Found while checking the entry's caveat, and filed as LB-53 (Lane A):** `oura_daily_derived`
-holds **four `computed_at` stamps in its entire history**, with a **nine-day gap** where nothing was
-written and a pass that rewrote 85 rows minutes after a deploy. That makes this marking *more*
-load-bearing — the provisional state may last far longer than the ~9 minutes Q-529 measured.
+**⚠ Filed as LB-53 (Lane A), and REFUTED as filed on 2026-09-04 — read the corrected version.**
+The original reading (four `computed_at` stamps in the table's whole history, a nine-day gap, a pass
+rewriting 85 rows after a deploy) was drawn from a column stamped by every write of any of the row's
+36 columns, so it says nothing about when a score was computed; the 85-row pass writes `body_comp`
+only. What is true: the live route rewrites **today's** score on every request and nothing revises a
+day once it ends. So this marking is still *more* load-bearing than the ~9 minutes Q-529 measured —
+the provisional window is the whole local day — but it is bounded by that day, not open-ended.
 **Not device-verified**, and the device owns the only real test: a morning where the ring is
 genuinely mid-upload ([journal](docs/overview/entries/2026-09-02-q529-provisional-sleep-score.md)).
 
