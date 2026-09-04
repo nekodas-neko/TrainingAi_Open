@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
-import { DEFAULT_TZ, toAestDay } from '@trainingai/shared/date-utils'
+import { DEFAULT_TZ, toAestDay, todayInTz, shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 import type { LoadComparisonEntry } from '@/components/health/workout-load-comparison-chart'
 
 export async function GET(req: Request) {
@@ -16,7 +16,11 @@ export async function GET(req: Request) {
 
   const tz = session.user?.timezone ?? DEFAULT_TZ
   const repo = await getRepository()
-  const from90d = new Date(Date.now() - 90 * 86_400_000)
+  // Anchored at a local midnight, not `Date.now() - N × 86_400_000`: an ms-offset window starts
+  // mid-day in the user's timezone and so straddles two local days at its far edge. The results are
+  // bucketed by `toAestDay` below, which makes the effect small here — one boundary day in or out —
+  // but this is the banned pattern CLAUDE.md names, and it has shipped six times before.
+  const from90d = dateStrMidnightInTz(shiftDateStr(todayInTz(tz), -90), tz)
   const sessions = await repo.getWorkoutSessionsFrom(userId, from90d)
 
   // Prefer matching by the program session's stable id — a session-name match breaks

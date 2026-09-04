@@ -15486,12 +15486,6 @@ per-field merge where an AI write has no honest source rank to claim.
   reusable components. What is missing is one entry point instead of two, three stats, a 7-day
   comparison, and the wrap-up continuing from the read-through. Reasoning and alternatives: the plan.
 
-### [readiness][nutrition] Q-112c — the 7-day comparison window
-
-- **Branch:** `feat/day-review-week-window` · **Lane: A** — `app/api/**`
-- The prior-7-day series for the stats that get a trend. Reuse `computeActiveEnergy()`,
-  `/api/workout-load-history`, `body_metrics`, `buildDayAudit`. Anchor at `todayMidnightUtc(tz)`.
-
 ### [nutrition][app-shell] Q-112d — draw the trends, on four stats not fourteen
 
 - **Branch:** `feat/day-review-trends` · **Lane: B** · **Plan:** the above, §4
@@ -15514,8 +15508,12 @@ per-field merge where an AI write has no honest source rank to claim.
 
 - **Branch:** `chore/load-comparison-rehome-or-delete` · **Lane: A** — the decision reaches
   `app/api/workout-load-history/route.ts`; the re-home half alone would be Lane B.
+- **Needs: Q-112d**
 - **Added:** 2026-08-27 · Lane B, from Q-112a's own diff. Filed rather than acted on, because the
-  right answer depends on Q-112b–d, which are not built yet.
+  right answer depends on Q-112b–d, which are not built yet. **The dependency is a field as of
+  2026-09-04**: the entry's own body says "do not delete the route yet" because Q-112c reuses it,
+  and Q-112c shipped that day — so the blocker is now Q-112d, and it is written where the lane
+  runner can read it instead of in prose it prints as READY over.
 - **What Q-112a removed.** `components/day-review-sheet.tsx` was the **only** renderer of
   `components/health/workout-load-comparison-chart.tsx` and the only caller of
   `/api/workout-load-history`. After Q-112a shipped:
