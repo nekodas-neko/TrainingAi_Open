@@ -132,6 +132,10 @@ class ScaleBleService : Service(), ScaleGattClient.Listener {
     // housekeeping as if it were a fresh, failed weigh-in. See onState/onUnstableReading/
     // onCycleDeadline/onFailure below.
     private var hasCapturedThisWake = false
+    /** Q-104. The weight of this wake's last capture, or null before one. Reset with the two
+     *  flags below on every wake, since a replay can only impersonate a capture from the same
+     *  connection. See ScaleWeighInGate. */
+    private var lastCapturedKg: Double? = null
     // Set only by onUnstableReading — the first real proof the scale is reporting live weight
     // data, not just that a GATT link exists. Cleared only at the start of a genuinely fresh
     // scan-hit cycle (onStartCommand), same as hasCapturedThisWake. Persistent connections (#972)
@@ -190,6 +194,7 @@ class ScaleBleService : Service(), ScaleGattClient.Listener {
                 cycleActive = true
                 hasCapturedThisWake = false
                 hasSeenActivityThisWake = false
+                lastCapturedKg = null
                 attempts = 0
                 cycleStartElapsedMs = SystemClock.elapsedRealtime()
                 val deadline = Runnable { onCycleDeadline() }
@@ -214,6 +219,7 @@ class ScaleBleService : Service(), ScaleGattClient.Listener {
         linked = false
         hasCapturedThisWake = false
         hasSeenActivityThisWake = false
+        lastCapturedKg = null
         instance = null
         super.onDestroy()
     }
@@ -312,6 +318,17 @@ class ScaleBleService : Service(), ScaleGattClient.Listener {
     }
 
     override fun onUnstableReading(weightKg: Double) = runOnMain {
+        // Q-104. Logged unconditionally, gate or no gate: the entry has been open since 2026-08-05
+        // waiting on an on-device capture to answer whether the replayed reading matches the capture
+        // it follows, and this line answers it from the next ordinary occurrence instead.
+        log("unstable reading ${weightKg}kg (last captured this wake: ${lastCapturedKg ?: "none"})")
+        if (!ScaleWeighInGate.isNewWeighInEvidence(weightKg, lastCapturedKg)) {
+            // Same value as the capture we just took: the scale replaying its last notification to a
+            // resubscribing client, not a person. Leave the suppression system alone and draw no
+            // progress bar — this is the "Weighing you… with nobody on the scale" the owner reported.
+            log("  ↳ identical to the last capture — treating as a resubscribe replay, not a new weigh-in")
+            return@runOnMain
+        }
         updateNotification("Weighing you…")
         // Real evidence a new physical weigh-in is underway (not just link housekeeping) — undo
         // the post-capture suppression above so a genuinely new attempt reports normally,
@@ -331,6 +348,8 @@ class ScaleBleService : Service(), ScaleGattClient.Listener {
     override fun onWeighIn(packet: ScaleProtocol.WeightPacket) = runOnMain {
         updateNotification("Weigh-in captured — syncing…")
         hasCapturedThisWake = true
+        // Q-104: what a later unstable reading is compared against to tell a replay from a person.
+        lastCapturedKg = packet.weightKg
         // No client=null and no cooldown re-arm here anymore (2026-08-01) — the connection stays
         // open (see the class doc) and keeps listening for the next weigh-in instead of
         // disconnecting after this one, so there's nothing to "settle back to sleep" from.
