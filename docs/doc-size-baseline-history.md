@@ -7707,3 +7707,17 @@ of them checks `isActive` — because "middleware only" is the exact phrasing th
 theoretical. The backlog half spends its length on three candidate fixes with a recommendation and a
 reversal cost, since it is an auth change and the choice between them is the owner's, not something a
 session should settle by picking the smallest diff.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17717 (LB-55)
+
+Forty-eight lines for one Reference entry, and the length is the point: it is read *while* a red E2E
+is being diagnosed, which is exactly when a session has no logs, no `main` baseline, and a failure
+that presents as a timeout rather than as the assertion that failed.
+
+Most of it records things NOT to do, which is what this cost was made of. The `toPass` budgets that
+exceed their test timeouts are written down with "this is not the cause, do not fix it as one",
+because that hypothesis fit three independent observations before one line of error text refuted it.
+The string-checking guard is written down with the reason it cannot work — it passed its own
+mutation — so the next session does not spend an hour rebuilding it. And the measurement that a PR
+merged with E2E red is recorded as a measurement, with the three candidate explanations left open,
+because it is the owner's to settle and it changes what every other session should do while waiting.

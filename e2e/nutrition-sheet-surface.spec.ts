@@ -47,7 +47,7 @@ test('a nutrition sheet paints the tab palette behind its content, not over it',
       const box = (await button.boundingBox())!
       await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
     }
-    await expect(page.getByRole('tab', { name: 'Meals', exact: true })).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByRole('tab', { name: 'My Foods', exact: true })).toBeVisible({ timeout: 5_000 })
   }).toPass({ timeout: 90_000 })
 
   const content = page.locator('[data-slot="sheet-content"]').first()
@@ -81,9 +81,9 @@ test('a nutrition sheet paints the tab palette behind its content, not over it',
   expect(Number(zIndex), 'the palette layer must sit BEHIND the sheet content').toBeLessThan(0)
 
   // 4. And the sheet is still usable.
-  const tab = page.getByRole('tab', { name: 'Meals', exact: true })
+  const tab = page.getByRole('tab', { name: 'My Foods', exact: true })
   await tab.tap()
-  await expect(page.getByRole('tab', { name: 'Meals', exact: true })).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('tab', { name: 'My Foods', exact: true })).toHaveAttribute('aria-selected', 'true')
 })
 
 test('with the wallpaper off, the sheet is unchanged', async ({ page }) => {
@@ -110,7 +110,7 @@ test('with the wallpaper off, the sheet is unchanged', async ({ page }) => {
       const box = (await button.boundingBox())!
       await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
     }
-    await expect(page.getByRole('tab', { name: 'Meals', exact: true })).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByRole('tab', { name: 'My Foods', exact: true })).toBeVisible({ timeout: 5_000 })
   }).toPass({ timeout: 90_000 })
 
   const content = page.locator('[data-slot="sheet-content"]').first()

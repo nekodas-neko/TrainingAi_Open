@@ -108,7 +108,7 @@ test('the external food-database row is the shared row, and keeps its mismatch w
   await tap(page, page.getByRole('button', { name: 'Log Food' }))
   // The builder is reached from the meal library, so this one goes to `Meals` rather than to the
   // single-food tab above.
-  await tap(page, page.getByRole('tab', { name: 'Meals' }))
+  await tap(page, page.getByRole('tab', { name: 'My Foods' }))
 
   // Into the builder, where the ingredient picker's search lives.
   await tap(page, page.getByRole('button', { name: /^(New|Build your first meal)$/ }).first())

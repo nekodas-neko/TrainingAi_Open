@@ -388,6 +388,54 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+
+### [platform] LB-55 — E2E fails as a timeout, not as an error, and a red E2E does not actually block a merge
+
+- **Lane:** ? — neither. `.github/workflows/ci.yml`, `playwright.config.ts` and the branch ruleset are
+  the Orchestrator's and the owner's.
+- **Added:** 2026-09-04 · from `fix/e2e-my-foods-tab-rename`, where six specs waiting for a tab
+  renamed three days earlier cost four PRs and most of a session to identify.
+- **Reference:** read before diagnosing a red E2E. Pairs with **LB-54** (unreadable job logs, no
+  `main` baseline), which is the other half of the same cost.
+
+- **⚠️ 22 of 27 spec files budget a `toPass` timeout LARGER than the 45-second test containing it.**
+  Fourteen ask **90 seconds inside 45**; only `first-run-empty-states` and `meal-label` raise
+  `test.setTimeout` to match. Playwright's test timeout always wins, so those retry windows are
+  unreachable — and, far worse for diagnosis, **every failure inside a `toPass` loop is reported as a
+  45-second test timeout rather than as the assertion that actually failed.** Three unrelated specs
+  failed at 45.6s, 46.5s and 46.5s; the signature reads as a slow runner and sent this session
+  looking at CI capacity.
+  - **This is NOT a cause of failure and must not be "fixed" as one.** It was hypothesised as the
+    cause, and the hypothesis fit three independent observations before one line of error text
+    (`element(s) not found`) refuted it. Raising the timeouts would have moved the failures from 45s
+    to 90s and made the suite slower. What it is worth doing for is **legibility**: a budget that
+    cannot be reached is a lie about intent, and it hides the real assertion.
+  - Worth pairing with a rule that a `toPass` budget may not exceed its file's test timeout — that
+    one IS statically checkable, unlike the string check below.
+
+- **⚠️ A red E2E does not block a merge, whatever the ruleset shows.** **PR #868 merged into `main`
+  on 2026-09-04 with E2E red** (`pnpm e2e` failed after ~50 minutes; the other five jobs green).
+  Measured, not inferred — the merge commit is in `main`. Candidates: the ruleset is in *Evaluate*
+  rather than *Active*, a bypass actor covers the merging identity, or the merge used an admin
+  override. **This is the owner's to check**, and it matters in both directions: if E2E is meant to
+  block, it is not doing so; if it is not meant to block, then every session holding a PR behind it
+  — as this one did for hours — is waiting on nothing.
+
+- **⚠️ The obvious guard for the stale-string class does not work, and here is why, so it is not
+  rebuilt.** `check-e2e-ui-strings.js` was written and deleted the same hour. It asserted that every
+  tab name and placeholder a spec waits for appears somewhere in `app/`, `components/` or
+  `packages/shared/src`; it passed 26 queries across 73 files with one documented exemption.
+  **It failed its own mutation test** — reverting a spec to the old `'Meals'` left it green, because
+  `'Meals'` appears in `meal-plan-setup-sheet.tsx`'s `STEPS` array. A substring search over a large
+  codebase finds any short word somewhere.
+  - An earlier draft checking every `getByRole(name:)` was worse: eight false positives, because an
+    **accessible name is computed from child DOM text**, so a button whose children are `Log` and
+    `Body Weight` is named "Log Body Weight" while that string exists nowhere.
+  - A version that would work has to compare against the **tab label sets extracted from source**
+    (`{ value, label }` arrays and `TabsTrigger` children) rather than against the whole codebase as
+    a flat string. Tractable, narrow, and fragile the moment tabs are declared differently — which is
+    why it is a queued question rather than something done in passing.
+
 ### [sleep][platform] PS-17 — a phantom afternoon "sleep" replaced a real night in the daily summary, and it is scoring 🔴 LIVE
 
 - **Lane:** A (the rollup and the summary write)

@@ -40,10 +40,10 @@ async function openEmptyMealsTab(page: import('@playwright/test').Page) {
       const box = (await button.boundingBox())!
       await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
     }
-    await expect(page.getByRole('tab', { name: 'Meals', exact: true })).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByRole('tab', { name: 'My Foods', exact: true })).toBeVisible({ timeout: 5_000 })
   }).toPass({ timeout: 90_000 })
 
-  await page.getByRole('tab', { name: 'Meals', exact: true }).tap()
+  await page.getByRole('tab', { name: 'My Foods', exact: true }).tap()
   await expect(page.getByText('No meals saved yet.')).toBeVisible({ timeout: 30_000 })
 }
 
