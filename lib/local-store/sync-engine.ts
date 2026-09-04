@@ -299,6 +299,7 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     activityContributors:           asJson(r.activityContributors),
     activeCaloriesEst:              (r.activeCaloriesEst as number) ?? null,
     trainingLoadOts:                (r.trainingLoadOts as number) ?? null,
+    trainingLoadGate:               (r.trainingLoadGate as string) ?? null,
     trainingLoadHigh:               (r.trainingLoadHigh as boolean) ?? null,
     recoveryIndexHours:             (r.recoveryIndexHours as number) ?? null,
     wornHoursBle:                   (r.wornHoursBle as number) ?? null,

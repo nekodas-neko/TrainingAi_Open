@@ -77,15 +77,19 @@ export async function GET(req: Request) {
     tzChange: 0,
   })
 
-  if (result.status === 'ok') {
-    try {
-      await repo.upsertOuraDailyDerived(userId, date, {
-        trainingLoadOts: result.ots,
-        trainingLoadHigh: result.high,
-      })
-    } catch (err) {
-      console.error('[training-stress] persist failed (read still served):', err)
-    }
+  // Q-270. The gate reason is persisted on EVERY evaluation, not only on the success path, and that
+  // is the whole point: `training_load_ots` has been NULL on all 104 days and three diagnoses have
+  // been wrong because "the route was never called" and "the route ran and refused" are
+  // indistinguishable from outside. With this, NULL means the first and a string means the second.
+  //
+  // 'ok' rather than null on the success path is load-bearing — the upsert COALESCEs, so a null
+  // would leave a morning's 'insufficient_met' standing on a day that scored by afternoon.
+  try {
+    await repo.upsertOuraDailyDerived(userId, date, result.status === 'ok'
+      ? { trainingLoadOts: result.ots, trainingLoadHigh: result.high, trainingLoadGate: 'ok' }
+      : { trainingLoadGate: result.reason })
+  } catch (err) {
+    console.error('[training-stress] persist failed (read still served):', err)
   }
 
   return NextResponse.json(result satisfies TrainingStressResponse, {

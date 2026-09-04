@@ -136,4 +136,38 @@ describe.skipIf(!canRun)('training-stress persists its OTS once the gates pass (
     )
     expect(Number(rows[0].ots)).toBeCloseTo(123.5, 5)
   })
+
+  /**
+   * The gate reason, which is the half of Q-270 that had no producer at all. The entry's own
+   * diagnosis is that "the route was never called" and "the route ran and refused" are
+   * indistinguishable from outside, so a session cannot tell an absent caller from a failing gate —
+   * and three diagnoses have been wrong for exactly that reason.
+   *
+   * These pin the vocabulary the route now writes on EVERY evaluation: NULL means it never ran, a
+   * reason means it ran and refused, 'ok' means it scored. The third case is the one worth the test
+   * — writing NULL on success would leave a morning's `insufficient_met` standing on a day that
+   * scored by afternoon, because the upsert COALESCEs.
+   */
+  it('a gate reason is recorded for a day that did not score, and overwritten when it does', async () => {
+    const { upsertOuraDailyDerived } = await import('@/lib/data/postgres/slices/oura')
+    const GATED_DAY = '2026-06-14'
+    const gate = async () => (await pool.query<{ g: string | null }>(
+      `SELECT training_load_gate AS g FROM oura_daily_derived WHERE user_id = $1 AND day = $2::date`,
+      [TEST_USER_ID, GATED_DAY])).rows
+
+    // Nothing has evaluated this day: no row at all, which is what NULL has to mean.
+    expect(await gate(), 'an unevaluated day must have no row to read a reason from').toHaveLength(0)
+
+    // A gated evaluation writes the reason and creates the row even though there is no score.
+    await upsertOuraDailyDerived(db, TEST_USER_ID, GATED_DAY, { trainingLoadGate: 'insufficient_met' })
+    expect((await gate())[0].g).toBe('insufficient_met')
+
+    // The same day later scores. 'ok' must replace the reason rather than sit beside it.
+    await upsertOuraDailyDerived(db, TEST_USER_ID, GATED_DAY, {
+      trainingLoadOts: 55.5, trainingLoadHigh: false, trainingLoadGate: 'ok',
+    })
+    expect((await gate())[0].g, 'a stale gate reason on a scored day is the bug this guards').toBe('ok')
+
+    await pool.query(`DELETE FROM oura_daily_derived WHERE user_id = $1 AND day = $2::date`, [TEST_USER_ID, GATED_DAY])
+  })
 })

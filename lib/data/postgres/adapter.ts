@@ -4908,6 +4908,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             activeCaloriesEst:     int(p.activeCaloriesEst),
             trainingLoadOts:       num(p.trainingLoadOts),
             trainingLoadHigh:      bool(p.trainingLoadHigh),
+            trainingLoadGate:      str(p.trainingLoadGate),
             recoveryIndexHours:    num(p.recoveryIndexHours),
             wornHoursBle:          num(p.wornHoursBle),
             nightHrvBaselineMs:    num(p.nightHrvBaselineMs),
@@ -4925,6 +4926,13 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             resilienceDailySleepRecovery:  num(p.resilienceDailySleepRecovery),
             resilienceGranular:            num(p.resilienceGranular),
             resilienceConfidence:          num(p.resilienceConfidence),
+            // These two were in DERIVED_COLS, in the local mirror, in the outbox payload and in the
+            // round-trip test's fixture, and absent from this branch — so a device backing up its
+            // derived rows silently lost them. Exactly the class the field-coverage test exists to
+            // catch; it compared the fixture against DERIVED_COLS rather than asserting what landed,
+            // so it could not see a gap on this side. Found 2026-09-04 while adding trainingLoadGate.
+            daytimeStressCoverageMin:      int(p.daytimeStressCoverageMin),
+            chronicStressGranularNights:   int(p.chronicStressGranularNights),
             bdiDerived:            num(p.bdiDerived),
             vascularAge:           num(p.vascularAge),
             pwv:                   num(p.pwv),

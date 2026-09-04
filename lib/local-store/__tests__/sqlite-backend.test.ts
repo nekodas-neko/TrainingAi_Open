@@ -54,7 +54,7 @@ const ouraDerivedRow = {
   day: '2026-07-01', source: 'ble', modelVersions: { sleepnet: 'v1' }, sleepScore: 84,
   sleepContributors: { deep: 90 }, readinessScore: 80, readinessContributors: { hrv: 88 },
   readinessSource: 'derived', activityScore: 77, activityContributors: { move: 70 },
-  activeCaloriesEst: 450, trainingLoadOts: 1.2, trainingLoadHigh: true, recoveryIndexHours: 6,
+  activeCaloriesEst: 450, trainingLoadOts: 1.2, trainingLoadGate: 'ok', trainingLoadHigh: true, recoveryIndexHours: 6,
   wornHoursBle: 22, nightHrvBaselineMs: 60, illnessFlag: 'none', illnessScore: 3,
   illnessBiomarkers: { temp: 0.1 }, daytimeStressScaled: 40, stressHighMinutes: 30,
   recoveryHighMinutes: 120, chronicStressScore: 25, chronicStressContributors: { load: 20 },
@@ -619,7 +619,10 @@ describe('D2 prep — Oura local read/write accessors (Phase-1 Task 1)', () => {
     await store.upsertOuraDailyDerived(ouraDerivedRow)
     const params = runSQL.mock.calls.find(c => String(c[0]).includes('INTO oura_daily_derived'))![1] as unknown[]
     expect(params[2]).toBe(JSON.stringify({ sleepnet: 'v1' })) // model_versions
-    expect(params[12]).toBe(1) // training_load_high: true -> 1
+    // Positional, so it moves whenever a column is inserted before it — Q-270's `training_load_gate`
+    // went in at 12 and pushed this to 13. The index is the point of the assertion (it proves the
+    // value list still lines up with the column list), so it is corrected rather than made robust.
+    expect(params[13]).toBe(1) // training_load_high: true -> 1
   })
 
   it('getOuraDailyDerived round-trips JSON columns and the boolean back correctly', async () => {
@@ -628,6 +631,7 @@ describe('D2 prep — Oura local read/write accessors (Phase-1 Task 1)', () => {
       sleep_contributors: JSON.stringify({ deep: 90 }), readiness_score: 80,
       readiness_contributors: JSON.stringify({ hrv: 88 }), readiness_source: 'derived', activity_score: 77,
       activity_contributors: JSON.stringify({ move: 70 }), active_calories_est: 450, training_load_ots: 1.2,
+      training_load_gate: 'ok',
       training_load_high: 1, recovery_index_hours: 6, worn_hours_ble: 22, night_hrv_baseline_ms: 60,
       illness_flag: 'none', illness_score: 3, illness_biomarkers: JSON.stringify({ temp: 0.1 }),
       daytime_stress_scaled: 40, stress_high_minutes: 30, recovery_high_minutes: 120, chronic_stress_score: 25,

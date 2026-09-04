@@ -1590,6 +1590,10 @@ export const ouraDailyDerived = pgTable('oura_daily_derived', {
   activeCaloriesEst:    integer('active_calories_est'),
   trainingLoadOts:      doublePrecision('training_load_ots'),
   trainingLoadHigh:     boolean('training_load_high'),
+  // Q-270. Why the route did not score this day: NULL = it never ran, 'ok' = it scored, else
+  // the gate that refused. Written on every evaluation, which is what makes "never called"
+  // and "called and gated" distinguishable from outside for the first time.
+  trainingLoadGate:     text('training_load_gate'),
 
   recoveryIndexHours: doublePrecision('recovery_index_hours'),
   wornHoursBle:       doublePrecision('worn_hours_ble'),
