@@ -15472,6 +15472,22 @@ per-field merge where an AI write has no honest source rank to claim.
   JS-side's current (already short-of-native) 12s figure. Supports the owner's instinct, though that
   capture is link-latency only, not full weight-stabilization time — pick the final number from a
   fresh capture, not from this alone.
+- **⚑ THE DRIFT IS FIXED 2026-09-04; THE TRIM IS NOT, AND THEY WERE NEVER THE SAME TASK.** The JS
+  constant now reads **16_000**, matching the native `CYCLE_BUDGET_MS`, and
+  `scripts/check-scale-cycle-budget.js` fails the Custom Rules job if they diverge again — a comment
+  saying two numbers "must be kept in sync by hand" is a description of how they drift, not a
+  guard. Custom Rules is now 68 steps.
+- **⚠ Note the direction: the bar got LONGER, not shorter, and that is the correct fix.** It was
+  finishing four seconds before the native side gave up, and the bar's stated job is telling the
+  owner how long to keep standing still — under-reporting that invites stepping off mid-retry and
+  losing the weigh-in the bar exists to protect.
+- **Keep:** the trim the owner actually asked for. It still needs a capture, and this is why: **both**
+  12s and 16s are the retry give-up ceiling, and neither is "how long a weigh-in actually takes".
+  The 2206ms/1270ms figures in `scale-ble-connect-latency.md` are **link establishment only** — using
+  them to pick a bar duration would be measuring one thing and reporting another. Capture real
+  weight-stabilisation time, then change the Kotlin constant; the check above makes the JS side
+  follow by force.
+- **Gate:** device
 - **Native-only APK caveat**: `CYCLE_BUDGET_MS` is also the real retry-give-up budget, not just a
   visual duration — shortening it trades away retry margin for slower-than-typical connections, so
   reconcile + shorten carefully and re-verify on-device, not just visually.
@@ -15620,6 +15636,23 @@ per-field merge where an AI write has no honest source rank to claim.
   finishing its own post-use re-advertising re-links the persistent connection with no one there").
   The owner's "scrolling to home" almost certainly means navigating/swiping to the Home tab, which
   is exactly this path.
+- **⚑ THE GATE SHIPPED 2026-09-04, and it is a CANDIDATE fix — do not strike this on the diff.**
+  `ScaleWeighInGate.isNewWeighInEvidence(weightKg, lastCapturedKg)` (a pure object, four unit tests
+  that run in the Android CI job) is consulted before `onUnstableReading` does anything, and the
+  service tracks `lastCapturedKg` per wake. Option (b) of the two below, chosen over (a) because a
+  time threshold is a number picked without data and this one is not: it cannot fire before a capture
+  has happened this wake, and it cannot fire on a reading differing by even a gram. **If the replay
+  theory is wrong the gate never engages and nothing changes** — which is exactly why it was safe to
+  ship without the capture the entry was waiting for.
+- **⚑ And the capture is no longer needed to answer the question.** `onUnstableReading` now logs the
+  incoming weight and the wake's last captured weight on **every** call, gate or no gate. The next
+  ordinary occurrence answers *"does the replayed unstable reading match 71.0 kg exactly?"* from the
+  device log, without anyone having to hold `chrome://inspect` open at the moment of failure — which
+  is why this entry sat from 2026-08-05.
+- **Keep:** the confirmation, and it is an owner/device read, not code. On the next APK: either the
+  bar stops appearing on an empty Home visit (fixed), or the log line says the replayed value did
+  **not** match the capture, which refutes the replay theory and sends this back to option (a).
+- **Gate:** device
 - **Fix direction, now more concrete than "needs a capture"**: gate `onUnstableReading` itself
   against a plausibility check rather than treating it as unconditional proof — e.g. require either
   (a) a minimum elapsed time since the last captured/unstable reading before honoring a fresh one as

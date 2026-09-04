@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.6",
+    date: "2026-09-04",
+    changes: [
+      "The \u201cWeighing you\u2026\u201d bar should stop appearing when nobody is on the scale. The scale re-sends its last reading when the app reconnects to it, and the app was treating that as a new person stepping on. Needs the new app build to take effect \u2014 if it still happens, the app now records enough to say why.",
+      "The weigh-in progress bar was finishing four seconds before the scale actually gave up trying, so it told you to step off too early. It now runs the full time the scale is still working.",
+    ],
+  },
+  {
     version: "1.436.5",
     date: "2026-09-04",
     changes: [

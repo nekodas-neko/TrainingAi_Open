@@ -7687,3 +7687,13 @@ and carries both the number that supports it (1,094 packed rows spanning the ful
 one that complicates it (`step_live_windows` holds 8 rows, so that table is not the shortcut it
 looks like), because an unverified idea recorded without its own disconfirming evidence is how a
 session three months from now inherits a false lead.
+
+## 2026-09-04 — `projectOverview.md` → 9796, `docs/implementation-backlog.md` → 17629 (the scale batch)
+
+A device-unverified change to a path the owner reports bugs on needs a row that says so, and this one
+has to carry more than "not verified": that the Q-104 gate is a CANDIDATE fix which does nothing at
+all if the replay theory is wrong, and that Q-114's bar got LONGER — the opposite of what the owner
+asked for, and correct anyway, because a bar finishing before the native side gives up tells them to
+step off mid-retry. Both readings are counter-intuitive enough that a reader who skims the diff would
+draw the wrong conclusion from either. The backlog half keeps each entry's remaining data-dependent
+work stated as its own `Keep:`, so the shipped code is not mistaken for the finished item.
