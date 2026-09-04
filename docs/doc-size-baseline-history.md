@@ -7676,3 +7676,14 @@ names the gate. Writing that down is what converts the column from a thing that 
 answer someone can actually collect. The rest records a second bug found on the way — two derived
 columns the sync push branch dropped silently — and why the tripwire meant to catch exactly that was
 blind to it, since a session that trusts that check needs to know which half of it was load-bearing.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17598 (Q-222 gated, and a smaller ask for the owner)
+
+Twenty-two lines onto the activity-detection entry, and only two of them are the gate. The rest is a
+hypothesis worth writing down before anyone books four physical capture sessions: the ring's frames
+are archived by design, so the signal for months of walking may already exist and what is actually
+missing is labels — several of which are already timestamped in the database. It is marked untested
+and carries both the number that supports it (1,094 packed rows spanning the full history) and the
+one that complicates it (`step_live_windows` holds 8 rows, so that table is not the shortcut it
+looks like), because an unverified idea recorded without its own disconfirming evidence is how a
+session three months from now inherits a false lead.
