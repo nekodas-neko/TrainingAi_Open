@@ -7576,3 +7576,16 @@ useful, because injuries sit on Health for a reason and a wholesale move would c
 down: goals may be right where they are, since they are read weekly and a DEXA scan twice a year, and
 **no storage migration** — every table is already correct and the assembler is what makes the data
 feel like one place.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17418 (BF-119, the resumed walk's missing samples)
+
+One entry for a data-loss bug the owner caught by killing the app mid-walk. The trace is short because
+the asymmetry is stark: `startedAtMs` is persisted so the clock survives a relaunch, while
+`samplesRef` is a component ref and the cadence tracker is rebuilt — anchored to the original start
+while holding only post-resume data, which is why the earlier interval buckets are empty. What the
+entry spends its length on is worth it: that the store **already contains this reasoning** for the
+neighbouring `mode: 'done'` case and did not carry it to `active`; that `rawPoints` proves the fix
+pattern is already in the same store for a different stream; that `kcal` is the one figure that stays
+correct because it is duration-derived server-side, which is the tell a reader can use; and a warning
+not to copy `rawPoints` blindly, since an HR beat every second through a debounced localStorage write
+is a different load profile from a GPS fix every few seconds.
