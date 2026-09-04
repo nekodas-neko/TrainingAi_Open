@@ -440,10 +440,21 @@ below threshold and left in place for next time.
     includes `earned from movement`, so a hardcoded figure lands wherever that day's movement puts
     it, which is how a test becomes intermittent rather than fixed. It needs a fixture that pins the
     budget, or an assertion that accepts either note. That is a decision, not a rename.
-  - `preferences-survive-reinstall.spec.ts:36` (8.7s) · `timeline-card-navigation.spec.ts:80`
-    (18.6s) · `touch-target-size.spec.ts:53` on `/` (26.7s) — middling, unclassified.
-  - `profile-details-consolidation.spec.ts:50` (**3.0m**) — an outlier by an order of magnitude and
-    probably its own thing.
+  - `profile-details-consolidation.spec.ts:50` — **fixed**, and it was the same stale-string class a
+    third time: it clicked a row named `/Name, body facts/`, which is a sublabel BF-79's regrouping
+    removed. The row is `Profile details` now. A 3.0-minute timeout became a 14.4s pass.
+  - **⚠️ `preferences-survive-reinstall:36`, `timeline-card-navigation:80` and all five
+    `touch-target-size:53` cases PASS IN ISOLATION and fail in the full run.** Run individually
+    against a clean CI-shaped database they are green in 2–15 seconds. So they are **order-dependent,
+    not stale strings**, and the triage-by-duration above does not reach them — this is the hazard
+    `e2e/README.md` already names, *"the specs share one seeded Postgres and one signed-in user, and
+    writes in one spec are visible to another"*, with `workers: 1, fullyParallel: false` making the
+    order fixed and therefore reproducible.
+    - **Do not "fix" one by running it alone and declaring it passing.** That is what the isolation
+      run proves *cannot* work: the failure is caused by a spec that ran earlier, so the useful
+      question is which write, not what the assertion says.
+    - The tractable next step is a bisect, not a read: run the suite from the start and stop after
+      the failing spec, then halve the set of files before it.
   - **Start from the `error-context.md` Playwright writes beside each failure**, not from the spec:
     it carries the accessibility snapshot of the screen at the moment it gave up, and that is what
     identified both drifts here in minutes after hours of theorising.

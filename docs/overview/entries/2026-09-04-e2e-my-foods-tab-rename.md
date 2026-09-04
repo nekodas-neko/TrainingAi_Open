@@ -110,11 +110,17 @@ with it.
 
 **This is NOT the whole of E2E's redness, and the number is now known rather than hedged.** A full
 run against the CI-shaped database, on the branch carrying the tab-rename fix, was **146 passed / 10
-failed**. Five of those ten are fixed here — the three meal-plan ones and, on a second pass, the two
+failed**. Six of those ten are fixed here — the three meal-plan ones and, on a second pass, the two
 in `recipe-url-to-meal` that carried the identical Q-407 drift (45.5s/45.2s timeouts to 12.3s/6.3s
-passes). **Five remain**, listed with their durations in LB-55, one of them (`plan-rescale:168`)
-diagnosed down to the branch and deliberately left alone because its fixture needs a decision rather
-than a rename — the duration classifies them, since a ~45s failure is a retry loop
+passes), and `profile-details-consolidation` — the same stale-string class a third time, clicking a
+`Name, body facts` sublabel that BF-79's regrouping removed, 3.0 minutes to 14.4 seconds.
+
+**Four remain, and only one of them is a stale string.** `plan-rescale:168` is diagnosed to the
+branch and left alone because its fixture needs a decision. The other three —
+`preferences-survive-reinstall`, `timeline-card-navigation` and all five `touch-target-size` cases —
+**pass in isolation** and fail only in the full run, so they are order-dependent: the shared seeded
+Postgres that `e2e/README.md` already warns about, with `workers: 1` making the order fixed. Running
+one alone and declaring it green is exactly the wrong move, and LB-55 says so — the duration classifies them, since a ~45s failure is a retry loop
 spinning on something absent while a sub-second one is a real assertion.
 
 The first version of this section said "a tenth may exist", which understated it. That was written

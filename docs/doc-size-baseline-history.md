@@ -7708,7 +7708,7 @@ theoretical. The backlog half spends its length on three candidate fixes with a 
 reversal cost, since it is an auth change and the choice between them is the owner's, not something a
 session should settle by picking the smallest diff.
 
-## 2026-09-04 — `docs/implementation-backlog.md` → 17773 (LB-55)
+## 2026-09-04 — `docs/implementation-backlog.md` → 17784 (LB-55)
 
 Forty-eight lines for one Reference entry, and the length is the point: it is read *while* a red E2E
 is being diagnosed, which is exactly when a session has no logs, no `main` baseline, and a failure
@@ -7747,3 +7747,9 @@ and every remaining route adds an authentication bypass. The length is the two c
 recommendation between them, and the reason the in-process detail matters — without it the next
 session re-derives the dead end. Recorded rather than left, because a confident wrong next step in a
 backlog entry costs more than no next step at all.
+
+Eleven more once the remaining failures were actually run rather than reasoned about. Three of them
+pass in isolation and fail in the full suite, which the duration-based triage above cannot see and
+would have sent the next session hunting a stale string that is not there. That is written down with
+the instruction not to run one alone and call it fixed — the isolation run is what proves the cause
+lies in a spec that ran earlier, so the question is which write, not which assertion.
