@@ -255,7 +255,9 @@ jobs:
           path: |
             /tmp/next-server.log
             /tmp/logcat.txt
+            /tmp/logcat-launch.txt
             /tmp/pulled-local.db
             /tmp/maestro-report.xml
+            /tmp/maestro-hierarchy.txt
           retention-days: 7
           if-no-files-found: ignore

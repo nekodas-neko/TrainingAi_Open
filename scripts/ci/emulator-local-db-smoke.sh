@@ -25,21 +25,60 @@ EXPECTED=$(node -e "
 ")
 echo "Expecting local SQLite schema version ${EXPECTED}"
 
-echo '--- reachability: the emulator must see the host server ---'
+echo '--- reachability, part 1: a shell probe if the image happens to carry one ---'
 adb wait-for-device
-# 10.0.2.2 is the emulator's alias for the host loopback. If this fails the APK would fall back to
-# an error page and never open the local DB, which would read as a migration failure.
+# 10.0.2.2 is the emulator's alias for the host loopback. If the hop is broken the WebView shows an
+# error page, no form is ever drawn, and the failure reads as a UI-automation problem eight minutes
+# later — which is exactly how runs 1-4 were misread.
+#
+# This stays ADVISORY on purpose, and that is a change of role rather than a repeat of the old bug:
+# it used to be the only reachability check and it never once confirmed the hop, so "could not
+# confirm" was silently equivalent to "reachable". The assertion is now part 2 below, which needs no
+# binary that may be missing; this is kept only because when a probe IS present it names the failure
+# in one line instead of via a log grep.
 #
 # Any HTTP status counts as reachable — `/` redirects to /sign-in, which proves the hop works.
 # Deliberately not /api/version: it awaits an outbound GitHub Releases call before responding, so
 # it can time out against a perfectly healthy server.
-adb shell 'curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://10.0.2.2:3000/' 2>/dev/null \
-  | tr -d '\r' | grep -qE '^[1-5][0-9][0-9]$' \
-  && echo 'host reachable from inside the emulator' \
-  || echo 'WARN: could not confirm host reachability (curl may be absent from this image); continuing'
+PROBE_RESULT='no probe binary on this image'
+for probe in \
+  'curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://10.0.2.2:3000/' \
+  'toybox wget -q -O /dev/null http://10.0.2.2:3000/ && echo 200' \
+  'echo | toybox nc -w 3 10.0.2.2 3000 >/dev/null && echo 200'
+do
+  OUT=$(adb shell "$probe" 2>&1 | tr -d '\r' | tail -1 || true)
+  case "$OUT" in
+    [1-5][0-9][0-9]) PROBE_RESULT="reachable (HTTP $OUT)"; break ;;
+  esac
+done
+echo "shell probe: $PROBE_RESULT"
 
 echo '--- install ---'
 adb install -r -g "$APK"
+
+echo '--- reachability, part 2: the WebView itself, which is the probe that cannot be missing ---'
+# The app IS the reachability test, and it is the only one guaranteed to exist on the image. If the
+# WebView cannot fetch the document from the host alias, Chromium logs a net:: error and Capacitor
+# renders an error page; neither is distinguishable from "Maestro cannot read text in a WebView"
+# once the flow has already timed out, which is the ambiguity that capped this investigation.
+# Launching alone first — before Maestro, whose `clearState: true` relaunches anyway — separates the
+# two candidates cleanly and costs one app start.
+adb logcat -c
+adb shell am start -n "$PKG/.MainActivity" >/dev/null
+sleep 20
+adb logcat -d > /tmp/logcat-launch.txt 2>&1 || true
+
+NET_ERR=$(grep -oE 'net::ERR_[A-Z_]+' /tmp/logcat-launch.txt | sort -u | tr '\n' ' ' || true)
+if [ -n "$NET_ERR" ]; then
+  echo "FAIL: the WebView could not load from http://10.0.2.2:3000 — ${NET_ERR}"
+  echo 'The emulator cannot reach the host server, so no form is ever drawn. This is a host/emulator'
+  echo 'networking failure, NOT a Maestro or accessibility problem — do not chase the UI flow.'
+  echo "shell probe said: $PROBE_RESULT"
+  echo '--- log tail ---'
+  grep -iE 'chromium|capacitor|trainingai|net::' /tmp/logcat-launch.txt | tail -40 || tail -40 /tmp/logcat-launch.txt
+  exit 1
+fi
+echo 'no net:: errors after launch — the WebView reached the host'
 
 echo '--- sign in, which is what makes the local store exist at all ---'
 # `getLocalStore(userId)` requires a signed-in user, so an app sitting on the sign-in screen never
@@ -50,6 +89,13 @@ maestro test .maestro/sign-in.yaml --format junit --output /tmp/maestro-report.x
   echo 'FAIL: the sign-in flow did not complete.'
   echo '--- maestro debug output ---'
   tail -60 ~/.maestro/tests/*/maestro.log 2>/dev/null || true
+  # The remaining candidate once reachability is proven above: Maestro may not see inside the
+  # WebView at all. The hierarchy says so directly — an empty or chrome-only tree means the fix is
+  # `setWebContentsDebuggingEnabled(true)` plus web-view selectors, never a longer timeout. Reading
+  # it from a log grep is guesswork; this prints the tree.
+  echo '--- view hierarchy (is anything inside the WebView visible to Maestro?) ---'
+  maestro hierarchy > /tmp/maestro-hierarchy.txt 2>&1 || true
+  head -120 /tmp/maestro-hierarchy.txt || true
   echo '--- app log tail ---'
   adb logcat -d > /tmp/logcat.txt 2>&1 || true
   grep -iE 'trainingai|chromium.*CONSOLE' /tmp/logcat.txt | tail -40 || tail -40 /tmp/logcat.txt
