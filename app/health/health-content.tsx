@@ -17,6 +17,7 @@ import { PullToSync } from "@/components/pull-to-sync";
 import type { BodyMetaRow, WeekToDate } from "@/app/api/body-metadata/route";
 import { displayBodyFat, type BodyFatCalibrationMeta } from "@/components/health/body-fat-display";
 import { cachedFetch, readCacheSync, setCached, cachedFetchToday, readTodayCacheSync, isBodyMetadataFresh } from "@/lib/sqlite/cache";
+import { useDayRolloverRefresh } from '@/components/shell/local-day-provider';
 import { useUserTimezone } from '@/components/shell/user-timezone-provider';
 import { runWithConcurrency } from "@/lib/async/run-with-concurrency";
 import { invalidateReadinessInputs, invalidateOuraSync, invalidateBiometrics, invalidateHealthTrends, invalidateBodyMetricWrite } from "@/lib/cache-groups";
@@ -442,6 +443,11 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
   const refreshVisibleHealthData = useCallback(async () => {
     await Promise.all([fetchSharedHealthData(), fetchActiveTabHealthData()]);
   }, [fetchSharedHealthData, fetchActiveTabHealthData]);
+
+  // BF-117, sibling surface: `tabEpoch` covers the user navigating back to this tab, but it does
+  // not bump when the app simply resumes — so a phone left open on Health across midnight keeps
+  // yesterday's readiness, trends and training load until something else moves. Same fix as Home's.
+  useDayRolloverRefresh(() => { refreshVisibleHealthData().catch(() => {}); });
 
   useEffect(() => {
     fetchSharedHealthData();
