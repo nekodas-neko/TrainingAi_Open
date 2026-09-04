@@ -253,11 +253,35 @@ jobs:
       # log lines, and not being able to is what capped the investigation at four runs. This prints
       # the three lines that decide the diagnosis, last, where the smallest possible tail finds them.
       - name: Verdict
+        id: verdict
         if: always()
         run: |
           echo '================ Q-250 VERDICT ================'
           cat /tmp/q250-verdict.txt 2>/dev/null || echo 'no verdict file — the job died before the emulator step'
           echo '==============================================='
+          if grep -q 'candidate (a)' /tmp/q250-verdict.txt 2>/dev/null; then echo 'answer=a' >> "$GITHUB_OUTPUT"
+          elif grep -q 'candidate (b)' /tmp/q250-verdict.txt 2>/dev/null; then echo 'answer=b' >> "$GITHUB_OUTPUT"
+          elif [ -s /tmp/q250-verdict.txt ]; then echo 'answer=passed' >> "$GITHUB_OUTPUT"
+          else echo 'answer=none' >> "$GITHUB_OUTPUT"; fi
+
+      # Q-250. The verdict is carried by these steps' NAMES, not by their output, and that is the
+      # whole point. This job's log ends with the runner's own post-job blocks — artifact upload, git
+      # cleanup, the Postgres container dump — which nothing in the job can print after, so reading a
+      # verdict from the log tail means pulling a hundred-plus lines every time and often missing it
+      # anyway. Four attempts went that way before this. A step listing gives the step names for
+      # free, so exactly one of these running is the answer, readable without opening a log at all.
+      - name: 'VERDICT A — reachability OK, Maestro could not find the sign-in form'
+        if: always() && steps.verdict.outputs.answer == 'a'
+        run: grep -E 'hierarchy bytes|sign-in text' /tmp/q250-verdict.txt || true
+      - name: 'VERDICT B — the emulator could not reach the host server'
+        if: always() && steps.verdict.outputs.answer == 'b'
+        run: grep 'candidate (b)' /tmp/q250-verdict.txt || true
+      - name: 'VERDICT — reachability OK and Maestro passed; the failure is later'
+        if: always() && steps.verdict.outputs.answer == 'passed'
+        run: cat /tmp/q250-verdict.txt || true
+      - name: 'VERDICT — none, the job died before the emulator step'
+        if: always() && steps.verdict.outputs.answer == 'none'
+        run: 'true'
 
       - uses: actions/upload-artifact@v6
         if: failure()
