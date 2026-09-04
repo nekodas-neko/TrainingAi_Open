@@ -7580,3 +7580,17 @@ itself predicted before any of this was written.
 Also recorded: a first test fixture omitted `checkinScore`, so the cold case read `no_input` —
 correctly, since a missing check-in is missing data. Writing down that the *fixture* was wrong rather
 than the code is what stops the next reader treating an exhaustive fixture as incidental.
+## 2026-09-04 — `docs/implementation-backlog.md` → 17360 (BF-118, the consolidation scope)
+
++42, and it is a map rather than an argument. The owner asked for all of it in one place, so the six
+surfaces where personal data is entered today were traced: goals inline on the More root, height and
+age one level down, DEXA and RMR another level down, the training schedule under `/program`, injuries
+on a **different tab**, and dietary restrictions **only inside the meal-plan wizard**. That last one
+is the finding — the schema says an allergy belongs to the person, and the only door to it is a flow
+about generating a meal plan. Two things keep the scope honest: the `Your setup` group on More already
+gathers three of the six, so this is mostly moving two outliers rather than building a hub; and the
+resolution recorded is one canonical editor per fact with links from wherever it is contextually
+useful, because injuries sit on Health for a reason and a wholesale move would cost it. Also written
+down: goals may be right where they are, since they are read weekly and a DEXA scan twice a year, and
+**no storage migration** — every table is already correct and the assembler is what makes the data
+feel like one place.
