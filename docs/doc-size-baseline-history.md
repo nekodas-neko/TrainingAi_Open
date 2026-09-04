@@ -7607,3 +7607,20 @@ pattern is already in the same store for a different stream; that `kcal` is the 
 correct because it is duration-derived server-side, which is the tell a reader can use; and a warning
 not to copy `rawPoints` blindly, since an HR beat every second through a debounced localStorage write
 is a different load profile from a GPS fix every few seconds.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17487 (Q-155, the third ownership blind spot)
+
+Twenty-five lines onto an entry that is already long, and the justification is that the entry's whole
+value is the record of which detection mechanisms exist and what each one cannot see. Two were
+already documented; this adds the third and states plainly why it is not mechanised — a check that
+flagged every id-taking method without `userId` would fire on nine legitimately join-scoped ones, so
+it needs an allowlist, and an allowlist that size is its own hazard. Also converts the trailing
+"what keeps this open" prose into a `Keep:` bullet, which is what the protocol wants on an entry that
+ships work without closing.
+
+## 2026-09-04 — `projectOverview.md` → 9767 (Q-155, the third ownership blind spot)
+
+Twelve lines onto the ownership-coverage Known-Issues row. The row's function is to tell the next
+session what the two mutation mechanisms can and cannot see, so a third category they are both blind
+to belongs in it rather than only in the backlog — and it carries the finding (three methods that
+constrained ownership nowhere, one of them a bare `UPDATE`) plus the reason it is not automated.

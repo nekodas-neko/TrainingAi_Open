@@ -6542,7 +6542,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getWorkoutHrStats(userId: string, sessionId: string) { return oura.getWorkoutHrStats(this.db, userId, sessionId) }
   async getAvgBpmBySession(userId: string, sessionIds: string[]) { return oura.getAvgBpmBySession(this.db, userId, sessionIds) }
   async listSessionsMissingHrStats(userId: string, since: Date, limit: number) { return oura.listSessionsMissingHrStats(this.db, userId, since, limit) }
-  async getSetDetailsForSession(workoutSessionId: string) { return oura.getSetDetailsForSession(this.db, workoutSessionId) }
+  async getSetDetailsForSession(userId: string, workoutSessionId: string) { return oura.getSetDetailsForSession(this.db, userId, workoutSessionId) }
   async upsertSetHrStats(userId: string, workoutSessionId: string, rows: import('@trainingai/shared/workout/set-hr-stats').SetHrRow[]) { return oura.upsertSetHrStats(this.db, userId, workoutSessionId, rows) }
   async getSetHrStatsForSession(userId: string, workoutSessionId: string) { return oura.getSetHrStatsForSession(this.db, userId, workoutSessionId) }
   async getSetHrStatsForExercise(userId: string, opts: { exerciseId?: string | null; exerciseName?: string; since: Date }) { return oura.getSetHrStatsForExercise(this.db, userId, opts) }
@@ -6550,8 +6550,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async listSessionsMissingSetHrStats(userId: string, since: Date, limit: number) { return oura.listSessionsMissingSetHrStats(this.db, userId, since, limit) }
   async getOuraWorkouts(userId: string, opts: { unreviewed?: boolean; from?: string; to?: string; timezone?: string }) { return oura.getOuraWorkouts(this.db, userId, opts) }
   async markOuraWorkoutReviewed(userId: string, id: string) { return oura.markOuraWorkoutReviewed(this.db, userId, id) }
-  async getSetTimestampsForSession(workoutSessionId: string) { return oura.getSetTimestampsForSession(this.db, workoutSessionId) }
-  async markHrSynced(workoutSessionId: string) { return oura.markHrSynced(this.db, workoutSessionId) }
+  async getSetTimestampsForSession(userId: string, workoutSessionId: string) { return oura.getSetTimestampsForSession(this.db, userId, workoutSessionId) }
+  async markHrSynced(userId: string, workoutSessionId: string) { return oura.markHrSynced(this.db, userId, workoutSessionId) }
   async getUnsyncedHrSessionsForDay(userId: string, day: string, timezone = DEFAULT_TZ) { return oura.getUnsyncedHrSessionsForDay(this.db, userId, day, timezone) }
   async getUnsyncedHrSessions(userId: string, from: Date, to: Date) { return oura.getUnsyncedHrSessions(this.db, userId, from, to) }
   async getWorkoutSessionById(userId: string, id: string) { return oura.getWorkoutSessionById(this.db, userId, id) }

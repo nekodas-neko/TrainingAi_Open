@@ -14547,6 +14547,31 @@ data layer", which is indistinguishable from the thing this entry exists to prev
 work around it. Either the owner runs it locally, or it needs an explicit permission grant; a
 session that plans this residual without knowing that will lose the time twice.
 
+**A THIRD blind spot, found and closed 2026-09-04 — a method that never asked for `userId` at all.**
+Both mechanisms above assume the owner is a *parameter*: the 278-predicate sweep mutates predicates
+that exist, and `check-repository-user-scoping.js` fails a method that **takes** `userId` and never
+uses it. Neither can see a method whose signature omits the owner entirely — there is no predicate to
+neutralise and no unused parameter to flag. Enumerating every data-layer method taking an id but no
+`userId` found **12**; nine constrain ownership through a join or a documented pre-check, and
+**three constrained it nowhere**: `getSetDetailsForSession`, `getSetTimestampsForSession` and
+`markHrSynced` (a bare unscoped `UPDATE`, so it wrote rather than read). They were safe only because
+the single production caller passed an id sourced from a user-scoped query — a property of that
+caller, not of these functions — and two of the three have no production caller at all, which is why
+the shape survived. All three now take `userId` and constrain on `workout_sessions.user_id`;
+`getSetTimestampsForSession` needed the `workout_sessions` join *added*, since the owner is not
+reachable from `set_logs`/`exercise_logs` alone, which is exactly what made the omission easy.
+`lib/data/postgres/__tests__/hr-session-ownership.test.ts` covers the class — two controls proving
+the fixture produces data at all, three cross-user cases, mutation-verified (dropping the predicates
+fails exactly the three cross-user tests while both controls still pass). **Not mechanised**: a
+check that flagged every id-taking method without `userId` would fire on all nine legitimately
+join-scoped ones, so it needs a per-method allowlist to be useful, and an allowlist that large is
+its own maintenance hazard. Recorded here as the shape to re-enumerate rather than automated.
+
+- **Keep:** the two residuals above — exact per-predicate attribution across the 278 (~278 runs), and
+  a full-suite measurement, which is BLOCKED in the sandbox per the paragraph above. Plus the third
+  class: re-enumerate id-taking methods without `userId` when the data layer next grows.
+
+
 ### [app-shell] ⏳ Q-151 — WATCH ONLY, nothing to implement — the sign-in React #418 did not reproduce and the whole series stopped
 
 - **Lane:** A
