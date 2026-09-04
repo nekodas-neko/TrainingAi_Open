@@ -7717,3 +7717,15 @@ and every remaining route adds an authentication bypass. The length is the two c
 recommendation between them, and the reason the in-process detail matters — without it the next
 session re-derives the dead end. Recorded rather than left, because a confident wrong next step in a
 backlog entry costs more than no next step at all.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17741 (LA-57 refuted, Q-509's candidate 3 closed)
+
+Fifty-one lines to retract an entry filed the day before and to correct the note it was built on. The
+length is the measurement, and it has to be: "the inputs stepped at the re-key" is a claim a reader
+can only check against numbers, and the refutation is a table showing the same series rising +38%
+*inside* one device era where the proposed cause cannot operate. Recording the conclusion alone would
+leave the next session with two contradictory entries and no way to tell which is right.
+
+Also here: the caveat I raised and discarded — that the Cloud-vs-BLE refit might compare two
+different estimators — written down precisely because the next reader will notice the same empty
+table and needs to know it was checked rather than missed.
