@@ -263,6 +263,13 @@ jobs:
           elif grep -q 'candidate (b)' /tmp/q250-verdict.txt 2>/dev/null; then echo 'answer=b' >> "$GITHUB_OUTPUT"
           elif [ -s /tmp/q250-verdict.txt ]; then echo 'answer=passed' >> "$GITHUB_OUTPUT"
           else echo 'answer=none' >> "$GITHUB_OUTPUT"; fi
+          # Second axis, for the candidate-(a) case: does the tree contain the form's text at all?
+          # An absent tree and a full tree with no matching text are different bugs with different
+          # fixes, and the step names below are the only place that distinction survives.
+          if grep -qE 'sign-in text visible to Maestro: [1-9]' /tmp/q250-verdict.txt 2>/dev/null; then
+            echo 'tree=text-present' >> "$GITHUB_OUTPUT"
+          elif [ -s /tmp/maestro-hierarchy.txt ]; then echo 'tree=no-text' >> "$GITHUB_OUTPUT"
+          else echo 'tree=absent' >> "$GITHUB_OUTPUT"; fi
 
       # Q-250. The verdict is carried by these steps' NAMES, not by their output, and that is the
       # whole point. This job's log ends with the runner's own post-job blocks — artifact upload, git
@@ -281,6 +288,16 @@ jobs:
         run: cat /tmp/q250-verdict.txt || true
       - name: 'VERDICT — none, the job died before the emulator step'
         if: always() && steps.verdict.outputs.answer == 'none'
+        run: 'true'
+
+      - name: 'TREE — the sign-in text IS in the hierarchy, so this is not WebView opacity'
+        if: always() && steps.verdict.outputs.answer == 'a' && steps.verdict.outputs.tree == 'text-present'
+        run: 'true'
+      - name: 'TREE — a hierarchy came back but carries no sign-in text'
+        if: always() && steps.verdict.outputs.answer == 'a' && steps.verdict.outputs.tree == 'no-text'
+        run: 'true'
+      - name: 'TREE — no hierarchy at all'
+        if: always() && steps.verdict.outputs.answer == 'a' && steps.verdict.outputs.tree == 'absent'
         run: 'true'
 
       - uses: actions/upload-artifact@v6
