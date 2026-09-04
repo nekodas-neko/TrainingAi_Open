@@ -1111,61 +1111,6 @@ consumer today means a new hand-rolled gather.
   editable at its source rather than only inside a prompt.
 
 
-### [app-shell] BF-117 — a day rollover re-prompts the check-in and refreshes nothing else; Home keeps yesterday until the app is killed
-
-- **Lane:** B — `app/session-select/session-select-content.tsx`. One effect. **No engine change.**
-- **Added:** 2026-09-04 · owner: *"when opening the app after a day has been completed it doesnt
-  reset the screens (I flagged this before) so I need to close and reopen app to get a fresh view."*
-- **Needs:** nothing — the mechanism it uses already ships.
-
-**He did flag it before, and BF-86 deliberately left this half undone pending evidence. This is the
-evidence.** That entry closed the *"should it be a literal reload?"* question (no — BF-80 forbids it,
-and instant paint exists so a repeat open shows data rather than a spinner) and then wrote a scope
-line: *"whether any [today-scoped read] is both persistently mounted and never re-read is the Q-359
-question… subscribing all of them blind would be a large diff justified by a guess."* That caution was
-right. The guess is now unnecessary — the answer is one line, not a sweep.
-
-**The mechanism, traced.** `useLocalDay()` has **three** consumers in the whole app
-(`local-day-provider.tsx`, `workout-day-rollover.tsx`, `session-select-content.tsx`), and inside Home
-it is read at exactly **two** places: line 758 (`loadTodayMood`) and line 788 (the check-in prompt).
-Everything else on that screen — readiness, body battery, training load, `oura-hr-day` — is gated on
-**`refreshTick`**, and `setRefreshTick` is bumped from exactly three places: `refetchAll` (644, 658)
-and the BLE-drain-settled listener (703). **A day change bumps nothing.** The tab shell is persistent
-and never unmounts, so those payloads are the ones fetched at app launch and they stay until the
-process is killed.
-
-**The screenshot is the proof, and it splits cleanly along that line.** Friday 4 September, *"Good
-morning"*, and *"Morning check-in saved"* — the header reads the clock directly and the check-in is
-what BF-86 fixed, so both are correct. Below them, *"Rest Day — you chose to rest today"* and a
-Partial Recovery card citing chest and shoulder soreness: **yesterday's**. The two halves of the same
-screen disagree about what day it is.
-
-- **Recommendation: bump `refreshTick` when `localDay` changes.** This reuses the path pull-to-refresh
-  already takes, so nothing new is introduced and the refresh is one the app performs many times a day
-  already. It satisfies BF-86's objection directly: not a blind subscription of 30 call sites, and not
-  a reload.
-- **⚠ The trap: `localDay` is seeded synchronously**, so an effect keyed on it **fires once at
-  mount** — bumping the tick there would double-fetch every launch. Skip the first run with a ref.
-  This is easy to miss because the duplicate fetch is invisible: it looks like a working app that is
-  slightly slower to settle.
-- **⚠ `sleep-sessions` is NOT one of the `refreshTick`-gated effects**, and the code says so at line
-  700 (Q-91): it is *"read by this screen too (the home HR chart's sleep-window shading) but… nothing
-  ever re-fetched it on this signal."* So the tick alone leaves last night's sleep stale on a
-  rollover — the one read where a day change matters most. Handle it in this entry or state plainly
-  that it is still owed.
-- **Sibling surfaces, worth one check in the same pass:** only three files consume `useLocalDay`, and
-  Health and Nutrition are in the same persistent shell. Home is what was reported and what this entry
-  covers; if either of the others holds a day-scoped read the same way, it is the same fix and should
-  ride along rather than become the next report.
-- **⚠ Do not "fix" this with a reload or a forced remount.** BF-80 and BF-86 both rule it out, and
-  BF-86 adds the reasons that are specific here: an unsynced outbox and an in-progress workout both
-  survive a resume today and are not tested against a scheduled restart.
-- **Verification (device):** leave the app open overnight on the S25 and resume after midnight — the
-  scores, the rest-day card and the recovery card all show today, without a reload, a spinner or a
-  blank frame; resume again ten minutes later and nothing refetches; an in-progress workout and a
-  queued outbox both survive the rollover untouched.
-
-
 ### [body] BF-113 — the BMI band is computed from a DEXA-corrected body fat and the card only says "via body fat %"
 
 - **Lane:** B — `app/health/health-sections.tsx:499` (the caption) and `:507` (the info popover).
@@ -2316,12 +2261,15 @@ two screens, and a user who sets one has no way to know the other exists.
   without the reset** — on the first resume of a new day the app re-prompts and re-reads, and on any
   other resume it does nothing. If the owner still wants a literal restart after using it, that is a
   new entry with that experience as its subject, not this one.
-- **⚠ 2026-09-04 — the deferred half came back as a report, and BF-117 owns it.** The scope line
+- **✅ 2026-09-04 — the deferred half came back as a report, and BF-117 shipped it.** The scope line
   below was right to wait for evidence rather than subscribe 30 sites blind; the owner supplied it
   (*"opening the app after a day has been completed… I need to close and reopen"*). The answer turned
   out to be narrow: Home gates its data effects on `refreshTick`, which a day change never bumps, so
   one bump does what a sweep would have. Nothing in this entry changes — the reload is still refused
-  and the check-in half is still shipped.
+  and the check-in half is still shipped. `useDayRolloverRefresh` in `local-day-provider.tsx` is the
+  mechanism, and Health and Nutrition take it too: `tabEpoch` bumps when the user navigates back to a
+  tab, never when the app resumes onto one they never left, so the sentence below about most sites
+  sitting behind the re-show pass was true and not sufficient.
 - **Keep — the today-scoped read surface is NOT swept, and that is a scope line rather than an
   oversight.** ~30 `cachedFetchToday` call sites and 59 `readTodayCacheSync` sites exist; both already
   treat a past-dated entry as a miss, so they are correct **whenever they run**, and most sit behind

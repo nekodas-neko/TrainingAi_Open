@@ -3,7 +3,8 @@
 import { useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef } from "react";
 import { savePreference } from '@/lib/user/preferences-sync'
 import { useRouter, useSearchParams } from "next/navigation";
-import { useTabVisibility } from "@/components/shell/tab-visibility";
+import { useDayRolloverRefresh } from "@/components/shell/local-day-provider";
+import { useRefreshOnTabShow, useTabVisibility } from "@/components/shell/tab-visibility";
 import dynamic from "next/dynamic";
 import { useDrag } from "@use-gesture/react";
 import { AnimatePresence, motion } from "motion/react";
@@ -310,8 +311,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
 
   const { epoch: tabEpoch } = useTabVisibility();
   const lastVisibleDayRef = useRef(todayStr);
-  useEffect(() => {
-    if (tabEpoch === 0) return;
+  const catchUpToToday = useCallback(() => {
     const today = todayInTz(tz);
     if (lastVisibleDayRef.current !== today && selectedDateRef.current === lastVisibleDayRef.current) {
       // Midnight rolled while hidden and the user was on "today" — follow it,
@@ -323,7 +323,12 @@ export default function NutritionContent({ userId }: { userId?: string }) {
     }
     lastVisibleDayRef.current = today;
     fetchData(selectedDateRef.current);
-  }, [tabEpoch, fetchData, tz]);
+  }, [fetchData, tz]);
+
+  // BF-117: this screen already knew how to follow midnight, but only on the signal that fires
+  // when the user navigates back to the tab. A resume onto a tab they never left bumps no epoch.
+  useRefreshOnTabShow(catchUpToToday);
+  useDayRolloverRefresh(catchUpToToday);
 
   // Local-first meal-type read: paint the mirrored names/emoji before the network cache
   // resolves, so a food log opened offline groups under a real meal type. `fetchMountData`'s
