@@ -1627,6 +1627,22 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [platform] 🟠 Deactivation does not deactivate: the `isActive` gate never runs on an API route (LA-58, 2026-09-04)
+
+`middleware.ts`'s matcher excludes `api` as its first exclusion, so the deactivation branch cannot
+run on any of the **219** `app/api/**/route.ts` files. Each of them calls `auth()` and checks
+`session?.user?.id`; **none checks `isActive`**, and there is no shared route-auth helper to add it
+to in one place.
+
+A deactivated or still-pending user therefore keeps full API access to **their own** data while their
+session cookie is valid. Not a cross-user leak — the routes are user-scoped — so it reads as
+"deactivation stops the UI and nothing else". The browser bounces them to `/pending`; `curl` with
+their cookie does not.
+
+Found while assessing Q-1a, which names it as a precondition for bearer auth. That framing is why it
+sat: it reads as future work for a feature that has not started, and it is live now. **LA-58 carries
+the three candidate fixes with a recommendation; it is `Gate: owner` because it is an auth change.**
+
 ### [devices][body] 🟡 The scale's "Weighing you…" gate shipped UNVERIFIED on device (Q-104/Q-114, 2026-09-04)
 
 Two owner-reported scale bugs got their code half, and **neither has been on a phone**. This sandbox

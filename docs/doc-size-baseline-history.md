@@ -7697,3 +7697,13 @@ asked for, and correct anyway, because a bar finishing before the native side gi
 step off mid-retry. Both readings are counter-intuitive enough that a reader who skims the diff would
 draw the wrong conclusion from either. The backlog half keeps each entry's remaining data-dependent
 work stated as its own `Keep:`, so the shipped code is not mistaken for the finished item.
+
+## 2026-09-04 — `projectOverview.md` → 9812, `docs/implementation-backlog.md` → 17669 (LA-58)
+
+A live auth gap that had been sitting inside a deferred feature's preamble, where it read as a
+precondition for work nobody has started rather than something true today. Both rows carry the
+measurement that makes it checkable — the matcher string, the 219 route files, and the fact that none
+of them checks `isActive` — because "middleware only" is the exact phrasing that let it be read as
+theoretical. The backlog half spends its length on three candidate fixes with a recommendation and a
+reversal cost, since it is an auth change and the choice between them is the owner's, not something a
+session should settle by picking the smallest diff.

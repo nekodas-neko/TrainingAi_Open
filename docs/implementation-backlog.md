@@ -16154,6 +16154,46 @@ passes and the inventory is explicit rather than forgotten.
   correct, because it holds reverse-engineered frames of *that ring's* firmware and
   `sensor_raw_samples` would imply a shared frame format that does not exist.
 
+### [platform] 🟠 LA-58 — deactivation does not deactivate: the `isActive` gate never runs on an API route
+
+- **Lane:** A
+- **Gate:** owner — it is an auth change, and the sensible fixes differ in blast radius enough that
+  the choice is not mine to make. See **The three ways to fix it** below.
+- **Added:** 2026-09-04 · found while assessing Q-1a, whose own "read first" note says
+  *"`isActive === false` is enforced **only** in `middleware.ts:18`"*. That note is inside a deferred
+  feature's preamble, framed as a precondition for work that has not started. **It is live now.**
+- **Measured, not inferred.** `middleware.ts`'s matcher is
+  `"/((?!api|_next/static|_next/image|favicon.ico|sw.js|manifest.webmanifest|icon|apple-icon).*)"` —
+  `api` is the first exclusion. So the deactivation branch (`req.auth.isActive === false` →
+  `/pending`) cannot run on any of the **219** `app/api/**/route.ts` files. Every one of them
+  independently does `const session = await auth()` and checks `session?.user?.id`; **none checks
+  `isActive`**, and there is no shared route-auth helper to add it to in one place.
+- **What it actually costs.** A user who is deactivated, or who has registered and is still pending
+  approval, keeps full API access to **their own** data for as long as their session cookie is valid.
+  It is not a cross-user leak — the routes are user-scoped (Q-155's territory) — so the exposure is
+  "deactivation stops the UI and nothing else". The browser bounces them to `/pending`; `curl` with
+  their cookie does not, and neither would a native client talking to the API directly, which is
+  exactly why Q-1a flags it as a precondition.
+- **The three ways to fix it, and why this needs the owner:**
+  1. **Middleware covers `/api` too**, answering 403 JSON rather than a redirect (a 307 to `/pending`
+     hands an API caller HTML). One file, catches every route including ones not yet written. Costs a
+     middleware invocation on every API request, and the redirect branches all need an `/api` guard
+     so they do not fire.
+  2. **A shared `requireActiveUser()` helper**, migrated across 219 routes. No per-request cost on
+     paths that already call `auth()`, and it makes the check greppable — but it is 219 files, and
+     the next route someone writes still has to remember it (a Custom Rules check could hold that).
+  3. **Refuse the session at the source** — have `auth()`'s JWT callback drop the session when
+     `isActive` goes false, so every caller sees an unauthenticated request. Smallest diff, but it
+     changes what "signed in" means app-wide and would bounce a pending user off `/pending` itself,
+     which is the one page they are supposed to see.
+- **Recommendation if asked: (1).** It is the only one that covers a route written next week without
+  anyone remembering, and the per-request cost is a JWT verify the route is about to do anyway. (2)
+  is the safer diff but leaves the same hole open for every future route. (3) is smallest and has the
+  worst failure mode.
+- **Reversal cost is low for all three** — no data changes, no migration; each is a revert.
+- ⚠ **Do not fold this into Q-1a.** That entry is a feature (bearer auth + `apiUrl()`), it is not
+  scheduled, and this gap is open regardless of whether it is ever built.
+
 ### [app-shell] 🟢 Q-1a — client bearer auth + `apiUrl()` (SPLIT OUT 2026-08-03 — startable now)
 
 - **Lane:** A
