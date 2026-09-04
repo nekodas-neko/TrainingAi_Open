@@ -85,3 +85,34 @@ describe('the display rule itself', () => {
     ])).toEqual({ corrected: 2, total: 3 })
   })
 })
+
+/**
+ * BF-113. The band the BMI card draws is chosen from a DEXA-corrected figure, and the card said only
+ * "via body fat %" — one word short of true, per the owner: *"bmi doesnt say its scaled to match
+ * dexa."* The label has to follow the flag on the reading actually shown, which is why the value and
+ * the flag are read together.
+ */
+describe('the BMI card says when its band rests on a calibrated reading', () => {
+  it('takes the value and the flag from the same row', () => {
+    const src = code(source('app/health/health-content.tsx'))
+    expect(src).toMatch(/latestDisplayedBodyFat\(metaRecentReversed\)/)
+    // The shape it replaced: right number, no idea which row produced it.
+    expect(src, 'map(displayBodyFat).find loses the row the flag has to come from')
+      .not.toMatch(/map\(displayBodyFat\)\s*\.\s*find/)
+  })
+
+  it('conditions the caption and the popover on that flag', () => {
+    const src = code(source('app/health/health-sections.tsx'))
+    expect(src).toMatch(/via body fat %\{latestBfIsCorrected/)
+    expect(src).toMatch(/latestBfIsCorrected \?/)
+    expect(src).toMatch(/corrected to your DEXA scan/)
+  })
+
+  it('never infers the correction by comparing the two numbers', () => {
+    // body-fat-display.ts: an offset can round to zero, and "corrected by 0.0" and "not corrected"
+    // are different claims.
+    for (const file of ['app/health/health-content.tsx', 'app/health/health-sections.tsx']) {
+      expect(code(source(file)), file).not.toMatch(/bodyFatCorrected\s*!==?\s*bodyFat\b/)
+    }
+  })
+})
