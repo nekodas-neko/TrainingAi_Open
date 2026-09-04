@@ -7455,6 +7455,48 @@ because none of them is the change that review was for, and per **No orphaned fi
 without a queue entry is a dropped finding.*
 
 
+### [platform] LB-54 — a red CI job cannot be read, and E2E has no green baseline to compare against
+
+- **Lane:** ? — neither lane. `.github/workflows/ci.yml` and the CI tooling are the Orchestrator's.
+- **Added:** 2026-09-03 · from BF-111 (#840), where diagnosing one red check consumed most of a
+  session and still did not reach the failing assertion.
+- **⚠️ `get_job_logs` cannot reach a step's output on this repo's jobs.** Every retrieval — by
+  `job_id`, by `run_id` with `failed_only`, at `tail_lines` from 60 to 400 — returns only the
+  **post-job Postgres service-container dump**, which the runner prints last and which is thousands
+  of lines of `role "root" does not exist` healthcheck noise. Measured: the whole retrievable content
+  for a failed `Tests` job was **2,797 characters**, none of it vitest's. `get_check_run` is no help
+  either — Actions jobs leave `output.text` empty. **So a red job announces that it is red and
+  nothing else.**
+  - The practical consequence: a failure that does not reproduce locally cannot be diagnosed at all.
+    BF-111's `Tests` job failed on CI while the same commit ran **6,429 passed, 0 failed** locally,
+    and there is no way from here to learn which test failed.
+  - Worth trying: uploading vitest's and Playwright's own output as a run artifact, or printing a
+    failure summary to a file the workflow `cat`s in a final step — anything that puts the failure
+    *before* the container dump rather than behind it.
+- **⚠️ E2E is a required check with no green baseline on `main`.** The job is gated
+  `if: github.event_name != 'schedule'`, so the nightly run on `main` **skips it** (confirmed: run
+  33797376255 shows E2E `skipped`). It therefore only ever runs on a PR. **CI history cannot answer
+  "is this red on `main` too?"** — the first question the CI rules tell you to ask.
+  - That is not hypothetical: it sent this session to reproduce the comparison by hand, and the
+    hand-rolled version was **wrong** — see the caveat below.
+- **⚠️ Local e2e is NOT an adjudicator in this sandbox, and treating it as one produced a false
+  finding.** A local run showed the same specs failing on the branch *and* on clean `main`, which was
+  read as "not this PR's fault". It was not evidence: the sandbox's storage credentials 403,
+  `CLAUDE_RO_OWNER_USER_ID` is unset, and the dev database accumulates e2e fixtures across runs — the
+  poisoned-state failure `docs/local-dev-database.md` already documents. **Both sides failed because
+  the environment failed.** Other agents' UI PRs merged the same day with E2E green, which is what
+  exposed it. The baton's existing rule — *CI's fresh database is the adjudicator* — applies to e2e
+  at least as strongly as to unit tests.
+- **⚠️ Worktrees cannot run this app's dev server**, which rules out the obvious way to compare two
+  refs side by side. A symlinked `node_modules` is rejected by Turbopack — *"Symlink node_modules is
+  invalid, it points out of the filesystem root"* — and a real copy per worktree is not free against a
+  fixed disk allowance. Checking the other ref out in the primary worktree and switching back is the
+  workable route.
+- **Why this is worth an entry rather than a shrug:** E2E became required on 2026-08-26, so a red E2E
+  now blocks every merge. The tooling to tell a real failure from an inherited one, or from a flake,
+  does not exist — and the first time it mattered it cost a session and produced one wrong conclusion
+  along the way.
+
 ### [sleep][platform] LB-53 — `oura_daily_derived` is written in occasional bulk passes, not per night
 
 > **✅ THE QUESTION THIS ENTRY SAID TO MEASURE FIRST IS ANSWERED (2026-09-03): the scores go STALE,
