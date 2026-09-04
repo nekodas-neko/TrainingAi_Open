@@ -5,7 +5,7 @@ import {
   cmdSyncHeartRate, cmdSyncSleep, cmdRawSensorEnable, cmdRawSensorDisable,
   cmdReadAutoPref, cmdWriteAutoPref, AUTO_METRICS, BIG_DATA_TYPE, CMD,
 } from '@/lib/colmi-ble/protocol'
-import { framesToPayload } from '@/lib/colmi-ble/ble'
+import { framesToPayload } from '@/lib/colmi-ble/frames-to-payload'
 import { localDayStartSeconds, wallClockSecondsToEpochMs } from '@/lib/colmi-ble/resolve-time'
 import { formatInTimeZone } from 'date-fns-tz'
 import type { ColmiFrame } from '@/lib/colmi-ble/decode'

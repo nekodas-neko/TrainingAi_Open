@@ -7183,7 +7183,386 @@ just deleting it is what stops a later session restoring it from the prose that 
 The `Math.round` note in the journal is the third thing worth its length: a surviving mutation that
 turned out to be a real off-by-one on some values, not a gap in the tests.
 
-## 2026-09-03 — `projectOverview.md` → 9741, `docs/implementation-backlog.md` → 16443 (BF-110)
+---
+
+## 2026-09-03 — `docs/implementation-backlog.md` 16398 → 16432 (BF-92, Lane A)
+
+Thirty-four lines onto BF-92, recording that the code half of the Sentry client blackout shipped and
+what specifically is still owed. They earn the space because **the entry named one gate and there
+were three**: `connect-src`, then the auth matcher in `middleware.ts` (which would have 307'd an
+unauthenticated report to `/sign-in`), then the service worker's catch-all branch (which would have
+`cache.put()` a POST and raised an unhandled rejection on every successful report). Only the first
+had been found by reading. Recording all three is what stops the next session "fixing the CSP" and
+declaring it done, which is precisely the shape of the original failure.
+
+Two of those lines are the note that the tunnel rewrite lands in `routes-manifest.json` under
+**`afterFiles`**, not `beforeFiles`. The first verification here read the empty `beforeFiles` and
+concluded the change had not taken effect at all. A wrong "it didn't work" costs more than a wrong
+"it worked" in a repo that gates on device verification, because it invites reverting a correct fix.
+
+The owner-visible trade-off — excluding the tunnel path from the auth gate widens it to
+unauthenticated callers — is written on the entry rather than only in the journal, because that is
+the file a session reads before deciding whether the item is finished.
+
+Also `projectOverview.md` 9725 → 9726, for the **Waiting on the owner** row that carries the same
+trade-off. It belongs in that table rather than only on the entry because the widening is the one
+thing here a session must not decide on the owner's behalf, and that table is the place the owner
+reads rather than the queue.
+## 2026-09-03 — `docs/implementation-backlog.md` 16398 → 16458 (LA-56 + LB-53 measurements, Lane A)
+
+Two production measurements, onto two entries, on the same branch because they came from the same
+half-hour of queries and neither is code.
+
+**LA-56 (+43).** The entry hedged that "abandoned" was an inference, because the reaper is a pure
+start-age check with no heartbeat. It is now a measurement, and the lines that earn their space are
+the *method*: `replaceOuraDailySummary` deletes and reinserts every row, so a completed full-history
+pass leaves one shared `created_at`. There are 17, and the oldest is 2026-08-17. That is a way of
+dating the last successful pass that needs no instrumentation and would otherwise have to be
+rediscovered, and it is the reason the entry can now state three failed attempts rather than suspect
+them.
+
+The rest is a **retraction**, which is why it is emphatic rather than brief: both this entry and the
+owner-facing table told the owner to run the synchronous path as a workaround, on the strength of a
+note that was true on 2026-08-17 and is not true now. A workaround that silently does nothing is
+worse than none, because the 502 looks identical either way. Retractions get written at the length it
+takes for the next reader not to re-adopt the advice.
+
+**LB-53 (+17).** Its own "measure this first" question — stale scores or absent rows — is answered
+(stale; rows are created the morning after, unbroken). Also two corrections: its four-stamp table is a
+stale snapshot, and the deploy hypothesis it floats does not survive today's data. Recording that a
+hypothesis failed is worth more than the lines it costs, because the alternative is the next session
+building around it.
+
+`projectOverview.md` is unchanged in length — the **Waiting on the owner** row was rewritten in place
+from "run it once only" to "do not attempt".
+
+Same day, `docs/implementation-backlog.md` 16458 → 16502: the root cause turned up in `error_events`
+an hour after the entry above was written, so LA-56 gained the fault verbatim (url, cause chain,
+`at Worker.<anonymous>`) rather than a paraphrase. The cause chain is the whole value — the message
+alone says only which query failed — and it exists because `rollup-worker-entry.ts`'s `msg()` walks
+`.cause` after 2026-08-17's three failures recovered nothing but SQL text. Quoting it in full is what
+lets the next session match a new fault against it without re-querying production.
+
+The two candidate mechanisms are written as candidates, and the warning not to simply raise
+`statement_timeout`/`connectionTimeoutMillis` is written beside them, because that is the obvious fix
+and `CLAUDE.md` records that those settings took production down in session 165.
+## 2026-09-03 — Review sweep 45 (RV-42)
+
+`docs/implementation-backlog.md` 16398 → 16429 (+31), `projectOverview.md` 9725 → 9742 (+17),
+`docs/agents/state/review.md` 194 → 205 (+11).
+
+RV-42's length is mostly the two lines that set its severity *down*. "No data leaks — the meal-plan
+read joins neither table" is the difference between this entry and RV-32, which it otherwise resembles
+exactly, and without it the next reader treats a stored id as an exposed name. The `ON DELETE SET
+NULL` chain is the other half and has to be spelled out because the consequence is not visible from
+the defect: the account that loses data is not the one that made the bad request.
+
+The line naming `writeSavedMeal` as the fix earns its place by pointing at working code in the same
+repository rather than describing a check, and the line refusing a composite FK is there because that
+is the first idea a reader has and it would turn a four-line slice change into a migration on a table
+two routes write.
+
+**⚠ The baton has drifted 173 → 205 across five sweeps in one session**, and it was compressed at
+every one of those raises — the sweep-40 carry is two bullets, two method notes were merged into one,
+and rule (a) was deleted from the Next list rather than marked done. The content that remains is
+state. **The next session that touches it should make a structural cut rather than another
+incremental one**: the "Now" section's method bullets and the standing "Method notes" section are
+converging on the same list and should become one.
+
+## 2026-09-03 — `docs/implementation-backlog.md` 16429 → 16680 (+71 here, rebased onto a larger main), `projectOverview.md` 9742 → 9765 (+23), PS-21 Stage A / PS-22 / PS-23
+
+Two additions and one edit. The new backlog entry is PS-22 — a fifth of every Colmi sync's
+heart-rate log is discarded as future-dated. The lines that earn their place are the ones separating
+the measurement from the guess: 209 decoded, 167 accepted, 41 rejected as future-dated, and the
+packet numbering that puts them at 20:15 on a sync that ran at 07:12. The obvious explanation is
+written down **as a hypothesis with the instruction to check it against the archived bytes**, because
+this integration has had four diagnoses made from row counts of which three were wrong, and an entry
+that stated the guess as the cause would have produced a fifth.
+
+The PS-21 edit strikes Stage A and keeps B and C, which is the `Keep:` convention rather than a
+deletion — the entry still owes the APK work.
+
+`projectOverview.md` gains a Known-Issues row for the same reason every device change gets one: the
+server decode was proved equivalent against the local database and has never run from the phone. It
+names the tell (`decodedBy`) rather than only the risk, because the failure it guards against — a
+WebView older than the deploy — looks like "the sync stored nothing" and is otherwise indistinguishable
+from a broken ring.
+
+A second entry, PS-23, was added after the first CI round: two test files create and drop the same
+global Postgres role, and the collision produces three different errors — one of which is a **false
+schema-drift report naming an innocent column**, because `information_schema` is privilege-filtered
+and a revoked grant reads as a missing column rather than an error. Those lines are the entry: the
+symptom is worth more than the fix, which is a rename.
+
+Both raised slightly above the exact count so a small follow-up does not need its own note.
+---
+
+## 2026-09-03 — `docs/implementation-backlog.md` 16561 → 16580 (Q-509 + LA-57, Lane A)
+
+A new entry (LA-57) plus Q-509's candidate-3 result. The measurement worth its lines is the negative
+one: over 58 BLE-era nights `recovery_index_hours` has OLS slope −0.0055 h/night and r = −0.060, so
+the remaining 0.39 h was there on the first BLE night and has not grown. Recording *how* that was
+established matters as much as the number — the previous two rounds built a frame-decoding
+reconstruction harness because they were asking about individual nights, and a question about a
+series needs two aggregate queries instead.
+
+The caveat that it does **not** refute candidate 3 outright — a change that happened AT the re-key
+and then held reads flat too — is one line and prevents the entry being closed on this evidence.
+
+LA-57's length is mostly prohibition. The obvious response to "BLE HRV is double Cloud HRV" is to
+rescale it, and that is wrong twice over: RMSSD and SDNN are both legitimate so the defect is two
+scales behind one column, and a rescale rewrites stored history. Both are written down beside the
+finding rather than left to be re-derived by whoever picks it up.
+
+Also recorded: the 2026-08-18 input-drift review checked HRV for **presence** and never for
+**scale**, which is how a doubled input survived six weeks of review in its own area. That sentence
+is the transferable one.
+## 2026-09-03 — `docs/implementation-backlog.md` 16533 → 16561 (Q-278, Lane A)
+
+Twenty-eight lines answering the open question Q-278 could not start without — *are daytime stress
+and resilience "pillars"?* — with the finding that it is the wrong question to encode: key the
+representation on the metric being rendered and the ruling never has to be made.
+
+The rest is measurement that stops the next implementer repeating an hour of reading:
+`score-availability.ts` is 74 lines with exactly **one** real consumer (`readiness-payload.ts:708`,
+flattening it into four response fields), so generalising it is a one-payload change rather than the
+sweep the entry implies — the second time this entry has turned out smaller on inspection. And
+scope item 3's absent/provisional split is already half-built, per-contributor, in
+`readiness-composite`.
+
+The warning about building an absence-reason enum from what reads well rather than from what the
+producers can report is the line most likely to save real work: it is the failure mode that turns a
+"why" field into a constant.
+
+---
+
+## 2026-09-03 — `docs/implementation-backlog.md` 16580 → 16598 (Q-279, Lane A)
+
+Eighteen lines putting numbers behind a switch the entry describes as contained. The two that earn
+their space are the pair the decision turns on: **the scales agree** (mean 0.919 → 0.955), so no
+threshold moves with the switch — which is what keeps this a small change rather than a
+recalibration of three constants together — and **the taper goes from 4 firings to 1**, because the
+EWMA damps the single-heavy-session spike it reacts to. The second is the owner's question and could
+not have been guessed from the code.
+
+The warning not to read this as "the new number is more correct" is deliberate: the uncoupled form
+fixes the coupling and nothing else, and an entry that cites collapsed evidence is exactly where that
+over-reading would happen.
+
+Also the premise refinement — chronic divides by the observed span, not a flat 4 — so nobody goes
+looking for a `/ 4` that was deliberately removed.
+
+---
+
+## 2026-09-03 — `docs/implementation-backlog.md` 16645 → 16680 (Q-252, Lane A)
+
+Thirty-five lines on an entry that is mostly already built. They are worth it because the entry's
+**title** asks for session replay and the codebase says no to session replay in three config files,
+with the privacy reasoning attached — so an implementer working the queue top-down would have
+reversed a made decision without ever learning it had been made. A status table line by line is the
+cheapest way to make that visible; prose would bury it.
+
+The entry is annotated rather than deleted because one piece (release tagging) is real and unbuilt,
+and rather than re-opened because replay's rejection is a decision, not an oversight. Both of those
+are stated explicitly, since the natural readings of "mostly superseded" are *delete it* and
+*reconsider it*, and both would be wrong.
+
+Also recorded: the entry's premise — that `error_events` cannot say what preceded a throw — is the
+wrong problem while BF-92 has Sentry receiving nothing from the browser at all.
+
+---
+
+## 2026-09-03 — `docs/implementation-backlog.md` 16680 → 16687 (Q-511, Lane A)
+
+Seven lines adding a `Reference:` field to Q-511. It was standing at **#3 READY** in Lane A's list
+while its own **First action** reads *"none in scoring"* — a "do nothing unless" entry sitting where
+an implementer working top-down picks it up and builds it anyway. `Reference:` is the field for
+exactly this ("nothing to BUILD"), and it moves the entry into its own section without hiding it.
+
+The lines say *why* rather than just setting the field, because the entry's real value is the
+**⚠️ PROTECT THIS** warning it carries — that sleep and readiness being on comparable scales is now
+load-bearing for Body Battery — and a reader who sees only "Reference: nothing to build" would skip
+the one thing worth reading. The re-promotion condition is stated so the field is reversible by rule
+rather than by judgement.
+
+---
+
+## 2026-09-03 — `docs/implementation-backlog.md` 16680 → 16753: **`main` was RED, and only 7 of the 66 lines are this PR's**
+
+`main` at `830f9983` failed its own doc-size check — 16,746 lines against a 16,680 baseline, over by
+**66**. Reproduced directly by checking out `origin/main` and running the script, not inferred from a
+PR's failure.
+
+**Cause is the merge race LB-52 describes.** #844 (Colmi server-side decode, the other lane) was
+checked by CI against a `main` that did not yet contain #848, and #848 landed between that check and
+that merge. Both PRs were green; their sum is not. **A green check on a PR is a statement about the
+merge base it ran against, and nothing about the `main` that results** — which is precisely why the
+doc-size gate can be green on every branch and red on the trunk.
+
+**The 66 lines are #844's; this PR adds 7 more.** Raised to 16,753 = main's 16,746 + Q-511's
+`Reference:` field, so the number is honest about both. This PR is the carrier only because it was
+already touching this baseline — the growth is not its own and it claims none of it.
+
+⚠️ **Worth noticing about the check itself:** it runs against the *merged* tree in CI and the *branch*
+tree locally, so a branch cut from an older `main` passes `pnpm check:rules` locally and fails in CI
+for reasons that have nothing to do with its diff. That happened here. Re-merging `origin/main`
+before the final local gate run is what makes the two agree.
+
+## 2026-09-03 — `docs/implementation-backlog.md` → 16885 (BF-113 … BF-116, four owner reports)
+
+Four entries from one batch, and three of them cost their length by naming the thing that would
+otherwise be re-derived. **BF-113** is a label: the BMI band is chosen from a DEXA-corrected body fat
+and the card says only "via body fat %", while the card beside it already states its calibration span
+— sibling-surface, one word short. **BF-114** carries the measurement that makes it real: 1,543 kcal
+from the scale against 1,325 from the clinical RMR, 218 apart, and the smaller one is what drives the
+targets. **BF-115** turned up something nobody had recorded — `sleep_sessions` holds **three rows for
+2026-09-03** — and the entry deliberately stops short of a fix, because whether the fragments are
+naps or artefacts decides between row selection and de-duplication; it also marks the part of the
+trace that was not finished rather than implying a complete one. **BF-116** is the most useful to
+have written down: the header overflow is caused by BF-96's own fix, which correctly made the weather
+chip unshrinkable and thereby left the row with no compressible item at all, one day before Q-111
+added a third chip. Without that history the obvious repair is to undo BF-96 and restore the
+two-line wrap.
+## 2026-09-03 — `docs/implementation-backlog.md` → 16822 (BF-112, splitting stage 2 out of BF-69)
+
+The owner asked how retatrutide tracking had progressed. Tracing it produced a better answer than a
+status line: the storage is finished — BF-3's dose-on-log, then BF-69's stage 1 with migrations 254
+and 255 — and production holds **2 supplements, no amounts, one log from June, and no retatrutide**,
+because nothing in the UI can write to any of those columns. The reason it stalled is structural
+rather than anyone's oversight: BF-69 carries a `Keep:` line, so `next-item.js` prints it under
+*"shipped; only the stated residue is owed. Not new work"* — true of the storage, false of the
+feature, since the residue named is stages 2 to 4, the whole user-facing half. An implementer working
+top-down skips it. Same shape as the `Verify:` misuse corrected the day before: a field meaning
+*finished* attached to something unfinished. BF-112 lifts stage 2 into a startable Lane B entry and
+BF-69 gains a pointer to it. Worth recording that BF-112 was itself first filed with a `Reference:`
+bullet — which files an entry as *"read by other entries, never next"* — and landed in the REFERENCE
+section, the exact failure it was written to correct; the plan link moved into prose.
+
+---
+
+## 2026-09-03 — `docs/implementation-backlog.md` 16923 → 16968 (BF-115, Lane A)
+
+Forty-five lines on a root cause, and they replace an investigation rather than adding to one. BF-115
+asked why a date carried three sleep rows before anyone touched the sheet — the right question, and
+the answer is that **the rows are correct**: a night plus two naps, on one of 19 dates spanning
+2026-05-29 → 09-03. The route is correct too; `mergeByDate`'s `primaryCluster` already drops both
+fragments. The defect is that the local-first seed pushes raw rows into state without that merge.
+
+The three lines most worth their space are the ones that stop a wrong fix: **do not treat this as
+PS-17** (its `ALWAYS_NIGHT_MIN_HOURS = 4` short-circuit cannot have fired — both fragments are under
+4 h, and 2026-08-27 appearing in both lists invites exactly that conflation); **do not "fix" the
+sheet's selection**, which would paper over a missing merge; and **do not fix storage**, which is
+doing the right thing. Each is a plausible next step that the measurement rules out.
+
+Also recorded: this is device-only because `getLocalStore` returns null in the sandbox, so a green
+`pnpm dev` proves nothing about it — the reason the entry keeps its device check.
+
+---
+
+## 2026-09-03 — `docs/implementation-backlog.md` 16968 → 16980 (LA-56, Lane A)
+
+Twelve lines recording that the reporting gap which hid LA-56 is closed. Worth its length because it
+is the part a future reader will otherwise disbelieve: `step()` catches, therefore the rollup never
+throws, therefore the `.catch` that was the callers' only reporting could never fire for the failure
+mode that actually happens. The ingest route's own comment asserted the opposite, which is how it
+went unnoticed.
+
+The last two lines are the ones that stop the entry being closed on this: **it does not fix the
+redecode.** The worker still loses its database connection. What changes is that the next failure
+names itself rather than being reconstructed from `created_at` arithmetic — which is how this
+entry's diagnosis was reached and is not a method anyone should need twice.
+
+---
+
+## 2026-09-03 — `docs/implementation-backlog.md` 16980 → 17028 (Q-250, Lane A)
+
+Forty-eight lines for four real emulator runs. They earn it by replacing an account of where the job
+stops that is now wrong in every particular: the entry said the gap was sign-in driving, and the
+first run's *"Sign in with email is not visible"* looked like exactly that. It was a dead server.
+
+The run table is the shape worth keeping — each row records what that run *established*, not what it
+did, so the next reader inherits four measurements rather than four failures. The two lines most
+likely to save real work are the ones that rule out plausible next steps: **do not relax either boot
+gate** (they key on NODE_ENV specifically so a production deploy that lost its storage variables
+fails loudly), and **settle host reachability before touching Maestro**, because the smoke script's
+reachability check has always been advisory and has never once confirmed the hop.
+
+Also recorded, because it caps anyone else's attempt the same way: the evidence needed next lives in
+the run artifact, and a session with no artifact download cannot open it.
+
+---
+
+## 2026-09-03 — BF-92's auth-gate decision, recorded on the entry and in the owner table
+
+The tunnel ships behind the auth gate. The lines are worth their space because the decision turns on
+something easy to miss and easy to re-litigate: **the reported defect is fixed either way.** A
+signed-in request falls through `middleware.ts` without a redirect, and BF-92's 13 days of silence
+happened while the owner was signed in — so excluding `/monitoring` would have bought errors from the
+sign-in screen, a bonus, not the fix.
+
+Recorded alongside it, because the risk is as easy to overstate as the benefit: an unauthenticated
+tunnel is bandwidth and reputation, **not** extra exposure of our own Sentry project, whose DSN
+already ships in every client bundle. Someone re-reading this in six months should not have to
+re-derive either half.
+
+The cost is written down too — sign-in-path errors remain uncaptured by anything, since
+`/api/client-error` requires auth — with the condition that would justify revisiting: a sign-in
+failure nobody can diagnose.
+## 2026-09-04 — `docs/implementation-backlog.md` → 17087 (BF-117, the day-rollover refresh)
+
+One entry plus six lines onto BF-86. The owner re-reported something BF-86 had deliberately left
+undone, and that entry's scope line is the reason this one is short rather than a sweep: it refused to
+subscribe ~30 today-scoped call sites *"blind… justified by a guess"* and said the question needed
+evidence. The evidence arrived as a report, and tracing it made the answer narrow — `useLocalDay()`
+has three consumers in the whole app and only two inside Home, while every data effect on that screen
+is gated on `refreshTick`, which is bumped by pull-to-refresh and by BLE-drain-settled and by nothing
+else. A day change bumps nothing. So the fix is one bump of an existing tick, not a subscription
+sweep, and BF-86's caution is vindicated rather than overturned. The length that remains is two traps
+worth more than they cost: `localDay` is seeded synchronously so a naive effect double-fetches on
+every launch, and `sleep-sessions` is explicitly outside the tick (Q-91), which would leave last
+night's sleep stale on exactly the rollover where it matters most.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17278 (BF-118, the User Information section)
+
+A feature request rather than a fault, and the length is mostly the trace that changes what the work
+is. The owner asked for a place to put documents and free text that every AI surface then reads; five
+of the six things he listed already have stores (`injuries`, `dexa_scans`, `measured_rmr`,
+`blood_panels`, `blood_analytes`), the upload pipeline is already queued as BF-41, and the flagship
+example he gave — a lumbar constraint stopping the builder programming deadlifts — **shipped on
+2026-08-31 as BF-68**, from a near-identical sentence. He has not seen it because BF-68's UI half was
+deferred. So the entry's job is to say that the missing piece is not storage but a single shared
+assembler, with `formatInjuryContext` as the working prototype and the measured fact that nutrition
+and the AI routes import none of these stores. The rest is the design decision the entry exists to
+force — structured records can be enforced by filtering the candidate list, prose can only be handed
+to a model, and BF-68 already measured that as "luck rather than a rule" — plus three traps that would
+otherwise be discovered late: crop-before-upload on an X-ray that carries more identifiers than an RMR
+printout, BF-41's standing decision that no source document is stored, and the existing `schedules`
+table being training structure rather than availability.
+
+The +50 that followed came from the owner refining the intake to a blurb router in the same sitting,
+and it earns its lines by being traced fragment by fragment against his own example sentence: of the
+four things in it, the injury and the food exclusion have structured homes (and the injury is
+*enforced*, not merely stored), while work availability and training experience have none. That ratio
+is the finding — a router is worth exactly as much as its destination registry, and "other notes" is
+the honest fallback rather than the target. The sharpest line recorded is that enforcement cuts both
+ways: because an injury removes exercises from the candidate list, a wrongly-routed one silently
+deletes training options, which makes the confirm step load-bearing rather than polite.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17318 (BF-118, the capture pattern and prompts)
+
++40 onto BF-118, and the reason they are worth it is that they **correct the entry's own earlier
+recommendation**. It had said to ship the typed blurb before the image path because the image half
+needs an upload surface; tracing the surface the owner pointed at shows that half is already built —
+`/api/nutrition/scan` takes image, mimeType and text in one call and sanitises the text, and
+`capture-actions.tsx` has camera, gallery and a note field, complete with a `CameraSource.Camera`
+detail fixed once already under BF-50. What the image path actually owes is the **crop step**, which
+exists nowhere in the app and is the owner's own PII rule. The ship order stands and its reason does
+not, which is the kind of thing worth writing down rather than quietly leaving. Also recorded: do not
+add an `imageKind` and route medical images through the food scan route — same surface, different
+sensitivity class and different retention decision — and the prompts are best generated from the
+destinations that are still empty, since a fixed chip row is decoration by the second visit.
+
+## 2026-09-03 — `projectOverview.md` → 9771, `docs/implementation-backlog.md` → 17363 (BF-110)
 
 The index grows by two and the backlog by eleven, and both carry the same two sentences because both
 are read by different people at different times. The first is the retraction: **a scroll fixes it, so

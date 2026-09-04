@@ -21,3 +21,19 @@ Sentry.init({
   // locally already achieves this; the flag makes it deliberate rather than incidental.
   enabled: process.env.NODE_ENV === 'production',
 })
+
+// BF-92. This failure was invisible for 13 days because an unset DSN and a quiet week look
+// identical from outside — nobody can tell "nothing broke" from "nothing could be reported". One
+// line at boot removes that ambiguity permanently, and it names BOTH DSNs because the server
+// process can read the client's `NEXT_PUBLIC_` one too, so a single server-side log covers the
+// path that has no log of its own.
+//
+// The DSN itself is never printed: it is write-only by design, but a URL in a deploy log gets
+// copied into places a deploy log's audience is not.
+if (process.env.NODE_ENV === 'production') {
+  console.info(
+    `[sentry] server DSN ${process.env.SENTRY_DSN ? 'found' : 'MISSING'}; ` +
+    `browser DSN ${process.env.NEXT_PUBLIC_SENTRY_DSN ? 'found' : 'MISSING'}; ` +
+    `browser events tunnel via /monitoring (same-origin, so no connect-src entry is needed)`,
+  )
+}

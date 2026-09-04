@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **263** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **265** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v36** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -456,6 +456,9 @@ recompute has to run over the affected days once the selection is fixed.
 - **Gate:** device — Stages B and C need an APK and cannot be verified in the sandbox
 - **Plan:** [`2026-09-03-colmi-background-sync-service.md`](superpowers/plans/2026-09-03-colmi-background-sync-service.md)
 - **Added:** 2026-09-03 · owner asked for it after in-app auto-sync proved insufficient
+- **Keep:** Stages B and C. **Stage A shipped 2026-09-03** — the server decodes, the client posts
+  bytes only, and the two paths were proved to write byte-identical rows over a real 31-frame sync
+  (166 rows, excluding the clock-stamped battery reading). What B and C still owe is the APK.
 
 In-app auto-sync (v1.395.1) closed the evening gap and is still not enough. **Measured 2026-09-02:**
 last reading 11:45, checked at 17:59 — six hours missing because the app had not been opened, and
@@ -474,9 +477,14 @@ same test vector as its TypeScript twin) and nothing else. ~400 lines against ~1
 
 **Three stages, and the first ships without Android:**
 
-- **A — decode moves server-side.** `/api/colmi/samples` already accepts and stores `rawFrames`;
-  it gains the decode. Proven by replaying the ~90 archived frames and asserting the readings match
-  what the client produced for the same syncs. JS only, reversible, no APK.
+- ~~**A — decode moves server-side.**~~ **Shipped 2026-09-03.** `framesToPayload` moved out of
+  `ble.ts` into `lib/colmi-ble/frames-to-payload.ts` (no BLE or DOM imports) and the route runs it
+  over the frames it archives. Two things the work turned up that the plan had not: the archive
+  could not restore ARRIVAL ORDER — every frame of a sync shares one `created_at`, so the
+  heart-rate log came back shuffled and a reversed replay kept 9 of 175 samples — fixed by
+  migration 263's `seq` for new frames and `sortFramesForReplay()` for the ones already stored; and
+  the Zod bounds on sleep `stage`/`minutes` only ever guarded the client's payload, so they are now
+  restated at the write where both paths meet.
 - **B — the Kotlin transport service.** Connect, run the command sequence, POST hex. Auth reuses the
   WebView cookie exactly as `OuraRingService` does, so no new secret.
 - **C — cadence.** Periodic ~2 h plus one guaranteed evening sync before midnight discards the
@@ -489,6 +497,66 @@ and Samsung does not honour `autoConnect = true`, so direct connect plus a bound
 **Out of scope on purpose:** this does not put the ring's data on any screen — learning-mode
 isolation stands and wiring it into scoring waits on the H10 session. It does not resolve steps,
 calories or the stage mapping (PS-16, PS-19).
+
+### [nutrition][platform] RV-42 — a meal plan can point at another account's saved meal and meal type
+
+- **Lane:** A — `lib/data/postgres/slices/meal-plans.ts` (`replaceMealPlanStructure` and the create
+  path). Both routes go through it; the fix is one pre-check, not two.
+- **Added:** 2026-09-03, Review sweep 45 —
+  [`write-up §4`](reviews/2026-09-03-fk-edges-meal-plan-cross-user-refs.md)
+- **The plan is ownership-checked; its child ids are not.** `ownedPlan(db, id, userId)` guards the
+  plan, then `meal_plan_meals` rows are inserted with `mealTypeId: m.mealTypeId ?? null` and
+  `savedMealId: m.savedMealId ?? null` straight from the request. Both are `z.string().uuid()` at the
+  boundary, which proves the shape and nothing about the owner. `meal_plan_meals` has no `user_id`, so
+  the FK is the only ownership link — and it only proves the row exists. **This is rule (c).**
+- **Two doors, both driven as a second account against the seeded user's rows:**
+  `POST /api/nutrition/meal-plans` → 201 stored; `PATCH /api/nutrition/meal-plans/meals/[mealId]` →
+  200 stored. Read back from Postgres, B's plan meal points at A's `saved_meal_id` *and* A's
+  `meal_type_id`.
+- **No data leaks — check this before raising the severity.** The meal-plan read joins neither
+  `saved_meals` nor `meal_types`; the API returns raw ids and `savedMealName`/`mealTypeName` came back
+  `null`. That is the half RV-32 had and this does not.
+- **What it does cost: one account silently mutates another's.** Both columns are `ON DELETE SET
+  NULL`. Driven end to end — B's plan meal held A's `saved_meal_id`, A deleted their own saved meal
+  through A's own API (`200 {"success":true}`), and B's row read `<NULLED>`. Neither account can see
+  why. Same second-order consequence RV-32 recorded on the progression-style edges.
+- **The fix already exists in a sibling.** `writeSavedMeal` verifies both of its equivalent ids in the
+  same transaction and cites rule (c) while doing it — copy that shape and refuse with a 400 naming
+  the field. **Do not reach for a composite FK carrying `user_id`**: it would work, but it is a
+  migration on a table two routes write, where a four-line pre-check matches the sibling code.
+- **How to test locally:** two accounts, create a plan as B naming A's `savedMealId`/`mealTypeId`, and
+  read `meal_plan_meals` back — the response body echoes the ids either way and proves nothing.
+- **Verify:** owner — nothing user-visible changes; a green local gate plus the two-account probe is
+  the bar.
+### [devices] PS-22 — a fifth of the ring's heart-rate log is discarded as future-dated, every sync
+
+- **Lane:** A — `lib/colmi-ble/frames-to-payload.ts`, decode only; no schema change
+- **Reference:** the frames are already archived, so this is answerable from stored bytes
+- **Added:** 2026-09-03 · found while proving Stage A's server decode against a real sync
+
+**Measured on the 2026-09-02 21:12 UTC sync, 31 frames:** `framesToPayload` produces **209**
+readings and the route accepts **167**. Of the 42 dropped, **41 are rejected as future-dated** and
+one is a calories bucket over range. This is not new and is not a Stage A regression — the client
+path produced the identical 209/167 split — but the response now reports `received` beside
+`accepted`, which is what made it visible.
+
+**The shape of it.** That sync ran at 07:12 Brisbane. The heart-rate log arrived as packets 1–7 and
+then 20–23, with packets 8–19 absent. Packets 1–7 map to indices 0–87, which is 00:00–07:15 — the
+day so far, correct. Packets 20–23 map to indices 243–294 by the same formula, which is 20:15
+onwards, a time that had not happened yet. Their contents are plausible BPM (71, 97, 85, 85, 79,
+75, 72, 110, 100, 117), not zeros or padding.
+
+**What is NOT established:** why. The obvious reading is that the ring keeps a fixed 288-slot day
+array and packets 20–23 hold yesterday's tail, not yet overwritten — but that is a hypothesis from
+the timestamps, and this integration has already had four diagnoses made from counts of which three
+were wrong. Answer it from the bytes: pull several syncs' `colmi_raw_frames`, line the tail packets
+of consecutive days up against each other, and see whether the values repeat a day late.
+
+**Why it matters:** if the hypothesis holds, those are real readings for the previous day being
+thrown away rather than shifted back, and the ring's daytime coverage is meaningfully better than
+the 288/day currently stored. If it does not hold, the future-dated rejection is doing exactly its
+job and this closes as understood. Either way the rejection stays — a sample ahead of now is a bad
+clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
 
 ### [nutrition][workouts] RV-41 — the Coach can write goal numbers the user's own screens refuse
 
@@ -766,6 +834,475 @@ calories or the stage mapping (PS-16, PS-19).
 - **Not done, and it still loses:** porting the MET table so `estWorkoutKcal` runs client-side. It
   would make the tile instant and work offline, but it duplicates a formula One Formula, One Place
   says lives once, and the `node:path` read is the coupling that keeps it server-side.
+
+### [platform][workouts][nutrition] 🔵 BF-118 — "User Information": one place the app knows you from, and one assembler every AI route reads
+
+> **⚑ REFINED 2026-09-04 — the intake is a BLURB ROUTER, and the owner would rather talk than fill in
+> forms.** *"maybe like an AI chat that populates the sections as you talk to it… I want to be able to
+> just give it a blurb like: I work monday to friday from 8-6; i cant eat potato, my lower back hurts
+> from lumbarixation - so less loaded lower back, I have 3 years gym experience — and it will read
+> summarize and put into the correct sections. if a section isn't defined it goes under 'other notes'…
+> so you can fill in manually (like dexa/rmr etc) or you can type/upload images and the AI will do it
+> automatically."*
+>
+> **That one blurb is the whole specification, and it was traced field by field:**
+>
+> | fragment | destination | exists? |
+> |---|---|---|
+> | *"my lower back hurts from lumbarixation — less loaded lower back"* | `injuries` | **yes, and it is ENFORCED** — `excludeInjuredExercises` filters the candidate list (BF-68) |
+> | *"i cant eat potato"* | `user_dietary_restrictions` | **yes** — per-user by design (*"an allergy belongs to the person, so every plan inherits it"*), with a `dietary_restrictions` catalogue carrying **`synonyms`** |
+> | *"I work monday to friday from 8-6"* | availability | **no home.** Not `schedules` — that is which session runs on which day |
+> | *"3 years gym experience"* | experience level | **no home.** `users` has height, DOB, sex, `activityLevel`, `fitnessGoal` — no training age |
+>
+> **Two of four already have structured, queryable homes; two have none.** That ratio is the entry's
+> real content: **the router is worth exactly as much as its destination registry**. Routing into
+> `injuries` produces a rule the generator cannot ignore; routing into "other notes" produces prose a
+> model may or may not honour. So *"other notes"* is the honest fallback for what has no home yet — not
+> the design target, and every fragment that keeps landing there is an argument for giving that kind a
+> real column.
+>
+> **`dietary_restrictions.synonyms` is the proof this is with the grain**, not against it: a catalogue
+> of codes with alternative wordings is precisely what a text router needs to turn *"cant eat potato"*
+> into a stored code rather than a sentence.
+>
+> - **Shape: the model returns a LIST OF PROPOSED RECORDS, each with a destination — never one blob and
+>   never a direct write.** One blurb produced four items bound for four tables; a single free-text
+>   summary would collapse that into prose and lose the enforcement. Each proposal is shown with where
+>   it is going, and is individually editable, acceptable and rejectable.
+> - **⚠ Confirmation is mandatory, and the schema already says so.** BF-41 records that `source` is
+>   `'manual' | 'extracted'` with **no third value for a model's unconfirmed output**. The same rule
+>   binds here: nothing the router proposes may be written without the owner accepting it.
+> - **⚠ Enforcement cuts both ways, and this is the sharpest risk in the feature.** Because an injury
+>   *removes exercises from the candidate list*, a wrongly-routed or hallucinated injury **silently
+>   deletes training options** and the owner sees only that something is missing. A wrong note is
+>   cosmetic; a wrong injury is not. Injuries and dietary restrictions are the two destinations where a
+>   confirm step is load-bearing rather than polite.
+> - **⚠ A blurb is not a document.** Free text is cheap, reversible and carries only what the owner
+>   typed; an uploaded X-ray carries a name, a date of birth, an accession number and a referrer, and
+>   the extraction call sends it to Google. **Ship the typed blurb first** — it needs no upload surface,
+>   no crop step and no BF-41 dependency, and it covers three of the four fragments above. The image
+>   path is the second half and inherits every warning in this entry.
+> - **Manual entry stays the reference path, not a legacy one.** The owner asked for both. DEXA and RMR
+>   forms (BF-71) already exist and the router should *prefill* them, exactly as BF-41 specifies for
+>   extraction — the router is another way into the same forms, never a parallel write path.
+
+> **⚑ REFINED AGAIN 2026-09-04 — copy the food capture surface, and add prompts.** Owner: *"id like
+> it to be like the ai food upload where I can upload images and then type the text. maybe some
+> promps would be good like 'when can you train?' etc."*
+>
+> **The pattern he is pointing at exists and is proven, which CORRECTS this entry's earlier
+> sequencing note.** That note said to ship the typed blurb first because the image path needs an
+> upload surface; the upload surface is the cheap part:
+> - **`/api/nutrition/scan` already takes `image` + `mimeType` + `text` in ONE call** — an image with
+>   an optional note, or text alone, which is exactly the shape asked for. It also **sanitises the
+>   free text**: control characters stripped, capped at 500. Copy that hardening rather than
+>   re-deriving it.
+> - **`components/nutrition/capture-actions.tsx`** is the UI — camera, gallery, and a `photoNote`
+>   field beside the image. It carries an owner-driven detail worth keeping: `CameraSource.Camera`,
+>   **not `Prompt`** (BF-50 ③), because the prompt variant *"first opens the screen for /From…"*.
+>   Re-deriving that would reintroduce a papercut already fixed once.
+>
+> **So the real cost of the image path is the CROP STEP, which does not exist anywhere.** BF-1's rule
+> is the owner's own — crop before upload, because extraction sends the image to Google and redacting
+> afterwards is too late — and no surface in the app implements it today. That, not the picker, is
+> what the image half owes. **Ship order is unchanged, but for a corrected reason:** typed blurb
+> first because it needs no crop step, not because the upload UI is expensive.
+>
+> **⚠ Do not route medical images through `/api/nutrition/scan`.** It discriminates on `imageKind`
+> and adding one more looks like the cheap path, but a food label and a spinal X-ray are different
+> sensitivity classes with different retention rules, and BF-41's *"no source document is stored"*
+> decision belongs to the clinical pipeline rather than the food one. Copy the surface; do not share
+> the route.
+>
+> **The prompts are the destination registry made visible, and that is the argument for them.**
+> *"When can you train?"* is the availability destination asking for itself; a blank box gets a blurb
+> about whatever is top of mind, and a prompt gets the field that is actually empty. **No
+> suggested-prompt pattern exists in the app today** — `mood-checkin-sheet.tsx`'s "suggestions" are
+> sore-muscle chips, a different thing — so this is new UI, but small.
+> - **Best value: prompt for what is MISSING, not a fixed list.** The section knows which destinations
+>   are empty, so *"When can you train?"* should appear while availability is unset and stop once it is
+>   answered. A static row of chips becomes decoration on the second visit.
+> - Seed set, matching the destinations that exist or are named in this entry: when you can train ·
+>   anything you cannot eat · injuries or pain to work around · how long you have trained · anything
+>   else the app should know.
+
+
+- **Lane:** A for the store and the assembler; B for the section itself. **Needs a plan document
+  before implementation** — this is a feature spanning five pillars, not a fix, and the backlog
+  protocol says plan first.
+- **Added:** 2026-09-04 · owner: *"I want to create a section called 'user information'… I could
+  upload documents or type etc and the ai will summarize it into important key notes… I will upload
+  my xray showing my lumbar issues — or I could say what days I have work or my schedule or injuries
+  or medical conditions. And when we use the workout generator or nutrition calculator or anything
+  that requires user information it will read from there and get context too… so say im making a
+  workout — it will read my personal info section; and not recommend heavy lower back lifts… user
+  awareness is what I want."*
+- **Needs:** BF-41 — the document intake pipeline. Not a blocker for the whole entry, only for the
+  upload half; the free-text half and the assembler can ship first and are the larger win.
+
+**Most of this exists, which changes what the work is.** Traced against `main` 2026-09-04:
+
+| the owner's ask | today |
+|---|---|
+| injuries | **`injuries` table, and the workout half of his exact example already ships** |
+| DEXA / RMR | `dexa_scans`, `measured_rmr` + typed forms (BF-71) |
+| blood tests | `blood_panels`, `blood_analytes` (BF-1) |
+| upload a document, have it fill itself in | **BF-41**, queued and promoted twice by the owner |
+| free text — work days, conditions, anything else | **nothing. No store, no surface.** |
+| "anything that requires user information reads from there" | **workouts only** |
+
+**The flagship example is already built and he has not seen it.** BF-68 shipped 2026-08-31 from a
+near-identical request (*"i have a sore lower back, so would rather not heavily loaded lower back
+exercises"*): `generate-program`, `builder-chat` and `coach/options` all read `repo.listInjuries()`,
+and — this is the part that matters — **the exclusion happens on the candidate list, not in the
+prompt**, via `excludeInjuredExercises`. It is a hard rule the model cannot talk itself out of. What
+BF-68 did *not* ship is the UI half: nothing on the wizard says the constraint is active, which is
+exactly why the owner is asking for a feature he partly has.
+
+**So the missing piece is not storage. It is one shared assembler.**
+`packages/shared/src/workout/injury-context.ts` — `formatInjuryContext` — is the prototype: a single
+formatter, exported so a second consumer imports it rather than re-writing it. There is no equivalent
+that gathers *everything* the app knows, and the proof is that **`app/api/nutrition/**` and
+`app/api/ai/**` read none of these stores** — not injuries, not DEXA, not blood, not RMR. Each new
+consumer today means a new hand-rolled gather.
+
+- **Recommendation, in three parts, in this order.**
+  1. **A `user_context` free-text store** — dated, titled, editable notes with a kind
+     (`condition` · `constraint` · `schedule` · `note`). This is the only genuinely new storage, it is
+     small, and it is what unblocks "type anything".
+  2. **A shared context assembler** — one module, the `formatInjuryContext` shape widened, that
+     returns the app's whole picture of the user, and which `generate-program`, `builder-chat`, the
+     nutrition recommender and the AI chat all import. **This is "user awareness"**, and it is glue
+     over stores that already exist rather than new data.
+  3. **The section itself** — a More → User Information screen showing what the app knows, per
+     source, editable. The screen is also the answer to BF-68's missing UI half: a constraint you can
+     see is one you can trust.
+- **⚠ The hard/soft split is the design decision this entry exists to force, and getting it wrong is
+  the failure mode.** A structured record (`injuries`) can be enforced by *filtering the candidate
+  list* — deadlifts are removed, and no phrasing brings them back. Free text can only ever be handed
+  to a model as prose, which BF-68 already found to be *"luck rather than a rule"*. So: **free text
+  and documents are summarised into structured records the owner reviews and can edit**, and it is
+  those records that constrain generation. Prose must never be the only thing standing between a
+  lumbar injury and a loaded deadlift.
+- **⚠ CROP BEFORE UPLOAD — the owner's own rule (BF-1), and an X-ray is the sharpest case yet.** The
+  extraction call sends the image to Google, so *redacting after extraction is too late*. His RMR
+  printouts carry a name and date of birth in the header band; imaging carries the same plus an
+  accession number and often the referrer. The crop step must be the **default path**, shown before
+  anything can be sent, never auto-sending a freshly-picked photo.
+- **⚠ An X-ray is not the same object as a report, and BF-41's pipeline does not cover it.** That
+  pipeline extracts *labelled numbers* from a results printout into an existing form. The useful
+  content of imaging is the **radiologist's findings text**, and what the app needs from it is one or
+  two constraints ("avoid axial loading"), not fields. **BF-41 also decided that no source document is
+  stored** — extract, confirm, save the fields, discard the file — so an image itself has no home
+  today, and giving it one is a separate decision with its own storage, retention and privacy weight.
+  **Do not quietly reverse that decision inside this entry.**
+- **⚠ "What days I have work" is not the existing `schedules` table.** That one is *"which session
+  runs on which day"* — training structure, user-defined, and load-bearing. Availability is a
+  different concept and must not be pushed into it.
+- **Out of scope, and worth stating because medical documents invite it:** the app records and applies
+  what the owner tells it. **No diagnosis, no interpretation of imaging, no medical advice.** A
+  summary of an uploaded report is a restatement for the owner to check, never a finding. The repo's
+  standing AI rule applies with force here — no model-reported value may gate an automatic action or
+  be shown as fact.
+- **Verification:** a typed constraint about the lumbar spine produces a program with no loaded
+  lower-back work *and* a visible reason on the wizard; the same constraint still applies weeks later
+  when the daily engine writes a session (BF-68's point — a builder-only constraint dies at save); the
+  nutrition recommender cites something from this section; and every summarised note is visible and
+  editable at its source rather than only inside a prompt.
+
+
+### [app-shell] BF-117 — a day rollover re-prompts the check-in and refreshes nothing else; Home keeps yesterday until the app is killed
+
+- **Lane:** B — `app/session-select/session-select-content.tsx`. One effect. **No engine change.**
+- **Added:** 2026-09-04 · owner: *"when opening the app after a day has been completed it doesnt
+  reset the screens (I flagged this before) so I need to close and reopen app to get a fresh view."*
+- **Needs:** nothing — the mechanism it uses already ships.
+
+**He did flag it before, and BF-86 deliberately left this half undone pending evidence. This is the
+evidence.** That entry closed the *"should it be a literal reload?"* question (no — BF-80 forbids it,
+and instant paint exists so a repeat open shows data rather than a spinner) and then wrote a scope
+line: *"whether any [today-scoped read] is both persistently mounted and never re-read is the Q-359
+question… subscribing all of them blind would be a large diff justified by a guess."* That caution was
+right. The guess is now unnecessary — the answer is one line, not a sweep.
+
+**The mechanism, traced.** `useLocalDay()` has **three** consumers in the whole app
+(`local-day-provider.tsx`, `workout-day-rollover.tsx`, `session-select-content.tsx`), and inside Home
+it is read at exactly **two** places: line 758 (`loadTodayMood`) and line 788 (the check-in prompt).
+Everything else on that screen — readiness, body battery, training load, `oura-hr-day` — is gated on
+**`refreshTick`**, and `setRefreshTick` is bumped from exactly three places: `refetchAll` (644, 658)
+and the BLE-drain-settled listener (703). **A day change bumps nothing.** The tab shell is persistent
+and never unmounts, so those payloads are the ones fetched at app launch and they stay until the
+process is killed.
+
+**The screenshot is the proof, and it splits cleanly along that line.** Friday 4 September, *"Good
+morning"*, and *"Morning check-in saved"* — the header reads the clock directly and the check-in is
+what BF-86 fixed, so both are correct. Below them, *"Rest Day — you chose to rest today"* and a
+Partial Recovery card citing chest and shoulder soreness: **yesterday's**. The two halves of the same
+screen disagree about what day it is.
+
+- **Recommendation: bump `refreshTick` when `localDay` changes.** This reuses the path pull-to-refresh
+  already takes, so nothing new is introduced and the refresh is one the app performs many times a day
+  already. It satisfies BF-86's objection directly: not a blind subscription of 30 call sites, and not
+  a reload.
+- **⚠ The trap: `localDay` is seeded synchronously**, so an effect keyed on it **fires once at
+  mount** — bumping the tick there would double-fetch every launch. Skip the first run with a ref.
+  This is easy to miss because the duplicate fetch is invisible: it looks like a working app that is
+  slightly slower to settle.
+- **⚠ `sleep-sessions` is NOT one of the `refreshTick`-gated effects**, and the code says so at line
+  700 (Q-91): it is *"read by this screen too (the home HR chart's sleep-window shading) but… nothing
+  ever re-fetched it on this signal."* So the tick alone leaves last night's sleep stale on a
+  rollover — the one read where a day change matters most. Handle it in this entry or state plainly
+  that it is still owed.
+- **Sibling surfaces, worth one check in the same pass:** only three files consume `useLocalDay`, and
+  Health and Nutrition are in the same persistent shell. Home is what was reported and what this entry
+  covers; if either of the others holds a day-scoped read the same way, it is the same fix and should
+  ride along rather than become the next report.
+- **⚠ Do not "fix" this with a reload or a forced remount.** BF-80 and BF-86 both rule it out, and
+  BF-86 adds the reasons that are specific here: an unsynced outbox and an in-progress workout both
+  survive a resume today and are not tested against a scheduled restart.
+- **Verification (device):** leave the app open overnight on the S25 and resume after midnight — the
+  scores, the rest-day card and the recovery card all show today, without a reload, a spinner or a
+  blank frame; resume again ten minutes later and nothing refetches; an in-progress workout and a
+  queued outbox both survive the rollover untouched.
+
+
+### [body] BF-113 — the BMI band is computed from a DEXA-corrected body fat and the card only says "via body fat %"
+
+- **Lane:** B — `app/health/health-sections.tsx:499` (the caption) and `:507` (the info popover).
+- **Added:** 2026-09-03 · owner: *"bmi doesnt say its scaled to match dexa."*
+
+**He is right, and the card is one word short of true.** `latestBf` is
+`metaRecentReversed.map(displayBodyFat)` (`health-content.tsx:545`), and `displayBodyFat` returns
+`bodyFatCorrected ?? bodyFat` — the **DEXA-corrected** value. So the band shown (*High fat* at 27.9)
+is decided by a calibrated figure, and the only thing the card says about it is *"via body fat %"*.
+The info popover is no better: *"Category is based on your body fat % — more accurate for muscular
+builds."* Nothing names the calibration.
+
+**The sibling card already does this properly**, which makes it a sibling-surface gap rather than a
+missing feature. `components/health/body-fat-card.tsx:46` calls `correctedSpan(metaRecent)` and says
+how many of the window's readings carry a correction — a helper written for exactly this
+(`body-fat-display.ts`: *"the two numbers together are what lets a chart say 'the last 4 of 7' rather
+than imply all or none"*).
+
+- **Recommendation: `via body fat % (DEXA-calibrated)` in the caption, and one sentence in the
+  popover** saying the scale reading is corrected to the owner's DEXA before the band is chosen. The
+  value is already correct; this is a labelling change only.
+- **⚠ Use `isCorrectedReading()`, never `bodyFatCorrected !== bodyFat`.** `body-fat-display.ts` warns
+  that an offset can round to zero and *"corrected by 0.0" and "not corrected" are different claims* —
+  and two thirds of the owner's history is on instruments the calibration does not cover, so the label
+  must follow the flag on the reading actually used, not a comparison.
+- **Verification:** the caption names the calibration on a corrected reading and does **not** on an
+  uncorrected one; the number itself is unchanged.
+
+
+### [body][nutrition] BF-114 — two numbers called BMR, 218 kcal apart, on two screens, neither saying which is which
+
+- **Lane:** B for the labelling; no engine change — both values already exist and both are correct.
+- **Added:** 2026-09-03 · owner: *"the BMR in scale is different to home; should probably indicate the
+  difference?"*
+
+**Measured in production 2026-09-03:**
+
+| | value | source |
+|---|---|---|
+| Body tab, "BODY COMPOSITION (SCALE)" → **BMR** | **1,543 kcal** | `body_metrics.bmr_kcal` — the scale's own bioimpedance estimate, re-read every weigh-in (1,545 / 1,542 / 1,543 across three days) |
+| the energy model behind Home's targets | **1,325 kcal** | `measured_rmr`, a single clinical test on **2026-08-27** |
+
+**218 kcal apart — 16%** — and the one the app actually *uses* is the smaller, measured one. Nothing
+on either screen says a word about it, so the more prominent number is the one that governs nothing.
+
+- **Recommendation: label the source on both, and say which drives the targets.** *"BMR 1,543 kcal ·
+  scale estimate"* on the composition card, and wherever the energy baseline is shown, *"from your
+  measured RMR, 27 Aug"*. That is the whole fix: the numbers are right, their provenance is missing.
+- **A tolerance note is worth adding, not a reconciliation.** Bioimpedance BMR and an indirect
+  calorimetry RMR are different measurements of different things; 16% is unremarkable between them.
+  **Do not average them, and do not switch the model to the scale's figure** — the measured value is
+  the better input and Q-401's reasoning (measured beats self-reported or inferred) applies.
+- **⚠ Related but distinct from BF-99**, which was about the *base rate* reading lower than the RMR
+  because the recomp deficit had been subtracted. This is a second pair of numbers entirely; fixing
+  one does not touch the other.
+- **Verification:** both screens name their source; a reader can tell in one glance which figure the
+  calorie targets come from.
+
+
+### [sleep] BF-115 — the hypnogram is missing from the sleep tile's detail, and there are three sleep rows for that date
+
+> **✅ ROOT CAUSE FOUND (2026-09-03, Lane A). The three rows are CORRECT DATA, the storage is fine,
+> and the remaining fix is one import in a Lane B file.**
+>
+> **1. The rows are a night and two naps, not duplicates.** Converted to Brisbane, 2026-09-03 holds
+> `ble:51136441` **22:16 → 06:21** (7.67 h, phase 97 — the real night), `ble:51614985` **11:33 →
+> 13:58** (2.00 h, phase 29) and `ble:51827985` **17:28 → 19:35** (1.83 h, phase 26). A midday and an
+> early-evening sleep. Nothing is wrong with storing them. **19 dates carry more than one row,
+> spanning 2026-05-29 → 09-03**, so this is longstanding, not a regression — and 2026-08-27 in that
+> list is PS-17's own phantom date.
+> ⚠ **These are NOT PS-17's mechanism.** PS-17 blames `ALWAYS_NIGHT_MIN_HOURS = 4` short-circuiting
+> the circadian check; both fragments here are **under** 4 h, so that escape hatch never fired. Same
+> family, different cause — do not close one on the other's evidence.
+>
+> **2. The route is already correct.** `/api/sleep-sessions` runs `mergeByDate`, whose
+> `primaryCluster` keeps the longest row plus anything within `CONTIGUOUS_GAP_MS` (1 h). The 11:33
+> nap sits ~8 h from the night and the 17:28 one ~2 h 41 m before it, so **both are dropped** and the
+> route returns the 7.67 h row with its 97-character phase string. Nothing to fix here.
+>
+> **3. The defect is the LOCAL-FIRST read path, which bypasses that merge entirely.**
+> `health-content.tsx:230` reads `store.getSleepSessions(cutoffStr)` and line 299 pushes the result
+> straight into state — `setSleepRows(localSleep as unknown as SleepRow[])`. **Raw per-cluster rows,
+> never merged.** So the sheet receives all three, finds the entry for the date, and lands on a
+> fragment whose 29- or 26-character phase string and tiny stage hours fail both the hypnogram
+> condition and the proportion-bar fallback. That is exactly the reported symptom.
+>
+> **This is also why it is device-only and why two surfaces disagree.** `getLocalStore` returns null
+> in the web sandbox, so on `pnpm dev` the sheet only ever sees the merged server rows and the bug is
+> invisible; on the APK the local seed paints first. The Body tab's card is fed through a path that
+> does merge, which is the "two surfaces, same date, different rows" the entry noticed.
+> **The `as unknown as SleepRow[]` double cast the entry flagged is the enabling mistake** — it
+> silences the fact that a local row and a merged `SleepRow` are different things with different
+> semantics, not just different shapes.
+>
+> **The fix, and it is small: run the local rows through the same `mergeByDate` before setting
+> state.** It is already exported from `lib/sleep/merge-sessions.ts` and importable from client code,
+> so no Lane A change is needed — this is One Formula, One Place, with the second caller simply
+> missing. **Re-laned to B**: the only edit is in `app/health/health-content.tsx`.
+> ⚠ Check the other three consumers of `/api/sleep-sessions` for the same local-seed shape while
+> there — `session-select-content.tsx` (3 sites) and `health/sleep/sleep-content.tsx` (2 sites) —
+> that is the sibling sweep this belongs to.
+>
+> **Not verified:** the device. The reasoning above is read from source and from production rows;
+> that the sheet renders correctly once merged is BF-115's own device check, unchanged.
+
+- **Lane:** B — **re-laned 2026-09-03.** It was A while the duplicate rows were unexplained; they
+  now are, the storage is correct and the route is correct, and the only edit left is one import in
+  `app/health/health-content.tsx`.
+- **Added:** 2026-09-03 · owner: *"the sleep hypnogram still does not work on days when accessed from
+  the sleep tile."* Screenshot: the detail sheet for 2026-09-03 showing every stat and **no Sleep
+  Stages section at all** — neither the hypnogram nor the proportion-bar fallback.
+
+**The lead, found while tracing and not previously recorded: `sleep_sessions` holds THREE rows for
+2026-09-03.** Phase-string lengths **97, 29 and 25**, deep-sleep hours 0.67 / 0.75 / 0.33. All three
+carry a `sleep_start`, a `sleep_end` and a non-null phase string. The 97 is the real night (7h40m ≈ 92
+five-minute buckets); the other two are short fragments.
+
+**So this is very likely a row-selection problem, not missing data.** The sheet takes
+`sleepReadings={[...sleepRows]}` and finds the entry for a date; with three rows sharing that date,
+which one it lands on decides what renders. **This was not confirmed from the sandbox** — the
+selection path was not read to the end, and it should be the first thing an implementer checks rather
+than assumed.
+
+- **The render condition is `r.sleepPhase5Min && r.sleepStart && r.sleepEnd`**
+  (`health-metric-sheet.tsx:246`), with a proportion-bar fallback at `stageTotal > 0`. **Both failed**,
+  which is the informative part: the chosen row had no usable phase string *and* no stage hours, while
+  the Body tab's own sleep card on the same screen shows Deep 0.7h / REM 2.1h / Light 4.9h / Awake
+  0.4h. Two surfaces, same date, different rows.
+- **⚠ Ask why there are three rows before making the sheet pick better.** A per-date duplicate is a
+  storage question — naps, a re-drain writing a second session, or an upsert key that does not hold —
+  and a UI that picks the longest row would hide it. Whether the fragments are real short sleeps or
+  artefacts decides whether the fix is selection or de-duplication.
+- **⚠ `health-content.tsx:299` seeds these rows from the local store through
+  `as unknown as SleepRow[]`** — a double cast that silences the type checker, so a shape mismatch
+  between the local table and `SleepRow` would be invisible at compile time. Worth checking as part of
+  this even if the duplicates turn out to be the whole story.
+- **Verification (device):** open the sleep tile on a date with more than one session — the hypnogram
+  renders and matches the stage hours the Body tab's card shows for the same night; a date with a
+  single session is unchanged; and a date whose only row genuinely lacks phase data falls back to the
+  proportion bar rather than showing nothing.
+
+
+### [app-shell] BF-116 — the header chips now overflow into the action buttons, because BF-96 made every item unshrinkable
+
+- **Lane:** B — `app/session-select/session-select-content.tsx:1058-1063` (the header row).
+- **Added:** 2026-09-03 · owner: *"the grid and battery pill still intersect."* Screenshot: `86%`
+  sitting under the reorder-sections grid icon.
+
+**"Still" is the important word, and the cause is the previous fix.** BF-96 shipped
+`whitespace-nowrap shrink-0` on the weather chip on 2026-09-01, correctly: it was the row's only
+compressible item and took 100% of any shortfall, so `UV 5` broke at its own space and the pill went
+two lines tall. `device-battery-chip.tsx:50` carries the same pair, and the date at `:1059` already
+did.
+
+**Every item in that row is now `shrink-0`, so the shortfall has nowhere to go.** It used to wrap;
+now it overflows. The row is `flex items-center gap-2` inside a `flex-1 min-w-0` column, with the
+action group beside it as `flex-none` — and `HeaderChips` returns a **bare fragment**, so there is no
+wrapper to constrain, truncate or scroll. Content spills past the column and crosses the buttons. On
+2026-09-03 that is `Thursday 3 September` + weather + a ring battery chip, which is one chip more than
+the row was ever laid out for (Q-111 added device chips on 2026-09-02, the day after BF-96).
+
+- **⚠ Do not solve it by removing `shrink-0`** — that restores the two-line wrap BF-96 fixed. The row
+  needs an **overflow strategy**, not more or less shrinking.
+- **Recommendation: let the date be the thing that gives.** It is the least informative item, it is
+  the longest, and its length is what varies — `EEEE d MMMM` runs 12–20 characters across the year,
+  which BF-96 already identified as the variable that runs the row out of width. Drop its `shrink-0`
+  and give it `truncate` with a `min-w-0` parent, so a long date shortens while the chips stay whole.
+  A shorter format on narrow widths is the alternative and reads worse.
+- **The chips will keep arriving** — ring and strap ship today, the scale deliberately has none
+  (`header-chips.tsx:17`), and anything else with a battery is a candidate. A row that only fits
+  today's count is the same bug scheduled for later, so whatever is chosen should hold for three
+  chips.
+- **Verification (device, at the S25 width):** on the longest weekday-plus-month combination
+  (`Wednesday 30 September`) with weather and two device chips present, nothing crosses the grid icon
+  and no chip wraps to a second line; with one chip and a short date, the layout is unchanged.
+### [nutrition] BF-112 — enter an actual dose: the storage for retatrutide is finished and there is still no field to type it into
+
+- **Lane:** B — the supplements manage sheet and `supplements-section.tsx`. **Engine work: none.**
+  Stage 1 shipped 2026-09-01 (migrations 254 + 255, local SQLite v34) and every column this needs
+  already exists.
+- **Added:** 2026-09-03 · owner: *"i havent seen the retatrutide tracking section yet can you tell me
+  how its progressed?"* — a question, and the answer is that his half has never been built.
+- **The design is settled** in [`docs/superpowers/plans/2026-09-01-dosed-substance-exposure.md`](superpowers/plans/2026-09-01-dosed-substance-exposure.md)
+  §5 and §6 stage 2, and is not re-litigated here. This entry exists so the work is **startable**
+  rather than only described.
+
+**⚠ Why this is a new entry and not another line on BF-69.** BF-69 carries a `Keep:` and therefore
+prints under **KEEP — "shipped; only the stated residue is owed. Not new work."** That is true of the
+*storage*, and the residue it names is **stages 2, 3 and 4 — the entire user-facing feature**. An
+implementer working the queue top-down sees "not new work" and moves on, which is why two months of
+engine work has produced nothing the owner can use. Same failure shape as the `Verify:` misuse
+corrected on 2026-09-02: a field that means *finished* attached to something unfinished.
+
+**Measured in production 2026-09-03, and it is stark:**
+
+| | live |
+|---|---|
+| supplements defined | **2** — Fish Oil, Vitamin D |
+| `default_amount` / `unit` on either | **neither** |
+| `started_on` / `stopped_on` / `dose_prompt` | **null / null / false** on both |
+| `supplement_logs` rows, all time | **1** — Vitamin D, **2026-06-21** |
+| rows carrying an `amount` | **0** |
+| retatrutide | **not in the table** |
+
+The columns BF-3 and BF-69 added are all present and all empty, because nothing in the UI can write
+to them. The last supplement log of any kind is from June.
+
+**What stage 2 is, from the plan — this entry does not redesign it:**
+
+- an **amount + unit** on the supplement definition (the manage sheet has no such field today);
+- **`dose_prompt`** as a single boolean on the definition — the owner's *"selection first to choose
+  dosage"*. Creatine is 5 g every time; retatrutide titrates, so a prompted log asks for the number at
+  log time. **One flag, not a second flow**: a prompted log is still one contribution row, only the
+  source of the number differs;
+- `started_on` / `stopped_on`, so a drug that was started and stopped reads as a window rather than as
+  a gap in the logs — the plan's §2 presence model, where *"unknown is a real answer"*;
+- **`supplements-section.tsx` rendering `loggedAmount`**, which `listSupplements` already returns beside
+  `loggedDose`. The two are different questions — what a past log recorded against what the definition
+  says now — and freezing the first was the whole point of BF-3's gap 1.
+
+- **⚠ Do not touch `loggedToday`.** It tracks the **manual** contribution only, deliberately: it is the
+  tick's checked state, and a meal-sourced dose turning it on leaves a control that refuses to turn
+  off. Stage 1's comment says so; it is easy to "fix" and hard to notice.
+- **Stage 3 (meal attachment) is not part of this** and stage 4 (the trends overlay) is gated on data
+  the owner cannot produce until this ships — the plan says a series needs **~4 weeks** of real
+  amounts. **So this entry is the thing standing between the feature and its own evidence**, which is
+  the argument for its queue position rather than its size.
+- **Out of scope, and worth restating because the substance invites it:** the app records what was
+  taken. No dosing guidance, no interaction checking, no titration schedule generation. Any
+  correlation stays an observation on n=1 with a dozen confounders, shown as a number, never as a
+  claim about cause.
+- **Verification:** define a supplement with an amount and a unit; tick it and the log carries that
+  number; turn on `dose_prompt`, tick it, and it asks — the entered number lands on the log and not on
+  the definition; change the definition's amount afterwards and the earlier log still reads what it
+  recorded (BF-3 gap 1, and the reason the stamp is on the log); set `started_on`, and a date before it
+  reads as outside the window rather than as a missed dose.
+
 
 ### [app-shell][platform] BF-110 — the blank resume survives a scroll, which means the renderer never died
 
@@ -1437,6 +1974,61 @@ gates — and it is the reason the parked count still overstates blocking after 
 
 ### [platform] BF-92 — Sentry is connected, correctly written, and receiving nothing from the client
 
+> **✅ THE CODE HALF SHIPPED 2026-09-03 (Lane A). The device check is what remains, and it is the
+> whole gate.** `next.config.ts` now wraps the config in `withSentryConfig` with
+> `tunnelRoute: '/monitoring'`, so the browser POSTs **same-origin** — which `connect-src 'self'`
+> already permits — and Next rewrites it on to `*.ingest.sentry.io`. **No CSP edit**, per this
+> entry's own recommendation ①, so the next edit to `lib/security/csp.ts` cannot silently break it
+> again.
+>
+> **✅ THE AUTH-GATE QUESTION IS DECIDED (2026-09-03): the tunnel stays BEHIND the gate.** The owner
+> delegated the call. What settled it is that **the reported defect is fixed either way** — a
+> signed-in request falls through `middleware.ts` without a redirect, so the tunnel works for every
+> session, and BF-92's 13 days of silence happened while the owner was signed in. Excluding the path
+> would only have added errors from the **sign-in screen**, which is a bonus rather than the fix.
+>
+> Against that: exclusion makes `/monitoring` an unauthenticated relay. The SDK installs it as a Next
+> *rewrite*, so `?o=<org>&p=<project>` are caller-supplied and anyone could forward an envelope to
+> another Sentry project through this domain. ⚠ **Note what that is and is not** — it is bandwidth
+> and reputation, **not** extra exposure of our own project, whose DSN already ships in every client
+> bundle by design. Small either way, and one line either way; the deciding argument is that a new
+> unauthenticated surface should not be taken for a speculative bonus.
+>
+> **What this costs, stated plainly: errors on the sign-in path are still uncaptured** — by Sentry
+> now, and by `/api/client-error` always, since that route requires auth. The first-run APK flow that
+> `middleware.ts`'s own comment records as fragile therefore still has no reporting.
+> **To revisit, the evidence to look for is a sign-in failure nobody can diagnose**; adding
+> `monitoring|` to the matcher's negative lookahead is the whole change.
+> `sentry-tunnel-reachability.test.ts` now pins the gated state, so reintroducing the exclusion is a
+> deliberate decision rather than a tidy-up.
+
+> **The middleware was a second, undiscovered instance of the same bug.** `/monitoring` fell inside
+> `middleware.ts`'s matcher and is in no `PUBLIC_PATHS`, so an unauthenticated report would have
+> been 307'd to `/sign-in` and dropped — the identical silent drop, moved from the CSP to the auth
+> gate. It is excluded from the matcher now. That is a genuine **widening**: `/monitoring` is
+> reachable without a session. ⚠ **Owner-visible trade-off** — it buys the errors most worth having
+> (the sign-in path has no session by definition, and `/api/client-error` requires auth, so it has
+> never captured one), and it costs a relay that could forward an envelope to another Sentry project
+> via this domain. No data of ours, no auth surface, no database; the rewrite's destination host
+> pattern is fixed by the SDK. One line to revert if the owner would rather not.
+>
+> Also: recommendation ③ shipped — `sentry.server.config.ts` logs one line at boot naming whether
+> **each** DSN was found (the server process can read the `NEXT_PUBLIC_` one too, so one server log
+> covers the path that has no log of its own). The DSN value itself is never printed.
+>
+> **Verified in the sandbox, end to end at the artefact level, not by intent:** a real `pnpm build`
+> emits the tunnel rewrite into `routes-manifest.json` (`afterFiles`, with both the region and
+> non-region variants) and bakes `_sentryRewritesTunnelPath="/monitoring"` into the client chunks;
+> the built `middleware-manifest.json` regex carries the `monitoring` exclusion. ⚠ **The first read
+> of this said the rewrite had NOT landed — it was read from `beforeFiles`, which is empty. Check
+> `afterFiles`.** `lib/security/__tests__/sentry-tunnel-reachability.test.ts` holds all of it
+> (mutation-checked: reverting the matcher fails it), including an assertion that no Sentry host
+> reappears in `connect-src`, since that would mean somebody had reverted to the shape that broke.
+>
+> **NOT verified: that an event actually arrives.** That needs the APK and a deliberate throw — it is
+> the `Gate: device` below, unchanged, and it is still the only thing that proves this.
+> [`journal`](overview/entries/2026-09-03-sentry-client-tunnel.md).
+
 - **Lane:** A — `lib/security/csp.ts` and the Railway environment. No application code is wrong.
 - **Added:** 2026-09-01 · owner: *"have a look into sentry.io we did connect this and have it
   working. not sure if its being used."* The first half is right — it is connected and the
@@ -1644,6 +2236,12 @@ two screens, and a user who sets one has no way to know the other exists.
   without the reset** — on the first resume of a new day the app re-prompts and re-reads, and on any
   other resume it does nothing. If the owner still wants a literal restart after using it, that is a
   new entry with that experience as its subject, not this one.
+- **⚠ 2026-09-04 — the deferred half came back as a report, and BF-117 owns it.** The scope line
+  below was right to wait for evidence rather than subscribe 30 sites blind; the owner supplied it
+  (*"opening the app after a day has been completed… I need to close and reopen"*). The answer turned
+  out to be narrow: Home gates its data effects on `refreshTick`, which a day change never bumps, so
+  one bump does what a sweep would have. Nothing in this entry changes — the reload is still refused
+  and the check-in half is still shipped.
 - **Keep — the today-scoped read surface is NOT swept, and that is a scope line rather than an
   oversight.** ~30 `cachedFetchToday` call sites and 59 `readTodayCacheSync` sites exist; both already
   treat a past-dated entry as a miss, so they are correct **whenever they run**, and most sit behind
@@ -3210,6 +3808,12 @@ a finding — it does not by itself explain a plain `GET` hanging beside it.
 
 ### [nutrition][platform] BF-69 — dosed substances are stored but nothing reads them; make exposure an analysable variable
 
+- **⚠ 2026-09-03 — STAGE 2 IS NOW ITS OWN ENTRY, BF-112, because this one prints under KEEP.**
+  A `Keep:` line files an entry as *"shipped; not new work"*, which is true of the storage and false
+  of the feature: the residue named below is the entire user-facing half. The owner asked how
+  retatrutide tracking had progressed and the answer was that his part had never been built — two
+  months of engine work, and production still holds 2 supplements, no amounts, and one log from June.
+  Stage 2 is startable Lane B work and now says so. Stages 3 and 4 remain below.
 - **Keep — STAGE 1 SHIPPED 2026-09-01 (migrations 254 + 255, local SQLite v34). Stages 2-4 are what
   is owed, and stage 2 is the one that matters.** The storage half is done: `supplement_logs` is
   contribution-rows now (its whole-day `unique (supplement_id, log_date)` is gone, replaced by a
@@ -6852,6 +7456,25 @@ without a queue entry is a dropped finding.*
 
 
 ### [sleep][platform] LB-53 — `oura_daily_derived` is written in occasional bulk passes, not per night
+
+> **✅ THE QUESTION THIS ENTRY SAID TO MEASURE FIRST IS ANSWERED (2026-09-03): the scores go STALE,
+> they are not ABSENT.** `created_at` on `oura_daily_derived` runs one row per day, each created the
+> day after the night it describes — 2026-08-22 created day 08-23, 08-23 created 08-24, unbroken
+> through 2026-09-02 creating 09-03 — with one catch-up of 5 rows on 2026-08-17. So a row exists from
+> the morning after, and it then holds its first value until a bulk pass rewrites it. Nothing was
+> missing during the nine-day gap. **That settles which of the two failure modes this is**, and it is
+> the less alarming one: no screen was ever blank, but a screen could show a days-old score.
+>
+> **The "four stamps in the whole history" reading is stale and the shape is different now.** As of
+> 2026-09-03 there is a bulk pass at **07:00:15Z** rewriting ~30 days in a single ~50 ms burst, and a
+> single-row write at **08:00:09Z** for that day only. So both cadences exist — an incremental
+> per-day write and an occasional whole-history rewrite. Re-read the stamps before building; this
+> entry's table was one snapshot.
+>
+> **The deploy hypothesis is NOT confirmed and should not be carried as if it were.** The 21:55 pass
+> landing minutes after #827 is one coincidence, and today's 07:00:15 bulk pass does not line up with
+> a merge (#838 merged 07:49, #839 later). Whatever schedules the bulk pass, a deploy is not
+> obviously it. Establish the trigger before designing around it.
 
 - **Lane:** A — the rollup (`lib/oura-ble/rollup/**`) and whatever schedules it. Found from Lane B
   while checking Q-529's own caveat; filing rather than building, per the lane rule.
@@ -10954,6 +11577,103 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [platform][devices] LA-56 — the full-history redecode has never once completed, and "abandoned" is a guess
 
+> **⚠ MEASURED 2026-09-03 — "abandoned" is NO LONGER a guess, and the workaround does not work
+> either.** The entry hedged because `reapStaleRedecodeJobs` is a pure `started_at` age check with no
+> heartbeat, so a reaped job might have been slow rather than dead. Production settles it.
+>
+> **`replaceOuraDailySummary` — the full-history write path — is `DELETE` all rows + `INSERT` all
+> rows in one transaction.** So a completed full-history pass leaves every row sharing ONE
+> `created_at`. That is the measurement this entry was missing, and it needs no instrumentation.
+>
+> | reading, 2026-09-03 08:35Z | value |
+> |---|---|
+> | `min(created_at)` on `oura_daily_summary` | **2026-08-17 07:50:31Z** |
+> | distinct `created_at` stamps across 59 rows | **17**, not 1 |
+> | `max(updated_at)` | 2026-09-03 06:59:31Z — *before* the 08:00 attempt started |
+>
+> Seventeen stamps means the table has been assembled night by night by `upsertOuraDailySummary`
+> ever since. **The last full-history redecode that completed was 2026-08-17**, which is exactly the
+> pass Q-535 measured at `scanned=1098158`. Since then there have been **three attempts and three
+> nothings**: the async jobs of 2026-08-30 and 2026-09-03 03:00 (both reaped at 30 minutes, no rows),
+> and the owner's **synchronous** run at ~08:00 on 2026-09-03, which had written nothing 35 minutes
+> later. The synchronous path is the documented workaround, and it is now measured not to work.
+>
+> **⚠ This retires the standing advice.** Both this entry and `projectOverview.md`'s
+> **Waiting on the owner** row told the owner to run the synchronous path "once only" because its own
+> note recorded it completing behind the 502. That note was true **on 2026-08-17** and is not true
+> now. Do not send anyone to that workaround again until this is understood.
+>
+> **The regression window is one day wide, and there is a candidate.** The last success was
+> 2026-08-17; the packing work landed **2026-08-18** — `oura_raw_packed`'s first pack carries that
+> date, and Q-541 Task 7 made `measured_at`/`event_name` derived the same day, removing the row-walk
+> that used to dominate. So the re-aggregate now reads a store that did not exist when it last
+> succeeded. **State this as a lead, not a cause** — it is a correlation across a model change, which
+> is the trap `docs/data-layer-rules.md` names; nothing here has profiled the re-aggregate.
+> **The next step is a measurement, not a fix:** run the full-history re-aggregate against a copy
+> with timing per phase, or add phase timings behind the existing job row, and find where it stops.
+> The heartbeat this entry already owes would answer "is it alive?" for free, which is now the more
+> valuable half of it rather than the optional one.
+>
+> **Not yet checked:** whether the process is alive and slow, or dead. Distinguishing those is
+> precisely the heartbeat, and until it exists this measurement says only that the work does not
+> land, never why.
+> **✅ ANSWERED THE SAME SESSION — the rollup worker is losing its DATABASE CONNECTION, and
+> `error_events` had it the whole time.** The session-start ritual read turned up a live fault four
+> minutes after the owner's 08:00 attempt:
+>
+> ```
+> url:     /api/oura-ble/samples#aggregate
+> at:      2026-09-03 08:04:43Z
+> message: Failed query: select "started_at", "completed_at" from "workout_sessions" …
+>            caused by: Connection terminated due to connection timeout
+>            caused by: Connection terminated unexpectedly
+> stack:   at Worker.<anonymous> (/app/.next/server/chunks/1706.js)
+> ```
+>
+> `at Worker.<anonymous>` places it **inside the rollup worker thread**. The only other fault ever
+> recorded at that url is **2026-08-17 11:33** — the same cause chain, hours after the last
+> full-history pass that ever completed. Two data points, both bracketing the regression.
+>
+> **The cause chain is the diagnostic, and it exists because someone already fixed the blind spot.**
+> `rollup-worker-entry.ts`'s `msg()` walks `.cause` precisely because on 2026-08-17 a redecode failed
+> three times and the only recoverable detail was the SQL text. Without that walk this entry would
+> still be guessing.
+>
+> **Two candidate mechanisms, and this does NOT choose between them:**
+> 1. **The worker's event loop is blocked long enough for the connection to die.** The full-history
+>    pass decodes ~1M samples in JS *inside the worker*; a pg client that cannot service its socket
+>    gets dropped, and the next query finds a dead connection. `Connection terminated unexpectedly`
+>    is that shape, not a statement timeout (which reports as *canceling statement*).
+> 2. **Pool self-contention.** `connectionTimeoutMillis: 5_000` against `max: 10`, and the worker
+>    has its **own** pool — a worker thread carries its own module registry, so `getPool()` there is
+>    a second Pool, not the main process's.
+>
+> **Ruled out: the Postgres server.** `max_connections` is **500** with **11** in use. This is
+> client-side, inside our own pool, not the instance.
+>
+> **What this changes about the fix.** The heartbeat this entry owes would report the run as dead
+> rather than merely stale — worth having — but it treats the symptom. The pass is dying on
+> infrastructure ceilings (`statement_timeout: 15_000`, `idle_in_transaction_session_timeout: 15_000`,
+> `connectionTimeoutMillis: 5_000`) that a whole-archive walk cannot respect. ⚠ **Those three
+> settings are load-bearing and must not simply be raised** — `CLAUDE.md`'s pool section records that
+> both took production down in session 165. The direction is to make the pass fit the ceilings
+> (chunk the read, release the connection between chunks) rather than raise them for everyone.
+>
+> **Still not checked:** which of the two mechanisms it is. That wants a timed run, and it is the
+> next measurement.
+
+> **✅ THE REPORTING GAP THAT HID THIS IS CLOSED (2026-09-03, shipped).** Tracing why the 07:00 pass
+> rewrote 84 derived rows while leaving `oura_daily_summary` untouched found the reason there was no
+> trace at all: **`step()` catches, so the rollup never throws, so the callers' `.catch` — the only
+> reporting either had — can never fire.** A failed sleep/summary/illness/resilience write reached
+> Railway stdout and *nothing else*: not `error_events`, not Sentry, not the job row. `error_events`
+> saw rollup faults only when the whole worker died, which is the rarer half.
+> `lib/oura-ble/report-step-errors.ts` now reports `stepErrors` from **all three** callers — ingest,
+> async redecode, and the synchronous redecode, which is the most blind of them because its 502 means
+> the caller never receives the JSON carrying `stepErrors` at all.
+> **This does not fix the redecode**; it means the next failure names itself instead of being
+> reconstructed from `created_at` arithmetic, which is how this entry got here.
+
 - **Branch:** `fix/redecode-job-heartbeat` · **Lane:** A
 - **Added:** 2026-09-02 · found when the owner ran the pass TN-1 and Q-525 have been waiting on.
 - **Measured — every attempt that has ever existed has failed the same way.** `oura_redecode_jobs`
@@ -11013,7 +11733,54 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Verify:** device
 - **Gate:** owner
 
+### [readiness][devices] LA-57 — night HRV roughly DOUBLED at the re-key, and only its presence was ever checked
+
+- **Lane:** A — `lib/oura-ble/rollup/**` and the decoder that produces `hrv_avg_ms`.
+- **Added:** 2026-09-03 · found while closing Q-509's candidate 3 ·
+  [`review`](reviews/2026-09-03-recovery-index-remainder-and-hrv-step.md)
+- **Measured.** `claude_ro.body_metrics` either side of the 2026-07-07 re-key: mean HRV
+  **26.9 ms (Cloud, n=14) → 55.9 ms (BLE, n=59)**. Per night, pre-boundary values run **20–39** and
+  post-boundary **40–56**, with no return and no overlap to speak of. A doubling within days is a
+  measurement-definition change, not physiology.
+- **Why it survived six weeks of looking.** The BLE input-drift review
+  ([2026-08-18](reviews/2026-08-18-ble-era-input-drift.md)) checked `hrv_avg_ms` for **presence**
+  (18/18 rows) and never for **scale**. A column that is populated on every night looks healthy.
+- **Why it matters.** `hrv_avg_ms` feeds the readiness composite's `hrvBalance` **and** the rolling
+  personal baseline. The baseline absorbs a level shift eventually — but for the weeks it took, a
+  Cloud-scaled baseline was compared against BLE-scaled inputs, which produces systematically high
+  HRV z-scores. **Whether that happened, and over how many nights, is not answered.** That is the
+  first thing to establish.
+- **The likely mechanism is already a named trap in `CLAUDE.md`:** *"HRV used `Sdnn` instead of
+  `Rmssd`"*. Verify which statistic each side computes against the pinned sources — the `open_oura`
+  Rust source for the BLE decoder, the archived Cloud field for the other — rather than assuming.
+- **⚠ Do NOT "correct" the BLE scale to match Cloud without deciding which is right.** RMSSD and SDNN
+  are both legitimate; the defect is two scales behind one column and one baseline, not the value of
+  either. A rescale is also a rewrite of stored history, which is the destructive half.
+- **Not yet checked:** the mechanism, the number of nights affected, and whether
+  `sleep_sessions.average_hrv_ms` and `oura_daily_derived` carry the same step.
+- **Verify:** device
+
 ### [devices][readiness] Q-509 — the BLE-era Recovery Index refit lands at 3.31 h against a shipped anchor of 5: the input moved, not the physiology
+
+> **⚑ CANDIDATE 3's NATURAL READING IS REFUTED (2026-09-03) —**
+> [`review`](reviews/2026-09-03-recovery-index-remainder-and-hrv-step.md). If the remaining ~0.39 h
+> were *a real change over the six weeks*, the series would be moving. Over **58 BLE-era nights** it
+> is flat: OLS slope **−0.0055 h/night**, Pearson **r = −0.060** (r² = 0.004), halves 2.803 → 2.612
+> against a per-night sd of ~1.59. The remainder was there on the first BLE night and has not grown.
+> **This needed no reconstruction harness** — the question is about a series, not a night.
+> ⚠ It does **not** refute candidate 3 outright: a change that happened **at** the re-key and then
+> held reads flat too. What is excluded is a *gradual* six-week change.
+>
+> **And the inputs did step at the re-key.** `body_metrics` either side of 2026-07-07: RHR
+> **65.7 → 53.8 bpm**, HRV **26.9 → 55.9 ms**. Per night, pre-boundary HRV runs **20–39** and
+> post-boundary **40–56**, never returning. ⚠ **The RHR half is NOT clean** — it was already falling
+> through late June (70 → 61), so some of that is plausibly real; the **HRV** step is the sharp one
+> and the one coincident with the device change.
+>
+> **Both prohibitions are strengthened, not weakened: do not widen `MEDIAN_WINDOW`, do not move
+> `RECOVERY_INDEX_OPTIMAL_HOURS`.** The entry's title is now supported by a second independent
+> measurement rather than the anchor-ratio argument alone, and a constant moved to absorb an
+> input-scale change bakes the change in.
 
 - **Branch:** `fix/ble-recovery-index-hours-bias`
 - **⚑ TWO OF THE THREE REMAINING CANDIDATES ARE NOW CLOSED (2026-09-02)** —
@@ -11149,6 +11916,13 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 - **Branch:** `feat/instrument-provisional-anchor` (low priority; **nothing to change in scoring**)
 - **Plan:** none yet — **Lane A implements; Tuning proposes only.**
+- **Reference:** its own **First action** is *"none in scoring"*, so there is nothing to build today
+  and it should not head Lane A's work list — it was standing at **#3 READY** on 2026-09-03, which is
+  how a "do nothing unless" entry gets picked up and built anyway. The durable value here is the
+  **⚠️ PROTECT THIS** warning: the sleep and readiness scales being comparable is now load-bearing for
+  Body Battery, so lifting the sleep distribution back toward its old mean re-opens an owner-reported
+  bug in a different pillar. **Re-promote to work the moment the flip is reported again** — the build
+  is then the instrumentation named below, and it is small.
 - **Added:** 2026-08-18 · Tuning agent ·
   [`docs/reviews/2026-08-18-battery-anchor-discontinuity.md`](reviews/2026-08-18-battery-anchor-discontinuity.md)
 - **Why it exists:** the audit of "did the sleep recalibration miss any consumer of the sleep scale?"
@@ -12364,6 +13138,34 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [platform][readiness] Q-278 — a score that could not be computed is rendered identically to a score of 76
 
+> **✅ THE OPEN QUESTION IS ANSWERED (2026-09-03, Lane A) — and the answer is that it is the wrong
+> question to encode.** The ⚠ below asks *"decide whether they are pillars before generalising a
+> coverage representation over five of them"*. **Don't decide. Key the representation on the metric
+> the caller is rendering, not on a fixed pillar list.** A tile asking "why is there no daytime-stress
+> value today?" gets an answer without anyone having to rule on whether daytime stress is a pillar,
+> and a sixth metric later costs nothing. Enumerating pillars in a type forces a taxonomy ruling that
+> has no consequence for the user and would have to be re-litigated the next time a metric is added.
+> Cheap to reverse — it is a type shape, not a schema.
+>
+> **Verified against the code, so the implementer does not repeat it:**
+> - `lib/health/score-availability.ts` is **74 lines** and readiness-only, exactly as the entry says.
+>   `scoreAvailability(present)` reports which *inputs* fed a score that **was** computed; there is no
+>   representation for "no score exists for this day". The premise holds.
+> - **Its only real consumer is `lib/health/readiness-payload.ts:708`**, which flattens it into four
+>   response fields (`inputsAvailable`/`inputsMissing`/`scoreConfidence`/`limited`).
+>   `components/health/readiness-breakdown.tsx` imports the `ReadinessInputKey` *type* only. So the
+>   blast radius of generalising it is one route payload, not a sweep — smaller again than the ⚠
+>   already made it.
+> - **Scope item 3 is half-built already.** `provisional` (computed from a cold baseline) exists
+>   **per contributor** in `readiness-composite` and is read by `packages/shared/src/health/score-audit/readiness.ts`.
+>   The absent/provisional distinction therefore needs promoting to the metric level, not inventing.
+>
+> **⚠ The real risk on this entry is a taxonomy nothing can populate.** The obvious design is an
+> absence-reason enum (`no_source` / `awaiting_baseline` / `below_gate` / `not_yet`). Before writing
+> one, check that each producer can actually distinguish those cases at the point it returns null —
+> for the activity score it is not obvious that it can. **Build the enum from what the producers can
+> report, not from what reads well**, or the UI gains a "why" field that always says the same thing.
+
 - **Branch:** `feat/score-coverage-surfacing`
 - **Plan:** none yet
 - **Added:** 2026-08-15 · from the comprehensive review §1.1
@@ -12412,8 +13214,45 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [workouts][readiness] Q-279 — ACWR drives two user-facing behaviours on evidence that has substantially collapsed
 
+> **⚑ MEASURED BEFORE BUILDING (2026-09-03, Lane A) —**
+> [`review`](reviews/2026-09-03-acwr-ewma-day-shift.md). Piece 2 is *"a contained change to one
+> shared function"*, which is true of the code and not of the consequence: ACWR drives two
+> user-facing behaviours, so the standing rule applies — **a proposal is incomplete until it states
+> how many other days it moves.** Over the owner's real history, 95 comparable days:
+>
+> | | mean | median | max |
+> |---|---|---|---|
+> | coupled (current) | 0.919 | 0.955 | 1.594 |
+> | uncoupled EWMA | 0.955 | 0.967 | **1.512** |
+>
+> | threshold | coupled | uncoupled | days that **change** |
+> |---|---|---|---|
+> | early-deload 1.2 | 12/95 | 15/95 | **19** |
+> | taper 1.5 | 4/95 | **1/95** | 5 |
+> | band floor 0.8 | 67/95 | 74/95 | 13 |
+>
+> **The scales agree, which is the load-bearing result: no threshold has to move with the switch.**
+> A formulation change that shifted the mean would have forced `lowMax`, `EARLY_DELOAD_ACWR_MIN` and
+> `ACWR_TAPER_START` to be recalibrated together — a far larger proposal than this entry describes.
+> **But ~20% of days flip at the deload boundary**, in both directions.
+> **The sharpest question is the taper: 4 firings become 1.** The EWMA's max is 1.512 against 1.594
+> — its weighting damps exactly the single-heavy-session spike the taper reacts to. Whether that is
+> the fix or the loss is the owner's call and is not decidable from here.
+> ⚠ **Do not read this as "the new number is more correct".** The uncoupled form removes the
+> *mathematical coupling* — the one criticism not in dispute — and does **nothing** for ACWR's
+> predictive validity. It is not evidence the card should fire more or less often.
+>
+> **Premise refinement:** the entry says *"naive 7:28"*. Chronic divides by the **observed span in
+> weeks**, not a flat 4 (the flat ÷4 was retired for inflating ACWR ~2× on new programs); the 28-day
+> bound comes from the caller (`readiness-payload.ts:339`, `getWorkoutSessionsFrom(from28dDate)`).
+> The coupling criticism is unaffected — acute is still contained in chronic — but there is no `/ 4`
+> to go looking for.
+>
+
 - **Branch:** `feat/acwr-ewma-and-copy`
 - **Plan:** none yet · **has an owner-decision component** (the copy change)
+- **Gate:** owner — the EWMA switch moves ~20% of days at the deload boundary and turns 4 taper
+  firings into 1. Measured 2026-09-03, so this is a decision with numbers rather than a guess.
 - **Added:** 2026-08-15 · from the comprehensive review §2.2
 - **Lane:** A — derived 2026-08-31 by the path rule while selecting Lane B's next item: it names `lib/health/readiness-payload.ts`, which three API routes reach.
 - **Where it bites.** `computeVolumeAcwr` (`@trainingai/shared/ai-periodization/acwr`) implements the
@@ -12742,6 +13581,52 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [platform][devices] Q-250 — an Android emulator job in CI, to close the 17 rows that need an Android runtime and nothing else
 
+> **⚑ FOUR REAL RUNS, 2026-09-03 — three defects fixed, the job still does not pass, and the
+> remaining question is now NARROW. Read this before the notes below; it supersedes their account of
+> where the job stops.** The `pull_request` trigger is deliberately still commented out.
+>
+> | run | outcome | what it established |
+> |---|---|---|
+> | 1 (11 m) | failed in the emulator: *"Sign in with email" is not visible* | **A red herring.** The SERVER was dead — `next start` sets `NODE_ENV=production` and `instrumentation-node.ts` hard-fails there on missing model constants, so every request 500'd. Maestro was reading an error page correctly. |
+> | 2 (6.5 m) | failed at **Start the server**, 120 s probe timeout | The probe fix worked: the failure moved to its cause. Constants staged from the committed fixtures; a **second** gate then fired. |
+> | 3 (12.5 m) | **server boots in 8 s**; APK, Maestro, KVM all pass; fails in the emulator | The dev-server switch cleared the boot problem entirely. |
+> | 4 (13 m) | routes warmed in **11 s**; fails in the emulator after **180 s** | **Disproves the timing hypothesis.** Compilation was never the cost, and 180 s is not short. |
+>
+> **Three genuine defects fixed, none of them the one the entry expected:**
+> 1. **The readiness probe accepted ANY HTTP status, including 500** — it printed *"server up (HTTP
+>    500)"* and let the job march on to fail eight minutes later inside the emulator. A probe that
+>    passes on 5xx is worse than none: it moves the error away from its cause, and it is why run 1
+>    read as a UI-automation failure. Now refuses 5xx.
+> 2. **Two boot gates are production-hard, and only one has a local substitute.** Model constants can
+>    be satisfied honestly from the committed synthetic fixtures; **`checkModelAssets` asks object
+>    storage and has no tree fallback at all**, so a production-mode server can NEVER boot on a
+>    bucket-less runner. ⚠ **Neither gate was relaxed, and neither should be** — they key on
+>    `NODE_ENV` rather than on whether credentials exist, precisely so a production deploy that lost
+>    its storage variables fails instead of quietly serving degraded sleep staging. Adding a CI
+>    escape hatch to `fatalOrLoud` is that same fail-open shape. The job serves from **`pnpm dev`**
+>    instead, which sidesteps both without touching either and changes nothing this job asserts.
+> 3. **`next dev` compiles on first request and the probe only ever asked for `/`**, which 307s to
+>    `/sign-in` without compiling it — so the emulator paid that cost inside a UI wait. Warmed on the
+>    host now. (It turned out to be 11 s, not the 120 s guessed — the fix is still right, and
+>    measuring it is what killed the hypothesis.)
+>
+> **What remains, stated as the two candidates it is and not more:**
+> - **(a) Maestro may not be able to read text inside the WebView.** The app is a WebView and its
+>   accessibility tree may not be exposed to Maestro's view hierarchy at all. If so the fix is
+>   `WebView.setWebContentsDebuggingEnabled(true)` in the debug build plus Maestro's web-view
+>   selectors, not a longer timeout.
+> - **(b) The emulator may not be reaching the host.** `emulator-local-db-smoke.sh`'s reachability
+>   check is **advisory** — it prints `WARN: could not confirm host reachability (curl may be absent
+>   …); continuing` and has never once confirmed the hop. If `10.0.2.2:3000` is not reachable the
+>   WebView shows an error page and no form, which is indistinguishable from (a) at this level of
+>   evidence. **Settle this first — it is cheaper**: make the check assert instead of warn, using
+>   something present on the image (`nc`, or a `UiAutomator`-free `am start` of a URL), and re-run.
+>
+> **The diagnostics to read are in the `emulator-diagnostics` artifact** (`/tmp/logcat.txt`,
+> `/tmp/maestro-report.xml`, and Maestro's own screenshot under `~/.maestro/tests/`), which a session
+> with no artifact download could not open — that, not the emulator, is what capped this
+> investigation at four runs.
+
 - **Lane:** A
 - **The `Gate: device` was removed 2026-09-01, and it was circular.** This entry is the one that
   *closes* device-gated rows, and it was parked behind the very bottleneck it exists to relieve —
@@ -12919,6 +13804,41 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   written and is now removed.
 
 ### [platform] Q-252 — error tracking with session replay, for the bug class that cannot be reproduced from source
+
+> **⚠ MOSTLY SUPERSEDED, AND ITS HEADLINE ASK WAS DECIDED AGAINST (2026-09-03, Lane A). Do not build
+> this as written.** Filed 2026-08-14, before the vendor was chosen. Checked line by line against
+> what shipped:
+>
+> | this entry asks for | status |
+> |---|---|
+> | error tracking beyond `error_events` | ✅ **shipped** — Sentry (Q-404): `@sentry/nextjs`, server/edge/client configs, `lib/observability/sentry-scrub.ts` |
+> | **session replay** | ⛔ **DECIDED AGAINST, in code, in three files** |
+> | source-mapped stack traces | 🚧 **in flight** — BF-92 wires `withSentryConfig` with sourcemap upload gated on `SENTRY_AUTH_TOKEN` |
+> | release tagging against `package.json` | ❌ **still owed — this is the real residue** |
+> | breadcrumbs | ✅ on by default in the SDK; nothing to build |
+> | *"decide before Q-49 lands"* (the DSN in the public repo) | ✅ answered — `instrumentation-client.ts` records that a DSN is a write-only ingest key and ships in every client bundle |
+>
+> **On session replay specifically:** `instrumentation-client.ts`, `sentry.server.config.ts` and
+> `sentry.edge.config.ts` all carry the same line — *"No session replay and no profiling: both
+> capture far more of a health screen than an alerting tool needs, and the reason this vendor was
+> accepted at all was alerting."* That is a deliberate privacy decision taken when the integration
+> was built, written in three places, and this entry predates it. **Building the entry as titled
+> would reverse a made decision without anyone noticing it had been made** — which is the specific
+> hazard the re-verify-before-implementing rule exists for.
+> ⚠ It is **not** re-opened here. If the owner wants replay, that is a fresh decision with the
+> privacy trade named, not a queue item carried forward from before the decision.
+>
+> **What genuinely remains is one thing: release tagging**, so a fault can be tied to a deploy.
+> Small, and it belongs with BF-92's `withSentryConfig` work rather than under this title.
+> ⚠ **And the premise beneath the whole entry is now the wrong problem.** Its argument is that
+> `error_events` cannot say what the user did before the throw. BF-92 measured something more basic:
+> **Sentry has received nothing from the browser at all** since setup, because `connect-src` never
+> named the ingest host. Richer client telemetry is not the next problem while client telemetry is
+> zero.
+>
+> **Recommended:** once BF-92 lands and a browser event is confirmed on the device, retitle this to
+> *"release tagging"* or fold it into BF-92 and strike it. Left queued rather than deleted because
+> the release-tagging half is real and unbuilt.
 
 - **Lane:** A
 - **Branch:** `feat/error-tracking-session-replay`
