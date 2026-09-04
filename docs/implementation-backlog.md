@@ -3868,8 +3868,24 @@ a finding — it does not by itself explain a plain `GET` hanging beside it.
   The trade is working: `oura_raw_samples` is a rolling window (`ring_timestamp_ds` spans **7.58
   days**, 189,406 rows, 73 MB) and the archive takes the overflow at about an eighth of the size —
   ~440 MB/year, permanent, on a 5 GB volume.
-- **Keep — what is still owed is the REMAINDER, ~0.7–1.7 MB/day**, and the archive should be
-  excluded from the next attempt rather than counted again.
+- **⚑ RE-READ 2026-09-04, which this entry asked for: user tables total 204 MB, and the remainder
+  sits at the TOP of the range below, not the bottom.** Against the 171 MB baseline of 2026-08-18
+  that is 33 MB in 17 days — but migration 249 removed 21 MB of index inside that window, so gross
+  growth is **54 MB / 17 days ≈ 3.2 MB/day**, slightly worse than the 2.9 measured on 08-30 rather
+  than better. `oura_raw_packed` accounts for ~1.06 MB/day of it (18 MB since its first pack on
+  08-18), leaving **~2.1 MB/day** against a ~0.4 MB/day expectation. Nothing has changed shape:
+  `oura_raw_samples` 74 MB (30 heap / **44 index**), `error_events` 52 MB, `oura_heartrate` 25 MB,
+  `oura_raw_packed` 18 MB, `rr_intervals` 17 MB.
+  **Compare only like with like — that trap was nearly walked into here.** `pg_database_size` reads
+  **218 MB** on the same day; the 171 / 200 / 206 / 204 series is `sum(pg_total_relation_size)` over
+  `pg_stat_user_tables`, and mixing the two turns a flat two days into an invented 9 MB/day. State
+  which measure a number is, every time.
+  ⚠ **A third instance of the `n_live_tup` trap, on the same table CLAUDE.md already names twice:**
+  it read **97** against `oura_raw_packed`'s **1,093** real rows (previously 0-vs-764 and
+  55-vs-1,051). The size columns in that same query were exact. Do not soften the rule — this table
+  is simply one autoanalyze has never reached.
+- **Keep — what is still owed is the REMAINDER, ~2.1 MB/day as re-measured above**, and the archive
+  should be excluded from the next attempt rather than counted again.
 - **What is still owed.** Total was **206 MB** against the **171 MB baseline of 2026-08-18** —
   ~2.9 MB/day where the post-packing expectation is ~0.4 MB/day. Removing 21 MB of index and one
   write-amplification source does not account for that; the question is what is adding ~2.5 MB/day
@@ -13716,7 +13732,43 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 >    host now. (It turned out to be 11 s, not the 120 s guessed — the fix is still right, and
 >    measuring it is what killed the hypothesis.)
 >
-> **What remains, stated as the two candidates it is and not more:**
+> **⚑ FIVE MORE RUNS, 2026-09-04 — (b) IS ELIMINATED AND (a) IS NARROWED TO ONE SENTENCE. Read this
+> instead of the two candidates below; they are settled.** Three independent axes now agree, and the
+> job reports all three by step name so re-reading them costs one API call and no log:
+>
+> | axis | answer |
+> |---|---|
+> | reachability | **OK** — no `net::` error after launch; the WebView loaded from the host |
+> | view hierarchy | **present, and carries no sign-in text** — not empty, so the driver sees the app |
+> | server access log | **it served `/sign-in`** — the page was requested and delivered |
+>
+> **So the page rendered and the driver cannot read inside the WebView.** That is (a), and the fix
+> the entry proposed for it — `setWebContentsDebuggingEnabled(true)` in the debug build — **shipped
+> here and did not change the result.** It is kept (it costs nothing, is gated on the manifest's own
+> `FLAG_DEBUGGABLE` so no release build can take it, and web-view tooling needs it anyway), but do
+> not expect it to be the answer.
+>
+> **⚠ Do not trust `net::`-free as proof the page is fine** — that was this session's own mistake,
+> caught one run later. A 500, a redirect or an app-level error page produces no `net::` entry, so
+> the reachability assertion alone is weaker than it reads. The server-log axis exists because of it.
+>
+> **The next thing to try is NOT more Maestro tuning — it is removing Maestro from this path.** The
+> UI flow was only ever a means to get a signed-in user, because `getLocalStore(userId)` needs one
+> before any local SQLite database exists. The job already owns `AUTH_SECRET` and seeds the user, so
+> it can mint the session cookie directly and hand it to the WebView, skipping the form entirely.
+> That asserts exactly what this job exists to assert — that the local migrations apply on real
+> Android SQLite — without depending on whether a WebView's DOM is legible to a UI driver, which is
+> a question this repo has no other reason to care about.
+>
+> **How to read this job now, and why it changed:** the verdict is carried by mutually exclusive
+> STEP NAMES (`VERDICT …`, `TREE …`, `PAGE …`), not by log output. `list_workflow_jobs` returns them
+> with no log fetch. This exists because the runner appends its own blocks — artifact upload, git
+> cleanup, the Postgres container dump — after every step, so nothing a job prints is ever last;
+> four log pulls of 100+ lines each failed to reach a verdict that was being printed correctly.
+> Also fixed on the way: the Postgres healthcheck ran `pg_isready` as root and logged a FATAL every
+> ten seconds, roughly 190 lines of noise per run, now `-U postgres` and about 65.
+>
+> **The two candidates below are the pre-2026-09-04 statement, kept for the reasoning only:**
 > - **(a) Maestro may not be able to read text inside the WebView.** The app is a WebView and its
 >   accessibility tree may not be exposed to Maestro's view hierarchy at all. If so the fix is
 >   `WebView.setWebContentsDebuggingEnabled(true)` in the debug build plus Maestro's web-view
