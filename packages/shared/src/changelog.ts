@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.5",
+    date: "2026-09-04",
+    changes: [
+      "Two pieces of the daily stress and resilience picture were not being backed up from the phone to the server. They were saved on the phone and sent, and the server quietly ignored them. Now they are kept, so a restore or a new phone brings them back.",
+      "The app now records why a day's training load could not be worked out \u2014 not enough movement data, readiness still learning, or a missing profile detail. Nothing looks different, but the reason a day is blank can now be answered instead of guessed at.",
+    ],
+  },
+  {
     version: "1.436.4",
     date: "2026-09-03",
     changes: [
