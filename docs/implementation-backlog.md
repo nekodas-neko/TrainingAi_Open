@@ -388,6 +388,147 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+
+
+### [platform] LB-56 — E2E costs 26 minutes a UI PR and currently gates nothing; decide which of those to change
+
+- **Lane:** ? — neither. `.github/workflows/ci.yml`, `playwright.config.ts` and the required-checks
+  setting are the Orchestrator's and the owner's.
+- **Added:** 2026-09-04 · owner: *"why is e2e taking so long? can it be investigated or turned off if
+  not needed"*.
+- **Needs:** nothing to investigate — the measurement is below. What it needs is a decision.
+
+**Measured, not estimated.** A full local run against a CI-shaped database: **144 tests, 27.1 minutes
+of test time.** There is no single pathology — 28 tests finish under 5s and 16 take over 20s. The
+heaviest files are `meal-plan-library-surface` **136s**, `recipe-url-to-meal` **90s**,
+`touch-target-size` **69s**, `meal-label` **65s**, `training-load-day-flags` **55s**; `auth.setup`
+alone is **50s**. On CI the job ran ~50 minutes before LB-55's fixes and **26 minutes after**, because
+twelve specs stopped burning 45-second timeouts — which is also the CI-side evidence that those fixes
+landed.
+
+**It is slow because it is serial, and the serialism is deliberate.** `playwright.config.ts` sets
+`workers: 1, fullyParallel: false` with the reason written down: *"the specs share one seeded Postgres
+and one signed-in user, and writes in one spec are visible to another."* **That is still true and was
+re-proved on 2026-09-04** — three specs pass in isolation and fail in the full run (LB-55). So raising
+`workers` trades ~20 minutes for flakiness, which is the wrong direction.
+
+- **⚠️ The real problem is not the 26 minutes, it is that they buy nothing right now.** `main` itself
+  would not pass this suite, so E2E gates nothing — #868 merged with it red on 2026-09-04 — while
+  still costing 26 minutes on every UI PR. **A red check that nobody can act on is worse than either
+  alternative**, because it trains six concurrent agents to scroll past a failing gate, which is how a
+  real regression gets waved through later. Whatever else is decided, this state should not persist.
+- **Recommendation: make it advisory now, fix it next, re-require it when green.** Removing it from
+  the required set costs nothing, matches what is already true, and unblocks the PRs waiting on it.
+  The risk is that an advisory check decays unwatched — which is how it reached ten failures without
+  anyone noticing — so it wants the re-require step queued, not assumed.
+- **Alternatives, and what each is better at:**
+  - *Fix the four and keep it required* — the durable answer, and where this should end up. One needs
+    a fixture decision, three need a bisect (LB-55). A session's work, uncertain.
+  - *Drop it from PRs, run nightly against `main`* — saves the 26 minutes outright and finds breakage
+    once a day. Defensible for a single-user app whose real gate is the device, and it would need the
+    nightly's `if: github.event_name != 'schedule'` removed, which is the line that leaves `main`
+    with no baseline today.
+  - *Shard across parallel CI jobs* — ~26 min to ~8 while keeping serial order inside each shard.
+    **Blocked on the order-dependence question**: three specs are known to fail after an earlier
+    spec's writes, and nothing has established that no spec *depends* on one.
+- **Reversal cost is near zero** for the first three: required-check membership is a settings toggle
+  and the job trigger is one line. Sharding is the only option that is real work to undo.
+- Already working in the repo's favour: the job is gated on a UI-paths diff, so a docs-only PR skips
+  it entirely.
+
+### [platform] LB-55 — E2E fails as a timeout, not as an error, and a red E2E does not actually block a merge
+
+- **Lane:** ? — neither. `.github/workflows/ci.yml`, `playwright.config.ts` and the branch ruleset are
+  the Orchestrator's and the owner's.
+- **Added:** 2026-09-04 · from `fix/e2e-my-foods-tab-rename`, where six specs waiting for a tab
+  renamed three days earlier cost four PRs and most of a session to identify.
+- **Reference:** read before diagnosing a red E2E. Pairs with **LB-54** (unreadable job logs, no
+  `main` baseline), which is the other half of the same cost.
+
+- **⚠️ 22 of 27 spec files budget a `toPass` timeout LARGER than the 45-second test containing it.**
+  Fourteen ask **90 seconds inside 45**; only `first-run-empty-states` and `meal-label` raise
+  `test.setTimeout` to match. Playwright's test timeout always wins, so those retry windows are
+  unreachable — and, far worse for diagnosis, **every failure inside a `toPass` loop is reported as a
+  45-second test timeout rather than as the assertion that actually failed.** Three unrelated specs
+  failed at 45.6s, 46.5s and 46.5s; the signature reads as a slow runner and sent this session
+  looking at CI capacity.
+  - **This is NOT a cause of failure and must not be "fixed" as one.** It was hypothesised as the
+    cause, and the hypothesis fit three independent observations before one line of error text
+    (`element(s) not found`) refuted it. Raising the timeouts would have moved the failures from 45s
+    to 90s and made the suite slower. What it is worth doing for is **legibility**: a budget that
+    cannot be reached is a lie about intent, and it hides the real assertion.
+  - Worth pairing with a rule that a `toPass` budget may not exceed its file's test timeout — that
+    one IS statically checkable, unlike the string check below.
+
+- **⚠️ A red E2E does not block a merge, whatever the ruleset shows.** **PR #868 merged into `main`
+  on 2026-09-04 with E2E red** (`pnpm e2e` failed after ~50 minutes; the other five jobs green).
+  Measured, not inferred — the merge commit is in `main`. Candidates: the ruleset is in *Evaluate*
+  rather than *Active*, a bypass actor covers the merging identity, or the merge used an admin
+  override. **This is the owner's to check**, and it matters in both directions: if E2E is meant to
+  block, it is not doing so; if it is not meant to block, then every session holding a PR behind it
+  — as this one did for hours — is waiting on nothing.
+
+- **⚠️ Seven specs still fail on `main` after this PR, and they are listed so nobody re-derives them.**
+  A full local run against a CI-shaped database, on the branch carrying the tab-rename fix, was
+  **146 passed / 10 failed**. Three of those ten were `meal-plan-library-surface` and are fixed. The
+  remaining seven, with the timing that says which kind each is — a ~45s time is a `toPass` loop
+  spinning on something absent, a sub-second time is a real assertion:
+  - `recipe-url-to-meal.spec.ts:91` and `:156` — **fixed**, same Q-407 drift (they tapped
+    `Build a meal plan` and waited for a dialog; it navigates to Coach now). 45.5s/45.2s timeouts
+    became 12.3s/6.3s passes. `nutrition-coach-plan-entry.spec.ts` still uses the old name and is
+    **correct** to — that spec is about the Coach entry itself.
+  - `plan-rescale.spec.ts:168` — **diagnosed, deliberately not fixed.** The spec sets
+    `OVER_KCAL = 1900` and asserts the floor note, *"…under a meal — the remaining meals are left as
+    planned"*. What renders is the other branch of `buildNote`: **"You're 0 kcal past today's target,
+    so the remaining 3 meals are left as planned."** `budgetRemaining` lands on exactly 0, so
+    `budgetRemaining <= 0` fires before the `flooredCount` branch ever can. The fixture was written
+    against a fixed 2,000 kcal budget; the budget is **derived** now (Q-415/Q-417), so 1900 no longer
+    puts the day in the floor-binding window. **Do not just try another number** — the derived budget
+    includes `earned from movement`, so a hardcoded figure lands wherever that day's movement puts
+    it, which is how a test becomes intermittent rather than fixed. It needs a fixture that pins the
+    budget, or an assertion that accepts either note. That is a decision, not a rename.
+  - `profile-details-consolidation.spec.ts:50` — **fixed**, and it was the same stale-string class a
+    third time: it clicked a row named `/Name, body facts/`, which is a sublabel BF-79's regrouping
+    removed. The row is `Profile details` now. A 3.0-minute timeout became a 14.4s pass.
+  - **⚠️ `preferences-survive-reinstall:36`, `timeline-card-navigation:80` and all five
+    `touch-target-size:53` cases PASS IN ISOLATION and fail in the full run.** Run individually
+    against a clean CI-shaped database they are green in 2–15 seconds. So they are **order-dependent,
+    not stale strings**, and the triage-by-duration above does not reach them — this is the hazard
+    `e2e/README.md` already names, *"the specs share one seeded Postgres and one signed-in user, and
+    writes in one spec are visible to another"*, with `workers: 1, fullyParallel: false` making the
+    order fixed and therefore reproducible.
+    - **Do not "fix" one by running it alone and declaring it passing.** That is what the isolation
+      run proves *cannot* work: the failure is caused by a spec that ran earlier, so the useful
+      question is which write, not what the assertion says.
+    - The tractable next step is a bisect, not a read: run the suite from the start and stop after
+      the failing spec, then halve the set of files before it.
+  - **Start from the `error-context.md` Playwright writes beside each failure**, not from the spec:
+    it carries the accessibility snapshot of the screen at the moment it gave up, and that is what
+    identified both drifts here in minutes after hours of theorising.
+
+- **⚠️ Do not trust a local full-suite run without checking the dev server survived it.** A re-run
+  after the meal-plan fix reported **106 failed / 41 passed** — almost every failure at ~250ms,
+  which is not the app failing but `ECONNREFUSED 127.0.0.1:3100`: the Next dev server died at test
+  42 and every later spec failed against nothing. On the same branch minutes earlier the number was
+  146/10. **A mass failure whose durations are uniformly sub-second is an environment collapse, and
+  reporting it as a finding would have been the poisoned-state trap `docs/local-dev-database.md`
+  already warns about.** Grep the run log for `ECONNREFUSED` before believing a bad result.
+
+- **⚠️ The obvious guard for the stale-string class does not work, and here is why, so it is not
+  rebuilt.** `check-e2e-ui-strings.js` was written and deleted the same hour. It asserted that every
+  tab name and placeholder a spec waits for appears somewhere in `app/`, `components/` or
+  `packages/shared/src`; it passed 26 queries across 73 files with one documented exemption.
+  **It failed its own mutation test** — reverting a spec to the old `'Meals'` left it green, because
+  `'Meals'` appears in `meal-plan-setup-sheet.tsx`'s `STEPS` array. A substring search over a large
+  codebase finds any short word somewhere.
+  - An earlier draft checking every `getByRole(name:)` was worse: eight false positives, because an
+    **accessible name is computed from child DOM text**, so a button whose children are `Log` and
+    `Body Weight` is named "Log Body Weight" while that string exists nowhere.
+  - A version that would work has to compare against the **tab label sets extracted from source**
+    (`{ value, label }` arrays and `TabsTrigger` children) rather than against the whole codebase as
+    a flat string. Tractable, narrow, and fragile the moment tabs are declared differently — which is
+    why it is a queued question rather than something done in passing.
+
 ### [sleep][platform] PS-17 — a phantom afternoon "sleep" replaced a real night in the daily summary, and it is scoring 🔴 LIVE
 
 - **Lane:** A (the rollup and the summary write)
