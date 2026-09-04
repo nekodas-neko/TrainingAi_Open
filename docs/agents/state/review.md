@@ -5,8 +5,8 @@
 > 🔴 handed on) and is the only part that moves. A session self-titles 🟢 on its first instruction and
 > flips itself to 🔴 as the last step of its handoff, after the baton and every PR have landed.
 
-**Updated:** 2026-09-03 · **By:** forty-five sweeps (2026-08-17 ×2, 2026-08-18 ×37, 2026-08-20 ×1,
-2026-09-03 ×5) · **Next ID: `RV-43`.**
+**Updated:** 2026-09-03 · **By:** forty-six sweeps (2026-08-17 ×2, 2026-08-18 ×37, 2026-08-20 ×1,
+2026-09-03 ×6) · **Next ID: `RV-45`.**
 
 > **Sweep 40's run is closed and nothing is owed from it** — RV-32, RV-33, RV-34 all shipped, verified
 > in source rather than taken from the closure note, and their `projectOverview.md` row is in
@@ -25,9 +25,8 @@ files, and every finding is a `projectOverview.md` row or a queue entry.
 `RV-<n>`, counting up forever. No band, no pointer, no ledger.
 `grep -rhoE '\bRV-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`.
 
-One trap in that command: `docs/agents/README.md` and `docs/implementation-backlog.md` carry
-**`RV-31` as a prose example**, not an entry. Follow the lookup anyway — skipped numbers cost nothing.
-Legacy `Q-` numbers stay valid where already used and are never renumbered.
+One trap: `docs/agents/README.md` and the backlog carry **`RV-31` as a prose example**, not an entry.
+Follow the lookup anyway — skipped numbers cost nothing. Legacy `Q-` numbers stay valid, never renumbered.
 
 ## Still open — do not re-file these
 
@@ -43,48 +42,34 @@ before the guard under test ran: `PATCH /api/activity-logs/<id>/metrics` (cross-
 unknown), and RV-40's `POST /api/complete-workout` and `POST /api/log-exercise` (malformed-id
 behaviour unknown). **A 4xx is not evidence the guard fired** — read which field it names.
 
-## Now — sweeps 41–45 filed (2026-09-03). **Next ID: `RV-43`.**
+## Now — sweeps 41–46 filed (2026-09-03). **Next ID: `RV-45`.**
 
-41–42 ran the owner's lens (mobile UI: safe area, back-and-return scroll, cache staleness); 43 took
-rule (a); 44 the owner's nutrition/workouts/coach ask; 45 the FK edges. **41** →
-[write-up](../../reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md), RV-35/36/37.
-**42** → [write-up](../../reviews/2026-09-03-first-run-honesty-and-instant-paint.md), RV-38/39.
-**43** → [write-up](../../reviews/2026-09-03-ownership-rule-a-and-body-supplied-ids.md), RV-40.
-**44** → [write-up](../../reviews/2026-09-03-coach-write-bounds-vs-user-routes.md), RV-41.
-**45** → [write-up](../../reviews/2026-09-03-fk-edges-meal-plan-cross-user-refs.md), RV-42.
+| # | Lens | Write-up | Filed |
+|---|---|---|---|
+| 41 | owner: back-and-return scroll, cache staleness | [day-rollover-and-scroll](../../reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md) | RV-35/36/37 |
+| 42 | first-run honesty, instant paint | [first-run-and-instant-paint](../../reviews/2026-09-03-first-run-honesty-and-instant-paint.md) | RV-38/39 |
+| 43 | ownership rule (a) | [rule-a-and-body-ids](../../reviews/2026-09-03-ownership-rule-a-and-body-supplied-ids.md) | RV-40 |
+| 44 | owner: nutrition/workouts/coach | [coach-write-bounds](../../reviews/2026-09-03-coach-write-bounds-vs-user-routes.md) | RV-41 |
+| 45 | the FK edges | [fk-edges-meal-plan](../../reviews/2026-09-03-fk-edges-meal-plan-cross-user-refs.md) | RV-42 |
+| 46 | owner: progression **logic**, nutrition, home | [adherence-ratchet](../../reviews/2026-09-03-progression-exact-adherence-ratchet.md) | RV-43/44 |
 
-- **A guard that exists is not a guard that reaches — all eight findings are this.** `useLocalDay()`
-  (BF-86) has 3 consumers; `useScrollRestoration` (BF-100) rides `pull-to-sync.tsx`, which 3 screens
-  use; `tabs-instant-paint.spec.ts` guards the 5 screens that never unmount and none of the ~20 that
-  do; the "Limited data" badge is gated on `hasData`, so the no-data case cannot reach it; and
-  `invalidUuidResponse` covers **27 of 27 dynamic `[id]` routes and zero body-id routes**; the Coach's
-  goal bounds are a second validator five times looser than the user routes'; and `meal_plan_meals`
-  checks the plan's owner but not its child ids. **Grep the call sites, and read the guard's own
-  comment** — two of these name their own scope or guarantee, and neither holds.
-- **The zero-data account reaches a state nothing else can** and was pointed at 2 screens. All 22 took
-  one loop and found RV-38 at once. Re-run it whenever a scoring surface changes — the seeded user has
-  data for everything, so a fabrication is invisible there.
-- **Assert the payload beside the rendered text, and count requests by the DATE they carry.** "The card
-  shows 50" is not a finding; "the route says `hasData: false` and the card shows 50" is. Health
-  reissued 11 requests on resume and only 3 carried the new day — a raw count would have been wrong
-  three ways.
-- **Test the comment, not just the code, and send the same value to both surfaces.** RV-41 was a doc
-  comment's own worked example (*"set my calories to 26000"*) sent as a request. Where two paths write
-  one column, drive both in the same session — read from source, the divergence is invisible and its
-  direction easy to get backwards.
-- **Pair every refusal with a control, and ask what the READ joins before calling a stored cross-user
-  reference a leak.** Three of sweep 45's four clean edges first returned a 400 for an *unrelated*
-  reason, which reads exactly like a guard firing; the pair differs by one field and nothing else
-  proves it. And RV-32's severity was an unscoped join returning another user's *name* — RV-42 is the
-  same write defect with a read carrying ids only, which is the difference between a report and an
-  alarm.
+**One pattern under all ten findings: a guard that exists is not a guard that reaches, and a claim the
+repo makes about itself is a test case.** `useLocalDay()` has 3 consumers; `useScrollRestoration` rides
+a component 3 screens use; the instant-paint spec guards the 5 screens that cannot exhibit the bug; the
+"Limited data" badge is gated on `hasData`; `invalidUuidResponse` covers 27 of 27 `[id]` routes and
+zero body-id ones; the Coach's bounds are a second validator 5× looser; `meal_plan_meals` checks the
+plan's owner but not its child ids; `atwater.ts` reached neither file that needed it. **Four findings
+came from testing a sentence** — a code comment (RV-41, RV-43), a shipped entry (RV-36), a prior
+review's praise (RV-43).
 
-**Closed clean, do not re-sweep:** the seven `freshWithinTtl` sites (every writer is in a group);
-`check-fetch-once-effects.js`'s CAN-BITE group (empty); instant paint on the sub-routes (13 of 14);
-the first-run render (21 of 22 routes); ownership rule (a) — **all three rules now have evidence**;
-and the Coach apply path's five domain handlers, now all driven end to end (write, undo, 404
-cross-user, 409 stale-with-drift); and four nutrition FK edges, each with a control. **Still owed:**
-RV-37 and RV-39 need the device; RV-38's and RV-41's bound questions need the owner; RV-40 leaves two
+**Closed clean, do not re-sweep:** the seven `freshWithinTtl` sites; `check-fetch-once-effects.js`'s
+CAN-BITE group (empty); instant paint on the sub-routes (13 of 14); the first-run render (21 of 22
+routes); ownership rule (a) — **all three rules now have evidence**; the Coach apply path's five
+domain handlers, all driven end to end; four nutrition FK edges, each with a control; Home's
+`scoreBand` (single source, no re-derived thresholds); and AI-10 from the 2026-07-10 review (fixed —
+`mround125Up` is dead code).
+
+**Still owed:** RV-37/RV-39 need the device; RV-38/RV-41/RV-43 need an owner decision; RV-40 leaves two
 routes and sweep 45 the whole workout/device FK half **unverified, not clean**.
 
 ## Carried from sweep 40 ([write-up](../../reviews/2026-08-20-non-workout-write-surface-ownership.md))
@@ -93,10 +78,9 @@ routes and sweep 45 the whole workout/device FK half **unverified, not clean**.
   `.set()` sites, all built field by field (sweep 40). (c): produced RV-32. (a): 21 unscoped child
   deletes across 12 functions, all guarded, both source incidents reproduced and refused (sweep 43).
 - **A cheap contrast beats a long argument**, used seven times now: *PUT 400, POST 201* (RV-32);
-  `/more` restores 840 and `/nutrition` returns 0; Home rolls the day over and Nutrition does not;
-  streak says `—` and Body Battery says 50; three routes say `400 Invalid id` and two say 500; the
-  user's form refuses 26,000 kcal and the Coach stores it. Find the surface that already does it right
-  before arguing that it should.
+  `/more` restores 840 and `/nutrition` returns 0; Home rolls the day over, Nutrition does not; streak
+  says `—`, Body Battery says 50; three routes say `400 Invalid id`, two say 500; the user's form
+  refuses 26,000 kcal, the Coach stores it. Find the surface that already does it right first.
 
 ## Next — in the order they are worth doing
 
@@ -149,6 +133,22 @@ None. This role's PRs are docs-only.
   midnight (sweep 41), and that same zero-data account pointed at 22 routes instead of 2 (sweep 42).
 
 ## Method notes — do not re-derive these
+
+- **Test what the repo says about itself.** A comment, a doc header or a prior review's praise is a
+  claim with a worked example in it; send it. Four of this session's findings came out of that.
+- **Pair every refusal with a control**, and **assert the payload beside the rendered text**. A 4xx
+  usually names a *different* missing field; "the card shows 50" is not a finding but "the route says
+  `hasData: false` and the card shows 50" is.
+- **Choose fixtures hostile to the arithmetic, and sweep the input range.** A 100 kg starting 1RM puts
+  every common percentage on a plate boundary and reports zero drift for a mechanism that moves 13%.
+- **Count requests by the DATE they carry, not how many there are** — Health reissued 11 on resume and
+  only 3 carried the new day.
+- **Ask what the READ joins before calling a stored cross-user reference a leak** (RV-32 vs RV-42).
+- **The zero-data account reaches a state nothing else can.** Re-run it whenever a scoring surface
+  changes: the seeded user has data for everything, so a fabrication is invisible there.
+- **Import the shipped module; never re-implement the formula you are auditing.** A throwaway vitest
+  file inside the package is the way in — there is no build output, `npx tsx` is absent, and vitest
+  swallows `console.log`, so write to a file and `cat` it.
 
 - `pnpm install --frozen-lockfile` first if `node_modules` is missing (`@sentry/nextjs` failing to resolve
   is the tell), then `pnpm db:local`, then **`env -u DATABASE_URL -u DATABASE_SSL pnpm dev`**. Both vars are

@@ -498,6 +498,63 @@ and Samsung does not honour `autoConnect = true`, so direct connect plus a bound
 isolation stands and wiring it into scoring waits on the H10 session. It does not resolve steps,
 calories or the stage mapping (PS-16, PS-19).
 
+### [workouts] RV-43 — hitting the prescription exactly is scored as progress, and the PR is permanent
+
+- **Lane:** A — `packages/shared/src/1rm.ts` and/or `app/api/next-session/prescription/route.ts`.
+- **Gate:** owner — the fix is a scoring decision, see below.
+- **Added:** 2026-09-03, Review sweep 46 —
+  [`write-up §2`](reviews/2026-09-03-progression-exact-adherence-ratchet.md)
+- **The module states this invariant and the 2026-07-10 workout review repeated it as a strength:**
+  *"prescriptionFactor making exact adherence 1RM-neutral"*. It is neutral for the exact prescribed
+  weight and broken by the plate rounding between the formula and the barbell.
+- **The mechanism, four steps.** (1) The prescription is `mroundStepUp(basis × pct/100, step)` — a
+  **ceiling** round, 2.5 kg on a barbell (`prescription/route.ts:138`), whose comment says *"slight
+  overload is better than underload"*. (2) The lifter hits it. (3) `prescriptionFactor` cancels the
+  `repFactor` terms, leaving `weight × 100/pct`, so the round-up is **amplified by 1/pct** — 1.43× at
+  70%. (4) The result exceeds the previous 1RM and becomes the next basis. Step 1 is deliberate;
+  nothing in either file mentions step 3.
+- **Measured** over 1,201 starting 1RMs (60.0–180.0 kg, 0.1 steps), 3×8 @70%, exact adherence:
+
+  | step | p50 | p90 | max | unchanged | sessions to settle |
+  |---|---|---|---|---|---|
+  | barbell 2.5 | **+2.60%** | +7.12% | **+13.55%** | 10/1201 | 3 |
+  | dumbbell 1.25 | +1.30% | +5.04% | +10.46% | 20/1201 | 4 |
+
+  Worked: `103.70 → 107.25 → 110.75 → 114.25` then settles (+10.2%).
+- **It converges, which caps the severity.** The fixed point is the smallest 1RM whose working weight
+  lands on a plate multiple, reached in 3–4 sessions. Not a runaway.
+- **Not cosmetic:** `log-exercise.ts:327` passes the estimate to `upsertPersonalRecordIfBetter`
+  (`shouldCountTowardPr` excludes only deloads, baselines and implausible values), and `IfBetter` is
+  monotone — so the inflation becomes a permanent all-time PR feeding the strength card, the digests
+  and `pickHeadlinePersonalRecord`.
+- **⚠ Do NOT "fix" this by switching to nearest-rounding.** The ceiling exists for a stated reason and
+  `mroundStep` shows the same ratchet at a lower median. **The real question is whether the estimate
+  should be computed from the PRESCRIBED weight rather than the rounded one**, which would make the
+  invariant true as written. That changes what a 1RM means, so it is the owner's call — present both
+  and let them choose.
+- **How to test locally:** import `estimateOneRm` in a throwaway vitest file inside
+  `packages/shared/src` (there is no build output to import, and `npx tsx` is not installed); write
+  results to a file, since vitest swallows `console.log`. **Sweep the starting values** — 100 kg makes
+  every common percentage land on a plate and reports zero drift for a mechanism that moves 13%.
+- The `Gate: owner` above **is** the decision: which of the two definitions of the estimate they want.
+  Nothing here can start until that is answered, so there is no separate verify.
+
+### [nutrition] RV-44 — nine longhand Atwater sites in the two files `atwater.ts` never reached
+
+- **Lane:** A — `packages/shared/src/nutrition/scan-totals.ts`, `.../meal-split.ts`.
+- **Added:** 2026-09-03, Review sweep 46 —
+  [`write-up §3`](reviews/2026-09-03-progression-exact-adherence-ratchet.md)
+- `atwater.ts` exists because of LB-9 and says so in its header: *"Six lines with no dependencies can
+  be imported from anywhere, which is the property that stops a fifth copy appearing."* Neither file
+  below imports it: `scan-totals.ts` lines 41, 113, 145, 155, 156 and `meal-split.ts` lines 173, 249,
+  250, 251 all write `* 4` / `* 4` / `* 9` longhand.
+- **No number is wrong today.** All nine agree at 4/4/9, and the Atwater factors are physiological
+  constants that will not change. **This is a consistency finding, not a correctness one** — do not
+  file it or fix it as though a value were incorrect.
+- Import `KCAL_PER_G` at the nine sites. Worth doing when someone is next in those files rather than
+  as a standalone PR.
+- **Verify:** owner — not needed beyond a green gate; nothing user-visible changes.
+
 ### [nutrition][platform] RV-42 — a meal plan can point at another account's saved meal and meal type
 
 - **Lane:** A — `lib/data/postgres/slices/meal-plans.ts` (`replaceMealPlanStructure` and the create
