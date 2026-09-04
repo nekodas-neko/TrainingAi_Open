@@ -7645,3 +7645,14 @@ Three lines net onto the Q-529 provisional-score row, which carried the refuted 
 the provisional state "may last far longer" than the ~9 minutes measured. The correction has to keep
 the conclusion (the marking is more load-bearing than 9 minutes) while replacing the reason and
 bounding it to the local day, because a reader who only sees "refuted" would drop the marking.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17510 (BF-55 re-measured, as its own Keep asked)
+
+Sixteen lines onto the growth entry, which had said outright that the total had not been read since
+2026-08-30 and to re-measure before assuming the trend held. It does hold, and slightly worse than
+recorded once the 21 MB migration-249 index drop is added back — so the numbers had to go in rather
+than a "still true". Two of those lines are not about growth at all and earn their place anyway: that
+the 171/200/206/204 series is `sum(pg_total_relation_size)` and not `pg_database_size`, which reads
+218 MB the same day and would turn two flat days into an invented 9 MB/day; and a third sighting of
+the `n_live_tup` trap on `oura_raw_packed`, 97 against 1,093 real rows, on the same table CLAUDE.md
+already names twice.

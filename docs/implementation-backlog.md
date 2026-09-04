@@ -3868,8 +3868,24 @@ a finding — it does not by itself explain a plain `GET` hanging beside it.
   The trade is working: `oura_raw_samples` is a rolling window (`ring_timestamp_ds` spans **7.58
   days**, 189,406 rows, 73 MB) and the archive takes the overflow at about an eighth of the size —
   ~440 MB/year, permanent, on a 5 GB volume.
-- **Keep — what is still owed is the REMAINDER, ~0.7–1.7 MB/day**, and the archive should be
-  excluded from the next attempt rather than counted again.
+- **⚑ RE-READ 2026-09-04, which this entry asked for: user tables total 204 MB, and the remainder
+  sits at the TOP of the range below, not the bottom.** Against the 171 MB baseline of 2026-08-18
+  that is 33 MB in 17 days — but migration 249 removed 21 MB of index inside that window, so gross
+  growth is **54 MB / 17 days ≈ 3.2 MB/day**, slightly worse than the 2.9 measured on 08-30 rather
+  than better. `oura_raw_packed` accounts for ~1.06 MB/day of it (18 MB since its first pack on
+  08-18), leaving **~2.1 MB/day** against a ~0.4 MB/day expectation. Nothing has changed shape:
+  `oura_raw_samples` 74 MB (30 heap / **44 index**), `error_events` 52 MB, `oura_heartrate` 25 MB,
+  `oura_raw_packed` 18 MB, `rr_intervals` 17 MB.
+  **Compare only like with like — that trap was nearly walked into here.** `pg_database_size` reads
+  **218 MB** on the same day; the 171 / 200 / 206 / 204 series is `sum(pg_total_relation_size)` over
+  `pg_stat_user_tables`, and mixing the two turns a flat two days into an invented 9 MB/day. State
+  which measure a number is, every time.
+  ⚠ **A third instance of the `n_live_tup` trap, on the same table CLAUDE.md already names twice:**
+  it read **97** against `oura_raw_packed`'s **1,093** real rows (previously 0-vs-764 and
+  55-vs-1,051). The size columns in that same query were exact. Do not soften the rule — this table
+  is simply one autoanalyze has never reached.
+- **Keep — what is still owed is the REMAINDER, ~2.1 MB/day as re-measured above**, and the archive
+  should be excluded from the next attempt rather than counted again.
 - **What is still owed.** Total was **206 MB** against the **171 MB baseline of 2026-08-18** —
   ~2.9 MB/day where the post-packing expectation is ~0.4 MB/day. Removing 21 MB of index and one
   write-amplification source does not account for that; the question is what is adding ~2.5 MB/day
