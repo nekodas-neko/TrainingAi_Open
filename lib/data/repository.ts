@@ -1201,7 +1201,7 @@ export interface WorkoutRepository {
   listSessionsMissingHrStats(userId: string, since: Date, limit: number): Promise<{ id: string; startedAt: Date; completedAt: Date | null }[]>
   // Per-SET HR metric snapshot (migration 139) — durable per-set record for per-exercise HR trends,
   // sibling of workout_hr_stats. getSetDetailsForSession feeds the formula; the rest persist/read it.
-  getSetDetailsForSession(workoutSessionId: string): Promise<import('@trainingai/shared/workout/set-hr-stats').RichSetMarker[]>
+  getSetDetailsForSession(userId: string, workoutSessionId: string): Promise<import('@trainingai/shared/workout/set-hr-stats').RichSetMarker[]>
   upsertSetHrStats(userId: string, workoutSessionId: string, rows: import('@trainingai/shared/workout/set-hr-stats').SetHrRow[]): Promise<void>
   getSetHrStatsForSession(userId: string, workoutSessionId: string): Promise<SetHrStatsRow[]>
   getSetHrStatsForExercise(userId: string, opts: { exerciseId?: string | null; exerciseName?: string; since: Date }): Promise<SetHrStatsRow[]>
@@ -1213,8 +1213,8 @@ export interface WorkoutRepository {
     source: string | null; reviewed: boolean;
   }[]>
   markOuraWorkoutReviewed(userId: string, id: string): Promise<void>
-  getSetTimestampsForSession(workoutSessionId: string): Promise<{ exerciseName: string; setNumber: number; setStartMs: number | null; setEndMs: number | null; loggedAt: Date | null }[]>
-  markHrSynced(workoutSessionId: string): Promise<void>
+  getSetTimestampsForSession(userId: string, workoutSessionId: string): Promise<{ exerciseName: string; setNumber: number; setStartMs: number | null; setEndMs: number | null; loggedAt: Date | null }[]>
+  markHrSynced(userId: string, workoutSessionId: string): Promise<void>
   getUnsyncedHrSessionsForDay(userId: string, day: string, timezone?: string): Promise<{ id: string; startedAt: Date; completedAt: Date | null }[]>
   getUnsyncedHrSessions(userId: string, from: Date, to: Date): Promise<{ id: string; startedAt: Date; completedAt: Date | null }[]>
   getWorkoutSessionById(userId: string, id: string): Promise<{ id: string; startedAt: Date; completedAt: Date | null } | null>
@@ -1394,6 +1394,10 @@ export interface OuraDailyDerivedRow {
   activeCaloriesEst: number | null
   trainingLoadOts: number | null
   trainingLoadHigh: boolean | null
+  // Q-270. NULL = the training-stress route never ran for this day; 'ok' = it scored; anything
+  // else is the gate that refused. `string | null` matches its siblings (`illnessFlag`,
+  // `readinessSource`) rather than importing the health package's union into the data layer.
+  trainingLoadGate: string | null
   recoveryIndexHours: number | null
   wornHoursBle: number | null
   nightHrvBaselineMs: number | null

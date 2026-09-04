@@ -18,7 +18,7 @@ const FULL_PAYLOAD = {
   sleepScore: 84, sleepContributors: JSON.stringify({ deep: 70 }),
   readinessScore: 78, readinessContributors: JSON.stringify({ hrv: 60 }), readinessSource: 'ble',
   activityScore: null, activityContributors: null, activeCaloriesEst: null,
-  trainingLoadOts: 42.5, trainingLoadHigh: true,
+  trainingLoadOts: 42.5, trainingLoadHigh: true, trainingLoadGate: 'ok',
   recoveryIndexHours: 6.1, wornHoursBle: 21.3, nightHrvBaselineMs: 44.2,
   illnessFlag: 'none', illnessScore: 12, illnessBiomarkers: JSON.stringify({ temp: 0.1 }),
   daytimeStressScaled: 33, stressHighMinutes: 90, recoveryHighMinutes: 120,
@@ -89,6 +89,28 @@ describe.skipIf(!canRun)('oura_daily_derived offline-sync round-trip (A2 server)
     const payloadKeys = new Set(Object.keys(FULL_PAYLOAD))
     const missing = Object.keys(DERIVED_COLS).filter((k) => !payloadKeys.has(k))
     expect(missing).toEqual([])
+  })
+
+  it('field coverage, the half that was missing: every column the payload sends actually LANDS', async () => {
+    // The assertion above compares the fixture against DERIVED_COLS — both sides of which are lists
+    // this test and the slice control. It cannot see the push BRANCH omitting a column, and that is
+    // not hypothetical: `daytime_stress_coverage_min` and `chronic_stress_granular_nights` were in
+    // DERIVED_COLS, in the local mirror, in the outbox payload and in the fixture above, and absent
+    // from `pushMutations` — so a device's backup dropped them silently for as long as they existed.
+    // The landing assertion in the first test named five columns by hand, which is why it held.
+    //
+    // Driven off DERIVED_COLS so it cannot go stale: every column whose fixture value is non-null
+    // must come back non-null. Columns the fixture deliberately leaves null are skipped — they are
+    // testing the COALESCE arm, not coverage.
+    const { DERIVED_COLS } = await import('@/lib/data/postgres/slices/oura')
+    const expected = (Object.keys(DERIVED_COLS) as (keyof typeof DERIVED_COLS)[])
+      .filter((k) => (FULL_PAYLOAD as Record<string, unknown>)[k] != null)
+    const cols = expected.map((k) => DERIVED_COLS[k]).join(', ')
+    const { rows } = await pool.query(
+      `SELECT ${cols} FROM oura_daily_derived WHERE user_id = $1 AND day = $2`, [TEST_USER_ID, DAY])
+    expect(rows).toHaveLength(1)
+    const dropped = expected.filter((k) => rows[0][DERIVED_COLS[k]] == null)
+    expect(dropped).toEqual([])
   })
 
   it('COALESCE: a partial re-push updates only its fields and never nulls the rest', async () => {

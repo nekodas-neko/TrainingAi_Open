@@ -79,10 +79,13 @@ sleep surface read it. Marked now on all three: the Home chip (via its existing 
 glyph, whose predicate was written out at three sites and is now one tested function), the Body
 tab's sleep card, and `/health/sleep`. An absent flag reads as **settled** — the local-store seed has
 no watermark, and badging every historical night would be worse than the bug.
-**⚠ Found while checking the entry's caveat, and filed as LB-53 (Lane A):** `oura_daily_derived`
-holds **four `computed_at` stamps in its entire history**, with a **nine-day gap** where nothing was
-written and a pass that rewrote 85 rows minutes after a deploy. That makes this marking *more*
-load-bearing — the provisional state may last far longer than the ~9 minutes Q-529 measured.
+**⚠ Filed as LB-53 (Lane A), and REFUTED as filed on 2026-09-04 — read the corrected version.**
+The original reading (four `computed_at` stamps in the table's whole history, a nine-day gap, a pass
+rewriting 85 rows after a deploy) was drawn from a column stamped by every write of any of the row's
+36 columns, so it says nothing about when a score was computed; the 85-row pass writes `body_comp`
+only. What is true: the live route rewrites **today's** score on every request and nothing revises a
+day once it ends. So this marking is still *more* load-bearing than the ~9 minutes Q-529 measured —
+the provisional window is the whole local day — but it is bounded by that day, not open-ended.
 **Not device-verified**, and the device owns the only real test: a morning where the ring is
 genuinely mid-upload ([journal](docs/overview/entries/2026-09-02-q529-provisional-sleep-score.md)).
 
@@ -4825,6 +4828,18 @@ covered": the quartile bisect bounds rather than attributes, so a range producin
 34 covered predicates. Exact attribution needs ~246 individual runs. Untouched entirely: ownership
 enforced by a join or pre-check instead of a `user_id` predicate, and the full ~3,270-test suite —
 only the 363 DB tests were measured.
+
+**A third blind spot, found and closed 2026-09-04 — a method that never asked for `userId` at all.**
+Both mechanisms assume the owner is a *parameter*: the sweep mutates predicates that exist, and
+`check-repository-user-scoping.js` flags a method that **takes** `userId` and never uses it. Neither
+can see a signature that omits the owner entirely. Of the **12** data-layer methods taking an id but
+no `userId`, nine are join- or pre-check-scoped and **three constrained ownership nowhere** —
+`getSetDetailsForSession`, `getSetTimestampsForSession`, and `markHrSynced`, a bare unscoped
+`UPDATE`. Safe only because the single production caller passed an id from a user-scoped query, and
+two of the three have no production caller at all. All three now take `userId` and constrain on
+`workout_sessions.user_id`, covered by `hr-session-ownership.test.ts` (5 tests, mutation-verified,
+including two controls proving the fixture produces data). **Not mechanised** — a check for this
+shape fires on all nine legitimate ones and would need an allowlist, which is its own hazard.
 
 **Carry this into any addition:** **four** assertions in that file could not fail as first written —
 `getBodyBatteryHistory` returns a row shape with no `userId`, making `not.toContain(USER_B)`

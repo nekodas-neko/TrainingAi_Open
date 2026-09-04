@@ -1078,7 +1078,15 @@ export async function listSessionsMissingHrStats(db: Db, userId: string, since: 
 
 /** The logged sets of a session with the identity + prescription dimensions the per-set HR formula
  *  needs (exercise identity, phase, actual/planned %1RM, rest, per-set timing). */
-export async function getSetDetailsForSession(db: Db, workoutSessionId: string): Promise<RichSetMarker[]> {
+// Q-155. `userId` is REQUIRED, and it was not always: this took a session id and constrained
+// ownership nowhere — no predicate, no join condition, no pre-check. It was safe only because its
+// one caller happened to pass an id from a user-scoped query, which is a property of the caller and
+// not of this function. Its siblings (`getSetHrStatsForSession`, `upsertSetHrStats`) already took
+// `userId`, so this was the odd one out rather than a considered exemption.
+//
+// This is the class `scripts/check-repository-user-scoping.js` is structurally blind to — that check
+// catches a method that TAKES `userId` and never uses it; nothing catches one that never asked.
+export async function getSetDetailsForSession(db: Db, userId: string, workoutSessionId: string): Promise<RichSetMarker[]> {
   const rows = await db
     .select({
       setLogId:       s.setLogs.id,
@@ -1101,6 +1109,7 @@ export async function getSetDetailsForSession(db: Db, workoutSessionId: string):
     .innerJoin(s.workoutSessions, eq(s.exerciseLogs.workoutSessionId, s.workoutSessions.id))
     .where(and(
       eq(s.exerciseLogs.workoutSessionId, workoutSessionId),
+      eq(s.workoutSessions.userId, userId),
       isNull(s.setLogs.deletedAt),
       isNull(s.exerciseLogs.deletedAt),
     ))
@@ -1292,7 +1301,10 @@ export async function markOuraWorkoutReviewed(db: Db, userId: string, id: string
 
 // ── HR Sync (workout sessions) ─────────────────────────────────────────────────
 
-export async function getSetTimestampsForSession(db: Db, workoutSessionId: string) {
+// Q-155. Same unscoped shape as `getSetDetailsForSession` above, and it needs the
+// `workout_sessions` join added rather than just a predicate — the owner is not reachable from
+// `set_logs`/`exercise_logs` alone, which is exactly why the scope was easy to omit.
+export async function getSetTimestampsForSession(db: Db, userId: string, workoutSessionId: string) {
   const rows = await db
     .select({
       exerciseName: s.exerciseLogs.exerciseName,
@@ -1303,7 +1315,13 @@ export async function getSetTimestampsForSession(db: Db, workoutSessionId: strin
     })
     .from(s.setLogs)
     .innerJoin(s.exerciseLogs, eq(s.setLogs.exerciseLogId, s.exerciseLogs.id))
-    .where(and(eq(s.exerciseLogs.workoutSessionId, workoutSessionId), isNull(s.setLogs.deletedAt), isNull(s.exerciseLogs.deletedAt)))
+    .innerJoin(s.workoutSessions, eq(s.exerciseLogs.workoutSessionId, s.workoutSessions.id))
+    .where(and(
+      eq(s.exerciseLogs.workoutSessionId, workoutSessionId),
+      eq(s.workoutSessions.userId, userId),
+      isNull(s.setLogs.deletedAt),
+      isNull(s.exerciseLogs.deletedAt),
+    ))
     .orderBy(asc(s.setLogs.updatedAt))
   return rows.map(r => ({
     exerciseName: r.exerciseName,
@@ -1314,11 +1332,14 @@ export async function getSetTimestampsForSession(db: Db, workoutSessionId: strin
   }))
 }
 
-export async function markHrSynced(db: Db, workoutSessionId: string) {
+// Q-155. An unscoped UPDATE — the highest-severity of the three, because a read leaks and a write
+// changes someone else's row. It has no production caller today, which is precisely why it could sit
+// like this: nothing exercised it, so nothing was wrong yet.
+export async function markHrSynced(db: Db, userId: string, workoutSessionId: string) {
   await db
     .update(s.workoutSessions)
     .set({ hrSyncedAt: new Date() })
-    .where(eq(s.workoutSessions.id, workoutSessionId))
+    .where(and(eq(s.workoutSessions.id, workoutSessionId), eq(s.workoutSessions.userId, userId)))
 }
 
 // No production caller today — only the adapter wrapper, the repository interface and a test. Kept
@@ -1532,7 +1553,7 @@ export const DERIVED_COLS: Record<keyof OuraDailyDerivedPatch, string> = {
   sleepScore: 'sleep_score', sleepContributors: 'sleep_contributors',
   readinessScore: 'readiness_score', readinessContributors: 'readiness_contributors', readinessSource: 'readiness_source',
   activityScore: 'activity_score', activityContributors: 'activity_contributors', activeCaloriesEst: 'active_calories_est',
-  trainingLoadOts: 'training_load_ots', trainingLoadHigh: 'training_load_high',
+  trainingLoadOts: 'training_load_ots', trainingLoadHigh: 'training_load_high', trainingLoadGate: 'training_load_gate',
   recoveryIndexHours: 'recovery_index_hours', wornHoursBle: 'worn_hours_ble', nightHrvBaselineMs: 'night_hrv_baseline_ms',
   illnessFlag: 'illness_flag', illnessScore: 'illness_score', illnessBiomarkers: 'illness_biomarkers',
   daytimeStressScaled: 'daytime_stress_scaled', stressHighMinutes: 'stress_high_minutes', recoveryHighMinutes: 'recovery_high_minutes',
@@ -1590,6 +1611,7 @@ export async function getOuraDailyDerived(db: Db, userId: string, from: string, 
     activeCaloriesEst: r.activeCaloriesEst,
     trainingLoadOts: r.trainingLoadOts,
     trainingLoadHigh: r.trainingLoadHigh,
+    trainingLoadGate: r.trainingLoadGate,
     recoveryIndexHours: r.recoveryIndexHours,
     wornHoursBle: r.wornHoursBle,
     nightHrvBaselineMs: r.nightHrvBaselineMs,

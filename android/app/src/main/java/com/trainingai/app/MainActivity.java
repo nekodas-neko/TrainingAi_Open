@@ -510,6 +510,14 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(com.trainingai.app.scale.ScaleBlePlugin.class);
         registerPlugin(com.trainingai.app.media.MediaSavePlugin.class);
         super.onCreate(savedInstanceState);
+        // Q-250. Debug builds only, and gated on the manifest's own debuggable flag rather than a
+        // build-type constant so a release APK can never take this branch. Without it the WebView's
+        // content is not exposed to the tooling that drives the emulator job, so its UI flow sees an
+        // app with no readable form — measured, not assumed: with the host hop proven reachable, the
+        // flow still could not find the sign-in form.
+        if ((getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0) {
+            android.webkit.WebView.setWebContentsDebuggingEnabled(true);
+        }
         // BF-80. Registered before anything else touches the WebView: Capacitor already forwards
         // `onRenderProcessGone` to its listeners and the default answer is `false`, which the
         // platform reads as "kill the app". Without a listener there is no recovery at all.

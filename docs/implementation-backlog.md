@@ -14,8 +14,8 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **265** | `lib/data/postgres/migrations/` |
-| Local SQLite schema version | **v36** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
+| Next free Postgres migration | **267** | `lib/data/postgres/migrations/` |
+| Local SQLite schema version | **v37** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
 > never were safely: a next-free pointer is a *floor*, not an authority, because it cannot see an
@@ -835,6 +835,64 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
   would make the tile instant and work offline, but it duplicates a formula One Formula, One Place
   says lives once, and the `node:path` read is the coupling that keeps it server-side.
 
+### [cardio][devices] BF-119 — a resumed guided walk keeps its clock and loses its samples, and the summary reports both as if they agree
+
+- **Lane:** B — `components/guided-walk/walk-active.tsx` and `lib/stores/guided-walk-store.ts`.
+- **Added:** 2026-09-04 · owner: *"I started my guided walk then I closed the app mid session and
+  opened again - I was able to resume the walk- but its missing data."* Screenshot: **30m** duration
+  beside a heart-rate chart whose axis ends at **6m**, per-interval rows reading `—` for sets 1-4 with
+  only set 5 populated, and **Session Load 6** where a comparable complete walk read 30.
+- **Verify:** device — the failure needs a real process kill; a browser reload is not the same path.
+
+**The resume is half-implemented, and the half that works is what makes it dangerous.**
+`startedAtMs` lives in the persisted store, so on relaunch the timer, the elapsed second count, the
+segment the walk is in and the final `durationMin` are all still measured from the **original** start.
+The samples are not:
+
+- `samplesRef = useRef<WalkHrSample[]>([])` (`walk-active.tsx:49`) is **component-local**. The
+  component remounts on relaunch and the array starts empty.
+- `cadenceRef` gets a **new** `CadenceTracker`, started with `tracker.start(startedAtMs)` — the
+  original start. So the tracker is anchored 25 minutes in the past holding 5 minutes of data, which
+  is why every earlier interval bucket is empty and only the final one has values.
+- `onFinish(samplesRef.current, cadenceRef.current?.summary() ?? null)` (`:141`) then hands the
+  summary a post-resume slice while the duration says half an hour.
+
+**So every derived figure is wrong in the same direction and nothing on the screen says so** — avg HR,
+max HR, time in zone, Session Load and the per-interval table all describe ~5 minutes, presented
+beside a 30-minute duration. **`kcal` is the exception and that is worth knowing**: it is derived
+server-side from duration and activity type, so it alone reflects the full walk. One tile disagreeing
+with the rest is the tell.
+
+**⚠ The store already knows this happens, for the neighbouring case.** `onRehydrateStorage` resets
+`mode: 'done'` to config with the comment *"the summary's in-memory samples are gone after a reload,
+so there's nothing to show."* The exact same reasoning applies to `mode: 'active'`, and that branch
+resumes anyway. The knowledge is in the file; only the conclusion was not carried across.
+
+**The fix pattern is already in the same store, applied to a different stream.** `rawPoints` — GPS —
+lives in the store and the store has **no `partialize`**, so route and distance already survive a
+relaunch. HR and cadence are the two streams that were left in component refs.
+
+- **Recommendation: move the HR sample array into the store beside `rawPoints`, and make the cadence
+  tracker resumable from it.** That makes the surviving data match the surviving clock, which is the
+  actual defect. It also costs nothing new architecturally — one stream in that store already does it.
+- **⚠ Watch the write volume before copying `rawPoints` blindly.** The store persists through
+  `debouncedLocalStorage(PERSIST_DEBOUNCE_MS)`, and an HR sample arrives roughly once a second against
+  a GPS fix every few seconds. Serialising a growing array on every beat is a different load profile;
+  the debounce may need widening, or the samples appending rather than the whole array re-serialising.
+  Measure it on the device rather than assuming the existing debounce absorbs it.
+- **If the samples cannot be preserved, the summary must say so rather than imply agreement.** A
+  second-best fix is honest labelling — the chart marked as covering part of the walk, and Session
+  Load withheld rather than under-reported. **Silently averaging five minutes and calling it thirty is
+  the thing to stop**, whichever way it is stopped.
+- **⚠ Do not fix it by refusing to resume.** Resuming is correct behaviour and the owner used it
+  successfully; ending a walk because the app was backgrounded would be a worse outcome than a partial
+  chart.
+- **Verification (device):** start a guided walk, kill the app from the recents switcher mid-session,
+  reopen and resume, then let it finish — the heart-rate chart spans the whole walk, every interval
+  row carries values, Session Load is comparable to an uninterrupted walk of the same length, and the
+  duration still matches the wall clock.
+
+
 ### [platform][workouts][nutrition] 🔵 BF-118 — "User Information": one place the app knows you from, and one assembler every AI route reads
 
 > **⚑ REFINED 2026-09-04 — the intake is a BLURB ROUTER, and the owner would rather talk than fill in
@@ -925,6 +983,48 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
 > - Seed set, matching the destinations that exist or are named in this entry: when you can train ·
 >   anything you cannot eat · injuries or pain to work around · how long you have trained · anything
 >   else the app should know.
+
+> **⚑ SCOPE SET 2026-09-04 — this is a CONSOLIDATION, not only a new section.** Owner: *"make sure
+> all this data about the user is one place goals and etc can probably all be in a user section."*
+>
+> **Where personal data is entered today, mapped:**
+>
+> | what | where |
+> |---|---|
+> | goals — weight, calories, steps, water | **More root**, `GoalsSection` rendered inline (`profile-tab.tsx:372`) |
+> | height · age · sex | More → **Profile details** (`/more/details`) |
+> | DEXA · RMR | More → **DEXA & RMR results** (`/more/clinical`) |
+> | training schedule | More → **Sessions, progression & schedule** (`/program`) |
+> | **injuries** | **the Health tab**, `injury-sheet.tsx` — a different tab entirely |
+> | **dietary restrictions** | **inside `meal-plan-setup-sheet.tsx`** — the meal-plan wizard, and nowhere else |
+>
+> **The dietary restrictions row is the sharpest case and it is worth stating on its own.** The schema
+> says outright that these belong to the person — *"Per USER, not per plan: an allergy belongs to the
+> person, so every plan inherits it"* — and yet the only way to record or change one is to enter a
+> wizard for generating a meal plan. A permanent fact about the owner is reachable only through a
+> flow about something else.
+>
+> **Good news for scope: `MoreRowGroup label="Your setup"` already exists and already gathers three of
+> the six.** So the consolidation is mostly moving the two outliers in and deciding what happens to
+> goals — not building a hub from nothing. The blurb router then writes into the same destinations the
+> section shows, which is what makes the two halves of this entry one feature rather than two.
+>
+> - **Recommendation: one canonical home per fact, plus a link from wherever it is contextually
+>   useful — not a hard move.** Injuries live on Health because that is where the owner is looking
+>   when something hurts, and relocating them wholesale would cost that. The rule that resolves it:
+>   **the canonical editor lives in the user section; every other surface links to it rather than
+>   holding a second copy of the form.**
+> - **The meal-plan wizard keeps its step**, but it should read and write the **user-level** record
+>   rather than being the only door to it. A wizard that quietly owns a permanent fact is the defect
+>   here, not the wizard asking the question.
+> - **⚠ Goals are the one item that may be right where it is.** They sit inline on the More root
+>   because they are looked at often, and burying them one level down to satisfy tidiness would be a
+>   regression. Decide it on how often each thing is *read*, not on what the category diagram looks
+>   like: goals are read weekly, a DEXA scan twice a year.
+> - **⚠ Do not migrate storage.** Every table here already exists and is correct; this is a navigation
+>   and surface change. Moving columns between tables to match the new screen would be the failure —
+>   the assembler in this entry is what makes the data feel like one place, and it reads the tables
+>   where they are.
 
 
 - **Lane:** A for the store and the assembler; B for the section itself. **Needs a plan document
@@ -3788,8 +3888,24 @@ a finding — it does not by itself explain a plain `GET` hanging beside it.
   The trade is working: `oura_raw_samples` is a rolling window (`ring_timestamp_ds` spans **7.58
   days**, 189,406 rows, 73 MB) and the archive takes the overflow at about an eighth of the size —
   ~440 MB/year, permanent, on a 5 GB volume.
-- **Keep — what is still owed is the REMAINDER, ~0.7–1.7 MB/day**, and the archive should be
-  excluded from the next attempt rather than counted again.
+- **⚑ RE-READ 2026-09-04, which this entry asked for: user tables total 204 MB, and the remainder
+  sits at the TOP of the range below, not the bottom.** Against the 171 MB baseline of 2026-08-18
+  that is 33 MB in 17 days — but migration 249 removed 21 MB of index inside that window, so gross
+  growth is **54 MB / 17 days ≈ 3.2 MB/day**, slightly worse than the 2.9 measured on 08-30 rather
+  than better. `oura_raw_packed` accounts for ~1.06 MB/day of it (18 MB since its first pack on
+  08-18), leaving **~2.1 MB/day** against a ~0.4 MB/day expectation. Nothing has changed shape:
+  `oura_raw_samples` 74 MB (30 heap / **44 index**), `error_events` 52 MB, `oura_heartrate` 25 MB,
+  `oura_raw_packed` 18 MB, `rr_intervals` 17 MB.
+  **Compare only like with like — that trap was nearly walked into here.** `pg_database_size` reads
+  **218 MB** on the same day; the 171 / 200 / 206 / 204 series is `sum(pg_total_relation_size)` over
+  `pg_stat_user_tables`, and mixing the two turns a flat two days into an invented 9 MB/day. State
+  which measure a number is, every time.
+  ⚠ **A third instance of the `n_live_tup` trap, on the same table CLAUDE.md already names twice:**
+  it read **97** against `oura_raw_packed`'s **1,093** real rows (previously 0-vs-764 and
+  55-vs-1,051). The size columns in that same query were exact. Do not soften the rule — this table
+  is simply one autoanalyze has never reached.
+- **Keep — what is still owed is the REMAINDER, ~2.1 MB/day as re-measured above**, and the archive
+  should be excluded from the next attempt rather than counted again.
 - **What is still owed.** Total was **206 MB** against the **171 MB baseline of 2026-08-18** —
   ~2.9 MB/day where the post-packing expectation is ~0.4 MB/day. Removing 21 MB of index and one
   write-amplification source does not account for that; the question is what is adding ~2.5 MB/day
@@ -7500,59 +7616,64 @@ without a queue entry is a dropped finding.*
   does not exist — and the first time it mattered it cost a session and produced one wrong conclusion
   along the way.
 
-### [sleep][platform] LB-53 — `oura_daily_derived` is written in occasional bulk passes, not per night
+### [sleep][platform] LB-53 — `oura_daily_derived`: what actually writes it, and the one thing still owed
 
-> **✅ THE QUESTION THIS ENTRY SAID TO MEASURE FIRST IS ANSWERED (2026-09-03): the scores go STALE,
-> they are not ABSENT.** `created_at` on `oura_daily_derived` runs one row per day, each created the
-> day after the night it describes — 2026-08-22 created day 08-23, 08-23 created 08-24, unbroken
-> through 2026-09-02 creating 09-03 — with one catch-up of 5 rows on 2026-08-17. So a row exists from
-> the morning after, and it then holds its first value until a bulk pass rewrites it. Nothing was
-> missing during the nine-day gap. **That settles which of the two failure modes this is**, and it is
-> the less alarming one: no screen was ever blank, but a screen could show a days-old score.
+> **⛔ REFUTED AS FILED, 2026-09-04 — `computed_at` does not mean what this entry read it to mean, and
+> the fix it implied is not the fix.** The column is stamped `now()` by **every** write of **any** of
+> the 36 columns on the row (`upsertOuraDailyDerived` sets `computedAt: new Date()` unconditionally,
+> `lib/data/postgres/slices/oura.ts`). So it answers *"when was this row last touched by any of five
+> producers"*, never *"when was this score computed"*. Three sessions have now tried to read a
+> per-score cadence out of it.
 >
-> **The "four stamps in the whole history" reading is stale and the shape is different now.** As of
-> 2026-09-03 there is a bulk pass at **07:00:15Z** rewriting ~30 days in a single ~50 ms burst, and a
-> single-row write at **08:00:09Z** for that day only. So both cadences exist — an incremental
-> per-day write and an occasional whole-history rewrite. Re-read the stamps before building; this
-> entry's table was one snapshot.
+> **The "bulk pass rewriting 85 rows" is the body-comp backfill, and it touches no score.** Every
+> rollup run calls `persistBodyCompFromMetrics` (`rollup-io.ts` → `persistBodyComp`), which walks the
+> **entire** `body_metrics` history and upserts one derived row per day that has a weight and a body
+> fat — re-stamping `computed_at` on every one of them while writing only `body_comp`. Measured
+> 2026-09-04 in production: a burst at 02:16:37Z, one row per day, writes 3–4 ms apart, spanning the
+> whole history. That is the shape this entry read as "the scores were recomputed in a bulk pass".
+> They were not; only `body_comp` was.
 >
-> **The deploy hypothesis is NOT confirmed and should not be carried as if it were.** The 21:55 pass
-> landing minutes after #827 is one coincidence, and today's 07:00:15 bulk pass does not line up with
-> a merge (#838 merged 07:49, #839 later). Whatever schedules the bulk pass, a deploy is not
-> obviously it. Establish the trigger before designing around it.
+> **The scores are written per day, on the day, by the live route — and never revisited afterwards.**
+> `lib/health/readiness-payload.ts` persists readiness, sleep and activity on every
+> `/api/readiness-score` request, keyed to today (`latestSummary?.date ?? todayIso`, and `lastSleep.date`
+> for sleep). So a day's stored score is refreshed continuously *while that day is current* and frozen
+> the moment it ends. **Direct evidence, not inference:** `model_versions.readiness` is stamped by
+> that route and only that route. In production it is present on exactly the **10** most recent days
+> (2026-08-26 → 09-04) and absent from all **76** older rows — if any pass ever recomputed a past
+> day's readiness, those rows would have picked the stamp up. None did.
+>
+> **The 27 scores with no stamp came from the admin backfill route** — `app/api/admin/backfill-derived-scores`,
+> the only other writer of `readiness_score`, which was writing the score and contributors and **no
+> stamp at all**. Fixed here: it now writes `modelVersions: { readiness: READINESS_MODEL_VERSION }`,
+> matching the live route. Its own comment had claimed it could not, because `model_versions` was
+> "replaced wholesale" — that stopped being true when Q-273 made the column merge per pillar with
+> `||` inside the statement, and the comment was never updated. Covered by a new case in
+> `backfill.test.ts` (mutation-verified: dropping the stamp fails that one test and no other), which
+> also pins that writing readiness leaves another pillar's stamp in place.
+>
+> **The full writer map, since no single place held it:** (1) the live readiness route — readiness,
+> sleep, activity, today only, stamped; (2) the admin backfill — readiness and sleep across a ≤31-day
+> range, now stamped; (3) the rollup — recovery index, worn hours, night-HRV baseline, stress,
+> resilience, BDI, for the days it processes; (4) `persistBodyCompFromMetrics` inside the rollup —
+> `body_comp` for the whole history, every run; (5) the device push (`oura_daily_derived` outbox
+> domain, `adapter.ts`). All five stamp `computed_at`.
 
-- **Lane:** A — the rollup (`lib/oura-ble/rollup/**`) and whatever schedules it. Found from Lane B
-  while checking Q-529's own caveat; filing rather than building, per the lane rule.
+- **Lane:** A
+- **Branch:** `fix/backfill-readiness-model-stamp` (the stamp half, shipped 2026-09-04)
 - **Added:** 2026-09-02 · measured against production while answering Q-529's *"re-read `computed_at`
-  the next day"*.
-- **The whole table carries four distinct `computed_at` stamps.** Not four per day — four in its
-  entire history:
-
-  | stamp (UTC) | rows | day range touched |
-  |---|---|---|
-  | 2026-09-02 21:55 | 85 | 2026-05-07 → 2026-09-03 |
-  | 2026-08-24 13:42 | 1 | 2026-08-22 |
-  | 2026-08-17 07:50 | 21 | 2026-07-08 → 2026-08-04 |
-  | 2026-07-30 03:30 | 1 | 2026-07-07 |
-
-- **Nine days with no write at all**, 2026-08-24 13:42 → 2026-09-02 21:55, across which every night
-  happened as usual. Rows exist for all of them and every one now carries the 21:55 stamp, so the
-  question this cannot answer from outside is whether those days held a stale score in the meantime
-  or no row at all. **That is the thing to measure first** — it is the difference between "scores go
-  stale" and "scores are absent until something triggers a pass".
-- **The 21:55 pass is suspicious in itself.** It landed minutes after a Railway deploy (#827) and
-  rewrote 85 rows spanning the whole history. If a *deploy* is what recomputes scores, then the
-  refresh cadence is release frequency rather than anything to do with the data — which no one would
-  choose, and which would explain the nine-day gap exactly.
-- **What it changes for the user:** Q-529 reported a score of 47 on 2026-08-20 that should have
-  settled higher. It now reads **62**. So the recompute is real, but on this evidence it is not
-  nightly, and a night's score can sit at its mid-sync value for a long time rather than the
-  ~9-minute window Q-529 assumed. **That makes Q-529's client-side marking more load-bearing, not
-  less** — the marked state may persist far longer than a few minutes.
-- **Not a duplicate of Q-529.** That is "the number on screen does not say it can still change", and
-  its Lane B half shipped 2026-09-02. This is "the number may not be recomputed for days".
-- **Caveats:** `claude_ro` is row-scoped to the owner, so this is one user's rows; and `computed_at`
-  is the only evidence available from outside — the scheduling itself is not visible from a query.
+  the next day"* · refuted and re-scoped 2026-09-04
+- **Keep:** one thing, and it is not what this entry was filed for. **58 of the owner's 109 derived
+  rows carry no readiness score at all** — the history is more hole than trend, because the live
+  route only ever writes today and nothing has back-filled the rest. The tool to fix it already
+  exists and now stamps correctly; running it is a **`Gate: owner`** action, not a code change,
+  because it writes months of history in one pass and a re-scored trend is not silently reversible.
+- **Gate:** owner
+- **Not a defect, recorded so it is not re-opened:** a day's score freezing when the day ends is
+  correct behaviour, not staleness. The narrow real case is a day whose last app open happened
+  before the ring synced — that day's stored score is built from an incomplete night and nothing
+  revises it. The backfill route is the remedy for that too.
+- **Caveats on the measurement:** `claude_ro` is row-scoped to the owner, so every count above is one
+  user's rows. The writer map is read from source and is complete; the counts are not.
 
 ### [platform] LB-52 — GitHub's auto-merge API does not see a Ruleset, so every PR is a hand-caught race
 
@@ -12818,7 +12939,8 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   **The entry's `adapter.ts:5706` reference is stale** — the step moved to
   `lib/oura-ble/rollup/run.ts` with the rollup extraction.
   [journal](overview/entries/2026-09-02-tn1-chronic-stress-count.md).
-- **⚠ Keep — AND IT NEEDS THE OWNER TO PRODUCE THE NUMBER.** The instrumentation is live but
+- **Gate:** owner
+- **Keep:** the number itself, and only the owner can produce it. The instrumentation is live but
   **nothing will write it until a `fullHistory` rollup pass is triggered by hand**, which is
   owner/device-gated and is the same gate Q-525 names. Until then the column stays NULL on every
   row, and that is the expected state rather than a defect. Once a number exists: **≥ 21 with the
@@ -13183,6 +13305,50 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [platform][readiness] Q-278 — a score that could not be computed is rendered identically to a score of 76
 
+> **✅ THE ENGINE HALF SHIPPED 2026-09-03 (Lane A). What remains is Lane B's surface work.**
+>
+> **The producer-level fix is the real content, and it was hiding in a branch that already existed.**
+> `zToScore` returned the same `NEUTRAL` for `z == null` (there is no input) and for
+> `nHistory < BASELINE_MIN_NIGHTS` (there IS an input; the baseline is too cold to score it) — two
+> situations that read completely differently to a user, collapsed into one indistinguishable value.
+> `ReadinessContributor` now carries `gap: 'no_input' | 'awaiting_baseline' | null`. **Only waiting
+> fixes the second**, so only the second can be told to a user as such.
+> ⚠ `provisional` is UNCHANGED and still means two things — `recoveryIndexScore` is `provisional`
+> because its *curve* is an approximation, not because anything is missing, and its gap is null.
+> That overload is part of why this entry existed; do not "tidy" it into `gap`.
+>
+> **`metricAvailability(metric, value, contributors)`** in `lib/health/score-availability.ts` is the
+> shared representation, **keyed on the metric name** — so the entry's blocking question (are daytime
+> stress and resilience "pillars"?) never has to be answered, and a sixth metric costs nothing. It
+> reports `state`, a `gap` when absent, and `degradedInputs` for a score that WAS produced from an
+> incomplete picture, which is what lets a surface say *"computed without HRV"* rather than only
+> *"limited"*. A mixed set of causes resolves to `no_input`: waiting cannot fix the half that has no
+> data, so the optimistic answer would be the misleading one.
+>
+> **The enum has exactly two members because that is what the producers can distinguish.** The
+> entry's own warning was against building `below_gate`/`not_yet` from what reads well; nothing
+> computes those, and they would have made the "why" a constant.
+>
+> **`/api/readiness-score` now returns `availability` for readiness, sleep and activity.** Optional
+> on the type, deliberately: clients seed this payload synchronously from SQLite, so a device can
+> paint from a response written before the field existed. Readiness carries contributors so its
+> reasons are real; sleep and activity have no contributor breakdown and honestly report only
+> present/absent.
+>
+> **Lane B's half:** consume `availability` on the surfaces that already render an em dash correctly,
+> so the dash gains a reason. `health-score-detail.tsx` builds a fallback `ReadinessScoreResponse`
+> literal and is where a Lane B session will start.
+>
+> **Verified:** 9 tests, three against a REAL `computeReadinessComposite` rather than hand-built
+> contributors — the gap between "the helper works" and "the producers populate it", which is the
+> shape of the failure this entry warned about. Mutation-checked: collapsing the split back into one
+> `NEUTRAL` fails them. Full suite 757 files / 6,453 tests. ⚠ **A first fixture omitted
+> `checkinScore` and the cold case then read `no_input` — correctly, since a missing check-in IS
+> missing data. The fixture was wrong, not the code**; an incomplete one silently tests a different
+> question.
+> **NOT verified:** an authenticated `/api/readiness-score` response. The route compiles and 401s
+> without a session, and the sandbox cannot mint one.
+
 > **✅ THE OPEN QUESTION IS ANSWERED (2026-09-03, Lane A) — and the answer is that it is the wrong
 > question to encode.** The ⚠ below asks *"decide whether they are pillars before generalising a
 > coverage representation over five of them"*. **Don't decide. Key the representation on the metric
@@ -13214,7 +13380,8 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Branch:** `feat/score-coverage-surfacing`
 - **Plan:** none yet
 - **Added:** 2026-08-15 · from the comprehensive review §1.1
-- **Lane:** A — derived 2026-08-31 by the path rule while selecting Lane B's next item: `lib/health/score-availability.ts` is reached by `app/api/readiness-score`, `app/api/body-battery` and `app/api/ai/health-insight`. The surfaces that consume it are Lane B, so this is a both-lanes item and the engine half goes first.
+- **Lane:** B — **was A, flipped 2026-09-04 once the engine half shipped.** Derived 2026-08-31 by the path rule while selecting Lane B's next item: `lib/health/score-availability.ts` is reached by `app/api/readiness-score`, `app/api/body-battery` and `app/api/ai/health-insight`, so the engine half was Lane A's and went first. It is done; every path still open here is a surface, and leaving the lane at A had `next-item.js --lane A` offering this as its fourth READY item with nothing in it for that lane to build.
+- **Keep:** Lane B's half — consume `availability` on the surfaces that already render an em dash, starting from the fallback `ReadinessScoreResponse` literal in `health-score-detail.tsx`.
 - **Measured** over 40 post-re-key days (`claude_ro.oura_daily_derived`):
 
   | Pillar | days with a value | coverage |
@@ -13655,7 +13822,43 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 >    host now. (It turned out to be 11 s, not the 120 s guessed — the fix is still right, and
 >    measuring it is what killed the hypothesis.)
 >
-> **What remains, stated as the two candidates it is and not more:**
+> **⚑ FIVE MORE RUNS, 2026-09-04 — (b) IS ELIMINATED AND (a) IS NARROWED TO ONE SENTENCE. Read this
+> instead of the two candidates below; they are settled.** Three independent axes now agree, and the
+> job reports all three by step name so re-reading them costs one API call and no log:
+>
+> | axis | answer |
+> |---|---|
+> | reachability | **OK** — no `net::` error after launch; the WebView loaded from the host |
+> | view hierarchy | **present, and carries no sign-in text** — not empty, so the driver sees the app |
+> | server access log | **it served `/sign-in`** — the page was requested and delivered |
+>
+> **So the page rendered and the driver cannot read inside the WebView.** That is (a), and the fix
+> the entry proposed for it — `setWebContentsDebuggingEnabled(true)` in the debug build — **shipped
+> here and did not change the result.** It is kept (it costs nothing, is gated on the manifest's own
+> `FLAG_DEBUGGABLE` so no release build can take it, and web-view tooling needs it anyway), but do
+> not expect it to be the answer.
+>
+> **⚠ Do not trust `net::`-free as proof the page is fine** — that was this session's own mistake,
+> caught one run later. A 500, a redirect or an app-level error page produces no `net::` entry, so
+> the reachability assertion alone is weaker than it reads. The server-log axis exists because of it.
+>
+> **The next thing to try is NOT more Maestro tuning — it is removing Maestro from this path.** The
+> UI flow was only ever a means to get a signed-in user, because `getLocalStore(userId)` needs one
+> before any local SQLite database exists. The job already owns `AUTH_SECRET` and seeds the user, so
+> it can mint the session cookie directly and hand it to the WebView, skipping the form entirely.
+> That asserts exactly what this job exists to assert — that the local migrations apply on real
+> Android SQLite — without depending on whether a WebView's DOM is legible to a UI driver, which is
+> a question this repo has no other reason to care about.
+>
+> **How to read this job now, and why it changed:** the verdict is carried by mutually exclusive
+> STEP NAMES (`VERDICT …`, `TREE …`, `PAGE …`), not by log output. `list_workflow_jobs` returns them
+> with no log fetch. This exists because the runner appends its own blocks — artifact upload, git
+> cleanup, the Postgres container dump — after every step, so nothing a job prints is ever last;
+> four log pulls of 100+ lines each failed to reach a verdict that was being printed correctly.
+> Also fixed on the way: the Postgres healthcheck ran `pg_isready` as root and logged a FATAL every
+> ten seconds, roughly 190 lines of noise per run, now `-U postgres` and about 65.
+>
+> **The two candidates below are the pre-2026-09-04 statement, kept for the reasoning only:**
 > - **(a) Maestro may not be able to read text inside the WebView.** The app is a WebView and its
 >   accessibility tree may not be exposed to Maestro's view hierarchy at all. If so the fix is
 >   `WebView.setWebContentsDebuggingEnabled(true)` in the debug build plus Maestro's web-view
@@ -14053,6 +14256,28 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   as test fixtures. None of this has been done; the bands today are still the plan's initial
   priors. Grepped the backlog for a tracking entry — none exists; this gap has sat as a code
   comment only.
+- **Gate:** owner
+- **Why it is gated rather than READY (added 2026-09-04):** every path in this entry ends at data only
+  the owner can produce, and it was heading Lane A's READY list with nothing an implementer could
+  start. The classifier's own header forbids the one thing that looks implementable — *"do not
+  hand-tune further without real data"* — so tightening the bands from a desk is the explicitly
+  prohibited move, not the fallback.
+- **⚠ UNTESTED, but it may make the owner's ask much smaller — worth checking before booking four
+  physical captures.** The plan asks for fresh captures of a counted walk, a run, a lifting session
+  and idle. But the ring's frames are archived: `oura_raw_packed` holds **1,094 rows spanning the
+  full history** (measured 2026-09-04) and CLAUDE.md's rule is that `body_hex` is the archival source
+  of truth precisely so *"a decoder added later can back-fill by re-decoding stored hex"*. If the
+  motion frames the classifier reads are among them and decode to the three `GaitFeatures` inputs,
+  the **signal** for months of walking already exists, and what is actually missing is **labels** —
+  which windows were a real walk and which were sitting. Some labels are already in the database
+  (guided walks, GPS-tracked activities and workout sessions are all timestamped), and the owner's
+  three false-positive reports are themselves labelled idle windows. That would turn the ask from
+  *"do four counted sessions with the ring on"* into *"confirm these timestamps"*.
+  **Two things to check before believing any of it:** whether the packed archive actually contains
+  the motion/steps frame tag rather than only the HR/sleep ones, and whether re-decoding them yields
+  `strideHz`/`strideAmpFrac`/`totalAmplitudeMg` rather than a different column set. Also note
+  `step_live_windows` holds **8 rows in total** — the live step path has produced almost nothing, so
+  do not reach for that table as a shortcut.
 - **Needs the owner, not just an implementer** — the capture step is physical (an actual counted
   walk/run/lifting session with the ring on), via the plan's referenced admin device-data capture
   panel or an ad-hoc capture. No code review substitutes for real frames.
@@ -14492,6 +14717,31 @@ classifier** — correctly, since the mechanical action is "delete every user-sc
 data layer", which is indistinguishable from the thing this entry exists to prevent. Do not try to
 work around it. Either the owner runs it locally, or it needs an explicit permission grant; a
 session that plans this residual without knowing that will lose the time twice.
+
+**A THIRD blind spot, found and closed 2026-09-04 — a method that never asked for `userId` at all.**
+Both mechanisms above assume the owner is a *parameter*: the 278-predicate sweep mutates predicates
+that exist, and `check-repository-user-scoping.js` fails a method that **takes** `userId` and never
+uses it. Neither can see a method whose signature omits the owner entirely — there is no predicate to
+neutralise and no unused parameter to flag. Enumerating every data-layer method taking an id but no
+`userId` found **12**; nine constrain ownership through a join or a documented pre-check, and
+**three constrained it nowhere**: `getSetDetailsForSession`, `getSetTimestampsForSession` and
+`markHrSynced` (a bare unscoped `UPDATE`, so it wrote rather than read). They were safe only because
+the single production caller passed an id sourced from a user-scoped query — a property of that
+caller, not of these functions — and two of the three have no production caller at all, which is why
+the shape survived. All three now take `userId` and constrain on `workout_sessions.user_id`;
+`getSetTimestampsForSession` needed the `workout_sessions` join *added*, since the owner is not
+reachable from `set_logs`/`exercise_logs` alone, which is exactly what made the omission easy.
+`lib/data/postgres/__tests__/hr-session-ownership.test.ts` covers the class — two controls proving
+the fixture produces data at all, three cross-user cases, mutation-verified (dropping the predicates
+fails exactly the three cross-user tests while both controls still pass). **Not mechanised**: a
+check that flagged every id-taking method without `userId` would fire on all nine legitimately
+join-scoped ones, so it needs a per-method allowlist to be useful, and an allowlist that large is
+its own maintenance hazard. Recorded here as the shape to re-enumerate rather than automated.
+
+- **Keep:** the two residuals above — exact per-predicate attribution across the 278 (~278 runs), and
+  a full-suite measurement, which is BLOCKED in the sandbox per the paragraph above. Plus the third
+  class: re-enumerate id-taking methods without `userId` when the data layer next grows.
+
 
 ### [app-shell] ⏳ Q-151 — WATCH ONLY, nothing to implement — the sign-in React #418 did not reproduce and the whole series stopped
 
@@ -15029,6 +15279,36 @@ per-field merge where an AI write has no honest source rank to claim.
     updates rather than swallows a real number, and there is now a test pinning that
     (`training-stress-persist.test.ts` — its upsert case runs everywhere; the two OTS cases need the
     vendored constants and skip without them).
+- **⚑ THE OBSERVABILITY SHIPPED 2026-09-04 — migration 265 (column) + 266 (regenerated `claude_ro`
+  views), local SQLite v37.** `oura_daily_derived.training_load_gate` is written by the route on
+  **every** evaluation, not just the successful one: **NULL** = the route never ran for that day,
+  **`'ok'`** = it scored, anything else = which of the four gates refused (`no_readiness` ·
+  `readiness_learning` · `no_profile` · `insufficient_met`, the existing `TrainingStressResult`
+  enum, not a new vocabulary). That is precisely the distinction this entry says nothing could make.
+  `'ok'` rather than NULL on the success path is load-bearing — the upsert COALESCEs, so a NULL
+  would leave a morning's `insufficient_met` standing on a day that scored by afternoon; a test
+  pins it. Migration 266 matters as much as 265: the view generator emits an explicit column list,
+  so without it the column is invisible to `/api/admin/db-query`, which is the only way anyone reads
+  production here.
+- **Keep:** the read. **Nothing is owed in code — what is owed is one query, a few days from now**,
+  once the column has had time to be written:
+  ```
+  SELECT day, training_load_gate, training_load_ots
+    FROM claude_ro.oura_daily_derived ORDER BY day DESC LIMIT 14
+  ```
+  **All-NULL means the route is not being called** — candidate 1 below (`warmCache` returning early
+  on a cached key) or no caller at all, and the fix is on the client. **A reason string means it is
+  called and refusing**, and the string names which gate, which retires the guessing entirely. Do
+  not diagnose further until that read exists; three diagnoses have been wrong without it.
+- **⚠ Found while shipping the above, and worse than the entry it came from:**
+  `daytime_stress_coverage_min` and `chronic_stress_granular_nights` were in `DERIVED_COLS`, in the
+  local mirror, in the outbox payload and in the round-trip test's fixture, and **absent from
+  `pushMutations`** — so a device backing up its derived rows silently dropped both for as long as
+  they have existed. Fixed here. The field-coverage tripwire could not see it: it compares the
+  fixture against `DERIVED_COLS`, and both of those are lists that the test and the slice control,
+  while the landing assertion beside it named five columns by hand. A second assertion now drives
+  off `DERIVED_COLS` and asserts every column the payload sends actually **lands**; restoring the
+  bug fails it by name and leaves the original passing.
 - **The structural problem, which is why this entry keeps being wrong.** The persist is a *side
   effect of a GET*, it happens only when `result.status === 'ok'`, and nothing records that the
   route ran or what it decided. So "not called" and "called and gated" are indistinguishable from
@@ -15296,12 +15576,6 @@ per-field merge where an AI write has no honest source rank to claim.
   reusable components. What is missing is one entry point instead of two, three stats, a 7-day
   comparison, and the wrap-up continuing from the read-through. Reasoning and alternatives: the plan.
 
-### [readiness][nutrition] Q-112c — the 7-day comparison window
-
-- **Branch:** `feat/day-review-week-window` · **Lane: A** — `app/api/**`
-- The prior-7-day series for the stats that get a trend. Reuse `computeActiveEnergy()`,
-  `/api/workout-load-history`, `body_metrics`, `buildDayAudit`. Anchor at `todayMidnightUtc(tz)`.
-
 ### [nutrition][app-shell] Q-112d — draw the trends, on four stats not fourteen
 
 - **Branch:** `feat/day-review-trends` · **Lane: B** · **Plan:** the above, §4
@@ -15324,8 +15598,12 @@ per-field merge where an AI write has no honest source rank to claim.
 
 - **Branch:** `chore/load-comparison-rehome-or-delete` · **Lane: A** — the decision reaches
   `app/api/workout-load-history/route.ts`; the re-home half alone would be Lane B.
+- **Needs: Q-112d**
 - **Added:** 2026-08-27 · Lane B, from Q-112a's own diff. Filed rather than acted on, because the
-  right answer depends on Q-112b–d, which are not built yet.
+  right answer depends on Q-112b–d, which are not built yet. **The dependency is a field as of
+  2026-09-04**: the entry's own body says "do not delete the route yet" because Q-112c reuses it,
+  and Q-112c shipped that day — so the blocker is now Q-112d, and it is written where the lane
+  runner can read it instead of in prose it prints as READY over.
 - **What Q-112a removed.** `components/day-review-sheet.tsx` was the **only** renderer of
   `components/health/workout-load-comparison-chart.tsx` and the only caller of
   `/api/workout-load-history`. After Q-112a shipped:

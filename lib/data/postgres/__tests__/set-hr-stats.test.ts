@@ -83,7 +83,7 @@ describe.skipIf(!canRun)('set_hr_stats round-trip', () => {
   })
 
   it('reads the rich set details for a session', async () => {
-    const sets = await repo.getSetDetailsForSession(WS)
+    const sets = await repo.getSetDetailsForSession(U, WS)
     expect(sets).toHaveLength(2)
     expect(sets[0]).toMatchObject({ exerciseName: 'Bench Press', phaseType: 'peak', intensityPct: 90 })
     expect(sets[0].setStartMs).not.toBeNull()

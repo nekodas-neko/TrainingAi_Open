@@ -4,6 +4,7 @@
 // — otherwise the table it fills is worse than the 21% sample it replaces. These tests pin that
 // (via the shared `PillarAudit.persist` payload both paths use), plus the write gate.
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest'
+import { READINESS_MODEL_VERSION } from '@trainingai/shared/health/readiness-composite'
 
 const canRun = !!process.env.DATABASE_URL
 const TEST_USER_ID = '00000000-0000-4000-8000-00000000f002'
@@ -45,6 +46,7 @@ describe.skipIf(!canRun)('backfill-derived-scores (F-2)', () => {
   beforeEach(async () => {
     await pool.query(`DELETE FROM sleep_sessions WHERE user_id = $1`, [TEST_USER_ID])
     await pool.query(`DELETE FROM oura_daily_derived WHERE user_id = $1`, [TEST_USER_ID])
+    await pool.query(`DELETE FROM oura_daily_summary WHERE user_id = $1`, [TEST_USER_ID])
     // The route allows 4 calls/minute — correct for an endpoint that can run ~370 queries, but the
     // suite would trip it after the second test. Reset the counter rather than loosen the limit.
     //
@@ -67,6 +69,21 @@ describe.skipIf(!canRun)('backfill-derived-scores (F-2)', () => {
        VALUES ($1, $2, $3, $4, 8, 92, 720)
        ON CONFLICT (user_id, sleep_start) DO NOTHING`,
       [TEST_USER_ID, dayStr(-offset), new Date(end.getTime() - 8 * 3_600_000), end],
+    )
+  }
+
+  /** A daily summary for `today - offset`. The readiness composite needs one — without it the audit
+   *  reports `no-score` for readiness and any assertion about a readiness write is unfalsifiable. */
+  async function seedSummary(offset: number) {
+    await pool.query(
+      `INSERT INTO oura_daily_summary (user_id, date, sleep_duration_hours, sleep_efficiency, hrv_avg_ms,
+         rhr_low_bpm, rhr_avg_bpm, temp_dev_c, met_avg, n_history,
+         hrv_baseline_mean_x8, hrv_baseline_dev_x8, rhr_baseline_mean_x8, rhr_baseline_dev_x8,
+         temp_baseline_mean_x8, temp_baseline_dev_x8, sleep_baseline_mean_x8, sleep_baseline_dev_x8,
+         met_baseline_mean_x8, met_baseline_dev_x8)
+       VALUES ($1, $2, 8, 92, 55, 48, 52, 0.1, 1.4, 20, 440, 40, 384, 24, 0, 8, 64, 8, 11, 2)
+       ON CONFLICT (user_id, date) DO NOTHING`,
+      [TEST_USER_ID, dayStr(-offset)],
     )
   }
 
@@ -121,6 +138,34 @@ describe.skipIf(!canRun)('backfill-derived-scores (F-2)', () => {
 
     expect(backfilled?.sleep_score).not.toBeUndefined()
     expect(backfilled.sleep_score).toBe(live?.sleep_score)
+  })
+
+  it('stamps the readiness model version, and leaves another pillar\'s stamp alone', async () => {
+    // LB-53. The stamp is what separates a score written under one model from a score written under
+    // the next; a backfill writes across history in one pass, so an unstamped backfilled score is
+    // exactly the unmarked step Q-273 added the stamp to prevent. This route wrote them for months:
+    // measured in production 2026-09-04, 27 rows carried a readiness score with no readiness stamp
+    // against 10 carrying both, and no other writer produces the first shape.
+    await seedNight(0)
+    await seedSummary(0)
+
+    // A stamp from a different pillar, already on the row. `model_versions` merges per key (Q-273),
+    // so writing readiness must add to this rather than replace it — the property the route's own
+    // comment used to (wrongly) deny.
+    const { getRepository } = await import('@/lib/data')
+    const repo = await getRepository()
+    await repo.upsertOuraDailyDerived(TEST_USER_ID, today, { modelVersions: { bodyComp: 'probe_1_0_0' } })
+
+    const body = await call(`from=${today}&to=${today}&dryRun=false`)
+    // Without this the assertions below pass vacuously on a day the audit could not score.
+    expect(body.summary.readiness.written).toBe(1)
+
+    const row = (await pool.query(
+      `SELECT readiness_score, model_versions FROM oura_daily_derived WHERE user_id = $1 AND day = $2`,
+      [TEST_USER_ID, today])).rows[0]
+    expect(row.readiness_score).not.toBeNull()
+    expect(row.model_versions.readiness).toBe(READINESS_MODEL_VERSION)
+    expect(row.model_versions.bodyComp).toBe('probe_1_0_0')
   })
 
   it('rejects a range wider than the cap and a malformed date', async () => {
