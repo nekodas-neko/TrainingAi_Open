@@ -15,7 +15,17 @@ const SCALE_WEIGH_IN_TOAST_MAX_MS = 60_000;
 // Mirrors ScaleBleService.CYCLE_BUDGET_MS (Kotlin, native side) — the toast's progress bar
 // visualises the same deadline the native retry loop actually gives up at, so the two must be
 // kept in sync by hand; there's no shared constant across the Kotlin/TS boundary.
-const SCALE_CYCLE_BUDGET_MS = 12_000;
+//
+// Q-114: it had drifted, which is exactly what "kept in sync by hand" fails at. This read 12_000
+// against a native 16_000, so the bar finished four seconds before the native side gave up — and
+// the bar's job is telling the owner how long to keep standing still, so under-reporting it invites
+// stepping off mid-retry. `scripts/check-scale-cycle-budget.js` now fails CI if the two diverge.
+//
+// This is the honest number, NOT the shorter one the owner asked for. Trimming it is a separate
+// change that needs a capture of real weight-stabilisation time: both 12s and 16s are the retry
+// give-up ceiling, and neither is "how long a weigh-in actually takes". Picking a shorter figure
+// from the link-latency capture alone would be guessing with a measurement of something else.
+const SCALE_CYCLE_BUDGET_MS = 16_000;
 
 /** The live weigh-in toast's content, rendered via toast.custom() instead of a plain
  *  string/description so it can carry a progress bar tracking SCALE_CYCLE_BUDGET_MS — the owner

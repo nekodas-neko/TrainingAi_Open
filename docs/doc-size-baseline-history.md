@@ -7735,3 +7735,47 @@ and carries both the number that supports it (1,094 packed rows spanning the ful
 one that complicates it (`step_live_windows` holds 8 rows, so that table is not the shortcut it
 looks like), because an unverified idea recorded without its own disconfirming evidence is how a
 session three months from now inherits a false lead.
+
+## 2026-09-04 — `projectOverview.md` → 9796, `docs/implementation-backlog.md` → 17629 (the scale batch)
+
+A device-unverified change to a path the owner reports bugs on needs a row that says so, and this one
+has to carry more than "not verified": that the Q-104 gate is a CANDIDATE fix which does nothing at
+all if the replay theory is wrong, and that Q-114's bar got LONGER — the opposite of what the owner
+asked for, and correct anyway, because a bar finishing before the native side gives up tells them to
+step off mid-retry. Both readings are counter-intuitive enough that a reader who skims the diff would
+draw the wrong conclusion from either. The backlog half keeps each entry's remaining data-dependent
+work stated as its own `Keep:`, so the shipped code is not mistaken for the finished item.
+
+## 2026-09-04 — `projectOverview.md` → 9812, `docs/implementation-backlog.md` → 17669 (LA-58)
+
+A live auth gap that had been sitting inside a deferred feature's preamble, where it read as a
+precondition for work nobody has started rather than something true today. Both rows carry the
+measurement that makes it checkable — the matcher string, the 219 route files, and the fact that none
+of them checks `isActive` — because "middleware only" is the exact phrasing that let it be read as
+theoretical. The backlog half spends its length on three candidate fixes with a recommendation and a
+reversal cost, since it is an auth change and the choice between them is the owner's, not something a
+session should settle by picking the smallest diff.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17690 (Q-250's next step is an auth bypass)
+
+Twenty lines correcting a sentence this same session wrote hours earlier — that CI could "mint the
+session cookie directly" because the job owns `AUTH_SECRET`. It reads as free and is not: the
+existing mobile-auth path keeps its one-time tokens in an in-process Map, so CI cannot inject one,
+and every remaining route adds an authentication bypass. The length is the two candidate shapes, a
+recommendation between them, and the reason the in-process detail matters — without it the next
+session re-derives the dead end. Recorded rather than left, because a confident wrong next step in a
+backlog entry costs more than no next step at all.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17788, `projectOverview.md` → 9828 (BF-110 rebase)
+
+Eight of the lines are a **retraction inside LB-54**, written the same day as the claim it corrects.
+That entry said local e2e is not an adjudicator in this sandbox, reasoning from a run where the same
+specs failed on the branch and on clean `main`. Both sides were failing because both sides were
+genuinely broken — nine specs waiting for UI that had moved — so the finding was right and was thrown
+away as an environment artefact. The retraction is longer than a strikethrough because the reason
+matters more than the verdict: CI cannot adjudicate this at all (no `main` baseline, unreachable
+logs, an always-empty artifact), so local e2e is not a weaker substitute here, it is the only
+instrument that can read a failure. The smaller true claim — build a fresh database, check the server
+survived — is kept rather than discarded with the wrong one.
+
+The rest is this branch catching up to a `main` that moved six times while it was open.

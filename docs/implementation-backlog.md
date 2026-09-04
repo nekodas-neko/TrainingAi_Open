@@ -7598,14 +7598,22 @@ without a queue entry is a dropped finding.*
   "is this red on `main` too?"** — the first question the CI rules tell you to ask.
   - That is not hypothetical: it sent this session to reproduce the comparison by hand, and the
     hand-rolled version was **wrong** — see the caveat below.
-- **⚠️ Local e2e is NOT an adjudicator in this sandbox, and treating it as one produced a false
-  finding.** A local run showed the same specs failing on the branch *and* on clean `main`, which was
-  read as "not this PR's fault". It was not evidence: the sandbox's storage credentials 403,
-  `CLAUDE_RO_OWNER_USER_ID` is unset, and the dev database accumulates e2e fixtures across runs — the
-  poisoned-state failure `docs/local-dev-database.md` already documents. **Both sides failed because
-  the environment failed.** Other agents' UI PRs merged the same day with E2E green, which is what
-  exposed it. The baton's existing rule — *CI's fresh database is the adjudicator* — applies to e2e
-  at least as strongly as to unit tests.
+- **⚠️ RETRACTED THE SAME DAY — local e2e IS the adjudicator here, and it is the only one.** This
+  bullet first read *"local e2e is NOT an adjudicator in this sandbox"*, on the strength of a run
+  where the same specs failed on the branch **and** on clean `main`. That reading was wrong twice
+  over. Both sides failed because **both sides were genuinely broken** — nine specs were waiting for
+  UI that BF-103 and Q-407 had moved (LB-55) — so "it fails on main too" was the correct finding,
+  dismissed as an environment artefact. And the run that finally settled it was *also* local: a
+  CI-shaped database built by hand (`createdb`, migrate, `seed.sql`), 146 passed / 10 failed, with
+  Playwright's `error-context.md` carrying the accessibility snapshot that named both drifts.
+  - **Why it matters that this was retracted rather than left standing:** CI cannot adjudicate this
+    at all. `main` has no E2E baseline (no `push: [main]` trigger), the job logs are unreachable, and
+    the artifact is always empty. Local e2e is not a weaker substitute for CI here — it is the *only*
+    instrument that can read a failure.
+  - **What IS true, and is the smaller claim worth keeping:** the sandbox's storage credentials 403,
+    `CLAUDE_RO_OWNER_USER_ID` is unset, and a long-lived dev database accumulates fixtures. Build a
+    fresh database for a full run rather than reusing one, and check the dev server survived (see
+    LB-55's `ECONNREFUSED` note) before believing a mass failure.
 - **⚠️ Worktrees cannot run this app's dev server**, which rules out the obvious way to compare two
   refs side by side. A symlinked `node_modules` is rejected by Turbopack — *"Symlink node_modules is
   invalid, it points out of the filesystem root"* — and a real copy per worktree is not free against a
@@ -13844,8 +13852,26 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 >
 > **The next thing to try is NOT more Maestro tuning — it is removing Maestro from this path.** The
 > UI flow was only ever a means to get a signed-in user, because `getLocalStore(userId)` needs one
-> before any local SQLite database exists. The job already owns `AUTH_SECRET` and seeds the user, so
-> it can mint the session cookie directly and hand it to the WebView, skipping the form entirely.
+> before any local SQLite database exists.
+>
+> **⚠ CORRECTION 2026-09-04, same day, before anyone acts on the sentence that used to be here.** It
+> said the job "already owns `AUTH_SECRET` and seeds the user, so it can mint the session cookie
+> directly and hand it to the WebView" — as if that were free. It is not, and the reason is worth
+> knowing before the next session spends a cycle finding out:
+> - **The existing production path cannot be reused.** `/api/auth/exchange-mobile-token` does exactly
+>   the right thing — one-time token in, session cookie out — but `lib/mobile-auth-tokens.ts` keeps
+>   those tokens in an **in-process `Map`**. CI cannot insert one from outside the server, and the
+>   real flow needs a Google sign-in in a Chrome Custom Tab, which no runner can drive.
+> - **So every remaining route adds an AUTHENTICATION BYPASS**, and the choice between them is the
+>   owner's, not an implementer's: **(a)** a CI-only sign-in endpoint gated on an env var absent in
+>   production — smallest change, but a bypass that exists in the shipped source; or **(b)** a
+>   debug-build-only Kotlin hook reading a session cookie from an intent extra and writing it via
+>   `CookieManager` — impossible in a release APK by construction (same `FLAG_DEBUGGABLE` gate as
+>   the `setWebContentsDebuggingEnabled` change above), but it puts session injection in the app.
+> - **Recommendation: (b).** A bypass that cannot exist in a release build is a smaller standing risk
+>   than one whose safety depends on an env var never being set, and this repo's own rule is that
+>   security checks fail closed rather than on configuration. Reversal is a revert either way.
+> - **That is why this entry is owner-gated** — the real field is a bullet below, outside this quote.
 > That asserts exactly what this job exists to assert — that the local migrations apply on real
 > Android SQLite — without depending on whether a WebView's DOM is legible to a UI driver, which is
 > a question this repo has no other reason to care about.
@@ -13876,6 +13902,9 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 > investigation at four runs.
 
 - **Lane:** A
+- **Gate:** owner — added 2026-09-04. Not the circular device gate removed on 2026-09-01 (that
+  removal stands and was right); this is the auth-bypass decision in the correction above. Every
+  remaining way to get a signed-in emulator adds one, and which shape it takes is the owner's call.
 - **The `Gate: device` was removed 2026-09-01, and it was circular.** This entry is the one that
   *closes* device-gated rows, and it was parked behind the very bottleneck it exists to relieve —
   so it could never be started, and the 17 rows it would close stayed shut. Nothing in it needs a
@@ -15562,6 +15591,22 @@ per-field merge where an AI write has no honest source rank to claim.
   JS-side's current (already short-of-native) 12s figure. Supports the owner's instinct, though that
   capture is link-latency only, not full weight-stabilization time — pick the final number from a
   fresh capture, not from this alone.
+- **⚑ THE DRIFT IS FIXED 2026-09-04; THE TRIM IS NOT, AND THEY WERE NEVER THE SAME TASK.** The JS
+  constant now reads **16_000**, matching the native `CYCLE_BUDGET_MS`, and
+  `scripts/check-scale-cycle-budget.js` fails the Custom Rules job if they diverge again — a comment
+  saying two numbers "must be kept in sync by hand" is a description of how they drift, not a
+  guard. Custom Rules is now 68 steps.
+- **⚠ Note the direction: the bar got LONGER, not shorter, and that is the correct fix.** It was
+  finishing four seconds before the native side gave up, and the bar's stated job is telling the
+  owner how long to keep standing still — under-reporting that invites stepping off mid-retry and
+  losing the weigh-in the bar exists to protect.
+- **Keep:** the trim the owner actually asked for. It still needs a capture, and this is why: **both**
+  12s and 16s are the retry give-up ceiling, and neither is "how long a weigh-in actually takes".
+  The 2206ms/1270ms figures in `scale-ble-connect-latency.md` are **link establishment only** — using
+  them to pick a bar duration would be measuring one thing and reporting another. Capture real
+  weight-stabilisation time, then change the Kotlin constant; the check above makes the JS side
+  follow by force.
+- **Gate:** device
 - **Native-only APK caveat**: `CYCLE_BUDGET_MS` is also the real retry-give-up budget, not just a
   visual duration — shortening it trades away retry margin for slower-than-typical connections, so
   reconcile + shorten carefully and re-verify on-device, not just visually.
@@ -15710,6 +15755,23 @@ per-field merge where an AI write has no honest source rank to claim.
   finishing its own post-use re-advertising re-links the persistent connection with no one there").
   The owner's "scrolling to home" almost certainly means navigating/swiping to the Home tab, which
   is exactly this path.
+- **⚑ THE GATE SHIPPED 2026-09-04, and it is a CANDIDATE fix — do not strike this on the diff.**
+  `ScaleWeighInGate.isNewWeighInEvidence(weightKg, lastCapturedKg)` (a pure object, four unit tests
+  that run in the Android CI job) is consulted before `onUnstableReading` does anything, and the
+  service tracks `lastCapturedKg` per wake. Option (b) of the two below, chosen over (a) because a
+  time threshold is a number picked without data and this one is not: it cannot fire before a capture
+  has happened this wake, and it cannot fire on a reading differing by even a gram. **If the replay
+  theory is wrong the gate never engages and nothing changes** — which is exactly why it was safe to
+  ship without the capture the entry was waiting for.
+- **⚑ And the capture is no longer needed to answer the question.** `onUnstableReading` now logs the
+  incoming weight and the wake's last captured weight on **every** call, gate or no gate. The next
+  ordinary occurrence answers *"does the replayed unstable reading match 71.0 kg exactly?"* from the
+  device log, without anyone having to hold `chrome://inspect` open at the moment of failure — which
+  is why this entry sat from 2026-08-05.
+- **Keep:** the confirmation, and it is an owner/device read, not code. On the next APK: either the
+  bar stops appearing on an empty Home visit (fixed), or the log line says the replayed value did
+  **not** match the capture, which refutes the replay theory and sends this back to option (a).
+- **Gate:** device
 - **Fix direction, now more concrete than "needs a capture"**: gate `onUnstableReading` itself
   against a plausibility check rather than treating it as unconditional proof — e.g. require either
   (a) a minimum elapsed time since the last captured/unstable reading before honoring a fresh one as
@@ -16210,6 +16272,46 @@ passes and the inventory is explicit rather than forgotten.
   (genuinely Oura Cloud credentials) and `oura_raw_samples` — the backlog's doubt about that one is
   correct, because it holds reverse-engineered frames of *that ring's* firmware and
   `sensor_raw_samples` would imply a shared frame format that does not exist.
+
+### [platform] 🟠 LA-58 — deactivation does not deactivate: the `isActive` gate never runs on an API route
+
+- **Lane:** A
+- **Gate:** owner — it is an auth change, and the sensible fixes differ in blast radius enough that
+  the choice is not mine to make. See **The three ways to fix it** below.
+- **Added:** 2026-09-04 · found while assessing Q-1a, whose own "read first" note says
+  *"`isActive === false` is enforced **only** in `middleware.ts:18`"*. That note is inside a deferred
+  feature's preamble, framed as a precondition for work that has not started. **It is live now.**
+- **Measured, not inferred.** `middleware.ts`'s matcher is
+  `"/((?!api|_next/static|_next/image|favicon.ico|sw.js|manifest.webmanifest|icon|apple-icon).*)"` —
+  `api` is the first exclusion. So the deactivation branch (`req.auth.isActive === false` →
+  `/pending`) cannot run on any of the **219** `app/api/**/route.ts` files. Every one of them
+  independently does `const session = await auth()` and checks `session?.user?.id`; **none checks
+  `isActive`**, and there is no shared route-auth helper to add it to in one place.
+- **What it actually costs.** A user who is deactivated, or who has registered and is still pending
+  approval, keeps full API access to **their own** data for as long as their session cookie is valid.
+  It is not a cross-user leak — the routes are user-scoped (Q-155's territory) — so the exposure is
+  "deactivation stops the UI and nothing else". The browser bounces them to `/pending`; `curl` with
+  their cookie does not, and neither would a native client talking to the API directly, which is
+  exactly why Q-1a flags it as a precondition.
+- **The three ways to fix it, and why this needs the owner:**
+  1. **Middleware covers `/api` too**, answering 403 JSON rather than a redirect (a 307 to `/pending`
+     hands an API caller HTML). One file, catches every route including ones not yet written. Costs a
+     middleware invocation on every API request, and the redirect branches all need an `/api` guard
+     so they do not fire.
+  2. **A shared `requireActiveUser()` helper**, migrated across 219 routes. No per-request cost on
+     paths that already call `auth()`, and it makes the check greppable — but it is 219 files, and
+     the next route someone writes still has to remember it (a Custom Rules check could hold that).
+  3. **Refuse the session at the source** — have `auth()`'s JWT callback drop the session when
+     `isActive` goes false, so every caller sees an unauthenticated request. Smallest diff, but it
+     changes what "signed in" means app-wide and would bounce a pending user off `/pending` itself,
+     which is the one page they are supposed to see.
+- **Recommendation if asked: (1).** It is the only one that covers a route written next week without
+  anyone remembering, and the per-request cost is a JWT verify the route is about to do anyway. (2)
+  is the safer diff but leaves the same hole open for every future route. (3) is smallest and has the
+  worst failure mode.
+- **Reversal cost is low for all three** — no data changes, no migration; each is a revert.
+- ⚠ **Do not fold this into Q-1a.** That entry is a feature (bearer auth + `apiUrl()`), it is not
+  scheduled, and this gap is open regardless of whether it is ever built.
 
 ### [app-shell] 🟢 Q-1a — client bearer auth + `apiUrl()` (SPLIT OUT 2026-08-03 — startable now)
 
