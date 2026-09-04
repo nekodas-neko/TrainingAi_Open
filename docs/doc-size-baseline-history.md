@@ -7720,7 +7720,8 @@ backlog entry costs more than no next step at all.
 
 ## 2026-09-03 — Review sweep 46 (RV-43, RV-44)
 
-`docs/implementation-backlog.md` 17690 → 17747 (+57), `projectOverview.md` 9812 → 9838 (+26).
+`docs/implementation-backlog.md` 17741 → 17798 (+57, rebased onto what landed mid-PR),
+`projectOverview.md` 9812 → 9838 (+26).
 **`docs/agents/state/review.md` needed NO raise** — see below.
 
 RV-43's length is the table and the four-step mechanism, and neither compresses. The table is 1,201
@@ -7747,3 +7748,15 @@ prose became a six-row table, the five accumulated method bullets moved into the
 notes" section they were converging on, and the sweep-46 additions fit inside the space that freed.
 205 lines, one whole sweep heavier, no raise. **This is the pattern to repeat** — the "Now" section
 should hold a table plus what is closed and what is owed, and nothing that is really a method note.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17741 (LA-57 refuted, Q-509's candidate 3 closed)
+
+Fifty-one lines to retract an entry filed the day before and to correct the note it was built on. The
+length is the measurement, and it has to be: "the inputs stepped at the re-key" is a claim a reader
+can only check against numbers, and the refutation is a table showing the same series rising +38%
+*inside* one device era where the proposed cause cannot operate. Recording the conclusion alone would
+leave the next session with two contradictory entries and no way to tell which is right.
+
+Also here: the caveat I raised and discarded — that the Cloud-vs-BLE refit might compare two
+different estimators — written down precisely because the next reader will notice the same empty
+table and needs to know it was checked rather than missed.
