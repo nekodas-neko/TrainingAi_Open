@@ -1464,6 +1464,15 @@ paint, only on Samsung's WebView, invisible in Chrome and in `pnpm dev`.
 
 ### [app-shell] BF-111 — "Up to date — v1.414.1 is the newest build" sits under a v1.436.2 badge, and both are right
 
+- **✅ SHIPPED 2026-09-03** (`fix/bf-111-version-labels`, v1.436.4). Both numbers labelled, and every
+  state now names the **installed** build rather than only the newest one — the update state used to
+  name a version the phone does not have and say nothing about the one it does. The date came from
+  `nativeBuiltAt`, which `/api/version` was already returning and the card was dropping.
+- **Gate:** device — the card returns early unless `Capacitor.isNativePlatform()`, so on web and in
+  every e2e harness it renders nothing at all and none of its three states has been on a screen.
+  The check is the one below: on a phone whose APK is behind the web app, About names both numbers,
+  says which is which, and the tick refers unambiguously to the Android build.
+
 - **Lane:** B — `components/more/update-check-card.tsx:81`.
 - **Added:** 2026-09-02 · noticed while tracing BF-110, not reported. The About screen shows the app as
   **v1.436.2** and, two rows below, a green tick reading **"Up to date — v1.414.1 is the newest

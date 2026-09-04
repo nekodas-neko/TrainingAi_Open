@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.9",
+    date: "2026-09-04",
+    changes: [
+      "About no longer looks like it is contradicting itself. The app version and the Android build version are different things and both were right, so a green tick appeared to vouch for the smaller one; each now says what it governs.",
+      "The Android build row names the version actually installed on your phone and the date it was built, so you can tell whether a native fix has reached the device without looking it up.",
+    ],
+  },
+  {
     version: "1.436.6",
     date: "2026-09-04",
     changes: [

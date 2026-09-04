@@ -7522,6 +7522,18 @@ worth more than they cost: `localDay` is seeded synchronously so a naive effect 
 every launch, and `sleep-sessions` is explicitly outside the tick (Q-91), which would leave last
 night's sleep stale on exactly the rollover where it matters most.
 
+## 2026-09-03 — `projectOverview.md` → 9769, `docs/implementation-backlog.md` → 17151 (BF-111)
+
+Short additions, and the line that earns its place in both is the pattern rather than the fix: this is
+the **third** entry in one day where a value was computed, served, and read by nothing — Q-529's
+per-night `provisional` flag, Q-516's `informativeShare`, and now `nativeBuiltAt`. Recording it once,
+where the next session's orientation read will meet it, is cheaper than each of them being rediscovered
+as a surprise. The server half tends to ship with its consumer assumed.
+
+The `Gate: device` note is longer than a gate usually needs because this card is invisible off-native:
+`UpdateCheckCard` returns early unless `Capacitor.isNativePlatform()`, so "it renders nothing in the
+harness" is not a test result and a later session should not read the green suite as coverage.
+
 ## 2026-09-04 — `docs/implementation-backlog.md` → 17278 (BF-118, the User Information section)
 
 A feature request rather than a fault, and the length is mostly the trace that changes what the work
