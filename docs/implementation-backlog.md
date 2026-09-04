@@ -13754,8 +13754,26 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 >
 > **The next thing to try is NOT more Maestro tuning — it is removing Maestro from this path.** The
 > UI flow was only ever a means to get a signed-in user, because `getLocalStore(userId)` needs one
-> before any local SQLite database exists. The job already owns `AUTH_SECRET` and seeds the user, so
-> it can mint the session cookie directly and hand it to the WebView, skipping the form entirely.
+> before any local SQLite database exists.
+>
+> **⚠ CORRECTION 2026-09-04, same day, before anyone acts on the sentence that used to be here.** It
+> said the job "already owns `AUTH_SECRET` and seeds the user, so it can mint the session cookie
+> directly and hand it to the WebView" — as if that were free. It is not, and the reason is worth
+> knowing before the next session spends a cycle finding out:
+> - **The existing production path cannot be reused.** `/api/auth/exchange-mobile-token` does exactly
+>   the right thing — one-time token in, session cookie out — but `lib/mobile-auth-tokens.ts` keeps
+>   those tokens in an **in-process `Map`**. CI cannot insert one from outside the server, and the
+>   real flow needs a Google sign-in in a Chrome Custom Tab, which no runner can drive.
+> - **So every remaining route adds an AUTHENTICATION BYPASS**, and the choice between them is the
+>   owner's, not an implementer's: **(a)** a CI-only sign-in endpoint gated on an env var absent in
+>   production — smallest change, but a bypass that exists in the shipped source; or **(b)** a
+>   debug-build-only Kotlin hook reading a session cookie from an intent extra and writing it via
+>   `CookieManager` — impossible in a release APK by construction (same `FLAG_DEBUGGABLE` gate as
+>   the `setWebContentsDebuggingEnabled` change above), but it puts session injection in the app.
+> - **Recommendation: (b).** A bypass that cannot exist in a release build is a smaller standing risk
+>   than one whose safety depends on an env var never being set, and this repo's own rule is that
+>   security checks fail closed rather than on configuration. Reversal is a revert either way.
+> - **That is why this entry is owner-gated** — the real field is a bullet below, outside this quote.
 > That asserts exactly what this job exists to assert — that the local migrations apply on real
 > Android SQLite — without depending on whether a WebView's DOM is legible to a UI driver, which is
 > a question this repo has no other reason to care about.
@@ -13786,6 +13804,9 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 > investigation at four runs.
 
 - **Lane:** A
+- **Gate:** owner — added 2026-09-04. Not the circular device gate removed on 2026-09-01 (that
+  removal stands and was right); this is the auth-bypass decision in the correction above. Every
+  remaining way to get a signed-in emulator adds one, and which shape it takes is the owner's call.
 - **The `Gate: device` was removed 2026-09-01, and it was circular.** This entry is the one that
   *closes* device-gated rows, and it was parked behind the very bottleneck it exists to relieve —
   so it could never be started, and the 17 rows it would close stayed shut. Nothing in it needs a
