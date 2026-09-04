@@ -11809,7 +11809,37 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Verify:** device
 - **Gate:** owner
 
-### [readiness][devices] LA-57 — night HRV roughly DOUBLED at the re-key, and only its presence was ever checked
+### [readiness][devices] ⛔ LA-57 — REFUTED: the night-HRV "step" at the re-key is a ramp
+
+> **⛔ THIS ENTRY'S CENTRAL CLAIM IS WRONG, corrected 2026-09-04 by the agent that filed it a day
+> earlier.** [`review`](reviews/2026-09-04-hrv-ramp-not-step.md). Do not implement anything below;
+> it is kept for the reasoning and because the *question* it raises is still open, narrowly.
+>
+> **The decisive measurement:** night HRV **inside the BLE era alone** — one device, one decoder,
+> where a definition change is not possible — runs 45.5 → 46.4 → 52.9 → 59.2 → **63.0** over five
+> weeks (**+38%**) and then plateaus at 56–62. A change in which statistic is computed produces a
+> step and a new stable level; it cannot make values keep climbing for five weeks under an unchanged
+> decoder.
+>
+> **The pre/post means below are a monotonic ramp cut in the middle.** Weekly daily-HRV means run
+> 21.8 → 31.1 → **41.6 (the re-key week)** → 46.4 → 52.9 → 59.2 → 68.0, with the boundary week
+> sitting on the line between its neighbours. RHR does the same in reverse, 68.3 → 50.0. A ramp
+> produces non-overlapping before/after ranges and a "doubling" of means on its own.
+>
+> **And the ranges DO overlap** — the entry says there is none "to speak of". The week of 2026-08-24
+> holds a BLE night at **26.5 ms**, inside the 20–39 band attributed to Cloud-era measurement.
+>
+> **What is still open, and it is much narrower:** whether a definition change *also* sits underneath
+> the ramp. Nothing excludes it — but the evidence offered here does not support it, and testing it
+> needs the trend modelled with a discontinuity fitted against it, on roughly **two weeks** of
+> pre-boundary HRV. That is thin, and it is a different piece of work from what this entry describes.
+> **The RMSSD-vs-SDNN check below is still worth doing on its own terms** (two scales behind one
+> column would be a real defect) — it is the reasoning for *why* that was wrong, not the check.
+>
+> **The lesson, which is the third instance of the same class in one session:** a before/after mean
+> across a trending series manufactures a step. The other two were mixing `pg_database_size` with a
+> table-sum on BF-55, and reading `computed_at` as a per-score stamp on LB-53.
+
 
 - **Lane:** A — `lib/oura-ble/rollup/**` and the decoder that produces `hrv_avg_ms`.
 - **Added:** 2026-09-03 · found while closing Q-509's candidate 3 ·
@@ -11885,6 +11915,27 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   **4× the median**, the signature of a minority of nights where a spurious late dip beat the true
   early minimum. Re-confirmed at **n=57, mean 2.653 h** (entry: 2.657 at n=42) and |Δbpm| **2.00**.
   The other half is still owed; the review names the three candidates it could not separate.
+- **⚑ CANDIDATE 3 IS CLOSED, 2026-09-04 — and in the opposite direction from "no change to find".**
+  [`review`](reviews/2026-09-04-hrv-ramp-not-step.md). The 2026-09-03 measurement stands:
+  `recovery_index_hours` is flat over 58 BLE nights. Its reading was wrong. **A great deal was
+  changing over exactly those nights** — night HRV rose **45.5 → 63.0 (+38%)** *inside the BLE era*,
+  daily RHR fell **68.3 → 50.0** across the window, steps rose 5,618 → 7,558 and weight 68.35 →
+  71.45 kg. The metric named for recovery did not respond to any of it.
+  **That is an independent line of evidence for this entry's own conclusion** — the hours estimator
+  is dominated by something other than physiology — reached without the anchor-ratio argument. It
+  does not weaken the estimator-bias reading; it corroborates it from a second direction.
+- **⚠ The "inputs stepped at the re-key" note in the 2026-09-03 block below is retracted.** RHR
+  65.7 → 53.8 and HRV 26.9 → 55.9 are before/after means across a **monotonic ramp**, which
+  manufactures a step from a trend. Weekly means show no discontinuity at the boundary, and the ramp
+  continues for four weeks past it. LA-57, which was filed on that reading, is refuted — see its
+  entry.
+- **A caveat raised and discarded, recorded so it is not re-raised.** `oura_daily_summary` holds no
+  rows before 2026-07-07, which suggests the Cloud-vs-BLE refit might compare **two different
+  estimators** (Oura's cloud number vs our reimplementation) rather than one estimator on two inputs.
+  **It does not.** `oura_heartrate` carries Cloud-sourced series (`awake`/`rest`/`live`/`workout`)
+  from 2026-06-22 to 07-06 and `ble` from 07-06, so our estimator ran on both. **The refit's
+  like-for-like framing is sound** — checked before publishing, and reported because the next reader
+  will notice the same empty table.
 - **Plan:** none yet — **Lane A implements; Tuning proposes only.** This is a `devices` finding by the
   readiness code's own pre-registered rule, **not** a scoring change.
 - **Added:** 2026-08-18 · Tuning agent ·
