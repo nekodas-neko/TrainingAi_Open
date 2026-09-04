@@ -12833,7 +12833,8 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   **The entry's `adapter.ts:5706` reference is stale** — the step moved to
   `lib/oura-ble/rollup/run.ts` with the rollup extraction.
   [journal](overview/entries/2026-09-02-tn1-chronic-stress-count.md).
-- **⚠ Keep — AND IT NEEDS THE OWNER TO PRODUCE THE NUMBER.** The instrumentation is live but
+- **Gate:** owner
+- **Keep:** the number itself, and only the owner can produce it. The instrumentation is live but
   **nothing will write it until a `fullHistory` rollup pass is triggered by hand**, which is
   owner/device-gated and is the same gate Q-525 names. Until then the column stays NULL on every
   row, and that is the expected state rather than a defect. Once a number exists: **≥ 21 with the
@@ -13273,7 +13274,8 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Branch:** `feat/score-coverage-surfacing`
 - **Plan:** none yet
 - **Added:** 2026-08-15 · from the comprehensive review §1.1
-- **Lane:** A — derived 2026-08-31 by the path rule while selecting Lane B's next item: `lib/health/score-availability.ts` is reached by `app/api/readiness-score`, `app/api/body-battery` and `app/api/ai/health-insight`. The surfaces that consume it are Lane B, so this is a both-lanes item and the engine half goes first.
+- **Lane:** B — **was A, flipped 2026-09-04 once the engine half shipped.** Derived 2026-08-31 by the path rule while selecting Lane B's next item: `lib/health/score-availability.ts` is reached by `app/api/readiness-score`, `app/api/body-battery` and `app/api/ai/health-insight`, so the engine half was Lane A's and went first. It is done; every path still open here is a surface, and leaving the lane at A had `next-item.js --lane A` offering this as its fourth READY item with nothing in it for that lane to build.
+- **Keep:** Lane B's half — consume `availability` on the surfaces that already render an em dash, starting from the fallback `ReadinessScoreResponse` literal in `health-score-detail.tsx`.
 - **Measured** over 40 post-re-key days (`claude_ro.oura_daily_derived`):
 
   | Pillar | days with a value | coverage |
