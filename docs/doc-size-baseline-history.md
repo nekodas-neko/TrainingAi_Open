@@ -7561,3 +7561,22 @@ not, which is the kind of thing worth writing down rather than quietly leaving. 
 add an `imageKind` and route medical images through the food scan route — same surface, different
 sensitivity class and different retention decision — and the prompts are best generated from the
 destinations that are still empty, since a fixed chip row is decoration by the second visit.
+
+---
+
+## 2026-09-03 — `docs/implementation-backlog.md` 17142 → 17183 (Q-278, Lane A)
+
+Forty-one lines for the engine half. The ones that earn their space are the two warnings, because
+both describe ways a later session would undo this without noticing.
+
+First: **`provisional` is unchanged and still means two things.** `recoveryIndexScore` is provisional
+because its curve is an approximation, not because an input is missing. Someone tidying that into the
+new `gap` field would recreate the collapse this entry exists to undo.
+
+Second: **the enum has two members on purpose.** The obvious extension (`below_gate`, `not_yet`)
+reads well and nothing computes it, which turns the "why" into a constant — the failure the entry
+itself predicted before any of this was written.
+
+Also recorded: a first test fixture omitted `checkinScore`, so the cold case read `no_input` —
+correctly, since a missing check-in is missing data. Writing down that the *fixture* was wrong rather
+than the code is what stops the next reader treating an exhaustive fixture as incidental.
