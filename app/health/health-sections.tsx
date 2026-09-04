@@ -302,6 +302,10 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
                   <div>
                     <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">BMR</p>
                     <p className="text-base font-bold text-foreground">{bmr} <span className="text-xs font-medium text-muted-foreground">kcal</span></p>
+                    {/* BF-114: the scale card below shows a second figure also labelled BMR, 218 kcal
+                        away, and neither said which was which. Both are right; they measure
+                        different things. */}
+                    <p className="text-[9px] text-muted-foreground/70">calculated from lean mass</p>
                   </div>
                 )}
               </div>
@@ -329,16 +333,20 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
         const latest = [...rows].reverse().find(r => r.skeletalMusclePct != null);
         if (!latest) return null;
         const muscleSeries = rows.map(r => r.skeletalMusclePct).filter((v): v is number => v != null);
-        const tiles: { label: string; value: string | null }[] = [
+        const tiles: { label: string; value: string | null; note?: string }[] = [
           { label: "Skeletal Muscle", value: latest.skeletalMusclePct != null ? `${latest.skeletalMusclePct}%` : null },
           { label: "Fat-Free Mass",   value: latest.fatFreeMassKg != null ? `${latest.fatFreeMassKg} kg` : null },
           { label: "Muscle Mass",     value: latest.muscleMassKg != null ? `${latest.muscleMassKg} kg` : null },
           { label: "Bone Mass",       value: latest.boneMassKg != null ? `${latest.boneMassKg} kg` : null },
           { label: "Body Water",      value: latest.bodyWaterPct != null ? `${latest.bodyWaterPct}%` : null },
           { label: "Subcutaneous Fat", value: latest.subcutaneousFatPct != null ? `${latest.subcutaneousFatPct}%` : null },
-          { label: "Visceral Fat",    value: latest.visceralFatIndex != null ? `${latest.visceralFatIndex}` : null },
+          { label: "Visceral Fat",    value: latest.visceralFatIndex != null ? `${latest.visceralFatIndex}` : null, note: "from BMI & age" },
           { label: "Protein",         value: latest.proteinPct != null ? `${latest.proteinPct}%` : null },
-          { label: "BMR",             value: latest.bmrKcal != null ? `${latest.bmrKcal} kcal` : null },
+          // BF-114: NOT the scale's own reading and NOT impedance-derived — `lib/scale-ble/composition.ts`
+          // computes it with Mifflin-St Jeor from weight, height, age and sex, and says so in its own
+          // comment. The card's popover claims the whole card is measured by impedance; for this tile
+          // that is false, which is most of why it disagrees with the resting rate behind the targets.
+          { label: "BMR",             value: latest.bmrKcal != null ? `${latest.bmrKcal} kcal` : null, note: "from weight & height" },
           { label: "Metabolic Age",   value: latest.metabolicAge != null ? `${latest.metabolicAge} yrs` : null },
         ].filter(t => t.value != null);
         return (
@@ -363,13 +371,14 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
                 <div key={t.label} className="rounded-xl bg-muted/40 border border-border/40 p-3 flex flex-col gap-0.5">
                   <p className="text-[9px] font-semibold uppercase tracking-widest text-muted-foreground">{t.label}</p>
                   <p className="text-lg font-bold tabular-nums">{t.value}</p>
+                  {t.note && <p className="text-[9px] text-muted-foreground/70">{t.note}</p>}
                 </div>
               ))}
             </div>
             {openInfo === 'bodyComposition' && (
               <div className="mt-3 rounded-xl bg-muted/50 p-2.5">
                 <p className="text-[10px] text-muted-foreground leading-relaxed">
-                  Measured directly by your body-composition scale (bioelectrical impedance) — only updates from an actual weigh-in with bare-foot skin contact, not calculated from weight/body-fat like the Body Composition card above.
+                  Measured directly by your body-composition scale (bioelectrical impedance) — only updates from an actual weigh-in with bare-foot skin contact, not calculated from weight/body-fat like the Body Composition card above. Two exceptions, marked on their tiles: BMR is the Mifflin-St Jeor equation and Visceral Fat is derived from BMI and age, so neither uses impedance. Your calorie targets prefer a clinically measured resting rate when you have one, which is why the two figures can differ.
                 </p>
               </div>
             )}

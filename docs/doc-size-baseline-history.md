@@ -7760,3 +7760,14 @@ leave the next session with two contradictory entries and no way to tell which i
 Also here: the caveat I raised and discarded — that the Cloud-vs-BLE refit might compare two
 different estimators — written down precisely because the next reader will notice the same empty
 table and needs to know it was checked rather than missed.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17801 (BF-114, UI half)
+
+Three lines net. BF-114 is rewritten rather than removed: its UI half shipped and its engine half is
+handed to Lane A, so the entry changes lane and keeps a `Keep:` naming exactly what is owed.
+
+Most of the rewrite is a correction rather than an addition. The entry had recorded the Body tab's
+BMR as the scale's bioimpedance estimate; it is Mifflin-St Jeor computed in our own code, which the
+source says outright. That matters beyond the label — it turns the 218 kcal gap from "two different
+measurements" into "a formula against a measurement", which is the sentence a reader needs, and it
+made the entry's own proposed wording false.

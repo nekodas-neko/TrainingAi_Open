@@ -1252,35 +1252,38 @@ than imply all or none"*).
   uncorrected one; the number itself is unchanged.
 
 
-### [body][nutrition] BF-114 — two numbers called BMR, 218 kcal apart, on two screens, neither saying which is which
+### [body][nutrition] BF-114 — the resting rate behind the calorie targets still names no source (UI half shipped)
 
-- **Lane:** B for the labelling; no engine change — both values already exist and both are correct.
+- **Lane: A** — was B, and the **B half shipped 2026-09-04**. What is left needs a field in
+  `lib/health/energy-balance-service.ts`, which `app/api/nutrition/energy-balance` reaches, so it is
+  Lane A's by the path rule.
 - **Added:** 2026-09-03 · owner: *"the BMR in scale is different to home; should probably indicate the
   difference?"*
+- **Keep:** Home and Nutrition both render *"your resting burn (N kcal)"* from
+  `components/nutrition/calorie-balance-bar.tsx` — one shared component, so one edit covers both —
+  and it names no source. **The payload cannot say one yet.** `restingBaseKcal` is
+  `measuredBmr ?? formula`, and nothing in the response records which branch produced it; the
+  existing `maintenance.source: 'calibrated' | 'formula'` is about the maintenance estimate, a
+  different number. Expose the branch (and the test date) and the UI line becomes a one-liner.
+  - **⚠ Say "carried forward", not "measured on 27 Aug".** `personalRmr` returns
+    `cunninghamBmr(currentFfmKg) + residual` — the measurement re-scaled onto **today's** lean mass,
+    not the number the lab produced. A label naming only the date would be subtly false.
 
-**Measured in production 2026-09-03:**
+**⚠️ THE ENTRY'S PREMISE WAS WRONG, and the correction is the useful part.** It recorded the Body
+tab's figure as *"the scale's own bioimpedance estimate"*. It is not. `lib/scale-ble/composition.ts`
+computes it with **Mifflin-St Jeor** from weight, height, age and sex, and its own comment says
+*"independent of impedance"*. So the 218 kcal gap is not *"two different measurements of different
+things"* as the entry reasoned — it is **a formula against a measurement**, which is a simpler and
+stronger reason the measured one wins.
 
-| | value | source |
-|---|---|---|
-| Body tab, "BODY COMPOSITION (SCALE)" → **BMR** | **1,543 kcal** | `body_metrics.bmr_kcal` — the scale's own bioimpedance estimate, re-read every weigh-in (1,545 / 1,542 / 1,543 across three days) |
-| the energy model behind Home's targets | **1,325 kcal** | `measured_rmr`, a single clinical test on **2026-08-27** |
-
-**218 kcal apart — 16%** — and the one the app actually *uses* is the smaller, measured one. Nothing
-on either screen says a word about it, so the more prominent number is the one that governs nothing.
-
-- **Recommendation: label the source on both, and say which drives the targets.** *"BMR 1,543 kcal ·
-  scale estimate"* on the composition card, and wherever the energy baseline is shown, *"from your
-  measured RMR, 27 Aug"*. That is the whole fix: the numbers are right, their provenance is missing.
-- **A tolerance note is worth adding, not a reconciliation.** Bioimpedance BMR and an indirect
-  calorimetry RMR are different measurements of different things; 16% is unremarkable between them.
-  **Do not average them, and do not switch the model to the scale's figure** — the measured value is
-  the better input and Q-401's reasoning (measured beats self-reported or inferred) applies.
-- **⚠ Related but distinct from BF-99**, which was about the *base rate* reading lower than the RMR
-  because the recomp deficit had been subtracted. This is a second pair of numbers entirely; fixing
-  one does not touch the other.
-- **Verification:** both screens name their source; a reader can tell in one glance which figure the
-  calorie targets come from.
-
+**Two more things the investigation turned up, both shipped in the B half:**
+- **The Body tab had TWO tiles both labelled `BMR`**, from different formulas: the "Body Composition"
+  card's is Cunningham from lean mass, the "Body Composition (Scale)" card's is the Mifflin-St Jeor
+  value above. Same screen, same word, different numbers. Both now name their source.
+- **The scale card's popover was false for two of its tiles.** It claimed the whole card is
+  *"measured directly by your body-composition scale (bioelectrical impedance)"*; BMR uses no
+  impedance at all, and **Visceral Fat** is derived from BMI and age. Both are now carved out
+  explicitly and marked on their tiles.
 
 ### [sleep] BF-115 — the hypnogram is missing from the sleep tile's detail, and there are three sleep rows for that date
 
