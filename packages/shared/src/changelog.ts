@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.11",
+    date: "2026-09-04",
+    changes: [
+      "The two BMR figures on the Body tab now say where each comes from, so it is clear why they differ. One is calculated from your lean mass, the other from your weight and height \u2014 and the card that shows the second no longer claims your scale measured it, because it does not. Your visceral fat number says it comes from BMI and age for the same reason.",
+    ],
+  },
+  {
     version: "1.436.6",
     date: "2026-09-04",
     changes: [
