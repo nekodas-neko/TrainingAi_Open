@@ -91,7 +91,7 @@ describe.skipIf(!canRun)('oura slice, workout queries — soft-delete filters', 
 
   // ── getSetDetailsForSession — sl.deleted_at, el.deleted_at ──
   describe('getSetDetailsForSession', () => {
-    const rows = () => slice.getSetDetailsForSession(db, sessionId)
+    const rows = () => slice.getSetDetailsForSession(db, USER, sessionId)
 
     it('returns a marker per live set', async () => {
       expect(await rows()).toHaveLength(2)
@@ -144,7 +144,7 @@ describe.skipIf(!canRun)('oura slice, workout queries — soft-delete filters', 
   // These timestamps are the windows HR readings get attributed to; a deleted set's window would
   // claim readings that belong to the set the user kept.
   describe('getSetTimestampsForSession', () => {
-    const rows = () => slice.getSetTimestampsForSession(db, sessionId)
+    const rows = () => slice.getSetTimestampsForSession(db, USER, sessionId)
 
     it('returns a window per live set', async () => {
       expect(await rows()).toHaveLength(2)

@@ -78,7 +78,7 @@ export async function GET() {
       const to   = new Date(ws.completedAt!.getTime() + 10 * 60 * 1000)
       const [readings, sets] = await Promise.all([
         repo.getHrForWindow(userId, from, to),
-        repo.getSetTimestampsForSession(ws.id),
+        repo.getSetTimestampsForSession(userId, ws.id),
       ])
       const stats = analyseHrRecovery(readings, sets)
       return { day: toAestDay(ws.startedAt, tz), hrr1Values: stats.map(s => s.hrr1) }
