@@ -14,8 +14,8 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **265** | `lib/data/postgres/migrations/` |
-| Local SQLite schema version | **v36** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
+| Next free Postgres migration | **267** | `lib/data/postgres/migrations/` |
+| Local SQLite schema version | **v37** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
 > never were safely: a next-free pointer is a *floor*, not an authority, because it cannot see an
@@ -15167,6 +15167,36 @@ per-field merge where an AI write has no honest source rank to claim.
     updates rather than swallows a real number, and there is now a test pinning that
     (`training-stress-persist.test.ts` — its upsert case runs everywhere; the two OTS cases need the
     vendored constants and skip without them).
+- **⚑ THE OBSERVABILITY SHIPPED 2026-09-04 — migration 265 (column) + 266 (regenerated `claude_ro`
+  views), local SQLite v37.** `oura_daily_derived.training_load_gate` is written by the route on
+  **every** evaluation, not just the successful one: **NULL** = the route never ran for that day,
+  **`'ok'`** = it scored, anything else = which of the four gates refused (`no_readiness` ·
+  `readiness_learning` · `no_profile` · `insufficient_met`, the existing `TrainingStressResult`
+  enum, not a new vocabulary). That is precisely the distinction this entry says nothing could make.
+  `'ok'` rather than NULL on the success path is load-bearing — the upsert COALESCEs, so a NULL
+  would leave a morning's `insufficient_met` standing on a day that scored by afternoon; a test
+  pins it. Migration 266 matters as much as 265: the view generator emits an explicit column list,
+  so without it the column is invisible to `/api/admin/db-query`, which is the only way anyone reads
+  production here.
+- **Keep:** the read. **Nothing is owed in code — what is owed is one query, a few days from now**,
+  once the column has had time to be written:
+  ```
+  SELECT day, training_load_gate, training_load_ots
+    FROM claude_ro.oura_daily_derived ORDER BY day DESC LIMIT 14
+  ```
+  **All-NULL means the route is not being called** — candidate 1 below (`warmCache` returning early
+  on a cached key) or no caller at all, and the fix is on the client. **A reason string means it is
+  called and refusing**, and the string names which gate, which retires the guessing entirely. Do
+  not diagnose further until that read exists; three diagnoses have been wrong without it.
+- **⚠ Found while shipping the above, and worse than the entry it came from:**
+  `daytime_stress_coverage_min` and `chronic_stress_granular_nights` were in `DERIVED_COLS`, in the
+  local mirror, in the outbox payload and in the round-trip test's fixture, and **absent from
+  `pushMutations`** — so a device backing up its derived rows silently dropped both for as long as
+  they have existed. Fixed here. The field-coverage tripwire could not see it: it compares the
+  fixture against `DERIVED_COLS`, and both of those are lists that the test and the slice control,
+  while the landing assertion beside it named five columns by hand. A second assertion now drives
+  off `DERIVED_COLS` and asserts every column the payload sends actually **lands**; restoring the
+  bug fails it by name and leaves the original passing.
 - **The structural problem, which is why this entry keeps being wrong.** The persist is a *side
   effect of a GET*, it happens only when `result.status === 'ok'`, and nothing records that the
   route ran or what it decided. So "not called" and "called and gated" are indistinguishable from

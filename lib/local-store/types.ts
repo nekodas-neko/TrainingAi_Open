@@ -200,6 +200,7 @@ export interface LocalOuraDailyDerived {
   activityContributors:           Record<string, unknown> | null;  // parsed from TEXT JSON
   activeCaloriesEst:              number | null;
   trainingLoadOts:                number | null;
+  trainingLoadGate:               string | null;
   trainingLoadHigh:               boolean | null;                  // stored as INTEGER 0/1
   recoveryIndexHours:             number | null;
   wornHoursBle:                   number | null;

@@ -7666,3 +7666,13 @@ own mistake, caught one run later), that the verdict is carried by step names be
 prints is ever last in a runner's log, and that the next move is to stop driving the form at all and
 mint the session cookie the job already has the secret for. The superseded candidates stay below,
 marked as the pre-2026-09-04 statement, because their reasoning is what makes the elimination legible.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17576 (Q-270, observability shipped + a dropped-column bug)
+
+Thirty lines onto an entry that has been wrong three times, and most of them are there to stop a
+fourth. The largest block is not prose but a query and its two readings: all-NULL means the route is
+not being called and the fix is on the client; a reason string means it is called and refusing, and
+names the gate. Writing that down is what converts the column from a thing that shipped into an
+answer someone can actually collect. The rest records a second bug found on the way — two derived
+columns the sync push branch dropped silently — and why the tripwire meant to catch exactly that was
+blind to it, since a session that trusts that check needs to know which half of it was load-bearing.
