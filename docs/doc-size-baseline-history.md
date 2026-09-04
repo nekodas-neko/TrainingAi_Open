@@ -7708,7 +7708,7 @@ theoretical. The backlog half spends its length on three candidate fixes with a 
 reversal cost, since it is an auth change and the choice between them is the owner's, not something a
 session should settle by picking the smallest diff.
 
-## 2026-09-04 — `docs/implementation-backlog.md` → 17752 (LB-55)
+## 2026-09-04 — `docs/implementation-backlog.md` → 17773 (LB-55)
 
 Forty-eight lines for one Reference entry, and the length is the point: it is read *while* a red E2E
 is being diagnosed, which is exactly when a session has no logs, no `main` baseline, and a failure
@@ -7737,3 +7737,13 @@ now, so the day lands on exactly zero remaining and the note that renders is the
 entry says explicitly not to try another number — the derived budget carries `earned from movement`,
 so a hardcoded figure lands wherever that day's movement puts it, which converts a failing test into
 an intermittent one. Naming the trap is worth more than the twelve lines.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17690 (Q-250's next step is an auth bypass)
+
+Twenty lines correcting a sentence this same session wrote hours earlier — that CI could "mint the
+session cookie directly" because the job owns `AUTH_SECRET`. It reads as free and is not: the
+existing mobile-auth path keeps its one-time tokens in an in-process Map, so CI cannot inject one,
+and every remaining route adds an authentication bypass. The length is the two candidate shapes, a
+recommendation between them, and the reason the in-process detail matters — without it the next
+session re-derives the dead end. Recorded rather than left, because a confident wrong next step in a
+backlog entry costs more than no next step at all.
