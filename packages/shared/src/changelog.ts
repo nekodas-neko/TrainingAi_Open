@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.8",
+    date: "2026-09-04",
+    changes: [
+      "The blank screen when you come back to the app should now paint on its own. It was never a crash \u2014 scrolling fixed it, which means the page was there all along and just was not drawn, so the app now gives the screen the same nudge your finger did.",
+    ],
+  },
+  {
     version: "1.436.6",
     date: "2026-09-04",
     changes: [

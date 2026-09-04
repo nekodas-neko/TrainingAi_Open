@@ -26,8 +26,24 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.436.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.436.5 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-03.
+
+**The blank resume was never a dead renderer (BF-110).** The owner: *"it fixes itself if you just
+scroll on it."* **That one detail overturns BF-80's diagnosis** — a killed WebView renderer has no
+document left to scroll, so content that reappears when you drag it was there all along and was not
+painted. A compositor failure, not a process death, and the two want opposite fixes. **BF-80's
+handler stays and is still correct**; they are two causes of one appearance. Shipped both halves in
+the order the entry insists on: measure the shell root's box and children on resume, then promote and
+release a layer for one frame — the instruction the manual scroll gives the compositor, without
+touching scroll state (BF-100's restoration listens for scroll on that same container).
+**⚠ The entry's "row per resume" was deliberately NOT built:** `error_events` prunes at 30 days, and
+**JS cannot tell whether the screen was blank** — the DOM is intact either way — so a row per resume
+evidences nothing while flooding the table. A `dom-lost` sample files always (it would disprove the
+entry); a `dom-intact` sample once per launch.
+**Not device-verified, and here that is the whole verdict** — this compositor is invisible in Chrome
+and `pnpm dev`, so the suite proves the effect runs and nothing about whether it fixes anything
+([journal](docs/overview/entries/2026-09-03-bf-110-resume-repaint.md)).
 
 **The HR Recovery Profile now says how much of it is signal (Q-516).** `aggregateHrRecoveryProfile`
 has returned `informativeShare` since the re-banding and **nothing rendered it** — the state the

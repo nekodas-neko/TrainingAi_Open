@@ -7562,6 +7562,54 @@ add an `imageKind` and route medical images through the food scan route — same
 sensitivity class and different retention decision — and the prompts are best generated from the
 destinations that are still empty, since a fixed chip row is decoration by the second visit.
 
+## 2026-09-03 — `projectOverview.md` → 9771, `docs/implementation-backlog.md` → 17363 (BF-110)
+
+The index grows by two and the backlog by eleven, and both carry the same two sentences because both
+are read by different people at different times. The first is the retraction: **a scroll fixes it, so
+the renderer never died** — a reader who starts from BF-80's hypothesis builds the wrong fix, and
+BF-80's entry is the one they are most likely to have read.
+
+The second is the departure from the entry's own instructions. It asks for a row on every resume;
+that was not built, and an unexplained absence reads as an oversight a later session will "correct".
+The reason is recorded where the instruction is: JS cannot tell whether the screen was blank, so the
+row it asks for evidences nothing. Keeping the `dom-lost` case uncapped is the part that must survive
+any future trim — it is the observation that would disprove the entry.
+
+**Version 1.436.5, skipping .4**, which PR #840 (BF-111) is holding while the GitHub API is rate
+limited. A skipped patch number costs nothing; two branches claiming one costs a merge conflict in
+the file the repo says never to splice.
+
+## 2026-09-03 — `docs/agents/state/implementation-lane-b.md` → 192, plus BF-110's index growth (LB-52)
+
+**The baton is raised rather than trimmed, which is the exception it usually is not.** Three of the
+added lines correct facts a successor would otherwise act on and be wrong: **E2E IS a required check
+now** (true since 2026-08-26, and this file said the opposite for a day), **`enable_pr_auto_merge`
+does not work here and the reason is a Ruleset the API cannot see** — not the missing setting LB-52
+first claimed and asked the owner for twice — and **READY (0) is not an empty queue**, which happened
+twice in one run while real work sat under UNCLASSIFIED and behind a discharged `Needs:`.
+
+Every one of those is a fact that costs a session if it is absent, and the file was trimmed where it
+was narrative first: LB-38's blow-by-blow is now its finding, since the search is over and only the
+lesson travels. The merged list was stale by eleven PRs and is rewritten rather than extended.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17686, `projectOverview.md` → 9786 (LB-54)
+
+Forty-two lines for one entry, which is long for the queue and deliberate. LB-54 records that a red
+CI job on this repo **cannot be read** — every `get_job_logs` retrieval returns the post-job Postgres
+container dump and nothing of the failing step — and that **E2E, required since 2026-08-26, has no
+green baseline on `main`** because the job is gated `if: github.event_name != 'schedule'` and the
+nightly run skips it. The entry carries the measurements (2,797 characters retrievable for a failed
+`Tests` job; run 33797376255 showing E2E `skipped`) because without them the next session repeats the
+same hand-rolled comparison this one got wrong, and repeats the wrong conclusion with it. The last
+three lines record how the `Tests` half resolved — a re-run of the same commit went green, so it was
+a flake — kept because the way it resolved *is* the finding: burning the one permitted re-run was the
+only instrument available, and it cannot tell a flake from a real failure that passes twice.
+
+The backlog number is stated against the merged base rather than the 17363 this branch was cut from —
+six other PRs raised it while this one was open, and quoting the base a branch started at is how a
+baseline note ends up describing a file nobody has. `projectOverview.md` moves for the same reason,
+not for anything this branch wrote to it.
+
 ---
 
 ## 2026-09-03 — `docs/implementation-backlog.md` 17142 → 17183 (Q-278, Lane A)
@@ -7717,3 +7765,17 @@ and every remaining route adds an authentication bypass. The length is the two c
 recommendation between them, and the reason the in-process detail matters — without it the next
 session re-derives the dead end. Recorded rather than left, because a confident wrong next step in a
 backlog entry costs more than no next step at all.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17788, `projectOverview.md` → 9828 (BF-110 rebase)
+
+Eight of the lines are a **retraction inside LB-54**, written the same day as the claim it corrects.
+That entry said local e2e is not an adjudicator in this sandbox, reasoning from a run where the same
+specs failed on the branch and on clean `main`. Both sides were failing because both sides were
+genuinely broken — nine specs waiting for UI that had moved — so the finding was right and was thrown
+away as an environment artefact. The retraction is longer than a strikethrough because the reason
+matters more than the verdict: CI cannot adjudicate this at all (no `main` baseline, unreachable
+logs, an always-empty artifact), so local e2e is not a weaker substitute here, it is the only
+instrument that can read a failure. The smaller true claim — build a fresh database, check the server
+survived — is kept rather than discarded with the wrong one.
+
+The rest is this branch catching up to a `main` that moved six times while it was open.

@@ -1406,6 +1406,26 @@ to them. The last supplement log of any kind is from June.
 
 ### [app-shell][platform] BF-110 — the blank resume survives a scroll, which means the renderer never died
 
+- **✅ SHIPPED 2026-09-03** (`fix/bf-110-resume-repaint`). Both halves, in the order this entry
+  insists on: `handleResume` measures the shell root's box and child count on every resume, then
+  promotes and releases a layer for one frame — the same instruction the manual scroll gives the
+  compositor, without touching scroll state. On `pull-to-sync.tsx`'s container, where BF-100 already
+  lives, because the report says *"pages often"* rather than naming a screen.
+- **⚠ THE ENTRY ASKS FOR A ROW PER RESUME AND THAT WAS NOT BUILT — deliberately.** `error_events`
+  prunes at 30 days and is the second-largest object in the database, the owner resumes many times a
+  day, and, decisively, **JS cannot tell whether the screen was actually blank**: the DOM is intact
+  either way, so a row per resume records nothing about the failure it is meant to evidence. What
+  ships instead: **a `dom-lost` sample always** — that is the observation that would disprove this
+  entry and must never be dropped — and **a `dom-intact` sample once per launch**, which is all the
+  positive case needs. The repaint itself runs on every resume; only the row is capped.
+- **Gate:** device — and here it is the whole verdict, not a formality. This is a Samsung WebView
+  compositor failure: Chrome and `pnpm dev` cannot show it, so the suite proves the effect RUNS and
+  nothing about whether it FIXES anything. Reproduce as the entry says (background the app on low
+  memory — the original report had battery at 10% with Messenger running), then resume and confirm
+  the screen paints without a scroll. Check `error_events` for `bf110 resume` afterwards: a
+  `dom-intact` row is the measurement this entry wanted, and a `dom-lost` row would put BF-80 back
+  in play.
+
 - **Lane:** B — the DOM is alive, so the fix is a paint invalidation in the shell, not native. **No APK
   needed**, which is the practical difference between this entry and BF-80.
 - **Added:** 2026-09-02 · owner: *"this screen still happens when tabbing back. I noticed it fixes
@@ -7551,6 +7571,59 @@ because none of them is the change that review was for, and per **No orphaned fi
 without a queue entry is a dropped finding.*
 
 
+### [platform] LB-54 — a red CI job cannot be read, and E2E has no green baseline to compare against
+
+- **Lane:** ? — neither lane. `.github/workflows/ci.yml` and the CI tooling are the Orchestrator's.
+- **Added:** 2026-09-03 · from BF-111 (#840), where diagnosing one red check consumed most of a
+  session and still did not reach the failing assertion.
+- **⚠️ `get_job_logs` cannot reach a step's output on this repo's jobs.** Every retrieval — by
+  `job_id`, by `run_id` with `failed_only`, at `tail_lines` from 60 to 400 — returns only the
+  **post-job Postgres service-container dump**, which the runner prints last and which is thousands
+  of lines of `role "root" does not exist` healthcheck noise. Measured: the whole retrievable content
+  for a failed `Tests` job was **2,797 characters**, none of it vitest's. `get_check_run` is no help
+  either — Actions jobs leave `output.text` empty. **So a red job announces that it is red and
+  nothing else.**
+  - The practical consequence: a failure that does not reproduce locally cannot be diagnosed at all.
+    BF-111's `Tests` job failed on CI while the same commit ran **6,429 passed, 0 failed** locally,
+    and there was no way from here to learn which test failed. **It was a flake** — a re-run of the
+    same commit went green in 2m30s (run 33809586570, attempt 2) — but *spending the one permitted
+    re-run was the only instrument available to establish that*, and a re-run cannot distinguish a
+    flake from a real failure that happens to pass twice. The logs would have answered it in seconds.
+  - Worth trying: uploading vitest's and Playwright's own output as a run artifact, or printing a
+    failure summary to a file the workflow `cat`s in a final step — anything that puts the failure
+    *before* the container dump rather than behind it.
+- **⚠️ E2E is a required check with no green baseline on `main`.** The job is gated
+  `if: github.event_name != 'schedule'`, so the nightly run on `main` **skips it** (confirmed: run
+  33797376255 shows E2E `skipped`). It therefore only ever runs on a PR. **CI history cannot answer
+  "is this red on `main` too?"** — the first question the CI rules tell you to ask.
+  - That is not hypothetical: it sent this session to reproduce the comparison by hand, and the
+    hand-rolled version was **wrong** — see the caveat below.
+- **⚠️ RETRACTED THE SAME DAY — local e2e IS the adjudicator here, and it is the only one.** This
+  bullet first read *"local e2e is NOT an adjudicator in this sandbox"*, on the strength of a run
+  where the same specs failed on the branch **and** on clean `main`. That reading was wrong twice
+  over. Both sides failed because **both sides were genuinely broken** — nine specs were waiting for
+  UI that BF-103 and Q-407 had moved (LB-55) — so "it fails on main too" was the correct finding,
+  dismissed as an environment artefact. And the run that finally settled it was *also* local: a
+  CI-shaped database built by hand (`createdb`, migrate, `seed.sql`), 146 passed / 10 failed, with
+  Playwright's `error-context.md` carrying the accessibility snapshot that named both drifts.
+  - **Why it matters that this was retracted rather than left standing:** CI cannot adjudicate this
+    at all. `main` has no E2E baseline (no `push: [main]` trigger), the job logs are unreachable, and
+    the artifact is always empty. Local e2e is not a weaker substitute for CI here — it is the *only*
+    instrument that can read a failure.
+  - **What IS true, and is the smaller claim worth keeping:** the sandbox's storage credentials 403,
+    `CLAUDE_RO_OWNER_USER_ID` is unset, and a long-lived dev database accumulates fixtures. Build a
+    fresh database for a full run rather than reusing one, and check the dev server survived (see
+    LB-55's `ECONNREFUSED` note) before believing a mass failure.
+- **⚠️ Worktrees cannot run this app's dev server**, which rules out the obvious way to compare two
+  refs side by side. A symlinked `node_modules` is rejected by Turbopack — *"Symlink node_modules is
+  invalid, it points out of the filesystem root"* — and a real copy per worktree is not free against a
+  fixed disk allowance. Checking the other ref out in the primary worktree and switching back is the
+  workable route.
+- **Why this is worth an entry rather than a shrug:** E2E became required on 2026-08-26, so a red E2E
+  now blocks every merge. The tooling to tell a real failure from an inherited one, or from a flake,
+  does not exist — and the first time it mattered it cost a session and produced one wrong conclusion
+  along the way.
+
 ### [sleep][platform] LB-53 — `oura_daily_derived`: what actually writes it, and the one thing still owed
 
 > **⛔ REFUTED AS FILED, 2026-09-04 — `computed_at` does not mean what this entry read it to mean, and
@@ -7610,11 +7683,36 @@ without a queue entry is a dropped finding.*
 - **Caveats on the measurement:** `claude_ro` is row-scoped to the owner, so every count above is one
   user's rows. The writer map is read from source and is complete; the counts are not.
 
-### [platform] LB-52 — `main` outpaces a CI cycle and auto-merge is unavailable, so every PR is a race
+### [platform] LB-52 — GitHub's auto-merge API does not see a Ruleset, so every PR is a hand-caught race
 
 - **Lane:** ? — neither. The fix is a repository *setting*, not code in either lane's paths.
-- **Gate:** owner — enabling branch-protection rules on `main` is the owner's call.
-- **Measured 2026-09-02, on BF-108 (#818): five merge rounds, four of them lost to the same race.**
+- **Gate:** owner — the remedy is a repo setting only the owner can make.
+- **⚠️ THIS ENTRY'S ORIGINAL DIAGNOSIS WAS WRONG, and the correction is the point (2026-09-03).** It
+  said *"turn on Allow auto-merge and add a branch protection rule"*. **Both were already on.** The
+  owner showed the settings: *Allow auto-merge* ticked, and `main` protected by a **Ruleset** with
+  six required checks (Lint, Tests, Build, Migration Check, Custom Rules, **E2E**). The entry was
+  written from a single error string, never tested, and asked the owner twice for work already done.
+- **What is actually happening, reproduced on a second PR.** `enable_pr_auto_merge` returns
+  *"Pull request Protected branch rules not configured for this branch"* — on PR #818 (2026-09-02)
+  and again on **PR #853 (2026-09-03)**, a fresh PR with checks in flight, against that same repo.
+  **GitHub's auto-merge API is looking for CLASSIC branch protection and does not recognise a
+  Ruleset.** That is a gap on GitHub's side, not a misconfiguration.
+- **Recommendation: add a classic branch-protection rule on `main` alongside the ruleset**, naming
+  the same six checks. The two coexist and GitHub takes the most restrictive, so enforcement does not
+  weaken — the classic rule exists only to give the auto-merge API the object it looks for. Reversal
+  cost is near zero: delete it and the repo is exactly where it is today.
+- **The alternative, if that is unwanted: reduce the conflict surface instead.** Move the version
+  bump and the doc-size baselines out of feature PRs — a changelog *fragment* per PR folded by the
+  compaction sweep, which CLAUDE.md already anticipates (*"a future changelog-fragment change could
+  remove that too"*). More work, and it only shrinks the race rather than ending it.
+- **⚠️ A rate limit is not a result.** Two attempts on 2026-09-03 returned *"API rate limit already
+  exceeded for user ID …"* — a different error that settles nothing. The polling this race forces is
+  itself what exhausted the budget, so the race now costs API quota as well as cycles.
+- **Related correction, same root:** *"E2E is not a required check"* was true until 2026-08-26 and is
+  now **false** — the owner added it per LA-22, whose `Keep:` is therefore satisfied. Sessions
+  carrying the old fact wait for five checks and merge into a sixth. Wait for **six**.
+- **Measured across 2026-09-02/03: fourteen merge attempts over seven PRs, every one green on its own merits.** BF-108 (#818) took five rounds and Q-516 (#839) took four.
+- **The original measurement, which still holds:**
   `main` moved roughly every ten minutes with six agents running; a CI cycle takes five to seven. So
   a PR opens green-in-waiting, `main` lands somebody else's merge, and the PR reads
   `mergeable_state: dirty` before its own checks finish. Merge, resolve, push, and the next cycle can
@@ -7629,9 +7727,9 @@ without a queue entry is a dropped finding.*
   mechanism this API does not see as a protection rule. Until it is available, an agent's only lever
   is to poll and merge the instant checks go green, which is what CLAUDE.md's 2–3 minute check-in is
   already for — and it does not close the window, it only narrows it.
-- **What to change, in order of value.** (1) Turn on *Allow auto-merge* and add a branch-protection
-  rule for `main` naming the five required checks, so `enable_pr_auto_merge` works and GitHub does the
-  waiting. (2) Failing that, take the version bump and the doc-size baselines out of the feature PR —
+- **⛔ The old "what to change" list is struck — see the correction at the top of this entry.** It
+  read: (1) turn on *Allow auto-merge* and add a branch-protection rule; (2) failing that, take the
+  version bump and the doc-size baselines out of the feature PR —
   a changelog *fragment* per PR, folded by the compaction sweep, removes the two files that conflict
   most, and CLAUDE.md already anticipates this (*"a future changelog-fragment change could remove that
   too"*). Either one alone would have made BF-108 a single round.
