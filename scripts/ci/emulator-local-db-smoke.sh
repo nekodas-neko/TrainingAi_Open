@@ -52,6 +52,10 @@ do
   esac
 done
 echo "shell probe: $PROBE_RESULT"
+# The job's verdict is written to a file as it is decided, not left to be grepped back out of
+# interleaved stdout. The final workflow step prints this, so reading the diagnosis costs a
+# five-line log tail instead of the several hundred that capped this investigation before.
+echo "shell probe: $PROBE_RESULT" > /tmp/q250-verdict.txt
 
 echo '--- install ---'
 adb install -r -g "$APK"
@@ -70,6 +74,7 @@ adb logcat -d > /tmp/logcat-launch.txt 2>&1 || true
 
 NET_ERR=$(grep -oE 'net::ERR_[A-Z_]+' /tmp/logcat-launch.txt | sort -u | tr '\n' ' ' || true)
 if [ -n "$NET_ERR" ]; then
+  echo "candidate (b): the emulator could not reach the host — ${NET_ERR}" >> /tmp/q250-verdict.txt
   echo "FAIL: the WebView could not load from http://10.0.2.2:3000 — ${NET_ERR}"
   echo 'The emulator cannot reach the host server, so no form is ever drawn. This is a host/emulator'
   echo 'networking failure, NOT a Maestro or accessibility problem — do not chase the UI flow.'
@@ -79,6 +84,7 @@ if [ -n "$NET_ERR" ]; then
   exit 1
 fi
 echo 'no net:: errors after launch — the WebView reached the host'
+echo 'reachability: OK, the WebView loaded from the host' >> /tmp/q250-verdict.txt
 
 echo '--- sign in, which is what makes the local store exist at all ---'
 # `getLocalStore(userId)` requires a signed-in user, so an app sitting on the sign-in screen never
@@ -96,6 +102,9 @@ maestro test .maestro/sign-in.yaml --format junit --output /tmp/maestro-report.x
   echo '--- view hierarchy (is anything inside the WebView visible to Maestro?) ---'
   maestro hierarchy > /tmp/maestro-hierarchy.txt 2>&1 || true
   head -120 /tmp/maestro-hierarchy.txt || true
+  echo "candidate (a): reachability passed and Maestro still could not find the form" >> /tmp/q250-verdict.txt
+  echo "hierarchy bytes: $(wc -c < /tmp/maestro-hierarchy.txt 2>/dev/null || echo 0)" >> /tmp/q250-verdict.txt
+  echo "sign-in text visible to Maestro: $(grep -ciE 'sign in|email|password' /tmp/maestro-hierarchy.txt 2>/dev/null || echo 0) matches" >> /tmp/q250-verdict.txt
   echo '--- app log tail ---'
   adb logcat -d > /tmp/logcat.txt 2>&1 || true
   grep -iE 'trainingai|chromium.*CONSOLE' /tmp/logcat.txt | tail -40 || tail -40 /tmp/logcat.txt
