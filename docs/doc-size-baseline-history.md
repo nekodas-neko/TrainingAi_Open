@@ -7766,3 +7766,17 @@ deliberate, its reason is written in the config, and three specs were re-proved 
 same day. Sharding is the option that would actually work and is the one blocked on a question nobody
 has answered. Recording which fixes are cheap to reverse — three of the four are a settings toggle or
 one line — is what lets this be decided quickly instead of deliberated again.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17850 (LB-55/LB-56, the sharding result)
+
+Nineteen lines to record an experiment that came back negative, which is exactly the kind that
+otherwise gets re-run. Four shards, each on its own fresh database: 155 passed, 5 failed. Sharding
+broke two specs that pass in the full run and did not rescue the two it was expected to, so the
+conclusion is the opposite of the prediction — the dependency between specs runs both ways and the
+suite is one entangled fixture rather than independent tests sharing a database.
+
+Both entries are corrected rather than appended to. LB-55 had characterised three failures as
+"poisoned by an earlier spec's writes" and pointed at a bisect; that reading survived one day and is
+replaced with the question that actually decides each case — what state does this spec need, and who
+creates it. LB-56's sharding option keeps its measured numbers (26 → ~11 min, not the ~8 estimated,
+because every shard pays the auth setup) alongside the reason it is not available yet.

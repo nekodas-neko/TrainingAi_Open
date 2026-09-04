@@ -428,9 +428,21 @@ re-proved on 2026-09-04** — three specs pass in isolation and fail in the full
     once a day. Defensible for a single-user app whose real gate is the device, and it would need the
     nightly's `if: github.event_name != 'schedule'` removed, which is the line that leaves `main`
     with no baseline today.
-  - *Shard across parallel CI jobs* — ~26 min to ~8 while keeping serial order inside each shard.
-    **Blocked on the order-dependence question**: three specs are known to fail after an earlier
-    spec's writes, and nothing has established that no spec *depends* on one.
+  - *Shard across parallel CI jobs* — **MEASURED 2026-09-04, and the answer is no, not as the suite
+    stands.** Four shards, each against its own fresh database: **155 passed, 5 failed**, 36.6 min
+    sequential which is ~10.3 min wall clock in parallel (each shard pays the ~50s auth setup, so the
+    win is 26 → ~11 min, not the ~8 first estimated).
+    - **It broke two specs that pass in the full run** — `food-log-swipe-delete:139` (554ms) and
+      `recommended-goal-values:28` (42.7s). Both need state an earlier spec creates, and sharding
+      took that earlier spec away.
+    - **And it did NOT clear the three that were failing** — `preferences-survive-reinstall:36` and
+      `touch-target-size:53` still failed *inside a shard with a fresh database*, so "poisoned by an
+      earlier spec's writes" is not the whole story for them either.
+    - **The real finding is that the dependency runs BOTH ways.** Some specs fail when others run
+      before them; others fail when they do not. The suite is one entangled fixture, not a set of
+      independent tests that merely happen to share a database. **Sharding is therefore blocked on
+      making specs self-sufficient, which is a much larger job than wiring up shards** — and that is
+      worth knowing before anyone spends a day on the workflow change expecting a 2.4x win.
 - **Reversal cost is near zero** for the first three: required-check membership is a settings toggle
   and the job trigger is one line. Sharding is the only option that is real work to undo.
 - Already working in the repo's favour: the job is gated on a UI-paths diff, so a docs-only PR skips
@@ -497,11 +509,18 @@ re-proved on 2026-09-04** — three specs pass in isolation and fail in the full
     `e2e/README.md` already names, *"the specs share one seeded Postgres and one signed-in user, and
     writes in one spec are visible to another"*, with `workers: 1, fullyParallel: false` making the
     order fixed and therefore reproducible.
-    - **Do not "fix" one by running it alone and declaring it passing.** That is what the isolation
-      run proves *cannot* work: the failure is caused by a spec that ran earlier, so the useful
-      question is which write, not what the assertion says.
-    - The tractable next step is a bisect, not a read: run the suite from the start and stop after
-      the failing spec, then halve the set of files before it.
+    - **Do not "fix" one by running it alone and declaring it passing.** Running it alone is a probe,
+      not a verification — it tells you the failure involves other specs, not what the assertion says.
+    - **⚠️ The first reading of this was too simple, and a sharding experiment refuted it (LB-56).**
+      "Poisoned by an earlier spec's writes" is only half of it: with four shards each on a fresh
+      database, `preferences-survive-reinstall` and `touch-target-size` **still failed**, while
+      `food-log-swipe-delete` and `recommended-goal-values` — both green in the full run — **started
+      failing**, because the specs that create the state they need had been sharded away.
+      **The dependency runs both ways.** The suite is one entangled fixture: some specs need what
+      earlier ones wrote, others break on it.
+    - So the tractable step is not a bisect for a single poisoner. It is to ask, per failing spec,
+      *what state does this need and who creates it* — and make it create its own. That is also the
+      precondition for sharding, and the reason sharding is not the quick win it looks like.
   - **Start from the `error-context.md` Playwright writes beside each failure**, not from the spec:
     it carries the accessibility snapshot of the screen at the moment it gave up, and that is what
     identified both drifts here in minutes after hours of theorising.
