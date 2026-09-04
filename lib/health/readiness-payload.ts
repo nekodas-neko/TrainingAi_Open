@@ -30,7 +30,7 @@ import { computeReadinessComposite, checkinScoreFromEnergy, READINESS_MODEL_VERS
 import { resilienceLevelToBand } from '@/lib/health/stress-resilience'
 import { computeIllnessRadar, illnessAdvisory, illnessZScores, type IllnessFlag, type IllnessBiomarker, type IllnessBiomarkerKey } from '@trainingai/shared/health/illness-radar'
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
-import { scoreAvailability, trailingBaselineZ, type ReadinessInputKey, type ScoreAvailability } from '@/lib/health/score-availability'
+import { scoreAvailability, metricAvailability, trailingBaselineZ, type ReadinessInputKey, type ScoreAvailability, type MetricAvailability } from '@/lib/health/score-availability'
 import { isTemperatureBaselineCentred } from '@trainingai/shared/health/temperature-baseline-health'
 
 /**
@@ -93,6 +93,24 @@ export interface ReadinessScoreResponse {
   inputsMissing: ReadinessInputKey[]
   scoreConfidence: ScoreAvailability['confidence']
   limited: boolean
+  /**
+   * Q-278. Per-metric availability WITH a reason, for the three surfaces that render a score.
+   *
+   * `limited` above says a score was computed from less than the full picture; this says which
+   * inputs were missing and — the part that was being thrown away — whether they were missing
+   * because there is no data or because the personal baseline is not mature yet. Only the second
+   * is fixed by waiting, so only the second can be told to a user as such.
+   *
+   * A metric whose score is null reports `state: 'absent'` with its own reason, which is the case
+   * the surfaces already render as `—` and could not previously explain.
+   *
+   * **Optional, and that is the honest shape rather than a concession.** Clients seed this payload
+   * synchronously from the SQLite cache (`cachedFetch` + `readCacheSync`), so a device can hold a
+   * response written before this field existed and paint from it. A required field would be a claim
+   * about what a client can receive that is not true. Read it as "absent means unknown", never as
+   * "no metrics".
+   */
+  availability?: MetricAvailability[]
   // Oura fields — null when no Oura data available
   ouraScore: number | null
   // Temperature deviation vs personal baseline (°C). BLE-derived (oura_daily_summary.temp_dev_c,
@@ -727,6 +745,14 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     inputsMissing:   availability.missing,
     scoreConfidence: availability.confidence,
     limited:         availability.limited,
+    // Q-278. Readiness carries its contributors, so its reasons are real; sleep and activity have no
+    // contributor breakdown of their own, so they can only report present/absent honestly — which is
+    // still more than the surfaces had.
+    availability: [
+      metricAvailability('readiness', score, ownComposite?.contributors ?? {}),
+      metricAvailability('sleep', sleepScore100),
+      metricAvailability('activity', ownActivityScore),
+    ],
     ouraScore:               ouraToday?.readinessScore             ?? null,
     temperatureDeviation,
     temperatureDeviationSource,

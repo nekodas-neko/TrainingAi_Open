@@ -59,15 +59,17 @@ describe('every contributor records the number it was computed from', () => {
     const c = computeReadinessComposite({
       ...FULL, previousNightScore: 81.6, activityBalanceScore: 72.4,
     }).contributors
-    expect(c.previousNight).toEqual({ score: 82, provisional: false, input: 81.6 })
-    expect(c.activityBalance).toEqual({ score: 72, provisional: false, input: 72.4 })
+    expect(c.previousNight).toEqual({ score: 82, provisional: false, input: 81.6, gap: null })
+    expect(c.activityBalance).toEqual({ score: 72, provisional: false, input: 72.4, gap: null })
   })
 
   // A cold baseline discards the z and returns a flat 50. Recording the z anyway would make the row
   // look re-derivable when the score was never a function of it.
   it('records null when a contributor fell back to neutral, even though a z existed', () => {
     const cold = computeReadinessComposite({ ...FULL, nHistory: 3 }).contributors
-    expect(cold.restingHeartRate).toEqual({ score: 50, provisional: true, input: null })
+    // Q-278: `awaiting_baseline`, not `no_input` — the z existed and was discarded by the maturity
+    // gate, which is exactly what this test's own comment above describes.
+    expect(cold.restingHeartRate).toEqual({ score: 50, provisional: true, input: null, gap: 'awaiting_baseline' })
     expect(cold.hrvBalance.input).toBeNull()
   })
 
