@@ -13193,6 +13193,50 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [platform][readiness] Q-278 — a score that could not be computed is rendered identically to a score of 76
 
+> **✅ THE ENGINE HALF SHIPPED 2026-09-03 (Lane A). What remains is Lane B's surface work.**
+>
+> **The producer-level fix is the real content, and it was hiding in a branch that already existed.**
+> `zToScore` returned the same `NEUTRAL` for `z == null` (there is no input) and for
+> `nHistory < BASELINE_MIN_NIGHTS` (there IS an input; the baseline is too cold to score it) — two
+> situations that read completely differently to a user, collapsed into one indistinguishable value.
+> `ReadinessContributor` now carries `gap: 'no_input' | 'awaiting_baseline' | null`. **Only waiting
+> fixes the second**, so only the second can be told to a user as such.
+> ⚠ `provisional` is UNCHANGED and still means two things — `recoveryIndexScore` is `provisional`
+> because its *curve* is an approximation, not because anything is missing, and its gap is null.
+> That overload is part of why this entry existed; do not "tidy" it into `gap`.
+>
+> **`metricAvailability(metric, value, contributors)`** in `lib/health/score-availability.ts` is the
+> shared representation, **keyed on the metric name** — so the entry's blocking question (are daytime
+> stress and resilience "pillars"?) never has to be answered, and a sixth metric costs nothing. It
+> reports `state`, a `gap` when absent, and `degradedInputs` for a score that WAS produced from an
+> incomplete picture, which is what lets a surface say *"computed without HRV"* rather than only
+> *"limited"*. A mixed set of causes resolves to `no_input`: waiting cannot fix the half that has no
+> data, so the optimistic answer would be the misleading one.
+>
+> **The enum has exactly two members because that is what the producers can distinguish.** The
+> entry's own warning was against building `below_gate`/`not_yet` from what reads well; nothing
+> computes those, and they would have made the "why" a constant.
+>
+> **`/api/readiness-score` now returns `availability` for readiness, sleep and activity.** Optional
+> on the type, deliberately: clients seed this payload synchronously from SQLite, so a device can
+> paint from a response written before the field existed. Readiness carries contributors so its
+> reasons are real; sleep and activity have no contributor breakdown and honestly report only
+> present/absent.
+>
+> **Lane B's half:** consume `availability` on the surfaces that already render an em dash correctly,
+> so the dash gains a reason. `health-score-detail.tsx` builds a fallback `ReadinessScoreResponse`
+> literal and is where a Lane B session will start.
+>
+> **Verified:** 9 tests, three against a REAL `computeReadinessComposite` rather than hand-built
+> contributors — the gap between "the helper works" and "the producers populate it", which is the
+> shape of the failure this entry warned about. Mutation-checked: collapsing the split back into one
+> `NEUTRAL` fails them. Full suite 757 files / 6,453 tests. ⚠ **A first fixture omitted
+> `checkinScore` and the cold case then read `no_input` — correctly, since a missing check-in IS
+> missing data. The fixture was wrong, not the code**; an incomplete one silently tests a different
+> question.
+> **NOT verified:** an authenticated `/api/readiness-score` response. The route compiles and 401s
+> without a session, and the sandbox cannot mint one.
+
 > **✅ THE OPEN QUESTION IS ANSWERED (2026-09-03, Lane A) — and the answer is that it is the wrong
 > question to encode.** The ⚠ below asks *"decide whether they are pillars before generalising a
 > coverage representation over five of them"*. **Don't decide. Key the representation on the metric
