@@ -7592,7 +7592,7 @@ Every one of those is a fact that costs a session if it is absent, and the file 
 was narrative first: LB-38's blow-by-blow is now its finding, since the search is over and only the
 lesson travels. The merged list was stale by eleven PRs and is rewritten rather than extended.
 
-## 2026-09-03 — `docs/implementation-backlog.md` 17363 → 17405 (LB-54)
+## 2026-09-03 — `docs/implementation-backlog.md` 17363 → 17408 (LB-54)
 
 Forty-two lines for one entry, which is long for the queue and deliberate. LB-54 records that a red
 CI job on this repo **cannot be read** — every `get_job_logs` retrieval returns the post-job Postgres
@@ -7600,4 +7600,7 @@ container dump and nothing of the failing step — and that **E2E, required sinc
 green baseline on `main`** because the job is gated `if: github.event_name != 'schedule'` and the
 nightly run skips it. The entry carries the measurements (2,797 characters retrievable for a failed
 `Tests` job; run 33797376255 showing E2E `skipped`) because without them the next session repeats the
-same hand-rolled comparison this one got wrong, and repeats the wrong conclusion with it.
+same hand-rolled comparison this one got wrong, and repeats the wrong conclusion with it. The last
+three lines record how the `Tests` half resolved — a re-run of the same commit went green, so it was
+a flake — kept because the way it resolved *is* the finding: burning the one permitted re-run was the
+only instrument available, and it cannot tell a flake from a real failure that passes twice.

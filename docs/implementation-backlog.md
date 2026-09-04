@@ -7469,7 +7469,10 @@ without a queue entry is a dropped finding.*
   nothing else.**
   - The practical consequence: a failure that does not reproduce locally cannot be diagnosed at all.
     BF-111's `Tests` job failed on CI while the same commit ran **6,429 passed, 0 failed** locally,
-    and there is no way from here to learn which test failed.
+    and there was no way from here to learn which test failed. **It was a flake** — a re-run of the
+    same commit went green in 2m30s (run 33809586570, attempt 2) — but *spending the one permitted
+    re-run was the only instrument available to establish that*, and a re-run cannot distinguish a
+    flake from a real failure that happens to pass twice. The logs would have answered it in seconds.
   - Worth trying: uploading vitest's and Playwright's own output as a run artifact, or printing a
     failure summary to a file the workflow `cat`s in a final step — anything that puts the failure
     *before* the container dump rather than behind it.
