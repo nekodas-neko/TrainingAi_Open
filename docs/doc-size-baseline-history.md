@@ -7708,7 +7708,7 @@ theoretical. The backlog half spends its length on three candidate fixes with a 
 reversal cost, since it is an auth change and the choice between them is the owner's, not something a
 session should settle by picking the smallest diff.
 
-## 2026-09-04 — `docs/implementation-backlog.md` → 17740 (LB-55)
+## 2026-09-04 — `docs/implementation-backlog.md` → 17752 (LB-55)
 
 Forty-eight lines for one Reference entry, and the length is the point: it is read *while* a red E2E
 is being diagnosed, which is exactly when a session has no logs, no `main` baseline, and a failure
@@ -7730,3 +7730,10 @@ of 106 failed / 41 passed is recorded as what it actually was: the dev server dy
 later spec failing against `ECONNREFUSED`. Reporting that as a finding would have been exactly the
 poisoned-state trap already documented, so the tell — uniformly sub-second durations — is written
 down beside it.
+
+Twelve more for `plan-rescale:168`, which is written up rather than fixed because the write-up is the
+useful part: the fixture sets 1900 kcal against a budget that used to be a fixed 2,000 and is derived
+now, so the day lands on exactly zero remaining and the note that renders is the wrong branch. The
+entry says explicitly not to try another number — the derived budget carries `earned from movement`,
+so a hardcoded figure lands wherever that day's movement puts it, which converts a failing test into
+an intermittent one. Naming the trap is worth more than the twelve lines.

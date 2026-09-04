@@ -426,8 +426,20 @@ below threshold and left in place for next time.
   **146 passed / 10 failed**. Three of those ten were `meal-plan-library-surface` and are fixed. The
   remaining seven, with the timing that says which kind each is — a ~45s time is a `toPass` loop
   spinning on something absent, a sub-second time is a real assertion:
-  - `plan-rescale.spec.ts:168` (36.9s) · `recipe-url-to-meal.spec.ts:91` and `:156` (45.3s, 45.2s)
-    — the slow shape, so most likely the same drift class as the nine already fixed.
+  - `recipe-url-to-meal.spec.ts:91` and `:156` — **fixed**, same Q-407 drift (they tapped
+    `Build a meal plan` and waited for a dialog; it navigates to Coach now). 45.5s/45.2s timeouts
+    became 12.3s/6.3s passes. `nutrition-coach-plan-entry.spec.ts` still uses the old name and is
+    **correct** to — that spec is about the Coach entry itself.
+  - `plan-rescale.spec.ts:168` — **diagnosed, deliberately not fixed.** The spec sets
+    `OVER_KCAL = 1900` and asserts the floor note, *"…under a meal — the remaining meals are left as
+    planned"*. What renders is the other branch of `buildNote`: **"You're 0 kcal past today's target,
+    so the remaining 3 meals are left as planned."** `budgetRemaining` lands on exactly 0, so
+    `budgetRemaining <= 0` fires before the `flooredCount` branch ever can. The fixture was written
+    against a fixed 2,000 kcal budget; the budget is **derived** now (Q-415/Q-417), so 1900 no longer
+    puts the day in the floor-binding window. **Do not just try another number** — the derived budget
+    includes `earned from movement`, so a hardcoded figure lands wherever that day's movement puts
+    it, which is how a test becomes intermittent rather than fixed. It needs a fixture that pins the
+    budget, or an assertion that accepts either note. That is a decision, not a rename.
   - `preferences-survive-reinstall.spec.ts:36` (8.7s) · `timeline-card-navigation.spec.ts:80`
     (18.6s) · `touch-target-size.spec.ts:53` on `/` (26.7s) — middling, unclassified.
   - `profile-details-consolidation.spec.ts:50` (**3.0m**) — an outlier by an order of magnitude and

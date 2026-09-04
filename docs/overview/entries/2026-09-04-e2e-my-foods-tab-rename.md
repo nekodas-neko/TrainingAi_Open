@@ -110,8 +110,11 @@ with it.
 
 **This is NOT the whole of E2E's redness, and the number is now known rather than hedged.** A full
 run against the CI-shaped database, on the branch carrying the tab-rename fix, was **146 passed / 10
-failed**. Three of those ten were the meal-plan drift and are fixed here. **Seven remain**, listed
-with their durations in LB-55 — the duration classifies them, since a ~45s failure is a retry loop
+failed**. Five of those ten are fixed here — the three meal-plan ones and, on a second pass, the two
+in `recipe-url-to-meal` that carried the identical Q-407 drift (45.5s/45.2s timeouts to 12.3s/6.3s
+passes). **Five remain**, listed with their durations in LB-55, one of them (`plan-rescale:168`)
+diagnosed down to the branch and deliberately left alone because its fixture needs a decision rather
+than a rename — the duration classifies them, since a ~45s failure is a retry loop
 spinning on something absent while a sub-second one is a real assertion.
 
 The first version of this section said "a tenth may exist", which understated it. That was written
