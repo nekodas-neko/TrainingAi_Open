@@ -13732,7 +13732,43 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 >    host now. (It turned out to be 11 s, not the 120 s guessed — the fix is still right, and
 >    measuring it is what killed the hypothesis.)
 >
-> **What remains, stated as the two candidates it is and not more:**
+> **⚑ FIVE MORE RUNS, 2026-09-04 — (b) IS ELIMINATED AND (a) IS NARROWED TO ONE SENTENCE. Read this
+> instead of the two candidates below; they are settled.** Three independent axes now agree, and the
+> job reports all three by step name so re-reading them costs one API call and no log:
+>
+> | axis | answer |
+> |---|---|
+> | reachability | **OK** — no `net::` error after launch; the WebView loaded from the host |
+> | view hierarchy | **present, and carries no sign-in text** — not empty, so the driver sees the app |
+> | server access log | **it served `/sign-in`** — the page was requested and delivered |
+>
+> **So the page rendered and the driver cannot read inside the WebView.** That is (a), and the fix
+> the entry proposed for it — `setWebContentsDebuggingEnabled(true)` in the debug build — **shipped
+> here and did not change the result.** It is kept (it costs nothing, is gated on the manifest's own
+> `FLAG_DEBUGGABLE` so no release build can take it, and web-view tooling needs it anyway), but do
+> not expect it to be the answer.
+>
+> **⚠ Do not trust `net::`-free as proof the page is fine** — that was this session's own mistake,
+> caught one run later. A 500, a redirect or an app-level error page produces no `net::` entry, so
+> the reachability assertion alone is weaker than it reads. The server-log axis exists because of it.
+>
+> **The next thing to try is NOT more Maestro tuning — it is removing Maestro from this path.** The
+> UI flow was only ever a means to get a signed-in user, because `getLocalStore(userId)` needs one
+> before any local SQLite database exists. The job already owns `AUTH_SECRET` and seeds the user, so
+> it can mint the session cookie directly and hand it to the WebView, skipping the form entirely.
+> That asserts exactly what this job exists to assert — that the local migrations apply on real
+> Android SQLite — without depending on whether a WebView's DOM is legible to a UI driver, which is
+> a question this repo has no other reason to care about.
+>
+> **How to read this job now, and why it changed:** the verdict is carried by mutually exclusive
+> STEP NAMES (`VERDICT …`, `TREE …`, `PAGE …`), not by log output. `list_workflow_jobs` returns them
+> with no log fetch. This exists because the runner appends its own blocks — artifact upload, git
+> cleanup, the Postgres container dump — after every step, so nothing a job prints is ever last;
+> four log pulls of 100+ lines each failed to reach a verdict that was being printed correctly.
+> Also fixed on the way: the Postgres healthcheck ran `pg_isready` as root and logged a FATAL every
+> ten seconds, roughly 190 lines of noise per run, now `-U postgres` and about 65.
+>
+> **The two candidates below are the pre-2026-09-04 statement, kept for the reasoning only:**
 > - **(a) Maestro may not be able to read text inside the WebView.** The app is a WebView and its
 >   accessibility tree may not be exposed to Maestro's view hierarchy at all. If so the fix is
 >   `WebView.setWebContentsDebuggingEnabled(true)` in the debug build plus Maestro's web-view

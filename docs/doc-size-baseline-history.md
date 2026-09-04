@@ -7656,3 +7656,13 @@ the 171/200/206/204 series is `sum(pg_total_relation_size)` and not `pg_database
 218 MB the same day and would turn two flat days into an invented 9 MB/day; and a third sighting of
 the `n_live_tup` trap on `oura_raw_packed`, 97 against 1,093 real rows, on the same table CLAUDE.md
 already names twice.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17546 (Q-250, both candidates settled)
+
+Thirty-six lines onto the emulator entry, replacing a two-candidate guess with a three-axis answer
+table and the reason the entry's own proposed fix is not it. The length is mostly things a next
+session would otherwise pay for again: that `net::`-free is not proof a page rendered (this session's
+own mistake, caught one run later), that the verdict is carried by step names because nothing a job
+prints is ever last in a runner's log, and that the next move is to stop driving the form at all and
+mint the session cookie the job already has the secret for. The superseded candidates stay below,
+marked as the pre-2026-09-04 statement, because their reasoning is what makes the elimination legible.
