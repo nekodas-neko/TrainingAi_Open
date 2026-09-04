@@ -61,6 +61,32 @@ An earlier draft was worse and is worth naming too: checking every `getByRole(na
 false positives, because an accessible name is **computed from child DOM text** — a button whose
 children are `Log` and `Body Weight` is named "Log Body Weight" while that string exists nowhere.
 
+## A second drift, found by finishing the suite rather than by reasoning
+
+The full run on the fix branch reached **140 passing** and then failed three tests in
+`meal-plan-library-surface.spec.ts`, all at ~45.3s. Not the tab rename — a different entry point
+that had also moved.
+
+`openWizard` taps **`Build a meal plan`** and waits for `Step 1 of 7`. Q-407 repointed that button at
+the **conversational Coach flow**, and its own subtitle now says so: *"Talk it through with your
+coach"*. Tapping it navigates to the Coach tab, so the spec spent its retry loop waiting for a
+stepper on a screen that does not have one. Q-407 deliberately kept the stepper beside the
+conversation — *"a conversational flow which stalls mid-plan with no fallback is worse than seven
+screens that finish"* — under its own trigger, **`Prefer the step-by-step setup?`**. That is what the
+spec should have been tapping, and it is now.
+
+**One wrong hypothesis on the way, and it is worth recording because it was plausible.** The first
+read was the off-screen-panel hazard `back-dismiss-sweep` documents: all five tab trees stay mounted,
+a locator matches panels that are not on screen, and a coordinate tap on one lands on the carousel
+and switches tabs. That is a real hazard and the symptom fit it exactly. It was wrong — the
+navigation was the button doing its job. What settled it was the error message from the helper
+written for that wrong hypothesis: *"no match was inside the viewport"* on a page whose heading was
+already `AI Coach`, which says the navigation happened before the tap it was blamed on.
+
+`tapInView` is kept, in `fixtures.ts`. It replaces a raw `(await trigger.boundingBox())!` coordinate
+tap — which throws uninformatively when the element is gone — with one that checks the viewport
+first, and it earned its place by producing the message that corrected the diagnosis.
+
 ## Verification
 
 Each fixed spec was run against a clean CI-shaped database, before and after:
@@ -71,6 +97,7 @@ Each fixed spec was run against a clean CI-shaped database, before and after:
 | `builder-barcode-scan` | 46.5s timeout | **14.3s pass** |
 | `back-dismiss-sweep:171` | 45.7s timeout | **13.3s pass** |
 | `food-row-shared`, `nutrition-sheet-surface`, `recipe-image-to-meal` | — | **6 pass** |
+| `meal-plan-library-surface` (×3) | 45.3s timeout | **10.9s / 7.0s / 6.7s pass** |
 
 The before/after is the proof: these are not timeouts that got more time, they are tests that now
 find what they were looking for and finish in seconds.
@@ -81,7 +108,7 @@ find what they were looking for and finish in seconds.
 (BF-103) shipped three days ago and is already on the owner's phone; this only makes the suite agree
 with it.
 
-**Whether this is the whole of E2E's redness.** A full-suite run on this branch was clean past the
-point where `main` had already failed twice, but the suite is 144 serial tests and other failures
-may sit behind these. The claim here is bounded: six specs were waiting for a string the app stopped
-rendering, and they no longer are.
+**Whether this is the whole of E2E's redness.** The caveat this section originally carried turned out
+to be worth carrying: a full-suite run found three more failures at test 140, from a different drift.
+Those are fixed here too and the suite was re-run, but the honest claim remains bounded — nine specs
+were asking for things the app had stopped offering, and they no longer are. A tenth may exist.

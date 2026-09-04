@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { settleRouteBoundary } from './fixtures'
+import { settleRouteBoundary, tapInView } from './fixtures'
 
 /**
  * The meal-plan wizard surfaces the library, and stops dropping pins silently (BF-11h).
@@ -51,13 +51,17 @@ async function openWizard(page: Page) {
   await stubLibrary(page)
   await page.goto('/nutrition')
   await settleRouteBoundary(page)
-  const trigger = page.getByRole('button', { name: /Build a meal plan/ })
-  await expect(trigger).toBeVisible({ timeout: 60_000 })
+  // NOT `Build a meal plan` — Q-407 pointed that at the conversational Coach flow, and its own
+  // subtitle now says so ("Talk it through with your coach"). Tapping it navigates to the Coach tab,
+  // which is where these three tests were ending up while waiting for a stepper that never opened.
+  // The stepper kept its own entry point beside the conversation, deliberately, for exactly the user
+  // with no plan yet — which is the user this spec stubs.
+  const trigger = page.getByRole('button', { name: 'Prefer the step-by-step setup?' })
+  await expect(trigger.first()).toBeVisible({ timeout: 60_000 })
   await expect(async () => {
-    if (await page.getByRole('dialog').count() === 0) {
-      const box = (await trigger.boundingBox())!
-      await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
-    }
+    // `tapInView`, not a raw coordinate tap: all five tab trees stay mounted, so this locator
+    // matches off-screen panels too, and tapping one of those boxes lands on the carousel instead.
+    if (await page.getByRole('dialog').count() === 0) await tapInView(page, trigger)
     await expect(page.getByText(/Step 1 of 7/)).toBeVisible({ timeout: 5_000 })
   }).toPass({ timeout: 90_000 })
 }
