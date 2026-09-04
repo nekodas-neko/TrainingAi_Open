@@ -4810,6 +4810,18 @@ covered": the quartile bisect bounds rather than attributes, so a range producin
 enforced by a join or pre-check instead of a `user_id` predicate, and the full ~3,270-test suite —
 only the 363 DB tests were measured.
 
+**A third blind spot, found and closed 2026-09-04 — a method that never asked for `userId` at all.**
+Both mechanisms assume the owner is a *parameter*: the sweep mutates predicates that exist, and
+`check-repository-user-scoping.js` flags a method that **takes** `userId` and never uses it. Neither
+can see a signature that omits the owner entirely. Of the **12** data-layer methods taking an id but
+no `userId`, nine are join- or pre-check-scoped and **three constrained ownership nowhere** —
+`getSetDetailsForSession`, `getSetTimestampsForSession`, and `markHrSynced`, a bare unscoped
+`UPDATE`. Safe only because the single production caller passed an id from a user-scoped query, and
+two of the three have no production caller at all. All three now take `userId` and constrain on
+`workout_sessions.user_id`, covered by `hr-session-ownership.test.ts` (5 tests, mutation-verified,
+including two controls proving the fixture produces data). **Not mechanised** — a check for this
+shape fires on all nine legitimate ones and would need an allowlist, which is its own hazard.
+
 **Carry this into any addition:** **four** assertions in that file could not fail as first written —
 `getBodyBatteryHistory` returns a row shape with no `userId`, making `not.toContain(USER_B)`
 unfalsifiable; `deleteFitnessTest` is a soft delete, so asserting on an untouched column could never
