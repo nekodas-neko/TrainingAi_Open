@@ -7717,3 +7717,20 @@ and every remaining route adds an authentication bypass. The length is the two c
 recommendation between them, and the reason the in-process detail matters — without it the next
 session re-derives the dead end. Recorded rather than left, because a confident wrong next step in a
 backlog entry costs more than no next step at all.
+
+## 2026-09-02 — `docs/implementation-backlog.md` 17690 → 17729 (+39)
+
+`fix/or-101-lone-row-macros`. One entry, filed from an owner device check, and most of its length is
+the part that stops the next reader repeating this session's mistake.
+
+**OR-101** — a meal section holding one loose food shows no macros at all. The owner found it while
+checking BF-98, and the interesting half is what it is *not*: BF-98's own case table lists
+*"one loose row → no footer (unchanged)"*, so this is not a regression from that fix and BF-98 stays
+closed. The cause is a premise stated twice in `meal-card.tsx` — *"a single row already states its
+own macros"* — which stopped being true when Q-406 moved per-item P/C/F into the detail sheet. The
+same file states the true version ten lines away.
+
+Recorded at length because two sessions in a row now (Q-149, this) have found an entry reasoning
+from a premise that was accurate when written and silently expired. The entry names the condition
+the comments were actually reaching for — *does the only entry state its own macros* — so the fix
+does not re-derive it.
