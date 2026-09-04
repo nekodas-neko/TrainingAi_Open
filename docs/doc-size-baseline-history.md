@@ -7718,6 +7718,37 @@ recommendation between them, and the reason the in-process detail matters — wi
 session re-derives the dead end. Recorded rather than left, because a confident wrong next step in a
 backlog entry costs more than no next step at all.
 
+## 2026-09-03 — Review sweep 46 (RV-43, RV-44)
+
+`docs/implementation-backlog.md` 17741 → 17798 (+57, rebased onto what landed mid-PR),
+`projectOverview.md` 9812 → 9838 (+26).
+**`docs/agents/state/review.md` needed NO raise** — see below.
+
+RV-43's length is the table and the four-step mechanism, and neither compresses. The table is 1,201
+starting 1RMs summarised as p50/p90/max because a single worked example is what made the first
+simulation wrong: at 100 kg every common percentage lands on a plate boundary and the effect
+disappears entirely. The distribution is the finding; one number would be a coincidence. The four
+steps are there because the defect is an *interaction* — step 1 (ceiling rounding) is deliberate and
+documented, step 3 (`prescriptionFactor` amplifying it by `1/pct`) is deliberate and documented, and
+neither file mentions the other. An entry naming only one of them sends the implementer to fix the
+wrong line.
+
+Two lines exist to prevent the obvious wrong fix. One says not to switch to nearest-rounding — the
+ceiling has a stated purpose and nearest shows the same ratchet anyway. The other says the real
+question is which weight the *estimate* is computed from, which is a scoring decision and is why this
+carries `Gate: owner` rather than a patch.
+
+RV-44 is four lines of finding and two of restraint: **no number is wrong today**, all nine sites
+agree at 4/4/9, and the factors are physiological constants. Without those the next reader treats a
+consistency item as a calculation bug.
+
+**The baton was restructured instead of raised.** It had drifted 173 → 205 over five sweeps and the
+previous entry flagged that the next session should make a structural cut. It did: the per-sweep
+prose became a six-row table, the five accumulated method bullets moved into the standing "Method
+notes" section they were converging on, and the sweep-46 additions fit inside the space that freed.
+205 lines, one whole sweep heavier, no raise. **This is the pattern to repeat** — the "Now" section
+should hold a table plus what is closed and what is owed, and nothing that is really a method note.
+
 ## 2026-09-04 — `docs/implementation-backlog.md` → 17741 (LA-57 refuted, Q-509's candidate 3 closed)
 
 Fifty-one lines to retract an entry filed the day before and to correct the note it was built on. The
