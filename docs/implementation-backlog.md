@@ -926,6 +926,48 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
 >   anything you cannot eat · injuries or pain to work around · how long you have trained · anything
 >   else the app should know.
 
+> **⚑ SCOPE SET 2026-09-04 — this is a CONSOLIDATION, not only a new section.** Owner: *"make sure
+> all this data about the user is one place goals and etc can probably all be in a user section."*
+>
+> **Where personal data is entered today, mapped:**
+>
+> | what | where |
+> |---|---|
+> | goals — weight, calories, steps, water | **More root**, `GoalsSection` rendered inline (`profile-tab.tsx:372`) |
+> | height · age · sex | More → **Profile details** (`/more/details`) |
+> | DEXA · RMR | More → **DEXA & RMR results** (`/more/clinical`) |
+> | training schedule | More → **Sessions, progression & schedule** (`/program`) |
+> | **injuries** | **the Health tab**, `injury-sheet.tsx` — a different tab entirely |
+> | **dietary restrictions** | **inside `meal-plan-setup-sheet.tsx`** — the meal-plan wizard, and nowhere else |
+>
+> **The dietary restrictions row is the sharpest case and it is worth stating on its own.** The schema
+> says outright that these belong to the person — *"Per USER, not per plan: an allergy belongs to the
+> person, so every plan inherits it"* — and yet the only way to record or change one is to enter a
+> wizard for generating a meal plan. A permanent fact about the owner is reachable only through a
+> flow about something else.
+>
+> **Good news for scope: `MoreRowGroup label="Your setup"` already exists and already gathers three of
+> the six.** So the consolidation is mostly moving the two outliers in and deciding what happens to
+> goals — not building a hub from nothing. The blurb router then writes into the same destinations the
+> section shows, which is what makes the two halves of this entry one feature rather than two.
+>
+> - **Recommendation: one canonical home per fact, plus a link from wherever it is contextually
+>   useful — not a hard move.** Injuries live on Health because that is where the owner is looking
+>   when something hurts, and relocating them wholesale would cost that. The rule that resolves it:
+>   **the canonical editor lives in the user section; every other surface links to it rather than
+>   holding a second copy of the form.**
+> - **The meal-plan wizard keeps its step**, but it should read and write the **user-level** record
+>   rather than being the only door to it. A wizard that quietly owns a permanent fact is the defect
+>   here, not the wizard asking the question.
+> - **⚠ Goals are the one item that may be right where it is.** They sit inline on the More root
+>   because they are looked at often, and burying them one level down to satisfy tidiness would be a
+>   regression. Decide it on how often each thing is *read*, not on what the category diagram looks
+>   like: goals are read weekly, a DEXA scan twice a year.
+> - **⚠ Do not migrate storage.** Every table here already exists and is correct; this is a navigation
+>   and surface change. Moving columns between tables to match the new screen would be the failure —
+>   the assembler in this entry is what makes the data feel like one place, and it reads the tables
+>   where they are.
+
 
 - **Lane:** A for the store and the assembler; B for the section itself. **Needs a plan document
   before implementation** — this is a feature spanning five pillars, not a fix, and the backlog
