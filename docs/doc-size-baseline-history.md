@@ -7707,3 +7707,13 @@ of them checks `isActive` — because "middleware only" is the exact phrasing th
 theoretical. The backlog half spends its length on three candidate fixes with a recommendation and a
 reversal cost, since it is an auth change and the choice between them is the owner's, not something a
 session should settle by picking the smallest diff.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17690 (Q-250's next step is an auth bypass)
+
+Twenty lines correcting a sentence this same session wrote hours earlier — that CI could "mint the
+session cookie directly" because the job owns `AUTH_SECRET`. It reads as free and is not: the
+existing mobile-auth path keeps its one-time tokens in an in-process Map, so CI cannot inject one,
+and every remaining route adds an authentication bypass. The length is the two candidate shapes, a
+recommendation between them, and the reason the in-process detail matters — without it the next
+session re-derives the dead end. Recorded rather than left, because a confident wrong next step in a
+backlog entry costs more than no next step at all.
