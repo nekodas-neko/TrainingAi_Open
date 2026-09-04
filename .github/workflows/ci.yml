@@ -333,6 +333,9 @@ jobs:
       - name: An e2e /api stub blocks the service worker
         run: node scripts/check-e2e-api-stub-sw.js
 
+      - name: The scale progress bar matches the native give-up deadline
+        run: node scripts/check-scale-cycle-budget.js
+
       - name: An admin check that cannot run is not a refusal
         run: node scripts/check-admin-guard-catch.js
 

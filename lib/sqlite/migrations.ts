@@ -119,6 +119,7 @@ const CREATE_OURA_DAILY_DERIVED_LOCAL = `CREATE TABLE IF NOT EXISTS oura_daily_d
   activity_contributors        TEXT,
   active_calories_est          INTEGER,
   training_load_ots            REAL,
+  training_load_gate           TEXT,
   training_load_high           INTEGER,
   recovery_index_hours         REAL,
   worn_hours_ble               REAL,
@@ -405,6 +406,7 @@ export const RECONCILE_COLUMNS: { table: string; column: string; ddl: string }[]
   { table: 'oura_daily_derived', column: 'resilience_confidence',         ddl: `ALTER TABLE oura_daily_derived ADD COLUMN resilience_confidence REAL` },
   { table: 'oura_daily_derived', column: 'daytime_stress_coverage_min', ddl: `ALTER TABLE oura_daily_derived ADD COLUMN daytime_stress_coverage_min REAL` },
   { table: 'oura_daily_derived', column: 'chronic_stress_granular_nights', ddl: `ALTER TABLE oura_daily_derived ADD COLUMN chronic_stress_granular_nights INTEGER` },
+  { table: 'oura_daily_derived', column: 'training_load_gate', ddl: `ALTER TABLE oura_daily_derived ADD COLUMN training_load_gate TEXT` },
   { table: 'oura_daily_derived', column: 'vascular_age',                  ddl: `ALTER TABLE oura_daily_derived ADD COLUMN vascular_age REAL` },
   { table: 'oura_daily_derived', column: 'pwv',                          ddl: `ALTER TABLE oura_daily_derived ADD COLUMN pwv REAL` },
   { table: 'oura_daily_derived', column: 'body_comp',                     ddl: `ALTER TABLE oura_daily_derived ADD COLUMN body_comp TEXT` },
@@ -1486,6 +1488,16 @@ export const MIGRATIONS: UpgradeStatement[] = [
       // so fresh installs already have it, this ALTER reaches every upgraded device, and the
       // RECONCILE_COLUMNS row is the authority if it half-applies.
       `ALTER TABLE oura_daily_derived ADD COLUMN chronic_stress_granular_nights INTEGER`,
+    ],
+  },
+  {
+    toVersion: 37,
+    statements: [
+      // Q-270 — why the training-stress route did not score a day, mirroring Postgres migration 265.
+      // Same shape as v35/v36: the column is in `CREATE_OURA_DAILY_DERIVED_LOCAL` above so fresh
+      // installs already have it, this ALTER reaches every upgraded device, and the RECONCILE_COLUMNS
+      // row is the authority if it half-applies.
+      `ALTER TABLE oura_daily_derived ADD COLUMN training_load_gate TEXT`,
     ],
   },
 ];

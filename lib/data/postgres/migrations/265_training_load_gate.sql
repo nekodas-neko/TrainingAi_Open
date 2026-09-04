@@ -1,0 +1,19 @@
+-- Q-270: why the training-stress route did not score this day.
+--
+-- `training_load_ots` has been NULL on all 104 days. Three diagnoses have been wrong, and the entry
+-- says why: the persist is a side effect of a GET, it happens only on `status === 'ok'`, and nothing
+-- records that the route ran at all. So "never called" and "called and gated" are indistinguishable
+-- from outside, and every attempt so far has had to guess between them.
+--
+-- This column removes the guess. The route writes it on EVERY evaluation:
+--   NULL              — the route has never run for this day (nothing called it)
+--   'ok'              — it ran and scored; `training_load_ots` beside this is the number
+--   a gate reason     — it ran and refused, and this is which of the four gates said no
+--                       ('no_readiness' | 'readiness_learning' | 'no_profile' | 'insufficient_met')
+--
+-- 'ok' rather than NULL on the success path is load-bearing: the upsert COALESCEs, so writing NULL
+-- would leave a morning's 'insufficient_met' standing on a day that scored by afternoon.
+--
+-- The reason strings are the existing `TrainingStressResult` gate enum, not a new vocabulary — this
+-- records a decision the code already makes and then discards.
+ALTER TABLE oura_daily_derived ADD COLUMN IF NOT EXISTS training_load_gate TEXT;

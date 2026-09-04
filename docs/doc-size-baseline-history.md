@@ -7533,3 +7533,199 @@ as a surprise. The server half tends to ship with its consumer assumed.
 The `Gate: device` note is longer than a gate usually needs because this card is invisible off-native:
 `UpdateCheckCard` returns early unless `Capacitor.isNativePlatform()`, so "it renders nothing in the
 harness" is not a test result and a later session should not read the green suite as coverage.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17278 (BF-118, the User Information section)
+
+A feature request rather than a fault, and the length is mostly the trace that changes what the work
+is. The owner asked for a place to put documents and free text that every AI surface then reads; five
+of the six things he listed already have stores (`injuries`, `dexa_scans`, `measured_rmr`,
+`blood_panels`, `blood_analytes`), the upload pipeline is already queued as BF-41, and the flagship
+example he gave — a lumbar constraint stopping the builder programming deadlifts — **shipped on
+2026-08-31 as BF-68**, from a near-identical sentence. He has not seen it because BF-68's UI half was
+deferred. So the entry's job is to say that the missing piece is not storage but a single shared
+assembler, with `formatInjuryContext` as the working prototype and the measured fact that nutrition
+and the AI routes import none of these stores. The rest is the design decision the entry exists to
+force — structured records can be enforced by filtering the candidate list, prose can only be handed
+to a model, and BF-68 already measured that as "luck rather than a rule" — plus three traps that would
+otherwise be discovered late: crop-before-upload on an X-ray that carries more identifiers than an RMR
+printout, BF-41's standing decision that no source document is stored, and the existing `schedules`
+table being training structure rather than availability.
+
+The +50 that followed came from the owner refining the intake to a blurb router in the same sitting,
+and it earns its lines by being traced fragment by fragment against his own example sentence: of the
+four things in it, the injury and the food exclusion have structured homes (and the injury is
+*enforced*, not merely stored), while work availability and training experience have none. That ratio
+is the finding — a router is worth exactly as much as its destination registry, and "other notes" is
+the honest fallback rather than the target. The sharpest line recorded is that enforcement cuts both
+ways: because an injury removes exercises from the candidate list, a wrongly-routed one silently
+deletes training options, which makes the confirm step load-bearing rather than polite.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17318 (BF-118, the capture pattern and prompts)
+
++40 onto BF-118, and the reason they are worth it is that they **correct the entry's own earlier
+recommendation**. It had said to ship the typed blurb before the image path because the image half
+needs an upload surface; tracing the surface the owner pointed at shows that half is already built —
+`/api/nutrition/scan` takes image, mimeType and text in one call and sanitises the text, and
+`capture-actions.tsx` has camera, gallery and a note field, complete with a `CameraSource.Camera`
+detail fixed once already under BF-50. What the image path actually owes is the **crop step**, which
+exists nowhere in the app and is the owner's own PII rule. The ship order stands and its reason does
+not, which is the kind of thing worth writing down rather than quietly leaving. Also recorded: do not
+add an `imageKind` and route medical images through the food scan route — same surface, different
+sensitivity class and different retention decision — and the prompts are best generated from the
+destinations that are still empty, since a fixed chip row is decoration by the second visit.
+
+---
+
+## 2026-09-03 — `docs/implementation-backlog.md` 17142 → 17183 (Q-278, Lane A)
+
+Forty-one lines for the engine half. The ones that earn their space are the two warnings, because
+both describe ways a later session would undo this without noticing.
+
+First: **`provisional` is unchanged and still means two things.** `recoveryIndexScore` is provisional
+because its curve is an approximation, not because an input is missing. Someone tidying that into the
+new `gap` field would recreate the collapse this entry exists to undo.
+
+Second: **the enum has two members on purpose.** The obvious extension (`below_gate`, `not_yet`)
+reads well and nothing computes it, which turns the "why" into a constant — the failure the entry
+itself predicted before any of this was written.
+
+Also recorded: a first test fixture omitted `checkinScore`, so the cold case read `no_input` —
+correctly, since a missing check-in is missing data. Writing down that the *fixture* was wrong rather
+than the code is what stops the next reader treating an exhaustive fixture as incidental.
+## 2026-09-04 — `docs/implementation-backlog.md` → 17360 (BF-118, the consolidation scope)
+
++42, and it is a map rather than an argument. The owner asked for all of it in one place, so the six
+surfaces where personal data is entered today were traced: goals inline on the More root, height and
+age one level down, DEXA and RMR another level down, the training schedule under `/program`, injuries
+on a **different tab**, and dietary restrictions **only inside the meal-plan wizard**. That last one
+is the finding — the schema says an allergy belongs to the person, and the only door to it is a flow
+about generating a meal plan. Two things keep the scope honest: the `Your setup` group on More already
+gathers three of the six, so this is mostly moving two outliers rather than building a hub; and the
+resolution recorded is one canonical editor per fact with links from wherever it is contextually
+useful, because injuries sit on Health for a reason and a wholesale move would cost it. Also written
+down: goals may be right where they are, since they are read weekly and a DEXA scan twice a year, and
+**no storage migration** — every table is already correct and the assembler is what makes the data
+feel like one place.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17418 (BF-119, the resumed walk's missing samples)
+
+One entry for a data-loss bug the owner caught by killing the app mid-walk. The trace is short because
+the asymmetry is stark: `startedAtMs` is persisted so the clock survives a relaunch, while
+`samplesRef` is a component ref and the cadence tracker is rebuilt — anchored to the original start
+while holding only post-resume data, which is why the earlier interval buckets are empty. What the
+entry spends its length on is worth it: that the store **already contains this reasoning** for the
+neighbouring `mode: 'done'` case and did not carry it to `active`; that `rawPoints` proves the fix
+pattern is already in the same store for a different stream; that `kcal` is the one figure that stays
+correct because it is duration-derived server-side, which is the tell a reader can use; and a warning
+not to copy `rawPoints` blindly, since an HR beat every second through a debounced localStorage write
+is a different load profile from a GPS fix every few seconds.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17487 (Q-155, the third ownership blind spot)
+
+Twenty-five lines onto an entry that is already long, and the justification is that the entry's whole
+value is the record of which detection mechanisms exist and what each one cannot see. Two were
+already documented; this adds the third and states plainly why it is not mechanised — a check that
+flagged every id-taking method without `userId` would fire on nine legitimately join-scoped ones, so
+it needs an allowlist, and an allowlist that size is its own hazard. Also converts the trailing
+"what keeps this open" prose into a `Keep:` bullet, which is what the protocol wants on an entry that
+ships work without closing.
+
+## 2026-09-04 — `projectOverview.md` → 9767 (Q-155, the third ownership blind spot)
+
+Twelve lines onto the ownership-coverage Known-Issues row. The row's function is to tell the next
+session what the two mutation mechanisms can and cannot see, so a third category they are both blind
+to belongs in it rather than only in the backlog — and it carries the finding (three methods that
+constrained ownership nowhere, one of them a bare `UPDATE`) plus the reason it is not automated.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17494 (LB-53 re-scoped; two stale lane fields)
+
+Net five lines: the entry's original evidence table and its three hypotheses came out, and a refutation
+plus the full writer map went in. The map is the part worth the length — five producers write this
+table and no single place held that list, which is how three sessions in a row read a per-score cadence
+out of a column that is stamped by all five on every write of any column. The `Keep:` is one line and
+is now the only thing the entry owes.
+
+Two more lines are field syntax, not prose. TN-1's residual was written as `⚠ Keep —`, which the lane
+runner does not parse, so a shipped owner-gated entry kept printing as Lane A's third READY item; and
+Q-278 stayed `Lane: A` after its engine half shipped, so it printed as the fourth with nothing in it
+for that lane to build. Both now say what they are, and `next-item.js --lane A` went from 28 READY to
+25 — the three it dropped are the three a session would have read before finding that out.
+
+## 2026-09-04 — `projectOverview.md` → 9770 (LB-53 refuted, Q-529's note corrected)
+
+Three lines net onto the Q-529 provisional-score row, which carried the refuted claim as fact — that
+the provisional state "may last far longer" than the ~9 minutes measured. The correction has to keep
+the conclusion (the marking is more load-bearing than 9 minutes) while replacing the reason and
+bounding it to the local day, because a reader who only sees "refuted" would drop the marking.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17510 (BF-55 re-measured, as its own Keep asked)
+
+Sixteen lines onto the growth entry, which had said outright that the total had not been read since
+2026-08-30 and to re-measure before assuming the trend held. It does hold, and slightly worse than
+recorded once the 21 MB migration-249 index drop is added back — so the numbers had to go in rather
+than a "still true". Two of those lines are not about growth at all and earn their place anyway: that
+the 171/200/206/204 series is `sum(pg_total_relation_size)` and not `pg_database_size`, which reads
+218 MB the same day and would turn two flat days into an invented 9 MB/day; and a third sighting of
+the `n_live_tup` trap on `oura_raw_packed`, 97 against 1,093 real rows, on the same table CLAUDE.md
+already names twice.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17546 (Q-250, both candidates settled)
+
+Thirty-six lines onto the emulator entry, replacing a two-candidate guess with a three-axis answer
+table and the reason the entry's own proposed fix is not it. The length is mostly things a next
+session would otherwise pay for again: that `net::`-free is not proof a page rendered (this session's
+own mistake, caught one run later), that the verdict is carried by step names because nothing a job
+prints is ever last in a runner's log, and that the next move is to stop driving the form at all and
+mint the session cookie the job already has the secret for. The superseded candidates stay below,
+marked as the pre-2026-09-04 statement, because their reasoning is what makes the elimination legible.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17576 (Q-270, observability shipped + a dropped-column bug)
+
+Thirty lines onto an entry that has been wrong three times, and most of them are there to stop a
+fourth. The largest block is not prose but a query and its two readings: all-NULL means the route is
+not being called and the fix is on the client; a reason string means it is called and refusing, and
+names the gate. Writing that down is what converts the column from a thing that shipped into an
+answer someone can actually collect. The rest records a second bug found on the way — two derived
+columns the sync push branch dropped silently — and why the tripwire meant to catch exactly that was
+blind to it, since a session that trusts that check needs to know which half of it was load-bearing.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17598 (Q-222 gated, and a smaller ask for the owner)
+
+Twenty-two lines onto the activity-detection entry, and only two of them are the gate. The rest is a
+hypothesis worth writing down before anyone books four physical capture sessions: the ring's frames
+are archived by design, so the signal for months of walking may already exist and what is actually
+missing is labels — several of which are already timestamped in the database. It is marked untested
+and carries both the number that supports it (1,094 packed rows spanning the full history) and the
+one that complicates it (`step_live_windows` holds 8 rows, so that table is not the shortcut it
+looks like), because an unverified idea recorded without its own disconfirming evidence is how a
+session three months from now inherits a false lead.
+
+## 2026-09-04 — `projectOverview.md` → 9796, `docs/implementation-backlog.md` → 17629 (the scale batch)
+
+A device-unverified change to a path the owner reports bugs on needs a row that says so, and this one
+has to carry more than "not verified": that the Q-104 gate is a CANDIDATE fix which does nothing at
+all if the replay theory is wrong, and that Q-114's bar got LONGER — the opposite of what the owner
+asked for, and correct anyway, because a bar finishing before the native side gives up tells them to
+step off mid-retry. Both readings are counter-intuitive enough that a reader who skims the diff would
+draw the wrong conclusion from either. The backlog half keeps each entry's remaining data-dependent
+work stated as its own `Keep:`, so the shipped code is not mistaken for the finished item.
+
+## 2026-09-04 — `projectOverview.md` → 9812, `docs/implementation-backlog.md` → 17669 (LA-58)
+
+A live auth gap that had been sitting inside a deferred feature's preamble, where it read as a
+precondition for work nobody has started rather than something true today. Both rows carry the
+measurement that makes it checkable — the matcher string, the 219 route files, and the fact that none
+of them checks `isActive` — because "middleware only" is the exact phrasing that let it be read as
+theoretical. The backlog half spends its length on three candidate fixes with a recommendation and a
+reversal cost, since it is an auth change and the choice between them is the owner's, not something a
+session should settle by picking the smallest diff.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17690 (Q-250's next step is an auth bypass)
+
+Twenty lines correcting a sentence this same session wrote hours earlier — that CI could "mint the
+session cookie directly" because the job owns `AUTH_SECRET`. It reads as free and is not: the
+existing mobile-auth path keeps its one-time tokens in an in-process Map, so CI cannot inject one,
+and every remaining route adds an authentication bypass. The length is the two candidate shapes, a
+recommendation between them, and the reason the in-process detail matters — without it the next
+session re-derives the dead end. Recorded rather than left, because a confident wrong next step in a
+backlog entry costs more than no next step at all.

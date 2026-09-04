@@ -5,6 +5,7 @@ import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { rateLimit } from '@/lib/rate-limit'
 import { DEFAULT_TZ, todayInTz, normalizeDateParamIso, shiftDateStr, daysBetweenDateStrs } from '@trainingai/shared/date-utils'
 import { buildDayAudit } from '@trainingai/shared/health/score-audit/build-day-audit'
+import { READINESS_MODEL_VERSION } from '@trainingai/shared/health/readiness-composite'
 
 /**
  * Backfill the persisted Sleep and Readiness scores across history (audit finding F-2).
@@ -99,9 +100,12 @@ export async function POST(req: NextRequest) {
       outcome.sleep.recomputed = sleep?.persist?.score ?? null
       outcome.readiness.recomputed = readiness?.persist?.score ?? null
 
-      // Two separate upserts with disjoint column sets, mirroring the live route: the shared
-      // `source`/`model_versions` columns are replaced wholesale by the upsert, so writing them
-      // here would clobber body_comp/illness provenance on the same row.
+      // Two separate upserts with disjoint column sets, mirroring the live route. `source` is left
+      // alone deliberately — it is one shared column per row, so writing it here would relabel
+      // provenance the body-comp and illness producers own. `model_versions` is NOT in that
+      // category any more: Q-273 made it merge per pillar with `||` inside the statement, so a
+      // writer stamping its own key cannot clobber another's. Stamping readiness below is what
+      // makes a backfilled score distinguishable from one the live route wrote.
       if (sleep?.persist) {
         outcome.sleep.action = outcome.sleep.stored === sleep.persist.score ? 'unchanged' : 'written'
         if (!dryRun && outcome.sleep.action === 'written') {
@@ -118,6 +122,13 @@ export async function POST(req: NextRequest) {
             readinessScore: readiness.persist.score,
             readinessContributors: readiness.persist.contributors,
             readinessSource: 'ble-derived',
+            // The point of Q-273's stamp is that a later model change leaves a readable step in the
+            // trend rather than an unmarked one. A backfill writes across history in one pass, so an
+            // unstamped backfilled score is the exact case it was added for — and this route was
+            // producing them: measured 2026-09-04, 27 of the owner's rows carry a readiness score
+            // with no readiness stamp, against 10 that carry both, and only this route writes the
+            // first shape.
+            modelVersions: { readiness: READINESS_MODEL_VERSION },
           })
         }
       }

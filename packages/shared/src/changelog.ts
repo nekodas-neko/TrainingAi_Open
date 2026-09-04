@@ -6,11 +6,27 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.436.6",
-    date: "2026-09-03",
+    version: "1.436.9",
+    date: "2026-09-04",
     changes: [
       "About no longer looks like it is contradicting itself. The app version and the Android build version are different things and both were right, so a green tick appeared to vouch for the smaller one; each now says what it governs.",
       "The Android build row names the version actually installed on your phone and the date it was built, so you can tell whether a native fix has reached the device without looking it up.",
+    ],
+  },
+  {
+    version: "1.436.6",
+    date: "2026-09-04",
+    changes: [
+      "The \u201cWeighing you\u2026\u201d bar should stop appearing when nobody is on the scale. The scale re-sends its last reading when the app reconnects to it, and the app was treating that as a new person stepping on. Needs the new app build to take effect \u2014 if it still happens, the app now records enough to say why.",
+      "The weigh-in progress bar was finishing four seconds before the scale actually gave up trying, so it told you to step off too early. It now runs the full time the scale is still working.",
+    ],
+  },
+  {
+    version: "1.436.5",
+    date: "2026-09-04",
+    changes: [
+      "Two pieces of the daily stress and resilience picture were not being backed up from the phone to the server. They were saved on the phone and sent, and the server quietly ignored them. Now they are kept, so a restore or a new phone brings them back.",
+      "The app now records why a day's training load could not be worked out \u2014 not enough movement data, readiness still learning, or a missing profile detail. Nothing looks different, but the reason a day is blank can now be answered instead of guessed at.",
     ],
   },
   {

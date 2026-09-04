@@ -77,10 +77,13 @@ sleep surface read it. Marked now on all three: the Home chip (via its existing 
 glyph, whose predicate was written out at three sites and is now one tested function), the Body
 tab's sleep card, and `/health/sleep`. An absent flag reads as **settled** — the local-store seed has
 no watermark, and badging every historical night would be worse than the bug.
-**⚠ Found while checking the entry's caveat, and filed as LB-53 (Lane A):** `oura_daily_derived`
-holds **four `computed_at` stamps in its entire history**, with a **nine-day gap** where nothing was
-written and a pass that rewrote 85 rows minutes after a deploy. That makes this marking *more*
-load-bearing — the provisional state may last far longer than the ~9 minutes Q-529 measured.
+**⚠ Filed as LB-53 (Lane A), and REFUTED as filed on 2026-09-04 — read the corrected version.**
+The original reading (four `computed_at` stamps in the table's whole history, a nine-day gap, a pass
+rewriting 85 rows after a deploy) was drawn from a column stamped by every write of any of the row's
+36 columns, so it says nothing about when a score was computed; the 85-row pass writes `body_comp`
+only. What is true: the live route rewrites **today's** score on every request and nothing revises a
+day once it ends. So this marking is still *more* load-bearing than the ~9 minutes Q-529 measured —
+the provisional window is the whole local day — but it is bounded by that day, not open-ended.
 **Not device-verified**, and the device owns the only real test: a morning where the ring is
 genuinely mid-upload ([journal](docs/overview/entries/2026-09-02-q529-provisional-sleep-score.md)).
 
@@ -1637,6 +1640,48 @@ Last swept **2026-09-03**.
 > An entry only leaves when **nothing is still owed**: no open work, no pending owner or device
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
+
+### [platform] 🟠 Deactivation does not deactivate: the `isActive` gate never runs on an API route (LA-58, 2026-09-04)
+
+`middleware.ts`'s matcher excludes `api` as its first exclusion, so the deactivation branch cannot
+run on any of the **219** `app/api/**/route.ts` files. Each of them calls `auth()` and checks
+`session?.user?.id`; **none checks `isActive`**, and there is no shared route-auth helper to add it
+to in one place.
+
+A deactivated or still-pending user therefore keeps full API access to **their own** data while their
+session cookie is valid. Not a cross-user leak — the routes are user-scoped — so it reads as
+"deactivation stops the UI and nothing else". The browser bounces them to `/pending`; `curl` with
+their cookie does not.
+
+Found while assessing Q-1a, which names it as a precondition for bearer auth. That framing is why it
+sat: it reads as future work for a feature that has not started, and it is live now. **LA-58 carries
+the three candidate fixes with a recommendation; it is `Gate: owner` because it is an auth change.**
+
+### [devices][body] 🟡 The scale's "Weighing you…" gate shipped UNVERIFIED on device (Q-104/Q-114, 2026-09-04)
+
+Two owner-reported scale bugs got their code half, and **neither has been on a phone**. This sandbox
+has no Android SDK and Gradle is proxy-blocked, so the only gate they passed is CI's Kotlin unit
+tests and APK build — real behaviour needs the next APK install.
+
+**Q-104 — the false "Weighing you…" bar.** `onUnstableReading` treated every unstable reading as
+proof someone is on the scale and undid the post-capture suppression on that basis; it was the one
+path bypassing the whole suppression system. It now consults `ScaleWeighInGate`, which refuses a
+reading identical to the wake's last capture — the resubscribe-replay shape the owner's 5:46 capture
+/ 5:47 re-link screenshots showed. **This is a candidate fix, not a confirmed one**: it is deliberate
+that the gate cannot fire before a capture or on a reading differing by a gram, so if the replay
+theory is wrong it simply never engages. `onUnstableReading` also now logs the incoming and last
+captured weights on every call, so the next ordinary occurrence answers the question the entry sat on
+since 2026-08-05 without anyone holding `chrome://inspect` open at the moment of failure.
+
+**Q-114 — the progress bar's duration.** It read 12s against a native give-up of 16s, so it finished
+four seconds early — and the bar's job is telling the owner how long to keep standing still.
+Reconciled to 16s, with `scripts/check-scale-cycle-budget.js` failing CI if they diverge again.
+**Note the direction: the bar got longer, which is the opposite of what the owner asked for.** The
+trim they wanted is still owed and still needs a capture — both 12s and 16s are the retry ceiling,
+and neither is how long a weigh-in actually takes.
+
+**What to watch on the next APK:** the bar not appearing on a plain Home-tab visit with an empty
+scale, and a genuine weigh-in still drawing one.
 
 ### [nutrition][platform] 🟡 A meal plan can point at another account's saved meal and meal type (RV-42, 2026-09-03)
 
@@ -4823,6 +4868,18 @@ covered": the quartile bisect bounds rather than attributes, so a range producin
 34 covered predicates. Exact attribution needs ~246 individual runs. Untouched entirely: ownership
 enforced by a join or pre-check instead of a `user_id` predicate, and the full ~3,270-test suite —
 only the 363 DB tests were measured.
+
+**A third blind spot, found and closed 2026-09-04 — a method that never asked for `userId` at all.**
+Both mechanisms assume the owner is a *parameter*: the sweep mutates predicates that exist, and
+`check-repository-user-scoping.js` flags a method that **takes** `userId` and never uses it. Neither
+can see a signature that omits the owner entirely. Of the **12** data-layer methods taking an id but
+no `userId`, nine are join- or pre-check-scoped and **three constrained ownership nowhere** —
+`getSetDetailsForSession`, `getSetTimestampsForSession`, and `markHrSynced`, a bare unscoped
+`UPDATE`. Safe only because the single production caller passed an id from a user-scoped query, and
+two of the three have no production caller at all. All three now take `userId` and constrain on
+`workout_sessions.user_id`, covered by `hr-session-ownership.test.ts` (5 tests, mutation-verified,
+including two controls proving the fixture produces data). **Not mechanised** — a check for this
+shape fires on all nine legitimate ones and would need an allowlist, which is its own hazard.
 
 **Carry this into any addition:** **four** assertions in that file could not fail as first written —
 `getBodyBatteryHistory` returns a row shape with no `userId`, making `not.toContain(USER_B)`

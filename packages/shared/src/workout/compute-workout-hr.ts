@@ -32,9 +32,9 @@ export async function computeWorkoutHr(
 
   const [readings, sets, rrRows, richSets, baseline] = await Promise.all([
     repo.getHrForWindow(userId, from, to),
-    repo.getSetTimestampsForSession(ws.id),
+    repo.getSetTimestampsForSession(userId, ws.id),
     repo.getRrForWindow(userId, ws.startedAt, ws.completedAt),
-    repo.getSetDetailsForSession(ws.id),
+    repo.getSetDetailsForSession(userId, ws.id),
     resolveHrProfile(repo, userId, tz),
   ])
 

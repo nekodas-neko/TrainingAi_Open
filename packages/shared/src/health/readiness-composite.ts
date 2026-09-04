@@ -57,6 +57,9 @@ export interface ReadinessCompositeInputs {
   recoveryIndexHours?: number | null
 }
 
+/** Why a contributor could not be scored. See {@link ReadinessContributor.gap}. */
+export type ContributorGap = 'no_input' | 'awaiting_baseline'
+
 export interface ReadinessContributor {
   score: number // 0-100
   /** True when this contributor fell back to neutral — either no signal, or the
@@ -79,6 +82,20 @@ export interface ReadinessContributor {
    * under the stamped `model_versions.readiness` becomes checkable without a second table.
    */
   input: number | null
+  /**
+   * Q-278. WHY this contributor fell back to the neutral 50, or null when it was genuinely scored.
+   *
+   * The distinction already existed in the code and was being thrown away: `zToScore` returns the
+   * same NEUTRAL for `z == null` (there is no input at all) and for `nHistory <
+   * BASELINE_MIN_NIGHTS` (there IS an input, the baseline is just too cold to score it). Those read
+   * very differently to a user — "we have no HRV for you" versus "we have HRV but not enough
+   * history yet" — and collapsing them is why a surface could say a score was limited but never say
+   * what would fix it.
+   *
+   * Deliberately only two values, because those are the only two the producers can actually tell
+   * apart. An enum with more members would have to invent the difference.
+   */
+  gap: ContributorGap | null
 }
 
 export interface ReadinessCompositeResult {
@@ -86,7 +103,10 @@ export interface ReadinessCompositeResult {
   contributors: Record<keyof typeof READINESS_WEIGHTS, ReadinessContributor>
 }
 
-const NEUTRAL: ReadinessContributor = { score: 50, provisional: true, input: null }
+const NEUTRAL: ReadinessContributor = { score: 50, provisional: true, input: null, gap: 'no_input' }
+/** The input exists; the personal baseline is not mature enough to score it yet (Q-278). Same score
+ *  and same `provisional` as NEUTRAL — only the reason differs, which is the whole point. */
+const AWAITING_BASELINE: ReadinessContributor = { score: 50, provisional: true, input: null, gap: 'awaiting_baseline' }
 
 // Points added per z-unit around the neutral 50. Recalibrated 2026-07-22 (W-D): 50/1.5 ≈ 33.3, so a
 // contributor reaches a full 100 at +1.5σ (a realistically-great day) rather than the former +2.5σ
@@ -119,16 +139,17 @@ function zToScore(
   direction: 'higher-better' | 'lower-better' | 'closer-better',
   nHistory: number,
 ): ReadinessContributor {
-  if (z == null || nHistory < BASELINE_MIN_NIGHTS) return NEUTRAL
+  if (z == null) return NEUTRAL
+  if (nHistory < BASELINE_MIN_NIGHTS) return AWAITING_BASELINE
   const raw = direction === 'closer-better'
     ? 100 - Math.abs(z) * (2 * Z_POINTS_PER_UNIT)
     : 50 + (direction === 'higher-better' ? z : -z) * Z_POINTS_PER_UNIT
-  return { score: Math.max(0, Math.min(100, Math.round(raw))), provisional: false, input: z }
+  return { score: Math.max(0, Math.min(100, Math.round(raw))), provisional: false, input: z, gap: null }
 }
 
 function plainScore(v: number | null): ReadinessContributor {
   if (v == null) return NEUTRAL
-  return { score: Math.max(0, Math.min(100, Math.round(v))), provisional: false, input: v }
+  return { score: Math.max(0, Math.min(100, Math.round(v))), provisional: false, input: v, gap: null }
 }
 
 /** Stamped onto `oura_daily_derived.model_versions.readiness` so a score can be attributed to the
@@ -171,7 +192,9 @@ export const RECOVERY_INDEX_OPTIMAL_HOURS = 5
 function recoveryIndexScore(hours: number | null | undefined): ReadinessContributor {
   if (hours == null || !Number.isFinite(hours)) return NEUTRAL
   const score = Math.max(0, Math.min(100, Math.round((hours / RECOVERY_INDEX_OPTIMAL_HOURS) * 100)))
-  return { score, provisional: true, input: hours }
+  // `provisional` here means the CURVE is an approximation, not that an input is missing — so the
+  // gap is null. Q-278 exists because those two senses of "provisional" used to be one field.
+  return { score, provisional: true, input: hours, gap: null }
 }
 
 /**
