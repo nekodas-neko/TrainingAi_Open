@@ -7707,3 +7707,16 @@ of them checks `isActive` — because "middleware only" is the exact phrasing th
 theoretical. The backlog half spends its length on three candidate fixes with a recommendation and a
 reversal cost, since it is an auth change and the choice between them is the owner's, not something a
 session should settle by picking the smallest diff.
+
+## 2026-09-04 — `projectOverview.md` → 9823, `docs/implementation-backlog.md` → 17617 (BF-117)
+
+The backlog **falls** by 52: BF-117 shipped and its entry is gone from the queue, which is the shape
+the protocol wants and the reason the ratchet is worth having at all.
+
+The index grows by eleven, all of it on two existing entries rather than a new one. RV-35 measured
+Nutrition failing to roll over and diagnosed it exactly; it stays in Known Issues rather than moving
+to the archive because the device check is still owed, and it now carries the fix and one line
+pointing at the figure in its own measurement that was easy to read past — Home went from 4 dated
+requests to 2, which is the check-in and mood reads BF-86 fixed and nothing else. BF-86's own entry
+gains a pointer saying the half it deliberately deferred has landed, because that entry is what a
+reader arrives at first and it otherwise reads as still-open scope.

@@ -634,7 +634,10 @@ deliberately not built** — BF-80 forbids fixing a resume with a reload, and th
 ask without trading instant paint for a spinner. The e2e test drives Playwright's clock across local
 midnight so the case fires on every run; **its first version passed with the fix reverted**, because
 `isVisible()` is a point-in-time check and not a wait. **Not device-verified**
-([journal](docs/overview/entries/2026-09-01-local-day-rollover.md)).
+([journal](docs/overview/entries/2026-09-01-local-day-rollover.md)). **The half this deliberately
+deferred shipped as BF-117 on 2026-09-04** — the rest of Home, plus Health and Nutrition, now follow
+the day too, via `useDayRolloverRefresh` in the same file
+([journal](docs/overview/entries/2026-09-04-bf-117-rollover-refetch.md)).
 
 **A peaking week stops reading as a volume deficit (BF-59, the screen's half).** Owner: *"i did the
 full sessions for the week; and i was nowhere near hitting the reccomended amount of muscle sets"*,
@@ -1744,7 +1747,15 @@ threshold. The existing `expectNoSkeleton` helper polls to 20 s, so it catches *
 blind to this class. **Needs the device** — the ring card's real state is BLE, unreachable on web.
 [`§3`](docs/reviews/2026-09-03-first-run-honesty-and-instant-paint.md).
 
-### [nutrition][app-shell] 🔴 Nutrition never asks what day it is on resume, so a log after midnight lands on yesterday (RV-35, 2026-09-03)
+### [nutrition][app-shell] 🟡 Nutrition never asks what day it is on resume, so a log after midnight lands on yesterday (RV-35, 2026-09-03 — fixed 2026-09-04, device check owed)
+
+**Fixed by BF-117** and kept here because the device check is owed. RV-35's measurement was right and
+its diagnosis was exact: `tabEpoch` increments only on a **re-show**, never on a resume-in-place. The
+fix is the second signal rather than new logic — Nutrition's midnight branch already knew what to do.
+`useDayRolloverRefresh` now drives it alongside `useRefreshOnTabShow`, and Home and Health take the
+same hook. **The Home figure in the measurement below is the more alarming one and was easy to read
+past: 4 dated requests before, 2 after — the check-in and mood reads BF-86 fixed, and nothing else.**
+[journal](docs/overview/entries/2026-09-04-bf-117-rollover-refetch.md).
 
 The tab shell is persistent, and Nutrition's midnight branch keys on `tabEpoch` — which the shell
 increments only when a tab is **re-shown**, never on a resume-in-place. Measured across all five tabs
