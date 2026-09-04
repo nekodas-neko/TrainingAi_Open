@@ -835,6 +835,64 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
   would make the tile instant and work offline, but it duplicates a formula One Formula, One Place
   says lives once, and the `node:path` read is the coupling that keeps it server-side.
 
+### [cardio][devices] BF-119 — a resumed guided walk keeps its clock and loses its samples, and the summary reports both as if they agree
+
+- **Lane:** B — `components/guided-walk/walk-active.tsx` and `lib/stores/guided-walk-store.ts`.
+- **Added:** 2026-09-04 · owner: *"I started my guided walk then I closed the app mid session and
+  opened again - I was able to resume the walk- but its missing data."* Screenshot: **30m** duration
+  beside a heart-rate chart whose axis ends at **6m**, per-interval rows reading `—` for sets 1-4 with
+  only set 5 populated, and **Session Load 6** where a comparable complete walk read 30.
+- **Verify:** device — the failure needs a real process kill; a browser reload is not the same path.
+
+**The resume is half-implemented, and the half that works is what makes it dangerous.**
+`startedAtMs` lives in the persisted store, so on relaunch the timer, the elapsed second count, the
+segment the walk is in and the final `durationMin` are all still measured from the **original** start.
+The samples are not:
+
+- `samplesRef = useRef<WalkHrSample[]>([])` (`walk-active.tsx:49`) is **component-local**. The
+  component remounts on relaunch and the array starts empty.
+- `cadenceRef` gets a **new** `CadenceTracker`, started with `tracker.start(startedAtMs)` — the
+  original start. So the tracker is anchored 25 minutes in the past holding 5 minutes of data, which
+  is why every earlier interval bucket is empty and only the final one has values.
+- `onFinish(samplesRef.current, cadenceRef.current?.summary() ?? null)` (`:141`) then hands the
+  summary a post-resume slice while the duration says half an hour.
+
+**So every derived figure is wrong in the same direction and nothing on the screen says so** — avg HR,
+max HR, time in zone, Session Load and the per-interval table all describe ~5 minutes, presented
+beside a 30-minute duration. **`kcal` is the exception and that is worth knowing**: it is derived
+server-side from duration and activity type, so it alone reflects the full walk. One tile disagreeing
+with the rest is the tell.
+
+**⚠ The store already knows this happens, for the neighbouring case.** `onRehydrateStorage` resets
+`mode: 'done'` to config with the comment *"the summary's in-memory samples are gone after a reload,
+so there's nothing to show."* The exact same reasoning applies to `mode: 'active'`, and that branch
+resumes anyway. The knowledge is in the file; only the conclusion was not carried across.
+
+**The fix pattern is already in the same store, applied to a different stream.** `rawPoints` — GPS —
+lives in the store and the store has **no `partialize`**, so route and distance already survive a
+relaunch. HR and cadence are the two streams that were left in component refs.
+
+- **Recommendation: move the HR sample array into the store beside `rawPoints`, and make the cadence
+  tracker resumable from it.** That makes the surviving data match the surviving clock, which is the
+  actual defect. It also costs nothing new architecturally — one stream in that store already does it.
+- **⚠ Watch the write volume before copying `rawPoints` blindly.** The store persists through
+  `debouncedLocalStorage(PERSIST_DEBOUNCE_MS)`, and an HR sample arrives roughly once a second against
+  a GPS fix every few seconds. Serialising a growing array on every beat is a different load profile;
+  the debounce may need widening, or the samples appending rather than the whole array re-serialising.
+  Measure it on the device rather than assuming the existing debounce absorbs it.
+- **If the samples cannot be preserved, the summary must say so rather than imply agreement.** A
+  second-best fix is honest labelling — the chart marked as covering part of the walk, and Session
+  Load withheld rather than under-reported. **Silently averaging five minutes and calling it thirty is
+  the thing to stop**, whichever way it is stopped.
+- **⚠ Do not fix it by refusing to resume.** Resuming is correct behaviour and the owner used it
+  successfully; ending a walk because the app was backgrounded would be a worse outcome than a partial
+  chart.
+- **Verification (device):** start a guided walk, kill the app from the recents switcher mid-session,
+  reopen and resume, then let it finish — the heart-rate chart spans the whole walk, every interval
+  row carries values, Session Load is comparable to an uninterrupted walk of the same length, and the
+  duration still matches the wall clock.
+
+
 ### [platform][workouts][nutrition] 🔵 BF-118 — "User Information": one place the app knows you from, and one assembler every AI route reads
 
 > **⚑ REFINED 2026-09-04 — the intake is a BLURB ROUTER, and the owner would rather talk than fill in
