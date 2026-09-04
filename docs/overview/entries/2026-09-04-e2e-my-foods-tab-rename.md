@@ -108,7 +108,18 @@ find what they were looking for and finish in seconds.
 (BF-103) shipped three days ago and is already on the owner's phone; this only makes the suite agree
 with it.
 
-**Whether this is the whole of E2E's redness.** The caveat this section originally carried turned out
-to be worth carrying: a full-suite run found three more failures at test 140, from a different drift.
-Those are fixed here too and the suite was re-run, but the honest claim remains bounded — nine specs
-were asking for things the app had stopped offering, and they no longer are. A tenth may exist.
+**This is NOT the whole of E2E's redness, and the number is now known rather than hedged.** A full
+run against the CI-shaped database, on the branch carrying the tab-rename fix, was **146 passed / 10
+failed**. Three of those ten were the meal-plan drift and are fixed here. **Seven remain**, listed
+with their durations in LB-55 — the duration classifies them, since a ~45s failure is a retry loop
+spinning on something absent while a sub-second one is a real assertion.
+
+The first version of this section said "a tenth may exist", which understated it. That was written
+from a run still in flight, read at three failures when it went on to find ten. **A partial log is
+not a result**, and the reporting was corrected rather than left to look better than the evidence.
+
+**One run had to be thrown away.** A re-run after the meal-plan fix reported 106 failed / 41 passed,
+almost all at ~250ms. That was not the app: the dev server died at test 42 and every later spec hit
+`ECONNREFUSED 127.0.0.1:3100`. Uniformly sub-second durations across unrelated files is the tell for
+an environment collapse, and it is recorded in LB-55 because reporting it as a finding would have
+been the poisoned-state trap `docs/local-dev-database.md` already warns about.

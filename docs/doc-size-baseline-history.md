@@ -7708,7 +7708,7 @@ theoretical. The backlog half spends its length on three candidate fixes with a 
 reversal cost, since it is an auth change and the choice between them is the owner's, not something a
 session should settle by picking the smallest diff.
 
-## 2026-09-04 — `docs/implementation-backlog.md` → 17717 (LB-55)
+## 2026-09-04 — `docs/implementation-backlog.md` → 17740 (LB-55)
 
 Forty-eight lines for one Reference entry, and the length is the point: it is read *while* a red E2E
 is being diagnosed, which is exactly when a session has no logs, no `main` baseline, and a failure
@@ -7721,3 +7721,12 @@ The string-checking guard is written down with the reason it cannot work — it 
 mutation — so the next session does not spend an hour rebuilding it. And the measurement that a PR
 merged with E2E red is recorded as a measurement, with the three candidate explanations left open,
 because it is the owner's to settle and it changes what every other session should do while waiting.
+
+Twenty-three more lines the same day, both of them measurements that stop a repeat. The seven specs
+still failing after this PR are listed with their DURATIONS, because the duration is what classifies
+them — a ~45s failure is a `toPass` loop spinning on something absent, a sub-second one is a real
+assertion, and knowing which before opening the file is most of the triage. And a full-suite result
+of 106 failed / 41 passed is recorded as what it actually was: the dev server dying at test 42, every
+later spec failing against `ECONNREFUSED`. Reporting that as a finding would have been exactly the
+poisoned-state trap already documented, so the tell — uniformly sub-second durations — is written
+down beside it.

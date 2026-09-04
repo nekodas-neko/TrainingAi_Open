@@ -421,6 +421,29 @@ below threshold and left in place for next time.
   block, it is not doing so; if it is not meant to block, then every session holding a PR behind it
   — as this one did for hours — is waiting on nothing.
 
+- **⚠️ Seven specs still fail on `main` after this PR, and they are listed so nobody re-derives them.**
+  A full local run against a CI-shaped database, on the branch carrying the tab-rename fix, was
+  **146 passed / 10 failed**. Three of those ten were `meal-plan-library-surface` and are fixed. The
+  remaining seven, with the timing that says which kind each is — a ~45s time is a `toPass` loop
+  spinning on something absent, a sub-second time is a real assertion:
+  - `plan-rescale.spec.ts:168` (36.9s) · `recipe-url-to-meal.spec.ts:91` and `:156` (45.3s, 45.2s)
+    — the slow shape, so most likely the same drift class as the nine already fixed.
+  - `preferences-survive-reinstall.spec.ts:36` (8.7s) · `timeline-card-navigation.spec.ts:80`
+    (18.6s) · `touch-target-size.spec.ts:53` on `/` (26.7s) — middling, unclassified.
+  - `profile-details-consolidation.spec.ts:50` (**3.0m**) — an outlier by an order of magnitude and
+    probably its own thing.
+  - **Start from the `error-context.md` Playwright writes beside each failure**, not from the spec:
+    it carries the accessibility snapshot of the screen at the moment it gave up, and that is what
+    identified both drifts here in minutes after hours of theorising.
+
+- **⚠️ Do not trust a local full-suite run without checking the dev server survived it.** A re-run
+  after the meal-plan fix reported **106 failed / 41 passed** — almost every failure at ~250ms,
+  which is not the app failing but `ECONNREFUSED 127.0.0.1:3100`: the Next dev server died at test
+  42 and every later spec failed against nothing. On the same branch minutes earlier the number was
+  146/10. **A mass failure whose durations are uniformly sub-second is an environment collapse, and
+  reporting it as a finding would have been the poisoned-state trap `docs/local-dev-database.md`
+  already warns about.** Grep the run log for `ECONNREFUSED` before believing a bad result.
+
 - **⚠️ The obvious guard for the stale-string class does not work, and here is why, so it is not
   rebuilt.** `check-e2e-ui-strings.js` was written and deleted the same hour. It asserted that every
   tab name and placeholder a spec waits for appears somewhere in `app/`, `components/` or
