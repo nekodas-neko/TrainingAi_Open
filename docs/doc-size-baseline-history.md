@@ -7796,3 +7796,18 @@ The backlog number is **recomputed from the merged file**, not carried from eith
 entry landed on `main` between this branch and its merge, so both sides raised the same baseline to
 different numbers — the one case where a `.size` conflict is a genuine disagreement rather than two
 unrelated additions.
+
+## 2026-09-05 — `docs/implementation-backlog.md` → 17951, `projectOverview.md` → 9892 (sweep 48: RV-47, RV-48)
+
+Two queue entries and their two Known-Issues rows. Both carry a table rather than a sentence, and the
+table is the finding: RV-47's four rows put a malformed id beside a well-formed missing one on the
+same route, which is what shows one of the two statuses is wrong without needing a fixture. RV-48's
+three rows pair each ghost-id `200` with the positive control where that same response follows a
+write that did change the database — without which "reports success" is an assertion, not a result.
+
+One row of RV-48 reads **not established**: `oura_workouts` has no rows locally, so its positive
+control could not be built. Recording the gap in the entry is the point — the next session should not
+read three confirmed rows where there are two.
+
+`docs/agents/state/review.md` stayed inside its 205 baseline; the §Now section and four older
+entries were condensed to absorb the new material, per the baton's own one-screen rule.
