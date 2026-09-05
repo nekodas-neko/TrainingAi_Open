@@ -544,8 +544,33 @@ database:
 unconditionally, so nothing can distinguish the cases from the response. It is also the only one of
 the five with **neither** an id-format guard nor a not-found path.
 
-### [platform][nutrition] RV-45 — Q-556's 404 shipped on one route; its comment says "match every sibling delete"
+### [platform][nutrition] 🟡 RV-45 — the six sibling deletes now 404; the device path is unchecked
 
+> **✅ SWEPT 2026-09-05.** All seven now answer **404** when a delete matched no row, matching the
+> Q-556 reference on `activity-logs`. Seven repository methods went from `Promise<void>` to
+> `Promise<boolean>` via `.returning()` — **the predicates are untouched**, so this reports on the
+> match rather than changing which rows match.
+>
+> **The two throwing pre-checks are deliberately unaffected:** `MealTypeHasLogsError` still answers
+> 409 and `deleteActivityType`'s in-use guard still throws. *"This has entries"* is not *"this does
+> not exist"*.
+>
+> **A test pinned the old behaviour and it did its job.** `not-found-status.test.ts` required 200
+> with the comment *"pinned so it does not get 'fixed' later"* — that is the 2026-08-18 decision this
+> entry reverses. It is reversed **with the cause written into the test**, not quietly flipped: the
+> idempotence argument holds for the owner re-deleting their own row and fails across accounts, where
+> the row is present and correctly so. `delete-404-parity.test.ts` now holds all seven together,
+> mutation-verified — reverting two routes fails exactly those two by name.
+- **Keep:** the device check, and it is the half this sweep could not reach. These deletes now make a
+  previously-silent no-op **loud**: `manage-supplements-sheet.tsx` and `injury-sheet.tsx` do
+  `if (!res.ok) throw`, so a 404 becomes an error toast where the user used to get a false success.
+  That is the point — but on device those two surfaces write locally first and take the API as a
+  **fallback**, which is a path the web build never exercises. **What closes it:** delete a
+  supplement and an injury on the APK, online and then offline, and confirm no error toast appears
+  for a delete that genuinely worked locally. The queued-but-unpushed race the 404 could otherwise
+  expose is reconciled by the push arm (Q-328) and every affected domain is in
+  `SYNCED_MUTATION_DOMAINS` — established, not assumed, but not observed on hardware either.
+- **Verify:** device
 - **Lane:** A — `app/api/**` delete handlers and the repository methods behind them.
 - **Added:** 2026-09-05, Review sweep 47 —
   [write-up](reviews/2026-09-05-delete-reports-success-for-nothing.md).

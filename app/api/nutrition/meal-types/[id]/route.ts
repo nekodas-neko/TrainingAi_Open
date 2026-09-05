@@ -71,8 +71,11 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
       const { moved } = await repo.reassignAndDeleteMealType(userId, id, reassignTo)
       return NextResponse.json({ success: true, moved })
     }
+    // RV-45: 404 when nothing matched, matching the Q-556 reference. The 409 below is a different
+    // answer and is untouched — "this meal type has entries" is not "this meal type does not exist".
+    let deleted: boolean
     try {
-      await repo.deleteMealType(id, userId)
+      deleted = await repo.deleteMealType(id, userId)
     } catch (e) {
       if (e instanceof Error && e.message === 'MEAL_TYPE_HAS_LOGS') {
         const logCount = (e as { logCount?: number }).logCount ?? 0
@@ -84,6 +87,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
       }
       throw e
     }
+    if (!deleted) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     return NextResponse.json({ success: true })
   })
 }
