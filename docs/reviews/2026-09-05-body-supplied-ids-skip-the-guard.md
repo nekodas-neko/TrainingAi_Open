@@ -33,6 +33,10 @@ paired with a control, and every write is read back out of Postgres:
 than the one under test — a `distanceKm` of 999 against a schema capped at 500, a wrong key name, a
 `status` outside its enum. Every result below is from a re-probe whose control fired correctly.
 
+**Re-verified after the merge.** LA-58 (*"make the deactivation gate cover API routes"*) landed on
+`main` between the probes and this PR, changing gating on the routes measured here. Every result in
+§2 and §3 was re-run against the merged tree and is unchanged.
+
 **What this does not establish.** `oura_workouts` holds **0 rows** locally, so the positive control
 for `PATCH /api/oura/workouts` could not be built: its `200`-for-a-ghost is measured, but "the same
 response also means a real write" is read from source, not observed. This is the **web** build —
