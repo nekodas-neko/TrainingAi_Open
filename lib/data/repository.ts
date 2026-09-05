@@ -679,7 +679,8 @@ export interface WorkoutRepository {
   listActivityTypes(): Promise<ActivityType[]>
   createActivityType(data: { label: string; icon: string; isDistanceBased: boolean; sortOrder: number }): Promise<ActivityType>
   updateActivityType(id: string, patch: Partial<{ label: string; icon: string; isDistanceBased: boolean; sortOrder: number }>): Promise<ActivityType>
-  deleteActivityType(id: string): Promise<void>
+  /** RV-45: false when nothing matched. Still throws when the type is in use. */
+  deleteActivityType(id: string): Promise<boolean>
   /** `source` is required, not optional: it decides the per-field rank merge in `source_map`.
    *  A caller left on a default would silently write rank-0 and win over the ring forever. */
   saveSleepSession(userId: string, session: Omit<SleepSession, 'id' | 'userId' | 'createdAt'>, source: HealthSource): Promise<void>
@@ -843,7 +844,8 @@ export interface WorkoutRepository {
   listMealTypes(userId: string): Promise<MealType[]>
   createMealType(userId: string, data: Omit<MealType, 'id' | 'userId' | 'createdAt'>): Promise<MealType>
   updateMealType(id: string, userId: string, data: Partial<Omit<MealType, 'id' | 'userId' | 'createdAt'>>): Promise<MealType>
-  deleteMealType(id: string, userId: string): Promise<void>
+  /** RV-45: false when nothing matched. Still throws MealTypeHasLogsError when logs reference it. */
+  deleteMealType(id: string, userId: string): Promise<boolean>
   /** Live (non-soft-deleted) food logs pointing at a meal type — what the delete refusal reports (Q-412). */
   countLiveFoodLogsForMealType(userId: string, mealTypeId: string): Promise<number>
   /** Move every live log onto `toId`, re-stamping each one's eaten-at against the new window, then soft-delete `fromId`. One transaction (Q-412). */
@@ -873,14 +875,16 @@ export interface WorkoutRepository {
    *  id gets the same treatment as the other two. */
   foodLogRefsValid(userId: string, mealTypeId: string, foodItemId: string, savedMealId?: string | null): Promise<boolean>
   updateFoodLog(id: string, userId: string, quantityMultiplier: number): Promise<FoodLog>
-  deleteFoodLog(id: string, userId: string): Promise<void>
+  /** RV-45: false when nothing matched. */
+  deleteFoodLog(id: string, userId: string): Promise<boolean>
 
   listSavedMeals(userId: string): Promise<SavedMeal[]>
   /** `imageDataUri`: omit to leave a stored thumbnail alone, `null` to remove it. Capped (Q-396). */
   /** `mealTypeIds` undefined = leave stored tags alone; `[]` = clear them (BF-11e). */
   createSavedMeal(userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], id?: string, servings?: number, imageDataUri?: string | null, mealTypeIds?: string[]): Promise<SavedMeal>
   updateSavedMeal(id: string, userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], servings?: number, imageDataUri?: string | null, mealTypeIds?: string[]): Promise<SavedMeal>
-  deleteSavedMeal(id: string, userId: string): Promise<void>
+  /** RV-45: false when nothing matched. */
+  deleteSavedMeal(id: string, userId: string): Promise<boolean>
 
   // ── Meal Plan (Q-186) ────────────────────────────────────────────────────────
   // Variants and meals carry no user_id; every write below proves ownership by joining back to
@@ -1082,18 +1086,21 @@ export interface WorkoutRepository {
   listInjuries(userId: string): Promise<import('@trainingai/shared/types/injury').Injury[]>
   createInjury(userId: string, data: Omit<import('@trainingai/shared/types/injury').Injury, 'id' | 'userId' | 'createdAt' | 'updatedAt'> & { id?: string }): Promise<import('@trainingai/shared/types/injury').Injury>
   updateInjury(id: string, userId: string, data: Partial<Omit<import('@trainingai/shared/types/injury').Injury, 'id' | 'userId' | 'createdAt' | 'updatedAt'>>): Promise<import('@trainingai/shared/types/injury').Injury>
-  deleteInjury(id: string, userId: string): Promise<void>
+  /** RV-45: false when nothing matched. */
+  deleteInjury(id: string, userId: string): Promise<boolean>
 
   // ── Supplements ────────────────────────────────────────────────────────────
   listSupplements(userId: string, date: string): Promise<import('@trainingai/shared/types/supplement').SupplementWithStatus[]>
   createSupplement(userId: string, data: Omit<import('@trainingai/shared/types/supplement').Supplement, 'id' | 'userId' | 'createdAt'> & { id?: string }): Promise<import('@trainingai/shared/types/supplement').Supplement>
   updateSupplement(id: string, userId: string, data: Partial<Omit<import('@trainingai/shared/types/supplement').Supplement, 'id' | 'userId' | 'createdAt'>>): Promise<import('@trainingai/shared/types/supplement').Supplement>
-  deleteSupplement(id: string, userId: string): Promise<void>
+  /** RV-45: false when nothing matched, so the route can 404 rather than confirm a no-op delete. */
+  deleteSupplement(id: string, userId: string): Promise<boolean>
   /** `dose` is what was actually taken (BF-3). Omit it and the definition's CURRENT dose is
    *  stamped — right for the web route, wrong for a mutation queued offline and drained after a
    *  titration, which is why the sync engine fills it from the local row. */
   logSupplement(supplementId: string, userId: string, date: string, dose?: Partial<import('@trainingai/shared/types/supplement').SupplementDose>): Promise<void>
-  unlogSupplement(supplementId: string, userId: string, date: string): Promise<void>
+  /** RV-45: false when nothing matched. */
+  unlogSupplement(supplementId: string, userId: string, date: string): Promise<boolean>
 
   // ── AI Periodization ───────────────────────────────────────────────────────
   getSessionPeriodization(userId: string, programSessionId: string): Promise<SessionPeriodization | null>

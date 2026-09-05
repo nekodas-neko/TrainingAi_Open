@@ -210,12 +210,18 @@ export async function reassignAndDeleteMealType(
   })
 }
 
-export async function deleteMealType(db: Db, id: string, userId: string): Promise<void> {
+// RV-45. The MealTypeHasLogsError above is a different answer and is untouched; this only
+// distinguishes "deleted it" from "there was nothing there". Note the predicate already excludes
+// rows with a `deletedAt`, so re-deleting an already-deleted meal type now reports false — which is
+// the honest answer, and matches what the route is being asked to tell the user.
+export async function deleteMealType(db: Db, id: string, userId: string): Promise<boolean> {
   const logCount = await countLiveFoodLogsForMealType(db, userId, id)
   if (logCount > 0) throw new MealTypeHasLogsError(logCount)
-  await db.update(s.mealTypes)
+  const rows = await db.update(s.mealTypes)
     .set({ deletedAt: new Date() })
     .where(and(eq(s.mealTypes.id, id), eq(s.mealTypes.userId, userId), isNull(s.mealTypes.deletedAt)))
+    .returning({ id: s.mealTypes.id })
+  return rows.length > 0
 }
 
 export async function reorderMealTypes(db: Db, userId: string, orderedIds: string[]): Promise<void> {
@@ -463,10 +469,14 @@ export async function updateFoodLog(db: Db, id: string, userId: string, quantity
   return rowToFoodLog(r)
 }
 
-export async function deleteFoodLog(db: Db, id: string, userId: string): Promise<void> {
-  await db.update(s.foodLogs)
+// RV-45: returns whether a row actually matched, so the route can answer 404 rather than confirming
+// a delete that removed nothing. The predicate is unchanged — this reports on the match.
+export async function deleteFoodLog(db: Db, id: string, userId: string): Promise<boolean> {
+  const rows = await db.update(s.foodLogs)
     .set({ deletedAt: new Date(), updatedAt: new Date() })
     .where(and(eq(s.foodLogs.id, id), eq(s.foodLogs.userId, userId)))
+    .returning({ id: s.foodLogs.id })
+  return rows.length > 0
 }
 
 export async function listFoodLogsSummary(db: Db, userId: string, from: string, to: string): Promise<{ date: string; calories: number; proteinG: number; carbsG: number; fatG: number }[]> {
@@ -742,8 +752,12 @@ export async function updateSavedMeal(db: Db, id: string, userId: string, name: 
   return writeSavedMeal(db, userId, id, name, items, servings, imageDataUri, mealTypeIds)
 }
 
-export async function deleteSavedMeal(db: Db, id: string, userId: string): Promise<void> {
-  await db.delete(s.savedMeals).where(and(eq(s.savedMeals.id, id), eq(s.savedMeals.userId, userId)))
+// RV-45. See deleteFoodLog.
+export async function deleteSavedMeal(db: Db, id: string, userId: string): Promise<boolean> {
+  const rows = await db.delete(s.savedMeals)
+    .where(and(eq(s.savedMeals.id, id), eq(s.savedMeals.userId, userId)))
+    .returning({ id: s.savedMeals.id })
+  return rows.length > 0
 }
 
 // ── Nutrition Targets ──────────────────────────────────────────────────────────

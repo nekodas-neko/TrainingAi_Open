@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.8",
+    date: "2026-09-05",
+    changes: [
+      "Deleting a supplement, injury, food entry, saved meal or meal type used to say it worked even when it had not \u2014 a stale entry, or one that was not yours, was confirmed as deleted and then reappeared on the next sync. It now tells you the delete failed instead of pretending it succeeded.",
+    ],
+  },
+  {
     version: "1.436.7",
     date: "2026-09-04",
     changes: [

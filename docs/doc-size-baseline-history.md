@@ -7827,6 +7827,26 @@ entries were condensed to absorb the new material, per the baton's own one-scree
 Both numbers are **recomputed from the merged file**: LA-58 (#884) landed between the branch and its
 merge and raised the same two baselines, so each side had a different number for the same document —
 the case where a `.size` conflict is a real disagreement rather than two unrelated additions.
+## 2026-09-05 — `docs/implementation-backlog.md` → 18085 (RV-45 swept)
+
+Most of the added length is the two things a sweep like this is judged on later. That the predicates
+were NOT changed — seven methods gained a `.returning()` and report the match, which is what stops a
+reader assuming rows started matching differently. And that a test pinning the opposite behaviour
+existed, did its job, and was reversed with the cause recorded in the test rather than flipped
+quietly: the idempotence argument is sound for an owner re-deleting their own row and fails across
+accounts, which is the whole reason Q-556 reached the other conclusion first.
+
+The `Keep:` is a device check rather than leftover code — these deletes now make a previously-silent
+no-op loud, and on device supplements and injuries take the API as a fallback, a path the web build
+never runs.
+
+**Recomputed from the merged file, twice.** Sweep 48 (RV-47, RV-48) landed between this branch and
+its PR and raised the same baseline to 17981; #886 landed again while CI ran and raised it to 18060.
+The branch's own number was measured against a file that no longer existed on both occasions, so
+18085 is `awk 'END{print NR+1}'` on the tree as actually merged rather than any arithmetic on those
+numbers. The backlog conflict itself was the *other* shape the standing rule warns about — not two
+deletions, but sweep 48's two new entries against this branch's rewrite of the RV-45 heading, where
+keeping both sides is correct and dropping one silently loses a queue entry.
 
 ## 2026-09-05 — `docs/implementation-backlog.md` → 18060 (BF-120, and the dosing model on BF-112)
 
