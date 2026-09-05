@@ -1522,7 +1522,86 @@ the row was ever laid out for (Q-111 added device chips on 2026-09-02, the day a
 - **Verification (device, at the S25 width):** on the longest weekday-plus-month combination
   (`Wednesday 30 September`) with weather and two device chips present, nothing crosses the grid icon
   and no chip wraps to a second line; with one chip and a short date, the layout is unchanged.
+### [nutrition] BF-120 — a meal section holding one item lost its macro row, which is BF-98's fix landing one notch too wide
+
+- **Lane:** B — `components/nutrition/meal-card.tsx:150`, one condition.
+- **Added:** 2026-09-05 · owner: *"1 meal doesnt show the calorie total; but 2 meals do."* Screenshot:
+  **Pre Workout** with two grouped meals showing `P 37g · C 26g · F 17g` and `413 kcal`; **Post
+  Workout** with a single `LOADED MAC & CHEESE` showing neither.
+
+**This is a consequence of BF-98, not an unrelated regression.** That entry fixed a section holding
+one grouped meal drawing its macros **twice**, and the fix moved the gate from `logs.length > 1` to
+`entries.length > 1` — counting groups rather than flat rows. Correct for the duplication; it also
+means a section with exactly one entry now renders no footer at all.
+
+**The calorie half of the report is arguably fine and the macro half is not.** With one item the
+section's calorie total *is* that item's number, and the section header already prints it (`672`
+beside POST WORKOUT), so a footer repeating it is the redundancy BF-98 set out to remove. **But the
+`P / C / F` row goes with it**, and that is not redundant — nothing else on the screen breaks a single
+logged item into protein, carbs and fat. So the owner reads 672 kcal with no idea what it is made of,
+while the two-item section above tells him.
+
+- **Recommendation: render the macro row whenever a section has any entry, and keep the calorie total
+  gated at two or more.** That satisfies both reports at once — no duplicated number, no missing
+  breakdown — and is a smaller change than it sounds, since `totals` is already computed for every
+  section regardless of the gate.
+- **⚠ Check it against BF-98's own case before shipping.** The duplication BF-98 fixed was a
+  *grouped* meal drawing its macros once as a group and again as a section footer. A single grouped
+  meal must still not print two macro rows; a single **loose** item must print one. Those are
+  different shapes behind the same count of 1, and the fix has to tell them apart — which is likely
+  why the threshold was set where it was.
+- **⚠ BF-98 also carries an unresolved note worth reading first:** its duplication *"could NOT be
+  reproduced in e2e"*, and `diary-nested-meal.spec.ts` covers this exact fixture. Whatever changes
+  here should extend that spec to the one-loose-item case, which is the shape now visibly wrong and
+  is reproducible.
+- **Verification (device):** a section with one loose item shows its macro breakdown and no duplicated
+  calorie line; a section with one grouped meal shows exactly one macro row; a section with two or
+  more shows the breakdown and the total, as it does today.
+
+
 ### [nutrition] BF-112 — enter an actual dose: the storage for retatrutide is finished and there is still no field to type it into
+
+> **⚑ THE OWNER STARTS DOSING 2026-09-06 AND THIS IS NOT BUILT.** Measured 2026-09-05: Lane B
+> **READY #6**, and production still shows two supplements with `default_amount`, `unit`,
+> `dose_prompt` and `started_on` all empty. **Nothing in the app can record a dose tomorrow.**
+>
+> **⚠ A workaround exists for tomorrow and it preserves the data that matters.** BF-3 stamps
+> `supplement_logs.dose_text` **from the definition at log time**, so the text freezes on the log and
+> later edits do not rewrite history. So: create a supplement named for the drug, put the current dose
+> in its free-text `dose` field, and tick it on each dose day. Each tick freezes that day's dose text
+> and its date. When the dose changes, edit the definition — past logs keep what they had. This gets
+> **the dose dates and the dose amounts recorded from day one**, in a form BF-112 can later migrate
+> into `amount`/`unit`. The dates are the half that cannot be reconstructed afterwards.
+>
+> **⚠ The owner's model needs one correction, and it is the whole design.** He asked for *"a dose of
+> xmg… so that each day after it can assume it's wearing off"*, weekly, escalating. Decay alone is not
+> enough: **weekly dosing with a multi-day half-life ACCUMULATES.** A dose given seven days after the
+> last one lands on top of a substantial residual, so the level climbs for several weeks **even at a
+> constant dose**, and settles at a multiple of the single-dose peak. Modelling each dose as an
+> isolated decay curve would under-report every week after the first.
+> - **The right shape is superposition:** `level(day t) = Σᵢ doseᵢ × 0.5^((t − tᵢ) / halfLife)` over
+>   every dose so far. One number per day, on one scale, comparable across the whole timeline — and it
+>   answers *"all previous data is 0% reta"* for free, because before the first dose the sum is empty.
+> - **`halfLife` must be a stored, editable value, not a constant in a formula.** It is an assumption
+>   about a drug, the published figure carries a range, and this app's own rule is that no
+>   model-or-literature number may be shown as fact. Store it beside the substance, show it as the
+>   assumption it is, and let the curve be recomputed if it changes.
+>
+> **⚠ "Which dose is best for sleep/HR/stress" is the question this cannot honestly answer, and saying
+> so now is cheaper than discovering it in three months.** On an escalating schedule, **dose, cumulative
+> level and elapsed time all rise together** — they are the same line. Anything that improves or
+> worsens over those weeks correlates with all three, and the design cannot separate them. Worse, the
+> drug's *intended* effect is weight loss, and weight loss independently changes sleep, resting heart
+> rate and HRV — so the most likely confounder is the thing being measured.
+> - **What the data CAN support**, and what to build toward: the **pre-dose baseline** (three months of
+>   ring data at level 0, which is why the first dose date matters); **within-week shape** — day 1 after
+>   a dose against day 6, which varies while the dose is held constant and is the one contrast not
+>   confounded by titration; and a **plateau**, if he holds a dose for several weeks, which is the only
+>   way a level gets observed twice at different times.
+> - **State it as association, never attribution.** n=1, no control, no blinding, a dozen confounders.
+>   The app shows the number beside the level; it does not say the drug caused it, and it must not
+>   recommend a dose. That is a medical decision and out of scope, as this entry's parent already says.
+
 
 - **Lane:** B — the supplements manage sheet and `supplements-section.tsx`. **Engine work: none.**
   Stage 1 shipped 2026-09-01 (migrations 254 + 255, local SQLite v34) and every column this needs
