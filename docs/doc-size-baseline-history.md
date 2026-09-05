@@ -7760,3 +7760,18 @@ leave the next session with two contradictory entries and no way to tell which i
 Also here: the caveat I raised and discarded — that the Cloud-vs-BLE refit might compare two
 different estimators — written down precisely because the next reader will notice the same empty
 table and needs to know it was checked rather than missed.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17827 (BF-35, the barcode image measurement)
+
+The owner re-reported barcode scans having no photo. No new entry: BF-35 already owns it and already
+records that the remaining half is the unbuilt render. What is appended is a production reading and,
+more usefully, its own weakness. `claude_ro.food_items.image_bytes` is NULL on all 259 rows including
+barcode scans dated after BF-70's fix — which reads as a regression against that entry's *"verified: a
+5,359-char data URI"* claim. But the view exposes `image_bytes` as an **integer**, a size, not the
+`image_data_uri` text the app writes, and whether the two are wired together was not verified. A first
+pass at this used `count(image_bytes)` and would have filed a storage regression on the strength of a
+column whose meaning had not been checked; writing that down is worth more than the reading itself,
+because the same trap is one query away for the next person. Also measured, and new: **4 of 10** of the
+owner's most-scanned brand carry a thumbnail in Open Food Facts at all — so even with both halves
+correct, most of his scans of that brand stay blank, which makes the placeholder a first-class state
+and means "still no photo" cannot be read as a bug on its own next time.

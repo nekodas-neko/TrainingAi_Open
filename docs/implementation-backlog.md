@@ -4991,6 +4991,35 @@ back resolving to the tab that owns the destination instead of unwinding to the 
   - **`food_items.image_data_uri` is bytes, not a URL** — it is read local-first and mirrored into
     on-device SQLite. Render it as a data URI; do not add a network fetch to a row that already
     carries its own picture.
+
+- **⚑ RE-REPORTED 2026-09-04 — *"noticing scanned barcodes still dont have their photo"*, and a
+  production reading that questions this entry's own "storage is fixed" claim.** Screenshot: a
+  barcode-logged `LOADED MAC & CHEESE` with a placeholder tile beside two AI-logged meals showing real
+  photos — the same shape as the 2026-09-01 report, which is expected while (1) is unbuilt.
+  **What is not expected is the measurement.** `claude_ro.food_items.image_bytes` is **NULL on all 259
+  rows** — 236 `ai`, 15 `barcode`, 8 `text` — and the newest barcode row is dated **2026-09-05**,
+  days *after* BF-70 shipped on 08-31 and recorded *"verified: a 5,359-char data URI on a real Open
+  Food Facts product"*.
+  - **⚠ Do not treat that as proof of a regression — the reading has a known weakness and it is
+    stated here so the next reader does not repeat the mistake made getting to it.** The `claude_ro`
+    view exposes `image_bytes` as an **`integer`**, not the `image_data_uri` text column the app
+    writes; it is a size, deliberately exposed instead of the payload. Whether it is derived from
+    `image_data_uri` at all was **not** verified, so an all-NULL column may mean "nothing stored" or
+    may mean "this view column is not wired to that data". A first attempt at this measurement used
+    `count(image_bytes)` and would have reported a storage failure on the strength of a column whose
+    meaning had not been checked.
+  - **The cheap way to settle it** is a direct read of `image_data_uri` on the newest barcode row
+    (the admin endpoint cannot see it, so this needs a route or a check that already runs
+    server-side), or a fresh scan of a product **known to carry an OFF thumbnail** followed by
+    reading the row back. Settle it before building the render — a render fed by an empty column
+    looks identical to the bug being reported now.
+  - **⚠ Expectation to set regardless of the outcome: many products have no image in Open Food Facts
+    at all.** Measured 2026-09-04 against the owner's own most-scanned brand — **4 of 10** Core
+    Powerfoods products carry an `image_front_thumb_url`; `BBQ Mac & Cheese`, `Curried Sausages`,
+    `Anabolic Chicken` and three others have none. So even with storage and render both correct, a
+    majority of his barcode scans of that brand will still show the placeholder. This reinforces the
+    note above — the placeholder is a **first-class state**, not a loading shim — and it means "still
+    no photo" cannot by itself be read as a bug in the next report either.
 - **Keep:** the ENGINE half of routes 1 and 2 shipped 2026-08-26 (migrations 227 + 228, local SQLite
   v30) — `food_items.image_data_uri`, `FOOD_ITEM_IMAGE_MAX_BYTES`, the whole offline chain (delta
   select, pull mapping, local upsert, outbox payload, both write paths), and the barcode route
