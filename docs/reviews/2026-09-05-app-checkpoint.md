@@ -1,6 +1,6 @@
 # App checkpoint — WORK IN PROGRESS (coordinator ledger snapshot, not the report)
 
-This file is a safety commit so the checkpoint's verified findings survive the ephemeral container. It will be REPLACED by the collated report before this branch is merged.
+Safety commit so verified findings survive the ephemeral container. Replaced by the collated report before merge.
 
 # Coordinator ledger — what I have re-verified myself (survives compaction)
 
@@ -74,3 +74,33 @@ This file is a safety commit so the checkpoint's verified findings survive the e
 - RV-43 not re-filed (lane checked: unchanged).
 - Lane 05 #2 bodyweight CONFIRMED by my vitest: estimateOneRm 6 reps -> 114.5 -> repMaxFromOneRm = 5; 10 -> 124 -> 7; 20 -> 166.5 -> 16. Store scales (amrapScaleFactor), inverse does not => prescribed reps ratchet DOWN under exact adherence. data-correctness. Claim tested: spec 2026-07-01-bodyweight-rep-progression-design.md:41-46 says no scale factor for bodyweight and repMaxFromOneRm(calc1RM(BW_REF,r))===r.
 - Lane 25 #2 CONFIRMED: check-icon-button-names.js:41 regex `(\s[^>]*?)?>` — `[^>]` stops at the `>` of `=>`. #4 CONFIRMED: check-doc-index-size.js:85 `if (lines <= limit) continue;` — no shrink branch.
+- Lane 05 #1 PROD CONFIRMED by me (claude_ro, owner's rows): 34 exercises, latest log estimated_1rm=0 for 16, exercise_deloaded for 16. => the strength card's deload-zero defect is LIVE on ~half the owner's exercises today. user-visible, top of queue with the auth items.
+
+## Lane 06 (training load) — VERIFIED 2026-09-05 (#1,#3,#4 by me from source+prod; #2 my re-run below)
+- #1 CONFIRMED: lib/ai-chat/tools.ts:402-408 `daysAgo(56)` + `return { acwr }` (no band) vs app/api/training-load/route.ts:25 `from28d`, :84 `interpretation: acwrBand(acwr).key`. Chat bands the number itself, on a different window. Claim tested: acwr.ts "never re-derive from the raw acwr number at the call site". consistency. Lane's prod replay: 32 of 76 days differ in band.
+- #3 CONFIRMED: three baselining rules — route:60-63 startedAt ?? createdAt; readiness-payload.ts:365-368 startedAt else Infinity (never baselines); signals.ts:423-429 none. PROD (by me): active program 'Shikai' started_at=NULL, created_at=2026-07-01. So in July the card said baselining while early-deload/activity taper consumed live ACWR. consistency.
+- #4 CONFIRMED: training_load_gate reason values are read by NO UI (grep: only the route + a test); training-stress-line.tsx:22 hides on any non-ok. PROD (by me): oura_daily_derived since 2026-07-01: 63 days gate NULL, 1 day insufficient_met, 0 OTS values. The J-9 "OTS persists on a good read" has never had a good read. user-visible (an empty card with a recorded reason nobody shows).
+- #2 acute window: acwr.ts:18 `from7d = todayMid - 7d`, session counted if `t >= from7d` => 8 inclusive days vs chronic/4. See coord-acwr.txt for my constant-load numbers.
+- Clean (lane): one computeVolumeAcwr; band edges correct; week starts in user tz (Monday, Brisbane); ACWR null until >=21-day span; owner's ACWR spans 0.70-1.69 across all four bands.
+- Hygiene (lane, not re-verified): route shows toFixed(2) but bands the unrounded value (1.304 -> "1.30 · elevated"); health-insight hands computeVolumeAcwr a UTC midnight (only reads a window-independent median today).
+- #2 CONFIRMED by my vitest (constant 1000 kg/session, 28-day list): daily, trained today -> acwr 1.103 (acute 8 sessions=8000 vs 29/4=7250); daily, trained yesterday -> 1.000; two days ago -> 0.889; every-3rd-day trained yesterday -> 1.200 (=EARLY_DELOAD_ACWR_MIN); two days ago -> 0.825. Steady state is biased +10% and swings 0.89<->1.10 on whether today's session is logged. data-correctness. Claim tested: training-load-card.tsx "last 7 days vs your 28-day average" — it is 8 days.
+
+## Lane 12 (AI inventory) — VERIFIED 2026-09-05 (5 of 5 by me)
+- Inventory (lane): 17 sites all via lib/ai/instrument.ts loggedGenerate* -> withAiRetry -> ai_call_log; 0 JSON.parse of model text; every object site post-processes/clamps; rate limits on all 13 routes; PROSE_GUARDS on every prose card except running-plan/explain.
+- Prod cost (lane, claude_ro.ai_call_log, owner, 30d): 210 calls, 594k in / 77k out tokens; coach 356k in (22 flash-lite + 5 on 3.6-flash); prescription 94k; nutrition-scan 37k. NO price anywhere in repo — ai-usage page reports tokens only, default window 168h.
+- #1 CONFIRMED LIVE: POST /api/ai/health-insight {section:sleep, force} as zero-data -> 200 with a Gemini "no data available" insight; route.ts:125 unconditional `Contributors: …` line makes splitMeasured count the section as measured, defeating the :180-183 deterministic gate (which its own comment says exists to avoid paying for this). readiness (:104,:111) and activity (:173) same; heart-rate has no such line and gates correctly. user-visible + AI cost. SIBLING of lane 01's weekly-digest-of-zeros (lane 12 confirms weekly-digest emits zeros on the SEEDED account too).
+- #2 CONFIRMED: running-plan/explain/route.ts has no maxRetries:0 (14 other files do) => SDK default 2 retries x withAiRetry 1. consistency.
+- #3 CONFIRMED: scan/route.ts:184 image fingerprint {mode,imageKind,note} => distinct photos share a fingerprint; ai-usage double-trip metric false-positives (Q-471's contentKey fix not applied here). hygiene.
+- #4 CONFIRMED: meal/route.ts:172-175 error copy swapped (fresh generation says "Could not rewrite"). hygiene.
+- #5 CONFIRMED: review-step.tsx:182-187 renders model `confidence` as an "AI confidence" bar; log-food.ts:31 `confidence ? 'ai' : 'manual'` decides source. Against CLAUDE.md's letter ("no LLM self-reported number shown as fact"); labelled honestly. consistency, Gate: owner.
+- Clean (lane): daily-digest gate holds ({digest:null}, no call); heart-rate insight gate holds; workout-review confidence overwritten to 1.0 by /apply (correct); generate-program's Push/Pull/Legs example names are an explicit CI exemption.
+- COLLATION: #1 + lane01 weekly-digest = ONE class "AI routes with no data gate" (health-insight x3 sections, weekly-digest). 
+
+## Lane 07 (sleep/readiness) — VERIFIED 2026-09-05 (3 of 3 new findings by me; PS-17 status only)
+- #1 CONFIRMED source: sleep-performance-correlation/route.ts `points.push` inside `for (const ex of ws.exercises)` with one sleepHours per day => n counts exercises not days; DEFAULT_MIN_N=20 (correlation.ts:190) cleared by 4 days x 5 exercises; p-value at n=20; text says "N paired days". data-correctness. Owner live output NOT fetched (session-scoped).
+- #2 PROD CONFIRMED by me (owner's rows, 60d): 62 days; 20 where (86400-non_wear_time_sec) < sleep seconds; first 2026-08-14, last 2026-09-02. 09-01 worn 0.5h vs slept 7.5h HRV 65; 09-02 0.5h vs 8.17h; 09-03 20h; 09-04 24h. Writer run.ts:880-905 (wornSec = bins x 900 over the run's window). Consumers: readiness-payload isLowWearToday (:799), excludeLowWearDays on HRV/RHR baselines (:329/:341), trends worn-hours chart, chip dims at lowWear. MECHANISM NOT ESTABLISHED (suspect: incremental run's narrowed window overwrites a full-pass count). Not previously filed (no non_wear/wear-time heading). data-correctness.
+- #4 CONFIRMED source: readiness-payload.ts:566-572 score = ownComposite.score (z-composite) else legacy sum; :739 serves legacy parts as `components` regardless => components (sum 78) do not explain score (46). No UI consumer found. hygiene.
+- PS-17 status (lane, prod): 08-27 phantom 4.75h row still in oura_daily_summary (hrv 26.5, rhr 73.7), derived 08-27 readiness 33 / sleep 36; groupSleepPeriods still promotes a 4.02h afternoon window (ALWAYS_NIGHT_MIN_HOURS=4). Back-fill not run. Already filed — status only.
+- Q-507 reversed by TN-22; Q-518 fixed #525 (not re-verified); Q-501 still queued, night_hrv_baseline_ms null on all rows.
+- Clean (lane): scoreBand single source, boundaries 49.9/50/69.9/70 correct; sleep-day keying 0 mismatches over 75 prod nights; HRV is RMSSD end to end (one stale SDNN comment in health-connect-sync.ts:51); 73/75 nights have HRV; baselines seed from first sample; readiness 90d mean 66 sd 14 range 25-87, sleep mean 77 sd 21 — every band populated.
+- Nit (lane): contributor-detail.tsx:31 `score < 50 ? low : high` gives Moderate band the "high" text.
