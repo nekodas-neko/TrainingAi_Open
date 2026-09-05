@@ -1360,88 +1360,60 @@ on either screen says a word about it, so the more prominent number is the one t
   calorie targets come from.
 
 
-### [sleep] BF-115 — the hypnogram is missing from the sleep tile's detail, and there are three sleep rows for that date
+### [sleep] BF-115 — the hypnogram is missing from the sleep tile's detail (the proposed fix would make it worse)
 
-> **✅ ROOT CAUSE FOUND (2026-09-03, Lane A). The three rows are CORRECT DATA, the storage is fine,
-> and the remaining fix is one import in a Lane B file.**
+> **⛔ THE STATED FIX IS REFUTED, 2026-09-04 (Lane B, on picking it up). Do not implement it.**
+> The 2026-09-03 root-cause note concluded *"run the local rows through the same `mergeByDate` before
+> setting state… the only edit is one import in `app/health/health-content.tsx`."* Read to the end,
+> that edit does not fix the reported symptom and it fabricates a number.
 >
-> **1. The rows are a night and two naps, not duplicates.** Converted to Brisbane, 2026-09-03 holds
-> `ble:51136441` **22:16 → 06:21** (7.67 h, phase 97 — the real night), `ble:51614985` **11:33 →
-> 13:58** (2.00 h, phase 29) and `ble:51827985` **17:28 → 19:35** (1.83 h, phase 26). A midday and an
-> early-evening sleep. Nothing is wrong with storing them. **19 dates carry more than one row,
-> spanning 2026-05-29 → 09-03**, so this is longstanding, not a regression — and 2026-08-27 in that
-> list is PS-17's own phantom date.
-> ⚠ **These are NOT PS-17's mechanism.** PS-17 blames `ALWAYS_NIGHT_MIN_HOURS = 4` short-circuiting
-> the circadian check; both fragments here are **under** 4 h, so that escape hatch never fired. Same
-> family, different cause — do not close one on the other's evidence.
+> **1. It cannot restore the hypnogram, because the local rows have no timestamps to restore.**
+> The render condition is `r.sleepPhase5Min && r.sleepStart && r.sleepEnd`
+> (`health-metric-sheet.tsx:246`). **`LocalSleepSession` has no `sleepStart`, no `sleepEnd` and no
+> `awakHours`** — confirmed at the storage level, not just in the type: `sqlite-backend.ts`'s
+> `sleep_sessions` insert names `manual_sleep_start` and nothing else of the kind, and that column is
+> Q-519's user-remembered bedtime, which its own doc comment says is *"never read by anything deriving
+> a window"*. A merge cannot invent the two fields the condition needs.
 >
-> **2. The route is already correct.** `/api/sleep-sessions` runs `mergeByDate`, whose
-> `primaryCluster` keeps the longest row plus anything within `CONTIGUOUS_GAP_MS` (1 h). The 11:33
-> nap sits ~8 h from the night and the 17:28 one ~2 h 41 m before it, so **both are dropped** and the
-> route returns the 7.67 h row with its 97-character phase string. Nothing to fix here.
+> **2. The clustering it relies on is disabled for exactly these rows.** `primaryCluster` opens with
+> `const timed = list.filter(r => r.sleepStart && r.sleepEnd)` and returns the list untouched when
+> `timed.length <= 1`; line 57 then keeps untimed rows explicitly. For local rows `timed` is
+> **empty**, so the nap-dropping the note credits it with never happens.
 >
-> **3. The defect is the LOCAL-FIRST read path, which bypasses that merge entirely.**
-> `health-content.tsx:230` reads `store.getSleepSessions(cutoffStr)` and line 299 pushes the result
-> straight into state — `setSleepRows(localSleep as unknown as SleepRow[])`. **Raw per-cluster rows,
-> never merged.** So the sheet receives all three, finds the entry for the date, and lands on a
-> fragment whose 29- or 26-character phase string and tiny stage hours fail both the hypnogram
-> condition and the proportion-bar fallback. That is exactly the reported symptom.
+> **3. And what remains is an additive merge, which is where the harm is.** All three rows carry an
+> `ouraId` (`ble:…`), so `ouraRows.length === 1 && samsungRows.length >= 1` is false and they fall to
+> the same-source branch, which **sums** the stage fields. On the owner's own date that yields a
+> single row claiming **7.67 + 2.00 + 1.83 = 11.5 hours** of sleep, deep 1.75 h, carrying whichever
+> phase string `list[0]` happened to hold. **A fabricated eleven-and-a-half-hour night is worse than
+> a missing chart.**
+> The additive merge is not wrong — it is built for Samsung midnight *splits*, contiguous fragments of
+> one night, and `primaryCluster` is what guarantees it only ever sees those. Untimed rows disable
+> that guarantee and hand naps to a summer.
 >
-> **This is also why it is device-only and why two surfaces disagree.** `getLocalStore` returns null
-> in the web sandbox, so on `pnpm dev` the sheet only ever sees the merged server rows and the bug is
-> invisible; on the APK the local seed paints first. The Body tab's card is fed through a path that
-> does merge, which is the "two surfaces, same date, different rows" the entry noticed.
-> **The `as unknown as SleepRow[]` double cast the entry flagged is the enabling mistake** — it
-> silences the fact that a local row and a merged `SleepRow` are different things with different
-> semantics, not just different shapes.
->
-> **The fix, and it is small: run the local rows through the same `mergeByDate` before setting
-> state.** It is already exported from `lib/sleep/merge-sessions.ts` and importable from client code,
-> so no Lane A change is needed — this is One Formula, One Place, with the second caller simply
-> missing. **Re-laned to B**: the only edit is in `app/health/health-content.tsx`.
-> ⚠ Check the other three consumers of `/api/sleep-sessions` for the same local-seed shape while
-> there — `session-select-content.tsx` (3 sites) and `health/sleep/sleep-content.tsx` (2 sites) —
-> that is the sibling sweep this belongs to.
->
-> **Not verified:** the device. The reasoning above is read from source and from production rows;
-> that the sheet renders correctly once merged is BF-115's own device check, unchanged.
+> **So the real requirement is `sleepStart`/`sleepEnd` (and `awakHours`) in the local table**, which is
+> a local SQLite version bump plus RECONCILE — **Lane A's alone** by the standing rule, which is why
+> this is re-laned rather than half-built.
 
-- **Lane:** B — **re-laned 2026-09-03.** It was A while the duplicate rows were unexplained; they
-  now are, the storage is correct and the route is correct, and the only edit left is one import in
-  `app/health/health-content.tsx`.
+- **Lane: A** — re-laned **back** on 2026-09-04. It was moved to B on the strength of the merge fix;
+  that fix is refuted above and the remaining work is a local schema change.
 - **Added:** 2026-09-03 · owner: *"the sleep hypnogram still does not work on days when accessed from
-  the sleep tile."* Screenshot: the detail sheet for 2026-09-03 showing every stat and **no Sleep
-  Stages section at all** — neither the hypnogram nor the proportion-bar fallback.
-
-**The lead, found while tracing and not previously recorded: `sleep_sessions` holds THREE rows for
-2026-09-03.** Phase-string lengths **97, 29 and 25**, deep-sleep hours 0.67 / 0.75 / 0.33. All three
-carry a `sleep_start`, a `sleep_end` and a non-null phase string. The 97 is the real night (7h40m ≈ 92
-five-minute buckets); the other two are short fragments.
-
-**So this is very likely a row-selection problem, not missing data.** The sheet takes
-`sleepReadings={[...sleepRows]}` and finds the entry for a date; with three rows sharing that date,
-which one it lands on decides what renders. **This was not confirmed from the sandbox** — the
-selection path was not read to the end, and it should be the first thing an implementer checks rather
-than assumed.
-
-- **The render condition is `r.sleepPhase5Min && r.sleepStart && r.sleepEnd`**
-  (`health-metric-sheet.tsx:246`), with a proportion-bar fallback at `stageTotal > 0`. **Both failed**,
-  which is the informative part: the chosen row had no usable phase string *and* no stage hours, while
-  the Body tab's own sleep card on the same screen shows Deep 0.7h / REM 2.1h / Light 4.9h / Awake
-  0.4h. Two surfaces, same date, different rows.
-- **⚠ Ask why there are three rows before making the sheet pick better.** A per-date duplicate is a
-  storage question — naps, a re-drain writing a second session, or an upsert key that does not hold —
-  and a UI that picks the longest row would hide it. Whether the fragments are real short sleeps or
-  artefacts decides whether the fix is selection or de-duplication.
-- **⚠ `health-content.tsx:299` seeds these rows from the local store through
-  `as unknown as SleepRow[]`** — a double cast that silences the type checker, so a shape mismatch
-  between the local table and `SleepRow` would be invisible at compile time. Worth checking as part of
-  this even if the duplicates turn out to be the whole story.
-- **Verification (device):** open the sleep tile on a date with more than one session — the hypnogram
-  renders and matches the stage hours the Body tab's card shows for the same night; a date with a
-  single session is unchanged; and a date whose only row genuinely lacks phase data falls back to the
-  proportion bar rather than showing nothing.
-
+  the sleep tile."* Screenshot: the detail sheet for 2026-09-03 with every stat and **no Sleep Stages
+  section at all** — neither the hypnogram nor the proportion-bar fallback.
+- **Keep — everything the 2026-09-03 investigation established still stands**, and it is good: the
+  three rows are a night and two naps rather than duplicates, storage is correct, `/api/sleep-sessions`
+  merges correctly, and the defect is that `health-content.tsx:299` seeds raw local rows past that
+  merge through an `as unknown as SleepRow[]` double cast. **That cast is still the enabling mistake**
+  — it is what let two types that differ by three load-bearing fields be treated as one.
+- **⚠ A Lane B mitigation exists but is a judgement call, not a cleanup.** Not seeding sleep rows from
+  the local store on this surface would leave the sheet reading the merged server payload, which is
+  correct — at the cost of a blank stages section offline instead of a wrong one, which the
+  instant-paint rule normally calls the worse outcome. Worth deciding deliberately rather than
+  slipping in beside a schema change.
+- **Verification (device), unchanged:** open the sleep tile on a date with more than one session — the
+  hypnogram renders and matches the stage hours the Body tab's card shows for the same night; a
+  single-session date is unchanged; and a date whose only row genuinely lacks phase data falls back to
+  the proportion bar rather than showing nothing. **Add one: no date may report a duration larger than
+  its longest single session.**
 
 ### [app-shell] BF-116 — the header chips now overflow into the action buttons, because BF-96 made every item unshrinkable
 
