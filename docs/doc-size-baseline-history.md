@@ -7827,7 +7827,7 @@ entries were condensed to absorb the new material, per the baton's own one-scree
 Both numbers are **recomputed from the merged file**: LA-58 (#884) landed between the branch and its
 merge and raised the same two baselines, so each side had a different number for the same document —
 the case where a `.size` conflict is a real disagreement rather than two unrelated additions.
-## 2026-09-05 — `docs/implementation-backlog.md` → 18006 (RV-45 swept)
+## 2026-09-05 — `docs/implementation-backlog.md` → 18085 (RV-45 swept)
 
 Most of the added length is the two things a sweep like this is judged on later. That the predicates
 were NOT changed — seven methods gained a `.returning()` and report the match, which is what stops a
@@ -7840,9 +7840,30 @@ The `Keep:` is a device check rather than leftover code — these deletes now ma
 no-op loud, and on device supplements and injuries take the API as a fallback, a path the web build
 never runs.
 
-**Recomputed from the merged file.** Sweep 48 (RV-47, RV-48) landed between this branch and its
-merge and raised the same baseline to 17981, so the branch's own 17960 was measured against a file
-that no longer existed. 18006 is `awk 'END{print NR+1}'` on the resolved document. The backlog
-conflict itself was the *other* shape the standing rule warns about — not two deletions, but sweep
-48's two new entries against this branch's rewrite of the RV-45 heading, where keeping both sides is
-correct and dropping one silently loses a queue entry.
+**Recomputed from the merged file, twice.** Sweep 48 (RV-47, RV-48) landed between this branch and
+its PR and raised the same baseline to 17981; #886 landed again while CI ran and raised it to 18060.
+The branch's own number was measured against a file that no longer existed on both occasions, so
+18085 is `awk 'END{print NR+1}'` on the tree as actually merged rather than any arithmetic on those
+numbers. The backlog conflict itself was the *other* shape the standing rule warns about — not two
+deletions, but sweep 48's two new entries against this branch's rewrite of the RV-45 heading, where
+keeping both sides is correct and dropping one silently loses a queue entry.
+
+## 2026-09-05 — `docs/implementation-backlog.md` → 18060 (BF-120, and the dosing model on BF-112)
+
+Two changes. **BF-120** is the inverse of BF-98: that entry stopped a section with one grouped meal
+drawing its macros twice by counting groups instead of rows, and the new threshold also removes the
+footer from a section with a single item. The calorie half of that is arguably right — the section
+header already prints the number — but the `P/C/F` row goes with it and nothing else breaks a single
+item into macros, so the recommendation splits the gate rather than reverting it.
+
+**BF-112** gains the dosing model, and it is long because the owner's stated mental model needs one
+correction that changes the whole design: weekly dosing with a multi-day half-life **accumulates**, so
+treating each dose as an isolated decay curve under-reports every week after the first. The shape
+recorded is superposition of decays, which yields one comparable number per day and makes "all
+previous data is 0%" fall out for free. The rest is what the data honestly cannot do — on an
+escalating schedule dose, cumulative level and elapsed time are the same line, and the drug's intended
+effect (weight loss) independently moves sleep, RHR and HRV, so the most likely confounder is the
+thing being measured. Named instead: the pre-dose baseline, within-week shape at a held dose, and a
+deliberate plateau. Also a workaround usable tomorrow, since nothing is built and dosing starts:
+`dose_text` freezes on the log at log time, so ticking a named supplement captures the dose dates,
+which are the half that cannot be reconstructed later.
