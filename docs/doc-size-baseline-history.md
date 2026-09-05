@@ -7761,7 +7761,22 @@ Also here: the caveat I raised and discarded — that the Cloud-vs-BLE refit mig
 different estimators — written down precisely because the next reader will notice the same empty
 table and needs to know it was checked rather than missed.
 
-## 2026-09-05 — `docs/implementation-backlog.md` → 17880, `projectOverview.md` → 9872 (sweep 47: RV-45, RV-46)
+## 2026-09-04 — `docs/implementation-backlog.md` → 17827 (BF-35, the barcode image measurement)
+
+The owner re-reported barcode scans having no photo. No new entry: BF-35 already owns it and already
+records that the remaining half is the unbuilt render. What is appended is a production reading and,
+more usefully, its own weakness. `claude_ro.food_items.image_bytes` is NULL on all 259 rows including
+barcode scans dated after BF-70's fix — which reads as a regression against that entry's *"verified: a
+5,359-char data URI"* claim. But the view exposes `image_bytes` as an **integer**, a size, not the
+`image_data_uri` text the app writes, and whether the two are wired together was not verified. A first
+pass at this used `count(image_bytes)` and would have filed a storage regression on the strength of a
+column whose meaning had not been checked; writing that down is worth more than the reading itself,
+because the same trap is one query away for the next person. Also measured, and new: **4 of 10** of the
+owner's most-scanned brand carry a thumbnail in Open Food Facts at all — so even with both halves
+correct, most of his scans of that brand stay blank, which makes the placeholder a first-class state
+and means "still no photo" cannot be read as a bug on its own next time.
+
+## 2026-09-05 — `docs/implementation-backlog.md` → 17904, `projectOverview.md` → 9872 (sweep 47: RV-45, RV-46)
 
 Two queue entries and their two Known-Issues rows. The length is carrying one specific thing: RV-45
 overlaps a decision the repo already made **the other way** on 2026-08-18, when a review named these
@@ -7776,3 +7791,8 @@ without becoming the thing it is not.
 
 `docs/agents/state/review.md` stayed inside its 205 baseline — the sweep-40 carry-over and five
 stale method notes were condensed to absorb the new ones, per the baton's own one-screen rule.
+
+The backlog number is **recomputed from the merged file**, not carried from either side. BF-35's
+entry landed on `main` between this branch and its merge, so both sides raised the same baseline to
+different numbers — the one case where a `.size` conflict is a genuine disagreement rather than two
+unrelated additions.
