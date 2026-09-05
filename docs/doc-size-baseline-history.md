@@ -7760,3 +7760,19 @@ leave the next session with two contradictory entries and no way to tell which i
 Also here: the caveat I raised and discarded — that the Cloud-vs-BLE refit might compare two
 different estimators — written down precisely because the next reader will notice the same empty
 table and needs to know it was checked rather than missed.
+
+## 2026-09-05 — `docs/implementation-backlog.md` → 17880, `projectOverview.md` → 9872 (sweep 47: RV-45, RV-46)
+
+Two queue entries and their two Known-Issues rows. The length is carrying one specific thing: RV-45
+overlaps a decision the repo already made **the other way** on 2026-08-18, when a review named these
+exact seven routes and deliberately declined to file them on idempotency grounds. An entry that only
+said "six deletes answer 200" would read to the next session as a re-file of something already
+considered and rejected, and would be closed as such.
+
+So both the entry and the row carry the boundary: the earlier argument is correct for the owner
+deleting their own already-deleted row, and false in the cross-account case, where the desired end
+state is not "row absent". That is the whole finding, and it cannot be compressed to a sentence
+without becoming the thing it is not.
+
+`docs/agents/state/review.md` stayed inside its 205 baseline — the sweep-40 carry-over and five
+stale method notes were condensed to absorb the new ones, per the baton's own one-screen rule.

@@ -5,8 +5,8 @@
 > 🔴 handed on) and is the only part that moves. A session self-titles 🟢 on its first instruction and
 > flips itself to 🔴 as the last step of its handoff, after the baton and every PR have landed.
 
-**Updated:** 2026-09-03 · **By:** forty-six sweeps (2026-08-17 ×2, 2026-08-18 ×37, 2026-08-20 ×1,
-2026-09-03 ×6) · **Next ID: `RV-45`.**
+**Updated:** 2026-09-05 · **By:** forty-seven sweeps (2026-08-17 ×2, 2026-08-18 ×37, 2026-08-20 ×1,
+2026-09-03 ×6, 2026-09-05 ×1) · **Next ID: `RV-47`.**
 
 > **Sweep 40's run is closed and nothing is owed from it** — RV-32, RV-33, RV-34 all shipped, verified
 > in source rather than taken from the closure note, and their `projectOverview.md` row is in
@@ -34,57 +34,54 @@ From sweeps 29–39
 ([record](../../handoff-2026-08-20-platform-review-sweeps-29-39.md); 10 of its 13 findings shipped):
 **Q-499** (self-fetching cards vanish on a failed fetch — its ten unverified candidates are a
 *worklist*, not a defect count), **Q-555** (offline, a tab tap is a silent no-op before the service
-worker claims the page), **Q-556** (`DELETE /api/activity-logs` reports success for a row it did not
-delete). From sweeps 41-42: **RV-37** and **RV-39**, both needing the device.
+worker claims the page). **Q-556 was listed here and is CLOSED** — it shipped on
+`/api/activity-logs`, which now answers 404, verified live in sweep 47. From sweeps 41-42: **RV-37** and **RV-39**, both needing the device.
 
 **Three surfaces are explicitly unverified, not clean** — each a probe rejected on some *other* field
 before the guard under test ran: `PATCH /api/activity-logs/<id>/metrics` (cross-user behaviour
 unknown), and RV-40's `POST /api/complete-workout` and `POST /api/log-exercise` (malformed-id
 behaviour unknown). **A 4xx is not evidence the guard fired** — read which field it names.
 
-## Now — sweeps 41–46 filed (2026-09-03). **Next ID: `RV-45`.**
+## Now — sweep 47 filed (2026-09-05). **Next ID: `RV-47`.**
 
 | # | Lens | Write-up | Filed |
 |---|---|---|---|
-| 41 | owner: back-and-return scroll, cache staleness | [day-rollover-and-scroll](../../reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md) | RV-35/36/37 |
-| 42 | first-run honesty, instant paint | [first-run-and-instant-paint](../../reviews/2026-09-03-first-run-honesty-and-instant-paint.md) | RV-38/39 |
-| 43 | ownership rule (a) | [rule-a-and-body-ids](../../reviews/2026-09-03-ownership-rule-a-and-body-supplied-ids.md) | RV-40 |
-| 44 | owner: nutrition/workouts/coach | [coach-write-bounds](../../reviews/2026-09-03-coach-write-bounds-vs-user-routes.md) | RV-41 |
-| 45 | the FK edges | [fk-edges-meal-plan](../../reviews/2026-09-03-fk-edges-meal-plan-cross-user-refs.md) | RV-42 |
-| 46 | owner: progression **logic**, nutrition, home | [adherence-ratchet](../../reviews/2026-09-03-progression-exact-adherence-ratchet.md) | RV-43/44 |
+| 47 | does a caught refusal map to the RIGHT status | [delete-reports-success](../../reviews/2026-09-05-delete-reports-success-for-nothing.md) | RV-45/46 |
 
-**One pattern under all ten findings: a guard that exists is not a guard that reaches, and a claim the
-repo makes about itself is a test case.** `useLocalDay()` has 3 consumers; `useScrollRestoration` rides
-a component 3 screens use; the instant-paint spec guards the 5 screens that cannot exhibit the bug; the
-"Limited data" badge is gated on `hasData`; `invalidUuidResponse` covers 27 of 27 `[id]` routes and
-zero body-id ones; the Coach's bounds are a second validator 5× looser; `meal_plan_meals` checks the
-plan's owner but not its child ids; `atwater.ts` reached neither file that needed it. **Four findings
-came from testing a sentence** — a code comment (RV-41, RV-43), a shipped entry (RV-36), a prior
-review's praise (RV-43).
+**RV-45.** `activity-logs/route.ts:70` answers 404 for a delete that matched nothing, and its comment
+says the change was made to *"match every sibling delete"*. Six siblings answer 200 — for a
+nonexistent id **and** for another account's row, measured with a second account and the row read
+back out of Postgres. Ownership is enforced; the answer is what is wrong. **RV-46, low:**
+`PATCH /api/admin/activity-types`, the one route of thirteen without the Q-463 mapper — 500, empty
+body, and an `error_events` row for a plain not-found.
 
-**Closed clean, do not re-sweep:** the seven `freshWithinTtl` sites; `check-fetch-once-effects.js`'s
-CAN-BITE group (empty); instant paint on the sub-routes (13 of 14); the first-run render (21 of 22
-routes); ownership rule (a) — **all three rules now have evidence**; the Coach apply path's five
-domain handlers, all driven end to end; four nutrition FK edges, each with a control; Home's
-`scoreBand` (single source, no re-derived thresholds); and AI-10 from the 2026-07-10 review (fixed —
-`mround125Up` is dead code).
+**The 2026-08-18 review had already declined to file those seven and was not simply wrong** — its
+idempotency argument holds for the owner's own already-deleted row and fails cross-account.
 
-**Still owed:** RV-37/RV-39 need the device; RV-38/RV-41/RV-43 need an owner decision; RV-40 leaves two
-routes and sweep 45 the whole workout/device FK half **unverified, not clean**.
+**Closed clean, do not re-sweep:** `isRetryableWriteError` (one site, in `pushMutations`'s
+per-mutation catch, covering every domain — *not* an unreached helper); `/api/complete-workout`'s
+blanket 404 (client queues on any non-ok, the outbox replays it); the four fixed-400 catches in
+`ai-periodization/*` and `workout-review/*/apply` (the `try` wraps only the body parse);
+`DELETE /api/admin/activity-types`'s in-use branch. **Twelve of thirteen routes calling a
+typed-throwing repo method use the mapper** — the class is otherwise done.
+
+**Correction:** the previous baton listed **Q-556 as open**. It shipped; the route answers 404.
+
+**Still owed:** RV-37/RV-39 need the device; RV-38/RV-41/RV-43 need an owner decision; RV-40 leaves
+two routes and sweep 45 the whole workout/device FK half **unverified, not clean**.
 
 ## Carried from sweep 40 ([write-up](../../reviews/2026-08-20-non-workout-write-surface-ownership.md))
 
-- **✅ All three write-path ownership rules now have evidence.** (b): 116 mutating routes, 325
-  `.set()` sites, all built field by field (sweep 40). (c): produced RV-32. (a): 21 unscoped child
-  deletes across 12 functions, all guarded, both source incidents reproduced and refused (sweep 43).
-- **A cheap contrast beats a long argument**, used seven times now: *PUT 400, POST 201* (RV-32);
-  `/more` restores 840 and `/nutrition` returns 0; Home rolls the day over, Nutrition does not; streak
-  says `—`, Body Battery says 50; three routes say `400 Invalid id`, two say 500; the user's form
-  refuses 26,000 kcal, the Coach stores it. Find the surface that already does it right first.
+- **✅ All three write-path ownership rules now have evidence.** (b) sweep 40, (c) RV-32, (a) sweep 43.
+- **A cheap contrast beats a long argument**, used eight times now — most recently *six routes say
+  200, three say 404*, on the same operation in the same tree. Find the surface that already does it
+  right, and the finding writes itself.
 
 ## Next — in the order they are worth doing
 
-**Not this:** the documentation-integrity seam. Sweeps 34–37 were four consecutive passes over it and
+**Not this:** the status-mapping lens — sweep 47 finished it. Twelve of thirteen routes map, the
+one gap is filed, and the remaining hand-rolled catches were each checked for `try` scope. And not
+the documentation-integrity seam. Sweeps 34–37 were four consecutive passes over it and
 left three CI checks behind (`check-known-issue-duplication`, `check-index-doc-paths`,
 `check-module-map-symbols`). Pick a lens that runs the app.
 
@@ -94,9 +91,10 @@ left three CI checks behind (`check-known-issue-duplication`, `check-index-doc-p
   27** — re-run the query in sweep 45's write-up §2 rather than any remembered count. **Check each
   edge's `delete_rule` too**: `ON DELETE SET NULL` on an unverified FK is a cross-account write
   primitive, and `CASCADE` on the same defect would delete rather than null.
-- **The 62 mutating routes that *do* carry a `try {`** were checked only for whether they map a refusal
-  at all, never for whether they map it to the *right* status. Sweep 43 did this for eight body-id
-  routes and found two wrong; the other ~54 are untouched, and it is now the top lens.
+- **Whether a 2xx means what it says, beyond DELETE.** Sweep 47 did the delete surface and found six
+  routes answering 200 for a write that changed nothing. The same question is unasked of `PUT`/`PATCH`
+  upserts: does a patch against a nonexistent or non-owned id report success too? Same method — a
+  malformed-id control, then read the row back.
 - **A clean clone, actually built.** Nobody has done `git clone` into an empty container and run
   `pnpm install && pnpm build && pnpm test`. It is the one check that would settle `NOTICE`'s claim outright,
   and Q-313 (no `next build` gate in the publish dry-run) is why it is worth doing.
@@ -134,6 +132,15 @@ None. This role's PRs are docs-only.
 
 ## Method notes — do not re-derive these
 
+- **A prior review's DECISION is a claim too — find its boundary, do not reverse it.** Sweep 47's
+  seven routes were considered and deliberately not filed on 2026-08-18; that argument is right for
+  the case it tested and false for the one it did not. The finding is the boundary.
+- **Two identical responses are two failed probes.** Ghost and malformed both returning
+  `400 Invalid body` read as "it rejects everything"; both had missed the handler (wrong param shape).
+- **A malformed id is the cheapest control for a dynamic route** — `400 Invalid id` proves the route
+  matched and its guard ran, for one extra request and no fixture.
+- **A one-call-site helper is not automatically unreached** — `isRetryableWriteError` has one site,
+  placed where it covers every branch. Check where the site *sits* before counting it.
 - **Test what the repo says about itself.** A comment, a doc header or a prior review's praise is a
   claim with a worked example in it; send it. Four of this session's findings came out of that.
 - **Pair every refusal with a control**, and **assert the payload beside the rendered text**. A 4xx
@@ -141,11 +148,12 @@ None. This role's PRs are docs-only.
   `hasData: false` and the card shows 50" is.
 - **Choose fixtures hostile to the arithmetic, and sweep the input range.** A 100 kg starting 1RM puts
   every common percentage on a plate boundary and reports zero drift for a mechanism that moves 13%.
-- **Count requests by the DATE they carry, not how many there are** — Health reissued 11 on resume and
-  only 3 carried the new day.
+- **Count requests by the DATE they carry, not how many there are** (Health reissued 11 on resume; 3
+  carried the new day).
 - **Ask what the READ joins before calling a stored cross-user reference a leak** (RV-32 vs RV-42).
-- **The zero-data account reaches a state nothing else can.** Re-run it whenever a scoring surface
-  changes: the seeded user has data for everything, so a fabrication is invisible there.
+
+- **The zero-data account reaches a state nothing else can** — the seeded user has data for
+  everything, so a fabrication is invisible there. Re-run it whenever a scoring surface changes.
 - **Import the shipped module; never re-implement the formula you are auditing.** A throwaway vitest
   file inside the package is the way in — there is no build output, `npx tsx` is absent, and vitest
   swallows `console.log`, so write to a file and `cat` it.
@@ -157,17 +165,15 @@ None. This role's PRs are docs-only.
 - Launch the dev server with `nohup … &` through a **background** Bash call. A `(cmd &)` subshell gets
   reaped when the tool call returns.
 - API sweeps: sign in with `curl` via `/api/auth/csrf` → `/api/auth/callback/credentials`
-  (`test@local.dev` / `testpass123`) into a cookie jar. A second account is two minutes: insert a row
-  copying the seeded user's `password_hash` with `is_active = true` — **without `is_active`, sign-in 302s
-  and leaves a null session**, which reads like broken login and is the invite gate working.
+  (`test@local.dev` / `testpass123`) into a cookie jar. A second account is two minutes — copy the
+  seeded `password_hash` onto `zero@local.dev` with `is_active = true`; **without `is_active`,
+  sign-in 302s to a null session**, which reads like broken login and is the invite gate working.
 - Screens: temporary specs in `e2e/`, run against the already-running server with
   `E2E_BASE_URL=http://localhost:3000` **and `DATABASE_URL=…` set** (`zero-data.setup.ts` fails loudly
   without it, before your spec runs). **Delete the spec and `test-results/` before committing.**
-- **This container's clone is SHALLOW.** After `git fetch origin main`, a merge can fail with
-  *"refusing to merge unrelated histories"* and `git merge-base HEAD origin/main` can print nothing —
-  neither means divergence. The fetched commits simply do not reach back past the shallow boundary.
-  `git fetch --unshallow origin` fixes it in one call, and the merge base appears immediately. Do not
-  reach for `--allow-unrelated-histories`; it would graft two disjoint trees together.
+- **This container's clone is SHALLOW.** *"refusing to merge unrelated histories"* and an empty
+  `git merge-base` mean the fetch did not reach past the shallow boundary, not divergence.
+  `git fetch --unshallow origin` fixes it. Never `--allow-unrelated-histories`.
 - **`get_check_runs` returning `total_count: 0` has a third cause, and it is the likeliest one here.**
   `CLAUDE.md` names a stale base; the PR field to read is **`mergeable_state`**. `dirty` means a merge
   conflict, and **GitHub runs no PR checks at all while it cannot compute the merge commit** — so a
@@ -176,29 +182,23 @@ None. This role's PRs are docs-only.
   conflict and the checks start within seconds; `unstable` means mergeable with checks still running.
   **Check `mergeable_state` before waiting on anything.**
 - **Crossing local midnight is one Playwright call** — `page.clock.install({time})`, `fastForward`,
-  then dispatch `visibilitychange`. That measured every tab's day-rollover in one run (sweep 41).
-  `faketime` neither helps nor is needed.
-- **`page.goto()` is a HARD navigation and makes every screen look broken:** React cleanup never runs,
-  so nothing saves its scroll offset — sweep 41's first table read `{}` for `/more`, the screen that
-  provably works. Drive a real in-app click. And a screen with nothing to scroll fails identically to
-  a broken one, so assert the precondition. Two more traps on BF-100's four, all reporting
-  `expected N, received 0`.
+  dispatch `visibilitychange`. `faketime` neither helps nor is needed.
+- **`page.goto()` is a HARD navigation and makes every screen look broken:** React cleanup never
+  runs, so nothing saves its scroll offset. Drive a real in-app click, and assert the precondition —
+  a screen with nothing to scroll fails identically to a broken one.
 - **Assert every probe reached a real route.** Next's HTML 404 for an unmatched path is indistinguishable
   from an access-control rejection by status alone — the tell is the body, HTML vs JSON. A 405 means the
   route is real and the verb is wrong; check the handler before concluding anything.
-- **Read the row back out of Postgres.** A 2xx cannot distinguish "did it" from "ignored it safely", and a
-  response body echoing your input proves nothing about what was stored.
+- **Read the row back out of Postgres.** A 2xx cannot distinguish "did it" from "ignored it safely";
+  a body echoing your input proves nothing about what was stored. This is what produced RV-45.
 - **Expect your probe to be wrong in the direction of your hypothesis.** Sweeps 36–39 produced four
-  measurement errors, every one plausible, specific and publishable as written. **Corroboration between two
-  weak signals is not evidence when they can fail for the same reason** — prefer one signal that cannot be
-  faked over two that agree.
-- First-visit renders are confounded by Turbopack compile time; anything that looks sparse must be
-  re-checked warm before it is believed.
-- **Before running the docs compaction chore, check the open-PR list** — it is a whole-directory operation
-  and has been done in duplicate twice. And when a durable doc cites a session, cite the **review or handoff
-  doc**, never the loose journal entry: the linked-entry floor tracks durable-doc citations, not entry count.
+  measurement errors, each plausible and publishable as written. **Corroboration between two weak
+  signals is not evidence when they can fail for the same reason.**
+- First-visit renders are confounded by Turbopack compile time; re-check warm before believing sparse.
+- **Before the docs compaction chore, check the open-PR list** — whole-directory, done in duplicate
+  twice. Cite the review/handoff doc, never the loose journal entry.
 
 ## Where the earlier sweeps live
 
-**All eleven pillars have been reviewed at least once.** Read the write-ups by *subject*, through
-`docs/domains/*/README.md`, rather than in sweep order — the pillar index is what that is for.
+All eleven pillars have been reviewed at least once. Read the write-ups by *subject* through
+`docs/domains/*/README.md`, not in sweep order.
