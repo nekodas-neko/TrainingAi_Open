@@ -498,6 +498,141 @@ and Samsung does not honour `autoConnect = true`, so direct connect plus a bound
 isolation stands and wiring it into scoring waits on the H10 session. It does not resolve steps,
 calories or the stage mapping (PS-16, PS-19).
 
+### [platform][nutrition] RV-45 — Q-556's 404 shipped on one route; its comment says "match every sibling delete"
+
+- **Lane:** A — `app/api/**` delete handlers and the repository methods behind them.
+- **Added:** 2026-09-05, Review sweep 47 —
+  [write-up](reviews/2026-09-05-delete-reports-success-for-nothing.md).
+
+`app/api/activity-logs/route.ts:70` answers `404` when a delete matches no row, and the comment
+above it says the change was made to *"Match every sibling delete: 404 for both a nonexistent id and
+someone else's."* **Six siblings answer `200` to both.** The direction is backwards: it is the only
+one of seven that does this, not the one catching up.
+
+Probed live, each beside a malformed-id control returning `400 Invalid id` — so the route matched,
+the handler ran and its guard fired:
+
+| Route | nonexistent id |
+|---|---|
+| `supplements/[id]` | `200 {"ok":true}` |
+| `supplements/[id]/log` | `200 {"ok":true}` |
+| `injuries/[id]` | `200 {"ok":true}` |
+| `nutrition/food-logs/[id]` | `200 {"success":true}` |
+| `nutrition/saved-meals/[id]` | `200 {"success":true}` |
+| `nutrition/meal-types/[id]` | `200 {"success":true}` |
+| `admin/activity-types` (`?id=`) | `200 {"ok":true}` |
+| `activity-logs` (Q-556) | `404` |
+| `nutrition/meal-plans/[id]`, `phase-sets/[id]` | `404` |
+
+**The "someone else's" half, measured.** A second account deleted the first's supplement and got
+`200 {"ok":true}`; the row was still in Postgres afterwards with its owner unchanged. Ownership is
+enforced — the *answer* is what is wrong. A correct refusal is reported as a success, so nothing
+distinguishes it and nothing reaches `error_events`.
+
+**Do not read this as reversing the 2026-08-18 decision without cause.** That review
+([§2](reviews/2026-08-18-write-surface-not-found.md)) deliberately declined to file these routes,
+arguing DELETE is idempotent and *"the desired end state (row absent) genuinely holds"*. That is
+correct for the owner deleting their own already-deleted row. It is false in the cross-account case,
+where the row is present and correctly so — the premise fails, and Q-556 subsequently reached the
+opposite conclusion and shipped it.
+
+**Nothing blocks aligning the rest.** Q-556's comment names the precondition that made a 404 unsafe
+before it — a row queued via `queueMutation` but not yet pushed, reconciled by the push arm since
+Q-328. That holds identically for the siblings: `supplements`, `supplement_logs`, `injuries`,
+`food_logs` and `saved_meals` are all in `SYNCED_MUTATION_DOMAINS`, as `activity_logs` is.
+`meal_types` and `admin/activity-types` have no outbox path, so no race exists there at all.
+
+**Why it is not cosmetic.** `manage-supplements-sheet.tsx:166` and `injury-sheet.tsx:179` both do
+`if (!res.ok) throw new Error()`, then drop the row and toast "deleted". A delete that removed
+nothing confirms itself to the user, and the row returns on the next pull.
+
+**Not established:** measured on the web build, where the offline-first clients take their API
+fallback. On device, supplements and injuries write locally and return before the fetch, so for
+those two surfaces this is the fallback path, not the primary.
+
+### [platform] RV-46 — the Q-463 route mapper reaches twelve of the thirteen routes that need it
+
+- **Lane:** A — `app/api/admin/activity-types/route.ts`.
+- **Added:** 2026-09-05, Review sweep 47 —
+  [write-up](reviews/2026-09-05-delete-reports-success-for-nothing.md).
+
+Eighteen repository methods throw a typed `NotFoundError`/`UserFacingError`; thirteen mutating
+routes call one; twelve map it through `refusalResponse`/`routeErrorResponse`. The thirteenth wraps
+only `requireAdmin` in its `try`, leaving `repo.updateActivityType(...)` uncaught on the handler's
+last line:
+
+```
+PATCH {"id":"walk",                  "sortOrder":1}  ->  200  {"activityType":{…}}
+PATCH {"id":"no-such-activity-type", "sortOrder":1}  ->  500  (empty body)
+```
+
+Both symptoms `route-errors.ts` names in its own header: the wrong status, and the **empty body**
+that makes a client's `res.json()` throw on top of the failure. It also writes the row that helper
+exists to prevent — read back straight after the probe:
+`PATCH /api/admin/activity-types | server | Activity type not found`, a correctly-refused request
+recorded as a server fault.
+
+**Low severity, and filed at that level** — admin-only, one caller
+(`activity-type-manager.tsx:146`). It is worth an entry because it is the last unconverted site of a
+class the repo already decided how to fix, and the fix is one line.
+
+### [workouts] RV-43 — hitting the prescription exactly is scored as progress, and the PR is permanent
+
+- **Lane:** A — `packages/shared/src/1rm.ts` and/or `app/api/next-session/prescription/route.ts`.
+- **Gate:** owner — the fix is a scoring decision, see below.
+- **Added:** 2026-09-03, Review sweep 46 —
+  [`write-up §2`](reviews/2026-09-03-progression-exact-adherence-ratchet.md)
+- **The module states this invariant and the 2026-07-10 workout review repeated it as a strength:**
+  *"prescriptionFactor making exact adherence 1RM-neutral"*. It is neutral for the exact prescribed
+  weight and broken by the plate rounding between the formula and the barbell.
+- **The mechanism, four steps.** (1) The prescription is `mroundStepUp(basis × pct/100, step)` — a
+  **ceiling** round, 2.5 kg on a barbell (`prescription/route.ts:138`), whose comment says *"slight
+  overload is better than underload"*. (2) The lifter hits it. (3) `prescriptionFactor` cancels the
+  `repFactor` terms, leaving `weight × 100/pct`, so the round-up is **amplified by 1/pct** — 1.43× at
+  70%. (4) The result exceeds the previous 1RM and becomes the next basis. Step 1 is deliberate;
+  nothing in either file mentions step 3.
+- **Measured** over 1,201 starting 1RMs (60.0–180.0 kg, 0.1 steps), 3×8 @70%, exact adherence:
+
+  | step | p50 | p90 | max | unchanged | sessions to settle |
+  |---|---|---|---|---|---|
+  | barbell 2.5 | **+2.60%** | +7.12% | **+13.55%** | 10/1201 | 3 |
+  | dumbbell 1.25 | +1.30% | +5.04% | +10.46% | 20/1201 | 4 |
+
+  Worked: `103.70 → 107.25 → 110.75 → 114.25` then settles (+10.2%).
+- **It converges, which caps the severity.** The fixed point is the smallest 1RM whose working weight
+  lands on a plate multiple, reached in 3–4 sessions. Not a runaway.
+- **Not cosmetic:** `log-exercise.ts:327` passes the estimate to `upsertPersonalRecordIfBetter`
+  (`shouldCountTowardPr` excludes only deloads, baselines and implausible values), and `IfBetter` is
+  monotone — so the inflation becomes a permanent all-time PR feeding the strength card, the digests
+  and `pickHeadlinePersonalRecord`.
+- **⚠ Do NOT "fix" this by switching to nearest-rounding.** The ceiling exists for a stated reason and
+  `mroundStep` shows the same ratchet at a lower median. **The real question is whether the estimate
+  should be computed from the PRESCRIBED weight rather than the rounded one**, which would make the
+  invariant true as written. That changes what a 1RM means, so it is the owner's call — present both
+  and let them choose.
+- **How to test locally:** import `estimateOneRm` in a throwaway vitest file inside
+  `packages/shared/src` (there is no build output to import, and `npx tsx` is not installed); write
+  results to a file, since vitest swallows `console.log`. **Sweep the starting values** — 100 kg makes
+  every common percentage land on a plate and reports zero drift for a mechanism that moves 13%.
+- The `Gate: owner` above **is** the decision: which of the two definitions of the estimate they want.
+  Nothing here can start until that is answered, so there is no separate verify.
+
+### [nutrition] RV-44 — nine longhand Atwater sites in the two files `atwater.ts` never reached
+
+- **Lane:** A — `packages/shared/src/nutrition/scan-totals.ts`, `.../meal-split.ts`.
+- **Added:** 2026-09-03, Review sweep 46 —
+  [`write-up §3`](reviews/2026-09-03-progression-exact-adherence-ratchet.md)
+- `atwater.ts` exists because of LB-9 and says so in its header: *"Six lines with no dependencies can
+  be imported from anywhere, which is the property that stops a fifth copy appearing."* Neither file
+  below imports it: `scan-totals.ts` lines 41, 113, 145, 155, 156 and `meal-split.ts` lines 173, 249,
+  250, 251 all write `* 4` / `* 4` / `* 9` longhand.
+- **No number is wrong today.** All nine agree at 4/4/9, and the Atwater factors are physiological
+  constants that will not change. **This is a consistency finding, not a correctness one** — do not
+  file it or fix it as though a value were incorrect.
+- Import `KCAL_PER_G` at the nine sites. Worth doing when someone is next in those files rather than
+  as a standalone PR.
+- **Verify:** owner — not needed beyond a green gate; nothing user-visible changes.
+
 ### [nutrition][platform] RV-42 — a meal plan can point at another account's saved meal and meal type
 
 - **Lane:** A — `lib/data/postgres/slices/meal-plans.ts` (`replaceMealPlanStructure` and the create
@@ -4973,6 +5108,35 @@ back resolving to the tab that owns the destination instead of unwinding to the 
   - **`food_items.image_data_uri` is bytes, not a URL** — it is read local-first and mirrored into
     on-device SQLite. Render it as a data URI; do not add a network fetch to a row that already
     carries its own picture.
+
+- **⚑ RE-REPORTED 2026-09-04 — *"noticing scanned barcodes still dont have their photo"*, and a
+  production reading that questions this entry's own "storage is fixed" claim.** Screenshot: a
+  barcode-logged `LOADED MAC & CHEESE` with a placeholder tile beside two AI-logged meals showing real
+  photos — the same shape as the 2026-09-01 report, which is expected while (1) is unbuilt.
+  **What is not expected is the measurement.** `claude_ro.food_items.image_bytes` is **NULL on all 259
+  rows** — 236 `ai`, 15 `barcode`, 8 `text` — and the newest barcode row is dated **2026-09-05**,
+  days *after* BF-70 shipped on 08-31 and recorded *"verified: a 5,359-char data URI on a real Open
+  Food Facts product"*.
+  - **⚠ Do not treat that as proof of a regression — the reading has a known weakness and it is
+    stated here so the next reader does not repeat the mistake made getting to it.** The `claude_ro`
+    view exposes `image_bytes` as an **`integer`**, not the `image_data_uri` text column the app
+    writes; it is a size, deliberately exposed instead of the payload. Whether it is derived from
+    `image_data_uri` at all was **not** verified, so an all-NULL column may mean "nothing stored" or
+    may mean "this view column is not wired to that data". A first attempt at this measurement used
+    `count(image_bytes)` and would have reported a storage failure on the strength of a column whose
+    meaning had not been checked.
+  - **The cheap way to settle it** is a direct read of `image_data_uri` on the newest barcode row
+    (the admin endpoint cannot see it, so this needs a route or a check that already runs
+    server-side), or a fresh scan of a product **known to carry an OFF thumbnail** followed by
+    reading the row back. Settle it before building the render — a render fed by an empty column
+    looks identical to the bug being reported now.
+  - **⚠ Expectation to set regardless of the outcome: many products have no image in Open Food Facts
+    at all.** Measured 2026-09-04 against the owner's own most-scanned brand — **4 of 10** Core
+    Powerfoods products carry an `image_front_thumb_url`; `BBQ Mac & Cheese`, `Curried Sausages`,
+    `Anabolic Chicken` and three others have none. So even with storage and render both correct, a
+    majority of his barcode scans of that brand will still show the placeholder. This reinforces the
+    note above — the placeholder is a **first-class state**, not a loading shim — and it means "still
+    no photo" cannot by itself be read as a bug in the next report either.
 - **Keep:** the ENGINE half of routes 1 and 2 shipped 2026-08-26 (migrations 227 + 228, local SQLite
   v30) — `food_items.image_data_uri`, `FOOD_ITEM_IMAGE_MAX_BYTES`, the whole offline chain (delta
   select, pull mapping, local upsert, outbox payload, both write paths), and the barcode route
@@ -11848,7 +12012,37 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Verify:** device
 - **Gate:** owner
 
-### [readiness][devices] LA-57 — night HRV roughly DOUBLED at the re-key, and only its presence was ever checked
+### [readiness][devices] ⛔ LA-57 — REFUTED: the night-HRV "step" at the re-key is a ramp
+
+> **⛔ THIS ENTRY'S CENTRAL CLAIM IS WRONG, corrected 2026-09-04 by the agent that filed it a day
+> earlier.** [`review`](reviews/2026-09-04-hrv-ramp-not-step.md). Do not implement anything below;
+> it is kept for the reasoning and because the *question* it raises is still open, narrowly.
+>
+> **The decisive measurement:** night HRV **inside the BLE era alone** — one device, one decoder,
+> where a definition change is not possible — runs 45.5 → 46.4 → 52.9 → 59.2 → **63.0** over five
+> weeks (**+38%**) and then plateaus at 56–62. A change in which statistic is computed produces a
+> step and a new stable level; it cannot make values keep climbing for five weeks under an unchanged
+> decoder.
+>
+> **The pre/post means below are a monotonic ramp cut in the middle.** Weekly daily-HRV means run
+> 21.8 → 31.1 → **41.6 (the re-key week)** → 46.4 → 52.9 → 59.2 → 68.0, with the boundary week
+> sitting on the line between its neighbours. RHR does the same in reverse, 68.3 → 50.0. A ramp
+> produces non-overlapping before/after ranges and a "doubling" of means on its own.
+>
+> **And the ranges DO overlap** — the entry says there is none "to speak of". The week of 2026-08-24
+> holds a BLE night at **26.5 ms**, inside the 20–39 band attributed to Cloud-era measurement.
+>
+> **What is still open, and it is much narrower:** whether a definition change *also* sits underneath
+> the ramp. Nothing excludes it — but the evidence offered here does not support it, and testing it
+> needs the trend modelled with a discontinuity fitted against it, on roughly **two weeks** of
+> pre-boundary HRV. That is thin, and it is a different piece of work from what this entry describes.
+> **The RMSSD-vs-SDNN check below is still worth doing on its own terms** (two scales behind one
+> column would be a real defect) — it is the reasoning for *why* that was wrong, not the check.
+>
+> **The lesson, which is the third instance of the same class in one session:** a before/after mean
+> across a trending series manufactures a step. The other two were mixing `pg_database_size` with a
+> table-sum on BF-55, and reading `computed_at` as a per-score stamp on LB-53.
+
 
 - **Lane:** A — `lib/oura-ble/rollup/**` and the decoder that produces `hrv_avg_ms`.
 - **Added:** 2026-09-03 · found while closing Q-509's candidate 3 ·
@@ -11924,6 +12118,27 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   **4× the median**, the signature of a minority of nights where a spurious late dip beat the true
   early minimum. Re-confirmed at **n=57, mean 2.653 h** (entry: 2.657 at n=42) and |Δbpm| **2.00**.
   The other half is still owed; the review names the three candidates it could not separate.
+- **⚑ CANDIDATE 3 IS CLOSED, 2026-09-04 — and in the opposite direction from "no change to find".**
+  [`review`](reviews/2026-09-04-hrv-ramp-not-step.md). The 2026-09-03 measurement stands:
+  `recovery_index_hours` is flat over 58 BLE nights. Its reading was wrong. **A great deal was
+  changing over exactly those nights** — night HRV rose **45.5 → 63.0 (+38%)** *inside the BLE era*,
+  daily RHR fell **68.3 → 50.0** across the window, steps rose 5,618 → 7,558 and weight 68.35 →
+  71.45 kg. The metric named for recovery did not respond to any of it.
+  **That is an independent line of evidence for this entry's own conclusion** — the hours estimator
+  is dominated by something other than physiology — reached without the anchor-ratio argument. It
+  does not weaken the estimator-bias reading; it corroborates it from a second direction.
+- **⚠ The "inputs stepped at the re-key" note in the 2026-09-03 block below is retracted.** RHR
+  65.7 → 53.8 and HRV 26.9 → 55.9 are before/after means across a **monotonic ramp**, which
+  manufactures a step from a trend. Weekly means show no discontinuity at the boundary, and the ramp
+  continues for four weeks past it. LA-57, which was filed on that reading, is refuted — see its
+  entry.
+- **A caveat raised and discarded, recorded so it is not re-raised.** `oura_daily_summary` holds no
+  rows before 2026-07-07, which suggests the Cloud-vs-BLE refit might compare **two different
+  estimators** (Oura's cloud number vs our reimplementation) rather than one estimator on two inputs.
+  **It does not.** `oura_heartrate` carries Cloud-sourced series (`awake`/`rest`/`live`/`workout`)
+  from 2026-06-22 to 07-06 and `ble` from 07-06, so our estimator ran on both. **The refit's
+  like-for-like framing is sound** — checked before publishing, and reported because the next reader
+  will notice the same empty table.
 - **Plan:** none yet — **Lane A implements; Tuning proposes only.** This is a `devices` finding by the
   readiness code's own pre-registered rule, **not** a scoring change.
 - **Added:** 2026-08-18 · Tuning agent ·

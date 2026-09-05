@@ -269,15 +269,20 @@ Live at the time of writing (2026-07-30):
   spike it reacts to. Also refines the entry: chronic divides by the **observed span in weeks**, not
   a flat 4, so there is no `/ 4` to go looking for. Now `Gate: owner`.
 - **[`../../reviews/2026-09-03-recovery-index-remainder-and-hrv-step.md`](../../reviews/2026-09-03-recovery-index-remainder-and-hrv-step.md)**
-  — 🆕 **Q-509's remainder is not a trend, and the inputs stepped at the re-key (LA-57).** Over 58
-  BLE-era nights `recovery_index_hours` is flat — OLS slope −0.0055 h/night, r = −0.060 — so the
-  ~0.39 h was there on the first BLE night and has not grown; that refutes *a gradual six-week
-  change*, though not a change that happened AT the re-key and held. Meanwhile `body_metrics` either
-  side of 2026-07-07: RHR 65.7 → 53.8 bpm and **HRV 26.9 → 55.9 ms** — pre-boundary nights run 20–39,
-  post-boundary 40–56, never returning. The RHR half is not clean (it was already falling through
-  late June); the HRV step is. The 2026-08-18 input-drift review checked HRV *presence*, never its
-  *scale*, which is how it survived. **Strengthens both Q-509 prohibitions** — do not widen
-  `MEDIAN_WINDOW`, do not move `RECOVERY_INDEX_OPTIMAL_HOURS`.
+  — **Q-509's remainder is not a trend.** Over 58 BLE-era nights `recovery_index_hours` is flat —
+  OLS slope −0.0055 h/night, r = −0.060 — so the ~0.39 h was there on the first BLE night and has not
+  grown. **Strengthens both Q-509 prohibitions** — do not widen `MEDIAN_WINDOW`, do not move
+  `RECOVERY_INDEX_OPTIMAL_HOURS`.
+  **⛔ Its second half — "the inputs stepped at the re-key (LA-57)" — is REFUTED**, see the
+  2026-09-04 review below. Those were before/after means across a monotonic ramp.
+- **[`../../reviews/2026-09-04-hrv-ramp-not-step.md`](../../reviews/2026-09-04-hrv-ramp-not-step.md)**
+  — 🆕 **The HRV "step" is a ramp, and it closes Q-509's candidate 3 the other way up.** Night HRV
+  rises **45.5 → 63.0 (+38%) inside the BLE era** — one device, one decoder, where a definition
+  change cannot happen — then plateaus; weekly daily-HRV means run 21.8 → 31.1 → 41.6 (the re-key
+  week) → 46.4 → 52.9 → 59.2 → 68.0 with no discontinuity, and a BLE night at 26.5 ms sits inside the
+  band claimed as Cloud-only. So candidate 3 does not close as "nothing was changing": **a great deal
+  was, and `recovery_index_hours` did not respond** — independent corroboration of the estimator-bias
+  reading. LA-57 is refuted.
 - **[`../../reviews/2026-09-02-recovery-index-bin-occupancy.md`](../../reviews/2026-09-02-recovery-index-bin-occupancy.md)**
   — 🆕 **Q-509, continued: two of the three remaining candidates are closed.** Bin occupancy does
   **nothing** — across 575 night bins not one falls below `MIN_BEATS_PER_BIN`, the argmin carried
