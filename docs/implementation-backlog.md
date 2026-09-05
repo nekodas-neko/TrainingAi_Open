@@ -498,6 +498,84 @@ and Samsung does not honour `autoConnect = true`, so direct connect plus a bound
 isolation stands and wiring it into scoring waits on the H10 session. It does not resolve steps,
 calories or the stage mapping (PS-16, PS-19).
 
+### [platform][nutrition] RV-45 — Q-556's 404 shipped on one route; its comment says "match every sibling delete"
+
+- **Lane:** A — `app/api/**` delete handlers and the repository methods behind them.
+- **Added:** 2026-09-05, Review sweep 47 —
+  [write-up](reviews/2026-09-05-delete-reports-success-for-nothing.md).
+
+`app/api/activity-logs/route.ts:70` answers `404` when a delete matches no row, and the comment
+above it says the change was made to *"Match every sibling delete: 404 for both a nonexistent id and
+someone else's."* **Six siblings answer `200` to both.** The direction is backwards: it is the only
+one of seven that does this, not the one catching up.
+
+Probed live, each beside a malformed-id control returning `400 Invalid id` — so the route matched,
+the handler ran and its guard fired:
+
+| Route | nonexistent id |
+|---|---|
+| `supplements/[id]` | `200 {"ok":true}` |
+| `supplements/[id]/log` | `200 {"ok":true}` |
+| `injuries/[id]` | `200 {"ok":true}` |
+| `nutrition/food-logs/[id]` | `200 {"success":true}` |
+| `nutrition/saved-meals/[id]` | `200 {"success":true}` |
+| `nutrition/meal-types/[id]` | `200 {"success":true}` |
+| `admin/activity-types` (`?id=`) | `200 {"ok":true}` |
+| `activity-logs` (Q-556) | `404` |
+| `nutrition/meal-plans/[id]`, `phase-sets/[id]` | `404` |
+
+**The "someone else's" half, measured.** A second account deleted the first's supplement and got
+`200 {"ok":true}`; the row was still in Postgres afterwards with its owner unchanged. Ownership is
+enforced — the *answer* is what is wrong. A correct refusal is reported as a success, so nothing
+distinguishes it and nothing reaches `error_events`.
+
+**Do not read this as reversing the 2026-08-18 decision without cause.** That review
+([§2](reviews/2026-08-18-write-surface-not-found.md)) deliberately declined to file these routes,
+arguing DELETE is idempotent and *"the desired end state (row absent) genuinely holds"*. That is
+correct for the owner deleting their own already-deleted row. It is false in the cross-account case,
+where the row is present and correctly so — the premise fails, and Q-556 subsequently reached the
+opposite conclusion and shipped it.
+
+**Nothing blocks aligning the rest.** Q-556's comment names the precondition that made a 404 unsafe
+before it — a row queued via `queueMutation` but not yet pushed, reconciled by the push arm since
+Q-328. That holds identically for the siblings: `supplements`, `supplement_logs`, `injuries`,
+`food_logs` and `saved_meals` are all in `SYNCED_MUTATION_DOMAINS`, as `activity_logs` is.
+`meal_types` and `admin/activity-types` have no outbox path, so no race exists there at all.
+
+**Why it is not cosmetic.** `manage-supplements-sheet.tsx:166` and `injury-sheet.tsx:179` both do
+`if (!res.ok) throw new Error()`, then drop the row and toast "deleted". A delete that removed
+nothing confirms itself to the user, and the row returns on the next pull.
+
+**Not established:** measured on the web build, where the offline-first clients take their API
+fallback. On device, supplements and injuries write locally and return before the fetch, so for
+those two surfaces this is the fallback path, not the primary.
+
+### [platform] RV-46 — the Q-463 route mapper reaches twelve of the thirteen routes that need it
+
+- **Lane:** A — `app/api/admin/activity-types/route.ts`.
+- **Added:** 2026-09-05, Review sweep 47 —
+  [write-up](reviews/2026-09-05-delete-reports-success-for-nothing.md).
+
+Eighteen repository methods throw a typed `NotFoundError`/`UserFacingError`; thirteen mutating
+routes call one; twelve map it through `refusalResponse`/`routeErrorResponse`. The thirteenth wraps
+only `requireAdmin` in its `try`, leaving `repo.updateActivityType(...)` uncaught on the handler's
+last line:
+
+```
+PATCH {"id":"walk",                  "sortOrder":1}  ->  200  {"activityType":{…}}
+PATCH {"id":"no-such-activity-type", "sortOrder":1}  ->  500  (empty body)
+```
+
+Both symptoms `route-errors.ts` names in its own header: the wrong status, and the **empty body**
+that makes a client's `res.json()` throw on top of the failure. It also writes the row that helper
+exists to prevent — read back straight after the probe:
+`PATCH /api/admin/activity-types | server | Activity type not found`, a correctly-refused request
+recorded as a server fault.
+
+**Low severity, and filed at that level** — admin-only, one caller
+(`activity-type-manager.tsx:146`). It is worth an entry because it is the last unconverted site of a
+class the repo already decided how to fix, and the fix is one line.
+
 ### [workouts] RV-43 — hitting the prescription exactly is scored as progress, and the PR is permanent
 
 - **Lane:** A — `packages/shared/src/1rm.ts` and/or `app/api/next-session/prescription/route.ts`.

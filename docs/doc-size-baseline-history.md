@@ -7775,3 +7775,24 @@ because the same trap is one query away for the next person. Also measured, and 
 owner's most-scanned brand carry a thumbnail in Open Food Facts at all — so even with both halves
 correct, most of his scans of that brand stay blank, which makes the placeholder a first-class state
 and means "still no photo" cannot be read as a bug on its own next time.
+
+## 2026-09-05 — `docs/implementation-backlog.md` → 17905, `projectOverview.md` → 9872 (sweep 47: RV-45, RV-46)
+
+Two queue entries and their two Known-Issues rows. The length is carrying one specific thing: RV-45
+overlaps a decision the repo already made **the other way** on 2026-08-18, when a review named these
+exact seven routes and deliberately declined to file them on idempotency grounds. An entry that only
+said "six deletes answer 200" would read to the next session as a re-file of something already
+considered and rejected, and would be closed as such.
+
+So both the entry and the row carry the boundary: the earlier argument is correct for the owner
+deleting their own already-deleted row, and false in the cross-account case, where the desired end
+state is not "row absent". That is the whole finding, and it cannot be compressed to a sentence
+without becoming the thing it is not.
+
+`docs/agents/state/review.md` stayed inside its 205 baseline — the sweep-40 carry-over and five
+stale method notes were condensed to absorb the new ones, per the baton's own one-screen rule.
+
+The backlog number is **recomputed from the merged file**, not carried from either side. BF-35's
+entry landed on `main` between this branch and its merge, so both sides raised the same baseline to
+different numbers — the one case where a `.size` conflict is a genuine disagreement rather than two
+unrelated additions.
