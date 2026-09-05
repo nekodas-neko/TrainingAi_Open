@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.7",
+    date: "2026-09-04",
+    changes: [
+      "An account that has been deactivated, or has signed up but not yet been approved, could still reach the app's data directly even though the app itself sent it to the waiting screen. It now gets refused there too. Nothing changes for an active account.",
+    ],
+  },
+  {
     version: "1.436.6",
     date: "2026-09-04",
     changes: [

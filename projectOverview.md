@@ -1627,7 +1627,7 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
-### [platform] 🟠 Deactivation does not deactivate: the `isActive` gate never runs on an API route (LA-58, 2026-09-04)
+### [platform] 🟡 Deactivation now covers API routes — shipped same day, 403 branch unverified (LA-58, 2026-09-04)
 
 `middleware.ts`'s matcher excludes `api` as its first exclusion, so the deactivation branch cannot
 run on any of the **219** `app/api/**/route.ts` files. Each of them calls `auth()` and checks
@@ -1640,8 +1640,19 @@ session cookie is valid. Not a cross-user leak — the routes are user-scoped �
 their cookie does not.
 
 Found while assessing Q-1a, which names it as a precondition for bearer auth. That framing is why it
-sat: it reads as future work for a feature that has not started, and it is live now. **LA-58 carries
-the three candidate fixes with a recommendation; it is `Gate: owner` because it is an auth change.**
+sat: it reads as future work for a feature that has not started, and it was live.
+
+**Fixed the same day on the owner's instruction** (option 1): the matcher excludes `api/auth` only,
+and a session with `isActive === false` gets **403 JSON** on any `/api` path. `/api/auth/*` stays
+excluded because those routes create sessions — gating them would lock sign-in out entirely.
+
+**⚠ The window is ≤24 h, not instant.** `ISACTIVE_RECHECK_MS` is a day, so the claim middleware reads
+refreshes at most daily. API access now closes on the same schedule pages already had, which is the
+point — the defect was that the two disagreed. Immediate revocation is a separate change.
+
+**Kept here rather than archived because one thing is unverified:** a genuinely deactivated session
+receiving the 403. The sandbox cannot mint a session. Every other path class was checked at runtime
+and is unchanged.
 
 ### [devices][body] 🟡 The scale's "Weighing you…" gate shipped UNVERIFIED on device (Q-104/Q-114, 2026-09-04)
 
