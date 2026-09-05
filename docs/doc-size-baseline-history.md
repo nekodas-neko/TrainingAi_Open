@@ -7847,3 +7847,10 @@ thing being measured. Named instead: the pre-dose baseline, within-week shape at
 deliberate plateau. Also a workaround usable tomorrow, since nothing is built and dosing starts:
 `dose_text` freezes on the log at log time, so ticking a named supplement captures the dose dates,
 which are the half that cannot be reconstructed later.
+
+## 2026-09-05 — `docs/implementation-backlog.md` unchanged at 18060 (BF-112 moved to the queue head)
+
+No size change; a move. The owner starts dosing on 2026-09-06 and asked for this at the top, so
+BF-112 goes from Lane B READY #6 to #1. Queue position is priority in this file, so the reorder is
+the whole mechanism — nothing else needed editing, and `grep '^### '` sorted is identical to
+`origin/main`, which is the check that the move did not silently drop or resurrect an entry.
