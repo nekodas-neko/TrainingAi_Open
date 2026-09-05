@@ -1680,6 +1680,28 @@ and neither is how long a weigh-in actually takes.
 **What to watch on the next APK:** the bar not appearing on a plain Home-tab visit with an empty
 scale, and a genuine weigh-in still drawing one.
 
+### [platform][nutrition] ⚠️ A malformed id in a request body reaches the driver and answers 500 (RV-47, 2026-09-05)
+
+`invalidUuidResponse` is applied to **27 of 27** dynamic `[id]` routes and **zero** body-id ones.
+`PATCH /api/admin/exercises` answers **500** for `not-a-uuid` and `404` for a well-formed missing id —
+one route, one payload, one field differing only in format. `PATCH /api/admin/users` and
+`PATCH /api/nutrition/meal-types` answer **500 with an empty body**. All three file the raw failing
+statement into `error_events` (`[pg 22P02] Failed query: update "users" set "is_active" = $1 …`).
+Response bodies are safe, so this is Q-482's status half, not Q-483. The fix is already written in
+`PATCH /api/workout-entry`: `.uuid()` on the id field of the schema these routes already have.
+[Sweep 48](docs/reviews/2026-09-05-body-supplied-ids-skip-the-guard.md).
+
+### [platform] ⚠️ Three update routes report success for a write that matched nothing (RV-48, 2026-09-05)
+
+`PATCH /api/admin/users`, `PATCH /api/nutrition/meal-types` (reorder) and `PATCH /api/oura/workouts`
+answer `200 {"ok":true}` for an id that does not exist. Each was probed against a positive control
+where the same response follows a write that *did* change the database — deactivating a real user
+flips `is_active`, reordering real ids moves `sort_order` — so the response cannot distinguish them.
+`markOuraWorkoutReviewed` returns `Promise<void>` and its route returns `{ok:true}` unconditionally;
+it is the only one with neither an id guard nor a not-found path, and its positive control is **not
+established** (`oura_workouts` has 0 rows locally). Sibling of RV-45, different cause.
+[Sweep 48](docs/reviews/2026-09-05-body-supplied-ids-skip-the-guard.md).
+
 ### [platform][nutrition] 🟡 Q-556's 404 shipped on one delete route; six siblings still answer 200 (RV-45, 2026-09-05)
 
 `app/api/activity-logs/route.ts:70` answers 404 when a delete matches no row, and its comment says

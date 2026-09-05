@@ -6,7 +6,7 @@
 > flips itself to 🔴 as the last step of its handoff, after the baton and every PR have landed.
 
 **Updated:** 2026-09-05 · **By:** forty-seven sweeps (2026-08-17 ×2, 2026-08-18 ×37, 2026-08-20 ×1,
-2026-09-03 ×6, 2026-09-05 ×1) · **Next ID: `RV-47`.**
+2026-09-03 ×6, 2026-09-05 ×2) · **Next ID: `RV-49`.**
 
 > **Sweep 40's run is closed and nothing is owed from it** — RV-32, RV-33, RV-34 all shipped, verified
 > in source rather than taken from the closure note, and their `projectOverview.md` row is in
@@ -37,38 +37,35 @@ From sweeps 29–39
 worker claims the page). **Q-556 was listed here and is CLOSED** — it shipped on
 `/api/activity-logs`, which now answers 404, verified live in sweep 47. From sweeps 41-42: **RV-37** and **RV-39**, both needing the device.
 
-**Three surfaces are explicitly unverified, not clean** — each a probe rejected on some *other* field
-before the guard under test ran: `PATCH /api/activity-logs/<id>/metrics` (cross-user behaviour
-unknown), and RV-40's `POST /api/complete-workout` and `POST /api/log-exercise` (malformed-id
-behaviour unknown). **A 4xx is not evidence the guard fired** — read which field it names.
+**Those three unverified surfaces are CLOSED** — sweep 48 probed all three and all are correct. The
+rule that found them stands: **a 4xx is not evidence the guard fired** — read which field it names.
+Sweep 48 had five probes rejected on the wrong field before re-probing.
 
-## Now — sweep 47 filed (2026-09-05). **Next ID: `RV-47`.**
+## Now — sweep 48 filed (2026-09-05). **Next ID: `RV-49`.**
 
 | # | Lens | Write-up | Filed |
 |---|---|---|---|
 | 47 | does a caught refusal map to the RIGHT status | [delete-reports-success](../../reviews/2026-09-05-delete-reports-success-for-nothing.md) | RV-45/46 |
+| 48 | does a 2xx mean what it says, beyond DELETE | [body-supplied-ids](../../reviews/2026-09-05-body-supplied-ids-skip-the-guard.md) | RV-47/48 |
 
-**RV-45.** `activity-logs/route.ts:70` answers 404 for a delete that matched nothing, and its comment
-says the change was made to *"match every sibling delete"*. Six siblings answer 200 — for a
-nonexistent id **and** for another account's row, measured with a second account and the row read
-back out of Postgres. Ownership is enforced; the answer is what is wrong. **RV-46, low:**
-`PATCH /api/admin/activity-types`, the one route of thirteen without the Q-463 mapper — 500, empty
-body, and an `error_events` row for a plain not-found.
+**RV-47.** `invalidUuidResponse` reaches **27 of 27** dynamic `[id]` routes and **zero** body-id
+ones. `admin/exercises` answers 500 for `not-a-uuid` and 404 for a well-formed missing id — one
+route, one payload, one field differing only in format; `admin/users` and `nutrition/meal-types`
+answer **500, empty body**; all three log the raw `22P02`. `workout-entry` carries the fix already
+(`.uuid()` in the schema). **RV-48:** three routes answer `200 {ok:true}` for an update that matched
+nothing, each against a positive control where that response follows a real write.
 
-**The 2026-08-18 review had already declined to file those seven and was not simply wrong** — its
-idempotency argument holds for the owner's own already-deleted row and fails cross-account.
+**Sweep 47's finding is a DELETE finding** — all thirteen dynamic `PUT`/`PATCH` routes answer 404 for a ghost id and refuse the second account's row unchanged.
 
-**Closed clean, do not re-sweep:** `isRetryableWriteError` (one site, in `pushMutations`'s
-per-mutation catch, covering every domain — *not* an unreached helper); `/api/complete-workout`'s
-blanket 404 (client queues on any non-ok, the outbox replays it); the four fixed-400 catches in
-`ai-periodization/*` and `workout-review/*/apply` (the `try` wraps only the body parse);
-`DELETE /api/admin/activity-types`'s in-use branch. **Twelve of thirteen routes calling a
-typed-throwing repo method use the mapper** — the class is otherwise done.
+**THREE previously-unverified surfaces are now VERIFIED:** `activity-logs/[id]/metrics` cross-user,
+and RV-40's `complete-workout` and `log-exercise`. **`CLAUDE.md` ownership rule (c)'s
+`ensureWorkoutSession` claim is verified live** — cross-account got 404, nothing written.
 
-**Correction:** the previous baton listed **Q-556 as open**. It shipped; the route answers 404.
+**Closed clean:** the thirteen dynamic `PUT`/`PATCH` routes; `saved-meals/[id]` (a create at a client
+UUID is `writeSavedMeal`'s deliberate upsert, `setWhere` on the owner); `workout-entry`.
 
-**Still owed:** RV-37/RV-39 need the device; RV-38/RV-41/RV-43 need an owner decision; RV-40 leaves
-two routes and sweep 45 the whole workout/device FK half **unverified, not clean**.
+**Still owed:** RV-37/RV-39 need the device; RV-38/RV-41/RV-43 need an owner decision. Sweep 45's
+workout/device FK half is **untouched, not clean**.
 
 ## Carried from sweep 40 ([write-up](../../reviews/2026-08-20-non-workout-write-surface-ownership.md))
 
@@ -85,28 +82,23 @@ the documentation-integrity seam. Sweeps 34–37 were four consecutive passes ov
 left three CI checks behind (`check-known-issue-duplication`, `check-index-doc-paths`,
 `check-module-map-symbols`). Pick a lens that runs the app.
 
-- **The remaining FK edges — the WORKOUT and DEVICE half.** Sweep 45 did the nutrition ones and found
-  RV-42; `program_phases`, `schedules`, `set_hr_stats`, `blood_analytes`, `dexa_scan_regions`,
-  `exercise_logs` and `prescribed_runs` are **untouched, not clean**. The inventory is **31 edges, not
-  27** — re-run the query in sweep 45's write-up §2 rather than any remembered count. **Check each
-  edge's `delete_rule` too**: `ON DELETE SET NULL` on an unverified FK is a cross-account write
-  primitive, and `CASCADE` on the same defect would delete rather than null.
-- **Whether a 2xx means what it says, beyond DELETE.** Sweep 47 did the delete surface and found six
-  routes answering 200 for a write that changed nothing. The same question is unasked of `PUT`/`PATCH`
-  upserts: does a patch against a nonexistent or non-owned id report success too? Same method — a
-  malformed-id control, then read the row back.
-- **A clean clone, actually built.** Nobody has done `git clone` into an empty container and run
-  `pnpm install && pnpm build && pnpm test`. It is the one check that would settle `NOTICE`'s claim outright,
-  and Q-313 (no `next build` gate in the publish dry-run) is why it is worth doing.
+- **The remaining FK edges — the WORKOUT and DEVICE half.** Sweep 45 did nutrition (RV-42);
+  `program_phases`, `schedules`, `set_hr_stats`, `blood_analytes`, `dexa_scan_regions`,
+  `exercise_logs`, `prescribed_runs` are **untouched, not clean**. **31 edges, not 27** — re-run
+  sweep 45's §2 query. **Check each `delete_rule`**: `SET NULL` on an unverified FK is a
+  cross-account write primitive; `CASCADE` would delete rather than null.
+- **The POST surface, the only verb left.** Sweeps 47 and 48 covered `DELETE` and `PUT`/`PATCH`; no
+  sweep has asked what a `POST` answers when its body references a row that does not exist or is not
+  the caller's. Same method — a malformed-id control beside a well-formed one, then read the row back.
+- **A clean clone, actually built** — `git clone` into an empty container, `pnpm install && pnpm build
+  && pnpm test`. Settles `NOTICE`'s claim outright; Q-313 is why it is worth doing.
 - **The sync/outbox under a server that fails mid-push, on the device half.** Sweep 10 drove the
   server half; the local SQLite outbox has never been exercised, and it needs hardware.
 - **`/api/coach/preview`, still unprobed** after three Coach sweeps — and **whether the model proposes
-  sane numbers**, which no sweep has touched because every patch has been hand-written. RV-41 makes
-  the second one matter more than it did.
-- **Q-452's siblings — partly done by sweep 42, and what remains is narrower.** All 22 routes were
-  driven as the zero-data account and are honest bar RV-38, so the *rendering* half is swept. Still
-  untouched: `weekly-digest` and the coach, neither of which produces output for a zero-data account
-  and so cannot be reached that way — they need a **partial**-data fixture, which does not exist yet.
+  sane numbers**, untouched because every patch has been hand-written. RV-41 raises its stakes.
+- **Q-452's siblings.** The rendering half is swept (22 routes, honest bar RV-38). Untouched:
+  `weekly-digest` and the coach, which produce nothing for a zero-data account — they need a
+  **partial**-data fixture, which does not exist yet.
 
 ## Blocked
 
@@ -132,6 +124,14 @@ None. This role's PRs are docs-only.
 
 ## Method notes — do not re-derive these
 
+- **A malformed id and a well-formed missing one are each other's control** on one route with one
+  payload: two statuses for two ids differing only in format means one is wrong, no fixture needed.
+- **"Reports success" is not a finding without a POSITIVE control** — `200 {ok:true}` for a ghost id
+  says nothing until the same call with a real id is shown to move the database. Where the table was
+  empty, sweep 48 wrote *not established* rather than asserting or dropping it.
+- **Check for the offline-first upsert before filing a create-on-update.** `saved-meals` writing a
+  row at a client-supplied UUID looks like the ownership class and is the opposite: one shared
+  upsert with `setWhere` on the owner, so a device can mint ids offline.
 - **A prior review's DECISION is a claim too — find its boundary, do not reverse it.** Sweep 47's
   seven routes were considered and deliberately not filed on 2026-08-18; that argument is right for
   the case it tested and false for the one it did not. The finding is the boundary.
