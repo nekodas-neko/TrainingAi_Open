@@ -7776,7 +7776,7 @@ owner's most-scanned brand carry a thumbnail in Open Food Facts at all — so ev
 correct, most of his scans of that brand stay blank, which makes the placeholder a first-class state
 and means "still no photo" cannot be read as a bug on its own next time.
 
-## 2026-09-05 — `docs/implementation-backlog.md` → 17904, `projectOverview.md` → 9872 (sweep 47: RV-45, RV-46)
+## 2026-09-05 — `docs/implementation-backlog.md` → 17905, `projectOverview.md` → 9872 (sweep 47: RV-45, RV-46)
 
 Two queue entries and their two Known-Issues rows. The length is carrying one specific thing: RV-45
 overlaps a decision the repo already made **the other way** on 2026-08-18, when a review named these
