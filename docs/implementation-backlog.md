@@ -16436,11 +16436,41 @@ passes and the inventory is explicit rather than forgotten.
   correct, because it holds reverse-engineered frames of *that ring's* firmware and
   `sensor_raw_samples` would imply a shared frame format that does not exist.
 
-### [platform] 🟠 LA-58 — deactivation does not deactivate: the `isActive` gate never runs on an API route
+### [platform] 🟡 LA-58 — deactivation now covers API routes; the 403 itself is unverified
+
+> **✅ FIXED 2026-09-04 — option (1), on the owner's instruction.** `middleware.ts`'s matcher excluded
+> `api` as its first term; it now excludes `api/auth` only, and the handler answers **403 JSON** for a
+> session whose `isActive === false` on any `/api` path. Everything else about `/api` is left to the
+> routes: a session-less request falls straight through, so they still answer their own 401 and
+> signature-authenticated ingest keeps working.
+>
+> **`/api/auth/*` is deliberately still excluded** — NextAuth's handler, the mobile PKCE exchange and
+> registration are how a session comes to exist, so gating them on having one is circular and would
+> lock sign-in out of the app, including on a fresh APK install. `deactivation-covers-api.test.ts`
+> pins both directions by evaluating the real matcher, and both are mutation-checked: restoring the
+> old exclusion fails the "reaches API routes" case, widening it to swallow `/api/auth` fails the
+> lockout case, and swapping the 403 for a redirect fails a third.
+>
+> **⚠ The window is ≤24 h, not instant, and that is inherited rather than introduced.**
+> `ISACTIVE_RECHECK_MS` is a day (`lib/auth/is-active-refresh.ts`), so the claim middleware reads
+> refreshes at most once per day. API access now closes on the same schedule pages already had —
+> which is the point, since the defect was that the two disagreed. **Immediate revocation is a
+> different change**: it needs the claim re-read per request, which is a cost and a decision of its
+> own. Do not read "fixed" as "instant".
+>
+> **Not verified end-to-end:** a genuinely deactivated session receiving the 403. The sandbox cannot
+> mint a session, so what was proven at runtime is that every *other* path class is unchanged — an
+> API route still 401s without a session (not a 307), `/api/auth/session` and `/api/auth/providers`
+> still answer 200, a page still 307s to `/sign-in`, and `/sign-in` still serves. The 403 branch
+> itself is four lines pinned by test.
 
 - **Lane:** A
-- **Gate:** owner — it is an auth change, and the sensible fixes differ in blast radius enough that
-  the choice is not mine to make. See **The three ways to fix it** below.
+- **Branch:** `fix/la58-deactivation-covers-api`
+- **Keep:** one observation, and it needs a real deactivated session — something this sandbox cannot
+  mint. **What closes it:** deactivate an account, wait for the claim to refresh (≤24 h, or sign out
+  and back in to force it), and confirm an `/api` call with that cookie answers **403** while
+  `/pending` still loads. Every other path class is already proven unchanged at runtime; this is the
+  one branch the fix exists for.
 - **Added:** 2026-09-04 · found while assessing Q-1a, whose own "read first" note says
   *"`isActive === false` is enforced **only** in `middleware.ts:18`"*. That note is inside a deferred
   feature's preamble, framed as a precondition for work that has not started. **It is live now.**

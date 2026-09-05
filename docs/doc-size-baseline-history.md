@@ -7797,6 +7797,18 @@ entry landed on `main` between this branch and its merge, so both sides raised t
 different numbers — the one case where a `.size` conflict is a genuine disagreement rather than two
 unrelated additions.
 
+## 2026-09-04 — `projectOverview.md` → 9881, `docs/implementation-backlog.md` → 17935 (LA-58 fixed)
+
+An auth fix's rows have to carry what it does NOT do, or "fixed" is read as more than it is. Two
+things get the length here: that `/api/auth/*` stays outside the gate on purpose, because those
+routes create sessions and gating them locks sign-in out of the app — the single way this change
+could go badly wrong, and the one a later "tidy the exclusion" would reach for; and that the window
+is ≤24 h rather than instant, inherited from `ISACTIVE_RECHECK_MS`, which matters because the
+obvious reading of a shipped deactivation gate is that it bites immediately.
+
+Both entries stay open rather than moving to the resolved archive: the 403 branch itself has never
+run against a real deactivated session, since the sandbox cannot mint one.
+
 ## 2026-09-05 — `docs/implementation-backlog.md` → 17951, `projectOverview.md` → 9892 (sweep 48: RV-47, RV-48)
 
 Two queue entries and their two Known-Issues rows. Both carry a table rather than a sentence, and the
