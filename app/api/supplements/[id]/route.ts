@@ -39,7 +39,12 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   if (badId) return badId
   const repo = await getRepository()
   return withRouteErrors(async () => {
-    await repo.deleteSupplement(id, session.user!.id!)
+    // RV-45: a delete that matched no row is reported as one that removed something, and the
+    // sheets that call this do `if (!res.ok) throw` — so a refused cross-account delete, or a
+    // stale id, confirms itself to the user and the row returns on the next pull. 404 matches
+    // the Q-556 reference on activity-logs.
+    const deleted = await repo.deleteSupplement(id, session.user!.id!)
+    if (!deleted) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     return NextResponse.json({ ok: true })
   })
 }
