@@ -44,6 +44,28 @@ export function isCorrectedReading(r: BodyFatReading | null | undefined): boolea
   return r?.bodyFatIsCorrected === true
 }
 
+/**
+ * The most recent reading that has a body fat to show, and whether **that** reading was calibrated.
+ *
+ * The value and the flag have to come from the same row, which is the whole reason this is a helper
+ * rather than two expressions at the call site. Health's BMI card derived its number with
+ * `rows.map(displayBodyFat).find(v => v != null)` — correct for the number, but it throws away which
+ * row produced it, so nothing downstream could say whether the band on screen rested on a corrected
+ * figure. Two thirds of the owner's history is on instruments the calibration does not cover, so the
+ * answer genuinely varies row to row (BF-113).
+ *
+ * `rows` is newest-first. Rows with no body fat at all are skipped rather than ending the search.
+ */
+export function latestDisplayedBodyFat(
+  rows: readonly BodyFatReading[],
+): { value: number | null; corrected: boolean } {
+  for (const r of rows) {
+    const value = displayBodyFat(r)
+    if (value != null) return { value, corrected: isCorrectedReading(r) }
+  }
+  return { value: null, corrected: false }
+}
+
 /** How many of a window's readings carry a correction, and how many carry a body fat at all. The
  *  two numbers together are what lets a chart say "the last 4 of 7" rather than imply all or none. */
 export function correctedSpan(rows: readonly BodyFatReading[]): { corrected: number; total: number } {

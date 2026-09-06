@@ -15,7 +15,7 @@ import { getLocalStore } from "@/lib/local-store";
 import { pushMutations, pullDelta } from "@/lib/local-store/sync-engine";
 import { PullToSync } from "@/components/pull-to-sync";
 import type { BodyMetaRow, WeekToDate } from "@/app/api/body-metadata/route";
-import { displayBodyFat, type BodyFatCalibrationMeta } from "@/components/health/body-fat-display";
+import { displayBodyFat, latestDisplayedBodyFat, type BodyFatCalibrationMeta } from "@/components/health/body-fat-display";
 import { cachedFetch, readCacheSync, setCached, cachedFetchToday, readTodayCacheSync, isBodyMetadataFresh } from "@/lib/sqlite/cache";
 import { useUserTimezone } from '@/components/shell/user-timezone-provider';
 import { runWithConcurrency } from "@/lib/async/run-with-concurrency";
@@ -542,7 +542,11 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
   // The corrected value (LA-45). This feeds the BMI classification and the card's visibility gate,
   // both of which are derivations — the raw reading stays reachable through `metaToday.bodyFat`,
   // which is what `openLog` seeds from and must keep seeding from.
-  const latestBf = metaRecentReversed.map(displayBodyFat).find((v): v is number => v != null) ?? null;
+  // BF-113: the flag has to come from the row the value came from. `.map(displayBodyFat).find(...)`
+  // gave the right number and threw away which reading produced it, so the card could not say whether
+  // the band it draws rests on a calibrated figure — and two thirds of the history is on instruments
+  // the calibration does not cover, so it genuinely varies row to row.
+  const { value: latestBf, corrected: latestBfIsCorrected } = latestDisplayedBodyFat(metaRecentReversed);
 
   const todayWaterMl = (metaToday as (typeof metaToday & { waterMl?: number | null }) | null)?.waterMl ?? null;
   const bodyBaseline = progressSummary?.bodyBaseline ?? { weightKg: null, bodyFatPct: null };
@@ -559,7 +563,7 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
     metaLoading, metaToday, metaRecent, latestWeight, latestWeightIsStale, latestWeightDate: latestWeightMeta.date, latestBf, latestSteps,
     latestDistanceKm, targetWeightKg, targetBfPct, openInfo, toggleInfo, openLog,
     setMetricSheet, setWaterLogOpen, recentSleep, lastSleep, readiness,
-    todayWaterMl, waterGoalMl, activeEnergyKcalToday, bmi, bmiLabel, bmiUsesBf,
+    todayWaterMl, waterGoalMl, activeEnergyKcalToday, bmi, bmiLabel, bmiUsesBf, latestBfIsCorrected,
     weightTrendKgPerWeek, energyBalanceKcal, energyBalance, trainingLoad, sleepCorr, injuries,
     setInjuries, userId, recoveryMuscles, handleDayClick, weeklyStats,
     activeSessions, trainingGoal, muscleSets, strengthTrend, weekToDate, userGoals,

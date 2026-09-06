@@ -7936,3 +7936,15 @@ document exists to be: what shipped, what it cost, and the one thing left owed. 
 defects found while verifying, the live round trip, the surfaces not exercised — is in the journal
 entry, not here. Raised rather than absorbed because the previous session's paragraph is still the
 one above it; the compaction sweep is what removes both, not this PR.
+
+## 2026-09-06 — `projectOverview.md` → 9947 (BF-113's device gate, which was missing)
+
+Thirteen lines for a Known Issue that should have been in the original PR and was not. BF-113's entry
+was removed from the queue on shipping while its visual claim had never been rendered — the BMI card
+showed its "No data" branch against `pnpm dev`, so neither the caption nor the popover was on the
+page at all. The device-verification gate takes either a `Keep:` on the entry or a row here; the
+entry was deleted and no row was written, so the check was silently dropped. Recorded at this length
+because the *reason* the screen could not be reached is the reusable part: `bodyFatIsCorrected` is
+computed server-side from a DEXA calibration and cannot be produced by inserting a reading, which is
+why the next attempt should not start by seeding one. Recomputed from the merged base — the row is
+the same thirteen lines, on top of a document two other PRs had grown since this branch measured it.
