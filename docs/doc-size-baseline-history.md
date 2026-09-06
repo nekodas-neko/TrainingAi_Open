@@ -8307,3 +8307,28 @@ than a strikethrough because a wrong cause sends the next session hunting a defe
 exist — the same reason this file keeps refutations rather than deleting them.
 
 The backlog moves the other way in the same PR: LA-59's 22-line entry goes on shipping.
+
+## 2026-09-06 — `docs/implementation-backlog.md` 18,816 → 18,884 (+68), BF-129, BF-130 and a BF-126 retraction
+
+Two entries plus an amendment, all from the owner saying he has no commercial gym.
+
+**BF-129** — 22 `exercise_library` rows carry `equipment = []`, and both equipment filters read an
+empty list as an unconditional pass, so three `Machine %` rows clear a home-gym selection. The entry
+is longer than "fill the column in" because the same empty list has a second consequence the fix
+must not miss: `transitionSecForEquipment([])` returns the *barbell* default, so the calisthenics in
+that set are budgeted at four minutes each instead of one. That is the same symptom BF-128 measures
+arriving from a second cause, and an implementer who fixes only the filter leaves it in place. The
+entry also states what `empty` should mean afterwards, with a recommendation, because the data
+drifts back otherwise.
+
+**BF-130** — the library holds exactly two knee-flexion hamstring exercises, `Leg Curl` (machine) and
+`Nordic Hamstring Curl`. Everything else hamstring-main is a hinge. A home gym therefore has one
+option and it is the hardest movement in the category. Recorded because it is a *content* gap that
+no code check would ever surface, and because it collides with the owner's lumbar constraint: the
+alternatives the library does offer are all loaded hinges, the pattern he is limiting.
+
+**BF-126's ordering half is retracted in place**, not deleted. The entry claimed the generated
+`primary` sitting second was a defect; the owner's answer was *"that order is how I want it!"* —
+and `builder-review.tsx:229` already said so in a comment that was read past. The retraction is
+kept visible rather than quietly removed so the next session does not re-derive the same wrong
+finding from the same screenshot, and the title no longer advertises it. The role-count half stands.

@@ -774,7 +774,7 @@ new reward currency.
   wants the short form for its own overflow, which is a reason to land these together.
 - **Reversal cost:** low. The state-setter shape already exists in `swapExercise`.
 
-### [workouts] BF-126 — nothing constrains how many primaries or secondaries a generated session gets, and the main lift need not come first
+### [workouts] BF-126 — nothing constrains how many primaries or secondaries a generated session gets
 
 - **Lane:** A — `app/api/generate-program/route.ts`.
 - **Added:** 2026-09-06 · owner, from a generated 5-day program where Pull came back with two `secondary` compounds and one accessory while Push got one and two.
@@ -787,20 +787,88 @@ new reward currency.
   never falls back to the model's choice for primary/secondary. The observed Pull session therefore
   carries three heavy-ish exercises (one at 72.5–92.5%, two at 65–85%) against Push's two, at equal
   exercise counts. Session-to-session load becomes whatever that generation happened to roll.
-- **Second half: order.** Array order is saved as position (`components/workout-builder/builder-review.tsx:295`,
-  `:302`), and in the observed program the `primary` sat *second*, behind a secondary compound — so
-  the heaviest lift of the session is done after a pull-up. Nothing in the prompt says the primary
-  leads. Note `builder-review.tsx:229` deliberately allows a user reorder ahead of the main lift, so
-  the invariant belongs at generation, not on the editor.
+- **⚠ The ordering half of this entry is RETRACTED — do not build it (owner, 2026-09-06).** It
+  originally read that the `primary` sitting second was a defect, because the heaviest lift of the
+  session is then done after a pull-up. Put to the owner, the answer was *"that order is how I want
+  it!"* — a lighter compound before the main lift is a deliberate ramp, not a mis-generation. The
+  code already agreed and was not read carefully enough: `builder-review.tsx:229` says the reorder
+  exists *"so the user can e.g. warm up on a secondary/accessory before the main lift"*. **Sorting
+  the primary first would fight both the owner's preference and that comment.** What remains is the
+  role-count half above, which the owner did act on — he demoted the extra secondary by hand.
 - **Fix it where the style is already overridden** — a post-generation pass in the same block, not
   more prompt text. The model has been asked in prose and did not comply; a validator that demotes
-  extra primaries and sorts the primary first is deterministic and cheap. Per the AI defaults in
+  extra primaries is deterministic and cheap — **counts only, no sorting**. Per the AI defaults in
   CLAUDE.md, structure a model returns is checked in code rather than trusted.
 - **Confirm the shape against more than one sample before choosing the rule.** One program is the
   evidence here. Whether the cap is "exactly one primary, at most one secondary" or something looser
   should be read off several generations at the owner's real settings — a rule fitted to a single
   roll is how a legitimate 2-compound Pull day gets forbidden.
 - **Reversal cost:** low — one pure function over the parsed response, before it is returned.
+
+### [workouts] BF-129 — 22 library exercises have no equipment listed, and empty means "everyone owns it" 🔴 LIVE
+
+- **Lane:** A — `app/api/generate-program/route.ts` and the `exercise_library` rows; the swap filter in `components/workout-builder/builder-review.tsx` is the Lane B half of the same read.
+- **Added:** 2026-09-06 · found while answering the owner's *"I have no commercial gym so no machines"* — he was being offered machine work.
+- **Needs:** — nothing.
+- **Measured.** 22 non-merged rows in `exercise_library` carry `equipment = []`. Both equipment
+  filters read an empty list as an unconditional pass —
+  `route.ts:141` and `builder-review.tsx:198` are each
+  `ex.equipment.length === 0 || ex.equipment.some(e => equipmentSet.has(...))`. So an unlabelled row
+  clears **every** equipment selection anyone can make.
+- **Three of the 22 are machines**: `Machine Chest Press`, `Machine Shoulder Press`, `Machine Shrug`.
+  The owner trains at home with a barbell, dumbbells, a cable tower and a pull-up bar, and has logged
+  no machine work in 120 days — the generator can hand him those three regardless, and the swap sheet
+  can offer them as alternatives.
+- **The rest are mostly bodyweight**, which is the second failure and it compounds **BF-128**:
+  `transitionSecForEquipment([])` returns `TRANSITION_SEC_DEFAULT`, which *is*
+  `TRANSITION_SEC_BARBELL = 240 s` (`duration-model.ts:141`, commented *"unknown equipment: assume
+  worst case"*). So `Diamond Push-Up`, `Pike Push-Up`, `Weighted Dip`, `Burpee`, `Inverted Row`,
+  `Side Plank`, `Pallof Press`, `V-Up`, `Mountain Climbers` and the rest are each budgeted as a
+  four-minute barbell lift instead of a one-minute bodyweight one. Costing bodyweight work at 4×
+  makes the session planner fit fewer exercises — the same symptom BF-128 measures, from a second
+  cause.
+- **Both halves are one fix: fill the column in.** The worst-case default is defensible for an
+  unknown; what is not defensible is 22 knowns being unknown. Set the 22 rows from their names and
+  movements — the three `Machine %` rows to `['machine']`, the calisthenics to `['bodyweight']`,
+  `Decline Dumbbell Press` to `['dumbbell']`, `Barbell Box Squat` and `Rack Pull` to `['barbell']`,
+  `Cable Crunch Abs` to `['cable']`.
+- **Then decide what empty should mean**, because the data will drift again. Two options and they
+  are not equal: treating empty as *"needs nothing"* (i.e. bodyweight) makes the filter permissive
+  in the safe direction and the time estimate optimistic; treating it as *"unknown, exclude"* is
+  safe on both but silently drops any future unlabelled row out of every generation. Recommend
+  bodyweight for the **time** default and unknown-excludes for the **filter**, since a wrong minute
+  is cheaper than an exercise the lifter cannot perform. Whichever is chosen, a check that fails on
+  a new empty-equipment row is what actually holds it.
+- **`Dumbbell Lunges` is a duplicate of `Dumbbell Lunge`** and surfaced in the same sweep — it wants
+  a `merged_into`, not an equipment value.
+- **Reversal cost:** low. Data plus one predicate.
+
+### [workouts] BF-130 — the library has no home-gym knee-flexion hamstring exercise, so the gap is unfillable from the app
+
+- **Lane:** A — `exercise_library` content.
+- **Added:** 2026-09-06 · owner, told the fix for his one uncovered muscle was a Nordic curl: *"Not sure I can do this at home - can you look up other excercises we can replace this with"*.
+- **Needs:** BF-129
+- **The whole library holds two knee-flexion hamstring movements**: `Leg Curl` (`machine`) and
+  `Nordic Hamstring Curl` (`bodyweight`). Every other hamstring-main exercise — Barbell/Dumbbell
+  RDL, Deadlift, Sumo, Trap Bar, Good Morning, Jefferson Curl, Single Leg RDL — is a hip hinge.
+- **So a home gym without a leg-curl machine has exactly one option, and it is the hardest movement
+  in the category.** For this owner both are out: no machine, and the Nordic needs an ankle anchor.
+  His program (`Bankai`) therefore trains hamstrings through hip extension only — Hip Thrust ×2 plus
+  an SL RDL — and nothing in the app can close it.
+- **It also collides with his lumbar constraint**, which is what makes this worth an entry rather
+  than a shrug: every alternative the library *does* offer is a loaded hinge, the one pattern he is
+  trying to limit. The category with no spinal loading is exactly the category with no rows.
+- **Add the home-gym knee-flexion variants**: a cable leg curl (ankle strap — he already has the
+  tower), a slider/towel leg curl and a stability-ball leg curl, all `bodyweight` or `cable`. Band
+  variants are optional; their resistance curve peaks where the hamstring is weakest.
+- **He can already self-serve this** — `AddExerciseSheet` posts to `/api/exercises` and is reachable
+  from the builder's "+ Add" and the Stats library search — so this entry is about the *default*
+  library being complete, not about unblocking him.
+- **Worth a wider pass than hamstrings while someone is in there.** This gap was found by asking one
+  question about one muscle; nothing says hamstrings are the only category whose only options need
+  equipment a home gym lacks. Check each muscle for at least one `bodyweight`-or-`dumbbell` entry per
+  movement pattern.
+- **Reversal cost:** none — added rows.
 
 ### [platform] LB-56 — E2E costs 26 minutes a UI PR and currently gates nothing; decide which of those to change
 
