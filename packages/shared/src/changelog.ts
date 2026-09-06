@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.10",
+    date: "2026-09-06",
+    changes: [
+      "Renaming an activity type that no longer exists used to fail with a blank server error. It now says the activity type was not found.",
+    ],
+  },
+  {
     version: "1.436.9",
     date: "2026-09-05",
     changes: [

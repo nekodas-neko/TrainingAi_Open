@@ -7908,3 +7908,8 @@ A **downward** move by this branch — two completed entries left the queue and 
 way to get it right when both sides moved the same document. Recorded at all because the ratchet
 only enforces a ceiling: a baseline left above the real count silently hands the next entry free
 lines it did not have to justify.
+
+## 2026-09-06 — `docs/implementation-backlog.md` → 18344 (RV-46 shipped and removed)
+
+Downward again: one completed entry left the queue and nothing replaced it. Lowered so the ceiling
+keeps tracking the real count rather than banking the difference for the next entry.

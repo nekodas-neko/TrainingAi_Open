@@ -971,32 +971,6 @@ nothing confirms itself to the user, and the row returns on the next pull.
 fallback. On device, supplements and injuries write locally and return before the fetch, so for
 those two surfaces this is the fallback path, not the primary.
 
-### [platform] RV-46 — the Q-463 route mapper reaches twelve of the thirteen routes that need it
-
-- **Lane:** A — `app/api/admin/activity-types/route.ts`.
-- **Added:** 2026-09-05, Review sweep 47 —
-  [write-up](reviews/2026-09-05-delete-reports-success-for-nothing.md).
-
-Eighteen repository methods throw a typed `NotFoundError`/`UserFacingError`; thirteen mutating
-routes call one; twelve map it through `refusalResponse`/`routeErrorResponse`. The thirteenth wraps
-only `requireAdmin` in its `try`, leaving `repo.updateActivityType(...)` uncaught on the handler's
-last line:
-
-```
-PATCH {"id":"walk",                  "sortOrder":1}  ->  200  {"activityType":{…}}
-PATCH {"id":"no-such-activity-type", "sortOrder":1}  ->  500  (empty body)
-```
-
-Both symptoms `route-errors.ts` names in its own header: the wrong status, and the **empty body**
-that makes a client's `res.json()` throw on top of the failure. It also writes the row that helper
-exists to prevent — read back straight after the probe:
-`PATCH /api/admin/activity-types | server | Activity type not found`, a correctly-refused request
-recorded as a server fault.
-
-**Low severity, and filed at that level** — admin-only, one caller
-(`activity-type-manager.tsx:146`). It is worth an entry because it is the last unconverted site of a
-class the repo already decided how to fix, and the fix is one line.
-
 ### [workouts] RV-43 — hitting the prescription exactly is scored as progress, and the PR is permanent
 
 - **Lane:** A — `packages/shared/src/1rm.ts` and/or `app/api/next-session/prescription/route.ts`.
