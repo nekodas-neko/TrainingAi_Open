@@ -36,6 +36,31 @@ async function withDb<T>(fn: (db: Client) => Promise<T>): Promise<T> {
   try { return await fn(db) } finally { await db.end() }
 }
 
+/** BF-120 / OR-101: one LOOSE row, with no saved meal and no group, so the section holds exactly
+ *  one entry of kind 'log'. That is the shape whose macros went missing. */
+async function seedLooseOnly(db: Client) {
+  const { rows } = await db.query<{ id: string }>('SELECT id FROM users WHERE email = $1', [SEED_EMAIL])
+  const userId = rows[0]?.id
+  expect(userId, `${SEED_EMAIL} is not seeded — run pnpm db:local`).toBeTruthy()
+  await cleanup(db)
+  const f = FOODS[0]
+  await db.query(
+    `INSERT INTO food_items (id, user_id, name, serving_size_g, calories, protein_g, carbs_g, fat_g, source)
+     VALUES ($1, $2, $3, 100, 150, 8, 20, 4, 'manual')`,
+    [f.id, userId, f.name],
+  )
+  // The LAST meal type, so this row does not land in the same section as anything the dev seed
+  // already holds — the defect is about a section with exactly one entry, so a neighbour hides it.
+  await db.query(
+    `INSERT INTO food_logs (user_id, date, meal_type_id, food_item_id, quantity_multiplier, logged_at)
+     SELECT $1, to_char(now() AT TIME ZONE u.timezone, 'YYYY-MM-DD'),
+            (SELECT id FROM meal_types WHERE user_id = $1 ORDER BY sort_order DESC LIMIT 1),
+            $2, 1.0, now()
+       FROM users u WHERE u.id = $1`,
+    [userId, f.id],
+  )
+}
+
 async function cleanup(db: Client) {
   await db.query('DELETE FROM food_logs WHERE food_item_id = ANY($1)', [FOODS.map(f => f.id)])
   await db.query('DELETE FROM saved_meal_items WHERE saved_meal_id = $1', [MEAL_ID])
@@ -156,4 +181,34 @@ test('rows logged before the columns existed stay loose, which is correct rather
   await expect(page.getByText(FOODS[0].name, { exact: true })).toBeVisible({ timeout: 30_000 })
   for (const f of FOODS) await expect(page.getByText(f.name, { exact: true })).toBeVisible()
   await expect(groupRow(page)).toHaveCount(0)
+})
+
+/**
+ * BF-120 / OR-101 — a section holding ONE loose food shows its macro breakdown.
+ *
+ * The owner: *"1 meal doesnt show the calorie total; but 2 meals do"*, and the screenshot showed no
+ * protein, carbs or fat anywhere for that section while the one above it had all three. The gate was
+ * a count (`entries.length > 1`) and the question is a kind: a group row states its own macros, a
+ * loose row has not since Q-406 moved the per-item P/C/F into the detail sheet.
+ *
+ * BF-98 stays fixed and is asserted by the first test in this file, which is the case that must NOT
+ * regain a second macro row.
+ */
+test('a section with one loose food still breaks it into protein, carbs and fat', async ({ page }) => {
+  await withDb(seedLooseOnly)
+  await openDiary(page)
+
+  const row = page.getByText(FOODS[0].name, { exact: true })
+  await expect(row).toBeVisible({ timeout: 30_000 })
+
+  // Counted rather than scoped to an ancestor, and the count is the stronger assertion: `toHaveCount(1)`
+  // fails on 0 (this defect) AND on 2 (BF-98's duplication, which must not come back). The fixture
+  // leaves every other section empty, so these figures can only come from this one.
+  await expect(page.getByText('P 8g', { exact: true })).toHaveCount(1)
+  await expect(page.getByText('C 20g', { exact: true })).toHaveCount(1)
+  await expect(page.getByText('F 4g', { exact: true })).toHaveCount(1)
+
+  // And NOT the calorie total a second time: the row prints 150kcal and the section header prints
+  // 150, so a footer repeating it is the redundancy BF-98 set out to remove.
+  await expect(page.getByText('150 kcal', { exact: true })).toHaveCount(0)
 })

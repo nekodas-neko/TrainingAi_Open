@@ -8133,3 +8133,16 @@ instrument that can read a failure. The smaller true claim — build a fresh dat
 survived — is kept rather than discarded with the wrong one.
 
 The rest is this branch catching up to a `main` that moved six times while it was open.
+
+## 2026-09-06 — `projectOverview.md` → 10011 (BF-120's status paragraph and device row)
+
+Twenty-three lines across two sections, and the split is deliberate. The **Current Status** half is
+mostly the correction: two reports described one screen and disagreed about the cause, and the one
+that holds is checkable against BF-98's own case table rather than a matter of judgement — so the
+paragraph says which reading survived and why, because the losing one is the intuitive one and will
+be re-derived otherwise. The **Known-Issues** half exists because the e2e assertion at 412 dp is
+close to the device check and is not it; both reports came from the S25 and both are about how the
+card looks.
+
+The backlog moves the other way in the same PR — BF-120's 37-line entry is removed on shipping, and
+RV-49 gains eight lines of re-laning rather than being left to be picked up wrongly a second time.

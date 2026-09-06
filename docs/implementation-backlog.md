@@ -723,7 +723,14 @@ exactly one entry, and both times the fix was a docs sweep unrelated to the chan
 
 ### [workouts][app-shell] RV-49 — the Home deload confirm evicts neither key the visible screen reads
 
-- **Lane:** B — `app/session-select/session-select-content.tsx:887-892`, `lib/cache-groups.ts:369-384`.
+- **Lane: A** — was filed B, and re-laned 2026-09-06 by Lane B on picking it up. **The whole fix is
+  in `lib/cache-groups.ts`**, which CLAUDE.md names in Lane A's path list *and* which the lane rule
+  independently sends to A: it is reached from `app/api/coach/apply/route.ts` and
+  `app/api/coach/apply/[id]/undo/route.ts`. The call site the entry also names
+  (`session-select-content.tsx:887-892`) needs **no change** — it already calls
+  `invalidatePrescriptionChanged()` with no id, and the fix is to make that call evict what it
+  claims to. So there is no Lane B half to ship first, and the e2e repaint assertion has to ride
+  with the group change or it is a test with nothing to assert against.
 - **Added:** 2026-09-06, Review sweep 49 —
   [write-up](reviews/2026-09-06-deload-confirm-eviction-gap.md). Owner-reported symptom.
 
@@ -1882,43 +1889,6 @@ takes one portion — 246 kcal of the 983 below."*
   per-portion kcal matches the `246 / portion` shown today; a 1-portion recipe shows one set of
   figures and no redundant second line; the per-portion macros equal what the detail sheet shows for
   the same saved meal, and what a logged portion writes into the diary.
-
-
-### [nutrition] BF-120 — a meal section holding one item lost its macro row, which is BF-98's fix landing one notch too wide
-
-- **Lane:** B — `components/nutrition/meal-card.tsx:150`, one condition.
-- **Added:** 2026-09-05 · owner: *"1 meal doesnt show the calorie total; but 2 meals do."* Screenshot:
-  **Pre Workout** with two grouped meals showing `P 37g · C 26g · F 17g` and `413 kcal`; **Post
-  Workout** with a single `LOADED MAC & CHEESE` showing neither.
-
-**This is a consequence of BF-98, not an unrelated regression.** That entry fixed a section holding
-one grouped meal drawing its macros **twice**, and the fix moved the gate from `logs.length > 1` to
-`entries.length > 1` — counting groups rather than flat rows. Correct for the duplication; it also
-means a section with exactly one entry now renders no footer at all.
-
-**The calorie half of the report is arguably fine and the macro half is not.** With one item the
-section's calorie total *is* that item's number, and the section header already prints it (`672`
-beside POST WORKOUT), so a footer repeating it is the redundancy BF-98 set out to remove. **But the
-`P / C / F` row goes with it**, and that is not redundant — nothing else on the screen breaks a single
-logged item into protein, carbs and fat. So the owner reads 672 kcal with no idea what it is made of,
-while the two-item section above tells him.
-
-- **Recommendation: render the macro row whenever a section has any entry, and keep the calorie total
-  gated at two or more.** That satisfies both reports at once — no duplicated number, no missing
-  breakdown — and is a smaller change than it sounds, since `totals` is already computed for every
-  section regardless of the gate.
-- **⚠ Check it against BF-98's own case before shipping.** The duplication BF-98 fixed was a
-  *grouped* meal drawing its macros once as a group and again as a section footer. A single grouped
-  meal must still not print two macro rows; a single **loose** item must print one. Those are
-  different shapes behind the same count of 1, and the fix has to tell them apart — which is likely
-  why the threshold was set where it was.
-- **⚠ BF-98 also carries an unresolved note worth reading first:** its duplication *"could NOT be
-  reproduced in e2e"*, and `diary-nested-meal.spec.ts` covers this exact fixture. Whatever changes
-  here should extend that spec to the one-loose-item case, which is the shape now visibly wrong and
-  is reproducible.
-- **Verification (device):** a section with one loose item shows its macro breakdown and no duplicated
-  calorie line; a section with one grouped meal shows exactly one macro row; a section with two or
-  more shows the breakdown and the total, as it does today.
 
 
 ### [app-shell][platform] BF-110 — the blank resume survives a scroll, which means the renderer never died
