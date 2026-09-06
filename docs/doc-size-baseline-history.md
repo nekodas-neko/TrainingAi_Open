@@ -8261,3 +8261,31 @@ Both up. PS-34's entry left the queue and LA-62 replaced it — longer, because 
 accessibility findings it carries need their file counts written down to be actionable, and because
 it has to say why the scan must not be narrowed again. `projectOverview.md` gains the matching
 Known-Issues row.
+
+## 2026-09-06 — `docs/implementation-backlog.md` 18,663 → 18,838 (+175), BF-123…BF-128
+
+Six entries from one owner pass over a generated program and the screens around it. Two are UI
+(BF-123 the tap-target floor, BF-124 the role picker), two are the role model (BF-125 no editor on
+the review screen, BF-126 no distribution invariant at generation), and two came out of the owner's
+two questions about the prescription itself (BF-127 the pull-up load, BF-128 the exercise count).
+
+Roughly 29 lines each, and the length is measurement in four of the six:
+
+- **BF-127** states the arithmetic that produced the wrong number — `estimated_1rm = 118.25` for a
+  `bodyweight` exercise, computed against `BW_REF = 100` while the owner weighs 70.65 kg, ×0.7 →
+  82.5 rendered as kg. Without those figures the entry reads as a formatting nit rather than an
+  instruction to load a weight that does not correspond to anything.
+- **BF-128** carries the full budget calculation (51 working minutes, an 856/450 s blend, 694 s
+  average → 4) *and* the 90-day history it disagrees with (62 sessions, median 5 exercises in a
+  median 56.2 minutes). Either half alone is unconvincing: the arithmetic without the history is a
+  theory about a constant, and the history without the arithmetic gives the implementer nothing to
+  change. Together they name the term to remove and the evidence for removing it.
+- **BF-123** and **BF-127** both spend lines on the fact that the repo had already diagnosed their
+  bug class once — `switch.tsx:19` for the 48 px floor, `1rm.ts:218` for the kg/RM display basis —
+  and that the fix exists and was never swept to the siblings. That is the actionable part: the
+  entry is a sweep against a known pattern, not an investigation.
+
+Two things were deliberately kept out. BF-126 does not specify the invariant (one primary? at most
+one secondary?) because one generated program is the whole evidence base, and it says so — a rule
+fitted to a single roll would forbid a legitimate two-compound pull day. And no plan doc was written
+for any of the six; each fix is small enough that a plan would restate the entry.
