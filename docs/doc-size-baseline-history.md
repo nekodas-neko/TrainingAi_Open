@@ -8133,3 +8133,23 @@ instrument that can read a failure. The smaller true claim — build a fresh dat
 survived — is kept rather than discarded with the wrong one.
 
 The rest is this branch catching up to a `main` that moved six times while it was open.
+
+## 2026-09-06 — `docs/implementation-backlog.md` (OR-102, the reta tracker)
+
+`feat/or-102-reta-tracker`. One entry, and it is long because the measurement in it is the finding.
+
+The owner asked for an AI dose recommendation driven by his weight trend — hold while losing
+steadily, increase on a plateau. Clinically standard logic. **Measured against production before
+agreeing to it:** 87 weigh-ins over 118 days carry a residual SD of **1.203 kg** about the trend, so
+a 14-day slope resolves only to **±1.30 kg/wk** against a target band **0.35 kg/wk wide**. Six weeks
+is the first window that resolves the band at all.
+
+So the feature as described would emit confident weekly advice that flips on water weight. The entry
+records the numbers, the asymmetry that rescues most of it (a too-fast rate is a large effect and
+detectable in 2–3 weeks, where a plateau is not), and the line the app must not cross — report his
+data against his own band, never name a dose.
+
+Also captured: reconstitution must be stamped on the **log**, not just the definition, because the
+same milligram dose becomes a different number of syringe units when the next vial is mixed
+differently. Same rule BF-3 already applies to dose text, one layer up, and the only half of this
+entry that cannot be repaired afterwards.
