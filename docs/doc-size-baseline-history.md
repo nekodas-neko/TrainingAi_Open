@@ -6769,7 +6769,7 @@ The lines are the evidence, not the argument: the four file:line references that
 already arrives, and the note that the outbox push confirms `synced` without applying the server row
 — which is why the number lands on the next pull rather than at first paint. Lane B needs those to
 avoid re-deriving them; the reasoning is in
-[`docs/overview/entries/2026-09-02-bf-107-relane.md`](overview/entries/2026-09-02-bf-107-relane.md),
+[`docs/overview/history-2026-09-06.md`](overview/history-2026-09-06.md) (folded 2026-09-06),
 and this block was cut by a third after the check first failed.
 
 A mis-laned entry costs more than its lines: it is picked up, traced and put back by every session
@@ -7929,7 +7929,15 @@ source says outright. That matters beyond the label — it turns the 218 kcal ga
 measurements" into "a formula against a measurement", which is the sentence a reader needs, and it
 made the entry's own proposed wording false.
 
-## 2026-09-06 — `projectOverview.md` → 9931 (BF-113's device gate, which was missing)
+## 2026-09-06 — `projectOverview.md` → 9934 (BF-112's Current Status paragraph)
+
+Sixteen lines for the stage-2 dose-entry paragraph in **Current Status**, which is the section this
+document exists to be: what shipped, what it cost, and the one thing left owed. The detail — the two
+defects found while verifying, the live round trip, the surfaces not exercised — is in the journal
+entry, not here. Raised rather than absorbed because the previous session's paragraph is still the
+one above it; the compaction sweep is what removes both, not this PR.
+
+## 2026-09-06 — `projectOverview.md` → 9947 (BF-113's device gate, which was missing)
 
 Thirteen lines for a Known Issue that should have been in the original PR and was not. BF-113's entry
 was removed from the queue on shipping while its visual claim had never been rendered — the BMI card
@@ -7938,4 +7946,5 @@ page at all. The device-verification gate takes either a `Keep:` on the entry or
 entry was deleted and no row was written, so the check was silently dropped. Recorded at this length
 because the *reason* the screen could not be reached is the reusable part: `bodyFatIsCorrected` is
 computed server-side from a DEXA calibration and cannot be produced by inserting a reading, which is
-why the next attempt should not start by seeding one.
+why the next attempt should not start by seeding one. Recomputed from the merged base — the row is
+the same thirteen lines, on top of a document two other PRs had grown since this branch measured it.

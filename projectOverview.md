@@ -26,8 +26,24 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.436.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-09-03.
+**Version:** v1.436.13 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-09-06.
+
+**A dose can be typed in at last (BF-112, stage 2 of BF-69).** The storage shipped 2026-09-01 and
+nothing could write to it: production held two supplements with `default_amount`, `unit`,
+`dose_prompt` and `started_on` all empty, and one log of any kind, from June — with the owner due to
+start dosing on **2026-09-06**. The manage sheet now carries an amount, a unit, the started/stopped
+window and an *ask me each time* switch; a supplement with that switch asks for the number when it is
+ticked, pre-filled from the definition. The row's second line reads **what today's log recorded**,
+not what the definition currently says, so changing the dose later does not rewrite a past day —
+verified live by patching a definition from 2.5 mg to 10 mg while its earlier log kept reading 5 mg.
+**Two defects were found while verifying and both are fixed here:** the nutrition page's local-first
+branch dropped every new field, so the prompt would never have fired **on the device** while working
+in the browser; and the tick left the previous log's number on screen until the next pull. **Not
+device-verified** — which is precisely the surface the first defect was hiding on. Left behind as
+**LB-57**: the day's exposure is now derived once per lane, and the single home is `packages/shared`,
+which Lane B may not write
+([journal](docs/overview/entries/2026-09-06-bf-112-dose-entry.md)).
 
 **The HR Recovery Profile now says how much of it is signal (Q-516).** `aggregateHrRecoveryProfile`
 has returned `informativeShare` since the re-banding and **nothing rendered it** — the state the
@@ -9889,7 +9905,7 @@ append-only session journal and the batched archives live under `docs/`:
 | `docs/overview/entries/` | **Recent journal (uncompacted)** — one file per PR/session (`YYYY-MM-DD-<slug>.md`); read these + the newest history file for "what happened lately". Folded into the batched history by the compaction sweep — see the README there. **Corrected 2026-07-30:** this line said "near-empty (compacted 2026-07-20)" but the directory holds ~179 files from 07-20→07-29 — the compaction sweep is overdue; a future session should run it. |
 | [`docs/agents/README.md`](docs/agents/README.md) | **The standing agents** — the four roles, their authority, the two-lane file-ownership contract, the Q-number bands, and the handoff protocol. Cold-start prompts in `docs/agents/prompts/`, live batons in `docs/agents/state/` |
 | `docs/overview/status-archive.md` | The 157 dated status notes that had accumulated in this file's Current Status section, archived 2026-08-17. Superseded by the journal; do not add to it |
-| [`docs/overview/history-2026-08-25.md`](docs/overview/history-2026-08-25.md) … `history-2026-07-17.md` | **Completed journal (batched)** — eleven files covering 2026-07-17 → 2026-08-24, folded from 498 + 41 loose entries by the 2026-08-17 and 2026-08-18 compaction sweeps, oldest-first within each. Every entry keeps a `<!-- from: … -->` marker naming the PR file it came from. `history-2026-08-18.md` was started because `history-2026-08-15.md` had passed the ~250 KB rule at 300 KB, and `history-2026-08-24.md` because `history-2026-08-18.md` had, at 326 KB. **The 2026-08-24 sweep folded 57 of 153 loose entries**, and **the 2026-08-25 sweep (LA-25) folded 25 of 191, taking unlinked 59 → 34** — the rest are cited by path from `projectOverview.md`, the domain indexes or an agent baton, and folding a linked entry breaks those citations. `history-2026-08-25.md` was started because `history-2026-08-24.md` was at 223 KB and 25 more entries would have passed the ~250 KB rule |
+| [`docs/overview/history-2026-09-06.md`](docs/overview/history-2026-09-06.md) … `history-2026-07-17.md` | **Completed journal (batched)** — fifteen files covering 2026-07-17 → 2026-09-06, folded from 498 + 41 loose entries by the 2026-08-17 and 2026-08-18 compaction sweeps, oldest-first within each. Every entry keeps a `<!-- from: … -->` marker naming the PR file it came from. `history-2026-08-18.md` was started because `history-2026-08-15.md` had passed the ~250 KB rule at 300 KB, and `history-2026-08-24.md` because `history-2026-08-18.md` had, at 326 KB. **The 2026-08-24 sweep folded 57 of 153 loose entries**, and **the 2026-08-25 sweep (LA-25) folded 25 of 191, taking unlinked 59 → 34** — the rest are cited by path from `projectOverview.md`, the domain indexes or an agent baton, and folding a linked entry breaks those citations. `history-2026-08-25.md` was started because `history-2026-08-24.md` was at 223 KB and 25 more entries would have passed the ~250 KB rule. **The 2026-09-06 sweep folded 46 of 320**, taking unlinked to **0** and the directory to **274** — it was run because the directory sat at exactly its 320 total ceiling, and that branch of the check has no BF-36 attribution, so it fails whichever PR is open when the count crosses rather than the one that grew it. `history-2026-09-06.md` was started rather than appending 172 KB to `history-2026-09-01.md`'s 105 KB |
 | `docs/overview/history-2026-07-20.md` | **Completed journal (batched)** — the 2026-07-17 → 2026-07-20 loose entries, compacted 2026-07-20, newest at top |
 | `docs/overview/history-2026-07-16.md` | **Completed journal (batched)** — sessions 2026-07-16 → 2026-07-17, newest at top |
 | `docs/overview/history-current.md` | Sessions ~287 → 2026-07-16 (closed batch) |

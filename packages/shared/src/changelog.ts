@@ -13,6 +13,15 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
+    version: "1.436.13",
+    date: "2026-09-06",
+    changes: [
+      "Supplements can now record an actual amount. A supplement carries an amount and a unit, and the row shows what today's log recorded rather than what the definition currently says \u2014 so changing the dose later does not rewrite what a past day shows.",
+      "A supplement whose dose changes can be set to ask for the number each time it is ticked, for anything on a titration schedule.",
+      "Supplements can carry a started and a stopped date. Days outside that window count as not taking it, rather than as a missed dose.",
+    ],
+  },
+  {
     version: "1.436.12",
     date: "2026-09-06",
     changes: [
