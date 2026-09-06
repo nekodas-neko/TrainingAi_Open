@@ -7928,3 +7928,14 @@ BMR as the scale's bioimpedance estimate; it is Mifflin-St Jeor computed in our 
 source says outright. That matters beyond the label — it turns the 218 kcal gap from "two different
 measurements" into "a formula against a measurement", which is the sentence a reader needs, and it
 made the entry's own proposed wording false.
+
+## 2026-09-06 — `projectOverview.md` → 9931 (BF-113's device gate, which was missing)
+
+Thirteen lines for a Known Issue that should have been in the original PR and was not. BF-113's entry
+was removed from the queue on shipping while its visual claim had never been rendered — the BMI card
+showed its "No data" branch against `pnpm dev`, so neither the caption nor the popover was on the
+page at all. The device-verification gate takes either a `Keep:` on the entry or a row here; the
+entry was deleted and no row was written, so the check was silently dropped. Recorded at this length
+because the *reason* the screen could not be reached is the reusable part: `bodyFatIsCorrected` is
+computed server-side from a DEXA calibration and cannot be produced by inserting a reading, which is
+why the next attempt should not start by seeding one.

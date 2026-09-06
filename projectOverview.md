@@ -1627,6 +1627,19 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [body] The DEXA-calibration label on the BMI card has never been rendered (BF-113, 2026-09-06)
+
+The caption now reads `via body fat % (DEXA-calibrated)` on a corrected reading, and **neither branch
+of it has been seen on a screen.** Against `pnpm dev` the BMI card rendered its *"No data"* state —
+`metaRecent` does not reach the client for the seeded user, so `bmi` is null and neither the caption
+nor the popover is on the page; seeding a body-fat row did not change it, and the corrected case
+needs more still, because `bodyFatIsCorrected` is computed server-side from a DEXA calibration and
+cannot be produced by inserting a reading. The flag is proven by unit test and the wiring by source
+guard; the rendering by neither. **On the S25: a corrected reading must show the calibration under an
+unchanged band, and an uncorrected one must not claim it.** The same gap applies to BF-114's BMR
+provenance labels, on the same card, for the same reason.
+[journal](docs/overview/entries/2026-09-04-bf-113-bmi-dexa-label.md).
+
 ### [platform] 🔴 REOPENED — deactivation still does not deactivate: the claim LA-58's gate reads never refreshes (PS-24, 2026-09-06)
 
 The app checkpoint confirmed live: `is_active=false` for a signed-in account and its existing cookie
