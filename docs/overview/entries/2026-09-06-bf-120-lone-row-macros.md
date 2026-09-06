@@ -90,9 +90,10 @@ in `projectOverview.md`.
 
 ## Left behind
 
-**#875 is now superseded.** It is a docs-only PR from another session that *files* OR-101; the defect
-it files is fixed here, and OR-101 never reached `main`. It should be closed rather than merged —
-left for its author rather than closed from here.
+**#875 merged while this branch was open**, so OR-101 reached the queue as a live entry and is
+removed here on shipping — which is tidier than the alternative this entry first proposed (closing
+#875 as superseded). The queue now records that the defect was filed twice, from two device checks,
+and fixed once.
 
 **RV-49 was re-laned to A** on picking it up. The entry says Lane B, but the whole fix is in
 `lib/cache-groups.ts`, which CLAUDE.md's path list names as Lane A's *and* which the lane rule
