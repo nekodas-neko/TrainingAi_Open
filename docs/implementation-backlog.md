@@ -872,6 +872,32 @@ the home screen depends on (`calendar-data`, `training-load`, `streak-data` appe
 strings in tests) and the external-ingest routes. Pick the dozen that would hurt most and give each
 one route-level test; keep the scan as the ratchet.
 
+### [platform] LA-60 — the sandbox runs Node 22 and every CI job pins Node 20
+
+- **Lane:** A — `.github/workflows/ci.yml`, `package.json` (`engines`), `.claude/hooks/`.
+- **Added:** 2026-09-06, found when RV-46's PR went red on `globSync is not a function`.
+
+The three CI jobs set `node-version: '20'`; the sandbox this repo is developed in runs **22.22.2**.
+So a local `pnpm test` can pass on an API the job does not have. Measured once, live:
+`fs.globSync` is Node 22+, a new test used it, the full local suite was green and the Tests job
+threw `TypeError: globSync is not a function`.
+
+**Nothing catches this.** `tsc` is happy — `@types/node` describes the installed runtime, not the
+one CI pins — and lint has no opinion about it. The failure surfaces only after a push, one CI cycle
+at a time, and only for the subset of Node-22 APIs a change happens to use.
+
+**Two candidate fixes, and the choice is the entry.**
+1. **Pin the sandbox to Node 20** so local and CI agree. Removes the class rather than detecting it,
+   and is the only option that also covers behaviour differences rather than missing functions. Cost
+   is whatever in the sandbox wants 22.
+2. **Raise CI to 22 and add `engines.node`.** Also removes the class, and forward rather than back —
+   but Railway's build image decides what production runs, so this cannot be done from the workflow
+   file alone without checking that first.
+
+Not a detection rule: a hardcoded list of Node-22 APIs goes stale the moment Node 23 ships, and the
+thing that actually needs to be true is that the two runtimes match.
+
+
 ### [app-shell][nutrition] LA-59 — the meal-type reorder ignores the status it is now given
 
 - **Lane:** B — `components/nutrition/meal-type-manager.tsx`.
@@ -970,32 +996,6 @@ nothing confirms itself to the user, and the row returns on the next pull.
 **Not established:** measured on the web build, where the offline-first clients take their API
 fallback. On device, supplements and injuries write locally and return before the fetch, so for
 those two surfaces this is the fallback path, not the primary.
-
-### [platform] RV-46 — the Q-463 route mapper reaches twelve of the thirteen routes that need it
-
-- **Lane:** A — `app/api/admin/activity-types/route.ts`.
-- **Added:** 2026-09-05, Review sweep 47 —
-  [write-up](reviews/2026-09-05-delete-reports-success-for-nothing.md).
-
-Eighteen repository methods throw a typed `NotFoundError`/`UserFacingError`; thirteen mutating
-routes call one; twelve map it through `refusalResponse`/`routeErrorResponse`. The thirteenth wraps
-only `requireAdmin` in its `try`, leaving `repo.updateActivityType(...)` uncaught on the handler's
-last line:
-
-```
-PATCH {"id":"walk",                  "sortOrder":1}  ->  200  {"activityType":{…}}
-PATCH {"id":"no-such-activity-type", "sortOrder":1}  ->  500  (empty body)
-```
-
-Both symptoms `route-errors.ts` names in its own header: the wrong status, and the **empty body**
-that makes a client's `res.json()` throw on top of the failure. It also writes the row that helper
-exists to prevent — read back straight after the probe:
-`PATCH /api/admin/activity-types | server | Activity type not found`, a correctly-refused request
-recorded as a server fault.
-
-**Low severity, and filed at that level** — admin-only, one caller
-(`activity-type-manager.tsx:146`). It is worth an entry because it is the last unconverted site of a
-class the repo already decided how to fix, and the fix is one line.
 
 ### [workouts] RV-43 — hitting the prescription exactly is scored as progress, and the PR is permanent
 

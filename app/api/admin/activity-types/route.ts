@@ -4,6 +4,7 @@ import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { getRepository } from '@/lib/data'
 import { z } from 'zod'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { routeErrorResponse } from '@/lib/api/route-errors'
 
 // One activity type.
 const MAX_BODY_BYTES = 8 * 1024
@@ -80,8 +81,16 @@ export async function PATCH(req: NextRequest) {
   if (!body.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
 
   const repo = await getRepository()
-  const activityType = await repo.updateActivityType(id, body.data)
-  return NextResponse.json({ activityType })
+  // RV-46: the handler's only `try` wrapped `requireAdmin`, so `updateActivityType`'s typed
+  // `NotFoundError` escaped uncaught — an unknown id answered 500 with an empty body and filed the
+  // refusal into `error_events` as a server fault. `routeErrorResponse` re-throws anything it does
+  // not recognise, so a real bug still reaches `onRequestError`.
+  try {
+    const activityType = await repo.updateActivityType(id, body.data)
+    return NextResponse.json({ activityType })
+  } catch (err) {
+    return routeErrorResponse(err)
+  }
 }
 
 export async function DELETE(req: NextRequest) {
