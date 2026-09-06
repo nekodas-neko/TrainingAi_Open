@@ -1879,3 +1879,20 @@ dropping any night whose start is not clear of the cutoff by `MAX_SLEEP_DS`, and
 
 **Not closed by this:** confirming the DB-pool-contention causal link against Railway's own logs.
 That was never Q-225's to answer — the `[platform]` Q-107 row carries it, and still does.
+
+### [platform] ✅ The login rate limiter no longer resets when the email is padded (PS-25, 2026-09-06)
+
+`rateLimit()` keyed on `email.toLowerCase()` while the lookup used `email.toLowerCase().trim()` —
+two derivations of the same address, so ` user@x` and `user@x ` were fresh 20-attempt buckets
+against one account and padded guessing was unbounded. Fixed in v1.436.12: one normalisation feeds
+both, and a per-IP limit (50 / 15 min) now bounds spraying across accounts, which a per-email limit
+cannot see.
+
+Verified live: with the bucket full, the correct password was refused through the plain address and
+four padded spellings, and `rate_limits` held exactly one email key at its cap. Control — after a
+restart the same account signs in normally.
+
+**A local-testing note worth keeping.** The first control run failed and the fix looked broken. The
+limiter's in-memory L1 is not cleared by deleting `rate_limits` rows, so counts survive a `psql`
+reset and poison the next run; only restarting `pnpm dev` clears them. Anything measuring this
+limiter locally has to restart between runs.

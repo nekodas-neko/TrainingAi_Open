@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.12",
+    date: "2026-09-06",
+    changes: [
+      "Hardened the sign-in page against password guessing. The limit on failed attempts could be reset by adding a space to the email address, which made repeated guessing against one account effectively unlimited; it now counts every spelling of an address together, and a second limit caps attempts from one source across all accounts.",
+    ],
+  },
+  {
     version: "1.436.11",
     date: "2026-09-06",
     changes: [

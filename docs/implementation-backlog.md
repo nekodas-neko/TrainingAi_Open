@@ -548,17 +548,37 @@ with a fresh 7-day expiry on every request. Two ways to close it, neither taken 
 
 Not a decision for a queue pass: option 1 changes how every request in the app is served.
 
-### [platform] PS-25 — the login rate limiter keys on the untrimmed email, and has no IP limit
+### [platform] LA-61 — three email lookups on the OAuth path skip the normalisation the write applies
 
-- **Lane:** A — `auth.ts:26-29`.
-- **Added:** 2026-09-06, app checkpoint — [report](reviews/2026-09-05-app-checkpoint.md) §2.
+- **Lane:** A — `auth.ts` signIn callback, `lib/data/postgres/adapter.ts` (`getUserByEmail`).
+- **Added:** 2026-09-06, found while fixing PS-25's rate-limit key.
+- **Gate:** owner — the recommended fix needs a schema decision (a functional index), and getting it
+  wrong loses matches on existing rows rather than gaining them.
 
-`rateLimit(\`login:${email.toLowerCase()}\`)` on the untrimmed email; the lookup trims — so
-` user@x` and `user@x ` are fresh 20-attempt buckets against one account. Verified live: after 20
-misses, attempt 21 (plain, correct password) refused; attempt 22 (leading space, correct password)
-signed in. Case is folded (control); whitespace is not. No IP-keyed limit exists on this endpoint,
-so padded attempts per account are unbounded. Fix: key on `email.toLowerCase().trim()` and add the
-per-IP limit its sibling endpoints have.
+Registration **writes** `email.toLowerCase().trim()`, and `getUserByEmail` compares with a plain
+`eq`, so the lookup is case- and whitespace-sensitive. Three sites on the Google path pass the raw
+provider value: `getUserByEmail(user.email!)`, `isInvited(user.email!)`, and
+`upsertUser({ email: user.email! })`. Two consequences, both silent:
+
+- **A duplicate account.** If the provider ever returns an address whose case differs from the
+  stored one, the link lookup misses and `upsertUser` creates a second row for the same person.
+- **A missed invite.** `isInvited` compares the same way, so an invite recorded in one case does not
+  match a sign-in in another, and the user lands in `/pending` with no explanation.
+
+Google normalises to lowercase in practice, which is why this has never fired. That is a property of
+someone else's service, not of this code.
+
+**Do NOT fix it by normalising the input.** Any row already stored non-normalised stops matching, and
+this endpoint cannot see how many such rows exist — `claude_ro` is row-scoped to the owner, so a
+count from the admin query proves nothing about anyone else's. Normalising the *comparison* instead
+(`lower(email) = lower($1)`) can only gain matches, never lose them.
+
+**That is the schema decision.** `users.email` is unique, and a `lower()` comparison does not use a
+plain b-tree index on `email` — it wants `CREATE INDEX ... ON users (lower(email))`, and arguably a
+unique one, which would then **fail to create** if two rows already differ only by case. That failure
+is information worth having, but it is a migration that can refuse to apply, so it is the owner's
+call rather than a queue pass. Alternative: leave lookups as they are and add the normalisation to
+`upsertUser`'s write only, which stops new divergence without touching matching.
 
 ### [sleep][platform] PS-17 — a phantom afternoon "sleep" replaced a real night in the daily summary, and it is scoring 🔴 LIVE
 

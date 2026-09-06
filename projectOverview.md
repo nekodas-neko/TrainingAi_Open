@@ -1645,12 +1645,6 @@ throttle must not be made to persist.
 [Journal](docs/overview/entries/2026-09-06-deactivation-takes-effect.md) ·
 [Checkpoint](docs/reviews/2026-09-05-app-checkpoint.md) §2.
 
-### [platform] 🔴 The login rate limiter is bypassed by whitespace-padding the email (PS-25, 2026-09-06)
-
-`auth.ts:26` keys on the untrimmed email, `:29` looks up the trimmed one — each padding variant is a
-fresh 20-attempt bucket against the same account (live: attempt 21 plain refused, attempt 22 padded
-signed in). No IP-keyed limit on the endpoint. [Checkpoint](docs/reviews/2026-09-05-app-checkpoint.md) §2.
-
 ### [workouts][app-shell] 🟡 Confirming a deload on Home leaves full-intensity weights on screen for up to 6 h (RV-49, 2026-09-06)
 
 Owner-reported and mechanism-confirmed: the Home confirm calls `invalidatePrescriptionChanged()`
