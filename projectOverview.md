@@ -26,8 +26,20 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.436.20 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.436.21 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-06.
+
+**The meal builder divided the calories and not the macros (BF-121).** Owner: *"for the meal creator
+when adding in serving size it would be good to see the macros per serve."* A 4-portion recipe read
+`BATCH 983 kcal · 52 P · 103 C · 39 F` with `246 / portion` at the far right — **one row carrying two
+denominators, only one of them labelled**, while the same meal's detail sheet shows per-portion macros
+and says so. Now two labelled lines, `Batch` and `Per portion`, through one `MacroLine` component; a
+second LINE rather than six more numbers on the first, because width is the stated risk and BF-116 is
+that exact failure one screen over. `perPortion` divides and the render rounds — rounding first would
+disagree with the diary row the log writes — and dividing the batch is exact rather than approximate,
+which a test proves against `oneServingItems` instead of asserting in a comment.
+**The two lines have not been seen at 412 dp, and for a width change that is the gap that matters**
+([journal](docs/overview/entries/2026-09-06-bf-121-per-portion-macros.md)).
 
 **A refused meal-type reorder no longer reports success (LA-59).** `handleDragEnd` fired
 `fetch(...).then(success).catch(failure)`, and **a `fetch` promise does not reject on a 4xx** — so the
@@ -1716,6 +1728,17 @@ clearing a file requires lowering its number in the same PR. Every icon involved
 **PS-34's own claim that no live violation sat behind any of its seven rules was wrong here.** A
 re-scan reporting zero is worth exactly as much as the pattern it re-scanned with.
 [Journal](docs/overview/entries/2026-09-06-guard-repairs.md).
+
+### [nutrition] BF-121's two footer lines have not been seen at 412 dp (2026-09-06)
+
+The meal builder's footer now draws `Batch` and `Per portion` as two labelled lines. **The change's
+stated risk is width** — BF-116 is the same failure one screen over, where Home's header chips
+overflowed into the action buttons once a third arrived — and the fix has only a structural argument
+behind it, not a measurement: the per-portion figures went onto a new flex row and line one lost its
+`/ portion` suffix, so no line is wider than today's. **On the S25: a 4-portion recipe shows both
+lines without wrapping or overlapping the Save button; a 1-portion recipe shows one line and no
+redundant second; the per-portion figures match the detail sheet and a logged portion in the diary.**
+[journal](docs/overview/entries/2026-09-06-bf-121-per-portion-macros.md).
 
 ### [nutrition] LA-59's refusal path has not been watched happening (2026-09-06)
 

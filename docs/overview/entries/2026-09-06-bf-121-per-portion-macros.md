@@ -1,0 +1,70 @@
+# 2026-09-06 — BF-121: the meal builder divided the calories and not the macros
+
+**Branch:** `fix/bf-121-per-portion-macros` · **Lane B** · v1.436.21
+
+The owner: *"for the meal creator when adding in serving size it would be good to see the macros per
+serve."* His screenshot — *Protein Pancakes*, 4 portions — read
+`BATCH 983 kcal · 52 P · 103 C · 39 F` and, at the far right, `246 / portion`.
+
+## One row, two denominators, one of them labelled
+
+`Math.round(batchKcal / servings)` produced the `246`. The three macros beside it printed raw batch
+figures. So a reader dividing 52 P by 4 in their head was doing arithmetic the footer already did for
+the number next to it.
+
+**And the same meal's detail sheet reads the other way round**, which makes this a consistency bug
+rather than a missing feature: `meal-detail-sheet.tsx` states outright that its *"macro columns are
+per portion — that is what `Log this meal` writes."* The builder's own body text was the third voice:
+*"Logging this meal… takes one portion — 246 kcal of the 983 below."*
+
+## Both denominators, each labelled
+
+Two lines — `Batch` and `Per portion` — rendered through **one** `MacroLine` component. Two
+instances rather than two copies, because two copies drifting apart in format is the shape of the bug
+being fixed.
+
+**A second line, not six more numbers on the first.** That row already carried a label, a kcal figure
+and three macros. The entry flags width as the real constraint and names the precedent: **BF-116**,
+one screen over, where Home's header chips overflowed into the action buttons once a third chip
+arrived. Squeezing is how that happened.
+
+The batch total stays. It is what the ingredient list sums to and is the useful figure while a whole
+tray is being entered, so replacing it would trade one confusion for another.
+
+## Divide, then round
+
+`perPortion` divides and the render rounds. Rounding first would make the footer disagree with the
+diary row the log later writes, which is the number the owner actually compares against.
+
+Dividing the batch sum is **exact**, not an approximation of the canonical path: `oneServingItems`
+scales each ingredient's `quantityMultiplier` by `1 / servings`, and the totals are a linear sum of
+those, so `batch / servings` and `sum(perPortionRows)` are the same real number. A test drives both
+routes over the same fixture and compares them rather than asserting that from the comment.
+
+`servings` of 0 or less falls back to the batch — the same guard `oneServingItems` uses.
+
+## Verified
+
+Ten unit cases: the owner's own figures (983/4 → 246 kcal, 13 P, 26 C, 10 F), that the calorie number
+already on screen does not move, that dividing precedes rounding, the one-portion and
+cannot-divide fallbacks, and the equality with `oneServingItems` above. Three source guards: the
+inline `batchKcal / servings` is gone, both lines are labelled, and `MacroLine` is defined once.
+
+`tsc` clean · lint clean · `pnpm check:rules` **Ran 68 of 68** · full unit suite green.
+
+## Not exercised — and for a layout change this matters
+
+**The two lines have not been seen at 412 dp.** For a change whose stated risk is *width*, that is
+the gap worth stating loudest.
+
+What can be said without a screenshot is structural rather than measured: the per-portion figures
+went onto a **new** flex row, and line one lost its `/ portion` suffix, so no line is wider than the
+one shipping today. That is an argument from the DOM, not a measurement.
+
+**Driving the builder needs the repo's own pattern**, and this session learned it the slow way:
+`page.touchscreen.tap` on a bounding box inside a `toPass` loop (`empty-meal-library.spec.ts`), not
+`.click()`; the harness and its stored session cookie belong to port **3100**
+(`playwright.config.ts:23`), not 3000; and a cold route needs 30–60 s, not the 8 s an ad-hoc script
+tends to allow. All three were mistaken for application defects earlier today before being run down.
+
+**Not verified on device.**

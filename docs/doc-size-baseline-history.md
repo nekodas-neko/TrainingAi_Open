@@ -8307,3 +8307,15 @@ than a strikethrough because a wrong cause sends the next session hunting a defe
 exist — the same reason this file keeps refutations rather than deleting them.
 
 The backlog moves the other way in the same PR: LA-59's 22-line entry goes on shipping.
+
+## 2026-09-06 — `projectOverview.md` → 10074 (BF-121's status paragraph and its width gap)
+
+Twenty-three lines, split the same way as BF-120's earlier today and for the same reason. The status
+half carries the correction that makes the fix legible — one row was mixing two denominators with
+only one labelled, which is a different complaint from the one the owner filed and is what the detail
+sheet already disagreed with. The Known-Issues half exists because this is a **width** change whose
+width has not been measured: what stands behind it is a structural argument (the per-portion figures
+went onto a new row, and line one lost its `/ portion` suffix, so no line grew) and BF-116 is the
+proof that arguing about width one screen over is not the same as looking at it.
+
+The backlog moves the other way: BF-121's 40-line entry goes on shipping.

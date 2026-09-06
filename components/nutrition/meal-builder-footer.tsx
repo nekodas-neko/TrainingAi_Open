@@ -3,6 +3,7 @@
 import { memo } from 'react'
 import { Button } from '@/components/ui/button'
 import { MACRO_COLORS } from '@trainingai/shared/nutrition/macro-colors'
+import { perPortion, showsPerPortion, type MealMacroTotals } from '@/components/nutrition/meal-builder-portions'
 
 interface Props {
   hasIngredients: boolean
@@ -38,28 +39,20 @@ export const MealBuilderFooter = memo(function MealBuilderFooter({
   // edge while the ingredients it saves sat 16px in.
   return (
     <div className="flex shrink-0 flex-col gap-2.5 border-t border-border px-4 pt-2.5">
+      {/* BF-121: two labelled lines rather than one row mixing denominators. The batch total is
+          what the ingredient list sums to and is worth keeping while a whole tray is entered; the
+          per-portion line is what `Log this meal` writes and what the detail sheet already shows.
+          A second LINE rather than six more numbers on the first: that row already carries a label,
+          a kcal figure and three macros, and squeezing more onto it at 412 dp is exactly how BF-116
+          happened one screen over. */}
       {hasIngredients && (
-        <div className="flex items-baseline gap-2.5">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.04em] text-muted-foreground">
-            Batch
-          </span>
-          <span className="text-sm font-bold tabular-nums">{Math.round(batchKcal)} kcal</span>
-          {/* `MACRO_COLORS`, like every other macro readout — the artboard's own hex values
-              are this palette, so parity and the token rule agree here. */}
-          <span className="text-xs font-semibold tabular-nums" style={{ color: MACRO_COLORS.protein }}>
-            {Math.round(protein)} P
-          </span>
-          <span className="text-xs font-semibold tabular-nums" style={{ color: MACRO_COLORS.carbs }}>
-            {Math.round(carbs)} C
-          </span>
-          <span className="text-xs font-semibold tabular-nums" style={{ color: MACRO_COLORS.fat }}>
-            {Math.round(fat)} F
-          </span>
-          <span className="flex-1" />
-          {servings !== 1 && (
-            <span className="flex-none text-[11px] tabular-nums text-muted-foreground">
-              {Math.round(batchKcal / servings)} / portion
-            </span>
+        <div className="flex flex-col gap-1">
+          <MacroLine label="Batch" totals={{ calories: batchKcal, protein, carbs, fat }} bold />
+          {showsPerPortion(servings) && (
+            <MacroLine
+              label="Per portion"
+              totals={perPortion({ calories: batchKcal, protein, carbs, fat }, servings)}
+            />
           )}
         </div>
       )}
@@ -78,3 +71,32 @@ export const MealBuilderFooter = memo(function MealBuilderFooter({
     </div>
   )
 })
+
+/**
+ * One labelled row of kcal + P/C/F. Two instances rather than two copies, so the batch and
+ * per-portion lines cannot drift in format — which is the shape of the bug this fixes.
+ */
+function MacroLine({ label, totals, bold }: { label: string; totals: MealMacroTotals; bold?: boolean }) {
+  return (
+    <div className="flex items-baseline gap-2.5">
+      <span className="text-[10px] font-semibold uppercase tracking-[0.04em] text-muted-foreground">
+        {label}
+      </span>
+      <span className={`tabular-nums ${bold ? 'text-sm font-bold' : 'text-xs font-semibold text-muted-foreground'}`}>
+        {Math.round(totals.calories)} kcal
+      </span>
+      <span className="flex-1" />
+      {/* `MACRO_COLORS`, like every other macro readout — the artboard's own hex values are this
+          palette, so parity and the token rule agree here. */}
+      <span className="text-xs font-semibold tabular-nums" style={{ color: MACRO_COLORS.protein }}>
+        {Math.round(totals.protein)} P
+      </span>
+      <span className="text-xs font-semibold tabular-nums" style={{ color: MACRO_COLORS.carbs }}>
+        {Math.round(totals.carbs)} C
+      </span>
+      <span className="text-xs font-semibold tabular-nums" style={{ color: MACRO_COLORS.fat }}>
+        {Math.round(totals.fat)} F
+      </span>
+    </div>
+  )
+}
