@@ -528,6 +528,36 @@ and Samsung does not honour `autoConnect = true`, so direct connect plus a bound
 isolation stands and wiring it into scoring waits on the H10 session. It does not resolve steps,
 calories or the stage mapping (PS-16, PS-19).
 
+### [workouts][app-shell] RV-49 — the Home deload confirm evicts neither key the visible screen reads
+
+- **Lane:** B — `app/session-select/session-select-content.tsx:887-892`, `lib/cache-groups.ts:369-384`.
+- **Added:** 2026-09-06, Review sweep 49 —
+  [write-up](reviews/2026-09-06-deload-confirm-eviction-gap.md). Owner-reported symptom.
+
+`handleEarlyDeloadConfirm` carries Q-117's fix comment and then calls
+`invalidatePrescriptionChanged()` **with no sessionId** — and in the group, `workout-card:<id>`
+eviction is conditional on the id (so the call evicts no cards, the exact keys Q-117 names) and
+`next-session` is not in the group at all (it is Home's recommendation key). After "Start deload
+week", the recommendation card and every per-session card keep full-intensity weights out of cache
+for up to TTL_LONG (6 h). Q-117's fix reached the other caller (`ai-prescription-card.tsx:106`
+passes the id); the surface Q-117 was filed about still misses. Fix: add
+`invalidateCache('next-session')` to the group and make `workout-card:` a prefix drop when no id is
+given (the injuries group at `:238` is the pattern). Add a Playwright repaint assertion with the fix.
+
+### [app-shell] RV-50 — three raw seed-only `workout-card` reads never revalidate
+
+- **Lane:** B — `app/session-select/components/recommendation-card.tsx:23`,
+  `app/workout-select/workout-select-content.tsx:32`, `components/workout-screen.tsx`.
+- **Added:** 2026-09-06, Review sweep 49 —
+  [write-up](reviews/2026-09-06-deload-confirm-eviction-gap.md). The reader half of RV-49.
+- **Needs:** RV-49
+
+Raw `readCacheSync('workout-card:<id>')` with no fetch of the key in the component — two of the
+three sites say so in their own comments. The Q-260 seed-only shape: an evicted key goes blank until
+something else refills it; a missed eviction serves the snapshot for the full TTL. Scanned all 80
+`readCacheSync` sites: these three are the live cluster after discarding fallback-paired seeds.
+Convert to `useCachedValue` or fold into the RV-49 fix and its test.
+
 ### [workouts] PS-26 — the strength card shows a deload as a full-1RM crash, live on 16 of 34 exercises 🔴 LIVE
 
 - **Lane:** A — `packages/shared/src/health/strength-progress.ts`, `getExerciseSummary`.

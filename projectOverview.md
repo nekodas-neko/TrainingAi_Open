@@ -1644,6 +1644,17 @@ mechanism defers an `isAdmin` revocation indefinitely. **PS-24, top of the queue
 fresh 20-attempt bucket against the same account (live: attempt 21 plain refused, attempt 22 padded
 signed in). No IP-keyed limit on the endpoint. [Checkpoint](docs/reviews/2026-09-05-app-checkpoint.md) §2.
 
+### [workouts][app-shell] 🟡 Confirming a deload on Home leaves full-intensity weights on screen for up to 6 h (RV-49, 2026-09-06)
+
+Owner-reported and mechanism-confirmed: the Home confirm calls `invalidatePrescriptionChanged()`
+without a sessionId, so the group's conditional skips every `workout-card:<id>`, and `next-session`
+is not in the group at all — the two keys the recommendation and session cards read, two of them via
+raw seed-only `readCacheSync` that can never revalidate (RV-50). Q-117's fix reached only the
+id-passing caller. One-line fixes each; a Playwright repaint assertion rides the fix.
+[Sweep 49](docs/reviews/2026-09-06-deload-confirm-eviction-gap.md). The nutrition add surface was
+swept in the same pass and is **clean at source** — if the food-add symptom persists after RV-49
+ships, one repro (which screen added from, which screen stale) routes it.
+
 ### [workouts] 🟡 The strength card shows a deload as a full-1RM crash — live on 16 of 34 exercises (PS-26, 2026-09-06)
 
 `strength-progress.ts` guards the previous 1RM (Q-298) but not the current one, so an exercise whose

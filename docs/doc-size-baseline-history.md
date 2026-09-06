@@ -7874,3 +7874,10 @@ Sixteen entries from a twenty-six-lane checkpoint, already capped by class — ~
 folded into 16 entries (six rule-bypass shapes are one entry; the nutrition paper cuts are one; the
 docs sweep is one). Four Known-Issues rows plus the reopened LA-58 row carry the two escalations and
 the two live-data defects. The checkpoint report itself is a review doc, not index growth.
+
+## 2026-09-06 — `docs/implementation-backlog.md` → 18355, `projectOverview.md` → 9918 (sweep 49: RV-49, RV-50)
+
+Two entries and one Known-Issues row for the owner-reported stale-screen symptom. The entries carry
+the mechanism (an id-less group call the group's own conditional no-ops, and the seed-only reader
+class that turns a missed eviction into TTL-long staleness) because the fix comment above the call
+already claims this fixed — a bare "invalidate more keys" entry would read as done.
