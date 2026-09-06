@@ -594,6 +594,181 @@ new reward currency.
   pushes the fold on the S25 with several widgets enabled. That is a check on the built thing, so it
   is not a field on this entry.
 
+### [workouts] BF-127 — the baseline banner tells the owner to load 82.5 kg on a pull-up, from an index that is not kilograms 🔴 LIVE
+
+- **Lane:** B — `components/workout/pre-workout-screen.tsx` and `components/workout/ai-baseline-banner.tsx`.
+- **Added:** 2026-09-06 · owner, on today's Pull session: *"pull up = weight"*.
+- **Needs:** — nothing.
+- **Measured, not inferred.** `personal_records` holds `Pull-Up` `estimated_1rm = 118.25`.
+  `pre-workout-screen.tsx:246` computes `mround125(ex.current1rm * 0.7)` → **82.5**, and
+  `ai-baseline-banner.tsx:37` prints it with a hardcoded `kg` under the heading *"Suggested starting
+  weights (≈70% of PR)"*. The screen therefore instructs the owner to load 82.5 kg on a pull-up.
+- **That 118.25 is not a weight.** `exercise_library.exercise_type` for `Pull-Up` is `bodyweight`,
+  and a bodyweight `estimated1rm` is computed against **`BW_REF = 100`** (`packages/shared/src/1rm.ts:116`),
+  a fixed stand-in — the owner's real body weight is **70.65 kg**. So the number is an index driven
+  by reps and added load, and 70% of it is 70% of nothing physical.
+- **The repo already forbids exactly this, in a comment written for a previous instance of it.**
+  `1rm.ts:218`: *"Display basis: bodyweight strength is measured in REPS, never kilograms … Rendering
+  it as kg is what let a change of the BW_REF constant read as a +40% strength gain (audit finding
+  Q-12) … Every surface that shows a stored 1RM resolves its unit here rather than hardcoding
+  'kg'."* `displayOneRm()` / `oneRmUnit()` / `oneRmLabel()` are that resolver. The banner does not
+  call any of them.
+- **The proof it is reachable is on the same screen.** The exercise card below the banner renders
+  `5 × 0kg · 5 RM` — the `RM` unit, correct, for the same exercise, six lines further down. One
+  surface resolves the unit and the other hardcodes it.
+- **Fix:** `signals.exercises[]` already carries `exerciseType` (`packages/shared/src/ai-periodization/signals.ts:277`);
+  the banner's `.map()` at `pre-workout-screen.tsx:243` simply does not read it. Pass it through and
+  render through `displayOneRm`. **A bodyweight row should offer a rep target, not a load** — 70% of
+  a 1RM is a weight prescription, and the equivalent instruction for a bodyweight movement is a
+  number of reps.
+- **Sweep the siblings**, per the same rule that this one escaped: any other surface multiplying or
+  formatting `current1rm` / `estimated_1rm` without going through `oneRmUnit`. The Q-12 fix built the
+  resolver; it did not prove every caller uses it.
+- **Reversal cost:** low — one field threaded through and one formatter swapped.
+
+### [workouts] BF-128 — the session planner charges rest after the final set, and prescribes 4 exercises where the owner's own history does 5
+
+- **Lane:** A — `packages/shared/src/workout/duration-model.ts`, consumed by `app/api/generate-program/route.ts`.
+- **Added:** 2026-09-06 · owner, on a generated 60-minute session: *"also its given 4 excercises for a 60min session is this right?"*
+- **Needs:** — nothing.
+- **The 4 is not the model ignoring the budget — it is what the budget says.** `route.ts:195–210`
+  computes the target: `workingBudgetMin(60)` = 51 min after the 15% warm-up carve-out, then a 60/40
+  blend of the goal's primary and accessory styles. For powerbuilding that is 856 s and 450 s, a
+  694 s average, `floor(3060 / 694)` = **4**. Hypertrophy also gives 4; strength gives 3.
+- **`styleWorkSec` charges `restSec` for every set, including the last**
+  (`duration-model.ts:201`). A powerbuilding primary is 4 × 120 s of rest where only three of those
+  rests are taken before the exercise ends — and the walk to the next station is *already* charged
+  separately as `TRANSITION_SEC_BARBELL = 240 s`. So the final rest is counted twice.
+- **It is worth exactly one exercise.** Dropping the trailing rest lowers the blended average by
+  ~96 s to 598 s, and `floor(3060 / 598)` = **5**.
+- **The owner's history says 5 is right.** Over 90 days, 62 completed sessions: **median 5 exercises**
+  (mean 4.77, max 5) in a **median 56.2 minutes** (mean 54.3) against a 60-minute budget. So five
+  exercises fit with room to spare, and the planner is one short — the same one the double-count
+  explains.
+- **Do not just delete the term.** Two other things use `styleWorkSec`, and a planner that suddenly
+  fits more work everywhere is a worse failure than one that fits slightly less: check
+  `packages/shared/src/workout/time-audit.ts` and the `signals.ts:508` budget consumer, and validate
+  the change against the same 62 sessions rather than against the arithmetic alone. The honest
+  framing is that the model has a defensible reason to over-reserve (a missed rest is time the lifter
+  never gets back) — but 4 vs a measured 5 says the reserve is currently too large.
+- **`TRANSITION_SEC_BARBELL = 240 s` deserves the same measurement pass** while the data is open —
+  `exercise_logs` stores `inter_exercise_rest_sec` and `prep_time_sec`, so the real transition is
+  recorded and does not need to be assumed.
+- **Reversal cost:** low as code, higher as behaviour — it changes every future generated program's
+  volume, so it wants the validation above before it ships, not after.
+
+### [app-shell] BF-123 — the global 48 px tap floor turns every sub-48 px `<button>` into a circle; the opt-out exists and was never swept
+
+- **Lane:** B — `app/globals.css` opt-out classes at the call sites; `components/config/**` and the sibling chips.
+- **Added:** 2026-09-06 · owner, on the program editor sheet: *"noting this UI is really bad and needs adjustment"* — a screenshot in which the muscle chips render as large filled circles.
+- **Batch:** editor-sheet-density
+- **Traced, and the diagnosis is already written down in this repo.** `app/globals.css:553` sets
+  `button, [role="button"] { min-height: 48px; min-width: 48px }` inside `@media (max-width: 640px)`.
+  The muscle chips at `components/config/program-editor-sheet.tsx:882` are real `<button>`s asking
+  for `h-5 px-1.5 rounded-full` — 20 px tall. The floor wins, `rounded-full` on a 48×48 box is a
+  circle, and the `text-[10px]` label does not scale with it, so the text floats in the middle. A
+  short label (`lats`) lands under the 48 px min-width and comes out perfectly round; a longer one
+  (`upper back`) comes out as a stadium. That is the exact shape in the screenshot.
+- **`components/ui/switch.tsx:19` carries the diagnosis verbatim** — *"the global 48px tap-target
+  floor in globals.css wins over h-5/w-9 and renders this as a 48×48 `rounded-full` **black
+  circle** rather than a pill"* — and fixes it with `tap-dense` plus a `before:` pseudo-element that
+  puts the 48 px touch box back invisibly. So the mechanism, the fix and the reason the fix keeps the
+  control reachable are all settled. What never happened is the sweep.
+- **CLAUDE.md already required that sweep**, under **No global element-selector styling**: *"Any
+  unavoidable global rule needs its opt-outs applied in the same PR, not left for a later audit."*
+  This entry is that audit, arriving as an owner bug report — which is the outcome the rule exists to
+  prevent, and worth saying plainly rather than filing as a fresh discovery.
+- **Known instances beyond the chips**, all `<button>`/`role="button"` styled below 48 px with no
+  `tap-dense`: the two hand-rolled toggles at `program-editor-sheet.tsx:465` and `:490` (`h-5 w-9`,
+  the same circle the Radix switch had), and `components/config/style-editor-sheet.tsx:109`. Sweep for
+  the rest rather than fixing these three — the sweep is the entry.
+- **Do the search on the ELEMENT, not the class.** Most `rounded-full text-[10px]` hits in the app
+  are `<span>`s, which the selector never reaches and which must not be touched; grepping the class
+  finds mostly false positives. The set that matters is `<button>` and `[role="button"]` whose own
+  styles declare a box under 48 px in either axis.
+- **Every opt-out restores the touch box.** `tap-dense` alone shrinks the hit area to the ink, which
+  is the accessibility regression the floor was added to prevent. Copy the switch's pattern, or use
+  `.tap-target-44` / `.tap-target-dot` where a neighbour is close enough that a 48 px box would
+  overlap it — `globals.css` explains that trade-off in place and it is real, not theoretical.
+- **`e2e/touch-target-size.spec.ts` is the gate.** Its allowlist is empty by design, so it can hold
+  the result; check it actually covers a `tap-dense` control's `before:` box rather than only the
+  element, or the sweep will make it red.
+- **Reversal cost:** low, and per-site — each opt-out is one class on one element.
+
+### [app-shell] BF-124 — the role picker on the program editor sheet overflows, and its selected state reads as disabled
+
+- **Lane:** B — `components/config/program-editor-sheet.tsx`.
+- **Added:** 2026-09-06 · owner, same screenshot as **BF-123**.
+- **Batch:** editor-sheet-density
+- **Needs:** BF-123
+- **Two problems, both downstream of the same floor** but not fixed by removing it, which is why they
+  are their own entry:
+  - **The row cannot fit.** `program-editor-sheet.tsx:844` is `<div className="flex gap-1">` with no
+    `flex-wrap`, holding three buttons labelled *Main Compound · Secondary Compound · Accessory*.
+    With the 48 px min-width each, the longest label wraps to two lines and `Accessory` is clipped
+    at the right edge. It needs to wrap, or the labels need to be short.
+  - **The selected state is a white slab.** `bg-primary text-primary-foreground` against this dark
+    sheet renders as a bright block that reads as disabled rather than chosen — the opposite of its
+    intent. The unselected `bg-muted` siblings look more active than the selected one.
+- **Check the label question against BF-125 before renaming anything** — the builder review screen
+  calls the same three roles *Main / Compound / Accessory*. Shortening the labels here is the obvious
+  fix for the overflow and it is also half of that entry, so decide the vocabulary once.
+- **Reversal cost:** low — layout classes and a token on one control.
+
+### [workouts] BF-125 — the one screen that shows the role imbalance is the one screen that cannot fix it
+
+- **Lane:** B — `components/workout-builder/builder-review.tsx`.
+- **Added:** 2026-09-06 · owner, looking at a generated program: *"why does one of these have 2 compounds?"* then *"so how would i change its badge?"*
+- **What is there today.** The builder review screen renders the role badge read-only
+  (`builder-review.tsx:536`) — Swap, Add and the ▲▼ reorder arrows are the whole control set, and
+  the role survives both a swap (`:214`) and a reorder (`:230`) untouched. The editable version is on
+  a different screen: `components/config/program-editor-sheet.tsx:841` has a three-button **Role**
+  row calling `updateExerciseRole`, gated on `phaseMode !== 'manual'` (so it does show for AI
+  Dynamic).
+- **So the route to correct a bad generation is: save the program you can already see is wrong →
+  Config → find it → expand the exercise → change the role.** The review screen is the one place the
+  whole program is visible at once, which is where an imbalance is *noticeable*; it is the only place
+  it is not fixable.
+- **The role is not cosmetic**, which is what makes this worth a control rather than a shrug:
+  `app/api/generate-program/route.ts:428` picks the progression style from the role and, for
+  `primary`/`secondary`, overrides whatever the model chose. Demoting an exercise to accessory moves
+  it from 65–85% / 6–10 reps to 66–75% / 8–12.
+- **Fold in the vocabulary mismatch.** Review says *Main / Compound / Accessory*
+  (`builder-review.tsx:33`); the editor says *Main Compound / Secondary Compound / Accessory*
+  (`program-editor-sheet.tsx:846`). Same three enum values, two wordings, and a user moving between
+  the screens to do exactly what this entry describes meets both. Pick one and put it in a shared
+  map — **One Formula, One Place** applies to a label the user matches across screens. **BF-124**
+  wants the short form for its own overflow, which is a reason to land these together.
+- **Reversal cost:** low. The state-setter shape already exists in `swapExercise`.
+
+### [workouts] BF-126 — nothing constrains how many primaries or secondaries a generated session gets, and the main lift need not come first
+
+- **Lane:** A — `app/api/generate-program/route.ts`.
+- **Added:** 2026-09-06 · owner, from a generated 5-day program where Pull came back with two `secondary` compounds and one accessory while Push got one and two.
+- **Needs:** — nothing.
+- **The prompt asks for a role per exercise and says nothing about the distribution.** Rule 3
+  (`route.ts:316`) defines `primary` / `secondary` / `accessory`; no rule caps any of them, requires
+  exactly one primary, or orders them. Rule 6 constrains the compound:isolation split *"at roughly
+  60:40"* of the session count, which is advisory prose to the model, checked nowhere.
+- **The consequence is load, not labelling.** `route.ts:428` enforces the style from the role and
+  never falls back to the model's choice for primary/secondary. The observed Pull session therefore
+  carries three heavy-ish exercises (one at 72.5–92.5%, two at 65–85%) against Push's two, at equal
+  exercise counts. Session-to-session load becomes whatever that generation happened to roll.
+- **Second half: order.** Array order is saved as position (`components/workout-builder/builder-review.tsx:295`,
+  `:302`), and in the observed program the `primary` sat *second*, behind a secondary compound — so
+  the heaviest lift of the session is done after a pull-up. Nothing in the prompt says the primary
+  leads. Note `builder-review.tsx:229` deliberately allows a user reorder ahead of the main lift, so
+  the invariant belongs at generation, not on the editor.
+- **Fix it where the style is already overridden** — a post-generation pass in the same block, not
+  more prompt text. The model has been asked in prose and did not comply; a validator that demotes
+  extra primaries and sorts the primary first is deterministic and cheap. Per the AI defaults in
+  CLAUDE.md, structure a model returns is checked in code rather than trusted.
+- **Confirm the shape against more than one sample before choosing the rule.** One program is the
+  evidence here. Whether the cap is "exactly one primary, at most one secondary" or something looser
+  should be read off several generations at the owner's real settings — a rule fitted to a single
+  roll is how a legitimate 2-compound Pull day gets forbidden.
+- **Reversal cost:** low — one pure function over the parsed response, before it is returned.
+
 ### [platform] LB-56 — E2E costs 26 minutes a UI PR and currently gates nothing; decide which of those to change
 
 - **Lane:** ? — neither. `.github/workflows/ci.yml`, `playwright.config.ts` and the required-checks
