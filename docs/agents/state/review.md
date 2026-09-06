@@ -64,8 +64,11 @@ and RV-40's `complete-workout` and `log-exercise`. **`CLAUDE.md` ownership rule 
 **Closed clean:** the thirteen dynamic `PUT`/`PATCH` routes; `saved-meals/[id]` (a create at a client
 UUID is `writeSavedMeal`'s deliberate upsert, `setWhere` on the owner); `workout-entry`.
 
-**Still owed:** RV-37/RV-39 need the device; RV-38/RV-41/RV-43 need an owner decision. Sweep 45's
-workout/device FK half is **untouched, not clean**.
+**Still owed:** RV-37/RV-39 need the device; RV-38/RV-41/RV-43 need an owner decision.
+**2026-09-06: this session ran the whole-app checkpoint** (`PS-24…PS-39`,
+[report](../../reviews/2026-09-05-app-checkpoint.md)) — it CLOSED the workout/device FK half,
+`/api/coach/preview` and the tz midnight-band run, and ESCALATED PS-24/PS-25. Do not re-sweep lanes
+its table marks ✅; lane 23 and the POST surface stay open.
 
 ## Carried from sweep 40 ([write-up](../../reviews/2026-08-20-non-workout-write-surface-ownership.md))
 
@@ -82,11 +85,8 @@ the documentation-integrity seam. Sweeps 34–37 were four consecutive passes ov
 left three CI checks behind (`check-known-issue-duplication`, `check-index-doc-paths`,
 `check-module-map-symbols`). Pick a lens that runs the app.
 
-- **The remaining FK edges — the WORKOUT and DEVICE half.** Sweep 45 did nutrition (RV-42);
-  `program_phases`, `schedules`, `set_hr_stats`, `blood_analytes`, `dexa_scan_regions`,
-  `exercise_logs`, `prescribed_runs` are **untouched, not clean**. **31 edges, not 27** — re-run
-  sweep 45's §2 query. **Check each `delete_rule`**: `SET NULL` on an unverified FK is a
-  cross-account write primitive; `CASCADE` would delete rather than null.
+- ~~The workout/device FK half~~ — CLOSED clean by the checkpoint (all CASCADEs same-owner; the
+  one client-writable CASCADE edge refuses cross-user, control held).
 - **The POST surface, the only verb left.** Sweeps 47 and 48 covered `DELETE` and `PUT`/`PATCH`; no
   sweep has asked what a `POST` answers when its body references a row that does not exist or is not
   the caller's. Same method — a malformed-id control beside a well-formed one, then read the row back.
