@@ -26,8 +26,24 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.436.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-09-03.
+**Version:** v1.436.13 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-09-06.
+
+**A dose can be typed in at last (BF-112, stage 2 of BF-69).** The storage shipped 2026-09-01 and
+nothing could write to it: production held two supplements with `default_amount`, `unit`,
+`dose_prompt` and `started_on` all empty, and one log of any kind, from June — with the owner due to
+start dosing on **2026-09-06**. The manage sheet now carries an amount, a unit, the started/stopped
+window and an *ask me each time* switch; a supplement with that switch asks for the number when it is
+ticked, pre-filled from the definition. The row's second line reads **what today's log recorded**,
+not what the definition currently says, so changing the dose later does not rewrite a past day —
+verified live by patching a definition from 2.5 mg to 10 mg while its earlier log kept reading 5 mg.
+**Two defects were found while verifying and both are fixed here:** the nutrition page's local-first
+branch dropped every new field, so the prompt would never have fired **on the device** while working
+in the browser; and the tick left the previous log's number on screen until the next pull. **Not
+device-verified** — which is precisely the surface the first defect was hiding on. Left behind as
+**LB-57**: the day's exposure is now derived once per lane, and the single home is `packages/shared`,
+which Lane B may not write
+([journal](docs/overview/entries/2026-09-06-bf-112-dose-entry.md)).
 
 **The HR Recovery Profile now says how much of it is signal (Q-516).** `aggregateHrRecoveryProfile`
 has returned `informativeShare` since the re-banding and **nothing rendered it** — the state the
