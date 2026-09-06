@@ -4,6 +4,7 @@ import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { getRepository } from '@/lib/data'
 import { z } from 'zod'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { routeErrorResponse } from '@/lib/api/route-errors'
 
 // One activity type.
 const MAX_BODY_BYTES = 8 * 1024
@@ -80,8 +81,16 @@ export async function PATCH(req: NextRequest) {
   if (!body.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
 
   const repo = await getRepository()
-  const activityType = await repo.updateActivityType(id, body.data)
-  return NextResponse.json({ activityType })
+  // RV-46: the handler's only `try` wrapped `requireAdmin`, so `updateActivityType`'s typed
+  // `NotFoundError` escaped uncaught — an unknown id answered 500 with an empty body and filed the
+  // refusal into `error_events` as a server fault. `routeErrorResponse` re-throws anything it does
+  // not recognise, so a real bug still reaches `onRequestError`.
+  try {
+    const activityType = await repo.updateActivityType(id, body.data)
+    return NextResponse.json({ activityType })
+  } catch (err) {
+    return routeErrorResponse(err)
+  }
 }
 
 export async function DELETE(req: NextRequest) {
@@ -101,7 +110,12 @@ export async function DELETE(req: NextRequest) {
 
   const repo = await getRepository()
   try {
-    await repo.deleteActivityType(id)
+    // RV-45: a delete that matched no row is reported as one that removed something, and the
+    // sheets that call this do `if (!res.ok) throw` — so a refused cross-account delete, or a
+    // stale id, confirms itself to the user and the row returns on the next pull. 404 matches
+    // the Q-556 reference on activity-logs.
+    const deleted = await repo.deleteActivityType(id)
+    if (!deleted) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   } catch {
     return NextResponse.json({ error: 'Activity type is in use' }, { status: 409 })
   }

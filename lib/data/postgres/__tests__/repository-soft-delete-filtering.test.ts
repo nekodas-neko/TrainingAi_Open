@@ -187,7 +187,10 @@ describe.skipIf(!canRun)('soft-delete filtering (Q-178)', () => {
     // Delete through the real repository method, so the delete path and the read filter are
     // exercised together.
     await repo.deleteFoodLog(log.rows[0].id, USER)
-    await expect(repo.deleteMealType(mt.rows[0].id, USER)).resolves.toBeUndefined()
+    // RV-45 made this return whether a row matched. `true` is the stronger assertion for this
+    // test's own point — the meal type really did become deletable again, rather than merely not
+    // throwing.
+    await expect(repo.deleteMealType(mt.rows[0].id, USER)).resolves.toBe(true)
 
     // Gone from the user's list…
     const live = await repo.listMealTypes(USER)

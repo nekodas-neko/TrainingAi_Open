@@ -28,24 +28,46 @@ export function ManageSupplementsSheet({ open, onOpenChange, supplements, onChan
   const [editTarget, setEditTarget] = useState<Supplement | 'new' | null>(null)
   const [name, setName] = useState('')
   const [dose, setDose] = useState('')
+  // BF-112 stage 2. `dose` stays as the free-text line it always was; these are the structured
+  // fields the storage has had since 2026-09-01 with nothing able to write them.
+  const [amount, setAmount] = useState('')
+  const [unit, setUnit] = useState('')
+  const [dosePrompt, setDosePrompt] = useState(false)
+  const [startedOn, setStartedOn] = useState('')
+  const [stoppedOn, setStoppedOn] = useState('')
   const [reminderEnabled, setReminderEnabled] = useState(false)
   const [reminderTime, setReminderTime] = useState('08:00')
   const [saving, setSaving] = useState(false)
 
   function openNew() {
     setName(''); setDose(''); setReminderEnabled(false); setReminderTime('08:00')
+    setAmount(''); setUnit(''); setDosePrompt(false); setStartedOn(''); setStoppedOn('')
     setEditTarget('new')
   }
 
   function openEdit(s: Supplement) {
     setName(s.name); setDose(s.dose ?? ''); setReminderEnabled(s.reminderEnabled)
     setReminderTime(s.reminderTime ?? '08:00')
+    setAmount(s.defaultAmount == null ? '' : String(s.defaultAmount))
+    setUnit(s.unit ?? ''); setDosePrompt(s.dosePrompt === true)
+    setStartedOn(s.startedOn ?? ''); setStoppedOn(s.stoppedOn ?? '')
     setEditTarget(s)
   }
 
   async function handleSave() {
     if (!name.trim()) return
     setSaving(true)
+    // BF-112: derived once. Four consumers below (the local row, the outbox payload, the optimistic
+    // Supplement and the API body) must agree, and a field present in three of them is the shape
+    // that ships as "saves but does not persist".
+    const parsedAmount = amount.trim() === '' ? null : Number(amount)
+    const doseFields = {
+      defaultAmount: Number.isFinite(parsedAmount as number) ? parsedAmount : null,
+      unit: unit.trim() || null,
+      dosePrompt,
+      startedOn: startedOn.trim() || null,
+      stoppedOn: stoppedOn.trim() || null,
+    }
     const store = userId ? getLocalStore(userId) : null
     const isNew = editTarget === 'new'
     const existingId = isNew ? undefined : (editTarget as Supplement).id
@@ -58,6 +80,7 @@ export function ManageSupplementsSheet({ open, onOpenChange, supplements, onChan
         const record = {
           id, name: name.trim(),
           dose: dose.trim() || null,
+          ...doseFields,
           reminderEnabled,
           reminderTime: reminderEnabled ? reminderTime : null,
           sortOrder,
@@ -69,10 +92,11 @@ export function ManageSupplementsSheet({ open, onOpenChange, supplements, onChan
           userId: userId!,
           domain: 'supplements',
           date: todayInTz(tz),
-          payload: { id, name: record.name, dose: record.dose, reminderEnabled, reminderTime: record.reminderTime, sortOrder, active: true },
+          payload: { id, name: record.name, dose: record.dose, ...doseFields, reminderEnabled, reminderTime: record.reminderTime, sortOrder, active: true },
         })
         const supplementRecord: Supplement = {
           id, userId: userId!, name: record.name, dose: record.dose,
+          ...doseFields,
           reminderEnabled, reminderTime: record.reminderTime,
           sortOrder, active: true, createdAt: now,
         }
@@ -104,6 +128,7 @@ export function ManageSupplementsSheet({ open, onOpenChange, supplements, onChan
         body: JSON.stringify({
           name: name.trim(),
           dose: dose.trim() || null,
+          ...doseFields,
           reminderEnabled,
           reminderTime: reminderEnabled ? reminderTime : null,
           sortOrder: isNew ? supplements.length : undefined,
@@ -246,6 +271,66 @@ export function ManageSupplementsSheet({ open, onOpenChange, supplements, onChan
                 placeholder="e.g. 5g, 1 capsule"
                 className="w-full rounded-xl bg-muted/60 border border-border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               />
+            </div>
+            {/* BF-112 stage 2. The free-text `Dose` above stays — it is what BF-3 freezes onto each
+                log — and these are the structured fields beside it, so a dose can be a number the
+                app can add up rather than a string it can only display. */}
+            <div className="grid grid-cols-[1fr_5rem] gap-2">
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-1.5">Amount <span className="font-normal">(optional)</span></p>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step="any"
+                  min="0"
+                  value={amount}
+                  onChange={e => setAmount(e.target.value)}
+                  placeholder="e.g. 5"
+                  className="w-full rounded-xl bg-muted/60 border border-border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-1.5">Unit</p>
+                <input
+                  type="text"
+                  value={unit}
+                  onChange={e => setUnit(e.target.value)}
+                  placeholder="mg"
+                  className="w-full rounded-xl bg-muted/60 border border-border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+            </div>
+            <div className="rounded-xl bg-muted/60 border border-border px-4 py-3 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold">Ask for the amount each time</p>
+                <p className="text-xs text-muted-foreground mt-0.5">For a dose that changes — logging asks for the number instead of using the one above</p>
+              </div>
+              <Switch checked={dosePrompt} onCheckedChange={setDosePrompt} />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground mb-1.5">Started <span className="font-normal">(optional)</span></p>
+              <input
+                type="date"
+                value={startedOn}
+                onChange={e => setStartedOn(e.target.value)}
+                className="w-full rounded-xl bg-muted/60 border border-border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+              {/* The plan's §2 presence model: a day before this reads as outside the window rather
+                  than as a missed dose. */}
+              <p className="text-[11px] text-muted-foreground mt-1">Days before this count as not taking it, rather than as missed.</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground mb-1.5">Stopped <span className="font-normal">(optional)</span></p>
+              <input
+                type="date"
+                value={stoppedOn}
+                onChange={e => setStoppedOn(e.target.value)}
+                className="w-full rounded-xl bg-muted/60 border border-border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+              {/* Without the closing end the window never shuts, and every day after stopping reads
+                  as a missed dose instead of as outside it — the half of §2 that a start alone
+                  cannot express. */}
+              <p className="text-[11px] text-muted-foreground mt-1">Days after this count the same way. Leave blank while you are still taking it.</p>
             </div>
             <div className="rounded-xl bg-muted/60 border border-border px-4 py-3 flex items-center justify-between">
               <div>

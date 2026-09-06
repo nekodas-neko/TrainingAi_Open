@@ -1,5 +1,21 @@
 # Q-509's remainder is not a trend — and the inputs stepped at the re-key
 
+> **⛔ HALF OF THIS TITLE IS WRONG. Corrected the next day by the agent that wrote it:**
+> [`2026-09-04-hrv-ramp-not-step.md`](2026-09-04-hrv-ramp-not-step.md).
+>
+> **Stands:** `recovery_index_hours` is flat over 58 BLE-era nights (OLS slope −0.0055 h/night,
+> r = −0.060). That measurement and its arithmetic are unaffected.
+>
+> **Refuted:** *"the inputs stepped at the re-key."* The RHR 65.7 → 53.8 and HRV 26.9 → 55.9 figures
+> are before/after means across a **monotonic ramp**, which manufactures a step from a trend. Night
+> HRV rises 45.5 → 63.0 (+38%) *inside the BLE era*, where no definition change is possible, and the
+> weekly series crosses the boundary with no discontinuity. LA-57, filed on this reading, is refuted.
+>
+> **And the conclusion flips rather than disappears:** candidate 3 does not close as "no
+> physiological change to find". A large one happened over exactly these nights and
+> `recovery_index_hours` did not respond to it — which corroborates the estimator-bias reading from a
+> second direction.
+
 **2026-09-03 · Lane A · read-only production (`claude_ro`, row-scoped to the owner)**
 
 Q-509 had ~0.39 h of its 0.933 h gap left after smoothing (0.487 h), bin occupancy (0.000 h) and
