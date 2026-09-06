@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.18",
+    date: "2026-09-06",
+    changes: [
+      "A meal with only one food in it shows its protein, carbs and fat again. The breakdown was hidden whenever a meal held a single item, so you could see that it was 150 kcal and nothing about what those calories were made of.",
+    ],
+  },
+  {
     version: "1.436.17",
     date: "2026-09-06",
     changes: [
