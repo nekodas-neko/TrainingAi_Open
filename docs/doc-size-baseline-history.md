@@ -7915,3 +7915,16 @@ RV-46 left the queue on shipping and LA-60 took its place — the Node 20/22 spl
 sandbox, found when this PR went red on an API the local run had. Net upward by the difference
 between a 26-line entry removed and a 28-line one added, which is the honest accounting rather than
 two separate movements.
+
+## 2026-09-06 — `docs/implementation-backlog.md` → 18373 (BF-114, UI half, on the merged base)
+
+Three lines net. BF-114 is rewritten rather than removed: its UI half shipped and its engine half is
+handed to Lane A, so the entry changes lane and keeps a `Keep:` naming exactly what is owed.
+**Recomputed from the merged file rather than carried from the branch** — this PR sat while two
+others raised the same baseline, so its own 17801 was against a document that no longer exists.
+
+Most of the rewrite is a correction rather than an addition. The entry had recorded the Body tab's
+BMR as the scale's bioimpedance estimate; it is Mifflin-St Jeor computed in our own code, which the
+source says outright. That matters beyond the label — it turns the 218 kcal gap from "two different
+measurements" into "a formula against a measurement", which is the sentence a reader needs, and it
+made the entry's own proposed wording false.
