@@ -6,10 +6,53 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.436.10",
-    date: "2026-09-04",
+    version: "1.436.14",
+    date: "2026-09-06",
     changes: [
       "The BMI card now says its category comes from a body fat reading corrected to your DEXA scan, rather than just \"via body fat %\". The number and the category are unchanged \u2014 the card was already using the corrected figure and only the label was short.",
+    ],
+  },
+  {
+    version: "1.436.12",
+    date: "2026-09-06",
+    changes: [
+      "The date and the battery pills at the top of Home no longer run into the buttons beside them. When the row is too narrow the date shortens instead, so the pills stay whole and readable.",
+    ],
+  },
+  {
+    version: "1.436.11",
+    date: "2026-09-06",
+    changes: [
+      "The two BMR figures on the Body tab now say where each comes from, so it is clear why they differ. One is calculated from your lean mass, the other from your weight and height \u2014 and the card that shows the second no longer claims your scale measured it, because it does not. Your visceral fat number says it comes from BMI and age for the same reason.",
+    ],
+  },
+  {
+    version: "1.436.10",
+    date: "2026-09-06",
+    changes: [
+      "Renaming an activity type that no longer exists used to fail with a blank server error. It now says the activity type was not found.",
+    ],
+  },
+  {
+    version: "1.436.9",
+    date: "2026-09-05",
+    changes: [
+      "Dragging your meal types into a new order used to report success even when the order was not saved \u2014 which happened whenever the list on screen included a meal type that had already been deleted somewhere else. It now saves the whole order or none of it, and says so.",
+      "Admin actions on the users and exercise lists no longer report success for a user or exercise that is not there.",
+    ],
+  },
+  {
+    version: "1.436.8",
+    date: "2026-09-05",
+    changes: [
+      "Deleting a supplement, injury, food entry, saved meal or meal type used to say it worked even when it had not \u2014 a stale entry, or one that was not yours, was confirmed as deleted and then reappeared on the next sync. It now tells you the delete failed instead of pretending it succeeded.",
+    ],
+  },
+  {
+    version: "1.436.7",
+    date: "2026-09-04",
+    changes: [
+      "An account that has been deactivated, or has signed up but not yet been approved, could still reach the app's data directly even though the app itself sent it to the waiting screen. It now gets refused there too. Nothing changes for an active account.",
     ],
   },
   {

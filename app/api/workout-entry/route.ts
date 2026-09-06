@@ -7,6 +7,7 @@ import { computeSetAggregates, computeIntensityPct } from "@trainingai/shared/wo
 import { getRepository } from "@/lib/data";
 import { reportServerError } from '@/lib/observability'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { invalidUuidResponse } from '@/lib/api/route-errors'
 
 // 20 weights and 20 reps plus a few scalars, capped by the schema below.
 const MAX_BODY_BYTES = 16 * 1024;
@@ -139,6 +140,10 @@ export async function DELETE(req: NextRequest) {
   }
   const { exerciseLogId } = (read.body ?? {}) as { exerciseLogId?: string };
   if (!exerciseLogId) return NextResponse.json({ error: "Missing exerciseLogId" }, { status: 400 });
+  // RV-47: PATCH gets this from `.uuid()` on its Zod schema; DELETE parses the body by hand and had
+  // no guard, so a malformed id reached `assertOwnership` and 500'd on the cast.
+  const badId = invalidUuidResponse(exerciseLogId);
+  if (badId) return badId;
 
   if (!(await assertOwnership(userId, exerciseLogId))) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });

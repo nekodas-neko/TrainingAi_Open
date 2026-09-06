@@ -80,12 +80,26 @@ describe.skipIf(!canRun)('a fabricated id is 404 with a JSON body, not 500', () 
     expect(await put.json()).toEqual(await del.json())
   })
 
-  // The entry is explicit that this looks like the same shape and is NOT: DELETE is idempotent by
-  // convention, the desired end state (row absent) holds, and the outbox is right to treat it as
-  // done. Pinned so it does not get "fixed" later.
-  it('leaves an idempotent DELETE of an absent row at 200', async () => {
+  // ⚠ THIS ASSERTION WAS REVERSED, 2026-09-05 (RV-45). It used to require 200 and said "pinned so it
+  // does not get 'fixed' later" — the pin worked, and this is the cause it was asking for rather
+  // than a later session quietly flipping it.
+  //
+  // The 2026-08-18 argument was that DELETE is idempotent by convention and the desired end state
+  // (row absent) genuinely holds. **That premise is true for the owner re-deleting their own row and
+  // false across accounts**, where the row is present and correctly so — ownership is enforced, and
+  // reporting a correct refusal as a success is what makes it invisible. Measured in the RV-45
+  // sweep: a second account deleted the first's supplement, got `200 {"ok":true}`, and the row was
+  // still in Postgres with its owner unchanged.
+  //
+  // It also is not only cosmetic. `manage-supplements-sheet.tsx` and `injury-sheet.tsx` both do
+  // `if (!res.ok) throw`, then drop the row and toast "deleted" — so a delete that removed nothing
+  // confirms itself and the row returns on the next pull.
+  //
+  // Q-556 reached this conclusion first and shipped 404 on `activity-logs`, leaving that route the
+  // only one of seven doing so. This aligns the rest rather than inventing a new answer.
+  it('404s a DELETE of an absent row, so a no-op is not reported as a success (RV-45)', async () => {
     const { DELETE } = await import('@/app/api/nutrition/meal-types/[id]/route')
     const res = await DELETE(req() as never, { params })
-    expect(res.status).toBe(200)
+    expect(res.status).toBe(404)
   })
 })

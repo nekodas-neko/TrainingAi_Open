@@ -48,6 +48,10 @@ export async function PATCH(req: NextRequest) {
   if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
 
   const repo = await getRepository()
-  await repo.markOuraWorkoutReviewed(session.user.id, id)
+  // RV-48: this was the only one of the measured routes with neither an id-format guard nor a
+  // not-found path. It needs no format guard — `oura_workouts.id` is `text`, so there is no format
+  // to be wrong, which is also why nothing ever failed loudly here. 404 is the whole fix.
+  const marked = await repo.markOuraWorkoutReviewed(session.user.id, id)
+  if (!marked) return NextResponse.json({ error: 'Workout not found' }, { status: 404 })
   return NextResponse.json({ ok: true })
 }
