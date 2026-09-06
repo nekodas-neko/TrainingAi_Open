@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { refusalResponse, isRefusal } from "@/lib/api/route-errors";
+import { refusalResponse, isRefusal, invalidUuidResponse } from "@/lib/api/route-errors";
 import { reportServerError } from "@/lib/observability";
 import { auth } from "@/auth";
 import { requireAdmin } from "@/lib/admin";
@@ -112,6 +112,11 @@ export async function PATCH(req: NextRequest) {
   }
   const { id, ...rest } = (read.body ?? {}) as Record<string, unknown>;
   if (typeof id !== "string" || !id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+  // RV-47: the same route answered 404 for a well-formed missing id and 500 "Update failed" for a
+  // malformed one — one payload, one field, differing only in format. `exercise_library.id` is a
+  // uuid, so the malformed value reached the driver and filed its SELECT into `error_events`.
+  const badId = invalidUuidResponse(id);
+  if (badId) return badId;
 
   const body = ExerciseBody.safeParse(rest);
   if (!body.success) return NextResponse.json({ error: "Invalid body" }, { status: 400 });
@@ -166,7 +171,10 @@ export async function DELETE(req: NextRequest) {
   if (!name) return NextResponse.json({ error: "Missing name" }, { status: 400 });
 
   const repo = await getRepository();
-  await repo.deleteExercise(name);
+  // RV-45's class on the admin surface: this deletes by name, so a stale or misspelled one removed
+  // nothing and still answered `{ ok: true }`.
+  const deleted = await repo.deleteExercise(name);
+  if (!deleted) return NextResponse.json({ error: "Exercise not found" }, { status: 404 });
   invalidateExerciseMuscleMap();
 
   await ensureSchema();

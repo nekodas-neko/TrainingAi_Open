@@ -872,51 +872,53 @@ the home screen depends on (`calendar-data`, `training-load`, `streak-data` appe
 strings in tests) and the external-ingest routes. Pick the dozen that would hurt most and give each
 one route-level test; keep the scan as the ratchet.
 
-### [platform][nutrition] RV-47 — the id guard reaches every path parameter and no request body
+### [platform] LA-60 — the sandbox runs Node 22 and every CI job pins Node 20
 
-- **Lane:** A — the five body-supplied-id mutating routes.
-- **Added:** 2026-09-05, Review sweep 48 —
-  [write-up](reviews/2026-09-05-body-supplied-ids-skip-the-guard.md).
-- **Same class as Q-482**, on the surface Q-482 did not cover. Sweep 47 measured the gap
-  (`invalidUuidResponse` covers **27 of 27** dynamic `[id]` routes and **zero** body-id ones); this
-  shows it is live on three.
+- **Lane:** A — `.github/workflows/ci.yml`, `package.json` (`engines`), `.claude/hooks/`.
+- **Added:** 2026-09-06, found when RV-46's PR went red on `globSync is not a function`.
 
-| Route | malformed body id | well-formed, missing |
-|---|---|---|
-| `PATCH /api/admin/exercises` | **500 "Update failed"** | `404 Exercise not found` |
-| `PATCH /api/nutrition/meal-types` (reorder) | **500, empty body** | `200 {"ok":true}` |
-| `PATCH /api/admin/users` | **500, empty body** | `200 {"ok":true}` |
-| `PATCH /api/workout-entry` | `400 Invalid body` | `404 Not found` ✅ |
+The three CI jobs set `node-version: '20'`; the sandbox this repo is developed in runs **22.22.2**.
+So a local `pnpm test` can pass on an API the job does not have. Measured once, live:
+`fs.globSync` is Node 22+, a new test used it, the full local suite was green and the Tests job
+threw `TypeError: globSync is not a function`.
 
-The first row is self-controlling — one route, one payload, one field differing only in *format*,
-answering 500 and 404. All three 500s file the failing statement into `error_events`:
-`[pg 22P02] Failed query: update "users" set "is_active" = $1 …`. The response bodies are safe (not
-Q-483), but two are **empty**, the symptom `lib/api/route-errors.ts` names in its own header, where a
-client's `res.json()` throws on top of the failure.
+**Nothing catches this.** `tsc` is happy — `@types/node` describes the installed runtime, not the
+one CI pins — and lint has no opinion about it. The failure surfaces only after a push, one CI cycle
+at a time, and only for the subset of Node-22 APIs a change happens to use.
 
-**The fix is already written, in `workout-entry`:** `.uuid()` on the id field of the Zod schema these
-routes already have, so a malformed id is a 400 before any query. One word per route.
+**Two candidate fixes, and the choice is the entry.**
+1. **Pin the sandbox to Node 20** so local and CI agree. Removes the class rather than detecting it,
+   and is the only option that also covers behaviour differences rather than missing functions. Cost
+   is whatever in the sandbox wants 22.
+2. **Raise CI to 22 and add `engines.node`.** Also removes the class, and forward rather than back —
+   but Railway's build image decides what production runs, so this cannot be done from the workflow
+   file alone without checking that first.
 
-### [platform] RV-48 — an update that matched nothing reports success
+Not a detection rule: a hardcoded list of Node-22 APIs goes stale the moment Node 23 ships, and the
+thing that actually needs to be true is that the two runtimes match.
 
-- **Lane:** A — `app/api/admin/users`, `app/api/nutrition/meal-types`, `app/api/oura/workouts`.
-- **Added:** 2026-09-05, Review sweep 48 —
-  [write-up](reviews/2026-09-05-body-supplied-ids-skip-the-guard.md).
-- **Sibling of RV-45, filed separately because the cause differs**: the delete routes discard an
-  affected-row count they could return, these never ask for one.
 
-Each probed with a positive control showing the *same* response after a write that did change the
-database:
+### [app-shell][nutrition] LA-59 — the meal-type reorder ignores the status it is now given
 
-| Route | ghost id | positive control |
-|---|---|---|
-| `PATCH /api/admin/users` | `200 {"ok":true}`, nothing changed | real id + `deactivate` → `200`, `is_active` flips to `f` |
-| `PATCH /api/nutrition/meal-types` (reorder) | `200 {"ok":true}`, order unchanged | real ids → `200`, Lunch moves `sort_order` 2 → 0 |
-| `PATCH /api/oura/workouts` | `200 {"ok":true}` | **not established** — `oura_workouts` has 0 rows locally |
+- **Lane:** B — `components/nutrition/meal-type-manager.tsx`.
+- **Added:** 2026-09-05, found while shipping RV-48.
+- **Needs:** nothing — the engine half is on `main`.
 
-`markOuraWorkoutReviewed` returns `Promise<void>` and its route returns `{ ok: true }`
-unconditionally, so nothing can distinguish the cases from the response. It is also the only one of
-the five with **neither** an id-format guard nor a not-found path.
+`handleDragEnd` fires the reorder as
+`fetch(...).then(() => invalidateMealTypes()).catch(() => toast.error('Failed to save order'))`.
+A `fetch` promise does not reject on a 4xx, so the `.then` runs for every response the server sends
+and the `.catch` only ever sees a transport failure. RV-48 gave that route a 404 for a reorder it
+refused to apply; nothing on this surface reads it.
+
+The other three surfaces touched by RV-45/RV-47/RV-48 already do `if (!res.ok) throw` — the two
+admin ones and the exercise manager — so this is the last of the four, not a general gap. The two
+Oura `PATCH` callers are deliberately fire-and-forget and stay that way.
+
+**The fix is `if (!res.ok)`, and then a refetch rather than only a toast.** A 404 here means the
+list the drag was computed from is stale — a meal type deleted on another device is the realistic
+route to it — so re-reading the list is what actually resolves it. A toast alone leaves the screen
+showing an order the server rejected.
+
 
 ### [platform][nutrition] 🟡 RV-45 — the six sibling deletes now 404; the device path is unchecked
 
@@ -994,32 +996,6 @@ nothing confirms itself to the user, and the row returns on the next pull.
 **Not established:** measured on the web build, where the offline-first clients take their API
 fallback. On device, supplements and injuries write locally and return before the fetch, so for
 those two surfaces this is the fallback path, not the primary.
-
-### [platform] RV-46 — the Q-463 route mapper reaches twelve of the thirteen routes that need it
-
-- **Lane:** A — `app/api/admin/activity-types/route.ts`.
-- **Added:** 2026-09-05, Review sweep 47 —
-  [write-up](reviews/2026-09-05-delete-reports-success-for-nothing.md).
-
-Eighteen repository methods throw a typed `NotFoundError`/`UserFacingError`; thirteen mutating
-routes call one; twelve map it through `refusalResponse`/`routeErrorResponse`. The thirteenth wraps
-only `requireAdmin` in its `try`, leaving `repo.updateActivityType(...)` uncaught on the handler's
-last line:
-
-```
-PATCH {"id":"walk",                  "sortOrder":1}  ->  200  {"activityType":{…}}
-PATCH {"id":"no-such-activity-type", "sortOrder":1}  ->  500  (empty body)
-```
-
-Both symptoms `route-errors.ts` names in its own header: the wrong status, and the **empty body**
-that makes a client's `res.json()` throw on top of the failure. It also writes the row that helper
-exists to prevent — read back straight after the probe:
-`PATCH /api/admin/activity-types | server | Activity type not found`, a correctly-refused request
-recorded as a server fault.
-
-**Low severity, and filed at that level** — admin-only, one caller
-(`activity-type-manager.tsx:146`). It is worth an entry because it is the last unconverted site of a
-class the repo already decided how to fix, and the fix is one line.
 
 ### [workouts] RV-43 — hitting the prescription exactly is scored as progress, and the PR is permanent
 

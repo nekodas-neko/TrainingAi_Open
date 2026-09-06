@@ -7900,3 +7900,18 @@ total is the thing the ingredient list sums to; round the same way the log path 
 and the diary will disagree about the meal that was just saved; and a width warning pointing at
 **BF-116**, where the Home header overflowed into its buttons two days ago after one more item was
 squeezed into a full row.
+## 2026-09-05 — `docs/implementation-backlog.md` → 18370 (RV-47, RV-48 shipped and removed)
+
+A **downward** move by this branch — two completed entries left the queue and one smaller one
+(LA-59, the Lane B half RV-48 exposed) took their place — landing on top of the checkpoint sweep's
+18394. Recomputed from the merged file rather than subtracted from either number, which is the only
+way to get it right when both sides moved the same document. Recorded at all because the ratchet
+only enforces a ceiling: a baseline left above the real count silently hands the next entry free
+lines it did not have to justify.
+
+## 2026-09-06 — `docs/implementation-backlog.md` → 18370 (RV-46 out, LA-60 in)
+
+RV-46 left the queue on shipping and LA-60 took its place — the Node 20/22 split between CI and the
+sandbox, found when this PR went red on an API the local run had. Net upward by the difference
+between a 26-line entry removed and a 28-line one added, which is the honest accounting rather than
+two separate movements.

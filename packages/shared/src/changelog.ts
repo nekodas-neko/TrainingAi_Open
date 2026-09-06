@@ -7,9 +7,16 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: "1.436.12",
-    date: "2026-09-04",
+    date: "2026-09-06",
     changes: [
       "The date and the battery pills at the top of Home no longer run into the buttons beside them. When the row is too narrow the date shortens instead, so the pills stay whole and readable.",
+    ],
+  },
+  {
+    version: "1.436.10",
+    date: "2026-09-06",
+    changes: [
+      "Renaming an activity type that no longer exists used to fail with a blank server error. It now says the activity type was not found.",
     ],
   },
   {

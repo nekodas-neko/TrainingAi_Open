@@ -224,13 +224,33 @@ export async function deleteMealType(db: Db, id: string, userId: string): Promis
   return rows.length > 0
 }
 
-export async function reorderMealTypes(db: Db, userId: string, orderedIds: string[]): Promise<void> {
-  await db.transaction(async tx => {
+/**
+ * RV-48 — all of the ids or none of them.
+ *
+ * Every update was already scoped to the owner, so an id that was not theirs simply matched nothing
+ * and the transaction committed anyway: the route answered `200 {"ok":true}` for an order that was
+ * never applied. Returns false instead, and the pre-check runs inside the transaction so a partly
+ * applied order is never committed.
+ *
+ * All-or-nothing rather than best-effort on purpose. A short list means the client is holding meal
+ * types that no longer exist — a row deleted on another device is the realistic way there — and the
+ * order it computed from that stale list is not the order the user would have chosen from the real
+ * one. Applying the matching part of it commits an arrangement nobody asked for and reports success;
+ * refusing tells the client to refetch, which is the only thing that can actually fix it.
+ */
+export async function reorderMealTypes(db: Db, userId: string, orderedIds: string[]): Promise<boolean> {
+  return db.transaction(async tx => {
+    const live = await tx.select({ id: s.mealTypes.id }).from(s.mealTypes)
+      .where(and(eq(s.mealTypes.userId, userId), isNull(s.mealTypes.deletedAt)))
+    const liveIds = new Set(live.map(r => r.id))
+    if (orderedIds.some(id => !liveIds.has(id))) return false
+
     for (let i = 0; i < orderedIds.length; i++) {
       await tx.update(s.mealTypes)
         .set({ sortOrder: i })
         .where(and(eq(s.mealTypes.id, orderedIds[i]), eq(s.mealTypes.userId, userId), isNull(s.mealTypes.deletedAt)))
     }
+    return true
   })
 }
 
