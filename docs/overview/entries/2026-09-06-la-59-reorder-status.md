@@ -1,6 +1,6 @@
 # 2026-09-06 — LA-59: the meal-type reorder reads the status it is given
 
-**Branch:** `fix/la-59-reorder-status` · **Lane B** · v1.436.19
+**Branch:** `fix/la-59-reorder-status` · **Lane B** · v1.436.20
 
 `handleDragEnd` in `meal-type-manager.tsx` fired the reorder as:
 

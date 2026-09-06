@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.436.19",
+    version: "1.436.20",
     date: "2026-09-06",
     changes: [
       "Dragging your meal types into a new order used to say it saved even when the server refused — which happens when the list on screen still shows a meal type deleted somewhere else. It now tells you, and reloads the list so the order on screen is the one that is actually stored.",
+    ],
+  },
+  {
+    version: "1.436.19",
+    date: "2026-09-06",
+    changes: [
+      "The strength card no longer reads a deload week as a collapse. An exercise whose most recent session was a deload showed an empty bar and a drop equal to your entire one-rep max; it now shows your last real estimate and compares against the one before it.",
     ],
   },
   {

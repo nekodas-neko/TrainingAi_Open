@@ -67,6 +67,7 @@ function linkedEntryNames(rootDir, entriesAbs) {
 }
 
 const failures = [];
+const slack = [];
 const inherited = [];
 
 // Q-424: the ratchet asks whether THIS BRANCH grew the file, not whether the file is over its number.
@@ -82,7 +83,29 @@ for (const [rel, limit] of Object.entries(BASELINE)) {
     continue;
   }
   const lines = fs.readFileSync(abs, 'utf8').split('\n').length;
-  if (lines <= limit) continue;
+
+  // PS-34: this used to be `if (lines <= limit) continue`, so the ratchet only ever pointed one
+  // way. A document could fall well under its number and the slack stayed available for silent
+  // regrowth — CLAUDE.md sat **429 lines** under baseline, i.e. the most-read file in the repo
+  // could grow by more than half its own length with nothing complaining. Its shrink-only siblings
+  // (`check-hex-colors.js`, `check-fetch-once-effects.js`, `check-component-size.js`) all fail on
+  // a stale-high number for exactly this reason; this one did not.
+  //
+  // Failing on slack rather than reporting it, and with no `inherited` escape hatch: lowering a
+  // number is a one-line change with no risk, so "someone else shrank it" is not a reason to leave
+  // the ceiling wrong. That is the opposite of the growth side, where the inherited case is a real
+  // one (Q-424) because the fix there is moving prose, not editing a number.
+  const call = verdict({ count: lines, limit, atBase: null });
+  if (call === 'ok') continue;
+  if (call === 'slack') {
+    slack.push(
+      `${rel} is ${lines} lines against a ${limit}-line baseline — ${limit - lines} line${limit - lines === 1 ? '' : 's'} of slack.\n` +
+        `      Lower the number in ${baselinePathFor(rel)} to ${lines}, in this PR, with a note in\n` +
+        `      docs/doc-size-baseline-history.md. Left as it is, the document can regrow into that\n` +
+        `      slack without the ratchet saying anything.`,
+    );
+    continue;
+  }
 
   const atBase = lineCountAtBase(baseRef, rel);
   if (verdict({ count: lines, limit, atBase }) === 'inherited') {
@@ -101,6 +124,8 @@ for (const [rel, limit] of Object.entries(BASELINE)) {
       `      in docs/doc-size-baseline-history.md, if the growth is genuinely part of the index.`,
   );
 }
+
+failures.push(...slack);
 
 const entriesAbs = path.join(root, ENTRIES_DIR);
 if (fs.existsSync(entriesAbs)) {

@@ -8232,8 +8232,66 @@ Two shorter alternatives were rejected. Cutting the measurement leaves the next 
 it from production. Putting it in a plan doc under `docs/superpowers/plans/` is the usual home for
 this much reasoning, but nothing is designed yet — there is no implementation to plan, and a plan
 that is only a restated brief is a second place for the brief to go stale.
+## 2026-09-06 — `docs/implementation-backlog.md` → 18652, `projectOverview.md` → 10004 (PS-26 shipped)
 
-## 2026-09-06 — `projectOverview.md` → 10040 (LA-59's status paragraph and its verification gap)
+`projectOverview.md` is **down** 7: PS-26's Known-Issues row was struck and moved whole to
+`known-issues-resolved.md` rather than ticked in place.
+
+The backlog number is **recomputed from the merged file**, not from this branch's own edit. PS-26's
+13 lines left the queue while OR-102a/b (#899) and then OR-101 (#875) added considerably more, and
+they land as one number — recomputed on every merge rather than adjusted. Four merges in, that is
+the only method that stays correct: `projectOverview.md` is UP here despite this branch striking a
+row out of it, because concurrent work added more than PS-26 removed. Subtracting the branch's delta from either side would have been wrong in both directions —
+the count is the only thing that is true after a merge.
+
+## 2026-09-06 — CLAUDE.md → 775, lane-a baton → 92, orchestrator → 61 (PS-34: the ratchet now points both ways)
+
+Three **downward** corrections, and the reason they were needed is the change itself. The doc-size
+check treated any count at or under its number as fine, so a document that shrank left the
+difference available for silent regrowth. CLAUDE.md sat **429 lines** under baseline — the most-read
+file in the repo could have grown by more than half its own length with nothing complaining. The
+lane-a baton was 101 under, the orchestrator's 1.
+
+`verdict()` returns `'slack'` for that case now and the check fails on it, so a baseline can no
+longer drift high. Each of these three is set to its exact current count.
+
+## 2026-09-06 — `docs/implementation-backlog.md` → 18663, `projectOverview.md` → 10022 (PS-34 shipped)
+
+Both up. PS-34's entry left the queue and LA-62 replaced it — longer, because the eighteen live
+accessibility findings it carries need their file counts written down to be actionable, and because
+it has to say why the scan must not be narrowed again. `projectOverview.md` gains the matching
+Known-Issues row.
+
+## 2026-09-06 — `docs/implementation-backlog.md` 18,663 → 18,838 (+175), BF-123…BF-128
+
+Six entries from one owner pass over a generated program and the screens around it. Two are UI
+(BF-123 the tap-target floor, BF-124 the role picker), two are the role model (BF-125 no editor on
+the review screen, BF-126 no distribution invariant at generation), and two came out of the owner's
+two questions about the prescription itself (BF-127 the pull-up load, BF-128 the exercise count).
+
+Roughly 29 lines each, and the length is measurement in four of the six:
+
+- **BF-127** states the arithmetic that produced the wrong number — `estimated_1rm = 118.25` for a
+  `bodyweight` exercise, computed against `BW_REF = 100` while the owner weighs 70.65 kg, ×0.7 →
+  82.5 rendered as kg. Without those figures the entry reads as a formatting nit rather than an
+  instruction to load a weight that does not correspond to anything.
+- **BF-128** carries the full budget calculation (51 working minutes, an 856/450 s blend, 694 s
+  average → 4) *and* the 90-day history it disagrees with (62 sessions, median 5 exercises in a
+  median 56.2 minutes). Either half alone is unconvincing: the arithmetic without the history is a
+  theory about a constant, and the history without the arithmetic gives the implementer nothing to
+  change. Together they name the term to remove and the evidence for removing it.
+- **BF-123** and **BF-127** both spend lines on the fact that the repo had already diagnosed their
+  bug class once — `switch.tsx:19` for the 48 px floor, `1rm.ts:218` for the kg/RM display basis —
+  and that the fix exists and was never swept to the siblings. That is the actionable part: the
+  entry is a sweep against a known pattern, not an investigation.
+
+Two things were deliberately kept out. BF-126 does not specify the invariant (one primary? at most
+one secondary?) because one generated program is the whole evidence base, and it says so — a rule
+fitted to a single roll would forbid a legitimate two-compound pull day. And no plan doc was written
+for any of the six; each fix is small enough that a plan would restate the entry.
+
+
+## 2026-09-06 — `projectOverview.md` → 10051 (LA-59's status paragraph and its verification gap)
 
 Twenty-one lines, and eleven of them are the Known-Issues row rather than the fix. The fix itself
 compresses to a sentence — a `fetch` promise does not reject on a 4xx — but what is *not* verified
