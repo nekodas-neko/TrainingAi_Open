@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { perPortion, showsPerPortion } from '@/components/nutrition/meal-builder-portions';
 import { oneServingItems } from '@trainingai/shared/nutrition/saved-meal-ingredients';
+import type { SavedMeal } from '@trainingai/shared/types/nutrition';
 
 // The owner's screenshot: Protein Pancakes, 4 portions.
 const PANCAKES = { calories: 983, protein: 52, carbs: 103, fat: 39 };
@@ -61,12 +62,12 @@ describe('it agrees with the canonical per-portion path', () => {
         { id: 'b', savedMealId: 'm', foodItemId: 'f2', quantityMultiplier: 1,
           foodItem: { id: 'f2', name: 'B', servingSizeG: 100, calories: 383, proteinG: 12, carbsG: 43, fatG: 19 } },
       ],
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any;
+      // Cast to the real type rather than `any`: this fixture stands in for a saved meal, and a
+      // shape that drifts from `SavedMeal` should fail here rather than pass by being untyped.
+    } as unknown as SavedMeal;
     const scaled = oneServingItems(meal);
     const sum = (k: 'calories' | 'proteinG' | 'carbsG' | 'fatG') =>
-      scaled.reduce((a: number, i: { quantityMultiplier: number; foodItem: Record<string, number> }) =>
-        a + i.foodItem[k] * i.quantityMultiplier, 0);
+      scaled.reduce<number>((a, i) => a + (i.foodItem?.[k] ?? 0) * i.quantityMultiplier, 0);
     const batch = { calories: 300 * 2 + 383, protein: 20 * 2 + 12, carbs: 30 * 2 + 43, fat: 10 * 2 + 19 };
     const p = perPortion(batch, 4);
     expect(p.calories).toBeCloseTo(sum('calories'), 10);

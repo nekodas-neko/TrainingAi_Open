@@ -52,6 +52,15 @@ inline `batchKcal / servings` is gone, both lines are labelled, and `MacroLine` 
 
 `tsc` clean · lint clean · `pnpm check:rules` **Ran 68 of 68** · full unit suite green.
 
+**CI's Build failed first, and the reason is worth carrying.** `npx tsc --noEmit` was clean and said
+nothing, because `tsconfig.json` excludes `**/__tests__/**` — the whole point of LB-37 and of
+`scripts/check-test-typecheck.js`, which runs inside the Build job. A **new** spec is checked
+immediately rather than baselined, and this one had five errors in one hand-written `reduce`
+callback. Local `next build` passed too, since the typecheck is a separate step after it.
+**The gate to run before pushing a new test file is `node scripts/check-test-typecheck.js`, not
+`tsc`** — and the fix was to type the fixture as `SavedMeal` rather than `any`, so a shape that
+drifts from the real type fails here instead of passing by being untyped.
+
 ## Not exercised — and for a layout change this matters
 
 **The two lines have not been seen at 412 dp.** For a change whose stated risk is *width*, that is
