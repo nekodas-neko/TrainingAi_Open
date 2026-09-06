@@ -8261,3 +8261,9 @@ Both up. PS-34's entry left the queue and LA-62 replaced it — longer, because 
 accessibility findings it carries need their file counts written down to be actionable, and because
 it has to say why the scan must not be narrowed again. `projectOverview.md` gains the matching
 Known-Issues row.
+
+## 2026-09-06 — `docs/implementation-backlog.md` → 18630, `projectOverview.md` → 10036 (OR-102a shipped)
+
+The backlog is DOWN 33: OR-102a left the queue and nothing replaced it, because its follow-up half
+(OR-102b, the surface) was already filed alongside it. `projectOverview.md` gains a Known-Issues row
+for the one thing genuinely outstanding — local SQLite v38 has never been opened on a device.

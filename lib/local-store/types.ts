@@ -598,6 +598,22 @@ export interface LocalSupplement {
   deletedAt?:      string | null;
 }
 
+/**
+ * A vial as the device sees it (OR-102a). Read-only: vials are created server-side and arrive in
+ * the pull delta. Concentration is not a field — it is `strengthMg / waterMl`, derived by
+ * `@trainingai/shared/health/vial-dose`.
+ */
+export interface LocalSupplementVial {
+  id:                string;
+  supplementId:      string;
+  strengthMg:        number;
+  waterMl:           number;
+  syringeUnitsPerMl: number;
+  openedOn:          string;
+  updatedAt:         string;
+  deletedAt?:        string | null;
+}
+
 export interface LocalSupplementLog {
   id:           string;
   supplementId: string;
@@ -615,6 +631,15 @@ export interface LocalSupplementLog {
   // `upsertSupplementLog` defaults to `'manual'`, which is what every writer today is.
   source?:      'manual' | 'meal';
   sourceRef?:   string | null;
+  // OR-102a — WHEN it was taken, and the reconstitution frozen at that moment. Optional for the
+  // same reason as the BF-3 fields above: every existing writer constructs a log without them, and
+  // `upsertSupplementLog` fills them from the local `supplements`/`supplement_vials` rows when the
+  // caller omits them. Filling them LOCALLY is the point — a log stamped by the server at push
+  // time would carry whatever vial is current when sync happens, not when the dose was taken.
+  takenAt?:        string | null;
+  vialStrengthMg?: number | null;
+  vialWaterMl?:    number | null;
+  vialUnitsPerMl?: number | null;
   updatedAt:    string;
   deletedAt:    string | null;
   syncStatus:   'pending' | 'synced';

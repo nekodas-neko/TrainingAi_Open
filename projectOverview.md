@@ -1689,6 +1689,20 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [platform][body] 🟡 The vial and dose-time engine is unverified on device (OR-102a, 2026-09-06)
+
+Shipped in v1.436.20: Postgres migrations 267/268 and **local SQLite v38** add a vial record
+(`strength_mg`, `water_ml`, `syringe_units_per_ml`, `opened_on`), `supplement_logs.taken_at`, and
+the reconstitution frozen on each log so a historical dose in syringe units survives the next vial
+being mixed at a different volume. Four API routes and the sync mirroring are in.
+
+**Not verified on device.** `getLocalStore` returns null in the sandbox, so v38's ALTERs, the
+read-only vial mirror and the offline stamp are covered by unit test and by reading, never by
+running. The server half needs no APK — Railway delivers it — but the local-store half is
+device-only. Smoke-run it before trusting an offline dose to carry its own freeze.
+
+**No UI yet**; OR-102b is the surface half. Nothing on screen reads any of this.
+
 ### [app-shell] 🟡 Eighteen icon-only buttons announce as "button" and nothing else (LA-62, 2026-09-06)
 
 An icon-only control with no accessible name is read out by a screen reader as "button", with

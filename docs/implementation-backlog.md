@@ -14,8 +14,8 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **267** | `lib/data/postgres/migrations/` |
-| Local SQLite schema version | **v37** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
+| Next free Postgres migration | **269** | `lib/data/postgres/migrations/` |
+| Local SQLite schema version | **v38** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
 > never were safely: a next-free pointer is a *floor*, not an authority, because it cannot see an
@@ -389,39 +389,6 @@ below threshold and left in place for next time.
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
 
-
-### [platform][body] OR-102a — the reta tracker, engine half: a vial record and a dose TIMESTAMP
-
-- **Lane:** A — one migration plus the repository/sync mirroring. **Small, and it is the only half
-  that cannot be repaired afterwards.**
-- **Added:** 2026-09-06 · owner, specifying the tracker in four parts (see **OR-102b**).
-- **Two columns' worth of work, and both exist because of something already measured:**
-
-  **1. A vial record**, so the calculator has a concentration: `strength_mg`, `water_ml`,
-  `syringe_units_per_ml` (default 100 for a U-100 barrel), `opened_on`. Concentration derives; it is
-  never stored as its own truth.
-  - **Owner: reconstitution is stable** — *"I reconstitute a vial and will use it for weeks at a
-    time."* So the newest vial is the **sticky default** and carries forward. Opening a new one is an
-    explicit action, not a form to refill each dose.
-  - **⚠ STAMP THE RECONSTITUTION ON THE LOG, NOT ONLY THE VIAL.** Mix the next vial at a different
-    volume and the *same* milligram dose becomes a different number of units. The stored mg stays
-    correct; a historical *"15 units"* silently starts reading wrong. This is BF-3's dose-freezing
-    rule one layer up, it is the reason this entry is Lane A, and it is the single thing here that
-    cannot be back-filled.
-
-  **2. `supplement_logs.taken_at` — a real timestamp.** Verified 2026-09-06: the table has
-  **`log_date`, a DATE, and no time at all** (`schema.ts:1082`). The owner's request — *"marks the
-  day time when the dose used… correlate sleep/HR everything to the dose"* — is not expressible
-  today. Nullable, defaulting to the moment of the tick, editable after the fact.
-  - **This is the column that makes the one honest analysis possible.** Dose, cumulative level and
-    elapsed time all rise together on a titration, so almost nothing separates them — **except
-    hours-since-dose within a single week**, which varies while the dose is held constant. Without a
-    time, that contrast does not exist and the tracker can only ever show correlations confounded by
-    the schedule.
-
-- **Nothing else changes.** `amount`/`unit`/`dose_text` already exist and already freeze (BF-3,
-  migration 244); `started_on`/`stopped_on` shipped in #896.
-- **Reversal cost:** a corrective migration. Additive columns only, no rewrite of existing rows.
 
 ### [nutrition][body] OR-102b — the reta tracker: vial setup, dose calculator, dose timeline, weight response
 
