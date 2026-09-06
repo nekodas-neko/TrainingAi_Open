@@ -26,8 +26,24 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.436.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-09-03.
+**Version:** v1.436.13 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-09-06.
+
+**A dose can be typed in at last (BF-112, stage 2 of BF-69).** The storage shipped 2026-09-01 and
+nothing could write to it: production held two supplements with `default_amount`, `unit`,
+`dose_prompt` and `started_on` all empty, and one log of any kind, from June — with the owner due to
+start dosing on **2026-09-06**. The manage sheet now carries an amount, a unit, the started/stopped
+window and an *ask me each time* switch; a supplement with that switch asks for the number when it is
+ticked, pre-filled from the definition. The row's second line reads **what today's log recorded**,
+not what the definition currently says, so changing the dose later does not rewrite a past day —
+verified live by patching a definition from 2.5 mg to 10 mg while its earlier log kept reading 5 mg.
+**Two defects were found while verifying and both are fixed here:** the nutrition page's local-first
+branch dropped every new field, so the prompt would never have fired **on the device** while working
+in the browser; and the tick left the previous log's number on screen until the next pull. **Not
+device-verified** — which is precisely the surface the first defect was hiding on. Left behind as
+**LB-57**: the day's exposure is now derived once per lane, and the single home is `packages/shared`,
+which Lane B may not write
+([journal](docs/overview/entries/2026-09-06-bf-112-dose-entry.md)).
 
 **The HR Recovery Profile now says how much of it is signal (Q-516).** `aggregateHrRecoveryProfile`
 has returned `informativeShare` since the re-banding and **nothing rendered it** — the state the
@@ -1630,21 +1646,60 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
-### [platform] 🟠 Deactivation does not deactivate: the `isActive` gate never runs on an API route (LA-58, 2026-09-04)
+### [body] The DEXA-calibration label on the BMI card has never been rendered (BF-113, 2026-09-06)
 
-`middleware.ts`'s matcher excludes `api` as its first exclusion, so the deactivation branch cannot
-run on any of the **219** `app/api/**/route.ts` files. Each of them calls `auth()` and checks
-`session?.user?.id`; **none checks `isActive`**, and there is no shared route-auth helper to add it
-to in one place.
+The caption now reads `via body fat % (DEXA-calibrated)` on a corrected reading, and **neither branch
+of it has been seen on a screen.** Against `pnpm dev` the BMI card rendered its *"No data"* state —
+`metaRecent` does not reach the client for the seeded user, so `bmi` is null and neither the caption
+nor the popover is on the page; seeding a body-fat row did not change it, and the corrected case
+needs more still, because `bodyFatIsCorrected` is computed server-side from a DEXA calibration and
+cannot be produced by inserting a reading. The flag is proven by unit test and the wiring by source
+guard; the rendering by neither. **On the S25: a corrected reading must show the calibration under an
+unchanged band, and an uncorrected one must not claim it.** The same gap applies to BF-114's BMR
+provenance labels, on the same card, for the same reason.
+[journal](docs/overview/entries/2026-09-04-bf-113-bmi-dexa-label.md).
 
-A deactivated or still-pending user therefore keeps full API access to **their own** data while their
-session cookie is valid. Not a cross-user leak — the routes are user-scoped — so it reads as
-"deactivation stops the UI and nothing else". The browser bounces them to `/pending`; `curl` with
-their cookie does not.
+### [platform] 🔴 REOPENED — deactivation still does not deactivate: the claim LA-58's gate reads never refreshes (PS-24, 2026-09-06)
 
-Found while assessing Q-1a, which names it as a precondition for bearer auth. That framing is why it
-sat: it reads as future work for a feature that has not started, and it is live now. **LA-58 carries
-the three candidate fixes with a recommendation; it is `Gate: owner` because it is an auth change.**
+The app checkpoint confirmed live: `is_active=false` for a signed-in account and its existing cookie
+kept answering 200 on API routes and pages; only a fresh sign-in is blocked. LA-58's 403 gate works
+(a hand-minted `isActive:false` claim is refused — control held) but the claim is stamped at sign-in
+and never refreshed on the path that matters: the Edge middleware runs `NextAuth(authConfig)` with no
+refresh in its jwt callback and re-signs the stale claim with a fresh 7-day expiry every request;
+`refreshIsActiveClaim` is wired only into the Node `auth()` whose re-signed cookie is discarded. Same
+mechanism defers an `isAdmin` revocation indefinitely. **PS-24, top of the queue.**
+[Checkpoint](docs/reviews/2026-09-05-app-checkpoint.md) §2.
+
+### [platform] 🔴 The login rate limiter is bypassed by whitespace-padding the email (PS-25, 2026-09-06)
+
+`auth.ts:26` keys on the untrimmed email, `:29` looks up the trimmed one — each padding variant is a
+fresh 20-attempt bucket against the same account (live: attempt 21 plain refused, attempt 22 padded
+signed in). No IP-keyed limit on the endpoint. [Checkpoint](docs/reviews/2026-09-05-app-checkpoint.md) §2.
+
+### [workouts][app-shell] 🟡 Confirming a deload on Home leaves full-intensity weights on screen for up to 6 h (RV-49, 2026-09-06)
+
+Owner-reported and mechanism-confirmed: the Home confirm calls `invalidatePrescriptionChanged()`
+without a sessionId, so the group's conditional skips every `workout-card:<id>`, and `next-session`
+is not in the group at all — the two keys the recommendation and session cards read, two of them via
+raw seed-only `readCacheSync` that can never revalidate (RV-50). Q-117's fix reached only the
+id-passing caller. One-line fixes each; a Playwright repaint assertion rides the fix.
+[Sweep 49](docs/reviews/2026-09-06-deload-confirm-eviction-gap.md). The nutrition add surface was
+swept in the same pass and is **clean at source** — if the food-add symptom persists after RV-49
+ships, one repro (which screen added from, which screen stale) routes it.
+
+### [workouts] 🟡 The strength card shows a deload as a full-1RM crash — live on 16 of 34 exercises (PS-26, 2026-09-06)
+
+`strength-progress.ts` guards the previous 1RM (Q-298) but not the current one, so an exercise whose
+latest log is a deload (`estimated_1rm = 0` by design) renders "−<full 1RM> kg" and a 0 % bar.
+Production: 16 of the owner's 34 exercises are in that state today. Prescription unaffected.
+[Checkpoint](docs/reviews/2026-09-05-app-checkpoint.md) §P5.
+
+### [devices][readiness] 🟡 The ring's stored wear time read 0.3–1.5 h on 20 consecutive scored nights (PS-30, 2026-09-06)
+
+2026-08-14→09-02, `oura_daily.non_wear_time_sec` says the ring was barely worn on days whose
+summaries carry 7–9 h nights with HRV — feeding `isLowWearToday`, the baseline exclusions and the
+wear chart a false signal. 09-03+ is sane; mechanism not established (suspect the incremental
+rollup's narrowed window). [Checkpoint](docs/reviews/2026-09-05-app-checkpoint.md) §P5.
 
 ### [devices][body] 🟡 The scale's "Weighing you…" gate shipped UNVERIFIED on device (Q-104/Q-114, 2026-09-04)
 
@@ -1671,6 +1726,86 @@ and neither is how long a weigh-in actually takes.
 
 **What to watch on the next APK:** the bar not appearing on a plain Home-tab visit with an empty
 scale, and a genuine weigh-in still drawing one.
+
+### [platform][nutrition] ⚠️ A malformed id in a request body reaches the driver and answers 500 (RV-47, 2026-09-05)
+
+`invalidUuidResponse` is applied to **27 of 27** dynamic `[id]` routes and **zero** body-id ones.
+`PATCH /api/admin/exercises` answers **500** for `not-a-uuid` and `404` for a well-formed missing id —
+one route, one payload, one field differing only in format. `PATCH /api/admin/users` and
+`PATCH /api/nutrition/meal-types` answer **500 with an empty body**. All three file the raw failing
+statement into `error_events` (`[pg 22P02] Failed query: update "users" set "is_active" = $1 …`).
+Response bodies are safe, so this is Q-482's status half, not Q-483. The fix is already written in
+`PATCH /api/workout-entry`: `.uuid()` on the id field of the schema these routes already have.
+[Sweep 48](docs/reviews/2026-09-05-body-supplied-ids-skip-the-guard.md).
+
+### [platform] ⚠️ Three update routes report success for a write that matched nothing (RV-48, 2026-09-05)
+
+`PATCH /api/admin/users`, `PATCH /api/nutrition/meal-types` (reorder) and `PATCH /api/oura/workouts`
+answer `200 {"ok":true}` for an id that does not exist. Each was probed against a positive control
+where the same response follows a write that *did* change the database — deactivating a real user
+flips `is_active`, reordering real ids moves `sort_order` — so the response cannot distinguish them.
+`markOuraWorkoutReviewed` returns `Promise<void>` and its route returns `{ok:true}` unconditionally;
+it is the only one with neither an id guard nor a not-found path, and its positive control is **not
+established** (`oura_workouts` has 0 rows locally). Sibling of RV-45, different cause.
+[Sweep 48](docs/reviews/2026-09-05-body-supplied-ids-skip-the-guard.md).
+
+### [platform][nutrition] 🟡 Q-556's 404 shipped on one delete route; six siblings still answer 200 (RV-45, 2026-09-05)
+
+`app/api/activity-logs/route.ts:70` answers 404 when a delete matches no row, and its comment says
+the change was made to *"Match every sibling delete: 404 for both a nonexistent id and someone
+else's."* **Six siblings answer 200 to both** — `supplements/[id]`, `supplements/[id]/log`,
+`injuries/[id]`, `nutrition/food-logs/[id]`, `nutrition/saved-meals/[id]`,
+`nutrition/meal-types/[id]`, plus `admin/activity-types`. Each was probed beside a malformed id
+returning `400 Invalid id`, so the route matched and its guard ran.
+
+**Ownership is enforced; the answer is what is wrong.** A second account deleting the first's
+supplement got `200 {"ok":true}` with the row still in Postgres, owner unchanged — a correct refusal
+reported as a success, so nothing distinguishes it and nothing reaches `error_events`. The clients
+(`manage-supplements-sheet.tsx:166`, `injury-sheet.tsx:179`) gate on `res.ok` alone, drop the row and
+toast "deleted"; it returns on the next pull.
+
+The 2026-08-18 review deliberately declined to file these on idempotency grounds, which is correct
+for the owner's own already-deleted row and false in the cross-account case. Q-556 later reached the
+opposite conclusion and shipped it on one route. Nothing blocks the rest: the outbox precondition
+Q-556 names holds identically for every sibling domain.
+**Not device-verified** — measured on the web build, where the offline-first clients take their API
+fallback. [Sweep 47](docs/reviews/2026-09-05-delete-reports-success-for-nothing.md).
+
+### [platform] ⚠️ `PATCH /api/admin/activity-types` answers 500 with an empty body for a not-found (RV-46, 2026-09-05)
+
+The one route of thirteen calling a typed-throwing repository method that does not use the Q-463
+mapper: its `try` wraps only `requireAdmin`, so `updateActivityType`'s `NotFoundError` reaches Next's
+default handler. The same payload with one field changed gives `200` for a real id and `500` with an
+**empty body** for a missing one — both symptoms `lib/api/route-errors.ts` names in its own header —
+and writes `PATCH /api/admin/activity-types | server | Activity type not found` into `error_events`,
+the table that mapper exists to keep clean. Admin-only, one caller, one-line fix.
+[Sweep 47](docs/reviews/2026-09-05-delete-reports-success-for-nothing.md).
+
+### [workouts] 🟡 Hitting the prescription exactly is scored as progress, and the PR is permanent (RV-43, 2026-09-03)
+
+`1rm.ts` states — and the 2026-07-10 workout review repeated as a strength — that `prescriptionFactor`
+makes *"exact adherence 1RM-neutral"*. It is neutral for the exact prescribed weight and broken by the
+plate rounding in between. The prescription ceiling-rounds to the plate step (deliberately: *"slight
+overload is better than underload"*), then `prescriptionFactor` cancels the rep terms and leaves
+`weight × 100/pct`, **amplifying the round-up by 1/pct** — 1.43× at 70%. Nothing in either file
+mentions the other.
+
+Measured over 1,201 starting 1RMs (60–180 kg, 3×8 @70%, exact adherence): **p50 +2.60%, p90 +7.12%,
+max +13.55%** on a barbell, settling in 3 sessions; only 1% of starts see no ratchet. It converges
+rather than running away, which caps the severity. But `log-exercise.ts:327` feeds the estimate to
+`upsertPersonalRecordIfBetter`, which is monotone — so the inflation becomes a permanent all-time PR.
+**The fix is a scoring decision** (compute the estimate from the prescribed weight rather than the
+rounded one), so it is `Gate: owner`.
+[`Review sweep 46`](docs/reviews/2026-09-03-progression-exact-adherence-ratchet.md). **Arithmetic
+against the shipped module; no production data read.**
+
+### [nutrition] ⚠️ Nine longhand Atwater sites in the two files `atwater.ts` never reached (RV-44, 2026-09-03)
+
+`scan-totals.ts` (5 sites) and `meal-split.ts` (4) write `* 4` / `* 4` / `* 9` by hand and import
+neither `KCAL_PER_G` nor anything else, in a module created by LB-9 to stop exactly that. **No number
+is wrong today** — all nine agree and the factors are physiological constants — so this is a
+consistency finding, filed at that level.
+[`§3`](docs/reviews/2026-09-03-progression-exact-adherence-ratchet.md).
 
 ### [nutrition][platform] 🟡 A meal plan can point at another account's saved meal and meal type (RV-42, 2026-09-03)
 
@@ -9781,7 +9916,7 @@ append-only session journal and the batched archives live under `docs/`:
 | `docs/overview/entries/` | **Recent journal (uncompacted)** — one file per PR/session (`YYYY-MM-DD-<slug>.md`); read these + the newest history file for "what happened lately". Folded into the batched history by the compaction sweep — see the README there. **Corrected 2026-07-30:** this line said "near-empty (compacted 2026-07-20)" but the directory holds ~179 files from 07-20→07-29 — the compaction sweep is overdue; a future session should run it. |
 | [`docs/agents/README.md`](docs/agents/README.md) | **The standing agents** — the four roles, their authority, the two-lane file-ownership contract, the Q-number bands, and the handoff protocol. Cold-start prompts in `docs/agents/prompts/`, live batons in `docs/agents/state/` |
 | `docs/overview/status-archive.md` | The 157 dated status notes that had accumulated in this file's Current Status section, archived 2026-08-17. Superseded by the journal; do not add to it |
-| [`docs/overview/history-2026-08-25.md`](docs/overview/history-2026-08-25.md) … `history-2026-07-17.md` | **Completed journal (batched)** — eleven files covering 2026-07-17 → 2026-08-24, folded from 498 + 41 loose entries by the 2026-08-17 and 2026-08-18 compaction sweeps, oldest-first within each. Every entry keeps a `<!-- from: … -->` marker naming the PR file it came from. `history-2026-08-18.md` was started because `history-2026-08-15.md` had passed the ~250 KB rule at 300 KB, and `history-2026-08-24.md` because `history-2026-08-18.md` had, at 326 KB. **The 2026-08-24 sweep folded 57 of 153 loose entries**, and **the 2026-08-25 sweep (LA-25) folded 25 of 191, taking unlinked 59 → 34** — the rest are cited by path from `projectOverview.md`, the domain indexes or an agent baton, and folding a linked entry breaks those citations. `history-2026-08-25.md` was started because `history-2026-08-24.md` was at 223 KB and 25 more entries would have passed the ~250 KB rule |
+| [`docs/overview/history-2026-09-06.md`](docs/overview/history-2026-09-06.md) … `history-2026-07-17.md` | **Completed journal (batched)** — fifteen files covering 2026-07-17 → 2026-09-06, folded from 498 + 41 loose entries by the 2026-08-17 and 2026-08-18 compaction sweeps, oldest-first within each. Every entry keeps a `<!-- from: … -->` marker naming the PR file it came from. `history-2026-08-18.md` was started because `history-2026-08-15.md` had passed the ~250 KB rule at 300 KB, and `history-2026-08-24.md` because `history-2026-08-18.md` had, at 326 KB. **The 2026-08-24 sweep folded 57 of 153 loose entries**, and **the 2026-08-25 sweep (LA-25) folded 25 of 191, taking unlinked 59 → 34** — the rest are cited by path from `projectOverview.md`, the domain indexes or an agent baton, and folding a linked entry breaks those citations. `history-2026-08-25.md` was started because `history-2026-08-24.md` was at 223 KB and 25 more entries would have passed the ~250 KB rule. **The 2026-09-06 sweep folded 46 of 320**, taking unlinked to **0** and the directory to **274** — it was run because the directory sat at exactly its 320 total ceiling, and that branch of the check has no BF-36 attribution, so it fails whichever PR is open when the count crosses rather than the one that grew it. `history-2026-09-06.md` was started rather than appending 172 KB to `history-2026-09-01.md`'s 105 KB |
 | `docs/overview/history-2026-07-20.md` | **Completed journal (batched)** — the 2026-07-17 → 2026-07-20 loose entries, compacted 2026-07-20, newest at top |
 | `docs/overview/history-2026-07-16.md` | **Completed journal (batched)** — sessions 2026-07-16 → 2026-07-17, newest at top |
 | `docs/overview/history-current.md` | Sessions ~287 → 2026-07-16 (closed batch) |

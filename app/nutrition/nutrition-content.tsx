@@ -30,9 +30,9 @@ import { Button } from "@/components/ui/button";
 import { ScreenHeader } from "@/components/shell/screen-header";
 import { Switch } from "@/components/ui/switch";
 import type { MealType, FoodLogWithItem, NutritionTargets, MealPlan } from "@trainingai/shared/types/nutrition";
-import type { SupplementWithStatus } from "@trainingai/shared/types/supplement";
+import { useSupplements } from "@/lib/hooks/use-supplements";
 import { toast } from "sonner";
-import { cachedFetch, cachedFetchToday, readCacheSync, readTodayCacheSync, isBodyMetadataFresh } from "@/lib/sqlite/cache";
+import { cachedFetch, readCacheSync, isBodyMetadataFresh } from "@/lib/sqlite/cache";
 import { invalidateNutritionWrite } from "@/lib/cache-groups";
 import { TTL_MEDIUM, TTL_LONG, ENERGY_BALANCE_TTL } from '@trainingai/shared/cache-ttl';
 import { todayInTz, shiftDateStr } from "@trainingai/shared/date-utils";
@@ -145,8 +145,6 @@ export default function NutritionContent({ userId }: { userId?: string }) {
   // longer exists, so the call site read `onEndOfDay={() => setChatOpen(true)}` and every reader had
   // to already know those were the same thing.
   const [reviewOpen, setReviewOpen] = useState(false);
-  const [supplements, setSupplements] = useState<SupplementWithStatus[]>([])
-  const [supplementsLoading, setSupplementsLoading] = useState(true)
 
   // Seed from localStorage/SQLite cache synchronously before first paint so the
   // page renders with data immediately rather than showing a blank state.
@@ -166,8 +164,6 @@ export default function NutritionContent({ userId }: { userId?: string }) {
     if (meta && isBodyMetadataFresh(meta, tz)) {
       if (meta.today?.waterMl != null) setTodayWaterMl(meta.today.waterMl);
     }
-    const supps = readTodayCacheSync<SupplementWithStatus[]>('supplements');
-    if (supps) { setSupplements(Array.isArray(supps) ? supps : []); setSupplementsLoading(false); }
     const balance = readCacheSync<EnergyBalanceResponse>(`energy-balance:${today}`);
     if (balance) setEnergyBalance(balance);
     const plans = readCacheSync<MealPlansResponse>('meal-plans');
@@ -310,6 +306,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
   useEffect(() => { fetchData(selectedDate); }, [fetchData, selectedDate]);
 
   const { epoch: tabEpoch } = useTabVisibility();
+  const { supplements, setSupplements, loading: supplementsLoading } = useSupplements(userId, tz, tabEpoch);
   const lastVisibleDayRef = useRef(todayStr);
   const catchUpToToday = useCallback(() => {
     const today = todayInTz(tz);
@@ -343,43 +340,6 @@ export default function NutritionContent({ userId }: { userId?: string }) {
     }).catch(() => {});
   }, [userId]);
 
-  useEffect(() => {
-    const today = todayInTz(tz);
-    const store = userId ? getLocalStore(userId) : null;
-    if (store) {
-      Promise.all([store.getSupplements(), store.getSupplementLogs(today)]).then(([defs, logs]) => {
-        if (defs.length > 0) {
-          const loggedIds = new Set(logs.map(l => l.supplementId));
-          setSupplements(defs.map(s => ({
-            id: s.id, userId: userId!, name: s.name, dose: s.dose,
-            reminderEnabled: s.reminderEnabled, reminderTime: s.reminderTime,
-            sortOrder: s.sortOrder, active: s.active,
-            createdAt: s.updatedAt, loggedToday: loggedIds.has(s.id),
-          })));
-          setSupplementsLoading(false);
-          return;
-        }
-        throw new Error('empty');
-      }).catch(() => {
-        cachedFetchToday<SupplementWithStatus[]>(
-          'supplements', '/api/supplements', TTL_MEDIUM,
-          d => setSupplements(Array.isArray(d) ? d : []),
-        ).catch(() => {}).finally(() => setSupplementsLoading(false));
-      });
-    } else {
-      // cachedFetchToday, not cachedFetch: the same key is written by the today-variant at the
-      // seed site (`readTodayCacheSync` above), by the sync-provider's warm pass, and by the
-      // fallback directly above. Mixing variants on one key means incompatible envelopes
-      // ({date,data} vs a raw array), so whichever wrote last decided whether this branch saw an
-      // array at all — and when it did not, the section rendered empty (Q-124b, the weekly-stats
-      // crash class). This branch is reachable on device too, not just web: getLocalStore returns
-      // null whenever the store failed to open or before userId resolves.
-      cachedFetchToday<SupplementWithStatus[]>(
-        'supplements', '/api/supplements', TTL_MEDIUM,
-        d => setSupplements(Array.isArray(d) ? d : []),
-      ).catch(() => {}).finally(() => setSupplementsLoading(false));
-    }
-  }, [userId, tabEpoch, tz])
 
   const totals = logs.reduce(
     (acc, l) => ({ calories: acc.calories + l.calories, proteinG: acc.proteinG + l.proteinG, carbsG: acc.carbsG + l.carbsG, fatG: acc.fatG + l.fatG }),
