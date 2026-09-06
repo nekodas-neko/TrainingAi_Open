@@ -7868,9 +7868,43 @@ deliberate plateau. Also a workaround usable tomorrow, since nothing is built an
 `dose_text` freezes on the log at log time, so ticking a named supplement captures the dose dates,
 which are the half that cannot be reconstructed later.
 
-## 2026-09-05 — `docs/implementation-backlog.md` → 18061 (RV-47, RV-48 shipped and removed)
+## 2026-09-05 — `docs/implementation-backlog.md` unchanged at 18060 (BF-112 moved to the queue head)
 
-A **downward** move, so it needs no argument for the growth — two completed entries left the queue
-and one smaller one (LA-59, the Lane B half RV-48 exposed) took their place. Recorded because the
-ratchet only enforces a ceiling: leaving the baseline at 18085 would silently hand the next entry 24
-free lines it did not have to justify.
+No size change; a move. The owner starts dosing on 2026-09-06 and asked for this at the top, so
+BF-112 goes from Lane B READY #6 to #1. Queue position is priority in this file, so the reorder is
+the whole mechanism — nothing else needed editing, and `grep '^### '` sorted is identical to
+`origin/main`, which is the check that the move did not silently drop or resurrect an entry.
+## 2026-09-06 — `docs/implementation-backlog.md` → 18325, `projectOverview.md` → 9907 (app checkpoint: PS-24…PS-39)
+
+Sixteen entries from a twenty-six-lane checkpoint, already capped by class — ~45 verified findings
+folded into 16 entries (six rule-bypass shapes are one entry; the nutrition paper cuts are one; the
+docs sweep is one). Four Known-Issues rows plus the reopened LA-58 row carry the two escalations and
+the two live-data defects. The checkpoint report itself is a review doc, not index growth.
+
+## 2026-09-06 — `docs/implementation-backlog.md` → 18355, `projectOverview.md` → 9918 (sweep 49: RV-49, RV-50)
+
+Two entries and one Known-Issues row for the owner-reported stale-screen symptom. The entries carry
+the mechanism (an id-less group call the group's own conditional no-ops, and the seed-only reader
+class that turns a missed eviction into TTL-long staleness) because the fix comment above the call
+already claims this fixed — a bare "invalidate more keys" entry would read as done.
+
+## 2026-09-05 — `docs/implementation-backlog.md` → 18394 (BF-121, per-portion macros in the meal builder)
+
+One entry, and what makes it worth its length is that the request turns out to be a consistency bug
+rather than a missing feature. The builder's footer divides calories by the portion count and prints
+the macros raw, so one row carries two denominators with only one of them labelled — and the meal's
+own detail sheet states in a comment that its macro columns are per portion, which is what `Log this
+meal` writes. The same meal therefore reads one way while you build it and another way once you open
+it. Recorded alongside: show both denominators rather than swapping one for the other, since the batch
+total is the thing the ingredient list sums to; round the same way the log path does, or the builder
+and the diary will disagree about the meal that was just saved; and a width warning pointing at
+**BF-116**, where the Home header overflowed into its buttons two days ago after one more item was
+squeezed into a full row.
+## 2026-09-05 — `docs/implementation-backlog.md` → 18370 (RV-47, RV-48 shipped and removed)
+
+A **downward** move by this branch — two completed entries left the queue and one smaller one
+(LA-59, the Lane B half RV-48 exposed) took their place — landing on top of the checkpoint sweep's
+18394. Recomputed from the merged file rather than subtracted from either number, which is the only
+way to get it right when both sides moved the same document. Recorded at all because the ratchet
+only enforces a ceiling: a baseline left above the real count silently hands the next entry free
+lines it did not have to justify.

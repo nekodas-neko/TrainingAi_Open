@@ -1627,32 +1627,47 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
-### [platform] 🟡 Deactivation now covers API routes — shipped same day, 403 branch unverified (LA-58, 2026-09-04)
+### [platform] 🔴 REOPENED — deactivation still does not deactivate: the claim LA-58's gate reads never refreshes (PS-24, 2026-09-06)
 
-`middleware.ts`'s matcher excludes `api` as its first exclusion, so the deactivation branch cannot
-run on any of the **219** `app/api/**/route.ts` files. Each of them calls `auth()` and checks
-`session?.user?.id`; **none checks `isActive`**, and there is no shared route-auth helper to add it
-to in one place.
+The app checkpoint confirmed live: `is_active=false` for a signed-in account and its existing cookie
+kept answering 200 on API routes and pages; only a fresh sign-in is blocked. LA-58's 403 gate works
+(a hand-minted `isActive:false` claim is refused — control held) but the claim is stamped at sign-in
+and never refreshed on the path that matters: the Edge middleware runs `NextAuth(authConfig)` with no
+refresh in its jwt callback and re-signs the stale claim with a fresh 7-day expiry every request;
+`refreshIsActiveClaim` is wired only into the Node `auth()` whose re-signed cookie is discarded. Same
+mechanism defers an `isAdmin` revocation indefinitely. **PS-24, top of the queue.**
+[Checkpoint](docs/reviews/2026-09-05-app-checkpoint.md) §2.
 
-A deactivated or still-pending user therefore keeps full API access to **their own** data while their
-session cookie is valid. Not a cross-user leak — the routes are user-scoped — so it reads as
-"deactivation stops the UI and nothing else". The browser bounces them to `/pending`; `curl` with
-their cookie does not.
+### [platform] 🔴 The login rate limiter is bypassed by whitespace-padding the email (PS-25, 2026-09-06)
 
-Found while assessing Q-1a, which names it as a precondition for bearer auth. That framing is why it
-sat: it reads as future work for a feature that has not started, and it was live.
+`auth.ts:26` keys on the untrimmed email, `:29` looks up the trimmed one — each padding variant is a
+fresh 20-attempt bucket against the same account (live: attempt 21 plain refused, attempt 22 padded
+signed in). No IP-keyed limit on the endpoint. [Checkpoint](docs/reviews/2026-09-05-app-checkpoint.md) §2.
 
-**Fixed the same day on the owner's instruction** (option 1): the matcher excludes `api/auth` only,
-and a session with `isActive === false` gets **403 JSON** on any `/api` path. `/api/auth/*` stays
-excluded because those routes create sessions — gating them would lock sign-in out entirely.
+### [workouts][app-shell] 🟡 Confirming a deload on Home leaves full-intensity weights on screen for up to 6 h (RV-49, 2026-09-06)
 
-**⚠ The window is ≤24 h, not instant.** `ISACTIVE_RECHECK_MS` is a day, so the claim middleware reads
-refreshes at most daily. API access now closes on the same schedule pages already had, which is the
-point — the defect was that the two disagreed. Immediate revocation is a separate change.
+Owner-reported and mechanism-confirmed: the Home confirm calls `invalidatePrescriptionChanged()`
+without a sessionId, so the group's conditional skips every `workout-card:<id>`, and `next-session`
+is not in the group at all — the two keys the recommendation and session cards read, two of them via
+raw seed-only `readCacheSync` that can never revalidate (RV-50). Q-117's fix reached only the
+id-passing caller. One-line fixes each; a Playwright repaint assertion rides the fix.
+[Sweep 49](docs/reviews/2026-09-06-deload-confirm-eviction-gap.md). The nutrition add surface was
+swept in the same pass and is **clean at source** — if the food-add symptom persists after RV-49
+ships, one repro (which screen added from, which screen stale) routes it.
 
-**Kept here rather than archived because one thing is unverified:** a genuinely deactivated session
-receiving the 403. The sandbox cannot mint a session. Every other path class was checked at runtime
-and is unchanged.
+### [workouts] 🟡 The strength card shows a deload as a full-1RM crash — live on 16 of 34 exercises (PS-26, 2026-09-06)
+
+`strength-progress.ts` guards the previous 1RM (Q-298) but not the current one, so an exercise whose
+latest log is a deload (`estimated_1rm = 0` by design) renders "−<full 1RM> kg" and a 0 % bar.
+Production: 16 of the owner's 34 exercises are in that state today. Prescription unaffected.
+[Checkpoint](docs/reviews/2026-09-05-app-checkpoint.md) §P5.
+
+### [devices][readiness] 🟡 The ring's stored wear time read 0.3–1.5 h on 20 consecutive scored nights (PS-30, 2026-09-06)
+
+2026-08-14→09-02, `oura_daily.non_wear_time_sec` says the ring was barely worn on days whose
+summaries carry 7–9 h nights with HRV — feeding `isLowWearToday`, the baseline exclusions and the
+wear chart a false signal. 09-03+ is sane; mechanism not established (suspect the incremental
+rollup's narrowed window). [Checkpoint](docs/reviews/2026-09-05-app-checkpoint.md) §P5.
 
 ### [devices][body] 🟡 The scale's "Weighing you…" gate shipped UNVERIFIED on device (Q-104/Q-114, 2026-09-04)
 
