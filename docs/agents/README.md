@@ -584,6 +584,12 @@ Paste the matching prompt from [`prompts/`](prompts/):
 | Review | [`prompts/review.md`](prompts/review.md) |
 | Orchestrator | [`prompts/orchestrator.md`](prompts/orchestrator.md) |
 
+One prompt is not a standing agent: [`prompts/checkpoint.md`](prompts/checkpoint.md) runs a
+whole-app checkpoint — twenty-six specialist lanes from cold start to every leaf function, plus a seam pass between them, collated into one report —
+as a one-off session titled `🧭 App Checkpoint 🟢`, filing under `PS-`. Run it roughly quarterly, or
+after a stretch of change heavy enough that nobody is sure what the app now contains. It does not
+take a baton and has no successor.
+
 Each prompt is written to be pasted verbatim into a cold session. None of them reference a
 conversation, and none need editing between generations.
 

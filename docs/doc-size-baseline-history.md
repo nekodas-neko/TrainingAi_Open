@@ -7761,10 +7761,167 @@ Also here: the caveat I raised and discarded — that the Cloud-vs-BLE refit mig
 different estimators — written down precisely because the next reader will notice the same empty
 table and needs to know it was checked rather than missed.
 
-## 2026-09-04 — `docs/implementation-backlog.md` → 17801 (BF-114, UI half)
+## 2026-09-04 — `docs/implementation-backlog.md` → 17827 (BF-35, the barcode image measurement)
+
+The owner re-reported barcode scans having no photo. No new entry: BF-35 already owns it and already
+records that the remaining half is the unbuilt render. What is appended is a production reading and,
+more usefully, its own weakness. `claude_ro.food_items.image_bytes` is NULL on all 259 rows including
+barcode scans dated after BF-70's fix — which reads as a regression against that entry's *"verified: a
+5,359-char data URI"* claim. But the view exposes `image_bytes` as an **integer**, a size, not the
+`image_data_uri` text the app writes, and whether the two are wired together was not verified. A first
+pass at this used `count(image_bytes)` and would have filed a storage regression on the strength of a
+column whose meaning had not been checked; writing that down is worth more than the reading itself,
+because the same trap is one query away for the next person. Also measured, and new: **4 of 10** of the
+owner's most-scanned brand carry a thumbnail in Open Food Facts at all — so even with both halves
+correct, most of his scans of that brand stay blank, which makes the placeholder a first-class state
+and means "still no photo" cannot be read as a bug on its own next time.
+
+## 2026-09-05 — `docs/implementation-backlog.md` → 17905, `projectOverview.md` → 9872 (sweep 47: RV-45, RV-46)
+
+Two queue entries and their two Known-Issues rows. The length is carrying one specific thing: RV-45
+overlaps a decision the repo already made **the other way** on 2026-08-18, when a review named these
+exact seven routes and deliberately declined to file them on idempotency grounds. An entry that only
+said "six deletes answer 200" would read to the next session as a re-file of something already
+considered and rejected, and would be closed as such.
+
+So both the entry and the row carry the boundary: the earlier argument is correct for the owner
+deleting their own already-deleted row, and false in the cross-account case, where the desired end
+state is not "row absent". That is the whole finding, and it cannot be compressed to a sentence
+without becoming the thing it is not.
+
+`docs/agents/state/review.md` stayed inside its 205 baseline — the sweep-40 carry-over and five
+stale method notes were condensed to absorb the new ones, per the baton's own one-screen rule.
+
+The backlog number is **recomputed from the merged file**, not carried from either side. BF-35's
+entry landed on `main` between this branch and its merge, so both sides raised the same baseline to
+different numbers — the one case where a `.size` conflict is a genuine disagreement rather than two
+unrelated additions.
+
+## 2026-09-04 — `projectOverview.md` → 9881, `docs/implementation-backlog.md` → 17935 (LA-58 fixed)
+
+An auth fix's rows have to carry what it does NOT do, or "fixed" is read as more than it is. Two
+things get the length here: that `/api/auth/*` stays outside the gate on purpose, because those
+routes create sessions and gating them locks sign-in out of the app — the single way this change
+could go badly wrong, and the one a later "tidy the exclusion" would reach for; and that the window
+is ≤24 h rather than instant, inherited from `ISACTIVE_RECHECK_MS`, which matters because the
+obvious reading of a shipped deactivation gate is that it bites immediately.
+
+Both entries stay open rather than moving to the resolved archive: the 403 branch itself has never
+run against a real deactivated session, since the sandbox cannot mint one.
+
+## 2026-09-05 — `docs/implementation-backlog.md` → 17981, `projectOverview.md` → 9903 (sweep 48: RV-47, RV-48)
+
+Two queue entries and their two Known-Issues rows. Both carry a table rather than a sentence, and the
+table is the finding: RV-47's four rows put a malformed id beside a well-formed missing one on the
+same route, which is what shows one of the two statuses is wrong without needing a fixture. RV-48's
+three rows pair each ghost-id `200` with the positive control where that same response follows a
+write that did change the database — without which "reports success" is an assertion, not a result.
+
+One row of RV-48 reads **not established**: `oura_workouts` has no rows locally, so its positive
+control could not be built. Recording the gap in the entry is the point — the next session should not
+read three confirmed rows where there are two.
+
+`docs/agents/state/review.md` stayed inside its 205 baseline; the §Now section and four older
+entries were condensed to absorb the new material, per the baton's own one-screen rule.
+
+Both numbers are **recomputed from the merged file**: LA-58 (#884) landed between the branch and its
+merge and raised the same two baselines, so each side had a different number for the same document —
+the case where a `.size` conflict is a real disagreement rather than two unrelated additions.
+## 2026-09-05 — `docs/implementation-backlog.md` → 18085 (RV-45 swept)
+
+Most of the added length is the two things a sweep like this is judged on later. That the predicates
+were NOT changed — seven methods gained a `.returning()` and report the match, which is what stops a
+reader assuming rows started matching differently. And that a test pinning the opposite behaviour
+existed, did its job, and was reversed with the cause recorded in the test rather than flipped
+quietly: the idempotence argument is sound for an owner re-deleting their own row and fails across
+accounts, which is the whole reason Q-556 reached the other conclusion first.
+
+The `Keep:` is a device check rather than leftover code — these deletes now make a previously-silent
+no-op loud, and on device supplements and injuries take the API as a fallback, a path the web build
+never runs.
+
+**Recomputed from the merged file, twice.** Sweep 48 (RV-47, RV-48) landed between this branch and
+its PR and raised the same baseline to 17981; #886 landed again while CI ran and raised it to 18060.
+The branch's own number was measured against a file that no longer existed on both occasions, so
+18085 is `awk 'END{print NR+1}'` on the tree as actually merged rather than any arithmetic on those
+numbers. The backlog conflict itself was the *other* shape the standing rule warns about — not two
+deletions, but sweep 48's two new entries against this branch's rewrite of the RV-45 heading, where
+keeping both sides is correct and dropping one silently loses a queue entry.
+
+## 2026-09-05 — `docs/implementation-backlog.md` → 18060 (BF-120, and the dosing model on BF-112)
+
+Two changes. **BF-120** is the inverse of BF-98: that entry stopped a section with one grouped meal
+drawing its macros twice by counting groups instead of rows, and the new threshold also removes the
+footer from a section with a single item. The calorie half of that is arguably right — the section
+header already prints the number — but the `P/C/F` row goes with it and nothing else breaks a single
+item into macros, so the recommendation splits the gate rather than reverting it.
+
+**BF-112** gains the dosing model, and it is long because the owner's stated mental model needs one
+correction that changes the whole design: weekly dosing with a multi-day half-life **accumulates**, so
+treating each dose as an isolated decay curve under-reports every week after the first. The shape
+recorded is superposition of decays, which yields one comparable number per day and makes "all
+previous data is 0%" fall out for free. The rest is what the data honestly cannot do — on an
+escalating schedule dose, cumulative level and elapsed time are the same line, and the drug's intended
+effect (weight loss) independently moves sleep, RHR and HRV, so the most likely confounder is the
+thing being measured. Named instead: the pre-dose baseline, within-week shape at a held dose, and a
+deliberate plateau. Also a workaround usable tomorrow, since nothing is built and dosing starts:
+`dose_text` freezes on the log at log time, so ticking a named supplement captures the dose dates,
+which are the half that cannot be reconstructed later.
+
+## 2026-09-05 — `docs/implementation-backlog.md` unchanged at 18060 (BF-112 moved to the queue head)
+
+No size change; a move. The owner starts dosing on 2026-09-06 and asked for this at the top, so
+BF-112 goes from Lane B READY #6 to #1. Queue position is priority in this file, so the reorder is
+the whole mechanism — nothing else needed editing, and `grep '^### '` sorted is identical to
+`origin/main`, which is the check that the move did not silently drop or resurrect an entry.
+## 2026-09-06 — `docs/implementation-backlog.md` → 18325, `projectOverview.md` → 9907 (app checkpoint: PS-24…PS-39)
+
+Sixteen entries from a twenty-six-lane checkpoint, already capped by class — ~45 verified findings
+folded into 16 entries (six rule-bypass shapes are one entry; the nutrition paper cuts are one; the
+docs sweep is one). Four Known-Issues rows plus the reopened LA-58 row carry the two escalations and
+the two live-data defects. The checkpoint report itself is a review doc, not index growth.
+
+## 2026-09-06 — `docs/implementation-backlog.md` → 18355, `projectOverview.md` → 9918 (sweep 49: RV-49, RV-50)
+
+Two entries and one Known-Issues row for the owner-reported stale-screen symptom. The entries carry
+the mechanism (an id-less group call the group's own conditional no-ops, and the seed-only reader
+class that turns a missed eviction into TTL-long staleness) because the fix comment above the call
+already claims this fixed — a bare "invalidate more keys" entry would read as done.
+
+## 2026-09-05 — `docs/implementation-backlog.md` → 18394 (BF-121, per-portion macros in the meal builder)
+
+One entry, and what makes it worth its length is that the request turns out to be a consistency bug
+rather than a missing feature. The builder's footer divides calories by the portion count and prints
+the macros raw, so one row carries two denominators with only one of them labelled — and the meal's
+own detail sheet states in a comment that its macro columns are per portion, which is what `Log this
+meal` writes. The same meal therefore reads one way while you build it and another way once you open
+it. Recorded alongside: show both denominators rather than swapping one for the other, since the batch
+total is the thing the ingredient list sums to; round the same way the log path does, or the builder
+and the diary will disagree about the meal that was just saved; and a width warning pointing at
+**BF-116**, where the Home header overflowed into its buttons two days ago after one more item was
+squeezed into a full row.
+## 2026-09-05 — `docs/implementation-backlog.md` → 18370 (RV-47, RV-48 shipped and removed)
+
+A **downward** move by this branch — two completed entries left the queue and one smaller one
+(LA-59, the Lane B half RV-48 exposed) took their place — landing on top of the checkpoint sweep's
+18394. Recomputed from the merged file rather than subtracted from either number, which is the only
+way to get it right when both sides moved the same document. Recorded at all because the ratchet
+only enforces a ceiling: a baseline left above the real count silently hands the next entry free
+lines it did not have to justify.
+
+## 2026-09-06 — `docs/implementation-backlog.md` → 18370 (RV-46 out, LA-60 in)
+
+RV-46 left the queue on shipping and LA-60 took its place — the Node 20/22 split between CI and the
+sandbox, found when this PR went red on an API the local run had. Net upward by the difference
+between a 26-line entry removed and a 28-line one added, which is the honest accounting rather than
+two separate movements.
+
+## 2026-09-06 — `docs/implementation-backlog.md` → 18373 (BF-114, UI half, on the merged base)
 
 Three lines net. BF-114 is rewritten rather than removed: its UI half shipped and its engine half is
 handed to Lane A, so the entry changes lane and keeps a `Keep:` naming exactly what is owed.
+**Recomputed from the merged file rather than carried from the branch** — this PR sat while two
+others raised the same baseline, so its own 17801 was against a document that no longer exists.
 
 Most of the rewrite is a correction rather than an addition. The entry had recorded the Body tab's
 BMR as the scale's bioimpedance estimate; it is Mifflin-St Jeor computed in our own code, which the

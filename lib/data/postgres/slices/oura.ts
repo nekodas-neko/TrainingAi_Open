@@ -1293,10 +1293,14 @@ export async function getOuraWorkouts(db: Db, userId: string, opts: { unreviewed
   }))
 }
 
-export async function markOuraWorkoutReviewed(db: Db, userId: string, id: string): Promise<void> {
-  await db.update(s.ouraWorkouts)
+// RV-48: returns whether a row was actually marked. `oura_workouts.id` is `text`, not `uuid`, so a
+// wrong id can never raise a cast error — a ghost id was indistinguishable from a real review.
+export async function markOuraWorkoutReviewed(db: Db, userId: string, id: string): Promise<boolean> {
+  const rows = await db.update(s.ouraWorkouts)
     .set({ reviewed: true })
     .where(and(eq(s.ouraWorkouts.userId, userId), eq(s.ouraWorkouts.id, id)))
+    .returning({ id: s.ouraWorkouts.id })
+  return rows.length > 0
 }
 
 // ── HR Sync (workout sessions) ─────────────────────────────────────────────────
