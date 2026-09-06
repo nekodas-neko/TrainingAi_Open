@@ -215,13 +215,26 @@ export function MealTypeManager() {
     })
   }, [])
 
-  const handleDragEnd = useCallback(() => {
+  const handleDragEnd = useCallback(async () => {
     const orderedIds = mealTypesRef.current.map(mt => mt.id)
-    fetch('/api/nutrition/meal-types', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orderedIds }),
-    }).then(() => invalidateMealTypes()).catch(() => toast.error('Failed to save order'))
+    try {
+      const res = await fetch('/api/nutrition/meal-types', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderedIds }),
+      })
+      // LA-59: a `fetch` promise does not reject on a 4xx, so the old `.then` ran for every response
+      // the server sent and the `.catch` only ever saw a transport failure. RV-48 gave this route a
+      // 404 for a reorder it refuses to apply, and nothing on this surface read it.
+      if (!res.ok) throw new Error()
+      await invalidateMealTypes()
+    } catch {
+      toast.error('Failed to save order')
+      // Refetch, not just a toast. That 404 means the list this drag was computed from is stale —
+      // a meal type deleted on another device is the realistic route — so re-reading is what
+      // resolves it. Restoring the previous local order would only put back a different wrong one.
+      invalidateMealTypes().then(load).catch(() => {})
+    }
   }, [])
 
   if (loading) return <Loader2 className="w-5 h-5 animate-spin text-muted-foreground m-4" />

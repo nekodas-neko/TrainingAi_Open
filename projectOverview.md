@@ -26,8 +26,18 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.436.18 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.436.19 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-06.
+
+**A refused meal-type reorder no longer reports success (LA-59).** `handleDragEnd` fired
+`fetch(...).then(success).catch(failure)`, and **a `fetch` promise does not reject on a 4xx** — so the
+`.then` ran for every response the server sent and the `.catch` only ever saw a transport error.
+RV-48 gave that route a 404 for a reorder it declines to apply and nothing here read it. It now checks
+`res.ok` and **refetches rather than only toasting**, which is the substantive half: a 404 means the
+list the drag was computed from is stale, so restoring the previous local order would put back a
+different wrong one. Last of the four surfaces RV-45/RV-47/RV-48 touched. **The 404 is proven live;
+the toast and the refetch have not been seen on screen**
+([journal](docs/overview/entries/2026-09-06-la-59-reorder-status.md)).
 
 **A meal with one food in it shows its macros again (BF-120 / OR-101).** The owner, from two
 device checks: *"1 meal doesnt show the calorie total; but 2 meals do"*. A section holding one
@@ -1688,6 +1698,17 @@ Last swept **2026-09-03**.
 > An entry only leaves when **nothing is still owed**: no open work, no pending owner or device
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
+
+### [nutrition] LA-59's refusal path has not been watched happening (2026-09-06)
+
+The meal-type reorder now checks `res.ok`, toasts and refetches. **The 404 is proven live** — a
+reorder carrying a stale id returns `{"error":"Meal type not found"}` while a valid one returns 200 —
+and three mutation-tested source guards pin the code shape. **What has not been observed is the two
+things the user sees:** the error toast and the list re-reading itself. Three attempts to drive the
+meal-type manager in a browser ended with the settings sheet not rendering inside the timeout.
+Closing this properly wants a `@dnd-kit` drag simulated in Playwright with the PATCH stubbed to 404;
+`empty-meal-library.spec.ts` has the route-stubbing shape to copy.
+[journal](docs/overview/entries/2026-09-06-la-59-reorder-status.md).
 
 ### [nutrition] The lone-row macro footer has not been seen on the S25 (BF-120, 2026-09-06)
 

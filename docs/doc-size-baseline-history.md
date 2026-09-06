@@ -8201,3 +8201,14 @@ card looks.
 
 The backlog moves the other way in the same PR — BF-120's 37-line entry is removed on shipping, and
 RV-49 gains eight lines of re-laning rather than being left to be picked up wrongly a second time.
+
+## 2026-09-06 — `projectOverview.md` → 10032 (LA-59's status paragraph and its verification gap)
+
+Twenty-one lines, and eleven of them are the Known-Issues row rather than the fix. The fix itself
+compresses to a sentence — a `fetch` promise does not reject on a 4xx — but what is *not* verified
+does not compress, because the next session has to know both what was proven (the route's 404, live)
+and what was not (the toast and the refetch, on screen), or it will read "shipped" as "seen working".
+The row also names the instrument that would close it and the spec to copy the shape from, so the
+next attempt does not start by rediscovering that a `@dnd-kit` drag is the hard part.
+
+The backlog moves the other way in the same PR: LA-59's 22-line entry goes on shipping.

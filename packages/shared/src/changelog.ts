@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.19",
+    date: "2026-09-06",
+    changes: [
+      "Dragging your meal types into a new order used to say it saved even when the server refused — which happens when the list on screen still shows a meal type deleted somewhere else. It now tells you, and reloads the list so the order on screen is the one that is actually stored.",
+    ],
+  },
+  {
     version: "1.436.18",
     date: "2026-09-06",
     changes: [
