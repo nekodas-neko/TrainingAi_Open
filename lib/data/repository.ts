@@ -554,10 +554,12 @@ export interface WorkoutRepository {
   upsertUser(user: Omit<User, 'id' | 'createdAt' | 'isActive' | 'isAdmin'>, forceActive?: boolean): Promise<User>
   listUsers(limit?: number, offset?: number): Promise<User[]>
   countInactiveUsers(): Promise<number>
-  activateUser(userId: string): Promise<void>
-  deactivateUser(userId: string): Promise<void>
+  /** True when a user row matched. RV-48 — false is a no-op the route answers 404 for. */
+  activateUser(userId: string): Promise<boolean>
+  deactivateUser(userId: string): Promise<boolean>
   getUserById(userId: string): Promise<User | null>
-  deleteUser(userId: string): Promise<void>
+  /** True when a user row was removed. */
+  deleteUser(userId: string): Promise<boolean>
   getUserByEmail(email: string): Promise<(User & { passwordHash?: string }) | null>
   updateUserProfile(userId: string, profile: Partial<Pick<User, 'displayName' | 'heightCm' | 'dateOfBirth' | 'weightGoalKg' | 'timezone' | 'sex' | 'activityLevel' | 'fitnessGoal'>>): Promise<User>
   touchLastGoalReviewAt(userId: string): Promise<void>
@@ -679,7 +681,8 @@ export interface WorkoutRepository {
   listActivityTypes(): Promise<ActivityType[]>
   createActivityType(data: { label: string; icon: string; isDistanceBased: boolean; sortOrder: number }): Promise<ActivityType>
   updateActivityType(id: string, patch: Partial<{ label: string; icon: string; isDistanceBased: boolean; sortOrder: number }>): Promise<ActivityType>
-  deleteActivityType(id: string): Promise<void>
+  /** RV-45: false when nothing matched. Still throws when the type is in use. */
+  deleteActivityType(id: string): Promise<boolean>
   /** `source` is required, not optional: it decides the per-field rank merge in `source_map`.
    *  A caller left on a default would silently write rank-0 and win over the ring forever. */
   saveSleepSession(userId: string, session: Omit<SleepSession, 'id' | 'userId' | 'createdAt'>, source: HealthSource): Promise<void>
@@ -780,7 +783,8 @@ export interface WorkoutRepository {
   listExerciseMuscleMap(): Promise<Pick<ExerciseLibraryEntry, 'name' | 'muscles'>[]>
   getExerciseType(exerciseName: string): Promise<ExerciseType>
   upsertExercise(entry: Omit<ExerciseLibraryEntry, 'id'> & { id?: string }): Promise<ExerciseLibraryEntry>
-  deleteExercise(name: string): Promise<void>
+  /** True when a library entry with this name was removed. */
+  deleteExercise(name: string): Promise<boolean>
   createExercise(entry: { name: string; muscles: MuscleAssignment[]; equipment: string[]; instructions?: string; createdBy: string; exerciseType?: ExerciseType }): Promise<ExerciseLibraryEntry>
   renameExercise(userId: string, id: string, newName: string): Promise<ExerciseLibraryEntry>
   // Admin-only edit that may rename the exercise (any library entry, regardless of
@@ -843,12 +847,15 @@ export interface WorkoutRepository {
   listMealTypes(userId: string): Promise<MealType[]>
   createMealType(userId: string, data: Omit<MealType, 'id' | 'userId' | 'createdAt'>): Promise<MealType>
   updateMealType(id: string, userId: string, data: Partial<Omit<MealType, 'id' | 'userId' | 'createdAt'>>): Promise<MealType>
-  deleteMealType(id: string, userId: string): Promise<void>
+  /** RV-45: false when nothing matched. Still throws MealTypeHasLogsError when logs reference it. */
+  deleteMealType(id: string, userId: string): Promise<boolean>
   /** Live (non-soft-deleted) food logs pointing at a meal type — what the delete refusal reports (Q-412). */
   countLiveFoodLogsForMealType(userId: string, mealTypeId: string): Promise<number>
   /** Move every live log onto `toId`, re-stamping each one's eaten-at against the new window, then soft-delete `fromId`. One transaction (Q-412). */
   reassignAndDeleteMealType(userId: string, fromId: string, toId: string): Promise<{ moved: number }>
-  reorderMealTypes(userId: string, orderedIds: string[]): Promise<void>
+  /** True when every id was one of the user's live meal types and the order was applied. False
+   *  applies nothing at all — see the implementation for why it is not best-effort. */
+  reorderMealTypes(userId: string, orderedIds: string[]): Promise<boolean>
   seedDefaultMealTypes(userId: string): Promise<void>
 
   /** `reuseExisting` (BF-38) returns the user's existing identical row instead of writing a
@@ -873,14 +880,16 @@ export interface WorkoutRepository {
    *  id gets the same treatment as the other two. */
   foodLogRefsValid(userId: string, mealTypeId: string, foodItemId: string, savedMealId?: string | null): Promise<boolean>
   updateFoodLog(id: string, userId: string, quantityMultiplier: number): Promise<FoodLog>
-  deleteFoodLog(id: string, userId: string): Promise<void>
+  /** RV-45: false when nothing matched. */
+  deleteFoodLog(id: string, userId: string): Promise<boolean>
 
   listSavedMeals(userId: string): Promise<SavedMeal[]>
   /** `imageDataUri`: omit to leave a stored thumbnail alone, `null` to remove it. Capped (Q-396). */
   /** `mealTypeIds` undefined = leave stored tags alone; `[]` = clear them (BF-11e). */
   createSavedMeal(userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], id?: string, servings?: number, imageDataUri?: string | null, mealTypeIds?: string[]): Promise<SavedMeal>
   updateSavedMeal(id: string, userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], servings?: number, imageDataUri?: string | null, mealTypeIds?: string[]): Promise<SavedMeal>
-  deleteSavedMeal(id: string, userId: string): Promise<void>
+  /** RV-45: false when nothing matched. */
+  deleteSavedMeal(id: string, userId: string): Promise<boolean>
 
   // ── Meal Plan (Q-186) ────────────────────────────────────────────────────────
   // Variants and meals carry no user_id; every write below proves ownership by joining back to
@@ -1082,18 +1091,21 @@ export interface WorkoutRepository {
   listInjuries(userId: string): Promise<import('@trainingai/shared/types/injury').Injury[]>
   createInjury(userId: string, data: Omit<import('@trainingai/shared/types/injury').Injury, 'id' | 'userId' | 'createdAt' | 'updatedAt'> & { id?: string }): Promise<import('@trainingai/shared/types/injury').Injury>
   updateInjury(id: string, userId: string, data: Partial<Omit<import('@trainingai/shared/types/injury').Injury, 'id' | 'userId' | 'createdAt' | 'updatedAt'>>): Promise<import('@trainingai/shared/types/injury').Injury>
-  deleteInjury(id: string, userId: string): Promise<void>
+  /** RV-45: false when nothing matched. */
+  deleteInjury(id: string, userId: string): Promise<boolean>
 
   // ── Supplements ────────────────────────────────────────────────────────────
   listSupplements(userId: string, date: string): Promise<import('@trainingai/shared/types/supplement').SupplementWithStatus[]>
   createSupplement(userId: string, data: Omit<import('@trainingai/shared/types/supplement').Supplement, 'id' | 'userId' | 'createdAt'> & { id?: string }): Promise<import('@trainingai/shared/types/supplement').Supplement>
   updateSupplement(id: string, userId: string, data: Partial<Omit<import('@trainingai/shared/types/supplement').Supplement, 'id' | 'userId' | 'createdAt'>>): Promise<import('@trainingai/shared/types/supplement').Supplement>
-  deleteSupplement(id: string, userId: string): Promise<void>
+  /** RV-45: false when nothing matched, so the route can 404 rather than confirm a no-op delete. */
+  deleteSupplement(id: string, userId: string): Promise<boolean>
   /** `dose` is what was actually taken (BF-3). Omit it and the definition's CURRENT dose is
    *  stamped — right for the web route, wrong for a mutation queued offline and drained after a
    *  titration, which is why the sync engine fills it from the local row. */
   logSupplement(supplementId: string, userId: string, date: string, dose?: Partial<import('@trainingai/shared/types/supplement').SupplementDose>): Promise<void>
-  unlogSupplement(supplementId: string, userId: string, date: string): Promise<void>
+  /** RV-45: false when nothing matched. */
+  unlogSupplement(supplementId: string, userId: string, date: string): Promise<boolean>
 
   // ── AI Periodization ───────────────────────────────────────────────────────
   getSessionPeriodization(userId: string, programSessionId: string): Promise<SessionPeriodization | null>
@@ -1212,7 +1224,8 @@ export interface WorkoutRepository {
     calories: number | null; distanceM: number | null; intensity: string | null;
     source: string | null; reviewed: boolean;
   }[]>
-  markOuraWorkoutReviewed(userId: string, id: string): Promise<void>
+  /** True when the workout existed and belonged to this user. */
+  markOuraWorkoutReviewed(userId: string, id: string): Promise<boolean>
   getSetTimestampsForSession(userId: string, workoutSessionId: string): Promise<{ exerciseName: string; setNumber: number; setStartMs: number | null; setEndMs: number | null; loggedAt: Date | null }[]>
   markHrSynced(userId: string, workoutSessionId: string): Promise<void>
   getUnsyncedHrSessionsForDay(userId: string, day: string, timezone?: string): Promise<{ id: string; startedAt: Date; completedAt: Date | null }[]>
