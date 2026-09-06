@@ -7999,3 +7999,11 @@ BMR as the scale's bioimpedance estimate; it is Mifflin-St Jeor computed in our 
 source says outright. That matters beyond the label — it turns the 218 kcal gap from "two different
 measurements" into "a formula against a measurement", which is the sentence a reader needs, and it
 made the entry's own proposed wording false.
+
+## 2026-09-06 — `projectOverview.md` → 9934 (BF-112's Current Status paragraph)
+
+Sixteen lines for the stage-2 dose-entry paragraph in **Current Status**, which is the section this
+document exists to be: what shipped, what it cost, and the one thing left owed. The detail — the two
+defects found while verifying, the live round trip, the surfaces not exercised — is in the journal
+entry, not here. Raised rather than absorbed because the previous session's paragraph is still the
+one above it; the compaction sweep is what removes both, not this PR.

@@ -548,110 +548,6 @@ re-proved on 2026-09-04** — three specs pass in isolation and fail in the full
     a flat string. Tractable, narrow, and fragile the moment tabs are declared differently — which is
     why it is a queued question rather than something done in passing.
 
-### [nutrition] BF-112 — enter an actual dose: the storage for retatrutide is finished and there is still no field to type it into
-
-> **⚑ THE OWNER STARTS DOSING 2026-09-06 AND THIS IS NOT BUILT.** Measured 2026-09-05: Lane B
-> **READY #6**, and production still shows two supplements with `default_amount`, `unit`,
-> `dose_prompt` and `started_on` all empty. **Nothing in the app can record a dose tomorrow.**
->
-> **⚠ A workaround exists for tomorrow and it preserves the data that matters.** BF-3 stamps
-> `supplement_logs.dose_text` **from the definition at log time**, so the text freezes on the log and
-> later edits do not rewrite history. So: create a supplement named for the drug, put the current dose
-> in its free-text `dose` field, and tick it on each dose day. Each tick freezes that day's dose text
-> and its date. When the dose changes, edit the definition — past logs keep what they had. This gets
-> **the dose dates and the dose amounts recorded from day one**, in a form BF-112 can later migrate
-> into `amount`/`unit`. The dates are the half that cannot be reconstructed afterwards.
->
-> **⚠ The owner's model needs one correction, and it is the whole design.** He asked for *"a dose of
-> xmg… so that each day after it can assume it's wearing off"*, weekly, escalating. Decay alone is not
-> enough: **weekly dosing with a multi-day half-life ACCUMULATES.** A dose given seven days after the
-> last one lands on top of a substantial residual, so the level climbs for several weeks **even at a
-> constant dose**, and settles at a multiple of the single-dose peak. Modelling each dose as an
-> isolated decay curve would under-report every week after the first.
-> - **The right shape is superposition:** `level(day t) = Σᵢ doseᵢ × 0.5^((t − tᵢ) / halfLife)` over
->   every dose so far. One number per day, on one scale, comparable across the whole timeline — and it
->   answers *"all previous data is 0% reta"* for free, because before the first dose the sum is empty.
-> - **`halfLife` must be a stored, editable value, not a constant in a formula.** It is an assumption
->   about a drug, the published figure carries a range, and this app's own rule is that no
->   model-or-literature number may be shown as fact. Store it beside the substance, show it as the
->   assumption it is, and let the curve be recomputed if it changes.
->
-> **⚠ "Which dose is best for sleep/HR/stress" is the question this cannot honestly answer, and saying
-> so now is cheaper than discovering it in three months.** On an escalating schedule, **dose, cumulative
-> level and elapsed time all rise together** — they are the same line. Anything that improves or
-> worsens over those weeks correlates with all three, and the design cannot separate them. Worse, the
-> drug's *intended* effect is weight loss, and weight loss independently changes sleep, resting heart
-> rate and HRV — so the most likely confounder is the thing being measured.
-> - **What the data CAN support**, and what to build toward: the **pre-dose baseline** (three months of
->   ring data at level 0, which is why the first dose date matters); **within-week shape** — day 1 after
->   a dose against day 6, which varies while the dose is held constant and is the one contrast not
->   confounded by titration; and a **plateau**, if he holds a dose for several weeks, which is the only
->   way a level gets observed twice at different times.
-> - **State it as association, never attribution.** n=1, no control, no blinding, a dozen confounders.
->   The app shows the number beside the level; it does not say the drug caused it, and it must not
->   recommend a dose. That is a medical decision and out of scope, as this entry's parent already says.
-
-
-- **Lane:** B — the supplements manage sheet and `supplements-section.tsx`. **Engine work: none.**
-  Stage 1 shipped 2026-09-01 (migrations 254 + 255, local SQLite v34) and every column this needs
-  already exists.
-- **Added:** 2026-09-03 · owner: *"i havent seen the retatrutide tracking section yet can you tell me
-  how its progressed?"* — a question, and the answer is that his half has never been built.
-- **The design is settled** in [`docs/superpowers/plans/2026-09-01-dosed-substance-exposure.md`](superpowers/plans/2026-09-01-dosed-substance-exposure.md)
-  §5 and §6 stage 2, and is not re-litigated here. This entry exists so the work is **startable**
-  rather than only described.
-
-**⚠ Why this is a new entry and not another line on BF-69.** BF-69 carries a `Keep:` and therefore
-prints under **KEEP — "shipped; only the stated residue is owed. Not new work."** That is true of the
-*storage*, and the residue it names is **stages 2, 3 and 4 — the entire user-facing feature**. An
-implementer working the queue top-down sees "not new work" and moves on, which is why two months of
-engine work has produced nothing the owner can use. Same failure shape as the `Verify:` misuse
-corrected on 2026-09-02: a field that means *finished* attached to something unfinished.
-
-**Measured in production 2026-09-03, and it is stark:**
-
-| | live |
-|---|---|
-| supplements defined | **2** — Fish Oil, Vitamin D |
-| `default_amount` / `unit` on either | **neither** |
-| `started_on` / `stopped_on` / `dose_prompt` | **null / null / false** on both |
-| `supplement_logs` rows, all time | **1** — Vitamin D, **2026-06-21** |
-| rows carrying an `amount` | **0** |
-| retatrutide | **not in the table** |
-
-The columns BF-3 and BF-69 added are all present and all empty, because nothing in the UI can write
-to them. The last supplement log of any kind is from June.
-
-**What stage 2 is, from the plan — this entry does not redesign it:**
-
-- an **amount + unit** on the supplement definition (the manage sheet has no such field today);
-- **`dose_prompt`** as a single boolean on the definition — the owner's *"selection first to choose
-  dosage"*. Creatine is 5 g every time; retatrutide titrates, so a prompted log asks for the number at
-  log time. **One flag, not a second flow**: a prompted log is still one contribution row, only the
-  source of the number differs;
-- `started_on` / `stopped_on`, so a drug that was started and stopped reads as a window rather than as
-  a gap in the logs — the plan's §2 presence model, where *"unknown is a real answer"*;
-- **`supplements-section.tsx` rendering `loggedAmount`**, which `listSupplements` already returns beside
-  `loggedDose`. The two are different questions — what a past log recorded against what the definition
-  says now — and freezing the first was the whole point of BF-3's gap 1.
-
-- **⚠ Do not touch `loggedToday`.** It tracks the **manual** contribution only, deliberately: it is the
-  tick's checked state, and a meal-sourced dose turning it on leaves a control that refuses to turn
-  off. Stage 1's comment says so; it is easy to "fix" and hard to notice.
-- **Stage 3 (meal attachment) is not part of this** and stage 4 (the trends overlay) is gated on data
-  the owner cannot produce until this ships — the plan says a series needs **~4 weeks** of real
-  amounts. **So this entry is the thing standing between the feature and its own evidence**, which is
-  the argument for its queue position rather than its size.
-- **Out of scope, and worth restating because the substance invites it:** the app records what was
-  taken. No dosing guidance, no interaction checking, no titration schedule generation. Any
-  correlation stays an observation on n=1 with a dozen confounders, shown as a number, never as a
-  claim about cause.
-- **Verification:** define a supplement with an amount and a unit; tick it and the log carries that
-  number; turn on `dose_prompt`, tick it, and it asks — the entered number lands on the log and not on
-  the definition; change the definition's amount afterwards and the earlier log still reads what it
-  recorded (BF-3 gap 1, and the reason the stamp is on the log); set `started_on`, and a date before it
-  reads as outside the window rather than as a missed dose.
-
 ### [platform] PS-24 — deactivating a user does not end their session; LA-58's gate reads a claim that never refreshes 🔴 LIVE
 
 - **Lane:** A — `auth.config.ts`, `middleware.ts`, `lib/auth/is-active-refresh.ts`.
@@ -4574,14 +4470,45 @@ a finding — it does not by itself explain a plain `GET` hanging beside it.
 - **Added:** 2026-08-30 · measured against production while checking BF-54. **These are the size
   columns, read from the filesystem, so they are exact** — unlike the row counts BF-54 is about.
 
+### [nutrition] LB-57 — the day's supplement exposure is derived in two places, one per lane
+
+- **Lane:** A — the hoist lands in `packages/shared/`, which Lane B may not write.
+- **Added:** 2026-09-06, by the lane that created the second copy — see
+  [journal](overview/entries/2026-09-06-bf-112-dose-entry.md).
+
+`listSupplements` (`lib/data/postgres/adapter.ts`, around the `manual`/`summed` maps) and
+`summariseSupplementDay` (`components/nutrition/supplement-day-totals.ts`) compute the same two
+values from the same rows: `loggedToday` from the manual contribution only, and `loggedAmount` as
+the sum over every live contribution with its count. Both must keep three behaviours identical —
+manual-only for the tick, null rather than 0 when no contribution carried a number, and the unit
+taken from the first contribution that has one.
+
+**Why there are two.** The device never reaches the server's copy: the nutrition page's local-first
+branch returns early once the local store has definitions, so BF-112 had to derive the same totals
+from `getSupplementLogs`. The correct single home is `packages/shared/`, and both `packages/shared/**`
+and `lib/data/**` are Lane A's, so the extraction was not Lane B's to make.
+
+**The fix:** move the derivation into `packages/shared/src/supplements/day-totals.ts` over a minimal
+row shape (`{ supplementId, amount, unit, source, deletedAt }`), have the adapter and the client
+helper both call it, and keep
+`components/nutrition/__tests__/supplement-day-totals.test.ts` pointed at the shared version —
+its cases were written against the adapter's semantics on purpose, including the two the adapter's
+own comments call load-bearing.
+
+**Not urgent.** Both copies agree today and both are covered by tests. What this costs is the next
+change to the rule: a `source` value added on one side, or a mixed-unit day handled on one side, and
+the device silently disagrees with the server.
+
 ### [nutrition][platform] BF-69 — dosed substances are stored but nothing reads them; make exposure an analysable variable
 
-- **⚠ 2026-09-03 — STAGE 2 IS NOW ITS OWN ENTRY, BF-112, because this one prints under KEEP.**
-  A `Keep:` line files an entry as *"shipped; not new work"*, which is true of the storage and false
-  of the feature: the residue named below is the entire user-facing half. The owner asked how
-  retatrutide tracking had progressed and the answer was that his part had never been built — two
-  months of engine work, and production still holds 2 supplements, no amounts, and one log from June.
-  Stage 2 is startable Lane B work and now says so. Stages 3 and 4 remain below.
+- **⚠ 2026-09-03 — STAGE 2 WAS SPLIT OUT AS BF-112, because this one prints under KEEP.**
+  A `Keep:` line files an entry as *"shipped; not new work"*, which was true of the storage and false
+  of the feature: the residue named below was the entire user-facing half. The owner asked how
+  retatrutide tracking had progressed and the answer was that his part had never been built.
+- **✅ STAGE 2 SHIPPED 2026-09-06** — amount/unit/prompt/window on the definition, the titration
+  prompt at log time, and the day's logged amount rendered on the row.
+  [journal](overview/entries/2026-09-06-bf-112-dose-entry.md). **Not device-verified**; stages 3 and
+  4 remain below.
 - **Keep — STAGE 1 SHIPPED 2026-09-01 (migrations 254 + 255, local SQLite v34). Stages 2-4 are what
   is owed, and stage 2 is the one that matters.** The storage half is done: `supplement_logs` is
   contribution-rows now (its whole-day `unique (supplement_id, log_date)` is gone, replaced by a
