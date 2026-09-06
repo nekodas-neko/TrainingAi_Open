@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { mealFooter } from '@/components/nutrition/meal-card-footer'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { groupDiaryEntries, sumLogs } from '../diary-groups'
@@ -186,9 +187,16 @@ describe('BF-98 — the card counts rendered entries', () => {
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/\/\/.*/g, '')
 
-  it('gates the totals footer on entries.length, never logs.length', () => {
-    expect(card).toMatch(/\{entries\.length > 1 && <MealTotals/)
+  it('gates the totals footer on rendered entries, never on the flat log count', () => {
+    // BF-120 replaced the literal `entries.length > 1` this used to pin with `mealFooter(kinds)`,
+    // because the count was the wrong question — see `meal-card-footer.ts`. What BF-98 protects is
+    // unchanged and is asserted by behaviour in `meal-card-footer.test.ts`: ONE group entry draws
+    // no footer, which is the duplication the owner photographed. The guard that matters here is
+    // still that the flat `logs` list is not what decides it.
+    expect(card).toMatch(/mealFooter\(entries\.map\(e => e\.kind\)\)/)
     expect(card).not.toMatch(/\{logs\.length > 1 && <MealTotals/)
+    expect(mealFooter(['meal']), 'BF-98: one group draws its own macros and must get no footer')
+      .toEqual({ show: false, showCalories: false })
   })
 
   it('still shows the collapsed summary from the log count, which is a different question', () => {

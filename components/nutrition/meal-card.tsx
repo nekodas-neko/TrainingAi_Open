@@ -5,6 +5,7 @@ import { Plus, ChevronDown, Trash2 } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import type { MealType, FoodLogWithItem } from '@trainingai/shared/types/nutrition'
+import { mealFooter } from "@/components/nutrition/meal-card-footer";
 import { MACRO_COLORS } from '@trainingai/shared/nutrition/macro-colors'
 import { SwipeActions, type SwipeAction } from '@/components/ui/swipe-actions'
 import { FoodRow } from './food-row'
@@ -36,6 +37,7 @@ export const MealCard = memo(function MealCard({ mealType, logs, onAdd, onQuickE
     () => groupDiaryEntries(logs, new Set(savedMeals.keys())),
     [logs, savedMeals],
   )
+  const footer = useMemo(() => mealFooter(entries.map(e => e.kind)), [entries])
   const totals = logs.reduce(
     (acc, l) => ({ calories: acc.calories + l.calories, proteinG: acc.proteinG + l.proteinG, carbsG: acc.carbsG + l.carbsG, fatG: acc.fatG + l.fatG }),
     { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 },
@@ -140,14 +142,11 @@ export const MealCard = memo(function MealCard({ mealType, logs, onAdd, onQuickE
                   </motion.div>
                 ))}
               </AnimatePresence>
-
-              {/* Totals footer — only when there are 2+ RENDERED entries, not 2+ logs (BF-98).
-                  `logs` is the flat list, so a section holding one grouped meal of three
-                  ingredients passed `logs.length > 1` and drew the group's own macros and then the
-                  identical footer beneath them. The rule is already stated twelve lines above and
-                  applied to the collapsed branch: a single row states its own macros, so a footer
-                  repeats it — and a group IS a single row. */}
-              {entries.length > 1 && <MealTotals totals={totals} bordered />}
+              {/* Totals footer — BF-120 / OR-101. The gate used to be a COUNT and the question is a
+                  KIND: a group row states its own macros, a loose row has not since Q-406 moved the
+                  per-item P/C/F into the detail sheet. `mealFooter` holds that decision and the
+                  reasoning for it. */}
+              {footer.show && <MealTotals totals={totals} showCalories={footer.showCalories} bordered />}
             </>
           )}
         </div>
@@ -238,7 +237,13 @@ const DiaryRow = memo(function DiaryRow(
  * and standing alone it does not.
  */
 function MealTotals(
-  { totals, bordered }: { totals: { calories: number; proteinG: number; carbsG: number; fatG: number }; bordered?: boolean },
+  { totals, bordered, showCalories = true }: {
+    totals: { calories: number; proteinG: number; carbsG: number; fatG: number }
+    bordered?: boolean
+    /** BF-120: withheld for a lone loose row, whose calorie number the section header already
+     *  prints. The macros are the half nothing else on the screen states. */
+    showCalories?: boolean
+  },
 ) {
   return (
     <div className={`flex items-center justify-between bg-muted/20 px-4 py-3 ${bordered ? 'border-t border-border/20' : ''}`}>
@@ -247,7 +252,7 @@ function MealTotals(
         <span className="text-xs font-semibold" style={{ color: MACRO_COLORS.carbs }}>C {Math.round(totals.carbsG)}g</span>
         <span className="text-xs font-semibold" style={{ color: MACRO_COLORS.fat }}>F {Math.round(totals.fatG)}g</span>
       </div>
-      <span className="text-sm font-bold tabular-nums">{Math.round(totals.calories)} kcal</span>
+      {showCalories && <span className="text-sm font-bold tabular-nums">{Math.round(totals.calories)} kcal</span>}
     </div>
   )
 }

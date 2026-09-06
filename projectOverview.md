@@ -26,8 +26,21 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.436.17 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.436.18 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-06.
+
+**A meal with one food in it shows its macros again (BF-120 / OR-101).** The owner, from two
+device checks: *"1 meal doesnt show the calorie total; but 2 meals do"*. A section holding one
+loose food printed no protein, carbs or fat **anywhere**, while the section above it printed all
+three. The gate was a COUNT (`entries.length > 1`) and the question is a KIND: a group row states
+its own macros, a loose row has not since **Q-406** moved the per-item P/C/F into the detail
+sheet — and `meal-card.tsx` held both the true statement and the false one depending on it, ten
+lines apart. **The two reports disagreed about the cause and OR-101's reading is the one that
+holds:** BF-98 did not regress this — its own case table lists *"one loose row → no footer
+(unchanged)"* — and the first test in `diary-nested-meal.spec.ts` still pins the duplication it
+did fix. The calorie total stays gated at two or more, per BF-120: with one entry the section
+total *is* that row's number and the header prints it already.
+**Not device-verified** ([journal](docs/overview/entries/2026-09-06-bf-120-lone-row-macros.md)).
 
 **A dose can be typed in at last (BF-112, stage 2 of BF-69).** The storage shipped 2026-09-01 and
 nothing could write to it: production held two supplements with `default_amount`, `unit`,
@@ -1675,6 +1688,16 @@ Last swept **2026-09-03**.
 > An entry only leaves when **nothing is still owed**: no open work, no pending owner or device
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
+
+### [nutrition] The lone-row macro footer has not been seen on the S25 (BF-120, 2026-09-06)
+
+A section with one loose food now renders `P / C / F` and withholds the duplicate calorie total. It
+is asserted at 412 dp by `diary-nested-meal.spec.ts` — which is close to the real check and is not it:
+both reports came from the device, and what they were about is how the card *looks*. **On the S25: a
+section with one loose item shows the breakdown and no repeated calorie line; a section with one
+grouped meal shows exactly one macro row (BF-98's fix, which must not come back); two or more shows
+both, unchanged.**
+[journal](docs/overview/entries/2026-09-06-bf-120-lone-row-macros.md).
 
 ### [body] The DEXA-calibration label on the BMI card has never been rendered (BF-113, 2026-09-06)
 

@@ -8188,12 +8188,27 @@ So it is two entries: **OR-102a** (Lane A — vial record + `taken_at`; the only
 back-filled, because reconstitution must be stamped on the *log* or historical unit figures silently
 go wrong) and **OR-102b** (Lane B — the four surfaces), with `Needs:` between them. Both sit at the
 top of the queue; `102b` correctly reads PARKED until `102a` ships, which is one small migration.
-## 2026-09-06 — `docs/implementation-backlog.md` → 18581, `projectOverview.md` → 9981 (PS-26 shipped)
+
+## 2026-09-06 — `projectOverview.md` → 10011 (BF-120's status paragraph and device row)
+
+Twenty-three lines across two sections, and the split is deliberate. The **Current Status** half is
+mostly the correction: two reports described one screen and disagreed about the cause, and the one
+that holds is checkable against BF-98's own case table rather than a matter of judgement — so the
+paragraph says which reading survived and why, because the losing one is the intuitive one and will
+be re-derived otherwise. The **Known-Issues** half exists because the e2e assertion at 412 dp is
+close to the device check and is not it; both reports came from the S25 and both are about how the
+card looks.
+
+The backlog moves the other way in the same PR — BF-120's 37-line entry is removed on shipping, and
+RV-49 gains eight lines of re-laning rather than being left to be picked up wrongly a second time.
+## 2026-09-06 — `docs/implementation-backlog.md` → 18512, `projectOverview.md` → 10004 (PS-26 shipped)
 
 `projectOverview.md` is **down** 7: PS-26's Known-Issues row was struck and moved whole to
 `known-issues-resolved.md` rather than ticked in place.
 
 The backlog number is **recomputed from the merged file**, not from this branch's own edit. PS-26's
 13 lines left the queue while OR-102a/b (#899) and then OR-101 (#875) added considerably more, and
-they land as one number — recomputed twice, once per merge, rather than adjusted. Subtracting the branch's delta from either side would have been wrong in both directions —
+they land as one number — recomputed on every merge rather than adjusted. Four merges in, that is
+the only method that stays correct: `projectOverview.md` is UP here despite this branch striking a
+row out of it, because concurrent work added more than PS-26 removed. Subtracting the branch's delta from either side would have been wrong in both directions —
 the count is the only thing that is true after a merge.
