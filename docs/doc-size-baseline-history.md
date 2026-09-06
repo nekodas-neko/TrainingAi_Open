@@ -8133,3 +8133,9 @@ instrument that can read a failure. The smaller true claim — build a fresh dat
 survived — is kept rather than discarded with the wrong one.
 
 The rest is this branch catching up to a `main` that moved six times while it was open.
+
+## 2026-09-06 — `docs/implementation-backlog.md` → 18445, `projectOverview.md` → 9981 (PS-26 shipped)
+
+Both moves are the entry leaving. The backlog is up slightly on the merge of concurrent work and
+down by PS-26's 13 lines; `projectOverview.md` is down 7 because the Known-Issues row was struck and
+moved whole to `known-issues-resolved.md` rather than ticked in place.

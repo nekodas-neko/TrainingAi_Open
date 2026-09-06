@@ -25,13 +25,13 @@ export async function GET(_req: NextRequest) {
 
   const repo = await getRepository();
   const tz = session.user?.timezone ?? DEFAULT_TZ;
-  const [program, latestLogs, personalRecords, exerciseLibrary, maxRepsByExercise, previous1rmMap] = await Promise.all([
+  const [program, latestLogs, personalRecords, exerciseLibrary, maxRepsByExercise, recent1rmMap] = await Promise.all([
     repo.getActiveProgram(userId),
     repo.getExerciseSummary(userId),
     repo.listPersonalRecords(userId),
     repo.listExerciseLibrary(),
     repo.listMaxReps(userId),
-    repo.listPrevious1rm(userId),
+    repo.listRecent1rm(userId),
   ]);
 
   const logMap = new Map(latestLogs.map(l => [l.exerciseName, l]));
@@ -50,8 +50,13 @@ export async function GET(_req: NextRequest) {
             ? toAestDay(log.loggedAt, tz).replace(/-/g, '/')
             : null,
           sessionName: sess.name,
-          estimated1rm: log?.estimated1rm ?? null,
-          previousEstimated1rm: previous1rmMap.get(ex.exerciseName) ?? null,
+          // PS-26: NOT `log?.estimated1rm`. A deload stores `estimated_1rm = 0` deliberately, so
+          // taking the latest row's value published a 0 beside a real previous estimate and the
+          // strength card rendered the difference — the lifter's whole 1RM, as a loss, with an
+          // empty bar. `listRecent1rm` skips deloads on both ranks, so this is the most recent
+          // estimate that is one, and the delta is between two comparable numbers.
+          estimated1rm: recent1rmMap.get(ex.exerciseName)?.latest ?? null,
+          previousEstimated1rm: recent1rmMap.get(ex.exerciseName)?.previous ?? null,
           target80: log?.target80 ?? null,
           personalRecord1rm: personalRecords.get(ex.exerciseName) ?? null,
           exerciseType: exerciseTypeByName.get(ex.exerciseName) ?? 'weighted',

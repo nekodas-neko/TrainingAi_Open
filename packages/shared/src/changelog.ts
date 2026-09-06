@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.18",
+    date: "2026-09-06",
+    changes: [
+      "The strength card no longer reads a deload week as a collapse. An exercise whose most recent session was a deload showed an empty bar and a drop equal to your entire one-rep max; it now shows your last real estimate and compares against the one before it.",
+    ],
+  },
+  {
     version: "1.436.17",
     date: "2026-09-06",
     changes: [

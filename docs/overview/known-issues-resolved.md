@@ -1879,3 +1879,22 @@ dropping any night whose start is not clear of the cutoff by `MAX_SLEEP_DS`, and
 
 **Not closed by this:** confirming the DB-pool-contention causal link against Railway's own logs.
 That was never Q-225's to answer — the `[platform]` Q-107 row carries it, and still does.
+
+### [workouts] ✅ The strength card no longer reads a deload as a full-1RM crash (PS-26, 2026-09-06)
+
+A deload stores `estimated_1rm = 0` on purpose — deload work is submaximal and must not read as a
+max. Q-298 taught `listPrevious1rm` that the 0 is a sentinel; nothing taught the route.
+`/api/weights-summary` took `estimated1rm` off the newest log whatever it was, so an exercise whose
+last session was a deload published a 0 beside a real previous estimate and the card rendered the
+difference: an empty bar and a drop equal to the lifter's entire 1RM, in red. Live on 16 of the
+owner's 34 exercises, every one flagged deload.
+
+Fixed in v1.436.18: `listRecent1rm` returns the two most recent estimates that *are* estimates, so
+the card's "current" is the last real one and the delta is between two comparable numbers. The
+display module carries the same predicate as defence, applied to the bar as well as the delta —
+guarding one and not the other leaves the empty bar, which was the reported half.
+
+**Prescription was never affected** (`resolveWorkingBasis` already skips deload rows — control held),
+so nothing that was lifted was ever wrong; only what was drawn.
+[Journal](docs/overview/entries/2026-09-06-deload-not-a-crash.md) ·
+[Checkpoint](docs/reviews/2026-09-05-app-checkpoint.md) §P5.

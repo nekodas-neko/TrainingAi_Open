@@ -56,6 +56,53 @@ describe.skipIf(!canRun)('listPrevious1rm skips deliberately-unestimated deloads
     expect((await repo.listPrevious1rm(TEST_USER_ID)).get(EX)).toBe(100)
   })
 
+  // ── PS-26: the same sentinel, read as a CURRENT value one layer up ─────────────────────────
+  //
+  // Q-298 fixed `previous`. Nothing fixed `latest`: `/api/weights-summary` took `estimated1rm`
+  // straight off the newest log, so an exercise whose last session was a deload published a 0
+  // beside a real previous estimate, and the strength card rendered the difference as a loss of
+  // the lifter's entire 1RM with an empty bar. Measured on the owner's rows — 16 of 34 exercises,
+  // every one flagged deload.
+  it('reaches past a deload for the LATEST estimate too, not just the previous one', async () => {
+    await logSession(10, 100, false)  // a real max
+    await logSession(5, 105, false)   // …a better one
+    await logSession(1, 0, true)      // …then today is a deload
+
+    const recent = (await repo.listRecent1rm(TEST_USER_ID)).get(EX)
+    // The card's "current" must be the last real estimate, not today's sentinel.
+    expect(recent?.latest).toBe(105)
+    expect(recent?.previous).toBe(100)
+  })
+
+  it('skips a run of consecutive deloads', async () => {
+    await logSession(20, 90, false)
+    await logSession(15, 95, false)
+    await logSession(10, 0, true)
+    await logSession(5, 0, true)
+    await logSession(1, 0, true)
+
+    const recent = (await repo.listRecent1rm(TEST_USER_ID)).get(EX)
+    expect(recent?.latest).toBe(95)
+    expect(recent?.previous).toBe(90)
+  })
+
+  // The whole point is that the delta is between two comparable numbers. With one real estimate
+  // there is nothing to compare, and inventing a second is what this class of bug is made of.
+  it('reports no previous when only one real estimate exists', async () => {
+    await logSession(5, 0, true)
+    await logSession(1, 100, false)
+
+    const recent = (await repo.listRecent1rm(TEST_USER_ID)).get(EX)
+    expect(recent?.latest).toBe(100)
+    expect(recent?.previous).toBeUndefined()
+  })
+
+  it('reports nothing at all for an exercise that has only ever been deloaded', async () => {
+    await logSession(5, 0, true)
+    await logSession(1, 0, true)
+    expect((await repo.listRecent1rm(TEST_USER_ID)).get(EX)).toBeUndefined()
+  })
+
   it('still returns the previous estimate when no deload intervenes', async () => {
     await logSession(5, 100, false)
     await logSession(1, 105, false)

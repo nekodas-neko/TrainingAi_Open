@@ -751,19 +751,6 @@ something else refills it; a missed eviction serves the snapshot for the full TT
 `readCacheSync` sites: these three are the live cluster after discarding fallback-paired seeds.
 Convert to `useCachedValue` or fold into the RV-49 fix and its test.
 
-### [workouts] PS-26 — the strength card shows a deload as a full-1RM crash, live on 16 of 34 exercises 🔴 LIVE
-
-- **Lane:** A — `packages/shared/src/health/strength-progress.ts`, `getExerciseSummary`.
-- **Added:** 2026-09-06, app checkpoint — [report](reviews/2026-09-05-app-checkpoint.md) §P5.
-
-A deload stores `estimated_1rm = 0` on purpose (Q-298), and Q-298's `> 0` guard reached
-`listPrevious1rm` only. `strength-progress.ts:32-34` computes the delta from the CURRENT value with
-no guard and :52-59 the bar pct from it, so an exercise whose latest log is a deload shows
-"−<full 1RM> kg" and a 0 % bar. Live probe: `/api/weights-summary` returned
-`estimated1rm: 0, previousEstimated1rm: 97` for a deload fixture. **Production (owner's rows,
-verified): 34 exercises, the latest log has `estimated_1rm = 0` on 16, all 16 flagged deload.**
-Prescription is unaffected (`resolveWorkingBasis` skips deload rows — control held).
-
 ### [workouts] PS-27 — 1RM arithmetic: non-monotone in reps, bodyweight ratchets down, two rep-ceiling behaviours
 
 - **Lane:** A — `packages/shared/src/1rm.ts`. Sibling of RV-43.
