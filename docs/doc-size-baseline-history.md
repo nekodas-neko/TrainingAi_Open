@@ -6769,7 +6769,7 @@ The lines are the evidence, not the argument: the four file:line references that
 already arrives, and the note that the outbox push confirms `synced` without applying the server row
 — which is why the number lands on the next pull rather than at first paint. Lane B needs those to
 avoid re-deriving them; the reasoning is in
-[`docs/overview/entries/2026-09-02-bf-107-relane.md`](overview/entries/2026-09-02-bf-107-relane.md),
+[`docs/overview/history-2026-09-06.md`](overview/history-2026-09-06.md) (folded 2026-09-06),
 and this block was cut by a third after the check first failed.
 
 A mis-laned entry costs more than its lines: it is picked up, traced and put back by every session
