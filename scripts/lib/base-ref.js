@@ -139,8 +139,30 @@ function dirNamesAtBase(baseRef, dirRelPath) {
   }
 }
 
+/**
+ * `'ok'` · `'slack'` · `'inherited'` · `'fail'`.
+ *
+ * PS-34 added `'slack'`. The ratchet only ever pointed one way: a document under its number was
+ * `'ok'`, so the difference stayed available for silent regrowth — CLAUDE.md sat **429 lines**
+ * under baseline, meaning the most-read file in the repo could grow by more than half its own
+ * length with nothing complaining. The shrink-only siblings (`check-hex-colors.js`,
+ * `check-fetch-once-effects.js`, `check-component-size.js`) all fail on a stale-high number for
+ * exactly this reason.
+ *
+ * **Only `check-doc-index-size.js` acts on `'slack'`.** The other eight callers branch on
+ * `'inherited'` and `'fail'` alone, so it falls through to no action for them exactly as `'ok'`
+ * did — and that is correct, because each of them already enforces shrink in a second loop over
+ * its own baseline. Do not "finish the job" by making them handle `'slack'` too: they would then
+ * report the same stale number twice.
+ *
+ * `'slack'` has no `inherited` escape hatch, and that asymmetry is deliberate. On the growth side
+ * the fix is moving prose, so blaming a branch for `main`'s size was wrong (Q-424). On this side
+ * the fix is editing one number, so "someone else shrank it" is no reason to leave the ceiling
+ * wrong.
+ */
 function verdict({ count, limit, atBase }) {
-  if (count <= limit) return 'ok';
+  if (count === limit) return 'ok';
+  if (count < limit) return 'slack';
   if (atBase !== null && atBase !== undefined && count <= atBase) return 'inherited';
   return 'fail';
 }

@@ -9,13 +9,28 @@
 import { describe, it, expect } from 'vitest'
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { verdict } = require('../lib/base-ref.js') as {
-  verdict: (a: { count: number; limit: number; atBase: number | null }) => 'ok' | 'inherited' | 'fail'
+  verdict: (a: { count: number; limit: number; atBase: number | null }) => 'ok' | 'slack' | 'inherited' | 'fail'
 }
 
 describe('doc-size ratchet verdict (Q-424)', () => {
-  it('passes at or under the baseline', () => {
+  it('passes when the count is exactly the baseline', () => {
     expect(verdict({ count: 100, limit: 100, atBase: 100 })).toBe('ok')
-    expect(verdict({ count: 90, limit: 100, atBase: 100 })).toBe('ok')
+  })
+
+  // PS-34 changed this case. It used to be `'ok'`, and that was the whole defect on the shrink
+  // side: a document under its number left the difference available for silent regrowth. Measured
+  // when the rule was written — CLAUDE.md was **429 lines** under baseline, so the most-read file
+  // in the repo could grow by more than half its own length with nothing complaining.
+  it('reports slack when the file is UNDER its baseline', () => {
+    expect(verdict({ count: 90, limit: 100, atBase: 100 })).toBe('slack')
+  })
+
+  // The asymmetry with `inherited`, stated so it is not "tidied" later. On the growth side the fix
+  // is moving prose, so blaming a branch for main's size was wrong. Here the fix is editing one
+  // number, so someone else having shrunk it is no reason to leave the ceiling wrong.
+  it('reports slack regardless of what the base held', () => {
+    expect(verdict({ count: 90, limit: 100, atBase: 90 })).toBe('slack')
+    expect(verdict({ count: 90, limit: 100, atBase: null })).toBe('slack')
   })
 
   it('fails a branch that grew the file past the baseline', () => {

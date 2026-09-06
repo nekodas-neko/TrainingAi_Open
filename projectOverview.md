@@ -1689,6 +1689,24 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [app-shell] 🟡 Eighteen icon-only buttons announce as "button" and nothing else (LA-62, 2026-09-06)
+
+An icon-only control with no accessible name is read out by a screen reader as "button", with
+nothing to say what it does. Q-162 found six in 2026-08 and a CI rule was written to stop the class
+recurring; the rule's opening-tag regex ended at the `>` of `=>`, so every button with an
+inline-arrow handler was skipped and it reported clean over code it had never parsed. PS-34's repair
+surfaced all eighteen at once — six in `config-screen.tsx`, three in `manage-friends-sheet.tsx`, the
+rest one apiece.
+
+They are **frozen shrink-only** in `scripts/check-icon-button-names.js`, so no new one can land, and
+clearing a file requires lowering its number in the same PR. Every icon involved has an obvious name
+(`Pencil`, `Trash2`, `X`, `Check`, `ArrowLeft`), so the fix is `aria-label` and no design decision —
+**Lane B's**, which is why this shipped as a frozen list rather than a rewrite of the surface.
+
+**PS-34's own claim that no live violation sat behind any of its seven rules was wrong here.** A
+re-scan reporting zero is worth exactly as much as the pattern it re-scanned with.
+[Journal](docs/overview/entries/2026-09-06-guard-repairs.md).
+
 ### [nutrition] The lone-row macro footer has not been seen on the S25 (BF-120, 2026-09-06)
 
 A section with one loose food now renders `P / C / F` and withholds the duplicate calorie total. It
