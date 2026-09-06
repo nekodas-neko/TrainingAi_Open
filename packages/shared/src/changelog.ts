@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.11",
+    date: "2026-09-06",
+    changes: [
+      "Deactivating an account now takes effect on its very next request. Until this, someone already signed in kept full access to their data for as long as their existing login lasted \u2014 up to a week \u2014 even though a fresh sign-in was correctly turned away.",
+    ],
+  },
+  {
     version: "1.436.10",
     date: "2026-09-06",
     changes: [

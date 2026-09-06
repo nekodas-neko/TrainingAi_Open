@@ -492,23 +492,61 @@ to them. The last supplement log of any kind is from June.
   recorded (BF-3 gap 1, and the reason the stamp is on the log); set `started_on`, and a date before it
   reads as outside the window rather than as a missed dose.
 
-### [platform] PS-24 — deactivating a user does not end their session; LA-58's gate reads a claim that never refreshes 🔴 LIVE
+### [platform] 🟡 PS-24 — deactivation is immediate now; the middleware's claim is still stale
 
-- **Lane:** A — `auth.config.ts`, `middleware.ts`, `lib/auth/is-active-refresh.ts`.
-- **Added:** 2026-09-06, app checkpoint —
-  [report](reviews/2026-09-05-app-checkpoint.md) §2.
+- **Lane:** A — `auth.ts`. `middleware.ts` and `auth.config.ts` are deliberately unchanged.
+- **Verify:** device — the APK talks to the same routes, but a deactivated account reaching a
+  Custom Tab sign-in has not been walked through on hardware.
+- **Keep:** the Edge middleware still gates on a claim it cannot refresh. That is a second line now
+  rather than the only one, but it is still wrong, and the two ways to close it properly are
+  recorded below so the next session does not re-derive them.
 
-Confirmed live: `UPDATE users SET is_active=false` for a signed-in account, and its existing cookie
-kept answering 200 on `/api/friends` (×3) and `GET /` (no redirect). Control: a fresh sign-in while
-inactive → 302 `/pending`. The claim is stamped at sign-in and never changes on the path that
-matters: `middleware.ts:5` runs `NextAuth(authConfig)` whose jwt callback (`auth.config.ts:32-46`)
-has no refresh; `refreshIsActiveClaim` is wired only into `auth.ts:60`, and the no-arg `auth()`
-every route handler uses discards the re-signed cookie. The Edge middleware re-signs the stale claim
-with a fresh 7-day expiry on every request. **LA-58 (#884) added the 403 gate; the gate works
-(control: a hand-minted `isActive:false` claim → 403/redirect) — the claim it reads is what never
-moves.** Same mechanism: an `isAdmin` revocation never reaches a live session. Also: because the
-`isActiveCheckedAt` throttle stamp never persists either, every authenticated request performs the
-"once per day" users-row read.
+> **✅ FIXED 2026-09-06 (v1.436.11).** `auth()` returns `null` when the freshly-read row says the
+> account is inactive. Reproduced live on `pnpm dev` with a real credentials session, before and
+> after: `UPDATE users SET is_active=false` with the **same cookie** took `GET /api/friends` from
+> `200` to `401` on the next request, and `GET /` from the app shell to a `/sign-in` redirect.
+> Reactivating restored `200` with no re-sign-in.
+>
+> **It costs no extra database work, which is why this shape was chosen.** `isActiveCheckedAt` lives
+> only in the token and the token never persists, so `refreshIsActiveClaim`'s once-a-day throttle
+> never engages and the users row was already being re-read on every authenticated request. The true
+> value sat in `session.isActive` with nothing consulting it. **So the checkpoint's third finding —
+> "every authenticated request performs the once-per-day read" — must NOT be optimised away**:
+> making the stamp persist would restore `ISACTIVE_RECHECK_MS` of staleness and undo this. Pinned by
+> a test in `lib/auth/__tests__/is-active-refresh.test.ts`.
+>
+> **One sub-claim of this entry is refuted by measurement.** *"Same mechanism: an `isAdmin`
+> revocation never reaches a live session"* is false for every Node consumer. Granting `is_admin` in
+> the database and re-reading `/api/auth/session` on the **same cookie** returned `isAdmin: true`
+> with no re-sign-in, because the same per-request refresh updates that claim too. It is stale only
+> in the Edge middleware, which never reads it.
+>
+> **`null` rather than a session with its id stripped**, deliberately: 213 route handlers call
+> `auth()`, 81 guard on `session?.user?.id`, and the rest read it in shapes that would reach the
+> driver as `undefined` — an unscoped or malformed query, which is worse than the staleness. `null`
+> is the not-signed-in state every caller already handles.
+>
+> **`handlers` is not wrapped**, so `/api/auth/session` still describes a deactivated account.
+> Checked rather than assumed: this app has **zero** `useSession`/`SessionProvider` call sites, so
+> nothing consumes that endpoint — the shell takes its session as props from a server component that
+> redirects first.
+
+**What is still owed: the middleware gates on a claim it cannot verify.** It builds its own NextAuth
+instance from the Edge-only `auth.config.ts`, and the response headers confirm it re-signs that claim
+with a fresh 7-day expiry on every request. Two ways to close it, neither taken here:
+
+1. **Node.js middleware runtime.** Confirmed available in the pinned Next 15.5.22 —
+   `loadNodeMiddleware` in `next-server.js` is gated on the functions-config manifest, not on an
+   `experimental` flag. It would let the one enforcement point read the row and keep LA-58's 403,
+   which distinguishes "deactivated" from "not signed in" in a way 401 cannot. **Cost:** every
+   request in the app moves onto Node middleware, `auth.config.ts`'s "no bcrypt, no pg" contract
+   stops applying, and a database read lands on paths that currently touch nothing.
+2. **Leave the middleware as a cheap first line** and treat `auth()` as the authoritative one, which
+   is the state as of this PR. **Cost:** a stale-cookie caller gets 401 rather than 403, so it
+   re-authenticates — which terminates at `/pending` rather than looping, since sign-in mints no
+   session for an inactive account, but it is a worse answer than 403.
+
+Not a decision for a queue pass: option 1 changes how every request in the app is served.
 
 ### [platform] PS-25 — the login rate limiter keys on the untrimmed email, and has no IP limit
 
