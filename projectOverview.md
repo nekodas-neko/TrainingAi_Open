@@ -26,7 +26,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.436.16 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.436.17 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-06.
 
 **A dose can be typed in at last (BF-112, stage 2 of BF-69).** The storage shipped 2026-09-01 and
@@ -44,6 +44,20 @@ device-verified** — which is precisely the surface the first defect was hiding
 **LB-57**: the day's exposure is now derived once per lane, and the single home is `packages/shared`,
 which Lane B may not write
 ([journal](docs/overview/entries/2026-09-06-bf-112-dose-entry.md)).
+
+**About stops looking like it contradicts itself (BF-111).** The screen showed **v1.436.2** and, two
+rows below, a green tick reading *"Up to date — v1.414.1 is the newest build."* Both were right — the
+first is the web app, advanced by every deploy; the second is the newest APK — and nothing said so, so
+the tick appeared to vouch for the smaller number. Both are labelled now, and **every state names the
+INSTALLED build**, which is what answers *"has that native fix reached my phone?"*: the update state
+used to name a version the device does not have and say nothing about the one it does.
+**The date was already in the payload** — `/api/version` has returned `nativeBuiltAt` all along and
+the card dropped it. **That is the third entry today of that shape** (Q-529's `provisional`, Q-516's
+`informativeShare`), which is a class worth watching rather than three coincidences. Rendered through
+`toAestDay`, not `toLocaleDateString`, which would use the *device's* zone.
+**Not device-verified, and here that is the whole surface** — the card returns early off-native, so
+none of its three states has ever been on a screen
+([journal](docs/overview/entries/2026-09-03-bf-111-version-labels.md)).
 
 **The blank resume was never a dead renderer (BF-110).** The owner: *"it fixes itself if you just
 scroll on it."* **That one detail overturns BF-80's diagnosis** — a killed WebView renderer has no
