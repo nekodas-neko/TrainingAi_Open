@@ -7909,7 +7909,9 @@ way to get it right when both sides moved the same document. Recorded at all bec
 only enforces a ceiling: a baseline left above the real count silently hands the next entry free
 lines it did not have to justify.
 
-## 2026-09-06 — `docs/implementation-backlog.md` → 18344 (RV-46 shipped and removed)
+## 2026-09-06 — `docs/implementation-backlog.md` → 18370 (RV-46 out, LA-60 in)
 
-Downward again: one completed entry left the queue and nothing replaced it. Lowered so the ceiling
-keeps tracking the real count rather than banking the difference for the next entry.
+RV-46 left the queue on shipping and LA-60 took its place — the Node 20/22 split between CI and the
+sandbox, found when this PR went red on an API the local run had. Net upward by the difference
+between a 26-line entry removed and a 28-line one added, which is the honest accounting rather than
+two separate movements.

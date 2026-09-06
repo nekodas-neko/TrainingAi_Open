@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { readFileSync, readdirSync } from 'node:fs'
+import { join, relative } from 'node:path'
 
 // RV-46. Eighteen repository methods throw a typed `NotFoundError`/`UserFacingError`; thirteen
 // mutating routes call one. Twelve mapped it through `refusalResponse`/`routeErrorResponse`. The
@@ -75,15 +75,29 @@ describe('every route calling a throwing repository method maps its error', () =
   const stripComments = (src: string) =>
     src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
 
+  // A hand-rolled walk rather than `fs.globSync`, which is Node 22+ and does not exist on the
+  // Node 20 the CI jobs run: the first version passed locally and threw `globSync is not a
+  // function` in the Tests job.
+  function routeFiles(dir: string, found: string[] = []): string[] {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, e.name)
+      if (e.isDirectory()) routeFiles(full, found)
+      else if (e.name === 'route.ts') found.push(full)
+    }
+    return found
+  }
+
   it('and the list of such routes is not silently growing', async () => {
-    const { globSync } = await import('node:fs')
-    const files = globSync('app/api/**/route.ts', { cwd: process.cwd() })
+    const files = routeFiles(join(process.cwd(), 'app/api'))
+    // A walk that finds nothing also finds nothing unmapped, so the count is the control.
     expect(files.length).toBeGreaterThan(100)
     const unmapped: string[] = []
     for (const rel of files) {
-      const src = stripComments(readFileSync(join(process.cwd(), rel), 'utf8'))
+      const src = stripComments(readFileSync(rel, 'utf8'))
       const calls = THROWING.filter(m => src.includes(`repo.${m}(`))
-      if (calls.length && !MAPPERS.test(src)) unmapped.push(`${rel} calls ${calls.join(', ')}`)
+      if (calls.length && !MAPPERS.test(src)) {
+        unmapped.push(`${relative(process.cwd(), rel)} calls ${calls.join(', ')}`)
+      }
     }
     expect(unmapped, 'a route calling a throwing repository method needs routeErrorResponse/refusalResponse').toEqual([])
   })

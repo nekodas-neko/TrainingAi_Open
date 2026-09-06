@@ -38,6 +38,18 @@ The generalisable part: **a source check that reads prose is checking the wrong 
 reason it surfaced is that the mutation was run after the test was written rather than assumed from
 the passing run.
 
+## And it failed CI anyway, on a Node version
+
+The first push was green locally and red in the Tests job: `TypeError: globSync is not a function`.
+`fs.globSync` is Node 22+; **the sandbox runs Node 22.22.2 and every CI job pins `node-version:
+'20'`**. Replaced with a `readdirSync` walk, which depends on nothing version-specific, plus a
+`files.length > 100` control — a walk that finds nothing also finds nothing unmapped, so without it
+the scan would pass by failing.
+
+Two majors of drift between the machine a change is validated on and the machine that gates it is a
+standing trap, not a one-off: `pnpm test` passing in the sandbox is not evidence about the job. Filed
+as **LA-60** so it stops being rediscovered.
+
 ## The list of throwing methods is read, not grepped
 
 `THROWING` was built by reading each implementation. A `grep -B40` for `throw new NotFoundError`
