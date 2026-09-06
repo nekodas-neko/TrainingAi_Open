@@ -496,6 +496,50 @@ random, and worse than no colour because it looks authoritative.
 - **Verify:** device — the calculator's arithmetic against the owner's own third-party app, and
   whether the colour chip reads correctly at a glance on the S25.
 
+### [nutrition][body] OR-104 — a supplement can carry two contradicting doses, and the wrong one is what history keeps 🔴 LIVE
+
+- **Lane:** A — the stamping is in `lib/data/postgres/adapter.ts` and `lib/local-store/sqlite-backend.ts`;
+  the surface half (`components/nutrition/manage-supplements-sheet.tsx`) follows, engine first per §3.
+- **Added:** 2026-09-06 by Orchestrator. **Branch:** unassigned.
+- **Live in production right now, on the one supplement that matters most.** `Retatrutide` reads
+  `default_amount 0.5 · unit mg` **and** free-text `dose '10mg'` — the second is the *vial strength*,
+  entered in the field the sheet labels `Dose`. The 2026-09-07 log has already frozen both:
+  `amount 0.5, unit mg, dose_text '10mg'`. The two disagree by 20×.
+
+**Why it happened, and why it will happen again.** BF-112 stage 2 added structured `amount`/`unit`
+beside the free-text `dose` that has always been there, and the edit sheet now offers **both, with
+nothing reconciling them**. `manage-supplements-sheet.tsx:30` keeps `dose` "as the free-text line it
+always was". Nothing warns that the two are the same question asked twice, so the natural reading of
+a field called `Dose` — *what is in the vial* — writes a number that contradicts the structured one.
+
+**Why it is not visible.** `supplementSubtitle()` falls back to `s.dose` **last**, so with
+`defaultAmount` set the list correctly reads `0.5 mg today` and the contradiction never surfaces
+there. It shows only on the manage sheet's own row (`:385`), where `10mg` sits under the name. So
+this is a defect that is *already* wrong in the archive while every screen looks right.
+
+**Why it matters more than a cosmetic mismatch.** `dose_text` is stamped at log time on purpose
+(BF-3) so editing a definition cannot rewrite history — which means **fixing the definition does not
+fix the logs already written**, and every future log inherits the same stamp until someone notices.
+OR-102a/b will read dose history to recommend the next dose. A tracker that reads `dose_text` over
+`amount` recommends against a number 20× high.
+
+**What to do:**
+1. **Engine:** do not stamp `dose_text` from the definition's free text when a structured `amount`
+   was stamped from the same definition. Two representations of one number, one of them unparsed
+   prose, is the thing to stop writing — not a display choice.
+2. **Surface:** the sheet must not offer both unreconciled. Either hide the free-text field once
+   `amount`+`unit` are set, or relabel it to what it is now used for (a note, not a dose).
+3. **The existing row is the owner's** — see `Gate:`. Nothing in this entry repairs it, because the
+   freeze is deliberate.
+
+- **Gate:** owner — the live `Retatrutide` definition and its 2026-09-07 log need correcting in the
+  app by hand (clear the free-text `Dose`; delete and re-log the day). Production is read-only from
+  a session, so no agent can do it. The code fix does not depend on this and should not wait for it.
+- **Verify:** device — add a supplement with an amount and a unit, confirm the sheet does not also
+  invite a free-text dose, log it, and confirm the stored `dose_text` no longer contradicts.
+- **Reversal cost:** low. No migration; existing rows keep whatever they were stamped with, which is
+  the point of the stamp.
+
 ### [app-shell][platform] BF-122a — the cat collection, engine half: the ladder derivation and a decay window read off the schedule
 
 - **Lane:** A — `packages/shared/**`. No migration, no API route, no table: the whole thing is a pure

@@ -42,3 +42,19 @@ The four `O` entries are now *visible*; none of them was worked. LB-56 (E2E gate
 top of that lane and is the Orchestrator's own next piece of queue work.
 
 **Surfaces not exercised:** none apply — this touches no runtime code, no device path, no schema.
+
+## Also in this PR — OR-104, filed from a live production read
+
+Checking the `Retatrutide` row (the owner asked for its free-text dose to be fixed) showed the
+definition carrying `default_amount 0.5 · unit mg` **and** free-text `dose '10mg'` — the vial
+strength, typed into a field labelled `Dose`. The 2026-09-07 log has already frozen both:
+`amount 0.5, unit mg, dose_text '10mg'`, a 20× disagreement inside one row.
+
+It is invisible because `supplementSubtitle()` falls back to the free text **last**, so with
+`defaultAmount` set every list reads `0.5 mg today` correctly while the archive is wrong. The edit
+sheet offers both fields with nothing reconciling them (`manage-supplements-sheet.tsx:30`), which is
+why it will recur. Filed as **OR-104**, Lane A (engine stamping first, sheet after), directly behind
+the reta tracker entries — OR-102a/b read dose history, and would inherit this.
+
+**The live row is `Gate: owner`:** production is read-only from a session, and BF-3's stamp is
+deliberate, so neither an agent nor a definition edit can repair the log already written.

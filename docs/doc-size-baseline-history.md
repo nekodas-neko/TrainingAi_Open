@@ -8315,3 +8315,11 @@ readable value, so the field-rules block gains its definition, and five entries 
 `Lane:` line (LB-52/54/55/56 → `O`, LB-46 → `A`). No entry was added. The number is 18828 rather
 than 18675+11 because it was re-measured after merging `main` — LA-59 raised the same baseline in
 parallel, and a raise computed before the rebase is a guess.
+
+## 2026-09-06 — `docs/implementation-backlog.md` → 18872 (OR-104, two contradicting doses)
+
+Forty-four lines for one entry, and the length is the finding. A supplement can carry a structured
+`0.5 mg` and a free-text `10mg` at once, the free text is what `dose_text` freezes onto every log,
+and **no screen shows the contradiction** — `supplementSubtitle()` falls back to the free text last,
+so the list reads correctly while the archive is 20× wrong. An entry that only said "the dose fields
+disagree" would send the next session to the display code, which is right.
