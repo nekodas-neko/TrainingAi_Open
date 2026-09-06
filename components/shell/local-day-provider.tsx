@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { todayInTz } from '@trainingai/shared/date-utils'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 
@@ -64,4 +64,33 @@ export function useLocalDay(): string {
   const tz = useUserTimezone()
   const fromContext = useContext(LocalDayContext)
   return fromContext ?? todayInTz(tz)
+}
+
+/**
+ * Runs `fn` on the first resume of a new local day, and at no other time — never on mount.
+ *
+ * The day-rollover counterpart to `useRefreshOnTabShow`, and it exists for the same reason: the
+ * five tabs stay mounted for the life of the app, so anything fetched in a mount effect is a
+ * snapshot of the launch. `epoch` covers the user navigating back to a tab; this covers the clock
+ * moving underneath a tab they never left. Home showed today's greeting over yesterday's rest-day
+ * card because nothing covered the second case (BF-117).
+ *
+ * **Mount must not fire it.** `LocalDayProvider` seeds the date synchronously so the first frame
+ * carries the real one, which means an effect keyed on `useLocalDay()` alone runs once per launch —
+ * a duplicate fetch that is invisible in use, reading as an app that is merely slow to settle. The
+ * ref holds the day the caller last refreshed for, seeded at mount, so the first run is a no-op by
+ * construction rather than by a flag someone has to remember.
+ *
+ * `fn` is held in a ref, so an inline arrow at the call site does not re-fire it.
+ */
+export function useDayRolloverRefresh(fn: () => void): void {
+  const day = useLocalDay()
+  const ref = useRef(fn)
+  ref.current = fn
+  const refreshedFor = useRef(day)
+  useEffect(() => {
+    if (refreshedFor.current === day) return
+    refreshedFor.current = day
+    ref.current()
+  }, [day])
 }

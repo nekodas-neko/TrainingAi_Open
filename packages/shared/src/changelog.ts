@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.15",
+    date: "2026-09-06",
+    changes: [
+      "Leaving the app open overnight and coming back to it now shows the new day. Home, Health and Nutrition kept the numbers they loaded when the app was last started, so the greeting said one day and the cards below it said the day before \u2014 the only way out was closing and reopening the app.",
+    ],
+  },
+  {
     version: "1.436.14",
     date: "2026-09-06",
     changes: [

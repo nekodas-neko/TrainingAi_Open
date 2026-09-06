@@ -7754,6 +7754,24 @@ entry says explicitly not to try another number — the derived budget carries `
 so a hardcoded figure lands wherever that day's movement puts it, which converts a failing test into
 an intermittent one. Naming the trap is worth more than the twelve lines.
 
+## 2026-09-06 — `projectOverview.md` → 9958, `docs/implementation-backlog.md` → 18351 (BF-117)
+
+Both numbers are stated against the merged base, not the 17669 this branch was cut from — the point
+this note already made when it read 9823/17638, and which it then fell foul of itself. Two days and
+roughly a dozen merges later those figures described a file nobody had either, so they are recomputed
+here: quoting a branch's own starting point is how a baseline note ends up describing a document that
+does not exist, and a note written once and left is the slower version of the same mistake. What this branch does to it on its own is
+**remove 52 lines**: BF-117 shipped and its entry is gone from the queue, which is the shape the
+protocol wants and the reason the ratchet is worth having at all.
+
+The index grows by eleven, all of it on two existing entries rather than a new one. RV-35 measured
+Nutrition failing to roll over and diagnosed it exactly; it stays in Known Issues rather than moving
+to the archive because the device check is still owed, and it now carries the fix and one line
+pointing at the figure in its own measurement that was easy to read past — Home went from 4 dated
+requests to 2, which is the check-in and mood reads BF-86 fixed and nothing else. BF-86's own entry
+gains a pointer saying the half it deliberately deferred has landed, because that entry is what a
+reader arrives at first and it otherwise reads as still-open scope.
+
 ## 2026-09-04 — `docs/implementation-backlog.md` → 17690 (Q-250's next step is an auth bypass)
 
 Twenty lines correcting a sentence this same session wrote hours earlier — that CI could "mint the

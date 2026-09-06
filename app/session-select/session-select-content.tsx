@@ -3,7 +3,8 @@
 import { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo } from "react";
 import { savePreference } from '@/lib/user/preferences-sync'
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
-import { useLocalDay } from '@/components/shell/local-day-provider';
+import { useDayRolloverRefresh, useLocalDay } from '@/components/shell/local-day-provider';
+import { getGreeting } from './greeting';
 import { isMorningCheckinPromptDone, markMorningCheckinPromptDone } from '@/app/session-select/morning-checkin-marker';
 import { useSearchParams } from "next/navigation";
 import { useTransitionRouter } from "@/lib/view-transition";
@@ -91,13 +92,6 @@ import type { HrSleepWindow } from "@trainingai/shared/health/hr-sleep-band";
 // score chip reads. A `Pick` keeps the seed's narrow object literal assignable.
 type HomeSleepRow = Pick<SleepRow,
   'date' | 'durationHours' | 'deepSleepHours' | 'remSleepHours' | 'lightSleepHours' | 'awakHours' | 'provisional'>;
-
-
-function getGreeting(name: string, tz: string): string {
-  const h = parseInt(formatInTimeZone(new Date(), tz, "H"), 10);
-  const period = h < 12 ? "morning" : h < 17 ? "afternoon" : h < 21 ? "evening" : "night";
-  return `Good ${period}, ${name}.`;
-}
 
 
 export default function SessionSelectContent({ userId, isAdmin }: { userId?: string; isAdmin?: boolean }) {
@@ -756,6 +750,10 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   }, [userId]);
 
   useEffect(() => { loadTodayMood(); }, [loadTodayMood, localDay]);
+
+  // BF-117: everything gated on `refreshTick` still holds what it fetched at launch, so across
+  // midnight this screen showed today's greeting over yesterday's rest-day card.
+  useDayRolloverRefresh(() => { refetchAll().catch(() => {}); });
 
   // The persistent shell re-shows this tab without remounting it — re-run the
   // mount refresh pass (same cachedFetch-backed reads a remount used to run).
