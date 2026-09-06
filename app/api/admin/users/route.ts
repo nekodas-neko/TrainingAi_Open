@@ -6,6 +6,7 @@ const MAX_BODY_BYTES = 4 * 1024
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { requireAdmin, adminErrorResponse } from '@/lib/admin'
+import { invalidUuidResponse } from '@/lib/api/route-errors'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -44,13 +45,18 @@ export async function PATCH(req: NextRequest) {
   if (typeof userId !== 'string' || typeof action !== 'string' || !['activate', 'deactivate'].includes(action)) {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
   }
+  // RV-47: `users.id` is a uuid, so a malformed one reached the driver as a 22P02 and answered 500
+  // with an empty body, filing the failing UPDATE statement into `error_events` as a server fault.
+  const badId = invalidUuidResponse(userId)
+  if (badId) return badId
 
   const repo = await getRepository()
-  if (action === 'activate') {
-    await repo.activateUser(userId)
-  } else {
-    await repo.deactivateUser(userId)
-  }
+  // RV-48: an id that matched no user answered `200 {"ok":true}`, the same response a real
+  // activation gives.
+  const changed = action === 'activate'
+    ? await repo.activateUser(userId)
+    : await repo.deactivateUser(userId)
+  if (!changed) return NextResponse.json({ error: 'User not found' }, { status: 404 })
   return NextResponse.json({ ok: true })
 }
 
@@ -72,9 +78,12 @@ export async function DELETE(req: NextRequest) {
   }
   const { userId } = (read.body ?? {}) as { userId?: unknown }
   if (typeof userId !== 'string' || !userId) return NextResponse.json({ error: 'userId required' }, { status: 400 })
+  const badId = invalidUuidResponse(userId)
+  if (badId) return badId
   if (userId === session.user.id) return NextResponse.json({ error: 'Cannot delete yourself' }, { status: 400 })
 
   const repo = await getRepository()
-  await repo.deleteUser(userId)
+  const deleted = await repo.deleteUser(userId)
+  if (!deleted) return NextResponse.json({ error: 'User not found' }, { status: 404 })
   return NextResponse.json({ ok: true })
 }

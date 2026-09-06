@@ -26,8 +26,54 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.436.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-09-03.
+**Version:** v1.436.17 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-09-06.
+
+**A dose can be typed in at last (BF-112, stage 2 of BF-69).** The storage shipped 2026-09-01 and
+nothing could write to it: production held two supplements with `default_amount`, `unit`,
+`dose_prompt` and `started_on` all empty, and one log of any kind, from June — with the owner due to
+start dosing on **2026-09-06**. The manage sheet now carries an amount, a unit, the started/stopped
+window and an *ask me each time* switch; a supplement with that switch asks for the number when it is
+ticked, pre-filled from the definition. The row's second line reads **what today's log recorded**,
+not what the definition currently says, so changing the dose later does not rewrite a past day —
+verified live by patching a definition from 2.5 mg to 10 mg while its earlier log kept reading 5 mg.
+**Two defects were found while verifying and both are fixed here:** the nutrition page's local-first
+branch dropped every new field, so the prompt would never have fired **on the device** while working
+in the browser; and the tick left the previous log's number on screen until the next pull. **Not
+device-verified** — which is precisely the surface the first defect was hiding on. Left behind as
+**LB-57**: the day's exposure is now derived once per lane, and the single home is `packages/shared`,
+which Lane B may not write
+([journal](docs/overview/entries/2026-09-06-bf-112-dose-entry.md)).
+
+**About stops looking like it contradicts itself (BF-111).** The screen showed **v1.436.2** and, two
+rows below, a green tick reading *"Up to date — v1.414.1 is the newest build."* Both were right — the
+first is the web app, advanced by every deploy; the second is the newest APK — and nothing said so, so
+the tick appeared to vouch for the smaller number. Both are labelled now, and **every state names the
+INSTALLED build**, which is what answers *"has that native fix reached my phone?"*: the update state
+used to name a version the device does not have and say nothing about the one it does.
+**The date was already in the payload** — `/api/version` has returned `nativeBuiltAt` all along and
+the card dropped it. **That is the third entry today of that shape** (Q-529's `provisional`, Q-516's
+`informativeShare`), which is a class worth watching rather than three coincidences. Rendered through
+`toAestDay`, not `toLocaleDateString`, which would use the *device's* zone.
+**Not device-verified, and here that is the whole surface** — the card returns early off-native, so
+none of its three states has ever been on a screen
+([journal](docs/overview/entries/2026-09-03-bf-111-version-labels.md)).
+
+**The blank resume was never a dead renderer (BF-110).** The owner: *"it fixes itself if you just
+scroll on it."* **That one detail overturns BF-80's diagnosis** — a killed WebView renderer has no
+document left to scroll, so content that reappears when you drag it was there all along and was not
+painted. A compositor failure, not a process death, and the two want opposite fixes. **BF-80's
+handler stays and is still correct**; they are two causes of one appearance. Shipped both halves in
+the order the entry insists on: measure the shell root's box and children on resume, then promote and
+release a layer for one frame — the instruction the manual scroll gives the compositor, without
+touching scroll state (BF-100's restoration listens for scroll on that same container).
+**⚠ The entry's "row per resume" was deliberately NOT built:** `error_events` prunes at 30 days, and
+**JS cannot tell whether the screen was blank** — the DOM is intact either way — so a row per resume
+evidences nothing while flooding the table. A `dom-lost` sample files always (it would disprove the
+entry); a `dom-intact` sample once per launch.
+**Not device-verified, and here that is the whole verdict** — this compositor is invisible in Chrome
+and `pnpm dev`, so the suite proves the effect runs and nothing about whether it fixes anything
+([journal](docs/overview/entries/2026-09-03-bf-110-resume-repaint.md)).
 
 **The HR Recovery Profile now says how much of it is signal (Q-516).** `aggregateHrRecoveryProfile`
 has returned `informativeShare` since the re-banding and **nothing rendered it** — the state the
@@ -634,7 +680,10 @@ deliberately not built** — BF-80 forbids fixing a resume with a reload, and th
 ask without trading instant paint for a spinner. The e2e test drives Playwright's clock across local
 midnight so the case fires on every run; **its first version passed with the fix reverted**, because
 `isVisible()` is a point-in-time check and not a wait. **Not device-verified**
-([journal](docs/overview/entries/2026-09-01-local-day-rollover.md)).
+([journal](docs/overview/entries/2026-09-01-local-day-rollover.md)). **The half this deliberately
+deferred shipped as BF-117 on 2026-09-04** — the rest of Home, plus Health and Nutrition, now follow
+the day too, via `useDayRolloverRefresh` in the same file
+([journal](docs/overview/entries/2026-09-04-bf-117-rollover-refetch.md)).
 
 **A peaking week stops reading as a volume deficit (BF-59, the screen's half).** Owner: *"i did the
 full sessions for the week; and i was nowhere near hitting the reccomended amount of muscle sets"*,
@@ -1627,21 +1676,60 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
-### [platform] 🟠 Deactivation does not deactivate: the `isActive` gate never runs on an API route (LA-58, 2026-09-04)
+### [body] The DEXA-calibration label on the BMI card has never been rendered (BF-113, 2026-09-06)
 
-`middleware.ts`'s matcher excludes `api` as its first exclusion, so the deactivation branch cannot
-run on any of the **219** `app/api/**/route.ts` files. Each of them calls `auth()` and checks
-`session?.user?.id`; **none checks `isActive`**, and there is no shared route-auth helper to add it
-to in one place.
+The caption now reads `via body fat % (DEXA-calibrated)` on a corrected reading, and **neither branch
+of it has been seen on a screen.** Against `pnpm dev` the BMI card rendered its *"No data"* state —
+`metaRecent` does not reach the client for the seeded user, so `bmi` is null and neither the caption
+nor the popover is on the page; seeding a body-fat row did not change it, and the corrected case
+needs more still, because `bodyFatIsCorrected` is computed server-side from a DEXA calibration and
+cannot be produced by inserting a reading. The flag is proven by unit test and the wiring by source
+guard; the rendering by neither. **On the S25: a corrected reading must show the calibration under an
+unchanged band, and an uncorrected one must not claim it.** The same gap applies to BF-114's BMR
+provenance labels, on the same card, for the same reason.
+[journal](docs/overview/entries/2026-09-04-bf-113-bmi-dexa-label.md).
 
-A deactivated or still-pending user therefore keeps full API access to **their own** data while their
-session cookie is valid. Not a cross-user leak — the routes are user-scoped — so it reads as
-"deactivation stops the UI and nothing else". The browser bounces them to `/pending`; `curl` with
-their cookie does not.
+### [platform] 🔴 REOPENED — deactivation still does not deactivate: the claim LA-58's gate reads never refreshes (PS-24, 2026-09-06)
 
-Found while assessing Q-1a, which names it as a precondition for bearer auth. That framing is why it
-sat: it reads as future work for a feature that has not started, and it is live now. **LA-58 carries
-the three candidate fixes with a recommendation; it is `Gate: owner` because it is an auth change.**
+The app checkpoint confirmed live: `is_active=false` for a signed-in account and its existing cookie
+kept answering 200 on API routes and pages; only a fresh sign-in is blocked. LA-58's 403 gate works
+(a hand-minted `isActive:false` claim is refused — control held) but the claim is stamped at sign-in
+and never refreshed on the path that matters: the Edge middleware runs `NextAuth(authConfig)` with no
+refresh in its jwt callback and re-signs the stale claim with a fresh 7-day expiry every request;
+`refreshIsActiveClaim` is wired only into the Node `auth()` whose re-signed cookie is discarded. Same
+mechanism defers an `isAdmin` revocation indefinitely. **PS-24, top of the queue.**
+[Checkpoint](docs/reviews/2026-09-05-app-checkpoint.md) §2.
+
+### [platform] 🔴 The login rate limiter is bypassed by whitespace-padding the email (PS-25, 2026-09-06)
+
+`auth.ts:26` keys on the untrimmed email, `:29` looks up the trimmed one — each padding variant is a
+fresh 20-attempt bucket against the same account (live: attempt 21 plain refused, attempt 22 padded
+signed in). No IP-keyed limit on the endpoint. [Checkpoint](docs/reviews/2026-09-05-app-checkpoint.md) §2.
+
+### [workouts][app-shell] 🟡 Confirming a deload on Home leaves full-intensity weights on screen for up to 6 h (RV-49, 2026-09-06)
+
+Owner-reported and mechanism-confirmed: the Home confirm calls `invalidatePrescriptionChanged()`
+without a sessionId, so the group's conditional skips every `workout-card:<id>`, and `next-session`
+is not in the group at all — the two keys the recommendation and session cards read, two of them via
+raw seed-only `readCacheSync` that can never revalidate (RV-50). Q-117's fix reached only the
+id-passing caller. One-line fixes each; a Playwright repaint assertion rides the fix.
+[Sweep 49](docs/reviews/2026-09-06-deload-confirm-eviction-gap.md). The nutrition add surface was
+swept in the same pass and is **clean at source** — if the food-add symptom persists after RV-49
+ships, one repro (which screen added from, which screen stale) routes it.
+
+### [workouts] 🟡 The strength card shows a deload as a full-1RM crash — live on 16 of 34 exercises (PS-26, 2026-09-06)
+
+`strength-progress.ts` guards the previous 1RM (Q-298) but not the current one, so an exercise whose
+latest log is a deload (`estimated_1rm = 0` by design) renders "−<full 1RM> kg" and a 0 % bar.
+Production: 16 of the owner's 34 exercises are in that state today. Prescription unaffected.
+[Checkpoint](docs/reviews/2026-09-05-app-checkpoint.md) §P5.
+
+### [devices][readiness] 🟡 The ring's stored wear time read 0.3–1.5 h on 20 consecutive scored nights (PS-30, 2026-09-06)
+
+2026-08-14→09-02, `oura_daily.non_wear_time_sec` says the ring was barely worn on days whose
+summaries carry 7–9 h nights with HRV — feeding `isLowWearToday`, the baseline exclusions and the
+wear chart a false signal. 09-03+ is sane; mechanism not established (suspect the incremental
+rollup's narrowed window). [Checkpoint](docs/reviews/2026-09-05-app-checkpoint.md) §P5.
 
 ### [devices][body] 🟡 The scale's "Weighing you…" gate shipped UNVERIFIED on device (Q-104/Q-114, 2026-09-04)
 
@@ -1668,6 +1756,28 @@ and neither is how long a weigh-in actually takes.
 
 **What to watch on the next APK:** the bar not appearing on a plain Home-tab visit with an empty
 scale, and a genuine weigh-in still drawing one.
+
+### [platform][nutrition] ⚠️ A malformed id in a request body reaches the driver and answers 500 (RV-47, 2026-09-05)
+
+`invalidUuidResponse` is applied to **27 of 27** dynamic `[id]` routes and **zero** body-id ones.
+`PATCH /api/admin/exercises` answers **500** for `not-a-uuid` and `404` for a well-formed missing id —
+one route, one payload, one field differing only in format. `PATCH /api/admin/users` and
+`PATCH /api/nutrition/meal-types` answer **500 with an empty body**. All three file the raw failing
+statement into `error_events` (`[pg 22P02] Failed query: update "users" set "is_active" = $1 …`).
+Response bodies are safe, so this is Q-482's status half, not Q-483. The fix is already written in
+`PATCH /api/workout-entry`: `.uuid()` on the id field of the schema these routes already have.
+[Sweep 48](docs/reviews/2026-09-05-body-supplied-ids-skip-the-guard.md).
+
+### [platform] ⚠️ Three update routes report success for a write that matched nothing (RV-48, 2026-09-05)
+
+`PATCH /api/admin/users`, `PATCH /api/nutrition/meal-types` (reorder) and `PATCH /api/oura/workouts`
+answer `200 {"ok":true}` for an id that does not exist. Each was probed against a positive control
+where the same response follows a write that *did* change the database — deactivating a real user
+flips `is_active`, reordering real ids moves `sort_order` — so the response cannot distinguish them.
+`markOuraWorkoutReviewed` returns `Promise<void>` and its route returns `{ok:true}` unconditionally;
+it is the only one with neither an id guard nor a not-found path, and its positive control is **not
+established** (`oura_workouts` has 0 rows locally). Sibling of RV-45, different cause.
+[Sweep 48](docs/reviews/2026-09-05-body-supplied-ids-skip-the-guard.md).
 
 ### [platform][nutrition] 🟡 Q-556's 404 shipped on one delete route; six siblings still answer 200 (RV-45, 2026-09-05)
 
@@ -1802,7 +1912,15 @@ threshold. The existing `expectNoSkeleton` helper polls to 20 s, so it catches *
 blind to this class. **Needs the device** — the ring card's real state is BLE, unreachable on web.
 [`§3`](docs/reviews/2026-09-03-first-run-honesty-and-instant-paint.md).
 
-### [nutrition][app-shell] 🔴 Nutrition never asks what day it is on resume, so a log after midnight lands on yesterday (RV-35, 2026-09-03)
+### [nutrition][app-shell] 🟡 Nutrition never asks what day it is on resume, so a log after midnight lands on yesterday (RV-35, 2026-09-03 — fixed 2026-09-04, device check owed)
+
+**Fixed by BF-117** and kept here because the device check is owed. RV-35's measurement was right and
+its diagnosis was exact: `tabEpoch` increments only on a **re-show**, never on a resume-in-place. The
+fix is the second signal rather than new logic — Nutrition's midnight branch already knew what to do.
+`useDayRolloverRefresh` now drives it alongside `useRefreshOnTabShow`, and Home and Health take the
+same hook. **The Home figure in the measurement below is the more alarming one and was easy to read
+past: 4 dated requests before, 2 after — the check-in and mood reads BF-86 fixed, and nothing else.**
+[journal](docs/overview/entries/2026-09-04-bf-117-rollover-refetch.md).
 
 The tab shell is persistent, and Nutrition's midnight branch keys on `tabEpoch` — which the shell
 increments only when a tab is **re-shown**, never on a resume-in-place. Measured across all five tabs
@@ -9828,7 +9946,7 @@ append-only session journal and the batched archives live under `docs/`:
 | `docs/overview/entries/` | **Recent journal (uncompacted)** — one file per PR/session (`YYYY-MM-DD-<slug>.md`); read these + the newest history file for "what happened lately". Folded into the batched history by the compaction sweep — see the README there. **Corrected 2026-07-30:** this line said "near-empty (compacted 2026-07-20)" but the directory holds ~179 files from 07-20→07-29 — the compaction sweep is overdue; a future session should run it. |
 | [`docs/agents/README.md`](docs/agents/README.md) | **The standing agents** — the four roles, their authority, the two-lane file-ownership contract, the Q-number bands, and the handoff protocol. Cold-start prompts in `docs/agents/prompts/`, live batons in `docs/agents/state/` |
 | `docs/overview/status-archive.md` | The 157 dated status notes that had accumulated in this file's Current Status section, archived 2026-08-17. Superseded by the journal; do not add to it |
-| [`docs/overview/history-2026-08-25.md`](docs/overview/history-2026-08-25.md) … `history-2026-07-17.md` | **Completed journal (batched)** — eleven files covering 2026-07-17 → 2026-08-24, folded from 498 + 41 loose entries by the 2026-08-17 and 2026-08-18 compaction sweeps, oldest-first within each. Every entry keeps a `<!-- from: … -->` marker naming the PR file it came from. `history-2026-08-18.md` was started because `history-2026-08-15.md` had passed the ~250 KB rule at 300 KB, and `history-2026-08-24.md` because `history-2026-08-18.md` had, at 326 KB. **The 2026-08-24 sweep folded 57 of 153 loose entries**, and **the 2026-08-25 sweep (LA-25) folded 25 of 191, taking unlinked 59 → 34** — the rest are cited by path from `projectOverview.md`, the domain indexes or an agent baton, and folding a linked entry breaks those citations. `history-2026-08-25.md` was started because `history-2026-08-24.md` was at 223 KB and 25 more entries would have passed the ~250 KB rule |
+| [`docs/overview/history-2026-09-06.md`](docs/overview/history-2026-09-06.md) … `history-2026-07-17.md` | **Completed journal (batched)** — fifteen files covering 2026-07-17 → 2026-09-06, folded from 498 + 41 loose entries by the 2026-08-17 and 2026-08-18 compaction sweeps, oldest-first within each. Every entry keeps a `<!-- from: … -->` marker naming the PR file it came from. `history-2026-08-18.md` was started because `history-2026-08-15.md` had passed the ~250 KB rule at 300 KB, and `history-2026-08-24.md` because `history-2026-08-18.md` had, at 326 KB. **The 2026-08-24 sweep folded 57 of 153 loose entries**, and **the 2026-08-25 sweep (LA-25) folded 25 of 191, taking unlinked 59 → 34** — the rest are cited by path from `projectOverview.md`, the domain indexes or an agent baton, and folding a linked entry breaks those citations. `history-2026-08-25.md` was started because `history-2026-08-24.md` was at 223 KB and 25 more entries would have passed the ~250 KB rule. **The 2026-09-06 sweep folded 46 of 320**, taking unlinked to **0** and the directory to **274** — it was run because the directory sat at exactly its 320 total ceiling, and that branch of the check has no BF-36 attribution, so it fails whichever PR is open when the count crosses rather than the one that grew it. `history-2026-09-06.md` was started rather than appending 172 KB to `history-2026-09-01.md`'s 105 KB |
 | `docs/overview/history-2026-07-20.md` | **Completed journal (batched)** — the 2026-07-17 → 2026-07-20 loose entries, compacted 2026-07-20, newest at top |
 | `docs/overview/history-2026-07-16.md` | **Completed journal (batched)** — sessions 2026-07-16 → 2026-07-17, newest at top |
 | `docs/overview/history-current.md` | Sessions ~287 → 2026-07-16 (closed batch) |
