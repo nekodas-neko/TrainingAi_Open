@@ -7915,3 +7915,11 @@ RV-46 left the queue on shipping and LA-60 took its place — the Node 20/22 spl
 sandbox, found when this PR went red on an API the local run had. Net upward by the difference
 between a 26-line entry removed and a 28-line one added, which is the honest accounting rather than
 two separate movements.
+
+## 2026-09-06 — `projectOverview.md` → 9934 (BF-112's Current Status paragraph)
+
+Sixteen lines for the stage-2 dose-entry paragraph in **Current Status**, which is the section this
+document exists to be: what shipped, what it cost, and the one thing left owed. The detail — the two
+defects found while verifying, the live round trip, the surfaces not exercised — is in the journal
+entry, not here. Raised rather than absorbed because the previous session's paragraph is still the
+one above it; the compaction sweep is what removes both, not this PR.
