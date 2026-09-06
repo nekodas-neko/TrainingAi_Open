@@ -1740,13 +1740,6 @@ id-passing caller. One-line fixes each; a Playwright repaint assertion rides the
 swept in the same pass and is **clean at source** — if the food-add symptom persists after RV-49
 ships, one repro (which screen added from, which screen stale) routes it.
 
-### [workouts] 🟡 The strength card shows a deload as a full-1RM crash — live on 16 of 34 exercises (PS-26, 2026-09-06)
-
-`strength-progress.ts` guards the previous 1RM (Q-298) but not the current one, so an exercise whose
-latest log is a deload (`estimated_1rm = 0` by design) renders "−<full 1RM> kg" and a 0 % bar.
-Production: 16 of the owner's 34 exercises are in that state today. Prescription unaffected.
-[Checkpoint](docs/reviews/2026-09-05-app-checkpoint.md) §P5.
-
 ### [devices][readiness] 🟡 The ring's stored wear time read 0.3–1.5 h on 20 consecutive scored nights (PS-30, 2026-09-06)
 
 2026-08-14→09-02, `oura_daily.non_wear_time_sec` says the ring was barely worn on days whose

@@ -28,8 +28,21 @@ function trendColor(trend: 'up' | 'down' | 'same' | null, pct: number): string {
 // The change is computed in DISPLAY units — reps for a bodyweight exercise, kilograms otherwise.
 // A bodyweight 1RM is BW_REF-relative, so a kg delta on it is a number with no physical meaning
 // (audit finding Q-12).
+/**
+ * The exercise's current 1RM, or null when there isn't one (PS-26).
+ *
+ * `<= 0`, not just null: a deload stores `estimated_1rm = 0` deliberately, and reading that as a
+ * value produced a 0% bar beside "−<the lifter's whole 1RM> kg". `/api/weights-summary` no longer
+ * publishes the sentinel, so this is defence rather than the fix — but it has to be ONE predicate,
+ * because guarding the delta and not the bar leaves the empty bar, which is the half that was
+ * reported. No exercise has a meaningful 1RM of zero, weighted or bodyweight.
+ */
+function currentOneRm(ex: ExerciseSummary): number | null {
+  return ex.estimated1rm != null && ex.estimated1rm > 0 ? ex.estimated1rm : null
+}
+
 function computeTrend(ex: ExerciseSummary): { trend: 'up' | 'down' | 'same' | null; delta: number | null } {
-  const current = ex.estimated1rm
+  const current = currentOneRm(ex)
   if (current == null) return { trend: null, delta: null }
   const d = displayOneRmDelta(current, ex.previousEstimated1rm, ex.exerciseType)
   if (d == null) return { trend: null, delta: null }
@@ -49,15 +62,16 @@ export function computeBarMetric(ex: ExerciseSummary, mode: StrengthMode): BarMe
   // below 100%), while a fresh best can sit *above* a stale PR. Taking the max of both
   // keeps the bar denominator commensurable. Both views show this best 1RM as the
   // end label; they differ only in what the bar fill represents.
-  const max1rm = Math.max(ex.personalRecord1rm ?? 0, ex.estimated1rm ?? 0)
+  const current = currentOneRm(ex)
+  const max1rm = Math.max(ex.personalRecord1rm ?? 0, current ?? 0)
 
   // "1RM" view — end label = best 1RM; bar fill = the latest (current) 1RM toward it.
   // The bar PERCENTAGE stays on the stored values: they share one basis, so the ratio is right
   // either way, and taking it from the rounded rep counts would quantise the fill to whole reps.
   if (mode === 'latest') {
-    if (ex.estimated1rm == null) return null
-    const pct = max1rm > 0 ? Math.min((ex.estimated1rm / max1rm) * 100, 100) : 100
-    const label = displayOneRm(max1rm > 0 ? max1rm : ex.estimated1rm, ex.exerciseType).text
+    if (current == null) return null
+    const pct = max1rm > 0 ? Math.min((current / max1rm) * 100, 100) : 100
+    const label = displayOneRm(max1rm > 0 ? max1rm : current, ex.exerciseType).text
     return { pct, label, color: trendColor(trend, pct), trend, delta, deltaUnit }
   }
 

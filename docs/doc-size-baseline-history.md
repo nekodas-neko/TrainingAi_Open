@@ -8232,3 +8232,14 @@ Two shorter alternatives were rejected. Cutting the measurement leaves the next 
 it from production. Putting it in a plan doc under `docs/superpowers/plans/` is the usual home for
 this much reasoning, but nothing is designed yet — there is no implementation to plan, and a plan
 that is only a restated brief is a second place for the brief to go stale.
+## 2026-09-06 — `docs/implementation-backlog.md` → 18652, `projectOverview.md` → 10004 (PS-26 shipped)
+
+`projectOverview.md` is **down** 7: PS-26's Known-Issues row was struck and moved whole to
+`known-issues-resolved.md` rather than ticked in place.
+
+The backlog number is **recomputed from the merged file**, not from this branch's own edit. PS-26's
+13 lines left the queue while OR-102a/b (#899) and then OR-101 (#875) added considerably more, and
+they land as one number — recomputed on every merge rather than adjusted. Four merges in, that is
+the only method that stays correct: `projectOverview.md` is UP here despite this branch striking a
+row out of it, because concurrent work added more than PS-26 removed. Subtracting the branch's delta from either side would have been wrong in both directions —
+the count is the only thing that is true after a merge.
