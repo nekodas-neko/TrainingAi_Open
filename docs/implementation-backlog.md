@@ -487,6 +487,146 @@ random, and worse than no colour because it looks authoritative.
 - **Verify:** device — the calculator's arithmetic against the owner's own third-party app, and
   whether the colour chip reads correctly at a glance on the S25.
 
+### [app-shell][platform] BF-122a — the cat collection, engine half: the ladder derivation and a decay window read off the schedule
+
+- **Lane:** A — `packages/shared/**`. No migration, no API route, no table: the whole thing is a pure
+  function over day series the app already stores.
+- **Added:** 2026-09-06 · owner, after a design pass in the BugFix session: *"1 workout = 1 slime …
+  if you collect x amount, they merge into a bigger one … a big item gets broken down into its
+  smaller ones … if you had 1 big and 1 small when the decay happens it would take the small first"*,
+  then *"yes file it!"* with the four deliverables: **the increase mechanism · the character models ·
+  a widget on the home screen · some information on it somewhere in the app**. This entry is the
+  first of those; **BF-122b** is the other three.
+- **Needs:** — nothing. It reads tables that are already populated.
+
+**The mechanic, as the owner settled it.** Three ladders, one per faucet, each a chain of merges:
+
+| faucet | spawns on | ladder |
+|---|---|---|
+| a logged workout | `workout_sessions` completion day | cat slime → … → **cat Tank** |
+| a step day | `body_metrics.steps` day | cat slime → … → **cat Archer** |
+| a slept night | `sleep_sessions` night | cat slime → … → **cat Cleric** |
+
+`N` of a tier merge into one of the next. Decay removes stock when the faucet goes quiet, and the two
+rules that make it a game rather than a punishment are the owner's:
+
+- **A big item breaks down into its components, it is never deleted.** Losing a Tank costs you the
+  merge, not the five workouts under it. Progress is recoverable; the top of the ladder is not free.
+- **Decay takes the smallest item first.** Loose stock is the buffer, so the visible cost of a missed
+  day lands on the thing you were about to merge — which is where the pull to log comes from.
+
+**Spawn on *logging*, not on hitting a target.** Rewarding a hit calorie goal creates a standing
+incentive to under-eat to keep a collection alive, and the collection is on the Home screen where it
+is seen daily. Every faucet above is "you recorded a thing", which is safe to want more of.
+
+**The decay window is derived from the schedule, and this is the part the owner called out.** *"when
+you setup a workout it asks how many days you can train a week — it should consider that, cause if
+you choose 2 workouts a week that could have up to 5 days between workout 1 and 2 and you are still
+following."* A fixed 2-day clock is right for the owner and wrong for the setting the app itself
+offers, so:
+
+- **`rotation`** (`schedules.type`, `schedules.rest_after_n`): the cycle is *N* training days then a
+  rest day, so the largest compliant gap is **1 day**. The owner is on `rotation` / `rest_after_n = 3`.
+- **`weekly`** (`schedule_days` rows with a non-null `session_id`): the largest compliant gap is the
+  **widest wrap-around gap between consecutive scheduled days**, not `7 ÷ count`. Mon+Tue is two days
+  a week with a five-day hole in it, which is exactly the owner's example.
+- **`getScheduledSessionsPerWeek()`** (`packages/shared/src/schedule-utils.ts`) already collapses both
+  shapes to a per-week *count* for the Home "This Week X/Y" chip. **It is the wrong input here** — a
+  count cannot see where the hole is. Add the gap helper beside it, in the same file, and leave the
+  count alone.
+- **Steps and sleep have no schedule**, so their windows are constants. They are also nearly
+  gap-free in practice, which is the calibration note below.
+
+**The window is calibrated, not guessed** — measured over the owner's last 120 days:
+
+| gap between workout days | times | rest days in it |
+|---|---|---|
+| 1 day | 44 | 0 — safe |
+| 2 days | 26 | 1 — safe |
+| 3 days | 5 | 2 — decays |
+| 6 days | 1 | 5 — decays hard |
+
+So a 1-rest-day allowance fires **6 times in 120 days**, about monthly, with 92% of gaps inside it.
+That is a live clock rather than a decorative one, and the owner's instinct was better calibrated
+than the "that is too harsh" reading it was checked against. **Steps and sleep are not comparable** —
+steps logged 129 of 129 days and sleep lands nightly, so those two ladders will essentially never
+decay and are the calm half of the widget by construction. Do not tighten them to manufacture
+tension; the workout ladder is where the tension is.
+
+**Three traps, each of which turns the mechanic against the user:**
+
+1. **A rest day the app itself recommended must not decay anything.** Deload weeks and the
+   recommendation engine's own rest days are compliance, not neglect. Pause the clock on them.
+2. **`computeStreak(dates, tz, maxRestGap)` already hardcodes this number as a literal `1`** at three
+   sites — `lib/achievements.ts:212` and `app/api/friends/leaderboard/route.ts:101` — for exactly the
+   same question the decay clock asks. Per **One Formula, One Place** the schedule-derived allowance
+   is one helper and those sites adopt it, in this PR. Two answers to "was that gap OK" is a bug by
+   definition, and it is currently right only for a schedule shaped like the owner's.
+3. **A user-configurable threshold breaks the no-table design.** Because the collection is *replayed*
+   from the day series on every read, changing `N` or the window retroactively rewrites all of
+   history — a Tank you earned last month silently un-merges. If the threshold is ever exposed,
+   version it with an effective-from date and replay each span under the rule that was live then.
+   Ship it as a constant first.
+
+- **Why no game-state table.** Merges are automatic and the inputs are immutable day series, so the
+  collection is a pure fold and there is nothing to keep in sync, migrate, or repair when a
+  back-dated workout lands. This is only true while (2) and (3) hold — the moment a merge needs a
+  user decision, or the threshold moves without versioning, it needs state and that is a different
+  entry.
+- **Reversal cost:** near zero. One shared module and one call site; deleting it deletes the feature.
+- **One caveat for whoever builds it:** the `maxRestGap` unification in trap (2) is the only part of
+  this entry that changes existing behaviour, and it changes the workout streak's tolerance for
+  anyone not on the owner's schedule. Say so in the journal.
+
+### [app-shell] BF-122b — the cat collection, surface half: the sprites, the home widget, and where you read about it
+
+- **Lane:** B — `components/home/**`, `lib/home/home-prefs.ts`, `components/more/**` and the art.
+- **Added:** 2026-09-06 · owner, same conversation as **BF-122a** — *"ideally it's a small widget card
+  on the home screen, so I don't know if it can be too big"* and *"rather than a humanoid character
+  could we have a cat variant? cat tank, cat slime etc"*.
+- **Needs:** BF-122a
+
+**The art brief, sized so it can actually get drawn.** Four classes × several tiers is forty sprites
+if each is unique, and forty sprites is how this never ships. **One cat silhouette, tiers signalled by
+props and scale** — a slime blob, then a shield, then a bow, then a staff — is roughly **twelve**
+assets and stays legible at widget size, which is the binding constraint. Whatever the count, the
+sprites need to read at ~32 px on the S25 before anything else is drawn.
+
+**The widget is a tenth `CardWidgetKey`.** `lib/home/home-prefs.ts:5` holds the union, the Home
+screen gates each card on `activeCardWidgets.includes(...)`, and `components/more/home-widgets-section.tsx`
+is where it gets toggled on — an existing, opt-in, reorderable slot, which is the right shape for a
+feature not everyone wants. Note `DEFAULT_CARD_WIDGETS` is empty, so it ships off by default and that
+is correct.
+
+**One line of content, chosen by the app, not by a tab bar.** Three ladders do not fit a card that
+has to sit under the nutrition donut. Show **the ladder nearest its next merge** and let it rotate
+itself — `🛡️ Tank ●●●●○ — one more workout`. It answers "what do I do today" in one glance, which a
+three-column collection grid does not, and it needs no interaction to be useful. Tap navigates to the
+full collection, matching every other card's navigate-on-tap behaviour.
+
+**The information surface is the fourth deliverable and the one most likely to get dropped.** A decay
+that is never explained reads as a bug — the owner will lose a Tank and there will be nothing in the
+app that says why, or that the workouts underneath it survived. The collection screen states, in
+plain words: what each faucet spawns, how many merge, how long the gap can be **and that the gap
+comes from their own schedule**, and that big items break down rather than vanish.
+
+**What already exists and should not be rebuilt:** XP, levels and `getLevelLabel`
+(`lib/achievements.ts`), ~48 achievement definitions, `users.equippedTitle`, `users.friendCode`, the
+friends feed and leaderboard, and `components/profile/level-sheet.tsx`. The collection is a *new
+display* over faucets those already count — completing a ladder is a natural `equippedTitle`, not a
+new reward currency.
+
+- **Parked, deliberately, as phase two:** the owner asked what a finished team is *for* and then
+  answered it himself — *"maybe it would be better to just have it be a collection game"*. A weekly
+  encounter auto-resolved from the real week (a narrative wrapper on the weekly summary, not a combat
+  engine, no input, no numbers to balance) is the cheapest version of "for", and it is not in scope
+  here. Do not build a battle system.
+- **Reversal cost:** low — one opt-in widget key and one screen. The art is the only unrecoverable
+  spend, which is the argument for the twelve-asset brief over the forty.
+- **When it ships it needs a device look** — sprite legibility at widget size, and whether the card
+  pushes the fold on the S25 with several widgets enabled. That is a check on the built thing, so it
+  is not a field on this entry.
+
 ### [platform] LB-56 — E2E costs 26 minutes a UI PR and currently gates nothing; decide which of those to change
 
 - **Lane:** ? — neither. `.github/workflows/ci.yml`, `playwright.config.ts` and the required-checks
