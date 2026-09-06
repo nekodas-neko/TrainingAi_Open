@@ -1735,39 +1735,6 @@ stronger reason the measured one wins.
   the proportion bar rather than showing nothing. **Add one: no date may report a duration larger than
   its longest single session.**
 
-### [app-shell] BF-116 — the header chips now overflow into the action buttons, because BF-96 made every item unshrinkable
-
-- **Lane:** B — `app/session-select/session-select-content.tsx:1058-1063` (the header row).
-- **Added:** 2026-09-03 · owner: *"the grid and battery pill still intersect."* Screenshot: `86%`
-  sitting under the reorder-sections grid icon.
-
-**"Still" is the important word, and the cause is the previous fix.** BF-96 shipped
-`whitespace-nowrap shrink-0` on the weather chip on 2026-09-01, correctly: it was the row's only
-compressible item and took 100% of any shortfall, so `UV 5` broke at its own space and the pill went
-two lines tall. `device-battery-chip.tsx:50` carries the same pair, and the date at `:1059` already
-did.
-
-**Every item in that row is now `shrink-0`, so the shortfall has nowhere to go.** It used to wrap;
-now it overflows. The row is `flex items-center gap-2` inside a `flex-1 min-w-0` column, with the
-action group beside it as `flex-none` — and `HeaderChips` returns a **bare fragment**, so there is no
-wrapper to constrain, truncate or scroll. Content spills past the column and crosses the buttons. On
-2026-09-03 that is `Thursday 3 September` + weather + a ring battery chip, which is one chip more than
-the row was ever laid out for (Q-111 added device chips on 2026-09-02, the day after BF-96).
-
-- **⚠ Do not solve it by removing `shrink-0`** — that restores the two-line wrap BF-96 fixed. The row
-  needs an **overflow strategy**, not more or less shrinking.
-- **Recommendation: let the date be the thing that gives.** It is the least informative item, it is
-  the longest, and its length is what varies — `EEEE d MMMM` runs 12–20 characters across the year,
-  which BF-96 already identified as the variable that runs the row out of width. Drop its `shrink-0`
-  and give it `truncate` with a `min-w-0` parent, so a long date shortens while the chips stay whole.
-  A shorter format on narrow widths is the alternative and reads worse.
-- **The chips will keep arriving** — ring and strap ship today, the scale deliberately has none
-  (`header-chips.tsx:17`), and anything else with a battery is a candidate. A row that only fits
-  today's count is the same bug scheduled for later, so whatever is chosen should hold for three
-  chips.
-- **Verification (device, at the S25 width):** on the longest weekday-plus-month combination
-  (`Wednesday 30 September`) with weather and two device chips present, nothing crosses the grid icon
-  and no chip wraps to a second line; with one chip and a short date, the layout is unchanged.
 ### [nutrition] BF-121 — the meal builder divides calories per portion and not the macros, so it disagrees with the sheet that opens the same meal
 
 - **Lane:** B — `components/nutrition/meal-builder-footer.tsx:41-64`. **No engine change**; the divisor
