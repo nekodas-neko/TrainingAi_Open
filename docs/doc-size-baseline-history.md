@@ -7887,3 +7887,16 @@ Two entries and one Known-Issues row for the owner-reported stale-screen symptom
 the mechanism (an id-less group call the group's own conditional no-ops, and the seed-only reader
 class that turns a missed eviction into TTL-long staleness) because the fix comment above the call
 already claims this fixed — a bare "invalidate more keys" entry would read as done.
+
+## 2026-09-05 — `docs/implementation-backlog.md` → 18394 (BF-121, per-portion macros in the meal builder)
+
+One entry, and what makes it worth its length is that the request turns out to be a consistency bug
+rather than a missing feature. The builder's footer divides calories by the portion count and prints
+the macros raw, so one row carries two denominators with only one of them labelled — and the meal's
+own detail sheet states in a comment that its macro columns are per portion, which is what `Log this
+meal` writes. The same meal therefore reads one way while you build it and another way once you open
+it. Recorded alongside: show both denominators rather than swapping one for the other, since the batch
+total is the thing the ingredient list sums to; round the same way the log path does, or the builder
+and the diary will disagree about the meal that was just saved; and a width warning pointing at
+**BF-116**, where the Home header overflowed into its buttons two days ago after one more item was
+squeezed into a full row.
