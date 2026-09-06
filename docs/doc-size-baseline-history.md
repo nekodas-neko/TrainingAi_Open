@@ -7867,3 +7867,10 @@ thing being measured. Named instead: the pre-dose baseline, within-week shape at
 deliberate plateau. Also a workaround usable tomorrow, since nothing is built and dosing starts:
 `dose_text` freezes on the log at log time, so ticking a named supplement captures the dose dates,
 which are the half that cannot be reconstructed later.
+
+## 2026-09-05 — `docs/implementation-backlog.md` → 18061 (RV-47, RV-48 shipped and removed)
+
+A **downward** move, so it needs no argument for the growth — two completed entries left the queue
+and one smaller one (LA-59, the Lane B half RV-48 exposed) took their place. Recorded because the
+ratchet only enforces a ceiling: leaving the baseline at 18085 would silently hand the next entry 24
+free lines it did not have to justify.

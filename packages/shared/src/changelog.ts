@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.9",
+    date: "2026-09-05",
+    changes: [
+      "Dragging your meal types into a new order used to report success even when the order was not saved \u2014 which happened whenever the list on screen included a meal type that had already been deleted somewhere else. It now saves the whole order or none of it, and says so.",
+      "Admin actions on the users and exercise lists no longer report success for a user or exercise that is not there.",
+    ],
+  },
+  {
     version: "1.436.8",
     date: "2026-09-05",
     changes: [
