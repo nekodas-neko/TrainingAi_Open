@@ -8261,3 +8261,9 @@ Both up. PS-34's entry left the queue and LA-62 replaced it — longer, because 
 accessibility findings it carries need their file counts written down to be actionable, and because
 it has to say why the scan must not be narrowed again. `projectOverview.md` gains the matching
 Known-Issues row.
+
+## 2026-09-06 — `docs/implementation-backlog.md` → 18675 (OR-103, the `O` lane)
+
+Twelve lines, all field documentation rather than queue material. `Lane: O` joins `A`/`B`/`?` as a
+readable value, so the field-rules block gains its definition, and five entries gain or change a
+`Lane:` line (LB-52/54/55/56 → `O`, LB-46 → `A`). No entry was added.

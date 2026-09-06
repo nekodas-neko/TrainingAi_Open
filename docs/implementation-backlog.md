@@ -102,6 +102,15 @@ silently misdirecting the next session. Update them in the same PR that consumes
 >   runtime, and the sandbox cannot run the local store at all — "probably fine" is the judgement
 >   that has shipped bugs here before. The field makes the debt countable; only the S25 clears it.
 >
+> - **`Lane: O`** — the **Orchestrator's** lane, added 2026-09-06 (`OR-103`). For work in neither
+>   implementer's paths: `.github/workflows/**`, `playwright.config.ts`, repository settings and
+>   rulesets, and the queue tooling itself. **It exists because §3's path rule cannot answer those** —
+>   they are reached from no `app/`, `components/` or `lib/` path — so four entries printed as
+>   UNCLASSIFIED to every lane at once, each explaining "neither lane" **in prose**. A label that
+>   lives only in prose is the exact defect the `Lane:` field was created to fix, so the third value
+>   is the consistent answer rather than a special case. `--lane O` lists them; an `O` entry is
+>   hidden from A and B, which is the point.
+>
 > - **`Keep: <what is owed>`** — the entry partly shipped and stays queued for the residue.
 >   `next-item.js` routes it to a **KEEP** section headed *"shipped; only the stated residue is owed.
 >   Not new work"* — so **what follows `Keep:` must be a check, a decision, or a measurement, never a
@@ -629,7 +638,7 @@ new reward currency.
 
 ### [platform] LB-56 — E2E costs 26 minutes a UI PR and currently gates nothing; decide which of those to change
 
-- **Lane:** ? — neither. `.github/workflows/ci.yml`, `playwright.config.ts` and the required-checks
+- **Lane:** O — the Orchestrator's, not an implementer's. `.github/workflows/ci.yml`, `playwright.config.ts` and the required-checks
   setting are the Orchestrator's and the owner's.
 - **Added:** 2026-09-04 · owner: *"why is e2e taking so long? can it be investigated or turned off if
   not needed"*.
@@ -687,7 +696,7 @@ re-proved on 2026-09-04** — three specs pass in isolation and fail in the full
 
 ### [platform] LB-55 — E2E fails as a timeout, not as an error, and a red E2E does not actually block a merge
 
-- **Lane:** ? — neither. `.github/workflows/ci.yml`, `playwright.config.ts` and the branch ruleset are
+- **Lane:** O — the Orchestrator's, not an implementer's. `.github/workflows/ci.yml`, `playwright.config.ts` and the branch ruleset are
   the Orchestrator's and the owner's.
 - **Added:** 2026-09-04 · from `fix/e2e-my-foods-tab-rename`, where six specs waiting for a tab
   renamed three days earlier cost four PRs and most of a session to identify.
@@ -5092,6 +5101,9 @@ owner has to re-describe in a wizard what the app already knows.
 
 - **✅ CLOSED 2026-09-01 by measurement against production.** No code change. Kept as a
   **`Reference:`** because the measurement is what the next reader needs, not the conclusion.
+- **Lane:** A — nothing is owed here today, but the one latent inconsistency this entry leaves open
+  (below) is in `reevaluate.ts`, which is Lane A's. Tagged 2026-09-06 so it stops printing as
+  UNCLASSIFIED to every lane.
 - **Reference:** what the AI Prescription card can and cannot say, and why a hand-built prescription
   fixture misleads.
 - **What I filed, and why it looked like a bug.** A card showed `4×5 @ 128.75kg (80%)` for an
@@ -8367,7 +8379,7 @@ without a queue entry is a dropped finding.*
 
 ### [platform] LB-54 — a red CI job cannot be read, and E2E has no green baseline to compare against
 
-- **Lane:** ? — neither lane. `.github/workflows/ci.yml` and the CI tooling are the Orchestrator's.
+- **Lane:** O — the Orchestrator's. `.github/workflows/ci.yml` and the CI tooling are the Orchestrator's.
 - **Added:** 2026-09-03 · from BF-111 (#840), where diagnosing one red check consumed most of a
   session and still did not reach the failing assertion.
 - **⚠️ `get_job_logs` cannot reach a step's output on this repo's jobs.** Every retrieval — by
@@ -8479,7 +8491,7 @@ without a queue entry is a dropped finding.*
 
 ### [platform] LB-52 — GitHub's auto-merge API does not see a Ruleset, so every PR is a hand-caught race
 
-- **Lane:** ? — neither. The fix is a repository *setting*, not code in either lane's paths.
+- **Lane:** O — the Orchestrator's. The fix is a repository *setting*, not code in either lane's paths.
 - **Gate:** owner — the remedy is a repo setting only the owner can make.
 - **⚠️ THIS ENTRY'S ORIGINAL DIAGNOSIS WAS WRONG, and the correction is the point (2026-09-03).** It
   said *"turn on Allow auto-merge and add a branch protection rule"*. **Both were already on.** The
