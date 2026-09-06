@@ -6,6 +6,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.12",
+    date: "2026-09-06",
+    changes: [
+      "The date and the battery pills at the top of Home no longer run into the buttons beside them. When the row is too narrow the date shortens instead, so the pills stay whole and readable.",
+    ],
+  },
+  {
+    version: "1.436.11",
+    date: "2026-09-06",
+    changes: [
+      "The two BMR figures on the Body tab now say where each comes from, so it is clear why they differ. One is calculated from your lean mass, the other from your weight and height \u2014 and the card that shows the second no longer claims your scale measured it, because it does not. Your visceral fat number says it comes from BMI and age for the same reason.",
+    ],
+  },
+  {
     version: "1.436.10",
     date: "2026-09-06",
     changes: [

@@ -7708,6 +7708,14 @@ theoretical. The backlog half spends its length on three candidate fixes with a 
 reversal cost, since it is an auth change and the choice between them is the owner's, not something a
 session should settle by picking the smallest diff.
 
+## 2026-09-06 — `docs/implementation-backlog.md` → 18472 (LB-54/55/56, recomputed on the merged base)
+
+Recomputed from the merged file, not carried from the branch. This PR sat for two days while five
+others moved the same document in both directions, so its own 18530 was against a backlog that no
+longer exists — and the merged count is *lower* than the branch's, because main's removals landed
+alongside these three additions. The three notes below record what the entries themselves cost; this
+one records only that the number they were measured against moved underneath them.
+
 ## 2026-09-04 — `docs/implementation-backlog.md` → 17784 (LB-55)
 
 Forty-eight lines for one Reference entry, and the length is the point: it is read *while* a red E2E
@@ -7978,3 +7986,16 @@ RV-46 left the queue on shipping and LA-60 took its place — the Node 20/22 spl
 sandbox, found when this PR went red on an API the local run had. Net upward by the difference
 between a 26-line entry removed and a 28-line one added, which is the honest accounting rather than
 two separate movements.
+
+## 2026-09-06 — `docs/implementation-backlog.md` → 18373 (BF-114, UI half, on the merged base)
+
+Three lines net. BF-114 is rewritten rather than removed: its UI half shipped and its engine half is
+handed to Lane A, so the entry changes lane and keeps a `Keep:` naming exactly what is owed.
+**Recomputed from the merged file rather than carried from the branch** — this PR sat while two
+others raised the same baseline, so its own 17801 was against a document that no longer exists.
+
+Most of the rewrite is a correction rather than an addition. The entry had recorded the Body tab's
+BMR as the scale's bioimpedance estimate; it is Mifflin-St Jeor computed in our own code, which the
+source says outright. That matters beyond the label — it turns the 218 kcal gap from "two different
+measurements" into "a formula against a measurement", which is the sentence a reader needs, and it
+made the entry's own proposed wording false.
