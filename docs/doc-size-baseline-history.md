@@ -8262,8 +8262,56 @@ accessibility findings it carries need their file counts written down to be acti
 it has to say why the scan must not be narrowed again. `projectOverview.md` gains the matching
 Known-Issues row.
 
-## 2026-09-06 — `docs/implementation-backlog.md` → 18675 (OR-103, the `O` lane)
+## 2026-09-06 — `docs/implementation-backlog.md` 18,663 → 18,838 (+175), BF-123…BF-128
+
+Six entries from one owner pass over a generated program and the screens around it. Two are UI
+(BF-123 the tap-target floor, BF-124 the role picker), two are the role model (BF-125 no editor on
+the review screen, BF-126 no distribution invariant at generation), and two came out of the owner's
+two questions about the prescription itself (BF-127 the pull-up load, BF-128 the exercise count).
+
+Roughly 29 lines each, and the length is measurement in four of the six:
+
+- **BF-127** states the arithmetic that produced the wrong number — `estimated_1rm = 118.25` for a
+  `bodyweight` exercise, computed against `BW_REF = 100` while the owner weighs 70.65 kg, ×0.7 →
+  82.5 rendered as kg. Without those figures the entry reads as a formatting nit rather than an
+  instruction to load a weight that does not correspond to anything.
+- **BF-128** carries the full budget calculation (51 working minutes, an 856/450 s blend, 694 s
+  average → 4) *and* the 90-day history it disagrees with (62 sessions, median 5 exercises in a
+  median 56.2 minutes). Either half alone is unconvincing: the arithmetic without the history is a
+  theory about a constant, and the history without the arithmetic gives the implementer nothing to
+  change. Together they name the term to remove and the evidence for removing it.
+- **BF-123** and **BF-127** both spend lines on the fact that the repo had already diagnosed their
+  bug class once — `switch.tsx:19` for the 48 px floor, `1rm.ts:218` for the kg/RM display basis —
+  and that the fix exists and was never swept to the siblings. That is the actionable part: the
+  entry is a sweep against a known pattern, not an investigation.
+
+Two things were deliberately kept out. BF-126 does not specify the invariant (one primary? at most
+one secondary?) because one generated program is the whole evidence base, and it says so — a rule
+fitted to a single roll would forbid a legitimate two-compound pull day. And no plan doc was written
+for any of the six; each fix is small enough that a plan would restate the entry.
+
+
+## 2026-09-06 — `projectOverview.md` → 10051 (LA-59's status paragraph and its verification gap)
+
+Twenty-one lines, and eleven of them are the Known-Issues row rather than the fix. The fix itself
+compresses to a sentence — a `fetch` promise does not reject on a 4xx — but what is *not* verified
+does not compress, because the next session has to know both what was proven (the route's 404, live)
+and what was not (the toast and the refetch, on screen), or it will read "shipped" as "seen working".
+The row also names the instrument that would close it and the spec to copy the shape from, so the
+next attempt does not start by rediscovering that a `@dnd-kit` drag is the hard part.
+
+**Eight more lines retracting the cause this row first gave.** It said the settings sheet failed to
+render, which is a claim about the app; it was an ad-hoc script waiting 8 seconds for a cold compile,
+against port 3000 when the harness and its stored cookie belong to 3100. The retraction is longer
+than a strikethrough because a wrong cause sends the next session hunting a defect that does not
+exist — the same reason this file keeps refutations rather than deleting them.
+
+The backlog moves the other way in the same PR: LA-59's 22-line entry goes on shipping.
+
+## 2026-09-06 — `docs/implementation-backlog.md` → 18828 (OR-103, the `O` lane)
 
 Twelve lines, all field documentation rather than queue material. `Lane: O` joins `A`/`B`/`?` as a
 readable value, so the field-rules block gains its definition, and five entries gain or change a
-`Lane:` line (LB-52/54/55/56 → `O`, LB-46 → `A`). No entry was added.
+`Lane:` line (LB-52/54/55/56 → `O`, LB-46 → `A`). No entry was added. The number is 18828 rather
+than 18675+11 because it was re-measured after merging `main` — LA-59 raised the same baseline in
+parallel, and a raise computed before the rebase is a guess.
