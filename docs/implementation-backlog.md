@@ -390,6 +390,103 @@ below threshold and left in place for next time.
 
 
 
+### [platform][body] OR-102a — the reta tracker, engine half: a vial record and a dose TIMESTAMP
+
+- **Lane:** A — one migration plus the repository/sync mirroring. **Small, and it is the only half
+  that cannot be repaired afterwards.**
+- **Added:** 2026-09-06 · owner, specifying the tracker in four parts (see **OR-102b**).
+- **Two columns' worth of work, and both exist because of something already measured:**
+
+  **1. A vial record**, so the calculator has a concentration: `strength_mg`, `water_ml`,
+  `syringe_units_per_ml` (default 100 for a U-100 barrel), `opened_on`. Concentration derives; it is
+  never stored as its own truth.
+  - **Owner: reconstitution is stable** — *"I reconstitute a vial and will use it for weeks at a
+    time."* So the newest vial is the **sticky default** and carries forward. Opening a new one is an
+    explicit action, not a form to refill each dose.
+  - **⚠ STAMP THE RECONSTITUTION ON THE LOG, NOT ONLY THE VIAL.** Mix the next vial at a different
+    volume and the *same* milligram dose becomes a different number of units. The stored mg stays
+    correct; a historical *"15 units"* silently starts reading wrong. This is BF-3's dose-freezing
+    rule one layer up, it is the reason this entry is Lane A, and it is the single thing here that
+    cannot be back-filled.
+
+  **2. `supplement_logs.taken_at` — a real timestamp.** Verified 2026-09-06: the table has
+  **`log_date`, a DATE, and no time at all** (`schema.ts:1082`). The owner's request — *"marks the
+  day time when the dose used… correlate sleep/HR everything to the dose"* — is not expressible
+  today. Nullable, defaulting to the moment of the tick, editable after the fact.
+  - **This is the column that makes the one honest analysis possible.** Dose, cumulative level and
+    elapsed time all rise together on a titration, so almost nothing separates them — **except
+    hours-since-dose within a single week**, which varies while the dose is held constant. Without a
+    time, that contrast does not exist and the tracker can only ever show correlations confounded by
+    the schedule.
+
+- **Nothing else changes.** `amount`/`unit`/`dose_text` already exist and already freeze (BF-3,
+  migration 244); `started_on`/`stopped_on` shipped in #896.
+- **Reversal cost:** a corrective migration. Additive columns only, no rewrite of existing rows.
+
+### [nutrition][body] OR-102b — the reta tracker: vial setup, dose calculator, dose timeline, weight response
+
+- **Lane:** B — a new section under Nutrition, plus the supplement sheet.
+- **Needs:** OR-102a
+- **Added:** 2026-09-06 · owner, who specified four parts and asked for them in one place:
+  *"the reta tracker; the usefulness of it; what to increase/use each week — what dosage etc."*
+- **Design already settled** in [`plans/2026-09-01-dosed-substance-exposure.md`](superpowers/plans/2026-09-01-dosed-substance-exposure.md)
+  and in **OR-102a** above. Not re-litigated here.
+
+**① Vial setup.** Bac water (mL) and peptide strength (mg) in; concentration out.
+`10 mg ÷ 3.0 mL = 3.33 mg/mL`. Show the division, not only the result. Prefilled from the last vial.
+
+**② Dose calculator.** Type the dose in mg, get the units to draw:
+`0.5 mg ÷ 3.33 mg/mL = 0.15 mL → 15 units`. Verified against the owner's third-party calculator —
+all four of its figures reproduce exactly. Also free from the same record: **doses left in the vial**,
+and a guard when a dose needs more than the barrel holds.
+- **Store mg, display units.** mg is the invariant the exposure model needs; units are a property of
+  how *this* vial was mixed.
+
+**③ Dose timeline.** The tick writes `taken_at`, and the dose appears on the day timeline beside
+sleep, HR and stress like any other event.
+- **What this can honestly show: within-week shape** — day 1 after a dose against day 6, at a
+  *constant* dose. That is the one contrast a titration does not confound.
+- **What it must NOT claim:** that a change across weeks is the drug. Dose, level and time rise
+  together, and the drug's intended effect (weight loss) independently moves sleep, resting HR and
+  HRV — so the most likely confounder *is* the thing being measured. **Association, never
+  attribution.**
+
+**④ Weight response since the last dose — and the owner's shape needs one correction.**
+Asked for: *"weight delta from last weight on injection day to last recorded day (or average) with a
+colour showing if its too much weight loss or if its good."* The colour is right. **A two-point delta
+is not**, and production says so:
+
+| how the delta is measured | noise (SD) |
+|---|---|
+| **two single weigh-ins, 7 days apart** | **± 1.70 kg** |
+| 3-day mean at each end | ± 0.98 kg |
+| 5-day mean at each end | ± 0.76 kg |
+| **7-day mean at each end** | **± 0.64 kg** |
+
+Measured from 87 weigh-ins over 118 days: residual SD about the trend is **1.203 kg**, so a
+difference of two single readings carries √2 × that. **The target band is 0.35–0.70 kg/wk.** A
+two-point delta is more than twice the width of the entire band — the colour would be close to
+random, and worse than no colour because it looks authoritative.
+- **Build it as a trailing 7-day mean at each end**, and **grey the chip when the difference does not
+  clear the noise**, with *"not enough weigh-ins yet"*. Red/amber/green only when the number is real.
+- **The band is the owner's setting**, entered as %/week of bodyweight, defaulting to 0.5–1 %.
+- **Too-fast is the reliable direction, and it is the one that matters.** Flagging a rate above
+  ~1.5 kg/wk needs far less precision than separating 0.1 from 0.4 kg/wk, so the muscle-loss warning
+  the owner actually wants is reachable in 2–3 weeks, while a plateau call needs ~6.
+
+**⚠ What this entry deliberately does NOT build: an increase/hold recommendation.**
+- **Statistically it cannot be supported yet** — a 14-day slope resolves only to ±1.30 kg/wk against a
+  0.35 kg-wide band, so a weekly call would flip on water weight while sounding certain.
+- **And naming a dose is a medical decision**, out of scope per this entry's parent. The app reports
+  the owner's data against a band the owner set; it does not choose the number.
+- **The honest substitute, which is most of the value:** *"week 3 of 4 at 2 mg · −0.42 kg/wk (95% CI
+  −0.88 to +0.04, 21 days)"*. Facts plus their uncertainty, next to the schedule.
+- **Revisit the plateau call once 6+ weeks of on-drug data exist** to test it against — not before.
+
+- **Reversal cost:** low. A section and a card; no data, no migration (those are OR-102a's).
+- **Verify:** device — the calculator's arithmetic against the owner's own third-party app, and
+  whether the colour chip reads correctly at a glance on the S25.
+
 ### [platform] LB-56 — E2E costs 26 minutes a UI PR and currently gates nothing; decide which of those to change
 
 - **Lane:** ? — neither. `.github/workflows/ci.yml`, `playwright.config.ts` and the required-checks

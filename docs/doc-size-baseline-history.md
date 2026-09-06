@@ -8134,6 +8134,45 @@ survived — is kept rather than discarded with the wrong one.
 
 The rest is this branch catching up to a `main` that moved six times while it was open.
 
+## 2026-09-06 — `docs/implementation-backlog.md` (OR-102, the reta tracker)
+
+`feat/or-102-reta-tracker`. One entry, and it is long because the measurement in it is the finding.
+
+The owner asked for an AI dose recommendation driven by his weight trend — hold while losing
+steadily, increase on a plateau. Clinically standard logic. **Measured against production before
+agreeing to it:** 87 weigh-ins over 118 days carry a residual SD of **1.203 kg** about the trend, so
+a 14-day slope resolves only to **±1.30 kg/wk** against a target band **0.35 kg/wk wide**. Six weeks
+is the first window that resolves the band at all.
+
+So the feature as described would emit confident weekly advice that flips on water weight. The entry
+records the numbers, the asymmetry that rescues most of it (a too-fast rate is a large effect and
+detectable in 2–3 weeks, where a plateau is not), and the line the app must not cross — report his
+data against his own band, never name a dose.
+
+Also captured: reconstitution must be stamped on the **log**, not just the definition, because the
+same milligram dose becomes a different number of syringe units when the next vial is mixed
+differently. Same rule BF-3 already applies to dose text, one layer up, and the only half of this
+entry that cannot be repaired afterwards.
+
+## 2026-09-06 — OR-102 split into OR-102a / OR-102b, both moved to the queue top
+
+`feat/or-102-reta-tracker`, second pass. The owner specified the tracker in four parts and asked for
+it at the top of Lane B. Two measurements taken while writing it up changed the shape:
+
+- **`supplement_logs` has `log_date`, a DATE, and no time** (`schema.ts:1082`). Part ③ — *"marks the
+  day time when the dose used… correlate sleep/HR"* — is not expressible today. That makes a
+  `taken_at` timestamp engine work, and it is the column that enables the one analysis a titration
+  does not confound: **hours-since-dose within a week**, which varies while the dose is held constant.
+- **A two-point weight delta cannot carry the colour the owner asked for.** Residual SD about the
+  trend is 1.203 kg, so a difference of two single readings is **±1.70 kg** against a target band
+  0.35–0.70 kg/wk. A 7-day trailing mean at each end brings it to ±0.64 kg. The entry specifies the
+  mean, and greys the chip when the difference does not clear the noise.
+
+So it is two entries: **OR-102a** (Lane A — vial record + `taken_at`; the only half that cannot be
+back-filled, because reconstitution must be stamped on the *log* or historical unit figures silently
+go wrong) and **OR-102b** (Lane B — the four surfaces), with `Needs:` between them. Both sit at the
+top of the queue; `102b` correctly reads PARKED until `102a` ships, which is one small migration.
+
 ## 2026-09-06 — `projectOverview.md` → 10011 (BF-120's status paragraph and device row)
 
 Twenty-three lines across two sections, and the split is deliberate. The **Current Status** half is
