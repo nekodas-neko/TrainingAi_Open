@@ -7708,7 +7708,7 @@ theoretical. The backlog half spends its length on three candidate fixes with a 
 reversal cost, since it is an auth change and the choice between them is the owner's, not something a
 session should settle by picking the smallest diff.
 
-## 2026-09-06 — `docs/implementation-backlog.md` → 18399 (LB-55/LB-56, recomputed on the merged base)
+## 2026-09-06 — `docs/implementation-backlog.md` → 18432 (LB-55/LB-56, recomputed on the merged base)
 
 Recomputed from the merged file, not carried from the branch. This PR sat for two days while five
 others moved the same document in both directions, so its own 18530 was against a backlog that no
@@ -7720,7 +7720,9 @@ only that the number they were measured against moved underneath them.
 new entries and main's deletion of a shipped one (BF-112, which merged meanwhile) as a *single*
 conflict region — the two-deletions shape, in the form where one side's addition and the other's
 removal are adjacent enough to fuse. Measuring the baseline before separating them counted a
-completed entry that does not belong in the queue. 18399 is the count with it gone.
+completed entry that does not belong in the queue. 18399 was the count with it gone, and 18432 is
+the count after LB-58 landed on main — a third recompute, for a third movement underneath this
+branch. Fifty-nine lines of that total are this branch's own two entries; the rest is inherited.
 
 ## 2026-09-04 — `docs/implementation-backlog.md` → 17784 (LB-55)
 
