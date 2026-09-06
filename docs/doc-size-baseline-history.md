@@ -8201,7 +8201,38 @@ card looks.
 
 The backlog moves the other way in the same PR — BF-120's 37-line entry is removed on shipping, and
 RV-49 gains eight lines of re-laning rather than being left to be picked up wrongly a second time.
-## 2026-09-06 — `docs/implementation-backlog.md` → 18512, `projectOverview.md` → 10004 (PS-26 shipped)
+
+## 2026-09-06 — `docs/implementation-backlog.md` 18,525 → 18,665 (+140), BF-122a/BF-122b
+
+The owner asked for a game-like mini feature — a cat collection fed by workouts, steps and sleep,
+with items that merge upward and decay when a faucet goes quiet — and named four deliverables: the
+increase mechanism, the character models, a home widget, and somewhere in the app that explains it.
+Filed as two entries because the split is the same one the reta tracker took four days earlier: a
+Lane A derivation in `packages/shared/**` with no table and no migration, and a Lane B surface that
+`Needs:` it.
+
+The length is mostly **measurement rather than description**, which is why it is not shorter:
+
+- The decay window is the owner's own point (*"if you choose 2 workouts a week that could have up to
+  5 days between workout 1 and 2 and you are still following"*), and it needed the schedule shapes
+  spelled out — `rotation` gives one compliant rest day off `rest_after_n`, `weekly` needs the widest
+  wrap-around gap in `schedule_days`, and `getScheduledSessionsPerWeek()` is a *count* and therefore
+  the wrong input for both. That distinction is exactly what a one-line entry would have lost.
+- The gap distribution over the owner's last 120 days is in the entry because it decides whether the
+  clock is live or decorative: a 1-rest-day allowance fires 6 times, about monthly, with 92% of gaps
+  inside it. It also shows steps (129/129 days) and sleep will essentially never decay, which stops a
+  future session tightening them to manufacture tension.
+- The three traps each turn the mechanic against the user and none is visible from the design: an
+  app-recommended rest day must not decay anything; `computeStreak`'s `maxRestGap` is already a
+  hardcoded `1` at three sites asking the same question, so **One Formula, One Place** applies; and a
+  configurable threshold retroactively rewrites a replayed history, which is what would force the
+  game-state table the design is built to avoid.
+
+Two shorter alternatives were rejected. Cutting the measurement leaves the next session re-deriving
+it from production. Putting it in a plan doc under `docs/superpowers/plans/` is the usual home for
+this much reasoning, but nothing is designed yet — there is no implementation to plan, and a plan
+that is only a restated brief is a second place for the brief to go stale.
+## 2026-09-06 — `docs/implementation-backlog.md` → 18652, `projectOverview.md` → 10004 (PS-26 shipped)
 
 `projectOverview.md` is **down** 7: PS-26's Known-Issues row was struck and moved whole to
 `known-issues-resolved.md` rather than ticked in place.
