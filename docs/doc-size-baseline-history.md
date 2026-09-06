@@ -7850,6 +7850,22 @@ recommendation between them, and the reason the in-process detail matters — wi
 session re-derives the dead end. Recorded rather than left, because a confident wrong next step in a
 backlog entry costs more than no next step at all.
 
+## 2026-09-02 — `docs/implementation-backlog.md` 17690 → 17729 (+39)
+
+`fix/or-101-lone-row-macros`. One entry, filed from an owner device check, and most of its length is
+the part that stops the next reader repeating this session's mistake.
+
+**OR-101** — a meal section holding one loose food shows no macros at all. The owner found it while
+checking BF-98, and the interesting half is what it is *not*: BF-98's own case table lists
+*"one loose row → no footer (unchanged)"*, so this is not a regression from that fix and BF-98 stays
+closed. The cause is a premise stated twice in `meal-card.tsx` — *"a single row already states its
+own macros"* — which stopped being true when Q-406 moved per-item P/C/F into the detail sheet. The
+same file states the true version ten lines away.
+
+Recorded at length because two sessions in a row now (Q-149, this) have found an entry reasoning
+from a premise that was accurate when written and silently expired. The entry names the condition
+the comments were actually reaching for — *does the only entry state its own macros* — so the fix
+does not re-derive it.
 Eleven more once the remaining failures were actually run rather than reasoned about. Three of them
 pass in isolation and fail in the full suite, which the duration-based triage above cannot see and
 would have sent the next session hunting a stale string that is not there. That is written down with
@@ -8172,12 +8188,12 @@ So it is two entries: **OR-102a** (Lane A — vial record + `taken_at`; the only
 back-filled, because reconstitution must be stamped on the *log* or historical unit figures silently
 go wrong) and **OR-102b** (Lane B — the four surfaces), with `Needs:` between them. Both sit at the
 top of the queue; `102b` correctly reads PARKED until `102a` ships, which is one small migration.
-## 2026-09-06 — `docs/implementation-backlog.md` → 18542, `projectOverview.md` → 9981 (PS-26 shipped)
+## 2026-09-06 — `docs/implementation-backlog.md` → 18581, `projectOverview.md` → 9981 (PS-26 shipped)
 
 `projectOverview.md` is **down** 7: PS-26's Known-Issues row was struck and moved whole to
 `known-issues-resolved.md` rather than ticked in place.
 
 The backlog number is **recomputed from the merged file**, not from this branch's own edit. PS-26's
-13 lines left the queue while OR-102a/b (#899) added considerably more, and the two land as one
-number. Subtracting the branch's delta from either side would have been wrong in both directions —
+13 lines left the queue while OR-102a/b (#899) and then OR-101 (#875) added considerably more, and
+they land as one number — recomputed twice, once per merge, rather than adjusted. Subtracting the branch's delta from either side would have been wrong in both directions —
 the count is the only thing that is true after a merge.
