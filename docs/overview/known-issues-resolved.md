@@ -1896,5 +1896,5 @@ guarding one and not the other leaves the empty bar, which was the reported half
 
 **Prescription was never affected** (`resolveWorkingBasis` already skips deload rows — control held),
 so nothing that was lifted was ever wrong; only what was drawn.
-[Journal](docs/overview/entries/2026-09-06-deload-not-a-crash.md) ·
-[Checkpoint](docs/reviews/2026-09-05-app-checkpoint.md) §P5.
+[Journal](entries/2026-09-06-deload-not-a-crash.md) ·
+[Checkpoint](../reviews/2026-09-05-app-checkpoint.md) §P5.
