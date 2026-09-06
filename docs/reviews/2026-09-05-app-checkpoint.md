@@ -1,126 +1,192 @@
-# App checkpoint — WORK IN PROGRESS (coordinator ledger snapshot, not the report)
+# App checkpoint — twenty-six lanes, one report
 
-Safety commit so verified findings survive the ephemeral container. Replaced by the collated report before merge.
+**Date:** 2026-09-05/06 · **Session:** 📖 Review (running the checkpoint prompt as a one-off) ·
+**IDs:** `PS-` · **Pillars:** all eleven
+**Method:** the twenty-six specialist lanes of [`docs/agents/prompts/checkpoint.md`](../agents/prompts/checkpoint.md),
+run as read-only subagents where budget allowed and by the coordinator directly where it did not,
+with **every finding below re-verified by the coordinator** — re-run against the live dev server,
+production (`claude_ro`, owner-scoped), or the cited line — before it was written here. Lane raw
+returns: `scratchpad/checkpoint/returns/lane-*.md` (ephemeral); the verification ledger is §7.
 
-# Coordinator ledger — what I have re-verified myself (survives compaction)
+## 1. What this app now contains
 
-## Lane 02 (IA) — VERIFIED 2026-09-05
-- Dev server was down during its run (a lane's Playwright harness spawned :3104 and killed :3000). Source-only; crawl NOT run.
-- VERIFIED by my own grep: manifest.ts:8 start_url=/session-select; session-select/page.tsx redirect(/workout);
-  tab-shell:139 home=SessionSelectContent, :151 workout=WorkoutSelectContent; workout-select/page.tsx renders
-  WorkoutSelectContent+BottomNav OUTSIDE shell; done-activity-screen pushes /workout-select x3 (:264,:310,:320);
-  done-screen pushes /session-select (:512); stats/config/profile are redirect-only; callers as cited.
-- CORRECTION to lane: pathname-routing.ts:26 `startsWith('/workout')` precedes :45 `startsWith('/workout-select')`,
-  so :45 is likely UNREACHABLE and /workout-select gets palette 'workout' — the palette-differs claim is NOT established;
-  the dead-branch at :45 is a small extra hygiene item. Duplicate-URL finding stands.
-- Disposition: 41 keep / 5 delete (workout-select, session-select, stats, config, profile) / 0 merge. -> ONE backlog entry, Gate: owner.
-- Clean: middleware public set == the 5 no-session pages; all admin pages gate; no orphan pages.
+A Next.js 15 offline-first training app whose engine is in better shape than its edges. The core
+write paths are genuinely hardened — sweeps 40–48 plus this checkpoint's probes found ownership
+enforced on every surface tried: cross-user reads, writes, deletes, coach patches and client-minted
+ids all refuse correctly, the outbox replays with an optimistic-concurrency token, and the cache
+layer has no bare prefix-siblings and one TTL per key. The maths is where the drift is: five
+independent arithmetic defects live in the scoring path (three on the owner's data today), the same
+formula has grown second and third homes in three domains, and the AI layer spends tokens on calls
+whose inputs are empty. The single worst finding is not maths: **deactivating a user does not end
+their session, and the fix that shipped for exactly this on 2026-09-05 (LA-58) reads a claim that is
+never refreshed.** Documentation is extensive and mostly honest, but `CLAUDE.md` — loaded into every
+session — carries seven verified-stale claims, and the custom-rules gate, this repo's proudest
+mechanism, has six rules that fire on the textbook violation and miss the common shape of it.
 
-## Lane 26 (docs + CLAUDE.md) — VERIFIED 2026-09-05 (11 of 12 findings spot-checked by me, all confirmed)
-- CLAUDE.md:64 "three-part wrap-up ritual" vs :154 "all four steps" — CONFIRMED.
-- CLAUDE.md:304 "36 remaining sites / 19 mounted" vs `node scripts/check-fetch-once-effects.js` -> "12 known ... across 10 files" — CONFIRMED.
-- CLAUDE.md:360 cites /api/oura/sync; app/api/oura/ has hr-data hr-day hr-sync hr-window stats workouts (no sync) — CONFIRMED.
-- CLAUDE.md:689/748 W1 bounce in set-card.tsx; animate-bounce only in active-workout-screen.tsx — CONFIRMED.
-- CLAUDE.md:664 one model; instrument.ts:10 gemini-3.1-flash-lite, :27 COACH gemini-3.6-flash — CONFIRMED.
-- projectOverview.md has Q-479 as TWO live headings (:2486, :2998); check-known-issue-duplication is cross-file only — CONFIRMED.
-- next-item.js:111 `unmetNeeds = needs.filter(n => inQueue.has(n))` => a Needs: on a KEEP entry never clears; BF-118/BF-43 -> BF-41 confirmed as examples. 13 edges claimed, 2 verified.
-- LB-27 Keep asks for a decision on connectionTimeoutMillis:0; client.ts:36 already 5_000 — CONFIRMED.
-- Missing backlog paths: 4 of 5 spot-checked missing; lib/keep.js is really scripts/lib/keep.js — CONFIRMED.
-- Unindexed top-level docs: device-perf-profiling-checklist, oura-asset-architecture, owner-decisions-2026-08-12 have 0 index refs — CONFIRMED.
-- handoff-2026-08-24-cross-bugfix-* indexed nowhere — CONFIRMED.
-- NOT re-verified: the 17-handoff unindexed list beyond one, the doc-disposition reasons (41 rows), CLAUDE.md duplication line pairs.
-- Collation note: these are ONE class "CLAUDE.md carries stale counts/paths/claims" (7 items) + ONE class "backlog/index hygiene" (paths, handoffs, Q-479 dup) + ONE process defect (Needs->KEEP). Cap accordingly.
+## 2. Escalated — production authorisation, confirmed live
 
-## Lane 03 (auth) — VERIFIED 2026-09-05 — TWO SECURITY FINDINGS, ESCALATE #1
-- **#1 CONFIRMED LIVE BY ME:** UPDATE users SET is_active=false for zero; zero's EXISTING cookie -> GET /api/friends 200,200,200; GET / 200 no redirect.
-  CONTROL: fresh sign-in while inactive -> 302 /pending. Gate works only at sign-in.
-  ROOT CAUSE (source, verified): middleware.ts:5 `NextAuth(authConfig)`; auth.config.ts jwt callback (:32-46) sets isActive only from `user` at sign-in, no refresh;
-  the refresh (`refreshIsActiveClaim`) is only wired in auth.ts:60 (Node `auth()`), and no-arg auth() discards the re-signed cookie (next-auth lib/index.js:104-106 per lane).
-  => LA-58 (#884, merged today, "make the deactivation gate cover API routes") added the 403 gate but the claim it reads never changes. Same for isAdmin revocation.
-  SEVERITY: data-correctness/authorisation. Known-Issues row for LA-58 must be REOPENED, not archived.
-- **#2 CONFIRMED (source, decisive):** auth.ts:26 rateLimit key `login:${email.toLowerCase()}` (untrimmed) vs :29 lookup `.toLowerCase().trim()` => padded email = fresh bucket. Lane's live 24-attempt sequence consistent (case IS folded; whitespace is NOT). No IP-keyed limit on this endpoint.
-- #3 (hygiene) isActiveCheckedAt never persists -> users lookup every request. Consistent with #1's mechanism; not separately measured by me.
-- #4 (dev-only) mobile-bridge token Map bundled twice under Turbopack -> exchange 401 locally. NOT established for the prod webpack build.
-- Clean (lane, not re-verified by me): unauth sweep, expired/tampered JWT, friendship-gated profile reads, per-IP limits on register/exchange, check-sign-out-clears-device + check-admin-claim-in-api green.
-- Lane 03's probe file is gone; the untracked file now is lane 05's (in flight).
+**PS-24 — Deactivation and admin revocation never reach a live session.** Set `is_active = false`
+for a signed-in account: its existing cookie kept answering `200` on API routes and pages
+(3× `/api/friends`, `GET /` no redirect). Only a fresh sign-in is blocked (control: 302 → `/pending`).
+Cause, verified in source: `middleware.ts:5` runs `NextAuth(authConfig)` whose jwt callback
+(`auth.config.ts:32-46`) sets `isActive` only at sign-in; the refresh (`refreshIsActiveClaim`) is
+wired only into `auth.ts:60`, and the no-arg `auth()` every route uses discards the re-signed
+cookie. The Edge middleware re-signs the sign-in-time claim with a fresh 7-day expiry on every
+request, so the session is effectively immortal while used. **LA-58 (#884, merged 2026-09-05)
+added the 403 gate but the claim it reads never changes** — its Known-Issues row must reopen, not
+archive. Same mechanism: an `isAdmin` revocation never reaches a live session.
 
-## Lane 01 (boot) — VERIFIED 2026-09-05 (4 of 4 by me)
-- warmCache (sync-provider.tsx:99) bare fetch; cache.ts:137 inFlightRequests module-private (0 exports) => Phase-3 warm duplicates home's 3 heaviest requests on slow network (lane measured: body-metadata x2, workout-data x3, next-session x2 on Fast-3G). CONFIRMED source; magnitude on device NOT established. hygiene.
-- workout-store.ts:438 `applyRehydrateFixups(state, null, ...)`; :204 `dateRolledOver = today !== null && ...` => the E1-4 "or from a previous day" abandon branch is DEAD; rolloverDay (:425) clears todayLogged/revertedDeloads but keeps workoutSessionId/workoutStartMs. CONFIRMED source + lane's fixture reload. consistency. (Claim tested: the E1-4 comment at :222.)
-- weekly-digest: no insufficient-data gate; live POST as zero@ returns a Gemini digest "0 sessions ... 0 kg" (cached). CONFIRMED live. user-visible. Also an AI-cost item (lane 12 seam).
-- weather-chip.tsx:26-28 pulses while loading, no timeout/failure state; lane saw 1 pulse element for full 8s sample on web. CONFIRMED source; device NOT established. hygiene.
-- Clean (lane): warm boot zero skeleton frames (readCacheSync localStorage fallback works); nothing DB-bound before first paint; app-load beacon once; expired/garbage cookie -> 307 with valid control; zero-data boots clean; SW caches `/` once controlling but NO clients.claim() so launch 1 never caches it (worth a hygiene line).
-- NOT established: offline boot (setOffline doesn't reach SW target) -> device checklist.
+**PS-25 — The login brute-force limiter is bypassed by whitespace.** `auth.ts:26` keys the limit on
+the **untrimmed** email; `:29` looks up the **trimmed** one — ` user@x` and `user@x ` are fresh
+20-attempt buckets against one account (lane-verified live: attempt 21 plain → refused; attempt 22
+padded → signed in). Case IS folded (control). No IP-keyed limit exists on this endpoint.
 
-## Lane 25 (CI rules + tests) — VERIFIED 2026-09-05 (5 of 7 by me; #2 mechanism plausible, #7 spot-checked)
-- `Ran 68 of 68` confirmed by lane. Lane built a harness that injected a violation per rule into a scratch copy: 67/67 rule steps FIRED on the simple shape. Findings are BYPASS SHAPES:
-- #1 PPL rule: ci.yml:173 `grep -v 'push\|pull'` is case-sensitive and runs BEFORE the -Ei match, so a line with lowercase push/pull hides a "Push" literal. CONFIRMED source.
-- #2 icon-button rule: attribute regex stops at the `>` of `=>` so `<button onClick={() => …}>` is never examined. Mechanism plausible (regex at the `<(button|Button)` line); lane's harness showed DID-NOT-FIRE; 0 live instances.
-- #3 Capacitor-proxy rule: only single-quoted import + return with NO semicolon. Lane harness; 0 live. Not re-run by me.
-- #4 doc-size ratchet is NOT shrink-only: CLAUDE.md 774 vs baseline 1204, lane-a baton 91 vs 193 — CONFIRMED numbers; a 400-line regrowth passes. Unlike check-hex-literals/fetch-once/component-size which fail on shrink.
-- #5 test-user-uuid-collisions reads `git ls-files '*.test.ts'` (:111) => untracked/.test.tsx invisible locally. CONFIRMED source.
-- #6 vendor-constants rule vacuous: 0 json in lib/oura-models/constants/, script prints "0 vendor values". CONFIRMED.
-- #7 93 of 219 routes referenced by no test (lane's scan). Spot: calendar-data appears only in cache-groups + use-cached-value tests (cache-key strings). Consistent; not re-run.
-- COLLATION: #1-#6 are ONE class "a custom rule that fires on the simple shape and not the common one" (6 rules) -> one entry listing the six. #7 separate (test coverage).
-- Clean (lane): all 67 rule steps fired on their simplest violation; both trees left clean.
+## 3. Cross-lane patterns, by cause
 
-## Lane 05 (strength/1RM) — VERIFIED 2026-09-05 (5 of 6 by me)
-- #3 CONFIRMED by my vitest on shipped calculate1RM([80],[r]): 5->6 91.75->91.5; 8->9 97.25->96.25; 12->13 105.75->103.25; 20->21 133.25->125.25. One more rep LOWERS the estimate (amrapScaleFactor step table). data-correctness. Claim tested: backlog Q-514 text says calcAmrap1RM/amrapScaleFactor "have no production call site" — false (calculate1RM's no-style fallback + amrapAverage1Rm).
-- #4 CONFIRMED: calculate1RM 80x31 -> 0 (dropped); calcAmrap1RM 80x31 -> 136 (clamped). ">30 guard" applied two ways. Owner max reps 25 => latent.
-- #5 CONFIRMED source: workout-screen.tsx:78 mroundStep vs active-workout-screen.tsx:377 mroundStepUp on the same no-style branch. Latent (every owner exercise has a style).
-- #6 CONFIRMED source: utils.ts:68-74 clamp [5,250]. Latent for owner (max 127.5).
-- #1 CONFIRMED source: strength-progress.ts:32-34 delta uses current with NO >0 guard; :52-59 pct = estimated1rm/max => a deload row's stored 0 gives 0% bar and "-<full 1RM>" delta. Q-298's guard reached listPrevious1rm only. Prod "16 of 31 exercises" NOT yet re-verified by me (query pending). user-visible.
-- #2 bodyweight ratchet-DOWN: lane's vitest (10 reps stored as 7 RM; 10->7->6->5). My re-probe: see coord-bw.txt.
-- RV-43 not re-filed (lane checked: unchanged).
-- Lane 05 #2 bodyweight CONFIRMED by my vitest: estimateOneRm 6 reps -> 114.5 -> repMaxFromOneRm = 5; 10 -> 124 -> 7; 20 -> 166.5 -> 16. Store scales (amrapScaleFactor), inverse does not => prescribed reps ratchet DOWN under exact adherence. data-correctness. Claim tested: spec 2026-07-01-bodyweight-rep-progression-design.md:41-46 says no scale factor for bodyweight and repMaxFromOneRm(calc1RM(BW_REF,r))===r.
-- Lane 25 #2 CONFIRMED: check-icon-button-names.js:41 regex `(\s[^>]*?)?>` — `[^>]` stops at the `>` of `=>`. #4 CONFIRMED: check-doc-index-size.js:85 `if (lines <= limit) continue;` — no shrink branch.
-- Lane 05 #1 PROD CONFIRMED by me (claude_ro, owner's rows): 34 exercises, latest log estimated_1rm=0 for 16, exercise_deloaded for 16. => the strength card's deload-zero defect is LIVE on ~half the owner's exercises today. user-visible, top of queue with the auth items.
+**P1 — A guard that exists is not a guard that reaches** (the repo's own recurring class, now
+measured at checkpoint scale): `PROSE_GUARDS` says *"imported by every prose-generating AI route"*
+and reaches 5 of 9 (lane 13); `invalidUuidResponse` reaches 27/27 path-ids and 0 body-ids (RV-47,
+sweep 48); `check-body-fat-correction.js` never walks `components/` and its `DERIVERS` list omits
+`calculateBaseline`, the function its header names (lane 10); `health-insight`'s "nothing to
+interpret" gate is defeated by its own unconditional `Contributors:` line in 3 of 4 sections, so
+Gemini is paid to say "no data was recorded" (lane 12, live); and **six custom rules fire on the
+textbook violation and miss the common shape** (lane 25, harness-verified): the PPL rule's
+case-sensitive `grep -v 'push\|pull'` hides `"Push"` on any line with lowercase push/pull; the
+icon-button regex stops at the `>` of `=>` so every inline-arrow `onClick` button is unexamined;
+the Capacitor-proxy rule needs single quotes and no semicolon; the doc-size ratchet is not
+shrink-only (CLAUDE.md sits 430 lines under baseline and can grow back silently); the
+test-user-UUID rule reads `git ls-files` so untracked tests are invisible locally; the
+vendor-constants rule is vacuous (0 JSON files to compare against).
 
-## Lane 06 (training load) — VERIFIED 2026-09-05 (#1,#3,#4 by me from source+prod; #2 my re-run below)
-- #1 CONFIRMED: lib/ai-chat/tools.ts:402-408 `daysAgo(56)` + `return { acwr }` (no band) vs app/api/training-load/route.ts:25 `from28d`, :84 `interpretation: acwrBand(acwr).key`. Chat bands the number itself, on a different window. Claim tested: acwr.ts "never re-derive from the raw acwr number at the call site". consistency. Lane's prod replay: 32 of 76 days differ in band.
-- #3 CONFIRMED: three baselining rules — route:60-63 startedAt ?? createdAt; readiness-payload.ts:365-368 startedAt else Infinity (never baselines); signals.ts:423-429 none. PROD (by me): active program 'Shikai' started_at=NULL, created_at=2026-07-01. So in July the card said baselining while early-deload/activity taper consumed live ACWR. consistency.
-- #4 CONFIRMED: training_load_gate reason values are read by NO UI (grep: only the route + a test); training-stress-line.tsx:22 hides on any non-ok. PROD (by me): oura_daily_derived since 2026-07-01: 63 days gate NULL, 1 day insufficient_met, 0 OTS values. The J-9 "OTS persists on a good read" has never had a good read. user-visible (an empty card with a recorded reason nobody shows).
-- #2 acute window: acwr.ts:18 `from7d = todayMid - 7d`, session counted if `t >= from7d` => 8 inclusive days vs chronic/4. See coord-acwr.txt for my constant-load numbers.
-- Clean (lane): one computeVolumeAcwr; band edges correct; week starts in user tz (Monday, Brisbane); ACWR null until >=21-day span; owner's ACWR spans 0.70-1.69 across all four bands.
-- Hygiene (lane, not re-verified): route shows toFixed(2) but bands the unrounded value (1.304 -> "1.30 · elevated"); health-insight hands computeVolumeAcwr a UTC midnight (only reads a window-independent median today).
-- #2 CONFIRMED by my vitest (constant 1000 kg/session, 28-day list): daily, trained today -> acwr 1.103 (acute 8 sessions=8000 vs 29/4=7250); daily, trained yesterday -> 1.000; two days ago -> 0.889; every-3rd-day trained yesterday -> 1.200 (=EARLY_DELOAD_ACWR_MIN); two days ago -> 0.825. Steady state is biased +10% and swings 0.89<->1.10 on whether today's session is logged. data-correctness. Claim tested: training-load-card.tsx "last 7 days vs your 28-day average" — it is 8 days.
+**P2 — A value stamped once, trusted forever**: the auth claims (§2); `workout-store.ts:438` passes
+`today = null` into rehydration so the *"or from a previous day is abandoned"* branch (its own E1-4
+comment) is dead — a cross-midnight workout keeps its session while its ticks are cleared (lane 01);
+the weather cache is one unkeyed `localStorage` entry returned before coordinates are read, so a
+moved device shows the previous location for 30 min (lane 08).
 
-## Lane 12 (AI inventory) — VERIFIED 2026-09-05 (5 of 5 by me)
-- Inventory (lane): 17 sites all via lib/ai/instrument.ts loggedGenerate* -> withAiRetry -> ai_call_log; 0 JSON.parse of model text; every object site post-processes/clamps; rate limits on all 13 routes; PROSE_GUARDS on every prose card except running-plan/explain.
-- Prod cost (lane, claude_ro.ai_call_log, owner, 30d): 210 calls, 594k in / 77k out tokens; coach 356k in (22 flash-lite + 5 on 3.6-flash); prescription 94k; nutrition-scan 37k. NO price anywhere in repo — ai-usage page reports tokens only, default window 168h.
-- #1 CONFIRMED LIVE: POST /api/ai/health-insight {section:sleep, force} as zero-data -> 200 with a Gemini "no data available" insight; route.ts:125 unconditional `Contributors: …` line makes splitMeasured count the section as measured, defeating the :180-183 deterministic gate (which its own comment says exists to avoid paying for this). readiness (:104,:111) and activity (:173) same; heart-rate has no such line and gates correctly. user-visible + AI cost. SIBLING of lane 01's weekly-digest-of-zeros (lane 12 confirms weekly-digest emits zeros on the SEEDED account too).
-- #2 CONFIRMED: running-plan/explain/route.ts has no maxRetries:0 (14 other files do) => SDK default 2 retries x withAiRetry 1. consistency.
-- #3 CONFIRMED: scan/route.ts:184 image fingerprint {mode,imageKind,note} => distinct photos share a fingerprint; ai-usage double-trip metric false-positives (Q-471's contentKey fix not applied here). hygiene.
-- #4 CONFIRMED: meal/route.ts:172-175 error copy swapped (fresh generation says "Could not rewrite"). hygiene.
-- #5 CONFIRMED: review-step.tsx:182-187 renders model `confidence` as an "AI confidence" bar; log-food.ts:31 `confidence ? 'ai' : 'manual'` decides source. Against CLAUDE.md's letter ("no LLM self-reported number shown as fact"); labelled honestly. consistency, Gate: owner.
-- Clean (lane): daily-digest gate holds ({digest:null}, no call); heart-rate insight gate holds; workout-review confidence overwritten to 1.0 by /apply (correct); generate-program's Push/Pull/Legs example names are an explicit CI exemption.
-- COLLATION: #1 + lane01 weekly-digest = ONE class "AI routes with no data gate" (health-insight x3 sections, weekly-digest). 
+**P3 — One formula, several homes**: ACWR is banded from a 28-day window on the Health card but the
+AI-chat tool computes it over **56 days and returns the raw number with no band** — 32 of the
+owner's last 76 days disagree (lane 06); program-age baselining has **three** rules across three
+consumers, and the owner's active program (`started_at = NULL`) takes a different one on each
+(lane 06); "WHO moderate-equivalent minutes" has **three** mappings (Z3 doubled / Z3 single / the
+filed Tuning band) (lane 08); the water goal is weight-derived in `goal-recommendation.ts` and
+hardcoded 2500 ml in two consumers (lane 09); the same screen rounds the pre-filled set weight
+NEAREST and its target display UP on the no-style branch (lane 05).
 
-## Lane 07 (sleep/readiness) — VERIFIED 2026-09-05 (3 of 3 new findings by me; PS-17 status only)
-- #1 CONFIRMED source: sleep-performance-correlation/route.ts `points.push` inside `for (const ex of ws.exercises)` with one sleepHours per day => n counts exercises not days; DEFAULT_MIN_N=20 (correlation.ts:190) cleared by 4 days x 5 exercises; p-value at n=20; text says "N paired days". data-correctness. Owner live output NOT fetched (session-scoped).
-- #2 PROD CONFIRMED by me (owner's rows, 60d): 62 days; 20 where (86400-non_wear_time_sec) < sleep seconds; first 2026-08-14, last 2026-09-02. 09-01 worn 0.5h vs slept 7.5h HRV 65; 09-02 0.5h vs 8.17h; 09-03 20h; 09-04 24h. Writer run.ts:880-905 (wornSec = bins x 900 over the run's window). Consumers: readiness-payload isLowWearToday (:799), excludeLowWearDays on HRV/RHR baselines (:329/:341), trends worn-hours chart, chip dims at lowWear. MECHANISM NOT ESTABLISHED (suspect: incremental run's narrowed window overwrites a full-pass count). Not previously filed (no non_wear/wear-time heading). data-correctness.
-- #4 CONFIRMED source: readiness-payload.ts:566-572 score = ownComposite.score (z-composite) else legacy sum; :739 serves legacy parts as `components` regardless => components (sum 78) do not explain score (46). No UI consumer found. hygiene.
-- PS-17 status (lane, prod): 08-27 phantom 4.75h row still in oura_daily_summary (hrv 26.5, rhr 73.7), derived 08-27 readiness 33 / sleep 36; groupSleepPeriods still promotes a 4.02h afternoon window (ALWAYS_NIGHT_MIN_HOURS=4). Back-fill not run. Already filed — status only.
-- Q-507 reversed by TN-22; Q-518 fixed #525 (not re-verified); Q-501 still queued, night_hrv_baseline_ms null on all rows.
-- Clean (lane): scoreBand single source, boundaries 49.9/50/69.9/70 correct; sleep-day keying 0 mismatches over 75 prod nights; HRV is RMSSD end to end (one stale SDNN comment in health-connect-sync.ts:51); 73/75 nights have HRV; baselines seed from first sample; readiness 90d mean 66 sd 14 range 25-87, sleep mean 77 sd 21 — every band populated.
-- Nit (lane): contributor-detail.tsx:31 `score < 50 ? low : high` gives Moderate band the "high" text.
+**P4 — Arithmetic wrong at the boundary**: `amrapScaleFactor`'s step table makes the stored 1RM
+**non-monotone in reps** — one more rep at 80 kg *lowers* the estimate at 5→6, 8→9, 12→13, 20→21
+(−8 kg at the last), coordinator-verified through the shipped module, and the backlog's Q-514 claim
+that this path has "no production call site" is false (lane 05); bodyweight estimates scale with
+`amrapScaleFactor` but invert without it, so 10 achieved reps are stored as a "7 RM" and exact
+adherence ratchets prescriptions DOWN (10→7→6→5) — the spec says the opposite design was chosen
+precisely to avoid this (lane 05); `computeVolumeAcwr`'s acute window is 8 inclusive days over a
+28/4 chronic, so constant load reads 1.10 daily and lands exactly on the 1.2 early-deload threshold
+for an every-third-day lifter (coordinator-verified) (lane 06); the sleep-performance correlation
+counts one point per **exercise**, so 4 days clear the 20-"paired days" floor and the p-value is
+computed at 5× the real n (lane 07); the >30-rep guard drops a working set to 0 but clamps a
+baseline set to 30 (lane 05).
 
-## Lane 08 (activity/cardio/running) — VERIFIED 2026-09-05 (4 of 4 by me, source)
-- #1 CONFIRMED: fitness-tests.ts:40 sexCode = female?1 : male?0 : null; Burr guard requires sexCode != null => sex='other' with full profile falls to Ross 2010 (lane's vitest: 42.7 vs 18.7 for identical inputs). Comment :31-32 says fallback only when terms "unavailable". user-visible; owner unaffected (not 'other').
-- #2 CONFIRMED: cardio-trends.ts:89 bestAvgPaceSecPerKm has no min-distance floor (best1k/best5k are windowed); lane's live fixture 0.03 km @95 s/km became "Best pace". user-visible.
-- #3 CONFIRMED: zone-minutes.ts header "Zone 3+ counts DOUBLE (WHO vigorous)" vs zone-targets.ts header "hard = Z4-5, Z3 grey zone" and moderateEquiv counts Z3 x1 (lane vitest: [30,108,8,5,0] -> 126). Two WHO mappings + the filed Tuning band = three. Existing backlog entry (13396-13446) covers only activeMinutesFromZoneSeconds. consistency.
-- #4 CONFIRMED: use-weather.ts:9 CACHE_KEY unkeyed by lat/lon; :52-56 returns cached before reading location => moved device / changed manual location shows the previous location's weather for 30 min. user-visible; browser not exercised.
-- Clean (lane): HR zones contiguous and correct at every ±1 bpm boundary; maxHr from resolveHrProfile (corroborated observed max else 220-age else 190), all 15 computeHrZones sites use it; Burr/Cooper/Ross coefficients match published; guided-walk store persists (2 s debounce) and rehydrates an active walk; running-bests ties first-wins.
-- Not established (lane): pace units/GPS smoothing, map-tiles, cardio-week/trends routes; a sub-505 m full-duration Cooper would write a negative VO2 to the local store before the server's positive() guard (device only).
+**P5 — Live on the owner's data today** (all coordinator-verified in production): the home strength
+card shows a full-1RM red drop and 0 % bar for **16 of 34 exercises** whose latest log is a deload —
+Q-298's `> 0` guard reached `listPrevious1rm` and not the current side (lane 05); `oura_daily`
+recorded the ring worn **0.3–1.5 h on 20 consecutive days** (08-14→09-02) that each carry a 7–9 h
+scored night, feeding `isLowWearToday`, the baseline exclusion and the wear chart a false signal
+(lane 07, mechanism not established); PS-17's phantom afternoon night still sits scored in the
+summary (status, already filed).
 
-## Lane 10 (body composition) — VERIFIED 2026-09-05 (3 of 3 by me, source; lane's live probes cleaned up)
-- #1 CONFIRMED: scale-ble/samples/route.ts:76-77 and pending/[id]/confirm/route.ts:36-37 use `heightCm ?? 170` and `age ?? 35` => body fat / metabolic age computed from a profile the user never entered and stored under source scale_ble as real (lane's live POST: 22% BF, metabolic age 37 with DOB null). Claim tested: goal-baseline.ts:29-33 "null values, never guessed ones". data-correctness; owner likely has full profile (exposure = second account).
-- #2 CONFIRMED: no UNIQUE on scale_raw_samples in any migration (157 has two non-unique indexes) => byte-identical re-send inserts a second raw row (lane: two rows same measured_at). Trend row NOT duplicated (lowest-wins held). hygiene.
-- #3 CONFIRMED: check-body-fat-correction.js walks only app/lib/packages/shared/src (not components/) and DERIVERS lacks calculateBaseline; goal-baseline.ts (components/) calls calculateBaseline. Right today via displayBodyFat at goals-section.tsx:132, but outside the guard. consistency — joins the "guard that does not reach" class.
-- Clean (lane): DEXA correction reaches body-metadata/nutrition-goals/oura snapshot/goals-section; day keying on the reading's local day; two weigh-ins 30 s apart -> lowest-wins, third equal -> isAdditionalReadingForDay; blood-panel ranges come per-analyte from the provider, verdict derived — no hardcoded clinical table.
+**P6 — AI spend without a data gate**: `weekly-digest` generates a Gemini recap of zeros for an
+empty week (lane 01, live, cached; also fires on the seeded account); `health-insight` calls the
+model for sleep/readiness/activity with every metric absent (§P1); `running-plan/explain` is the
+one site missing `maxRetries: 0`, multiplying the SDK's retries with the shared helper's; the
+image-scan fingerprint omits content so the ai-usage double-trip metric false-positives (Q-471's
+fix unapplied there); the model's `confidence` is rendered as an "AI confidence" bar and picks the
+saved entry's `source` (against CLAUDE.md's letter; honestly labelled — owner call). **Prompt
+injection**: `meal-plans/generate` splices `excludedFoods`/`usualMeals`/`stores` raw — a 71-char
+"exclusion" renamed the plan and every meal to PWNED (lane 13, live; self-injection only).
 
-## Lane 09 (nutrition) — VERIFIED 2026-09-05 (#1,#2 by me source; #3 lane vitest, contract line confirmed)
-- #1 CONFIRMED: day-checkin-prefill.ts:14 and health-content.tsx:159 hardcode 2500 ml; goal-recommendation.ts:197 derives waterMl = weight*33 + activity bump (lane: 1650-4580 across weights, never 2500). One-Formula violation. consistency.
-- #2 CONFIRMED: water-log/route.ts:37-38 ignores any client date, keys to server-now in user tz (lane live: {"date":"2026-01-01"} -> stored 2026-09-06); outbox path adapter.ts:4330-4333 keys to mut.date (client todayInTz). Two doors, two day keys. hygiene (web non-canonical).
-- #3 lane vitest: splitMacrosAcrossMeals 345/384 exact; fails only on 2-dp targets (1-dp rounding) and sub-2 g totals (negative slot). Docstring "preserved exactly" contradicted; unreachable from sane targets; owner's targets are integers. hygiene.
-- Clean (lane, method stated): RMR ladder documented and single (personalRmr -> cunningham (bf 4-60%) -> MSJ), both consumers apply DEXA correction first; TDEE = BMR x sedentary (Q-401); measured-rmr route bounds 500-5000; day totals drift max 0.5 kcal over 62 owner days; 2 of 263 owner food_items exceed 40% Atwater deviation (one 0-use AI item); food-log day boundary at 23:59 correct across windows; RV-44 unchanged; Q-517 shipped 09-02 with a correct Keep.
+**P7 — Ingest trusts a placeholder**: scale ingest computes and stores body fat and metabolic age
+from `height ?? 170` / `age ?? 35` when the profile lacks them, filed under `scale_ble` as a real
+reading (lane 10, live); `scale_raw_samples` has no dedup key, unlike its Oura sibling.
+
+## 4. The consolidation proposal (lane 02, `Gate: owner`)
+
+Of 46 pages: **41 keep, 5 delete, 0 merge**. The five are zero-content redirect/duplicate routes
+with ≤4 in-repo callers each: `/workout-select` (same `WorkoutSelectContent` as the Workout tab,
+mounted outside the shell — re-point 3 pushes in `done-activity-screen.tsx`), `/session-select`
+(redirects to `/workout`; also the PWA `start_url`, so a manifest launch lands on the Workout tab
+under a name that means Home), `/stats`, `/config`, `/profile` (each a bare `redirect()` with 1–3
+callers). ~10 call-site edits plus `manifest.ts` and two dead `pathname-routing.ts` palette keys.
+The four `health/*` details are hub→detail, not duplicates; `more/data` vs `more/details` hold
+different data; no page is orphaned; the middleware's public set exactly matches the five
+no-session pages. Coordinator correction to the lane: `pathname-routing.ts:26` (`/workout`)
+precedes `:45` (`/workout-select`), so the `workoutSelect` palette branch is unreachable — the
+lane's palette-differs claim is **not established**; the dead branch itself is the hygiene item.
+
+## 5. The CLAUDE.md audit (lane 26, every item coordinator-verified)
+
+Seven stale claims in the file every session loads: :64 "three-part wrap-up" vs :154 "four steps";
+:304's fetch-once counts (36/19/16) vs the script's real 12-across-10; :360 cites `/api/oura/sync`,
+which does not exist; :689/:748 put the W1 bounce in `set-card.tsx` when `animate-bounce` exists
+only in `active-workout-screen.tsx`; :664 names one Gemini model when the coach runs a second
+(`gemini-3.6-flash`); :753-754 keep two struck-through Known Issues in place against the file's own
+:178 rule; the `Ran N of N` origin story predates the count tripling. Plus: **Q-479 has two live
+FIXED rows in `projectOverview.md` (:2486, :2998)** and the duplication check only compares across
+files; 13 backlog `Needs:` edges point at KEEP entries, which `next-item.js`'s "absent = shipped"
+rule can never clear; LB-27's Keep asks for a decision `client.ts:36` already made
+(`connectionTimeoutMillis: 5_000`); 22 backlog-cited paths no longer exist; 17 handoffs are
+unindexed and one is indexed nowhere; four top-level docs have zero inbound references. Disposition
+table for all 41 top-level docs (9 archive/merge/delete candidates, led by
+`oura-ring-data-reference.md`, which documents the retired Cloud API with no retirement note) is in
+the lane return and the backlog entry.
+
+## 6. Per-lane results (compressed; ✅ = clean, method stated in §7's ledger)
+
+| Lane | Verdict |
+|---|---|
+| 01 boot | 4 findings (§P2/P6); ✅ warm boot paints with zero skeleton frames; nothing DB-bound before first paint; cold Fast-3G inventory measured |
+| 02 IA | §4; ✅ no orphan pages; middleware public set exact |
+| 03 auth | §2 (2 escalations) + per-request users lookup + dev-only bridge double-bundle; ✅ unauth sweep, tampered/expired JWT, friendship gating, per-IP limits |
+| 04 offline | ✅ at source: SW `/api/` no-store bypass, `/offline` fallback, `clients.claim()` present (corrects lane 01); device half not exercised |
+| 05 strength | 6 findings (§P4/P5); RV-43 unchanged; ✅ `mround125Up` still dead |
+| 06 load | 4 findings (§P3/P4); ✅ one ACWR implementation, band edges right, week starts in user tz, owner's ACWR spans all four bands |
+| 07 sleep | 3 findings (§P4/P5); ✅ scoreBand single-source, sleep-day keying 0/75 mismatches, HRV is RMSSD end-to-end, score distributions healthy |
+| 08 cardio | 4 findings (§P3 + sex='other' Ross fallback + best-pace floor + weather); ✅ HR zones exact at every ±1 bpm boundary; equations match their citations |
+| 09 nutrition | 3 small findings (§P3 + water-log day keys + meal-split contract); ✅ RMR ladder single and documented; day totals drift ≤0.5 kcal over 62 days |
+| 10 body | 3 findings (§P7 + body-fat check scope); ✅ DEXA correction reaches its consumers; lowest-wins weigh-ins; provider-supplied blood ranges |
+| 11 tz | ✅ full suite green with the user's tz in the 00:00–02:00 hazard band (5405 passed; single failure was the coordinator's env, not tz); partial coverage — seeded user only, 23:30 half not run |
+| 12 AI inventory | 5 findings (§P6); ✅ 0 `JSON.parse` of model text, all 17 sites instrumented, every object post-processed, rate limits everywhere; 30-day cost 594k in/77k out tokens, coach = 60 % of input spend |
+| 13 prompts | 3 findings (§P6); ✅ live no-superlatives control (a score of 80 → no "perfect"); every prompt hands numbers with units |
+| 14 coach | ✅ CLEAN: preview measures consequences and refuses cross-user; apply replay → 409 with drift (`from` is an optimistic-concurrency token); closes the baton's `/api/coach/preview` item |
+| 15 schema/FK | ✅ the workout/device FK half: all CASCADEs same-owner; the one client-writable CASCADE edge (`phase_set_id`) refused cross-user with control; cross-ref count 0 |
+| 16 write paths | ✅ by reference: sweeps 40/43/47/48 + this checkpoint; POST surface remains the baton's next lens |
+| 17 outbox | ✅ reconcile/push/invalidate checks green; device half not exercised |
+| 18 cache | ✅ 20 prefix groups, zero bare prefix-sibling keys across every read site; TTL and no-store checks green; full matrix not built |
+| 19 export | ✅ 94 tables: 71 exported, 26 excluded with reasons, 18 soft-delete-filtered |
+| 20/21 devices | pipeline LIVE (latest ring sample minutes old); wear-time defect carried in §P5; scale dedup in §P7 |
+| 22 native | not exercisable here; both native-guard rules green (with lane 25's caveats) |
+| 23 mobile UI | NOT swept (screenshot crawl unbudgeted) — recorded as not established, not clean |
+| 24 perf | build + dependency scan: see below |
+| 25 CI rules | `Ran 68 of 68`; 67/67 rule steps fire on their simplest violation; 6 bypass shapes (§P1); 93 of 219 routes referenced by no test |
+| 26 docs | §5 |
+
+### Lane 24 — performance
+Dependency scan: 88 dependencies, 4 with no source reference after excluding toolchain —
+**`@ai-sdk/openai`** (an OpenAI SDK in a Gemini-only app), `@aws-sdk/lib-storage`, `@dnd-kit/dom`,
+`@radix-ui/react-use-controllable-state`. Boot cost measured by lane 01 (cold Fast-3G: 35 API calls
+/ 121 KB; warm: 16 / 25 KB; the §P2 warm-duplication is the one waste found). Production build: shared first-load JS **192 kB**; heaviest pages `/workout` **496 kB**
+(43.5 kB own), `/admin/data-capture` 466 kB, the four tab pages 449 kB each, `/health/day` 408 kB
+(33.6 kB own). Nothing pathological for a WebView app that ships its tabs in one shell; the two
+page-level outliers (`/workout`, `/health/day`) are the places a split would pay.
+
+## 7. What was NOT exercised
+
+The device, entirely: native SQLite (`getLocalStore()` null — every offline-first read took its web
+fallback), safe-area, gestures, notifications, BLE, Samsung WebView. The screenshot crawl (lane 23)
+and per-route bundle-to-page seam. The 23:30 half of the tz run; non-seeded-user tz coverage.
+`oura_workouts`' positive control (0 rows). Production readiness of the dev-only mobile-bridge
+finding. The correlation route's live owner output. Mechanism of the wear-time undercount.
+`claude_ro` is owner-scoped throughout: every production claim reads "the owner's rows", never
+"nobody's". The coordinator's own errors are recorded inline where they occurred: two probes that
+missed their handler (coach domain/targetId), one environmental 500 (a build clobbering `.next`
+under the dev server) withdrawn rather than filed, and one lane claim (missing `clients.claim()`)
+struck on re-verification.

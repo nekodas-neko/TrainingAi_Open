@@ -7867,3 +7867,10 @@ thing being measured. Named instead: the pre-dose baseline, within-week shape at
 deliberate plateau. Also a workaround usable tomorrow, since nothing is built and dosing starts:
 `dose_text` freezes on the log at log time, so ticking a named supplement captures the dose dates,
 which are the half that cannot be reconstructed later.
+
+## 2026-09-06 — `docs/implementation-backlog.md` → 18325, `projectOverview.md` → 9907 (app checkpoint: PS-24…PS-39)
+
+Sixteen entries from a twenty-six-lane checkpoint, already capped by class — ~45 verified findings
+folded into 16 entries (six rule-bypass shapes are one entry; the nutrition paper cuts are one; the
+docs sweep is one). Four Known-Issues rows plus the reopened LA-58 row carry the two escalations and
+the two live-data defects. The checkpoint report itself is a review doc, not index growth.
