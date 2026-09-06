@@ -43,14 +43,22 @@ pin the three properties separately: no bare `.then`/`.catch` on a fetch, an `if
 
 ## Not exercised — and this is the honest gap
 
-**The toast and the refetch were never watched happening.** Three attempts to drive the meal-type
-manager in a browser ended with the settings sheet not rendering inside the timeout, and I stopped
-rather than keep spending on it. What is proven is that the route returns the 404 and that the code
-now reads it; what is not proven is the two things the user would see.
+**The toast and the refetch were never watched happening.** What is proven is that the route returns
+the 404 and that the code now reads it; what is not proven is the two things the user would see.
+
+**⚠ The cause first written here was wrong.** It said the settings sheet did not render, which reads
+as a defect in the manager. It is not one. The ad-hoc scripts waited 8 seconds for a page the dev
+server had not finished compiling — the e2e specs use 30–60 s for the same page — and one of them
+pointed at port 3000 while the harness, and the session cookie in `e2e/.auth/`, belong to **3100**
+(`playwright.config.ts:23`). Given a long enough wait on the right port the page renders in full.
+Recording the wrong cause is worse than recording none, because the next session goes looking for a
+bug that was never there.
 
 **Closing that properly needs a `@dnd-kit` drag simulated in Playwright** with the PATCH stubbed to
 404 — `empty-meal-library.spec.ts` has the route-stubbing shape (`serviceWorkers: 'block'`, a
-per-page `page.route` with `route.fallback()` for the methods it does not want). That is more work
+per-page `page.route` with `route.fallback()` for the methods it does not want), and it taps a
+coordinate via `page.touchscreen.tap` inside a `toPass` loop rather than calling `.click()`, which is
+the third thing an ad-hoc script gets wrong on this surface. That is more work
 than the twelve-line fix and is worth doing; it is not worth blocking the fix on. Recorded as a
 Known-Issues row rather than left implied.
 
