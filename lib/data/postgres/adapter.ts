@@ -655,12 +655,18 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return Number(result.rows[0]?.count ?? 0)
   }
 
-  async activateUser(userId: string): Promise<void> {
-    await this.db.update(s.users).set({ isActive: true }).where(eq(s.users.id, userId))
+  // RV-48: `.returning()` so the caller can tell an activation from a no-op. The predicate is
+  // unchanged — this reports the match rather than altering it.
+  async activateUser(userId: string): Promise<boolean> {
+    const rows = await this.db.update(s.users).set({ isActive: true })
+      .where(eq(s.users.id, userId)).returning({ id: s.users.id })
+    return rows.length > 0
   }
 
-  async deactivateUser(userId: string): Promise<void> {
-    await this.db.update(s.users).set({ isActive: false }).where(eq(s.users.id, userId))
+  async deactivateUser(userId: string): Promise<boolean> {
+    const rows = await this.db.update(s.users).set({ isActive: false })
+      .where(eq(s.users.id, userId)).returning({ id: s.users.id })
+    return rows.length > 0
   }
 
   async getUserById(userId: string): Promise<User | null> {
@@ -668,8 +674,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return r ? this.rowToUser(r) : null
   }
 
-  async deleteUser(userId: string): Promise<void> {
-    await this.db.delete(s.users).where(eq(s.users.id, userId))
+  async deleteUser(userId: string): Promise<boolean> {
+    const rows = await this.db.delete(s.users).where(eq(s.users.id, userId)).returning({ id: s.users.id })
+    return rows.length > 0
   }
 
   async getUserByEmail(email: string): Promise<(User & { passwordHash?: string }) | null> {
@@ -2299,8 +2306,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return { id: row.id, name: row.name, muscles: row.muscles as MuscleAssignment[], equipment: row.equipment ?? [], instructions: row.instructions ?? undefined, exerciseType: (row.exerciseType as ExerciseType) ?? 'weighted' }
   }
 
-  async deleteExercise(name: string): Promise<void> {
-    await this.db.delete(s.exerciseLibrary).where(eq(s.exerciseLibrary.name, name))
+  async deleteExercise(name: string): Promise<boolean> {
+    const rows = await this.db.delete(s.exerciseLibrary)
+      .where(eq(s.exerciseLibrary.name, name)).returning({ id: s.exerciseLibrary.id })
+    return rows.length > 0
   }
 
   async createExercise(entry: { name: string; muscles: MuscleAssignment[]; equipment: string[]; instructions?: string; createdBy: string; exerciseType?: ExerciseType }): Promise<ExerciseLibraryEntry> {

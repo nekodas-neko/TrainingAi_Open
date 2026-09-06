@@ -554,10 +554,12 @@ export interface WorkoutRepository {
   upsertUser(user: Omit<User, 'id' | 'createdAt' | 'isActive' | 'isAdmin'>, forceActive?: boolean): Promise<User>
   listUsers(limit?: number, offset?: number): Promise<User[]>
   countInactiveUsers(): Promise<number>
-  activateUser(userId: string): Promise<void>
-  deactivateUser(userId: string): Promise<void>
+  /** True when a user row matched. RV-48 — false is a no-op the route answers 404 for. */
+  activateUser(userId: string): Promise<boolean>
+  deactivateUser(userId: string): Promise<boolean>
   getUserById(userId: string): Promise<User | null>
-  deleteUser(userId: string): Promise<void>
+  /** True when a user row was removed. */
+  deleteUser(userId: string): Promise<boolean>
   getUserByEmail(email: string): Promise<(User & { passwordHash?: string }) | null>
   updateUserProfile(userId: string, profile: Partial<Pick<User, 'displayName' | 'heightCm' | 'dateOfBirth' | 'weightGoalKg' | 'timezone' | 'sex' | 'activityLevel' | 'fitnessGoal'>>): Promise<User>
   touchLastGoalReviewAt(userId: string): Promise<void>
@@ -781,7 +783,8 @@ export interface WorkoutRepository {
   listExerciseMuscleMap(): Promise<Pick<ExerciseLibraryEntry, 'name' | 'muscles'>[]>
   getExerciseType(exerciseName: string): Promise<ExerciseType>
   upsertExercise(entry: Omit<ExerciseLibraryEntry, 'id'> & { id?: string }): Promise<ExerciseLibraryEntry>
-  deleteExercise(name: string): Promise<void>
+  /** True when a library entry with this name was removed. */
+  deleteExercise(name: string): Promise<boolean>
   createExercise(entry: { name: string; muscles: MuscleAssignment[]; equipment: string[]; instructions?: string; createdBy: string; exerciseType?: ExerciseType }): Promise<ExerciseLibraryEntry>
   renameExercise(userId: string, id: string, newName: string): Promise<ExerciseLibraryEntry>
   // Admin-only edit that may rename the exercise (any library entry, regardless of
@@ -850,7 +853,9 @@ export interface WorkoutRepository {
   countLiveFoodLogsForMealType(userId: string, mealTypeId: string): Promise<number>
   /** Move every live log onto `toId`, re-stamping each one's eaten-at against the new window, then soft-delete `fromId`. One transaction (Q-412). */
   reassignAndDeleteMealType(userId: string, fromId: string, toId: string): Promise<{ moved: number }>
-  reorderMealTypes(userId: string, orderedIds: string[]): Promise<void>
+  /** True when every id was one of the user's live meal types and the order was applied. False
+   *  applies nothing at all — see the implementation for why it is not best-effort. */
+  reorderMealTypes(userId: string, orderedIds: string[]): Promise<boolean>
   seedDefaultMealTypes(userId: string): Promise<void>
 
   /** `reuseExisting` (BF-38) returns the user's existing identical row instead of writing a
@@ -1219,7 +1224,8 @@ export interface WorkoutRepository {
     calories: number | null; distanceM: number | null; intensity: string | null;
     source: string | null; reviewed: boolean;
   }[]>
-  markOuraWorkoutReviewed(userId: string, id: string): Promise<void>
+  /** True when the workout existed and belonged to this user. */
+  markOuraWorkoutReviewed(userId: string, id: string): Promise<boolean>
   getSetTimestampsForSession(userId: string, workoutSessionId: string): Promise<{ exerciseName: string; setNumber: number; setStartMs: number | null; setEndMs: number | null; loggedAt: Date | null }[]>
   markHrSynced(userId: string, workoutSessionId: string): Promise<void>
   getUnsyncedHrSessionsForDay(userId: string, day: string, timezone?: string): Promise<{ id: string; startedAt: Date; completedAt: Date | null }[]>

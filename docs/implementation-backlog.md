@@ -872,51 +872,27 @@ the home screen depends on (`calendar-data`, `training-load`, `streak-data` appe
 strings in tests) and the external-ingest routes. Pick the dozen that would hurt most and give each
 one route-level test; keep the scan as the ratchet.
 
-### [platform][nutrition] RV-47 — the id guard reaches every path parameter and no request body
+### [app-shell][nutrition] LA-59 — the meal-type reorder ignores the status it is now given
 
-- **Lane:** A — the five body-supplied-id mutating routes.
-- **Added:** 2026-09-05, Review sweep 48 —
-  [write-up](reviews/2026-09-05-body-supplied-ids-skip-the-guard.md).
-- **Same class as Q-482**, on the surface Q-482 did not cover. Sweep 47 measured the gap
-  (`invalidUuidResponse` covers **27 of 27** dynamic `[id]` routes and **zero** body-id ones); this
-  shows it is live on three.
+- **Lane:** B — `components/nutrition/meal-type-manager.tsx`.
+- **Added:** 2026-09-05, found while shipping RV-48.
+- **Needs:** nothing — the engine half is on `main`.
 
-| Route | malformed body id | well-formed, missing |
-|---|---|---|
-| `PATCH /api/admin/exercises` | **500 "Update failed"** | `404 Exercise not found` |
-| `PATCH /api/nutrition/meal-types` (reorder) | **500, empty body** | `200 {"ok":true}` |
-| `PATCH /api/admin/users` | **500, empty body** | `200 {"ok":true}` |
-| `PATCH /api/workout-entry` | `400 Invalid body` | `404 Not found` ✅ |
+`handleDragEnd` fires the reorder as
+`fetch(...).then(() => invalidateMealTypes()).catch(() => toast.error('Failed to save order'))`.
+A `fetch` promise does not reject on a 4xx, so the `.then` runs for every response the server sends
+and the `.catch` only ever sees a transport failure. RV-48 gave that route a 404 for a reorder it
+refused to apply; nothing on this surface reads it.
 
-The first row is self-controlling — one route, one payload, one field differing only in *format*,
-answering 500 and 404. All three 500s file the failing statement into `error_events`:
-`[pg 22P02] Failed query: update "users" set "is_active" = $1 …`. The response bodies are safe (not
-Q-483), but two are **empty**, the symptom `lib/api/route-errors.ts` names in its own header, where a
-client's `res.json()` throws on top of the failure.
+The other three surfaces touched by RV-45/RV-47/RV-48 already do `if (!res.ok) throw` — the two
+admin ones and the exercise manager — so this is the last of the four, not a general gap. The two
+Oura `PATCH` callers are deliberately fire-and-forget and stay that way.
 
-**The fix is already written, in `workout-entry`:** `.uuid()` on the id field of the Zod schema these
-routes already have, so a malformed id is a 400 before any query. One word per route.
+**The fix is `if (!res.ok)`, and then a refetch rather than only a toast.** A 404 here means the
+list the drag was computed from is stale — a meal type deleted on another device is the realistic
+route to it — so re-reading the list is what actually resolves it. A toast alone leaves the screen
+showing an order the server rejected.
 
-### [platform] RV-48 — an update that matched nothing reports success
-
-- **Lane:** A — `app/api/admin/users`, `app/api/nutrition/meal-types`, `app/api/oura/workouts`.
-- **Added:** 2026-09-05, Review sweep 48 —
-  [write-up](reviews/2026-09-05-body-supplied-ids-skip-the-guard.md).
-- **Sibling of RV-45, filed separately because the cause differs**: the delete routes discard an
-  affected-row count they could return, these never ask for one.
-
-Each probed with a positive control showing the *same* response after a write that did change the
-database:
-
-| Route | ghost id | positive control |
-|---|---|---|
-| `PATCH /api/admin/users` | `200 {"ok":true}`, nothing changed | real id + `deactivate` → `200`, `is_active` flips to `f` |
-| `PATCH /api/nutrition/meal-types` (reorder) | `200 {"ok":true}`, order unchanged | real ids → `200`, Lunch moves `sort_order` 2 → 0 |
-| `PATCH /api/oura/workouts` | `200 {"ok":true}` | **not established** — `oura_workouts` has 0 rows locally |
-
-`markOuraWorkoutReviewed` returns `Promise<void>` and its route returns `{ ok: true }`
-unconditionally, so nothing can distinguish the cases from the response. It is also the only one of
-the five with **neither** an id-format guard nor a not-found path.
 
 ### [platform][nutrition] 🟡 RV-45 — the six sibling deletes now 404; the device path is unchecked
 
