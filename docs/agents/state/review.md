@@ -6,7 +6,7 @@
 > flips itself to 🔴 as the last step of its handoff, after the baton and every PR have landed.
 
 **Updated:** 2026-09-05 · **By:** forty-seven sweeps (2026-08-17 ×2, 2026-08-18 ×37, 2026-08-20 ×1,
-2026-09-03 ×6, 2026-09-05 ×2) · **Next ID: `RV-49`.**
+2026-09-03 ×6, 2026-09-05 ×2, 2026-09-06 ×1) · **Next ID: `RV-51`.**
 
 > **Sweep 40's run is closed and nothing is owed from it** — RV-32, RV-33, RV-34 all shipped, verified
 > in source rather than taken from the closure note, and their `projectOverview.md` row is in
@@ -41,19 +41,21 @@ worker claims the page). **Q-556 was listed here and is CLOSED** — it shipped 
 rule that found them stands: **a 4xx is not evidence the guard fired** — read which field it names.
 Sweep 48 had five probes rejected on the wrong field before re-probing.
 
-## Now — sweep 48 filed (2026-09-05). **Next ID: `RV-49`.**
+## Now — sweep 49 filed (2026-09-06). **Next ID: `RV-51`.**
 
 | # | Lens | Write-up | Filed |
 |---|---|---|---|
 | 47 | does a caught refusal map to the RIGHT status | [delete-reports-success](../../reviews/2026-09-05-delete-reports-success-for-nothing.md) | RV-45/46 |
 | 48 | does a 2xx mean what it says, beyond DELETE | [body-supplied-ids](../../reviews/2026-09-05-body-supplied-ids-skip-the-guard.md) | RV-47/48 |
 
-**RV-47.** `invalidUuidResponse` reaches **27 of 27** dynamic `[id]` routes and **zero** body-id
-ones. `admin/exercises` answers 500 for `not-a-uuid` and 404 for a well-formed missing id — one
-route, one payload, one field differing only in format; `admin/users` and `nutrition/meal-types`
-answer **500, empty body**; all three log the raw `22P02`. `workout-entry` carries the fix already
-(`.uuid()` in the schema). **RV-48:** three routes answer `200 {ok:true}` for an update that matched
-nothing, each against a positive control where that response follows a real write.
+**Sweep 49 (owner-reported stale screens):** RV-49 — Home's id-less
+`invalidatePrescriptionChanged()` evicts no `workout-card:*` and never touches `next-session`;
+Q-117 fixed only the id-passing caller. RV-50 — three raw seed-only `workout-card` reads (`Needs:`
+RV-49). Nutrition add surface CLEAN at source — do not re-sweep without a fresh repro.
+
+**Sweep 48:** RV-47 (`invalidUuidResponse` reaches 27/27 path-ids, 0 body-ids — three routes 500 on
+a malformed body id; `workout-entry` carries the fix) · RV-48 (three routes answer `200 {ok:true}`
+for an update that matched nothing, each with a positive control).
 
 **Sweep 47's finding is a DELETE finding** — all thirteen dynamic `PUT`/`PATCH` routes answer 404 for a ghost id and refuse the second account's row unchanged.
 
@@ -85,8 +87,7 @@ the documentation-integrity seam. Sweeps 34–37 were four consecutive passes ov
 left three CI checks behind (`check-known-issue-duplication`, `check-index-doc-paths`,
 `check-module-map-symbols`). Pick a lens that runs the app.
 
-- ~~The workout/device FK half~~ — CLOSED clean by the checkpoint (all CASCADEs same-owner; the
-  one client-writable CASCADE edge refuses cross-user, control held).
+- ~~The workout/device FK half~~ — CLOSED clean by the checkpoint (CASCADE edge refuses cross-user).
 - **The POST surface, the only verb left.** Sweeps 47 and 48 covered `DELETE` and `PUT`/`PATCH`; no
   sweep has asked what a `POST` answers when its body references a row that does not exist or is not
   the caller's. Same method — a malformed-id control beside a well-formed one, then read the row back.
@@ -124,8 +125,8 @@ None. This role's PRs are docs-only.
 
 ## Method notes — do not re-derive these
 
-- **A malformed id and a well-formed missing one are each other's control** on one route with one
-  payload: two statuses for two ids differing only in format means one is wrong, no fixture needed.
+- **A malformed id and a well-formed missing one are each other's control** — two statuses for two
+  ids differing only in format means one is wrong; no fixture needed.
 - **"Reports success" is not a finding without a POSITIVE control** — `200 {ok:true}` for a ghost id
   says nothing until the same call with a real id is shown to move the database. Where the table was
   empty, sweep 48 wrote *not established* rather than asserting or dropping it.
@@ -148,8 +149,7 @@ None. This role's PRs are docs-only.
   `hasData: false` and the card shows 50" is.
 - **Choose fixtures hostile to the arithmetic, and sweep the input range.** A 100 kg starting 1RM puts
   every common percentage on a plate boundary and reports zero drift for a mechanism that moves 13%.
-- **Count requests by the DATE they carry, not how many there are** (Health reissued 11 on resume; 3
-  carried the new day).
+- **Count requests by the DATE they carry, not how many there are.**
 - **Ask what the READ joins before calling a stored cross-user reference a leak** (RV-32 vs RV-42).
 
 - **The zero-data account reaches a state nothing else can** — the seeded user has data for
