@@ -8153,3 +8153,22 @@ Also captured: reconstitution must be stamped on the **log**, not just the defin
 same milligram dose becomes a different number of syringe units when the next vial is mixed
 differently. Same rule BF-3 already applies to dose text, one layer up, and the only half of this
 entry that cannot be repaired afterwards.
+
+## 2026-09-06 — OR-102 split into OR-102a / OR-102b, both moved to the queue top
+
+`feat/or-102-reta-tracker`, second pass. The owner specified the tracker in four parts and asked for
+it at the top of Lane B. Two measurements taken while writing it up changed the shape:
+
+- **`supplement_logs` has `log_date`, a DATE, and no time** (`schema.ts:1082`). Part ③ — *"marks the
+  day time when the dose used… correlate sleep/HR"* — is not expressible today. That makes a
+  `taken_at` timestamp engine work, and it is the column that enables the one analysis a titration
+  does not confound: **hours-since-dose within a week**, which varies while the dose is held constant.
+- **A two-point weight delta cannot carry the colour the owner asked for.** Residual SD about the
+  trend is 1.203 kg, so a difference of two single readings is **±1.70 kg** against a target band
+  0.35–0.70 kg/wk. A 7-day trailing mean at each end brings it to ±0.64 kg. The entry specifies the
+  mean, and greys the chip when the difference does not clear the noise.
+
+So it is two entries: **OR-102a** (Lane A — vial record + `taken_at`; the only half that cannot be
+back-filled, because reconstitution must be stamped on the *log* or historical unit figures silently
+go wrong) and **OR-102b** (Lane B — the four surfaces), with `Needs:` between them. Both sit at the
+top of the queue; `102b` correctly reads PARKED until `102a` ships, which is one small migration.

@@ -390,6 +390,103 @@ below threshold and left in place for next time.
 
 
 
+### [platform][body] OR-102a — the reta tracker, engine half: a vial record and a dose TIMESTAMP
+
+- **Lane:** A — one migration plus the repository/sync mirroring. **Small, and it is the only half
+  that cannot be repaired afterwards.**
+- **Added:** 2026-09-06 · owner, specifying the tracker in four parts (see **OR-102b**).
+- **Two columns' worth of work, and both exist because of something already measured:**
+
+  **1. A vial record**, so the calculator has a concentration: `strength_mg`, `water_ml`,
+  `syringe_units_per_ml` (default 100 for a U-100 barrel), `opened_on`. Concentration derives; it is
+  never stored as its own truth.
+  - **Owner: reconstitution is stable** — *"I reconstitute a vial and will use it for weeks at a
+    time."* So the newest vial is the **sticky default** and carries forward. Opening a new one is an
+    explicit action, not a form to refill each dose.
+  - **⚠ STAMP THE RECONSTITUTION ON THE LOG, NOT ONLY THE VIAL.** Mix the next vial at a different
+    volume and the *same* milligram dose becomes a different number of units. The stored mg stays
+    correct; a historical *"15 units"* silently starts reading wrong. This is BF-3's dose-freezing
+    rule one layer up, it is the reason this entry is Lane A, and it is the single thing here that
+    cannot be back-filled.
+
+  **2. `supplement_logs.taken_at` — a real timestamp.** Verified 2026-09-06: the table has
+  **`log_date`, a DATE, and no time at all** (`schema.ts:1082`). The owner's request — *"marks the
+  day time when the dose used… correlate sleep/HR everything to the dose"* — is not expressible
+  today. Nullable, defaulting to the moment of the tick, editable after the fact.
+  - **This is the column that makes the one honest analysis possible.** Dose, cumulative level and
+    elapsed time all rise together on a titration, so almost nothing separates them — **except
+    hours-since-dose within a single week**, which varies while the dose is held constant. Without a
+    time, that contrast does not exist and the tracker can only ever show correlations confounded by
+    the schedule.
+
+- **Nothing else changes.** `amount`/`unit`/`dose_text` already exist and already freeze (BF-3,
+  migration 244); `started_on`/`stopped_on` shipped in #896.
+- **Reversal cost:** a corrective migration. Additive columns only, no rewrite of existing rows.
+
+### [nutrition][body] OR-102b — the reta tracker: vial setup, dose calculator, dose timeline, weight response
+
+- **Lane:** B — a new section under Nutrition, plus the supplement sheet.
+- **Needs:** OR-102a
+- **Added:** 2026-09-06 · owner, who specified four parts and asked for them in one place:
+  *"the reta tracker; the usefulness of it; what to increase/use each week — what dosage etc."*
+- **Design already settled** in [`plans/2026-09-01-dosed-substance-exposure.md`](superpowers/plans/2026-09-01-dosed-substance-exposure.md)
+  and in **OR-102a** above. Not re-litigated here.
+
+**① Vial setup.** Bac water (mL) and peptide strength (mg) in; concentration out.
+`10 mg ÷ 3.0 mL = 3.33 mg/mL`. Show the division, not only the result. Prefilled from the last vial.
+
+**② Dose calculator.** Type the dose in mg, get the units to draw:
+`0.5 mg ÷ 3.33 mg/mL = 0.15 mL → 15 units`. Verified against the owner's third-party calculator —
+all four of its figures reproduce exactly. Also free from the same record: **doses left in the vial**,
+and a guard when a dose needs more than the barrel holds.
+- **Store mg, display units.** mg is the invariant the exposure model needs; units are a property of
+  how *this* vial was mixed.
+
+**③ Dose timeline.** The tick writes `taken_at`, and the dose appears on the day timeline beside
+sleep, HR and stress like any other event.
+- **What this can honestly show: within-week shape** — day 1 after a dose against day 6, at a
+  *constant* dose. That is the one contrast a titration does not confound.
+- **What it must NOT claim:** that a change across weeks is the drug. Dose, level and time rise
+  together, and the drug's intended effect (weight loss) independently moves sleep, resting HR and
+  HRV — so the most likely confounder *is* the thing being measured. **Association, never
+  attribution.**
+
+**④ Weight response since the last dose — and the owner's shape needs one correction.**
+Asked for: *"weight delta from last weight on injection day to last recorded day (or average) with a
+colour showing if its too much weight loss or if its good."* The colour is right. **A two-point delta
+is not**, and production says so:
+
+| how the delta is measured | noise (SD) |
+|---|---|
+| **two single weigh-ins, 7 days apart** | **± 1.70 kg** |
+| 3-day mean at each end | ± 0.98 kg |
+| 5-day mean at each end | ± 0.76 kg |
+| **7-day mean at each end** | **± 0.64 kg** |
+
+Measured from 87 weigh-ins over 118 days: residual SD about the trend is **1.203 kg**, so a
+difference of two single readings carries √2 × that. **The target band is 0.35–0.70 kg/wk.** A
+two-point delta is more than twice the width of the entire band — the colour would be close to
+random, and worse than no colour because it looks authoritative.
+- **Build it as a trailing 7-day mean at each end**, and **grey the chip when the difference does not
+  clear the noise**, with *"not enough weigh-ins yet"*. Red/amber/green only when the number is real.
+- **The band is the owner's setting**, entered as %/week of bodyweight, defaulting to 0.5–1 %.
+- **Too-fast is the reliable direction, and it is the one that matters.** Flagging a rate above
+  ~1.5 kg/wk needs far less precision than separating 0.1 from 0.4 kg/wk, so the muscle-loss warning
+  the owner actually wants is reachable in 2–3 weeks, while a plateau call needs ~6.
+
+**⚠ What this entry deliberately does NOT build: an increase/hold recommendation.**
+- **Statistically it cannot be supported yet** — a 14-day slope resolves only to ±1.30 kg/wk against a
+  0.35 kg-wide band, so a weekly call would flip on water weight while sounding certain.
+- **And naming a dose is a medical decision**, out of scope per this entry's parent. The app reports
+  the owner's data against a band the owner set; it does not choose the number.
+- **The honest substitute, which is most of the value:** *"week 3 of 4 at 2 mg · −0.42 kg/wk (95% CI
+  −0.88 to +0.04, 21 days)"*. Facts plus their uncertainty, next to the schedule.
+- **Revisit the plateau call once 6+ weeks of on-drug data exist** to test it against — not before.
+
+- **Reversal cost:** low. A section and a card; no data, no migration (those are OR-102a's).
+- **Verify:** device — the calculator's arithmetic against the owner's own third-party app, and
+  whether the colour chip reads correctly at a glance on the S25.
+
 ### [platform] LB-56 — E2E costs 26 minutes a UI PR and currently gates nothing; decide which of those to change
 
 - **Lane:** ? — neither. `.github/workflows/ci.yml`, `playwright.config.ts` and the required-checks
@@ -2445,123 +2542,6 @@ feature and not a deletion like LB-41:
   still a plain row.
 - **Added:** 2026-09-01 · owner, with two screenshots side by side: *"looks like saved meals groups
   the food well; but when scanning it doesnt."*
-
-### [nutrition][body] OR-102 — the reta tracker: reconstitution, syringe units, and what the weight data can honestly say about a dose
-
-- **Lane:** A first (a vial record is storage), then B for the calculator and the card. Split it when
-  it is taken; the engine half is small.
-- **Added:** 2026-09-06 · owner, with screenshots of a third-party peptide calculator and a stated
-  goal: *"my goal here is to be able to use the AI and my data to determine dosage… if weight is
-  steadily decreasing… dose recommendation stays the same — if its platued it would recommend
-  increase."*
-- **Needs:** none. `BF-112` shipped 2026-09-06 (#896), so amount/unit/prompt/started all exist and
-  each log already freezes its own dose text (BF-3).
-
-## 1. What the owner actually handles is a vial and a syringe, not milligrams
-
-The app asks for `0.5` and `mg`. That is the right thing to **store** — it is what the exposure model
-needs and it stays true however the vial is mixed. But it is not what is in his hand at 6am. The real
-chain, verified against his screenshots (their arithmetic is correct):
-
-```
-10 mg vial ÷ 3.0 mL water = 3.33 mg/mL      → concentration
-0.5 mg ÷ 3.33 mg/mL       = 0.15 mL          → volume
-0.15 mL × 100             = 15 units         → what he draws on a U-100 syringe
-10 mg ÷ 0.5 mg            = 20 doses         → what is left in the vial
-```
-
-**Build: store mg, compute units.** A vial record — strength (mg), water (mL), syringe scale — and
-the dose prompt shows `0.5 mg → draw to 15 units` under the number he types.
-
-- **Owner: reconstitution is stable.** *"I reconstitute a vial and will use it for weeks at a time so
-  it doesn't change often."* So the vial record is **sticky** — the last one is the default and
-  carries forward; opening a new vial is an explicit action, not a form to re-fill each dose.
-- **⚠ Stamp the reconstitution on the LOG, not only the definition** — the same rule BF-3 already
-  applies to dose text, one layer up. Mix the next vial at a different volume and the *same*
-  milligram dose becomes a different number of units. The stored mg stays right; a historical
-  "15 units" would silently start reading as wrong. This is the one thing that cannot be repaired
-  afterwards, and it is the reason this entry is Lane A first.
-- Doses-remaining and an over-syringe guard (a dose needing more than the barrel holds) both fall
-  out of the same record for free.
-- **Show the working, not just the answer** — concentration and the division, beside the result. This
-  is arithmetic that ends in a needle, and the repo's own rule already forbids presenting a computed
-  number as fact.
-
-## 2. The dose recommendation — MEASURED, and the answer is not what the owner expects
-
-His model is: steady loss → hold; plateau → increase. The logic is clinically standard. **The
-question is whether his own data can see a plateau, and it was measured against production rather
-than assumed.**
-
-`claude_ro.body_metrics`, 87 weigh-ins over the last 118 days (~0.74/day), least-squares fit:
-
-| | |
-|---|---|
-| trend | **+0.117 kg/week** (essentially flat — this is the pre-dose baseline) |
-| **residual noise about the trend** | **SD 1.203 kg** |
-| slope 95% CI on the full 118 days | +0.070 to +0.164 kg/wk |
-
-**Day-to-day weight noise is 1.2 kg, and that is what a plateau has to be seen through.** How
-precisely a slope can be resolved at his weighing cadence:
-
-| window | weigh-ins | 95% CI half-width on the slope |
-|---|---|---|
-| 14 days | ~10 | **± 1.30 kg/wk** |
-| 21 days | ~15 | ± 0.70 kg/wk |
-| 28 days | ~20 | ± 0.46 kg/wk |
-| 42 days | ~30 | **± 0.25 kg/wk** |
-
-The clinical target band is roughly **0.5–1 % of body weight per week** — at 70 kg, **0.35–0.70
-kg/wk**, a band **0.35 kg/wk wide**.
-
-- **At two weeks the confidence interval is ±1.3 kg/wk — nearly four times the width of the entire
-  target band.** A fortnight of data cannot distinguish "losing well" from "plateaued" from "losing
-  dangerously fast".
-- **At four weeks it is still ±0.46 kg/wk**, wider than the band.
-- **Six weeks is the first window that resolves the band at all.**
-
-**So a weekly "increase / hold" recommendation driven by weight trend is not supportable on this
-data, and would be noise dressed as advice.** Building it as specified would produce confident
-recommendations that flip week to week on water weight.
-
-**What IS supportable, and it is most of what he wants**
-
-- **The asymmetry is the way in: "losing too fast" is a big effect and detectable early.** Flagging
-  a rate above ~1.5 kg/wk — the muscle-loss worry he raised — needs far less precision than
-  separating 0.1 from 0.4, and is reachable in 2–3 weeks. **Build the safety direction first.** It is
-  the half that matters most and the half the data can carry.
-- **Titrate on the schedule, not on the response.** Standard GLP-1 protocols escalate on a fixed
-  clock (typically 4 weeks per step) precisely because the response signal is too slow and noisy to
-  steer on. The app's job is then to say *"week 3 of 4 at 2 mg"* — a fact — and to interrupt that
-  schedule only on a safety signal.
-- **Show the trend with its uncertainty, and never a bare number.** `−0.42 kg/wk (95% CI −0.88 to
-  +0.04, 21 days)` is honest and is exactly what makes his own decision easy. A bare `−0.42` is not.
-- **A plateau call needs 6 weeks and should say so.** If the card cannot yet resolve the band, it
-  should say *"not enough data to call a plateau — 4 more weeks at this cadence"*, not guess.
-- **Weighing daily rather than ~0.74/day helps, but only as √n** — the noise is physiological
-  (water, food, glycogen), not measurement error. Going from 20 to 28 weigh-ins in a 28-day window
-  narrows the CI by about 15 %, not by half. Worth prompting for; not a fix.
-- **Lean mass is the real muscle question and the scale cannot answer it.** `bodyFatCorrected` exists
-  (LA-45) but DEXA is infrequent, and scale body-fat is noisier than scale weight. Rate-of-loss is
-  the practical proxy; say that it is a proxy.
-
-**The line this must not cross**
-
-**The app reports his data against a band he configured; it does not name a dose.** *"Your 21-day
-trend is −0.42 kg/wk, below your 0.5–1 %/wk target, and you have been at 2 mg for 3 weeks"* is
-defensible. *"Increase to 4 mg"* is a medical decision, is out of scope per this entry's parent, and
-must not ship. The distinction is not a disclaimer — it is what the feature is allowed to compute.
-
-## 3. Suggested split when this is taken
-
-1. **A1 (Lane A)** — the vial record + reconstitution stamped on the log. Small, and the only
-   irreversible half.
-2. **B1 (Lane B)** — the calculator: units from mg, doses remaining, the working shown.
-3. **B2 (Lane B)** — the trend card: rate with its confidence interval, weeks-at-this-dose, the
-   too-fast safety flag. **Not** the increase/hold recommendation.
-4. **Later, if wanted** — the plateau call, once 6+ weeks of on-drug data exist to test it against.
-
-- **Reversal cost:** low for 2–4, moderate for 1 (a migration). Nothing here changes existing rows.
 
 ### [nutrition] BF-98 — a section holding one grouped meal draws its macros twice (fixed; the reproduction is not understood)
 
