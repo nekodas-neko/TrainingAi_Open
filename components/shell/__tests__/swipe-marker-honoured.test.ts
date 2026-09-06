@@ -56,10 +56,18 @@ describe('BF-96 — the header chip resists compression like its sibling', () =>
     expect(root).toContain('shrink-0')
   })
 
-  it('the sibling date still refuses to wrap or shrink, which is why the chip must too', () => {
-    const header = code('app/session-select/session-select-content.tsx')
-    // If the date ever becomes compressible this guard is the wrong shape — but it would also mean
-    // the row's behaviour under pressure changed, which is worth a failing test rather than silence.
-    expect(header).toMatch(/whitespace-nowrap shrink-0/)
+  // This guard used to assert the sibling date was ALSO `whitespace-nowrap shrink-0`, and said of
+  // itself: *"if the date ever becomes compressible this guard is the wrong shape — but it would
+  // also mean the row's behaviour under pressure changed, which is worth a failing test rather than
+  // silence."* That is exactly what happened. BF-116: with every item unshrinkable the shortfall
+  // crossed the action buttons instead of wrapping, so the date is now the item that gives.
+  // The chip must still resist — its wrapping is the bug BF-96 fixed — but the reason changed, and
+  // the row moved to `components/home/header-meta-row.tsx`.
+  it('the sibling date is now the item that absorbs a shortfall (BF-116)', () => {
+    const row = code('components/home/header-meta-row.tsx')
+    expect(row, 'the date truncates rather than refusing to shrink').toMatch(/truncate min-w-0/)
+    expect(row, 'and the row clips, so chips alone cannot reach the buttons').toMatch(/overflow-hidden/)
+    // The page must no longer own the row, or two copies of this contract can drift apart.
+    expect(code('app/session-select/session-select-content.tsx')).toMatch(/<HeaderMetaRow tz=\{tz\} \/>/)
   })
 })

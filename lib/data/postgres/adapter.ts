@@ -655,12 +655,18 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return Number(result.rows[0]?.count ?? 0)
   }
 
-  async activateUser(userId: string): Promise<void> {
-    await this.db.update(s.users).set({ isActive: true }).where(eq(s.users.id, userId))
+  // RV-48: `.returning()` so the caller can tell an activation from a no-op. The predicate is
+  // unchanged — this reports the match rather than altering it.
+  async activateUser(userId: string): Promise<boolean> {
+    const rows = await this.db.update(s.users).set({ isActive: true })
+      .where(eq(s.users.id, userId)).returning({ id: s.users.id })
+    return rows.length > 0
   }
 
-  async deactivateUser(userId: string): Promise<void> {
-    await this.db.update(s.users).set({ isActive: false }).where(eq(s.users.id, userId))
+  async deactivateUser(userId: string): Promise<boolean> {
+    const rows = await this.db.update(s.users).set({ isActive: false })
+      .where(eq(s.users.id, userId)).returning({ id: s.users.id })
+    return rows.length > 0
   }
 
   async getUserById(userId: string): Promise<User | null> {
@@ -668,8 +674,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return r ? this.rowToUser(r) : null
   }
 
-  async deleteUser(userId: string): Promise<void> {
-    await this.db.delete(s.users).where(eq(s.users.id, userId))
+  async deleteUser(userId: string): Promise<boolean> {
+    const rows = await this.db.delete(s.users).where(eq(s.users.id, userId)).returning({ id: s.users.id })
+    return rows.length > 0
   }
 
   async getUserByEmail(email: string): Promise<(User & { passwordHash?: string }) | null> {
@@ -2299,8 +2306,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return { id: row.id, name: row.name, muscles: row.muscles as MuscleAssignment[], equipment: row.equipment ?? [], instructions: row.instructions ?? undefined, exerciseType: (row.exerciseType as ExerciseType) ?? 'weighted' }
   }
 
-  async deleteExercise(name: string): Promise<void> {
-    await this.db.delete(s.exerciseLibrary).where(eq(s.exerciseLibrary.name, name))
+  async deleteExercise(name: string): Promise<boolean> {
+    const rows = await this.db.delete(s.exerciseLibrary)
+      .where(eq(s.exerciseLibrary.name, name)).returning({ id: s.exerciseLibrary.id })
+    return rows.length > 0
   }
 
   async createExercise(entry: { name: string; muscles: MuscleAssignment[]; equipment: string[]; instructions?: string; createdBy: string; exerciseType?: ExerciseType }): Promise<ExerciseLibraryEntry> {
@@ -2584,10 +2593,13 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return { id: row.id, label: row.label, icon: row.icon, isDistanceBased: row.isDistanceBased, sortOrder: row.sortOrder }
   }
 
-  async deleteActivityType(id: string): Promise<void> {
+  // RV-45. The in-use throw above is a different answer and is untouched; this only distinguishes
+  // "deleted it" from "there was nothing there".
+  async deleteActivityType(id: string): Promise<boolean> {
     const [inUse] = await this.db.select({ id: s.activityLogs.id }).from(s.activityLogs).where(eq(s.activityLogs.activityType, id)).limit(1)
     if (inUse) throw new Error('Activity type is in use')
-    await this.db.delete(s.activityTypes).where(eq(s.activityTypes.id, id))
+    const rows = await this.db.delete(s.activityTypes).where(eq(s.activityTypes.id, id)).returning({ id: s.activityTypes.id })
+    return rows.length > 0
   }
 
   // One write function per domain: this goes through the same rank-merge upsert as the ring's
@@ -6301,10 +6313,13 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return this.rowToInjury(r)
   }
 
-  async deleteInjury(id: string, userId: string): Promise<void> {
-    await this.db.update(s.injuries)
+  // RV-45. See deleteSupplement — reports the match, does not change it.
+  async deleteInjury(id: string, userId: string): Promise<boolean> {
+    const rows = await this.db.update(s.injuries)
       .set({ deletedAt: new Date(), updatedAt: new Date() })
       .where(and(eq(s.injuries.id, id), eq(s.injuries.userId, userId)))
+      .returning({ id: s.injuries.id })
+    return rows.length > 0
   }
 
   async listSupplements(userId: string, date: string): Promise<SupplementWithStatus[]> {
@@ -6408,14 +6423,19 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return this.rowToSupplement(r)
   }
 
-  async deleteSupplement(id: string, userId: string): Promise<void> {
+  // RV-45: returns whether a row actually matched, so the route can answer 404 instead of
+  // confirming a delete that removed nothing. The predicate is unchanged — this reports on the
+  // match, it does not alter which rows match.
+  async deleteSupplement(id: string, userId: string): Promise<boolean> {
     // Sets both active=false (the pre-existing local-read hide signal — kept for
     // clients not yet reading deletedAt) and deletedAt (the real tombstone, so the
     // delete finally reaches getSyncDelta/other devices — a hard DELETE here never
     // did, since the row simply vanished before the next sync could see it).
-    await this.db.update(s.supplements)
+    const rows = await this.db.update(s.supplements)
       .set({ active: false, deletedAt: new Date(), updatedAt: new Date() })
       .where(and(eq(s.supplements.id, id), eq(s.supplements.userId, userId)))
+      .returning({ id: s.supplements.id })
+    return rows.length > 0
   }
 
   /**
@@ -6476,8 +6496,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    * silent data loss the contribution rows exist to prevent, and it is the assertion to look for
    * first when reviewing this: a meal's contribution must still be there afterwards.
    */
-  async unlogSupplement(supplementId: string, userId: string, date: string): Promise<void> {
-    await this.db.update(s.supplementLogs)
+  // RV-45. See deleteSupplement — reports the match, does not change it.
+  async unlogSupplement(supplementId: string, userId: string, date: string): Promise<boolean> {
+    const rows = await this.db.update(s.supplementLogs)
       .set({ deletedAt: new Date(), updatedAt: new Date() })
       .where(and(
         eq(s.supplementLogs.supplementId, supplementId),
@@ -6485,6 +6506,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         eq(s.supplementLogs.logDate, date),
         eq(s.supplementLogs.source, 'manual'),
       ))
+      .returning({ id: s.supplementLogs.id })
+    return rows.length > 0
   }
 
   // ── AI Periodization (delegated to slices/periodization.ts) ─────────────────

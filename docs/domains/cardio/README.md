@@ -32,6 +32,7 @@ prescription coach, the cardio hub/trends/picker surfaces, and guided walk.
   imported by a test at all.
 
 - [`docs/reviews/2026-08-16-multi-user-load-test.md`](../../reviews/2026-08-16-multi-user-load-test.md)
+- [`docs/reviews/2026-09-05-app-checkpoint.md`](../../reviews/2026-09-05-app-checkpoint.md) — **the whole-app checkpoint, 2026-09-05/06** (twenty-six lanes collated; PS-24…PS-39. For this pillar: see the report's pattern sections and per-lane table).
   — §5: `avg_pace_sec_per_km` is populated on **7 of 46** activity logs while **39 carry both
   duration and distance**. Read from the column, never derived, written as an explicit null at save —
   same shape as Q-230, likely one fix for pace/steps/calories together (Q-307).

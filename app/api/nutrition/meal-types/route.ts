@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { isUuid } from '@trainingai/shared/validation/uuid'
 
 // One meal type, or a reorder of at most 50 ids (the route's own cap).
 const MAX_BODY_BYTES = 8 * 1024
@@ -44,8 +45,17 @@ export async function PATCH(req: Request) {
   if (orderedIds.length > 50) {
     return NextResponse.json({ error: 'Too many meal types' }, { status: 413 })
   }
+  // RV-47: `meal_types.id` is a uuid, so one malformed entry aborted the reorder transaction as a
+  // 22P02 and answered 500 with an empty body. The array is checked whole — a partial reorder is
+  // exactly what `reorderMealTypes` now refuses to commit.
+  if (!(orderedIds as string[]).every(isUuid)) {
+    return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
+  }
   const repo = await getRepository()
-  await repo.reorderMealTypes(userId, orderedIds as string[])
+  // RV-48: an id that is not one of this user's live meal types applied nothing and still answered
+  // `{ ok: true }`. 404 tells the client its list is stale and a refetch is what fixes it.
+  const applied = await repo.reorderMealTypes(userId, orderedIds as string[])
+  if (!applied) return NextResponse.json({ error: 'Meal type not found' }, { status: 404 })
   return NextResponse.json({ ok: true })
 }
 
