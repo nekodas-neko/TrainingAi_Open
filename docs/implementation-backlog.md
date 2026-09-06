@@ -1404,28 +1404,6 @@ Not a detection rule: a hardcoded list of Node-22 APIs goes stale the moment Nod
 thing that actually needs to be true is that the two runtimes match.
 
 
-### [app-shell][nutrition] LA-59 — the meal-type reorder ignores the status it is now given
-
-- **Lane:** B — `components/nutrition/meal-type-manager.tsx`.
-- **Added:** 2026-09-05, found while shipping RV-48.
-- **Needs:** nothing — the engine half is on `main`.
-
-`handleDragEnd` fires the reorder as
-`fetch(...).then(() => invalidateMealTypes()).catch(() => toast.error('Failed to save order'))`.
-A `fetch` promise does not reject on a 4xx, so the `.then` runs for every response the server sends
-and the `.catch` only ever sees a transport failure. RV-48 gave that route a 404 for a reorder it
-refused to apply; nothing on this surface reads it.
-
-The other three surfaces touched by RV-45/RV-47/RV-48 already do `if (!res.ok) throw` — the two
-admin ones and the exercise manager — so this is the last of the four, not a general gap. The two
-Oura `PATCH` callers are deliberately fire-and-forget and stay that way.
-
-**The fix is `if (!res.ok)`, and then a refetch rather than only a toast.** A 404 here means the
-list the drag was computed from is stale — a meal type deleted on another device is the realistic
-route to it — so re-reading the list is what actually resolves it. A toast alone leaves the screen
-showing an order the server rejected.
-
-
 ### [platform][nutrition] 🟡 RV-45 — the six sibling deletes now 404; the device path is unchecked
 
 > **✅ SWEPT 2026-09-05.** All seven now answer **404** when a delete matched no row, matching the

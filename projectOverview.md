@@ -26,8 +26,18 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.436.18 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.436.20 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-06.
+
+**A refused meal-type reorder no longer reports success (LA-59).** `handleDragEnd` fired
+`fetch(...).then(success).catch(failure)`, and **a `fetch` promise does not reject on a 4xx** — so the
+`.then` ran for every response the server sent and the `.catch` only ever saw a transport error.
+RV-48 gave that route a 404 for a reorder it declines to apply and nothing here read it. It now checks
+`res.ok` and **refetches rather than only toasting**, which is the substantive half: a 404 means the
+list the drag was computed from is stale, so restoring the previous local order would put back a
+different wrong one. Last of the four surfaces RV-45/RV-47/RV-48 touched. **The 404 is proven live;
+the toast and the refetch have not been seen on screen**
+([journal](docs/overview/entries/2026-09-06-la-59-reorder-status.md)).
 
 **A meal with one food in it shows its macros again (BF-120 / OR-101).** The owner, from two
 device checks: *"1 meal doesnt show the calorie total; but 2 meals do"*. A section holding one
@@ -1706,6 +1716,25 @@ clearing a file requires lowering its number in the same PR. Every icon involved
 **PS-34's own claim that no live violation sat behind any of its seven rules was wrong here.** A
 re-scan reporting zero is worth exactly as much as the pattern it re-scanned with.
 [Journal](docs/overview/entries/2026-09-06-guard-repairs.md).
+
+### [nutrition] LA-59's refusal path has not been watched happening (2026-09-06)
+
+The meal-type reorder now checks `res.ok`, toasts and refetches. **The 404 is proven live** — a
+reorder carrying a stale id returns `{"error":"Meal type not found"}` while a valid one returns 200 —
+and three mutation-tested source guards pin the code shape. **What has not been observed is the two
+things the user sees:** the error toast and the list re-reading itself.
+
+**⚠ The reason first recorded here was wrong and is retracted.** It said three browser attempts ended
+with the settings sheet not rendering, implying a UI defect. The sheet was fine: the ad-hoc scripts
+waited 8 seconds for a page the dev server had not finished compiling, and one of them also pointed
+at port 3000 while the harness and its stored session cookie belong to **3100**
+(`playwright.config.ts:23`). The e2e specs use 30–60 s waits for exactly this. Nothing about the
+manager was ever shown to be broken, and a future session should not go looking for that.
+Closing this wants a `@dnd-kit` drag simulated in Playwright with the PATCH stubbed to 404 —
+`empty-meal-library.spec.ts` has the route-stubbing shape, and taps a coordinate through
+`page.touchscreen.tap` inside a `toPass` loop rather than calling `.click()`, which is the other
+thing an ad-hoc script gets wrong here.
+[journal](docs/overview/entries/2026-09-06-la-59-reorder-status.md).
 
 ### [nutrition] The lone-row macro footer has not been seen on the S25 (BF-120, 2026-09-06)
 

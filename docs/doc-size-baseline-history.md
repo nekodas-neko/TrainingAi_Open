@@ -8289,3 +8289,21 @@ Two things were deliberately kept out. BF-126 does not specify the invariant (on
 one secondary?) because one generated program is the whole evidence base, and it says so — a rule
 fitted to a single roll would forbid a legitimate two-compound pull day. And no plan doc was written
 for any of the six; each fix is small enough that a plan would restate the entry.
+
+
+## 2026-09-06 — `projectOverview.md` → 10051 (LA-59's status paragraph and its verification gap)
+
+Twenty-one lines, and eleven of them are the Known-Issues row rather than the fix. The fix itself
+compresses to a sentence — a `fetch` promise does not reject on a 4xx — but what is *not* verified
+does not compress, because the next session has to know both what was proven (the route's 404, live)
+and what was not (the toast and the refetch, on screen), or it will read "shipped" as "seen working".
+The row also names the instrument that would close it and the spec to copy the shape from, so the
+next attempt does not start by rediscovering that a `@dnd-kit` drag is the hard part.
+
+**Eight more lines retracting the cause this row first gave.** It said the settings sheet failed to
+render, which is a claim about the app; it was an ad-hoc script waiting 8 seconds for a cold compile,
+against port 3000 when the harness and its stored cookie belong to 3100. The retraction is longer
+than a strikethrough because a wrong cause sends the next session hunting a defect that does not
+exist — the same reason this file keeps refutations rather than deleting them.
+
+The backlog moves the other way in the same PR: LA-59's 22-line entry goes on shipping.
