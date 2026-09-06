@@ -102,7 +102,11 @@ test('a recipe link with no stated yield asks how many it serves before it can b
   await page.goto('/nutrition')
   await settleRouteBoundary(page)
   await expect(async () => {
-    await tap(page, /^Build a meal plan/)
+    // NOT `Build a meal plan` — Q-407 repointed that at the conversational Coach flow, so tapping
+    // it navigates to the Coach tab and no dialog ever opens. The stepper this spec wants kept its
+    // own trigger beside it. (`nutrition-coach-plan-entry` still uses the old name, correctly: that
+    // spec is about the Coach entry.)
+    await tap(page, 'Prefer the step-by-step setup?')
     await expect(page.getByRole('dialog')).toBeVisible({ timeout: 3_000 })
   }).toPass({ timeout: 60_000 })
 
@@ -165,7 +169,7 @@ test('a recipe that states its yield is not divided a second time', async ({ pag
   await page.goto('/nutrition')
   await settleRouteBoundary(page)
   await expect(async () => {
-    await tap(page, /^Build a meal plan/)
+    await tap(page, 'Prefer the step-by-step setup?')
     await expect(page.getByRole('dialog')).toBeVisible({ timeout: 3_000 })
   }).toPass({ timeout: 60_000 })
 

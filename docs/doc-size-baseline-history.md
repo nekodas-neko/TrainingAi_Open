@@ -7708,6 +7708,52 @@ theoretical. The backlog half spends its length on three candidate fixes with a 
 reversal cost, since it is an auth change and the choice between them is the owner's, not something a
 session should settle by picking the smallest diff.
 
+## 2026-09-06 — `docs/implementation-backlog.md` → 18432 (LB-55/LB-56, recomputed on the merged base)
+
+Recomputed from the merged file, not carried from the branch. This PR sat for two days while five
+others moved the same document in both directions, so its own 18530 was against a backlog that no
+longer exists — and the merged count is *lower* than the branch's, because main's removals landed
+alongside these additions. The notes below record what the entries themselves cost; this one records
+only that the number they were measured against moved underneath them.
+
+**Recomputed a second time, at 18472, and that number was wrong.** Git presented this branch's two
+new entries and main's deletion of a shipped one (BF-112, which merged meanwhile) as a *single*
+conflict region — the two-deletions shape, in the form where one side's addition and the other's
+removal are adjacent enough to fuse. Measuring the baseline before separating them counted a
+completed entry that does not belong in the queue. 18399 was the count with it gone, and 18432 is
+the count after LB-58 landed on main — a third recompute, for a third movement underneath this
+branch. Fifty-nine lines of that total are this branch's own two entries; the rest is inherited.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17784 (LB-55)
+
+Forty-eight lines for one Reference entry, and the length is the point: it is read *while* a red E2E
+is being diagnosed, which is exactly when a session has no logs, no `main` baseline, and a failure
+that presents as a timeout rather than as the assertion that failed.
+
+Most of it records things NOT to do, which is what this cost was made of. The `toPass` budgets that
+exceed their test timeouts are written down with "this is not the cause, do not fix it as one",
+because that hypothesis fit three independent observations before one line of error text refuted it.
+The string-checking guard is written down with the reason it cannot work — it passed its own
+mutation — so the next session does not spend an hour rebuilding it. And the measurement that a PR
+merged with E2E red is recorded as a measurement, with the three candidate explanations left open,
+because it is the owner's to settle and it changes what every other session should do while waiting.
+
+Twenty-three more lines the same day, both of them measurements that stop a repeat. The seven specs
+still failing after this PR are listed with their DURATIONS, because the duration is what classifies
+them — a ~45s failure is a `toPass` loop spinning on something absent, a sub-second one is a real
+assertion, and knowing which before opening the file is most of the triage. And a full-suite result
+of 106 failed / 41 passed is recorded as what it actually was: the dev server dying at test 42, every
+later spec failing against `ECONNREFUSED`. Reporting that as a finding would have been exactly the
+poisoned-state trap already documented, so the tell — uniformly sub-second durations — is written
+down beside it.
+
+Twelve more for `plan-rescale:168`, which is written up rather than fixed because the write-up is the
+useful part: the fixture sets 1900 kcal against a budget that used to be a fixed 2,000 and is derived
+now, so the day lands on exactly zero remaining and the note that renders is the wrong branch. The
+entry says explicitly not to try another number — the derived budget carries `earned from movement`,
+so a hardcoded figure lands wherever that day's movement puts it, which converts a failing test into
+an intermittent one. Naming the trap is worth more than the twelve lines.
+
 ## 2026-09-04 — `docs/implementation-backlog.md` → 17690 (Q-250's next step is an auth bypass)
 
 Twenty lines correcting a sentence this same session wrote hours earlier — that CI could "mint the
@@ -7717,6 +7763,39 @@ and every remaining route adds an authentication bypass. The length is the two c
 recommendation between them, and the reason the in-process detail matters — without it the next
 session re-derives the dead end. Recorded rather than left, because a confident wrong next step in a
 backlog entry costs more than no next step at all.
+
+Eleven more once the remaining failures were actually run rather than reasoned about. Three of them
+pass in isolation and fail in the full suite, which the duration-based triage above cannot see and
+would have sent the next session hunting a stale string that is not there. That is written down with
+the instruction not to run one alone and call it fixed — the isolation run is what proves the cause
+lies in a spec that ran earlier, so the question is which write, not which assertion.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17831 (LB-56)
+
+Forty-seven lines for a question the owner asked directly — *"why is e2e taking so long? can it be
+investigated or turned off if not needed"* — answered with the measurement rather than an impression:
+144 tests, 27.1 minutes of test time, no single pathology, and the per-file numbers that show it.
+
+The length is mostly the alternatives, and they are worth the room because the obvious one is wrong.
+Raising `workers` looks like the fix and would trade twenty minutes for flakiness: the serialism is
+deliberate, its reason is written in the config, and three specs were re-proved order-dependent the
+same day. Sharding is the option that would actually work and is the one blocked on a question nobody
+has answered. Recording which fixes are cheap to reverse — three of the four are a settings toggle or
+one line — is what lets this be decided quickly instead of deliberated again.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17850 (LB-55/LB-56, the sharding result)
+
+Nineteen lines to record an experiment that came back negative, which is exactly the kind that
+otherwise gets re-run. Four shards, each on its own fresh database: 155 passed, 5 failed. Sharding
+broke two specs that pass in the full run and did not rescue the two it was expected to, so the
+conclusion is the opposite of the prediction — the dependency between specs runs both ways and the
+suite is one entangled fixture rather than independent tests sharing a database.
+
+Both entries are corrected rather than appended to. LB-55 had characterised three failures as
+"poisoned by an earlier spec's writes" and pointed at a bisect; that reading survived one day and is
+replaced with the question that actually decides each case — what state does this spec need, and who
+creates it. LB-56's sharding option keeps its measured numbers (26 → ~11 min, not the ~8 estimated,
+because every shard pays the auth setup) alongside the reason it is not available yet.
 
 ## 2026-09-03 — Review sweep 46 (RV-43, RV-44)
 
