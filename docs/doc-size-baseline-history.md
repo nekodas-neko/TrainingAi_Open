@@ -7874,3 +7874,16 @@ No size change; a move. The owner starts dosing on 2026-09-06 and asked for this
 BF-112 goes from Lane B READY #6 to #1. Queue position is priority in this file, so the reorder is
 the whole mechanism — nothing else needed editing, and `grep '^### '` sorted is identical to
 `origin/main`, which is the check that the move did not silently drop or resurrect an entry.
+## 2026-09-06 — `docs/implementation-backlog.md` → 18325, `projectOverview.md` → 9907 (app checkpoint: PS-24…PS-39)
+
+Sixteen entries from a twenty-six-lane checkpoint, already capped by class — ~45 verified findings
+folded into 16 entries (six rule-bypass shapes are one entry; the nutrition paper cuts are one; the
+docs sweep is one). Four Known-Issues rows plus the reopened LA-58 row carry the two escalations and
+the two live-data defects. The checkpoint report itself is a review doc, not index growth.
+
+## 2026-09-06 — `docs/implementation-backlog.md` → 18355, `projectOverview.md` → 9918 (sweep 49: RV-49, RV-50)
+
+Two entries and one Known-Issues row for the owner-reported stale-screen symptom. The entries carry
+the mechanism (an id-less group call the group's own conditional no-ops, and the seed-only reader
+class that turns a missed eviction into TTL-long staleness) because the fix comment above the call
+already claims this fixed — a bare "invalidate more keys" entry would read as done.
