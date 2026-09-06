@@ -688,6 +688,39 @@ and Samsung does not honour `autoConnect = true`, so direct connect plus a bound
 isolation stands and wiring it into scoring waits on the H10 session. It does not resolve steps,
 calories or the stage mapping (PS-16, PS-19).
 
+### [platform] LB-58 — the journal ceiling fails whichever PR is open when the count crosses, not the one that grew it
+
+- **Lane:** A — `scripts/lib/entries-verdict.js`, which no lane's path list names; it is not
+  `components/**` or `app/**`, so it falls to A by the rule.
+- **Added:** 2026-09-06, by the second session to be blocked by it. The first
+  ([folded journal](overview/history-2026-09-06.md), the 2026-09-03 decode-flake entry) measured the
+  same thing and recorded it in its own note, where nothing could act on it — a documented finding
+  with no queue entry, which is the shape **No orphaned findings** exists to prevent.
+
+`entriesVerdict` has two limits and they are not written the same way. The **foldable** limit carries
+the BF-36 attribution — `grewIt`, so it fails the branch that added entries and merely *notes* the
+overflow for one that did not. The **total ceiling** directly below it has no such guard, so once
+`main` reaches the ceiling the next PR to add any journal entry fails Custom Rules, whoever it
+belongs to and however small its diff. That is precisely the unfairness BF-36 was filed to remove,
+one level up in the same function.
+
+**Measured twice.** On 2026-09-03 the directory hit 251 against a 250 ceiling and blocked a spec fix,
+which paid for it by folding three entries. On 2026-09-06 it sat at exactly 320 against a 320 ceiling
+and blocked an e2e-drift PR, which paid for it by folding 46. Both times the blocked PR had added
+exactly one entry, and both times the fix was a docs sweep unrelated to the change under review.
+
+- **The fix is one condition**, mirroring the branch above: fail on the ceiling only when `grewIt`,
+  and emit the note otherwise. **Do not simply raise the number** — the ceiling is doing real work,
+  and raising it defers the same block to a later PR chosen just as arbitrarily.
+- **⚠ There is a real question underneath it that the guard does not answer.** The ceiling counts
+  *all* entries, and 274 of the 320 were **linked** by a durable doc and therefore unfoldable. So a
+  sweep can no longer clear much: headroom after the 2026-09-06 sweep is 46 entries, and the linked
+  floor only rises. The check's own failure text says so — *"the durable docs citing the other 274
+  need to point at the batched history instead"*. That is the Orchestrator's call and a much larger
+  job; this entry is only about who gets blamed in the meantime.
+- **Verification:** with `main` at the ceiling, a branch adding one entry passes with a note; a branch
+  that adds enough to cross a rising ceiling still fails.
+
 ### [workouts][app-shell] RV-49 — the Home deload confirm evicts neither key the visible screen reads
 
 - **Lane:** B — `app/session-select/session-select-content.tsx:887-892`, `lib/cache-groups.ts:369-384`.
