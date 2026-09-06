@@ -108,7 +108,12 @@ function findCollisions(files) {
 }
 
 function main() {
-  const files = execSync("git ls-files '*.test.ts'", { encoding: 'utf8' })
+  // PS-34: `git ls-files '*.test.ts'` alone is two blind spots at once. It omits **untracked**
+  // files, so a test written this session is invisible to the local gate and only collides in CI
+  // — the run where the author is no longer looking — and it omits **`.tsx`** tests entirely.
+  // `--others --exclude-standard` adds the untracked-but-not-ignored files; the second pattern
+  // adds the component tests.
+  const files = execSync("git ls-files --cached --others --exclude-standard '*.test.ts' '*.test.tsx'", { encoding: 'utf8' })
     .trim().split('\n').filter(Boolean)
     .map(f => { try { return [f, fs.readFileSync(f, 'utf8')] } catch { return [f, ''] } })
 

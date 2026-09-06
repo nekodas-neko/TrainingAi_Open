@@ -8243,3 +8243,21 @@ they land as one number — recomputed on every merge rather than adjusted. Four
 the only method that stays correct: `projectOverview.md` is UP here despite this branch striking a
 row out of it, because concurrent work added more than PS-26 removed. Subtracting the branch's delta from either side would have been wrong in both directions —
 the count is the only thing that is true after a merge.
+
+## 2026-09-06 — CLAUDE.md → 775, lane-a baton → 92, orchestrator → 61 (PS-34: the ratchet now points both ways)
+
+Three **downward** corrections, and the reason they were needed is the change itself. The doc-size
+check treated any count at or under its number as fine, so a document that shrank left the
+difference available for silent regrowth. CLAUDE.md sat **429 lines** under baseline — the most-read
+file in the repo could have grown by more than half its own length with nothing complaining. The
+lane-a baton was 101 under, the orchestrator's 1.
+
+`verdict()` returns `'slack'` for that case now and the check fails on it, so a baseline can no
+longer drift high. Each of these three is set to its exact current count.
+
+## 2026-09-06 — `docs/implementation-backlog.md` → 18663, `projectOverview.md` → 10022 (PS-34 shipped)
+
+Both up. PS-34's entry left the queue and LA-62 replaced it — longer, because the eighteen live
+accessibility findings it carries need their file counts written down to be actionable, and because
+it has to say why the scan must not be narrowed again. `projectOverview.md` gains the matching
+Known-Issues row.

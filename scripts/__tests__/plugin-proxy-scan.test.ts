@@ -108,3 +108,54 @@ async function describeState() {
     expect(findProxyReturns([{ file: 'f.ts', src }])).toHaveLength(0)
   })
 })
+
+// PS-34. The scan pinned two incidentals of the one file it was written against: the import's
+// quote character and the absence of a trailing semicolon. Either variant made the file fall out
+// silently — a file with no recognised bindings looks exactly like a clean one, so the rule
+// reported green on code it had not read.
+//
+// These are the same BROKEN shape written the other three ways someone would naturally write it.
+const BROKEN_DOUBLE_QUOTES = `
+async function getNativeSpeech() {
+  const { SpeechRecognition } = await import("@capacitor-community/speech-recognition")
+  return SpeechRecognition
+}
+`
+
+const BROKEN_SEMICOLON = `
+async function getNativeSpeech() {
+  const { SpeechRecognition } = await import('@capacitor-community/speech-recognition');
+  return SpeechRecognition;
+}
+`
+
+const BROKEN_BACKTICKS = `
+async function getNativeSpeech() {
+  const { SpeechRecognition } = await import(\`@capacitor-community/speech-recognition\`)
+  return SpeechRecognition
+}
+`
+
+describe('the same defect written the ways it is actually written (PS-34)', () => {
+  for (const [name, src] of [
+    ['double-quoted import', BROKEN_DOUBLE_QUOTES],
+    ['semicolon after the return', BROKEN_SEMICOLON],
+    ['backtick import', BROKEN_BACKTICKS],
+  ] as const) {
+    it(`catches it with a ${name}`, () => {
+      const found = findProxyReturns([{ file: 'x.ts', src }])
+      expect(found.map(f => f.name)).toEqual(['SpeechRecognition'])
+    })
+  }
+
+  // The precision half: the variants must not turn the correct shapes into offenders.
+  it('still passes the correct shapes when written the same ways', () => {
+    const ok = `
+async function getBle() {
+  const { BleClient } = await import("@capacitor-community/bluetooth-le");
+  return BleClient;
+}
+`
+    expect(findProxyReturns([{ file: 'ok.ts', src: ok }])).toEqual([])
+  })
+})
