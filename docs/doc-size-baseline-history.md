@@ -8652,3 +8652,12 @@ contiguous, `early_deload_week_start` NULL on all five programs, `is_early_deloa
 ever, and a largest trained-day gap of 2 days where the allowance is already 2. The entry now
 carries those numbers, because the alternative is the next session spending an hour re-deriving them
 before it can tell that the buildable half is six lines and the rest is a schema decision.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18778 (LA-67 shipped)
+
+Down 33, and the entry earned its length: it argued at length from the failure toward a timezone
+hypothesis it labelled *"not measured"*. The hypothesis was refutable from the entry's own text — a
+mis-dated log would have failed the file's first test too, and that one passed — and the real cause
+took one reproduction to find. What replaces it is two rules in `e2e/README.md` about specs that
+write real rows and specs that read running totals, which is where a spec author will actually meet
+them.
