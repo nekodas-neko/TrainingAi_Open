@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
+import { execSync } from 'node:child_process'
 import { join } from 'node:path'
 
 /**
@@ -97,10 +98,68 @@ describe('the remaining tap-dense controls (Q-176)', () => {
     expect(src).not.toMatch(/tap-target-(44|dot)[^"]*inline-flex/)
   })
 
-  it('a 44px box is never given to a control that has not been checked for neighbours', () => {
-    // Only these two files may use it; adding a third means measuring its clearance first.
-    const users = ['components/more/profile-tab.tsx']
-    for (const f of users) expect(read(f), f).toContain('tap-target-44')
+  it('the 44px box is still 44px', () => {
+    expect(read('components/more/profile-tab.tsx')).toContain('tap-target-44')
     expect(read('app/globals.css')).toMatch(/\.tap-target-44::before[\s\S]*?width:\s*44px/)
+  })
+
+  it('the positioning context is layered, so a call site can still be absolute', () => {
+    // Measured 2026-09-07: unlayered, this rule beat Tailwind's `absolute` utility outright —
+    // unlayered CSS wins over every cascade layer regardless of specificity — and the avatar badge
+    // above computed `position: relative`, flowing inline instead of pinning to the corner (x=162
+    // rather than x=226 at 412dp). In `@layer components` the utilities layer wins.
+    const css = read('app/globals.css')
+    expect(css).toMatch(/@layer components \{\s*\.tap-target-44,\s*\.tap-target-dot \{\s*position: relative;/)
+  })
+})
+
+/**
+ * BF-123: the sweep the floor's own rule required and never got. `app/globals.css` sets
+ * `button, [role="button"] { min-height: 48px; min-width: 48px }` under 640px, so any control that
+ * declares a smaller box renders inflated — a `rounded-full` chip comes out as a circle, which is
+ * how the owner reported it on the program editor sheet.
+ *
+ * The fix is per site and has two halves, and shipping only the first is the accessibility
+ * regression the floor exists to prevent. This guard holds the second half: **no control opts out
+ * of the floor without putting a touch area back.**
+ *
+ * `tap-dense` on an inline text button is the exception the opt-out was written for, and the two
+ * that remain are listed with the reason. The list is shrink-only: remove a row when it is fixed,
+ * never add one without the measurement that justifies it.
+ */
+describe('every tap-dense control restores a touch area (BF-123)', () => {
+  const BARE_TAP_DENSE: Record<string, string> = {
+    'components/workout/done-screen.tsx':
+      'inline underlined text button in a sentence — the case `.tap-dense` was written for',
+    'components/workout/next-workout-card.tsx':
+      'same inline underlined text button, other surface',
+    'components/workout/pre-workout-screen.tsx':
+      'Deload pill — grows its real ink instead, because the stats button 8px above would lose the overlap (Q-176 above)',
+  }
+
+  it('holds across every screen and component', () => {
+    const files = execSync(
+      "grep -rl 'tap-dense' --include=*.tsx app components lib",
+      { cwd: root, encoding: 'utf8' },
+    ).trim().split('\n').filter(Boolean)
+
+    // Asserted, not assumed: a glob that matched nothing would report no violations and pass.
+    expect(files.length, 'no tap-dense call sites found — this is not measuring anything')
+      .toBeGreaterThan(10)
+
+    const bare: string[] = []
+    for (const file of files) {
+      if (file in BARE_TAP_DENSE) continue
+      // Line by line, and comment lines dropped first: `tap-dense` is named in prose in three
+      // places, and a regex spanning newlines swallows whole components between two quotes.
+      for (const line of read(file).split('\n')) {
+        if (/^\s*(\/\/|\*|\/\*)/.test(line)) continue
+        for (const cls of line.match(/"[^"\n]*\btap-dense\b[^"\n]*"/g) ?? []) {
+          if (!/tap-target-44|tap-target-dot|before:/.test(cls)) bare.push(`${file}: ${cls}`)
+        }
+      }
+    }
+    expect(bare, 'tap-dense with no touch area — add .tap-target-44 / .tap-target-dot, or grow the ink')
+      .toEqual([])
   })
 })

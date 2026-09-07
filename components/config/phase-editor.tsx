@@ -157,14 +157,14 @@ export function PhaseEditor({
             <div className="flex items-center gap-1">
               <button
                 onClick={() => updateMain(idx, { durationCycles: Math.max(0, phase.durationCycles - 1) })}
-                className="h-6 w-6 rounded border text-sm font-bold flex items-center justify-center hover:bg-muted"
+                className="tap-dense tap-target-44 h-6 w-6 rounded border text-sm font-bold flex items-center justify-center hover:bg-muted"
               >−</button>
               <span className="text-sm w-16 text-center">
                 {phase.durationCycles} cycle{phase.durationCycles !== 1 ? 's' : ''}
               </span>
               <button
                 onClick={() => updateMain(idx, { durationCycles: phase.durationCycles + 1 })}
-                className="h-6 w-6 rounded border text-sm font-bold flex items-center justify-center hover:bg-muted"
+                className="tap-dense tap-target-44 h-6 w-6 rounded border text-sm font-bold flex items-center justify-center hover:bg-muted"
               >+</button>
               {avgSessionsPerWeek > 0 && phase.durationCycles > 0 && (
                 <span className="text-xs text-muted-foreground ml-1">
@@ -177,7 +177,7 @@ export function PhaseEditor({
           {/* Type */}
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground w-24 shrink-0">Type</span>
-            <div className="flex gap-1 flex-wrap">
+            <div className="flex gap-1.5 flex-wrap">
               {(Object.keys(TYPE_LABELS) as Array<keyof typeof TYPE_LABELS>).map(t => (
                 <button
                   key={t}
@@ -186,7 +186,7 @@ export function PhaseEditor({
                     ...(t === 'deload' ? { primaryStyleId: undefined, secondaryStyleId: undefined } : {}),
                   })}
                   className={cn(
-                    "px-2 py-0.5 rounded text-xs border transition",
+                    "tap-dense tap-target-44 px-2.5 py-1.5 rounded text-xs border transition",
                     phase.phaseType === t
                       ? "bg-primary text-primary-foreground border-primary"
                       : "hover:bg-muted",

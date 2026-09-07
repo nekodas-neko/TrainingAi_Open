@@ -1726,6 +1726,24 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [app-shell] ⚠️ The 48 px tap-floor sweep landed on 48 controls; 41 of them are on screens no gate opens (BF-123, 2026-09-07, v1.436.39)
+
+`globals.css`'s `min-height/min-width: 48px` floor inflated every control drawn smaller — the owner
+reported it as muscle chips rendering as filled circles on the program editor sheet. **Fixed:** 48
+call sites across 24 files carry `tap-dense` plus a restored touch area, and six wrapped chip rows
+grew their ink so the box overflows ~2 px into a neighbour rather than ~10.
+[Journal](docs/overview/entries/2026-09-07-fix-bf-123-tap-floor-sweep.md).
+
+**What is owed:** `e2e/touch-target-size.spec.ts` covers five screens' initial state and **41 of the
+48 sites are not on them** — sheets, pickers, the config editor. Those were measured in the
+Playwright harness at 412 dp (muscle chips read 47×28 where they were 48×48), which is the web
+build. **Not verified on the S25**; no APK needed, it deploys through the WebView.
+
+**Not swept, on purpose** — `trophy-case` (`aspect-square`), `goal-spectrum` and
+`builder-review.tsx:660` (a full-width card and a send button, 48 px is right), `config-screen.tsx`
+:629/:639 (two-line cards), the `admin/` and `oura-ble/` debug consoles, and every site declaring its
+own `min-h-*`. One of those reading wrong on device is a deliberate omission, not a miss.
+
 ### [sleep] 🟡 The sleep–performance insight now reports 48 paired days instead of 233, and nobody has seen the new number (PS-29, 2026-09-07)
 
 **What shipped.** `/api/sleep-performance-correlation` pushed one point per **exercise** with one

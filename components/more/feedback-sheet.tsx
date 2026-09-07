@@ -136,7 +136,7 @@ export function FeedbackSheet({ open, onOpenChange }: Props) {
                 <button
                   type="button"
                   onClick={() => setScreenshot(null)}
-                  className="absolute -top-2 -right-2 rounded-full bg-destructive text-destructive-foreground w-5 h-5 flex items-center justify-center"
+                  className="tap-dense tap-target-44 absolute -top-2 -right-2 rounded-full bg-destructive text-destructive-foreground w-5 h-5 flex items-center justify-center"
                 >
                   <XIcon className="w-3 h-3" />
                 </button>

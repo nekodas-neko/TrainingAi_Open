@@ -589,44 +589,6 @@ new reward currency.
   pushes the fold on the S25 with several widgets enabled. That is a check on the built thing, so it
   is not a field on this entry.
 
-### [app-shell] BF-123 — the global 48 px tap floor turns every sub-48 px `<button>` into a circle; the opt-out exists and was never swept
-
-- **Lane:** B — `app/globals.css` opt-out classes at the call sites; `components/config/**` and the sibling chips.
-- **Added:** 2026-09-06 · owner, on the program editor sheet: *"noting this UI is really bad and needs adjustment"* — a screenshot in which the muscle chips render as large filled circles.
-- **Batch:** editor-sheet-density
-- **Traced, and the diagnosis is already written down in this repo.** `app/globals.css:553` sets
-  `button, [role="button"] { min-height: 48px; min-width: 48px }` inside `@media (max-width: 640px)`.
-  The muscle chips at `components/config/program-editor-sheet.tsx:882` are real `<button>`s asking
-  for `h-5 px-1.5 rounded-full` — 20 px tall. The floor wins, `rounded-full` on a 48×48 box is a
-  circle, and the `text-[10px]` label does not scale with it, so the text floats in the middle. A
-  short label (`lats`) lands under the 48 px min-width and comes out perfectly round; a longer one
-  (`upper back`) comes out as a stadium. That is the exact shape in the screenshot.
-- **`components/ui/switch.tsx:19` carries the diagnosis verbatim** — *"the global 48px tap-target
-  floor in globals.css wins over h-5/w-9 and renders this as a 48×48 `rounded-full` **black
-  circle** rather than a pill"* — and fixes it with `tap-dense` plus a `before:` pseudo-element that
-  puts the 48 px touch box back invisibly. So the mechanism, the fix and the reason the fix keeps the
-  control reachable are all settled. What never happened is the sweep.
-- **CLAUDE.md already required that sweep**, under **No global element-selector styling**: *"Any
-  unavoidable global rule needs its opt-outs applied in the same PR, not left for a later audit."*
-  This entry is that audit, arriving as an owner bug report — which is the outcome the rule exists to
-  prevent, and worth saying plainly rather than filing as a fresh discovery.
-- **Known instances beyond the chips**, all `<button>`/`role="button"` styled below 48 px with no
-  `tap-dense`: the two hand-rolled toggles at `program-editor-sheet.tsx:465` and `:490` (`h-5 w-9`,
-  the same circle the Radix switch had), and `components/config/style-editor-sheet.tsx:109`. Sweep for
-  the rest rather than fixing these three — the sweep is the entry.
-- **Do the search on the ELEMENT, not the class.** Most `rounded-full text-[10px]` hits in the app
-  are `<span>`s, which the selector never reaches and which must not be touched; grepping the class
-  finds mostly false positives. The set that matters is `<button>` and `[role="button"]` whose own
-  styles declare a box under 48 px in either axis.
-- **Every opt-out restores the touch box.** `tap-dense` alone shrinks the hit area to the ink, which
-  is the accessibility regression the floor was added to prevent. Copy the switch's pattern, or use
-  `.tap-target-44` / `.tap-target-dot` where a neighbour is close enough that a 48 px box would
-  overlap it — `globals.css` explains that trade-off in place and it is real, not theoretical.
-- **`e2e/touch-target-size.spec.ts` is the gate.** Its allowlist is empty by design, so it can hold
-  the result; check it actually covers a `tap-dense` control's `before:` box rather than only the
-  element, or the sweep will make it red.
-- **Reversal cost:** low, and per-site — each opt-out is one class on one element.
-
 ### [app-shell] BF-124 — the role picker on the program editor sheet overflows, and its selected state reads as disabled
 
 - **Lane:** B — `components/config/program-editor-sheet.tsx`.

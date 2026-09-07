@@ -99,7 +99,7 @@ export function PlanSetupSheet({ open, onOpenChange, onCreated }: Props) {
                     key={d.km}
                     type="button"
                     onClick={() => setTargetDistanceKm(d.km)}
-                    className="rounded-lg border px-3 py-1.5 text-sm transition-colors"
+                    className="tap-dense tap-target-44 rounded-lg border px-3 py-1.5 text-sm transition-colors"
                     style={
                       targetDistanceKm === d.km
                         ? { borderColor: 'var(--accent-cyan)', background: 'color-mix(in oklch, var(--accent-cyan) 12%, transparent)', fontWeight: 600 }
@@ -155,7 +155,7 @@ export function PlanSetupSheet({ open, onOpenChange, onCreated }: Props) {
                   key={min}
                   type="button"
                   onClick={() => setTimePerSessionMinutes(min)}
-                  className="rounded-lg border px-3 py-1.5 text-sm transition-colors"
+                  className="tap-dense tap-target-44 rounded-lg border px-3 py-1.5 text-sm transition-colors"
                   style={
                     timePerSessionMinutes === min
                       ? { borderColor: 'var(--accent-cyan)', background: 'color-mix(in oklch, var(--accent-cyan) 12%, transparent)', fontWeight: 600 }

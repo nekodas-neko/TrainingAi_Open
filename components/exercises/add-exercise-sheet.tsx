@@ -287,7 +287,7 @@ export function AddExerciseSheet({ open, onOpenChange, initialName = '', onAdded
                       key={t}
                       type="button"
                       onClick={() => setExerciseType(t)}
-                      className="text-xs px-2.5 py-1 rounded-lg border transition-colors capitalize"
+                      className="tap-dense tap-target-44 text-xs px-2.5 py-1.5 rounded-lg border transition-colors capitalize"
                       style={exerciseType === t
                         ? { borderColor: 'var(--color-brand)', color: 'var(--color-brand)', background: 'color-mix(in oklch, var(--color-brand) 10%, transparent)' }
                         : { borderColor: 'var(--color-border)', color: 'var(--color-muted-foreground)' }}
