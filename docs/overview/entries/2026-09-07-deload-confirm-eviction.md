@@ -52,5 +52,27 @@ same defect; fixing one and leaving the other would have been arbitrary.
    "the button does not exist", which is a convincing wrong answer. `suppressMorningCheckin(page)` in
    `e2e/fixtures.ts` exists for this and its own doc comment says the same thing happened before.
 
+## The E2E failure this surfaced, which was not this change
+
+The first E2E run went red on `plan-rescale.spec.ts` — **159 passed, 1 failed**, and the new spec
+here was among the passing. Its `beforeAll` dies on
+`duplicate key value violates unique constraint "meal_plans_one_active_per_user"`.
+
+`plan-rescale` and `plan-meal-to-saved-meal` are the only two specs that create an **active** meal
+plan, and only one of them protects itself: `plan-meal-to-saved-meal.spec.ts:70` stands down any
+other active plan for the seeded user before inserting. `plan-rescale`'s `cleanup` removes only its
+own row by id, so any stray active plan makes its insert fail and every test in the file dies in
+setup, reporting a constraint rather than anything about the plan card.
+
+Fixed here by copying the sibling's guard. Confirmed both directions against the exact state:
+with a stray active plan seeded, the file fails without the guard and passes with it.
+
+**A correction on my own reasoning.** I first ran the spec on plain `main`, saw it fail, and took
+that as "already broken, not mine". It was failing for a *different* reason — a stray plan left in my
+local database by an earlier run — and after clearing it, `main` passed. The conclusion happened to
+hold, but the evidence did not support it, and one dirty-database failure reads exactly like another.
+
+## Not exercised
+
 **Not exercised:** the S25. The eviction is client-side and the spec drives real browser storage, but
 the owner's own report was on the APK and this was not re-checked there.
