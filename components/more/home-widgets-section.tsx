@@ -4,18 +4,15 @@ import { useEffect, useState } from 'react'
 import {
   LayoutGrid, ChevronDown, Star, Activity, CalendarDays, BarChart2,
   Scale, Footprints, Flame, Route, Beef, Wheat, Droplets, TrendingUp, Apple, Moon, MessageCircle,
-  Heart, Dumbbell, Check,
+  Heart, Dumbbell, Check, Cat,
   type LucideIcon,
 } from 'lucide-react'
 import { ColorSwatchPicker } from '@/components/ui/color-swatch-picker'
 import { useRovingRadioGroup } from '@/lib/hooks/use-roving-radio-group'
 import { savePreference } from '@/lib/user/preferences-sync'
-import { SCORE_RING_STYLES, SCORE_RING_STYLE_CHANGE_EVENT, loadScoreRingStyle, type ScoreRingStyle } from '@/lib/home/home-prefs'
+import { SCORE_RING_STYLES, SCORE_RING_STYLE_CHANGE_EVENT, loadScoreRingStyle, type ScoreRingStyle, type CardWidgetKey } from '@/lib/home/home-prefs'
 
 type MetaKey = "weightKg" | "steps" | "calories" | "protein" | "carb" | "fat" | "distanceKm" | "waterIntake"
-type CardWidgetKey =
-  | "weightSparkline" | "nutritionDonut" | "sleepWidget" | "stepsWidget" | "moodWidget"
-  | "acwrWidget" | "muscleStatusWidget" | "hrChartWidget" | "energyBalanceWidget"
 type HomeSectionKey = "recommendation" | "streak" | "weekStrip" | "metricTiles"
 
 const WIDGETS_KEY         = "ta_ss_widgets"
@@ -37,6 +34,7 @@ const CARD_DEFAULT_COLORS: Record<CardWidgetKey, string> = {
   muscleStatusWidget: '#22c55e',
   hrChartWidget:      'transparent',
   energyBalanceWidget: '#22c55e',
+  collectionWidget:   '#fb923c',
 }
 
 const HOME_SECTION_DEFS: { key: HomeSectionKey; label: string; icon: LucideIcon }[] = [
@@ -56,6 +54,7 @@ const CARD_WIDGET_DEFS: { key: CardWidgetKey; label: string; icon: LucideIcon }[
   { key: "muscleStatusWidget", label: "Muscle Status", icon: Dumbbell      },
   { key: "hrChartWidget",      label: "HR Chart",      icon: Heart         },
   { key: "energyBalanceWidget", label: "Energy Balance", icon: Flame        },
+  { key: "collectionWidget",    label: "Collection",     icon: Cat          },
 ]
 
 const WIDGET_DEFS: { key: MetaKey; label: string; icon: LucideIcon; color: string }[] = [

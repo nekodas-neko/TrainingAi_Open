@@ -1348,6 +1348,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
                 card_muscleStatusWidget: 'Muscle Status',
                 card_hrChartWidget:      'Heart Rate Chart',
                 card_energyBalanceWidget: 'Energy Balance',
+                card_collectionWidget:   'Collection',
               };
               return (
                 <button

@@ -92,7 +92,10 @@ const BASELINE = {
   'components/health/zone-gauge.tsx': 8,
   'components/home/early-deload-card.tsx': 2,
   'components/home/home-card-widget.tsx': 5,
-  'components/more/home-widgets-section.tsx': 16,
+  // 17 rather than 16 since BF-122b: `CARD_DEFAULT_COLORS` is a map of user-EDITABLE swatch
+  // values, persisted to localStorage and applied through `accentCardStyle`. A theme token cannot
+  // round-trip through the colour picker, so a tenth card slot is necessarily a tenth literal.
+  'components/more/home-widgets-section.tsx': 17,
   'components/more/profile-tab.tsx': 6,
   'components/more/stats-grid.tsx': 2,
   'components/muscle-heatmap.tsx': 8,

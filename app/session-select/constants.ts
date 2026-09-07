@@ -11,4 +11,5 @@ export const CARD_DEFAULT_COLORS: Record<string, string> = {
   muscleStatusWidget: "#22c55e",
   hrChartWidget:      "transparent",
   energyBalanceWidget: "#22c55e",
+  collectionWidget: "#fb923c",
 };

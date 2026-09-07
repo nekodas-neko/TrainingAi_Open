@@ -8661,3 +8661,11 @@ mis-dated log would have failed the file's first test too, and that one passed �
 took one reproduction to find. What replaces it is two rules in `e2e/README.md` about specs that
 write real rows and specs that read running totals, which is where a spec author will actually meet
 them.
+
+## 2026-09-07 — `projectOverview.md` → 10418, `docs/implementation-backlog.md` → 18741 (BF-122b)
+
+Up 20 for a feature whose index row is carrying three things a green CI run cannot say: the device
+look it still owes, that the art is deferred rather than done, and that the decay count on the card
+is a lifetime figure the engine has no recency to improve. The queue is down 37 — BF-122b out, and BF-126 (the art,
+owner-gated) in at a quarter of its length, because everything BF-122b had to argue about the fold,
+the widget slot and the information surface is now code and does not need re-arguing.
