@@ -1726,6 +1726,32 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [workouts] 🟡 Every generated program now gets one more exercise per session, and no generated program has been opened on the S25 (BF-128, 2026-09-07)
+
+**What changed.** `styleWorkSec` no longer charges a rest period after the last set of an exercise.
+Measured over the owner's 90 days, that rest is not taken — 289 of 309 final sets record NULL or 0,
+against 0 of 517 non-final sets — and the walk to the next station was already charged separately, so
+it was counted twice. A 60-minute powerbuilding session moved from 4 exercises to 5, which is the
+median the owner's own 65 completed sessions actually contain.
+
+**Why it is here rather than struck.** Two things are owed.
+
+1. **The volume change is real and untested by use.** Every goal gains up to one exercise per session
+   at most budgets (hypertrophy and powerbuilding 4→5 at 60 min, strength 3→4). It was validated
+   against 36 warm-up-stamped sessions — median error moves from +5.1 min over to −3.6 min — but
+   nobody has *trained* a session generated under the new number. If five exercises consistently
+   overrun the hour in practice, this is the change to look at first.
+2. **No device check.** `POST /api/generate-program` and `POST /api/builder-chat` were exercised
+   end-to-end on `pnpm dev` against the local database, authenticated, and returned 5 exercises in
+   all four sessions. This is server-side arithmetic delivered by a Railway deploy with no native
+   path — but the program-builder screens themselves were not opened on the S25.
+
+**Related and NOT fixed by this.** `estimateExerciseDurationSec` — the *display* estimate — still
+charges every set, and probably should not. It was left alone because its validation flips sign with
+the transition constant, which measured contradictorily (240 s assumed; 249 s, 316 s, or an implied
++20.8 min over-prediction depending on how the NULLs are treated). **LA-65** holds that with the
+numbers. Until it lands, a session's *estimated* minutes and the number of exercises the planner
+fits are derived on two slightly different models.
 ### [workouts] BF-127's fixed banner has not been on a screen (2026-09-07)
 
 The baseline banner renders only in the `baseline` phase with `baselineComplete === false`, which the
