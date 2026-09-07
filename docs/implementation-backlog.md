@@ -1294,6 +1294,47 @@ BF, metabolic age 37 on a DOB-less profile). Skip composition and store weight-o
 non-unique) — a byte-identical re-send inserts a second raw row, unlike `oura_raw_samples`'s dedup;
 the trend survived (lowest-wins) but the archive double-counts.
 
+### [platform] LA-63 — E2E fails on every PR that touches code, and has for at least three sessions
+
+- **Lane:** A — `.github/workflows/ci.yml` (the E2E job), `e2e/`, `playwright.config.ts`.
+- **Added:** 2026-09-06, found while merging OR-102a — three unrelated PRs, three sessions, one
+  signature.
+
+**Measured across four runs on 2026-09-06, from three different sessions:**
+
+| run | PR | touches | `pnpm e2e` | result |
+|---|---|---|---|---|
+| 1712 | OR-102a (mine) | `app/api/**` | 23:41:45 → 24m | **failure** |
+| 1713 | LA-59 | `components/**` | ~24 m | **failure** |
+| 1715 | BF-121 | `components/**` | 23:41:45 → **24 m 47 s** | **failure** |
+| 1711, 1717, 1718 | docs-only | — | skipped | success in ~5 min |
+
+Every required check passes in all four. The job's UI gate skips the browser run for a docs-only
+diff, which is why those pass in five minutes — so the split is **not** "some PRs are broken", it is
+**"E2E runs ⇒ E2E fails"**.
+
+**~25 minutes with the database idle throughout.** The Postgres service log for run 1712 shows only
+its 10-second health probe for the entire span — no query traffic. That is the shape of a Playwright
+or web-server startup timeout, not of specs asserting and failing.
+
+**What is NOT established.** The Playwright output itself. `get_job_logs` returns the service
+container's log for this job and the byte cap does not reach the step's own output; the failure
+artifact uploaded by `actions/upload-artifact@v6` on line 638 is the thing to read, and nobody has.
+So the timeout reading above is **inferred from timing and an idle database**, not seen. Do not
+close this on the inference.
+
+**Why it matters even though nothing is blocked.** E2E is not in the required set — LA-22 measured
+that (#454 merged with E2E red) — so merges proceed. But the job's own comment states the intent:
+*"the job is gated on UI paths above so that it CAN safely be required, and the owner adds it to
+branch protection."* It cannot be made required while it fails on every code PR, and in the meantime
+every session pays ~25 minutes of runner time and learns to read a red check as normal, which is how
+a real failure gets waved through later.
+
+**A second, smaller thing the gate gets wrong.** It matches `^app/`, so an `app/api/**`-only change
+with no UI in it triggers the full browser suite — that is how OR-102a, a migration and four API
+routes, ended up in this table at all. Narrowing it to exclude `app/api/` would cut the runner cost
+of this bug while it is open, and is worth doing regardless of the fix.
+
 ### [app-shell] LA-62 — eighteen icon-only buttons announce as "button" and nothing else
 
 - **Lane:** B — `components/**` and two `app/**` pages; the list is in
