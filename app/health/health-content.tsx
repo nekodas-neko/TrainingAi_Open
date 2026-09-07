@@ -38,6 +38,7 @@ import type { ActivityLevel } from '@trainingai/shared/types/user'
 import type { ReadinessScoreResponse } from '@/app/api/readiness-score/route'
 import { useBmiClassification, useWeightTrend, useEnergyBalanceToday } from "@/app/health/hooks/use-health-calcs";
 import { useInvalidationRefetch } from "@/lib/hooks/use-invalidation-refetch";
+import { DEFAULT_WATER_GOAL_ML } from '@trainingai/shared/nutrition/goal-recommendation';
 
 type Tab = "body" | "training" | "progress";
 
@@ -157,7 +158,7 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
 
   // Once the server payload exists it is the whole truth, including its nulls — falling back to the
   // seed per-field would let a goal the user cleared keep rendering from the device copy forever.
-  const waterGoalMl = userGoals ? (userGoals.waterGoalMl ?? 2500) : (waterGoalSeed ?? 2500);
+  const waterGoalMl = userGoals ? (userGoals.waterGoalMl ?? DEFAULT_WATER_GOAL_ML) : (waterGoalSeed ?? DEFAULT_WATER_GOAL_ML);
   const targetWeightKg = userGoals ? userGoals.targetWeightKg : targetWeightSeed;
   const targetBfPct = userGoals ? userGoals.targetBfPct : targetBfSeed;
   const [injuries, setInjuries] = useState<Injury[] | null>(null);

@@ -8608,10 +8608,28 @@ was never given, and BF-122b — four Lane B surfaces — cannot start without i
 merging `main`, which had already moved the baseline to 18794; carrying this branch's own number
 across that merge would have handed the queue a whole entry's worth of silent slack.
 
-## 2026-09-07 — `projectOverview.md` → 10398, `docs/implementation-backlog.md` → 18766 (BF-124, BF-125)
+## 2026-09-07 — `projectOverview.md` → 10398, `docs/implementation-backlog.md` → 18758 (BF-124, BF-125)
 
 Up 20 on the index, down 27 on the queue — two entries out, LB-61 in. The index row is carrying an
 unusual admission rather than a status line: the review screen's new role control was **not rendered
 in the harness at all**, because reaching it needs a live model generation. That is the kind of gap
 the index exists to hold, and it is worth its lines precisely because a green CI run says nothing
-about it.
+about it. The queue number is re-derived from the merged file, as always — `main` moved it to 18785
+while this branch was open.
+## 2026-09-07 — `docs/implementation-backlog.md` → 18800 (LA-74's style half shipped)
+
+Up 7 on this branch, landing at 18800 after merging LB-60's and BF-123's own raises — recomputed from the merged
+file rather than carried across, because two branches raising the SAME document genuinely disagree
+about one number and splicing either side would hand the queue silent slack. The growth is the
+finding. LA-74 said two routes take an unvalidated body; the style half
+shipped with a `.strict()` schema, and the program half did not — because the enumeration turned up
+two producers that disagree (the editor omits `programId`/`sessionId`, the activate button sends
+them), a two-variant `schedule` union, and dates that arrive as strings against a `Date` type. That
+list is now in the entry rather than in a session's head, which is what the extra lines buy.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18785 (LB-60 shipped)
+
+Down 15. LB-60 spent most of its length proving a negative — a table of the four `ReplayInput` fields
+against what the client could reach, and the conclusion that not even a workout-only widget was
+buildable. That argument did its job the moment the route existed, so what replaces it is the one
+thing still missing: LA-76, deload days in `pausedDays`.

@@ -1221,6 +1221,25 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return trainedDays
   }
 
+  async listTrainedDayKeys(userId: string, timezone: string = DEFAULT_TZ): Promise<string[]> {
+    // Same definition of "trained" as `getRecentTrainedDays` — a session with at least one
+    // surviving exercise log — but distinct days over ALL history and no session names, because the
+    // collection fold spawns once per day and replays from the beginning. `DISTINCT` in SQL rather
+    // than in JS: this is the one read here with no window, and a few hundred date strings is the
+    // whole result rather than a row per set.
+    const rows = await this.db.selectDistinct({
+      dateKey: sql<string>`to_char(${s.workoutSessions.startedAt} AT TIME ZONE ${timezone}, 'YYYY-MM-DD')`,
+    })
+      .from(s.workoutSessions)
+      .innerJoin(s.exerciseLogs, eq(s.exerciseLogs.workoutSessionId, s.workoutSessions.id))
+      .where(and(
+        eq(s.workoutSessions.userId, userId),
+        isNull(s.workoutSessions.deletedAt),
+        isNull(s.exerciseLogs.deletedAt),
+      ))
+    return rows.map(r => r.dateKey).sort()
+  }
+
   private async buildWorkoutSessions(wsRows: typeof s.workoutSessions.$inferSelect[]): Promise<WorkoutSession[]> {
     if (!wsRows.length) return []
     const wsIds = wsRows.map(r => r.id)

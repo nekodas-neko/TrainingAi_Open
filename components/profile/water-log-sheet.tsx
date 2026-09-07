@@ -95,7 +95,10 @@ export function WaterLogSheet({ open, onOpenChange, onLogged, userId }: WaterLog
       const res = await fetch('/api/water-log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ml }),
+        // PS-37: the outbox path keys this increment to the client's own day, so the web fallback
+        // sends the same key rather than letting the server decide — the two used to disagree
+        // whenever the request crossed midnight.
+        body: JSON.stringify({ ml, localDate: todayInTz(tz) }),
       })
       if (!res.ok) throw new Error()
       toast.success(`+${ml} ml logged`)

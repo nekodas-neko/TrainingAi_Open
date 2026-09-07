@@ -176,9 +176,11 @@ export async function POST(req: Request) {
     meal = result.object
   } catch {
     return NextResponse.json({
+      // PS-37: the else branch said "Could not rewrite that meal" on a FRESH generation, which is
+      // the one thing the user did not ask for. The rewriting branch was always correct.
       error: rewriting
         ? 'Could not apply that change right now. Try again shortly.'
-        : 'Could not rewrite that meal right now. Try again shortly.',
+        : 'Could not suggest a meal right now. Try again shortly.',
     }, { status: 502 })
   }
 

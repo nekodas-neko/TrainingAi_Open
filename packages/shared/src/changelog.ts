@@ -6,12 +6,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.436.40",
+    version: "1.436.41",
     date: "2026-09-07",
     changes: [
       "You can change an exercise\u0027s role on the program review screen now. The review screen is where you can see the whole program at once \u2014 so it is where you notice one session has two main lifts \u2014 and it was the only screen where you could not fix it. Tap the Main / Secondary / Accessory badge under an exercise name to change it.",
       "The three roles are called the same thing everywhere. Review used to say Main / Compound / Accessory and the program editor said Main Compound / Secondary Compound / Accessory, for the same three settings.",
       "The role picker in the program editor no longer runs off the edge of the sheet with \u0027Accessory\u0027 half cut off, and the role you have chosen is marked in green instead of a white block that read as switched off.",
+    ],
+  },
+  {
+    version: "1.436.40",
+    date: "2026-09-07",
+    changes: [
+      "Water logged just after midnight now counts on the day you logged it. The quick-add on the web fell back to the server's idea of the date, which could put it on the wrong day; the offline path already used yours.",
+      "A meal plan can no longer show a negative gram figure for a macro. It took a target under two grams split across five meals to produce one, but it was possible.",
+      "When suggesting a fresh meal fails, the message no longer says it could not rewrite the meal — nothing was being rewritten.",
     ],
   },
   {

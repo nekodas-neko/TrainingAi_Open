@@ -540,35 +540,20 @@ OR-102a/b will read dose history to recommend the next dose. A tracker that read
 - **Reversal cost:** low. No migration; existing rows keep whatever they were stamped with, which is
   the point of the stamp.
 
-### [app-shell][platform] LB-60 — the collection engine has no way to be fed
+### [app-shell][platform] LA-76 — a deload week still decays the collection
 
-- **Lane:** A — a read route under `app/api/**`, assembling from the repository.
-- **Added:** 2026-09-07, by Lane B on picking up BF-122b and finding it unstartable.
-- **Blocks:** BF-122b, entirely.
+- **Lane:** A — `app/api/collection/route.ts`, `packages/shared/src/phase-engine.ts`.
+- **Added:** 2026-09-07, Lane A — the half of LB-60's `pausedDays` that did not ship with the route.
 
-BF-122a shipped `replayCollection` as *"a pure fold over day series the app already stores"* and
-deliberately no route — *"no migration, no table, no route"*. That is right for the engine and it
-leaves the surface with nothing to call: **`replayCollection` has no caller anywhere in the repo.**
-
-`ReplayInput` wants four things and the client can reach one of them:
-
-| input | client-reachable today |
-|---|---|
-| `days` — workout | **partly.** `/api/streak-data` returns `trainedDays` over a fixed window; the fold replays *all* history |
-| `days` — steps, sleep | **no.** No endpoint serves a day series for either; `health-trends` serves analysis views |
-| `maxRestGap` | **no.** `maxCompliantRestGap` reads the program's schedule, which the home screen does not hold |
-| `pausedDays` | **no.** The app's own recommended rest and deload days are server-side. Without them, compliance decays — the exact outcome BF-122a's comment calls *"turning the mechanic against the user"* |
-
-**So not even a reduced, workout-only widget is buildable from the client.** The two things that
-make the workout ladder correct rather than merely present — the schedule-derived allowance and the
-paused days — are both missing.
-
-- **Shape:** one authenticated GET returning the three `CollectionState`s, or the assembled
-  `ReplayInput`s. Returning the **states** is preferable: the fold is a shared pure function, and
-  sending its inputs to the client means two places can disagree about which days paused.
-- **⚠ Read BF-122a's versioning note first.** State is replayed on every read and the thresholds are
-  constants, so a cached response and a live one must not straddle a threshold change.
-- **Not a migration.** Everything it reads already exists.
+`GET /api/collection` feeds `pausedDays` from `listRestDays` — the rest days the user actually chose,
+which is the app's own record of a compliant rest. **Deload days are not in it.** BF-122a's argument
+is that decaying compliance turns the mechanic against the user, and a deload week is compliance the
+app itself prescribed, so a lifter who follows one loses cats for it. `isDeloadActive(phase, program,
+day)` answers for a single day given its resolved phase, so covering a week means resolving the phase
+engine per day across all history — too much for a read route on every call and too easy to get
+quietly wrong, which is why it was named rather than guessed. A rest day is weekly and a deload week
+is occasional, so the shipped route covers the common case. The likely shape is a repository read
+that returns deload spans directly rather than a per-day fold.
 
 ### [app-shell] BF-122b — the cat collection, surface half: the sprites, the home widget, and where you read about it
 
@@ -1128,22 +1113,29 @@ metric false-positives (Q-471's contentKey fix unapplied here). (e) The model's 
 rendered as an "AI confidence" bar and decides `source` (`log-food.ts:31`) — against the CLAUDE.md
 rule's letter, honestly labelled; owner call.
 
-### [platform][workouts] LA-74 — two program write routes take an unvalidated body
+### [platform][workouts] LA-74 — `POST /api/workout-templates` still takes an unvalidated body
 
-- **Lane:** A — `app/api/workout-templates/route.ts`, `app/api/progression-styles/route.ts`.
+- **Lane:** A — `app/api/workout-templates/route.ts`, `packages/shared/src/validation/`.
+- **Keep:** the program half. The style half shipped 2026-09-07 with a `.strict()` schema.
 - **Added:** 2026-09-07, Lane A — found while applying LA-73's name guard and unable to.
 
-Neither route has a Zod schema at all. `workout-templates` spreads `body.program` straight into
-`repo.saveProgram`; `progression-styles` does the same into `saveProgressionStyle`. **Not mass
-assignment** — `saveProgram`'s `.set({ name, isActive, updatedAt })` key-whitelists, so an injected
-column cannot land — but nothing types or bounds any value, and both carry targeted ownership checks
-(`phaseSetId`, `styleId`) that read as validation while covering two fields out of many. CLAUDE.md
-names `updateInjury` as the reference for whitelisting a body, and Q-484 fixed this same asymmetry on
-`POST /api/injuries`. **It is why LA-73's name guard reached only `exercise_library`:** the other three
-name-bearing tables have no schema to hang a transform on. Give each a schema built from shared field
-definitions the way `packages/shared/src/validation/injury.ts` does, then add `promptSafeLine` to
-`programs.name`, `program_sessions.name` and `progression_styles.name`. Measured 2026-09-07: 5 program,
-22 session and 25 style names, none carrying a control character — a guard, not a repair.
+The route spreads `body.program` into `repo.saveProgram`. **Not mass assignment** — the repository's
+`.set({ name, isActive, updatedAt, … })` names every column — but nothing types or bounds a value,
+and the two ownership checks it does carry (`phaseSetId`, `styleId`) read as validation while
+covering two fields. `scripts/check-strict-request-schemas.js` requires `.strict()`, and neither of
+its exemptions applies: nothing in `pushMutations` writes programs, and the poster is the WebView,
+which ships with the deploy rather than with the APK.
+
+**The enumeration is done — this is what stopped it shipping.** Two producers disagree.
+`config-screen.tsx`'s editor builds sessions **without** `programId` and exercises **without**
+`sessionId`; the activate button posts the whole stored row back (`{ ...program, isActive: true }`)
+**with** both, plus `userId`, `startedAt` and JSON date strings. So every field either producer omits
+must be `.optional()`, `schedule` is a two-variant union (`weekly` / `rotation`, or `null`), and
+`createdAt`/`updatedAt` arrive as strings against a `Date` type. One wrong key 400s the app's core
+write path, on a device this sandbox cannot drive.
+`lib/__tests__/progression-style-write-schema.test.ts` already pins the four shapes the client posts
+— start there, and keep the name unbounded: `programs.name` is `text`, so a `.max()` would 400 the
+activate of a program that was fine yesterday.
 
 ### [body][devices] LA-71 — `scale_raw_samples` still has no unique key
 
@@ -1279,20 +1271,20 @@ bests are windowed correctly and are the pattern. (c) Zone-minutes doubles Z3 as
 zone-targets counts Z3 once — both cite WHO 2020; the filed Tuning band is a third position and
 names neither file.
 
-### [nutrition] PS-37 — small nutrition inconsistencies: two 2500 ml hardcodes, two day keys for one water write, a false docstring
+### [nutrition] LA-75 — the goals form suggests a water number the app's own recommender never produces
 
-- **Lane:** A — `packages/shared/src/nutrition/day-checkin-prefill.ts:14`,
-  `app/health/health-content.tsx:159`, `app/api/water-log/route.ts:37`,
-  `packages/shared/src/nutrition/meal-split.ts`,
-  `app/api/nutrition/meal-plans/generate/meal/route.ts:172-175`.
-- **Added:** 2026-09-06, app checkpoint — [report](reviews/2026-09-05-app-checkpoint.md) §P3.
+- **Lane:** B — `components/profile/goal-targets-section.tsx:163,204` (placeholder copy only).
+- **Added:** 2026-09-07, Lane A — the residue of PS-37, which named two 2500s and there are four.
 
-The weight-derived water goal (33 ml/kg + bump) never produces 2500, but two consumers hardcode it;
-the water-log route keys the increment to server-now while the outbox path keys the same write to
-the client's day (live: a posted `date` is ignored); `splitMacrosAcrossMeals`'s "preserved exactly"
-docstring fails for 2-dp targets and sub-2 g totals (unreachable from sane targets — fix the
-docstring or the rounding); the generate-meal error copy is swapped (fresh generation says "Could
-not rewrite"). One PR of small fixes.
+`placeholder="2500"` and `placeholder="e.g. 2500"` sit on the water-goal inputs, **beside the control
+that fills in the real recommendation** — `weightKg * 33 + WATER_BUMP_BY_ACTIVITY[activity]`, which
+for any real body weight lands nowhere near 2500 (the changelog even advertises "33 ml per kg of body
+weight, plus your activity bump"). PS-37 read the same number in two other places as a hardcoded goal;
+those two turned out to be a **no-goal-set fallback** (now `DEFAULT_WATER_GOAL_ML`, named as a
+placeholder rather than a recommendation) and a **population anchor** for a 1-5 prefill scale, which
+is deliberately not personal. The form is the one place where 2500 is genuinely wrong: it suggests a
+goal. Show the recommendation, or nothing. Left to Lane B because it is placeholder copy on a screen
+this session cannot see rendered.
 
 ### [platform] PS-38 — checkpoint docs sweep: seven stale CLAUDE.md claims, a duplicated Q-479 row, 13 Needs→KEEP edges
 
