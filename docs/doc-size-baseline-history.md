@@ -8232,7 +8232,8 @@ Two shorter alternatives were rejected. Cutting the measurement leaves the next 
 it from production. Putting it in a plan doc under `docs/superpowers/plans/` is the usual home for
 this much reasoning, but nothing is designed yet — there is no implementation to plan, and a plan
 that is only a restated brief is a second place for the brief to go stale.
-## 2026-09-06 — `docs/implementation-backlog.md` → 18978, `projectOverview.md` → 10059 (PS-26 shipped)
+## 2026-09-06 — `docs/implementation-backlog.md` → 19018, `projectOverview.md` → 10053 (PS-26 shipped)
+## 2026-09-06 — `docs/implementation-backlog.md` → 19018, `projectOverview.md` → 10053 (PS-26 shipped)
 
 `projectOverview.md` is **down** 7: PS-26's Known-Issues row was struck and moved whole to
 `known-issues-resolved.md` rather than ticked in place.
@@ -8373,3 +8374,15 @@ row nonetheless stays open, and that two of the checkpoint's own claims about it
 of those is the part worth the lines — an `isAdmin` staleness that does not exist, and a per-request
 read filed as a cost that is now the mechanism, are both things a future session would otherwise act
 on. The row was drafted at 27 lines and cut to 17 first; the detail lives in the journal entry.
+
+## 2026-09-06 — `docs/implementation-backlog.md` → 18998, `projectOverview.md` → 9919 (PS-25 shipped)
+
+The backlog is up 20: PS-25 left the queue on shipping and LA-61 took its place, which is longer
+than the entry it replaced because it has to say why the obvious fix is wrong. Normalising the input
+would silently stop matching rows already stored non-normalised, and this endpoint structurally
+cannot count those — `claude_ro` is row-scoped to the owner. The lines are the argument against a
+one-word change that looks correct.
+
+`projectOverview.md` is **down** 6: PS-25's row was struck and moved whole to
+`known-issues-resolved.md`, per the standing rule that a resolved entry leaves the file rather than
+sitting there with a tick.
