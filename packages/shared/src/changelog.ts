@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.37",
+    date: "2026-09-07",
+    changes: [
+      "Text you type into a meal plan — shops, foods to exclude, meals you usually eat — is now quoted to the AI as your words rather than mixed in with the app's own instructions. An excluded-food entry phrased as a command could rename the whole plan and every meal in it.",
+      "The rules that stop the AI inventing superlatives or slipping into pounds and Fahrenheit now reach every screen that writes text for you, instead of about half of them.",
+    ],
+  },
+  {
     version: "1.436.36",
     date: "2026-09-07",
     changes: [

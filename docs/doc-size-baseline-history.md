@@ -8550,3 +8550,10 @@ status: **read the new output carefully rather than as a regression.** The sleep
 was counting lifts as days — 233 where the owner has 48 — so its p-value was computed at an inflated
 n. If the screen now says "no reliable relationship across 48 paired days", that is the fix working,
 and without the row saying so the obvious next reading is that something broke.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18821 (PS-32 shipped, split in two)
+
+Up 10, and the growth is the point rather than a cost: PS-32 held three findings and the PR shipped
+two of them, so the one entry it replaced becomes two — **LA-69** (the same fence for the stored free
+text reaching four other prompts) and **LA-70** (20 routes echoing raw Zod wording). Both were cut
+from the PR deliberately, and an entry each is what stops a cut from reading as a completion.

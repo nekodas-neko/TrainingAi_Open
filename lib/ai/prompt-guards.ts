@@ -14,8 +14,38 @@
  * One string, imported by every prose-generating AI route, so a sixth route cannot be added
  * without it and the wording cannot drift into six versions.
  */
-export const PROSE_GUARDS = `
-Rules you must follow:
-- Metric units only — kilograms, centimetres, kilometres, degrees Celsius, millilitres. Never convert a value to imperial and never state a target in imperial, whatever units you were trained to expect.
-- Quote the numbers you were given, exactly. Never recompute one, never estimate one, and never state a number that is not above.
-- Never apply a superlative to a value — not "perfect", "record", "your best", "all-time", "flawless". You are shown one snapshot and cannot see the history that would justify any of them. If a value came with a band label, use that label and nothing stronger.`.trim()
+/** Metric units. Applies to anything a model writes for this user, prose or object field. */
+export const METRIC_UNITS_RULE =
+  '- Metric units only — kilograms, centimetres, kilometres, degrees Celsius, millilitres. Never convert a value to imperial and never state a target in imperial, whatever units you were trained to expect.'
+
+/** No superlatives. Same reach as the units rule: an object route's `reasoning` can fabricate one too. */
+export const NO_SUPERLATIVE_RULE =
+  '- Never apply a superlative to a value — not "perfect", "record", "your best", "all-time", "flawless". You are shown one snapshot and cannot see the history that would justify any of them. If a value came with a band label, use that label and nothing stronger.'
+
+/**
+ * Quote, never recompute. **This one does NOT generalise**, which is why PS-32 found the guard on
+ * only half the prose routes and why a blanket import would have been a regression: four of the
+ * remaining routes exist to PRODUCE numbers — `nutrition-goals/recommend` returns the calorie and
+ * macro targets, `workout-review` returns sets/reps/%1RM. Telling those "never state a number that
+ * is not above" contradicts the job. They take {@link PROSE_FIELD_GUARDS} instead.
+ */
+export const QUOTE_NUMBERS_RULE =
+  '- Quote the numbers you were given, exactly. Never recompute one, never estimate one, and never state a number that is not above.'
+
+/** For a route whose whole output is prose. Byte-identical to the string that shipped in Q-292. */
+export const PROSE_GUARDS = [
+  'Rules you must follow:',
+  METRIC_UNITS_RULE,
+  QUOTE_NUMBERS_RULE,
+  NO_SUPERLATIVE_RULE,
+].join('\n')
+
+/**
+ * For a route that returns structured data with a user-facing text field in it. Everything the
+ * prose guards say except "quote, never recompute", which such a route cannot obey.
+ */
+export const PROSE_FIELD_GUARDS = [
+  'Rules you must follow in any explanation you write:',
+  METRIC_UNITS_RULE,
+  NO_SUPERLATIVE_RULE,
+].join('\n')

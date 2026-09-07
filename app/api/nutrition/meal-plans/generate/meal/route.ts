@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { generateObject } from 'ai'
+import { userTextBlock, sanitiseUserText, USER_TEXT_NOTE } from '@trainingai/shared/ai/untrusted-text'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { aiModel, loggedGenerateObject, contentKey } from '@/lib/ai/instrument'
@@ -140,24 +141,30 @@ export async function POST(req: Request) {
             : 'You are a practical sports nutritionist. Design ONE meal.',
           '',
           rewriting ? '' : '',
-          rewriting ? `Current meal: ${input.currentMeal!.name}` : '',
+          rewriting ? `Current meal: ${userTextBlock([input.currentMeal!.name])}` : '',
           rewriting
-            ? `Its ingredients: ${input.currentMeal!.ingredients.map(i => `${i.name} ${Math.round(i.weightG)}g`).join(', ')}`
+            ? `Its ingredients: ${userTextBlock(input.currentMeal!.ingredients.map(i => `${i.name} ${Math.round(i.weightG)}g`))}`
             : '',
-          rewriting ? `The change to make: ${input.instruction}` : '',
+          // The rewrite instruction is the one field the model is MEANT to act on, so it is not
+          // fenced as data — that would be asking it to ignore the request it was sent to serve.
+          // It still loses its newlines: a line of its own is what turns a preference into a block
+          // that reads like the prompt's own rules.
+          rewriting ? `The change to make: ${sanitiseUserText(input.instruction ?? '')}` : '',
           rewriting ? 'Keep the rest of the meal recognisably the same — this is an edit, not a new suggestion.' : '',
           `It should land near ${Math.round(input.targetCalories)} kcal, ${Math.round(input.targetProteinG)}g protein, ${Math.round(input.targetCarbsG)}g carbs, ${Math.round(input.targetFatG)}g fat.`,
           input.suggestedTime ? `Eaten at about ${input.suggestedTime}.` : '',
           timingLine,
-          input.stores?.length ? `Shops at: ${input.stores.join(', ')}. Prefer everyday items from these.` : '',
-          allergies.length ? `MUST NOT CONTAIN (allergy): ${allergies.join(', ')}. Treat as absolute.` : '',
-          avoid.length ? `Avoid (preference): ${avoid.join(', ')}.` : '',
-          input.excludedFoods?.length ? `Also exclude: ${input.excludedFoods.join(', ')}.` : '',
+          input.stores?.length ? `Shops at: ${userTextBlock(input.stores)}. Prefer everyday items from these.` : '',
+          allergies.length ? `MUST NOT CONTAIN (allergy): ${userTextBlock(allergies)}. Treat as absolute.` : '',
+          avoid.length ? `Avoid (preference): ${userTextBlock(avoid)}.` : '',
+          input.excludedFoods?.length ? `Also exclude: ${userTextBlock(input.excludedFoods)}.` : '',
           // Deliberately suppressed when rewriting: "be different from the plan" fights an
           // instruction whose whole point is to keep this meal and change one thing about it.
           !rewriting && input.avoidNames?.length
-            ? `Suggest something genuinely DIFFERENT from these, which are already in the plan: ${input.avoidNames.join('; ')}.`
+            ? `Suggest something genuinely DIFFERENT from these, which are already in the plan: ${userTextBlock(input.avoidNames)}.`
             : '',
+          '',
+          USER_TEXT_NOTE,
           '',
           'Rules:',
           '- List the ingredients with a weight in grams and standard per-100g values (calories, protein, carbs, fat). The per-100g figures must be honest reference values for the food — never bend them to hit the numbers above — and do NOT output a meal total. Totals are summed from your ingredients in code.',
