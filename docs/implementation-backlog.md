@@ -1175,22 +1175,29 @@ metric false-positives (Q-471's contentKey fix unapplied here). (e) The model's 
 rendered as an "AI confidence" bar and decides `source` (`log-food.ts:31`) — against the CLAUDE.md
 rule's letter, honestly labelled; owner call.
 
-### [platform][workouts] LA-74 — two program write routes take an unvalidated body
+### [platform][workouts] LA-74 — `POST /api/workout-templates` still takes an unvalidated body
 
-- **Lane:** A — `app/api/workout-templates/route.ts`, `app/api/progression-styles/route.ts`.
+- **Lane:** A — `app/api/workout-templates/route.ts`, `packages/shared/src/validation/`.
+- **Keep:** the program half. The style half shipped 2026-09-07 with a `.strict()` schema.
 - **Added:** 2026-09-07, Lane A — found while applying LA-73's name guard and unable to.
 
-Neither route has a Zod schema at all. `workout-templates` spreads `body.program` straight into
-`repo.saveProgram`; `progression-styles` does the same into `saveProgressionStyle`. **Not mass
-assignment** — `saveProgram`'s `.set({ name, isActive, updatedAt })` key-whitelists, so an injected
-column cannot land — but nothing types or bounds any value, and both carry targeted ownership checks
-(`phaseSetId`, `styleId`) that read as validation while covering two fields out of many. CLAUDE.md
-names `updateInjury` as the reference for whitelisting a body, and Q-484 fixed this same asymmetry on
-`POST /api/injuries`. **It is why LA-73's name guard reached only `exercise_library`:** the other three
-name-bearing tables have no schema to hang a transform on. Give each a schema built from shared field
-definitions the way `packages/shared/src/validation/injury.ts` does, then add `promptSafeLine` to
-`programs.name`, `program_sessions.name` and `progression_styles.name`. Measured 2026-09-07: 5 program,
-22 session and 25 style names, none carrying a control character — a guard, not a repair.
+The route spreads `body.program` into `repo.saveProgram`. **Not mass assignment** — the repository's
+`.set({ name, isActive, updatedAt, … })` names every column — but nothing types or bounds a value,
+and the two ownership checks it does carry (`phaseSetId`, `styleId`) read as validation while
+covering two fields. `scripts/check-strict-request-schemas.js` requires `.strict()`, and neither of
+its exemptions applies: nothing in `pushMutations` writes programs, and the poster is the WebView,
+which ships with the deploy rather than with the APK.
+
+**The enumeration is done — this is what stopped it shipping.** Two producers disagree.
+`config-screen.tsx`'s editor builds sessions **without** `programId` and exercises **without**
+`sessionId`; the activate button posts the whole stored row back (`{ ...program, isActive: true }`)
+**with** both, plus `userId`, `startedAt` and JSON date strings. So every field either producer omits
+must be `.optional()`, `schedule` is a two-variant union (`weekly` / `rotation`, or `null`), and
+`createdAt`/`updatedAt` arrive as strings against a `Date` type. One wrong key 400s the app's core
+write path, on a device this sandbox cannot drive.
+`lib/__tests__/progression-style-write-schema.test.ts` already pins the four shapes the client posts
+— start there, and keep the name unbounded: `programs.name` is `text`, so a `.max()` would 400 the
+activate of a program that was fine yesterday.
 
 ### [body][devices] LA-71 — `scale_raw_samples` still has no unique key
 

@@ -8580,3 +8580,11 @@ no across all 155 exercise, 5 program, 22 session and 25 style names, so it ship
 the write. What replaces it is longer because it is a different finding: LA-74, the two program
 write routes that have no request schema at all, which is *why* the guard reached one table out of
 four rather than a scoping choice.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18801 (LA-74's style half shipped)
+
+Up 7, and the growth is the finding. LA-74 said two routes take an unvalidated body; the style half
+shipped with a `.strict()` schema, and the program half did not — because the enumeration turned up
+two producers that disagree (the editor omits `programId`/`sessionId`, the activate button sends
+them), a two-variant `schedule` union, and dates that arrive as strings against a `Date` type. That
+list is now in the entry rather than in a session's head, which is what the extra lines buy.
