@@ -102,6 +102,15 @@ silently misdirecting the next session. Update them in the same PR that consumes
 >   runtime, and the sandbox cannot run the local store at all — "probably fine" is the judgement
 >   that has shipped bugs here before. The field makes the debt countable; only the S25 clears it.
 >
+> - **`Lane: O`** — the **Orchestrator's** lane, added 2026-09-06 (`OR-103`). For work in neither
+>   implementer's paths: `.github/workflows/**`, `playwright.config.ts`, repository settings and
+>   rulesets, and the queue tooling itself. **It exists because §3's path rule cannot answer those** —
+>   they are reached from no `app/`, `components/` or `lib/` path — so four entries printed as
+>   UNCLASSIFIED to every lane at once, each explaining "neither lane" **in prose**. A label that
+>   lives only in prose is the exact defect the `Lane:` field was created to fix, so the third value
+>   is the consistent answer rather than a special case. `--lane O` lists them; an `O` entry is
+>   hidden from A and B, which is the point.
+>
 > - **`Keep: <what is owed>`** — the entry partly shipped and stays queued for the residue.
 >   `next-item.js` routes it to a **KEEP** section headed *"shipped; only the stated residue is owed.
 >   Not new work"* — so **what follows `Keep:` must be a check, a decision, or a measurement, never a
@@ -486,6 +495,50 @@ random, and worse than no colour because it looks authoritative.
 - **Reversal cost:** low. A section and a card; no data, no migration (those are OR-102a's).
 - **Verify:** device — the calculator's arithmetic against the owner's own third-party app, and
   whether the colour chip reads correctly at a glance on the S25.
+
+### [nutrition][body] OR-104 — a supplement can carry two contradicting doses, and the wrong one is what history keeps 🔴 LIVE
+
+- **Lane:** A — the stamping is in `lib/data/postgres/adapter.ts` and `lib/local-store/sqlite-backend.ts`;
+  the surface half (`components/nutrition/manage-supplements-sheet.tsx`) follows, engine first per §3.
+- **Added:** 2026-09-06 by Orchestrator. **Branch:** unassigned.
+- **Live in production right now, on the one supplement that matters most.** `Retatrutide` reads
+  `default_amount 0.5 · unit mg` **and** free-text `dose '10mg'` — the second is the *vial strength*,
+  entered in the field the sheet labels `Dose`. The 2026-09-07 log has already frozen both:
+  `amount 0.5, unit mg, dose_text '10mg'`. The two disagree by 20×.
+
+**Why it happened, and why it will happen again.** BF-112 stage 2 added structured `amount`/`unit`
+beside the free-text `dose` that has always been there, and the edit sheet now offers **both, with
+nothing reconciling them**. `manage-supplements-sheet.tsx:30` keeps `dose` "as the free-text line it
+always was". Nothing warns that the two are the same question asked twice, so the natural reading of
+a field called `Dose` — *what is in the vial* — writes a number that contradicts the structured one.
+
+**Why it is not visible.** `supplementSubtitle()` falls back to `s.dose` **last**, so with
+`defaultAmount` set the list correctly reads `0.5 mg today` and the contradiction never surfaces
+there. It shows only on the manage sheet's own row (`:385`), where `10mg` sits under the name. So
+this is a defect that is *already* wrong in the archive while every screen looks right.
+
+**Why it matters more than a cosmetic mismatch.** `dose_text` is stamped at log time on purpose
+(BF-3) so editing a definition cannot rewrite history — which means **fixing the definition does not
+fix the logs already written**, and every future log inherits the same stamp until someone notices.
+OR-102a/b will read dose history to recommend the next dose. A tracker that reads `dose_text` over
+`amount` recommends against a number 20× high.
+
+**What to do:**
+1. **Engine:** do not stamp `dose_text` from the definition's free text when a structured `amount`
+   was stamped from the same definition. Two representations of one number, one of them unparsed
+   prose, is the thing to stop writing — not a display choice.
+2. **Surface:** the sheet must not offer both unreconciled. Either hide the free-text field once
+   `amount`+`unit` are set, or relabel it to what it is now used for (a note, not a dose).
+3. **The existing row is the owner's** — see `Gate:`. Nothing in this entry repairs it, because the
+   freeze is deliberate.
+
+- **Gate:** owner — the live `Retatrutide` definition and its 2026-09-07 log need correcting in the
+  app by hand (clear the free-text `Dose`; delete and re-log the day). Production is read-only from
+  a session, so no agent can do it. The code fix does not depend on this and should not wait for it.
+- **Verify:** device — add a supplement with an amount and a unit, confirm the sheet does not also
+  invite a free-text dose, log it, and confirm the stored `dose_text` no longer contradicts.
+- **Reversal cost:** low. No migration; existing rows keep whatever they were stamped with, which is
+  the point of the stamp.
 
 ### [app-shell][platform] BF-122a — the cat collection, engine half: the ladder derivation and a decay window read off the schedule
 
@@ -872,7 +925,7 @@ new reward currency.
 
 ### [platform] LB-56 — E2E costs 26 minutes a UI PR and currently gates nothing; decide which of those to change
 
-- **Lane:** ? — neither. `.github/workflows/ci.yml`, `playwright.config.ts` and the required-checks
+- **Lane:** O — the Orchestrator's, not an implementer's. `.github/workflows/ci.yml`, `playwright.config.ts` and the required-checks
   setting are the Orchestrator's and the owner's.
 - **Added:** 2026-09-04 · owner: *"why is e2e taking so long? can it be investigated or turned off if
   not needed"*.
@@ -930,7 +983,7 @@ re-proved on 2026-09-04** — three specs pass in isolation and fail in the full
 
 ### [platform] LB-55 — E2E fails as a timeout, not as an error, and a red E2E does not actually block a merge
 
-- **Lane:** ? — neither. `.github/workflows/ci.yml`, `playwright.config.ts` and the branch ruleset are
+- **Lane:** O — the Orchestrator's, not an implementer's. `.github/workflows/ci.yml`, `playwright.config.ts` and the branch ruleset are
   the Orchestrator's and the owner's.
 - **Added:** 2026-09-04 · from `fix/e2e-my-foods-tab-rename`, where six specs waiting for a tab
   renamed three days earlier cost four PRs and most of a session to identify.
@@ -5313,6 +5366,9 @@ owner has to re-describe in a wizard what the app already knows.
 
 - **✅ CLOSED 2026-09-01 by measurement against production.** No code change. Kept as a
   **`Reference:`** because the measurement is what the next reader needs, not the conclusion.
+- **Lane:** A — nothing is owed here today, but the one latent inconsistency this entry leaves open
+  (below) is in `reevaluate.ts`, which is Lane A's. Tagged 2026-09-06 so it stops printing as
+  UNCLASSIFIED to every lane.
 - **Reference:** what the AI Prescription card can and cannot say, and why a hand-built prescription
   fixture misleads.
 - **What I filed, and why it looked like a bug.** A card showed `4×5 @ 128.75kg (80%)` for an
@@ -8588,7 +8644,7 @@ without a queue entry is a dropped finding.*
 
 ### [platform] LB-54 — a red CI job cannot be read, and E2E has no green baseline to compare against
 
-- **Lane:** ? — neither lane. `.github/workflows/ci.yml` and the CI tooling are the Orchestrator's.
+- **Lane:** O — the Orchestrator's. `.github/workflows/ci.yml` and the CI tooling are the Orchestrator's.
 - **Added:** 2026-09-03 · from BF-111 (#840), where diagnosing one red check consumed most of a
   session and still did not reach the failing assertion.
 - **⚠️ `get_job_logs` cannot reach a step's output on this repo's jobs.** Every retrieval — by
@@ -8700,7 +8756,7 @@ without a queue entry is a dropped finding.*
 
 ### [platform] LB-52 — GitHub's auto-merge API does not see a Ruleset, so every PR is a hand-caught race
 
-- **Lane:** ? — neither. The fix is a repository *setting*, not code in either lane's paths.
+- **Lane:** O — the Orchestrator's. The fix is a repository *setting*, not code in either lane's paths.
 - **Gate:** owner — the remedy is a repo setting only the owner can make.
 - **⚠️ THIS ENTRY'S ORIGINAL DIAGNOSIS WAS WRONG, and the correction is the point (2026-09-03).** It
   said *"turn on Allow auto-merge and add a branch protection rule"*. **Both were already on.** The

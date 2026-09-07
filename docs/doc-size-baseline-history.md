@@ -8332,3 +8332,27 @@ alternatives the library does offer are all loaded hinges, the pattern he is lim
 and `builder-review.tsx:229` already said so in a comment that was read past. The retraction is
 kept visible rather than quietly removed so the next session does not re-derive the same wrong
 finding from the same screenshot, and the title no longer advertises it. The role-count half stands.
+## 2026-09-06 — `docs/implementation-backlog.md` → 18828 (OR-103, the `O` lane)
+
+Twelve lines, all field documentation rather than queue material. `Lane: O` joins `A`/`B`/`?` as a
+readable value, so the field-rules block gains its definition, and five entries gain or change a
+`Lane:` line (LB-52/54/55/56 → `O`, LB-46 → `A`). No entry was added. The number is 18828 rather
+than 18675+11 because it was re-measured after merging `main` — LA-59 raised the same baseline in
+parallel, and a raise computed before the rebase is a guess.
+
+## 2026-09-06 — `docs/implementation-backlog.md` → 18872 (OR-104, two contradicting doses)
+
+Forty-four lines for one entry, and the length is the finding. A supplement can carry a structured
+`0.5 mg` and a free-text `10mg` at once, the free text is what `dose_text` freezes onto every log,
+and **no screen shows the contradiction** — `supplementSubtitle()` falls back to the free text last,
+so the list reads correctly while the archive is 20× wrong. An entry that only said "the dose fields
+disagree" would send the next session to the display code, which is right.
+
+### Reconciled on merge — 18,940
+
+`main` moved while this branch was open (OR-103 landed a third lane value). Both PRs raised the
+`docs/implementation-backlog.md` baseline, so the `.size` file conflicted — the one case where a
+conflict on these files is a genuine disagreement rather than two independent additions, since both
+sides are describing the same number. Recomputed from the merged file rather than taking either
+side. The two reasoning notes above are unaffected and both stand; this line only records why the
+number is neither PR's.
