@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import { rateLimit } from '@/lib/rate-limit'
 import { getRepository } from '@/lib/data'
 import { generateObject } from 'ai'
+import { PROSE_FIELD_GUARDS } from '@/lib/ai/prompt-guards'
 import { aiModel, loggedGenerateObject } from '@/lib/ai/instrument'
 import { z } from 'zod'
 import { GeneratedProgramSchema } from '@trainingai/shared/validation/generated-program'
@@ -190,7 +191,7 @@ When responding, mention if a change improves or worsens weekly volume balance. 
       () => generateObject({
         model: aiModel(),
         schema: BuilderChatObjectSchema,
-        system: systemPrompt,
+        system: `${systemPrompt}\n\n${PROSE_FIELD_GUARDS}`,
         prompt: userPrompt,
         maxRetries: 0,
       }),

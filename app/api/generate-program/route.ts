@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { generateObject } from 'ai'
+import { PROSE_FIELD_GUARDS } from '@/lib/ai/prompt-guards'
 import { aiModel, loggedGenerateObject } from '@/lib/ai/instrument'
 import { z } from 'zod'
 import type { GeneratedProgram, GeneratedExercise } from '@trainingai/shared/types/builder'
@@ -337,7 +338,7 @@ ${exerciseList}${injuryBlock}${referenceBlock}`
       () => generateObject({
         model: aiModel(),
         schema: GeneratedProgramSchema,
-        system: systemPrompt,
+        system: `${systemPrompt}\n\n${PROSE_FIELD_GUARDS}`,
         prompt: userPrompt,
         maxRetries: 0,
       }),

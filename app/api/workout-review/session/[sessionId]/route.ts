@@ -7,6 +7,7 @@ import { normalizeMuscle } from '@trainingai/shared/muscles'
 import { prescriptionDrivesLoad } from '@trainingai/shared/ai-periodization/apply-prescription'
 import { rateLimit } from '@/lib/rate-limit'
 import { generateObject } from 'ai'
+import { PROSE_FIELD_GUARDS } from '@/lib/ai/prompt-guards'
 import { aiModel, loggedGenerateObject } from '@/lib/ai/instrument'
 import { WorkoutReviewSchema } from '@trainingai/shared/workout/review/schema'
 import { buildReviewSystemPrompt, buildReviewUserPrompt } from '@trainingai/shared/workout/review/prompt'
@@ -106,7 +107,7 @@ export async function POST(
       () => generateObject({
         model: aiModel(),
         schema: WorkoutReviewSchema,
-        system: systemPrompt,
+        system: `${systemPrompt}\n\n${PROSE_FIELD_GUARDS}`,
         prompt: userPrompt,
         maxRetries: 0,
       }),

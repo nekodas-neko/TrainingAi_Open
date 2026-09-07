@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { generateText } from 'ai'
+import { PROSE_GUARDS } from '@/lib/ai/prompt-guards'
 import { aiModel, loggedGenerateText } from '@/lib/ai/instrument'
 import { rateLimit } from '@/lib/rate-limit'
 import { z } from 'zod'
@@ -43,7 +44,9 @@ export async function POST(req: NextRequest) {
       { section: 'running-plan-explain', userId, fingerprint: { type, durationMin } },
       () => generateText({
         model: aiModel(),
-        prompt: `You are a supportive running coach. In ONE encouraging sentence (no numbers you invent, no medical claims), restate why today's run is a "${type}" run${durationMin ? ` of about ${durationMin} minutes` : ''}. Base it ONLY on this reasoning: ${[rationale, ...gateReasons].join(' ')}`,
+        prompt: `You are a supportive running coach. In ONE encouraging sentence (no numbers you invent, no medical claims), restate why today's run is a "${type}" run${durationMin ? ` of about ${durationMin} minutes` : ''}. Base it ONLY on this reasoning: ${[rationale, ...gateReasons].join(' ')}
+
+${PROSE_GUARDS}`,
       }),
     )
     return NextResponse.json({ message: text.trim() })
