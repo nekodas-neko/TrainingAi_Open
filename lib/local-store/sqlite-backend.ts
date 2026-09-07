@@ -1960,20 +1960,48 @@ export class SQLiteLocalStore implements LocalStore {
         );
       } else {
         await runSQL(
-          `INSERT INTO supplement_logs (id, supplement_id, log_date, amount, unit, dose_text, source, source_ref, updated_at, deleted_at, sync_status)
-           VALUES (?,?,?,?,?,?,?,?,?,?,'synced')
+          `INSERT INTO supplement_logs (id, supplement_id, log_date, amount, unit, dose_text,
+             taken_at, vial_strength_mg, vial_water_ml, vial_units_per_ml,
+             source, source_ref, updated_at, deleted_at, sync_status)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
            ${isMeal
              ? `ON CONFLICT(id) DO UPDATE SET`
              : `ON CONFLICT(supplement_id, log_date) WHERE source = 'manual' DO UPDATE SET
              id=excluded.id,`}
              amount=excluded.amount, unit=excluded.unit, dose_text=excluded.dose_text,
+             taken_at=excluded.taken_at, vial_strength_mg=excluded.vial_strength_mg,
+             vial_water_ml=excluded.vial_water_ml, vial_units_per_ml=excluded.vial_units_per_ml,
              source=excluded.source, source_ref=excluded.source_ref,
              updated_at=excluded.updated_at,
              deleted_at=excluded.deleted_at, sync_status='synced'
            WHERE supplement_logs.sync_status='synced'`,
           [r.id, r.supplementId, r.logDate, r.amount ?? null, r.unit ?? null, r.doseText ?? null,
+           r.takenAt ?? null, r.vialStrengthMg ?? null, r.vialWaterMl ?? null, r.vialUnitsPerMl ?? null,
            isMeal ? 'meal' : 'manual', r.sourceRef ?? null,
            r.updatedAt, r.deletedAt],
+        );
+      }
+    }
+
+    // OR-102a — the vial mirror. Read-only on the device: vials are created server-side, and this
+    // exists so an offline tick can freeze its own reconstitution rather than being stamped at push
+    // time from whatever vial is current by then.
+    for (const r of delta.supplementVials ?? []) {
+      if (r.deletedAt) {
+        await runSQL(`DELETE FROM supplement_vials WHERE id = ?`, [r.id]);
+      } else {
+        await runSQL(
+          `INSERT INTO supplement_vials
+             (id, supplement_id, strength_mg, water_ml, syringe_units_per_ml, opened_on,
+              updated_at, deleted_at, sync_status)
+           VALUES (?,?,?,?,?,?,?,?, 'synced')
+           ON CONFLICT(id) DO UPDATE SET
+             supplement_id=excluded.supplement_id, strength_mg=excluded.strength_mg,
+             water_ml=excluded.water_ml, syringe_units_per_ml=excluded.syringe_units_per_ml,
+             opened_on=excluded.opened_on, updated_at=excluded.updated_at,
+             deleted_at=excluded.deleted_at, sync_status='synced'`,
+          [r.id, r.supplementId, r.strengthMg, r.waterMl, r.syringeUnitsPerMl, r.openedOn,
+           r.updatedAt, r.deletedAt ?? null],
         );
       }
     }
@@ -2751,17 +2779,57 @@ export class SQLiteLocalStore implements LocalStore {
     // the soft-deleted row rather than duplicating it, because the index covers soft-deleted rows
     // too. `source` defaults to 'manual' because that is what every writer today is — the
     // supplements page's tick.
+    // OR-102a — the same idea as the dose freeze above, one layer up, and read from the local vial
+    // mirror for the same reason: doing it HERE means an offline tick records the reconstitution
+    // that was true when the dose was taken. Stamping it server-side at push time would record
+    // whatever vial is current when sync happens, which is the retroactive rewrite the freeze
+    // exists to prevent — just with a shorter window.
+    //
+    // A caller that supplies its own wins, so the sync engine can replay a log at the vial it was
+    // actually dosed from.
+    let vial = {
+      takenAt: record.takenAt ?? null,
+      strengthMg: record.vialStrengthMg ?? null,
+      waterMl: record.vialWaterMl ?? null,
+      unitsPerMl: record.vialUnitsPerMl ?? null,
+    };
+    if (vial.strengthMg == null && vial.waterMl == null && vial.unitsPerMl == null) {
+      // Newest first, with the `created_at`-equivalent tie-break unavailable locally — `opened_on`
+      // plus `updated_at` is the closest ordering the mirror carries, and two vials opened the same
+      // day is not a shape that occurs in practice.
+      const [v] = await querySQL<Record<string, unknown>>(
+        `SELECT strength_mg, water_ml, syringe_units_per_ml FROM supplement_vials
+         WHERE supplement_id = ? AND deleted_at IS NULL
+         ORDER BY opened_on DESC, updated_at DESC LIMIT 1`, [record.supplementId]);
+      if (v) {
+        vial = {
+          takenAt: vial.takenAt,
+          strengthMg: Number(v.strength_mg),
+          waterMl: Number(v.water_ml),
+          unitsPerMl: Number(v.syringe_units_per_ml),
+        };
+      }
+    }
+    // The tick's own moment when the caller gave none. Unlike the vial numbers this is always
+    // filled for a new local log: a log with no time is exactly what OR-102a exists to stop.
+    if (vial.takenAt == null) vial.takenAt = now;
+
     const source = record.source ?? 'manual';
     await runSQL(
-      `INSERT INTO supplement_logs (id, supplement_id, log_date, amount, unit, dose_text, source, source_ref, updated_at, deleted_at, sync_status)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?)
+      `INSERT INTO supplement_logs (id, supplement_id, log_date, amount, unit, dose_text,
+         taken_at, vial_strength_mg, vial_water_ml, vial_units_per_ml,
+         source, source_ref, updated_at, deleted_at, sync_status)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
        ON CONFLICT(supplement_id, log_date) WHERE source = 'manual' DO UPDATE SET
          id=excluded.id, amount=excluded.amount, unit=excluded.unit, dose_text=excluded.dose_text,
+         taken_at=excluded.taken_at, vial_strength_mg=excluded.vial_strength_mg,
+         vial_water_ml=excluded.vial_water_ml, vial_units_per_ml=excluded.vial_units_per_ml,
          source_ref=excluded.source_ref, updated_at=excluded.updated_at,
          deleted_at=excluded.deleted_at, sync_status=excluded.sync_status`,
       [
         record.id, record.supplementId, record.logDate,
         dose.amount, dose.unit, dose.doseText,
+        vial.takenAt, vial.strengthMg, vial.waterMl, vial.unitsPerMl,
         source, record.sourceRef ?? null,
         record.updatedAt ?? now, record.deletedAt, record.syncStatus,
       ],

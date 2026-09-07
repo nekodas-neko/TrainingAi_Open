@@ -63,6 +63,15 @@ Instead, a local Postgres 16 instance is set up automatically:
   seven-mutation verification pass: `DELETE FROM rate_limits` then re-run gave 448 files / 3,697
   tests green, **twice consecutively**. So it is load-dependent, not a repeat-run hazard — two
   back-to-back suite runs are fine. Clear the table before believing a failure of this shape.
+  **`DELETE FROM rate_limits` is not enough against a running `pnpm dev`, and that remedy misled a
+  session on 2026-09-06.** The limiter is two-tier: the Postgres table is the shared store, but a
+  synchronous in-memory L1 map holds the counts inside the server process and a `psql` delete does
+  not touch it. The DB count is only written back into L1 after a background flush, so a bucket
+  filled by a manual probe keeps refusing afterwards. Measured while verifying PS-25: with the table
+  emptied, the correct password was still refused, which read exactly like a broken fix — and the
+  same request signed in immediately after a `pnpm dev` restart. **Restart the dev server between
+  runs that measure a rate limit.** For a suite run this does not arise, because each run is a fresh
+  process.
 - CI runs the suite on a clean database, so it is the better signal — but it is **not** infallible:
   on 2026-07-28 it went red on a genuine, deterministic failure that had nothing to do with the diff
   (see the hour-dependence rule in "Date Arithmetic"). A red CI on an unrelated change is worth one

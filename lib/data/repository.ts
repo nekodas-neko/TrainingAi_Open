@@ -1106,6 +1106,16 @@ export interface WorkoutRepository {
    *  stamped — right for the web route, wrong for a mutation queued offline and drained after a
    *  titration, which is why the sync engine fills it from the local row. */
   logSupplement(supplementId: string, userId: string, date: string, dose?: Partial<import('@trainingai/shared/types/supplement').SupplementDose>): Promise<void>
+
+  // ── Supplement vials (OR-102a) ─────────────────────────────────────────────
+  /** Every vial for one supplement, newest first. */
+  listSupplementVials(userId: string, supplementId: string): Promise<import('@trainingai/shared/types/supplement').SupplementVial[]>
+  /** The sticky default the log screen offers — the newest un-deleted vial, or null. */
+  currentSupplementVial(userId: string, supplementId: string): Promise<import('@trainingai/shared/types/supplement').SupplementVial | null>
+  createSupplementVial(userId: string, data: Omit<import('@trainingai/shared/types/supplement').SupplementVial, 'id' | 'userId' | 'createdAt'> & { id?: string }): Promise<import('@trainingai/shared/types/supplement').SupplementVial>
+  updateSupplementVial(id: string, userId: string, patch: Partial<Omit<import('@trainingai/shared/types/supplement').SupplementVial, 'id' | 'userId' | 'supplementId' | 'createdAt'>>): Promise<import('@trainingai/shared/types/supplement').SupplementVial>
+  /** True when a vial was removed. Editing or deleting a vial never touches logs stamped from it. */
+  deleteSupplementVial(id: string, userId: string): Promise<boolean>
   /** RV-45: false when nothing matched. */
   unlogSupplement(supplementId: string, userId: string, date: string): Promise<boolean>
 

@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs"
 import { getRepositoryAsync } from "@/lib/data"
 import { authConfig } from "./auth.config"
 import { rateLimit } from "@/lib/rate-limit"
+import { clientIp } from "@trainingai/shared/http/client-ip"
 import type { JWT } from "next-auth/jwt"
 import type { Session } from "next-auth"
 import { refreshIsActiveClaim } from "@/lib/auth/is-active-refresh"
@@ -17,16 +18,40 @@ const nextAuth = NextAuth({
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
-        const email = credentials?.email as string | undefined
+      async authorize(credentials, request) {
+        const submitted = credentials?.email as string | undefined
         const password = credentials?.password as string | undefined
-        if (!email || !password) return null
+        if (!submitted || !password) return null
+
+        // PS-25 — ONE normalisation, feeding both the rate-limit key and the lookup.
+        //
+        // They were written separately and drifted: the key folded case, the lookup folded case
+        // *and trimmed*, so ` user@x` and `user@x ` were fresh 20-attempt buckets against the same
+        // account. Verified live before the fix — after 20 misses, attempt 21 (plain, correct
+        // password) was refused and attempt 22 (one leading space, correct password) signed in.
+        // Padded attempts per account were therefore unbounded.
+        //
+        // Two derivations of "the same email" are what made that possible, so there is one now and
+        // the key is built from it. Do not reintroduce a second `.toLowerCase()` here.
+        const email = submitted.toLowerCase().trim()
+
+        // Per-IP before per-email, so a spray across many accounts is stopped without first
+        // spending a victim's bucket. `clientIp` counts in from the right (Q-493) — the leftmost
+        // X-Forwarded-For entry is caller-supplied, and keying on it lets the caller choose its own
+        // bucket.
+        //
+        // 50 per 15 minutes is deliberately loose. The per-email limit already bounds a brute force
+        // against one account; this bounds *spraying across accounts* from one source, which a
+        // per-email limit cannot see at all. A household or CGNAT egress shares this key, so a
+        // tighter number would lock out real users to slow an attacker who can simply use more
+        // addresses.
+        if (!rateLimit(`login-ip:${clientIp(request)}`, 50, 15 * 60 * 1000)) return null
 
         // 20 attempts per email per 15 minutes — prevents account-specific brute force
-        if (!rateLimit(`login:${email.toLowerCase()}`, 20, 15 * 60 * 1000)) return null
+        if (!rateLimit(`login:${email}`, 20, 15 * 60 * 1000)) return null
 
         const repo = await getRepositoryAsync()
-        const user = await repo.getUserByEmail(email.toLowerCase().trim())
+        const user = await repo.getUserByEmail(email)
         if (!user?.passwordHash) return null
 
         const valid = await bcrypt.compare(password, user.passwordHash)

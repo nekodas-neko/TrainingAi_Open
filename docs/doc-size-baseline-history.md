@@ -8232,7 +8232,9 @@ Two shorter alternatives were rejected. Cutting the measurement leaves the next 
 it from production. Putting it in a plan doc under `docs/superpowers/plans/` is the usual home for
 this much reasoning, but nothing is designed yet — there is no implementation to plan, and a plan
 that is only a restated brief is a second place for the brief to go stale.
-## 2026-09-06 — `docs/implementation-backlog.md` → 18978, `projectOverview.md` → 10059 (PS-26 shipped)
+## 2026-09-06 — `docs/implementation-backlog.md` → 19012, `projectOverview.md` → 10067 (PS-26 shipped)
+## 2026-09-06 — `docs/implementation-backlog.md` → 19012, `projectOverview.md` → 10067 (PS-26 shipped)
+## 2026-09-06 — `docs/implementation-backlog.md` → 19012, `projectOverview.md` → 10067 (PS-26 shipped)
 
 `projectOverview.md` is **down** 7: PS-26's Known-Issues row was struck and moved whole to
 `known-issues-resolved.md` rather than ticked in place.
@@ -8374,7 +8376,32 @@ of those is the part worth the lines — an `isAdmin` staleness that does not ex
 read filed as a cost that is now the mechanism, are both things a future session would otherwise act
 on. The row was drafted at 27 lines and cut to 17 first; the detail lives in the journal entry.
 
-## 2026-09-07 — `projectOverview.md` → 10082 (BF-121's status paragraph and its device row)
+## 2026-09-06 — `docs/implementation-backlog.md` → 18998, `projectOverview.md` → 9919 (PS-25 shipped)
+
+The backlog is up 20: PS-25 left the queue on shipping and LA-61 took its place, which is longer
+than the entry it replaced because it has to say why the obvious fix is wrong. Normalising the input
+would silently stop matching rows already stored non-normalised, and this endpoint structurally
+cannot count those — `claude_ro` is row-scoped to the owner. The lines are the argument against a
+one-word change that looks correct.
+
+`projectOverview.md` is **down** 6: PS-25's row was struck and moved whole to
+`known-issues-resolved.md`, per the standing rule that a resolved entry leaves the file rather than
+sitting there with a tick.
+## 2026-09-06 — `docs/implementation-backlog.md` → 19012, `projectOverview.md` → 10067 (OR-102a shipped)
+
+OR-102a left the queue and nothing replaced it, because its follow-up half
+(OR-102b, the surface) was already filed alongside it. `projectOverview.md` gains a Known-Issues row
+for the one thing genuinely outstanding — local SQLite v38 has never been opened on a device.
+
+## 2026-09-06 — `docs/implementation-backlog.md` → 18886 (LA-63 filed: E2E red whenever it runs)
+
+Up by the entry, and it is longer than a "CI is flaky" line because the evidence is the finding: a
+four-run table across three sessions showing E2E fails whenever it RUNS and is skipped whenever it
+passes. It also has to say what is *not* established — nobody has read the Playwright output, so the
+timeout reading is inferred from timing and an idle database, and the entry says so rather than
+letting the next session close it on the inference.
+
+## 2026-09-07 — `projectOverview.md` → 10090 (BF-121's status paragraph and its device row)
 
 Twenty-three lines, split the same way as BF-120's earlier today and for the same reason. The status
 half carries the correction that makes the fix legible — one row was mixing two denominators with

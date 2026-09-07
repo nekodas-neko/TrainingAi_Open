@@ -26,7 +26,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.436.23 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.436.25 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-06.
 
 **The meal builder divided the calories and not the macros (BF-121).** Owner: *"for the meal creator
@@ -1711,6 +1711,20 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [platform][body] 🟡 The vial and dose-time engine is unverified on device (OR-102a, 2026-09-06)
+
+Shipped in v1.436.20: Postgres migrations 267/268 and **local SQLite v38** add a vial record
+(`strength_mg`, `water_ml`, `syringe_units_per_ml`, `opened_on`), `supplement_logs.taken_at`, and
+the reconstitution frozen on each log so a historical dose in syringe units survives the next vial
+being mixed at a different volume. Four API routes and the sync mirroring are in.
+
+**Not verified on device.** `getLocalStore` returns null in the sandbox, so v38's ALTERs, the
+read-only vial mirror and the offline stamp are covered by unit test and by reading, never by
+running. The server half needs no APK — Railway delivers it — but the local-store half is
+device-only. Smoke-run it before trusting an offline dose to carry its own freeze.
+
+**No UI yet**; OR-102b is the surface half. Nothing on screen reads any of this.
+
 ### [platform] 🟡 Deactivation is immediate; the middleware still gates on a claim it cannot verify (PS-24, 2026-09-06)
 ### [app-shell] 🟡 Eighteen icon-only buttons announce as "button" and nothing else (LA-62, 2026-09-06)
 
@@ -1800,12 +1814,6 @@ the once-per-day read", filed as a cost, is **load-bearing**: it is what makes t
 throttle must not be made to persist.
 [Journal](docs/overview/entries/2026-09-06-deactivation-takes-effect.md) ·
 [Checkpoint](docs/reviews/2026-09-05-app-checkpoint.md) §2.
-
-### [platform] 🔴 The login rate limiter is bypassed by whitespace-padding the email (PS-25, 2026-09-06)
-
-`auth.ts:26` keys on the untrimmed email, `:29` looks up the trimmed one — each padding variant is a
-fresh 20-attempt bucket against the same account (live: attempt 21 plain refused, attempt 22 padded
-signed in). No IP-keyed limit on the endpoint. [Checkpoint](docs/reviews/2026-09-05-app-checkpoint.md) §2.
 
 ### [workouts][app-shell] 🟡 Confirming a deload on Home leaves full-intensity weights on screen for up to 6 h (RV-49, 2026-09-06)
 

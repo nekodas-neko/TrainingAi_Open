@@ -1111,9 +1111,62 @@ export const supplementLogs = pgTable('supplement_logs', {
    *  resolves its own contribution by this id, and an FK would turn a hard delete of a log into a
    *  cascade over exposure history. */
   sourceRef:    uuid('source_ref'),
+  /**
+   * WHEN the dose was actually taken (OR-102a, migration 267).
+   *
+   * `logDate` is a DATE and always was, so "correlate sleep and heart rate against the dose" had no
+   * time to correlate against. It is also the only variable that separates dose from cumulative
+   * level on a titration — those two rise together across weeks, but hours-since-dose varies WITHIN
+   * a week at a held dose, and that is the one contrast the schedule does not confound.
+   *
+   * Nullable, and it stays nullable. Every row predating this has no time, and defaulting them to
+   * midnight or `createdAt` would manufacture data points for exactly the analysis this exists to
+   * make possible.
+   */
+  takenAt:      timestamp('taken_at', { withTimezone: true }),
+  /**
+   * The RECONSTITUTION AS IT WAS when this was logged (OR-102a) — BF-3's dose freezing one layer up.
+   *
+   * `amount`/`unit` freeze the milligrams. These freeze what turns milligrams into syringe units.
+   * Mix the next vial at a different water volume and the same mg becomes a different number of
+   * units: the stored mg stays correct while a historical "15 units" silently starts reading wrong.
+   *
+   * Three numbers rather than a `vialId` FK deliberately — an FK points at a row that can be edited
+   * afterwards, which is the rewrite this is here to prevent.
+   */
+  vialStrengthMg: doublePrecision('vial_strength_mg'),
+  vialWaterMl:    doublePrecision('vial_water_ml'),
+  vialUnitsPerMl: doublePrecision('vial_units_per_ml'),
   createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:    timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt:    timestamp('deleted_at', { withTimezone: true }),
+})
+
+/**
+ * One reconstituted vial (OR-102a, migration 267).
+ *
+ * **Concentration is derived, never stored.** `strengthMg / waterMl` is mg per ml; a stored
+ * concentration is a third number that can disagree with the two it came from, and the first time
+ * it does nothing says which is right.
+ *
+ * `syringeUnitsPerMl` is stored rather than assumed 100 because a barrel that is not U-100 is a
+ * real possibility, and a wrong assumption here is a wrong dose.
+ *
+ * The newest un-deleted vial per supplement is the sticky default: reconstitution is stable in
+ * practice — one vial is used for weeks — so opening a new one is an explicit act rather than a
+ * form to refill at every dose.
+ */
+export const supplementVials = pgTable('supplement_vials', {
+  id:                uuid('id').primaryKey().defaultRandom(),
+  userId:            uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  supplementId:      uuid('supplement_id').notNull().references(() => supplements.id, { onDelete: 'cascade' }),
+  strengthMg:        doublePrecision('strength_mg').notNull(),
+  waterMl:           doublePrecision('water_ml').notNull(),
+  syringeUnitsPerMl: doublePrecision('syringe_units_per_ml').notNull().default(100),
+  openedOn:          date('opened_on', { mode: 'string' }).notNull(),
+  createdAt:         timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:         timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  deletedAt:         timestamp('deleted_at', { withTimezone: true }),
 })
 
 export const sessionPeriodization = pgTable('session_periodization', {

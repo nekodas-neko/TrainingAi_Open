@@ -1898,3 +1898,19 @@ guarding one and not the other leaves the empty bar, which was the reported half
 so nothing that was lifted was ever wrong; only what was drawn.
 [Journal](entries/2026-09-06-deload-not-a-crash.md) ·
 [Checkpoint](../reviews/2026-09-05-app-checkpoint.md) §P5.
+### [platform] ✅ The login rate limiter no longer resets when the email is padded (PS-25, 2026-09-06)
+
+`rateLimit()` keyed on `email.toLowerCase()` while the lookup used `email.toLowerCase().trim()` —
+two derivations of the same address, so ` user@x` and `user@x ` were fresh 20-attempt buckets
+against one account and padded guessing was unbounded. Fixed in v1.436.12: one normalisation feeds
+both, and a per-IP limit (50 / 15 min) now bounds spraying across accounts, which a per-email limit
+cannot see.
+
+Verified live: with the bucket full, the correct password was refused through the plain address and
+four padded spellings, and `rate_limits` held exactly one email key at its cap. Control — after a
+restart the same account signs in normally.
+
+**A local-testing note worth keeping.** The first control run failed and the fix looked broken. The
+limiter's in-memory L1 is not cleared by deleting `rate_limits` rows, so counts survive a `psql`
+reset and poison the next run; only restarting `pnpm dev` clears them. Anything measuring this
+limiter locally has to restart between runs.

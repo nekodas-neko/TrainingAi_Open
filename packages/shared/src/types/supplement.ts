@@ -6,6 +6,43 @@ export interface SupplementDose {
   /** The definition's free-text `dose` as it read at the time. The snapshot that makes a titration
    *  survive a dose change even for a supplement nobody ever entered as a number. */
   doseText: string | null
+  /**
+   * WHEN it was taken (OR-102a). Null on every row predating the column, and never invented — a
+   * defaulted midnight would manufacture data for the one analysis the timestamp exists to enable.
+   */
+  takenAt?: string | null
+  /**
+   * The RECONSTITUTION as it was when this was logged (OR-102a), so a historical dose in syringe
+   * units keeps meaning what it meant. Mix the next vial at a different water volume and the same
+   * milligrams become a different number of units; without these three, a past "15 units" silently
+   * starts reading wrong.
+   *
+   * All three or none: `frozenReconstitution()` returns null unless every one is present, because
+   * falling back to the current vial is exactly the rewrite this prevents.
+   */
+  vialStrengthMg?: number | null
+  vialWaterMl?: number | null
+  vialUnitsPerMl?: number | null
+}
+
+/**
+ * One reconstituted vial (OR-102a).
+ *
+ * Concentration is NOT a field: it is `strengthMg / waterMl`, derived by
+ * `@trainingai/shared/health/vial-dose`. A stored concentration is a third number that can
+ * disagree with the two it came from.
+ */
+export interface SupplementVial {
+  id: string
+  userId: string
+  supplementId: string
+  strengthMg: number
+  waterMl: number
+  /** Marks per millilitre on the barrel — 100 for a U-100. Stored because a different barrel is a
+   *  real possibility, and assuming one is a wrong dose. */
+  syringeUnitsPerMl: number
+  openedOn: string
+  createdAt: string
 }
 
 export interface Supplement {
