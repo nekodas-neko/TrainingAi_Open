@@ -98,4 +98,15 @@ describe('the footer shows both denominators, each labelled', () => {
   it('gates the second line on the helper rather than an inline count', () => {
     expect(footer).toMatch(/showsPerPortion\(servings\)/);
   });
+
+  it('withholds the kcal from the per-portion line, which the header already prints', () => {
+    // `meal-builder-header.tsx` renders `Makes N portions · X kcal each` under the same
+    // `hasIngredients` condition. The per-portion CALORIES were never missing — only the macros
+    // were — so repeating the number here would be the redundancy BF-120 removed one screen over.
+    const perPortionLine = footer.slice(footer.indexOf('label="Per portion"'));
+    expect(perPortionLine.slice(0, 200)).toMatch(/showCalories=\{false\}/);
+    const header = code(readFileSync(path.resolve(__dirname, '../meal-builder-header.tsx'), 'utf8'));
+    expect(header, 'if the header stops printing it, put it back on the footer line')
+      .toMatch(/Math\.round\(batchKcal \/ servings\)/);
+  });
 });

@@ -1729,15 +1729,15 @@ clearing a file requires lowering its number in the same PR. Every icon involved
 re-scan reporting zero is worth exactly as much as the pattern it re-scanned with.
 [Journal](docs/overview/entries/2026-09-06-guard-repairs.md).
 
-### [nutrition] BF-121's two footer lines have not been seen at 412 dp (2026-09-06)
+### [nutrition] BF-121's footer is layout-checked at 412 dp but not on the S25 (2026-09-06)
 
-The meal builder's footer now draws `Batch` and `Per portion` as two labelled lines. **The change's
-stated risk is width** — BF-116 is the same failure one screen over, where Home's header chips
-overflowed into the action buttons once a third arrived — and the fix has only a structural argument
-behind it, not a measurement: the per-portion figures went onto a new flex row and line one lost its
-`/ portion` suffix, so no line is wider than today's. **On the S25: a 4-portion recipe shows both
-lines without wrapping or overlapping the Save button; a 1-portion recipe shows one line and no
-redundant second; the per-portion figures match the detail sheet and a logged portion in the diary.**
+The meal builder's footer draws `Batch` and `Per portion` as two labelled lines. **The width risk
+this change carried is covered** — `edit-meal-batch-footer.spec.ts` asserts both labels and the Save
+button `toBeInViewport()` at 412 × 915 after the ingredient list is scrolled to its end, so a line
+that wrapped or pushed the button off screen fails. What is still owed is the device itself. **On the
+S25: the per-portion figures should match what the detail sheet shows for the same saved meal and
+what a logged portion writes into the diary** — the arithmetic is unit-tested against
+`oneServingItems`, but the three surfaces have never been read side by side.
 [journal](docs/overview/entries/2026-09-06-bf-121-per-portion-macros.md).
 
 ### [nutrition] LA-59's refusal path has not been watched happening (2026-09-06)

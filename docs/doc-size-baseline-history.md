@@ -8313,9 +8313,11 @@ The backlog moves the other way in the same PR: LA-59's 22-line entry goes on sh
 Twenty-three lines, split the same way as BF-120's earlier today and for the same reason. The status
 half carries the correction that makes the fix legible — one row was mixing two denominators with
 only one labelled, which is a different complaint from the one the owner filed and is what the detail
-sheet already disagreed with. The Known-Issues half exists because this is a **width** change whose
-width has not been measured: what stands behind it is a structural argument (the per-portion figures
-went onto a new row, and line one lost its `/ portion` suffix, so no line grew) and BF-116 is the
-proof that arguing about width one screen over is not the same as looking at it.
+sheet already disagreed with. The Known-Issues half exists because a device check is still owed.
+It was first written as "the width has not been measured" and is now narrower than that: updating
+`edit-meal-batch-footer.spec.ts` — which this change broke, and which the repo-wide E2E redness would
+have hidden — turned the width question into a permanent assertion at 412 × 915. What the row names
+now is the thing a spec cannot reach: the per-portion figures read against the detail sheet and the
+diary on the S25.
 
 The backlog moves the other way: BF-121's 40-line entry goes on shipping.

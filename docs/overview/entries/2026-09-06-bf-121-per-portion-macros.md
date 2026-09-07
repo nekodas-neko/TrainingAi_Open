@@ -61,19 +61,32 @@ callback. Local `next build` passed too, since the typecheck is a separate step 
 `tsc`** — and the fix was to type the fixture as `SavedMeal` rather than `any`, so a shape that
 drifts from the real type fails here instead of passing by being untyped.
 
-## Not exercised — and for a layout change this matters
+## The width question, answered — by a spec that already existed
 
-**The two lines have not been seen at 412 dp.** For a change whose stated risk is *width*, that is
-the gap worth stating loudest.
+**`e2e/edit-meal-batch-footer.spec.ts` covers this footer**, and it was asserting the old one-row
+form: `${BATCH_KCAL / 2} / portion`. So this change broke a spec, and the repo-wide E2E redness would
+have hidden that — which is the trap in treating a red job as uniformly not-mine.
 
-What can be said without a screenshot is structural rather than measured: the per-portion figures
-went onto a **new** flex row, and line one lost its `/ portion` suffix, so no line is wider than the
-one shipping today. That is an argument from the DOM, not a measurement.
+Updating it turned the gap into coverage. It now runs at **412 × 915** and asserts, after scrolling
+the ingredient list to its end, that **both** `Batch` and `Per portion` are `toBeInViewport()` along
+with the Save button, that each macro letter appears exactly **twice** with the batch and per-portion
+values both visible (`59 P` and `30 P`, `48 C` and `24 C`, `13 F` and `7 F`), and that the old
+one-row form is gone. A second line that wrapped or pushed the Save button off screen fails it. **4
+passed.**
 
-**Driving the builder needs the repo's own pattern**, and this session learned it the slow way:
+That is the width check this entry warned about, and it is now permanent rather than a screenshot.
+
+## What learning to drive this surface cost
+
 `page.touchscreen.tap` on a bounding box inside a `toPass` loop (`empty-meal-library.spec.ts`), not
 `.click()`; the harness and its stored session cookie belong to port **3100**
-(`playwright.config.ts:23`), not 3000; and a cold route needs 30–60 s, not the 8 s an ad-hoc script
-tends to allow. All three were mistaken for application defects earlier today before being run down.
+(`playwright.config.ts:23`), not 3000; a cold route needs 30–60 s, not the 8 s an ad-hoc script tends
+to allow. All three were mistaken for application defects earlier today before being run down — one
+published as a wrong cause and retracted. **The lesson is to reach for the existing spec rather than
+an ad-hoc script**: the harness solves all three, and it did here.
 
-**Not verified on device.**
+## Not exercised
+
+**Not verified on the device.** The emulated viewport is the layout check; the S25 is still the
+canonical runtime, and the per-portion figures should be read against the detail sheet and a logged
+portion in the diary there.

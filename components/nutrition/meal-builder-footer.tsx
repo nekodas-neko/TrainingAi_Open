@@ -49,8 +49,14 @@ export const MealBuilderFooter = memo(function MealBuilderFooter({
         <div className="flex flex-col gap-1">
           <MacroLine label="Batch" totals={{ calories: batchKcal, protein, carbs, fat }} bold />
           {showsPerPortion(servings) && (
+            /* No kcal on this line: the header three rows up already prints `Makes N portions ·
+               X kcal each`, under this same `hasIngredients` condition and already labelled. The
+               per-portion CALORIES were never missing — only the macros were, which is the whole of
+               what the owner asked for. Same rule as BF-120's lone-row footer: state what nothing
+               else on the screen does. */
             <MacroLine
               label="Per portion"
+              showCalories={false}
               totals={perPortion({ calories: batchKcal, protein, carbs, fat }, servings)}
             />
           )}
@@ -76,15 +82,20 @@ export const MealBuilderFooter = memo(function MealBuilderFooter({
  * One labelled row of kcal + P/C/F. Two instances rather than two copies, so the batch and
  * per-portion lines cannot drift in format — which is the shape of the bug this fixes.
  */
-function MacroLine({ label, totals, bold }: { label: string; totals: MealMacroTotals; bold?: boolean }) {
+function MacroLine(
+  { label, totals, bold, showCalories = true }:
+  { label: string; totals: MealMacroTotals; bold?: boolean; showCalories?: boolean },
+) {
   return (
     <div className="flex items-baseline gap-2.5">
       <span className="text-[10px] font-semibold uppercase tracking-[0.04em] text-muted-foreground">
         {label}
       </span>
-      <span className={`tabular-nums ${bold ? 'text-sm font-bold' : 'text-xs font-semibold text-muted-foreground'}`}>
-        {Math.round(totals.calories)} kcal
-      </span>
+      {showCalories && (
+        <span className={`tabular-nums ${bold ? 'text-sm font-bold' : 'text-xs font-semibold text-muted-foreground'}`}>
+          {Math.round(totals.calories)} kcal
+        </span>
+      )}
       <span className="flex-1" />
       {/* `MACRO_COLORS`, like every other macro readout — the artboard's own hex values are this
           palette, so parity and the token rule agree here. */}
