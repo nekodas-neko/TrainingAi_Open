@@ -8641,3 +8641,12 @@ contiguous, `early_deload_week_start` NULL on all five programs, `is_early_deloa
 ever, and a largest trained-day gap of 2 days where the allowance is already 2. The entry now
 carries those numbers, because the alternative is the next session spending an hour re-deriving them
 before it can tell that the buildable half is six lines and the rest is a schema decision.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18797 (LA-70 shipped)
+
+Down 11. LA-70's entry came out whole: the 19 sites are converted and the helper is in
+`route-errors.ts`, so what the entry was holding — the list of files and the proposed fix — is now
+either in the diff or, in the case of the proposed fix, disproved. The reason it was wrong
+(a hand-written message on a built-in check reports the built-in code, not `custom`) lives in the
+helper's own comment and in the module-map row, which are the two places someone touching this next
+would actually look.

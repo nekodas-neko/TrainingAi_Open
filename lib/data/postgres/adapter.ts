@@ -4419,7 +4419,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           // Q-485: the bounds were never the problem — both paths import the same
           // `validation/body-metrics.ts`, so they cannot drift. What differed was the *answer*.
           // Same value, same field, same instant: `POST /api/body-metadata` → 400
-          // `{"error":"Too big: expected number to be <=500"}`, `POST /api/sync/push` → 200
+          // `{"error":"Invalid body"}`, `POST /api/sync/push` → 200
           // `{"processed":1,"errors":[]}` with `weight_kg` NULL. The drop was invisible in all three
           // places it could have been recorded — no `errors[]` entry, so the client confirmed and
           // deleted the mutation; no console line; no `error_events` row.

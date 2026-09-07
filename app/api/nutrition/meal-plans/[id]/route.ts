@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
-import { invalidUuidResponse } from '@/lib/api/route-errors'
+import { invalidBodyResponse, invalidUuidResponse } from '@/lib/api/route-errors'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 
 // A plan rename or a partial update.
@@ -53,7 +53,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
   const parsed = PatchSchema.safeParse(read.body)
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
+    return invalidBodyResponse(parsed.error)
   }
   const { isActive, ...fields } = parsed.data
 

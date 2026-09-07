@@ -21,6 +21,7 @@ import { selectLibraryMeals } from '@trainingai/shared/nutrition/library-match'
 import { planNameFromMeals, restDayCarbLine } from '@trainingai/shared/nutrition/plan-naming'
 import { NutritionIngredientsSchema } from '@trainingai/shared/validators/nutrition-ingredient'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { invalidBodyResponse } from '@/lib/api/route-errors'
 
 // The schema's own caps total well under 100 KB (200 excluded foods x 80 chars is the largest
 // array). 256 KB is generous past that.
@@ -114,7 +115,7 @@ export async function POST(req: Request) {
   }
   const parsed = RequestSchema.safeParse(read.body)
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
+    return invalidBodyResponse(parsed.error)
   }
   const input = parsed.data
 

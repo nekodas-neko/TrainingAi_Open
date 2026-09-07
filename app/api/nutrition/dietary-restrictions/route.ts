@@ -4,6 +4,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import type { DietaryRestriction, UserDietaryRestriction } from '@trainingai/shared/types/nutrition'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { invalidBodyResponse } from '@/lib/api/route-errors'
 
 // A short list of restrictions.
 const MAX_BODY_BYTES = 16 * 1024
@@ -51,7 +52,7 @@ export async function PUT(req: Request) {
   }
   const parsed = PutSchema.safeParse(read.body)
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
+    return invalidBodyResponse(parsed.error)
   }
 
   const repo = await getRepository()

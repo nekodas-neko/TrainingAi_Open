@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { UserPreferencesPatchSchema } from '@trainingai/shared/user/preferences'
+import { invalidBodyResponse } from '@/lib/api/route-errors'
 
 // Colour maps and the background settings bag are the big ones; everything else is a scalar or a
 // short array of keys. 32 KB is far above any real bag and still far below a memory concern.
@@ -32,7 +33,7 @@ export async function PATCH(req: NextRequest) {
 
   const parsed = UserPreferencesPatchSchema.safeParse(read.body)
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
+    return invalidBodyResponse(parsed.error)
   }
 
   // `null` means "clear this key", absence means "leave it alone" — the distinction the whole

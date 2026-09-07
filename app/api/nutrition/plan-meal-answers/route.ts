@@ -4,6 +4,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { normalizeDateParam } from '@trainingai/shared/date-utils'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { invalidBodyResponse } from '@/lib/api/route-errors'
 
 // Two uuids and a date.
 const MAX_BODY_BYTES = 4 * 1024
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest) {
 
   const parsed = BodySchema.safeParse(read.body)
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
+    return invalidBodyResponse(parsed.error)
   }
 
   const logDate = normalizeDateParam(parsed.data.logDate)
@@ -97,7 +98,7 @@ export async function DELETE(req: NextRequest) {
 
   const parsed = DeleteSchema.safeParse(read.body)
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
+    return invalidBodyResponse(parsed.error)
   }
 
   const logDate = normalizeDateParam(parsed.data.logDate)

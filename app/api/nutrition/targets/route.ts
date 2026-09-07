@@ -4,6 +4,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { dailyKcalToGoal } from '@trainingai/shared/nutrition/calorie-balance'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { invalidBodyResponse } from '@/lib/api/route-errors'
 
 // Four macro numbers and a calorie total.
 const MAX_BODY_BYTES = 8 * 1024
@@ -37,7 +38,7 @@ export async function PUT(req: Request) {
   }
   const parsed = TargetsSchema.safeParse(read.body)
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
+    return invalidBodyResponse(parsed.error)
   }
   const repo = await getRepository()
   const targets = await repo.upsertNutritionTargets(userId, {

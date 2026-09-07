@@ -1380,17 +1380,6 @@ this is a future gap rather than a dead one.
 a migration and an owner call on whether a deload becomes first-class stored state. Deriving it
 instead is the option that loses: a replay with no window gets one wrong answer and keeps it forever.
 
-### [platform] LA-70 — 20 routes echo raw Zod wording back to the user
-
-- **Lane:** A — 20 files matching `parsed.error.issues[0]?.message`, plus a shared responder.
-- **Added:** 2026-09-07, Lane A — the third finding in PS-32, deferred for size.
-
-`{ error: parsed.error.issues[0]?.message ?? 'Invalid body' }` puts the library's own phrasing on screen —
-live: *"Too big: expected string to have <=80 characters"*. The fix is not to drop the message: a `.superRefine`
-message is written for the user and is the one worth surfacing (the exercises route's equipment error, BF-129).
-Surface `issue.code === 'custom'` only, otherwise the generic string — behind one helper, applied to all 20 in
-one sweep. Cosmetic, so it sat behind PS-32's two substantive halves rather than tripling that PR.
-
 ### [platform] LA-72 — ~30 source-scanning checks strip no comments, and nobody knows which need to
 
 - **Lane:** A — `scripts/check-*.js`.

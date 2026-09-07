@@ -4,6 +4,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { isUuid } from '@trainingai/shared/validation/uuid'
+import { invalidBodyResponse } from '@/lib/api/route-errors'
 
 // One meal type, or a reorder of at most 50 ids (the route's own cap).
 const MAX_BODY_BYTES = 8 * 1024
@@ -71,7 +72,7 @@ export async function POST(req: Request) {
   }
   const parsed = MealTypeSchema.safeParse(read.body)
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
+    return invalidBodyResponse(parsed.error)
   }
   const { name, emoji, sortOrder, timeStartHour, timeEndHour, remindersEnabled, required } = parsed.data
   const repo = await getRepository()
