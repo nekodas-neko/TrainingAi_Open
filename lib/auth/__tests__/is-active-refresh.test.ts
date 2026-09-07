@@ -94,3 +94,39 @@ describe('refreshIsActiveClaim', () => {
     expect(token.isAdmin).toBe(true)
   })
 })
+
+// ── PS-24: the throttle that never engages, and why that is now load-bearing ─────────────────
+//
+// The checkpoint filed "every authenticated request performs the once-per-day users-row read" as a
+// cost. It is, but it is also the only reason PS-24's fix works, so it must not be "optimised".
+//
+// `isActiveCheckedAt` lives in the token. The token is re-signed by the Edge middleware from the
+// cookie on every request, and the cookie never carries the stamp — so every request arrives with
+// an unstamped token and the throttle cannot fire. Making it persist would restore a staleness
+// window of `ISACTIVE_RECHECK_MS`, which is exactly the vulnerability `auth()`'s refusal closes.
+//
+// If a future change makes the stamp survive, `ISACTIVE_RECHECK_MS` becomes the deactivation
+// latency again and that trade needs deciding on purpose, not inheriting.
+describe('the per-request read PS-24 depends on', () => {
+  it('fires on every request, because the stamp never arrives with the token', async () => {
+    let reads = 0
+    const lookup = async () => { reads++; return { isActive: false, isAdmin: false } }
+    for (let i = 0; i < 3; i++) {
+      // What actually reaches the callback: the claim as stamped at sign-in, and no stamp.
+      const fromCookie: { userId: string; isActive: boolean; isActiveCheckedAt?: number } =
+        { userId: 'u1', isActive: true }
+      const token = await refreshIsActiveClaim(fromCookie, lookup)
+      expect(token.isActive).toBe(false)
+    }
+    expect(reads, 'a persisted stamp would make this 1 and reintroduce a day of staleness').toBe(3)
+  })
+
+  it('and the same read keeps isAdmin fresh for every Node caller', async () => {
+    // So the checkpoint's "an isAdmin revocation never reaches a live session" holds only for the
+    // Edge middleware, which does not read isAdmin at all. Anything going through `auth()` — every
+    // route handler and server component — gets the row's value.
+    const fromCookie = { userId: 'u1', isActive: true, isAdmin: true }
+    const token = await refreshIsActiveClaim(fromCookie, async () => ({ isActive: true, isAdmin: false }))
+    expect(token.isAdmin).toBe(false)
+  })
+})

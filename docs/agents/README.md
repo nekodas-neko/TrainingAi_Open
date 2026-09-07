@@ -264,6 +264,11 @@ Beyond the `[domain]` tags, an entry may carry:
   protocol; treating its absence as an error would wedge every dependent the day its blocker
   succeeded. The cost of that rule is that a typo'd ID looks identical to a shipped one, so the
   check script fails on a `Needs:` naming an ID that has never existed anywhere in the tree.
+- **`Lane: O` is the Orchestrator's own lane** (added 2026-09-06, `OR-103`). §3's path rule places
+  work by the files it touches, and CI config, `playwright.config.ts`, repository rulesets and the
+  queue tooling are in **neither** implementer's paths — so those entries had no lane the rule could
+  reach and printed as UNCLASSIFIED to A and B forever. Four had accumulated, each saying "neither
+  lane" in prose. `next-item.js --lane O` lists them; an `O` entry is hidden from A and B.
 - **`Gate: owner`** / **`Gate: device`** — waiting on a decision from the owner, or on the S25 smoke
   run. These used to be prose `⛔ blocked:` markers that conflated three different things with three
   different resolvers; separating them is what lets a script tell you what is genuinely ready.

@@ -102,6 +102,15 @@ silently misdirecting the next session. Update them in the same PR that consumes
 >   runtime, and the sandbox cannot run the local store at all — "probably fine" is the judgement
 >   that has shipped bugs here before. The field makes the debt countable; only the S25 clears it.
 >
+> - **`Lane: O`** — the **Orchestrator's** lane, added 2026-09-06 (`OR-103`). For work in neither
+>   implementer's paths: `.github/workflows/**`, `playwright.config.ts`, repository settings and
+>   rulesets, and the queue tooling itself. **It exists because §3's path rule cannot answer those** —
+>   they are reached from no `app/`, `components/` or `lib/` path — so four entries printed as
+>   UNCLASSIFIED to every lane at once, each explaining "neither lane" **in prose**. A label that
+>   lives only in prose is the exact defect the `Lane:` field was created to fix, so the third value
+>   is the consistent answer rather than a special case. `--lane O` lists them; an `O` entry is
+>   hidden from A and B, which is the point.
+>
 > - **`Keep: <what is owed>`** — the entry partly shipped and stays queued for the residue.
 >   `next-item.js` routes it to a **KEEP** section headed *"shipped; only the stated residue is owed.
 >   Not new work"* — so **what follows `Keep:` must be a check, a decision, or a measurement, never a
@@ -487,6 +496,50 @@ random, and worse than no colour because it looks authoritative.
 - **Verify:** device — the calculator's arithmetic against the owner's own third-party app, and
   whether the colour chip reads correctly at a glance on the S25.
 
+### [nutrition][body] OR-104 — a supplement can carry two contradicting doses, and the wrong one is what history keeps 🔴 LIVE
+
+- **Lane:** A — the stamping is in `lib/data/postgres/adapter.ts` and `lib/local-store/sqlite-backend.ts`;
+  the surface half (`components/nutrition/manage-supplements-sheet.tsx`) follows, engine first per §3.
+- **Added:** 2026-09-06 by Orchestrator. **Branch:** unassigned.
+- **Live in production right now, on the one supplement that matters most.** `Retatrutide` reads
+  `default_amount 0.5 · unit mg` **and** free-text `dose '10mg'` — the second is the *vial strength*,
+  entered in the field the sheet labels `Dose`. The 2026-09-07 log has already frozen both:
+  `amount 0.5, unit mg, dose_text '10mg'`. The two disagree by 20×.
+
+**Why it happened, and why it will happen again.** BF-112 stage 2 added structured `amount`/`unit`
+beside the free-text `dose` that has always been there, and the edit sheet now offers **both, with
+nothing reconciling them**. `manage-supplements-sheet.tsx:30` keeps `dose` "as the free-text line it
+always was". Nothing warns that the two are the same question asked twice, so the natural reading of
+a field called `Dose` — *what is in the vial* — writes a number that contradicts the structured one.
+
+**Why it is not visible.** `supplementSubtitle()` falls back to `s.dose` **last**, so with
+`defaultAmount` set the list correctly reads `0.5 mg today` and the contradiction never surfaces
+there. It shows only on the manage sheet's own row (`:385`), where `10mg` sits under the name. So
+this is a defect that is *already* wrong in the archive while every screen looks right.
+
+**Why it matters more than a cosmetic mismatch.** `dose_text` is stamped at log time on purpose
+(BF-3) so editing a definition cannot rewrite history — which means **fixing the definition does not
+fix the logs already written**, and every future log inherits the same stamp until someone notices.
+OR-102a/b will read dose history to recommend the next dose. A tracker that reads `dose_text` over
+`amount` recommends against a number 20× high.
+
+**What to do:**
+1. **Engine:** do not stamp `dose_text` from the definition's free text when a structured `amount`
+   was stamped from the same definition. Two representations of one number, one of them unparsed
+   prose, is the thing to stop writing — not a display choice.
+2. **Surface:** the sheet must not offer both unreconciled. Either hide the free-text field once
+   `amount`+`unit` are set, or relabel it to what it is now used for (a note, not a dose).
+3. **The existing row is the owner's** — see `Gate:`. Nothing in this entry repairs it, because the
+   freeze is deliberate.
+
+- **Gate:** owner — the live `Retatrutide` definition and its 2026-09-07 log need correcting in the
+  app by hand (clear the free-text `Dose`; delete and re-log the day). Production is read-only from
+  a session, so no agent can do it. The code fix does not depend on this and should not wait for it.
+- **Verify:** device — add a supplement with an amount and a unit, confirm the sheet does not also
+  invite a free-text dose, log it, and confirm the stored `dose_text` no longer contradicts.
+- **Reversal cost:** low. No migration; existing rows keep whatever they were stamped with, which is
+  the point of the stamp.
+
 ### [app-shell][platform] BF-122a — the cat collection, engine half: the ladder derivation and a decay window read off the schedule
 
 - **Lane:** A — `packages/shared/**`. No migration, no API route, no table: the whole thing is a pure
@@ -774,7 +827,7 @@ new reward currency.
   wants the short form for its own overflow, which is a reason to land these together.
 - **Reversal cost:** low. The state-setter shape already exists in `swapExercise`.
 
-### [workouts] BF-126 — nothing constrains how many primaries or secondaries a generated session gets, and the main lift need not come first
+### [workouts] BF-126 — nothing constrains how many primaries or secondaries a generated session gets
 
 - **Lane:** A — `app/api/generate-program/route.ts`.
 - **Added:** 2026-09-06 · owner, from a generated 5-day program where Pull came back with two `secondary` compounds and one accessory while Push got one and two.
@@ -787,14 +840,17 @@ new reward currency.
   never falls back to the model's choice for primary/secondary. The observed Pull session therefore
   carries three heavy-ish exercises (one at 72.5–92.5%, two at 65–85%) against Push's two, at equal
   exercise counts. Session-to-session load becomes whatever that generation happened to roll.
-- **Second half: order.** Array order is saved as position (`components/workout-builder/builder-review.tsx:295`,
-  `:302`), and in the observed program the `primary` sat *second*, behind a secondary compound — so
-  the heaviest lift of the session is done after a pull-up. Nothing in the prompt says the primary
-  leads. Note `builder-review.tsx:229` deliberately allows a user reorder ahead of the main lift, so
-  the invariant belongs at generation, not on the editor.
+- **⚠ The ordering half of this entry is RETRACTED — do not build it (owner, 2026-09-06).** It
+  originally read that the `primary` sitting second was a defect, because the heaviest lift of the
+  session is then done after a pull-up. Put to the owner, the answer was *"that order is how I want
+  it!"* — a lighter compound before the main lift is a deliberate ramp, not a mis-generation. The
+  code already agreed and was not read carefully enough: `builder-review.tsx:229` says the reorder
+  exists *"so the user can e.g. warm up on a secondary/accessory before the main lift"*. **Sorting
+  the primary first would fight both the owner's preference and that comment.** What remains is the
+  role-count half above, which the owner did act on — he demoted the extra secondary by hand.
 - **Fix it where the style is already overridden** — a post-generation pass in the same block, not
   more prompt text. The model has been asked in prose and did not comply; a validator that demotes
-  extra primaries and sorts the primary first is deterministic and cheap. Per the AI defaults in
+  extra primaries is deterministic and cheap — **counts only, no sorting**. Per the AI defaults in
   CLAUDE.md, structure a model returns is checked in code rather than trusted.
 - **Confirm the shape against more than one sample before choosing the rule.** One program is the
   evidence here. Whether the cap is "exactly one primary, at most one secondary" or something looser
@@ -802,9 +858,74 @@ new reward currency.
   roll is how a legitimate 2-compound Pull day gets forbidden.
 - **Reversal cost:** low — one pure function over the parsed response, before it is returned.
 
+### [workouts] BF-129 — 22 library exercises have no equipment listed, and empty means "everyone owns it" 🔴 LIVE
+
+- **Lane:** A — `app/api/generate-program/route.ts` and the `exercise_library` rows; the swap filter in `components/workout-builder/builder-review.tsx` is the Lane B half of the same read.
+- **Added:** 2026-09-06 · found while answering the owner's *"I have no commercial gym so no machines"* — he was being offered machine work.
+- **Needs:** — nothing.
+- **Measured.** 22 non-merged rows in `exercise_library` carry `equipment = []`. Both equipment
+  filters read an empty list as an unconditional pass —
+  `route.ts:141` and `builder-review.tsx:198` are each
+  `ex.equipment.length === 0 || ex.equipment.some(e => equipmentSet.has(...))`. So an unlabelled row
+  clears **every** equipment selection anyone can make.
+- **Three of the 22 are machines**: `Machine Chest Press`, `Machine Shoulder Press`, `Machine Shrug`.
+  The owner trains at home with a barbell, dumbbells, a cable tower and a pull-up bar, and has logged
+  no machine work in 120 days — the generator can hand him those three regardless, and the swap sheet
+  can offer them as alternatives.
+- **The rest are mostly bodyweight**, which is the second failure and it compounds **BF-128**:
+  `transitionSecForEquipment([])` returns `TRANSITION_SEC_DEFAULT`, which *is*
+  `TRANSITION_SEC_BARBELL = 240 s` (`duration-model.ts:141`, commented *"unknown equipment: assume
+  worst case"*). So `Diamond Push-Up`, `Pike Push-Up`, `Weighted Dip`, `Burpee`, `Inverted Row`,
+  `Side Plank`, `Pallof Press`, `V-Up`, `Mountain Climbers` and the rest are each budgeted as a
+  four-minute barbell lift instead of a one-minute bodyweight one. Costing bodyweight work at 4×
+  makes the session planner fit fewer exercises — the same symptom BF-128 measures, from a second
+  cause.
+- **Both halves are one fix: fill the column in.** The worst-case default is defensible for an
+  unknown; what is not defensible is 22 knowns being unknown. Set the 22 rows from their names and
+  movements — the three `Machine %` rows to `['machine']`, the calisthenics to `['bodyweight']`,
+  `Decline Dumbbell Press` to `['dumbbell']`, `Barbell Box Squat` and `Rack Pull` to `['barbell']`,
+  `Cable Crunch Abs` to `['cable']`.
+- **Then decide what empty should mean**, because the data will drift again. Two options and they
+  are not equal: treating empty as *"needs nothing"* (i.e. bodyweight) makes the filter permissive
+  in the safe direction and the time estimate optimistic; treating it as *"unknown, exclude"* is
+  safe on both but silently drops any future unlabelled row out of every generation. Recommend
+  bodyweight for the **time** default and unknown-excludes for the **filter**, since a wrong minute
+  is cheaper than an exercise the lifter cannot perform. Whichever is chosen, a check that fails on
+  a new empty-equipment row is what actually holds it.
+- **`Dumbbell Lunges` is a duplicate of `Dumbbell Lunge`** and surfaced in the same sweep — it wants
+  a `merged_into`, not an equipment value.
+- **Reversal cost:** low. Data plus one predicate.
+
+### [workouts] BF-130 — the library has no home-gym knee-flexion hamstring exercise, so the gap is unfillable from the app
+
+- **Lane:** A — `exercise_library` content.
+- **Added:** 2026-09-06 · owner, told the fix for his one uncovered muscle was a Nordic curl: *"Not sure I can do this at home - can you look up other excercises we can replace this with"*.
+- **Needs:** BF-129
+- **The whole library holds two knee-flexion hamstring movements**: `Leg Curl` (`machine`) and
+  `Nordic Hamstring Curl` (`bodyweight`). Every other hamstring-main exercise — Barbell/Dumbbell
+  RDL, Deadlift, Sumo, Trap Bar, Good Morning, Jefferson Curl, Single Leg RDL — is a hip hinge.
+- **So a home gym without a leg-curl machine has exactly one option, and it is the hardest movement
+  in the category.** For this owner both are out: no machine, and the Nordic needs an ankle anchor.
+  His program (`Bankai`) therefore trains hamstrings through hip extension only — Hip Thrust ×2 plus
+  an SL RDL — and nothing in the app can close it.
+- **It also collides with his lumbar constraint**, which is what makes this worth an entry rather
+  than a shrug: every alternative the library *does* offer is a loaded hinge, the one pattern he is
+  trying to limit. The category with no spinal loading is exactly the category with no rows.
+- **Add the home-gym knee-flexion variants**: a cable leg curl (ankle strap — he already has the
+  tower), a slider/towel leg curl and a stability-ball leg curl, all `bodyweight` or `cable`. Band
+  variants are optional; their resistance curve peaks where the hamstring is weakest.
+- **He can already self-serve this** — `AddExerciseSheet` posts to `/api/exercises` and is reachable
+  from the builder's "+ Add" and the Stats library search — so this entry is about the *default*
+  library being complete, not about unblocking him.
+- **Worth a wider pass than hamstrings while someone is in there.** This gap was found by asking one
+  question about one muscle; nothing says hamstrings are the only category whose only options need
+  equipment a home gym lacks. Check each muscle for at least one `bodyweight`-or-`dumbbell` entry per
+  movement pattern.
+- **Reversal cost:** none — added rows.
+
 ### [platform] LB-56 — E2E costs 26 minutes a UI PR and currently gates nothing; decide which of those to change
 
-- **Lane:** ? — neither. `.github/workflows/ci.yml`, `playwright.config.ts` and the required-checks
+- **Lane:** O — the Orchestrator's, not an implementer's. `.github/workflows/ci.yml`, `playwright.config.ts` and the required-checks
   setting are the Orchestrator's and the owner's.
 - **Added:** 2026-09-04 · owner: *"why is e2e taking so long? can it be investigated or turned off if
   not needed"*.
@@ -862,7 +983,7 @@ re-proved on 2026-09-04** — three specs pass in isolation and fail in the full
 
 ### [platform] LB-55 — E2E fails as a timeout, not as an error, and a red E2E does not actually block a merge
 
-- **Lane:** ? — neither. `.github/workflows/ci.yml`, `playwright.config.ts` and the branch ruleset are
+- **Lane:** O — the Orchestrator's, not an implementer's. `.github/workflows/ci.yml`, `playwright.config.ts` and the branch ruleset are
   the Orchestrator's and the owner's.
 - **Added:** 2026-09-04 · from `fix/e2e-my-foods-tab-rename`, where six specs waiting for a tab
   renamed three days earlier cost four PRs and most of a session to identify.
@@ -960,23 +1081,61 @@ re-proved on 2026-09-04** — three specs pass in isolation and fail in the full
     a flat string. Tractable, narrow, and fragile the moment tabs are declared differently — which is
     why it is a queued question rather than something done in passing.
 
-### [platform] PS-24 — deactivating a user does not end their session; LA-58's gate reads a claim that never refreshes 🔴 LIVE
+### [platform] 🟡 PS-24 — deactivation is immediate now; the middleware's claim is still stale
 
-- **Lane:** A — `auth.config.ts`, `middleware.ts`, `lib/auth/is-active-refresh.ts`.
-- **Added:** 2026-09-06, app checkpoint —
-  [report](reviews/2026-09-05-app-checkpoint.md) §2.
+- **Lane:** A — `auth.ts`. `middleware.ts` and `auth.config.ts` are deliberately unchanged.
+- **Verify:** device — the APK talks to the same routes, but a deactivated account reaching a
+  Custom Tab sign-in has not been walked through on hardware.
+- **Keep:** the Edge middleware still gates on a claim it cannot refresh. That is a second line now
+  rather than the only one, but it is still wrong, and the two ways to close it properly are
+  recorded below so the next session does not re-derive them.
 
-Confirmed live: `UPDATE users SET is_active=false` for a signed-in account, and its existing cookie
-kept answering 200 on `/api/friends` (×3) and `GET /` (no redirect). Control: a fresh sign-in while
-inactive → 302 `/pending`. The claim is stamped at sign-in and never changes on the path that
-matters: `middleware.ts:5` runs `NextAuth(authConfig)` whose jwt callback (`auth.config.ts:32-46`)
-has no refresh; `refreshIsActiveClaim` is wired only into `auth.ts:60`, and the no-arg `auth()`
-every route handler uses discards the re-signed cookie. The Edge middleware re-signs the stale claim
-with a fresh 7-day expiry on every request. **LA-58 (#884) added the 403 gate; the gate works
-(control: a hand-minted `isActive:false` claim → 403/redirect) — the claim it reads is what never
-moves.** Same mechanism: an `isAdmin` revocation never reaches a live session. Also: because the
-`isActiveCheckedAt` throttle stamp never persists either, every authenticated request performs the
-"once per day" users-row read.
+> **✅ FIXED 2026-09-06 (v1.436.11).** `auth()` returns `null` when the freshly-read row says the
+> account is inactive. Reproduced live on `pnpm dev` with a real credentials session, before and
+> after: `UPDATE users SET is_active=false` with the **same cookie** took `GET /api/friends` from
+> `200` to `401` on the next request, and `GET /` from the app shell to a `/sign-in` redirect.
+> Reactivating restored `200` with no re-sign-in.
+>
+> **It costs no extra database work, which is why this shape was chosen.** `isActiveCheckedAt` lives
+> only in the token and the token never persists, so `refreshIsActiveClaim`'s once-a-day throttle
+> never engages and the users row was already being re-read on every authenticated request. The true
+> value sat in `session.isActive` with nothing consulting it. **So the checkpoint's third finding —
+> "every authenticated request performs the once-per-day read" — must NOT be optimised away**:
+> making the stamp persist would restore `ISACTIVE_RECHECK_MS` of staleness and undo this. Pinned by
+> a test in `lib/auth/__tests__/is-active-refresh.test.ts`.
+>
+> **One sub-claim of this entry is refuted by measurement.** *"Same mechanism: an `isAdmin`
+> revocation never reaches a live session"* is false for every Node consumer. Granting `is_admin` in
+> the database and re-reading `/api/auth/session` on the **same cookie** returned `isAdmin: true`
+> with no re-sign-in, because the same per-request refresh updates that claim too. It is stale only
+> in the Edge middleware, which never reads it.
+>
+> **`null` rather than a session with its id stripped**, deliberately: 213 route handlers call
+> `auth()`, 81 guard on `session?.user?.id`, and the rest read it in shapes that would reach the
+> driver as `undefined` — an unscoped or malformed query, which is worse than the staleness. `null`
+> is the not-signed-in state every caller already handles.
+>
+> **`handlers` is not wrapped**, so `/api/auth/session` still describes a deactivated account.
+> Checked rather than assumed: this app has **zero** `useSession`/`SessionProvider` call sites, so
+> nothing consumes that endpoint — the shell takes its session as props from a server component that
+> redirects first.
+
+**What is still owed: the middleware gates on a claim it cannot verify.** It builds its own NextAuth
+instance from the Edge-only `auth.config.ts`, and the response headers confirm it re-signs that claim
+with a fresh 7-day expiry on every request. Two ways to close it, neither taken here:
+
+1. **Node.js middleware runtime.** Confirmed available in the pinned Next 15.5.22 —
+   `loadNodeMiddleware` in `next-server.js` is gated on the functions-config manifest, not on an
+   `experimental` flag. It would let the one enforcement point read the row and keep LA-58's 403,
+   which distinguishes "deactivated" from "not signed in" in a way 401 cannot. **Cost:** every
+   request in the app moves onto Node middleware, `auth.config.ts`'s "no bcrypt, no pg" contract
+   stops applying, and a database read lands on paths that currently touch nothing.
+2. **Leave the middleware as a cheap first line** and treat `auth()` as the authoritative one, which
+   is the state as of this PR. **Cost:** a stale-cookie caller gets 401 rather than 403, so it
+   re-authenticates — which terminates at `/pending` rather than looping, since sign-in mints no
+   session for an inactive account, but it is a worse answer than 403.
+
+Not a decision for a queue pass: option 1 changes how every request in the app is served.
 
 ### [platform] PS-25 — the login rate limiter keys on the untrimmed email, and has no IP limit
 
@@ -5205,6 +5364,9 @@ owner has to re-describe in a wizard what the app already knows.
 
 - **✅ CLOSED 2026-09-01 by measurement against production.** No code change. Kept as a
   **`Reference:`** because the measurement is what the next reader needs, not the conclusion.
+- **Lane:** A — nothing is owed here today, but the one latent inconsistency this entry leaves open
+  (below) is in `reevaluate.ts`, which is Lane A's. Tagged 2026-09-06 so it stops printing as
+  UNCLASSIFIED to every lane.
 - **Reference:** what the AI Prescription card can and cannot say, and why a hand-built prescription
   fixture misleads.
 - **What I filed, and why it looked like a bug.** A card showed `4×5 @ 128.75kg (80%)` for an
@@ -8480,7 +8642,7 @@ without a queue entry is a dropped finding.*
 
 ### [platform] LB-54 — a red CI job cannot be read, and E2E has no green baseline to compare against
 
-- **Lane:** ? — neither lane. `.github/workflows/ci.yml` and the CI tooling are the Orchestrator's.
+- **Lane:** O — the Orchestrator's. `.github/workflows/ci.yml` and the CI tooling are the Orchestrator's.
 - **Added:** 2026-09-03 · from BF-111 (#840), where diagnosing one red check consumed most of a
   session and still did not reach the failing assertion.
 - **⚠️ `get_job_logs` cannot reach a step's output on this repo's jobs.** Every retrieval — by
@@ -8592,7 +8754,7 @@ without a queue entry is a dropped finding.*
 
 ### [platform] LB-52 — GitHub's auto-merge API does not see a Ruleset, so every PR is a hand-caught race
 
-- **Lane:** ? — neither. The fix is a repository *setting*, not code in either lane's paths.
+- **Lane:** O — the Orchestrator's. The fix is a repository *setting*, not code in either lane's paths.
 - **Gate:** owner — the remedy is a repo setting only the owner can make.
 - **⚠️ THIS ENTRY'S ORIGINAL DIAGNOSIS WAS WRONG, and the correction is the point (2026-09-03).** It
   said *"turn on Allow auto-merge and add a branch protection rule"*. **Both were already on.** The
