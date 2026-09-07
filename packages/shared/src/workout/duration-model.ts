@@ -193,6 +193,13 @@ export interface DurationExercise {
 // `measuredRestSec` arrives from time-audit.ts, whose median filters `> 0` and so excludes those
 // trailing zeros, and validating the same change on this path needs the transition constant
 // settled first (LA-65).
+//
+// LA-65 measured it the same day, and the reason above needs one correction: the transition FIELD
+// is settled — `inter_exercise_rest_sec` is the whole gap and `prep_time_sec` is a sub-interval of
+// it, verified to a median 0.05 s against the independent set-timestamp clock. What is not settled
+// is the CONSTANT: the real gap is ~300 s against 240 s here, but it is charged per exercise while a
+// session has one fewer gap than exercises, so the two errors cancel at exactly five. Fixing this
+// function and fixing that off-by-one are one change, gated on the owner.
 export function estimateExerciseDurationSec(ex: DurationExercise): number {
   return ex.sets * effectiveSetWorkSec(ex.reps, ex.measuredSecPerRep)
     + ex.sets * (ex.measuredRestSec ?? ex.restSec)

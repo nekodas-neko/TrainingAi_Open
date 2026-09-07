@@ -1726,6 +1726,32 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [workouts] 🟡 The session-timing screen's setup row was measuring the wrong interval, and has not been looked at since (LA-65, 2026-09-07)
+
+**What shipped.** `/api/workout-sessions/[id]/timing` reported the actual setup time from
+`prepTimeSec` and compared it against `transitionSecForEquipment`, which models the whole
+inter-exercise transition — a part against a whole. `prep` is a **sub-interval of**
+`inter_exercise_rest_sec`, verified to a median **0.05 s** against the independent
+`set_end_ms`/`set_start_ms` clock and true by construction in `workout-screen.tsx`. Median prep on a
+non-first exercise is **2 s** against a 240 s expectation, so the screen reported setup as roughly
+four minutes *faster* than expected while the real transition ran ~300 s — **slower**. It now reads
+`interExerciseRestSec ?? prepTimeSec`.
+
+**What is owed: nobody has opened that screen.** The route needs a completed session with stamped
+set timestamps, which the seeded dev user does not have, so there was no `pnpm dev` call and no S25
+look. The change is one expression on a read-only route with handler-level tests over the present,
+absent and both-present cases, but the numbers it now renders have not been seen by a human. If the
+setup row ever looked plausible before, it was plausible and wrong.
+
+**The open decision, which is the owner's.** The real transition is ~300 s per gap against a 240 s
+constant — but the constant is charged **per exercise** while a session has **one fewer gap than
+exercises**. At five exercises 5 × 240 and 4 × 300 are both 1200 s, matching the measured 19.8 min of
+real transition per session, so the two errors cancel exactly at the length the owner trains at and
+nowhere else. **Raising the constant alone would take the 60-min powerbuilding count from 5 back to
+4 and undo BF-128**, which shipped the same day to fix his own report. `LA-65` in the backlog carries
+the arithmetic and is gated on him; the BF-128 row above already asks whether five exercises fits the
+hour in practice, and that answer decides this one.
+
 ### [workouts] 🟡 The catalogue's equipment column is fixed and guarded, but the add-exercise sheet still lets you submit with none (BF-129, 2026-09-07)
 
 **What shipped.** 22 `exercise_library` rows carried no equipment, and all three equipment filters
@@ -1811,11 +1837,21 @@ median the owner's own 65 completed sessions actually contain.
    path — but the program-builder screens themselves were not opened on the S25.
 
 **Related and NOT fixed by this.** `estimateExerciseDurationSec` — the *display* estimate — still
-charges every set, and probably should not. It was left alone because its validation flips sign with
-the transition constant, which measured contradictorily (240 s assumed; 249 s, 316 s, or an implied
-+20.8 min over-prediction depending on how the NULLs are treated). **LA-65** holds that with the
-numbers. Until it lands, a session's *estimated* minutes and the number of exercises the planner
-fits are derived on two slightly different models.
+charges every set, and probably should not. It was left alone on the grounds that its validation
+"flipped sign with the transition constant, which measured contradictorily".
+
+**AMENDED 2026-09-07 (LA-65): that reason was wrong, and the correction matters more than the
+original claim.** There was no contradiction in the data — the "+20.8 min over-prediction" was a
+double-count in the measurement itself. `prep_time_sec` is a **sub-interval of**
+`inter_exercise_rest_sec`, not additive to it, verified against the independent
+`set_end_ms`/`set_start_ms` clock (median error **0.05 s** for `inter` alone, **+136 s** when prep is
+added) and true by construction in `workout-screen.tsx`. What is genuinely open is different and
+sharper: the real transition is ~300 s per gap against a 240 s constant, but the constant is charged
+**per exercise** while a session has **one fewer gap than exercises** — so 5 × 240 and 4 × 300 are
+both 1200 s and the two errors cancel exactly at the owner's five, and only there. Raising the
+constant alone would take the 60-min powerbuilding count back to 4 and undo this very fix. **LA-65**
+carries the arithmetic and is gated on the owner. Until it lands, a session's *estimated* minutes and
+the number of exercises the planner fits are derived on two slightly different models.
 ### [workouts] BF-127's fixed banner has not been on a screen (2026-09-07)
 
 The baseline banner renders only in the `baseline` phase with `baselineComplete === false`, which the

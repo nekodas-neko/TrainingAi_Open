@@ -8483,3 +8483,16 @@ filter, which is Lane B's and which the BF-129 entry had already named as such.
 against a migrated database would have passed the entire time the catalogue was broken. That is
 written down because the next "add a check for it" on catalogue data needs to ask which half of the
 table it is checking.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18871, `projectOverview.md` → 10257 (LA-65 measured)
+
+The backlog is 3 lines shorter for a day's work, which is the point: LA-65 was rewritten rather than
+cleared. Its measurement is done and its contradiction dissolved — the "+20.8 min over-prediction"
+that justified filing it was a double-count in the measurement itself — but the entry stays queued,
+gated on the owner, because what the measurement uncovered is a real off-by-one that cannot be fixed
+without deciding whether to move every generated program's volume.
+
+`projectOverview.md` gains 36 across two edits, and one of them is a retraction rather than an
+addition: the BF-128 row's stated reason for deferring `estimateExerciseDurationSec` was wrong and is
+amended in place rather than quietly rewritten, because a session reading it would otherwise inherit
+a conclusion that its own evidence never supported.

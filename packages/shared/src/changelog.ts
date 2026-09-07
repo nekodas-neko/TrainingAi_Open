@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.32",
+    date: "2026-09-07",
+    changes: [
+      "The session timing breakdown now measures your setup time over the right interval. It was showing only the last few seconds before your first set \u2014 the bar-load moment \u2014 and comparing that against an estimate meant for the whole gap between exercises, so setup always looked minutes faster than expected when it was usually slower.",
+    ],
+  },
+  {
     version: "1.436.31",
     date: "2026-09-07",
     changes: [
