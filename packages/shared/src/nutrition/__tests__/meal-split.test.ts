@@ -278,3 +278,37 @@ describe('scaleIngredientsToTargets', () => {
     expect(scaleIngredientsToTargets([oats], { proteinG: 0, carbsG: 0, fatG: 0 })).toEqual([oats])
   })
 })
+
+describe('the residual never drives a slot negative (PS-37)', () => {
+  it('a sub-2 g total spreads without going below zero', () => {
+    // Measured before the fix: 0.3 g of protein across five meals rounded each to 0.1, overshot by
+    // 0.2, and the whole overshoot came off the largest slot — `[-0.1, 0.1, 0.1, 0.1, 0.1]`.
+    const slots = splitMacrosAcrossMeals({ calories: 10, proteinG: 0.3, carbsG: 1, fatG: 0.4 }, 5)
+    const protein = slots.map(s => s.proteinG)
+    expect(Math.min(...protein)).toBeGreaterThanOrEqual(0)
+    expect(Math.round(protein.reduce((a, b) => a + b, 0) * 10) / 10).toBe(0.3)
+    for (const key of ['carbsG', 'fatG'] as const) {
+      expect(Math.min(...slots.map(s => s[key]))).toBeGreaterThanOrEqual(0)
+    }
+  })
+
+  it('a positive residual still lands entirely on the largest slot', () => {
+    // The common path, unchanged: the fix must not redistribute what already worked.
+    const slots = splitMacrosAcrossMeals({ calories: 2000, proteinG: 151, carbsG: 200, fatG: 60 }, 4)
+    const protein = slots.map(s => s.proteinG)
+    expect(Math.round(protein.reduce((a, b) => a + b, 0) * 10) / 10).toBe(151)
+    // One slot carries the remainder rather than the rounding being smeared across all four.
+    expect(new Set(protein.map(p => Math.round(p * 10))).size).toBeLessThanOrEqual(2)
+  })
+
+  it('totals are preserved to the slot precision, not the target precision', () => {
+    // The docstring used to claim "preserved exactly". A target with more decimals than the slots
+    // are rounded to cannot be hit by values rounded to them, and saying otherwise gets trusted.
+    const slots = splitMacrosAcrossMeals({ calories: 2000, proteinG: 150.25, carbsG: 200, fatG: 60 }, 4)
+    const total = slots.reduce((s, m) => s + m.proteinG, 0)
+    // Within half a slot step (0.05 g), and not zero — the drift is real, bounded, and inherent to
+    // returning 0.1 g slots for a 0.01 g target.
+    expect(Math.abs(total - 150.25)).toBeLessThan(0.051)
+    expect(Math.abs(total - 150.25)).toBeGreaterThan(0.001)
+  })
+})

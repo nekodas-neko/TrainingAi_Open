@@ -1332,20 +1332,20 @@ bests are windowed correctly and are the pattern. (c) Zone-minutes doubles Z3 as
 zone-targets counts Z3 once — both cite WHO 2020; the filed Tuning band is a third position and
 names neither file.
 
-### [nutrition] PS-37 — small nutrition inconsistencies: two 2500 ml hardcodes, two day keys for one water write, a false docstring
+### [nutrition] LA-75 — the goals form suggests a water number the app's own recommender never produces
 
-- **Lane:** A — `packages/shared/src/nutrition/day-checkin-prefill.ts:14`,
-  `app/health/health-content.tsx:159`, `app/api/water-log/route.ts:37`,
-  `packages/shared/src/nutrition/meal-split.ts`,
-  `app/api/nutrition/meal-plans/generate/meal/route.ts:172-175`.
-- **Added:** 2026-09-06, app checkpoint — [report](reviews/2026-09-05-app-checkpoint.md) §P3.
+- **Lane:** B — `components/profile/goal-targets-section.tsx:163,204` (placeholder copy only).
+- **Added:** 2026-09-07, Lane A — the residue of PS-37, which named two 2500s and there are four.
 
-The weight-derived water goal (33 ml/kg + bump) never produces 2500, but two consumers hardcode it;
-the water-log route keys the increment to server-now while the outbox path keys the same write to
-the client's day (live: a posted `date` is ignored); `splitMacrosAcrossMeals`'s "preserved exactly"
-docstring fails for 2-dp targets and sub-2 g totals (unreachable from sane targets — fix the
-docstring or the rounding); the generate-meal error copy is swapped (fresh generation says "Could
-not rewrite"). One PR of small fixes.
+`placeholder="2500"` and `placeholder="e.g. 2500"` sit on the water-goal inputs, **beside the control
+that fills in the real recommendation** — `weightKg * 33 + WATER_BUMP_BY_ACTIVITY[activity]`, which
+for any real body weight lands nowhere near 2500 (the changelog even advertises "33 ml per kg of body
+weight, plus your activity bump"). PS-37 read the same number in two other places as a hardcoded goal;
+those two turned out to be a **no-goal-set fallback** (now `DEFAULT_WATER_GOAL_ML`, named as a
+placeholder rather than a recommendation) and a **population anchor** for a 1-5 prefill scale, which
+is deliberately not personal. The form is the one place where 2500 is genuinely wrong: it suggests a
+goal. Show the recommendation, or nothing. Left to Lane B because it is placeholder copy on a screen
+this session cannot see rendered.
 
 ### [platform] PS-38 — checkpoint docs sweep: seven stale CLAUDE.md claims, a duplicated Q-479 row, 13 Needs→KEEP edges
 

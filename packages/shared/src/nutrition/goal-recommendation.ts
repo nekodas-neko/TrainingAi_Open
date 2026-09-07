@@ -24,6 +24,16 @@ import { SEDENTARY_MULTIPLIER } from '../health/energy-baseline'
 // daily target, one place adds today's movement. The activity level is still asked for and still
 // used, but only where it is not double-counted: step goals and water.
 
+/**
+ * What to show when the user has set no water goal at all.
+ *
+ * **It is a placeholder, not a recommendation, and the two must not be confused (PS-37).** The
+ * recommendation is `weightKg * 33 + WATER_BUMP_BY_ACTIVITY[activity]` — for any real body weight
+ * that lands nowhere near 2500, so a screen falling back to this number is saying "no goal set",
+ * never "your goal is 2500". It lives here so the fallback is greppable from the formula it is not.
+ */
+export const DEFAULT_WATER_GOAL_ML = 2500
+
 export const STEP_GOAL_BY_ACTIVITY: Record<ActivityLevel, number> = {
   sedentary: 7000, light: 8500, moderate: 10000, active: 12000, extra_active: 12000,
 }
