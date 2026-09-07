@@ -1229,52 +1229,36 @@ extracts class tokens with `grep -roh`, so its output has no line prefix to filt
 only in a comment reads as used-but-undefined. That one is a false positive — loud, and cheap to work
 around — which is why LA-64 left it.
 
-### [platform] LA-63 — E2E fails on every PR that touches code, and has for at least three sessions
+### [platform] LA-63 — E2E's 9 failing specs
 
-- **Lane:** A — `.github/workflows/ci.yml` (the E2E job), `e2e/`, `playwright.config.ts`.
-- **Added:** 2026-09-06, found while merging OR-102a — three unrelated PRs, three sessions, one
-  signature.
+- **Lane:** A — `e2e/`, and the nutrition specs reach `components/**`, which is Lane B's.
+- **Added:** 2026-09-06, found while merging OR-102a. **Rewritten 2026-09-07 against a measured run.**
+- **Keep:** the specs themselves. Two of the entry's three claims were wrong and are struck below;
+  what is left is nine real failures nobody had seen.
 
-**Measured across four runs on 2026-09-06, from three different sessions:**
+**Struck: "a Playwright or web-server startup timeout, not specs asserting and failing."** Measured
+2026-09-07 by running the suite locally under `CI=1` against the CI seed: **147 passed, 9 failed,
+2 flaky, 2 did not run, 34 minutes.** The suite runs. The inference rested on the Postgres service
+log showing only its health probe — but Postgres logs no statements by default, so an absent query
+log is not evidence of an idle database, and 160 tests at `workers: 1` is ~25 minutes by itself.
 
-| run | PR | touches | `pnpm e2e` | result |
-|---|---|---|---|---|
-| 1712 | OR-102a | `app/api/**` | 24 m | **failure** |
-| 1713 | LA-59 | `components/**` | ~24 m | **failure** |
-| 1715 | BF-121 | `components/**` | **24 m 47 s** | **failure** |
-| 1711, 1717, 1718 | docs-only | — | skipped | success, ~5 min |
-| later | PS-24 | `auth.ts`, `middleware.ts` | **skipped, 44 s** | success |
-| later | PS-25 | `auth.ts`, `lib/` | **skipped, 65 s** | success |
+**Struck: "the failure artifact is the thing to read, and nobody has."** It does not exist. CI's
+reporter list was `[['github'], ['list']]` — annotations and stdout, neither of which writes a file
+— while the upload pointed at `playwright-report/`. The step warned, reported success, and the run's
+artifact count stayed at **0** (checked on #924's run). Fixed here: the `html` reporter is added, the
+upload takes `test-results/` too (where the traces already were), and `if-no-files-found: error`
+makes a silent empty artifact impossible.
 
-The last two rows matter: they are **code** PRs that pass, and they pass because the gate correctly
-skipped them. So the rule is not "code PRs fail" — it is **E2E fails whenever it actually runs**, and
-nothing yet observed contradicts that.
+**Also fixed here:** the gate matched `^app/`, so an `app/api/**`-only change bought the full suite.
+It now drops `app/api/` lines before matching, verified against eight path shapes including mixed.
 
-Every required check passes in all four. The job's UI gate skips the browser run for a docs-only
-diff, which is why those pass in five minutes — so the split is **not** "some PRs are broken", it is
-**"E2E runs ⇒ E2E fails"**.
-
-**~25 minutes with the database idle throughout.** The Postgres service log for run 1712 shows only
-its 10-second health probe for the entire span — no query traffic. That is the shape of a Playwright
-or web-server startup timeout, not of specs asserting and failing.
-
-**What is NOT established.** The Playwright output itself. `get_job_logs` returns the service
-container's log for this job and the byte cap does not reach the step's own output; the failure
-artifact uploaded by `actions/upload-artifact@v6` on line 638 is the thing to read, and nobody has.
-So the timeout reading above is **inferred from timing and an idle database**, not seen. Do not
-close this on the inference.
-
-**Why it matters even though nothing is blocked.** E2E is not in the required set — LA-22 measured
-that (#454 merged with E2E red) — so merges proceed. But the job's own comment states the intent:
-*"the job is gated on UI paths above so that it CAN safely be required, and the owner adds it to
-branch protection."* It cannot be made required while it fails on every code PR, and in the meantime
-every session pays ~25 minutes of runner time and learns to read a red check as normal, which is how
-a real failure gets waved through later.
-
-**A second, smaller thing the gate gets wrong.** It matches `^app/`, so an `app/api/**`-only change
-with no UI in it triggers the full browser suite — that is how OR-102a, a migration and four API
-routes, ended up in this table at all. Narrowing it to exclude `app/api/` would cut the runner cost
-of this bug while it is open, and is worth doing regardless of the fix.
+**What is owed — the nine.** Seven are nutrition/meal, which is a cluster tight enough to suspect one
+shared cause: `edit-meal-batch-footer`, `meal-detail-artboard-parity`, `meal-label`,
+`meal-photo-picker`, `my-meals-artboard-parity`, `plan-rescale` (LA-67), `saved-meal-tags`. The other
+two are `first-run-empty-states` and `preferences-survive-reinstall`. **Order matters:**
+`preferences-survive-reinstall` fails twice in the full run and only goes flaky when run alone, so at
+least some of these are shared-state, not the spec's own logic. Read the artifact this PR makes real
+before assuming a local-DB artifact — that mistake has already been made once on `plan-rescale`.
 
 ### [platform] LB-59 — a lane written as a word instead of its letter is silently unclassified
 
