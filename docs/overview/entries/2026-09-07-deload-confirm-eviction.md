@@ -65,7 +65,22 @@ own row by id, so any stray active plan makes its insert fail and every test in 
 setup, reporting a constraint rather than anything about the plan card.
 
 Fixed here by copying the sibling's guard. Confirmed both directions against the exact state:
-with a stray active plan seeded, the file fails without the guard and passes with it.
+with a stray active plan seeded, the file fails without the guard and passes with it — and the
+second CI run has **zero** occurrences of `duplicate key`, `violates unique constraint`, or that
+constraint's name.
+
+**The guard worked and the spec still fails, on a different assertion.** `the floor leaves the meals
+as planned and says why` times out on
+`getByText(/under a meal — the remaining meals are left as planned/)` — the copy never renders. Its
+sibling in the same file passes, so the fixture and page are fine. It failed on **two CI runs, on
+both the attempt and the retry** (four failures, same message), and passes locally on `main` and on
+this branch against a clean database. Two problems wearing one symptom: the setup constraint, which
+is fixed, and this, which is not.
+
+Filed as **LA-67** for Lane B with the verbatim error and a starting hypothesis (the fixture's food
+log is keyed on the user's Brisbane day while CI runs UTC, which would leave the day under target so
+the floor never binds — read off the spec, not measured). Not fixed here: the assertion is nutrition
+surface behaviour and this PR touches `lib/cache-groups.ts`.
 
 **A correction on my own reasoning.** I first ran the spec on plain `main`, saw it fail, and took
 that as "already broken, not mine". It was failing for a *different* reason — a stray plan left in my

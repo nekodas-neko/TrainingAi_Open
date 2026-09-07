@@ -8534,3 +8534,11 @@ Also recorded there, and in the journal entry, are the three dead ends the e2e c
 redirects to `/workout`, the route is `/api/readiness-score`, and the morning check-in sheet hides
 Home's buttons while leaving their text in the DOM — a failure that reads as "the button does not
 exist".
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18821 (LA-67 filed)
+
+Up 33 rather than down, and it is the right direction: RV-49's CI runs surfaced a nutrition E2E
+failure that is **not** the constraint race fixed alongside it. The entry carries the verbatim error
+and the four-failures-across-two-runs evidence because the tempting reading — "E2E is flaky" — is the
+one the run's own output refutes: 154 passed, and the five genuinely flaky specs all passed on retry
+while this one failed on both attempts, twice.
