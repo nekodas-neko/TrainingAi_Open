@@ -55,7 +55,7 @@ jobs:
           version: 10.33.0
       - uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
@@ -92,7 +92,7 @@ jobs:
           version: 10.33.0
       - uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - name: Apply all migrations
@@ -125,7 +125,7 @@ jobs:
           version: 10.33.0
       - uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
@@ -481,6 +481,9 @@ jobs:
       - name: A dead WebView renderer is handled, not fatal
         run: node scripts/check-render-process-recovery.js
 
+      - name: CI, engines.node and production agree on a Node major
+        run: node scripts/check-node-version-agreement.js
+
   migrations:
     # LB-31: the nightly verifies `main`'s test suite only — see the `schedule` trigger.
     if: github.event_name != 'schedule'
@@ -506,7 +509,7 @@ jobs:
           version: 10.33.0
       - uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - name: Apply all migrations
@@ -610,7 +613,7 @@ jobs:
       - uses: actions/setup-node@v5
         if: steps.ui.outputs.changed == 'true'
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
         if: steps.ui.outputs.changed == 'true'
