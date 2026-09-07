@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.31",
+    date: "2026-09-07",
+    changes: [
+      "Program generation and exercise swaps stop offering you kit you do not own. Twenty-two exercises in the catalogue had no equipment recorded against them, and a blank entry was being read as \u201cneeds nothing\u201d \u2014 so machine exercises passed a home-gym filter that should have excluded them. The blanks are filled in, and a new exercise can no longer be saved without saying what it needs.",
+    ],
+  },
+  {
     version: "1.436.30",
     date: "2026-09-07",
     changes: [

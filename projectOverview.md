@@ -1726,6 +1726,38 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [workouts] 🟡 The catalogue's equipment column is fixed and guarded, but the add-exercise sheet still lets you submit with none (BF-129, 2026-09-07)
+
+**What shipped.** 22 `exercise_library` rows carried no equipment, and all three equipment filters
+read an empty list as an unconditional pass — so an unlabelled row cleared *every* equipment
+selection anyone could make. That is how a home gym with no machines was offered `Machine Chest
+Press`. Migration 269 labels them, `POST /api/exercises` now refuses to create another,
+`equipmentEligible` excludes an unlabelled row rather than passing it, and a Migration Check step
+holds the seeded rows.
+
+**What is still owed.**
+
+1. **The sheet has no client-side guard.** `components/exercises/add-exercise-sheet.tsx` starts with
+   `equipment: []` and lets the user press Save with no chips selected; the API now answers 400 and
+   the sheet shows the message in a toast. Correct, but a disabled button would be better than a
+   round trip, and **that toast has not been seen on the S25**.
+2. **`builder-review.tsx` keeps the third copy of the filter**, still with the permissive
+   `length === 0 ||` branch. Filed as **LA-66** (Lane B, two lines). Hardening rather than a live
+   defect — with every row labelled there is nothing for that branch to let through.
+
+**The finding worth carrying forward, because it changes where this class can be caught.**
+`exercise_library` is only partly seeded: **production held 151 rows against a freshly-migrated 141**.
+The extra ten were created at runtime through `POST /api/exercises`. So a CI check against a migrated
+database would have passed the whole time this was broken — the guard that closes the path is the
+route validation, and `scripts/check-catalogue-equipment.js` only holds the seeded half. Its header
+says so. Any future "add a check for it" on catalogue data should ask first whether the data in
+question is seeded or written at runtime.
+
+**Deliberately not changed:** the time model. `transitionSecForEquipment([])` still charges the
+barbell worst case (240 s) for an unlabelled row. The entry recommended treating empty as bodyweight
+there; with every row labelled that branch is unreachable, and re-tuning the transition constant is
+**LA-65**'s on evidence this did not have.
+
 ### [workouts] 🟡 The generated-program role cap is a guard against a defect that no longer reproduces (BF-126, 2026-09-07)
 
 **What shipped.** `capPrimariesPerSession` caps a generated session at one `primary`, demoting extras

@@ -8471,3 +8471,15 @@ costs weekly training volume and is the owner's call, not a validator's.
 `projectOverview.md` gains 32 for the honest version of what shipped: a guard against a defect that
 did not reproduce in 44 sampled sessions. An entry that read "fixed" would be wrong, and an entry
 that read "could not reproduce, closed" would throw away a real hole in the code.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18874, `projectOverview.md` → 10221 (BF-129 shipped, LA-66 filed)
+
+Roughly flat: BF-129's 40 lines left, LA-66's 22 arrived — the swap sheet's copy of the equipment
+filter, which is Lane B's and which the BF-129 entry had already named as such.
+
+`projectOverview.md` gains 33, and most of it is one finding rather than a status line:
+`exercise_library` is only partly seeded — production held **151 rows against a freshly-migrated
+141** — so the rows that drifted came in through `POST /api/exercises` at runtime, and a CI check
+against a migrated database would have passed the entire time the catalogue was broken. That is
+written down because the next "add a check for it" on catalogue data needs to ask which half of the
+table it is checking.
