@@ -1726,6 +1726,38 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [workouts] 🟡 The generated-program role cap is a guard against a defect that no longer reproduces (BF-126, 2026-09-07)
+
+**What shipped.** `capPrimariesPerSession` caps a generated session at one `primary`, demoting extras
+to `secondary`, in both `/api/generate-program` and `/api/builder-chat`. The role picks the
+progression style in both routes and never falls back to the model's own choice, so an uncapped extra
+primary is a second exercise prescribed at the goal's heaviest band.
+
+**Why this is a Known Issue rather than a struck one — two things are owed.**
+
+1. **The reported defect did not reproduce, so the guard is unproven against the real failure.** The
+   owner saw one generated program where Pull carried three heavy exercises and Push two. Across
+   **44 sampled sessions** — 10 programs, powerbuilding and strength, 4- and 5-exercise budgets, 4-
+   and 5-day splits, including four at his exact reported configuration — **every session came back
+   with exactly one primary**. The model complies today. The cap exists because nothing in code would
+   catch it if that stopped being true, not because it was seen failing. If the owner sees a lopsided
+   generation again, this guard is the first thing to check, and its narrowness is the likely reason.
+2. **No device check.** Both routes were exercised end-to-end on `pnpm dev` against the local
+   database (12 sessions unchanged at 1 primary / 2 secondary / 2 accessory with correct styles; one
+   `builder-chat` edit turn returning 200), but the program-builder screens were not opened on the
+   S25.
+
+**Deliberately NOT capped: secondaries.** Two per session is the owner's normal in 10 of his 22 real
+program sessions, and it is what the generator returns in every sample. A cap there would demote what
+he keeps — and asked to *"make Upper Push heavier"*, `builder-chat` reached for a third secondary, so
+the cap would have blocked a legitimate request.
+
+**The related observation, unbuilt.** The invariant the owner's programs actually hold is a *constant
+number of heavy (primary + secondary) exercises across a program's sessions* — true in 3 of his 4
+role-bearing programs, and the thing his complaint literally described. Levelling it is not shipped:
+demoting a secondary to accessory drops 4×8 @70% to 3×10 @65%, which costs weekly volume the prompt
+works hard to hit, so it is a change that needs the owner's call rather than a validator's.
+
 ### [workouts] 🟡 Every generated program now gets one more exercise per session, and no generated program has been opened on the S25 (BF-128, 2026-09-07)
 
 **What changed.** `styleWorkSec` no longer charges a rest period after the last set of an exercise.
