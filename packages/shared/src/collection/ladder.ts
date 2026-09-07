@@ -187,3 +187,31 @@ export const LADDERS: Record<Ladder['faucet'], Ladder> = {
  */
 export const STEPS_MAX_REST_GAP = 2
 export const SLEEP_MAX_REST_GAP = 2
+
+/*
+ * What counts as a steps or sleep faucet day: **that one was recorded at all.**
+ *
+ * There is no threshold and adding one would break the design the two constants above were
+ * calibrated against — the comment there chose them because *"steps logged 129 of 129 days and
+ * sleep lands nightly"*, which is a statement about days with data, not days above a bar.
+ *
+ * Measured on the owner's production rows before wiring the route (LB-60, 2026-09-07): **130 days
+ * carry steps and only 35 of them reach 8,000** — an average of 5,646. An 8k faucet with a 2-day
+ * allowance would decay the steps ladder most weeks, which is exactly the tension this file's own
+ * comment says not to manufacture. Sleep is less extreme and points the same way: 107 nights
+ * recorded, 79 at six hours or more.
+ *
+ * A per-user goal is worse still, not better: the goal is editable, so replaying against it
+ * un-spawns past days the moment someone raises their target — the retroactive rewrite the
+ * versioning note at the top of this file exists to prevent, arriving without anyone editing a
+ * constant.
+ */
+
+/**
+ * Bumped whenever any threshold in this file changes.
+ *
+ * Returned with the state so a client can tell a cached collection from a live one: the state is
+ * replayed on every read, so a response cached before a change and one computed after it straddle
+ * that change silently — the cache half of the versioning note above.
+ */
+export const COLLECTION_RULES_VERSION = 1
