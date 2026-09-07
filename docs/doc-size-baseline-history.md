@@ -8632,3 +8632,12 @@ import the handler — gives 148, and the entry now carries that number, why the
 the command that regenerates the list. It also says explicitly that the remainder is buildable work
 and takes no `Keep:`, because OR-100 is about exactly that: a `Keep:` files real work under a
 heading that tells the lane not to look.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18808 (LA-76's early-deload half shipped)
+
+Up 15, and all of it is a measurement. LA-76 assumed a lifter loses cats for following a prescribed
+deload; production says that has never happened — 3 deload-stamped sessions, isolated rather than
+contiguous, `early_deload_week_start` NULL on all five programs, `is_early_deload` true on no row
+ever, and a largest trained-day gap of 2 days where the allowance is already 2. The entry now
+carries those numbers, because the alternative is the next session spending an hour re-deriving them
+before it can tell that the buildable half is six lines and the rest is a schema decision.

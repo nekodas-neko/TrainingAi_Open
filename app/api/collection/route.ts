@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils'
 import { maxCompliantRestGap } from '@trainingai/shared/schedule-utils'
+import { earlyDeloadWeekDays } from '@trainingai/shared/phase-engine'
 import {
   replayCollection, LADDERS, STEPS_MAX_REST_GAP, SLEEP_MAX_REST_GAP, COLLECTION_RULES_VERSION,
   type CollectionState,
@@ -42,16 +43,20 @@ export async function GET() {
     repo.listSleepSessions(userId, HISTORY_START, today),
   ])
 
-  // `pausedDays` is the rest days the user actually chose, which is the app's own record of a
-  // compliant rest rather than a guess at one.
+  // `pausedDays` is compliance the app itself asked for, so that following its instructions never
+  // costs the user cats. Two sources, and only two exist:
   //
-  // **Deload days are NOT in here yet and that is a known gap**, named because the entry's own
-  // argument is that decaying compliance turns the mechanic against the user. `isDeloadActive`
-  // answers for one day given its resolved phase, so covering a deload week means resolving the
-  // phase engine per day across all history — too much for a read route to do on every call, and
-  // too easy to get quietly wrong. A rest day is weekly and a deload week is occasional, so this
-  // covers the common case; the remainder is filed rather than pretended away.
-  const pausedDays = restDays
+  //  · the rest days the user chose (`listRestDays`) — the app's own record of a compliant rest;
+  //  · the confirmed early-deload week, which `confirm-early-deload` stamps onto the program as a
+  //    dated 7-day span. That span is the only DATED record of a deload anywhere in the schema.
+  //
+  // **A deload PHASE is still not in here, and it cannot be** (LA-76): `program_phases` measures a
+  // phase in CYCLES, not dates, so there is no interval to read — resolving one means replaying the
+  // phase engine per day across all history. `workout_sessions.phase_type` records which sessions
+  // fell in a deload, but a deload day you TRAINED is already a faucet day and needs no pause; what
+  // a pause is for is the days you did not train, and a set of isolated stamped sessions cannot say
+  // where those intervals began or ended.
+  const pausedDays = [...restDays, ...earlyDeloadWeekDays(program ?? {})]
 
   // A faucet day for these two is a day that was RECORDED, not one above a bar — see the note in
   // `ladder.ts`. Measured before wiring this up: only 35 of the owner's 130 step-days reach 8,000,
