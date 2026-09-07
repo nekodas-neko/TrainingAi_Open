@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { reconcileRehydratedActivity, clearActivitySetup } from '@/lib/stores/activity-store'
@@ -84,9 +84,21 @@ describe('what must NOT be touched', () => {
   it('an active session exactly at the bound is still live', () => {
     // The comparison is `>`, so the boundary resumes rather than being thrown away. Pinned because
     // an off-by-one here silently discards a recording.
-    const s = state({ ...SETUP, mode: 'active', startMs: Date.now() - 12 * HOURS })
-    reconcileRehydratedActivity(s)
-    expect(s.mode).toBe('active')
+    //
+    // The clock is FROZEN, and it has to be. The fixture reads `Date.now()` and
+    // `reconcileRehydratedActivity` reads it again, so "exactly at the bound" only holds if both
+    // land in the same millisecond — on an idle machine they do, and under a loaded CI runner they
+    // do not, at which point the gap makes the age `> MAX_ACTIVE_RECOVERY_MS` and the session is
+    // discarded. That is the CLAUDE.md rule about one side of a comparison being the real clock:
+    // this test failed in CI while passing 12 of 12 runs locally.
+    vi.useFakeTimers()
+    try {
+      const s = state({ ...SETUP, mode: 'active', startMs: Date.now() - 12 * HOURS })
+      reconcileRehydratedActivity(s)
+      expect(s.mode).toBe('active')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('a clean pre session is left as it is', () => {

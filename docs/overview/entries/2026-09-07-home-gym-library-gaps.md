@@ -58,6 +58,38 @@ loaded hinge the wrong substitute.
   so the new rows do not reintroduce BF-129's class.
 - Full suite green; `tsc` clean; Custom Rules 68 of 68.
 
+## What CI caught that local testing did not
+
+Two failures on the first run, and both are worth recording because neither was reproducible on the
+first attempt locally.
+
+**Migration Check — the new rows lost their equipment on replay.** `030_exercise_equipment.sql`
+opens with an **unconditional** `UPDATE exercise_library SET equipment = '{}'` — no `WHERE` clause —
+before setting the rows it knows by name. Migration Check truncates `schema_migrations` and replays
+every file, so 030 runs again and blanks the column on every row, including ones added by later
+migrations. Migrations **081 and 082 survive that only because each ends with guarded
+`... AND equipment = '{}'` UPDATEs** that repair their own rows; I copied their INSERT and not that
+half, and an `ON CONFLICT DO NOTHING` does not repair, because the conflict is a no-op and the row
+keeps the blank. Fixed by adding the same four trailing UPDATEs, verified through a full
+apply-then-replay cycle.
+
+This is also the first thing BF-129's `check-catalogue-equipment` caught. The hazard predates it —
+030 has been blanking replayed rows all along — and nothing asserted otherwise until this week.
+
+**Tests — a pre-existing flake, unrelated to this diff.**
+`activity-store-stale-setup.test.ts` > *"an active session exactly at the bound is still live"* is a
+coin flip by construction: the fixture computes `Date.now() - 12 * HOURS`, and
+`reconcileRehydratedActivity` reads `Date.now()` **again** against a `>` comparison. The two only
+agree if both land in the same millisecond. On an idle machine they do — it passed **12 of 12** runs
+locally on `main`'s unmodified copy — and on a loaded runner with 786 test files in flight they do
+not, at which point the session is discarded and the assertion fails.
+
+Confirmed by injecting a 5 ms gap: with the clock free the test fails, with it frozen it passes. It
+is exactly the class `CLAUDE.md` documents — one side of the comparison is the real clock — so the
+fix is `vi.useFakeTimers()` around that single case. Fixed here rather than filed because it reds
+every PR in the repo at random and the diagnosis was already in hand; it is a two-line change in one
+test and touches no product code.
+
 ## Noted, not fixed
 
 **Muscle names are case-inconsistent in the catalogue** — `Hamstrings` and `hamstrings`, `Lats` and

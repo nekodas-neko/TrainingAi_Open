@@ -9,18 +9,28 @@
 // and it was machine-only, so a home gym had zero — a worse gap than the reported one.
 //
 // Runs only against a real Postgres. CI's "Tests" job sets DATABASE_URL.
-import { describe, it, expect, beforeAll } from 'vitest'
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest'
+import { migrationTestLock } from './migration-test-lock'
 
 const canRun = !!process.env.DATABASE_URL
 const HOME_GYM = ['barbell', 'dumbbell', 'cable', 'bodyweight']
 
 describe.skipIf(!canRun)('migration 270 — home-gym coverage (BF-130)', () => {
   let pool: import('pg').Pool
+  // Takes the migration lock even though it only READS. `exercise-equipment-backfill-migration`
+  // blanks `equipment` on named rows while it holds this lock, and the coverage assertion below
+  // reads the whole catalogue — so without it these two race on the shared test database and pass
+  // or fail on order, which is the hazard `check-catalogue-equipment` was moved out of the Tests
+  // job to avoid in the first place.
+  const lock = migrationTestLock(() => pool)
 
   beforeAll(async () => {
     const { getPool } = await import('@/lib/data/postgres/client')
     pool = getPool()
   })
+
+  beforeEach(async () => { await lock.acquire() })
+  afterEach(async () => { await lock.release() })
 
   /** Rows whose MAIN muscle is `muscle`, with the equipment each declares. */
   const mainMoversFor = async (muscle: string): Promise<{ name: string; equipment: string[] }[]> => {

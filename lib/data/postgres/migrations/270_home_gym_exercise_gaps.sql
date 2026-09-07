@@ -47,3 +47,19 @@ INSERT INTO exercise_library (name, muscles, equipment, instructions, exercise_t
  'weighted')
 
 ON CONFLICT (name) DO NOTHING;
+
+-- REPLAY SAFETY, and it is not optional here. Migration 030 opens with an UNCONDITIONAL
+-- `UPDATE exercise_library SET equipment = '{}'` — no WHERE clause — before setting the rows it
+-- knows by name. Migration Check truncates `schema_migrations` and replays every file against the
+-- built schema, so 030 runs again and blanks the equipment column on EVERY row, including ones
+-- added by later migrations. 081 and 082 survive that because each ends with guarded
+-- `... AND equipment = '{}'` UPDATEs that repair their own rows; an INSERT with
+-- `ON CONFLICT DO NOTHING` does not, because the conflict is a no-op and the row keeps the blank.
+--
+-- So these four lines are what make the migration replay-safe. Without them the rows exist with no
+-- equipment after a replay, which is precisely the state BF-129 shipped a check against — and that
+-- check is what caught it.
+UPDATE exercise_library SET equipment = ARRAY['bodyweight'] WHERE name = 'Stability Ball Leg Curl' AND equipment = '{}';
+UPDATE exercise_library SET equipment = ARRAY['bodyweight'] WHERE name = 'Slider Leg Curl'         AND equipment = '{}';
+UPDATE exercise_library SET equipment = ARRAY['bodyweight'] WHERE name = 'Copenhagen Plank'        AND equipment = '{}';
+UPDATE exercise_library SET equipment = ARRAY['cable']      WHERE name = 'Cable Hip Adduction'     AND equipment = '{}';
