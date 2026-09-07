@@ -540,13 +540,50 @@ OR-102a/b will read dose history to recommend the next dose. A tracker that read
 - **Reversal cost:** low. No migration; existing rows keep whatever they were stamped with, which is
   the point of the stamp.
 
+### [app-shell][platform] LB-60 — the collection engine has no way to be fed
+
+- **Lane:** A — a read route under `app/api/**`, assembling from the repository.
+- **Added:** 2026-09-07, by Lane B on picking up BF-122b and finding it unstartable.
+- **Blocks:** BF-122b, entirely.
+
+BF-122a shipped `replayCollection` as *"a pure fold over day series the app already stores"* and
+deliberately no route — *"no migration, no table, no route"*. That is right for the engine and it
+leaves the surface with nothing to call: **`replayCollection` has no caller anywhere in the repo.**
+
+`ReplayInput` wants four things and the client can reach one of them:
+
+| input | client-reachable today |
+|---|---|
+| `days` — workout | **partly.** `/api/streak-data` returns `trainedDays` over a fixed window; the fold replays *all* history |
+| `days` — steps, sleep | **no.** No endpoint serves a day series for either; `health-trends` serves analysis views |
+| `maxRestGap` | **no.** `maxCompliantRestGap` reads the program's schedule, which the home screen does not hold |
+| `pausedDays` | **no.** The app's own recommended rest and deload days are server-side. Without them, compliance decays — the exact outcome BF-122a's comment calls *"turning the mechanic against the user"* |
+
+**So not even a reduced, workout-only widget is buildable from the client.** The two things that
+make the workout ladder correct rather than merely present — the schedule-derived allowance and the
+paused days — are both missing.
+
+- **Shape:** one authenticated GET returning the three `CollectionState`s, or the assembled
+  `ReplayInput`s. Returning the **states** is preferable: the fold is a shared pure function, and
+  sending its inputs to the client means two places can disagree about which days paused.
+- **⚠ Read BF-122a's versioning note first.** State is replayed on every read and the thresholds are
+  constants, so a cached response and a live one must not straddle a threshold change.
+- **Not a migration.** Everything it reads already exists.
+
 ### [app-shell] BF-122b — the cat collection, surface half: the sprites, the home widget, and where you read about it
 
 - **Lane:** B — `components/home/**`, `lib/home/home-prefs.ts`, `components/more/**` and the art.
 - **Added:** 2026-09-06 · owner, same conversation as **BF-122a** — *"ideally it's a small widget card
   on the home screen, so I don't know if it can be too big"* and *"rather than a humanoid character
   could we have a cat variant? cat tank, cat slime etc"*.
-- **Needs:** BF-122a
+- **Needs:** LB-60
+- **⚠ BF-122a shipped the fold and no way to feed it — checked 2026-09-07 before starting this.**
+  `replayCollection` has **no caller**, and nothing the client can reach assembles a `ReplayInput`:
+  `/api/streak-data` gives workout days only, over a window; there is no steps or sleep day series
+  (`health-trends` serves analysis views, not days); and neither the schedule that
+  `maxCompliantRestGap` reads nor the app's own recommended rest/deload days — `pausedDays`, without
+  which compliance decays and the mechanic turns against the user — is on the client at all. **Not
+  even a workout-only version is buildable from here.** That is LB-60, and it is Lane A's.
 
 **The art brief, sized so it can actually get drawn.** Four classes × several tiers is forty sprites
 if each is unique, and forty sprites is how this never ships. **One cat silhouette, tiers signalled by

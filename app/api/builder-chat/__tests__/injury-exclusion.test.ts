@@ -76,7 +76,7 @@ describe('builder-chat honours logged injuries (BF-68)', () => {
     expect(capturedPrompt).not.toContain('Deadlift')
     expect(capturedPrompt).not.toContain('Good Morning')
     expect(capturedPrompt).toContain('Leg Curl')
-    expect(capturedSystem).toContain('Lower Back (severe,')
+    expect(capturedSystem).toContain('<user_text>Lower Back</user_text> (severe,')
   })
 
   // The constraint dying at save is the entry's actual complaint: a swap agreed in this

@@ -8460,6 +8460,14 @@ phase, so nothing here has been on a screen.
 
 The backlog moves the other way: BF-127's 32-line entry goes on shipping.
 
+## 2026-09-07 — `docs/implementation-backlog.md` → 18942 (LB-60, and BF-122b's real blocker)
+
+Thirty-seven lines to stop the next session doing what this one nearly did: opening BF-122b, reading
+"Needs: BF-122a — merged", and starting a four-part feature that cannot render a number. The table of
+four inputs against what the client can actually reach is the whole entry; prose saying "it needs a
+route" would have been a third the length and would not have survived the first person who thought
+they could get away with the workout ladder alone. They cannot, and the row that says why — the
+paused days — is the one that matters, because building without it decays a user for complying.
 ## 2026-09-07 — `docs/implementation-backlog.md` → 18888, `projectOverview.md` → 10189 (BF-126 shipped)
 
 The backlog shrinks 31 with nothing filed behind it, which is worth noting because the last two
@@ -8581,9 +8589,18 @@ the write. What replaces it is longer because it is a different finding: LA-74, 
 write routes that have no request schema at all, which is *why* the guard reached one table out of
 four rather than a scoping choice.
 
-## 2026-09-07 — `docs/implementation-backlog.md` → 18801 (LA-74's style half shipped)
+## 2026-09-07 — `docs/implementation-backlog.md` → 18831 (LB-60 filed)
 
-Up 7, and the growth is the finding. LA-74 said two routes take an unvalidated body; the style half
+Up 37, and the entry is the whole growth: LB-60 is the authenticated GET that BF-122a's engine half
+was never given, and BF-122b — four Lane B surfaces — cannot start without it. Re-derived after
+merging `main`, which had already moved the baseline to 18794; carrying this branch's own number
+across that merge would have handed the queue a whole entry's worth of silent slack.
+## 2026-09-07 — `docs/implementation-backlog.md` → 18838 (LA-74's style half shipped)
+
+Up 7 on this branch, landing at 18838 after merging LB-60's own raise — recomputed from the merged
+file rather than carried across, because two branches raising the SAME document genuinely disagree
+about one number and splicing either side would hand the queue silent slack. The growth is the
+finding. LA-74 said two routes take an unvalidated body; the style half
 shipped with a `.strict()` schema, and the program half did not — because the enumeration turned up
 two producers that disagree (the editor omits `programId`/`sessionId`, the activate button sends
 them), a two-variant `schedule` union, and dates that arrive as strings against a `Date` type. That

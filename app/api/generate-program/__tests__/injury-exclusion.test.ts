@@ -89,8 +89,11 @@ describe('generate-program excludes injured-muscle exercises (BF-68)', () => {
     injuries = [{ muscleName: 'Lower Back', severity: 'moderate', startedDate: '2026-08-20', resolvedDate: null, notes: 'sore when hinging' }]
     await post()
     expect(captured).toContain('ACTIVE INJURIES')
-    expect(captured).toContain('Lower Back (moderate,')
-    expect(captured).toContain('sore when hinging')
+    // Fenced, since LA-69: the muscle name and the note are both the user's typed words, so they
+    // reach the model wrapped rather than spliced. Asserted in the fenced form on purpose — the
+    // bare substring passed before the fencing landed and would pass again if it were removed.
+    expect(captured).toContain('<user_text>Lower Back</user_text> (moderate,')
+    expect(captured).toContain('<user_text>sore when hinging</user_text>')
   })
 
   it('a resolved injury constrains nothing', async () => {
