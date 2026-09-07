@@ -27,6 +27,7 @@
 const fs = require('fs');
 const path = require('path');
 const { resolveBaseRef, countAtBase, verdict } = require('./lib/base-ref');
+const { stripComments } = require('./lib/strip-comments');
 
 const HEX = /#[0-9a-fA-F]{3,8}\b/g;
 
@@ -55,26 +56,20 @@ const BASELINE = {
   'app/session-select/components/deload-explanation.tsx': 3,
   'app/session-select/components/recommendation-card.tsx': 6,
   'app/session-select/components/streak-card.tsx': 4,
-  'app/session-select/session-select-content.tsx': 1,
-  'app/workout-select/workout-select-content.tsx': 1,
   'components/activity/activity-route-map.tsx': 4,
-  'components/activity/done-activity-screen.tsx': 1,
   'components/admin/calibration-card.tsx': 5,
   'components/body-battery-card.tsx': 2,
   'components/cardio/modality-picker.tsx': 3,
-  'components/cardio/time-picker-sheet.tsx': 1,
   'components/chart-message.tsx': 6,
   'components/checkin/readiness-checkin-card.tsx': 1,
   'components/exercise-history-sheet.tsx': 1,
   'components/google-sign-in.tsx': 4,
-  'components/guided-walk/walk-summary.tsx': 2,
   'components/health/ai-weekly-volume-card.tsx': 1,
   'components/health/body-cards/rhr-hrv-spo2-card.tsx': 15,
   'components/health/body-cards/sleep-card.tsx': 5,
   'components/health/body-muscle-card.tsx': 1,
   'components/health/detail-hero.tsx': 55,
   'components/health/goals-progress-card.tsx': 6,
-  'components/health/hr-day-chart.tsx': 1,
   'components/health/injury-card.tsx': 3,
   'components/health/metric-scale.tsx': 11,
   'components/health/metric-sheets.tsx': 5,
@@ -108,7 +103,6 @@ const BASELINE = {
   'components/profile/goal-targets-section.tsx': 3,
   'components/profile/level-sheet.tsx': 1,
   'components/profile/macro-targets-pane.tsx': 2,
-  'components/running/running-plan-content.tsx': 1,
   'components/shell/bottom-nav.tsx': 1,
   'components/ui/color-swatch-picker.tsx': 2,
   'components/ui/sparkline-chart.tsx': 1,
@@ -121,7 +115,6 @@ const BASELINE = {
   'components/workout/hr-recovery-chart.tsx': 6,
   'components/workout/last-set-rest-timer.tsx': 1,
   'components/workout/live-1rm-readout.tsx': 2,
-  'components/workout/log-activity-sheet.tsx': 1,
   'components/workout/pip-view.tsx': 2,
   'components/workout/rest-ring.tsx': 6,
   'components/workout/rpe-strip.tsx': 7,
@@ -147,7 +140,7 @@ function walk(dir) {
     }
     if (!entry.name.endsWith('.tsx')) continue;
     const rel = path.relative(root, full).split(path.sep).join('/');
-    const count = countHex(fs.readFileSync(full, 'utf8'));
+    const count = countHex(stripComments(fs.readFileSync(full, 'utf8')));
     total += count;
     seen.add(rel);
     const allowed = BASELINE[rel] ?? 0;

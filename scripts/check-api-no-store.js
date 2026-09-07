@@ -21,6 +21,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { stripComments } = require('./lib/strip-comments');
 
 const root = path.join(__dirname, '..');
 const API = path.join(root, 'app', 'api');
@@ -55,7 +56,7 @@ for (const file of walk(API)) {
   const rel = path.relative(root, file).split(path.sep).join('/');
   if (EXEMPT.has(rel)) continue;
   checked++;
-  const lines = fs.readFileSync(file, 'utf8').split('\n');
+  const lines = stripComments(fs.readFileSync(file, 'utf8')).split('\n');
   lines.forEach((line, i) => {
     if (!/Cache-Control/i.test(line)) return;
     if (BANNED.test(line)) offenders.push({ rel, line: i + 1, text: line.trim() });

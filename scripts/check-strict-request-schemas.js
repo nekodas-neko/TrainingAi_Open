@@ -109,6 +109,7 @@
 const fs = require('fs');
 const path = require('path');
 const { resolveBaseRef, countAtBase, verdict } = require('./lib/base-ref');
+const { stripComments } = require('./lib/strip-comments');
 
 const ROOTS = ['app/api', 'packages/shared/src/validation'];
 
@@ -175,7 +176,7 @@ function walk(dir, hit) {
     const p = path.join(dir, e.name);
     if (e.isDirectory()) walk(p, hit);
     else if (p.endsWith('.ts') && !p.includes('__tests__')) {
-      const n = countNonStrict(fs.readFileSync(p, 'utf8'));
+      const n = countNonStrict(stripComments(fs.readFileSync(p, 'utf8')));
       if (n > 0) hit[p] = n;
     }
   }

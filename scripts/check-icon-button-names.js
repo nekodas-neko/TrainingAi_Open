@@ -17,6 +17,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { stripComments } = require('./lib/strip-comments');
 
 const ROOTS = ['app', 'components'];
 
@@ -101,7 +102,7 @@ const BASELINE = {
 
 const offenders = [];
 for (const file of ROOTS.flatMap(r => (fs.existsSync(r) ? walk(r) : []))) {
-  const src = fs.readFileSync(file, 'utf8');
+  const src = stripComments(fs.readFileSync(file, 'utf8'));
   // PS-34: the opening tag was matched with `(\s[^>]*?)?>`, whose character class stops at the
   // FIRST `>` — which in `onClick={() => …}` is the arrow's. Every inline-arrow handler therefore
   // truncated `attrs` mid-attribute and threw the rest into `body`, so the `</button>` match failed
