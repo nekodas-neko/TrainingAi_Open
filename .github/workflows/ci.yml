@@ -170,7 +170,6 @@ jobs:
             -e '"Push"' -e '"Pull"' -e '"Legs"' \
             app/ lib/ components/ packages/ 2>/dev/null \
             | grep -v '\.md:' \
-            | grep -v 'push\|pull' \
             | grep -v 'app/api/generate-program/' \
             | grep -v 'components/config/exercise-picker-sheet' \
             | grep -Ei '"(Push|Pull|Legs)"' || true)

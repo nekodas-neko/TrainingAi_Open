@@ -102,6 +102,15 @@ silently misdirecting the next session. Update them in the same PR that consumes
 >   runtime, and the sandbox cannot run the local store at all — "probably fine" is the judgement
 >   that has shipped bugs here before. The field makes the debt countable; only the S25 clears it.
 >
+> - **`Lane: O`** — the **Orchestrator's** lane, added 2026-09-06 (`OR-103`). For work in neither
+>   implementer's paths: `.github/workflows/**`, `playwright.config.ts`, repository settings and
+>   rulesets, and the queue tooling itself. **It exists because §3's path rule cannot answer those** —
+>   they are reached from no `app/`, `components/` or `lib/` path — so four entries printed as
+>   UNCLASSIFIED to every lane at once, each explaining "neither lane" **in prose**. A label that
+>   lives only in prose is the exact defect the `Lane:` field was created to fix, so the third value
+>   is the consistent answer rather than a special case. `--lane O` lists them; an `O` entry is
+>   hidden from A and B, which is the point.
+>
 > - **`Keep: <what is owed>`** — the entry partly shipped and stays queued for the residue.
 >   `next-item.js` routes it to a **KEEP** section headed *"shipped; only the stated residue is owed.
 >   Not new work"* — so **what follows `Keep:` must be a check, a decision, or a measurement, never a
@@ -388,109 +397,621 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
-### [nutrition] BF-112 — enter an actual dose: the storage for retatrutide is finished and there is still no field to type it into
-
-> **⚑ THE OWNER STARTS DOSING 2026-09-06 AND THIS IS NOT BUILT.** Measured 2026-09-05: Lane B
-> **READY #6**, and production still shows two supplements with `default_amount`, `unit`,
-> `dose_prompt` and `started_on` all empty. **Nothing in the app can record a dose tomorrow.**
->
-> **⚠ A workaround exists for tomorrow and it preserves the data that matters.** BF-3 stamps
-> `supplement_logs.dose_text` **from the definition at log time**, so the text freezes on the log and
-> later edits do not rewrite history. So: create a supplement named for the drug, put the current dose
-> in its free-text `dose` field, and tick it on each dose day. Each tick freezes that day's dose text
-> and its date. When the dose changes, edit the definition — past logs keep what they had. This gets
-> **the dose dates and the dose amounts recorded from day one**, in a form BF-112 can later migrate
-> into `amount`/`unit`. The dates are the half that cannot be reconstructed afterwards.
->
-> **⚠ The owner's model needs one correction, and it is the whole design.** He asked for *"a dose of
-> xmg… so that each day after it can assume it's wearing off"*, weekly, escalating. Decay alone is not
-> enough: **weekly dosing with a multi-day half-life ACCUMULATES.** A dose given seven days after the
-> last one lands on top of a substantial residual, so the level climbs for several weeks **even at a
-> constant dose**, and settles at a multiple of the single-dose peak. Modelling each dose as an
-> isolated decay curve would under-report every week after the first.
-> - **The right shape is superposition:** `level(day t) = Σᵢ doseᵢ × 0.5^((t − tᵢ) / halfLife)` over
->   every dose so far. One number per day, on one scale, comparable across the whole timeline — and it
->   answers *"all previous data is 0% reta"* for free, because before the first dose the sum is empty.
-> - **`halfLife` must be a stored, editable value, not a constant in a formula.** It is an assumption
->   about a drug, the published figure carries a range, and this app's own rule is that no
->   model-or-literature number may be shown as fact. Store it beside the substance, show it as the
->   assumption it is, and let the curve be recomputed if it changes.
->
-> **⚠ "Which dose is best for sleep/HR/stress" is the question this cannot honestly answer, and saying
-> so now is cheaper than discovering it in three months.** On an escalating schedule, **dose, cumulative
-> level and elapsed time all rise together** — they are the same line. Anything that improves or
-> worsens over those weeks correlates with all three, and the design cannot separate them. Worse, the
-> drug's *intended* effect is weight loss, and weight loss independently changes sleep, resting heart
-> rate and HRV — so the most likely confounder is the thing being measured.
-> - **What the data CAN support**, and what to build toward: the **pre-dose baseline** (three months of
->   ring data at level 0, which is why the first dose date matters); **within-week shape** — day 1 after
->   a dose against day 6, which varies while the dose is held constant and is the one contrast not
->   confounded by titration; and a **plateau**, if he holds a dose for several weeks, which is the only
->   way a level gets observed twice at different times.
-> - **State it as association, never attribution.** n=1, no control, no blinding, a dozen confounders.
->   The app shows the number beside the level; it does not say the drug caused it, and it must not
->   recommend a dose. That is a medical decision and out of scope, as this entry's parent already says.
 
 
-- **Lane:** B — the supplements manage sheet and `supplements-section.tsx`. **Engine work: none.**
-  Stage 1 shipped 2026-09-01 (migrations 254 + 255, local SQLite v34) and every column this needs
-  already exists.
-- **Added:** 2026-09-03 · owner: *"i havent seen the retatrutide tracking section yet can you tell me
-  how its progressed?"* — a question, and the answer is that his half has never been built.
-- **The design is settled** in [`docs/superpowers/plans/2026-09-01-dosed-substance-exposure.md`](superpowers/plans/2026-09-01-dosed-substance-exposure.md)
-  §5 and §6 stage 2, and is not re-litigated here. This entry exists so the work is **startable**
-  rather than only described.
+### [platform][body] OR-102a — the reta tracker, engine half: a vial record and a dose TIMESTAMP
 
-**⚠ Why this is a new entry and not another line on BF-69.** BF-69 carries a `Keep:` and therefore
-prints under **KEEP — "shipped; only the stated residue is owed. Not new work."** That is true of the
-*storage*, and the residue it names is **stages 2, 3 and 4 — the entire user-facing feature**. An
-implementer working the queue top-down sees "not new work" and moves on, which is why two months of
-engine work has produced nothing the owner can use. Same failure shape as the `Verify:` misuse
-corrected on 2026-09-02: a field that means *finished* attached to something unfinished.
+- **Lane:** A — one migration plus the repository/sync mirroring. **Small, and it is the only half
+  that cannot be repaired afterwards.**
+- **Added:** 2026-09-06 · owner, specifying the tracker in four parts (see **OR-102b**).
+- **Two columns' worth of work, and both exist because of something already measured:**
 
-**Measured in production 2026-09-03, and it is stark:**
+  **1. A vial record**, so the calculator has a concentration: `strength_mg`, `water_ml`,
+  `syringe_units_per_ml` (default 100 for a U-100 barrel), `opened_on`. Concentration derives; it is
+  never stored as its own truth.
+  - **Owner: reconstitution is stable** — *"I reconstitute a vial and will use it for weeks at a
+    time."* So the newest vial is the **sticky default** and carries forward. Opening a new one is an
+    explicit action, not a form to refill each dose.
+  - **⚠ STAMP THE RECONSTITUTION ON THE LOG, NOT ONLY THE VIAL.** Mix the next vial at a different
+    volume and the *same* milligram dose becomes a different number of units. The stored mg stays
+    correct; a historical *"15 units"* silently starts reading wrong. This is BF-3's dose-freezing
+    rule one layer up, it is the reason this entry is Lane A, and it is the single thing here that
+    cannot be back-filled.
 
-| | live |
+  **2. `supplement_logs.taken_at` — a real timestamp.** Verified 2026-09-06: the table has
+  **`log_date`, a DATE, and no time at all** (`schema.ts:1082`). The owner's request — *"marks the
+  day time when the dose used… correlate sleep/HR everything to the dose"* — is not expressible
+  today. Nullable, defaulting to the moment of the tick, editable after the fact.
+  - **This is the column that makes the one honest analysis possible.** Dose, cumulative level and
+    elapsed time all rise together on a titration, so almost nothing separates them — **except
+    hours-since-dose within a single week**, which varies while the dose is held constant. Without a
+    time, that contrast does not exist and the tracker can only ever show correlations confounded by
+    the schedule.
+
+- **Nothing else changes.** `amount`/`unit`/`dose_text` already exist and already freeze (BF-3,
+  migration 244); `started_on`/`stopped_on` shipped in #896.
+- **Reversal cost:** a corrective migration. Additive columns only, no rewrite of existing rows.
+
+### [nutrition][body] OR-102b — the reta tracker: vial setup, dose calculator, dose timeline, weight response
+
+- **Lane:** B — a new section under Nutrition, plus the supplement sheet.
+- **Needs:** OR-102a
+- **Added:** 2026-09-06 · owner, who specified four parts and asked for them in one place:
+  *"the reta tracker; the usefulness of it; what to increase/use each week — what dosage etc."*
+- **Design already settled** in [`plans/2026-09-01-dosed-substance-exposure.md`](superpowers/plans/2026-09-01-dosed-substance-exposure.md)
+  and in **OR-102a** above. Not re-litigated here.
+
+**① Vial setup.** Bac water (mL) and peptide strength (mg) in; concentration out.
+`10 mg ÷ 3.0 mL = 3.33 mg/mL`. Show the division, not only the result. Prefilled from the last vial.
+
+**② Dose calculator.** Type the dose in mg, get the units to draw:
+`0.5 mg ÷ 3.33 mg/mL = 0.15 mL → 15 units`. Verified against the owner's third-party calculator —
+all four of its figures reproduce exactly. Also free from the same record: **doses left in the vial**,
+and a guard when a dose needs more than the barrel holds.
+- **Store mg, display units.** mg is the invariant the exposure model needs; units are a property of
+  how *this* vial was mixed.
+
+**③ Dose timeline.** The tick writes `taken_at`, and the dose appears on the day timeline beside
+sleep, HR and stress like any other event.
+- **What this can honestly show: within-week shape** — day 1 after a dose against day 6, at a
+  *constant* dose. That is the one contrast a titration does not confound.
+- **What it must NOT claim:** that a change across weeks is the drug. Dose, level and time rise
+  together, and the drug's intended effect (weight loss) independently moves sleep, resting HR and
+  HRV — so the most likely confounder *is* the thing being measured. **Association, never
+  attribution.**
+
+**④ Weight response since the last dose — and the owner's shape needs one correction.**
+Asked for: *"weight delta from last weight on injection day to last recorded day (or average) with a
+colour showing if its too much weight loss or if its good."* The colour is right. **A two-point delta
+is not**, and production says so:
+
+| how the delta is measured | noise (SD) |
 |---|---|
-| supplements defined | **2** — Fish Oil, Vitamin D |
-| `default_amount` / `unit` on either | **neither** |
-| `started_on` / `stopped_on` / `dose_prompt` | **null / null / false** on both |
-| `supplement_logs` rows, all time | **1** — Vitamin D, **2026-06-21** |
-| rows carrying an `amount` | **0** |
-| retatrutide | **not in the table** |
+| **two single weigh-ins, 7 days apart** | **± 1.70 kg** |
+| 3-day mean at each end | ± 0.98 kg |
+| 5-day mean at each end | ± 0.76 kg |
+| **7-day mean at each end** | **± 0.64 kg** |
 
-The columns BF-3 and BF-69 added are all present and all empty, because nothing in the UI can write
-to them. The last supplement log of any kind is from June.
+Measured from 87 weigh-ins over 118 days: residual SD about the trend is **1.203 kg**, so a
+difference of two single readings carries √2 × that. **The target band is 0.35–0.70 kg/wk.** A
+two-point delta is more than twice the width of the entire band — the colour would be close to
+random, and worse than no colour because it looks authoritative.
+- **Build it as a trailing 7-day mean at each end**, and **grey the chip when the difference does not
+  clear the noise**, with *"not enough weigh-ins yet"*. Red/amber/green only when the number is real.
+- **The band is the owner's setting**, entered as %/week of bodyweight, defaulting to 0.5–1 %.
+- **Too-fast is the reliable direction, and it is the one that matters.** Flagging a rate above
+  ~1.5 kg/wk needs far less precision than separating 0.1 from 0.4 kg/wk, so the muscle-loss warning
+  the owner actually wants is reachable in 2–3 weeks, while a plateau call needs ~6.
 
-**What stage 2 is, from the plan — this entry does not redesign it:**
+**⚠ What this entry deliberately does NOT build: an increase/hold recommendation.**
+- **Statistically it cannot be supported yet** — a 14-day slope resolves only to ±1.30 kg/wk against a
+  0.35 kg-wide band, so a weekly call would flip on water weight while sounding certain.
+- **And naming a dose is a medical decision**, out of scope per this entry's parent. The app reports
+  the owner's data against a band the owner set; it does not choose the number.
+- **The honest substitute, which is most of the value:** *"week 3 of 4 at 2 mg · −0.42 kg/wk (95% CI
+  −0.88 to +0.04, 21 days)"*. Facts plus their uncertainty, next to the schedule.
+- **Revisit the plateau call once 6+ weeks of on-drug data exist** to test it against — not before.
 
-- an **amount + unit** on the supplement definition (the manage sheet has no such field today);
-- **`dose_prompt`** as a single boolean on the definition — the owner's *"selection first to choose
-  dosage"*. Creatine is 5 g every time; retatrutide titrates, so a prompted log asks for the number at
-  log time. **One flag, not a second flow**: a prompted log is still one contribution row, only the
-  source of the number differs;
-- `started_on` / `stopped_on`, so a drug that was started and stopped reads as a window rather than as
-  a gap in the logs — the plan's §2 presence model, where *"unknown is a real answer"*;
-- **`supplements-section.tsx` rendering `loggedAmount`**, which `listSupplements` already returns beside
-  `loggedDose`. The two are different questions — what a past log recorded against what the definition
-  says now — and freezing the first was the whole point of BF-3's gap 1.
+- **Reversal cost:** low. A section and a card; no data, no migration (those are OR-102a's).
+- **Verify:** device — the calculator's arithmetic against the owner's own third-party app, and
+  whether the colour chip reads correctly at a glance on the S25.
 
-- **⚠ Do not touch `loggedToday`.** It tracks the **manual** contribution only, deliberately: it is the
-  tick's checked state, and a meal-sourced dose turning it on leaves a control that refuses to turn
-  off. Stage 1's comment says so; it is easy to "fix" and hard to notice.
-- **Stage 3 (meal attachment) is not part of this** and stage 4 (the trends overlay) is gated on data
-  the owner cannot produce until this ships — the plan says a series needs **~4 weeks** of real
-  amounts. **So this entry is the thing standing between the feature and its own evidence**, which is
-  the argument for its queue position rather than its size.
-- **Out of scope, and worth restating because the substance invites it:** the app records what was
-  taken. No dosing guidance, no interaction checking, no titration schedule generation. Any
-  correlation stays an observation on n=1 with a dozen confounders, shown as a number, never as a
-  claim about cause.
-- **Verification:** define a supplement with an amount and a unit; tick it and the log carries that
-  number; turn on `dose_prompt`, tick it, and it asks — the entered number lands on the log and not on
-  the definition; change the definition's amount afterwards and the earlier log still reads what it
-  recorded (BF-3 gap 1, and the reason the stamp is on the log); set `started_on`, and a date before it
-  reads as outside the window rather than as a missed dose.
+### [nutrition][body] OR-104 — a supplement can carry two contradicting doses, and the wrong one is what history keeps 🔴 LIVE
+
+- **Lane:** A — the stamping is in `lib/data/postgres/adapter.ts` and `lib/local-store/sqlite-backend.ts`;
+  the surface half (`components/nutrition/manage-supplements-sheet.tsx`) follows, engine first per §3.
+- **Added:** 2026-09-06 by Orchestrator. **Branch:** unassigned.
+- **Live in production right now, on the one supplement that matters most.** `Retatrutide` reads
+  `default_amount 0.5 · unit mg` **and** free-text `dose '10mg'` — the second is the *vial strength*,
+  entered in the field the sheet labels `Dose`. The 2026-09-07 log has already frozen both:
+  `amount 0.5, unit mg, dose_text '10mg'`. The two disagree by 20×.
+
+**Why it happened, and why it will happen again.** BF-112 stage 2 added structured `amount`/`unit`
+beside the free-text `dose` that has always been there, and the edit sheet now offers **both, with
+nothing reconciling them**. `manage-supplements-sheet.tsx:30` keeps `dose` "as the free-text line it
+always was". Nothing warns that the two are the same question asked twice, so the natural reading of
+a field called `Dose` — *what is in the vial* — writes a number that contradicts the structured one.
+
+**Why it is not visible.** `supplementSubtitle()` falls back to `s.dose` **last**, so with
+`defaultAmount` set the list correctly reads `0.5 mg today` and the contradiction never surfaces
+there. It shows only on the manage sheet's own row (`:385`), where `10mg` sits under the name. So
+this is a defect that is *already* wrong in the archive while every screen looks right.
+
+**Why it matters more than a cosmetic mismatch.** `dose_text` is stamped at log time on purpose
+(BF-3) so editing a definition cannot rewrite history — which means **fixing the definition does not
+fix the logs already written**, and every future log inherits the same stamp until someone notices.
+OR-102a/b will read dose history to recommend the next dose. A tracker that reads `dose_text` over
+`amount` recommends against a number 20× high.
+
+**What to do:**
+1. **Engine:** do not stamp `dose_text` from the definition's free text when a structured `amount`
+   was stamped from the same definition. Two representations of one number, one of them unparsed
+   prose, is the thing to stop writing — not a display choice.
+2. **Surface:** the sheet must not offer both unreconciled. Either hide the free-text field once
+   `amount`+`unit` are set, or relabel it to what it is now used for (a note, not a dose).
+3. **The existing row is the owner's** — see `Gate:`. Nothing in this entry repairs it, because the
+   freeze is deliberate.
+
+- **Gate:** owner — the live `Retatrutide` definition and its 2026-09-07 log need correcting in the
+  app by hand (clear the free-text `Dose`; delete and re-log the day). Production is read-only from
+  a session, so no agent can do it. The code fix does not depend on this and should not wait for it.
+- **Verify:** device — add a supplement with an amount and a unit, confirm the sheet does not also
+  invite a free-text dose, log it, and confirm the stored `dose_text` no longer contradicts.
+- **Reversal cost:** low. No migration; existing rows keep whatever they were stamped with, which is
+  the point of the stamp.
+
+### [app-shell][platform] BF-122a — the cat collection, engine half: the ladder derivation and a decay window read off the schedule
+
+- **Lane:** A — `packages/shared/**`. No migration, no API route, no table: the whole thing is a pure
+  function over day series the app already stores.
+- **Added:** 2026-09-06 · owner, after a design pass in the BugFix session: *"1 workout = 1 slime …
+  if you collect x amount, they merge into a bigger one … a big item gets broken down into its
+  smaller ones … if you had 1 big and 1 small when the decay happens it would take the small first"*,
+  then *"yes file it!"* with the four deliverables: **the increase mechanism · the character models ·
+  a widget on the home screen · some information on it somewhere in the app**. This entry is the
+  first of those; **BF-122b** is the other three.
+- **Needs:** — nothing. It reads tables that are already populated.
+
+**The mechanic, as the owner settled it.** Three ladders, one per faucet, each a chain of merges:
+
+| faucet | spawns on | ladder |
+|---|---|---|
+| a logged workout | `workout_sessions` completion day | cat slime → … → **cat Tank** |
+| a step day | `body_metrics.steps` day | cat slime → … → **cat Archer** |
+| a slept night | `sleep_sessions` night | cat slime → … → **cat Cleric** |
+
+`N` of a tier merge into one of the next. Decay removes stock when the faucet goes quiet, and the two
+rules that make it a game rather than a punishment are the owner's:
+
+- **A big item breaks down into its components, it is never deleted.** Losing a Tank costs you the
+  merge, not the five workouts under it. Progress is recoverable; the top of the ladder is not free.
+- **Decay takes the smallest item first.** Loose stock is the buffer, so the visible cost of a missed
+  day lands on the thing you were about to merge — which is where the pull to log comes from.
+
+**Spawn on *logging*, not on hitting a target.** Rewarding a hit calorie goal creates a standing
+incentive to under-eat to keep a collection alive, and the collection is on the Home screen where it
+is seen daily. Every faucet above is "you recorded a thing", which is safe to want more of.
+
+**The decay window is derived from the schedule, and this is the part the owner called out.** *"when
+you setup a workout it asks how many days you can train a week — it should consider that, cause if
+you choose 2 workouts a week that could have up to 5 days between workout 1 and 2 and you are still
+following."* A fixed 2-day clock is right for the owner and wrong for the setting the app itself
+offers, so:
+
+- **`rotation`** (`schedules.type`, `schedules.rest_after_n`): the cycle is *N* training days then a
+  rest day, so the largest compliant gap is **1 day**. The owner is on `rotation` / `rest_after_n = 3`.
+- **`weekly`** (`schedule_days` rows with a non-null `session_id`): the largest compliant gap is the
+  **widest wrap-around gap between consecutive scheduled days**, not `7 ÷ count`. Mon+Tue is two days
+  a week with a five-day hole in it, which is exactly the owner's example.
+- **`getScheduledSessionsPerWeek()`** (`packages/shared/src/schedule-utils.ts`) already collapses both
+  shapes to a per-week *count* for the Home "This Week X/Y" chip. **It is the wrong input here** — a
+  count cannot see where the hole is. Add the gap helper beside it, in the same file, and leave the
+  count alone.
+- **Steps and sleep have no schedule**, so their windows are constants. They are also nearly
+  gap-free in practice, which is the calibration note below.
+
+**The window is calibrated, not guessed** — measured over the owner's last 120 days:
+
+| gap between workout days | times | rest days in it |
+|---|---|---|
+| 1 day | 44 | 0 — safe |
+| 2 days | 26 | 1 — safe |
+| 3 days | 5 | 2 — decays |
+| 6 days | 1 | 5 — decays hard |
+
+So a 1-rest-day allowance fires **6 times in 120 days**, about monthly, with 92% of gaps inside it.
+That is a live clock rather than a decorative one, and the owner's instinct was better calibrated
+than the "that is too harsh" reading it was checked against. **Steps and sleep are not comparable** —
+steps logged 129 of 129 days and sleep lands nightly, so those two ladders will essentially never
+decay and are the calm half of the widget by construction. Do not tighten them to manufacture
+tension; the workout ladder is where the tension is.
+
+**Three traps, each of which turns the mechanic against the user:**
+
+1. **A rest day the app itself recommended must not decay anything.** Deload weeks and the
+   recommendation engine's own rest days are compliance, not neglect. Pause the clock on them.
+2. **`computeStreak(dates, tz, maxRestGap)` already hardcodes this number as a literal `1`** at three
+   sites — `lib/achievements.ts:212` and `app/api/friends/leaderboard/route.ts:101` — for exactly the
+   same question the decay clock asks. Per **One Formula, One Place** the schedule-derived allowance
+   is one helper and those sites adopt it, in this PR. Two answers to "was that gap OK" is a bug by
+   definition, and it is currently right only for a schedule shaped like the owner's.
+3. **A user-configurable threshold breaks the no-table design.** Because the collection is *replayed*
+   from the day series on every read, changing `N` or the window retroactively rewrites all of
+   history — a Tank you earned last month silently un-merges. If the threshold is ever exposed,
+   version it with an effective-from date and replay each span under the rule that was live then.
+   Ship it as a constant first.
+
+- **Why no game-state table.** Merges are automatic and the inputs are immutable day series, so the
+  collection is a pure fold and there is nothing to keep in sync, migrate, or repair when a
+  back-dated workout lands. This is only true while (2) and (3) hold — the moment a merge needs a
+  user decision, or the threshold moves without versioning, it needs state and that is a different
+  entry.
+- **Reversal cost:** near zero. One shared module and one call site; deleting it deletes the feature.
+- **One caveat for whoever builds it:** the `maxRestGap` unification in trap (2) is the only part of
+  this entry that changes existing behaviour, and it changes the workout streak's tolerance for
+  anyone not on the owner's schedule. Say so in the journal.
+
+### [app-shell] BF-122b — the cat collection, surface half: the sprites, the home widget, and where you read about it
+
+- **Lane:** B — `components/home/**`, `lib/home/home-prefs.ts`, `components/more/**` and the art.
+- **Added:** 2026-09-06 · owner, same conversation as **BF-122a** — *"ideally it's a small widget card
+  on the home screen, so I don't know if it can be too big"* and *"rather than a humanoid character
+  could we have a cat variant? cat tank, cat slime etc"*.
+- **Needs:** BF-122a
+
+**The art brief, sized so it can actually get drawn.** Four classes × several tiers is forty sprites
+if each is unique, and forty sprites is how this never ships. **One cat silhouette, tiers signalled by
+props and scale** — a slime blob, then a shield, then a bow, then a staff — is roughly **twelve**
+assets and stays legible at widget size, which is the binding constraint. Whatever the count, the
+sprites need to read at ~32 px on the S25 before anything else is drawn.
+
+**The widget is a tenth `CardWidgetKey`.** `lib/home/home-prefs.ts:5` holds the union, the Home
+screen gates each card on `activeCardWidgets.includes(...)`, and `components/more/home-widgets-section.tsx`
+is where it gets toggled on — an existing, opt-in, reorderable slot, which is the right shape for a
+feature not everyone wants. Note `DEFAULT_CARD_WIDGETS` is empty, so it ships off by default and that
+is correct.
+
+**One line of content, chosen by the app, not by a tab bar.** Three ladders do not fit a card that
+has to sit under the nutrition donut. Show **the ladder nearest its next merge** and let it rotate
+itself — `🛡️ Tank ●●●●○ — one more workout`. It answers "what do I do today" in one glance, which a
+three-column collection grid does not, and it needs no interaction to be useful. Tap navigates to the
+full collection, matching every other card's navigate-on-tap behaviour.
+
+**The information surface is the fourth deliverable and the one most likely to get dropped.** A decay
+that is never explained reads as a bug — the owner will lose a Tank and there will be nothing in the
+app that says why, or that the workouts underneath it survived. The collection screen states, in
+plain words: what each faucet spawns, how many merge, how long the gap can be **and that the gap
+comes from their own schedule**, and that big items break down rather than vanish.
+
+**What already exists and should not be rebuilt:** XP, levels and `getLevelLabel`
+(`lib/achievements.ts`), ~48 achievement definitions, `users.equippedTitle`, `users.friendCode`, the
+friends feed and leaderboard, and `components/profile/level-sheet.tsx`. The collection is a *new
+display* over faucets those already count — completing a ladder is a natural `equippedTitle`, not a
+new reward currency.
+
+- **Parked, deliberately, as phase two:** the owner asked what a finished team is *for* and then
+  answered it himself — *"maybe it would be better to just have it be a collection game"*. A weekly
+  encounter auto-resolved from the real week (a narrative wrapper on the weekly summary, not a combat
+  engine, no input, no numbers to balance) is the cheapest version of "for", and it is not in scope
+  here. Do not build a battle system.
+- **Reversal cost:** low — one opt-in widget key and one screen. The art is the only unrecoverable
+  spend, which is the argument for the twelve-asset brief over the forty.
+- **When it ships it needs a device look** — sprite legibility at widget size, and whether the card
+  pushes the fold on the S25 with several widgets enabled. That is a check on the built thing, so it
+  is not a field on this entry.
+
+### [workouts] BF-127 — the baseline banner tells the owner to load 82.5 kg on a pull-up, from an index that is not kilograms 🔴 LIVE
+
+- **Lane:** B — `components/workout/pre-workout-screen.tsx` and `components/workout/ai-baseline-banner.tsx`.
+- **Added:** 2026-09-06 · owner, on today's Pull session: *"pull up = weight"*.
+- **Needs:** — nothing.
+- **Measured, not inferred.** `personal_records` holds `Pull-Up` `estimated_1rm = 118.25`.
+  `pre-workout-screen.tsx:246` computes `mround125(ex.current1rm * 0.7)` → **82.5**, and
+  `ai-baseline-banner.tsx:37` prints it with a hardcoded `kg` under the heading *"Suggested starting
+  weights (≈70% of PR)"*. The screen therefore instructs the owner to load 82.5 kg on a pull-up.
+- **That 118.25 is not a weight.** `exercise_library.exercise_type` for `Pull-Up` is `bodyweight`,
+  and a bodyweight `estimated1rm` is computed against **`BW_REF = 100`** (`packages/shared/src/1rm.ts:116`),
+  a fixed stand-in — the owner's real body weight is **70.65 kg**. So the number is an index driven
+  by reps and added load, and 70% of it is 70% of nothing physical.
+- **The repo already forbids exactly this, in a comment written for a previous instance of it.**
+  `1rm.ts:218`: *"Display basis: bodyweight strength is measured in REPS, never kilograms … Rendering
+  it as kg is what let a change of the BW_REF constant read as a +40% strength gain (audit finding
+  Q-12) … Every surface that shows a stored 1RM resolves its unit here rather than hardcoding
+  'kg'."* `displayOneRm()` / `oneRmUnit()` / `oneRmLabel()` are that resolver. The banner does not
+  call any of them.
+- **The proof it is reachable is on the same screen.** The exercise card below the banner renders
+  `5 × 0kg · 5 RM` — the `RM` unit, correct, for the same exercise, six lines further down. One
+  surface resolves the unit and the other hardcodes it.
+- **Fix:** `signals.exercises[]` already carries `exerciseType` (`packages/shared/src/ai-periodization/signals.ts:277`);
+  the banner's `.map()` at `pre-workout-screen.tsx:243` simply does not read it. Pass it through and
+  render through `displayOneRm`. **A bodyweight row should offer a rep target, not a load** — 70% of
+  a 1RM is a weight prescription, and the equivalent instruction for a bodyweight movement is a
+  number of reps.
+- **Sweep the siblings**, per the same rule that this one escaped: any other surface multiplying or
+  formatting `current1rm` / `estimated_1rm` without going through `oneRmUnit`. The Q-12 fix built the
+  resolver; it did not prove every caller uses it.
+- **Reversal cost:** low — one field threaded through and one formatter swapped.
+
+### [workouts] BF-128 — the session planner charges rest after the final set, and prescribes 4 exercises where the owner's own history does 5
+
+- **Lane:** A — `packages/shared/src/workout/duration-model.ts`, consumed by `app/api/generate-program/route.ts`.
+- **Added:** 2026-09-06 · owner, on a generated 60-minute session: *"also its given 4 excercises for a 60min session is this right?"*
+- **Needs:** — nothing.
+- **The 4 is not the model ignoring the budget — it is what the budget says.** `route.ts:195–210`
+  computes the target: `workingBudgetMin(60)` = 51 min after the 15% warm-up carve-out, then a 60/40
+  blend of the goal's primary and accessory styles. For powerbuilding that is 856 s and 450 s, a
+  694 s average, `floor(3060 / 694)` = **4**. Hypertrophy also gives 4; strength gives 3.
+- **`styleWorkSec` charges `restSec` for every set, including the last**
+  (`duration-model.ts:201`). A powerbuilding primary is 4 × 120 s of rest where only three of those
+  rests are taken before the exercise ends — and the walk to the next station is *already* charged
+  separately as `TRANSITION_SEC_BARBELL = 240 s`. So the final rest is counted twice.
+- **It is worth exactly one exercise.** Dropping the trailing rest lowers the blended average by
+  ~96 s to 598 s, and `floor(3060 / 598)` = **5**.
+- **The owner's history says 5 is right.** Over 90 days, 62 completed sessions: **median 5 exercises**
+  (mean 4.77, max 5) in a **median 56.2 minutes** (mean 54.3) against a 60-minute budget. So five
+  exercises fit with room to spare, and the planner is one short — the same one the double-count
+  explains.
+- **Do not just delete the term.** Two other things use `styleWorkSec`, and a planner that suddenly
+  fits more work everywhere is a worse failure than one that fits slightly less: check
+  `packages/shared/src/workout/time-audit.ts` and the `signals.ts:508` budget consumer, and validate
+  the change against the same 62 sessions rather than against the arithmetic alone. The honest
+  framing is that the model has a defensible reason to over-reserve (a missed rest is time the lifter
+  never gets back) — but 4 vs a measured 5 says the reserve is currently too large.
+- **`TRANSITION_SEC_BARBELL = 240 s` deserves the same measurement pass** while the data is open —
+  `exercise_logs` stores `inter_exercise_rest_sec` and `prep_time_sec`, so the real transition is
+  recorded and does not need to be assumed.
+- **Reversal cost:** low as code, higher as behaviour — it changes every future generated program's
+  volume, so it wants the validation above before it ships, not after.
+
+### [app-shell] BF-123 — the global 48 px tap floor turns every sub-48 px `<button>` into a circle; the opt-out exists and was never swept
+
+- **Lane:** B — `app/globals.css` opt-out classes at the call sites; `components/config/**` and the sibling chips.
+- **Added:** 2026-09-06 · owner, on the program editor sheet: *"noting this UI is really bad and needs adjustment"* — a screenshot in which the muscle chips render as large filled circles.
+- **Batch:** editor-sheet-density
+- **Traced, and the diagnosis is already written down in this repo.** `app/globals.css:553` sets
+  `button, [role="button"] { min-height: 48px; min-width: 48px }` inside `@media (max-width: 640px)`.
+  The muscle chips at `components/config/program-editor-sheet.tsx:882` are real `<button>`s asking
+  for `h-5 px-1.5 rounded-full` — 20 px tall. The floor wins, `rounded-full` on a 48×48 box is a
+  circle, and the `text-[10px]` label does not scale with it, so the text floats in the middle. A
+  short label (`lats`) lands under the 48 px min-width and comes out perfectly round; a longer one
+  (`upper back`) comes out as a stadium. That is the exact shape in the screenshot.
+- **`components/ui/switch.tsx:19` carries the diagnosis verbatim** — *"the global 48px tap-target
+  floor in globals.css wins over h-5/w-9 and renders this as a 48×48 `rounded-full` **black
+  circle** rather than a pill"* — and fixes it with `tap-dense` plus a `before:` pseudo-element that
+  puts the 48 px touch box back invisibly. So the mechanism, the fix and the reason the fix keeps the
+  control reachable are all settled. What never happened is the sweep.
+- **CLAUDE.md already required that sweep**, under **No global element-selector styling**: *"Any
+  unavoidable global rule needs its opt-outs applied in the same PR, not left for a later audit."*
+  This entry is that audit, arriving as an owner bug report — which is the outcome the rule exists to
+  prevent, and worth saying plainly rather than filing as a fresh discovery.
+- **Known instances beyond the chips**, all `<button>`/`role="button"` styled below 48 px with no
+  `tap-dense`: the two hand-rolled toggles at `program-editor-sheet.tsx:465` and `:490` (`h-5 w-9`,
+  the same circle the Radix switch had), and `components/config/style-editor-sheet.tsx:109`. Sweep for
+  the rest rather than fixing these three — the sweep is the entry.
+- **Do the search on the ELEMENT, not the class.** Most `rounded-full text-[10px]` hits in the app
+  are `<span>`s, which the selector never reaches and which must not be touched; grepping the class
+  finds mostly false positives. The set that matters is `<button>` and `[role="button"]` whose own
+  styles declare a box under 48 px in either axis.
+- **Every opt-out restores the touch box.** `tap-dense` alone shrinks the hit area to the ink, which
+  is the accessibility regression the floor was added to prevent. Copy the switch's pattern, or use
+  `.tap-target-44` / `.tap-target-dot` where a neighbour is close enough that a 48 px box would
+  overlap it — `globals.css` explains that trade-off in place and it is real, not theoretical.
+- **`e2e/touch-target-size.spec.ts` is the gate.** Its allowlist is empty by design, so it can hold
+  the result; check it actually covers a `tap-dense` control's `before:` box rather than only the
+  element, or the sweep will make it red.
+- **Reversal cost:** low, and per-site — each opt-out is one class on one element.
+
+### [app-shell] BF-124 — the role picker on the program editor sheet overflows, and its selected state reads as disabled
+
+- **Lane:** B — `components/config/program-editor-sheet.tsx`.
+- **Added:** 2026-09-06 · owner, same screenshot as **BF-123**.
+- **Batch:** editor-sheet-density
+- **Needs:** BF-123
+- **Two problems, both downstream of the same floor** but not fixed by removing it, which is why they
+  are their own entry:
+  - **The row cannot fit.** `program-editor-sheet.tsx:844` is `<div className="flex gap-1">` with no
+    `flex-wrap`, holding three buttons labelled *Main Compound · Secondary Compound · Accessory*.
+    With the 48 px min-width each, the longest label wraps to two lines and `Accessory` is clipped
+    at the right edge. It needs to wrap, or the labels need to be short.
+  - **The selected state is a white slab.** `bg-primary text-primary-foreground` against this dark
+    sheet renders as a bright block that reads as disabled rather than chosen — the opposite of its
+    intent. The unselected `bg-muted` siblings look more active than the selected one.
+- **Check the label question against BF-125 before renaming anything** — the builder review screen
+  calls the same three roles *Main / Compound / Accessory*. Shortening the labels here is the obvious
+  fix for the overflow and it is also half of that entry, so decide the vocabulary once.
+- **Reversal cost:** low — layout classes and a token on one control.
+
+### [workouts] BF-125 — the one screen that shows the role imbalance is the one screen that cannot fix it
+
+- **Lane:** B — `components/workout-builder/builder-review.tsx`.
+- **Added:** 2026-09-06 · owner, looking at a generated program: *"why does one of these have 2 compounds?"* then *"so how would i change its badge?"*
+- **What is there today.** The builder review screen renders the role badge read-only
+  (`builder-review.tsx:536`) — Swap, Add and the ▲▼ reorder arrows are the whole control set, and
+  the role survives both a swap (`:214`) and a reorder (`:230`) untouched. The editable version is on
+  a different screen: `components/config/program-editor-sheet.tsx:841` has a three-button **Role**
+  row calling `updateExerciseRole`, gated on `phaseMode !== 'manual'` (so it does show for AI
+  Dynamic).
+- **So the route to correct a bad generation is: save the program you can already see is wrong →
+  Config → find it → expand the exercise → change the role.** The review screen is the one place the
+  whole program is visible at once, which is where an imbalance is *noticeable*; it is the only place
+  it is not fixable.
+- **The role is not cosmetic**, which is what makes this worth a control rather than a shrug:
+  `app/api/generate-program/route.ts:428` picks the progression style from the role and, for
+  `primary`/`secondary`, overrides whatever the model chose. Demoting an exercise to accessory moves
+  it from 65–85% / 6–10 reps to 66–75% / 8–12.
+- **Fold in the vocabulary mismatch.** Review says *Main / Compound / Accessory*
+  (`builder-review.tsx:33`); the editor says *Main Compound / Secondary Compound / Accessory*
+  (`program-editor-sheet.tsx:846`). Same three enum values, two wordings, and a user moving between
+  the screens to do exactly what this entry describes meets both. Pick one and put it in a shared
+  map — **One Formula, One Place** applies to a label the user matches across screens. **BF-124**
+  wants the short form for its own overflow, which is a reason to land these together.
+- **Reversal cost:** low. The state-setter shape already exists in `swapExercise`.
+
+### [workouts] BF-126 — nothing constrains how many primaries or secondaries a generated session gets, and the main lift need not come first
+
+- **Lane:** A — `app/api/generate-program/route.ts`.
+- **Added:** 2026-09-06 · owner, from a generated 5-day program where Pull came back with two `secondary` compounds and one accessory while Push got one and two.
+- **Needs:** — nothing.
+- **The prompt asks for a role per exercise and says nothing about the distribution.** Rule 3
+  (`route.ts:316`) defines `primary` / `secondary` / `accessory`; no rule caps any of them, requires
+  exactly one primary, or orders them. Rule 6 constrains the compound:isolation split *"at roughly
+  60:40"* of the session count, which is advisory prose to the model, checked nowhere.
+- **The consequence is load, not labelling.** `route.ts:428` enforces the style from the role and
+  never falls back to the model's choice for primary/secondary. The observed Pull session therefore
+  carries three heavy-ish exercises (one at 72.5–92.5%, two at 65–85%) against Push's two, at equal
+  exercise counts. Session-to-session load becomes whatever that generation happened to roll.
+- **Second half: order.** Array order is saved as position (`components/workout-builder/builder-review.tsx:295`,
+  `:302`), and in the observed program the `primary` sat *second*, behind a secondary compound — so
+  the heaviest lift of the session is done after a pull-up. Nothing in the prompt says the primary
+  leads. Note `builder-review.tsx:229` deliberately allows a user reorder ahead of the main lift, so
+  the invariant belongs at generation, not on the editor.
+- **Fix it where the style is already overridden** — a post-generation pass in the same block, not
+  more prompt text. The model has been asked in prose and did not comply; a validator that demotes
+  extra primaries and sorts the primary first is deterministic and cheap. Per the AI defaults in
+  CLAUDE.md, structure a model returns is checked in code rather than trusted.
+- **Confirm the shape against more than one sample before choosing the rule.** One program is the
+  evidence here. Whether the cap is "exactly one primary, at most one secondary" or something looser
+  should be read off several generations at the owner's real settings — a rule fitted to a single
+  roll is how a legitimate 2-compound Pull day gets forbidden.
+- **Reversal cost:** low — one pure function over the parsed response, before it is returned.
+
+### [platform] LB-56 — E2E costs 26 minutes a UI PR and currently gates nothing; decide which of those to change
+
+- **Lane:** O — the Orchestrator's, not an implementer's. `.github/workflows/ci.yml`, `playwright.config.ts` and the required-checks
+  setting are the Orchestrator's and the owner's.
+- **Added:** 2026-09-04 · owner: *"why is e2e taking so long? can it be investigated or turned off if
+  not needed"*.
+- **Needs:** nothing to investigate — the measurement is below. What it needs is a decision.
+
+**Measured, not estimated.** A full local run against a CI-shaped database: **144 tests, 27.1 minutes
+of test time.** There is no single pathology — 28 tests finish under 5s and 16 take over 20s. The
+heaviest files are `meal-plan-library-surface` **136s**, `recipe-url-to-meal` **90s**,
+`touch-target-size` **69s**, `meal-label` **65s**, `training-load-day-flags` **55s**; `auth.setup`
+alone is **50s**. On CI the job ran ~50 minutes before LB-55's fixes and **26 minutes after**, because
+twelve specs stopped burning 45-second timeouts — which is also the CI-side evidence that those fixes
+landed.
+
+**It is slow because it is serial, and the serialism is deliberate.** `playwright.config.ts` sets
+`workers: 1, fullyParallel: false` with the reason written down: *"the specs share one seeded Postgres
+and one signed-in user, and writes in one spec are visible to another."* **That is still true and was
+re-proved on 2026-09-04** — three specs pass in isolation and fail in the full run (LB-55). So raising
+`workers` trades ~20 minutes for flakiness, which is the wrong direction.
+
+- **⚠️ The real problem is not the 26 minutes, it is that they buy nothing right now.** `main` itself
+  would not pass this suite, so E2E gates nothing — #868 merged with it red on 2026-09-04 — while
+  still costing 26 minutes on every UI PR. **A red check that nobody can act on is worse than either
+  alternative**, because it trains six concurrent agents to scroll past a failing gate, which is how a
+  real regression gets waved through later. Whatever else is decided, this state should not persist.
+- **Recommendation: make it advisory now, fix it next, re-require it when green.** Removing it from
+  the required set costs nothing, matches what is already true, and unblocks the PRs waiting on it.
+  The risk is that an advisory check decays unwatched — which is how it reached ten failures without
+  anyone noticing — so it wants the re-require step queued, not assumed.
+- **Alternatives, and what each is better at:**
+  - *Fix the four and keep it required* — the durable answer, and where this should end up. One needs
+    a fixture decision, three need a bisect (LB-55). A session's work, uncertain.
+  - *Drop it from PRs, run nightly against `main`* — saves the 26 minutes outright and finds breakage
+    once a day. Defensible for a single-user app whose real gate is the device, and it would need the
+    nightly's `if: github.event_name != 'schedule'` removed, which is the line that leaves `main`
+    with no baseline today.
+  - *Shard across parallel CI jobs* — **MEASURED 2026-09-04, and the answer is no, not as the suite
+    stands.** Four shards, each against its own fresh database: **155 passed, 5 failed**, 36.6 min
+    sequential which is ~10.3 min wall clock in parallel (each shard pays the ~50s auth setup, so the
+    win is 26 → ~11 min, not the ~8 first estimated).
+    - **It broke two specs that pass in the full run** — `food-log-swipe-delete:139` (554ms) and
+      `recommended-goal-values:28` (42.7s). Both need state an earlier spec creates, and sharding
+      took that earlier spec away.
+    - **And it did NOT clear the three that were failing** — `preferences-survive-reinstall:36` and
+      `touch-target-size:53` still failed *inside a shard with a fresh database*, so "poisoned by an
+      earlier spec's writes" is not the whole story for them either.
+    - **The real finding is that the dependency runs BOTH ways.** Some specs fail when others run
+      before them; others fail when they do not. The suite is one entangled fixture, not a set of
+      independent tests that merely happen to share a database. **Sharding is therefore blocked on
+      making specs self-sufficient, which is a much larger job than wiring up shards** — and that is
+      worth knowing before anyone spends a day on the workflow change expecting a 2.4x win.
+- **Reversal cost is near zero** for the first three: required-check membership is a settings toggle
+  and the job trigger is one line. Sharding is the only option that is real work to undo.
+- Already working in the repo's favour: the job is gated on a UI-paths diff, so a docs-only PR skips
+  it entirely.
+
+### [platform] LB-55 — E2E fails as a timeout, not as an error, and a red E2E does not actually block a merge
+
+- **Lane:** O — the Orchestrator's, not an implementer's. `.github/workflows/ci.yml`, `playwright.config.ts` and the branch ruleset are
+  the Orchestrator's and the owner's.
+- **Added:** 2026-09-04 · from `fix/e2e-my-foods-tab-rename`, where six specs waiting for a tab
+  renamed three days earlier cost four PRs and most of a session to identify.
+- **Reference:** read before diagnosing a red E2E. Pairs with **LB-54** (unreadable job logs, no
+  `main` baseline), which is the other half of the same cost.
+
+- **⚠️ 22 of 27 spec files budget a `toPass` timeout LARGER than the 45-second test containing it.**
+  Fourteen ask **90 seconds inside 45**; only `first-run-empty-states` and `meal-label` raise
+  `test.setTimeout` to match. Playwright's test timeout always wins, so those retry windows are
+  unreachable — and, far worse for diagnosis, **every failure inside a `toPass` loop is reported as a
+  45-second test timeout rather than as the assertion that actually failed.** Three unrelated specs
+  failed at 45.6s, 46.5s and 46.5s; the signature reads as a slow runner and sent this session
+  looking at CI capacity.
+  - **This is NOT a cause of failure and must not be "fixed" as one.** It was hypothesised as the
+    cause, and the hypothesis fit three independent observations before one line of error text
+    (`element(s) not found`) refuted it. Raising the timeouts would have moved the failures from 45s
+    to 90s and made the suite slower. What it is worth doing for is **legibility**: a budget that
+    cannot be reached is a lie about intent, and it hides the real assertion.
+  - Worth pairing with a rule that a `toPass` budget may not exceed its file's test timeout — that
+    one IS statically checkable, unlike the string check below.
+
+- **⚠️ A red E2E does not block a merge, whatever the ruleset shows.** **PR #868 merged into `main`
+  on 2026-09-04 with E2E red** (`pnpm e2e` failed after ~50 minutes; the other five jobs green).
+  Measured, not inferred — the merge commit is in `main`. Candidates: the ruleset is in *Evaluate*
+  rather than *Active*, a bypass actor covers the merging identity, or the merge used an admin
+  override. **This is the owner's to check**, and it matters in both directions: if E2E is meant to
+  block, it is not doing so; if it is not meant to block, then every session holding a PR behind it
+  — as this one did for hours — is waiting on nothing.
+
+- **⚠️ Seven specs still fail on `main` after this PR, and they are listed so nobody re-derives them.**
+  A full local run against a CI-shaped database, on the branch carrying the tab-rename fix, was
+  **146 passed / 10 failed**. Three of those ten were `meal-plan-library-surface` and are fixed. The
+  remaining seven, with the timing that says which kind each is — a ~45s time is a `toPass` loop
+  spinning on something absent, a sub-second time is a real assertion:
+  - `recipe-url-to-meal.spec.ts:91` and `:156` — **fixed**, same Q-407 drift (they tapped
+    `Build a meal plan` and waited for a dialog; it navigates to Coach now). 45.5s/45.2s timeouts
+    became 12.3s/6.3s passes. `nutrition-coach-plan-entry.spec.ts` still uses the old name and is
+    **correct** to — that spec is about the Coach entry itself.
+  - `plan-rescale.spec.ts:168` — **diagnosed, deliberately not fixed.** The spec sets
+    `OVER_KCAL = 1900` and asserts the floor note, *"…under a meal — the remaining meals are left as
+    planned"*. What renders is the other branch of `buildNote`: **"You're 0 kcal past today's target,
+    so the remaining 3 meals are left as planned."** `budgetRemaining` lands on exactly 0, so
+    `budgetRemaining <= 0` fires before the `flooredCount` branch ever can. The fixture was written
+    against a fixed 2,000 kcal budget; the budget is **derived** now (Q-415/Q-417), so 1900 no longer
+    puts the day in the floor-binding window. **Do not just try another number** — the derived budget
+    includes `earned from movement`, so a hardcoded figure lands wherever that day's movement puts
+    it, which is how a test becomes intermittent rather than fixed. It needs a fixture that pins the
+    budget, or an assertion that accepts either note. That is a decision, not a rename.
+  - `profile-details-consolidation.spec.ts:50` — **fixed**, and it was the same stale-string class a
+    third time: it clicked a row named `/Name, body facts/`, which is a sublabel BF-79's regrouping
+    removed. The row is `Profile details` now. A 3.0-minute timeout became a 14.4s pass.
+  - **⚠️ `preferences-survive-reinstall:36`, `timeline-card-navigation:80` and all five
+    `touch-target-size:53` cases PASS IN ISOLATION and fail in the full run.** Run individually
+    against a clean CI-shaped database they are green in 2–15 seconds. So they are **order-dependent,
+    not stale strings**, and the triage-by-duration above does not reach them — this is the hazard
+    `e2e/README.md` already names, *"the specs share one seeded Postgres and one signed-in user, and
+    writes in one spec are visible to another"*, with `workers: 1, fullyParallel: false` making the
+    order fixed and therefore reproducible.
+    - **Do not "fix" one by running it alone and declaring it passing.** Running it alone is a probe,
+      not a verification — it tells you the failure involves other specs, not what the assertion says.
+    - **⚠️ The first reading of this was too simple, and a sharding experiment refuted it (LB-56).**
+      "Poisoned by an earlier spec's writes" is only half of it: with four shards each on a fresh
+      database, `preferences-survive-reinstall` and `touch-target-size` **still failed**, while
+      `food-log-swipe-delete` and `recommended-goal-values` — both green in the full run — **started
+      failing**, because the specs that create the state they need had been sharded away.
+      **The dependency runs both ways.** The suite is one entangled fixture: some specs need what
+      earlier ones wrote, others break on it.
+    - So the tractable step is not a bisect for a single poisoner. It is to ask, per failing spec,
+      *what state does this need and who creates it* — and make it create its own. That is also the
+      precondition for sharding, and the reason sharding is not the quick win it looks like.
+  - **Start from the `error-context.md` Playwright writes beside each failure**, not from the spec:
+    it carries the accessibility snapshot of the screen at the moment it gave up, and that is what
+    identified both drifts here in minutes after hours of theorising.
+
+- **⚠️ Do not trust a local full-suite run without checking the dev server survived it.** A re-run
+  after the meal-plan fix reported **106 failed / 41 passed** — almost every failure at ~250ms,
+  which is not the app failing but `ECONNREFUSED 127.0.0.1:3100`: the Next dev server died at test
+  42 and every later spec failed against nothing. On the same branch minutes earlier the number was
+  146/10. **A mass failure whose durations are uniformly sub-second is an environment collapse, and
+  reporting it as a finding would have been the poisoned-state trap `docs/local-dev-database.md`
+  already warns about.** Grep the run log for `ECONNREFUSED` before believing a bad result.
+
+- **⚠️ The obvious guard for the stale-string class does not work, and here is why, so it is not
+  rebuilt.** `check-e2e-ui-strings.js` was written and deleted the same hour. It asserted that every
+  tab name and placeholder a spec waits for appears somewhere in `app/`, `components/` or
+  `packages/shared/src`; it passed 26 queries across 73 files with one documented exemption.
+  **It failed its own mutation test** — reverting a spec to the old `'Meals'` left it green, because
+  `'Meals'` appears in `meal-plan-setup-sheet.tsx`'s `STEPS` array. A substring search over a large
+  codebase finds any short word somewhere.
+  - An earlier draft checking every `getByRole(name:)` was worse: eight false positives, because an
+    **accessible name is computed from child DOM text**, so a button whose children are `Log` and
+    `Body Weight` is named "Log Body Weight" while that string exists nowhere.
+  - A version that would work has to compare against the **tab label sets extracted from source**
+    (`{ value, label }` arrays and `TabsTrigger` children) rather than against the whole codebase as
+    a flat string. Tractable, narrow, and fragile the moment tabs are declared differently — which is
+    why it is a queued question rather than something done in passing.
 
 ### [platform] 🟡 PS-24 — deactivation is immediate now; the middleware's claim is still stale
 
@@ -690,9 +1211,49 @@ and Samsung does not honour `autoConnect = true`, so direct connect plus a bound
 isolation stands and wiring it into scoring waits on the H10 session. It does not resolve steps,
 calories or the stage mapping (PS-16, PS-19).
 
+### [platform] LB-58 — the journal ceiling fails whichever PR is open when the count crosses, not the one that grew it
+
+- **Lane:** A — `scripts/lib/entries-verdict.js`, which no lane's path list names; it is not
+  `components/**` or `app/**`, so it falls to A by the rule.
+- **Added:** 2026-09-06, by the second session to be blocked by it. The first
+  ([folded journal](overview/history-2026-09-06.md), the 2026-09-03 decode-flake entry) measured the
+  same thing and recorded it in its own note, where nothing could act on it — a documented finding
+  with no queue entry, which is the shape **No orphaned findings** exists to prevent.
+
+`entriesVerdict` has two limits and they are not written the same way. The **foldable** limit carries
+the BF-36 attribution — `grewIt`, so it fails the branch that added entries and merely *notes* the
+overflow for one that did not. The **total ceiling** directly below it has no such guard, so once
+`main` reaches the ceiling the next PR to add any journal entry fails Custom Rules, whoever it
+belongs to and however small its diff. That is precisely the unfairness BF-36 was filed to remove,
+one level up in the same function.
+
+**Measured twice.** On 2026-09-03 the directory hit 251 against a 250 ceiling and blocked a spec fix,
+which paid for it by folding three entries. On 2026-09-06 it sat at exactly 320 against a 320 ceiling
+and blocked an e2e-drift PR, which paid for it by folding 46. Both times the blocked PR had added
+exactly one entry, and both times the fix was a docs sweep unrelated to the change under review.
+
+- **The fix is one condition**, mirroring the branch above: fail on the ceiling only when `grewIt`,
+  and emit the note otherwise. **Do not simply raise the number** — the ceiling is doing real work,
+  and raising it defers the same block to a later PR chosen just as arbitrarily.
+- **⚠ There is a real question underneath it that the guard does not answer.** The ceiling counts
+  *all* entries, and 274 of the 320 were **linked** by a durable doc and therefore unfoldable. So a
+  sweep can no longer clear much: headroom after the 2026-09-06 sweep is 46 entries, and the linked
+  floor only rises. The check's own failure text says so — *"the durable docs citing the other 274
+  need to point at the batched history instead"*. That is the Orchestrator's call and a much larger
+  job; this entry is only about who gets blamed in the meantime.
+- **Verification:** with `main` at the ceiling, a branch adding one entry passes with a note; a branch
+  that adds enough to cross a rising ceiling still fails.
+
 ### [workouts][app-shell] RV-49 — the Home deload confirm evicts neither key the visible screen reads
 
-- **Lane:** B — `app/session-select/session-select-content.tsx:887-892`, `lib/cache-groups.ts:369-384`.
+- **Lane: A** — was filed B, and re-laned 2026-09-06 by Lane B on picking it up. **The whole fix is
+  in `lib/cache-groups.ts`**, which CLAUDE.md names in Lane A's path list *and* which the lane rule
+  independently sends to A: it is reached from `app/api/coach/apply/route.ts` and
+  `app/api/coach/apply/[id]/undo/route.ts`. The call site the entry also names
+  (`session-select-content.tsx:887-892`) needs **no change** — it already calls
+  `invalidatePrescriptionChanged()` with no id, and the fix is to make that call evict what it
+  claims to. So there is no Lane B half to ship first, and the e2e repaint assertion has to ride
+  with the group change or it is a test with nothing to assert against.
 - **Added:** 2026-09-06, Review sweep 49 —
   [write-up](reviews/2026-09-06-deload-confirm-eviction-gap.md). Owner-reported symptom.
 
@@ -719,19 +1280,6 @@ three sites say so in their own comments. The Q-260 seed-only shape: an evicted 
 something else refills it; a missed eviction serves the snapshot for the full TTL. Scanned all 80
 `readCacheSync` sites: these three are the live cluster after discarding fallback-paired seeds.
 Convert to `useCachedValue` or fold into the RV-49 fix and its test.
-
-### [workouts] PS-26 — the strength card shows a deload as a full-1RM crash, live on 16 of 34 exercises 🔴 LIVE
-
-- **Lane:** A — `packages/shared/src/health/strength-progress.ts`, `getExerciseSummary`.
-- **Added:** 2026-09-06, app checkpoint — [report](reviews/2026-09-05-app-checkpoint.md) §P5.
-
-A deload stores `estimated_1rm = 0` on purpose (Q-298), and Q-298's `> 0` guard reached
-`listPrevious1rm` only. `strength-progress.ts:32-34` computes the delta from the CURRENT value with
-no guard and :52-59 the bar pct from it, so an exercise whose latest log is a deload shows
-"−<full 1RM> kg" and a 0 % bar. Live probe: `/api/weights-summary` returned
-`estimated1rm: 0, previousEstimated1rm: 97` for a deload fixture. **Production (owner's rows,
-verified): 34 exercises, the latest log has `estimated_1rm = 0` on 16, all 16 flagged deload.**
-Prescription is unaffected (`resolveWorkingBasis` skips deload rows — control held).
 
 ### [workouts] PS-27 — 1RM arithmetic: non-monotone in reps, bodyweight ratchets down, two rep-ceiling behaviours
 
@@ -837,25 +1385,36 @@ BF, metabolic age 37 on a DOB-less profile). Skip composition and store weight-o
 non-unique) — a byte-identical re-send inserts a second raw row, unlike `oura_raw_samples`'s dedup;
 the trend survived (lowest-wins) but the archive double-counts.
 
-### [platform] PS-34 — six custom rules fire on the textbook shape and miss the common one
+### [app-shell] LA-62 — eighteen icon-only buttons announce as "button" and nothing else
 
-- **Lane:** A — `.github/workflows/ci.yml:173`, `scripts/check-icon-button-names.js:41`,
-  `scripts/lib/plugin-proxy-scan.js`, `scripts/check-doc-index-size.js:85`,
-  `scripts/check-test-user-uuid-collisions.js:111`, `scripts/check-inlined-constants.js`,
-  `scripts/check-body-fat-correction.js:71`.
-- **Added:** 2026-09-06, app checkpoint — [report](reviews/2026-09-05-app-checkpoint.md) §P1. All
-  harness-verified (a violating snippet per rule; 67/67 fire on the simple shape).
+- **Lane:** B — `components/**` and two `app/**` pages; the list is in
+  `scripts/check-icon-button-names.js`'s `BASELINE`.
+- **Added:** 2026-09-06, surfaced by PS-34 widening the guard that was supposed to be catching them.
+- **Needs:** nothing — the guard is on `main` and frozen shrink-only.
 
-(1) PPL: `grep -v 'push\|pull'` is case-sensitive and runs before the `-Ei` match — a line with
-lowercase push/pull hides `"Push"`. (2) Icon-button: the attribute regex stops at the `>` of `=>`,
-so every inline-arrow `onClick` button goes unexamined. (3) Capacitor-proxy: single quotes and
-no-semicolon only. (4) The doc-size ratchet is not shrink-only — CLAUDE.md sits 430 lines under
-baseline and can regrow silently (unlike hex/fetch-once/component-size, which fail on shrink).
-(5) UUID-collisions reads `git ls-files '*.test.ts'` — untracked and `.tsx` tests invisible to the
-local gate. (6) Vendor-constants is vacuous (0 JSON files → 0 values → green forever). Plus (7)
-`check-body-fat-correction.js` never walks `components/` and its DERIVERS omit `calculateBaseline`.
-No live violation exists behind any of them today (re-scans with widened patterns: 0 hits) — these
-are guard repairs, not code fixes.
+An icon-only control with no accessible name is announced by a screen reader as "button", with
+nothing to say what it does. Q-162 found six in 2026-08 and the rule was written to stop the class
+recurring. It did not: its opening-tag regex ended at the `>` of `=>`, so every button with an
+inline-arrow handler — which is most of them — was skipped without a word, and the rule reported
+clean over code it had never parsed.
+
+| file | count |
+|---|---|
+| `components/config-screen.tsx` | 6 |
+| `components/more/manage-friends-sheet.tsx` | 3 |
+| `app/admin/admin-content.tsx` · `app/profile/[userId]/page.tsx` | 1 each |
+| `components/admin/activity-type-manager.tsx` · `components/admin/exercise-manager.tsx` | 1 each |
+| `components/config/phase-editor.tsx` · `program-editor-sheet.tsx` · `style-editor-sheet.tsx` | 1 each |
+| `components/more/feedback-sheet.tsx` · `components/workout/added-weight-toggle.tsx` | 1 each |
+
+The icons are `Pencil`, `Trash2`, `X`, `Check`, `ArrowLeft`, `UserMinus`, `ChevronUpIcon` — every
+one of which has an obvious name, so this is `aria-label="Edit"` / `"Delete"` / `"Close"` and no
+design decision. Clearing a file means lowering its number in the baseline in the same PR; the check
+fails on a stale-high number, so the list cannot quietly stop shrinking.
+
+**Do not "fix" it by making the scan narrower again.** The baseline pins the scanner's reach as well
+as the debt: breaking the brace-aware walk makes files read as zero against a non-zero number, and
+the check fails for that too — verified by mutation.
 
 ### [app-shell] PS-35 — five zero-content pages, a wrong PWA start_url, and boot-time paper cuts
 
@@ -954,28 +1513,6 @@ at a time, and only for the subset of Node-22 APIs a change happens to use.
 
 Not a detection rule: a hardcoded list of Node-22 APIs goes stale the moment Node 23 ships, and the
 thing that actually needs to be true is that the two runtimes match.
-
-
-### [app-shell][nutrition] LA-59 — the meal-type reorder ignores the status it is now given
-
-- **Lane:** B — `components/nutrition/meal-type-manager.tsx`.
-- **Added:** 2026-09-05, found while shipping RV-48.
-- **Needs:** nothing — the engine half is on `main`.
-
-`handleDragEnd` fires the reorder as
-`fetch(...).then(() => invalidateMealTypes()).catch(() => toast.error('Failed to save order'))`.
-A `fetch` promise does not reject on a 4xx, so the `.then` runs for every response the server sends
-and the `.catch` only ever sees a transport failure. RV-48 gave that route a 404 for a reorder it
-refused to apply; nothing on this surface reads it.
-
-The other three surfaces touched by RV-45/RV-47/RV-48 already do `if (!res.ok) throw` — the two
-admin ones and the exercise manager — so this is the last of the four, not a general gap. The two
-Oura `PATCH` callers are deliberately fire-and-forget and stay that way.
-
-**The fix is `if (!res.ok)`, and then a refetch rather than only a toast.** A 404 here means the
-list the drag was computed from is stale — a meal type deleted on another device is the realistic
-route to it — so re-reading the list is what actually resolves it. A toast alone leaves the screen
-showing an order the server rejected.
 
 
 ### [platform][nutrition] 🟡 RV-45 — the six sibling deletes now 404; the device path is unchecked
@@ -1725,236 +2262,94 @@ consumer today means a new hand-rolled gather.
   editable at its source rather than only inside a prompt.
 
 
-### [app-shell] BF-117 — a day rollover re-prompts the check-in and refreshes nothing else; Home keeps yesterday until the app is killed
+### [body][nutrition] BF-114 — the resting rate behind the calorie targets still names no source (UI half shipped)
 
-- **Lane:** B — `app/session-select/session-select-content.tsx`. One effect. **No engine change.**
-- **Added:** 2026-09-04 · owner: *"when opening the app after a day has been completed it doesnt
-  reset the screens (I flagged this before) so I need to close and reopen app to get a fresh view."*
-- **Needs:** nothing — the mechanism it uses already ships.
-
-**He did flag it before, and BF-86 deliberately left this half undone pending evidence. This is the
-evidence.** That entry closed the *"should it be a literal reload?"* question (no — BF-80 forbids it,
-and instant paint exists so a repeat open shows data rather than a spinner) and then wrote a scope
-line: *"whether any [today-scoped read] is both persistently mounted and never re-read is the Q-359
-question… subscribing all of them blind would be a large diff justified by a guess."* That caution was
-right. The guess is now unnecessary — the answer is one line, not a sweep.
-
-**The mechanism, traced.** `useLocalDay()` has **three** consumers in the whole app
-(`local-day-provider.tsx`, `workout-day-rollover.tsx`, `session-select-content.tsx`), and inside Home
-it is read at exactly **two** places: line 758 (`loadTodayMood`) and line 788 (the check-in prompt).
-Everything else on that screen — readiness, body battery, training load, `oura-hr-day` — is gated on
-**`refreshTick`**, and `setRefreshTick` is bumped from exactly three places: `refetchAll` (644, 658)
-and the BLE-drain-settled listener (703). **A day change bumps nothing.** The tab shell is persistent
-and never unmounts, so those payloads are the ones fetched at app launch and they stay until the
-process is killed.
-
-**The screenshot is the proof, and it splits cleanly along that line.** Friday 4 September, *"Good
-morning"*, and *"Morning check-in saved"* — the header reads the clock directly and the check-in is
-what BF-86 fixed, so both are correct. Below them, *"Rest Day — you chose to rest today"* and a
-Partial Recovery card citing chest and shoulder soreness: **yesterday's**. The two halves of the same
-screen disagree about what day it is.
-
-- **Recommendation: bump `refreshTick` when `localDay` changes.** This reuses the path pull-to-refresh
-  already takes, so nothing new is introduced and the refresh is one the app performs many times a day
-  already. It satisfies BF-86's objection directly: not a blind subscription of 30 call sites, and not
-  a reload.
-- **⚠ The trap: `localDay` is seeded synchronously**, so an effect keyed on it **fires once at
-  mount** — bumping the tick there would double-fetch every launch. Skip the first run with a ref.
-  This is easy to miss because the duplicate fetch is invisible: it looks like a working app that is
-  slightly slower to settle.
-- **⚠ `sleep-sessions` is NOT one of the `refreshTick`-gated effects**, and the code says so at line
-  700 (Q-91): it is *"read by this screen too (the home HR chart's sleep-window shading) but… nothing
-  ever re-fetched it on this signal."* So the tick alone leaves last night's sleep stale on a
-  rollover — the one read where a day change matters most. Handle it in this entry or state plainly
-  that it is still owed.
-- **Sibling surfaces, worth one check in the same pass:** only three files consume `useLocalDay`, and
-  Health and Nutrition are in the same persistent shell. Home is what was reported and what this entry
-  covers; if either of the others holds a day-scoped read the same way, it is the same fix and should
-  ride along rather than become the next report.
-- **⚠ Do not "fix" this with a reload or a forced remount.** BF-80 and BF-86 both rule it out, and
-  BF-86 adds the reasons that are specific here: an unsynced outbox and an in-progress workout both
-  survive a resume today and are not tested against a scheduled restart.
-- **Verification (device):** leave the app open overnight on the S25 and resume after midnight — the
-  scores, the rest-day card and the recovery card all show today, without a reload, a spinner or a
-  blank frame; resume again ten minutes later and nothing refetches; an in-progress workout and a
-  queued outbox both survive the rollover untouched.
-
-
-### [body] BF-113 — the BMI band is computed from a DEXA-corrected body fat and the card only says "via body fat %"
-
-- **Lane:** B — `app/health/health-sections.tsx:499` (the caption) and `:507` (the info popover).
-- **Added:** 2026-09-03 · owner: *"bmi doesnt say its scaled to match dexa."*
-
-**He is right, and the card is one word short of true.** `latestBf` is
-`metaRecentReversed.map(displayBodyFat)` (`health-content.tsx:545`), and `displayBodyFat` returns
-`bodyFatCorrected ?? bodyFat` — the **DEXA-corrected** value. So the band shown (*High fat* at 27.9)
-is decided by a calibrated figure, and the only thing the card says about it is *"via body fat %"*.
-The info popover is no better: *"Category is based on your body fat % — more accurate for muscular
-builds."* Nothing names the calibration.
-
-**The sibling card already does this properly**, which makes it a sibling-surface gap rather than a
-missing feature. `components/health/body-fat-card.tsx:46` calls `correctedSpan(metaRecent)` and says
-how many of the window's readings carry a correction — a helper written for exactly this
-(`body-fat-display.ts`: *"the two numbers together are what lets a chart say 'the last 4 of 7' rather
-than imply all or none"*).
-
-- **Recommendation: `via body fat % (DEXA-calibrated)` in the caption, and one sentence in the
-  popover** saying the scale reading is corrected to the owner's DEXA before the band is chosen. The
-  value is already correct; this is a labelling change only.
-- **⚠ Use `isCorrectedReading()`, never `bodyFatCorrected !== bodyFat`.** `body-fat-display.ts` warns
-  that an offset can round to zero and *"corrected by 0.0" and "not corrected" are different claims* —
-  and two thirds of the owner's history is on instruments the calibration does not cover, so the label
-  must follow the flag on the reading actually used, not a comparison.
-- **Verification:** the caption names the calibration on a corrected reading and does **not** on an
-  uncorrected one; the number itself is unchanged.
-
-
-### [body][nutrition] BF-114 — two numbers called BMR, 218 kcal apart, on two screens, neither saying which is which
-
-- **Lane:** B for the labelling; no engine change — both values already exist and both are correct.
+- **Lane: A** — was B, and the **B half shipped 2026-09-04**. What is left needs a field in
+  `lib/health/energy-balance-service.ts`, which `app/api/nutrition/energy-balance` reaches, so it is
+  Lane A's by the path rule.
 - **Added:** 2026-09-03 · owner: *"the BMR in scale is different to home; should probably indicate the
   difference?"*
+- **Keep:** Home and Nutrition both render *"your resting burn (N kcal)"* from
+  `components/nutrition/calorie-balance-bar.tsx` — one shared component, so one edit covers both —
+  and it names no source. **The payload cannot say one yet.** `restingBaseKcal` is
+  `measuredBmr ?? formula`, and nothing in the response records which branch produced it; the
+  existing `maintenance.source: 'calibrated' | 'formula'` is about the maintenance estimate, a
+  different number. Expose the branch (and the test date) and the UI line becomes a one-liner.
+  - **⚠ Say "carried forward", not "measured on 27 Aug".** `personalRmr` returns
+    `cunninghamBmr(currentFfmKg) + residual` — the measurement re-scaled onto **today's** lean mass,
+    not the number the lab produced. A label naming only the date would be subtly false.
 
-**Measured in production 2026-09-03:**
+**⚠️ THE ENTRY'S PREMISE WAS WRONG, and the correction is the useful part.** It recorded the Body
+tab's figure as *"the scale's own bioimpedance estimate"*. It is not. `lib/scale-ble/composition.ts`
+computes it with **Mifflin-St Jeor** from weight, height, age and sex, and its own comment says
+*"independent of impedance"*. So the 218 kcal gap is not *"two different measurements of different
+things"* as the entry reasoned — it is **a formula against a measurement**, which is a simpler and
+stronger reason the measured one wins.
 
-| | value | source |
-|---|---|---|
-| Body tab, "BODY COMPOSITION (SCALE)" → **BMR** | **1,543 kcal** | `body_metrics.bmr_kcal` — the scale's own bioimpedance estimate, re-read every weigh-in (1,545 / 1,542 / 1,543 across three days) |
-| the energy model behind Home's targets | **1,325 kcal** | `measured_rmr`, a single clinical test on **2026-08-27** |
+**Two more things the investigation turned up, both shipped in the B half:**
+- **The Body tab had TWO tiles both labelled `BMR`**, from different formulas: the "Body Composition"
+  card's is Cunningham from lean mass, the "Body Composition (Scale)" card's is the Mifflin-St Jeor
+  value above. Same screen, same word, different numbers. Both now name their source.
+- **The scale card's popover was false for two of its tiles.** It claimed the whole card is
+  *"measured directly by your body-composition scale (bioelectrical impedance)"*; BMR uses no
+  impedance at all, and **Visceral Fat** is derived from BMI and age. Both are now carved out
+  explicitly and marked on their tiles.
 
-**218 kcal apart — 16%** — and the one the app actually *uses* is the smaller, measured one. Nothing
-on either screen says a word about it, so the more prominent number is the one that governs nothing.
+### [sleep] BF-115 — the hypnogram is missing from the sleep tile's detail (the proposed fix would make it worse)
 
-- **Recommendation: label the source on both, and say which drives the targets.** *"BMR 1,543 kcal ·
-  scale estimate"* on the composition card, and wherever the energy baseline is shown, *"from your
-  measured RMR, 27 Aug"*. That is the whole fix: the numbers are right, their provenance is missing.
-- **A tolerance note is worth adding, not a reconciliation.** Bioimpedance BMR and an indirect
-  calorimetry RMR are different measurements of different things; 16% is unremarkable between them.
-  **Do not average them, and do not switch the model to the scale's figure** — the measured value is
-  the better input and Q-401's reasoning (measured beats self-reported or inferred) applies.
-- **⚠ Related but distinct from BF-99**, which was about the *base rate* reading lower than the RMR
-  because the recomp deficit had been subtracted. This is a second pair of numbers entirely; fixing
-  one does not touch the other.
-- **Verification:** both screens name their source; a reader can tell in one glance which figure the
-  calorie targets come from.
-
-
-### [sleep] BF-115 — the hypnogram is missing from the sleep tile's detail, and there are three sleep rows for that date
-
-> **✅ ROOT CAUSE FOUND (2026-09-03, Lane A). The three rows are CORRECT DATA, the storage is fine,
-> and the remaining fix is one import in a Lane B file.**
+> **⛔ THE STATED FIX IS REFUTED, 2026-09-04 (Lane B, on picking it up). Do not implement it.**
+> The 2026-09-03 root-cause note concluded *"run the local rows through the same `mergeByDate` before
+> setting state… the only edit is one import in `app/health/health-content.tsx`."* Read to the end,
+> that edit does not fix the reported symptom and it fabricates a number.
 >
-> **1. The rows are a night and two naps, not duplicates.** Converted to Brisbane, 2026-09-03 holds
-> `ble:51136441` **22:16 → 06:21** (7.67 h, phase 97 — the real night), `ble:51614985` **11:33 →
-> 13:58** (2.00 h, phase 29) and `ble:51827985` **17:28 → 19:35** (1.83 h, phase 26). A midday and an
-> early-evening sleep. Nothing is wrong with storing them. **19 dates carry more than one row,
-> spanning 2026-05-29 → 09-03**, so this is longstanding, not a regression — and 2026-08-27 in that
-> list is PS-17's own phantom date.
-> ⚠ **These are NOT PS-17's mechanism.** PS-17 blames `ALWAYS_NIGHT_MIN_HOURS = 4` short-circuiting
-> the circadian check; both fragments here are **under** 4 h, so that escape hatch never fired. Same
-> family, different cause — do not close one on the other's evidence.
+> **1. It cannot restore the hypnogram, because the local rows have no timestamps to restore.**
+> The render condition is `r.sleepPhase5Min && r.sleepStart && r.sleepEnd`
+> (`health-metric-sheet.tsx:246`). **`LocalSleepSession` has no `sleepStart`, no `sleepEnd` and no
+> `awakHours`** — confirmed at the storage level, not just in the type: `sqlite-backend.ts`'s
+> `sleep_sessions` insert names `manual_sleep_start` and nothing else of the kind, and that column is
+> Q-519's user-remembered bedtime, which its own doc comment says is *"never read by anything deriving
+> a window"*. A merge cannot invent the two fields the condition needs.
 >
-> **2. The route is already correct.** `/api/sleep-sessions` runs `mergeByDate`, whose
-> `primaryCluster` keeps the longest row plus anything within `CONTIGUOUS_GAP_MS` (1 h). The 11:33
-> nap sits ~8 h from the night and the 17:28 one ~2 h 41 m before it, so **both are dropped** and the
-> route returns the 7.67 h row with its 97-character phase string. Nothing to fix here.
+> **2. The clustering it relies on is disabled for exactly these rows.** `primaryCluster` opens with
+> `const timed = list.filter(r => r.sleepStart && r.sleepEnd)` and returns the list untouched when
+> `timed.length <= 1`; line 57 then keeps untimed rows explicitly. For local rows `timed` is
+> **empty**, so the nap-dropping the note credits it with never happens.
 >
-> **3. The defect is the LOCAL-FIRST read path, which bypasses that merge entirely.**
-> `health-content.tsx:230` reads `store.getSleepSessions(cutoffStr)` and line 299 pushes the result
-> straight into state — `setSleepRows(localSleep as unknown as SleepRow[])`. **Raw per-cluster rows,
-> never merged.** So the sheet receives all three, finds the entry for the date, and lands on a
-> fragment whose 29- or 26-character phase string and tiny stage hours fail both the hypnogram
-> condition and the proportion-bar fallback. That is exactly the reported symptom.
+> **3. And what remains is an additive merge, which is where the harm is.** All three rows carry an
+> `ouraId` (`ble:…`), so `ouraRows.length === 1 && samsungRows.length >= 1` is false and they fall to
+> the same-source branch, which **sums** the stage fields. On the owner's own date that yields a
+> single row claiming **7.67 + 2.00 + 1.83 = 11.5 hours** of sleep, deep 1.75 h, carrying whichever
+> phase string `list[0]` happened to hold. **A fabricated eleven-and-a-half-hour night is worse than
+> a missing chart.**
+> The additive merge is not wrong — it is built for Samsung midnight *splits*, contiguous fragments of
+> one night, and `primaryCluster` is what guarantees it only ever sees those. Untimed rows disable
+> that guarantee and hand naps to a summer.
 >
-> **This is also why it is device-only and why two surfaces disagree.** `getLocalStore` returns null
-> in the web sandbox, so on `pnpm dev` the sheet only ever sees the merged server rows and the bug is
-> invisible; on the APK the local seed paints first. The Body tab's card is fed through a path that
-> does merge, which is the "two surfaces, same date, different rows" the entry noticed.
-> **The `as unknown as SleepRow[]` double cast the entry flagged is the enabling mistake** — it
-> silences the fact that a local row and a merged `SleepRow` are different things with different
-> semantics, not just different shapes.
->
-> **The fix, and it is small: run the local rows through the same `mergeByDate` before setting
-> state.** It is already exported from `lib/sleep/merge-sessions.ts` and importable from client code,
-> so no Lane A change is needed — this is One Formula, One Place, with the second caller simply
-> missing. **Re-laned to B**: the only edit is in `app/health/health-content.tsx`.
-> ⚠ Check the other three consumers of `/api/sleep-sessions` for the same local-seed shape while
-> there — `session-select-content.tsx` (3 sites) and `health/sleep/sleep-content.tsx` (2 sites) —
-> that is the sibling sweep this belongs to.
->
-> **Not verified:** the device. The reasoning above is read from source and from production rows;
-> that the sheet renders correctly once merged is BF-115's own device check, unchanged.
+> **So the real requirement is `sleepStart`/`sleepEnd` (and `awakHours`) in the local table**, which is
+> a local SQLite version bump plus RECONCILE — **Lane A's alone** by the standing rule, which is why
+> this is re-laned rather than half-built.
 
-- **Lane:** B — **re-laned 2026-09-03.** It was A while the duplicate rows were unexplained; they
-  now are, the storage is correct and the route is correct, and the only edit left is one import in
-  `app/health/health-content.tsx`.
+- **Lane: A** — re-laned **back** on 2026-09-04. It was moved to B on the strength of the merge fix;
+  that fix is refuted above and the remaining work is a local schema change.
 - **Added:** 2026-09-03 · owner: *"the sleep hypnogram still does not work on days when accessed from
-  the sleep tile."* Screenshot: the detail sheet for 2026-09-03 showing every stat and **no Sleep
-  Stages section at all** — neither the hypnogram nor the proportion-bar fallback.
+  the sleep tile."* Screenshot: the detail sheet for 2026-09-03 with every stat and **no Sleep Stages
+  section at all** — neither the hypnogram nor the proportion-bar fallback.
+- **Keep — everything the 2026-09-03 investigation established still stands**, and it is good: the
+  three rows are a night and two naps rather than duplicates, storage is correct, `/api/sleep-sessions`
+  merges correctly, and the defect is that `health-content.tsx:299` seeds raw local rows past that
+  merge through an `as unknown as SleepRow[]` double cast. **That cast is still the enabling mistake**
+  — it is what let two types that differ by three load-bearing fields be treated as one.
+- **⚠ A Lane B mitigation exists but is a judgement call, not a cleanup.** Not seeding sleep rows from
+  the local store on this surface would leave the sheet reading the merged server payload, which is
+  correct — at the cost of a blank stages section offline instead of a wrong one, which the
+  instant-paint rule normally calls the worse outcome. Worth deciding deliberately rather than
+  slipping in beside a schema change.
+- **Verification (device), unchanged:** open the sleep tile on a date with more than one session — the
+  hypnogram renders and matches the stage hours the Body tab's card shows for the same night; a
+  single-session date is unchanged; and a date whose only row genuinely lacks phase data falls back to
+  the proportion bar rather than showing nothing. **Add one: no date may report a duration larger than
+  its longest single session.**
 
-**The lead, found while tracing and not previously recorded: `sleep_sessions` holds THREE rows for
-2026-09-03.** Phase-string lengths **97, 29 and 25**, deep-sleep hours 0.67 / 0.75 / 0.33. All three
-carry a `sleep_start`, a `sleep_end` and a non-null phase string. The 97 is the real night (7h40m ≈ 92
-five-minute buckets); the other two are short fragments.
-
-**So this is very likely a row-selection problem, not missing data.** The sheet takes
-`sleepReadings={[...sleepRows]}` and finds the entry for a date; with three rows sharing that date,
-which one it lands on decides what renders. **This was not confirmed from the sandbox** — the
-selection path was not read to the end, and it should be the first thing an implementer checks rather
-than assumed.
-
-- **The render condition is `r.sleepPhase5Min && r.sleepStart && r.sleepEnd`**
-  (`health-metric-sheet.tsx:246`), with a proportion-bar fallback at `stageTotal > 0`. **Both failed**,
-  which is the informative part: the chosen row had no usable phase string *and* no stage hours, while
-  the Body tab's own sleep card on the same screen shows Deep 0.7h / REM 2.1h / Light 4.9h / Awake
-  0.4h. Two surfaces, same date, different rows.
-- **⚠ Ask why there are three rows before making the sheet pick better.** A per-date duplicate is a
-  storage question — naps, a re-drain writing a second session, or an upsert key that does not hold —
-  and a UI that picks the longest row would hide it. Whether the fragments are real short sleeps or
-  artefacts decides whether the fix is selection or de-duplication.
-- **⚠ `health-content.tsx:299` seeds these rows from the local store through
-  `as unknown as SleepRow[]`** — a double cast that silences the type checker, so a shape mismatch
-  between the local table and `SleepRow` would be invisible at compile time. Worth checking as part of
-  this even if the duplicates turn out to be the whole story.
-- **Verification (device):** open the sleep tile on a date with more than one session — the hypnogram
-  renders and matches the stage hours the Body tab's card shows for the same night; a date with a
-  single session is unchanged; and a date whose only row genuinely lacks phase data falls back to the
-  proportion bar rather than showing nothing.
-
-
-### [app-shell] BF-116 — the header chips now overflow into the action buttons, because BF-96 made every item unshrinkable
-
-- **Lane:** B — `app/session-select/session-select-content.tsx:1058-1063` (the header row).
-- **Added:** 2026-09-03 · owner: *"the grid and battery pill still intersect."* Screenshot: `86%`
-  sitting under the reorder-sections grid icon.
-
-**"Still" is the important word, and the cause is the previous fix.** BF-96 shipped
-`whitespace-nowrap shrink-0` on the weather chip on 2026-09-01, correctly: it was the row's only
-compressible item and took 100% of any shortfall, so `UV 5` broke at its own space and the pill went
-two lines tall. `device-battery-chip.tsx:50` carries the same pair, and the date at `:1059` already
-did.
-
-**Every item in that row is now `shrink-0`, so the shortfall has nowhere to go.** It used to wrap;
-now it overflows. The row is `flex items-center gap-2` inside a `flex-1 min-w-0` column, with the
-action group beside it as `flex-none` — and `HeaderChips` returns a **bare fragment**, so there is no
-wrapper to constrain, truncate or scroll. Content spills past the column and crosses the buttons. On
-2026-09-03 that is `Thursday 3 September` + weather + a ring battery chip, which is one chip more than
-the row was ever laid out for (Q-111 added device chips on 2026-09-02, the day after BF-96).
-
-- **⚠ Do not solve it by removing `shrink-0`** — that restores the two-line wrap BF-96 fixed. The row
-  needs an **overflow strategy**, not more or less shrinking.
-- **Recommendation: let the date be the thing that gives.** It is the least informative item, it is
-  the longest, and its length is what varies — `EEEE d MMMM` runs 12–20 characters across the year,
-  which BF-96 already identified as the variable that runs the row out of width. Drop its `shrink-0`
-  and give it `truncate` with a `min-w-0` parent, so a long date shortens while the chips stay whole.
-  A shorter format on narrow widths is the alternative and reads worse.
-- **The chips will keep arriving** — ring and strap ship today, the scale deliberately has none
-  (`header-chips.tsx:17`), and anything else with a battery is a candidate. A row that only fits
-  today's count is the same bug scheduled for later, so whatever is chosen should hold for three
-  chips.
-- **Verification (device, at the S25 width):** on the longest weekday-plus-month combination
-  (`Wednesday 30 September`) with weather and two device chips present, nothing crosses the grid icon
-  and no chip wraps to a second line; with one chip and a short date, the layout is unchanged.
 ### [nutrition] BF-121 — the meal builder divides calories per portion and not the macros, so it disagrees with the sheet that opens the same meal
 
 - **Lane:** B — `components/nutrition/meal-builder-footer.tsx:41-64`. **No engine change**; the divisor
@@ -1995,44 +2390,27 @@ takes one portion — 246 kcal of the 983 below."*
   the same saved meal, and what a logged portion writes into the diary.
 
 
-### [nutrition] BF-120 — a meal section holding one item lost its macro row, which is BF-98's fix landing one notch too wide
-
-- **Lane:** B — `components/nutrition/meal-card.tsx:150`, one condition.
-- **Added:** 2026-09-05 · owner: *"1 meal doesnt show the calorie total; but 2 meals do."* Screenshot:
-  **Pre Workout** with two grouped meals showing `P 37g · C 26g · F 17g` and `413 kcal`; **Post
-  Workout** with a single `LOADED MAC & CHEESE` showing neither.
-
-**This is a consequence of BF-98, not an unrelated regression.** That entry fixed a section holding
-one grouped meal drawing its macros **twice**, and the fix moved the gate from `logs.length > 1` to
-`entries.length > 1` — counting groups rather than flat rows. Correct for the duplication; it also
-means a section with exactly one entry now renders no footer at all.
-
-**The calorie half of the report is arguably fine and the macro half is not.** With one item the
-section's calorie total *is* that item's number, and the section header already prints it (`672`
-beside POST WORKOUT), so a footer repeating it is the redundancy BF-98 set out to remove. **But the
-`P / C / F` row goes with it**, and that is not redundant — nothing else on the screen breaks a single
-logged item into protein, carbs and fat. So the owner reads 672 kcal with no idea what it is made of,
-while the two-item section above tells him.
-
-- **Recommendation: render the macro row whenever a section has any entry, and keep the calorie total
-  gated at two or more.** That satisfies both reports at once — no duplicated number, no missing
-  breakdown — and is a smaller change than it sounds, since `totals` is already computed for every
-  section regardless of the gate.
-- **⚠ Check it against BF-98's own case before shipping.** The duplication BF-98 fixed was a
-  *grouped* meal drawing its macros once as a group and again as a section footer. A single grouped
-  meal must still not print two macro rows; a single **loose** item must print one. Those are
-  different shapes behind the same count of 1, and the fix has to tell them apart — which is likely
-  why the threshold was set where it was.
-- **⚠ BF-98 also carries an unresolved note worth reading first:** its duplication *"could NOT be
-  reproduced in e2e"*, and `diary-nested-meal.spec.ts` covers this exact fixture. Whatever changes
-  here should extend that spec to the one-loose-item case, which is the shape now visibly wrong and
-  is reproducible.
-- **Verification (device):** a section with one loose item shows its macro breakdown and no duplicated
-  calorie line; a section with one grouped meal shows exactly one macro row; a section with two or
-  more shows the breakdown and the total, as it does today.
-
-
 ### [app-shell][platform] BF-110 — the blank resume survives a scroll, which means the renderer never died
+
+- **✅ SHIPPED 2026-09-03** (`fix/bf-110-resume-repaint`). Both halves, in the order this entry
+  insists on: `handleResume` measures the shell root's box and child count on every resume, then
+  promotes and releases a layer for one frame — the same instruction the manual scroll gives the
+  compositor, without touching scroll state. On `pull-to-sync.tsx`'s container, where BF-100 already
+  lives, because the report says *"pages often"* rather than naming a screen.
+- **⚠ THE ENTRY ASKS FOR A ROW PER RESUME AND THAT WAS NOT BUILT — deliberately.** `error_events`
+  prunes at 30 days and is the second-largest object in the database, the owner resumes many times a
+  day, and, decisively, **JS cannot tell whether the screen was actually blank**: the DOM is intact
+  either way, so a row per resume records nothing about the failure it is meant to evidence. What
+  ships instead: **a `dom-lost` sample always** — that is the observation that would disprove this
+  entry and must never be dropped — and **a `dom-intact` sample once per launch**, which is all the
+  positive case needs. The repaint itself runs on every resume; only the row is capped.
+- **Gate:** device — and here it is the whole verdict, not a formality. This is a Samsung WebView
+  compositor failure: Chrome and `pnpm dev` cannot show it, so the suite proves the effect RUNS and
+  nothing about whether it FIXES anything. Reproduce as the entry says (background the app on low
+  memory — the original report had battery at 10% with Messenger running), then resume and confirm
+  the screen paints without a scroll. Check `error_events` for `bf110 resume` afterwards: a
+  `dom-intact` row is the measurement this entry wanted, and a `dom-lost` row would put BF-80 back
+  in play.
 
 - **Lane:** B — the DOM is alive, so the fix is a paint invalidation in the shell, not native. **No APK
   needed**, which is the practical difference between this entry and BF-80.
@@ -2091,6 +2469,15 @@ paint, only on Samsung's WebView, invisible in Chrome and in `pnpm dev`.
 
 
 ### [app-shell] BF-111 — "Up to date — v1.414.1 is the newest build" sits under a v1.436.2 badge, and both are right
+
+- **✅ SHIPPED 2026-09-03** (`fix/bf-111-version-labels`, v1.436.4). Both numbers labelled, and every
+  state now names the **installed** build rather than only the newest one — the update state used to
+  name a version the phone does not have and say nothing about the one it does. The date came from
+  `nativeBuiltAt`, which `/api/version` was already returning and the card was dropping.
+- **Gate:** device — the card returns early unless `Capacitor.isNativePlatform()`, so on web and in
+  every e2e harness it renders nothing at all and none of its three states has been on a screen.
+  The check is the one below: on a phone whose APK is behind the web app, About names both numbers,
+  says which is which, and the tick refers unambiguously to the Android build.
 
 - **Lane:** B — `components/more/update-check-card.tsx:81`.
 - **Added:** 2026-09-02 · noticed while tracing BF-110, not reported. The About screen shows the app as
@@ -2944,12 +3331,15 @@ two screens, and a user who sets one has no way to know the other exists.
   without the reset** — on the first resume of a new day the app re-prompts and re-reads, and on any
   other resume it does nothing. If the owner still wants a literal restart after using it, that is a
   new entry with that experience as its subject, not this one.
-- **⚠ 2026-09-04 — the deferred half came back as a report, and BF-117 owns it.** The scope line
+- **✅ 2026-09-04 — the deferred half came back as a report, and BF-117 shipped it.** The scope line
   below was right to wait for evidence rather than subscribe 30 sites blind; the owner supplied it
   (*"opening the app after a day has been completed… I need to close and reopen"*). The answer turned
   out to be narrow: Home gates its data effects on `refreshTick`, which a day change never bumps, so
   one bump does what a sweep would have. Nothing in this entry changes — the reload is still refused
-  and the check-in half is still shipped.
+  and the check-in half is still shipped. `useDayRolloverRefresh` in `local-day-provider.tsx` is the
+  mechanism, and Health and Nutrition take it too: `tabEpoch` bumps when the user navigates back to a
+  tab, never when the app resumes onto one they never left, so the sentence below about most sites
+  sitting behind the re-show pass was true and not sufficient.
 - **Keep — the today-scoped read surface is NOT swept, and that is a scope line rather than an
   oversight.** ~30 `cachedFetchToday` call sites and 59 `readTodayCacheSync` sites exist; both already
   treat a past-dated entry as a miss, so they are correct **whenever they run**, and most sit behind
@@ -4530,14 +4920,45 @@ a finding — it does not by itself explain a plain `GET` hanging beside it.
 - **Added:** 2026-08-30 · measured against production while checking BF-54. **These are the size
   columns, read from the filesystem, so they are exact** — unlike the row counts BF-54 is about.
 
+### [nutrition] LB-57 — the day's supplement exposure is derived in two places, one per lane
+
+- **Lane:** A — the hoist lands in `packages/shared/`, which Lane B may not write.
+- **Added:** 2026-09-06, by the lane that created the second copy — see
+  [journal](overview/entries/2026-09-06-bf-112-dose-entry.md).
+
+`listSupplements` (`lib/data/postgres/adapter.ts`, around the `manual`/`summed` maps) and
+`summariseSupplementDay` (`components/nutrition/supplement-day-totals.ts`) compute the same two
+values from the same rows: `loggedToday` from the manual contribution only, and `loggedAmount` as
+the sum over every live contribution with its count. Both must keep three behaviours identical —
+manual-only for the tick, null rather than 0 when no contribution carried a number, and the unit
+taken from the first contribution that has one.
+
+**Why there are two.** The device never reaches the server's copy: the nutrition page's local-first
+branch returns early once the local store has definitions, so BF-112 had to derive the same totals
+from `getSupplementLogs`. The correct single home is `packages/shared/`, and both `packages/shared/**`
+and `lib/data/**` are Lane A's, so the extraction was not Lane B's to make.
+
+**The fix:** move the derivation into `packages/shared/src/supplements/day-totals.ts` over a minimal
+row shape (`{ supplementId, amount, unit, source, deletedAt }`), have the adapter and the client
+helper both call it, and keep
+`components/nutrition/__tests__/supplement-day-totals.test.ts` pointed at the shared version —
+its cases were written against the adapter's semantics on purpose, including the two the adapter's
+own comments call load-bearing.
+
+**Not urgent.** Both copies agree today and both are covered by tests. What this costs is the next
+change to the rule: a `source` value added on one side, or a mixed-unit day handled on one side, and
+the device silently disagrees with the server.
+
 ### [nutrition][platform] BF-69 — dosed substances are stored but nothing reads them; make exposure an analysable variable
 
-- **⚠ 2026-09-03 — STAGE 2 IS NOW ITS OWN ENTRY, BF-112, because this one prints under KEEP.**
-  A `Keep:` line files an entry as *"shipped; not new work"*, which is true of the storage and false
-  of the feature: the residue named below is the entire user-facing half. The owner asked how
-  retatrutide tracking had progressed and the answer was that his part had never been built — two
-  months of engine work, and production still holds 2 supplements, no amounts, and one log from June.
-  Stage 2 is startable Lane B work and now says so. Stages 3 and 4 remain below.
+- **⚠ 2026-09-03 — STAGE 2 WAS SPLIT OUT AS BF-112, because this one prints under KEEP.**
+  A `Keep:` line files an entry as *"shipped; not new work"*, which was true of the storage and false
+  of the feature: the residue named below was the entire user-facing half. The owner asked how
+  retatrutide tracking had progressed and the answer was that his part had never been built.
+- **✅ STAGE 2 SHIPPED 2026-09-06** — amount/unit/prompt/window on the definition, the titration
+  prompt at log time, and the day's logged amount rendered on the row.
+  [journal](overview/entries/2026-09-06-bf-112-dose-entry.md). **Not device-verified**; stages 3 and
+  4 remain below.
 - **Keep — STAGE 1 SHIPPED 2026-09-01 (migrations 254 + 255, local SQLite v34). Stages 2-4 are what
   is owed, and stage 2 is the one that matters.** The storage half is done: `supplement_logs` is
   contribution-rows now (its whole-day `unique (supplement_id, log_date)` is gone, replaced by a
@@ -4935,6 +5356,9 @@ owner has to re-describe in a wizard what the app already knows.
 
 - **✅ CLOSED 2026-09-01 by measurement against production.** No code change. Kept as a
   **`Reference:`** because the measurement is what the next reader needs, not the conclusion.
+- **Lane:** A — nothing is owed here today, but the one latent inconsistency this entry leaves open
+  (below) is in `reevaluate.ts`, which is Lane A's. Tagged 2026-09-06 so it stops printing as
+  UNCLASSIFIED to every lane.
 - **Reference:** what the AI Prescription card can and cannot say, and why a hand-built prescription
   fixture misleads.
 - **What I filed, and why it looked like a bug.** A card showed `4×5 @ 128.75kg (80%)` for an
@@ -8208,6 +8632,59 @@ because none of them is the change that review was for, and per **No orphaned fi
 without a queue entry is a dropped finding.*
 
 
+### [platform] LB-54 — a red CI job cannot be read, and E2E has no green baseline to compare against
+
+- **Lane:** O — the Orchestrator's. `.github/workflows/ci.yml` and the CI tooling are the Orchestrator's.
+- **Added:** 2026-09-03 · from BF-111 (#840), where diagnosing one red check consumed most of a
+  session and still did not reach the failing assertion.
+- **⚠️ `get_job_logs` cannot reach a step's output on this repo's jobs.** Every retrieval — by
+  `job_id`, by `run_id` with `failed_only`, at `tail_lines` from 60 to 400 — returns only the
+  **post-job Postgres service-container dump**, which the runner prints last and which is thousands
+  of lines of `role "root" does not exist` healthcheck noise. Measured: the whole retrievable content
+  for a failed `Tests` job was **2,797 characters**, none of it vitest's. `get_check_run` is no help
+  either — Actions jobs leave `output.text` empty. **So a red job announces that it is red and
+  nothing else.**
+  - The practical consequence: a failure that does not reproduce locally cannot be diagnosed at all.
+    BF-111's `Tests` job failed on CI while the same commit ran **6,429 passed, 0 failed** locally,
+    and there was no way from here to learn which test failed. **It was a flake** — a re-run of the
+    same commit went green in 2m30s (run 33809586570, attempt 2) — but *spending the one permitted
+    re-run was the only instrument available to establish that*, and a re-run cannot distinguish a
+    flake from a real failure that happens to pass twice. The logs would have answered it in seconds.
+  - Worth trying: uploading vitest's and Playwright's own output as a run artifact, or printing a
+    failure summary to a file the workflow `cat`s in a final step — anything that puts the failure
+    *before* the container dump rather than behind it.
+- **⚠️ E2E is a required check with no green baseline on `main`.** The job is gated
+  `if: github.event_name != 'schedule'`, so the nightly run on `main` **skips it** (confirmed: run
+  33797376255 shows E2E `skipped`). It therefore only ever runs on a PR. **CI history cannot answer
+  "is this red on `main` too?"** — the first question the CI rules tell you to ask.
+  - That is not hypothetical: it sent this session to reproduce the comparison by hand, and the
+    hand-rolled version was **wrong** — see the caveat below.
+- **⚠️ RETRACTED THE SAME DAY — local e2e IS the adjudicator here, and it is the only one.** This
+  bullet first read *"local e2e is NOT an adjudicator in this sandbox"*, on the strength of a run
+  where the same specs failed on the branch **and** on clean `main`. That reading was wrong twice
+  over. Both sides failed because **both sides were genuinely broken** — nine specs were waiting for
+  UI that BF-103 and Q-407 had moved (LB-55) — so "it fails on main too" was the correct finding,
+  dismissed as an environment artefact. And the run that finally settled it was *also* local: a
+  CI-shaped database built by hand (`createdb`, migrate, `seed.sql`), 146 passed / 10 failed, with
+  Playwright's `error-context.md` carrying the accessibility snapshot that named both drifts.
+  - **Why it matters that this was retracted rather than left standing:** CI cannot adjudicate this
+    at all. `main` has no E2E baseline (no `push: [main]` trigger), the job logs are unreachable, and
+    the artifact is always empty. Local e2e is not a weaker substitute for CI here — it is the *only*
+    instrument that can read a failure.
+  - **What IS true, and is the smaller claim worth keeping:** the sandbox's storage credentials 403,
+    `CLAUDE_RO_OWNER_USER_ID` is unset, and a long-lived dev database accumulates fixtures. Build a
+    fresh database for a full run rather than reusing one, and check the dev server survived (see
+    LB-55's `ECONNREFUSED` note) before believing a mass failure.
+- **⚠️ Worktrees cannot run this app's dev server**, which rules out the obvious way to compare two
+  refs side by side. A symlinked `node_modules` is rejected by Turbopack — *"Symlink node_modules is
+  invalid, it points out of the filesystem root"* — and a real copy per worktree is not free against a
+  fixed disk allowance. Checking the other ref out in the primary worktree and switching back is the
+  workable route.
+- **Why this is worth an entry rather than a shrug:** E2E became required on 2026-08-26, so a red E2E
+  now blocks every merge. The tooling to tell a real failure from an inherited one, or from a flake,
+  does not exist — and the first time it mattered it cost a session and produced one wrong conclusion
+  along the way.
+
 ### [sleep][platform] LB-53 — `oura_daily_derived`: what actually writes it, and the one thing still owed
 
 > **⛔ REFUTED AS FILED, 2026-09-04 — `computed_at` does not mean what this entry read it to mean, and
@@ -8267,11 +8744,36 @@ without a queue entry is a dropped finding.*
 - **Caveats on the measurement:** `claude_ro` is row-scoped to the owner, so every count above is one
   user's rows. The writer map is read from source and is complete; the counts are not.
 
-### [platform] LB-52 — `main` outpaces a CI cycle and auto-merge is unavailable, so every PR is a race
+### [platform] LB-52 — GitHub's auto-merge API does not see a Ruleset, so every PR is a hand-caught race
 
-- **Lane:** ? — neither. The fix is a repository *setting*, not code in either lane's paths.
-- **Gate:** owner — enabling branch-protection rules on `main` is the owner's call.
-- **Measured 2026-09-02, on BF-108 (#818): five merge rounds, four of them lost to the same race.**
+- **Lane:** O — the Orchestrator's. The fix is a repository *setting*, not code in either lane's paths.
+- **Gate:** owner — the remedy is a repo setting only the owner can make.
+- **⚠️ THIS ENTRY'S ORIGINAL DIAGNOSIS WAS WRONG, and the correction is the point (2026-09-03).** It
+  said *"turn on Allow auto-merge and add a branch protection rule"*. **Both were already on.** The
+  owner showed the settings: *Allow auto-merge* ticked, and `main` protected by a **Ruleset** with
+  six required checks (Lint, Tests, Build, Migration Check, Custom Rules, **E2E**). The entry was
+  written from a single error string, never tested, and asked the owner twice for work already done.
+- **What is actually happening, reproduced on a second PR.** `enable_pr_auto_merge` returns
+  *"Pull request Protected branch rules not configured for this branch"* — on PR #818 (2026-09-02)
+  and again on **PR #853 (2026-09-03)**, a fresh PR with checks in flight, against that same repo.
+  **GitHub's auto-merge API is looking for CLASSIC branch protection and does not recognise a
+  Ruleset.** That is a gap on GitHub's side, not a misconfiguration.
+- **Recommendation: add a classic branch-protection rule on `main` alongside the ruleset**, naming
+  the same six checks. The two coexist and GitHub takes the most restrictive, so enforcement does not
+  weaken — the classic rule exists only to give the auto-merge API the object it looks for. Reversal
+  cost is near zero: delete it and the repo is exactly where it is today.
+- **The alternative, if that is unwanted: reduce the conflict surface instead.** Move the version
+  bump and the doc-size baselines out of feature PRs — a changelog *fragment* per PR folded by the
+  compaction sweep, which CLAUDE.md already anticipates (*"a future changelog-fragment change could
+  remove that too"*). More work, and it only shrinks the race rather than ending it.
+- **⚠️ A rate limit is not a result.** Two attempts on 2026-09-03 returned *"API rate limit already
+  exceeded for user ID …"* — a different error that settles nothing. The polling this race forces is
+  itself what exhausted the budget, so the race now costs API quota as well as cycles.
+- **Related correction, same root:** *"E2E is not a required check"* was true until 2026-08-26 and is
+  now **false** — the owner added it per LA-22, whose `Keep:` is therefore satisfied. Sessions
+  carrying the old fact wait for five checks and merge into a sixth. Wait for **six**.
+- **Measured across 2026-09-02/03: fourteen merge attempts over seven PRs, every one green on its own merits.** BF-108 (#818) took five rounds and Q-516 (#839) took four.
+- **The original measurement, which still holds:**
   `main` moved roughly every ten minutes with six agents running; a CI cycle takes five to seven. So
   a PR opens green-in-waiting, `main` lands somebody else's merge, and the PR reads
   `mergeable_state: dirty` before its own checks finish. Merge, resolve, push, and the next cycle can
@@ -8286,9 +8788,9 @@ without a queue entry is a dropped finding.*
   mechanism this API does not see as a protection rule. Until it is available, an agent's only lever
   is to poll and merge the instant checks go green, which is what CLAUDE.md's 2–3 minute check-in is
   already for — and it does not close the window, it only narrows it.
-- **What to change, in order of value.** (1) Turn on *Allow auto-merge* and add a branch-protection
-  rule for `main` naming the five required checks, so `enable_pr_auto_merge` works and GitHub does the
-  waiting. (2) Failing that, take the version bump and the doc-size baselines out of the feature PR —
+- **⛔ The old "what to change" list is struck — see the correction at the top of this entry.** It
+  read: (1) turn on *Allow auto-merge* and add a branch-protection rule; (2) failing that, take the
+  version bump and the doc-size baselines out of the feature PR —
   a changelog *fragment* per PR, folded by the compaction sweep, removes the two files that conflict
   most, and CLAUDE.md already anticipates this (*"a future changelog-fragment change could remove that
   too"*). Either one alone would have made BF-108 a single round.

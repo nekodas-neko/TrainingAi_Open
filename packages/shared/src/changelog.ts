@@ -6,17 +6,90 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.436.12",
+    version: "1.436.23",
     date: "2026-09-06",
     changes: [
       "Hardened the sign-in page against password guessing. The limit on failed attempts could be reset by adding a space to the email address, which made repeated guessing against one account effectively unlimited; it now counts every spelling of an address together, and a second limit caps attempts from one source across all accounts.",
     ],
   },
   {
-    version: "1.436.11",
+    version: "1.436.22",
     date: "2026-09-06",
     changes: [
       "Deactivating an account now takes effect on its very next request. Until this, someone already signed in kept full access to their data for as long as their existing login lasted \u2014 up to a week \u2014 even though a fresh sign-in was correctly turned away.",
+    ],
+  },
+  {
+    version: "1.436.20",
+    date: "2026-09-06",
+    changes: [
+      "Dragging your meal types into a new order used to say it saved even when the server refused — which happens when the list on screen still shows a meal type deleted somewhere else. It now tells you, and reloads the list so the order on screen is the one that is actually stored.",
+    ],
+  },
+  {
+    version: "1.436.19",
+    date: "2026-09-06",
+    changes: [
+      "The strength card no longer reads a deload week as a collapse. An exercise whose most recent session was a deload showed an empty bar and a drop equal to your entire one-rep max; it now shows your last real estimate and compares against the one before it.",
+    ],
+  },
+  {
+    version: "1.436.18",
+    date: "2026-09-06",
+    changes: [
+      "A meal with only one food in it shows its protein, carbs and fat again. The breakdown was hidden whenever a meal held a single item, so you could see that it was 150 kcal and nothing about what those calories were made of.",
+    ],
+  },
+  {
+    version: "1.436.17",
+    date: "2026-09-06",
+    changes: [
+      "About no longer looks like it is contradicting itself. The app version and the Android build version are different things and both were right, so a green tick appeared to vouch for the smaller one; each now says what it governs.",
+      "The Android build row names the version actually installed on your phone and the date it was built, so you can tell whether a native fix has reached the device without looking it up.",
+    ],
+  },
+  {
+    version: "1.436.16",
+    date: "2026-09-06",
+    changes: [
+      "The blank screen when you come back to the app should now paint on its own. It was never a crash \u2014 scrolling fixed it, which means the page was there all along and just was not drawn, so the app now gives the screen the same nudge your finger did.",
+    ],
+  },
+  {
+    version: "1.436.15",
+    date: "2026-09-06",
+    changes: [
+      "Leaving the app open overnight and coming back to it now shows the new day. Home, Health and Nutrition kept the numbers they loaded when the app was last started, so the greeting said one day and the cards below it said the day before \u2014 the only way out was closing and reopening the app.",
+    ],
+  },
+  {
+    version: "1.436.14",
+    date: "2026-09-06",
+    changes: [
+      "The BMI card now says its category comes from a body fat reading corrected to your DEXA scan, rather than just \"via body fat %\". The number and the category are unchanged \u2014 the card was already using the corrected figure and only the label was short.",
+    ],
+  },
+  {
+    version: "1.436.13",
+    date: "2026-09-06",
+    changes: [
+      "Supplements can now record an actual amount. A supplement carries an amount and a unit, and the row shows what today's log recorded rather than what the definition currently says \u2014 so changing the dose later does not rewrite what a past day shows.",
+      "A supplement whose dose changes can be set to ask for the number each time it is ticked, for anything on a titration schedule.",
+      "Supplements can carry a started and a stopped date. Days outside that window count as not taking it, rather than as a missed dose.",
+    ],
+  },
+  {
+    version: "1.436.12",
+    date: "2026-09-06",
+    changes: [
+      "The date and the battery pills at the top of Home no longer run into the buttons beside them. When the row is too narrow the date shortens instead, so the pills stay whole and readable.",
+    ],
+  },
+  {
+    version: "1.436.11",
+    date: "2026-09-06",
+    changes: [
+      "The two BMR figures on the Body tab now say where each comes from, so it is clear why they differ. One is calculated from your lean mass, the other from your weight and height \u2014 and the card that shows the second no longer claims your scale measured it, because it does not. Your visceral fat number says it comes from BMI and age for the same reason.",
     ],
   },
   {

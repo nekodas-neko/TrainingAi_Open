@@ -51,7 +51,8 @@ test('the More tab reaches the details screen', async ({ page }) => {
   await page.goto('/more')
   await settleRouteBoundary(page)
 
-  await page.getByRole('button', { name: /Name, body facts/ }).click()
+  // The row lost its "Name, body facts" sublabel and is now just its label (BF-79's regrouping).
+  await page.getByRole('button', { name: /Profile details/ }).click()
 
   await expect(page.getByRole('heading', { name: 'Profile details' })).toBeVisible({ timeout: 60_000 })
   // All four editable details on one screen — the whole of what the owner asked for.

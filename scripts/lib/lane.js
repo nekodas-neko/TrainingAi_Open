@@ -11,11 +11,17 @@
 // Q-421 hit the same thing the moment it was handed over — its shipped-banner read "(Lane A)".
 'use strict';
 
-const LANE_FIELD_RE = /\*{0,2}Lane:\*{0,2}\s*\*{0,2}(A\b|B\b|\?)/;
-const LANE_LOOSE_RE = /\*{0,2}Lane:?\*{0,2}\s*\*{0,2}(A\b|B\b|\?)/;
+const LANE_FIELD_RE = /\*{0,2}Lane:\*{0,2}\s*\*{0,2}(A\b|B\b|O\b|\?)/;
+const LANE_LOOSE_RE = /\*{0,2}Lane:?\*{0,2}\s*\*{0,2}(A\b|B\b|O\b|\?)/;
 
 /**
- * @returns `'A'` · `'B'` · `'?'` · or `null` for "not stated".
+ * @returns `'A'` · `'B'` · `'O'` · `'?'` · or `null` for "not stated".
+ *
+ * `'O'` is the Orchestrator's own lane, added 2026-09-06 (OR-103). It exists because CI config,
+ * workflow files and repository settings are in NEITHER implementer lane's paths, so §3's path rule
+ * cannot answer them and they printed as UNCLASSIFIED forever — four of them at once, each saying
+ * "neither lane" in prose. A label that lives only in prose is the defect this whole file exists
+ * for, so the third value is the consistent fix rather than a special case.
  *
  * `null` is not "hidden": the caller reads it as visible to BOTH lanes, because an unstated lane is
  * answered by the path rule in `docs/agents/README.md` §3 rather than by this file.

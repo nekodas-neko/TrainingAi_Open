@@ -29,6 +29,11 @@ const JUST_BEFORE_MIDNIGHT = new Date('2026-03-10T13:55:00Z')
 
 test.setTimeout(180_000)
 
+// BF-117's case counts requests with `page.route`, and the service worker re-issues every /api/
+// fetch where Playwright cannot see it — the stub would apply or not depending on whether the
+// worker had claimed the page.
+test.use({ serviceWorkers: 'block' })
+
 test('a resume after local midnight re-prompts the morning check-in', async ({ page }) => {
   await page.clock.install({ time: JUST_BEFORE_MIDNIGHT })
 
@@ -82,4 +87,59 @@ test('a resume on the SAME day does not re-prompt', async ({ page }) => {
 
   await page.waitForTimeout(2_000)
   await expect(sheet, 'the same day must not re-prompt').toBeHidden()
+})
+
+/**
+ * BF-117 — the rest of the screen follows the day, not just the check-in.
+ *
+ * BF-86 fixed the prompt and deliberately left this half undone: everything else on Home is gated
+ * on `refreshTick`, which a day change did not bump, so the owner saw today's greeting over
+ * yesterday's rest-day and recovery cards and had to kill the app. Counting requests rather than
+ * reading text is what makes this specific — the cards' content depends on seeded data, but
+ * "were these reads taken again" is exactly the defect.
+ *
+ * The negative case is the trap the fix had to avoid: `localDay` is seeded synchronously, so an
+ * effect merely keyed on it fires once at mount and double-fetches every launch — invisible in use,
+ * and it would read as an app that is just slow to settle.
+ */
+test('a resume after local midnight re-takes the day-scoped reads', async ({ page }) => {
+  await page.clock.install({ time: JUST_BEFORE_MIDNIGHT })
+
+  let readinessReads = 0
+  await page.route('**/api/readiness-score*', async route => {
+    readinessReads += 1
+    await route.fallback()
+  })
+
+  await page.goto('/')
+  await settleRouteBoundary(page)
+
+  const sheet = page.getByRole('heading', { name: 'Morning Check-in' })
+  await expect(sheet).toBeVisible({ timeout: 60_000 })
+  await page.keyboard.press('Escape')
+  await expect(sheet).toBeHidden({ timeout: 20_000 })
+
+  await expect
+    .poll(() => readinessReads, { timeout: 30_000, message: 'the launch read must have landed' })
+    .toBeGreaterThan(0)
+  const afterLaunch = readinessReads
+
+  // Same day, so nothing is owed — this is the mount/double-fetch guard.
+  await page.clock.fastForward('00:02:00')
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true })
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+  await page.waitForTimeout(3_000)
+  expect(readinessReads, 'a same-day resume must not refetch').toBe(afterLaunch)
+
+  // Across midnight it is owed.
+  await page.clock.fastForward('00:10:00')
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true })
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+  await expect
+    .poll(() => readinessReads, { timeout: 30_000, message: 'a new local day must re-take the reads' })
+    .toBeGreaterThan(afterLaunch)
 })

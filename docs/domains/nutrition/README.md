@@ -28,6 +28,15 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   unique constraint it says has to go is already gone.
 
 - [`docs/overview/entries/2026-09-02-q517-tdee-bmr-floor.md`](../../overview/entries/2026-09-02-q517-tdee-bmr-floor.md) — **the calibrated maintenance is floored at BMR, 2026-09-02 (Q-517).** `adaptive-tdee.ts` clamped at a universal **1000** against its own header's prediction that the failure would land at 1200; the owner's worst window computed **1052**. The floor is now the user's own BMR — the **measured** resting rate where one exists, because `energy-balance-service.ts` already resolves `personalRmr(measured) ?? comp.bmrKcal ?? mifflinStJeorBmr` two dozen lines above the call, which also disposes of the addendum's fallback ladder. Below it the window is **rejected, not clamped**, so the resolver falls back to the formula baseline. **The right floor already existed one line below on `restingBaseKcal`** — protecting what the balance *displays*, not the maintenance that becomes the recommendation and then `users.calorie_goal`. **SAFE, not CORRECT:** survivors still sit under the formula's 2,397, and within-day incompleteness detection stays on the `Keep:`.
+- [`docs/overview/entries/2026-09-06-bf-112-dose-entry.md`](../../overview/entries/2026-09-06-bf-112-dose-entry.md)
+  — **the dose can be typed in (BF-112, BF-69 stage 2), 2026-09-06.** The manage sheet writes
+  amount, unit, `dose_prompt` and the started/stopped window; a prompted supplement asks for the
+  number when ticked; the row renders **what the log recorded**, not the definition's current
+  amount. **Two defects found while verifying, both fixed here:** the nutrition tab's local-first
+  branch dropped every new field, so the prompt would never have fired **on the device** while
+  working in the browser, and the tick left the previous log's number on screen until the next pull.
+  **Not device-verified.** The read path now lives in `lib/hooks/use-supplements.ts`; the day's
+  exposure is derived once per lane, which is filed as **LB-57**.
 - [`docs/overview/entries/2026-09-01-supplement-contributions.md`](../../overview/entries/2026-09-01-supplement-contributions.md)
   — **a day's dose is a sum of contributions (BF-69 stage 1), 2026-09-01.** Migrations 254/255 and
   local SQLite v34. `supplement_logs` is contribution rows now, with a *partial* unique over

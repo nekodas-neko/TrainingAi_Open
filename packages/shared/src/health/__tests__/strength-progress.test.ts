@@ -53,6 +53,25 @@ describe('computeBarMetric — mode "latest"', () => {
     const ex = makeExercise({ estimated1rm: null, personalRecord1rm: 98 })
     expect(computeBarMetric(ex, 'latest')).toBeNull()
   })
+
+  // PS-26. A deload stores `estimated_1rm = 0` on purpose. Read as a value it produced the exact
+  // shape reported: a 0% bar and a delta equal to the lifter's ENTIRE previous 1RM, in red.
+  // `/api/weights-summary` no longer publishes the sentinel, so this pins the module's own
+  // defence — a regression upstream must degrade to a hidden row, never to an invented loss.
+  it('treats a deload sentinel of 0 as absent, not as a total collapse', () => {
+    const ex = makeExercise({ estimated1rm: 0, previousEstimated1rm: 97, personalRecord1rm: 98 })
+    expect(computeBarMetric(ex, 'latest')).toBeNull()
+  })
+
+  it('and the pre-fix behaviour is what that replaces — 97 kg of invented loss', () => {
+    // Asserting the delta rather than only the null keeps the size of the defect visible: without
+    // the guard this row reads "−97 kg" beside an empty bar, which is why it was reported.
+    const ex = makeExercise({ estimated1rm: 0.0001, previousEstimated1rm: 97, personalRecord1rm: 98 })
+    const metric = computeBarMetric(ex, 'latest')
+    expect(metric!.trend).toBe('down')
+    expect(metric!.delta).toBe(97)
+    expect(metric!.pct).toBeCloseTo(0, 3)
+  })
 })
 
 describe('computeBarMetric — mode "working", weighted exercises', () => {

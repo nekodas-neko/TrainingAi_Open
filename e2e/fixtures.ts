@@ -386,6 +386,39 @@ export async function tapCentre(page: Page, target: Locator): Promise<void> {
 }
 
 /**
+ * Tap the one match that is actually on screen.
+ *
+ * The tab shell keeps all five tab trees mounted, so a locator resolves into off-screen panels as
+ * readily as into the visible one — and `page.touchscreen.tap()` is a coordinate dispatch with no
+ * actionability check, so tapping an off-screen panel's box lands on the carousel and **switches
+ * tabs**. The spec then waits forever for something that is no longer on the screen it is looking
+ * at: `meal-plan-library-surface` tapped `Build a meal plan` and ended up on the AI Coach page,
+ * where three tests spun out their retry loops and failed as 45-second timeouts.
+ *
+ * Resolution stays with the locator rather than being re-implemented over the DOM, so accessible
+ * names and roles work as they do everywhere else — Radix `aria-hidden` subtrees are already
+ * outside the accessibility tree that `getByRole` searches. This only adds the viewport filter that
+ * a coordinate tap cannot do for itself.
+ *
+ * `back-dismiss-sweep.spec.ts` hand-rolls an equivalent `clickInView`; it predates this and can move
+ * across when that file is next touched.
+ */
+export async function tapInView(page: Page, target: Locator): Promise<void> {
+  const width = page.viewportSize()?.width ?? 412
+  for (let attempt = 0; attempt < 60; attempt++) {
+    for (const candidate of await target.all()) {
+      const box = await candidate.boundingBox()
+      if (box && box.width > 0 && box.x >= 0 && box.x < width) {
+        await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
+        return
+      }
+    }
+    await page.waitForTimeout(100)
+  }
+  throw new Error('no match was inside the viewport — every candidate sits in an off-screen tab panel')
+}
+
+/**
  * Suppress Home's first-open-of-day Morning Check-in prompt (OR-1).
  *
  * It is a **modal** Radix sheet, so while it is open Radix sets `aria-hidden="true"` on `<main>` and

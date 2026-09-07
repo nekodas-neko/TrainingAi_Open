@@ -104,6 +104,20 @@ function main() {
     }
   }
 
+  // PS-34: the guard above only covered the directory being GONE. What actually happened is that it
+  // stayed — holding a README and a `__tests__/` folder and no `.json` at all — so the skip never
+  // fired, `vendor` was empty, `vendor.has()` was false for every number, and the run printed
+  // "OK (0 vendor values, no inlined copies)". Green forever, over nothing.
+  //
+  // Zero values is the same state as no directory and gets the same answer. Not a failure: the
+  // constants were removed deliberately (Q-49 A4b), so failing would make CI red for a decision
+  // someone already took. The point is that the run stops claiming a coverage it does not have.
+  if (vendor.size === 0) {
+    console.log('check-inlined-constants: SKIPPED — lib/oura-models/constants/ holds no .json values to compare against.')
+    console.log('  Repoint this at the archived constants, or pin the last known-good result.')
+    return
+  }
+
   const findings = []
   for (const file of SRC_ROOTS.flatMap(r => walk(path.join(ROOT, r)))) {
     const rel = path.relative(ROOT, file).split(path.sep).join('/')

@@ -1624,30 +1624,56 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     }))
   }
 
-  async listPrevious1rm(userId: string): Promise<Map<string, number>> {
-    type Row = { exercise_name: string; estimated_1rm: number }
+  /**
+   * The two most recent **real** 1RM estimates per exercise, newest first.
+   *
+   * `> 0`, not `IS NOT NULL` (Q-298). A deloaded exercise stores `estimated_1rm = 0` **on purpose**
+   * — deload work is submaximal and must not read as a max — so `IS NOT NULL` admitted it as an
+   * estimate. That produced a signal pair that contradicted itself, and both halves go to the AI:
+   * `oneRmTrendStatus` guards `previous <= 0` and so reported **flat**, while `signals.ts`'s
+   * `rm1ChangeKg` (`current - prev`) has no such guard and reported the lifter's **entire 1RM as a
+   * gain since last time**. Every sibling query already gated on `> 0`; that one did not.
+   *
+   * PS-26 widened this from "the previous estimate" to "the two most recent", because the same
+   * sentinel was being read as a *current* value one layer up: `/api/weights-summary` took
+   * `estimated1rm` from the latest log whatever it was, so an exercise whose last session was a
+   * deload published `estimated1rm: 0` beside a real `previousEstimated1rm`, and the strength card
+   * rendered that as "−<the whole 1RM> kg" with an empty bar. Measured on the owner's rows: 16 of
+   * 34 exercises, every one of them flagged deload.
+   *
+   * So `latest` here is the most recent estimate that *is* one — not the most recent row.
+   */
+  async listRecent1rm(userId: string): Promise<Map<string, { latest: number; previous?: number }>> {
+    type Row = { exercise_name: string; estimated_1rm: number; rn: number }
     const result = await this.db.execute<Row>(sql`
-      SELECT exercise_name, estimated_1rm
+      SELECT exercise_name, estimated_1rm, rn
       FROM (
         SELECT el.exercise_name, el.estimated_1rm,
           ROW_NUMBER() OVER (PARTITION BY el.exercise_name ORDER BY el.logged_at DESC) AS rn
         FROM exercise_logs el
         JOIN workout_sessions ws ON ws.id = el.workout_session_id
-        -- \`> 0\`, not \`IS NOT NULL\` (Q-298). A deloaded exercise stores estimated_1rm = 0 **on
-        -- purpose** — deload work is submaximal and must not read as a max — so \`IS NOT NULL\`
-        -- admitted it as the previous estimate whenever the last-but-one session was a deload.
-        --
-        -- That produced a signal pair that contradicted itself, and both halves go to the AI:
-        -- \`oneRmTrendStatus\` guards \`previous <= 0\` and so reported **flat**, while
-        -- \`signals.ts\`'s \`rm1ChangeKg\` (\`current - prev\`) has no such guard and reported the
-        -- lifter's **entire 1RM as a gain since last time**. Every sibling query already gates on
-        -- \`> 0\`; this was the one that did not.
         WHERE ws.user_id = ${userId} AND el.estimated_1rm > 0
           AND el.deleted_at IS NULL AND ws.deleted_at IS NULL
       ) ranked
-      WHERE rn = 2
+      WHERE rn <= 2
     `)
-    return new Map(result.rows.map(r => [r.exercise_name, r.estimated_1rm]))
+    const out = new Map<string, { latest: number; previous?: number }>()
+    for (const r of result.rows) {
+      const entry = out.get(r.exercise_name) ?? { latest: 0 }
+      if (Number(r.rn) === 1) entry.latest = r.estimated_1rm
+      else entry.previous = r.estimated_1rm
+      out.set(r.exercise_name, entry)
+    }
+    // An exercise with only an rn=2 row cannot exist — ranks are dense from 1 — so `latest` is
+    // always filled by the time the loop ends.
+    return out
+  }
+
+  async listPrevious1rm(userId: string): Promise<Map<string, number>> {
+    const recent = await this.listRecent1rm(userId)
+    const out = new Map<string, number>()
+    for (const [name, v] of recent) if (v.previous != null) out.set(name, v.previous)
+    return out
   }
 
   // ── Scheduling ─────────────────────────────────────────────────────────────

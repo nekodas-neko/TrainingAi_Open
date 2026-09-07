@@ -203,7 +203,7 @@ test('back closes the meal on top of the list and leaves the list open', async (
   // an entry, back would spend presses on them and the unwind below would silently stop matching
   // what the user sees.
   await expect(async () => {
-    await clickInView('Meals')
+    await clickInView('My Foods')
     await expect(page.getByPlaceholder('Filter your meals')).toBeVisible({ timeout: 3_000 })
   }).toPass({ timeout: 60_000 })
   expect(await page.evaluate(() => history.length)).toBe(before + 1)
