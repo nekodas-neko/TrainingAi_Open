@@ -1200,18 +1200,18 @@ message is written for the user and is the one worth surfacing (the exercises ro
 Surface `issue.code === 'custom'` only, otherwise the generic string — behind one helper, applied to all 20 in
 one sweep. Cosmetic, so it sat behind PS-32's two substantive halves rather than tripling that PR.
 
-### [body][devices] PS-33 — scale ingest fabricates body composition from a placeholder profile, and the raw archive has no dedup
+### [body][devices] LA-71 — `scale_raw_samples` still has no unique key
 
-- **Lane:** A — `app/api/scale-ble/samples/route.ts:76-77`, `pending/[id]/confirm/route.ts:36-37`,
-  migration for `scale_raw_samples`.
-- **Added:** 2026-09-06, app checkpoint — [report](reviews/2026-09-05-app-checkpoint.md) §P7.
+- **Lane:** A — a migration for `scale_raw_samples`, plus dropping the pre-check in `insertScaleRawSample`.
+  **Gate:** owner — the migration has to DELETE duplicate rows before it can add the index.
+- **Added:** 2026-09-07, Lane A — the half of PS-33 that needs a schema change.
 
-`heightCm ?? 170`, `age ?? 35`: with DOB or height missing, body fat and metabolic age are computed
-from numbers the user never entered and stored under source `scale_ble` as real readings (live: 22 %
-BF, metabolic age 37 on a DOB-less profile). Skip composition and store weight-only instead, as
-`compositionSkipped` already can. And `scale_raw_samples` has no unique key (157's two indexes are
-non-unique) — a byte-identical re-send inserts a second raw row, unlike `oura_raw_samples`'s dedup;
-the trend survived (lowest-wins) but the archive double-counts.
+PS-33's re-send now dedups in `insertScaleRawSample` (select-then-insert on `user_id, measured_at,
+raw_hex`), so the reported symptom is closed — but a pre-check is not a constraint, and two simultaneous
+posts of the same bytes can still both insert. Only `CREATE UNIQUE INDEX ON scale_raw_samples (user_id,
+measured_at, raw_hex)` closes that, and it cannot be added blind: the build **fails the deploy** if any
+account holds a duplicate, so the migration must delete duplicates (lowest id wins) first. Measured
+2026-09-07 the owner's 99 rows hold **99 distinct pairs** — zero; other accounts cannot be counted from here (`claude_ro` is row-scoped), which is why this is not shipped on an assumption.
 
 ### [platform] LA-64 — three Custom Rules greps match their own explanatory comments
 

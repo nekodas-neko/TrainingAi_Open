@@ -4,7 +4,7 @@ import { auth } from '@/auth'
 import { getRepositoryAsync } from '@/lib/data'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { rateLimit } from '@/lib/rate-limit'
-import { computeBodyComposition, hasValidImpedance, SCALE_WEIGHT_ANOMALY_PCT } from '@/lib/scale-ble/composition'
+import { computeBodyComposition, hasValidImpedance, resolveCompositionInputs, SCALE_WEIGHT_ANOMALY_PCT, type CompositionSkipReason } from '@/lib/scale-ble/composition'
 import { ageFromDob, DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { applyScaleReadingToBodyMetrics } from '@/lib/scale-ble/apply-reading'
 import { resolveMeasuredAt } from '@trainingai/shared/validation/ingest-clock'
@@ -73,17 +73,17 @@ export async function POST(req: Request) {
     }
 
     const impedanceOhms = (impedanceOhmsA + impedanceOhmsB) / 2
-    const heightCm = user?.heightCm ?? 170
-    const ageYears = ageFromDob(user?.dateOfBirth, new Date()) ?? 35
+    const profile = resolveCompositionInputs(user, ageFromDob(user?.dateOfBirth, new Date()))
 
     // Socks, stockings, or dry feet break the foot-plate contact BIA needs — the scale reports
     // impedance as 0 rather than omitting the reading, which would otherwise divide-by-zero the
     // composition formula into a floored, meaningless body-fat% (see MIN_VALID_IMPEDANCE_OHMS).
     // The weight itself is a load-cell reading, unaffected by contact quality, so it still saves.
     const impedanceValid = hasValidImpedance(impedanceOhms)
-    const composition = impedanceValid
-      ? computeBodyComposition({ weightKg, impedanceOhms, heightCm, ageYears, sex: user?.sex })
+    const composition = impedanceValid && profile
+      ? computeBodyComposition({ weightKg, impedanceOhms, ...profile })
       : null
+    const skipReason: CompositionSkipReason | null = impedanceValid ? (profile ? null : 'profile') : 'impedance'
 
     await repo.insertScaleRawSample(userId, {
       measuredAt: measuredAtDate, rawHex,
@@ -98,7 +98,11 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       status: 'confirmed', weightKg,
-      compositionSkipped: !impedanceValid,
+      // Widened from `!impedanceValid` (PS-33): an incomplete profile is now a skip too. The
+      // installed APK reads this name and shows its bare-feet copy, which is wrong for the new
+      // reason — hence `compositionSkippedReason`, which a later APK can read to say which it was.
+      compositionSkipped: composition == null,
+      compositionSkippedReason: skipReason,
       // Deliberately the inverse of `trendUpdated`, and deliberately NOT renamed: the installed
       // APK reads this field name and renders "Additional reading today" from it, which is really
       // saying "this did not change your trend". Since a lower second reading now DOES become the
