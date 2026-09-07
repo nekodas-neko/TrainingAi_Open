@@ -1301,22 +1301,6 @@ this is a future gap rather than a dead one.
 a migration and an owner call on whether a deload becomes first-class stored state. Deriving it
 instead is the option that loses: a replay with no window gets one wrong answer and keeps it forever.
 
-### [platform] LA-72 — ~30 source-scanning checks strip no comments, and nobody knows which need to
-
-- **Lane:** A — `scripts/check-*.js`.
-- **Added:** 2026-09-07, Lane A — the residue of LA-64, which fixed the eight that already tried.
-
-LA-64 gave the eight checks that strip comments one shared implementation and put a comment filter on
-every inline grep in `ci.yml`. **Roughly thirty other `check-*.js` scripts read `.ts`/`.tsx` and match
-patterns with no stripper at all** — and a blanket conversion is wrong, because several of them
-legitimately read prose (`check-claude-md-paths`, `check-module-map-symbols`) or count raw lines
-(`check-component-size`). What is needed is a pass that decides per check, since the failure direction
-is the silent one: a rule that matches its own explanatory comment reports clean over code it never
-parsed. One known carve-out to fold in: **`Safe-area utility classes must be defined`** (ci.yml)
-extracts class tokens with `grep -roh`, so its output has no line prefix to filter and a class named
-only in a comment reads as used-but-undefined. That one is a false positive — loud, and cheap to work
-around — which is why LA-64 left it.
-
 ### [platform] LA-60 — the sandbox runs Node 22 and every CI job pins Node 20
 
 - **Lane:** A — `.github/workflows/ci.yml`, `package.json` (`engines`), `.claude/hooks/`.

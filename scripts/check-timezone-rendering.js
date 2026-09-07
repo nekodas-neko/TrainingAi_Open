@@ -11,6 +11,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { stripComments } = require('./lib/strip-comments');
 
 const EXEMPT_PREFIXES = [
   'components/admin/',
@@ -69,7 +70,7 @@ function walk(dir) {
     const rel = path.relative(root, full).split(path.sep).join('/');
     if (EXEMPT_PREFIXES.some(p => rel.startsWith(p))) continue;
 
-    const lines = fs.readFileSync(full, 'utf8').split('\n');
+    const lines = stripComments(fs.readFileSync(full, 'utf8')).split('\n');
     lines.forEach((line, i) => {
       if (!PATTERN.test(line)) return;
       // The option object can span lines; scan a small window for an explicit timeZone.

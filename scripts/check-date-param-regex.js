@@ -7,6 +7,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { stripComments } = require('./lib/strip-comments');
 
 // Dash-only schemas still on disk. Q-130 (#1148) widened seven of the original eleven; these four
 // files are what remains, and none is fed from localDateString() — verified by tracing its call
@@ -39,7 +40,7 @@ function walk(dir) {
     }
     if (!entry.name.endsWith('.ts')) continue;
     const rel = path.relative(root, full).split(path.sep).join('/');
-    const lines = fs.readFileSync(full, 'utf8').split('\n');
+    const lines = stripComments(fs.readFileSync(full, 'utf8')).split('\n');
     lines.forEach((line, i) => {
       if (!line.includes(DASH_ONLY)) return;
       if (!offenders.has(rel)) offenders.set(rel, []);

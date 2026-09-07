@@ -15,6 +15,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { stripComments } = require('./lib/strip-comments');
 
 const root = path.join(__dirname, '..');
 const GUARDS = ['isBodyMetadataFresh', 'isWorkoutDataToday'];
@@ -42,7 +43,7 @@ let checked = 0;
 for (const abs of files) {
   const rel = path.relative(root, abs).replace(/\\/g, '/');
   if (EXEMPT.has(rel)) continue;
-  const src = fs.readFileSync(abs, 'utf8');
+  const src = stripComments(fs.readFileSync(abs, 'utf8'));
   for (const guard of GUARDS) {
     let from = 0;
     for (;;) {

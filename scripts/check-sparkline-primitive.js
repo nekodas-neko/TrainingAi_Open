@@ -9,6 +9,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { stripComments } = require('./lib/strip-comments');
 
 // Legitimately not sparklines — these draw something else with the same element.
 //
@@ -62,7 +63,7 @@ function walk(dir) {
     }
     if (!entry.name.endsWith('.tsx')) continue;
     const rel = path.relative(root, full).split(path.sep).join('/');
-    const lines = fs.readFileSync(full, 'utf8').split('\n');
+    const lines = stripComments(fs.readFileSync(full, 'utf8')).split('\n');
     lines.forEach((line, i) => {
       if (!line.includes('<polyline')) return;
       if (!found.has(rel)) found.set(rel, []);

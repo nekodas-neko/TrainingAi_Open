@@ -17,6 +17,7 @@
 const fs = require('fs');
 const path = require('path');
 const { resolveBaseRef, materialiseBaseTree, cleanupBaseTree, verdict } = require('./lib/base-ref');
+const { stripComments } = require('./lib/strip-comments');
 
 const root = path.join(__dirname, '..');
 const DIRS = ['app', 'components'];
@@ -53,7 +54,7 @@ function scan(rootDir) {
   // Every component wrapped in memo(...), by the name it is rendered under.
   const memoised = new Set();
   for (const abs of files) {
-    const src = fs.readFileSync(abs, 'utf8');
+    const src = stripComments(fs.readFileSync(abs, 'utf8'));
     for (const m of src.matchAll(/(?:const|let)\s+(\w+)\s*(?::[^=]+)?=\s*(?:React\.)?memo\s*\(/g)) memoised.add(m[1]);
     for (const m of src.matchAll(/(?:React\.)?memo\s*\(\s*function\s+(\w+)/g)) memoised.add(m[1]);
   }
@@ -63,7 +64,7 @@ function scan(rootDir) {
 
   for (const abs of files) {
     const rel = path.relative(rootDir, abs).replace(/\\/g, '/');
-    const src = fs.readFileSync(abs, 'utf8');
+    const src = stripComments(fs.readFileSync(abs, 'utf8'));
     for (const name of memoised) {
     const re = new RegExp('<' + name + '(?=[\\s/>])', 'g');
     let m;
