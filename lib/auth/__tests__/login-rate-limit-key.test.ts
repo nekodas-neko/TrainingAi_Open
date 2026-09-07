@@ -10,11 +10,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // only "the 21st attempt fails" would pass on the broken version too, as long as the test never
 // padded the address.
 
-// Typed with the real signature rather than `vi.fn(() => true)`. Inferred from the initialiser it
-// takes NO parameters, so `mock.calls[0]` is an empty tuple and `mockImplementation((key) => …)`
-// does not assign — three errors that `npx tsc --noEmit` never showed, because tsconfig.json
-// excludes __tests__ and only `check-test-typecheck.js` (in the Build job) covers them.
-const rateLimit = vi.fn<(key: string, limit: number, windowMs: number) => boolean>(() => true)
+// Typed with the parameter it is actually called with. `vi.fn(() => true)` infers a ZERO-ARG mock,
+// so `c[0]` reads off an empty tuple and a `(key: string) => boolean` implementation will not
+// assign — three errors that `npx tsc --noEmit` never shows, because `tsconfig.json` excludes
+// `__tests__` (LB-37). `scripts/check-test-typecheck.js`, inside the Build job, is what sees them.
+const rateLimit = vi.fn((_key: string) => true)
 const getUserByEmail = vi.fn(async () => null)
 let capturedAuthorize: ((c: unknown, r: Request) => Promise<unknown>) | undefined
 

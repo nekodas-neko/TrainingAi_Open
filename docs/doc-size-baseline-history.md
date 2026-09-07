@@ -8401,7 +8401,7 @@ passes. It also has to say what is *not* established — nobody has read the Pla
 timeout reading is inferred from timing and an idle database, and the entry says so rather than
 letting the next session close it on the inference.
 
-## 2026-09-07 — `docs/implementation-backlog.md` → 18951, `projectOverview.md` → 10083 (BF-122a shipped, LA-64 filed)
+## 2026-09-07 — `docs/implementation-backlog.md` → 18977, `projectOverview.md` → 10083 (BF-122a shipped, LA-64 filed)
 
 The backlog is roughly flat: BF-122a's 90 lines left the queue and LA-64 took part of the space —
 the three Custom Rules greps that match their own explanatory comments, filed because three
@@ -8411,3 +8411,12 @@ occurrences in one session is a pattern rather than a coincidence.
 streak's rest-day allowance for non-rotation schedules, and nobody has looked at the achievements
 grid or the leaderboard since. Derived numbers that are correct in a test and unseen on a screen are
 exactly what that section is for.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 19038 (LB-59, and PS-38's lane tag)
+
+Twenty-six lines for a defect whose fix was one word. The length is the *measurement* and the trap,
+not the change: 4 entries write `Lane: O` and one wrote `Lane: Orchestrator`, and because an
+unmatched field reads as "unstated", that one printed at the top of **both** implementer lanes'
+READY lists for a day. The entry also records why the safe failure must stay "visible to both" — a
+version of `lane.js` that let an unmatched value through once hid 96 of 203 entries from everyone.
+Without that line the obvious fix is to filter, which is the worse bug.
