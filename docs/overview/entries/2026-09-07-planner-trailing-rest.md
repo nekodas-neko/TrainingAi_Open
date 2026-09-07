@@ -54,6 +54,15 @@ Before → after, exercises prescribed:
 At most +1 per cell — the entry warned that "a planner that suddenly fits more work everywhere is a
 worse failure", and this is bounded.
 
+> **AMENDED 2026-09-07 (LA-65).** The section below explains the deferral by saying the transition
+> term "came back contradictory". It did not: the +20.8 min figure was a double-count in my own
+> measurement — `prep_time_sec` is a sub-interval of `inter_exercise_rest_sec`, not additive to it
+> (median 0.05 s error for `inter` alone against the independent set-timestamp clock, +136 s when
+> prep is added). The deferral still stands, on a better reason: the transition is charged per
+> exercise while a session has one fewer gap than exercises, so 5 × 240 s and 4 × 300 s both come to
+> 1200 s and the errors cancel at exactly the owner's five. See
+> [the LA-65 entry](2026-09-07-transition-clock-semantics.md).
+
 ## What was deliberately not done
 
 `estimateExerciseDurationSec` almost certainly wants the same fix — its `measuredRestSec` comes from

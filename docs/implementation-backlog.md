@@ -640,49 +640,46 @@ new reward currency.
   wants the short form for its own overflow, which is a reason to land these together.
 - **Reversal cost:** low. The state-setter shape already exists in `swapExercise`.
 
-### [workouts] LA-65 — the planner's transition constant is the last unmeasured term, and the data disagrees with itself about it
+### [workouts] LA-65 — the transition constant is charged once too often at a value that is too low, and the two errors cancel at five exercises
 
-- **Lane:** A — `packages/shared/src/workout/duration-model.ts` (`TRANSITION_SEC_*`), `packages/shared/src/workout/time-audit.ts`.
-- **Added:** 2026-09-07 · Lane A, from the BF-128 measurement pass. BF-128 explicitly asked for this
-  while the data was open; it is filed rather than shipped because the measurement came back
-  **contradictory**, which is a finding rather than a number.
+- **Lane:** A — `packages/shared/src/workout/duration-model.ts` (`TRANSITION_SEC_*`), `app/api/generate-program/route.ts`.
+- **Added:** 2026-09-07 · Lane A, from the BF-128 measurement pass.
+- **Gate:** owner
 - **Needs:** — nothing.
-- **What BF-128 settled, so this entry does not re-litigate it.** The trailing per-set rest is not
-  taken: over 90 days and 309 exercises, all 517 non-final sets recorded a real rest (mean 126 s,
-  median 124 s, zero nulls) while **289 of 309 final sets — 93.5% — recorded NULL or 0**.
-  `styleWorkSec` no longer charges it.
-- **The contradiction.** `TRANSITION_SEC_BARBELL = 240 s` is the planner's per-exercise assumption.
-  Measured three ways over the same window, it reads:
-  - **249 s** mean across all 309 exercise logs, counting an unstamped row as 0 — which flatters it,
-    because **136 of 309 have a NULL `inter_exercise_rest_sec`** and only ~65 of those are the
-    first exercise of a session that genuinely has no preceding gap.
-  - **316 s** mean where `inter_exercise_rest_sec` is actually recorded (mean `prep_time_sec` 140 s
-    on top, itself NULL on 150 rows).
-  - and **feeding the recorded per-exercise transition into the model makes it over-predict the
-    measured working window by a median +20.8 min across all 36 warm-up-stamped sessions** — 36 of
-    36 over-estimates. With the planner's flat blend instead, the same 36 sessions come out at
-    **−3.6 min** median.
-- **So the recorded transition cannot be purely additive to the working window**, which is what the
-  `estimateExerciseDurationSec` comment currently assumes on the strength of one session
-  (2026-07-28). Either `inter_exercise_rest_sec` overlaps something already counted, or it is
-  stamped across pauses that are not transitions (a phone call, a set someone else was using the
-  rack for). **Deciding which is the entry** — the constant cannot be retuned on a number whose
-  meaning is unsettled, and raising 240 s toward the recorded 316 s would make the planner fit
-  *fewer* exercises, which is the direction the owner just reported as wrong.
-- **Start here:** compare `inter_exercise_rest_sec` against the gap implied by the neighbouring
-  sets' `set_end_ms`/`set_start_ms`, which is an independent clock the field does not derive from.
-  Where the two agree, the field means what it says; where they diverge, the divergence names the
-  overlap. `time-audit.ts` already has the robust-median machinery and an outlier band
-  (`[median × 0.25, median × 4]`) — the same band is the obvious first filter here.
-- **The second half, once the meaning is settled:** `estimateExerciseDurationSec` still charges
-  `sets × restSec`, and its `measuredRestSec` comes from a `time-audit.ts` median that filters
-  `> 0` and so **excludes exactly the trailing zeros** this class is about. That path very likely
-  wants BF-128's fix too. It was deliberately left alone because its own validation flips sign with
-  the transition term — which is this entry.
-- **Reversal cost:** low as code (one constant, one multiplier), high as behaviour — it moves every
-  generated program's volume, and it moves the stored session estimates users read. Wants the
-  measurement first, which is why nothing here is a patch.
-
+- **The measurement is DONE and the contradiction this entry was filed for is resolved** (2026-09-07,
+  same day). What remains is one decision, which is why it is gated rather than closed.
+- **The field semantics, settled against an independent clock.** `prep_time_sec` is a **sub-interval
+  of** `inter_exercise_rest_sec`, not additive to it — by construction (`workout-screen.tsx` computes
+  `prepSecRef` inside the same `handleStart` that stamps `exerciseStartMs`, where `inter` ends) and
+  by measurement: across 171 transitions, `inter` alone matches the gap implied by
+  `set_end_ms`/`set_start_ms` to a median **0.05 s**, while `inter + prep` overshoots by a median
+  **136 s**. **The "+20.8 min over-prediction" this entry was filed on was that double-count, not a
+  bad constant.** With the corrected definition the recorded components reconcile: work 10.8 + rest
+  19.4 + transition 19.8 = **50.0 min** against a **47.9 min** measured window, down from 58.1.
+  The consumer that had it wrong (`/api/workout-sessions/[id]/timing`) is fixed; `time-audit.ts`
+  already used `inter` alone and was right.
+- **The real transition is ~300 s per gap** (mean 316, median 299 on the owner's later exercises),
+  against `TRANSITION_SEC_BARBELL = 240`. **But the constant is charged per EXERCISE, and a session
+  has one fewer gap than it has exercises.** At the owner's five exercises: 5 × 240 = 1200 s, and
+  4 gaps × 300 = 1200 s — measured total transition per session was **19.8 min**, which is 1188 s.
+  The two errors cancel exactly at N = 5, and only at N = 5. At N = 3 the model over-reserves by
+  ~120 s; at N = 8 it under-reserves by ~180 s.
+- **The decision, and why it is the owner's.** Correcting this properly means charging `N − 1` gaps
+  at ~300 s, which changes the count at every budget except the one the owner trains at. Raising the
+  constant alone to the measured 300 s **re-breaks BF-128**: it takes the powerbuilding 60-min
+  blend from 598 s to 634 s and `floor(3060 / 634)` back to **4**, undoing the 4→5 that shipped on
+  2026-09-07 to fix the owner's own report. So the safe-looking change is the one that reintroduces
+  the reported bug.
+- **Recommendation: change nothing until the owner has trained several sessions under BF-128's five.**
+  The Known-Issues row for BF-128 already asks whether five fits the hour in practice. If it does,
+  the accidental cancellation is doing no harm at the length he actually trains and this becomes a
+  correctness cleanup to schedule deliberately. If five overruns, that answer and this arithmetic
+  are the same fix, and should be made together rather than twice.
+- **When it is built:** solve for N against `N × styleWork + (N − 1) × transition ≤ budget` rather
+  than dividing by a per-exercise average — the average is what hides the off-by-one. Keep the
+  worst-case default for unknown equipment.
+- **Reversal cost:** low as code, high as behaviour — it moves every generated program's volume, at
+  every budget except five exercises.
 ### [workouts][app-shell] LA-66 — the swap sheet still carries its own copy of the equipment filter, and it is the permissive one
 
 - **Lane:** B — `components/workout-builder/builder-review.tsx`.

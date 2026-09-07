@@ -82,7 +82,22 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         if (st.restTimeSec != null) { restActual += st.restTimeSec; restActualSeen = true }
         if (st.plannedRestSec != null) restExpected += st.plannedRestSec
       }
-      const setupActual = ex.prepTimeSec ?? null
+      // LA-65: the ACTUAL transition is `interExerciseRestSec`, not `prepTimeSec`. Both are
+      // written by `components/workout-screen.tsx`, and `prep` is a SUB-INTERVAL of `inter` by
+      // construction: `interExerciseRestSec` runs from the previous exercise's last set end to the
+      // first Start press, and `prepSecRef` is computed inside that same `handleStart` from the
+      // ready-screen baseline — so it is the tail of the same gap. Measured over 171 transitions
+      // against the independent `set_end_ms`/`set_start_ms` clock, `inter` alone matches the real
+      // gap to a median 0.05 s, while `inter + prep` overshoots by a median 136 s.
+      //
+      // This row compared `prep` against `transitionSecForEquipment`, which models the WHOLE
+      // transition (bar-load + walk-over + ramps) — a part against a whole. Median prep on a
+      // non-first exercise is 2 s against a 240 s expectation, so the screen reported setup as
+      // four minutes faster than expected when the real transition ran ~300 s, i.e. slower.
+      //
+      // The first exercise of a session has no preceding exercise and so no `inter`; its `prep`
+      // (mean 286 s — the ramp from the ready screen) is the right actual there.
+      const setupActual = ex.interExerciseRestSec ?? ex.prepTimeSec ?? null
       if (workActualSeen || restActualSeen || setupActual != null) anyTiming = true
       return {
         name: ex.exerciseName,
