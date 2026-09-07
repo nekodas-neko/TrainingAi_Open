@@ -26,7 +26,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.436.25 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.436.27 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-06.
 
 **The meal builder divided the calories and not the macros (BF-121).** Owner: *"for the meal creator
@@ -1710,6 +1710,22 @@ Last swept **2026-09-03**.
 > An entry only leaves when **nothing is still owed**: no open work, no pending owner or device
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
+
+### [workouts][app-shell] 🟡 The workout streak's rest-day allowance changed for non-rotation schedules (BF-122a, 2026-09-07)
+
+`computeStreak` had `1` hardcoded at two call sites — achievements and the friends leaderboard — for
+the question "was that gap OK". It now reads the allowance off the user's own schedule
+(`maxCompliantRestGap`), because a count of sessions per week cannot see where the hole is: Mon+Tue
+is two a week with **five** rest days in it, and a literal 1 broke that user's streak every week.
+
+**This is a live behaviour change**, and the only one in the PR. A rotation still yields 1, so the
+owner's own streak is unmoved; the fallback is also 1 when no schedule exists, so an unscheduled user
+is unaffected. What moves is a weekly schedule with clustered training days.
+
+**Not seen on a screen.** The engine is tested and the streak numbers are derived, but nobody has
+looked at the achievements grid or the leaderboard afterwards to confirm the displayed streak is the
+one intended. BF-122b builds the collection widget and is where that gets eyes.
+[Journal](docs/overview/entries/2026-09-07-collection-ladder.md).
 
 ### [platform][body] 🟡 The vial and dose-time engine is unverified on device (OR-102a, 2026-09-06)
 

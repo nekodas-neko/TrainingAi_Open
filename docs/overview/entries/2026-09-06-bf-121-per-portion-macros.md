@@ -1,6 +1,6 @@
 # 2026-09-06 — BF-121: the meal builder divided the calories and not the macros
 
-**Branch:** `fix/bf-121-per-portion-macros` · **Lane B** · v1.436.25
+**Branch:** `fix/bf-121-per-portion-macros` · **Lane B** · v1.436.27
 
 The owner: *"for the meal creator when adding in serving size it would be good to see the macros per
 serve."* His screenshot — *Protein Pancakes*, 4 portions — read
