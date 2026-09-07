@@ -8608,14 +8608,14 @@ was never given, and BF-122b — four Lane B surfaces — cannot start without i
 merging `main`, which had already moved the baseline to 18794; carrying this branch's own number
 across that merge would have handed the queue a whole entry's worth of silent slack.
 
-## 2026-09-07 — `projectOverview.md` → 10398, `docs/implementation-backlog.md` → 18758 (BF-124, BF-125)
+## 2026-09-07 — `projectOverview.md` → 10398, `docs/implementation-backlog.md` → 18766 (BF-124, BF-125)
 
 Up 20 on the index, down 27 on the queue — two entries out, LB-61 in. The index row is carrying an
 unusual admission rather than a status line: the review screen's new role control was **not rendered
 in the harness at all**, because reaching it needs a live model generation. That is the kind of gap
 the index exists to hold, and it is worth its lines precisely because a green CI run says nothing
-about it. The queue number is re-derived from the merged file, as always — `main` moved it to 18785
-while this branch was open.
+about it. The queue number is re-derived from the merged file each time `main` moves under this branch —
+18785, then 18793 — which is three different numbers for one PR and the ratchet doing its job.
 ## 2026-09-07 — `docs/implementation-backlog.md` → 18800 (LA-74's style half shipped)
 
 Up 7 on this branch, landing at 18800 after merging LB-60's and BF-123's own raises — recomputed from the merged
@@ -8633,3 +8633,11 @@ Down 15. LB-60 spent most of its length proving a negative — a table of the fo
 against what the client could reach, and the conclusion that not even a workout-only widget was
 buildable. That argument did its job the moment the route existed, so what replaces it is the one
 thing still missing: LA-76, deload days in `pausedDays`.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18793 (PS-39's ratchet shipped)
+
+Up 8. PS-39 said 93 routes were referenced by no test; asking the honest question — does anything
+import the handler — gives 148, and the entry now carries that number, why the old one was low, and
+the command that regenerates the list. It also says explicitly that the remainder is buildable work
+and takes no `Keep:`, because OR-100 is about exactly that: a `Keep:` files real work under a
+heading that tells the lane not to look.
