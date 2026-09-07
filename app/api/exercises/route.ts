@@ -7,12 +7,17 @@ import type { MuscleAssignment } from '@trainingai/shared/types/program'
 import { reportServerError } from '@/lib/observability'
 import { refusalResponse, isRefusal } from '@/lib/api/route-errors'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { promptSafeLine } from '@trainingai/shared/ai/untrusted-text'
 
 // An exercise with muscles, equipment and instructions.
 const MAX_BODY_BYTES = 32 * 1024
 
 const CreateBody = z.object({
-  name:         z.string().min(1).max(120),
+  // LA-73: a name is a menu item the model quotes back, so it is sanitised at the write rather
+  // than fenced at the prompt. `.min(1)` runs before the transform, so a name of only control
+  // characters would pass it and arrive empty — hence the refine after.
+  name:         z.string().min(1).max(120).transform(promptSafeLine)
+                  .refine(n => n.length > 0, { message: 'Name cannot be blank.' }),
   muscles:      z.array(z.object({ muscle: z.string(), role: z.enum(['main', 'secondary']) }).strict()).default([]),
   equipment:    z.array(z.string()).default([]),
   instructions: z.string().max(2000).optional(),
