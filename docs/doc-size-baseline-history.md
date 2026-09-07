@@ -8448,3 +8448,12 @@ The Known-Issues half is short and is the part that is owed: the banner only ren
 phase, so nothing here has been on a screen.
 
 The backlog moves the other way: BF-127's 32-line entry goes on shipping.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18942 (LB-60, and BF-122b's real blocker)
+
+Thirty-seven lines to stop the next session doing what this one nearly did: opening BF-122b, reading
+"Needs: BF-122a — merged", and starting a four-part feature that cannot render a number. The table of
+four inputs against what the client can actually reach is the whole entry; prose saying "it needs a
+route" would have been a third the length and would not have survived the first person who thought
+they could get away with the workout ladder alone. They cannot, and the row that says why — the
+paused days — is the one that matters, because building without it decays a user for complying.
