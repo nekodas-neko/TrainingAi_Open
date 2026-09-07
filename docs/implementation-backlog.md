@@ -626,52 +626,6 @@ new reward currency.
   pushes the fold on the S25 with several widgets enabled. That is a check on the built thing, so it
   is not a field on this entry.
 
-### [app-shell] BF-124 — the role picker on the program editor sheet overflows, and its selected state reads as disabled
-
-- **Lane:** B — `components/config/program-editor-sheet.tsx`.
-- **Added:** 2026-09-06 · owner, same screenshot as **BF-123**.
-- **Batch:** editor-sheet-density
-- **Needs:** BF-123
-- **Two problems, both downstream of the same floor** but not fixed by removing it, which is why they
-  are their own entry:
-  - **The row cannot fit.** `program-editor-sheet.tsx:844` is `<div className="flex gap-1">` with no
-    `flex-wrap`, holding three buttons labelled *Main Compound · Secondary Compound · Accessory*.
-    With the 48 px min-width each, the longest label wraps to two lines and `Accessory` is clipped
-    at the right edge. It needs to wrap, or the labels need to be short.
-  - **The selected state is a white slab.** `bg-primary text-primary-foreground` against this dark
-    sheet renders as a bright block that reads as disabled rather than chosen — the opposite of its
-    intent. The unselected `bg-muted` siblings look more active than the selected one.
-- **Check the label question against BF-125 before renaming anything** — the builder review screen
-  calls the same three roles *Main / Compound / Accessory*. Shortening the labels here is the obvious
-  fix for the overflow and it is also half of that entry, so decide the vocabulary once.
-- **Reversal cost:** low — layout classes and a token on one control.
-
-### [workouts] BF-125 — the one screen that shows the role imbalance is the one screen that cannot fix it
-
-- **Lane:** B — `components/workout-builder/builder-review.tsx`.
-- **Added:** 2026-09-06 · owner, looking at a generated program: *"why does one of these have 2 compounds?"* then *"so how would i change its badge?"*
-- **What is there today.** The builder review screen renders the role badge read-only
-  (`builder-review.tsx:536`) — Swap, Add and the ▲▼ reorder arrows are the whole control set, and
-  the role survives both a swap (`:214`) and a reorder (`:230`) untouched. The editable version is on
-  a different screen: `components/config/program-editor-sheet.tsx:841` has a three-button **Role**
-  row calling `updateExerciseRole`, gated on `phaseMode !== 'manual'` (so it does show for AI
-  Dynamic).
-- **So the route to correct a bad generation is: save the program you can already see is wrong →
-  Config → find it → expand the exercise → change the role.** The review screen is the one place the
-  whole program is visible at once, which is where an imbalance is *noticeable*; it is the only place
-  it is not fixable.
-- **The role is not cosmetic**, which is what makes this worth a control rather than a shrug:
-  `app/api/generate-program/route.ts:428` picks the progression style from the role and, for
-  `primary`/`secondary`, overrides whatever the model chose. Demoting an exercise to accessory moves
-  it from 65–85% / 6–10 reps to 66–75% / 8–12.
-- **Fold in the vocabulary mismatch.** Review says *Main / Compound / Accessory*
-  (`builder-review.tsx:33`); the editor says *Main Compound / Secondary Compound / Accessory*
-  (`program-editor-sheet.tsx:846`). Same three enum values, two wordings, and a user moving between
-  the screens to do exactly what this entry describes meets both. Pick one and put it in a shared
-  map — **One Formula, One Place** applies to a label the user matches across screens. **BF-124**
-  wants the short form for its own overflow, which is a reason to land these together.
-- **Reversal cost:** low. The state-setter shape already exists in `swapExercise`.
-
 ### [workouts] LA-65 — the transition constant is charged once too often at a value that is too low, and the two errors cancel at five exercises
 
 - **Lane:** A — `packages/shared/src/workout/duration-model.ts` (`TRANSITION_SEC_*`), `app/api/generate-program/route.ts`.
@@ -18277,6 +18231,25 @@ reads.
   of this file still stands** (claim a number against the directory *and* open PRs/plan docs): this
   closes the four that exist, it does not make future collisions safe.
 
+
+### [app-shell] LB-61 — every switch in the app is white when it is on, for the reason the role pill was
+
+- **Lane:** B — `components/ui/switch.tsx`.
+- **Added:** 2026-09-07 · Lane B, found while fixing BF-124's selected-state slab.
+- **Same token, wider blast radius.** `switch.tsx:16` marks the on state with
+  `data-[state=checked]:bg-primary`. `--primary` is `oklch(0.922 0 0)` in dark — near-white — which
+  is exactly why BF-124's selected role pill read as disabled rather than chosen. The switch has the
+  same problem and it was left alone on purpose: this is the shared primitive, so recolouring it
+  changes every toggle in the app at once, which is a design decision rather than a bug fix.
+- **What to decide, not what to do.** Whether an on switch should be brand-coloured (matching every
+  other chosen state in the app) or stay neutral-white (the shadcn default, and arguably right for a
+  binary that is not a *selection* among options). Count the switches before proposing either — the
+  answer probably differs between a settings toggle and an in-form choice.
+- **Not urgent and not a defect on its own** — nobody has reported a switch reading as off. It is
+  filed because the finding was made and CLAUDE.md's **No orphaned findings** rule applies, not
+  because it is queued work.
+- **Reversal cost:** low, one line — but it is seen everywhere, so it wants the owner's eye before
+  it lands.
 
 ### [platform] LB-37 — bring the 320 recorded test-file type errors down
 

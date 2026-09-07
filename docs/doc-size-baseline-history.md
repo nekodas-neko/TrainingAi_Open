@@ -8607,3 +8607,11 @@ Up 37, and the entry is the whole growth: LB-60 is the authenticated GET that BF
 was never given, and BF-122b — four Lane B surfaces — cannot start without it. Re-derived after
 merging `main`, which had already moved the baseline to 18794; carrying this branch's own number
 across that merge would have handed the queue a whole entry's worth of silent slack.
+
+## 2026-09-07 — `projectOverview.md` → 10398, `docs/implementation-backlog.md` → 18766 (BF-124, BF-125)
+
+Up 20 on the index, down 27 on the queue — two entries out, LB-61 in. The index row is carrying an
+unusual admission rather than a status line: the review screen's new role control was **not rendered
+in the harness at all**, because reaching it needs a live model generation. That is the kind of gap
+the index exists to hold, and it is worth its lines precisely because a green CI run says nothing
+about it.
