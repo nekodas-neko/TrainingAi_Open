@@ -92,4 +92,22 @@ describe.skipIf(!canRun)('calendar and streak bucket by the user\'s own timezone
     expect(Object.keys(trainedDays)).toContain(expectedNyKey)
     expect(Object.keys(trainedDays)).not.toContain(expectedBneKey)
   })
+
+  // LB-60 added a third reader of the same `AT TIME ZONE` shape, and it is the one with no window
+  // at all — the collection replays from the first trained day, so a day filed in the wrong zone is
+  // wrong forever rather than until it ages out.
+  it('keys the collection\'s all-history day list by the user\'s timezone', async () => {
+    const days = await repo.listTrainedDayKeys(NY_USER_ID, NY_TZ)
+    // Dashes here, slashes above: the calendar keys with `YYYY/MM/DD` and the fold takes
+    // `YYYY-MM-DD`, so the two are deliberately different strings for the same day.
+    expect(days).toContain(expectedNyKey.replace(/\//g, '-'))
+    expect(days).not.toContain(expectedBneKey.replace(/\//g, '-'))
+  })
+
+  it('returns each trained day once, ascending, however many sessions it holds', async () => {
+    // The fold spawns once per DISTINCT day; a second session on the same date must not double it.
+    const days = await repo.listTrainedDayKeys(NY_USER_ID, NY_TZ)
+    expect(new Set(days).size).toBe(days.length)
+    expect([...days].sort()).toEqual(days)
+  })
 })

@@ -540,35 +540,20 @@ OR-102a/b will read dose history to recommend the next dose. A tracker that read
 - **Reversal cost:** low. No migration; existing rows keep whatever they were stamped with, which is
   the point of the stamp.
 
-### [app-shell][platform] LB-60 — the collection engine has no way to be fed
+### [app-shell][platform] LA-76 — a deload week still decays the collection
 
-- **Lane:** A — a read route under `app/api/**`, assembling from the repository.
-- **Added:** 2026-09-07, by Lane B on picking up BF-122b and finding it unstartable.
-- **Blocks:** BF-122b, entirely.
+- **Lane:** A — `app/api/collection/route.ts`, `packages/shared/src/phase-engine.ts`.
+- **Added:** 2026-09-07, Lane A — the half of LB-60's `pausedDays` that did not ship with the route.
 
-BF-122a shipped `replayCollection` as *"a pure fold over day series the app already stores"* and
-deliberately no route — *"no migration, no table, no route"*. That is right for the engine and it
-leaves the surface with nothing to call: **`replayCollection` has no caller anywhere in the repo.**
-
-`ReplayInput` wants four things and the client can reach one of them:
-
-| input | client-reachable today |
-|---|---|
-| `days` — workout | **partly.** `/api/streak-data` returns `trainedDays` over a fixed window; the fold replays *all* history |
-| `days` — steps, sleep | **no.** No endpoint serves a day series for either; `health-trends` serves analysis views |
-| `maxRestGap` | **no.** `maxCompliantRestGap` reads the program's schedule, which the home screen does not hold |
-| `pausedDays` | **no.** The app's own recommended rest and deload days are server-side. Without them, compliance decays — the exact outcome BF-122a's comment calls *"turning the mechanic against the user"* |
-
-**So not even a reduced, workout-only widget is buildable from the client.** The two things that
-make the workout ladder correct rather than merely present — the schedule-derived allowance and the
-paused days — are both missing.
-
-- **Shape:** one authenticated GET returning the three `CollectionState`s, or the assembled
-  `ReplayInput`s. Returning the **states** is preferable: the fold is a shared pure function, and
-  sending its inputs to the client means two places can disagree about which days paused.
-- **⚠ Read BF-122a's versioning note first.** State is replayed on every read and the thresholds are
-  constants, so a cached response and a live one must not straddle a threshold change.
-- **Not a migration.** Everything it reads already exists.
+`GET /api/collection` feeds `pausedDays` from `listRestDays` — the rest days the user actually chose,
+which is the app's own record of a compliant rest. **Deload days are not in it.** BF-122a's argument
+is that decaying compliance turns the mechanic against the user, and a deload week is compliance the
+app itself prescribed, so a lifter who follows one loses cats for it. `isDeloadActive(phase, program,
+day)` answers for a single day given its resolved phase, so covering a week means resolving the phase
+engine per day across all history — too much for a read route on every call and too easy to get
+quietly wrong, which is why it was named rather than guessed. A rest day is weekly and a deload week
+is occasional, so the shipped route covers the common case. The likely shape is a repository read
+that returns deload spans directly rather than a per-day fold.
 
 ### [app-shell] BF-122b — the cat collection, surface half: the sprites, the home widget, and where you read about it
 

@@ -8617,3 +8617,10 @@ shipped with a `.strict()` schema, and the program half did not — because the 
 two producers that disagree (the editor omits `programId`/`sessionId`, the activate button sends
 them), a two-variant `schedule` union, and dates that arrive as strings against a `Date` type. That
 list is now in the entry rather than in a session's head, which is what the extra lines buy.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18785 (LB-60 shipped)
+
+Down 15. LB-60 spent most of its length proving a negative — a table of the four `ReplayInput` fields
+against what the client could reach, and the conclusion that not even a workout-only widget was
+buildable. That argument did its job the moment the route existed, so what replaces it is the one
+thing still missing: LA-76, deload days in `pausedDays`.

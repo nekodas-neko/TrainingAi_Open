@@ -748,6 +748,10 @@ export interface WorkoutRepository {
   // Rolling-window trained-day map (not month-aligned) for streak/week-strip
   // widgets that must not lose data at calendar-month boundaries.
   getRecentTrainedDays(userId: string, days: number, timezone?: string): Promise<Record<string, string[]>>
+  /** Every local day the user trained, all history, `YYYY-MM-DD` ascending. Distinct days only —
+   *  the collection fold (LB-60) spawns once per day and does not care which session it was, and a
+   *  windowed read would replay a partial history into a wrong answer. */
+  listTrainedDayKeys(userId: string, timezone?: string): Promise<string[]>
   /** `timezone` defaults to DEFAULT_TZ, which is right for the owner and wrong for anyone else —
    *  pass `session.user?.timezone` (LA-19). */
   getDayLog(userId: string, date: string, timezone?: string): Promise<WorkoutSession[]>
