@@ -4,6 +4,7 @@ import { formatInTimeZone } from 'date-fns-tz'
 import { shiftDateStr } from '@trainingai/shared/date-utils'
 import type { AchievementResult } from '@/components/profile/achievements-grid'
 import { calorieDayHitsGoal } from '@trainingai/shared/achievements-calc'
+import { maxCompliantRestGapFor } from '@trainingai/shared/schedule-utils'
 import { reconcileUserStats } from '@/lib/data/postgres/slices/user-stats'
 
 const LEVEL_THRESHOLDS = [0, 100, 250, 500, 900, 1400, 2100, 3000, 4200, 5800, 8000]
@@ -99,6 +100,7 @@ export async function computeAchievements(userId: string, tz: string): Promise<A
     maxStepsRes,
     distanceRes,
     goalDirRes,
+    scheduleRes,
   ] = await Promise.all([
     db.execute(sql`
       SELECT total_sessions, total_volume_kg, total_sets
@@ -178,6 +180,20 @@ export async function computeAchievements(userId: string, tz: string): Promise<A
       FROM activity_logs
       WHERE user_id = ${userId}::uuid
     `),
+    // BF-122a — the active schedule, so the workout streak's rest-day allowance comes from what the
+    // user actually signed up for rather than a literal 1. One row; the days are aggregated here so
+    // this stays a single round trip inside the existing parallel batch.
+    db.execute(sql`
+      SELECT sc.type, sc.rest_after_n,
+             COALESCE(ARRAY_AGG(sd.day_of_week ORDER BY sd.day_of_week)
+                      FILTER (WHERE sd.session_id IS NOT NULL), '{}') AS days
+      FROM programs p
+      JOIN schedules sc ON sc.program_id = p.id
+      LEFT JOIN schedule_days sd ON sd.schedule_id = sc.id
+      WHERE p.user_id = ${userId}::uuid AND p.is_active = true
+      GROUP BY sc.type, sc.rest_after_n
+      LIMIT 1
+    `),
     db.execute(sql`
       SELECT
         (SELECT target_weight_kg FROM users WHERE id = ${userId}::uuid) AS target_weight,
@@ -207,9 +223,24 @@ export async function computeAchievements(userId: string, tz: string): Promise<A
 
   const calorieDays = (calorieDaysRes.rows as Array<{ day: string; total_cals: number }>)
 
-  // 1 rest day allowed without breaking the streak — matches the home
-  // screen's streak definition (session-select-content.tsx).
-  const workoutStreaks = computeStreak(workoutDates, tz, 1)
+  // BF-122a — the rest-day allowance is READ OFF THE SCHEDULE, not hardcoded.
+  //
+  // This was a literal `1` here and at `app/api/friends/leaderboard`, for exactly the question the
+  // helper answers, and it was right only for a schedule shaped like the owner's. Someone training
+  // Mon+Tue is two sessions a week with a five-day hole in it and is following their plan for every
+  // one of those days; a `1` broke their streak every week.
+  //
+  // ⚠ This CHANGES the streak for anyone not on a rotation. The fallback is 1 when there is no
+  // schedule, so an unscheduled user is unaffected.
+  const scheduleRow = scheduleRes.rows[0] as
+    { type: string; rest_after_n: number | null; days: number[] | null } | undefined
+  const workoutRestGap = maxCompliantRestGapFor(scheduleRow ? {
+    type: scheduleRow.type === 'weekly' ? 'weekly' : 'rotation',
+    restAfterN: scheduleRow.rest_after_n ?? undefined,
+    // The query already filtered to days carrying a session, so every one here is a training day.
+    days: (scheduleRow.days ?? []).map(d => ({ dayOfWeek: d, sessionId: 'scheduled' })),
+  } : undefined)
+  const workoutStreaks = computeStreak(workoutDates, tz, workoutRestGap)
   const foodStreaks = computeStreak(foodDates, tz)
   const sleepStreaks = computeStreak(sleepDates, tz)
 
