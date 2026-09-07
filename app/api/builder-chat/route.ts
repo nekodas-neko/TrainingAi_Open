@@ -4,6 +4,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { getRepository } from '@/lib/data'
 import { generateObject } from 'ai'
 import { PROSE_FIELD_GUARDS } from '@/lib/ai/prompt-guards'
+import { USER_TEXT_NOTE } from '@trainingai/shared/ai/untrusted-text'
 import { aiModel, loggedGenerateObject } from '@/lib/ai/instrument'
 import { z } from 'zod'
 import { GeneratedProgramSchema } from '@trainingai/shared/validation/generated-program'
@@ -145,7 +146,8 @@ export async function POST(req: Request) {
 
 ACTIVE INJURIES — every exercise involving these areas has already been removed from the list below,
 so nothing you can pick will load them. Say which area you worked around when it affects a change:
-${injuryContext}`
+${injuryContext}
+${USER_TEXT_NOTE}`
     : `
 
 The user has no injuries logged. If they describe one in their message, work around it in this

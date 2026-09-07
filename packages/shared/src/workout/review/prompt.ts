@@ -4,6 +4,7 @@ import { intensityZone } from '@trainingai/shared/ai-periodization/prompt'
 import { PCT_BANDS } from '@trainingai/shared/workout/time-profile'
 import { SECONDS_PER_REP, SET_SETUP_SEC } from '@trainingai/shared/workout/duration-model'
 import type { SetShape } from './reconcile'
+import { userTextBlock, USER_TEXT_NOTE } from '../../ai/untrusted-text'
 
 export function buildReviewSystemPrompt(trainingGoal: string, phase: string): string {
   const z = intensityZone(trainingGoal, phase)
@@ -82,7 +83,7 @@ ${volumeLines}
 
 Recovery context:
   Sore muscles in this session: ${signals.soreMusclesInSession.length > 0 ? signals.soreMusclesInSession.join(', ') + soreSuffix : 'none'}
-  Active injuries in this session: ${signals.activeInjuredMusclesInSession.length > 0 ? signals.activeInjuredMusclesInSession.join(', ') : 'none'}
+  Active injuries in this session: ${signals.activeInjuredMusclesInSession.length > 0 ? userTextBlock(signals.activeInjuredMusclesInSession) : 'none'}${signals.activeInjuredMusclesInSession.length > 0 ? `\n  ${USER_TEXT_NOTE}` : ''}
 
 Review the session now: keep, adjust, or drop each exercise so the estimated duration fits effective_time_budget_min.`
 }

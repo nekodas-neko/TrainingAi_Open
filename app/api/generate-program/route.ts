@@ -4,6 +4,7 @@ import { getRepository } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { generateObject } from 'ai'
 import { PROSE_FIELD_GUARDS } from '@/lib/ai/prompt-guards'
+import { USER_TEXT_NOTE } from '@trainingai/shared/ai/untrusted-text'
 import { aiModel, loggedGenerateObject } from '@/lib/ai/instrument'
 import { z } from 'zod'
 import type { GeneratedProgram, GeneratedExercise } from '@trainingai/shared/types/builder'
@@ -243,7 +244,8 @@ ${referenceProgram.sessions
 ACTIVE INJURIES — the exercise list below has ALREADY had everything involving these areas removed,
 so nothing you can pick will load them. Say in \`notes\` which area you worked around and what you
 chose instead, so the user can see the program accounts for it:
-${injuryContext}`
+${injuryContext}
+${USER_TEXT_NOTE}`
     : ''
 
   const systemPrompt = `You are an expert strength and conditioning coach designing programs for optimal muscle growth and strength.`

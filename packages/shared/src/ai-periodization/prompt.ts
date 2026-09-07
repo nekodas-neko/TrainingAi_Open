@@ -6,6 +6,7 @@ import { PCT_BANDS } from '@trainingai/shared/workout/time-profile'
 import { displayOneRm, displayOneRmDelta } from '@trainingai/shared/1rm'
 import { FEVER_TEMP_Z } from '@trainingai/shared/health/illness-radar'
 import { goalRange } from './goal-ranges'
+import { userTextBlock, USER_TEXT_NOTE } from '../ai/untrusted-text'
 
 export interface IntensityZone {
   pctMin: number; pctMax: number
@@ -243,7 +244,11 @@ export function buildUserPrompt(
     `  Consecutive days trained (this session type): ${signals.consecutiveSessionDaysOfThisType}`,
     `  Sore muscles in today's session: ${signals.soreMusclesInSession.length > 0 ? signals.soreMusclesInSession.join(', ') + soreSuffix : 'none'}`,
     `  Sore muscles not in today's session (ignore): ${signals.soreMusclesOutOfSession.length > 0 ? signals.soreMusclesOutOfSession.join(', ') + soreSuffix : 'none'}`,
-    `  Active injuries in today's session: ${signals.activeInjuredMusclesInSession.length > 0 ? signals.activeInjuredMusclesInSession.join(', ') : 'none'}`,
+    // LA-69: an injury's `muscleName` is free text (`z.string().min(1).max(100)`), unlike the sore
+    // muscles above, which come from a picker. The note line is added below only when something was
+    // actually fenced, so a session with no injuries — the common case — sends the prompt unchanged.
+    `  Active injuries in today's session: ${signals.activeInjuredMusclesInSession.length > 0 ? userTextBlock(signals.activeInjuredMusclesInSession) : 'none'}`,
+    signals.activeInjuredMusclesInSession.length > 0 ? `  ${USER_TEXT_NOTE}` : '',
     signals.sleepTrend != null
       ? `  Sleep trend (recent/baseline ratio): ${signals.sleepTrend.toFixed(2)}`
       : `  Sleep trend: no data`,

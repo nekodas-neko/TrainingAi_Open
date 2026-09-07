@@ -1175,30 +1175,19 @@ metric false-positives (Q-471's contentKey fix unapplied here). (e) The model's 
 rendered as an "AI confidence" bar and decides `source` (`log-food.ts:31`) — against the CLAUDE.md
 rule's letter, honestly labelled; owner call.
 
-### [platform][workouts] LA-69 — stored free text still reaches four prompts unfenced
+### [platform][workouts] LA-73 — an exercise name is a MENU item, so it cannot be fenced like a preference
 
-- **Lane:** A — `packages/shared/src/workout/injury-context.ts`, `packages/shared/src/ai-periodization/prompt.ts`,
-  `app/api/coach/**`, the swap-sheet prompt.
-- **Added:** 2026-09-07, Lane A — the half of PS-32 its own text called "traced, not fired".
+- **Lane:** A — `app/api/exercises/route.ts` (the write), plus the candidate lists in generate-program, builder-chat and the swap sheet.
+- **Added:** 2026-09-07, Lane A — the part of LA-69 that a fence is the wrong tool for.
 
-PS-32 fenced the two meal-plan prompts; the second-order path it flagged is untouched. `formatInjuryContext`
-splices `injury.notes` — the user's own words, from a stored row — into **four** prompts (generate-program,
-builder-chat, the mid-workout swap sheet, coach/options), quoted with `"` a value can close rather than
-fenced. Exercise and saved-meal names take the same shape. The helper exists now
-(`@trainingai/shared/ai/untrusted-text`), so this is applying it plus `USER_TEXT_NOTE` to each consuming
-prompt. Do all four together: a fence in two of four prompts is the half-applied state the sibling-surface
-rule forbids, which is why it was cut from PS-32's PR rather than half-done in it.
-
-### [platform] LA-70 — 20 routes echo raw Zod wording back to the user
-
-- **Lane:** A — 20 files matching `parsed.error.issues[0]?.message`, plus a shared responder.
-- **Added:** 2026-09-07, Lane A — the third finding in PS-32, deferred for size.
-
-`{ error: parsed.error.issues[0]?.message ?? 'Invalid body' }` puts the library's own phrasing on screen —
-live: *"Too big: expected string to have <=80 characters"*. The fix is not to drop the message: a `.superRefine`
-message is written for the user and is the one worth surfacing (the exercises route's equipment error, BF-129).
-Surface `issue.code === 'custom'` only, otherwise the generic string — behind one helper, applied to all 20 in
-one sweep. Cosmetic, so it sat behind PS-32's two substantive halves rather than tripling that PR.
+LA-69 fenced the injury free text. Exercise names are the other user-writable string reaching these
+prompts (`POST /api/exercises` takes a `name`), and `userTextBlock` is **not** the fix: the model has
+to return a name **verbatim** so the route can match it back to the library, and wrapping menu items in
+a tag invites the tag into the answer — a preference the model reads and a menu it must quote back are
+different problems. The likely answer is sanitising at the write — control characters and angle
+brackets out of `name` before it is stored, since a stored name reaches four prompts and no screen
+needs a newline in it — plus a one-off pass over existing rows. Establish first whether any stored
+name actually carries one; if none do, this may be a guard rather than a fix.
 
 ### [body][devices] LA-71 — `scale_raw_samples` still has no unique key
 
@@ -1212,22 +1201,6 @@ posts of the same bytes can still both insert. Only `CREATE UNIQUE INDEX ON scal
 measured_at, raw_hex)` closes that, and it cannot be added blind: the build **fails the deploy** if any
 account holds a duplicate, so the migration must delete duplicates (lowest id wins) first. Measured
 2026-09-07 the owner's 99 rows hold **99 distinct pairs** — zero; other accounts cannot be counted from here (`claude_ro` is row-scoped), which is why this is not shipped on an assumption.
-
-### [platform] LA-72 — ~30 source-scanning checks strip no comments, and nobody knows which need to
-
-- **Lane:** A — `scripts/check-*.js`.
-- **Added:** 2026-09-07, Lane A — the residue of LA-64, which fixed the eight that already tried.
-
-LA-64 gave the eight checks that strip comments one shared implementation and put a comment filter on
-every inline grep in `ci.yml`. **Roughly thirty other `check-*.js` scripts read `.ts`/`.tsx` and match
-patterns with no stripper at all** — and a blanket conversion is wrong, because several of them
-legitimately read prose (`check-claude-md-paths`, `check-module-map-symbols`) or count raw lines
-(`check-component-size`). What is needed is a pass that decides per check, since the failure direction
-is the silent one: a rule that matches its own explanatory comment reports clean over code it never
-parsed. One known carve-out to fold in: **`Safe-area utility classes must be defined`** (ci.yml)
-extracts class tokens with `grep -roh`, so its output has no line prefix to filter and a class named
-only in a comment reads as used-but-undefined. That one is a false positive — loud, and cheap to work
-around — which is why LA-64 left it.
 
 ### [platform] LA-63 — E2E's 9 failing specs
 
@@ -1389,6 +1362,33 @@ Not a call to write 93 test files: 35 are admin/debug. The actionable core is th
 the home screen depends on (`calendar-data`, `training-load`, `streak-data` appear only as cache-key
 strings in tests) and the external-ingest routes. Pick the dozen that would hurt most and give each
 one route-level test; keep the scan as the ratchet.
+
+### [platform] LA-70 — 20 routes echo raw Zod wording back to the user
+
+- **Lane:** A — 20 files matching `parsed.error.issues[0]?.message`, plus a shared responder.
+- **Added:** 2026-09-07, Lane A — the third finding in PS-32, deferred for size.
+
+`{ error: parsed.error.issues[0]?.message ?? 'Invalid body' }` puts the library's own phrasing on screen —
+live: *"Too big: expected string to have <=80 characters"*. The fix is not to drop the message: a `.superRefine`
+message is written for the user and is the one worth surfacing (the exercises route's equipment error, BF-129).
+Surface `issue.code === 'custom'` only, otherwise the generic string — behind one helper, applied to all 20 in
+one sweep. Cosmetic, so it sat behind PS-32's two substantive halves rather than tripling that PR.
+
+### [platform] LA-72 — ~30 source-scanning checks strip no comments, and nobody knows which need to
+
+- **Lane:** A — `scripts/check-*.js`.
+- **Added:** 2026-09-07, Lane A — the residue of LA-64, which fixed the eight that already tried.
+
+LA-64 gave the eight checks that strip comments one shared implementation and put a comment filter on
+every inline grep in `ci.yml`. **Roughly thirty other `check-*.js` scripts read `.ts`/`.tsx` and match
+patterns with no stripper at all** — and a blanket conversion is wrong, because several of them
+legitimately read prose (`check-claude-md-paths`, `check-module-map-symbols`) or count raw lines
+(`check-component-size`). What is needed is a pass that decides per check, since the failure direction
+is the silent one: a rule that matches its own explanatory comment reports clean over code it never
+parsed. One known carve-out to fold in: **`Safe-area utility classes must be defined`** (ci.yml)
+extracts class tokens with `grep -roh`, so its output has no line prefix to filter and a class named
+only in a comment reads as used-but-undefined. That one is a false positive — loud, and cheap to work
+around — which is why LA-64 left it.
 
 ### [platform] LA-60 — the sandbox runs Node 22 and every CI job pins Node 20
 

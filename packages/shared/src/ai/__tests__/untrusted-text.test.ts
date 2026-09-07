@@ -63,6 +63,30 @@ describe('userTextBlock', () => {
 
 // The helper cannot stop a sixth field being spliced raw beside it, and that is the shape the
 // original defect took: three fields fenced nowhere, in a route where five others already were.
+describe('the injury prompts splice no user text raw (LA-69)', () => {
+  const root = join(__dirname, '..', '..', '..', '..', '..')
+  // `muscleName` is `z.string().min(1).max(100)` — free text, not a picker — and it reaches four
+  // prompts from a stored row. `soreMusclesInSession` beside it comes from the sore-muscle picker
+  // and is deliberately absent.
+  const SITES: Array<[string, string]> = [
+    ['packages/shared/src/workout/injury-context.ts', 'muscleName'],
+    ['packages/shared/src/ai-periodization/prompt.ts', 'activeInjuredMusclesInSession'],
+    ['packages/shared/src/workout/review/prompt.ts', 'activeInjuredMusclesInSession'],
+  ]
+
+  it.each(SITES)('%s fences %s', (path, field) => {
+    const src = readFileSync(join(root, path), 'utf8')
+    expect(src, `${field} is spliced raw`).not.toMatch(new RegExp(String.raw`\$\{[^}]*\b${field}[^}]*\.join\(`))
+    expect(src).toContain('userTextBlock')
+  })
+
+  it('the two routes that render the injury block explain the tag', () => {
+    for (const path of ['app/api/generate-program/route.ts', 'app/api/builder-chat/route.ts']) {
+      expect(readFileSync(join(root, path), 'utf8')).toContain('USER_TEXT_NOTE')
+    }
+  })
+})
+
 describe('the meal-plan prompts splice no user text raw', () => {
   const root = join(__dirname, '..', '..', '..', '..', '..')
   const ROUTES = [
