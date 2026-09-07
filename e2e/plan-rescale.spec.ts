@@ -55,6 +55,22 @@ async function cleanup(db: Client): Promise<void> {
   await db.query('DELETE FROM meal_plans WHERE id = $1', [PLAN])
 }
 
+/**
+ * Any OTHER active plan for the seeded user is stood down before this fixture inserts its own.
+ *
+ * `meal_plans_one_active_per_user` allows one, and `cleanup` above only removes THIS spec's row by
+ * id — so a plan left active by anything else makes the insert below fail with a duplicate-key
+ * error, and every test in the file dies in `beforeAll` with a message about a constraint rather
+ * than about the plan card. `plan-meal-to-saved-meal.spec.ts:70` already does exactly this; the two
+ * specs are the only ones that create an active plan, and only one of them was protecting itself.
+ *
+ * Deactivating rather than deleting: another spec's row is not this one's to remove, and `is_active`
+ * is all the constraint cares about.
+ */
+async function standDownOtherActivePlans(db: Client, uid: string): Promise<void> {
+  await db.query('UPDATE meal_plans SET is_active = false WHERE user_id = $1 AND id <> $2', [uid, PLAN])
+}
+
 /** Today in the USER's timezone, which is what `food_logs.date` is keyed on — never the runner's. */
 async function todayInUserTz(db: Client): Promise<string> {
   const { rows } = await db.query<{ d: string }>(
@@ -71,6 +87,7 @@ test.beforeAll(async () => {
   await withDb(async db => {
     const uid = await userId(db)
     await cleanup(db)
+    await standDownOtherActivePlans(db, uid)
     const date = await todayInUserTz(db)
 
     await db.query(

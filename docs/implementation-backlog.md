@@ -399,6 +399,39 @@ below threshold and left in place for next time.
 
 
 
+### [nutrition][platform] LA-67 — one plan-rescale test fails in CI and passes locally, on both attempts, and it is not a flake
+
+- **Lane:** B — `components/nutrition/**` / `app/nutrition/**` is where the copy under assertion is rendered; the spec itself is `e2e/plan-rescale.spec.ts`.
+- **Added:** 2026-09-07 · Lane A, from RV-49's CI runs. Filed rather than fixed because the assertion is nutrition-surface behaviour and the PR that surfaced it touches only `lib/cache-groups.ts`.
+- **Needs:** — nothing.
+- **The failure, verbatim and identical on the initial attempt and the retry:**
+  ```
+  e2e/plan-rescale.spec.ts › the floor leaves the meals as planned and says why
+  Locator: getByText(/under a meal — the remaining meals are left as planned/)
+  Expected: visible ... Error: element(s) not found
+  ```
+  The explanatory copy that should appear once the per-meal floor binds never renders. Its sibling
+  in the same file — *"the remaining meals are re-scaled to what is left of the day"* — **passes**,
+  so the fixture, the plan and the page all load; only this branch of the rescale logic is missing.
+- **It is not a flake, and the usual suspects are ruled out.** It failed on **two separate CI runs**
+  of the same PR, and within each run on the first attempt AND the retry — four failures, same
+  message. The run was otherwise healthy: 154 passed, and the 5 flaky specs all passed on retry
+  (one of those was a browser `SIGSEGV`, unrelated).
+- **It is not the setup constraint that was fixed alongside it.** The same PR fixed
+  `plan-rescale`'s `beforeAll` racing `meal_plans_one_active_per_user`; after that fix the CI log has
+  **zero** occurrences of `duplicate key`, `violates unique constraint`, or that constraint's name.
+  The setup now succeeds and this assertion still fails. They were two problems wearing one symptom.
+- **It reproduces only in CI.** Run locally against a clean `meal_plans` table, the whole file passes
+  — on `main` and on the branch, 4 of 4. So the difference is the environment or the seeded data,
+  not the code under test.
+- **Start here:** the test drives `setEaten(OVER_KCAL)` and expects the floor to bind. Whether it
+  binds depends on the day's logged calories against the plan target, which is keyed on the USER's
+  timezone (`food_logs.date`, `todayInUserTz` in the spec). A CI runner in UTC against a seeded user
+  in `Australia/Brisbane` is the obvious candidate for the fixture's food log landing on a different
+  local day than the page reads — which would leave the day under target, so the floor never binds
+  and the copy never renders. That is a hypothesis from reading the spec, **not measured**.
+- **Reversal cost:** none yet — nothing has been changed for it.
+
 ### [nutrition][body] OR-102b — the reta tracker: vial setup, dose calculator, dose timeline, weight response
 
 - **Lane:** B — a new section under Nutrition, plus the supplement sheet.
@@ -1061,29 +1094,6 @@ and Samsung does not honour `autoConnect = true`, so direct connect plus a bound
 **Out of scope on purpose:** this does not put the ring's data on any screen — learning-mode
 isolation stands and wiring it into scoring waits on the H10 session. It does not resolve steps,
 calories or the stage mapping (PS-16, PS-19).
-
-### [workouts][app-shell] RV-49 — the Home deload confirm evicts neither key the visible screen reads
-
-- **Lane: A** — was filed B, and re-laned 2026-09-06 by Lane B on picking it up. **The whole fix is
-  in `lib/cache-groups.ts`**, which CLAUDE.md names in Lane A's path list *and* which the lane rule
-  independently sends to A: it is reached from `app/api/coach/apply/route.ts` and
-  `app/api/coach/apply/[id]/undo/route.ts`. The call site the entry also names
-  (`session-select-content.tsx:887-892`) needs **no change** — it already calls
-  `invalidatePrescriptionChanged()` with no id, and the fix is to make that call evict what it
-  claims to. So there is no Lane B half to ship first, and the e2e repaint assertion has to ride
-  with the group change or it is a test with nothing to assert against.
-- **Added:** 2026-09-06, Review sweep 49 —
-  [write-up](reviews/2026-09-06-deload-confirm-eviction-gap.md). Owner-reported symptom.
-
-`handleEarlyDeloadConfirm` carries Q-117's fix comment and then calls
-`invalidatePrescriptionChanged()` **with no sessionId** — and in the group, `workout-card:<id>`
-eviction is conditional on the id (so the call evicts no cards, the exact keys Q-117 names) and
-`next-session` is not in the group at all (it is Home's recommendation key). After "Start deload
-week", the recommendation card and every per-session card keep full-intensity weights out of cache
-for up to TTL_LONG (6 h). Q-117's fix reached the other caller (`ai-prescription-card.tsx:106`
-passes the id); the surface Q-117 was filed about still misses. Fix: add
-`invalidateCache('next-session')` to the group and make `workout-card:` a prefix drop when no id is
-given (the injuries group at `:238` is the pattern). Add a Playwright repaint assertion with the fix.
 
 ### [app-shell] RV-50 — three raw seed-only `workout-card` reads never revalidate
 
