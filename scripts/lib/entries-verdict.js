@@ -49,14 +49,45 @@ function entriesVerdict({ total, unlinked, addedHere, chore, limit, totalCeiling
     };
   }
 
-  if (total > totalCeiling) {
+  // LB-58. The ceiling fails only the branch whose own entries CROSS it, not every branch that
+  // follows. Attribution here cannot use `grewIt` the way the runaway limit above does, and the
+  // difference is the whole entry: `grewIt` is true for practically every PR, because every session
+  // writes a journal entry — so gating on it would leave the measured problem exactly as it was
+  // (2026-09-03 blocked a spec fix at 251/250; 2026-09-06 blocked an e2e-drift PR at 320/320, both
+  // having added exactly one entry).
+  //
+  // The deeper reason it must not fail everyone: unlike the runaway limit, **the ceiling cannot be
+  // paid off by the branch it blocks**. 274 of the 320 were linked by a durable doc and therefore
+  // unfoldable, so the sweep the message asks for cannot get under the number — the failure demands
+  // something the author cannot do. Once the base is already over, that is the Orchestrator's
+  // restructuring job (the message says so), and every PR after the crossing gets a loud note.
+  const baseTotal = addedHere === null ? null : total - addedHere;
+  const crossedHere = baseTotal === null || baseTotal <= totalCeiling;
+  const ceilingBody =
+    `${dir}/ holds ${total} entries, over the ${totalCeiling} total ceiling — it has\n` +
+    `      stopped being a readable recent-window. Only ${unlinked} are foldable, so a sweep\n` +
+    `      alone will not fix this: the durable docs citing the other ${linked} need to point at\n` +
+    `      the batched history instead.`;
+
+  if (total > totalCeiling && crossedHere) {
     return {
       level: 'fail',
       message:
-        `${dir}/ holds ${total} entries, over the ${totalCeiling} total ceiling — it has\n` +
-        `      stopped being a readable recent-window. Only ${unlinked} are foldable, so a sweep\n` +
-        `      alone will not fix this: the durable docs citing the other ${linked} need to point at\n` +
-        `      the batched history instead.`,
+        ceilingBody +
+        (addedHere === null
+          ? `\n      The base branch could not be read, so this cannot be attributed — treating it as yours.`
+          : `\n      This branch's ${addedHere} entr${addedHere === 1 ? 'y is' : 'ies are'} what crossed it (base was ${baseTotal}).`),
+    };
+  }
+
+  if (total > totalCeiling) {
+    return {
+      level: 'note',
+      message:
+        `${dir}/ holds ${total} entries, over the ${totalCeiling} total ceiling ` +
+        `(${unlinked} foldable, ${linked} linked) — but the base was already over at ${baseTotal}, ` +
+        `so this branch did not cross it and a sweep here could not get under it either. ` +
+        `Restructuring the durable docs that cite the ${linked} linked entries is the fix.`,
     };
   }
 

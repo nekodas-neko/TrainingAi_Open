@@ -1726,6 +1726,27 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [platform] ⚠️ The journal ceiling now goes quiet once the base is over it, and 286 of 295 entries cannot be folded (LB-58, 2026-09-07)
+
+**What shipped.** The total-entry ceiling in `entriesVerdict` failed whichever PR was open when the
+count crossed. It now fails only the branch whose own entries **cross** it and notes for every branch
+after — measured twice before this: 2026-09-03 blocked a spec fix at 251/250, 2026-09-06 blocked an
+e2e-drift PR at 320/320, both having added exactly one entry.
+
+**The entry's prescribed fix would not have worked, and that is worth knowing.** LB-58 said to gate
+on `grewIt`, mirroring the runaway limit above. Every session writes a journal entry, so `grewIt` is
+true for practically every PR — both measured cases had `addedHere = 1` and would have failed exactly
+as before. The gate is whether this branch crossed the ceiling, not whether it grew the directory.
+
+**What is now owed, and it is the important half.** The ceiling exists because the directory stops
+being a readable recent-window; it counts *all* entries, and **286 of the current 295 are linked by a
+durable doc and therefore unfoldable**. So a sweep can no longer get under it, which is exactly why
+failing the author was unactionable — but it also means that once the base goes over, **nothing fails
+again until someone restructures the durable docs that cite those 286**. Headroom is **25 entries**
+and the linked floor only rises; this session alone added 7. That restructuring is the Orchestrator's
+call and a much larger job than a sweep. Until it happens the ceiling is a loud note rather than a
+gate, which is deliberate and stated in the message the check prints.
+
 ### [workouts] 🟡 Four exercises were added to the catalogue and none has been seen in the app (BF-130, 2026-09-07)
 
 **What shipped.** Migration 270 adds `Stability Ball Leg Curl` and `Slider Leg Curl` (knee-flexion
