@@ -1304,10 +1304,16 @@ the trend survived (lowest-wins) but the archive double-counts.
 
 | run | PR | touches | `pnpm e2e` | result |
 |---|---|---|---|---|
-| 1712 | OR-102a (mine) | `app/api/**` | 23:41:45 → 24m | **failure** |
+| 1712 | OR-102a | `app/api/**` | 24 m | **failure** |
 | 1713 | LA-59 | `components/**` | ~24 m | **failure** |
-| 1715 | BF-121 | `components/**` | 23:41:45 → **24 m 47 s** | **failure** |
-| 1711, 1717, 1718 | docs-only | — | skipped | success in ~5 min |
+| 1715 | BF-121 | `components/**` | **24 m 47 s** | **failure** |
+| 1711, 1717, 1718 | docs-only | — | skipped | success, ~5 min |
+| later | PS-24 | `auth.ts`, `middleware.ts` | **skipped, 44 s** | success |
+| later | PS-25 | `auth.ts`, `lib/` | **skipped, 65 s** | success |
+
+The last two rows matter: they are **code** PRs that pass, and they pass because the gate correctly
+skipped them. So the rule is not "code PRs fail" — it is **E2E fails whenever it actually runs**, and
+nothing yet observed contradicts that.
 
 Every required check passes in all four. The job's UI gate skips the browser run for a docs-only
 diff, which is why those pass in five minutes — so the split is **not** "some PRs are broken", it is

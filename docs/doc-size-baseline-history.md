@@ -8329,7 +8329,7 @@ OR-102a left the queue and nothing replaced it, because its follow-up half
 (OR-102b, the surface) was already filed alongside it. `projectOverview.md` gains a Known-Issues row
 for the one thing genuinely outstanding — local SQLite v38 has never been opened on a device.
 
-## 2026-09-06 — `docs/implementation-backlog.md` → 18880 (LA-63 filed: E2E red on every code PR)
+## 2026-09-06 — `docs/implementation-backlog.md` → 18886 (LA-63 filed: E2E red whenever it runs)
 
 Up by the entry, and it is longer than a "CI is flaky" line because the evidence is the finding: a
 four-run table across three sessions showing E2E fails whenever it RUNS and is skipped whenever it
