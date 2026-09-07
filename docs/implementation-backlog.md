@@ -2411,46 +2411,6 @@ stronger reason the measured one wins.
   the proportion bar rather than showing nothing. **Add one: no date may report a duration larger than
   its longest single session.**
 
-### [nutrition] BF-121 — the meal builder divides calories per portion and not the macros, so it disagrees with the sheet that opens the same meal
-
-- **Lane:** B — `components/nutrition/meal-builder-footer.tsx:41-64`. **No engine change**; the divisor
-  is already in scope and already used.
-- **Added:** 2026-09-05 · owner: *"for the meal creator when adding in serving size it would be good
-  to see the macros per serve."* Screenshot: *Protein Pancakes*, 4 portions — the footer reads
-  `BATCH 983 kcal · 52 P · 103 C · 39 F` and, at the far right, `246 / portion`.
-
-**Calories are divided and the macros are not.** `Math.round(batchKcal / servings)` produces the
-`246 / portion`; `protein`, `carbs` and `fat` print raw batch figures beside it. So the row mixes two
-denominators with only the calorie one labelled, and a reader dividing 52 P by 4 in their head is
-doing arithmetic the footer already does for the number next to it.
-
-**⚠ And the meal's own detail sheet already reads the other way**, which is what makes this a
-consistency bug rather than a missing feature. `meal-detail-sheet.tsx:50` states outright that its
-*"macro columns are **per portion** — that is what `Log this meal` writes."* The same meal therefore
-shows batch macros while you build it and per-portion macros once you open it, with nothing on either
-screen naming the difference. The builder's own body text is the third voice: *"Logging this meal…
-takes one portion — 246 kcal of the 983 below."*
-
-- **Recommendation: show both denominators explicitly rather than swapping one for the other.** The
-  batch total is genuinely useful while entering ingredients for a whole tray — it is what the
-  ingredient list sums to — so replacing it would trade one confusion for another. Label the row
-  `Batch` as now, and add a second line labelled `Per portion` carrying kcal **and** the three macros,
-  shown only when `servings !== 1` (the condition the calorie figure already uses).
-- **⚠ Width is the real constraint, and there is a fresh precedent.** That row already holds a label,
-  a kcal figure, three macro numbers and the per-portion note. Six more numbers will not fit on one
-  line at the S25 width — and **BF-116** is exactly this failure one screen over, where the Home
-  header's chips overflowed into the action buttons after a third chip arrived. A second line is the
-  cheap answer; squeezing is how BF-116 happened.
-- **Per-portion figures should round the same way the log does.** `Log this meal` writes a portion,
-  and if the footer rounds each macro independently while the write rounds differently, the meal will
-  read as one thing in the builder and land as another in the diary. Divide, then round, and match
-  whatever the log path does — that is the number the owner will later compare against.
-- **Verification (device):** a 4-portion recipe shows batch and per-portion side by side, and the
-  per-portion kcal matches the `246 / portion` shown today; a 1-portion recipe shows one set of
-  figures and no redundant second line; the per-portion macros equal what the detail sheet shows for
-  the same saved meal, and what a logged portion writes into the diary.
-
-
 ### [app-shell][platform] BF-110 — the blank resume survives a scroll, which means the renderer never died
 
 - **✅ SHIPPED 2026-09-03** (`fix/bf-110-resume-repaint`). Both halves, in the order this entry

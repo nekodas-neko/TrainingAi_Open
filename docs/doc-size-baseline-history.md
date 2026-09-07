@@ -8432,3 +8432,16 @@ the numbers or the next session repeats the measurement and reaches the same sta
 
 `projectOverview.md` gains 27 for the thing genuinely outstanding: the fix adds up to one exercise to
 every generated session at every budget, and nobody has trained one yet.
+## 2026-09-07 — `projectOverview.md` → 10090 (BF-121's status paragraph and its device row)
+
+Twenty-three lines, split the same way as BF-120's earlier today and for the same reason. The status
+half carries the correction that makes the fix legible — one row was mixing two denominators with
+only one labelled, which is a different complaint from the one the owner filed and is what the detail
+sheet already disagreed with. The Known-Issues half exists because a device check is still owed.
+It was first written as "the width has not been measured" and is now narrower than that: updating
+`edit-meal-batch-footer.spec.ts` — which this change broke, and which the repo-wide E2E redness would
+have hidden — turned the width question into a permanent assertion at 412 × 915. What the row names
+now is the thing a spec cannot reach: the per-portion figures read against the detail sheet and the
+diary on the S25.
+
+The backlog moves the other way: BF-121's 40-line entry goes on shipping.
