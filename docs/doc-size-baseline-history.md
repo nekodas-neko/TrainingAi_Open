@@ -8624,3 +8624,11 @@ Down 15. LB-60 spent most of its length proving a negative — a table of the fo
 against what the client could reach, and the conclusion that not even a workout-only widget was
 buildable. That argument did its job the moment the route existed, so what replaces it is the one
 thing still missing: LA-76, deload days in `pausedDays`.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18793 (PS-39's ratchet shipped)
+
+Up 8. PS-39 said 93 routes were referenced by no test; asking the honest question — does anything
+import the handler — gives 148, and the entry now carries that number, why the old one was low, and
+the command that regenerates the list. It also says explicitly that the remainder is buildable work
+and takes no `Keep:`, because OR-100 is about exactly that: a `Keep:` files real work under a
+heading that tells the lane not to look.
