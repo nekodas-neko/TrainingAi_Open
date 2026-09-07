@@ -1350,20 +1350,35 @@ actionable core: `program-week`, and the remaining ingest routes (`colmi/samples
 `oura-ble/samples/*`, `oura/hr-day`). `scripts/check-route-test-coverage.js` is the ratchet, so the debt can only
 shrink and a NEW route arrives uncovered and fails — which is the half that matters.
 
-### [app-shell][platform] LA-76 — a deload week still decays the collection
+### [app-shell][platform] LA-76 — a deload PHASE still decays the collection, and nothing dates one
 
-- **Lane:** A — `app/api/collection/route.ts`, `packages/shared/src/phase-engine.ts`.
+- **Lane:** A — `app/api/collection/route.ts`, plus a migration.
 - **Added:** 2026-09-07, Lane A — the half of LB-60's `pausedDays` that did not ship with the route.
+- **Gate:** owner — what is left needs a schema decision, below.
 
-`GET /api/collection` feeds `pausedDays` from `listRestDays` — the rest days the user actually chose,
-which is the app's own record of a compliant rest. **Deload days are not in it.** BF-122a's argument
-is that decaying compliance turns the mechanic against the user, and a deload week is compliance the
-app itself prescribed, so a lifter who follows one loses cats for it. `isDeloadActive(phase, program,
-day)` answers for a single day given its resolved phase, so covering a week means resolving the phase
-engine per day across all history — too much for a read route on every call and too easy to get
-quietly wrong, which is why it was named rather than guessed. A rest day is weekly and a deload week
-is occasional, so the shipped route covers the common case. The likely shape is a repository read
-that returns deload spans directly rather than a per-day fold.
+**The early-deload half SHIPPED 2026-09-07**: `pausedDays` now carries `earlyDeloadWeekDays(program)`
+beside the chosen rest days, so a confirmed early deload decays nothing. That span is the only DATED
+record of a deload in the schema, and wiring it was six lines.
+
+**What is left is the deload PHASE, blocked on the data model rather than on effort.**
+`program_phases` measures a phase in `durationCycles` — cycles, not dates — so there is no interval
+to read, and resolving one means replaying the phase engine per day across all history.
+`workout_sessions.phase_type` records which *sessions* fell in a deload, but a deload day you
+**trained** is already a faucet day needing no pause; a pause is for the days you did not train, and
+isolated stamped sessions cannot say where those intervals began or ended.
+
+**Measured on production before assuming the shape (2026-09-07):** 3 sessions stamped
+`phase_type = 'deload'` (2026-08-10, 08-17, 09-02) — 7 and 16 days apart, so isolated sessions
+rather than a week; `is_early_deload` true on **0 rows ever**; `early_deload_week_start` **NULL on
+all five programs**; largest trained-day gap across Aug–Sep **2 days**, which `maxRestGap` already
+allows; **5** decaying gaps (≥3) in all history, none near a deload session. So the premise — a
+lifter losing cats for following a prescribed deload — **has never occurred on the only real data
+set**, while the machinery is live (46 phases across 8 phase sets, each with a deload phase), so
+this is a future gap rather than a dead one.
+
+**The fix is a dated record of a deload span** — rows like `rest_days`, not a derivation — which is
+a migration and an owner call on whether a deload becomes first-class stored state. Deriving it
+instead is the option that loses: a replay with no window gets one wrong answer and keeps it forever.
 
 ### [platform] LA-70 — 20 routes echo raw Zod wording back to the user
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getCurrentPhase, isDeloadActive, isEarlyDeloadWeek, resolveStyleForExercise, buildAutomaticPhaseStatus, deloadAwareStylePhase } from '../phase-engine'
+import { getCurrentPhase, isDeloadActive, isEarlyDeloadWeek, earlyDeloadWeekDays, resolveStyleForExercise, buildAutomaticPhaseStatus, deloadAwareStylePhase } from '../phase-engine'
 import type { ProgramPhase } from '@trainingai/shared/types/program'
 
 const phases: ProgramPhase[] = [
@@ -225,5 +225,30 @@ describe('buildAutomaticPhaseStatus', () => {
   it('returns null approxWeeksRemaining when sessionPerWeek is 0', () => {
     const status = buildAutomaticPhaseStatus(twoPhase, 1, {}, '2026-07-06', 0)
     expect(status.approxWeeksRemaining).toBeNull()
+  })
+})
+
+describe('earlyDeloadWeekDays', () => {
+  it('is empty when no deload week is confirmed', () => {
+    expect(earlyDeloadWeekDays({})).toEqual([])
+  })
+
+  it('lists the window as days, starting at the confirmed start', () => {
+    expect(earlyDeloadWeekDays({ earlyDeloadWeekStart: '2026-06-01' })).toEqual([
+      '2026-06-01', '2026-06-02', '2026-06-03', '2026-06-04',
+      '2026-06-05', '2026-06-06', '2026-06-07',
+    ])
+  })
+
+  it('covers exactly the days isEarlyDeloadWeek answers true for', () => {
+    // The two readers derive from one shared length; this is what would catch them drifting apart,
+    // which matters because the collection replay pauses on THIS list while every prescription path
+    // asks the predicate.
+    const program = { earlyDeloadWeekStart: '2026-06-01' }
+    const listed = earlyDeloadWeekDays(program)
+    for (const day of listed) expect(isEarlyDeloadWeek(program, day)).toBe(true)
+    expect(isEarlyDeloadWeek(program, '2026-05-31')).toBe(false)
+    expect(isEarlyDeloadWeek(program, '2026-06-08')).toBe(false)
+    expect(listed).toHaveLength(7)
   })
 })

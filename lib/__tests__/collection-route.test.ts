@@ -99,6 +99,35 @@ describe('GET /api/collection assembles what the fold needs', () => {
     expect(withRest.collections.workout.decayEvents).toBe(0)
   })
 
+  it('excuses the confirmed early-deload week, so a prescribed deload costs no cats', async () => {
+    // LA-76. The mechanic's own argument is that decaying compliance turns it against the user, and
+    // a deload the app asked for is compliance. `confirm-early-deload` stamps a dated 7-day span on
+    // the program, and that span is the ONLY dated record of a deload in the schema — a deload
+    // PHASE is measured in cycles, so it has no interval to read.
+    const json0 = await body()
+    const today = json0.today
+    const days = [runTo(0, 1, today)[0], runTo(7, 1, today)[0]].sort()
+    listTrainedDayKeys.mockResolvedValue(days)
+
+    expect((await body()).collections.workout.decayEvents).toBeGreaterThan(0)
+
+    // The week starting six days back covers every day between those two sessions.
+    getActiveProgram.mockResolvedValue({ earlyDeloadWeekStart: shiftDateStr(today, -6) })
+    expect((await body()).collections.workout.decayEvents).toBe(0)
+  })
+
+  it('does not excuse a deload week that has already ended', async () => {
+    // The span is seven days and then it stops. Without that bound a single confirmed deload would
+    // excuse every gap after it forever, which is the failure mode of pausing on a scalar flag
+    // rather than a dated window.
+    const json0 = await body()
+    const today = json0.today
+    listTrainedDayKeys.mockResolvedValue([runTo(0, 1, today)[0], runTo(7, 1, today)[0]].sort())
+    getActiveProgram.mockResolvedValue({ earlyDeloadWeekStart: shiftDateStr(today, -60) })
+
+    expect((await body()).collections.workout.decayEvents).toBeGreaterThan(0)
+  })
+
   it('a recorded day is a faucet day, with no threshold above it', async () => {
     // Measured before this was wired: only 35 of the owner's 130 step-days reach 8,000 (avg 5,646).
     // A threshold there would decay the steps ladder most weeks, against `ladder.ts`'s own
