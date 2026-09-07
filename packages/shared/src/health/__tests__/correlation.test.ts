@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { bucketize, computeBaselines, pctFromBaseline, correlationInsight, pearson, spearman, averageRanks, pValueForR, partialCorrelation, type BucketDef } from '@trainingai/shared/health/correlation'
+import { bucketize, computeBaselines, pctFromBaseline, correlationInsight, buildExercise1rmBaseline, sessionMean1RmPct, pearson, spearman, averageRanks, pValueForR, partialCorrelation, type BucketDef } from '@trainingai/shared/health/correlation'
 
 const DEFS: BucketDef[] = [
   { label: '<6h', min: 0, max: 6 },
@@ -227,5 +227,115 @@ describe('spearman', () => {
 
   it('is null when one series is constant, same as pearson', () => {
     expect(spearman([{ x: 1, y: 5 }, { x: 2, y: 5 }, { x: 3, y: 5 }])).toBeNull()
+  })
+})
+
+/**
+ * PS-29 — a correlation fed one point per EXERCISE counts 4 days × 5 lifts as n = 20, clears
+ * `DEFAULT_MIN_N`, computes its p-value at 20, and renders "20 paired days" for four. The points
+ * from one day all carry the SAME x, so they are not independent observations of anything, and the
+ * inflation runs in the direction that manufactures significance.
+ *
+ * `sessionMean1RmPct` is what makes an observation an observation; these pin the aggregate and the
+ * count it produces.
+ */
+describe('sessionMean1RmPct — one observation per session, not per lift', () => {
+  const baseline = new Map([['Squat', 100], ['Bench', 50], ['Row', 80]])
+
+  it('AVERAGES the session\'s lifts rather than summing them', () => {
+    // +10% and +20% -> mean 15, sum 30. Deliberately asymmetric: a symmetric pair like +10/-10
+    // averages AND sums to zero, so it cannot tell the two apart.
+    const ws = { exercises: [
+      { exerciseName: 'Squat', estimated1rm: 110 },
+      { exerciseName: 'Bench', estimated1rm: 60 },
+    ] }
+    expect(sessionMean1RmPct(ws, baseline)).toBeCloseTo(15, 6)
+  })
+
+  it('does not grow with the number of lifts — three at +10% is still +10%', () => {
+    const one   = { exercises: [{ exerciseName: 'Squat', estimated1rm: 110 }] }
+    const three = { exercises: [
+      { exerciseName: 'Squat', estimated1rm: 110 },
+      { exerciseName: 'Bench', estimated1rm: 55 },
+      { exerciseName: 'Row',   estimated1rm: 88 },
+    ] }
+    expect(sessionMean1RmPct(one, baseline)).toBeCloseTo(10, 6)
+    expect(sessionMean1RmPct(three, baseline)).toBeCloseTo(10, 6)
+  })
+
+  it('ignores lifts with no baseline rather than treating them as zero deviation', () => {
+    const ws = { exercises: [
+      { exerciseName: 'Squat', estimated1rm: 110 },
+      { exerciseName: 'Unknown Lift', estimated1rm: 999 },
+    ] }
+    expect(sessionMean1RmPct(ws, baseline)).toBeCloseTo(10, 6)
+  })
+
+  it('returns null when nothing in the session can be compared', () => {
+    expect(sessionMean1RmPct({ exercises: [] }, baseline)).toBeNull()
+    expect(sessionMean1RmPct({ exercises: [{ exerciseName: 'Unknown', estimated1rm: 100 }] }, baseline)).toBeNull()
+    // A non-positive or absent estimate is not a data point.
+    expect(sessionMean1RmPct({ exercises: [{ exerciseName: 'Squat', estimated1rm: 0 }] }, baseline)).toBeNull()
+    expect(sessionMean1RmPct({ exercises: [{ exerciseName: 'Squat' }] }, baseline)).toBeNull()
+  })
+})
+
+describe('buildExercise1rmBaseline', () => {
+  const session = (...vals: [string, number][]) => ({
+    exercises: vals.map(([exerciseName, estimated1rm]) => ({ exerciseName, estimated1rm })),
+  })
+
+  it('needs three sessions of a lift before it has a baseline for it', () => {
+    const twice = [session(['Squat', 100]), session(['Squat', 110])]
+    expect(buildExercise1rmBaseline(twice).has('Squat')).toBe(false)
+    const thrice = [...twice, session(['Squat', 120])]
+    expect(buildExercise1rmBaseline(thrice).get('Squat')).toBeCloseTo(110, 6)
+  })
+
+  it('skips absent and non-positive estimates when counting toward that floor', () => {
+    const rows = [
+      session(['Squat', 100]), session(['Squat', 110]), session(['Squat', 0]),
+    ]
+    expect(buildExercise1rmBaseline(rows).has('Squat')).toBe(false)
+  })
+})
+
+/**
+ * The count is the defect, so it is asserted through the helpers that report it — both of them.
+ * `bucketize` counts points too, so per-exercise points inflated the per-bucket `minCount` gate as
+ * well: a single day of five lifts satisfied the "≥5 observations" floor that was raised from 3 on
+ * 2026-08-05 precisely because "three observations cannot support a claim about someone's body".
+ */
+describe('n and bucket counts are days, not lifts', () => {
+  const baseline = new Map([['Squat', 100]])
+  const LIFTS_PER_DAY = 5
+  const dayPoint = (sleepHours: number, oneRm: number) => ({
+    x: sleepHours,
+    y: sessionMean1RmPct(
+      { exercises: Array.from({ length: LIFTS_PER_DAY }, () => ({ exerciseName: 'Squat', estimated1rm: oneRm })) },
+      baseline,
+    )!,
+  })
+
+  it('four days of five lifts is n = 4 and withheld for sample size, not n = 20 and reported', () => {
+    const points = [dayPoint(5.5, 95), dayPoint(6.5, 100), dayPoint(7.5, 105), dayPoint(8.5, 110)]
+    expect(points).toHaveLength(4)
+
+    const buckets = bucketize(points, DEFS)
+    const r = correlationInsight(
+      buckets, () => 'unused', 1, undefined, { points, control: points.map((_, i) => i) },
+    )
+    expect(r.stats?.n).toBe(4)
+    expect(r.withheld).toBe('sample')
+    expect(r.insight).toContain('Only 4 paired days')
+  })
+
+  it('one day cannot fill a bucket on its own, however many lifts it contained', () => {
+    // All four days in the same bucket. Counted as days that is 4; counted as lifts it was 20, and
+    // a single day would have cleared a floor of 5 by itself.
+    const sameBucket = [dayPoint(6.1, 95), dayPoint(6.2, 100), dayPoint(6.3, 105), dayPoint(6.4, 110)]
+    const counts = bucketize(sameBucket, DEFS).map(b => b.count)
+    expect(counts.reduce((a, c) => a + c, 0)).toBe(4)
+    expect(Math.max(...counts)).toBe(4)
   })
 })

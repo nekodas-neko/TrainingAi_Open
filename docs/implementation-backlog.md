@@ -1144,16 +1144,6 @@ route `startedAt ?? createdAt`; readiness `startedAt` else **Infinity** (never b
 chat/running none — and the owner's active program has `started_at = NULL` (verified in prod), so
 July's early-deload consumed live ACWR while the card said "baselining".
 
-### [sleep] PS-29 — the sleep–performance correlation counts exercises as "paired days"
-
-- **Lane:** A — `app/api/sleep-performance-correlation/route.ts:81-88`.
-- **Added:** 2026-09-06, app checkpoint — [report](reviews/2026-09-05-app-checkpoint.md) §P4.
-
-`points.push` sits inside `for (const ex of ws.exercises)` with one sleep value per day, so n counts
-exercises: 4 days × 5 exercises clears the `DEFAULT_MIN_N = 20` floor, the p-value is computed at
-n=20, and the rendered text says "20 paired days". Fix: one point per day (aggregate the day's
-exercises first), or divide the floor honestly.
-
 ### [devices][readiness] PS-30 — oura_daily recorded the ring worn 0.3–1.5 h on 20 consecutive scored nights
 
 - **Lane:** A — `lib/oura-ble/rollup/run.ts:880-905`.

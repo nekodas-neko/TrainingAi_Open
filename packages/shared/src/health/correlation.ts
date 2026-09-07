@@ -255,6 +255,60 @@ export function correlationInsight(
   return { insight: `${render(best, worst)} (${n} paired days)`, hasSufficientData, stats }
 }
 
+// ── Per-exercise 1RM baselines, and the per-session aggregate over them ─────────────────────────
+//
+// Extracted from `app/api/health-trends/route.ts`, where both were local, once
+// `/api/sleep-performance-correlation` was found doing the same work inline (PS-29). The baseline
+// build was byte-equivalent in both; the aggregate existed in only one, and its absence from the
+// other is the defect PS-29 describes.
+
+/** The shape both routes' workout sessions satisfy — named so neither has to widen its own types. */
+export interface Exercise1rmSample {
+  exerciseName: string
+  estimated1rm?: number | null
+}
+
+/** Per-exercise mean estimated 1RM over the window, for exercises with at least `minSamples`. */
+export function buildExercise1rmBaseline(
+  sessions: { exercises: Exercise1rmSample[] }[],
+  minSamples = 3,
+): Map<string, number> {
+  const values = new Map<string, number[]>()
+  for (const ws of sessions) {
+    for (const ex of ws.exercises) {
+      if (ex.estimated1rm != null && ex.estimated1rm > 0) {
+        const vals = values.get(ex.exerciseName) ?? []
+        vals.push(ex.estimated1rm)
+        values.set(ex.exerciseName, vals)
+      }
+    }
+  }
+  return computeBaselines(values, minSamples)
+}
+
+/**
+ * One session's mean % deviation from baseline, or null when nothing in it can be compared.
+ *
+ * **This is what makes an observation an observation.** A correlation fed one point per EXERCISE
+ * counts 4 days × 5 lifts as n = 20, computes its p-value at 20, and renders "20 paired days" — and
+ * the points from one day all carry the SAME x, so they are not independent samples of anything.
+ * Every bucketed view in `/api/health-trends` already aggregates this way; `correlationInsight`
+ * words its output as "paired days" on the assumption that callers do.
+ */
+export function sessionMean1RmPct(
+  ws: { exercises: Exercise1rmSample[] },
+  baseline: Map<string, number>,
+): number | null {
+  const pcts: number[] = []
+  for (const ex of ws.exercises) {
+    const base = baseline.get(ex.exerciseName)
+    if (base == null || ex.estimated1rm == null || ex.estimated1rm <= 0) continue
+    pcts.push(pctFromBaseline(ex.estimated1rm, base))
+  }
+  if (pcts.length === 0) return null
+  return pcts.reduce((a, v) => a + v, 0) / pcts.length
+}
+
 function round3(v: number): number {
   return Math.round(v * 1000) / 1000
 }
