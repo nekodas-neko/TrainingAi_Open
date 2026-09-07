@@ -1137,19 +1137,22 @@ metric false-positives (Q-471's contentKey fix unapplied here). (e) The model's 
 rendered as an "AI confidence" bar and decides `source` (`log-food.ts:31`) — against the CLAUDE.md
 rule's letter, honestly labelled; owner call.
 
-### [platform][workouts] LA-73 — an exercise name is a MENU item, so it cannot be fenced like a preference
+### [platform][workouts] LA-74 — two program write routes take an unvalidated body
 
-- **Lane:** A — `app/api/exercises/route.ts` (the write), plus the candidate lists in generate-program, builder-chat and the swap sheet.
-- **Added:** 2026-09-07, Lane A — the part of LA-69 that a fence is the wrong tool for.
+- **Lane:** A — `app/api/workout-templates/route.ts`, `app/api/progression-styles/route.ts`.
+- **Added:** 2026-09-07, Lane A — found while applying LA-73's name guard and unable to.
 
-LA-69 fenced the injury free text. Exercise names are the other user-writable string reaching these
-prompts (`POST /api/exercises` takes a `name`), and `userTextBlock` is **not** the fix: the model has
-to return a name **verbatim** so the route can match it back to the library, and wrapping menu items in
-a tag invites the tag into the answer — a preference the model reads and a menu it must quote back are
-different problems. The likely answer is sanitising at the write — control characters and angle
-brackets out of `name` before it is stored, since a stored name reaches four prompts and no screen
-needs a newline in it — plus a one-off pass over existing rows. Establish first whether any stored
-name actually carries one; if none do, this may be a guard rather than a fix.
+Neither route has a Zod schema at all. `workout-templates` spreads `body.program` straight into
+`repo.saveProgram`; `progression-styles` does the same into `saveProgressionStyle`. **Not mass
+assignment** — `saveProgram`'s `.set({ name, isActive, updatedAt })` key-whitelists, so an injected
+column cannot land — but nothing types or bounds any value, and both carry targeted ownership checks
+(`phaseSetId`, `styleId`) that read as validation while covering two fields out of many. CLAUDE.md
+names `updateInjury` as the reference for whitelisting a body, and Q-484 fixed this same asymmetry on
+`POST /api/injuries`. **It is why LA-73's name guard reached only `exercise_library`:** the other three
+name-bearing tables have no schema to hang a transform on. Give each a schema built from shared field
+definitions the way `packages/shared/src/validation/injury.ts` does, then add `promptSafeLine` to
+`programs.name`, `program_sessions.name` and `progression_styles.name`. Measured 2026-09-07: 5 program,
+22 session and 25 style names, none carrying a control character — a guard, not a repair.
 
 ### [body][devices] LA-71 — `scale_raw_samples` still has no unique key
 

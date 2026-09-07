@@ -8573,10 +8573,20 @@ at length from an idle Postgres log toward "a startup timeout"; running the suit
 pass — 147 passed, 9 failed — so the reasoning is gone and the nine spec names are what remains.
 An entry that argues is an entry whose evidence was never gathered.
 
-## 2026-09-07 — `projectOverview.md` → 10378, `docs/implementation-backlog.md` → 18753 (BF-123)
+## 2026-09-07 — `projectOverview.md` → 10378, `docs/implementation-backlog.md` → 18756 (BF-123)
 
 Up 18 on the index, down 38 on the queue. The queue loses BF-123's entry; the index gains the
 Known-Issues row it owes, because the sweep touched 48 controls and the gate only opens five screens
 — 41 of them are verified in a 412 dp browser harness and not on the device. That gap is exactly what
 the index exists to carry, and it does not shrink until someone runs the device pass. Written twice:
 the first draft ran 21 lines because it re-argued the diagnosis the journal entry already carries.
+Re-derived from the merged file after LA-73 raised the queue baseline to 18794 mid-branch — carrying
+this branch's own 18753 across that merge would have handed the queue 41 lines of silent slack.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18794 (LA-73 shipped)
+
+Up 3. LA-73 asked a question — does any stored name carry a control character — and the answer was
+no across all 155 exercise, 5 program, 22 session and 25 style names, so it shipped as a guard on
+the write. What replaces it is longer because it is a different finding: LA-74, the two program
+write routes that have no request schema at all, which is *why* the guard reached one table out of
+four rather than a scoping choice.
