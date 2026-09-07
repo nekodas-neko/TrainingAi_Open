@@ -1726,6 +1726,36 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [sleep] 🟡 The sleep–performance insight now reports 48 paired days instead of 233, and nobody has seen the new number (PS-29, 2026-09-07)
+
+**What shipped.** `/api/sleep-performance-correlation` pushed one point per **exercise** with one
+sleep value per day, so every point from a day carried the same x. Measured on the owner's real 90
+days: **233 points as exercises, 48 as days.** The screen has been rendering *"233 paired days"* for
+48 and computing its p-value at n = 233 — inflation in the direction that manufactures significance.
+It now aggregates one point per day.
+
+The per-bucket `minCount` floor was inflated identically, which the entry did not mention: `bucketize`
+counts points, so one day of five lifts satisfied the "≥5 observations" gate by itself — the gate
+raised 3 → 5 on 2026-08-05 because *"three observations in a bucket cannot support a claim about
+someone's body"*.
+
+**What is owed.** The numbers the screen now shows have **not been seen**. There was no `pnpm dev`
+call: the route needs paired sleep and workout history the seeded dev user does not have, so the fix
+is covered at the helper level — where the defect lives and where the mutation tests bite — rather
+than through the running endpoint.
+
+**Read the new output carefully rather than as a regression.** n should fall 233 → 48, still above
+the `DEFAULT_MIN_N = 20` floor, so the insight should keep rendering with a corrected count. **If it
+instead starts saying "no reliable relationship across 48 paired days", that is the fix working** —
+the previous significance was partly an artefact of counting lifts as days, and a p-value that
+survives at n = 233 need not survive at 48.
+
+**A reasoned choice that his data cannot yet test.** This aggregates by *day*; the eight sibling
+views in `/api/health-trends` aggregate by *session*, correctly, because their x is a per-session
+quantity. Here x is one night's sleep, identical for every session after it. On the owner's data the
+two are indistinguishable — 48 sessions across 48 days, he never trains twice in a day in this
+window — so nothing here distinguishes them in practice.
+
 ### [workouts][app-shell] 🟡 The deload confirm now evicts what the screen reads, but not on the device the owner reported it from (RV-49, 2026-09-07)
 
 **What shipped.** `handleEarlyDeloadConfirm` called `invalidatePrescriptionChanged()` with no session

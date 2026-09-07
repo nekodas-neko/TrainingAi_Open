@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.35",
+    date: "2026-09-07",
+    changes: [
+      "The sleep-and-performance insight was counting each exercise as a separate day. It said \u201c233 paired days\u201d where you had 48, and judged how reliable the pattern was against that inflated number. It now counts days, so the figure it quotes is the one you actually have \u2014 and a pattern it calls reliable now has to survive the real count.",
+    ],
+  },
+  {
     version: "1.436.34",
     date: "2026-09-07",
     changes: [

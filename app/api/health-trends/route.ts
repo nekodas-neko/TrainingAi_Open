@@ -4,7 +4,7 @@ import { getRepository } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { formatInTimeZone } from 'date-fns-tz'
 import { DEFAULT_TZ, toAestDay, todayInTz, todayMidnightUtc } from '@trainingai/shared/date-utils'
-import { bucketize, computeBaselines, pctFromBaseline, correlationInsight, type BucketDef, type CorrelationBucket, type CorrelationStats, type WithheldReason } from '@trainingai/shared/health/correlation'
+import { bucketize, correlationInsight, buildExercise1rmBaseline, sessionMean1RmPct, type BucketDef, type CorrelationBucket, type CorrelationStats, type WithheldReason } from '@trainingai/shared/health/correlation'
 import { restAdherencePct } from '@trainingai/shared/workout/rest-adherence'
 import { energyBalanceByDay, medianOf } from '@trainingai/shared/health/energy-balance'
 import { sorenessVsVolumePoints } from '@trainingai/shared/health/soreness-volume'
@@ -84,33 +84,6 @@ const MUSCLE_VOLUME_BUCKETS: BucketDef[] = [
 
 function toBucketResponse(buckets: CorrelationBucket[]) {
   return buckets.map(b => ({ label: b.label, avg: b.avg, count: b.count }))
-}
-
-// Per-exercise estimated-1RM baseline (mean, ≥3 sessions) built once from the
-// whole window's workout sessions — shared by rest-adherence and recovery-vs-strength.
-function buildExercise1rmBaseline(workoutSessions: Awaited<ReturnType<Awaited<ReturnType<typeof getRepository>>['getWorkoutSessionsFrom']>>): Map<string, number> {
-  const values = new Map<string, number[]>()
-  for (const ws of workoutSessions) {
-    for (const ex of ws.exercises) {
-      if (ex.estimated1rm != null && ex.estimated1rm > 0) {
-        const vals = values.get(ex.exerciseName) ?? []
-        vals.push(ex.estimated1rm)
-        values.set(ex.exerciseName, vals)
-      }
-    }
-  }
-  return computeBaselines(values, 3)
-}
-
-function sessionMean1RmPct(ws: { exercises: { exerciseName: string; estimated1rm?: number }[] }, baseline: Map<string, number>): number | null {
-  const pcts: number[] = []
-  for (const ex of ws.exercises) {
-    const base = baseline.get(ex.exerciseName)
-    if (base == null || ex.estimated1rm == null || ex.estimated1rm <= 0) continue
-    pcts.push(pctFromBaseline(ex.estimated1rm, base))
-  }
-  if (pcts.length === 0) return null
-  return pcts.reduce((a, v) => a + v, 0) / pcts.length
 }
 
 export async function GET(req: Request) {

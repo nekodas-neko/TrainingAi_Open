@@ -8542,3 +8542,11 @@ failure that is **not** the constraint race fixed alongside it. The entry carrie
 and the four-failures-across-two-runs evidence because the tempting reading — "E2E is flaky" — is the
 one the run's own output refutes: 154 passed, and the five genuinely flaky specs all passed on retry
 while this one failed on both attempts, twice.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18811, `projectOverview.md` → 10360 (PS-29 shipped)
+
+Backlog down 10; `projectOverview.md` up 30, and most of that row is one instruction rather than a
+status: **read the new output carefully rather than as a regression.** The sleep–performance insight
+was counting lifts as days — 233 where the owner has 48 — so its p-value was computed at an inflated
+n. If the screen now says "no reliable relationship across 48 paired days", that is the fix working,
+and without the row saying so the obvious next reading is that something broke.
