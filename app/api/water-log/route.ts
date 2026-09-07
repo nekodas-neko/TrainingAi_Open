@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { formatInTimeZone } from 'date-fns-tz'
-import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
+import { DEFAULT_TZ, shiftDateStr } from '@trainingai/shared/date-utils'
 import { rateLimit } from '@/lib/rate-limit'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 
-// A date and a millilitre count. 4 KB is generous.
+// An optional local date and a millilitre count. 4 KB is generous.
 const MAX_BODY_BYTES = 4 * 1024
 
 export async function POST(req: NextRequest) {
@@ -29,13 +29,30 @@ export async function POST(req: NextRequest) {
       : NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  const ml = (read.body as { ml?: unknown } | null)?.ml
+  const body = (read.body ?? {}) as { ml?: unknown; localDate?: unknown }
+  const ml = body.ml
   if (typeof ml !== 'number' || ml <= 0 || ml > 5000) {
     return NextResponse.json({ error: 'ml must be a positive number ≤ 5000' }, { status: 400 })
   }
 
   const tz = session.user.timezone ?? DEFAULT_TZ
-  const date = formatInTimeZone(new Date(), tz, 'yyyy-MM-dd')
+  const serverToday = formatInTimeZone(new Date(), tz, 'yyyy-MM-dd')
+
+  // PS-37: this route keyed the increment to SERVER-now while the outbox path keys the identical
+  // write to the client's own day (`incrementWaterLogOnce(userId, mut.date, …)`), so the same quick
+  // add landed on a different date depending on which path carried it. The file's own header said
+  // "a date and a millilitre count" — the date was never read.
+  //
+  // Both separators, because `localDateString()` emits `YYYY/MM/DD` and a dash-only regex would
+  // reject every request from a client that fills the field from it (the ai-chat `localDate` bug).
+  // Bounded to today or yesterday in the user's timezone: the only honest reason for the client's
+  // day to differ from the server's is a request that crossed midnight, and an unbounded date on a
+  // running total is a way to rewrite history one accepted request at a time.
+  const raw = typeof body.localDate === 'string' && /^\d{4}[-/]\d{2}[-/]\d{2}$/.test(body.localDate)
+    ? body.localDate.replace(/\//g, '-')
+    : null
+  const yesterday = shiftDateStr(serverToday, -1)
+  const date = raw === serverToday || raw === yesterday ? raw : serverToday
 
   const repo = await getRepository()
   await repo.incrementWaterLog(userId, date, Math.round(ml))

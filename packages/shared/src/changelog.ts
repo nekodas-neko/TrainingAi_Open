@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.40",
+    date: "2026-09-07",
+    changes: [
+      "Water logged just after midnight now counts on the day you logged it. The quick-add on the web fell back to the server's idea of the date, which could put it on the wrong day; the offline path already used yours.",
+      "A meal plan can no longer show a negative gram figure for a macro. It took a target under two grams split across five meals to produce one, but it was possible.",
+      "When suggesting a fresh meal fails, the message no longer says it could not rewrite the meal — nothing was being rewritten.",
+    ],
+  },
+  {
     version: "1.436.39",
     date: "2026-09-07",
     changes: [

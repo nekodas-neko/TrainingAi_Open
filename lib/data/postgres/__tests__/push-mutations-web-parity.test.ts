@@ -592,6 +592,41 @@ describe.skipIf(!canRun)('pushMutations <-> web route parity', () => {
     await pool.query(`DELETE FROM body_metrics WHERE user_id = $1 AND date = $2`, [TEST_USER_ID, today])
   })
 
+  it('water: the web route keys the increment to the CLIENT day the outbox would have used (PS-37)', async () => {
+    // The two paths wrote the same quick-add to different dates: `pushMutations` keys it to
+    // `mut.date`, the client's own day at the moment the user tapped, while this route derived the
+    // day from server-now and ignored the body. They only disagree across midnight, which is
+    // exactly when a hydration total is being closed out.
+    const { POST } = await import('@/app/api/water-log/route')
+    const { todayInTz, shiftDateStr } = await import('@trainingai/shared/date-utils')
+    const today = todayInTz('Australia/Brisbane')
+    const yesterday = shiftDateStr(today, -1)
+
+    const res = await POST(jsonReq('http://localhost/api/water-log', { ml: 300, localDate: yesterday }) as never)
+    expect(res.status).toBe(200)
+    expect((await res.json()).date).toBe(yesterday)
+
+    const row = await pool.query(`SELECT water_ml FROM body_metrics WHERE user_id = $1 AND date = $2`, [TEST_USER_ID, yesterday])
+    expect(Number(row.rows[0].water_ml)).toBe(300)
+    await pool.query(`DELETE FROM body_metrics WHERE user_id = $1 AND date = $2`, [TEST_USER_ID, yesterday])
+  })
+
+  it('water: a date outside today-or-yesterday falls back to the server day, not the client (PS-37)', async () => {
+    // A running total is the wrong place to accept an arbitrary date: unbounded, it rewrites
+    // history one accepted request at a time. Crossing midnight is the only honest disagreement.
+    const { POST } = await import('@/app/api/water-log/route')
+    const { todayInTz } = await import('@trainingai/shared/date-utils')
+    const today = todayInTz('Australia/Brisbane')
+
+    const res = await POST(jsonReq('http://localhost/api/water-log', { ml: 200, localDate: '2020-01-01' }) as never)
+    expect(res.status).toBe(200)
+    expect((await res.json()).date).toBe(today)
+
+    const stale = await pool.query(`SELECT 1 FROM body_metrics WHERE user_id = $1 AND date = '2020-01-01'`, [TEST_USER_ID])
+    expect(stale.rowCount).toBe(0)
+    await pool.query(`DELETE FROM body_metrics WHERE user_id = $1 AND date = $2`, [TEST_USER_ID, today])
+  })
+
   it('pushMutations reports an unrecognized domain as a retryable error, not a silent drop (SYNC-Q1)', async () => {
     // Simulates a newer client sending a domain this server version doesn't
     // recognize yet (mid-deploy) — MutationDomain intentionally doesn't include

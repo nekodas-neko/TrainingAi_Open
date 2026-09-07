@@ -96,12 +96,23 @@ function distribute(total: number, weights: number[], decimals: number): number[
   const f = Math.pow(10, decimals)
   const exact = weights.map(w => (total * w) / sum)
   const rounded = exact.map(v => Math.round(v * f) / f)
-  // Push the whole residual onto the largest slot, where it is proportionally least visible.
+  // Push the residual onto the largest slot, where it is proportionally least visible — but a
+  // NEGATIVE residual can only be taken from what a slot actually holds (PS-37). Splitting 0.3 g of
+  // protein across five meals rounds each to 0.1, overshoots by 0.2, and the old single-slot
+  // subtraction turned the largest into **-0.1 g**. Unreachable from a sane daily target and
+  // nonsense on any plate, so it is taken from the slots in descending order instead, each capped
+  // at its own value. A positive residual still lands entirely on the largest slot, unchanged.
   const residual = Math.round((total - rounded.reduce((s, v) => s + v, 0)) * f) / f
   if (residual !== 0) {
-    let idx = 0
-    for (let i = 1; i < rounded.length; i++) if (rounded[i] > rounded[idx]) idx = i
-    rounded[idx] = Math.round((rounded[idx] + residual) * f) / f
+    const order = rounded.map((_, i) => i).sort((a, b) => rounded[b] - rounded[a])
+    let left = residual
+    const epsilon = 1 / (f * 2)
+    for (const i of order) {
+      if (Math.abs(left) < epsilon) break
+      const take = left > 0 ? left : Math.max(left, -rounded[i])
+      rounded[i] = Math.round((rounded[i] + take) * f) / f
+      left = Math.round((left - take) * f) / f
+    }
   }
   return rounded
 }
@@ -117,8 +128,13 @@ export interface SplitOptions {
  * Split a day's macro target across `mealCount` meals.
  *
  * Protein is even across meals. Carbohydrate is shifted toward the meals bracketing the training
- * time, and fat away from the pre-workout meal. **Daily totals are preserved exactly** — this
- * function only ever redistributes.
+ * time, and fat away from the pre-workout meal. This function only ever redistributes.
+ *
+ * **Daily totals are preserved to the precision the slots are returned at** — macros to 0.1 g,
+ * calories to 1 kcal — not to the precision of the target. A target carrying more decimals than
+ * that cannot be hit by values rounded to it: 150.25 g of protein across four meals returns slots
+ * summing to 150.2 (PS-37). The docstring used to say "preserved exactly", which is true for every
+ * target the app produces and false in general, and the difference is the kind that gets trusted.
  */
 export function splitMacrosAcrossMeals(
   targets: MacroTargets,
