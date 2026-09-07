@@ -1213,35 +1213,21 @@ measured_at, raw_hex)` closes that, and it cannot be added blind: the build **fa
 account holds a duplicate, so the migration must delete duplicates (lowest id wins) first. Measured
 2026-09-07 the owner's 99 rows hold **99 distinct pairs** — zero; other accounts cannot be counted from here (`claude_ro` is row-scoped), which is why this is not shipped on an assumption.
 
-### [platform] LA-64 — three Custom Rules greps match their own explanatory comments
+### [platform] LA-72 — ~30 source-scanning checks strip no comments, and nobody knows which need to
 
-- **Lane:** A — `.github/workflows/ci.yml` (the inline greps), `scripts/check-*.js`.
-- **Added:** 2026-09-06, after hitting it a third time in one session.
+- **Lane:** A — `scripts/check-*.js`.
+- **Added:** 2026-09-07, Lane A — the residue of LA-64, which fixed the eight that already tried.
 
-A source-scanning rule that reads prose is checking the wrong file. Three instances, all today:
-
-1. **`check-icon-button-names.js`'s companion scan (PS-34)** was **green against a fully reverted
-   fix**, because its regex matched the word `routeErrorResponse` in the fix's own comment. Fixed by
-   stripping comments and requiring a call form.
-2. **The typed-error-mapper scan**, same PR, same cause — that is the one above; it is listed
-   separately because it was found by mutation rather than by CI, which is the only reason it was
-   found at all.
-3. **`No UTC date slicing`** (ci.yml, an inline grep) flagged BF-122a's comment explaining that the
-   module deliberately does *not* use the banned expression. The code was correct; the sentence
-   describing it was the violation.
-
-**The costly direction is (1), not (3).** A rule matching a comment gives a **false negative** when
-the comment sits in the file being checked — the scan reports clean over code it never parsed. (3)
-is only a false positive, which is loud and gets worked around in a minute.
-
-**The fix is not "ban quoting the pattern in comments".** That trades a real explanation for a green
-check, and the explanation is what stops the next person reintroducing the thing. Strip comments
-before scanning: the `.js` checks can do it properly, and the inline greps in `ci.yml` can filter
-`^\s*(//|#|\*)` before the match, which covers the shape all three took.
-
-**Not urgent, and worth saying so:** nothing is currently mis-reporting. Both `.js` cases are fixed
-and (3) is a one-line reword. This entry exists because three occurrences in one session is a
-pattern, and the next one will be a false negative that nobody notices.
+LA-64 gave the eight checks that strip comments one shared implementation and put a comment filter on
+every inline grep in `ci.yml`. **Roughly thirty other `check-*.js` scripts read `.ts`/`.tsx` and match
+patterns with no stripper at all** — and a blanket conversion is wrong, because several of them
+legitimately read prose (`check-claude-md-paths`, `check-module-map-symbols`) or count raw lines
+(`check-component-size`). What is needed is a pass that decides per check, since the failure direction
+is the silent one: a rule that matches its own explanatory comment reports clean over code it never
+parsed. One known carve-out to fold in: **`Safe-area utility classes must be defined`** (ci.yml)
+extracts class tokens with `grep -roh`, so its output has no line prefix to filter and a class named
+only in a comment reads as used-but-undefined. That one is a false positive — loud, and cheap to work
+around — which is why LA-64 left it.
 
 ### [platform] LA-63 — E2E fails on every PR that touches code, and has for at least three sessions
 

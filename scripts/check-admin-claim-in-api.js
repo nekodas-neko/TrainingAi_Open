@@ -20,6 +20,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { stripComments } = require('./lib/strip-comments');
 
 const root = path.join(__dirname, '..');
 // `isAdminUser(` with anything after the first argument's comma before the closing paren.
@@ -28,11 +29,6 @@ const failures = [];
 let scanned = 0;
 
 // Blanks out // and /* */ comments, keeping byte offsets so reported line numbers stay true.
-function stripComments(src) {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '))
-    .replace(/(^|[^:])\/\/[^\n]*/g, (m, p) => p + ' '.repeat(m.length - p.length));
-}
 
 function walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {

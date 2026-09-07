@@ -33,17 +33,12 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { stripComments } = require('./lib/strip-comments');
 
 const root = path.join(__dirname, '..');
 
 // `req.json()` / `request.json()` in any form: awaited, chained with .catch, cast with `as`.
 const BARE_JSON = /\b(?:req|request)\s*\.\s*json\s*\(\s*\)/g;
-
-function stripComments(src) {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '))
-    .replace(/(^|[^:])\/\/[^\n]*/g, (m, p) => p + ' '.repeat(m.length - p.length));
-}
 
 // Route files allowed a bare read, each with the reason. Empty, and it should stay that way — an
 // entry here is a route whose body cannot be bounded, which is a claim that needs defending.

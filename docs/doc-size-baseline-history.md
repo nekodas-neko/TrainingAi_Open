@@ -8557,3 +8557,11 @@ Up 10, and the growth is the point rather than a cost: PS-32 held three findings
 two of them, so the one entry it replaced becomes two — **LA-69** (the same fence for the stored free
 text reaching four other prompts) and **LA-70** (20 routes echoing raw Zod wording). Both were cut
 from the PR deliberately, and an entry each is what stops a cut from reading as a completion.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18807 (LA-64 shipped)
+
+Down 14. LA-64 was a long entry because it argued a direction — that a rule matching its own
+comment gives a **false negative**, which reports clean over unparsed code, while the noisy case
+is only a false positive. That argument is now in `scripts/lib/strip-comments.js`'s header, where
+the next person changing the stripper will actually read it, so the entry's replacement (LA-72,
+the ~30 checks that strip nothing) only has to name the residue.
