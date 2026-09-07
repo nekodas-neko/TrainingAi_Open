@@ -8445,3 +8445,17 @@ now is the thing a spec cannot reach: the per-portion figures read against the d
 diary on the S25.
 
 The backlog moves the other way: BF-121's 40-line entry goes on shipping.
+
+## 2026-09-07 — `projectOverview.md` → 10131 (BF-127's status paragraph and device row)
+
+Twenty-five lines for a two-file fix, and most of them are the two corrections a reader needs before
+the diff makes sense. The status half has to explain why `118.25` is not a weight — without `BW_REF`
+the fix reads as arbitrary — and that the repo had already written the rule down after Q-12, which is
+what makes this a caller that escaped a resolver rather than a new class. It also records that the
+entry's own stated fix does not work, since the next person to read BF-127 would follow it into
+`packages/shared` and the wrong lane.
+
+The Known-Issues half is short and is the part that is owed: the banner only renders in the baseline
+phase, so nothing here has been on a screen.
+
+The backlog moves the other way: BF-127's 32-line entry goes on shipping.

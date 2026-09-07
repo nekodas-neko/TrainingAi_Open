@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.436.28",
+    version: "1.436.29",
     date: "2026-09-07",
     changes: [
       "A generated session now fits the number of exercises you actually do. The planner was reserving a rest period after the last set of every exercise \u2014 a rest you never take, because what follows the last set is walking to the next station, which it was already counting. On a 60-minute session that one double-count was worth a whole exercise: it prescribed four where your own history has five.",
+    ],
+  },
+  {
+    version: "1.436.28",
+    date: "2026-09-07",
+    changes: [
+      "The first-session banner no longer suggests a weight for bodyweight exercises. It was telling you to load 82.5 kg on a pull-up \u2014 that number is an internal strength index, not kilograms, and 70% of it means nothing. Bodyweight movements now say so, with your rep max beside them.",
     ],
   },
   {

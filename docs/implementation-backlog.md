@@ -556,38 +556,6 @@ new reward currency.
   pushes the fold on the S25 with several widgets enabled. That is a check on the built thing, so it
   is not a field on this entry.
 
-### [workouts] BF-127 — the baseline banner tells the owner to load 82.5 kg on a pull-up, from an index that is not kilograms 🔴 LIVE
-
-- **Lane:** B — `components/workout/pre-workout-screen.tsx` and `components/workout/ai-baseline-banner.tsx`.
-- **Added:** 2026-09-06 · owner, on today's Pull session: *"pull up = weight"*.
-- **Needs:** — nothing.
-- **Measured, not inferred.** `personal_records` holds `Pull-Up` `estimated_1rm = 118.25`.
-  `pre-workout-screen.tsx:246` computes `mround125(ex.current1rm * 0.7)` → **82.5**, and
-  `ai-baseline-banner.tsx:37` prints it with a hardcoded `kg` under the heading *"Suggested starting
-  weights (≈70% of PR)"*. The screen therefore instructs the owner to load 82.5 kg on a pull-up.
-- **That 118.25 is not a weight.** `exercise_library.exercise_type` for `Pull-Up` is `bodyweight`,
-  and a bodyweight `estimated1rm` is computed against **`BW_REF = 100`** (`packages/shared/src/1rm.ts:116`),
-  a fixed stand-in — the owner's real body weight is **70.65 kg**. So the number is an index driven
-  by reps and added load, and 70% of it is 70% of nothing physical.
-- **The repo already forbids exactly this, in a comment written for a previous instance of it.**
-  `1rm.ts:218`: *"Display basis: bodyweight strength is measured in REPS, never kilograms … Rendering
-  it as kg is what let a change of the BW_REF constant read as a +40% strength gain (audit finding
-  Q-12) … Every surface that shows a stored 1RM resolves its unit here rather than hardcoding
-  'kg'."* `displayOneRm()` / `oneRmUnit()` / `oneRmLabel()` are that resolver. The banner does not
-  call any of them.
-- **The proof it is reachable is on the same screen.** The exercise card below the banner renders
-  `5 × 0kg · 5 RM` — the `RM` unit, correct, for the same exercise, six lines further down. One
-  surface resolves the unit and the other hardcodes it.
-- **Fix:** `signals.exercises[]` already carries `exerciseType` (`packages/shared/src/ai-periodization/signals.ts:277`);
-  the banner's `.map()` at `pre-workout-screen.tsx:243` simply does not read it. Pass it through and
-  render through `displayOneRm`. **A bodyweight row should offer a rep target, not a load** — 70% of
-  a 1RM is a weight prescription, and the equivalent instruction for a bodyweight movement is a
-  number of reps.
-- **Sweep the siblings**, per the same rule that this one escaped: any other surface multiplying or
-  formatting `current1rm` / `estimated_1rm` without going through `oneRmUnit`. The Q-12 fix built the
-  resolver; it did not prove every caller uses it.
-- **Reversal cost:** low — one field threaded through and one formatter swapped.
-
 ### [app-shell] BF-123 — the global 48 px tap floor turns every sub-48 px `<button>` into a circle; the opt-out exists and was never swept
 
 - **Lane:** B — `app/globals.css` opt-out classes at the call sites; `components/config/**` and the sibling chips.
