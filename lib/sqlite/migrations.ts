@@ -251,6 +251,12 @@ export const RECONCILE_COLUMNS: { table: string; column: string; ddl: string }[]
   // BF-69 — the contribution's provenance and the substance's presence window. Registered for the
   // same reason as the BF-3 rows above: after a half-applied v34 this list is what a device's schema
   // actually is, and `source` missing is not a cosmetic gap — every read and write below keys off it.
+  // OR-102a. New columns go HERE as well as in the CREATE and the versioned ALTER — reconcile runs
+  // on every open, so it is what actually heals a device whose v38 half-applied.
+  { table: 'supplement_logs',  column: 'taken_at',          ddl: `ALTER TABLE supplement_logs ADD COLUMN taken_at TEXT` },
+  { table: 'supplement_logs',  column: 'vial_strength_mg',  ddl: `ALTER TABLE supplement_logs ADD COLUMN vial_strength_mg REAL` },
+  { table: 'supplement_logs',  column: 'vial_water_ml',     ddl: `ALTER TABLE supplement_logs ADD COLUMN vial_water_ml REAL` },
+  { table: 'supplement_logs',  column: 'vial_units_per_ml', ddl: `ALTER TABLE supplement_logs ADD COLUMN vial_units_per_ml REAL` },
   { table: 'supplement_logs',  column: 'source',     ddl: `ALTER TABLE supplement_logs ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'` },
   { table: 'supplement_logs',  column: 'source_ref', ddl: `ALTER TABLE supplement_logs ADD COLUMN source_ref TEXT` },
   { table: 'supplements',      column: 'started_on', ddl: `ALTER TABLE supplements ADD COLUMN started_on TEXT` },
@@ -655,11 +661,37 @@ const CREATE_SUPPLEMENT_LOGS = `CREATE TABLE IF NOT EXISTS supplement_logs (
   amount        REAL,
   unit          TEXT,
   dose_text     TEXT,
+  taken_at      TEXT,
+  vial_strength_mg  REAL,
+  vial_water_ml     REAL,
+  vial_units_per_ml REAL,
   source        TEXT NOT NULL DEFAULT 'manual',
   source_ref    TEXT,
   updated_at    TEXT NOT NULL,
   deleted_at    TEXT,
   sync_status   TEXT NOT NULL DEFAULT 'pending'
+)`;
+
+/**
+ * The vial mirror (OR-102a), so an OFFLINE tick can freeze its reconstitution.
+ *
+ * Read-only on the device: vials are created server-side and arrive through the pull delta. It
+ * exists because `upsertSupplementLog` fills the freeze from local data — exactly as it already
+ * does for BF-3's dose — and without a local vial an offline log would have to be stamped by the
+ * server at PUSH time, which records whatever vial is current when sync happens rather than when
+ * the dose was taken. That is the retroactive rewrite the freeze exists to prevent, just with a
+ * smaller window.
+ */
+const CREATE_SUPPLEMENT_VIALS = `CREATE TABLE IF NOT EXISTS supplement_vials (
+  id                   TEXT PRIMARY KEY,
+  supplement_id        TEXT NOT NULL,
+  strength_mg          REAL NOT NULL,
+  water_ml             REAL NOT NULL,
+  syringe_units_per_ml REAL NOT NULL DEFAULT 100,
+  opened_on            TEXT NOT NULL,
+  updated_at           TEXT NOT NULL,
+  deleted_at           TEXT,
+  sync_status          TEXT NOT NULL DEFAULT 'synced'
 )`;
 const CREATE_INJURIES = `CREATE TABLE IF NOT EXISTS injuries (
   id            TEXT PRIMARY KEY,
@@ -838,6 +870,7 @@ const RECONCILE_INDEXES: string[] = [
   `CREATE INDEX IF NOT EXISTS idx_activity_logs_date ON activity_logs (date)`,
   `CREATE INDEX IF NOT EXISTS idx_food_logs_date ON food_logs (date)`,
   `CREATE INDEX IF NOT EXISTS idx_supplement_logs_date ON supplement_logs (log_date)`,
+  `CREATE INDEX IF NOT EXISTS idx_supplement_vials_current ON supplement_vials (supplement_id, opened_on DESC)`,
   // BF-69 — the replacement for the table's old whole-day UNIQUE, and the reason the tick stays
   // idempotent: one MANUAL contribution per substance per day, ever, with meal contributions
   // deliberately unconstrained. Soft-deleted rows stay inside the index so an untick-then-re-tick
@@ -865,7 +898,7 @@ export const RECONCILE_TABLES: string[] = [
   CREATE_BODY_METRICS, CREATE_MOOD_LOGS, CREATE_SLEEP_SESSIONS,
   CREATE_ACTIVITY_LOGS, CREATE_LOCAL_PROGRAMS, CREATE_LOCAL_PROGRESSION_STYLES,
   CREATE_MUTATIONS_OUTBOX, CREATE_FOOD_LOGS, CREATE_SUPPLEMENTS,
-  CREATE_SUPPLEMENT_LOGS, CREATE_INJURIES,
+  CREATE_SUPPLEMENT_LOGS, CREATE_SUPPLEMENT_VIALS, CREATE_INJURIES,
   CREATE_PERSONAL_RECORDS, CREATE_OURA_DAILY,
   CREATE_PROGRAM_SESSIONS, CREATE_SESSION_EXERCISES,
   CREATE_SCHEDULES, CREATE_SCHEDULE_DAYS, CREATE_STYLE_SETS,
@@ -1498,6 +1531,26 @@ export const MIGRATIONS: UpgradeStatement[] = [
       // installs already have it, this ALTER reaches every upgraded device, and the RECONCILE_COLUMNS
       // row is the authority if it half-applies.
       `ALTER TABLE oura_daily_derived ADD COLUMN training_load_gate TEXT`,
+    ],
+  },
+  {
+    toVersion: 38,
+    statements: [
+      // OR-102a, mirroring Postgres migration 267. `taken_at` is the timestamp that makes
+      // hours-since-dose exist at all; the three `vial_*` columns are the reconstitution frozen at
+      // log time, so a historical dose in syringe units survives the next vial being mixed at a
+      // different water volume.
+      //
+      // The vials table is a READ-ONLY mirror — vials are created server-side and arrive in the
+      // pull delta. It is here so an offline tick can stamp the freeze from local data, the same
+      // way BF-3's dose freeze already works, rather than being stamped by the server at push time
+      // from whatever vial is current by then.
+      `ALTER TABLE supplement_logs ADD COLUMN taken_at TEXT`,
+      `ALTER TABLE supplement_logs ADD COLUMN vial_strength_mg REAL`,
+      `ALTER TABLE supplement_logs ADD COLUMN vial_water_ml REAL`,
+      `ALTER TABLE supplement_logs ADD COLUMN vial_units_per_ml REAL`,
+      CREATE_SUPPLEMENT_VIALS,
+      `CREATE INDEX IF NOT EXISTS idx_supplement_vials_current ON supplement_vials (supplement_id, opened_on DESC)`,
     ],
   },
 ];

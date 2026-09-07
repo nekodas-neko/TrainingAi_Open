@@ -14,8 +14,8 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **267** | `lib/data/postgres/migrations/` |
-| Local SQLite schema version | **v37** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
+| Next free Postgres migration | **269** | `lib/data/postgres/migrations/` |
+| Local SQLite schema version | **v38** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
 > never were safely: a next-free pointer is a *floor*, not an authority, because it cannot see an
@@ -398,39 +398,6 @@ below threshold and left in place for next time.
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
 
-
-### [platform][body] OR-102a — the reta tracker, engine half: a vial record and a dose TIMESTAMP
-
-- **Lane:** A — one migration plus the repository/sync mirroring. **Small, and it is the only half
-  that cannot be repaired afterwards.**
-- **Added:** 2026-09-06 · owner, specifying the tracker in four parts (see **OR-102b**).
-- **Two columns' worth of work, and both exist because of something already measured:**
-
-  **1. A vial record**, so the calculator has a concentration: `strength_mg`, `water_ml`,
-  `syringe_units_per_ml` (default 100 for a U-100 barrel), `opened_on`. Concentration derives; it is
-  never stored as its own truth.
-  - **Owner: reconstitution is stable** — *"I reconstitute a vial and will use it for weeks at a
-    time."* So the newest vial is the **sticky default** and carries forward. Opening a new one is an
-    explicit action, not a form to refill each dose.
-  - **⚠ STAMP THE RECONSTITUTION ON THE LOG, NOT ONLY THE VIAL.** Mix the next vial at a different
-    volume and the *same* milligram dose becomes a different number of units. The stored mg stays
-    correct; a historical *"15 units"* silently starts reading wrong. This is BF-3's dose-freezing
-    rule one layer up, it is the reason this entry is Lane A, and it is the single thing here that
-    cannot be back-filled.
-
-  **2. `supplement_logs.taken_at` — a real timestamp.** Verified 2026-09-06: the table has
-  **`log_date`, a DATE, and no time at all** (`schema.ts:1082`). The owner's request — *"marks the
-  day time when the dose used… correlate sleep/HR everything to the dose"* — is not expressible
-  today. Nullable, defaulting to the moment of the tick, editable after the fact.
-  - **This is the column that makes the one honest analysis possible.** Dose, cumulative level and
-    elapsed time all rise together on a titration, so almost nothing separates them — **except
-    hours-since-dose within a single week**, which varies while the dose is held constant. Without a
-    time, that contrast does not exist and the tracker can only ever show correlations confounded by
-    the schedule.
-
-- **Nothing else changes.** `amount`/`unit`/`dose_text` already exist and already freeze (BF-3,
-  migration 244); `started_on`/`stopped_on` shipped in #896.
-- **Reversal cost:** a corrective migration. Additive columns only, no rewrite of existing rows.
 
 ### [nutrition][body] OR-102b — the reta tracker: vial setup, dose calculator, dose timeline, weight response
 
@@ -1452,6 +1419,53 @@ BF, metabolic age 37 on a DOB-less profile). Skip composition and store weight-o
 `compositionSkipped` already can. And `scale_raw_samples` has no unique key (157's two indexes are
 non-unique) — a byte-identical re-send inserts a second raw row, unlike `oura_raw_samples`'s dedup;
 the trend survived (lowest-wins) but the archive double-counts.
+
+### [platform] LA-63 — E2E fails on every PR that touches code, and has for at least three sessions
+
+- **Lane:** A — `.github/workflows/ci.yml` (the E2E job), `e2e/`, `playwright.config.ts`.
+- **Added:** 2026-09-06, found while merging OR-102a — three unrelated PRs, three sessions, one
+  signature.
+
+**Measured across four runs on 2026-09-06, from three different sessions:**
+
+| run | PR | touches | `pnpm e2e` | result |
+|---|---|---|---|---|
+| 1712 | OR-102a | `app/api/**` | 24 m | **failure** |
+| 1713 | LA-59 | `components/**` | ~24 m | **failure** |
+| 1715 | BF-121 | `components/**` | **24 m 47 s** | **failure** |
+| 1711, 1717, 1718 | docs-only | — | skipped | success, ~5 min |
+| later | PS-24 | `auth.ts`, `middleware.ts` | **skipped, 44 s** | success |
+| later | PS-25 | `auth.ts`, `lib/` | **skipped, 65 s** | success |
+
+The last two rows matter: they are **code** PRs that pass, and they pass because the gate correctly
+skipped them. So the rule is not "code PRs fail" — it is **E2E fails whenever it actually runs**, and
+nothing yet observed contradicts that.
+
+Every required check passes in all four. The job's UI gate skips the browser run for a docs-only
+diff, which is why those pass in five minutes — so the split is **not** "some PRs are broken", it is
+**"E2E runs ⇒ E2E fails"**.
+
+**~25 minutes with the database idle throughout.** The Postgres service log for run 1712 shows only
+its 10-second health probe for the entire span — no query traffic. That is the shape of a Playwright
+or web-server startup timeout, not of specs asserting and failing.
+
+**What is NOT established.** The Playwright output itself. `get_job_logs` returns the service
+container's log for this job and the byte cap does not reach the step's own output; the failure
+artifact uploaded by `actions/upload-artifact@v6` on line 638 is the thing to read, and nobody has.
+So the timeout reading above is **inferred from timing and an idle database**, not seen. Do not
+close this on the inference.
+
+**Why it matters even though nothing is blocked.** E2E is not in the required set — LA-22 measured
+that (#454 merged with E2E red) — so merges proceed. But the job's own comment states the intent:
+*"the job is gated on UI paths above so that it CAN safely be required, and the owner adds it to
+branch protection."* It cannot be made required while it fails on every code PR, and in the meantime
+every session pays ~25 minutes of runner time and learns to read a red check as normal, which is how
+a real failure gets waved through later.
+
+**A second, smaller thing the gate gets wrong.** It matches `^app/`, so an `app/api/**`-only change
+with no UI in it triggers the full browser suite — that is how OR-102a, a migration and four API
+routes, ended up in this table at all. Narrowing it to exclude `app/api/` would cut the runner cost
+of this bug while it is open, and is worth doing regardless of the fix.
 
 ### [app-shell] LA-62 — eighteen icon-only buttons announce as "button" and nothing else
 

@@ -75,7 +75,7 @@ import type {
   DietarySeverity,
 } from '@trainingai/shared/types/nutrition'
 import type { Injury } from '@trainingai/shared/types/injury'
-import type { Supplement, SupplementWithStatus, SupplementDose } from '@trainingai/shared/types/supplement'
+import type { Supplement, SupplementWithStatus, SupplementDose, SupplementVial } from '@trainingai/shared/types/supplement'
 import * as n from './slices/nutrition'
 import * as mp from './slices/meal-plans'
 import * as social from './slices/social'
@@ -6487,10 +6487,39 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // BF-3 — freeze the dose on the log. `dose_text` is the half that matters today: every existing
     // supplement carries only free text, so this is what makes a titration survive a dose change
     // without the owner first re-entering anything as a number.
+    // OR-102a — the reconstitution is frozen alongside the dose, and for the same reason one layer
+    // up. `amount`/`unit` keep the milligrams honest across a titration; these keep a historical
+    // dose in SYRINGE UNITS honest across a re-mix. Mix the next vial at a different water volume
+    // and the same milligrams become a different number of units, so a past "15 units" would
+    // silently start reading wrong with nothing in the row to show it changed.
+    //
+    // Taken from the CURRENT vial at log time — the newest un-deleted one, which is the same
+    // sticky default the log screen offers. A supplement with no vial stamps nulls, and
+    // `frozenReconstitution()` then reports "cannot be expressed in units" rather than reaching
+    // for whatever vial is current later, which is the rewrite this exists to prevent.
+    const [vial] = await this.db.select({
+      strengthMg: s.supplementVials.strengthMg,
+      waterMl: s.supplementVials.waterMl,
+      unitsPerMl: s.supplementVials.syringeUnitsPerMl,
+    }).from(s.supplementVials)
+      .where(and(
+        eq(s.supplementVials.supplementId, supplementId),
+        eq(s.supplementVials.userId, userId),
+        isNull(s.supplementVials.deletedAt),
+      ))
+      .orderBy(desc(s.supplementVials.openedOn), desc(s.supplementVials.createdAt))
+      .limit(1)
+
     const stamped = {
       amount: dose?.amount ?? owns.defaultAmount ?? null,
       unit: dose?.unit ?? owns.unit ?? null,
       doseText: dose?.doseText ?? owns.dose ?? null,
+      // An explicit `takenAt` wins; otherwise the moment of the tick, which is what the owner
+      // means by ticking it now. Never back-filled onto rows that predate the column.
+      takenAt: dose?.takenAt != null ? new Date(dose.takenAt) : new Date(),
+      vialStrengthMg: vial?.strengthMg ?? null,
+      vialWaterMl: vial?.waterMl ?? null,
+      vialUnitsPerMl: vial?.unitsPerMl ?? null,
     }
 
     // BF-69 — this writes the MANUAL contribution, and only that one.
@@ -6511,6 +6540,116 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         set: { deletedAt: null, updatedAt: new Date(), ...stamped },
         setWhere: eq(s.supplementLogs.userId, userId),
       })
+  }
+
+  // ── Supplement vials (OR-102a) ─────────────────────────────────────────────
+  //
+  // Concentration is never stored, only `strengthMg` and `waterMl`. Every read below is ordered
+  // `openedOn DESC, createdAt DESC` — the tie-break is load-bearing, because two vials opened on
+  // the same day are otherwise ordered arbitrarily and the sticky default would flip between page
+  // loads.
+
+  /** Every vial for one supplement, newest first. */
+  async listSupplementVials(userId: string, supplementId: string): Promise<SupplementVial[]> {
+    const rows = await this.db.select().from(s.supplementVials)
+      .where(and(
+        eq(s.supplementVials.userId, userId),
+        eq(s.supplementVials.supplementId, supplementId),
+        isNull(s.supplementVials.deletedAt),
+      ))
+      .orderBy(desc(s.supplementVials.openedOn), desc(s.supplementVials.createdAt))
+    return rows.map(r => this.rowToSupplementVial(r))
+  }
+
+  /** The sticky default: the newest un-deleted vial, or null when none has been recorded. */
+  async currentSupplementVial(userId: string, supplementId: string): Promise<SupplementVial | null> {
+    const [row] = await this.db.select().from(s.supplementVials)
+      .where(and(
+        eq(s.supplementVials.userId, userId),
+        eq(s.supplementVials.supplementId, supplementId),
+        isNull(s.supplementVials.deletedAt),
+      ))
+      .orderBy(desc(s.supplementVials.openedOn), desc(s.supplementVials.createdAt))
+      .limit(1)
+    return row ? this.rowToSupplementVial(row) : null
+  }
+
+  async createSupplementVial(
+    userId: string,
+    data: Omit<SupplementVial, 'id' | 'userId' | 'createdAt'> & { id?: string },
+  ): Promise<SupplementVial> {
+    // Ownership of the parent is checked rather than assumed: `supplementId` arrives from the
+    // client, and the table has its own `user_id`, so an unchecked insert would file a vial under
+    // this user against someone else's substance (ownership rule (c)).
+    const [owns] = await this.db.select({ id: s.supplements.id }).from(s.supplements)
+      .where(and(eq(s.supplements.id, data.supplementId), eq(s.supplements.userId, userId)))
+      .limit(1)
+    if (!owns) throw new NotFoundError('Supplement')
+
+    const [row] = await this.db.insert(s.supplementVials).values({
+      ...(data.id ? { id: data.id } : {}),
+      userId,
+      supplementId: data.supplementId,
+      strengthMg: data.strengthMg,
+      waterMl: data.waterMl,
+      syringeUnitsPerMl: data.syringeUnitsPerMl,
+      openedOn: data.openedOn,
+    }).returning()
+    return this.rowToSupplementVial(row)
+  }
+
+  async updateSupplementVial(
+    id: string, userId: string,
+    patch: Partial<Omit<SupplementVial, 'id' | 'userId' | 'supplementId' | 'createdAt'>>,
+  ): Promise<SupplementVial> {
+    // Whitelisted field by field, never spread from the request body: `userId` and `deletedAt` are
+    // settable column keys and the TypeScript Omit is compile-time only (write-path rule (b)).
+    const set: Record<string, unknown> = { updatedAt: new Date() }
+    if (patch.strengthMg !== undefined) set.strengthMg = patch.strengthMg
+    if (patch.waterMl !== undefined) set.waterMl = patch.waterMl
+    if (patch.syringeUnitsPerMl !== undefined) set.syringeUnitsPerMl = patch.syringeUnitsPerMl
+    if (patch.openedOn !== undefined) set.openedOn = patch.openedOn
+
+    const [row] = await this.db.update(s.supplementVials).set(set)
+      .where(and(
+        eq(s.supplementVials.id, id),
+        eq(s.supplementVials.userId, userId),
+        isNull(s.supplementVials.deletedAt),
+      ))
+      .returning()
+    if (!row) throw new NotFoundError('Vial')
+    return this.rowToSupplementVial(row)
+  }
+
+  /**
+   * RV-45 — reports the match rather than changing it.
+   *
+   * Soft delete, and editing a vial does NOT touch logs already stamped from it: the whole point of
+   * the freeze is that a past dose keeps meaning what it meant.
+   */
+  async deleteSupplementVial(id: string, userId: string): Promise<boolean> {
+    const rows = await this.db.update(s.supplementVials)
+      .set({ deletedAt: new Date(), updatedAt: new Date() })
+      .where(and(
+        eq(s.supplementVials.id, id),
+        eq(s.supplementVials.userId, userId),
+        isNull(s.supplementVials.deletedAt),
+      ))
+      .returning({ id: s.supplementVials.id })
+    return rows.length > 0
+  }
+
+  private rowToSupplementVial(r: typeof s.supplementVials.$inferSelect): SupplementVial {
+    return {
+      id: r.id,
+      userId: r.userId,
+      supplementId: r.supplementId,
+      strengthMg: r.strengthMg,
+      waterMl: r.waterMl,
+      syringeUnitsPerMl: r.syringeUnitsPerMl,
+      openedOn: r.openedOn,
+      createdAt: r.createdAt.toISOString(),
+    }
   }
 
   /**

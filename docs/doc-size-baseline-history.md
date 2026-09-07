@@ -8232,8 +8232,9 @@ Two shorter alternatives were rejected. Cutting the measurement leaves the next 
 it from production. Putting it in a plan doc under `docs/superpowers/plans/` is the usual home for
 this much reasoning, but nothing is designed yet — there is no implementation to plan, and a plan
 that is only a restated brief is a second place for the brief to go stale.
-## 2026-09-06 — `docs/implementation-backlog.md` → 19018, `projectOverview.md` → 10053 (PS-26 shipped)
-## 2026-09-06 — `docs/implementation-backlog.md` → 19018, `projectOverview.md` → 10053 (PS-26 shipped)
+## 2026-09-06 — `docs/implementation-backlog.md` → 19012, `projectOverview.md` → 10067 (PS-26 shipped)
+## 2026-09-06 — `docs/implementation-backlog.md` → 19012, `projectOverview.md` → 10067 (PS-26 shipped)
+## 2026-09-06 — `docs/implementation-backlog.md` → 19012, `projectOverview.md` → 10067 (PS-26 shipped)
 
 `projectOverview.md` is **down** 7: PS-26's Known-Issues row was struck and moved whole to
 `known-issues-resolved.md` rather than ticked in place.
@@ -8386,3 +8387,16 @@ one-word change that looks correct.
 `projectOverview.md` is **down** 6: PS-25's row was struck and moved whole to
 `known-issues-resolved.md`, per the standing rule that a resolved entry leaves the file rather than
 sitting there with a tick.
+## 2026-09-06 — `docs/implementation-backlog.md` → 19012, `projectOverview.md` → 10067 (OR-102a shipped)
+
+OR-102a left the queue and nothing replaced it, because its follow-up half
+(OR-102b, the surface) was already filed alongside it. `projectOverview.md` gains a Known-Issues row
+for the one thing genuinely outstanding — local SQLite v38 has never been opened on a device.
+
+## 2026-09-06 — `docs/implementation-backlog.md` → 18886 (LA-63 filed: E2E red whenever it runs)
+
+Up by the entry, and it is longer than a "CI is flaky" line because the evidence is the finding: a
+four-run table across three sessions showing E2E fails whenever it RUNS and is skipped whenever it
+passes. It also has to say what is *not* established — nobody has read the Playwright output, so the
+timeout reading is inferred from timing and an idle database, and the entry says so rather than
+letting the next session close it on the inference.

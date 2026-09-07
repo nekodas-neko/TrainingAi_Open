@@ -51,6 +51,7 @@ export const SOFT_DELETED: Record<string, string> = {
   rest_days: 'deleted_at',
   set_logs: 'deleted_at',
   supplement_logs: 'deleted_at',
+  supplement_vials: 'deleted_at',
   supplements: 'deleted_at',
   workout_sessions: 'deleted_at',
 }
@@ -105,6 +106,7 @@ export const EXPORTED: Record<string, ExportScope> = {
   sleep_sessions: { kind: 'user_id' },
   step_live_windows: { kind: 'user_id' },
   supplement_logs: { kind: 'user_id' },
+  supplement_vials: { kind: 'user_id' },
   supplements: { kind: 'user_id' },
   user_dietary_restrictions: { kind: 'user_id' },
   user_stats: { kind: 'user_id' },

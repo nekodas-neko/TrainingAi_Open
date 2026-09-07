@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.24",
+    date: "2026-09-06",
+    changes: [
+      "Groundwork for the injectable-dose tracker: a vial can now record how it was mixed, and each dose records the time it was taken along with the mix it came from. Nothing is on screen yet — this is the part that has to exist before any dose is logged, because a dose recorded without it cannot be corrected later.",
+    ],
+  },
+  {
     version: "1.436.23",
     date: "2026-09-06",
     changes: [

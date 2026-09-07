@@ -2,7 +2,7 @@ import { isSQLiteAvailable, isLocalStoreDead, runSQL, querySQL } from '@/lib/sql
 import type {
   LocalBodyMetric, LocalMoodLog, LocalSleepSession, LocalWorkoutSession,
   LocalActivityLog, LocalFitnessTest, LocalPrescribedRun, LocalProgram, LocalProgressionStyle, PendingMutation,
-  LocalFoodLog, LocalFoodItem, LocalDayCheckin, LocalSupplement, LocalSupplementLog, LocalInjury,
+  LocalFoodLog, LocalFoodItem, LocalDayCheckin, LocalSupplement, LocalSupplementLog, LocalSupplementVial, LocalInjury,
   LocalExerciseLog, LocalSetLog, LocalPersonalRecord, LocalOuraDaily,
   LocalOuraDailySummary, LocalOuraDailyDerived, LocalOuraBucket, LocalOuraHeartratePoint,
   LocalProgramSession, LocalSessionExercise, LocalSchedule, LocalScheduleDay,
@@ -152,6 +152,8 @@ export interface LocalStore {
     foodItems?:         LocalFoodItem[];
     supplements?:       LocalSupplement[];
     supplementLogs?:    LocalSupplementLog[];
+    /** OR-102a — the read-only vial mirror, so an offline tick can freeze its own reconstitution. */
+    supplementVials?:   LocalSupplementVial[];
     injuries?:          LocalInjury[];
     exerciseLogs?:      LocalExerciseLog[];
     setLogs?:           LocalSetLog[];
