@@ -1467,6 +1467,32 @@ with no UI in it triggers the full browser suite — that is how OR-102a, a migr
 routes, ended up in this table at all. Narrowing it to exclude `app/api/` would cut the runner cost
 of this bug while it is open, and is worth doing regardless of the fix.
 
+### [platform] LB-59 — a lane written as a word instead of its letter is silently unclassified
+
+- **Lane:** A — `scripts/lib/lane.js` and/or `scripts/check-backlog-pointers.js`. Neither implementer
+  lane's paths reach `scripts/`, and the path rule sends it to A.
+- **Added:** 2026-09-07, by Lane B on picking up an entry that was not Lane B's.
+
+`LANE_FIELD_RE` matches `A\b|B\b|O\b|\?`, so `**Lane:** O` classifies and **`**Lane:** Orchestrator`
+does not** — the `O` is followed by `r`, and `\b` fails. An unmatched field returns `null`, which the
+caller reads as *"unstated, so the path rule answers it"*, and the entry then prints in **BOTH**
+implementer lanes' READY lists.
+
+**Measured 2026-09-07: 4 entries wrote `O`, 1 wrote `Orchestrator`** (PS-38, a docs sweep that is
+nobody's implementation work). It printed at the **top of Lane B's READY list** for a day. The entry
+itself is fixed; what is not fixed is that the next person to write the word out gets the same result
+with no signal.
+
+- **The convention is the letter**, and this entry does not propose changing it. Two ways to hold it,
+  and the second is probably better: widen the regex to accept the spelled-out word, **or** have
+  `check-backlog-pointers.js` fail on a `Lane:` field whose value is not one of `A`/`B`/`O`/`?`. The
+  check catches typos the regex would still miss (`Lane: Lane A`, `Lane: b/A`) and puts the error at
+  the point of writing rather than at the point of reading.
+- **⚠ Do not make an unmatched lane hide the entry.** `lane.js`'s own header records that a version
+  letting `undefined` through hid **96 of 203** entries from both lanes at once. Printing in both
+  lists is the safe failure and must stay the failure mode until the value is validated at write time.
+- **Not urgent.** One malformed entry in 322, now corrected.
+
 ### [app-shell] LA-62 — eighteen icon-only buttons announce as "button" and nothing else
 
 - **Lane:** B — `components/**` and two `app/**` pages; the list is in
@@ -1548,7 +1574,7 @@ not rewrite"). One PR of small fixes.
 
 ### [platform] PS-38 — checkpoint docs sweep: seven stale CLAUDE.md claims, a duplicated Q-479 row, 13 Needs→KEEP edges
 
-- **Lane:** Orchestrator — docs only. **Reference:** the full dispositions live in the
+- **Lane:** O — the Orchestrator's; docs only. **Reference:** the full dispositions live in the
   [report](reviews/2026-09-05-app-checkpoint.md) §5 and lane 26's return.
 - **Added:** 2026-09-06, app checkpoint.
 
