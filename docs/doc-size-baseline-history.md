@@ -8400,3 +8400,12 @@ four-run table across three sessions showing E2E fails whenever it RUNS and is s
 passes. It also has to say what is *not* established — nobody has read the Playwright output, so the
 timeout reading is inferred from timing and an idle database, and the entry says so rather than
 letting the next session close it on the inference.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 19038 (LB-59, and PS-38's lane tag)
+
+Twenty-six lines for a defect whose fix was one word. The length is the *measurement* and the trap,
+not the change: 4 entries write `Lane: O` and one wrote `Lane: Orchestrator`, and because an
+unmatched field reads as "unstated", that one printed at the top of **both** implementer lanes'
+READY lists for a day. The entry also records why the safe failure must stay "visible to both" — a
+version of `lane.js` that let an unmatched value through once hid 96 of 203 entries from everyone.
+Without that line the obvious fix is to filter, which is the worse bug.
