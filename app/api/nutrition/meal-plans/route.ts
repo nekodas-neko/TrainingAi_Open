@@ -5,6 +5,7 @@ import { getRepository } from '@/lib/data'
 import type { MealPlan } from '@trainingai/shared/types/nutrition'
 import { NutritionIngredientsSchema } from '@trainingai/shared/validators/nutrition-ingredient'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { invalidBodyResponse } from '@/lib/api/route-errors'
 
 // A whole plan: up to 3 variants x 20 meals, each with a 2,000-char note and a snapshot of its
 // ingredients. Roughly 700 KB at the schema's own limits; 2 MB is generous past that.
@@ -90,7 +91,7 @@ export async function POST(req: Request) {
 
   const parsed = CreateSchema.safeParse(read.body)
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
+    return invalidBodyResponse(parsed.error)
   }
 
   const dayTypes = parsed.data.variants.map(v => v.dayType).sort().join(',')

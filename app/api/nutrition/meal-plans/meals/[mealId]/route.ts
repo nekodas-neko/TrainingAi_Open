@@ -5,7 +5,7 @@ import { getRepository } from '@/lib/data'
 import { NutritionIngredientsSchema } from '@trainingai/shared/validators/nutrition-ingredient'
 import { scaleWithTopUp } from '@/lib/nutrition/meal-top-up'
 import type { NutritionIngredient } from '@trainingai/shared/types/nutrition'
-import { invalidUuidResponse } from '@/lib/api/route-errors'
+import { invalidBodyResponse, invalidUuidResponse } from '@/lib/api/route-errors'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 
 // One meal with its ingredient snapshot.
@@ -51,7 +51,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ mealId
   }
   const parsed = PatchSchema.safeParse(read.body)
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
+    return invalidBodyResponse(parsed.error)
   }
 
   const repo = await getRepository()

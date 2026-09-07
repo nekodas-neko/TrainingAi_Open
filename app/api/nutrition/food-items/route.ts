@@ -6,6 +6,7 @@ import { sanitiseNutrition } from '@trainingai/shared/nutrition/scan-totals'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { invalidBodyResponse } from '@/lib/api/route-errors'
 
 // One food item: a name, a brand and a dozen macro numbers.
 const MAX_BODY_BYTES = 8 * 1024
@@ -35,7 +36,7 @@ export async function POST(req: Request) {
   }
   const parsed = FoodItemSchema.safeParse(read.body)
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
+    return invalidBodyResponse(parsed.error)
   }
   const body = parsed.data
   // Same Atwater cross-check the AI-scan path already applies before the user ever sees it

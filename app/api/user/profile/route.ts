@@ -4,6 +4,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { ACTIVITY_LEVELS, FITNESS_GOALS } from '@trainingai/shared/types/user'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { invalidBodyResponse } from '@/lib/api/route-errors'
 
 // Eight fields, the longest capped at 100 characters by the schema below. 8 KB is generous.
 const MAX_BODY_BYTES = 8 * 1024
@@ -55,7 +56,7 @@ export async function PATCH(req: NextRequest) {
 
   const parsed = ProfileSchema.safeParse(read.body)
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
+    return invalidBodyResponse(parsed.error)
   }
   // BF-78. Forward only the keys the request actually sent, so `omitted` and `sent as null` stop
   // meaning the same thing. The old shape mapped every field through `?? undefined`, which

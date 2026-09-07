@@ -5,6 +5,7 @@ import { getRepository } from '@/lib/data'
 import { goalToDailyKcal } from '@trainingai/shared/nutrition/calorie-balance'
 import type { UserGoals } from '@/lib/data/repository'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { invalidBodyResponse } from '@/lib/api/route-errors'
 
 // Nine numbers and enums. 8 KB is generous.
 const MAX_BODY_BYTES = 8 * 1024
@@ -45,7 +46,7 @@ export async function PATCH(req: NextRequest) {
 
   const parsed = GoalsSchema.safeParse(read.body)
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
+    return invalidBodyResponse(parsed.error)
   }
   const body = parsed.data
 

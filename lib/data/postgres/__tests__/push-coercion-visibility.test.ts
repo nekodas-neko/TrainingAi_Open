@@ -1,6 +1,6 @@
 // Q-485: the same value, the same field, the same instant, answered two ways —
 //
-//   POST /api/body-metadata  →  400 {"error":"Too big: expected number to be <=500"}
+//   POST /api/body-metadata  →  400 {"error":"Invalid body"}
 //   POST /api/sync/push      →  200 {"processed":1,"errors":[]}, weight_kg NULL
 //
 // The bounds were never the problem: both paths import the same validation/body-metrics.ts, so they

@@ -65,6 +65,30 @@ coincidences.
   constraint. Written so any prefix re-runs to completion; **read the comment before touching it.**
 - **`getRecentFoodItems`** — `getLocalStore` returns null under vitest and in the web sandbox.
 
+## ⚠ 2026-09-07 — I merged three PRs with Build RED. Read this before merging anything.
+
+The rest of this baton is from 2026-09-02 and is stale (IDs, migration numbers); this section is not.
+
+**`Build` is NOT enforced as a required status check on this repo, whatever the documented list
+says.** #935, #936 and #937 all merged while `Build` was still `in_progress`, and all three had it
+finish `failure`. `main` carried a red Build for ~45 minutes. `merge_pull_request` succeeded every
+time, so **branch protection refusing a merge is not evidence that checks passed.**
+
+CLAUDE.md's "the reliable green check is attempting the merge" is written for a check that has
+already *finished* and is being reported stale by `get_check_runs`. It does not license merging a
+check that genuinely has not finished. **Wait for a conclusion on all six.**
+
+**And run the Build job's own steps locally — `tsc --noEmit` is not enough.** The test files are
+typechecked separately under `tsconfig.tests.json` by `node scripts/check-test-typecheck.js`, which
+runs *inside* Build and is what went red. Before pushing: `pnpm build` **and**
+`node scripts/check-test-typecheck.js`, not just `tsc --noEmit` + `check:rules` + vitest.
+
+The errors themselves are worth knowing: `vi.fn(async () => …)` infers a **zero-parameter**
+signature, so `mock.calls[0]` is typed `[]` and any cast off it (`as [string, Date]`,
+`mock.calls[0][0] as {…}`) is a hard error under the test config while being invisible to
+`tsc --noEmit`. Declare the mock's parameters (`vi.fn(async (_userId: string, _from: Date) => …)`)
+and delete the cast.
+
 ## Gotchas that cost time this session
 
 - **`get_check_runs` returning `total_count: 0` was a STALE BASE every single time** — never slow
