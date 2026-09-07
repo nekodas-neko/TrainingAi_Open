@@ -19,6 +19,8 @@ import { shiftDateStr, todayInTz } from '@trainingai/shared/date-utils'
 const getSessionLoadsFrom = vi.fn(async () => [] as Array<{ startedAt: Date; volume: number }>)
 const getActiveProgram = vi.fn(async () => null as unknown)
 const getCalendarData = vi.fn(async () => ({ trainedDays: {}, activityDays: {} }))
+// Parameters typed, not zero-arg: the assertion below reads `mock.calls[0]`, and a zero-argument
+// `vi.fn` gives that the tuple type `[]`, which no cast can widen to `[string, Date]`.
 const getWorkoutSessionsFrom = vi.fn(async (_userId: string, _from: Date) => [] as unknown[])
 const listExerciseMuscleMap = vi.fn(async () => [] as unknown[])
 

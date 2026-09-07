@@ -1726,6 +1726,26 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [workouts][app-shell] ⚠️ The review screen can now set an exercise's role — and that control is the one thing not rendered in a harness (BF-124, BF-125, 2026-09-07, v1.436.40)
+
+The three exercise roles are named once, in `components/workout/exercise-role-labels.ts`, as **Main /
+Secondary / Accessory** — review used to say *Main / Compound / Accessory* and the editor *Main
+Compound / Secondary Compound / Accessory*, for the same three values. The review screen's badge is
+now a control (BF-125: it was the one screen where the whole program is visible and the role was not
+editable), and the editor's row wraps with the chosen option in `bg-brand` instead of the near-white
+`bg-primary` slab that read as disabled.
+[Journal](docs/overview/entries/2026-09-07-fix-bf-124-125-role-vocabulary.md).
+
+**What is owed:** the editor's role row was measured at 412 dp (`Main` 55×30, `Secondary` 86×30,
+`Accessory` 82×30, nothing clipped). **The review screen's new control was not rendered at all** —
+reaching it needs a generated program, which is a live Gemini call the harness does not make. Its
+disclosure and state-setter both copy shapes already in that file, but the rendering is unexercised.
+**Not verified on device**; no APK needed.
+
+**Known cosmetic residue:** the row still wraps `Accessory` to a second line inside the indented
+exercise card. That is what BF-124 asked for — *"it needs to wrap, or the labels need to be short"* —
+and both were done, but it is two lines rather than one.
+
 ### [app-shell] ⚠️ The 48 px tap-floor sweep landed on 48 controls; 41 of them are on screens no gate opens (BF-123, 2026-09-07, v1.436.39)
 
 `globals.css`'s `min-height/min-width: 48px` floor inflated every control drawn smaller — the owner

@@ -15,6 +15,8 @@ import { Switch } from '@/components/ui/switch'
 import { useScrollToBottom } from '@/lib/hooks/use-scroll-to-bottom'
 import { useExerciseMedia } from '@/lib/hooks/use-exercise-media'
 import type { MuscleSetsEntry } from '@/app/api/weekly-muscle-sets/route'
+import { EXERCISE_ROLES, EXERCISE_ROLE_LABEL, exerciseRoleLabel, exerciseRoleBadge } from '@/components/workout/exercise-role-labels'
+import type { ExerciseRole } from '@trainingai/shared/types/program'
 
 interface Props {
   program: GeneratedProgram
@@ -22,18 +24,6 @@ interface Props {
   onBack: () => void
   onSaved: () => void
   onProgramChange: (p: GeneratedProgram) => void
-}
-
-const ROLE_BADGE: Record<string, string> = {
-  primary:   'bg-brand/20 text-brand',
-  secondary: 'bg-amber-500/20 text-amber-400',
-  accessory: 'bg-zinc-500/20 text-zinc-400',
-}
-
-const ROLE_LABEL: Record<string, string> = {
-  primary:   'Main',
-  secondary: 'Compound',
-  accessory: 'Accessory',
 }
 
 const STYLE_DISPLAY: Record<string, string> = {
@@ -114,6 +104,7 @@ export default function BuilderReview({ program, inputs, onBack, onSaved, onProg
   const [saving, setSaving] = useState(false)
   const [exerciseLibrary, setExerciseLibrary] = useState<ExerciseLibraryEntry[]>([])
   const [swapOpen, setSwapOpen] = useState<string | null>(null)
+  const [roleOpen, setRoleOpen] = useState<string | null>(null)
   const [addExSheetOpen, setAddExSheetOpen] = useState(false)
   const [addExSheetName, setAddExSheetName] = useState('')
   const [addExSheetTarget, setAddExSheetTarget] = useState<{ si: number; ei: number } | null>(null)
@@ -224,6 +215,23 @@ export default function BuilderReview({ program, inputs, onBack, onSaved, onProg
     }
     onProgramChange(updated)
     setSwapOpen(null)
+  }
+
+  // BF-125: the review screen is where a role imbalance is visible — the whole program is on one
+  // page — and it was the one screen where the role could not be changed. Only `exerciseRole`
+  // moves; the progression style is derived from the role server-side at save, exactly as it is
+  // for the editor's own role control.
+  function setExerciseRole(sessionIdx: number, exerciseIdx: number, role: ExerciseRole) {
+    onProgramChange({
+      ...program,
+      sessions: program.sessions.map((session, si) =>
+        si !== sessionIdx ? session : {
+          ...session,
+          exercises: session.exercises.map((ex, ei) => ei !== exerciseIdx ? ex : { ...ex, exerciseRole: role }),
+        }
+      ),
+    })
+    setRoleOpen(null)
   }
 
   // Reorder an exercise within its session (positions are saved from array order), so the
@@ -533,9 +541,19 @@ export default function BuilderReview({ program, inputs, onBack, onSaved, onProg
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium truncate">{ex.name}</p>
                         <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className={cn('text-[10px] font-semibold rounded-full px-2 py-0.5', ROLE_BADGE[ex.exerciseRole] ?? ROLE_BADGE.primary)}>
-                            {ROLE_LABEL[ex.exerciseRole] ?? ex.exerciseRole}
-                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setRoleOpen(roleOpen === swapKey ? null : swapKey)}
+                            aria-expanded={roleOpen === swapKey}
+                            aria-label={`Role: ${exerciseRoleLabel(ex.exerciseRole)} — change`}
+                            className={cn(
+                              'tap-dense tap-target-44 inline-flex items-center gap-0.5 text-[10px] font-semibold rounded-full px-2 py-1',
+                              exerciseRoleBadge(ex.exerciseRole),
+                            )}
+                          >
+                            {exerciseRoleLabel(ex.exerciseRole)}
+                            <ChevronDown className={cn('h-2.5 w-2.5 transition-transform', roleOpen === swapKey && 'rotate-180')} />
+                          </button>
                           {ex.exerciseRole === 'primary' && (ex.mainMuscles.length + ex.secondaryMuscles.length) <= 1 && (
                             <span className="flex items-center gap-0.5 text-[10px] font-semibold text-amber-500"><TriangleAlert className="w-2.5 h-2.5" /> isolation</span>
                           )}
@@ -594,6 +612,26 @@ export default function BuilderReview({ program, inputs, onBack, onSaved, onProg
                         </button>
                       </div>
                     </div>
+                    {roleOpen === swapKey && (
+                      <div className="mt-1 flex flex-wrap gap-1.5 rounded-lg bg-background border border-border/40 p-2">
+                        {EXERCISE_ROLES.map(role => (
+                          <button
+                            key={role}
+                            type="button"
+                            onClick={() => setExerciseRole(si, ei, role)}
+                            aria-pressed={(ex.exerciseRole ?? 'primary') === role}
+                            className={cn(
+                              'tap-dense tap-target-44 px-2.5 py-1.5 rounded text-xs border transition',
+                              (ex.exerciseRole ?? 'primary') === role
+                                ? 'bg-brand text-brand-foreground border-brand font-semibold'
+                                : 'bg-muted text-muted-foreground border-border hover:bg-background',
+                            )}
+                          >
+                            {EXERCISE_ROLE_LABEL[role]}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     {swapOpen === swapKey && (
                       <div className="mt-1 rounded-lg bg-background border border-border/40 overflow-hidden">
                         {alts.map(alt => (

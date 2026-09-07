@@ -15,6 +15,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const upsertBodyMetrics = vi.fn(async () => undefined)
+// Typed parameter, not zero-arg: `vi.fn(async () => …)` gives `mock.calls[0]` the tuple type `[]`,
+// so reading `[0]` off it is a type error. Same shape as the login rate-limit mock fixed in #912.
+// The row's shape is declared rather than left `unknown`, so the assertions below check against it
+// instead of casting — a cast would happily agree with a field the route stopped writing.
 const insertErrorEvent = vi.fn(async (_row: { message: string; stack: string | null; url: string | null; source: string }) => undefined)
 const getUserById = vi.fn(async () => ({ id: 'u-1', timezone: 'Australia/Brisbane' }))
 

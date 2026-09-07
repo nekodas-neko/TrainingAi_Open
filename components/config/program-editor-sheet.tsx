@@ -9,6 +9,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@trainingai/shared/utils";
+import { EXERCISE_ROLES, EXERCISE_ROLE_LABEL } from "@/components/workout/exercise-role-labels";
 import { getPaletteEntry } from "@trainingai/shared/session-palette";
 import { FITNESS_ICONS, getSessionIcon } from "@/lib/session-icon";
 import { SortableRow } from "@/components/config/sortable-row";
@@ -839,27 +840,25 @@ export function ProgramEditorSheet({
                                       </p>
                                     )}
                                     {phaseMode !== 'manual' && (
-                                      <div className="flex flex-wrap items-center gap-2">
-                                        <span className="text-xs text-muted-foreground flex-none">Role</span>
-                                        <div className="flex gap-1">
-                                          {(['primary', 'secondary', 'accessory'] as const).map(role => {
-                                            const roleLabel = role === 'primary' ? 'Main Compound' : role === 'secondary' ? 'Secondary Compound' : 'Accessory';
-                                            return (
-                                              <button
-                                                key={role}
-                                                type="button"
-                                                onClick={() => updateExerciseRole(si, ei, role)}
-                                                className={cn(
-                                                  "tap-dense tap-target-44 px-2.5 py-1.5 rounded text-xs border transition",
-                                                  (ex.exerciseRole ?? 'primary') === role
-                                                    ? "bg-primary text-primary-foreground border-primary"
-                                                    : "bg-muted text-muted-foreground border-border hover:bg-background"
-                                                )}
-                                              >
-                                                {roleLabel}
-                                              </button>
-                                            );
-                                          })}
+                                      <div className="space-y-1">
+                                        <span className="block text-xs text-muted-foreground">Role</span>
+                                        <div className="flex flex-wrap gap-1.5">
+                                          {EXERCISE_ROLES.map(role => (
+                                            <button
+                                              key={role}
+                                              type="button"
+                                              onClick={() => updateExerciseRole(si, ei, role)}
+                                              aria-pressed={(ex.exerciseRole ?? 'primary') === role}
+                                              className={cn(
+                                                "tap-dense tap-target-44 px-2.5 py-1.5 rounded text-xs border transition",
+                                                (ex.exerciseRole ?? 'primary') === role
+                                                  ? "bg-brand text-brand-foreground border-brand font-semibold"
+                                                  : "bg-muted text-muted-foreground border-border hover:bg-background"
+                                              )}
+                                            >
+                                              {EXERCISE_ROLE_LABEL[role]}
+                                            </button>
+                                          ))}
                                         </div>
                                       </div>
                                     )}

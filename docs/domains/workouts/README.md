@@ -149,6 +149,14 @@ grep -n '\[workouts\]' docs/implementation-backlog.md   # 3 queue items today
 
 Live at the time of writing (2026-07-30):
 
+- ⚠️ **The review screen can set an exercise's role now** (BF-125, 2026-09-07, v1.436.40). The one
+  screen where the whole program is visible — so where a session having two main lifts is
+  *noticeable* — was the only one where the role was not editable; the route to fix a bad generation
+  was save → Config → find it → expand. The badge is now a control, and the three roles are named
+  once in `components/workout/exercise-role-labels.ts` as Main / Secondary / Accessory (they had two
+  wordings across the two screens). **The new control was never rendered in the harness** — reaching
+  it needs a live generation — and it is not device-verified.
+  [`journal`](../../overview/entries/2026-09-07-fix-bf-124-125-role-vocabulary.md).
 - 🔴 **A deload session was invisible on both workout surfaces** (BF-8, fixed 2026-08-24, v1.343.0).
   The Intensity control said "Full · As prescribed" beside a card saying "Deload session ·
   Auto-applied", and the in-workout header showed no marker — the owner trained one believing it was

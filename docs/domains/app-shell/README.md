@@ -169,6 +169,12 @@ Live at the time of writing (2026-07-30):
   interchangeable. See
   [`the journal entry`](../../overview/history-2026-08-08.md).
 
+- ⚠️ **The three exercise roles are named once** (BF-124/BF-125, 2026-09-07, v1.436.40) —
+  `components/workout/exercise-role-labels.ts`, as Main / Secondary / Accessory. The editor's role
+  row wraps and marks the chosen option in `bg-brand`; the near-white `bg-primary` selected slab is
+  gone from both config sheets. **`components/ui/switch.tsx` still carries it** (LB-61) — deliberate,
+  it is the shared primitive. See
+  [`the journal entry`](../../overview/entries/2026-09-07-fix-bf-124-125-role-vocabulary.md).
 - ⚠️ **The 48 px floor's opt-out is now actually swept** (BF-123, 2026-09-07, v1.436.39). The owner
   reported the program editor's muscle chips rendering as filled circles; 48 controls across 24 files
   now carry `tap-dense` plus a restored touch area, and `.tap-target-44`'s `position: relative` moved
