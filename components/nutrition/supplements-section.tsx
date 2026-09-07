@@ -5,6 +5,10 @@ import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { CheckIcon, SettingsIcon } from "lucide-react";
 import { ManageSupplementsSheet } from "./manage-supplements-sheet";
 import { EmptyState } from "@/components/ui/empty-state";
+import { supplementSubtitle } from "@/components/nutrition/supplement-subtitle";
+import { applyManualToggle } from "@/components/nutrition/supplement-day-totals";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { cancelSupplementReminder } from "@/lib/supplement-reminders";
 import type { SupplementWithStatus } from "@trainingai/shared/types/supplement";
 import { cn } from "@trainingai/shared/utils";
@@ -26,12 +30,36 @@ export function SupplementsSection({ supplements, loading, onChanged, userId , g
   const tz = useUserTimezone();
   const [manageOpen, setManageOpen] = useState(false)
   const [toggling, setToggling] = useState<string | null>(null)
+  const [promptFor, setPromptFor] = useState<SupplementWithStatus | null>(null)
+  const [promptAmount, setPromptAmount] = useState('')
 
   const active = supplements.filter(s => s.active)
 
-  async function toggleLog(s: SupplementWithStatus) {
+  /**
+   * BF-112: a supplement whose dose changes asks for the number instead of using the definition's.
+   * **One flag, not a second flow** — a prompted log is still one contribution row; only the source
+   * of the number differs. A tick without the flag omits the dose entirely, and the local backend
+   * fills it from the definition, which is what freezes it against later edits (BF-3 gap 1).
+   */
+  async function toggleLog(s: SupplementWithStatus, promptedAmount?: number) {
     if (toggling) return
+    if (s.dosePrompt && !s.loggedToday && promptedAmount == null) {
+      setPromptFor(s)
+      setPromptAmount(s.defaultAmount == null ? '' : String(s.defaultAmount))
+      return
+    }
     setToggling(s.id)
+    const dose = promptedAmount == null ? null : { amount: promptedAmount, unit: s.unit ?? null }
+    // The tick's own effect on the day's total. Flipping `loggedToday` alone leaves the previous
+    // log's number on screen — un-ticking 5 mg still read "5 mg today", and re-ticking at 7.5 mg
+    // still read 5, until the next pull.
+    const logged = !s.loggedToday
+    const contribution = logged
+      ? { logging: true, amount: dose?.amount ?? s.defaultAmount ?? null, unit: dose?.unit ?? s.unit ?? null }
+      : { logging: false, amount: s.loggedDose?.amount ?? null, unit: s.loggedDose?.unit ?? null }
+    const applyOptimistic = () => onChanged(supplements.map(x => x.id === s.id
+      ? { ...x, loggedToday: logged, loggedAmount: applyManualToggle(x.loggedAmount, contribution) }
+      : x))
     try {
       const store = userId ? getLocalStore(userId) : null
       const today = todayInTz(tz)
@@ -48,16 +76,17 @@ export function SupplementsSection({ supplements, loading, onChanged, userId , g
             const id = crypto.randomUUID()
             await store.upsertSupplementLog({
               id, supplementId: s.id, logDate: today,
+              ...(dose ? { amount: dose.amount, unit: dose.unit } : {}),
               updatedAt: new Date().toISOString(), deletedAt: null, syncStatus: 'pending',
             })
             await store.queueMutation({
               userId: userId!, domain: 'supplement_logs', date: today,
-              payload: { supplementId: s.id, logDate: today },
+              payload: { supplementId: s.id, logDate: today, ...(dose ?? {}) },
             })
             await cancelSupplementReminder(s.id)
           }
           pushThenRevalidate(userId!, invalidateSupplements)
-          onChanged(supplements.map(x => x.id === s.id ? { ...x, loggedToday: !x.loggedToday } : x))
+          applyOptimistic()
           invalidateSupplements().catch(() => {})
           savedLocally = true
         } catch (sqliteErr) {
@@ -66,10 +95,12 @@ export function SupplementsSection({ supplements, loading, onChanged, userId , g
       }
       if (!savedLocally) {
         const method = s.loggedToday ? 'DELETE' : 'POST'
-        const res = await fetch(`/api/supplements/${s.id}/log`, { method })
+        const res = await fetch(`/api/supplements/${s.id}/log`, dose
+          ? { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dose) }
+          : { method })
         if (!res.ok) throw new Error()
         if (!s.loggedToday) await cancelSupplementReminder(s.id)
-        onChanged(supplements.map(x => x.id === s.id ? { ...x, loggedToday: !x.loggedToday } : x))
+        applyOptimistic()
         invalidateSupplements().catch(() => {})
       }
     } catch {
@@ -134,13 +165,57 @@ export function SupplementsSection({ supplements, loading, onChanged, userId , g
                   <p className={cn("text-sm font-medium", s.loggedToday && "line-through text-muted-foreground")}>
                     {s.name}
                   </p>
-                  {s.dose && <p className="text-xs text-muted-foreground">{s.dose}</p>}
+                  {/* BF-112: what today recorded, falling back to the definition — the two are
+                      different questions and the log's number must win, or editing the definition
+                      silently rewrites what a past day shows. */}
+                  {supplementSubtitle(s) && (
+                    <p className="text-xs text-muted-foreground">{supplementSubtitle(s)}</p>
+                  )}
                 </div>
               </button>
             ))}
           </div>
         )}
       </div>
+
+      {/* BF-112: the titration prompt. Confirming closes it and re-enters `toggleLog` with the
+          number, which is the same path a plain tick takes — there is no second write path. */}
+      <Dialog open={promptFor !== null} onOpenChange={open => { if (!open) setPromptFor(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{promptFor?.name}</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground text-center -mt-2 mb-4">How much did you take?</p>
+          <div className="grid grid-cols-[1fr_auto] items-center gap-2">
+            <input
+              type="number"
+              inputMode="decimal"
+              step="any"
+              min="0"
+              autoFocus
+              value={promptAmount}
+              onChange={e => setPromptAmount(e.target.value)}
+              className="w-full rounded-xl bg-muted/60 border border-border px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+            <span className="text-sm text-muted-foreground">{promptFor?.unit ?? ''}</span>
+          </div>
+          <div className="flex gap-2 mt-5">
+            <Button variant="outline" className="flex-1" onClick={() => setPromptFor(null)}>Cancel</Button>
+            <Button
+              className="flex-1"
+              disabled={!Number.isFinite(Number(promptAmount)) || promptAmount.trim() === ''}
+              onClick={() => {
+                const s = promptFor
+                if (!s) return
+                setPromptFor(null)
+                toggleLog(s, Number(promptAmount))
+              }}
+            >
+              Log
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <ManageSupplementsSheet
         open={manageOpen}

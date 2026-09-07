@@ -21,7 +21,10 @@ const fs = require('fs')
 const path = require('path')
 
 const ROOT = path.resolve(__dirname, '..')
-const DERIVERS = /\b(bodyComposition|bodyCompSnapshot|cunninghamBmr)\s*\(/
+// PS-34 added `calculateBaseline`. It derives a BMR/TDEE from body composition exactly as its three
+// siblings do, and omitting it meant `app/api/nutrition-goals/recommend` — which calls it twice —
+// was never examined at all.
+const DERIVERS = /\b(bodyComposition|bodyCompSnapshot|cunninghamBmr|calculateBaseline)\s*\(/
 const READS_LIST = /\blistBodyMetrics\s*\(/
 const READS_FIELD = /\bbodyFatPct\b/
 // A file "handles the correction" either by computing it (`body-fat-calibration`) or by consuming a
@@ -37,6 +40,14 @@ const EXEMPT = {
   'packages/shared/src/nutrition/goal-recommendation.ts':
     'derives from `input.bodyFatPct`, a value its caller supplies — the correction is applied at ' +
     'app/api/nutrition-goals/recommend/route.ts before the input is built',
+  // Surfaced by PS-34 widening the roots to `components`, and exempt for the same reason as its
+  // server twin above: `GoalBaselineInput.latestBodyFatPct` is documented as already corrected.
+  // Checked rather than taken from that comment — the one production caller,
+  // `components/profile/goals-section.tsx:276`, passes `displayBodyFat(latestBf)`, which is the
+  // corrected reading. If a second caller appears, this entry is what has to be re-argued.
+  'components/profile/goal-baseline.ts':
+    'takes an already-corrected `latestBodyFatPct` by contract; its only caller passes ' +
+    'displayBodyFat() output (verified 2026-09-06)',
 }
 
 // Rule 2 only. These read a stored body fat and pass it on for DISPLAY OR EDITING, where the raw
@@ -68,7 +79,11 @@ const failures = []
 const handlesButListed = []
 const exemptSeen = new Set()
 
-for (const dir of ['app', 'lib', 'packages/shared/src']) {
+// PS-34 added `components`. The three roots covered every server path and no surface at all, so a
+// component deriving body composition directly was outside the rule by construction. Nothing does
+// today — the widening finds zero — which is the point of doing it while that is still true rather
+// than after the first one lands.
+for (const dir of ['app', 'lib', 'packages/shared/src', 'components']) {
   for (const file of walk(path.join(ROOT, dir))) {
     const rel = path.relative(ROOT, file).replace(/\\/g, '/')
     const src = fs.readFileSync(file, 'utf8')

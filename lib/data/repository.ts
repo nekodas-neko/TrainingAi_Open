@@ -727,6 +727,8 @@ export interface WorkoutRepository {
   // All-time max reps logged per exercise, keyed by exercise name.
   listMaxReps(userId: string): Promise<Map<string, number>>
   // Second-most-recent estimated 1RM per exercise, keyed by exercise name (for trend detection).
+  /** The two most recent 1RM estimates per exercise, deloads excluded (PS-26). */
+  listRecent1rm(userId: string): Promise<Map<string, { latest: number; previous?: number }>>
   listPrevious1rm(userId: string): Promise<Map<string, number>>
 
   // ── Data Tools ─────────────────────────────────────────────────────────────

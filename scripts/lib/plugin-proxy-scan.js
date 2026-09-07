@@ -29,14 +29,20 @@ function findProxyReturns(sources) {
   for (const { file, src } of sources) {
     /** name -> the @capacitor package it was destructured from */
     const bound = new Map()
-    for (const m of src.matchAll(/const\s*\{([^}]+)\}\s*=\s*await import\('(@capacitor[^']+)'\)/g)) {
+    // PS-34: the quote character was pinned to `'`, so `await import("@capacitor/…")` and the
+    // backtick form bound nothing and the whole file fell out at the `bound.size === 0` guard
+    // below — silently, because a file with no bindings looks identical to a clean one.
+    for (const m of src.matchAll(/const\s*\{([^}]+)\}\s*=\s*await import\(\s*['"`](@capacitor[^'"`]+)['"`]\s*\)/g)) {
       for (const part of m[1].split(',')) {
         const name = part.split(':').pop().trim()
         if (name) bound.set(name, m[2])
       }
     }
     if (bound.size === 0) continue
-    for (const m of src.matchAll(/\n[ \t]*return[ \t]+([A-Za-z_$][\w$]*)[ \t]*\n/g)) {
+    // PS-34: this required the return to end at a newline, so `return Foo;` — with the semicolon
+    // this repo's own style uses in several files — never matched. Optional `;`, and the trailing
+    // anchor accepts a line comment too.
+    for (const m of src.matchAll(/\n[ \t]*return[ \t]+([A-Za-z_$][\w$]*)[ \t]*;?[ \t]*(?:\/\/[^\n]*)?\n/g)) {
       const name = m[1]
       if (!bound.has(name) || NOT_A_PROXY.has(name)) continue
       // +1 skips the leading \n the pattern anchors on, so the line reported is the RETURN

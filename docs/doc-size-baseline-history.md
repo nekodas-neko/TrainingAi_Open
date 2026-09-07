@@ -6769,7 +6769,7 @@ The lines are the evidence, not the argument: the four file:line references that
 already arrives, and the note that the outbox push confirms `synced` without applying the server row
 — which is why the number lands on the next pull rather than at first paint. Lane B needs those to
 avoid re-deriving them; the reasoning is in
-[`docs/overview/entries/2026-09-02-bf-107-relane.md`](overview/entries/2026-09-02-bf-107-relane.md),
+[`docs/overview/history-2026-09-06.md`](overview/history-2026-09-06.md) (folded 2026-09-06),
 and this block was cut by a third after the check first failed.
 
 A mis-laned entry costs more than its lines: it is picked up, traced and put back by every session
@@ -7522,6 +7522,26 @@ worth more than they cost: `localDay` is seeded synchronously so a naive effect 
 every launch, and `sleep-sessions` is explicitly outside the tick (Q-91), which would leave last
 night's sleep stale on exactly the rollover where it matters most.
 
+## 2026-09-06 — `projectOverview.md` → 9988, `docs/implementation-backlog.md` → 18458 (BF-111)
+
+Recomputed on the merged base, three days and roughly a dozen merges after this branch first
+measured 9769/17151 — and then recomputed a second time an hour later, because BF-110 landed in
+between and moved both documents again. This branch's own contribution is fourteen index lines and
+nine backlog lines; everything else in the difference is other people's work that landed while it
+waited. Two recomputes for one branch is what a serialised merge queue costs when the baseline is a
+line count of a shared document: the number is only true between two merges.
+
+
+Short additions, and the line that earns its place in both is the pattern rather than the fix: this is
+the **third** entry in one day where a value was computed, served, and read by nothing — Q-529's
+per-night `provisional` flag, Q-516's `informativeShare`, and now `nativeBuiltAt`. Recording it once,
+where the next session's orientation read will meet it, is cheaper than each of them being rediscovered
+as a surprise. The server half tends to ship with its consumer assumed.
+
+The `Gate: device` note is longer than a gate usually needs because this card is invisible off-native:
+`UpdateCheckCard` returns early unless `Capacitor.isNativePlatform()`, so "it renders nothing in the
+harness" is not a test result and a later session should not read the green suite as coverage.
+
 ## 2026-09-04 — `docs/implementation-backlog.md` → 17278 (BF-118, the User Information section)
 
 A feature request rather than a fault, and the length is mostly the trace that changes what the work
@@ -7561,6 +7581,54 @@ not, which is the kind of thing worth writing down rather than quietly leaving. 
 add an `imageKind` and route medical images through the food scan route — same surface, different
 sensitivity class and different retention decision — and the prompts are best generated from the
 destinations that are still empty, since a fixed chip row is decoration by the second visit.
+
+## 2026-09-03 — `projectOverview.md` → 9771, `docs/implementation-backlog.md` → 17363 (BF-110)
+
+The index grows by two and the backlog by eleven, and both carry the same two sentences because both
+are read by different people at different times. The first is the retraction: **a scroll fixes it, so
+the renderer never died** — a reader who starts from BF-80's hypothesis builds the wrong fix, and
+BF-80's entry is the one they are most likely to have read.
+
+The second is the departure from the entry's own instructions. It asks for a row on every resume;
+that was not built, and an unexplained absence reads as an oversight a later session will "correct".
+The reason is recorded where the instruction is: JS cannot tell whether the screen was blank, so the
+row it asks for evidences nothing. Keeping the `dom-lost` case uncapped is the part that must survive
+any future trim — it is the observation that would disprove the entry.
+
+**Version 1.436.5, skipping .4**, which PR #840 (BF-111) is holding while the GitHub API is rate
+limited. A skipped patch number costs nothing; two branches claiming one costs a merge conflict in
+the file the repo says never to splice.
+
+## 2026-09-03 — `docs/agents/state/implementation-lane-b.md` → 192, plus BF-110's index growth (LB-52)
+
+**The baton is raised rather than trimmed, which is the exception it usually is not.** Three of the
+added lines correct facts a successor would otherwise act on and be wrong: **E2E IS a required check
+now** (true since 2026-08-26, and this file said the opposite for a day), **`enable_pr_auto_merge`
+does not work here and the reason is a Ruleset the API cannot see** — not the missing setting LB-52
+first claimed and asked the owner for twice — and **READY (0) is not an empty queue**, which happened
+twice in one run while real work sat under UNCLASSIFIED and behind a discharged `Needs:`.
+
+Every one of those is a fact that costs a session if it is absent, and the file was trimmed where it
+was narrative first: LB-38's blow-by-blow is now its finding, since the search is over and only the
+lesson travels. The merged list was stale by eleven PRs and is rewritten rather than extended.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17686, `projectOverview.md` → 9786 (LB-54)
+
+Forty-two lines for one entry, which is long for the queue and deliberate. LB-54 records that a red
+CI job on this repo **cannot be read** — every `get_job_logs` retrieval returns the post-job Postgres
+container dump and nothing of the failing step — and that **E2E, required since 2026-08-26, has no
+green baseline on `main`** because the job is gated `if: github.event_name != 'schedule'` and the
+nightly run skips it. The entry carries the measurements (2,797 characters retrievable for a failed
+`Tests` job; run 33797376255 showing E2E `skipped`) because without them the next session repeats the
+same hand-rolled comparison this one got wrong, and repeats the wrong conclusion with it. The last
+three lines record how the `Tests` half resolved — a re-run of the same commit went green, so it was
+a flake — kept because the way it resolved *is* the finding: burning the one permitted re-run was the
+only instrument available, and it cannot tell a flake from a real failure that passes twice.
+
+The backlog number is stated against the merged base rather than the 17363 this branch was cut from —
+six other PRs raised it while this one was open, and quoting the base a branch started at is how a
+baseline note ends up describing a file nobody has. `projectOverview.md` moves for the same reason,
+not for anything this branch wrote to it.
 
 ---
 
@@ -7708,6 +7776,70 @@ theoretical. The backlog half spends its length on three candidate fixes with a 
 reversal cost, since it is an auth change and the choice between them is the owner's, not something a
 session should settle by picking the smallest diff.
 
+## 2026-09-06 — `docs/implementation-backlog.md` → 18432 (LB-55/LB-56, recomputed on the merged base)
+
+Recomputed from the merged file, not carried from the branch. This PR sat for two days while five
+others moved the same document in both directions, so its own 18530 was against a backlog that no
+longer exists — and the merged count is *lower* than the branch's, because main's removals landed
+alongside these additions. The notes below record what the entries themselves cost; this one records
+only that the number they were measured against moved underneath them.
+
+**Recomputed a second time, at 18472, and that number was wrong.** Git presented this branch's two
+new entries and main's deletion of a shipped one (BF-112, which merged meanwhile) as a *single*
+conflict region — the two-deletions shape, in the form where one side's addition and the other's
+removal are adjacent enough to fuse. Measuring the baseline before separating them counted a
+completed entry that does not belong in the queue. 18399 was the count with it gone, and 18432 is
+the count after LB-58 landed on main — a third recompute, for a third movement underneath this
+branch. Fifty-nine lines of that total are this branch's own two entries; the rest is inherited.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17784 (LB-55)
+
+Forty-eight lines for one Reference entry, and the length is the point: it is read *while* a red E2E
+is being diagnosed, which is exactly when a session has no logs, no `main` baseline, and a failure
+that presents as a timeout rather than as the assertion that failed.
+
+Most of it records things NOT to do, which is what this cost was made of. The `toPass` budgets that
+exceed their test timeouts are written down with "this is not the cause, do not fix it as one",
+because that hypothesis fit three independent observations before one line of error text refuted it.
+The string-checking guard is written down with the reason it cannot work — it passed its own
+mutation — so the next session does not spend an hour rebuilding it. And the measurement that a PR
+merged with E2E red is recorded as a measurement, with the three candidate explanations left open,
+because it is the owner's to settle and it changes what every other session should do while waiting.
+
+Twenty-three more lines the same day, both of them measurements that stop a repeat. The seven specs
+still failing after this PR are listed with their DURATIONS, because the duration is what classifies
+them — a ~45s failure is a `toPass` loop spinning on something absent, a sub-second one is a real
+assertion, and knowing which before opening the file is most of the triage. And a full-suite result
+of 106 failed / 41 passed is recorded as what it actually was: the dev server dying at test 42, every
+later spec failing against `ECONNREFUSED`. Reporting that as a finding would have been exactly the
+poisoned-state trap already documented, so the tell — uniformly sub-second durations — is written
+down beside it.
+
+Twelve more for `plan-rescale:168`, which is written up rather than fixed because the write-up is the
+useful part: the fixture sets 1900 kcal against a budget that used to be a fixed 2,000 and is derived
+now, so the day lands on exactly zero remaining and the note that renders is the wrong branch. The
+entry says explicitly not to try another number — the derived budget carries `earned from movement`,
+so a hardcoded figure lands wherever that day's movement puts it, which converts a failing test into
+an intermittent one. Naming the trap is worth more than the twelve lines.
+
+## 2026-09-06 — `projectOverview.md` → 9958, `docs/implementation-backlog.md` → 18351 (BF-117)
+
+Both numbers are stated against the merged base, not the 17669 this branch was cut from — the point
+this note already made when it read 9823/17638, and which it then fell foul of itself. Two days and
+roughly a dozen merges later those figures described a file nobody had either, so they are recomputed
+here: quoting a branch's own starting point is how a baseline note ends up describing a document that
+does not exist, and a note written once and left is the slower version of the same mistake. What this branch does to it on its own is
+**remove 52 lines**: BF-117 shipped and its entry is gone from the queue, which is the shape the
+protocol wants and the reason the ratchet is worth having at all.
+
+The index grows by eleven, all of it on two existing entries rather than a new one. RV-35 measured
+Nutrition failing to roll over and diagnosed it exactly; it stays in Known Issues rather than moving
+to the archive because the device check is still owed, and it now carries the fix and one line
+pointing at the figure in its own measurement that was easy to read past — Home went from 4 dated
+requests to 2, which is the check-in and mood reads BF-86 fixed and nothing else. BF-86's own entry
+gains a pointer saying the half it deliberately deferred has landed, because that entry is what a
+reader arrives at first and it otherwise reads as still-open scope.
+
 ## 2026-09-04 — `docs/implementation-backlog.md` → 17690 (Q-250's next step is an auth bypass)
 
 Twenty lines correcting a sentence this same session wrote hours earlier — that CI could "mint the
@@ -7717,6 +7849,55 @@ and every remaining route adds an authentication bypass. The length is the two c
 recommendation between them, and the reason the in-process detail matters — without it the next
 session re-derives the dead end. Recorded rather than left, because a confident wrong next step in a
 backlog entry costs more than no next step at all.
+
+## 2026-09-02 — `docs/implementation-backlog.md` 17690 → 17729 (+39)
+
+`fix/or-101-lone-row-macros`. One entry, filed from an owner device check, and most of its length is
+the part that stops the next reader repeating this session's mistake.
+
+**OR-101** — a meal section holding one loose food shows no macros at all. The owner found it while
+checking BF-98, and the interesting half is what it is *not*: BF-98's own case table lists
+*"one loose row → no footer (unchanged)"*, so this is not a regression from that fix and BF-98 stays
+closed. The cause is a premise stated twice in `meal-card.tsx` — *"a single row already states its
+own macros"* — which stopped being true when Q-406 moved per-item P/C/F into the detail sheet. The
+same file states the true version ten lines away.
+
+Recorded at length because two sessions in a row now (Q-149, this) have found an entry reasoning
+from a premise that was accurate when written and silently expired. The entry names the condition
+the comments were actually reaching for — *does the only entry state its own macros* — so the fix
+does not re-derive it.
+Eleven more once the remaining failures were actually run rather than reasoned about. Three of them
+pass in isolation and fail in the full suite, which the duration-based triage above cannot see and
+would have sent the next session hunting a stale string that is not there. That is written down with
+the instruction not to run one alone and call it fixed — the isolation run is what proves the cause
+lies in a spec that ran earlier, so the question is which write, not which assertion.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17831 (LB-56)
+
+Forty-seven lines for a question the owner asked directly — *"why is e2e taking so long? can it be
+investigated or turned off if not needed"* — answered with the measurement rather than an impression:
+144 tests, 27.1 minutes of test time, no single pathology, and the per-file numbers that show it.
+
+The length is mostly the alternatives, and they are worth the room because the obvious one is wrong.
+Raising `workers` looks like the fix and would trade twenty minutes for flakiness: the serialism is
+deliberate, its reason is written in the config, and three specs were re-proved order-dependent the
+same day. Sharding is the option that would actually work and is the one blocked on a question nobody
+has answered. Recording which fixes are cheap to reverse — three of the four are a settings toggle or
+one line — is what lets this be decided quickly instead of deliberated again.
+
+## 2026-09-04 — `docs/implementation-backlog.md` → 17850 (LB-55/LB-56, the sharding result)
+
+Nineteen lines to record an experiment that came back negative, which is exactly the kind that
+otherwise gets re-run. Four shards, each on its own fresh database: 155 passed, 5 failed. Sharding
+broke two specs that pass in the full run and did not rescue the two it was expected to, so the
+conclusion is the opposite of the prediction — the dependency between specs runs both ways and the
+suite is one entangled fixture rather than independent tests sharing a database.
+
+Both entries are corrected rather than appended to. LB-55 had characterised three failures as
+"poisoned by an earlier spec's writes" and pointed at a bisect; that reading survived one day and is
+replaced with the question that actually decides each case — what state does this spec need, and who
+creates it. LB-56's sharding option keeps its measured numbers (26 → ~11 min, not the ~8 estimated,
+because every shard pays the auth setup) alongside the reason it is not available yet.
 
 ## 2026-09-03 — Review sweep 46 (RV-43, RV-44)
 
@@ -7916,6 +8097,232 @@ sandbox, found when this PR went red on an API the local run had. Net upward by 
 between a 26-line entry removed and a 28-line one added, which is the honest accounting rather than
 two separate movements.
 
+## 2026-09-06 — `docs/implementation-backlog.md` → 18373 (BF-114, UI half, on the merged base)
+
+Three lines net. BF-114 is rewritten rather than removed: its UI half shipped and its engine half is
+handed to Lane A, so the entry changes lane and keeps a `Keep:` naming exactly what is owed.
+**Recomputed from the merged file rather than carried from the branch** — this PR sat while two
+others raised the same baseline, so its own 17801 was against a document that no longer exists.
+
+Most of the rewrite is a correction rather than an addition. The entry had recorded the Body tab's
+BMR as the scale's bioimpedance estimate; it is Mifflin-St Jeor computed in our own code, which the
+source says outright. That matters beyond the label — it turns the 218 kcal gap from "two different
+measurements" into "a formula against a measurement", which is the sentence a reader needs, and it
+made the entry's own proposed wording false.
+
+## 2026-09-06 — `projectOverview.md` → 9934 (BF-112's Current Status paragraph)
+
+Sixteen lines for the stage-2 dose-entry paragraph in **Current Status**, which is the section this
+document exists to be: what shipped, what it cost, and the one thing left owed. The detail — the two
+defects found while verifying, the live round trip, the surfaces not exercised — is in the journal
+entry, not here. Raised rather than absorbed because the previous session's paragraph is still the
+one above it; the compaction sweep is what removes both, not this PR.
+
+## 2026-09-06 — `projectOverview.md` → 9947 (BF-113's device gate, which was missing)
+
+Thirteen lines for a Known Issue that should have been in the original PR and was not. BF-113's entry
+was removed from the queue on shipping while its visual claim had never been rendered — the BMI card
+showed its "No data" branch against `pnpm dev`, so neither the caption nor the popover was on the
+page at all. The device-verification gate takes either a `Keep:` on the entry or a row here; the
+entry was deleted and no row was written, so the check was silently dropped. Recorded at this length
+because the *reason* the screen could not be reached is the reusable part: `bodyFatIsCorrected` is
+computed server-side from a DEXA calibration and cannot be produced by inserting a reading, which is
+why the next attempt should not start by seeding one. Recomputed from the merged base — the row is
+the same thirteen lines, on top of a document two other PRs had grown since this branch measured it.
+
+## 2026-09-06 — `docs/implementation-backlog.md` → 18449, `projectOverview.md` → 9974 (BF-110 rebase)
+
+Both numbers recomputed from the merged file on the day this actually landed, not the two-day-old
+figures the branch was carrying — eight PRs moved both documents while this one waited, and a
+baseline measured against a file that no longer exists is a ceiling nobody asked for. What this
+branch adds on its own is LB-54 and the LB-52 rewrite; the rest of the difference is inherited.
+
+
+Eight of the lines are a **retraction inside LB-54**, written the same day as the claim it corrects.
+That entry said local e2e is not an adjudicator in this sandbox, reasoning from a run where the same
+specs failed on the branch and on clean `main`. Both sides were failing because both sides were
+genuinely broken — nine specs waiting for UI that had moved — so the finding was right and was thrown
+away as an environment artefact. The retraction is longer than a strikethrough because the reason
+matters more than the verdict: CI cannot adjudicate this at all (no `main` baseline, unreachable
+logs, an always-empty artifact), so local e2e is not a weaker substitute here, it is the only
+instrument that can read a failure. The smaller true claim — build a fresh database, check the server
+survived — is kept rather than discarded with the wrong one.
+
+The rest is this branch catching up to a `main` that moved six times while it was open.
+
+## 2026-09-06 — `docs/implementation-backlog.md` (OR-102, the reta tracker)
+
+`feat/or-102-reta-tracker`. One entry, and it is long because the measurement in it is the finding.
+
+The owner asked for an AI dose recommendation driven by his weight trend — hold while losing
+steadily, increase on a plateau. Clinically standard logic. **Measured against production before
+agreeing to it:** 87 weigh-ins over 118 days carry a residual SD of **1.203 kg** about the trend, so
+a 14-day slope resolves only to **±1.30 kg/wk** against a target band **0.35 kg/wk wide**. Six weeks
+is the first window that resolves the band at all.
+
+So the feature as described would emit confident weekly advice that flips on water weight. The entry
+records the numbers, the asymmetry that rescues most of it (a too-fast rate is a large effect and
+detectable in 2–3 weeks, where a plateau is not), and the line the app must not cross — report his
+data against his own band, never name a dose.
+
+Also captured: reconstitution must be stamped on the **log**, not just the definition, because the
+same milligram dose becomes a different number of syringe units when the next vial is mixed
+differently. Same rule BF-3 already applies to dose text, one layer up, and the only half of this
+entry that cannot be repaired afterwards.
+
+## 2026-09-06 — OR-102 split into OR-102a / OR-102b, both moved to the queue top
+
+`feat/or-102-reta-tracker`, second pass. The owner specified the tracker in four parts and asked for
+it at the top of Lane B. Two measurements taken while writing it up changed the shape:
+
+- **`supplement_logs` has `log_date`, a DATE, and no time** (`schema.ts:1082`). Part ③ — *"marks the
+  day time when the dose used… correlate sleep/HR"* — is not expressible today. That makes a
+  `taken_at` timestamp engine work, and it is the column that enables the one analysis a titration
+  does not confound: **hours-since-dose within a week**, which varies while the dose is held constant.
+- **A two-point weight delta cannot carry the colour the owner asked for.** Residual SD about the
+  trend is 1.203 kg, so a difference of two single readings is **±1.70 kg** against a target band
+  0.35–0.70 kg/wk. A 7-day trailing mean at each end brings it to ±0.64 kg. The entry specifies the
+  mean, and greys the chip when the difference does not clear the noise.
+
+So it is two entries: **OR-102a** (Lane A — vial record + `taken_at`; the only half that cannot be
+back-filled, because reconstitution must be stamped on the *log* or historical unit figures silently
+go wrong) and **OR-102b** (Lane B — the four surfaces), with `Needs:` between them. Both sit at the
+top of the queue; `102b` correctly reads PARKED until `102a` ships, which is one small migration.
+
+## 2026-09-06 — `projectOverview.md` → 10011 (BF-120's status paragraph and device row)
+
+Twenty-three lines across two sections, and the split is deliberate. The **Current Status** half is
+mostly the correction: two reports described one screen and disagreed about the cause, and the one
+that holds is checkable against BF-98's own case table rather than a matter of judgement — so the
+paragraph says which reading survived and why, because the losing one is the intuitive one and will
+be re-derived otherwise. The **Known-Issues** half exists because the e2e assertion at 412 dp is
+close to the device check and is not it; both reports came from the S25 and both are about how the
+card looks.
+
+The backlog moves the other way in the same PR — BF-120's 37-line entry is removed on shipping, and
+RV-49 gains eight lines of re-laning rather than being left to be picked up wrongly a second time.
+
+## 2026-09-06 — `docs/implementation-backlog.md` 18,525 → 18,665 (+140), BF-122a/BF-122b
+
+The owner asked for a game-like mini feature — a cat collection fed by workouts, steps and sleep,
+with items that merge upward and decay when a faucet goes quiet — and named four deliverables: the
+increase mechanism, the character models, a home widget, and somewhere in the app that explains it.
+Filed as two entries because the split is the same one the reta tracker took four days earlier: a
+Lane A derivation in `packages/shared/**` with no table and no migration, and a Lane B surface that
+`Needs:` it.
+
+The length is mostly **measurement rather than description**, which is why it is not shorter:
+
+- The decay window is the owner's own point (*"if you choose 2 workouts a week that could have up to
+  5 days between workout 1 and 2 and you are still following"*), and it needed the schedule shapes
+  spelled out — `rotation` gives one compliant rest day off `rest_after_n`, `weekly` needs the widest
+  wrap-around gap in `schedule_days`, and `getScheduledSessionsPerWeek()` is a *count* and therefore
+  the wrong input for both. That distinction is exactly what a one-line entry would have lost.
+- The gap distribution over the owner's last 120 days is in the entry because it decides whether the
+  clock is live or decorative: a 1-rest-day allowance fires 6 times, about monthly, with 92% of gaps
+  inside it. It also shows steps (129/129 days) and sleep will essentially never decay, which stops a
+  future session tightening them to manufacture tension.
+- The three traps each turn the mechanic against the user and none is visible from the design: an
+  app-recommended rest day must not decay anything; `computeStreak`'s `maxRestGap` is already a
+  hardcoded `1` at three sites asking the same question, so **One Formula, One Place** applies; and a
+  configurable threshold retroactively rewrites a replayed history, which is what would force the
+  game-state table the design is built to avoid.
+
+Two shorter alternatives were rejected. Cutting the measurement leaves the next session re-deriving
+it from production. Putting it in a plan doc under `docs/superpowers/plans/` is the usual home for
+this much reasoning, but nothing is designed yet — there is no implementation to plan, and a plan
+that is only a restated brief is a second place for the brief to go stale.
+## 2026-09-06 — `docs/implementation-backlog.md` → 18910, `projectOverview.md` → 10059 (PS-26 shipped)
+
+`projectOverview.md` is **down** 7: PS-26's Known-Issues row was struck and moved whole to
+`known-issues-resolved.md` rather than ticked in place.
+
+The backlog number is **recomputed from the merged file**, not from this branch's own edit. PS-26's
+13 lines left the queue while OR-102a/b (#899) and then OR-101 (#875) added considerably more, and
+they land as one number — recomputed on every merge rather than adjusted. Four merges in, that is
+the only method that stays correct: `projectOverview.md` is UP here despite this branch striking a
+row out of it, because concurrent work added more than PS-26 removed. Subtracting the branch's delta from either side would have been wrong in both directions —
+the count is the only thing that is true after a merge.
+
+## 2026-09-06 — CLAUDE.md → 775, lane-a baton → 92, orchestrator → 61 (PS-34: the ratchet now points both ways)
+
+Three **downward** corrections, and the reason they were needed is the change itself. The doc-size
+check treated any count at or under its number as fine, so a document that shrank left the
+difference available for silent regrowth. CLAUDE.md sat **429 lines** under baseline — the most-read
+file in the repo could have grown by more than half its own length with nothing complaining. The
+lane-a baton was 101 under, the orchestrator's 1.
+
+`verdict()` returns `'slack'` for that case now and the check fails on it, so a baseline can no
+longer drift high. Each of these three is set to its exact current count.
+
+## 2026-09-06 — `docs/implementation-backlog.md` → 18663, `projectOverview.md` → 10022 (PS-34 shipped)
+
+Both up. PS-34's entry left the queue and LA-62 replaced it — longer, because the eighteen live
+accessibility findings it carries need their file counts written down to be actionable, and because
+it has to say why the scan must not be narrowed again. `projectOverview.md` gains the matching
+Known-Issues row.
+
+## 2026-09-06 — `docs/implementation-backlog.md` 18,663 → 18,838 (+175), BF-123…BF-128
+
+Six entries from one owner pass over a generated program and the screens around it. Two are UI
+(BF-123 the tap-target floor, BF-124 the role picker), two are the role model (BF-125 no editor on
+the review screen, BF-126 no distribution invariant at generation), and two came out of the owner's
+two questions about the prescription itself (BF-127 the pull-up load, BF-128 the exercise count).
+
+Roughly 29 lines each, and the length is measurement in four of the six:
+
+- **BF-127** states the arithmetic that produced the wrong number — `estimated_1rm = 118.25` for a
+  `bodyweight` exercise, computed against `BW_REF = 100` while the owner weighs 70.65 kg, ×0.7 →
+  82.5 rendered as kg. Without those figures the entry reads as a formatting nit rather than an
+  instruction to load a weight that does not correspond to anything.
+- **BF-128** carries the full budget calculation (51 working minutes, an 856/450 s blend, 694 s
+  average → 4) *and* the 90-day history it disagrees with (62 sessions, median 5 exercises in a
+  median 56.2 minutes). Either half alone is unconvincing: the arithmetic without the history is a
+  theory about a constant, and the history without the arithmetic gives the implementer nothing to
+  change. Together they name the term to remove and the evidence for removing it.
+- **BF-123** and **BF-127** both spend lines on the fact that the repo had already diagnosed their
+  bug class once — `switch.tsx:19` for the 48 px floor, `1rm.ts:218` for the kg/RM display basis —
+  and that the fix exists and was never swept to the siblings. That is the actionable part: the
+  entry is a sweep against a known pattern, not an investigation.
+
+Two things were deliberately kept out. BF-126 does not specify the invariant (one primary? at most
+one secondary?) because one generated program is the whole evidence base, and it says so — a rule
+fitted to a single roll would forbid a legitimate two-compound pull day. And no plan doc was written
+for any of the six; each fix is small enough that a plan would restate the entry.
+
+
+## 2026-09-06 — `projectOverview.md` → 10051 (LA-59's status paragraph and its verification gap)
+
+Twenty-one lines, and eleven of them are the Known-Issues row rather than the fix. The fix itself
+compresses to a sentence — a `fetch` promise does not reject on a 4xx — but what is *not* verified
+does not compress, because the next session has to know both what was proven (the route's 404, live)
+and what was not (the toast and the refetch, on screen), or it will read "shipped" as "seen working".
+The row also names the instrument that would close it and the spec to copy the shape from, so the
+next attempt does not start by rediscovering that a `@dnd-kit` drag is the hard part.
+
+**Eight more lines retracting the cause this row first gave.** It said the settings sheet failed to
+render, which is a claim about the app; it was an ad-hoc script waiting 8 seconds for a cold compile,
+against port 3000 when the harness and its stored cookie belong to 3100. The retraction is longer
+than a strikethrough because a wrong cause sends the next session hunting a defect that does not
+exist — the same reason this file keeps refutations rather than deleting them.
+
+The backlog moves the other way in the same PR: LA-59's 22-line entry goes on shipping.
+
+## 2026-09-06 — `docs/implementation-backlog.md` → 18828 (OR-103, the `O` lane)
+
+Twelve lines, all field documentation rather than queue material. `Lane: O` joins `A`/`B`/`?` as a
+readable value, so the field-rules block gains its definition, and five entries gain or change a
+`Lane:` line (LB-52/54/55/56 → `O`, LB-46 → `A`). No entry was added. The number is 18828 rather
+than 18675+11 because it was re-measured after merging `main` — LA-59 raised the same baseline in
+parallel, and a raise computed before the rebase is a guess.
+
+## 2026-09-06 — `docs/implementation-backlog.md` → 18872 (OR-104, two contradicting doses)
+
+Forty-four lines for one entry, and the length is the finding. A supplement can carry a structured
+`0.5 mg` and a free-text `10mg` at once, the free text is what `dose_text` freezes onto every log,
+and **no screen shows the contradiction** — `supplementSubtitle()` falls back to the free text last,
+so the list reads correctly while the archive is 20× wrong. An entry that only said "the dose fields
+disagree" would send the next session to the display code, which is right.
 ## 2026-09-06 — `docs/implementation-backlog.md` → 18408 (PS-24 fixed, entry kept for its residue)
 
 Upward by 38 lines on a fix, which is the opposite of the usual shape and is the entry earning its

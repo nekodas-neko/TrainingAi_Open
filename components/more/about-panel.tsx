@@ -14,12 +14,15 @@ export function AboutPanel() {
         <div>
           <p className="text-sm font-medium">TrainingAI</p>
           <p className="text-xs text-muted-foreground mt-0.5">Personal gym tracker — powered by AI</p>
+          {/* BF-111: this number and the Android build below are different things and both are
+              right. The app updates itself on every deploy; the APK only changes on a rebuild. */}
+          <p className="text-[10px] text-muted-foreground mt-0.5">Updates automatically — no reinstall needed</p>
         </div>
         <span
           className="text-xs font-mono font-bold px-2 py-1 rounded-lg"
           style={{ background: 'color-mix(in oklch, var(--color-brand) 15%, transparent)', color: 'var(--color-brand)' }}
         >
-          v{CURRENT_VERSION}
+          App v{CURRENT_VERSION}
         </span>
       </div>
       <UpdateCheckCard />

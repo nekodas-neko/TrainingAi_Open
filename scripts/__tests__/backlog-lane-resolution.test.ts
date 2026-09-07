@@ -71,4 +71,20 @@ describe('backlog lane resolution', () => {
   it('preserves an explicit unknown', () => {
     expect(laneFromLines(['- **Lane: ?** — whichever role does its handoff next'])).toBe('?')
   })
+
+  // `O` is the Orchestrator's own lane (OR-103, 2026-09-06). CI config, workflow files and
+  // repository settings sit in NEITHER implementer lane's paths, so §3's path rule cannot answer
+  // them — four entries said "neither lane" in prose and printed as UNCLASSIFIED forever. Prose is
+  // exactly what this parser exists to outrank, so the value has to be readable as a field.
+  it('reads the Orchestrator lane as a field', () => {
+    expect(laneFromLines(['- **Lane: O** — the Orchestrator owns `.github/workflows/`.'])).toBe('O')
+  })
+
+  it('reads the Orchestrator lane in the bare form', () => {
+    expect(laneFromLines(['- **Lane O** — repository rulesets are nobody else\'s.'])).toBe('O')
+  })
+
+  it('will not confuse an Orchestrator lane with the word it starts', () => {
+    expect(laneFromLines(['- **Lane:** Orchestrator-adjacent, but really Lane B'])).toBe('B')
+  })
 })
