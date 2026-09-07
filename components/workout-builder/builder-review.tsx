@@ -481,12 +481,12 @@ export default function BuilderReview({ program, inputs, onBack, onSaved, onProg
                       <div className="flex items-center gap-1 flex-none">
                         <button
                           onClick={() => setPhaseCycles(prev => ({ ...prev, [i]: Math.max(1, (prev[i] ?? phase.durationCycles) - 1) }))}
-                          className="w-7 h-7 rounded-lg bg-background border border-border flex items-center justify-center text-sm font-bold"
+                          className="tap-dense tap-target-44 w-7 h-7 rounded-lg bg-background border border-border flex items-center justify-center text-sm font-bold"
                         >−</button>
                         <span className="w-12 text-center text-sm font-bold tabular-nums">{cycles} {cycles === 1 ? 'cycle' : 'cycles'}</span>
                         <button
                           onClick={() => setPhaseCycles(prev => ({ ...prev, [i]: (prev[i] ?? phase.durationCycles) + 1 }))}
-                          className="w-7 h-7 rounded-lg bg-background border border-border flex items-center justify-center text-sm font-bold"
+                          className="tap-dense tap-target-44 w-7 h-7 rounded-lg bg-background border border-border flex items-center justify-center text-sm font-bold"
                         >+</button>
                       </div>
                     </div>

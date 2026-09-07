@@ -366,7 +366,7 @@ export default function BuilderWizard({ onClose, onSaved, registerCloseGuard }: 
                   key={muscle}
                   onClick={() => setInputs(i => ({ ...i, musclesToFocus: toggle(i.musclesToFocus, muscle) }))}
                   className={cn(
-                    'rounded-full border px-3 py-1.5 text-sm font-medium transition',
+                    'tap-dense tap-target-44 rounded-full border px-3 py-1.5 text-sm font-medium transition',
                     inputs.musclesToFocus.includes(muscle) ? 'bg-brand text-brand-foreground border-brand' : 'bg-muted border-transparent'
                   )}
                 >

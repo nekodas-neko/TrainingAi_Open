@@ -46,7 +46,7 @@ export function WellnessSection({ scales, onScale, soreMuscles, onToggleMuscle }
                     key={m}
                     type="button"
                     onClick={() => onToggleMuscle(m)}
-                    className="rounded-full px-3 py-1.5 text-xs font-medium border transition-all"
+                    className="tap-dense tap-target-44 rounded-full px-3 py-1.5 text-xs font-medium border transition-all"
                     style={{
                       borderColor: isSelected ? 'var(--accent-amber)' : undefined,
                       background: isSelected ? 'color-mix(in oklch, var(--accent-amber) 15%, transparent)' : undefined,

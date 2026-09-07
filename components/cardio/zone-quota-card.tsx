@@ -80,7 +80,7 @@ function ZoneQuotaCardImpl({ dayQuota, weekQuota, goalLabel }: Props) {
               key={v}
               type="button"
               onClick={() => setView(v)}
-              className="rounded-full border px-2 py-0.5 transition"
+              className="tap-dense tap-target-44 rounded-full border px-2 py-1 transition"
               style={{
                 borderColor: view === v ? 'var(--accent-cyan)' : 'var(--border)',
                 color: view === v ? 'var(--accent-cyan)' : 'var(--muted-foreground)',

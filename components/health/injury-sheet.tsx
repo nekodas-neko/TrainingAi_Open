@@ -213,7 +213,7 @@ export function InjurySheet({ open, onOpenChange, injury, onSaved, onDeleted, us
                   type="button"
                   onClick={() => setMuscle(m)}
                   className={cn(
-                    "rounded-lg px-3 py-1.5 text-xs font-medium border transition-colors capitalize",
+                    "tap-dense tap-target-44 rounded-lg px-3 py-1.5 text-xs font-medium border transition-colors capitalize",
                     muscle === m
                       ? "bg-foreground text-background border-foreground"
                       : "border-border text-muted-foreground hover:text-foreground"

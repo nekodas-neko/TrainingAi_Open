@@ -169,6 +169,12 @@ Live at the time of writing (2026-07-30):
   interchangeable. See
   [`the journal entry`](../../overview/history-2026-08-08.md).
 
+- ⚠️ **The 48 px floor's opt-out is now actually swept** (BF-123, 2026-09-07, v1.436.39). The owner
+  reported the program editor's muscle chips rendering as filled circles; 48 controls across 24 files
+  now carry `tap-dense` plus a restored touch area, and `.tap-target-44`'s `position: relative` moved
+  into `@layer components` because unlayered it was beating Tailwind's `absolute` and flowing the
+  avatar edit badge inline. 41 of the 48 sites are not on a gated screen — **not device-verified**.
+  See [`the journal entry`](../../overview/entries/2026-09-07-fix-bf-123-tap-floor-sweep.md).
 - ✅ **The `tap-dense` audit is complete** (Q-176, 2026-08-10, v1.277.2). Ten users, five different
   correct remedies — bare (inline text), self-restoring (`Switch`), a 24×44 dot box, a 44×44 box, or
   grown ink. What decides each is the clearance to the nearest interactive neighbour. See

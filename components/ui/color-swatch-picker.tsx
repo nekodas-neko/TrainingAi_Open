@@ -22,7 +22,7 @@ export function ColorSwatchPicker({ value, onChange, label, className }: ColorSw
           type="button"
           onClick={e => e.stopPropagation()}
           title={label ? `Change ${label} colour` : "Change colour"}
-          className={cn("relative flex-none w-5 h-5 rounded-full border-2 border-background shadow-md", className)}
+          className={cn("tap-dense tap-target-44 relative flex-none w-5 h-5 rounded-full border-2 border-background shadow-md", className)}
           style={{ background: value }}
         />
       </PopoverTrigger>
@@ -39,7 +39,7 @@ export function ColorSwatchPicker({ value, onChange, label, className }: ColorSw
               type="button"
               title={c.name}
               onClick={() => onChange(c.hex)}
-              className="w-9 h-9 rounded-full border-2 transition-transform active:scale-90 overflow-hidden"
+              className="tap-dense tap-target-44 w-9 h-9 rounded-full border-2 transition-transform active:scale-90 overflow-hidden"
               style={{
                 background: c.hex === 'transparent'
                   ? 'repeating-conic-gradient(#888 0% 25%, #444 0% 50%) 0 0 / 10px 10px'

@@ -97,7 +97,7 @@ function RunTypeCarouselImpl({
           type="button"
           disabled={disabled || durationMin <= MIN_DURATION}
           onClick={() => onDurationChange(Math.max(MIN_DURATION, durationMin - STEP_MIN))}
-          className="grid h-9 w-9 place-items-center rounded-full border border-[color:var(--border)] transition active:scale-95 disabled:opacity-30"
+          className="tap-dense tap-target-44 grid h-9 w-9 place-items-center rounded-full border border-[color:var(--border)] transition active:scale-95 disabled:opacity-30"
           aria-label="Remove 10 minutes"
         >
           <Minus className="h-4 w-4" aria-hidden />
@@ -107,7 +107,7 @@ function RunTypeCarouselImpl({
           type="button"
           disabled={disabled || durationMin >= MAX_DURATION}
           onClick={() => onDurationChange(Math.min(MAX_DURATION, durationMin + STEP_MIN))}
-          className="grid h-9 w-9 place-items-center rounded-full border border-[color:var(--border)] transition active:scale-95 disabled:opacity-30"
+          className="tap-dense tap-target-44 grid h-9 w-9 place-items-center rounded-full border border-[color:var(--border)] transition active:scale-95 disabled:opacity-30"
           aria-label="Add 10 minutes"
         >
           <Plus className="h-4 w-4" aria-hidden />

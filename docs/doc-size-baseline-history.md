@@ -8581,6 +8581,18 @@ at length from an idle Postgres log toward "a startup timeout"; running the suit
 pass — 147 passed, 9 failed — so the reasoning is gone and the nine spec names are what remains.
 An entry that argues is an entry whose evidence was never gathered.
 
+## 2026-09-07 — `projectOverview.md` → 10378, `docs/implementation-backlog.md` → 18793 (BF-123)
+
+Up 18 on the index, down 38 on the queue. The queue loses BF-123's entry; the index gains the
+Known-Issues row it owes, because the sweep touched 48 controls and the gate only opens five screens
+— 41 of them are verified in a 412 dp browser harness and not on the device. That gap is exactly what
+the index exists to carry, and it does not shrink until someone runs the device pass. Written twice:
+the first draft ran 21 lines because it re-argued the diagnosis the journal entry already carries.
+Re-derived from the merged file twice — LA-73 raised the queue baseline to 18794 mid-branch and
+LB-60 then raised it to 18831 — because carrying this branch's own number across either merge would
+have handed the queue a full entry's worth of silent slack. The number in this heading is the third
+one this note carried, which is the ratchet working rather than a mistake being corrected.
+
 ## 2026-09-07 — `docs/implementation-backlog.md` → 18794 (LA-73 shipped)
 
 Up 3. LA-73 asked a question — does any stored name carry a control character — and the answer was
@@ -8595,9 +8607,9 @@ Up 37, and the entry is the whole growth: LB-60 is the authenticated GET that BF
 was never given, and BF-122b — four Lane B surfaces — cannot start without it. Re-derived after
 merging `main`, which had already moved the baseline to 18794; carrying this branch's own number
 across that merge would have handed the queue a whole entry's worth of silent slack.
-## 2026-09-07 — `docs/implementation-backlog.md` → 18838 (LA-74's style half shipped)
+## 2026-09-07 — `docs/implementation-backlog.md` → 18800 (LA-74's style half shipped)
 
-Up 7 on this branch, landing at 18838 after merging LB-60's own raise — recomputed from the merged
+Up 7 on this branch, landing at 18800 after merging LB-60's and BF-123's own raises — recomputed from the merged
 file rather than carried across, because two branches raising the SAME document genuinely disagree
 about one number and splicing either side would hand the queue silent slack. The growth is the
 finding. LA-74 said two routes take an unvalidated body; the style half

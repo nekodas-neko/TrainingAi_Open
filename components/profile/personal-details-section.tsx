@@ -174,7 +174,7 @@ function MeasurementRow({
         <button
           type="button"
           onClick={onAction}
-          className="flex-none flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted transition"
+          className="tap-dense tap-target-44 flex-none flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted transition"
         >
           {action}
           <ArrowUpRight className="h-3 w-3" />

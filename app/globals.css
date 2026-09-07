@@ -577,8 +577,17 @@ body {
  * enough to be overlapped. Same rule as `.tap-target-dot`: never give a control a hit area larger
  * than its clearance, because the later sibling in DOM order wins the overlap and steals taps
  * meant for the earlier one. */
-.tap-target-44 {
-  position: relative;
+/* The positioning context sits in `@layer components`, NOT unlayered, and that is load-bearing.
+ * Unlayered CSS beats every cascade layer regardless of specificity, so an unlayered
+ * `position: relative` here silently overrode Tailwind's own `absolute` utility — which
+ * `components/more/profile-tab.tsx:217` combines with this class to pin an edit badge to an avatar
+ * corner. Declared in `components`, Tailwind's `utilities` layer wins when a call site asks for a
+ * position, and this still applies when it does not. */
+@layer components {
+  .tap-target-44,
+  .tap-target-dot {
+    position: relative;
+  }
 }
 .tap-target-44::before {
   content: "";
@@ -590,9 +599,6 @@ body {
   transform: translate(-50%, -50%);
 }
 
-.tap-target-dot {
-  position: relative;
-}
 .tap-target-dot::before {
   content: "";
   position: absolute;

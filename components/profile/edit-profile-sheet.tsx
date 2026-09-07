@@ -193,7 +193,7 @@ export function EditProfileSheet({ user, onSaved }: EditProfileSheetProps) {
                   setTimezone(detected)
                   toast.success(`Set to ${detected}`)
                 }}
-                className="flex-none rounded-lg px-3 py-1.5 text-xs font-medium border border-border hover:bg-muted transition"
+                className="tap-dense tap-target-44 flex-none rounded-lg px-3 py-1.5 text-xs font-medium border border-border hover:bg-muted transition"
               >
                 Auto-detect
               </button>
