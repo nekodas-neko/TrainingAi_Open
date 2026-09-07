@@ -15,7 +15,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const upsertBodyMetrics = vi.fn(async () => undefined)
-const insertErrorEvent = vi.fn(async () => undefined)
+// Typed parameter, not zero-arg: `vi.fn(async () => …)` gives `mock.calls[0]` the tuple type
+// `[]`, so reading `[0]` off it is a type error and the `as` cast from `undefined` is a second
+// one. Same shape as the login rate-limit mock fixed in #912.
+const insertErrorEvent = vi.fn(async (_row: unknown) => undefined)
 const getUserById = vi.fn(async () => ({ id: 'u-1', timezone: 'Australia/Brisbane' }))
 
 vi.mock('@/lib/data', () => ({

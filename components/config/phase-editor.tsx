@@ -188,7 +188,7 @@ export function PhaseEditor({
                   className={cn(
                     "tap-dense tap-target-44 px-2.5 py-1.5 rounded text-xs border transition",
                     phase.phaseType === t
-                      ? "bg-primary text-primary-foreground border-primary"
+                      ? "bg-brand text-brand-foreground border-brand font-semibold"
                       : "hover:bg-muted",
                   )}
                 >
