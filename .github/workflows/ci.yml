@@ -475,6 +475,9 @@ jobs:
       - name: savePreference is never called from a useEffect
         run: node scripts/check-save-preference-in-effect.js
 
+      - name: Every API route has a test that imports its handler
+        run: node scripts/check-route-test-coverage.js
+
       - name: A dead WebView renderer is handled, not fatal
         run: node scripts/check-render-process-recovery.js
 

@@ -540,21 +540,6 @@ OR-102a/b will read dose history to recommend the next dose. A tracker that read
 - **Reversal cost:** low. No migration; existing rows keep whatever they were stamped with, which is
   the point of the stamp.
 
-### [app-shell][platform] LA-76 — a deload week still decays the collection
-
-- **Lane:** A — `app/api/collection/route.ts`, `packages/shared/src/phase-engine.ts`.
-- **Added:** 2026-09-07, Lane A — the half of LB-60's `pausedDays` that did not ship with the route.
-
-`GET /api/collection` feeds `pausedDays` from `listRestDays` — the rest days the user actually chose,
-which is the app's own record of a compliant rest. **Deload days are not in it.** BF-122a's argument
-is that decaying compliance turns the mechanic against the user, and a deload week is compliance the
-app itself prescribed, so a lifter who follows one loses cats for it. `isDeloadActive(phase, program,
-day)` answers for a single day given its resolved phase, so covering a week means resolving the phase
-engine per day across all history — too much for a read route on every call and too easy to get
-quietly wrong, which is why it was named rather than guessed. A rest day is weekly and a deload week
-is occasional, so the shipped route covers the common case. The likely shape is a repository read
-that returns deload spans directly rather than a per-day fold.
-
 ### [app-shell] BF-122b — the cat collection, surface half: the sprites, the home widget, and where you read about it
 
 - **Lane:** B — `components/home/**`, `lib/home/home-prefs.ts`, `components/more/**` and the art.
@@ -1347,15 +1332,38 @@ repair the 22 dead backlog paths and 43 doubled `docs/overview/overview/` labels
 unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge candidates
 (led by `oura-ring-data-reference.md`, a retired-API reference with no retirement note).
 
-### [platform] PS-39 — 93 of 219 API routes are referenced by no test in any layer
+### [platform] PS-39 — 148 API routes still have no test that imports their handler
 
-- **Lane:** A. **Reference:** the route list is in lane 25's return; regenerate with its scan.
+- **Lane:** A. Regenerate the list with `node scripts/check-route-test-coverage.js` — it prints every
+  uncovered route when it fails, and the ratchet now holds the number.
 - **Added:** 2026-09-06, app checkpoint — [report](reviews/2026-09-05-app-checkpoint.md) lane 25.
+  The scan and the first two routes shipped 2026-09-07; the rest is buildable work rather than a
+  residue, so it keeps no `Keep:` — that would file it under a heading telling the lane not to look
+  (OR-100).
 
-Not a call to write 93 test files: 35 are admin/debug. The actionable core is the aggregate routes
-the home screen depends on (`calendar-data`, `training-load`, `streak-data` appear only as cache-key
-strings in tests) and the external-ingest routes. Pick the dozen that would hurt most and give each
-one route-level test; keep the scan as the ratchet.
+**The count was 93 and is really 148**, by the mechanism the entry half-noticed: it counted a route
+covered when any test mentioned its URL, so `calendar-data` and `training-load` "appearing only as
+cache-key strings" counted. Asking instead whether a test imports the handler gives 150 of 222, less
+the two that shipped with the ratchet. Not a call to write 148 files — 18 are admin/debug. The
+actionable core is unchanged: the home screen's aggregates (`calendar-data`, `training-load`,
+`muscle-recovery`, `program-week`) and the remaining ingest routes (`colmi/samples`,
+`oura-ble/samples/*`). `scripts/check-route-test-coverage.js` is the ratchet, so the debt can only
+shrink and a NEW route arrives uncovered and fails — which is the half that matters.
+
+### [app-shell][platform] LA-76 — a deload week still decays the collection
+
+- **Lane:** A — `app/api/collection/route.ts`, `packages/shared/src/phase-engine.ts`.
+- **Added:** 2026-09-07, Lane A — the half of LB-60's `pausedDays` that did not ship with the route.
+
+`GET /api/collection` feeds `pausedDays` from `listRestDays` — the rest days the user actually chose,
+which is the app's own record of a compliant rest. **Deload days are not in it.** BF-122a's argument
+is that decaying compliance turns the mechanic against the user, and a deload week is compliance the
+app itself prescribed, so a lifter who follows one loses cats for it. `isDeloadActive(phase, program,
+day)` answers for a single day given its resolved phase, so covering a week means resolving the phase
+engine per day across all history — too much for a read route on every call and too easy to get
+quietly wrong, which is why it was named rather than guessed. A rest day is weekly and a deload week
+is occasional, so the shipped route covers the common case. The likely shape is a repository read
+that returns deload spans directly rather than a per-day fold.
 
 ### [platform] LA-70 — 20 routes echo raw Zod wording back to the user
 
