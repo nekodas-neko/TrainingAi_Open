@@ -8,8 +8,8 @@
 // `streak-data` appear only as cache-key strings — which is to say a route counts as covered when a
 // test merely mentions its URL. Under that rule a cache-invalidation test covers a route it never
 // calls. The honest question is whether anything imports the handler, and by that rule it was **150
-// of 222**, not 93. Two came off in the same PR (`health-connect/ingest`, `client-error`), so the
-// number this file ships at is 148.
+// of 222**, not 93. Five have come off since (`health-connect/ingest`, `client-error`, and the home
+// aggregates `training-load`, `calendar-data`, `muscle-recovery`), so the number here is 145.
 //
 // So this counts a route as covered when a test file imports its `route` module. An e2e spec that
 // merely navigates a page does not count either: it exercises the route through a browser, which is
@@ -17,14 +17,14 @@
 //
 // Shrink-only per the house pattern (check-hex-literals, check-fetch-once-effects): the baseline is
 // a count, a route leaving the list may never rejoin it, and a NEW route arrives uncovered and
-// therefore fails. That last part is the point — the 148 are debt, and the ratchet is about the
-// 149th.
+// therefore fails. That last part is the point — the 145 are debt, and the ratchet is about the
+// 146th.
 
 const fs = require('fs');
 const path = require('path');
 
 const root = path.join(__dirname, '..');
-const BASELINE = 148;
+const BASELINE = 145;
 
 function walk(dir, out = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
