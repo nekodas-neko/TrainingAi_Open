@@ -8460,6 +8460,14 @@ phase, so nothing here has been on a screen.
 
 The backlog moves the other way: BF-127's 32-line entry goes on shipping.
 
+## 2026-09-07 — `docs/implementation-backlog.md` → 18942 (LB-60, and BF-122b's real blocker)
+
+Thirty-seven lines to stop the next session doing what this one nearly did: opening BF-122b, reading
+"Needs: BF-122a — merged", and starting a four-part feature that cannot render a number. The table of
+four inputs against what the client can actually reach is the whole entry; prose saying "it needs a
+route" would have been a third the length and would not have survived the first person who thought
+they could get away with the workout ladder alone. They cannot, and the row that says why — the
+paused days — is the one that matters, because building without it decays a user for complying.
 ## 2026-09-07 — `docs/implementation-backlog.md` → 18888, `projectOverview.md` → 10189 (BF-126 shipped)
 
 The backlog shrinks 31 with nothing filed behind it, which is worth noting because the last two
@@ -8573,15 +8581,17 @@ at length from an idle Postgres log toward "a startup timeout"; running the suit
 pass — 147 passed, 9 failed — so the reasoning is gone and the nine spec names are what remains.
 An entry that argues is an entry whose evidence was never gathered.
 
-## 2026-09-07 — `projectOverview.md` → 10378, `docs/implementation-backlog.md` → 18756 (BF-123)
+## 2026-09-07 — `projectOverview.md` → 10378, `docs/implementation-backlog.md` → 18793 (BF-123)
 
 Up 18 on the index, down 38 on the queue. The queue loses BF-123's entry; the index gains the
 Known-Issues row it owes, because the sweep touched 48 controls and the gate only opens five screens
 — 41 of them are verified in a 412 dp browser harness and not on the device. That gap is exactly what
 the index exists to carry, and it does not shrink until someone runs the device pass. Written twice:
 the first draft ran 21 lines because it re-argued the diagnosis the journal entry already carries.
-Re-derived from the merged file after LA-73 raised the queue baseline to 18794 mid-branch — carrying
-this branch's own 18753 across that merge would have handed the queue 41 lines of silent slack.
+Re-derived from the merged file twice — LA-73 raised the queue baseline to 18794 mid-branch and
+LB-60 then raised it to 18831 — because carrying this branch's own number across either merge would
+have handed the queue a full entry's worth of silent slack. The number in this heading is the third
+one this note carried, which is the ratchet working rather than a mistake being corrected.
 
 ## 2026-09-07 — `docs/implementation-backlog.md` → 18794 (LA-73 shipped)
 
@@ -8590,3 +8600,10 @@ no across all 155 exercise, 5 program, 22 session and 25 style names, so it ship
 the write. What replaces it is longer because it is a different finding: LA-74, the two program
 write routes that have no request schema at all, which is *why* the guard reached one table out of
 four rather than a scoping choice.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18831 (LB-60 filed)
+
+Up 37, and the entry is the whole growth: LB-60 is the authenticated GET that BF-122a's engine half
+was never given, and BF-122b — four Lane B surfaces — cannot start without it. Re-derived after
+merging `main`, which had already moved the baseline to 18794; carrying this branch's own number
+across that merge would have handed the queue a whole entry's worth of silent slack.
