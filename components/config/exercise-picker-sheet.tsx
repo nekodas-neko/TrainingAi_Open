@@ -128,7 +128,7 @@ export function ExercisePickerSheet({ open, onOpenChange, exerciseLibrary, onSel
                 type="button"
                 onClick={() => setMuscleFilter(null)}
                 className={cn(
-                  "px-3 py-1 rounded-full text-xs font-medium border transition-colors whitespace-nowrap",
+                  "tap-dense tap-target-44 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors whitespace-nowrap",
                   muscleFilter === null && !equipFilter
                     ? "bg-brand text-brand-foreground border-brand"
                     : "bg-muted text-muted-foreground border-transparent"
@@ -142,7 +142,7 @@ export function ExercisePickerSheet({ open, onOpenChange, exerciseLibrary, onSel
                   type="button"
                   onClick={() => setMuscleFilter(muscleFilter === g.label ? null : g.label)}
                   className={cn(
-                    "px-3 py-1 rounded-full text-xs font-medium border transition-colors whitespace-nowrap",
+                    "tap-dense tap-target-44 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors whitespace-nowrap",
                     muscleFilter === g.label
                       ? "bg-brand text-brand-foreground border-brand"
                       : "bg-muted text-muted-foreground border-transparent"
@@ -163,7 +163,7 @@ export function ExercisePickerSheet({ open, onOpenChange, exerciseLibrary, onSel
                   type="button"
                   onClick={() => setEquipFilter(equipFilter === eq ? null : eq)}
                   className={cn(
-                    "px-3 py-1 rounded-full text-xs font-medium border transition-colors whitespace-nowrap",
+                    "tap-dense tap-target-44 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors whitespace-nowrap",
                     equipFilter === eq
                       ? "bg-brand/20 text-brand border-brand"
                       : "bg-muted text-muted-foreground border-transparent"

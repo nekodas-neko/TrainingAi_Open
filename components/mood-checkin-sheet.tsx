@@ -401,7 +401,7 @@ export function MoodCheckInSheet({
                       key={opt.value}
                       type="button"
                       onClick={() => toggleIssue(opt.value)}
-                      className="rounded-full px-3 py-1.5 text-xs font-medium border transition-all"
+                      className="tap-dense tap-target-44 rounded-full px-3 py-1.5 text-xs font-medium border transition-all"
                       style={{
                         borderColor: isSelected ? color : undefined,
                         background:  isSelected ? `color-mix(in oklch, ${color} 15%, transparent)` : undefined,

@@ -70,7 +70,7 @@ export function BodyFatCard({
           )}
           <button
             onClick={() => openLog("bodyFat", "Body Fat", "%", 0.1)}
-            className="rounded-xl bg-muted px-3 py-1.5 text-xs font-semibold hover:bg-muted/80 transition-colors"
+            className="tap-dense tap-target-44 rounded-xl bg-muted px-3 py-1.5 text-xs font-semibold hover:bg-muted/80 transition-colors"
           >
             Log
           </button>

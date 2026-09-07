@@ -63,7 +63,7 @@ export function TimePickerSheet({ open, onOpenChange, quota, runningPlan, onLogA
                 key={m}
                 type="button"
                 onClick={() => { hapticLight(); setMinutes(m) }}
-                className="rounded-lg border px-3 py-1.5 text-sm transition-colors"
+                className="tap-dense tap-target-44 rounded-lg border px-3 py-1.5 text-sm transition-colors"
                 style={
                   minutes === m
                     ? { borderColor: 'var(--accent-cyan)', background: 'color-mix(in oklch, var(--accent-cyan) 12%, transparent)', fontWeight: 600 }

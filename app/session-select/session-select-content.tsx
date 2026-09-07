@@ -1084,7 +1084,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
             <div className="relative flex-none">
               <button
                 onClick={() => navigateToTab(router, "/more")}
-                className="relative h-9 w-9 rounded-full flex items-center justify-center overflow-hidden border-2 border-border hover:border-brand transition"
+                className="tap-dense tap-target-44 relative h-9 w-9 rounded-full flex items-center justify-center overflow-hidden border-2 border-border hover:border-brand transition"
                 style={{ background: "var(--brand-card-bg)" }}
                 aria-label="Profile"
               >

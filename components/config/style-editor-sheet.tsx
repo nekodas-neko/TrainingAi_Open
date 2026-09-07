@@ -106,7 +106,7 @@ export function StyleEditorSheet({
                     onClick={() => onToggleUseFor1rm(i)}
                     title={set.useFor1rm ? "Counts toward 1RM calculation" : "Excluded from 1RM calculation"}
                     className={cn(
-                      "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide transition border",
+                      "tap-dense tap-target-44 rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wide transition border",
                       set.useFor1rm
                         ? "bg-brand text-brand-foreground border-brand"
                         : "bg-transparent text-muted-foreground border-border"

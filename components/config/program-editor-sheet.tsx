@@ -388,13 +388,13 @@ export function ProgramEditorSheet({
                   <button
                     type="button"
                     onClick={() => onScheduleRestAfterNChange(Math.max(1, scheduleRestAfterN - 1))}
-                    className="h-7 w-7 rounded-lg bg-background border flex items-center justify-center text-lg font-bold hover:border-brand transition"
+                    className="tap-dense tap-target-44 h-7 w-7 rounded-lg bg-background border flex items-center justify-center text-lg font-bold hover:border-brand transition"
                   >−</button>
                   <span className="w-10 text-center font-semibold text-sm">{scheduleRestAfterN} day{scheduleRestAfterN !== 1 ? "s" : ""}</span>
                   <button
                     type="button"
                     onClick={() => onScheduleRestAfterNChange(Math.min(14, scheduleRestAfterN + 1))}
-                    className="h-7 w-7 rounded-lg bg-background border flex items-center justify-center text-lg font-bold hover:border-brand transition"
+                    className="tap-dense tap-target-44 h-7 w-7 rounded-lg bg-background border flex items-center justify-center text-lg font-bold hover:border-brand transition"
                   >+</button>
                 </div>
               </div>
@@ -462,7 +462,7 @@ export function ProgramEditorSheet({
                       aria-checked={autoApplyPrescriptions}
                       onClick={() => onAutoApplyPrescriptionsChange(!autoApplyPrescriptions)}
                       className={cn(
-                        "relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none",
+                        "tap-dense tap-target-44 relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none",
                         autoApplyPrescriptions ? "bg-brand" : "bg-muted-foreground/30"
                       )}
                     >
@@ -487,7 +487,7 @@ export function ProgramEditorSheet({
                     aria-checked={scheduleReminderEnabled}
                     onClick={() => onScheduleReminderEnabledChange(!scheduleReminderEnabled)}
                     className={cn(
-                      "relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-1",
+                      "tap-dense tap-target-44 relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-1",
                       scheduleReminderEnabled ? "bg-brand" : "bg-muted-foreground/30"
                     )}
                   >
@@ -646,7 +646,7 @@ export function ProgramEditorSheet({
                         <button
                           type="button"
                           onClick={() => onEmojiPickerSessionChange(emojiPickerSession === si ? null : si)}
-                          className="w-9 h-9 flex items-center justify-center rounded-lg border border-border bg-background hover:bg-muted transition"
+                          className="tap-dense tap-target-44 w-9 h-9 flex items-center justify-center rounded-lg border border-border bg-background hover:bg-muted transition"
                           title="Pick icon"
                         >
                           {(() => {
@@ -666,7 +666,7 @@ export function ProgramEditorSheet({
                                 onClick={() => setSessionIcon(si, emoji)}
                                 title={label}
                                 className={cn(
-                                  "w-8 h-8 flex items-center justify-center rounded-lg hover:bg-muted transition",
+                                  "tap-dense tap-target-dot w-8 h-8 flex items-center justify-center rounded-lg hover:bg-muted transition",
                                   sess.icon === emoji && "bg-brand/20 ring-1 ring-brand"
                                 )}
                               >
@@ -703,7 +703,7 @@ export function ProgramEditorSheet({
                             const cur = sess.timeBudgetMinutes ?? 60;
                             onProgramSessionsChange(programSessions.map((s, j) => j === si ? { ...s, timeBudgetMinutes: Math.max(20, cur - 5) } : s));
                           }}
-                          className="h-6 w-6 rounded-md bg-background border flex items-center justify-center text-base font-bold hover:border-brand transition"
+                          className="tap-dense tap-target-44 h-6 w-6 rounded-md bg-background border flex items-center justify-center text-base font-bold hover:border-brand transition"
                         >−</button>
                         <span className="text-xs tabular-nums w-16 text-center font-medium">{sess.timeBudgetMinutes ?? 60} min</span>
                         <button
@@ -712,7 +712,7 @@ export function ProgramEditorSheet({
                             const cur = sess.timeBudgetMinutes ?? 60;
                             onProgramSessionsChange(programSessions.map((s, j) => j === si ? { ...s, timeBudgetMinutes: Math.min(180, cur + 5) } : s));
                           }}
-                          className="h-6 w-6 rounded-md bg-background border flex items-center justify-center text-base font-bold hover:border-brand transition"
+                          className="tap-dense tap-target-44 h-6 w-6 rounded-md bg-background border flex items-center justify-center text-base font-bold hover:border-brand transition"
                         >+</button>
                       </div>
                     </div>
@@ -772,7 +772,7 @@ export function ProgramEditorSheet({
                                         type="button"
                                         aria-label="Browse exercise library"
                                         onClick={() => openPicker(si, ei)}
-                                        className="flex-none rounded-md border border-input bg-muted px-2.5 py-2 text-muted-foreground hover:text-foreground transition-colors"
+                                        className="tap-dense tap-target-44 flex-none rounded-md border border-input bg-muted px-2.5 py-2 text-muted-foreground hover:text-foreground transition-colors"
                                       >
                                         <Library className="h-4 w-4" />
                                       </button>
@@ -781,7 +781,7 @@ export function ProgramEditorSheet({
                                           type="button"
                                           aria-label="Preview exercise"
                                           onClick={() => setPreviewExercise(exerciseLibrary.find(l => l.name.toLowerCase() === ex.name.toLowerCase()) ?? null)}
-                                          className="flex-none rounded-md border border-input bg-muted px-2.5 py-2 text-muted-foreground hover:text-foreground transition-colors"
+                                          className="tap-dense tap-target-44 flex-none rounded-md border border-input bg-muted px-2.5 py-2 text-muted-foreground hover:text-foreground transition-colors"
                                         >
                                           <Info className="h-4 w-4" />
                                         </button>
@@ -791,7 +791,7 @@ export function ProgramEditorSheet({
                                           type="button"
                                           aria-label="Unlink superset"
                                           onClick={() => unlinkGroup(si, ei)}
-                                          className="flex-none rounded-md border border-input bg-muted px-2.5 py-2 text-muted-foreground hover:text-foreground transition-colors"
+                                          className="tap-dense tap-target-44 flex-none rounded-md border border-input bg-muted px-2.5 py-2 text-muted-foreground hover:text-foreground transition-colors"
                                         >
                                           <Link2Off className="h-4 w-4" />
                                         </button>
@@ -801,7 +801,7 @@ export function ProgramEditorSheet({
                                           type="button"
                                           aria-label="Link with next exercise"
                                           onClick={() => linkWithNext(si, ei)}
-                                          className="flex-none rounded-md border border-input bg-muted px-2.5 py-2 text-muted-foreground hover:text-foreground transition-colors"
+                                          className="tap-dense tap-target-44 flex-none rounded-md border border-input bg-muted px-2.5 py-2 text-muted-foreground hover:text-foreground transition-colors"
                                         >
                                           <Link2 className="h-4 w-4" />
                                         </button>
@@ -850,7 +850,7 @@ export function ProgramEditorSheet({
                                                 type="button"
                                                 onClick={() => updateExerciseRole(si, ei, role)}
                                                 className={cn(
-                                                  "px-2 py-0.5 rounded text-xs border transition",
+                                                  "tap-dense tap-target-44 px-2.5 py-1.5 rounded text-xs border transition",
                                                   (ex.exerciseRole ?? 'primary') === role
                                                     ? "bg-primary text-primary-foreground border-primary"
                                                     : "bg-muted text-muted-foreground border-border hover:bg-background"
@@ -872,14 +872,14 @@ export function ProgramEditorSheet({
                                         const label = role === "main" ? "Primary" : "Secondary";
                                         const available = MUSCLE_GROUPS.filter(g => !muscles.includes(g));
                                         return (
-                                          <div key={role} className={cn("flex flex-wrap items-center gap-1 rounded-lg border px-2 py-1.5 min-h-[32px]", pillColor)}>
+                                          <div key={role} className={cn("flex flex-wrap items-center gap-1.5 rounded-lg border px-2 py-1.5 min-h-[32px]", pillColor)}>
                                             <span className="text-[10px] font-bold uppercase tracking-wide opacity-60 mr-0.5">{label}</span>
                                             {muscles.map(m => (
                                               <button
                                                 key={m}
                                                 type="button"
                                                 onClick={() => removeMuscleFromRole(si, ei, m, role)}
-                                                className={cn("inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 h-5 rounded-full leading-none transition-opacity hover:opacity-70", chipColor)}
+                                                className={cn("tap-dense tap-target-44 inline-flex items-center gap-0.5 text-[10px] font-semibold px-2 h-7 rounded-full leading-none transition-opacity hover:opacity-70", chipColor)}
                                               >
                                                 {m} <XIcon className="w-2 h-2 opacity-70" />
                                               </button>

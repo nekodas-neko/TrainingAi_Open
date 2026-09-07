@@ -385,7 +385,7 @@ export function GoalsSection({ user, onUserSaved }: GoalsSectionProps) {
                 <button
                   type="button"
                   onClick={() => router.push('/more/details')}
-                  className="mx-auto flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-[11px] font-medium hover:bg-muted transition"
+                  className="tap-dense tap-target-44 mx-auto flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-[11px] font-medium hover:bg-muted transition"
                 >
                   Open Profile details
                   <ArrowUpRight className="h-3 w-3" />

@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.39",
+    date: "2026-09-07",
+    changes: [
+      "Small buttons across the app are the size they were drawn again. A rule that gave every button a 48\u00a0px minimum was inflating the ones designed smaller \u2014 the muscle chips in the program editor came out as filled circles with the label floating in the middle, and the same happened to the plus/minus steppers, the colour swatches, the filter chips and the screenshot-remove badge on the feedback sheet. Each one now draws at its own size and keeps an invisible touch area so it is no harder to tap.",
+      "The edit badge on your profile picture sits on the avatar\u0027s corner again instead of below it.",
+    ],
+  },
+  {
     version: "1.436.38",
     date: "2026-09-07",
     changes: [

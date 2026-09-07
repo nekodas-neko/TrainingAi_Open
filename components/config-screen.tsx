@@ -782,7 +782,7 @@ export default function ConfigScreen({ userId, openNewProgram }: { userId?: stri
                                 <div />
                                 <button
                                   onClick={openNewStyle}
-                                  className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold bg-brand text-brand-foreground hover:opacity-90 transition"
+                                  className="tap-dense tap-target-44 flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold bg-brand text-brand-foreground hover:opacity-90 transition"
                                 >
                                   <Plus className="h-3.5 w-3.5" />
                                   New
@@ -841,7 +841,7 @@ export default function ConfigScreen({ userId, openNewProgram }: { userId?: stri
                           {phaseSetsOpen && (
                             <div>
                               <div className="flex justify-end mb-3">
-                                <button onClick={() => openPhaseSetEditor(null)} className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold bg-brand text-brand-foreground hover:opacity-90 transition">
+                                <button onClick={() => openPhaseSetEditor(null)} className="tap-dense tap-target-44 flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold bg-brand text-brand-foreground hover:opacity-90 transition">
                                   <Plus className="h-3.5 w-3.5" />New
                                 </button>
                               </div>
