@@ -1713,6 +1713,7 @@ device-only. Smoke-run it before trusting an offline dose to carry its own freez
 
 **No UI yet**; OR-102b is the surface half. Nothing on screen reads any of this.
 
+### [platform] 🟡 Deactivation is immediate; the middleware still gates on a claim it cannot verify (PS-24, 2026-09-06)
 ### [app-shell] 🟡 Eighteen icon-only buttons announce as "button" and nothing else (LA-62, 2026-09-06)
 
 An icon-only control with no accessible name is read out by a screen reader as "button", with
@@ -1775,20 +1776,21 @@ provenance labels, on the same card, for the same reason.
 
 ### [platform] 🔴 REOPENED — deactivation still does not deactivate: the claim LA-58's gate reads never refreshes (PS-24, 2026-09-06)
 
-The app checkpoint confirmed live: `is_active=false` for a signed-in account and its existing cookie
-kept answering 200 on API routes and pages; only a fresh sign-in is blocked. LA-58's 403 gate works
-(a hand-minted `isActive:false` claim is refused — control held) but the claim is stamped at sign-in
-and never refreshed on the path that matters: the Edge middleware runs `NextAuth(authConfig)` with no
-refresh in its jwt callback and re-signs the stale claim with a fresh 7-day expiry every request;
-`refreshIsActiveClaim` is wired only into the Node `auth()` whose re-signed cookie is discarded. Same
-mechanism defers an `isAdmin` revocation indefinitely. **PS-24, top of the queue.**
+**Fixed** (v1.436.11): `auth()` returns `null` when the freshly-read row says the account is
+inactive, so deactivation lands on the next request. Measured on one real session, same cookie —
+`is_active=false` took `GET /api/friends` from `200` to `401`; reactivating restored `200`.
+
+**Open because** the Edge middleware still gates on the stale claim (`auth.config.ts` cannot read
+the row). It is a second line now, and the cost is a worse answer rather than access: a stale-cookie
+caller gets 401 instead of LA-58's 403, re-authenticates, and lands on `/pending`. PS-24 records the
+two ways to close it with their costs. **Not verified on device.**
+
+**Two corrections to the checkpoint.** Its `isAdmin` half is **false** for Node consumers — that
+claim refreshes per request, and only the middleware's copy is stale. And "every request performs
+the once-per-day read", filed as a cost, is **load-bearing**: it is what makes this fix free, so the
+throttle must not be made to persist.
+[Journal](docs/overview/entries/2026-09-06-deactivation-takes-effect.md) ·
 [Checkpoint](docs/reviews/2026-09-05-app-checkpoint.md) §2.
-
-### [platform] 🔴 The login rate limiter is bypassed by whitespace-padding the email (PS-25, 2026-09-06)
-
-`auth.ts:26` keys on the untrimmed email, `:29` looks up the trimmed one — each padding variant is a
-fresh 20-attempt bucket against the same account (live: attempt 21 plain refused, attempt 22 padded
-signed in). No IP-keyed limit on the endpoint. [Checkpoint](docs/reviews/2026-09-05-app-checkpoint.md) §2.
 
 ### [workouts][app-shell] 🟡 Confirming a deload on Home leaves full-intensity weights on screen for up to 6 h (RV-49, 2026-09-06)
 

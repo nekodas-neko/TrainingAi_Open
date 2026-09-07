@@ -8232,7 +8232,9 @@ Two shorter alternatives were rejected. Cutting the measurement leaves the next 
 it from production. Putting it in a plan doc under `docs/superpowers/plans/` is the usual home for
 this much reasoning, but nothing is designed yet — there is no implementation to plan, and a plan
 that is only a restated brief is a second place for the brief to go stale.
-## 2026-09-06 — `docs/implementation-backlog.md` → 18839, `projectOverview.md` → 10065 (PS-26 shipped)
+## 2026-09-06 — `docs/implementation-backlog.md` → 19012, `projectOverview.md` → 10067 (PS-26 shipped)
+## 2026-09-06 — `docs/implementation-backlog.md` → 19012, `projectOverview.md` → 10067 (PS-26 shipped)
+## 2026-09-06 — `docs/implementation-backlog.md` → 19012, `projectOverview.md` → 10067 (PS-26 shipped)
 
 `projectOverview.md` is **down** 7: PS-26's Known-Issues row was struck and moved whole to
 `known-issues-resolved.md` rather than ticked in place.
@@ -8308,6 +8310,30 @@ exist — the same reason this file keeps refutations rather than deleting them.
 
 The backlog moves the other way in the same PR: LA-59's 22-line entry goes on shipping.
 
+## 2026-09-06 — `docs/implementation-backlog.md` 18,816 → 18,884 (+68), BF-129, BF-130 and a BF-126 retraction
+
+Two entries plus an amendment, all from the owner saying he has no commercial gym.
+
+**BF-129** — 22 `exercise_library` rows carry `equipment = []`, and both equipment filters read an
+empty list as an unconditional pass, so three `Machine %` rows clear a home-gym selection. The entry
+is longer than "fill the column in" because the same empty list has a second consequence the fix
+must not miss: `transitionSecForEquipment([])` returns the *barbell* default, so the calisthenics in
+that set are budgeted at four minutes each instead of one. That is the same symptom BF-128 measures
+arriving from a second cause, and an implementer who fixes only the filter leaves it in place. The
+entry also states what `empty` should mean afterwards, with a recommendation, because the data
+drifts back otherwise.
+
+**BF-130** — the library holds exactly two knee-flexion hamstring exercises, `Leg Curl` (machine) and
+`Nordic Hamstring Curl`. Everything else hamstring-main is a hinge. A home gym therefore has one
+option and it is the hardest movement in the category. Recorded because it is a *content* gap that
+no code check would ever surface, and because it collides with the owner's lumbar constraint: the
+alternatives the library does offer are all loaded hinges, the pattern he is limiting.
+
+**BF-126's ordering half is retracted in place**, not deleted. The entry claimed the generated
+`primary` sitting second was a defect; the owner's answer was *"that order is how I want it!"* —
+and `builder-review.tsx:229` already said so in a comment that was read past. The retraction is
+kept visible rather than quietly removed so the next session does not re-derive the same wrong
+finding from the same screenshot, and the title no longer advertises it. The role-count half stands.
 ## 2026-09-06 — `docs/implementation-backlog.md` → 18828 (OR-103, the `O` lane)
 
 Twelve lines, all field documentation rather than queue material. `Lane: O` joins `A`/`B`/`?` as a
@@ -8323,7 +8349,45 @@ Forty-four lines for one entry, and the length is the finding. A supplement can 
 and **no screen shows the contradiction** — `supplementSubtitle()` falls back to the free text last,
 so the list reads correctly while the archive is 20× wrong. An entry that only said "the dose fields
 disagree" would send the next session to the display code, which is right.
-## 2026-09-06 — `docs/implementation-backlog.md` → 18839, `projectOverview.md` → 10065 (OR-102a shipped)
+
+### Reconciled on merge — 18,940
+
+`main` moved while this branch was open (OR-103 landed a third lane value). Both PRs raised the
+`docs/implementation-backlog.md` baseline, so the `.size` file conflicted — the one case where a
+conflict on these files is a genuine disagreement rather than two independent additions, since both
+sides are describing the same number. Recomputed from the merged file rather than taking either
+side. The two reasoning notes above are unaffected and both stand; this line only records why the
+number is neither PR's.
+## 2026-09-06 — `docs/implementation-backlog.md` → 18408 (PS-24 fixed, entry kept for its residue)
+
+Upward by 38 lines on a fix, which is the opposite of the usual shape and is the entry earning its
+keep. PS-24 stays queued because the Edge middleware still gates on a claim it cannot verify, and the
+two ways to close that — Node middleware runtime, or accepting `auth()` as the authoritative point —
+are written down with their costs so the next session decides rather than re-derives. Also recorded
+there: the once-a-day read that never throttles is now load-bearing and must not be "optimised", and
+one of the entry's own sub-claims about `isAdmin` is refuted by measurement.
+
+## 2026-09-06 — `projectOverview.md` → 9925 (PS-24 fixed, row kept open)
+
+Seven lines, on a row that was already there. The 🔴 row said one thing — deactivation does not
+deactivate. Its replacement has to say three: the defect is fixed and how that was measured, why the
+row nonetheless stays open, and that two of the checkpoint's own claims about it are wrong. The last
+of those is the part worth the lines — an `isAdmin` staleness that does not exist, and a per-request
+read filed as a cost that is now the mechanism, are both things a future session would otherwise act
+on. The row was drafted at 27 lines and cut to 17 first; the detail lives in the journal entry.
+
+## 2026-09-06 — `docs/implementation-backlog.md` → 18998, `projectOverview.md` → 9919 (PS-25 shipped)
+
+The backlog is up 20: PS-25 left the queue on shipping and LA-61 took its place, which is longer
+than the entry it replaced because it has to say why the obvious fix is wrong. Normalising the input
+would silently stop matching rows already stored non-normalised, and this endpoint structurally
+cannot count those — `claude_ro` is row-scoped to the owner. The lines are the argument against a
+one-word change that looks correct.
+
+`projectOverview.md` is **down** 6: PS-25's row was struck and moved whole to
+`known-issues-resolved.md`, per the standing rule that a resolved entry leaves the file rather than
+sitting there with a tick.
+## 2026-09-06 — `docs/implementation-backlog.md` → 19012, `projectOverview.md` → 10067 (OR-102a shipped)
 
 OR-102a left the queue and nothing replaced it, because its follow-up half
 (OR-102b, the surface) was already filed alongside it. `projectOverview.md` gains a Known-Issues row

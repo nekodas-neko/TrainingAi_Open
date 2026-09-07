@@ -6,10 +6,24 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.436.21",
+    version: "1.436.24",
     date: "2026-09-06",
     changes: [
       "Groundwork for the injectable-dose tracker: a vial can now record how it was mixed, and each dose records the time it was taken along with the mix it came from. Nothing is on screen yet — this is the part that has to exist before any dose is logged, because a dose recorded without it cannot be corrected later.",
+    ],
+  },
+  {
+    version: "1.436.23",
+    date: "2026-09-06",
+    changes: [
+      "Hardened the sign-in page against password guessing. The limit on failed attempts could be reset by adding a space to the email address, which made repeated guessing against one account effectively unlimited; it now counts every spelling of an address together, and a second limit caps attempts from one source across all accounts.",
+    ],
+  },
+  {
+    version: "1.436.22",
+    date: "2026-09-06",
+    changes: [
+      "Deactivating an account now takes effect on its very next request. Until this, someone already signed in kept full access to their data for as long as their existing login lasted \u2014 up to a week \u2014 even though a fresh sign-in was correctly turned away.",
     ],
   },
   {
