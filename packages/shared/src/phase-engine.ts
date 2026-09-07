@@ -115,6 +115,9 @@ export function isDeloadActive(
   return isEarlyDeloadWeek(program, today)
 }
 
+/** How long a confirmed early deload runs. The two readers below both take it from here. */
+const EARLY_DELOAD_WEEK_LENGTH_DAYS = 7
+
 // The confirmed early-deload window on its own, with no phase to consult. ai_dynamic programs have
 // no ProgramPhase rows at all, so `isDeloadActive` above cannot answer for them — and until Q-175
 // that meant a confirmed deload *week* never reached the AI prescription and the user trained at
@@ -124,8 +127,22 @@ export function isEarlyDeloadWeek(
   today: string,
 ): boolean {
   if (!program.earlyDeloadWeekStart) return false
-  const end = addDays(program.earlyDeloadWeekStart, 7)
+  const end = addDays(program.earlyDeloadWeekStart, EARLY_DELOAD_WEEK_LENGTH_DAYS)
   return today >= program.earlyDeloadWeekStart && today < end
+}
+
+/**
+ * The same window as a list of days, for a caller that needs the whole span rather than a verdict
+ * about one day — the collection replay, which walks history and cannot ask day by day.
+ *
+ * Deliberately not built on `isEarlyDeloadWeek`: that answers a membership question in O(1) and is
+ * called per session in hot paths, so turning it into an array scan to share one implementation
+ * would be the wrong trade. Sharing the LENGTH is what keeps the two from drifting.
+ */
+export function earlyDeloadWeekDays(program: { earlyDeloadWeekStart?: string }): string[] {
+  const start = program.earlyDeloadWeekStart
+  if (!start) return []
+  return Array.from({ length: EARLY_DELOAD_WEEK_LENGTH_DAYS }, (_, i) => addDays(start, i))
 }
 
 // The phase whose styles should be prescribed. During a confirmed early-deload window

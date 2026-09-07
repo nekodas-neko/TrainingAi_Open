@@ -1286,38 +1286,53 @@ repair the 22 dead backlog paths and 43 doubled `docs/overview/overview/` labels
 unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge candidates
 (led by `oura-ring-data-reference.md`, a retired-API reference with no retirement note).
 
-### [platform] PS-39 — 148 API routes still have no test that imports their handler
+### [platform] PS-39 — 145 API routes still have no test that imports their handler
 
 - **Lane:** A. Regenerate the list with `node scripts/check-route-test-coverage.js` — it prints every
   uncovered route when it fails, and the ratchet now holds the number.
 - **Added:** 2026-09-06, app checkpoint — [report](reviews/2026-09-05-app-checkpoint.md) lane 25.
-  The scan and the first two routes shipped 2026-09-07; the rest is buildable work rather than a
+  The scan shipped 2026-09-07 with `health-connect/ingest` and `client-error`, then
+  `training-load`, `calendar-data` and `muscle-recovery`; the rest is buildable work rather than a
   residue, so it keeps no `Keep:` — that would file it under a heading telling the lane not to look
   (OR-100).
 
-**The count was 93 and is really 148**, by the mechanism the entry half-noticed: it counted a route
+**The count was 93 and is really 145**, by the mechanism the entry half-noticed: it counted a route
 covered when any test mentioned its URL, so `calendar-data` and `training-load` "appearing only as
 cache-key strings" counted. Asking instead whether a test imports the handler gives 150 of 222, less
-the two that shipped with the ratchet. Not a call to write 148 files — 18 are admin/debug. The
-actionable core is unchanged: the home screen's aggregates (`calendar-data`, `training-load`,
-`muscle-recovery`, `program-week`) and the remaining ingest routes (`colmi/samples`,
-`oura-ble/samples/*`). `scripts/check-route-test-coverage.js` is the ratchet, so the debt can only
+the five paid down so far. Not a call to write 145 files — 18 are admin/debug. What is left of the
+actionable core: `program-week`, and the remaining ingest routes (`colmi/samples`,
+`oura-ble/samples/*`, `oura/hr-day`). `scripts/check-route-test-coverage.js` is the ratchet, so the debt can only
 shrink and a NEW route arrives uncovered and fails — which is the half that matters.
 
-### [app-shell][platform] LA-76 — a deload week still decays the collection
+### [app-shell][platform] LA-76 — a deload PHASE still decays the collection, and nothing dates one
 
-- **Lane:** A — `app/api/collection/route.ts`, `packages/shared/src/phase-engine.ts`.
+- **Lane:** A — `app/api/collection/route.ts`, plus a migration.
 - **Added:** 2026-09-07, Lane A — the half of LB-60's `pausedDays` that did not ship with the route.
+- **Gate:** owner — what is left needs a schema decision, below.
 
-`GET /api/collection` feeds `pausedDays` from `listRestDays` — the rest days the user actually chose,
-which is the app's own record of a compliant rest. **Deload days are not in it.** BF-122a's argument
-is that decaying compliance turns the mechanic against the user, and a deload week is compliance the
-app itself prescribed, so a lifter who follows one loses cats for it. `isDeloadActive(phase, program,
-day)` answers for a single day given its resolved phase, so covering a week means resolving the phase
-engine per day across all history — too much for a read route on every call and too easy to get
-quietly wrong, which is why it was named rather than guessed. A rest day is weekly and a deload week
-is occasional, so the shipped route covers the common case. The likely shape is a repository read
-that returns deload spans directly rather than a per-day fold.
+**The early-deload half SHIPPED 2026-09-07**: `pausedDays` now carries `earlyDeloadWeekDays(program)`
+beside the chosen rest days, so a confirmed early deload decays nothing. That span is the only DATED
+record of a deload in the schema, and wiring it was six lines.
+
+**What is left is the deload PHASE, blocked on the data model rather than on effort.**
+`program_phases` measures a phase in `durationCycles` — cycles, not dates — so there is no interval
+to read, and resolving one means replaying the phase engine per day across all history.
+`workout_sessions.phase_type` records which *sessions* fell in a deload, but a deload day you
+**trained** is already a faucet day needing no pause; a pause is for the days you did not train, and
+isolated stamped sessions cannot say where those intervals began or ended.
+
+**Measured on production before assuming the shape (2026-09-07):** 3 sessions stamped
+`phase_type = 'deload'` (2026-08-10, 08-17, 09-02) — 7 and 16 days apart, so isolated sessions
+rather than a week; `is_early_deload` true on **0 rows ever**; `early_deload_week_start` **NULL on
+all five programs**; largest trained-day gap across Aug–Sep **2 days**, which `maxRestGap` already
+allows; **5** decaying gaps (≥3) in all history, none near a deload session. So the premise — a
+lifter losing cats for following a prescribed deload — **has never occurred on the only real data
+set**, while the machinery is live (46 phases across 8 phase sets, each with a deload phase), so
+this is a future gap rather than a dead one.
+
+**The fix is a dated record of a deload span** — rows like `rest_days`, not a derivation — which is
+a migration and an owner call on whether a deload becomes first-class stored state. Deriving it
+instead is the option that loses: a replay with no window gets one wrong answer and keeps it forever.
 
 ### [platform] LA-70 — 20 routes echo raw Zod wording back to the user
 
@@ -18250,6 +18265,36 @@ reads.
   because it is queued work.
 - **Reversal cost:** low, one line — but it is seen everywhere, so it wants the owner's eye before
   it lands.
+
+### [platform] LB-62 — a zero-argument `vi.fn` whose recorded calls are then indexed; red `main` three times in one day
+
+- **Lane:** A — `scripts/` (a new Custom Rules check).
+- **Added:** 2026-09-07 · Lane B, after fixing the third instance.
+- **Needs:** — nothing.
+- **The shape.** `const f = vi.fn(async () => undefined)` takes no parameters, so TypeScript gives
+  `f.mock.calls[0]` the tuple type `[]`. A spec that then reads `[0]` off it gets **TS2493** (*"Tuple
+  type '[]' of length '0' has no element at index '0'"*), and any `as {…}` on the result gets
+  **TS2352** on top. The mock still *works* at runtime — vitest records the arguments regardless —
+  so the spec passes and only the type checker objects.
+- **Three instances on 2026-09-07, each of which turned `main` red:**
+  - `lib/auth/__tests__/login-rate-limit-key.test.ts` — `vi.fn(() => true)` (fixed in #912)
+  - `lib/__tests__/ingest-routes-fail-closed.test.ts` — `vi.fn(async () => undefined)`, 4 errors (PS-39, #935; fixed in #934)
+  - `lib/__tests__/home-aggregate-routes.test.ts` — `vi.fn(async () => [] as unknown[])` (PS-39, #936; fixed in #934)
+- **Why it keeps reaching `main` rather than being caught in the branch.** `tsconfig.json` excludes
+  `**/__tests__/**`, so `npx tsc --noEmit` — what an implementer runs — cannot see it. The only gate
+  that can is `check-test-typecheck.js`, which runs **inside the Build job after `pnpm build`**. An
+  author who runs lint and the suite locally gets a clean board and finds out post-merge.
+- **The fix is always the same and it is one line:** type the parameters the assertion expects
+  (`vi.fn(async (_userId: string, _from: Date) => …)`), which usually makes the cast unnecessary
+  too. So the check has an unambiguous suggested edit, which is what makes it worth automating.
+- **What to check.** A `vi.fn(` whose argument list is empty, in a file where the same identifier is
+  later read as `.mock.calls[<n>][<m>]` or destructured from `.mock.calls[<n>]`. Both halves are
+  needed — a zero-argument mock nobody indexes is fine and there are many.
+- **Cheaper alternative worth pricing first:** make `check-test-typecheck` runnable without a build,
+  or add it to `pnpm ci:local`, so the existing gate fires before the push instead of after the
+  merge. That fixes the *class* of "only CI sees test type errors" rather than this one shape, and it
+  may make the bespoke check unnecessary.
+- **Reversal cost:** low — a script and a CI step, deletable.
 
 ### [platform] LB-37 — bring the 320 recorded test-file type errors down
 

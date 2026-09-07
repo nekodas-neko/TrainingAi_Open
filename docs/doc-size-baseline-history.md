@@ -8608,14 +8608,16 @@ was never given, and BF-122b — four Lane B surfaces — cannot start without i
 merging `main`, which had already moved the baseline to 18794; carrying this branch's own number
 across that merge would have handed the queue a whole entry's worth of silent slack.
 
-## 2026-09-07 — `projectOverview.md` → 10398, `docs/implementation-backlog.md` → 18766 (BF-124, BF-125)
+## 2026-09-07 — `projectOverview.md` → 10398, `docs/implementation-backlog.md` → 18811 (BF-124, BF-125)
 
 Up 20 on the index, down 27 on the queue — two entries out, LB-61 in. The index row is carrying an
 unusual admission rather than a status line: the review screen's new role control was **not rendered
 in the harness at all**, because reaching it needs a live model generation. That is the kind of gap
 the index exists to hold, and it is worth its lines precisely because a green CI run says nothing
 about it. The queue number is re-derived from the merged file each time `main` moves under this branch —
-18785, then 18793 — which is three different numbers for one PR and the ratchet doing its job.
+18785, 18793, then 18808 — four numbers for one PR, which is the ratchet doing its job rather
+than drifting. The queue also gains LB-62 on the way past: the zero-argument `vi.fn` shape that
+turned `main` red three times today, filed once instead of fixed a fourth time by hand.
 ## 2026-09-07 — `docs/implementation-backlog.md` → 18800 (LA-74's style half shipped)
 
 Up 7 on this branch, landing at 18800 after merging LB-60's and BF-123's own raises — recomputed from the merged
@@ -8641,3 +8643,12 @@ import the handler — gives 148, and the entry now carries that number, why the
 the command that regenerates the list. It also says explicitly that the remainder is buildable work
 and takes no `Keep:`, because OR-100 is about exactly that: a `Keep:` files real work under a
 heading that tells the lane not to look.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18808 (LA-76's early-deload half shipped)
+
+Up 15, and all of it is a measurement. LA-76 assumed a lifter loses cats for following a prescribed
+deload; production says that has never happened — 3 deload-stamped sessions, isolated rather than
+contiguous, `early_deload_week_start` NULL on all five programs, `is_early_deload` true on no row
+ever, and a largest trained-day gap of 2 days where the allowance is already 2. The entry now
+carries those numbers, because the alternative is the next session spending an hour re-deriving them
+before it can tell that the buildable half is six lines and the rest is a schema decision.
