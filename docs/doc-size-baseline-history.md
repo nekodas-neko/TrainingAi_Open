@@ -8232,7 +8232,7 @@ Two shorter alternatives were rejected. Cutting the measurement leaves the next 
 it from production. Putting it in a plan doc under `docs/superpowers/plans/` is the usual home for
 this much reasoning, but nothing is designed yet — there is no implementation to plan, and a plan
 that is only a restated brief is a second place for the brief to go stale.
-## 2026-09-06 — `docs/implementation-backlog.md` → 18805, `projectOverview.md` → 10036 (PS-26 shipped)
+## 2026-09-06 — `docs/implementation-backlog.md` → 18839, `projectOverview.md` → 10065 (PS-26 shipped)
 
 `projectOverview.md` is **down** 7: PS-26's Known-Issues row was struck and moved whole to
 `known-issues-resolved.md` rather than ticked in place.
@@ -8289,7 +8289,41 @@ Two things were deliberately kept out. BF-126 does not specify the invariant (on
 one secondary?) because one generated program is the whole evidence base, and it says so — a rule
 fitted to a single roll would forbid a legitimate two-compound pull day. And no plan doc was written
 for any of the six; each fix is small enough that a plan would restate the entry.
-## 2026-09-06 — `docs/implementation-backlog.md` → 18805, `projectOverview.md` → 10036 (OR-102a shipped)
+
+
+## 2026-09-06 — `projectOverview.md` → 10051 (LA-59's status paragraph and its verification gap)
+
+Twenty-one lines, and eleven of them are the Known-Issues row rather than the fix. The fix itself
+compresses to a sentence — a `fetch` promise does not reject on a 4xx — but what is *not* verified
+does not compress, because the next session has to know both what was proven (the route's 404, live)
+and what was not (the toast and the refetch, on screen), or it will read "shipped" as "seen working".
+The row also names the instrument that would close it and the spec to copy the shape from, so the
+next attempt does not start by rediscovering that a `@dnd-kit` drag is the hard part.
+
+**Eight more lines retracting the cause this row first gave.** It said the settings sheet failed to
+render, which is a claim about the app; it was an ad-hoc script waiting 8 seconds for a cold compile,
+against port 3000 when the harness and its stored cookie belong to 3100. The retraction is longer
+than a strikethrough because a wrong cause sends the next session hunting a defect that does not
+exist — the same reason this file keeps refutations rather than deleting them.
+
+The backlog moves the other way in the same PR: LA-59's 22-line entry goes on shipping.
+
+## 2026-09-06 — `docs/implementation-backlog.md` → 18828 (OR-103, the `O` lane)
+
+Twelve lines, all field documentation rather than queue material. `Lane: O` joins `A`/`B`/`?` as a
+readable value, so the field-rules block gains its definition, and five entries gain or change a
+`Lane:` line (LB-52/54/55/56 → `O`, LB-46 → `A`). No entry was added. The number is 18828 rather
+than 18675+11 because it was re-measured after merging `main` — LA-59 raised the same baseline in
+parallel, and a raise computed before the rebase is a guess.
+
+## 2026-09-06 — `docs/implementation-backlog.md` → 18872 (OR-104, two contradicting doses)
+
+Forty-four lines for one entry, and the length is the finding. A supplement can carry a structured
+`0.5 mg` and a free-text `10mg` at once, the free text is what `dose_text` freezes onto every log,
+and **no screen shows the contradiction** — `supplementSubtitle()` falls back to the free text last,
+so the list reads correctly while the archive is 20× wrong. An entry that only said "the dose fields
+disagree" would send the next session to the display code, which is right.
+## 2026-09-06 — `docs/implementation-backlog.md` → 18839, `projectOverview.md` → 10065 (OR-102a shipped)
 
 OR-102a left the queue and nothing replaced it, because its follow-up half
 (OR-102b, the surface) was already filed alongside it. `projectOverview.md` gains a Known-Issues row

@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.436.20",
+    version: "1.436.21",
     date: "2026-09-06",
     changes: [
       "Groundwork for the injectable-dose tracker: a vial can now record how it was mixed, and each dose records the time it was taken along with the mix it came from. Nothing is on screen yet — this is the part that has to exist before any dose is logged, because a dose recorded without it cannot be corrected later.",
+    ],
+  },
+  {
+    version: "1.436.20",
+    date: "2026-09-06",
+    changes: [
+      "Dragging your meal types into a new order used to say it saved even when the server refused — which happens when the list on screen still shows a meal type deleted somewhere else. It now tells you, and reloads the list so the order on screen is the one that is actually stored.",
     ],
   },
   {

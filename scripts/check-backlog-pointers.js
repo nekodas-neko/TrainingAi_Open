@@ -133,7 +133,7 @@ for (let i = 0; i < queue.length; i++) {
       // Collected whole so the `Reference:` ratchet below sees the same lines `next-item.js` does.
       meta.get(currentId).lines.push(line);
 
-      const lane = line.match(/\*{0,2}Lane:?\*{0,2}\s*\*{0,2}(A\b|B\b|\?)/);
+      const lane = line.match(/\*{0,2}Lane:?\*{0,2}\s*\*{0,2}(A\b|B\b|O\b|\?)/);
       if (lane && !meta.get(currentId).lane) meta.get(currentId).lane = lane[1].trim();
     }
     continue;
