@@ -19,7 +19,7 @@ import { shiftDateStr, todayInTz } from '@trainingai/shared/date-utils'
 const getSessionLoadsFrom = vi.fn(async () => [] as Array<{ startedAt: Date; volume: number }>)
 const getActiveProgram = vi.fn(async () => null as unknown)
 const getCalendarData = vi.fn(async () => ({ trainedDays: {}, activityDays: {} }))
-const getWorkoutSessionsFrom = vi.fn(async () => [] as unknown[])
+const getWorkoutSessionsFrom = vi.fn(async (_userId: string, _from: Date) => [] as unknown[])
 const listExerciseMuscleMap = vi.fn(async () => [] as unknown[])
 
 let sessionUser: { id: string; timezone?: string } | null = { id: 'u-1', timezone: 'Australia/Brisbane' }
@@ -145,7 +145,7 @@ describe('GET /api/muscle-recovery', () => {
 
   it('reads only the last seven days, because recovery older than that is complete', async () => {
     await muscleRecovery()
-    const [userId, from] = getWorkoutSessionsFrom.mock.calls[0] as [string, Date]
+    const [userId, from] = getWorkoutSessionsFrom.mock.calls[0]
     expect(userId).toBe('u-1')
     const daysBack = (Date.now() - from.getTime()) / 86_400_000
     expect(daysBack).toBeGreaterThan(6.9)

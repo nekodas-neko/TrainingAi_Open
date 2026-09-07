@@ -52,6 +52,32 @@ Two sites deliberately **not** changed: `app-load` logs the message to the conso
 returning it (nobody reads it but us), and `sync/push` has a different shape and reports per-mutation
 errors.
 
+### I merged three PRs with Build red, and this PR is what caught it
+
+**#935, #936 and #937 all merged with the `Build` job failing.** This PR's Build failed on
+`check-test-typecheck.js`, and the two files it named — `ingest-routes-fail-closed.test.ts` (#935)
+and `home-aggregate-routes.test.ts` (#936) — are mine, so `main` had a red Build for roughly 45
+minutes before anything noticed.
+
+**Two mistakes, and the second is the one worth fixing.**
+
+*The gate I ran was incomplete.* I ran `npx tsc --noEmit`, which uses the app's tsconfig. The test
+files are checked separately under `tsconfig.tests.json`, by a script that runs **inside the Build
+job**, and I never ran either. The errors were real: `vi.fn(async () => …)` infers a zero-parameter
+signature, so `mock.calls[0]` is typed `[]` and every cast off it is an error. Fixed by declaring the
+mocks' parameters and deleting the casts — the tests are unchanged in behaviour and still pass.
+
+*I merged on an incomplete reading of CI.* On all three I saw Build still `in_progress` and merged
+anyway, on CLAUDE.md's guidance that "the reliable green check is attempting the merge", since
+branch protection refuses a pending required check. **It did not refuse — so `Build` is evidently
+not enforced as a required status check on this repository, whatever the documented list says.**
+That guidance is written for a *stale read* of a check that has actually finished; I used it to
+skip waiting for one that genuinely had not, which is not the same thing and is not what it says.
+
+The rule that follows, and that I have applied from here on: **do not merge until every check has a
+conclusion**, and run `node scripts/check-test-typecheck.js` (plus `pnpm build`) locally before
+pushing, not just `tsc --noEmit`. A green Lint/Tests/Custom Rules is not a green CI.
+
 ### Verification
 
 - `lib/api/__tests__/invalid-body-response.test.ts` — 8 tests, including the `too_small`-with-a-

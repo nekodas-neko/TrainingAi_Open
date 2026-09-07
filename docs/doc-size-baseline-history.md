@@ -8650,3 +8650,10 @@ either in the diff or, in the case of the proposed fix, disproved. The reason it
 (a hand-written message on a built-in check reports the built-in code, not `custom`) lives in the
 helper's own comment and in the module-map row, which are the two places someone touching this next
 would actually look.
+
+## 2026-09-07 — `docs/agents/state/implementation-lane-a.md` → 116 (the red-Build merges)
+
+Up 24, for a section that had to go in now rather than at wrap-up: `Build` is not enforced as a
+required check here, three PRs merged with it red on 2026-09-07, and the container is ephemeral, so
+a gotcha that lives only in a session is a gotcha that is learned again. The rest of this baton is
+from 2026-09-02 and stale; a full rewrite is owed and this is not it.
