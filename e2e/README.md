@@ -107,6 +107,21 @@ Chromium-on-Linux, and gestures behave differently under a real thumb. Those sti
   found rather than shipped.
 - Specs run serially against one seeded database and one signed-in user. Parallelism would buy
   seconds and cost reproducibility.
+- **A spec that writes real rows through the UI must remove them, and by NAME.** The button under
+  test writes with the app's own ids, so an id-scoped `DELETE` cannot reach them — give the fixture
+  a unique name and delete on that. `plan-day-fill.spec.ts` logged 100 kcal of real food per run and
+  cleaned up nothing; its own comment reasoned that unique per-run names made that safe, which is
+  true of a second run of *that* file and false of every file after it. `plan-rescale.spec.ts` sums
+  the day's food, so the residue put its floor case on a boundary and it failed on every CI run
+  (LA-67).
+- **A spec that reads a running total must be immune to what other specs put in it.** Deleting a
+  neighbour's rows is not the fix — the next spec that logs through the UI will be back. Read the
+  existing total and net it off, as `plan-rescale.spec.ts`'s `setEaten` does, so the fixture means
+  *make the day total this* rather than *write this figure*.
+- **"It only fails in CI" is usually "I only ran it alone."** One worker, serial, shared database —
+  so every earlier spec's leftovers are this one's input, and running the file by itself removes the
+  very thing that breaks it. Before concluding a failure is environmental, run the file after its
+  alphabetical neighbours. LA-67 was filed as CI-only and reproduced here in 5.6 minutes that way.
 - **Assert a direction, not a figure, for anything a rerun changes.** The water spec asserts the
   total *increased*; an absolute litre value would pass on the first run and fail on the second,
   since the seeded DB is shared and not reset between runs.

@@ -28,6 +28,7 @@ const ITEM = '44444444-4444-4444-8444-4444444444a7'
 const LOG = '55555555-5555-4555-8555-5555555555a7'
 
 const TARGET_KCAL = 2000
+/** Day totals, not this fixture's own figure — see `setEaten`, which nets off the day's other food. */
 /** 900 eaten leaves 1,100 over a 2,000 kcal plan — a factor of 0.55, well clear of the floor. */
 const EATEN_KCAL = 900
 /** 1,900 eaten leaves 100, which cannot make a meal — the floor case. */
@@ -79,8 +80,41 @@ async function todayInUserTz(db: Client): Promise<string> {
   return rows[0].d
 }
 
+/**
+ * What OTHER food is already logged for the fixture's day.
+ *
+ * **Measured 2026-09-07 (LA-67), and it is not zero.** `plan-day-fill.spec.ts` logs the day's past
+ * meals through the real button and cleans up nothing — deliberately, since its fixture names are
+ * unique per run — so by the time this file runs (later, alphabetically, in the same serial worker)
+ * the seeded user already has **100 kcal** on today. That made `eaten` 2,000 against a 2,000 target
+ * in the floor test, `budgetRemaining` exactly 0, and the note the *over-target* sentence rather
+ * than the floor one. The copy this spec waits for genuinely never rendered — no app defect.
+ *
+ * Reading the residue rather than deleting it: another spec's rows are not this one's to remove, and
+ * the next spec that logs food through the UI will be back. Soft-deleted rows are excluded because
+ * the page excludes them.
+ */
+async function otherEatenKcal(db: Client, uid: string, date: string): Promise<number> {
+  const { rows } = await db.query<{ kcal: string }>(
+    `SELECT COALESCE(SUM(fi.calories * fl.quantity_multiplier), 0)::text AS kcal
+       FROM food_logs fl
+       JOIN food_items fi ON fi.id = fl.food_item_id
+      WHERE fl.user_id = $1 AND fl.date = $2 AND fl.deleted_at IS NULL AND fl.id <> $3`,
+    [uid, date, LOG],
+  )
+  return Number(rows[0].kcal)
+}
+
+/** Makes the DAY total `kcal`, whatever else is already logged on it. */
 async function setEaten(kcal: number): Promise<void> {
-  await withDb(db => db.query('UPDATE food_items SET calories = $1 WHERE id = $2', [kcal, ITEM]).then(() => undefined))
+  await withDb(async db => {
+    const uid = await userId(db)
+    const other = await otherEatenKcal(db, uid, await todayInUserTz(db))
+    const mine = kcal - other
+    expect(mine, `${other} kcal of other food is logged today — more than this fixture's ${kcal}`)
+      .toBeGreaterThan(0)
+    await db.query('UPDATE food_items SET calories = $1 WHERE id = $2', [mine, ITEM])
+  })
 }
 
 test.beforeAll(async () => {
@@ -131,6 +165,9 @@ test.beforeAll(async () => {
       [LOG, uid, date, mealTypes[0].id, ITEM],
     )
   })
+  // Both tests call `setEaten` themselves; this makes the row consistent from the start rather than
+  // leaving `EATEN_KCAL` sitting in it as a figure that ignores the day's other food.
+  await setEaten(EATEN_KCAL)
 })
 
 test.afterAll(async () => {

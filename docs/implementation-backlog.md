@@ -399,39 +399,6 @@ below threshold and left in place for next time.
 
 
 
-### [nutrition][platform] LA-67 — one plan-rescale test fails in CI and passes locally, on both attempts, and it is not a flake
-
-- **Lane:** B — `components/nutrition/**` / `app/nutrition/**` is where the copy under assertion is rendered; the spec itself is `e2e/plan-rescale.spec.ts`.
-- **Added:** 2026-09-07 · Lane A, from RV-49's CI runs. Filed rather than fixed because the assertion is nutrition-surface behaviour and the PR that surfaced it touches only `lib/cache-groups.ts`.
-- **Needs:** — nothing.
-- **The failure, verbatim and identical on the initial attempt and the retry:**
-  ```
-  e2e/plan-rescale.spec.ts › the floor leaves the meals as planned and says why
-  Locator: getByText(/under a meal — the remaining meals are left as planned/)
-  Expected: visible ... Error: element(s) not found
-  ```
-  The explanatory copy that should appear once the per-meal floor binds never renders. Its sibling
-  in the same file — *"the remaining meals are re-scaled to what is left of the day"* — **passes**,
-  so the fixture, the plan and the page all load; only this branch of the rescale logic is missing.
-- **It is not a flake, and the usual suspects are ruled out.** It failed on **two separate CI runs**
-  of the same PR, and within each run on the first attempt AND the retry — four failures, same
-  message. The run was otherwise healthy: 154 passed, and the 5 flaky specs all passed on retry
-  (one of those was a browser `SIGSEGV`, unrelated).
-- **It is not the setup constraint that was fixed alongside it.** The same PR fixed
-  `plan-rescale`'s `beforeAll` racing `meal_plans_one_active_per_user`; after that fix the CI log has
-  **zero** occurrences of `duplicate key`, `violates unique constraint`, or that constraint's name.
-  The setup now succeeds and this assertion still fails. They were two problems wearing one symptom.
-- **It reproduces only in CI.** Run locally against a clean `meal_plans` table, the whole file passes
-  — on `main` and on the branch, 4 of 4. So the difference is the environment or the seeded data,
-  not the code under test.
-- **Start here:** the test drives `setEaten(OVER_KCAL)` and expects the floor to bind. Whether it
-  binds depends on the day's logged calories against the plan target, which is keyed on the USER's
-  timezone (`food_logs.date`, `todayInUserTz` in the spec). A CI runner in UTC against a seeded user
-  in `Australia/Brisbane` is the obvious candidate for the fixture's food log landing on a different
-  local day than the page reads — which would leave the day under target, so the floor never binds
-  and the copy never renders. That is a hypothesis from reading the spec, **not measured**.
-- **Reversal cost:** none yet — nothing has been changed for it.
-
 ### [nutrition][body] OR-102b — the reta tracker: vial setup, dose calculator, dose timeline, weight response
 
 - **Lane:** B — a new section under Nutrition, plus the supplement sheet.

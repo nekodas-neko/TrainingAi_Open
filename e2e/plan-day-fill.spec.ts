@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { Client } from 'pg'
 import { settleRouteBoundary } from './fixtures'
 
 /**
@@ -100,4 +101,29 @@ test('the plan offers only the meals whose time has come, and logging them clear
 
   // …and the offer is gone, rather than proposing the same meal again.
   await expect(page.getByRole('button', { name: /Log the .* so far/ })).toHaveCount(0)
+})
+
+/**
+ * The rows this spec writes are REAL — the button under test logs food through the app — and they
+ * were never removed. The unique `RUN` names above keep a second run of *this* file honest, and the
+ * comment on them concluded "CI gets a fresh database and would never show it". That is true of this
+ * file and false of the ones after it: `plan-rescale.spec.ts` runs later in the same serial worker,
+ * sums the day's food, and found this spec's 100 kcal sitting in it — which put its floor case
+ * exactly on the boundary and made it fail on every CI run (LA-67).
+ *
+ * Deleted by name rather than by id because the ids are the app's, not this spec's.
+ */
+test.afterAll(async () => {
+  const db = new Client({ connectionString: process.env.DATABASE_URL })
+  await db.connect()
+  try {
+    await db.query(
+      `DELETE FROM food_logs
+        WHERE food_item_id IN (SELECT id FROM food_items WHERE name = ANY($1::text[]))`,
+      [[MORNING, EVENING]],
+    )
+    await db.query('DELETE FROM food_items WHERE name = ANY($1::text[])', [[MORNING, EVENING]])
+  } finally {
+    await db.end()
+  }
 })
