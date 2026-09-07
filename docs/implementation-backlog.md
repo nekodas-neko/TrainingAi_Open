@@ -1144,18 +1144,18 @@ route `startedAt ?? createdAt`; readiness `startedAt` else **Infinity** (never b
 chat/running none — and the owner's active program has `started_at = NULL` (verified in prod), so
 July's early-deload consumed live ACWR while the card said "baselining".
 
-### [devices][readiness] PS-30 — oura_daily recorded the ring worn 0.3–1.5 h on 20 consecutive scored nights
+### [devices][readiness] LA-68 — restore the 22 wear-time days PS-30 overwrote
 
-- **Lane:** A — `lib/oura-ble/rollup/run.ts:880-905`.
-- **Added:** 2026-09-06, app checkpoint — [report](reviews/2026-09-05-app-checkpoint.md) §P5.
+- **Lane:** A — `oura_daily.non_wear_time_sec`, production data only. No code change.
+- **Gate:** owner — only a **fullHistory** Redecode rewrites those days, and it needs an admin session.
+- **Added:** 2026-09-07, Lane A — [journal](overview/entries/2026-09-07-fix-oura-nonwear-overwrite.md).
 
-Production, owner's rows, verified: 2026-08-14→09-02, `non_wear_time_sec` 81000–85500 (worn ≤1.5 h)
-on 20 days that each carry a 7–9 h scored night with HRV; 09-03+ reads sane. Consumers fed the false
-signal: `isLowWearToday` (readiness-payload:799), `excludeLowWearDays` on the HRV/RHR baselines
-(:329/:341), the worn-hours chart, the chip dimming. **Mechanism not established** — suspect the
-incremental run's narrowed window (`effectiveSinceDs − 3d`) rebuilding `wornBinsByDay` from partial
-rows and overwriting a full pass; why 09-03+ recovered is unknown. Diagnose before fixing; a
-corrective backfill of the 20 days rides the fix.
+PS-30's overwrite is fixed forward, but 2026-08-14→09-04 still hold the sliver values (worn
+15–90 min) and no incremental window reaches back that far again. The inputs exist — the two-tier
+frame reader resolves those days out of `oura_raw_packed`. **Owner action:** `/admin/oura-ble` →
+Redecode with the date field empty, then re-read the span; it should come back at 0–8,100 s like its
+neighbours. Until then `excludeLowWearDays` drops all 22 from the HRV/RHR baselines. Not a migration:
+nulling the column is data-dropping, and a Redecode restores real numbers.
 
 ### [platform] PS-31 — AI calls with no data gate, a missing maxRetries, and a blind fingerprint
 

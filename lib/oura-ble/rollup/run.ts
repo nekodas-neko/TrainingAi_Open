@@ -895,7 +895,18 @@ export async function runOuraRollup(
   }
   const todayStr = toAestDay(new Date(), timezone)
   const elapsedTodaySec = secondsSinceLocalMidnight(timezone)
-  const wearRows = Array.from(wornBinsByDay.entries()).map(([date, bins]) => {
+  // The window floor lands mid-day, so the day containing `rollupCutoffDs` holds only the
+  // bins after the cutoff. Writing it overwrites a complete earlier value with that sliver,
+  // and because the floor advances monotonically it is also the LAST write that day ever
+  // gets — 22 consecutive days ended up recording 15–90 min of wear against 7–10 h of scored
+  // sleep (PS-30). Every one of those days was already written in full by the two runs before
+  // this one, so dropping it here loses nothing. A cutoff exactly on local midnight does cover
+  // its day, and is kept.
+  const cutoffDate = rollupCutoffDs != null ? toDate(rollupCutoffDs) : null
+  const partialFloorDay = cutoffDate != null && formatInTimeZone(cutoffDate, timezone, 'HH:mm:ss') !== '00:00:00'
+    ? toAestDay(cutoffDate, timezone)
+    : null
+  const wearRows = Array.from(wornBinsByDay.entries()).filter(([date]) => date !== partialFloorDay).map(([date, bins]) => {
     const wornSec = bins.size * (WEAR_BIN_DS / 10)
     // Mirror the Cloud's cumulative semantics: today is a partial day, so
     // non-wear counts only elapsed-and-not-worn time (grows through the day).

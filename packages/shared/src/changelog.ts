@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.36",
+    date: "2026-09-07",
+    changes: [
+      "Fixed the ring's wear time recording almost no wear on days you wore it all night. Three weeks of days said the ring was on your finger for under an hour and a half, which pulled them out of your HRV and resting-heart-rate baselines and dimmed the readiness reading. New days are recorded correctly; the affected days from 14 August to 4 September need a one-off Redecode to be rebuilt.",
+    ],
+  },
+  {
     version: "1.436.35",
     date: "2026-09-07",
     changes: [
