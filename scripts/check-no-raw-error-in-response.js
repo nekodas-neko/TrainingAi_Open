@@ -34,6 +34,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { stripComments } = require('./lib/strip-comments');
 
 const root = path.join(__dirname, '..');
 
@@ -62,12 +63,6 @@ const ERRORLOG_BINDING = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*errorLog\
 
 const failures = [];
 let scanned = 0;
-
-function stripComments(src) {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '))
-    .replace(/(^|[^:])\/\/[^\n]*/g, (m, p) => p + ' '.repeat(m.length - p.length));
-}
 
 function walk(dir) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {

@@ -30,6 +30,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { stripComments } = require('./lib/strip-comments');
 
 const root = path.join(__dirname, '..');
 
@@ -45,12 +46,6 @@ const ACCEPTS = (name) => [
   new RegExp(`uuid\\(\\)\\.safeParse\\(\\s*${name}\\s*\\)`),
   new RegExp(`numericRouteId\\(\\s*${name}\\s*\\)`),
 ];
-
-function stripComments(src) {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '))
-    .replace(/(^|[^:])\/\/[^\n]*/g, (m, p) => p + ' '.repeat(m.length - p.length));
-}
 
 const failures = [];
 let scanned = 0;

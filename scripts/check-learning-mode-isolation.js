@@ -36,6 +36,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { stripComments } = require('./lib/strip-comments');
 
 const root = path.join(__dirname, '..');
 
@@ -96,25 +97,6 @@ function walk(dir, out = []) {
  * spot would have hidden the leak that matters most — a raw `sql` insert naming `oura_heartrate`
  * is a string, not an identifier. Comments still go, so prose describing the rule is not a hit.
  */
-function stripComments(src) {
-  let out = '';
-  let i = 0;
-  while (i < src.length) {
-    const two = src.slice(i, i + 2);
-    if (two === '//') {
-      const end = src.indexOf('\n', i);
-      const stop = end === -1 ? src.length : end;
-      out += ' '.repeat(stop - i); i = stop; continue;
-    }
-    if (two === '/*') {
-      const end = src.indexOf('*/', i + 2);
-      const stop = end === -1 ? src.length : end + 2;
-      out += ' '.repeat(stop - i); i = stop; continue;
-    }
-    out += src[i]; i += 1;
-  }
-  return out;
-}
 
 const files = [
   ...walk(path.join(root, 'lib')),

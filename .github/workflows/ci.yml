@@ -156,6 +156,7 @@ jobs:
             -e '\.toISOString()\.slice(0' \
             -e "\.toISOString()\.split('T')" \
             app/ lib/ components/ packages/ hooks/ types/ 2>/dev/null \
+            | grep -vE '^[^:]+:[0-9]+:[[:space:]]*(//|\*|\{?/\*)' \
             | grep -v 'lib/date-utils.ts' \
             | grep -v 'packages/shared/src/date-utils.ts' || true)
           if [ -n "$FOUND" ]; then
@@ -169,6 +170,7 @@ jobs:
           FOUND=$(grep -rn --include='*.ts' --include='*.tsx' \
             -e '"Push"' -e '"Pull"' -e '"Legs"' \
             app/ lib/ components/ packages/ 2>/dev/null \
+            | grep -vE '^[^:]+:[0-9]+:[[:space:]]*(//|\*|\{?/\*)' \
             | grep -v '\.md:' \
             | grep -v 'app/api/generate-program/' \
             | grep -v 'components/config/exercise-picker-sheet' \
@@ -183,6 +185,7 @@ jobs:
         run: |
           FOUND=$(grep -rn --include='*.tsx' 'safe-area-inset' \
             app/ components/ 2>/dev/null \
+            | grep -vE '^[^:]+:[0-9]+:[[:space:]]*(//|\*|\{?/\*)' \
             | grep -v 'components/shell/bottom-nav.tsx' || true)
           if [ -n "$FOUND" ]; then
             echo "Safe-area violation — use pb-safe-action / pb-nav-safe / pb-safe from globals.css (or SheetFooter/BottomActionBar which own it):"
@@ -192,7 +195,8 @@ jobs:
 
       - name: No PRAGMAs in local SQLite upgrade statements
         run: |
-          FOUND=$(grep -n 'PRAGMA' lib/sqlite/migrations.ts 2>/dev/null | grep -vE ':\s*//' || true)
+          FOUND=$(grep -n 'PRAGMA' lib/sqlite/migrations.ts 2>/dev/null \
+            | grep -vE '^[0-9]+:[[:space:]]*(//|\*|/\*)' || true)
           if [ -n "$FOUND" ]; then
             echo "PRAGMA found inside a local SQLite migration statement — Capacitor wraps upgrades in a transaction and SQLite rejects journal-mode changes there. Set pragmas post-open in sqlite-service.ts instead:"
             echo "$FOUND"
@@ -203,7 +207,8 @@ jobs:
         run: |
           FOUND=$(grep -rnE \
             'className=.[^"'"'"']*\bpt-safe(-or-4)?\b[^"'"'"']*\bpt-[0-9]|className=.[^"'"'"']*\bpt-[0-9][^"'"'"']*\bpt-safe(-or-4)?\b' \
-            app/ components/ --include='*.tsx' 2>/dev/null || true)
+            app/ components/ --include='*.tsx' 2>/dev/null \
+            | grep -vE '^[^:]+:[0-9]+:[[:space:]]*(//|\*|\{?/\*)' || true)
           if [ -n "$FOUND" ]; then
             echo "pt-safe(-or-4) combined with another pt-* class in the same className, in either order — the later Tailwind class wins and the inset is silently lost:"
             echo "$FOUND"
@@ -214,7 +219,8 @@ jobs:
         run: |
           FOUND=$(grep -rnE \
             'className=.[^"'"'"']*\b(pb-safe(-action(-lg)?)?|pb-nav-safe)\b[^"'"'"']*\b(pb|py|p)-[0-9]|className=.[^"'"'"']*\b(pb|py|p)-[0-9][^"'"'"']*\b(pb-safe(-action(-lg)?)?|pb-nav-safe)\b' \
-            app/ components/ --include='*.tsx' 2>/dev/null || true)
+            app/ components/ --include='*.tsx' 2>/dev/null \
+            | grep -vE '^[^:]+:[0-9]+:[[:space:]]*(//|\*|\{?/\*)' || true)
           if [ -n "$FOUND" ]; then
             echo "pb-safe/pb-safe-action/pb-safe-action-lg/pb-nav-safe combined with another pb-/py-/p- class in the same className, in either order — doubles or zeroes the inset depending on source order:"
             echo "$FOUND"
@@ -224,6 +230,7 @@ jobs:
       - name: No fixed bottom-N outside bottom-nav.tsx
         run: |
           FOUND=$(grep -rnE 'fixed[^"'"'"']*\bbottom-[0-9]' app/ components/ --include='*.tsx' 2>/dev/null \
+            | grep -vE '^[^:]+:[0-9]+:[[:space:]]*(//|\*|\{?/\*)' \
             | grep -v 'components/shell/bottom-nav.tsx' || true)
           if [ -n "$FOUND" ]; then
             echo "Fixed element with a raw bottom-N offset — on nav-bearing screens this can render under the bottom nav / gesture bar. Use bottom-nav-safe / bottom-fab-safe from globals.css (or bottom-0 + pb-safe-action for navless screens):"
@@ -247,7 +254,9 @@ jobs:
 
       - name: No nested button inside a role=button wrapper
         run: |
-          FOUND=$(grep -rn -A2 'role="button"' app/ components/ --include='*.tsx' 2>/dev/null | grep '<button' || true)
+          FOUND=$(grep -rn -A2 'role="button"' app/ components/ --include='*.tsx' 2>/dev/null \
+            | grep '<button' \
+            | grep -vE '^[^:]+[-:][0-9]+[-:][[:space:]]*(//|\*|\{?/\*)' || true)
           if [ -n "$FOUND" ]; then
             echo "Nested <button> inside a role=\"button\" wrapper — the browser silently strips the inner button and breaks native long-press handling. Use a plain element (span/div) for the inner control instead:"
             echo "$FOUND"
@@ -259,7 +268,7 @@ jobs:
           AI_ROUTES=$(grep -rl "@ai-sdk" app/api --include='*.ts' 2>/dev/null || true)
           FOUND=""
           for f in $AI_ROUTES; do
-            HIT=$(grep -n "JSON.parse" "$f" || true)
+            HIT=$(grep -n "JSON.parse" "$f" | grep -vE '^[0-9]+:[[:space:]]*(//|\*|/\*)' || true)
             if [ -n "$HIT" ]; then FOUND="$FOUND\n$f: $HIT"; fi
           done
           if [ -n "$FOUND" ]; then
@@ -274,7 +283,7 @@ jobs:
             | grep -v 'lib/cache-groups.ts:' \
             | grep -v 'lib/sqlite/cache.ts:' \
             | grep -v '__tests__' \
-            | grep -vE '^[^:]+:[0-9]+:\s*//' || true)
+            | grep -vE '^[^:]+:[0-9]+:[[:space:]]*(//|\*|\{?/\*)' || true)
           if [ -n "$FOUND" ]; then
             echo "Hand-rolled invalidateCache() call outside lib/cache-groups.ts — every mutation invalidates via a named group helper there (add one if it doesn't exist yet), never an ad-hoc key list at the write site (CLAUDE.md: Cache Invalidation):"
             echo "$FOUND"
