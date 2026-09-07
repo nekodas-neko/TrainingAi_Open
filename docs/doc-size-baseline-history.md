@@ -8375,7 +8375,7 @@ of those is the part worth the lines — an `isAdmin` staleness that does not ex
 read filed as a cost that is now the mechanism, are both things a future session would otherwise act
 on. The row was drafted at 27 lines and cut to 17 first; the detail lives in the journal entry.
 
-## 2026-09-06 — `docs/implementation-backlog.md` → 18428, `projectOverview.md` → 9919 (PS-25 shipped)
+## 2026-09-06 — `docs/implementation-backlog.md` → 18998, `projectOverview.md` → 9919 (PS-25 shipped)
 
 The backlog is up 20: PS-25 left the queue on shipping and LA-61 took its place, which is longer
 than the entry it replaced because it has to say why the obvious fix is wrong. Normalising the input

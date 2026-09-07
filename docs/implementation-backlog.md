@@ -1119,26 +1119,6 @@ re-proved on 2026-09-04** — three specs pass in isolation and fail in the full
 > Checked rather than assumed: this app has **zero** `useSession`/`SessionProvider` call sites, so
 > nothing consumes that endpoint — the shell takes its session as props from a server component that
 > redirects first.
-<<<<<<< HEAD
-=======
-
-**What is still owed: the middleware gates on a claim it cannot verify.** It builds its own NextAuth
-instance from the Edge-only `auth.config.ts`, and the response headers confirm it re-signs that claim
-with a fresh 7-day expiry on every request. Two ways to close it, neither taken here:
-
-1. **Node.js middleware runtime.** Confirmed available in the pinned Next 15.5.22 —
-   `loadNodeMiddleware` in `next-server.js` is gated on the functions-config manifest, not on an
-   `experimental` flag. It would let the one enforcement point read the row and keep LA-58's 403,
-   which distinguishes "deactivated" from "not signed in" in a way 401 cannot. **Cost:** every
-   request in the app moves onto Node middleware, `auth.config.ts`'s "no bcrypt, no pg" contract
-   stops applying, and a database read lands on paths that currently touch nothing.
-2. **Leave the middleware as a cheap first line** and treat `auth()` as the authoritative one, which
-   is the state as of this PR. **Cost:** a stale-cookie caller gets 401 rather than 403, so it
-   re-authenticates — which terminates at `/pending` rather than looping, since sign-in mints no
-   session for an inactive account, but it is a worse answer than 403.
-
-Not a decision for a queue pass: option 1 changes how every request in the app is served.
->>>>>>> origin/main
 
 **What is still owed: the middleware gates on a claim it cannot verify.** It builds its own NextAuth
 instance from the Edge-only `auth.config.ts`, and the response headers confirm it re-signs that claim
