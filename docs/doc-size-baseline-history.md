@@ -8496,3 +8496,15 @@ without deciding whether to move every generated program's volume.
 addition: the BF-128 row's stated reason for deferring `estimateExerciseDurationSec` was wrong and is
 amended in place rather than quietly rewritten, because a session reading it would otherwise inherit
 a conclusion that its own evidence never supported.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18844, `projectOverview.md` → 10284 (BF-130 shipped)
+
+The backlog drops 27 with nothing filed behind it — the fifth entry cleared today and the first in a
+while that raised no successor, because the wider pass it asked for came back with a finite answer
+rather than another question.
+
+`projectOverview.md` gains 27, and the load-bearing sentence is the one that has nothing to do with
+the report: **`adductors` held one exercise in the whole catalogue and it needed a machine**, so a
+home gym had zero. That was found by auditing every muscle rather than the one that was reported, and
+it was only measurable because BF-129 had labelled the equipment column hours earlier — with 22 rows
+carrying none, every one of them would have counted as reachable.
