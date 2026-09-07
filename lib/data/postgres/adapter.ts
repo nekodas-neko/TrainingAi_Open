@@ -2040,6 +2040,25 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   }
 
   async insertScaleRawSample(userId: string, sample: ScaleRawSampleInput): Promise<{ id: number }> {
+    // PS-33: a byte-identical re-send used to insert a second archive row. `oura_raw_samples`
+    // dedups on (user, timestamp, tag, body_hex); this table has only non-unique indexes, so the
+    // same three fields are matched here instead. Returning the existing id rather than skipping
+    // matters — the caller stages a pending reading and the client confirms it by that id.
+    //
+    // A pre-check is not a constraint: two simultaneous posts of the same bytes can still both
+    // insert. The unique index that would close that is LA-71 — it needs a migration that first
+    // deletes any duplicate rows, which is a different kind of change from this one.
+    const [existing] = await this.db
+      .select({ id: s.scaleRawSamples.id })
+      .from(s.scaleRawSamples)
+      .where(and(
+        eq(s.scaleRawSamples.userId, userId),
+        eq(s.scaleRawSamples.measuredAt, sample.measuredAt),
+        eq(s.scaleRawSamples.rawHex, sample.rawHex),
+      ))
+      .limit(1)
+    if (existing) return { id: existing.id }
+
     const [row] = await this.db.insert(s.scaleRawSamples)
       .values({
         userId, measuredAt: sample.measuredAt, rawHex: sample.rawHex,

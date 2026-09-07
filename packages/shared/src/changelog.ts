@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.38",
+    date: "2026-09-07",
+    changes: [
+      "The scale no longer estimates body fat, BMR or metabolic age when your height, date of birth or sex is missing from your profile. It was filling those gaps with 170 cm, 35 years and the female formula, then saving the result as a real measurement. Weigh-ins with a gap now save the weight only.",
+      "Weighing in twice with the same reading no longer stores the same measurement twice in the raw archive.",
+    ],
+  },
+  {
     version: "1.436.37",
     date: "2026-09-07",
     changes: [

@@ -23,6 +23,42 @@ export function hasValidImpedance(impedanceOhms: number): boolean {
   return impedanceOhms >= MIN_VALID_IMPEDANCE_OHMS
 }
 
+/** The profile fields the estimator needs the user to have actually entered. */
+export interface CompositionProfile {
+  heightCm?: number | null
+  dateOfBirth?: string | Date | null
+  sex?: string | null
+}
+
+/** Why a weigh-in stored no composition. `impedance` is a contact problem the user can fix by
+ *  standing barefoot; `profile` is a gap in their own details. */
+export type CompositionSkipReason = 'impedance' | 'profile'
+
+/**
+ * PS-33: the two ingest routes filled a missing height with 170 cm and a missing date of birth
+ * with 35 years, then stored the resulting body fat and metabolic age under source `scale_ble`
+ * as measured readings — live, 22 % body fat and a metabolic age of 37 on a profile with no date
+ * of birth in it. A default is right for a display preference and wrong for an input to a
+ * measurement: every field below moves the answer, and a reading nobody can tell apart from a
+ * real one is worse than no reading at all.
+ *
+ * `sex` is here for the same reason even though the entry named only the other two — the
+ * estimator reads `sex === 'male'`, so an absent value silently applies the female Deurenberg and
+ * Mifflin-St Jeor terms rather than declining.
+ *
+ * Returns null when anything is missing; the caller stores weight only, which is a path both
+ * routes already have for an invalid-impedance reading.
+ */
+export function resolveCompositionInputs(
+  user: CompositionProfile | null | undefined,
+  ageYears: number | null | undefined,
+): Pick<ScaleCompositionInput, 'heightCm' | 'ageYears' | 'sex'> | null {
+  const heightCm = user?.heightCm
+  const sex = user?.sex
+  if (heightCm == null || ageYears == null || !sex) return null
+  return { heightCm, ageYears, sex }
+}
+
 export interface ScaleCompositionInput {
   weightKg: number
   /** Average of the packet's two impedance fields (ohms). */
