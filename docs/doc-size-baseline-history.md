@@ -8420,3 +8420,17 @@ unmatched field reads as "unstated", that one printed at the top of **both** imp
 READY lists for a day. The entry also records why the safe failure must stay "visible to both" — a
 version of `lane.js` that let an unmatched value through once hid 96 of 203 entries from everyone.
 Without that line the obvious fix is to filter, which is the worse bug.
+
+## 2026-09-07 — `projectOverview.md` → 10090 (BF-121's status paragraph and its device row)
+
+Twenty-three lines, split the same way as BF-120's earlier today and for the same reason. The status
+half carries the correction that makes the fix legible — one row was mixing two denominators with
+only one labelled, which is a different complaint from the one the owner filed and is what the detail
+sheet already disagreed with. The Known-Issues half exists because a device check is still owed.
+It was first written as "the width has not been measured" and is now narrower than that: updating
+`edit-meal-batch-footer.spec.ts` — which this change broke, and which the repo-wide E2E redness would
+have hidden — turned the width question into a permanent assertion at 412 × 915. What the row names
+now is the thing a spec cannot reach: the per-portion figures read against the detail sheet and the
+diary on the S25.
+
+The backlog moves the other way: BF-121's 40-line entry goes on shipping.
