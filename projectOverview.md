@@ -26,8 +26,22 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.436.20 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-09-06.
+**Version:** v1.436.26 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-09-07.
+
+**The baseline banner told him to load 82.5 kg on a pull-up (BF-127).** Owner, mid-session: *"pull
+up = weight"*. `personal_records` holds `Pull-Up estimated_1rm = 118.25` — **not kilograms**: a
+bodyweight 1RM is computed against `BW_REF = 100`, a fixed stand-in, so it is an index of reps and
+added load, and the owner weighs 70.65 kg. The banner printed `mround125(118.25 × 0.7)` with a
+hardcoded `kg`. **The repo already forbade this in a comment written after Q-12** — *"bodyweight
+strength is measured in REPS, never kilograms … Every surface … resolves its unit here"* — and the
+exercise card **six lines below** rendered `5 RM` correctly for the same exercise. A bodyweight row
+now says `Bodyweight` with the rep max beside it, and offers no load, because 70% of a rep max is not
+a prescription. **The entry's own stated fix does not work** (`exerciseType` is on the LLM-prompt
+signal, not the card signal the client gets); the type comes from workout-data instead, keeping this
+in Lane B. **The sibling sweep found nothing else** — the other five sites all guard on
+`isBodyweight` or use the number as arithmetic. **Not seen on a screen, not device-verified**
+([journal](docs/overview/entries/2026-09-07-bf-127-bodyweight-baseline-unit.md)).
 
 **A refused meal-type reorder no longer reports success (LA-59).** `handleDragEnd` fired
 `fetch(...).then(success).catch(failure)`, and **a `fetch` promise does not reject on a 4xx** — so the
@@ -1698,6 +1712,16 @@ Last swept **2026-09-03**.
 > An entry only leaves when **nothing is still owed**: no open work, no pending owner or device
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
+
+### [workouts] BF-127's fixed banner has not been on a screen (2026-09-07)
+
+The baseline banner renders only in the `baseline` phase with `baselineComplete === false`, which the
+seeded dev user is not in — reaching it means driving a program into its first session. The unit
+logic is unit-tested against the owner's own stored figures (`118.25` bodyweight → no kilograms
+anywhere in the output; `92.5` weighted → `65 kg`, unchanged) and the render path is pinned by source
+guard, but neither is a screen. **On the S25, on a real Pull session: the Pull-Up row reads
+`Bodyweight` with the rep max beside it, and no kilograms appear on it.**
+[journal](docs/overview/entries/2026-09-07-bf-127-bodyweight-baseline-unit.md).
 
 ### [platform][body] 🟡 The vial and dose-time engine is unverified on device (OR-102a, 2026-09-06)
 
