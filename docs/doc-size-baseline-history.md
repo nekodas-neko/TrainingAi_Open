@@ -8508,3 +8508,15 @@ the report: **`adductors` held one exercise in the whole catalogue and it needed
 home gym had zero. That was found by auditing every muscle rather than the one that was reported, and
 it was only measurable because BF-129 had labelled the equipment column hours earlier — with 22 rows
 carrying none, every one of them would have counted as reachable.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18811, `projectOverview.md` → 10305 (LB-58 shipped)
+
+The backlog drops 33 for an entry whose fix was one condition. The `projectOverview.md` row that
+replaces it is deliberately longer than the change, because the useful half of LB-58 is not the fix:
+**286 of the 295 journal entries are linked by a durable doc and cannot be folded**, so the ceiling
+this PR stops enforcing arbitrarily is also a ceiling no sweep can get under. Headroom is 25 and this
+session added 7 of them.
+
+Recorded here as well as there because this file is where the next person raising a baseline will
+look, and the question they will have — *"why is the entries count allowed to keep climbing?"* — has
+an answer that is nobody's to fix inside a feature PR.
