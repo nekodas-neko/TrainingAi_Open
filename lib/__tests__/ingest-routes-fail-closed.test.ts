@@ -15,10 +15,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const upsertBodyMetrics = vi.fn(async () => undefined)
-// Typed parameter, not zero-arg: `vi.fn(async () => …)` gives `mock.calls[0]` the tuple type
-// `[]`, so reading `[0]` off it is a type error and the `as` cast from `undefined` is a second
-// one. Same shape as the login rate-limit mock fixed in #912.
-const insertErrorEvent = vi.fn(async (_row: unknown) => undefined)
+// Typed parameter, not zero-arg: `vi.fn(async () => …)` gives `mock.calls[0]` the tuple type `[]`,
+// so reading `[0]` off it is a type error. Same shape as the login rate-limit mock fixed in #912.
+// The row's shape is declared rather than left `unknown`, so the assertions below check against it
+// instead of casting — a cast would happily agree with a field the route stopped writing.
+const insertErrorEvent = vi.fn(async (_row: { message: string; stack: string | null; url: string | null; source: string }) => undefined)
 const getUserById = vi.fn(async () => ({ id: 'u-1', timezone: 'Australia/Brisbane' }))
 
 vi.mock('@/lib/data', () => ({
@@ -110,7 +111,7 @@ describe('client-error records what it is given, and refuses what it cannot', ()
     })
     expect(res.status).toBe(200)
     expect(insertErrorEvent).toHaveBeenCalledTimes(1)
-    const row = insertErrorEvent.mock.calls[0][0] as { message: string; stack: string; url: string; source: string }
+    const row = insertErrorEvent.mock.calls[0][0]
     expect(row.source).toBe('client')
     expect(row.message).toHaveLength(2000)
     expect(row.stack).toHaveLength(8000)
@@ -131,7 +132,7 @@ describe('client-error records what it is given, and refuses what it cannot', ()
   it('keeps a null stack and url rather than coercing them to strings', async () => {
     const res = await post(clientError, 'http://localhost/api/client-error', { message: 'boom' })
     expect(res.status).toBe(200)
-    const row = insertErrorEvent.mock.calls[0][0] as { stack: string | null; url: string | null }
+    const row = insertErrorEvent.mock.calls[0][0]
     expect(row.stack).toBeNull()
     expect(row.url).toBeNull()
   })

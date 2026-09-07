@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { SavedMealSchema } from '@trainingai/shared/validators/saved-meal'
-import { invalidUuidResponse, withRouteErrors } from '@/lib/api/route-errors'
+import { invalidBodyResponse, invalidUuidResponse, withRouteErrors } from '@/lib/api/route-errors'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 
 // Same shape as the create route.
@@ -26,7 +26,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   }
   const parsed = SavedMealSchema.safeParse(read.body)
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
+    return invalidBodyResponse(parsed.error)
   }
   const { name, items, servings, imageDataUri, mealTypeIds } = parsed.data
   const repo = await getRepository()

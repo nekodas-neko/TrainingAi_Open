@@ -10,6 +10,7 @@ import { scaleWithTopUp } from '@/lib/nutrition/meal-top-up'
 import { sumIngredients } from '@trainingai/shared/nutrition/scan-totals'
 import type { NutritionIngredient } from '@trainingai/shared/types/nutrition'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { invalidBodyResponse } from '@/lib/api/route-errors'
 
 // Same shape as the plan route plus one meal's ingredients. 256 KB is generous.
 const MAX_BODY_BYTES = 256 * 1024
@@ -93,7 +94,7 @@ export async function POST(req: Request) {
   }
   const parsed = RequestSchema.safeParse(read.body)
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
+    return invalidBodyResponse(parsed.error)
   }
   const input = parsed.data
 

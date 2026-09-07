@@ -4,6 +4,7 @@ import { auth } from "@/auth"
 import { getRepositoryAsync } from "@/lib/data"
 import { readJsonLimited } from "@trainingai/shared/http/request-guards"
 import { rateLimit } from "@/lib/rate-limit"
+import { invalidBodyResponse } from '@/lib/api/route-errors'
 
 const MAX_BODY_BYTES = 1024
 
@@ -45,7 +46,7 @@ export async function POST(req: Request) {
 
   const parsed = ManualBedtimeSchema.safeParse(result.body)
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid body" }, { status: 400 })
+    return invalidBodyResponse(parsed.error)
   }
 
   const date = parsed.data.date.replace(/\//g, "-")

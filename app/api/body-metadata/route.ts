@@ -8,6 +8,7 @@ import { type Sex } from "@trainingai/shared/health/workout-energy";
 import { computeActiveEnergy } from "@trainingai/shared/health/daily-energy";
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { correctBodyFatPct, type BodyFatCalibration } from '@trainingai/shared/health/body-fat-calibration'
+import { invalidBodyResponse } from '@/lib/api/route-errors'
 
 // One day's body metadata.
 const MAX_BODY_BYTES = 16 * 1024
@@ -279,7 +280,7 @@ export async function POST(req: NextRequest) {
 
   const parsed = BodyMetadataPostSchema.safeParse(read.body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid body" }, { status: 400 });
+    return invalidBodyResponse(parsed.error);
   }
   const body = parsed.data;
 

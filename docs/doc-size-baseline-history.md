@@ -8662,10 +8662,25 @@ took one reproduction to find. What replaces it is two rules in `e2e/README.md` 
 write real rows and specs that read running totals, which is where a spec author will actually meet
 them.
 
-## 2026-09-07 — `projectOverview.md` → 10418, `docs/implementation-backlog.md` → 18741 (BF-122b)
+## 2026-09-07 — `projectOverview.md` → 10418, `docs/implementation-backlog.md` → 18730 (BF-122b)
 
 Up 20 for a feature whose index row is carrying three things a green CI run cannot say: the device
 look it still owes, that the art is deferred rather than done, and that the decay count on the card
 is a lifetime figure the engine has no recency to improve. The queue is down 37 — BF-122b out, and BF-126 (the art,
 owner-gated) in at a quarter of its length, because everything BF-122b had to argue about the fold,
 the widget slot and the information surface is now code and does not need re-arguing.
+## 2026-09-07 — `docs/implementation-backlog.md` → 18797 (LA-70 shipped)
+
+Down 11. LA-70's entry came out whole: the 19 sites are converted and the helper is in
+`route-errors.ts`, so what the entry was holding — the list of files and the proposed fix — is now
+either in the diff or, in the case of the proposed fix, disproved. The reason it was wrong
+(a hand-written message on a built-in check reports the built-in code, not `custom`) lives in the
+helper's own comment and in the module-map row, which are the two places someone touching this next
+would actually look.
+
+## 2026-09-07 — `docs/agents/state/implementation-lane-a.md` → 116 (the red-Build merges)
+
+Up 24, for a section that had to go in now rather than at wrap-up: `Build` is not enforced as a
+required check here, three PRs merged with it red on 2026-09-07, and the container is ephemeral, so
+a gotcha that lives only in a session is a gotcha that is learned again. The rest of this baton is
+from 2026-09-02 and stale; a full rewrite is owed and this is not it.

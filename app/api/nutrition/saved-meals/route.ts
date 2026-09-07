@@ -3,7 +3,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { SavedMealSchema } from '@trainingai/shared/validators/saved-meal'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
-import { withRouteErrors } from '@/lib/api/route-errors'
+import { invalidBodyResponse, withRouteErrors } from '@/lib/api/route-errors'
 
 // 100 items of a uuid and a multiplier plus a 120-char name is well under 10 KB.
 // 64 KB, raised from 32 KB with Q-396. A capped thumbnail is 16 KB DECODED, which is ~21.3 KB of
@@ -31,7 +31,7 @@ export async function POST(req: Request) {
   }
   const parsed = SavedMealSchema.safeParse(read.body)
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
+    return invalidBodyResponse(parsed.error)
   }
   const { id, name, items, servings, imageDataUri, mealTypeIds } = parsed.data
   const repo = await getRepository()

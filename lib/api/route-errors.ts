@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { z, type ZodError } from 'zod'
 import { isNotFoundError, isUserFacingError } from '@trainingai/shared/errors'
 import { isUuid } from '@trainingai/shared/validation/uuid'
 
@@ -109,4 +110,62 @@ export function numericRouteId(id: unknown): { ok: true; id: number } | { ok: fa
     if (Number.isSafeInteger(parsed) && parsed > 0) return { ok: true, id: parsed }
   }
   return { ok: false, response: NextResponse.json({ error: 'Invalid id' }, { status: 400 }) }
+}
+
+/**
+ * The one answer to a body that failed Zod validation (LA-70).
+ *
+ * `{ error: parsed.error.issues[0]?.message }` put the LIBRARY's phrasing on screen — live, a user
+ * saw *"Too big: expected string to have <=80 characters"*. Nineteen sites across 18 routes did
+ * this.
+ *
+ * **But dropping the message wholesale is also wrong**, which is the half worth stating: a message
+ * someone wrote for the user is the one worth showing, and BF-129's equipment error is exactly that.
+ * So the rule is not "hide everything" — it is *whose words are these*.
+ *
+ * **The obvious discriminator, `issue.code === 'custom'`, is not it.** Measured against zod 4.4.3:
+ * `z.string().min(1, 'Name is required')` reports `code: 'too_small'` carrying the hand-written
+ * message, so filtering on `custom` — which only ever matches `.refine`/`.superRefine` — silently
+ * discards it. What actually separates the two is whether the message equals what Zod's own error
+ * map would have produced for that issue, so that is what this asks.
+ *
+ * Two carve-outs, both in the safe direction:
+ *
+ *   · `invalid_type` and `unrecognized_keys` are **never** surfaced. They describe the request's
+ *     SHAPE — a number arriving as a string, a key the schema does not know — which is a statement
+ *     about the wire format and never something a user chose or can act on. `invalid_type` also
+ *     cannot be compared reliably: the issue reaching a caller has lost its `input`, so the default
+ *     map re-renders it as "received undefined" and every one of them would read as hand-written.
+ *   · Anything that throws falls back. `z.core.locales` is not part of Zod's documented surface, so
+ *     if a future version moves it the failure must be a generic message, never a leaked internal.
+ */
+export function invalidBodyResponse(error: ZodError, fallback = 'Invalid body'): NextResponse {
+  return NextResponse.json({ error: userFacingIssueMessage(error) ?? fallback }, { status: 400 })
+}
+
+/** The message worth showing, or null when every issue is the library talking — the decision on its
+ *  own, separated from the response so it can be tested as one. */
+export function userFacingIssueMessage(error: ZodError): string | null {
+  for (const issue of error.issues) {
+    if (issue.code === 'invalid_type' || issue.code === 'unrecognized_keys') continue
+    if (issue.message && !isZodDefaultWording(issue)) return issue.message
+  }
+  return null
+}
+
+/** Built once: `locales.en()` allocates a fresh map per call and this runs per issue. */
+let defaultErrorMap: z.core.$ZodErrorMap | null | undefined
+
+function isZodDefaultWording(issue: { message: string }): boolean {
+  try {
+    if (defaultErrorMap === undefined) defaultErrorMap = z.core.locales.en().localeError ?? null
+    if (!defaultErrorMap) return true
+    const rendered = defaultErrorMap(issue as never)
+    // Anything we cannot render, we cannot prove is the user's — so it counts as the library's and
+    // the caller falls back. The failure direction is deliberate: a generic message is a worse
+    // answer than a written one, and a leaked internal is a worse answer than either.
+    return typeof rendered !== 'string' || rendered === issue.message
+  } catch {
+    return true
+  }
 }
