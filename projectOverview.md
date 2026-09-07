@@ -1726,6 +1726,33 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [workouts] 🟡 Four exercises were added to the catalogue and none has been seen in the app (BF-130, 2026-09-07)
+
+**What shipped.** Migration 270 adds `Stability Ball Leg Curl` and `Slider Leg Curl` (knee-flexion
+hamstrings needing no machine and no ankle anchor) plus `Copenhagen Plank` and `Cable Hip Adduction`.
+
+**The finding that outranks the report.** The entry was filed because the owner could not do a Nordic
+curl. Doing the wider pass it asked for found worse: **`adductors` held exactly one exercise in the
+whole catalogue, `Adductor Machine`, so a home gym had zero** — the only main muscle with no
+home-reachable option at all. Nobody had looked because nobody had asked. That audit was only
+possible because BF-129 shipped hours earlier; with 22 rows carrying no equipment, every one would
+have counted as reachable.
+
+**What is owed: nobody has seen these rows in the app.** A migration adding catalogue rows changes no
+code path, so there was no `pnpm dev` call and no S25 look. They should appear in the exercise
+picker, the swap sheet's alternatives and the generation candidate list after the next Railway
+deploy. The instructions text in particular has only been read in the migration file.
+
+**Also stale in the entry, corrected in the journal:** `Cable Lying Leg Curl` already existed with
+`['cable']`, added at runtime after the entry was written — so the cable variant it asked for was
+already there and was not added again.
+
+**Noted, deliberately not fixed:** muscle names are case-inconsistent in the catalogue (`Hamstrings`
+vs `hamstrings`, `Lats` vs `lats`, `Upper Back` vs `upper back`). Not a live defect —
+`normalizeMuscle` lowercases and the generation filter lowercases directly, so both forms match
+everywhere checked. Left alone because a rename touches rows other accounts reference for a cosmetic
+gain. Recorded so the next person to notice it does not re-derive whether it matters.
+
 ### [workouts] 🟡 The session-timing screen's setup row was measuring the wrong interval, and has not been looked at since (LA-65, 2026-09-07)
 
 **What shipped.** `/api/workout-sessions/[id]/timing` reported the actual setup time from

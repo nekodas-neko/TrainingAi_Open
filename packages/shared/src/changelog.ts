@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.33",
+    date: "2026-09-07",
+    changes: [
+      "Four exercises added for training at home. Hamstring curls you can do with a stability ball or a towel on the floor \u2014 the only knee-flexion options before were a machine or a Nordic curl, which needs your ankles held down. And two for the adductors, which had exactly one exercise in the whole library and it needed a machine.",
+    ],
+  },
+  {
     version: "1.436.32",
     date: "2026-09-07",
     changes: [

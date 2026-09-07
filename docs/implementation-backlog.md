@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **270** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **271** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v38** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -705,33 +705,6 @@ new reward currency.
   That is already true from the data fix, which is exactly why the code change needs its own check
   rather than a screenshot.
 - **Reversal cost:** trivial — one import and one predicate, on one component.
-
-### [workouts] BF-130 — the library has no home-gym knee-flexion hamstring exercise, so the gap is unfillable from the app
-
-- **Lane:** A — `exercise_library` content.
-- **Added:** 2026-09-06 · owner, told the fix for his one uncovered muscle was a Nordic curl: *"Not sure I can do this at home - can you look up other excercises we can replace this with"*.
-- **Needs:** BF-129
-- **The whole library holds two knee-flexion hamstring movements**: `Leg Curl` (`machine`) and
-  `Nordic Hamstring Curl` (`bodyweight`). Every other hamstring-main exercise — Barbell/Dumbbell
-  RDL, Deadlift, Sumo, Trap Bar, Good Morning, Jefferson Curl, Single Leg RDL — is a hip hinge.
-- **So a home gym without a leg-curl machine has exactly one option, and it is the hardest movement
-  in the category.** For this owner both are out: no machine, and the Nordic needs an ankle anchor.
-  His program (`Bankai`) therefore trains hamstrings through hip extension only — Hip Thrust ×2 plus
-  an SL RDL — and nothing in the app can close it.
-- **It also collides with his lumbar constraint**, which is what makes this worth an entry rather
-  than a shrug: every alternative the library *does* offer is a loaded hinge, the one pattern he is
-  trying to limit. The category with no spinal loading is exactly the category with no rows.
-- **Add the home-gym knee-flexion variants**: a cable leg curl (ankle strap — he already has the
-  tower), a slider/towel leg curl and a stability-ball leg curl, all `bodyweight` or `cable`. Band
-  variants are optional; their resistance curve peaks where the hamstring is weakest.
-- **He can already self-serve this** — `AddExerciseSheet` posts to `/api/exercises` and is reachable
-  from the builder's "+ Add" and the Stats library search — so this entry is about the *default*
-  library being complete, not about unblocking him.
-- **Worth a wider pass than hamstrings while someone is in there.** This gap was found by asking one
-  question about one muscle; nothing says hamstrings are the only category whose only options need
-  equipment a home gym lacks. Check each muscle for at least one `bodyweight`-or-`dumbbell` entry per
-  movement pattern.
-- **Reversal cost:** none — added rows.
 
 ### [platform] LB-56 — E2E costs 26 minutes a UI PR and currently gates nothing; decide which of those to change
 
