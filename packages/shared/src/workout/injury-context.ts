@@ -17,6 +17,7 @@
 
 import { daysBetweenDateStrs } from '../date-utils'
 import type { Injury } from '../types/injury'
+import { userTextBlock } from '../ai/untrusted-text'
 
 /** Unresolved injuries, newest first. `resolvedDate` is the only "is it over" signal — an injury
  *  has no expiry and does not lapse on its own. */
@@ -46,8 +47,12 @@ export function formatInjuryContext(injuries: Injury[], today: string): string {
     .map(i => {
       const days = Math.max(0, daysBetweenDateStrs(i.startedDate, today))
       const since = days === 0 ? 'started today' : `active ${days} day${days === 1 ? '' : 's'}`
-      const note = i.notes?.trim() ? ` — "${i.notes.trim()}"` : ''
-      return `- ${i.muscleName} (${i.severity}, ${since})${note}`
+      // LA-69. Both of these are free text the user typed — `muscleName` is
+      // `z.string().min(1).max(100)`, not a picker — and they arrive here from a STORED row, which
+      // is the second-order shape PS-32 fenced in the meal planner and left open here. The note used
+      // to be wrapped in a `"` the value itself can close.
+      const note = i.notes?.trim() ? ` — ${userTextBlock([i.notes])}` : ''
+      return `- ${userTextBlock([i.muscleName])} (${i.severity}, ${since})${note}`
     })
     .join('\n')
 }

@@ -6,6 +6,78 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.38",
+    date: "2026-09-07",
+    changes: [
+      "The scale no longer estimates body fat, BMR or metabolic age when your height, date of birth or sex is missing from your profile. It was filling those gaps with 170 cm, 35 years and the female formula, then saving the result as a real measurement. Weigh-ins with a gap now save the weight only.",
+      "Weighing in twice with the same reading no longer stores the same measurement twice in the raw archive.",
+    ],
+  },
+  {
+    version: "1.436.37",
+    date: "2026-09-07",
+    changes: [
+      "Text you type into a meal plan — shops, foods to exclude, meals you usually eat — is now quoted to the AI as your words rather than mixed in with the app's own instructions. An excluded-food entry phrased as a command could rename the whole plan and every meal in it.",
+      "The rules that stop the AI inventing superlatives or slipping into pounds and Fahrenheit now reach every screen that writes text for you, instead of about half of them.",
+    ],
+  },
+  {
+    version: "1.436.36",
+    date: "2026-09-07",
+    changes: [
+      "Fixed the ring's wear time recording almost no wear on days you wore it all night. Three weeks of days said the ring was on your finger for under an hour and a half, which pulled them out of your HRV and resting-heart-rate baselines and dimmed the readiness reading. New days are recorded correctly; the affected days from 14 August to 4 September need a one-off Redecode to be rebuilt.",
+    ],
+  },
+  {
+    version: "1.436.35",
+    date: "2026-09-07",
+    changes: [
+      "The sleep-and-performance insight was counting each exercise as a separate day. It said \u201c233 paired days\u201d where you had 48, and judged how reliable the pattern was against that inflated number. It now counts days, so the figure it quotes is the one you actually have \u2014 and a pattern it calls reliable now has to survive the real count.",
+    ],
+  },
+  {
+    version: "1.436.34",
+    date: "2026-09-07",
+    changes: [
+      "Starting a deload week now updates the weights on screen straight away. Confirming it changed your program but left the cached session cards and the home recommendation showing full-intensity targets \u2014 for up to six hours, or until you restarted the app.",
+    ],
+  },
+  {
+    version: "1.436.33",
+    date: "2026-09-07",
+    changes: [
+      "Four exercises added for training at home. Hamstring curls you can do with a stability ball or a towel on the floor \u2014 the only knee-flexion options before were a machine or a Nordic curl, which needs your ankles held down. And two for the adductors, which had exactly one exercise in the whole library and it needed a machine.",
+    ],
+  },
+  {
+    version: "1.436.32",
+    date: "2026-09-07",
+    changes: [
+      "The session timing breakdown now measures your setup time over the right interval. It was showing only the last few seconds before your first set \u2014 the bar-load moment \u2014 and comparing that against an estimate meant for the whole gap between exercises, so setup always looked minutes faster than expected when it was usually slower.",
+    ],
+  },
+  {
+    version: "1.436.31",
+    date: "2026-09-07",
+    changes: [
+      "Program generation and exercise swaps stop offering you kit you do not own. Twenty-two exercises in the catalogue had no equipment recorded against them, and a blank entry was being read as \u201cneeds nothing\u201d \u2014 so machine exercises passed a home-gym filter that should have excluded them. The blanks are filled in, and a new exercise can no longer be saved without saying what it needs.",
+    ],
+  },
+  {
+    version: "1.436.30",
+    date: "2026-09-07",
+    changes: [
+      "A generated session can no longer come back with two main lifts in it. The role on each exercise is what sets its percentages and sets, and nothing was checking how many of each a session got \u2014 so a session could be handed two exercises at the heaviest band where your programs carry one. Second compounds are untouched: two of those is normal.",
+    ],
+  },
+  {
+    version: "1.436.29",
+    date: "2026-09-07",
+    changes: [
+      "A generated session now fits the number of exercises you actually do. The planner was reserving a rest period after the last set of every exercise \u2014 a rest you never take, because what follows the last set is walking to the next station, which it was already counting. On a 60-minute session that one double-count was worth a whole exercise: it prescribed four where your own history has five.",
+    ],
+  },
+  {
     version: "1.436.28",
     date: "2026-09-07",
     changes: [

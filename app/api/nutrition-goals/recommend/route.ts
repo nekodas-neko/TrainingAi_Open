@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { describePersonalRecord } from '@trainingai/shared/1rm'
 import { generateObject } from 'ai'
+import { PROSE_FIELD_GUARDS } from '@/lib/ai/prompt-guards'
 import { aiModel, loggedGenerateObject } from '@/lib/ai/instrument'
 import { z } from 'zod'
 import { rateLimit } from '@/lib/rate-limit'
@@ -290,7 +291,9 @@ Instructions:
 - If the active program is currently in a "deload" or "testing" phase, expect reduced training volume, intensity, and possibly step counts — do not interpret this as a declining trend or sign of reduced effort.
 - Program phase can inform your numeric suggestions within reason: e.g. a "peak" or high-volume phase may justify a modest increase to calories/protein/steps over baseline, while a "deload" phase may justify holding steady or a slight reduction. Mention this reasoning explicitly when it influences a number.
 - "dataQualityNote": briefly note if the recommendation is baseline-only due to sparse data, otherwise return an empty string.
-- All step/calorie/water values must be DAILY figures, not weekly.`,
+- All step/calorie/water values must be DAILY figures, not weekly.
+
+${PROSE_FIELD_GUARDS}`,
     }))
     ai = result.object
 

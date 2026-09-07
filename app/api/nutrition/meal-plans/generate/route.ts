@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { generateObject } from 'ai'
+import { userTextBlock, USER_TEXT_NOTE } from '@trainingai/shared/ai/untrusted-text'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { aiModel, loggedGenerateObject, contentKey } from '@/lib/ai/instrument'
@@ -263,17 +264,19 @@ export async function POST(req: Request) {
           // it: the model duplicating a meal the plan already holds is the failure this phrasing
           // was measured to fix, and a library pick is no less already-there than a pin.
           kept.length + libraryPicks.length
-            ? `The plan ALREADY contains these meals, which the user eats and which are not yours to change: ${[...kept.map(k => k.name), ...libraryPicks.map(p => p.meal.name)].join('; ')}. Everything you return must be genuinely DIFFERENT food from those — different protein, different carb, different style.`
+            ? `The plan ALREADY contains these meals, which the user eats and which are not yours to change: ${userTextBlock([...kept.map(k => k.name), ...libraryPicks.map(p => p.meal.name)])}. Everything you return must be genuinely DIFFERENT food from those — different protein, different carb, different style.`
             : '',
           input.usualMeals?.length
-            ? `Meals they usually eat, for style — match this kind of food where it fits: ${input.usualMeals.join('; ')}.`
+            ? `Meals they usually eat, for style — match this kind of food where it fits: ${userTextBlock(input.usualMeals)}.`
             : '',
           `Daily targets (already decided — do NOT restate or recalculate them): ${dailyCalories} kcal, ${dailyProtein}g protein, ${dailyCarbs}g carbs, ${dailyFat}g fat.`,
           input.trainingTime ? `Trains at about ${input.trainingTime}.` : 'No usual training time.',
-          input.stores?.length ? `Shops at: ${input.stores.join(', ')}. Prefer everyday items from these.` : '',
-          allergies.length ? `MUST NOT CONTAIN (allergy): ${allergies.join(', ')}. Treat as absolute.` : '',
-          avoid.length ? `Avoid (preference): ${avoid.join(', ')}.` : '',
-          input.excludedFoods?.length ? `Also exclude: ${input.excludedFoods.join(', ')}.` : '',
+          input.stores?.length ? `Shops at: ${userTextBlock(input.stores)}. Prefer everyday items from these.` : '',
+          allergies.length ? `MUST NOT CONTAIN (allergy): ${userTextBlock(allergies)}. Treat as absolute.` : '',
+          avoid.length ? `Avoid (preference): ${userTextBlock(avoid)}.` : '',
+          input.excludedFoods?.length ? `Also exclude: ${userTextBlock(input.excludedFoods)}.` : '',
+          '',
+          USER_TEXT_NOTE,
           '',
           'Rules:',
           '- For each meal, list its ingredients with a weight in grams and standard per-100g values (calories, protein, carbs, fat). The per-100g figures must be honest reference values for the food — never bend them to make the sums work — and do NOT output a meal total. Totals are summed from your ingredients in code.',

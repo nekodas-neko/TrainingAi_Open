@@ -8421,6 +8421,17 @@ READY lists for a day. The entry also records why the safe failure must stay "vi
 version of `lane.js` that let an unmatched value through once hid 96 of 203 entries from everyone.
 Without that line the obvious fix is to filter, which is the worse bug.
 
+## 2026-09-07 — `docs/implementation-backlog.md` → 18991, `projectOverview.md` → 10110 (BF-128 shipped, LA-65 filed)
+
+Net +14 on the backlog for a fix that was one line of code. BF-128's 31 lines left; LA-65's 42
+arrived. The trade is deliberate and worth naming: BF-128 asked for a measurement pass on the
+transition constant "while the data is open", and the pass came back **contradictory** — 240 s
+assumed, reading as 249 s, 316 s, or an implied +20.8 min over-prediction depending purely on how
+136 NULL rows are treated. A contradiction is a finding, and the entry that records it has to carry
+the numbers or the next session repeats the measurement and reaches the same standstill.
+
+`projectOverview.md` gains 27 for the thing genuinely outstanding: the fix adds up to one exercise to
+every generated session at every budget, and nobody has trained one yet.
 ## 2026-09-07 — `projectOverview.md` → 10090 (BF-121's status paragraph and its device row)
 
 Twenty-three lines, split the same way as BF-120's earlier today and for the same reason. The status
@@ -8457,3 +8468,130 @@ four inputs against what the client can actually reach is the whole entry; prose
 route" would have been a third the length and would not have survived the first person who thought
 they could get away with the workout ladder alone. They cannot, and the row that says why — the
 paused days — is the one that matters, because building without it decays a user for complying.
+## 2026-09-07 — `docs/implementation-backlog.md` → 18888, `projectOverview.md` → 10189 (BF-126 shipped)
+
+The backlog shrinks 31 with nothing filed behind it, which is worth noting because the last two
+entries each left a successor. BF-126 raised one question it could not answer — whether the *heavy*
+count should be levelled across a program's sessions, which is what the owner's complaint literally
+described — and that went into the `projectOverview.md` row rather than the queue, because the answer
+costs weekly training volume and is the owner's call, not a validator's.
+
+`projectOverview.md` gains 32 for the honest version of what shipped: a guard against a defect that
+did not reproduce in 44 sampled sessions. An entry that read "fixed" would be wrong, and an entry
+that read "could not reproduce, closed" would throw away a real hole in the code.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18874, `projectOverview.md` → 10221 (BF-129 shipped, LA-66 filed)
+
+Roughly flat: BF-129's 40 lines left, LA-66's 22 arrived — the swap sheet's copy of the equipment
+filter, which is Lane B's and which the BF-129 entry had already named as such.
+
+`projectOverview.md` gains 33, and most of it is one finding rather than a status line:
+`exercise_library` is only partly seeded — production held **151 rows against a freshly-migrated
+141** — so the rows that drifted came in through `POST /api/exercises` at runtime, and a CI check
+against a migrated database would have passed the entire time the catalogue was broken. That is
+written down because the next "add a check for it" on catalogue data needs to ask which half of the
+table it is checking.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18871, `projectOverview.md` → 10257 (LA-65 measured)
+
+The backlog is 3 lines shorter for a day's work, which is the point: LA-65 was rewritten rather than
+cleared. Its measurement is done and its contradiction dissolved — the "+20.8 min over-prediction"
+that justified filing it was a double-count in the measurement itself — but the entry stays queued,
+gated on the owner, because what the measurement uncovered is a real off-by-one that cannot be fixed
+without deciding whether to move every generated program's volume.
+
+`projectOverview.md` gains 36 across two edits, and one of them is a retraction rather than an
+addition: the BF-128 row's stated reason for deferring `estimateExerciseDurationSec` was wrong and is
+amended in place rather than quietly rewritten, because a session reading it would otherwise inherit
+a conclusion that its own evidence never supported.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18844, `projectOverview.md` → 10284 (BF-130 shipped)
+
+The backlog drops 27 with nothing filed behind it — the fifth entry cleared today and the first in a
+while that raised no successor, because the wider pass it asked for came back with a finite answer
+rather than another question.
+
+`projectOverview.md` gains 27, and the load-bearing sentence is the one that has nothing to do with
+the report: **`adductors` held one exercise in the whole catalogue and it needed a machine**, so a
+home gym had zero. That was found by auditing every muscle rather than the one that was reported, and
+it was only measurable because BF-129 had labelled the equipment column hours earlier — with 22 rows
+carrying none, every one of them would have counted as reachable.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18811, `projectOverview.md` → 10305 (LB-58 shipped)
+
+The backlog drops 33 for an entry whose fix was one condition. The `projectOverview.md` row that
+replaces it is deliberately longer than the change, because the useful half of LB-58 is not the fix:
+**286 of the 295 journal entries are linked by a durable doc and cannot be folded**, so the ceiling
+this PR stops enforcing arbitrarily is also a ceiling no sweep can get under. Headroom is 25 and this
+session added 7 of them.
+
+Recorded here as well as there because this file is where the next person raising a baseline will
+look, and the question they will have — *"why is the entries count allowed to keep climbing?"* — has
+an answer that is nobody's to fix inside a feature PR.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18788, `projectOverview.md` → 10330 (RV-49 shipped)
+
+Backlog down 23, and the `projectOverview.md` row that replaces it is longer than the fix because
+two things are owed rather than none: the eviction is verified in Chromium but **not on the APK the
+owner reported it from**, and the e2e asserts the caches clear rather than that the card repaints
+with deloaded numbers. Both are stated as limits of the verification, not as future work someone
+must schedule — the first is a re-check, the second needs a multi-table fixture that is only worth
+building if the symptom returns.
+
+Also recorded there, and in the journal entry, are the three dead ends the e2e cost: `/session-select`
+redirects to `/workout`, the route is `/api/readiness-score`, and the morning check-in sheet hides
+Home's buttons while leaving their text in the DOM — a failure that reads as "the button does not
+exist".
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18821 (LA-67 filed)
+
+Up 33 rather than down, and it is the right direction: RV-49's CI runs surfaced a nutrition E2E
+failure that is **not** the constraint race fixed alongside it. The entry carries the verbatim error
+and the four-failures-across-two-runs evidence because the tempting reading — "E2E is flaky" — is the
+one the run's own output refutes: 154 passed, and the five genuinely flaky specs all passed on retry
+while this one failed on both attempts, twice.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18811, `projectOverview.md` → 10360 (PS-29 shipped)
+
+Backlog down 10; `projectOverview.md` up 30, and most of that row is one instruction rather than a
+status: **read the new output carefully rather than as a regression.** The sleep–performance insight
+was counting lifts as days — 233 where the owner has 48 — so its p-value was computed at an inflated
+n. If the screen now says "no reliable relationship across 48 paired days", that is the fix working,
+and without the row saying so the obvious next reading is that something broke.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18821 (PS-32 shipped, split in two)
+
+Up 10, and the growth is the point rather than a cost: PS-32 held three findings and the PR shipped
+two of them, so the one entry it replaced becomes two — **LA-69** (the same fence for the stored free
+text reaching four other prompts) and **LA-70** (20 routes echoing raw Zod wording). Both were cut
+from the PR deliberately, and an entry each is what stops a cut from reading as a completion.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18807 (LA-64 shipped)
+
+Down 14. LA-64 was a long entry because it argued a direction — that a rule matching its own
+comment gives a **false negative**, which reports clean over unparsed code, while the noisy case
+is only a false positive. That argument is now in `scripts/lib/strip-comments.js`'s header, where
+the next person changing the stripper will actually read it, so the entry's replacement (LA-72,
+the ~30 checks that strip nothing) only has to name the residue.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18791 (LA-63 rewritten)
+
+Down 16, and shorter because two thirds of the entry was argument rather than fact. LA-63 reasoned
+at length from an idle Postgres log toward "a startup timeout"; running the suite settled it in one
+pass — 147 passed, 9 failed — so the reasoning is gone and the nine spec names are what remains.
+An entry that argues is an entry whose evidence was never gathered.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18794 (LA-73 shipped)
+
+Up 3. LA-73 asked a question — does any stored name carry a control character — and the answer was
+no across all 155 exercise, 5 program, 22 session and 25 style names, so it shipped as a guard on
+the write. What replaces it is longer because it is a different finding: LA-74, the two program
+write routes that have no request schema at all, which is *why* the guard reached one table out of
+four rather than a scoping choice.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18831 (LB-60 filed)
+
+Up 37, and the entry is the whole growth: LB-60 is the authenticated GET that BF-122a's engine half
+was never given, and BF-122b — four Lane B surfaces — cannot start without it. Re-derived after
+merging `main`, which had already moved the baseline to 18794; carrying this branch's own number
+across that merge would have handed the queue a whole entry's worth of silent slack.

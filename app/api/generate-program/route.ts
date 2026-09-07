@@ -3,13 +3,17 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { generateObject } from 'ai'
+import { PROSE_FIELD_GUARDS } from '@/lib/ai/prompt-guards'
+import { USER_TEXT_NOTE } from '@trainingai/shared/ai/untrusted-text'
 import { aiModel, loggedGenerateObject } from '@/lib/ai/instrument'
 import { z } from 'zod'
 import type { GeneratedProgram, GeneratedExercise } from '@trainingai/shared/types/builder'
 import { KNOWN_STYLES, GOAL_STYLE_RULES } from '@trainingai/shared/workout/known-styles'
+import { buildEquipmentSet, equipmentEligible } from '@trainingai/shared/workout/equipment'
 import { buildExerciseNameResolver, resolveAgainstLibrary } from '@trainingai/shared/workout/exercise-name-resolver'
 import { activeInjuries, activeInjuredMuscles, formatInjuryContext } from '@trainingai/shared/workout/injury-context'
 import { excludeInjuredExercises } from '@trainingai/shared/workout/injury-substitution'
+import { capPrimariesPerSession } from '@trainingai/shared/workout/exercise-role'
 import { todayInTz, DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import {
   styleWorkSec, workingBudgetMin,
@@ -59,15 +63,6 @@ const EQUIPMENT_LABEL: Record<string, string> = {
   kettlebell: 'Kettlebells', machine: 'Machines', bodyweight: 'Bodyweight',
 }
 
-function buildEquipmentSet(selected: string[]): Set<string> {
-  const set = new Set<string>(['bodyweight'])
-  if (selected.includes('full_gym')) {
-    ;['barbell', 'dumbbell', 'cable', 'kettlebell', 'machine', 'bodyweight'].forEach(e => set.add(e))
-  } else {
-    selected.forEach(e => set.add(e))
-  }
-  return set
-}
 
 // Work+rest minutes per exercise for a style's set shape — transition overhead is
 // listed separately in the prompt because it depends on the exercise's equipment.
@@ -138,7 +133,7 @@ export async function POST(req: Request) {
   const focusSet = new Set(inputs.musclesToFocus.map(m => m.toLowerCase()))
 
   const eligibleExercises = allExercises.filter(ex => {
-    const hasEquipment = ex.equipment.length === 0 || ex.equipment.some(e => equipmentSet.has(e.toLowerCase()))
+    const hasEquipment = equipmentEligible(ex.equipment, equipmentSet)
     const muscleNames = ex.muscles.map(m => m.muscle.toLowerCase())
     const relevant = muscleNames.some(m => focusSet.has(m)) || focusSet.has('full body')
     return hasEquipment && relevant
@@ -249,7 +244,8 @@ ${referenceProgram.sessions
 ACTIVE INJURIES — the exercise list below has ALREADY had everything involving these areas removed,
 so nothing you can pick will load them. Say in \`notes\` which area you worked around and what you
 chose instead, so the user can see the program accounts for it:
-${injuryContext}`
+${injuryContext}
+${USER_TEXT_NOTE}`
     : ''
 
   const systemPrompt = `You are an expert strength and conditioning coach designing programs for optimal muscle growth and strength.`
@@ -344,7 +340,7 @@ ${exerciseList}${injuryBlock}${referenceBlock}`
       () => generateObject({
         model: aiModel(),
         schema: GeneratedProgramSchema,
-        system: systemPrompt,
+        system: `${systemPrompt}\n\n${PROSE_FIELD_GUARDS}`,
         prompt: userPrompt,
         maxRetries: 0,
       }),
@@ -419,7 +415,8 @@ ${exerciseList}${injuryBlock}${referenceBlock}`
         return {
           name: s.name,
           icon,
-          exercises: s.exercises.map(ex => {
+          // BF-126: cap before the role is read, because the role below picks the style.
+          exercises: capPrimariesPerSession(s.exercises).map(ex => {
             const role = ex.exerciseRole as GeneratedExercise['exerciseRole']
             const aiStyleName = ex.progressionStyleName
             const goalRules = GOAL_STYLE_RULES[inputs.goal]

@@ -78,3 +78,46 @@ export function recommendExerciseRole(entry: RoleRecommendationInput | null): Ex
  * movement nobody has classified. The preview says what it did, so the user can correct it.
  */
 export const UNCLASSIFIED_EXERCISE_ROLE: ExerciseRole = 'accessory'
+
+/**
+ * Cap a generated session at one `primary`, demoting any extra to `secondary` (BF-126).
+ *
+ * **Why this is checked in code rather than asked for in the prompt.** `/api/generate-program`
+ * (`route.ts` rule 3) and `/api/builder-chat` both ask the model for a role per exercise and then
+ * *enforce the progression style from that role*, never falling back to the model's own style
+ * choice. So the role the model returns picks the percentages and set count — it is a prescription,
+ * and `CLAUDE.md`'s AI defaults say structure a model returns is checked in code rather than
+ * trusted. Nothing checked it: no rule caps any role, and rule 6's compound:isolation split is
+ * advisory prose. Two primaries in one session is two exercises at the goal's heaviest band where
+ * the owner's programs carry one.
+ *
+ * **Measured before the rule was chosen, because a rule fitted to one sample forbids a legitimate
+ * session.** Across the owner's 22 real program sessions, 18 carry exactly one primary; the four
+ * that do not are one legacy program that marked every exercise primary, and one session with none.
+ * **Secondaries are deliberately NOT capped**: two per session is his normal in 10 of those
+ * sessions, and it is what the generator returns in every sample below — so a "at most one
+ * secondary" rule would demote what he actually keeps.
+ *
+ * **This did not reproduce on 44 generated sessions** (10 programs, two goals, 4- and 5-exercise
+ * budgets, 4- and 5-day splits): every one came back with exactly one primary. It is a guard against
+ * a model that stops complying, not a fix for an observed miscount — the owner saw it once, and
+ * nothing in code would catch it happening again.
+ *
+ * **Never promotes and never reorders.** A session with zero primaries is left alone: the owner
+ * keeps one such session, and promoting would raise load, which is the direction that hurts. Order
+ * is untouched because the owner confirmed a lighter compound before the main lift is deliberate
+ * ("that order is how I want it!") — so the primary that survives is the FIRST in the returned
+ * order, which is arbitrary between two equal candidates but deterministic, and demotion to
+ * `secondary` keeps it a compound rather than dropping it to isolation.
+ */
+export function capPrimariesPerSession<T extends { exerciseRole?: string }>(exercises: T[]): T[] {
+  let seenPrimary = false
+  return exercises.map(ex => {
+    if (ex.exerciseRole !== 'primary') return ex
+    if (!seenPrimary) {
+      seenPrimary = true
+      return ex
+    }
+    return { ...ex, exerciseRole: 'secondary' }
+  })
+}

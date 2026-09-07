@@ -3,7 +3,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { formatInTimeZone } from 'date-fns-tz'
 import { DEFAULT_TZ, toAestDay, todayInTz, todayMidnightUtc } from '@trainingai/shared/date-utils'
-import { bucketize, computeBaselines, pctFromBaseline, correlationInsight, type BucketDef, type CorrelationStats, type WithheldReason } from '@trainingai/shared/health/correlation'
+import { bucketize, correlationInsight, buildExercise1rmBaseline, sessionMean1RmPct, type BucketDef, type CorrelationStats, type WithheldReason } from '@trainingai/shared/health/correlation'
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
 
 export interface SleepCorrelationResponse {
@@ -54,24 +54,22 @@ export async function GET() {
     }
   }
 
-  // Step 1: collect all estimated 1RM values per exercise to compute baselines
-  const exerciseValues = new Map<string, number[]>()
-  for (const ws of workoutSessions) {
-    for (const ex of ws.exercises) {
-      if (ex.estimated1rm != null && ex.estimated1rm > 0) {
-        const vals = exerciseValues.get(ex.exerciseName) ?? []
-        vals.push(ex.estimated1rm)
-        exerciseValues.set(ex.exerciseName, vals)
-      }
-    }
-  }
+  // Step 1+2: per-exercise baseline mean — only exercises with ≥3 sessions.
+  const baseline = buildExercise1rmBaseline(workoutSessions)
 
-  // Step 2: per-exercise baseline mean — only exercises with ≥3 sessions
-  const baseline = computeBaselines(exerciseValues, 3)
-
-  // Step 3: bucket % deviation from baseline, keyed by sleep the night before
-  const points: { x: number; y: number }[] = []
-  const control: number[] = []
+  // Step 3: ONE point per DAY, keyed by the sleep before it (PS-29).
+  //
+  // This pushed one point per EXERCISE, all carrying the same `x`. Four days of five lifts read as
+  // n = 20: it cleared `DEFAULT_MIN_N`, the p-value was computed at 20, and `correlationInsight`
+  // rendered "20 paired days" for four. Points from one day are not independent observations of
+  // anything — they share their x exactly — so the inflation is in the direction that manufactures
+  // significance.
+  //
+  // Aggregated by DAY rather than by session, which is where this differs from the bucketed views
+  // in /api/health-trends. Theirs key on a per-SESSION x (rest adherence, session RPE), so two
+  // sessions really are two observations; here x is one night's sleep, identical for every session
+  // that follows it, so a day is the unit. `sessionMean1RmPct` is the same aggregate either way.
+  const byDay = new Map<string, { sleepHours: number; pcts: number[]; dayIndex: number }>()
   // Day index for the calendar-confounder control (Q-75) — relative to the first workout in range,
   // so the origin is arbitrary but the spacing is real, which is all a partial correlation needs.
   const firstDayMs = workoutSessions.length ? workoutSessions[0].startedAt.getTime() : 0
@@ -81,12 +79,25 @@ export async function GET() {
     const sleepHours  = sleepByDate.get(workoutDate) ?? sleepByDate.get(prevDate)
     if (sleepHours == null) continue
 
-    for (const ex of ws.exercises) {
-      const base = baseline.get(ex.exerciseName)
-      if (base == null || ex.estimated1rm == null || ex.estimated1rm <= 0) continue
-      points.push({ x: sleepHours, y: pctFromBaseline(ex.estimated1rm, base) })
-      control.push(Math.round((ws.startedAt.getTime() - firstDayMs) / 86_400_000))
-    }
+    const meanPct = sessionMean1RmPct(ws, baseline)
+    if (meanPct == null) continue
+
+    const day = byDay.get(workoutDate)
+    if (day) day.pcts.push(meanPct)
+    else byDay.set(workoutDate, {
+      sleepHours,
+      pcts: [meanPct],
+      dayIndex: Math.round((ws.startedAt.getTime() - firstDayMs) / 86_400_000),
+    })
+  }
+
+  const points: { x: number; y: number }[] = []
+  const control: number[] = []
+  // Sorted so `control` is monotonic in real time; Map iteration is insertion order, and the
+  // sessions arrive ordered, but the partial correlation should not depend on that holding.
+  for (const [, day] of [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    points.push({ x: day.sleepHours, y: day.pcts.reduce((a, v) => a + v, 0) / day.pcts.length })
+    control.push(day.dayIndex)
   }
 
   const rawBuckets = bucketize(points, BUCKETS)

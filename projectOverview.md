@@ -1726,6 +1726,235 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [sleep] 🟡 The sleep–performance insight now reports 48 paired days instead of 233, and nobody has seen the new number (PS-29, 2026-09-07)
+
+**What shipped.** `/api/sleep-performance-correlation` pushed one point per **exercise** with one
+sleep value per day, so every point from a day carried the same x. Measured on the owner's real 90
+days: **233 points as exercises, 48 as days.** The screen has been rendering *"233 paired days"* for
+48 and computing its p-value at n = 233 — inflation in the direction that manufactures significance.
+It now aggregates one point per day.
+
+The per-bucket `minCount` floor was inflated identically, which the entry did not mention: `bucketize`
+counts points, so one day of five lifts satisfied the "≥5 observations" gate by itself — the gate
+raised 3 → 5 on 2026-08-05 because *"three observations in a bucket cannot support a claim about
+someone's body"*.
+
+**What is owed.** The numbers the screen now shows have **not been seen**. There was no `pnpm dev`
+call: the route needs paired sleep and workout history the seeded dev user does not have, so the fix
+is covered at the helper level — where the defect lives and where the mutation tests bite — rather
+than through the running endpoint.
+
+**Read the new output carefully rather than as a regression.** n should fall 233 → 48, still above
+the `DEFAULT_MIN_N = 20` floor, so the insight should keep rendering with a corrected count. **If it
+instead starts saying "no reliable relationship across 48 paired days", that is the fix working** —
+the previous significance was partly an artefact of counting lifts as days, and a p-value that
+survives at n = 233 need not survive at 48.
+
+**A reasoned choice that his data cannot yet test.** This aggregates by *day*; the eight sibling
+views in `/api/health-trends` aggregate by *session*, correctly, because their x is a per-session
+quantity. Here x is one night's sleep, identical for every session after it. On the owner's data the
+two are indistinguishable — 48 sessions across 48 days, he never trains twice in a day in this
+window — so nothing here distinguishes them in practice.
+
+### [workouts][app-shell] 🟡 The deload confirm now evicts what the screen reads, but not on the device the owner reported it from (RV-49, 2026-09-07)
+
+**What shipped.** `handleEarlyDeloadConfirm` called `invalidatePrescriptionChanged()` with no session
+id — a deload is not scoped to one session — and the per-id eviction Q-117 added was conditional on
+that id, so the confirm evicted **no cards at all**: the exact keys Q-117 was filed about.
+`next-session`, Home's recommendation key, was never in the group. Both are load-bearing rather than
+first-paint accelerators (`workout-card:` uses `freshWithinTtl`; `next-session` has seed-only readers,
+one of which reads the deload flag itself), so the screen kept full-intensity weights for up to 6
+hours after the owner confirmed a deload. The group now prefix-drops both keys when no id is given
+and clears `next-session` either way.
+
+**What is owed: the device.** The eviction is client-side and a Playwright spec drives the real
+browser storage — confirmed binding, since reverting the fix fails it by name — but **the owner's
+report was on the APK and this has not been re-checked there.** The web path and the device path
+share this code, so the risk is low; it is listed because "verified in Chromium" is not "verified
+where it was reported".
+
+**The e2e is an eviction assertion, not the repaint assertion RV-49 asked for.** It proves the caches
+clear in a real browser, which the unit test cannot (it mocks `invalidateCache`). It does not prove
+the card then paints *deloaded* numbers, because that needs the server to return a deloaded
+prescription, which needs `earlyDeloadRecommended` to arise from real data — automatic phase mode, a
+phase list, a baseline HRV and an ACWR over threshold, across several tables. The stub used here
+short-circuits exactly that. Worth building if the symptom is ever reported again; not worth the
+fixture on its own.
+
+### [platform] ⚠️ The journal ceiling now goes quiet once the base is over it, and 286 of 295 entries cannot be folded (LB-58, 2026-09-07)
+
+**What shipped.** The total-entry ceiling in `entriesVerdict` failed whichever PR was open when the
+count crossed. It now fails only the branch whose own entries **cross** it and notes for every branch
+after — measured twice before this: 2026-09-03 blocked a spec fix at 251/250, 2026-09-06 blocked an
+e2e-drift PR at 320/320, both having added exactly one entry.
+
+**The entry's prescribed fix would not have worked, and that is worth knowing.** LB-58 said to gate
+on `grewIt`, mirroring the runaway limit above. Every session writes a journal entry, so `grewIt` is
+true for practically every PR — both measured cases had `addedHere = 1` and would have failed exactly
+as before. The gate is whether this branch crossed the ceiling, not whether it grew the directory.
+
+**What is now owed, and it is the important half.** The ceiling exists because the directory stops
+being a readable recent-window; it counts *all* entries, and **286 of the current 295 are linked by a
+durable doc and therefore unfoldable**. So a sweep can no longer get under it, which is exactly why
+failing the author was unactionable — but it also means that once the base goes over, **nothing fails
+again until someone restructures the durable docs that cite those 286**. Headroom is **25 entries**
+and the linked floor only rises; this session alone added 7. That restructuring is the Orchestrator's
+call and a much larger job than a sweep. Until it happens the ceiling is a loud note rather than a
+gate, which is deliberate and stated in the message the check prints.
+
+### [workouts] 🟡 Four exercises were added to the catalogue and none has been seen in the app (BF-130, 2026-09-07)
+
+**What shipped.** Migration 270 adds `Stability Ball Leg Curl` and `Slider Leg Curl` (knee-flexion
+hamstrings needing no machine and no ankle anchor) plus `Copenhagen Plank` and `Cable Hip Adduction`.
+
+**The finding that outranks the report.** The entry was filed because the owner could not do a Nordic
+curl. Doing the wider pass it asked for found worse: **`adductors` held exactly one exercise in the
+whole catalogue, `Adductor Machine`, so a home gym had zero** — the only main muscle with no
+home-reachable option at all. Nobody had looked because nobody had asked. That audit was only
+possible because BF-129 shipped hours earlier; with 22 rows carrying no equipment, every one would
+have counted as reachable.
+
+**What is owed: nobody has seen these rows in the app.** A migration adding catalogue rows changes no
+code path, so there was no `pnpm dev` call and no S25 look. They should appear in the exercise
+picker, the swap sheet's alternatives and the generation candidate list after the next Railway
+deploy. The instructions text in particular has only been read in the migration file.
+
+**Also stale in the entry, corrected in the journal:** `Cable Lying Leg Curl` already existed with
+`['cable']`, added at runtime after the entry was written — so the cable variant it asked for was
+already there and was not added again.
+
+**Noted, deliberately not fixed:** muscle names are case-inconsistent in the catalogue (`Hamstrings`
+vs `hamstrings`, `Lats` vs `lats`, `Upper Back` vs `upper back`). Not a live defect —
+`normalizeMuscle` lowercases and the generation filter lowercases directly, so both forms match
+everywhere checked. Left alone because a rename touches rows other accounts reference for a cosmetic
+gain. Recorded so the next person to notice it does not re-derive whether it matters.
+
+### [workouts] 🟡 The session-timing screen's setup row was measuring the wrong interval, and has not been looked at since (LA-65, 2026-09-07)
+
+**What shipped.** `/api/workout-sessions/[id]/timing` reported the actual setup time from
+`prepTimeSec` and compared it against `transitionSecForEquipment`, which models the whole
+inter-exercise transition — a part against a whole. `prep` is a **sub-interval of**
+`inter_exercise_rest_sec`, verified to a median **0.05 s** against the independent
+`set_end_ms`/`set_start_ms` clock and true by construction in `workout-screen.tsx`. Median prep on a
+non-first exercise is **2 s** against a 240 s expectation, so the screen reported setup as roughly
+four minutes *faster* than expected while the real transition ran ~300 s — **slower**. It now reads
+`interExerciseRestSec ?? prepTimeSec`.
+
+**What is owed: nobody has opened that screen.** The route needs a completed session with stamped
+set timestamps, which the seeded dev user does not have, so there was no `pnpm dev` call and no S25
+look. The change is one expression on a read-only route with handler-level tests over the present,
+absent and both-present cases, but the numbers it now renders have not been seen by a human. If the
+setup row ever looked plausible before, it was plausible and wrong.
+
+**The open decision, which is the owner's.** The real transition is ~300 s per gap against a 240 s
+constant — but the constant is charged **per exercise** while a session has **one fewer gap than
+exercises**. At five exercises 5 × 240 and 4 × 300 are both 1200 s, matching the measured 19.8 min of
+real transition per session, so the two errors cancel exactly at the length the owner trains at and
+nowhere else. **Raising the constant alone would take the 60-min powerbuilding count from 5 back to
+4 and undo BF-128**, which shipped the same day to fix his own report. `LA-65` in the backlog carries
+the arithmetic and is gated on him; the BF-128 row above already asks whether five exercises fits the
+hour in practice, and that answer decides this one.
+
+### [workouts] 🟡 The catalogue's equipment column is fixed and guarded, but the add-exercise sheet still lets you submit with none (BF-129, 2026-09-07)
+
+**What shipped.** 22 `exercise_library` rows carried no equipment, and all three equipment filters
+read an empty list as an unconditional pass — so an unlabelled row cleared *every* equipment
+selection anyone could make. That is how a home gym with no machines was offered `Machine Chest
+Press`. Migration 269 labels them, `POST /api/exercises` now refuses to create another,
+`equipmentEligible` excludes an unlabelled row rather than passing it, and a Migration Check step
+holds the seeded rows.
+
+**What is still owed.**
+
+1. **The sheet has no client-side guard.** `components/exercises/add-exercise-sheet.tsx` starts with
+   `equipment: []` and lets the user press Save with no chips selected; the API now answers 400 and
+   the sheet shows the message in a toast. Correct, but a disabled button would be better than a
+   round trip, and **that toast has not been seen on the S25**.
+2. **`builder-review.tsx` keeps the third copy of the filter**, still with the permissive
+   `length === 0 ||` branch. Filed as **LA-66** (Lane B, two lines). Hardening rather than a live
+   defect — with every row labelled there is nothing for that branch to let through.
+
+**The finding worth carrying forward, because it changes where this class can be caught.**
+`exercise_library` is only partly seeded: **production held 151 rows against a freshly-migrated 141**.
+The extra ten were created at runtime through `POST /api/exercises`. So a CI check against a migrated
+database would have passed the whole time this was broken — the guard that closes the path is the
+route validation, and `scripts/check-catalogue-equipment.js` only holds the seeded half. Its header
+says so. Any future "add a check for it" on catalogue data should ask first whether the data in
+question is seeded or written at runtime.
+
+**Deliberately not changed:** the time model. `transitionSecForEquipment([])` still charges the
+barbell worst case (240 s) for an unlabelled row. The entry recommended treating empty as bodyweight
+there; with every row labelled that branch is unreachable, and re-tuning the transition constant is
+**LA-65**'s on evidence this did not have.
+
+### [workouts] 🟡 The generated-program role cap is a guard against a defect that no longer reproduces (BF-126, 2026-09-07)
+
+**What shipped.** `capPrimariesPerSession` caps a generated session at one `primary`, demoting extras
+to `secondary`, in both `/api/generate-program` and `/api/builder-chat`. The role picks the
+progression style in both routes and never falls back to the model's own choice, so an uncapped extra
+primary is a second exercise prescribed at the goal's heaviest band.
+
+**Why this is a Known Issue rather than a struck one — two things are owed.**
+
+1. **The reported defect did not reproduce, so the guard is unproven against the real failure.** The
+   owner saw one generated program where Pull carried three heavy exercises and Push two. Across
+   **44 sampled sessions** — 10 programs, powerbuilding and strength, 4- and 5-exercise budgets, 4-
+   and 5-day splits, including four at his exact reported configuration — **every session came back
+   with exactly one primary**. The model complies today. The cap exists because nothing in code would
+   catch it if that stopped being true, not because it was seen failing. If the owner sees a lopsided
+   generation again, this guard is the first thing to check, and its narrowness is the likely reason.
+2. **No device check.** Both routes were exercised end-to-end on `pnpm dev` against the local
+   database (12 sessions unchanged at 1 primary / 2 secondary / 2 accessory with correct styles; one
+   `builder-chat` edit turn returning 200), but the program-builder screens were not opened on the
+   S25.
+
+**Deliberately NOT capped: secondaries.** Two per session is the owner's normal in 10 of his 22 real
+program sessions, and it is what the generator returns in every sample. A cap there would demote what
+he keeps — and asked to *"make Upper Push heavier"*, `builder-chat` reached for a third secondary, so
+the cap would have blocked a legitimate request.
+
+**The related observation, unbuilt.** The invariant the owner's programs actually hold is a *constant
+number of heavy (primary + secondary) exercises across a program's sessions* — true in 3 of his 4
+role-bearing programs, and the thing his complaint literally described. Levelling it is not shipped:
+demoting a secondary to accessory drops 4×8 @70% to 3×10 @65%, which costs weekly volume the prompt
+works hard to hit, so it is a change that needs the owner's call rather than a validator's.
+
+### [workouts] 🟡 Every generated program now gets one more exercise per session, and no generated program has been opened on the S25 (BF-128, 2026-09-07)
+
+**What changed.** `styleWorkSec` no longer charges a rest period after the last set of an exercise.
+Measured over the owner's 90 days, that rest is not taken — 289 of 309 final sets record NULL or 0,
+against 0 of 517 non-final sets — and the walk to the next station was already charged separately, so
+it was counted twice. A 60-minute powerbuilding session moved from 4 exercises to 5, which is the
+median the owner's own 65 completed sessions actually contain.
+
+**Why it is here rather than struck.** Two things are owed.
+
+1. **The volume change is real and untested by use.** Every goal gains up to one exercise per session
+   at most budgets (hypertrophy and powerbuilding 4→5 at 60 min, strength 3→4). It was validated
+   against 36 warm-up-stamped sessions — median error moves from +5.1 min over to −3.6 min — but
+   nobody has *trained* a session generated under the new number. If five exercises consistently
+   overrun the hour in practice, this is the change to look at first.
+2. **No device check.** `POST /api/generate-program` and `POST /api/builder-chat` were exercised
+   end-to-end on `pnpm dev` against the local database, authenticated, and returned 5 exercises in
+   all four sessions. This is server-side arithmetic delivered by a Railway deploy with no native
+   path — but the program-builder screens themselves were not opened on the S25.
+
+**Related and NOT fixed by this.** `estimateExerciseDurationSec` — the *display* estimate — still
+charges every set, and probably should not. It was left alone on the grounds that its validation
+"flipped sign with the transition constant, which measured contradictorily".
+
+**AMENDED 2026-09-07 (LA-65): that reason was wrong, and the correction matters more than the
+original claim.** There was no contradiction in the data — the "+20.8 min over-prediction" was a
+double-count in the measurement itself. `prep_time_sec` is a **sub-interval of**
+`inter_exercise_rest_sec`, not additive to it, verified against the independent
+`set_end_ms`/`set_start_ms` clock (median error **0.05 s** for `inter` alone, **+136 s** when prep is
+added) and true by construction in `workout-screen.tsx`. What is genuinely open is different and
+sharper: the real transition is ~300 s per gap against a 240 s constant, but the constant is charged
+**per exercise** while a session has **one fewer gap than exercises** — so 5 × 240 and 4 × 300 are
+both 1200 s and the two errors cancel exactly at the owner's five, and only there. Raising the
+constant alone would take the 60-min powerbuilding count back to 4 and undo this very fix. **LA-65**
+carries the arithmetic and is gated on the owner. Until it lands, a session's *estimated* minutes and
+the number of exercises the planner fits are derived on two slightly different models.
 ### [workouts] BF-127's fixed banner has not been on a screen (2026-09-07)
 
 The baseline banner renders only in the `baseline` phase with `baselineComplete === false`, which the
@@ -1867,12 +2096,12 @@ id-passing caller. One-line fixes each; a Playwright repaint assertion rides the
 swept in the same pass and is **clean at source** — if the food-add symptom persists after RV-49
 ships, one repro (which screen added from, which screen stale) routes it.
 
-### [devices][readiness] 🟡 The ring's stored wear time read 0.3–1.5 h on 20 consecutive scored nights (PS-30, 2026-09-06)
+### [devices][readiness] 🟡 22 days of wear time are still wrong; only an owner-run Redecode fixes them (PS-30 → LA-68, 2026-09-07)
 
-2026-08-14→09-02, `oura_daily.non_wear_time_sec` says the ring was barely worn on days whose
-summaries carry 7–9 h nights with HRV — feeding `isLowWearToday`, the baseline exclusions and the
-wear chart a false signal. 09-03+ is sane; mechanism not established (suspect the incremental
-rollup's narrowed window). [Checkpoint](docs/reviews/2026-09-05-app-checkpoint.md) §P5.
+**Fixed forward** (`lib/oura-ble/rollup/run.ts`): the rollup wrote a wear row for the day its window floor landed
+part-way through, replacing a complete day with the 15–90 min after the cutoff — and the floor only moves forward, so
+that was the day's last value. **Still owed:** 2026-08-14→09-04 still hold those values, so `excludeLowWearDays` drops
+all 22 from the HRV/RHR baselines; one owner-run **fullHistory** Redecode rebuilds them. [Journal](docs/overview/entries/2026-09-07-fix-oura-nonwear-overwrite.md).
 
 ### [devices][body] 🟡 The scale's "Weighing you…" gate shipped UNVERIFIED on device (Q-104/Q-114, 2026-09-04)
 

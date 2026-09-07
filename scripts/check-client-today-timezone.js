@@ -35,6 +35,7 @@
 const fs = require('fs');
 const path = require('path');
 const { resolveBaseRef, countAtBase, verdict } = require('./lib/base-ref');
+const { stripComments } = require('./lib/strip-comments');
 
 const root = path.join(__dirname, '..');
 
@@ -69,12 +70,6 @@ function walk(dir, out) {
     else if (/\.tsx?$/.test(e.name)) out.push(p);
   }
   return out;
-}
-
-function stripComments(src) {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '))
-    .replace(/(^|[^:])\/\/[^\n]*/g, (m, p) => p + ' '.repeat(m.length - p.length));
 }
 
 /** The one counting pass, so the working tree and the base branch are measured identically (LA-16). */

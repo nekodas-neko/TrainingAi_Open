@@ -175,13 +175,31 @@ export interface DurationExercise {
   measuredRestSec?: number | null
 }
 
-// Rest is charged for EVERY set, not `sets - 1`. The old form assumed the inter-exercise
+// Rest is charged for EVERY set here, not `sets - 1` — read the BF-128 note below for the scope
+// of that, which is narrower than this paragraph reads. The old form assumed the inter-exercise
 // transition absorbed the last set's rest; production says they are separate clocks. On the
 // 2026-07-28 Push session: 11.1 min of set work + 26.0 min of per-set rest (all 14 sets) +
 // 13.2 min of inter-exercise gaps = 50.3 min against a measured 52-min working window — the
 // three sum to the window, so `rest_time_sec` and `inter_exercise_rest_sec` do not overlap.
 // Dropping one rest per exercise cost ~7-8 min on a 5-exercise session, which is why stored
 // estimates read 35-49 min while real working windows ran 41-65 min.
+//
+// BF-128 qualifies the headline above rather than overturning it. What that session established is
+// that per-set rest and inter-exercise gaps are SEPARATE clocks — they summed to the window, and
+// that still holds. What it did not establish is `sets` vs `sets - 1`, because it summed RECORDED
+// rests, and the recorded trailing rest is 0 (93.5% of 309 exercises). So the sum was already
+// effectively `sets - 1` and reads the same either way. The distinction only bites where a
+// *planned* rest is multiplied out, which is styleWorkSec — fixed there, deliberately not here:
+// `measuredRestSec` arrives from time-audit.ts, whose median filters `> 0` and so excludes those
+// trailing zeros, and validating the same change on this path needs the transition constant
+// settled first (LA-65).
+//
+// LA-65 measured it the same day, and the reason above needs one correction: the transition FIELD
+// is settled — `inter_exercise_rest_sec` is the whole gap and `prep_time_sec` is a sub-interval of
+// it, verified to a median 0.05 s against the independent set-timestamp clock. What is not settled
+// is the CONSTANT: the real gap is ~300 s against 240 s here, but it is charged per exercise while a
+// session has one fewer gap than exercises, so the two errors cancel at exactly five. Fixing this
+// function and fixing that off-by-one are one change, gated on the owner.
 export function estimateExerciseDurationSec(ex: DurationExercise): number {
   return ex.sets * effectiveSetWorkSec(ex.reps, ex.measuredSecPerRep)
     + ex.sets * (ex.measuredRestSec ?? ex.restSec)
@@ -198,6 +216,22 @@ export function estimateSessionDurationMin(exercises: DurationExercise[]): numbe
 
 // Work + rest seconds for a progression-style set shape. No transition overhead —
 // callers add transitionSecForEquipment (or a blended planning assumption).
+//
+// BF-128. The LAST set's rest is not charged, because it is not taken. Measured over the owner's
+// 90 days (309 exercises, 826 sets): every one of the 517 non-final sets recorded a real rest
+// (mean 126 s, median 124 s, zero nulls), while 289 of the 309 FINAL sets — 93.5% — recorded NULL
+// or 0. What follows the last set is the walk to the next station, and callers already charge that
+// separately as transitionSecForEquipment. Charging both counted it twice: on a 60-min
+// powerbuilding session the blended per-exercise estimate was 694 s, `floor(3060 / 694)` = 4
+// exercises, against a measured median of 5 (mean 4.75, max 5 over 65 completed sessions).
+// Dropping the trailing rest gives 598 s and 5 — and against 36 sessions with a stamped warm-up
+// the median error moves from +5.1 min over (29/36 over-estimates) to −3.6 min (14/36).
+//
+// This is the PLANNING term. estimateExerciseDurationSec still charges every set, and the comment
+// there explains why the two differ: it sums RECORDED rests, where the trailing one is already 0.
 export function styleWorkSec(sets: Array<{ reps: number; restSec: number }>): number {
-  return sets.reduce((total, set) => total + setWorkSec(set.reps) + set.restSec, 0)
+  return sets.reduce(
+    (total, set, i) => total + setWorkSec(set.reps) + (i === sets.length - 1 ? 0 : set.restSec),
+    0,
+  )
 }

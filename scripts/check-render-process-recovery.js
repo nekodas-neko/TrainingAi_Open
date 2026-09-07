@@ -15,6 +15,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { stripComments } = require('./lib/strip-comments');
 
 const root = path.resolve(__dirname, '..');
 const LISTENER = 'android/app/src/main/java/com/trainingai/app/RenderProcessRecovery.java';
@@ -30,9 +31,6 @@ function read(rel) {
 /** Comments say what the code is meant to do; only the code does it. Stripping them first is not
  *  tidiness — the `recreate` check below PASSED on a handler whose recovery had been replaced by an
  *  empty lambda, because the word survived in the log line and the comment above it. */
-function stripComments(src) {
-  return src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
-}
 
 const listener = read(LISTENER);
 if (listener == null) {

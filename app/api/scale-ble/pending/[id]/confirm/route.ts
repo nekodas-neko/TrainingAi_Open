@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepositoryAsync } from '@/lib/data'
-import { computeBodyComposition, hasValidImpedance } from '@/lib/scale-ble/composition'
+import { computeBodyComposition, hasValidImpedance, resolveCompositionInputs, type CompositionSkipReason } from '@/lib/scale-ble/composition'
 import { ageFromDob, DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { applyScaleReadingToBodyMetrics } from '@/lib/scale-ble/apply-reading'
 import { numericRouteId } from '@/lib/api/route-errors'
@@ -33,13 +33,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const user = await repo.getUserById(userId)
   const tz = user?.timezone ?? DEFAULT_TZ
   const impedanceOhms = (decoded.impedanceOhmsA + decoded.impedanceOhmsB) / 2
-  const heightCm = user?.heightCm ?? 170
-  const ageYears = ageFromDob(user?.dateOfBirth, new Date()) ?? 35
+  const profile = resolveCompositionInputs(user, ageFromDob(user?.dateOfBirth, new Date()))
 
   const impedanceValid = hasValidImpedance(impedanceOhms)
-  const composition = impedanceValid
-    ? computeBodyComposition({ weightKg: decoded.weightKg, impedanceOhms, heightCm, ageYears, sex: user?.sex })
+  const composition = impedanceValid && profile
+    ? computeBodyComposition({ weightKg: decoded.weightKg, impedanceOhms, ...profile })
     : null
+  const skipReason: CompositionSkipReason | null = impedanceValid ? (profile ? null : 'profile') : 'impedance'
 
   // Q-25: `row.measuredAt`, never today. A pending reading is confirmed whenever the owner next
   // opens the app — potentially days after the anomaly gate staged it — so keying this write on
@@ -50,7 +50,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   return NextResponse.json({
     status: 'confirmed', weightKg: decoded.weightKg,
-    compositionSkipped: !impedanceValid,
+    // See the note in /api/scale-ble/samples — widened to cover an incomplete profile (PS-33).
+    compositionSkipped: composition == null,
+    compositionSkippedReason: skipReason,
     // See the note in /api/scale-ble/samples — the wire name is kept for the installed APK; the
     // meaning is "trend unchanged", which is what its toast copy actually says.
     isAdditionalReadingForDay: !trendUpdated,

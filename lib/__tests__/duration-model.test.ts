@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { KNOWN_STYLES, GOAL_STYLE_RULES } from '@trainingai/shared/workout/known-styles'
 import {
   SECONDS_PER_REP, SET_SETUP_SEC,
   WARMUP_FRACTION, workingBudgetMin, warmupBudgetMin, MIN_WARMUP_MIN, MAX_WARMUP_MIN,
@@ -78,9 +79,37 @@ describe('duration formula', () => {
     expect(estimateSessionDurationMin(exs)).toBe(Math.round(estimateSessionDurationSec(exs) / 60))
   })
 
-  it('styleWorkSec sums per-set work + rest with no transition', () => {
+  // BF-128. The trailing rest is not charged: measured over the owner's 90 days, all 517 non-final
+  // sets recorded a real rest and 289 of 309 final sets recorded none. The walk to the next station
+  // is the caller's transitionSecForEquipment, so charging both counted it twice.
+  it('styleWorkSec sums per-set work but charges rest for every set except the last', () => {
     const sets = [{ reps: 5, restSec: 120 }, { reps: 5, restSec: 120 }]
-    expect(styleWorkSec(sets)).toBe(2 * setWorkSec(5) + 2 * 120)
+    expect(styleWorkSec(sets)).toBe(2 * setWorkSec(5) + 1 * 120)
+  })
+
+  it('styleWorkSec charges no rest at all for a single-set shape', () => {
+    expect(styleWorkSec([{ reps: 5, restSec: 120 }])).toBe(setWorkSec(5))
+  })
+
+  it('styleWorkSec drops the LAST rest, not the largest or the first', () => {
+    // Unequal rests, so a fix that dropped the wrong one still reads as "one rest less".
+    const sets = [{ reps: 5, restSec: 200 }, { reps: 5, restSec: 100 }, { reps: 5, restSec: 30 }]
+    expect(styleWorkSec(sets)).toBe(3 * setWorkSec(5) + 200 + 100)
+  })
+
+  // The defect as the owner met it: a 60-minute powerbuilding session was prescribed 4 exercises
+  // where 90 days of history has a median of 5. This pins the arithmetic that produced the 4, so a
+  // regression shows up as the number the owner would see rather than as a seconds delta.
+  it('a 60-min powerbuilding budget now fits the 5 exercises the history shows', () => {
+    // The real shapes GOAL_STYLE_RULES.powerbuilding resolves to, not invented ones — a test that
+    // made up its own sets would keep passing if these were retuned.
+    const primary = KNOWN_STYLES.find(s => s.name === GOAL_STYLE_RULES.powerbuilding.primary)!.sets
+    const accessory = KNOWN_STYLES.find(s => s.name === GOAL_STYLE_RULES.powerbuilding.accessory)!.sets
+    const perExercise = Math.round(
+      0.6 * (styleWorkSec(primary) + TRANSITION_SEC_BARBELL)
+      + 0.4 * (styleWorkSec(accessory) + TRANSITION_SEC_STANDARD),
+    )
+    expect(Math.floor(workingBudgetMin(60) * 60 / perExercise)).toBe(5)
   })
 
   it('working budget carves out only the warmup fraction (no finish-early buffer)', () => {

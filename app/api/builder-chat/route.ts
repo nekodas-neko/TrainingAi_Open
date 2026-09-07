@@ -3,11 +3,15 @@ import { auth } from '@/auth'
 import { rateLimit } from '@/lib/rate-limit'
 import { getRepository } from '@/lib/data'
 import { generateObject } from 'ai'
+import { PROSE_FIELD_GUARDS } from '@/lib/ai/prompt-guards'
+import { USER_TEXT_NOTE } from '@trainingai/shared/ai/untrusted-text'
 import { aiModel, loggedGenerateObject } from '@/lib/ai/instrument'
 import { z } from 'zod'
 import { GeneratedProgramSchema } from '@trainingai/shared/validation/generated-program'
 import type { GeneratedProgram, ChatMessage } from '@trainingai/shared/types/builder'
 import { KNOWN_STYLES, GOAL_STYLE_RULES } from '@trainingai/shared/workout/known-styles'
+import { buildEquipmentSet, equipmentEligible } from '@trainingai/shared/workout/equipment'
+import { capPrimariesPerSession } from '@trainingai/shared/workout/exercise-role'
 import { styleWorkSec, workingBudgetMin, TRANSITION_SEC_BARBELL, TRANSITION_SEC_STANDARD } from '@trainingai/shared/workout/duration-model'
 import { activeInjuredMuscles, formatInjuryContext } from '@trainingai/shared/workout/injury-context'
 import { excludeInjuredExercises } from '@trainingai/shared/workout/injury-substitution'
@@ -61,15 +65,6 @@ const EQUIPMENT_LABEL: Record<string, string> = {
   kettlebell: 'Kettlebells', machine: 'Machines', bodyweight: 'Bodyweight',
 }
 
-function buildEquipmentSet(selected: string[]): Set<string> {
-  const set = new Set<string>(['bodyweight'])
-  if (selected.includes('full_gym')) {
-    ;['barbell', 'dumbbell', 'cable', 'kettlebell', 'machine', 'bodyweight'].forEach(e => set.add(e))
-  } else {
-    selected.forEach(e => set.add(e))
-  }
-  return set
-}
 
 export async function POST(req: Request) {
   const session = await auth()
@@ -105,7 +100,7 @@ export async function POST(req: Request) {
   // which is the correct outcome while the injury is unresolved.
   const injuredMuscles = activeInjuredMuscles(injuries)
   const availableExercises = excludeInjuredExercises(
-    allExercises.filter(ex => ex.equipment.length === 0 || ex.equipment.some(e => equipmentSet.has(e.toLowerCase()))),
+    allExercises.filter(ex => equipmentEligible(ex.equipment, equipmentSet)),
     injuredMuscles,
   )
     .map(ex =>
@@ -151,7 +146,8 @@ export async function POST(req: Request) {
 
 ACTIVE INJURIES — every exercise involving these areas has already been removed from the list below,
 so nothing you can pick will load them. Say which area you worked around when it affects a change:
-${injuryContext}`
+${injuryContext}
+${USER_TEXT_NOTE}`
     : `
 
 The user has no injuries logged. If they describe one in their message, work around it in this
@@ -197,7 +193,7 @@ When responding, mention if a change improves or worsens weekly volume balance. 
       () => generateObject({
         model: aiModel(),
         schema: BuilderChatObjectSchema,
-        system: systemPrompt,
+        system: `${systemPrompt}\n\n${PROSE_FIELD_GUARDS}`,
         prompt: userPrompt,
         maxRetries: 0,
       }),
@@ -224,12 +220,14 @@ When responding, mention if a change improves or worsens weekly volume balance. 
       ...raw.program,
       sessions: raw.program.sessions.map((s: GeneratedProgram['sessions'][number]) => ({
         ...s,
-        exercises: s.exercises
+        // BF-126: cap before the role is read, because the role below picks the style. After the
+        // unknown-name filter, so a dropped hallucination cannot spend the session's one primary.
+        exercises: capPrimariesPerSession(s.exercises
           .filter((ex: GeneratedProgram['sessions'][number]['exercises'][number]) => {
             const known = exerciseMuscleLookup.has(ex.name)
             if (!known) droppedUnknown++
             return known
-          })
+          }))
           .map((ex: GeneratedProgram['sessions'][number]['exercises'][number]) => {
           // Re-enforce progression styles so the AI can't switch goal families.
           let styleName = ex.progressionStyleName as string | undefined
