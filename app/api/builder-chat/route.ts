@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { GeneratedProgramSchema } from '@trainingai/shared/validation/generated-program'
 import type { GeneratedProgram, ChatMessage } from '@trainingai/shared/types/builder'
 import { KNOWN_STYLES, GOAL_STYLE_RULES } from '@trainingai/shared/workout/known-styles'
+import { buildEquipmentSet, equipmentEligible } from '@trainingai/shared/workout/equipment'
 import { capPrimariesPerSession } from '@trainingai/shared/workout/exercise-role'
 import { styleWorkSec, workingBudgetMin, TRANSITION_SEC_BARBELL, TRANSITION_SEC_STANDARD } from '@trainingai/shared/workout/duration-model'
 import { activeInjuredMuscles, formatInjuryContext } from '@trainingai/shared/workout/injury-context'
@@ -62,15 +63,6 @@ const EQUIPMENT_LABEL: Record<string, string> = {
   kettlebell: 'Kettlebells', machine: 'Machines', bodyweight: 'Bodyweight',
 }
 
-function buildEquipmentSet(selected: string[]): Set<string> {
-  const set = new Set<string>(['bodyweight'])
-  if (selected.includes('full_gym')) {
-    ;['barbell', 'dumbbell', 'cable', 'kettlebell', 'machine', 'bodyweight'].forEach(e => set.add(e))
-  } else {
-    selected.forEach(e => set.add(e))
-  }
-  return set
-}
 
 export async function POST(req: Request) {
   const session = await auth()
@@ -106,7 +98,7 @@ export async function POST(req: Request) {
   // which is the correct outcome while the injury is unresolved.
   const injuredMuscles = activeInjuredMuscles(injuries)
   const availableExercises = excludeInjuredExercises(
-    allExercises.filter(ex => ex.equipment.length === 0 || ex.equipment.some(e => equipmentSet.has(e.toLowerCase()))),
+    allExercises.filter(ex => equipmentEligible(ex.equipment, equipmentSet)),
     injuredMuscles,
   )
     .map(ex =>

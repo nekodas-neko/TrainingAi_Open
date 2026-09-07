@@ -515,6 +515,15 @@ jobs:
           psql -h localhost -U postgres -d trainingai_ci -c 'TRUNCATE schema_migrations'
           node scripts/local-db/migrate.js --replay
 
+      # BF-129: runs HERE rather than in Tests because it needs a database where only the
+      # migrations have run. Tests shares one database across the suite and
+      # `set-log-planned-snapshot.test.ts` inserts an equipment-less `exercise_library` fixture, so
+      # the same assertion there would pass or fail on test ORDER.
+      - name: Every seeded exercise declares its equipment
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/trainingai_ci
+        run: node scripts/check-catalogue-equipment.js
+
   e2e:
     # Its own job, deliberately not folded into Tests: a browser job's runtime and failure modes
     # (flake, timeout, a dev server that never came up) are different enough that mixing them makes

@@ -7,6 +7,7 @@ import { aiModel, loggedGenerateObject } from '@/lib/ai/instrument'
 import { z } from 'zod'
 import type { GeneratedProgram, GeneratedExercise } from '@trainingai/shared/types/builder'
 import { KNOWN_STYLES, GOAL_STYLE_RULES } from '@trainingai/shared/workout/known-styles'
+import { buildEquipmentSet, equipmentEligible } from '@trainingai/shared/workout/equipment'
 import { buildExerciseNameResolver, resolveAgainstLibrary } from '@trainingai/shared/workout/exercise-name-resolver'
 import { activeInjuries, activeInjuredMuscles, formatInjuryContext } from '@trainingai/shared/workout/injury-context'
 import { excludeInjuredExercises } from '@trainingai/shared/workout/injury-substitution'
@@ -60,15 +61,6 @@ const EQUIPMENT_LABEL: Record<string, string> = {
   kettlebell: 'Kettlebells', machine: 'Machines', bodyweight: 'Bodyweight',
 }
 
-function buildEquipmentSet(selected: string[]): Set<string> {
-  const set = new Set<string>(['bodyweight'])
-  if (selected.includes('full_gym')) {
-    ;['barbell', 'dumbbell', 'cable', 'kettlebell', 'machine', 'bodyweight'].forEach(e => set.add(e))
-  } else {
-    selected.forEach(e => set.add(e))
-  }
-  return set
-}
 
 // Work+rest minutes per exercise for a style's set shape — transition overhead is
 // listed separately in the prompt because it depends on the exercise's equipment.
@@ -139,7 +131,7 @@ export async function POST(req: Request) {
   const focusSet = new Set(inputs.musclesToFocus.map(m => m.toLowerCase()))
 
   const eligibleExercises = allExercises.filter(ex => {
-    const hasEquipment = ex.equipment.length === 0 || ex.equipment.some(e => equipmentSet.has(e.toLowerCase()))
+    const hasEquipment = equipmentEligible(ex.equipment, equipmentSet)
     const muscleNames = ex.muscles.map(m => m.muscle.toLowerCase())
     const relevant = muscleNames.some(m => focusSet.has(m)) || focusSet.has('full body')
     return hasEquipment && relevant

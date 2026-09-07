@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **269** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **270** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v38** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -640,46 +640,6 @@ new reward currency.
   wants the short form for its own overflow, which is a reason to land these together.
 - **Reversal cost:** low. The state-setter shape already exists in `swapExercise`.
 
-### [workouts] BF-129 — 22 library exercises have no equipment listed, and empty means "everyone owns it" 🔴 LIVE
-
-- **Lane:** A — `app/api/generate-program/route.ts` and the `exercise_library` rows; the swap filter in `components/workout-builder/builder-review.tsx` is the Lane B half of the same read.
-- **Added:** 2026-09-06 · found while answering the owner's *"I have no commercial gym so no machines"* — he was being offered machine work.
-- **Needs:** — nothing.
-- **Measured.** 22 non-merged rows in `exercise_library` carry `equipment = []`. Both equipment
-  filters read an empty list as an unconditional pass —
-  `route.ts:141` and `builder-review.tsx:198` are each
-  `ex.equipment.length === 0 || ex.equipment.some(e => equipmentSet.has(...))`. So an unlabelled row
-  clears **every** equipment selection anyone can make.
-- **Three of the 22 are machines**: `Machine Chest Press`, `Machine Shoulder Press`, `Machine Shrug`.
-  The owner trains at home with a barbell, dumbbells, a cable tower and a pull-up bar, and has logged
-  no machine work in 120 days — the generator can hand him those three regardless, and the swap sheet
-  can offer them as alternatives.
-- **The rest are mostly bodyweight**, which is the second failure and it compounds **BF-128**:
-  `transitionSecForEquipment([])` returns `TRANSITION_SEC_DEFAULT`, which *is*
-  `TRANSITION_SEC_BARBELL = 240 s` (`duration-model.ts:141`, commented *"unknown equipment: assume
-  worst case"*). So `Diamond Push-Up`, `Pike Push-Up`, `Weighted Dip`, `Burpee`, `Inverted Row`,
-  `Side Plank`, `Pallof Press`, `V-Up`, `Mountain Climbers` and the rest are each budgeted as a
-  four-minute barbell lift instead of a one-minute bodyweight one. Costing bodyweight work at 4×
-  makes the session planner fit fewer exercises — the same symptom BF-128 measured, from a second
-  cause. **BF-128 shipped on 2026-09-07** (the trailing rest is no longer charged, which moved a
-  60-min powerbuilding session from 4 exercises to a verified 5); this half is untouched by it, so
-  the under-count it describes is still live and still worth exactly this entry.
-- **Both halves are one fix: fill the column in.** The worst-case default is defensible for an
-  unknown; what is not defensible is 22 knowns being unknown. Set the 22 rows from their names and
-  movements — the three `Machine %` rows to `['machine']`, the calisthenics to `['bodyweight']`,
-  `Decline Dumbbell Press` to `['dumbbell']`, `Barbell Box Squat` and `Rack Pull` to `['barbell']`,
-  `Cable Crunch Abs` to `['cable']`.
-- **Then decide what empty should mean**, because the data will drift again. Two options and they
-  are not equal: treating empty as *"needs nothing"* (i.e. bodyweight) makes the filter permissive
-  in the safe direction and the time estimate optimistic; treating it as *"unknown, exclude"* is
-  safe on both but silently drops any future unlabelled row out of every generation. Recommend
-  bodyweight for the **time** default and unknown-excludes for the **filter**, since a wrong minute
-  is cheaper than an exercise the lifter cannot perform. Whichever is chosen, a check that fails on
-  a new empty-equipment row is what actually holds it.
-- **`Dumbbell Lunges` is a duplicate of `Dumbbell Lunge`** and surfaced in the same sweep — it wants
-  a `merged_into`, not an equipment value.
-- **Reversal cost:** low. Data plus one predicate.
-
 ### [workouts] LA-65 — the planner's transition constant is the last unmeasured term, and the data disagrees with itself about it
 
 - **Lane:** A — `packages/shared/src/workout/duration-model.ts` (`TRANSITION_SEC_*`), `packages/shared/src/workout/time-audit.ts`.
@@ -722,6 +682,32 @@ new reward currency.
 - **Reversal cost:** low as code (one constant, one multiplier), high as behaviour — it moves every
   generated program's volume, and it moves the stored session estimates users read. Wants the
   measurement first, which is why nothing here is a patch.
+
+### [workouts][app-shell] LA-66 — the swap sheet still carries its own copy of the equipment filter, and it is the permissive one
+
+- **Lane:** B — `components/workout-builder/builder-review.tsx`.
+- **Added:** 2026-09-07 · Lane A, from BF-129. The entry itself named this the Lane B half of the same read, so this is that half filed rather than reached across the lane boundary.
+- **Needs:** — nothing.
+- **What BF-129 did, so this entry does not repeat it.** `buildEquipmentSet` existed as **three
+  byte-identical copies**; two of them (`app/api/generate-program/route.ts`,
+  `app/api/builder-chat/route.ts`) now import `buildEquipmentSet` / `equipmentEligible` from
+  `packages/shared/src/workout/equipment.ts`, where an exercise declaring **no** equipment is
+  excluded rather than passed. `builder-review.tsx:177` keeps the third copy, and its filter at
+  `:198` is still `ex.equipment.length === 0 || ex.equipment.some(...)`.
+- **The change is two lines**: delete the local `buildEquipmentSet`, import both helpers from the
+  shared module, and call `equipmentEligible(ex.equipment, equipmentSet)` at `:198`. The shared
+  module's doc comment carries the reasoning; nothing needs restating at the call site.
+- **This is hardening, not a live defect, and the distinction is worth keeping straight.** Migration
+  269 labelled the 22 rows that had drifted and `POST /api/exercises` now refuses to create another,
+  so there should be no unlabelled row for the permissive branch to let through. What this fixes is
+  the *third* divergent copy of a rule that decides whether a lifter is offered an exercise they
+  cannot perform — and the reason BF-129 existed at all is that the rule had three homes and only
+  one of them got looked at.
+- **Verify by reading, not by generating.** The swap sheet's alternatives list is the surface: with
+  a home-gym equipment selection, no `Machine %` exercise should appear among the eight offered.
+  That is already true from the data fix, which is exactly why the code change needs its own check
+  rather than a screenshot.
+- **Reversal cost:** trivial — one import and one predicate, on one component.
 
 ### [workouts] BF-130 — the library has no home-gym knee-flexion hamstring exercise, so the gap is unfillable from the app
 
