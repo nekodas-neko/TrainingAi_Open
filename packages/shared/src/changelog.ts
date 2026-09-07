@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.30",
+    date: "2026-09-07",
+    changes: [
+      "A generated session can no longer come back with two main lifts in it. The role on each exercise is what sets its percentages and sets, and nothing was checking how many of each a session got \u2014 so a session could be handed two exercises at the heaviest band where your programs carry one. Second compounds are untouched: two of those is normal.",
+    ],
+  },
+  {
     version: "1.436.29",
     date: "2026-09-07",
     changes: [

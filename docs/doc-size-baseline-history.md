@@ -8459,3 +8459,15 @@ The Known-Issues half is short and is the part that is owed: the banner only ren
 phase, so nothing here has been on a screen.
 
 The backlog moves the other way: BF-127's 32-line entry goes on shipping.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18888, `projectOverview.md` → 10189 (BF-126 shipped)
+
+The backlog shrinks 31 with nothing filed behind it, which is worth noting because the last two
+entries each left a successor. BF-126 raised one question it could not answer — whether the *heavy*
+count should be levelled across a program's sessions, which is what the owner's complaint literally
+described — and that went into the `projectOverview.md` row rather than the queue, because the answer
+costs weekly training volume and is the owner's call, not a validator's.
+
+`projectOverview.md` gains 32 for the honest version of what shipped: a guard against a defect that
+did not reproduce in 44 sampled sessions. An entry that read "fixed" would be wrong, and an entry
+that read "could not reproduce, closed" would throw away a real hole in the code.

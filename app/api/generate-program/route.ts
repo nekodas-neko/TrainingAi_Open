@@ -10,6 +10,7 @@ import { KNOWN_STYLES, GOAL_STYLE_RULES } from '@trainingai/shared/workout/known
 import { buildExerciseNameResolver, resolveAgainstLibrary } from '@trainingai/shared/workout/exercise-name-resolver'
 import { activeInjuries, activeInjuredMuscles, formatInjuryContext } from '@trainingai/shared/workout/injury-context'
 import { excludeInjuredExercises } from '@trainingai/shared/workout/injury-substitution'
+import { capPrimariesPerSession } from '@trainingai/shared/workout/exercise-role'
 import { todayInTz, DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import {
   styleWorkSec, workingBudgetMin,
@@ -419,7 +420,8 @@ ${exerciseList}${injuryBlock}${referenceBlock}`
         return {
           name: s.name,
           icon,
-          exercises: s.exercises.map(ex => {
+          // BF-126: cap before the role is read, because the role below picks the style.
+          exercises: capPrimariesPerSession(s.exercises).map(ex => {
             const role = ex.exerciseRole as GeneratedExercise['exerciseRole']
             const aiStyleName = ex.progressionStyleName
             const goalRules = GOAL_STYLE_RULES[inputs.goal]

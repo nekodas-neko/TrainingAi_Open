@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { GeneratedProgramSchema } from '@trainingai/shared/validation/generated-program'
 import type { GeneratedProgram, ChatMessage } from '@trainingai/shared/types/builder'
 import { KNOWN_STYLES, GOAL_STYLE_RULES } from '@trainingai/shared/workout/known-styles'
+import { capPrimariesPerSession } from '@trainingai/shared/workout/exercise-role'
 import { styleWorkSec, workingBudgetMin, TRANSITION_SEC_BARBELL, TRANSITION_SEC_STANDARD } from '@trainingai/shared/workout/duration-model'
 import { activeInjuredMuscles, formatInjuryContext } from '@trainingai/shared/workout/injury-context'
 import { excludeInjuredExercises } from '@trainingai/shared/workout/injury-substitution'
@@ -224,12 +225,14 @@ When responding, mention if a change improves or worsens weekly volume balance. 
       ...raw.program,
       sessions: raw.program.sessions.map((s: GeneratedProgram['sessions'][number]) => ({
         ...s,
-        exercises: s.exercises
+        // BF-126: cap before the role is read, because the role below picks the style. After the
+        // unknown-name filter, so a dropped hallucination cannot spend the session's one primary.
+        exercises: capPrimariesPerSession(s.exercises
           .filter((ex: GeneratedProgram['sessions'][number]['exercises'][number]) => {
             const known = exerciseMuscleLookup.has(ex.name)
             if (!known) droppedUnknown++
             return known
-          })
+          }))
           .map((ex: GeneratedProgram['sessions'][number]['exercises'][number]) => {
           // Re-enforce progression styles so the AI can't switch goal families.
           let styleName = ex.progressionStyleName as string | undefined

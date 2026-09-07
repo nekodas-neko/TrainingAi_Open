@@ -640,37 +640,6 @@ new reward currency.
   wants the short form for its own overflow, which is a reason to land these together.
 - **Reversal cost:** low. The state-setter shape already exists in `swapExercise`.
 
-### [workouts] BF-126 — nothing constrains how many primaries or secondaries a generated session gets
-
-- **Lane:** A — `app/api/generate-program/route.ts`.
-- **Added:** 2026-09-06 · owner, from a generated 5-day program where Pull came back with two `secondary` compounds and one accessory while Push got one and two.
-- **Needs:** — nothing.
-- **The prompt asks for a role per exercise and says nothing about the distribution.** Rule 3
-  (`route.ts:316`) defines `primary` / `secondary` / `accessory`; no rule caps any of them, requires
-  exactly one primary, or orders them. Rule 6 constrains the compound:isolation split *"at roughly
-  60:40"* of the session count, which is advisory prose to the model, checked nowhere.
-- **The consequence is load, not labelling.** `route.ts:428` enforces the style from the role and
-  never falls back to the model's choice for primary/secondary. The observed Pull session therefore
-  carries three heavy-ish exercises (one at 72.5–92.5%, two at 65–85%) against Push's two, at equal
-  exercise counts. Session-to-session load becomes whatever that generation happened to roll.
-- **⚠ The ordering half of this entry is RETRACTED — do not build it (owner, 2026-09-06).** It
-  originally read that the `primary` sitting second was a defect, because the heaviest lift of the
-  session is then done after a pull-up. Put to the owner, the answer was *"that order is how I want
-  it!"* — a lighter compound before the main lift is a deliberate ramp, not a mis-generation. The
-  code already agreed and was not read carefully enough: `builder-review.tsx:229` says the reorder
-  exists *"so the user can e.g. warm up on a secondary/accessory before the main lift"*. **Sorting
-  the primary first would fight both the owner's preference and that comment.** What remains is the
-  role-count half above, which the owner did act on — he demoted the extra secondary by hand.
-- **Fix it where the style is already overridden** — a post-generation pass in the same block, not
-  more prompt text. The model has been asked in prose and did not comply; a validator that demotes
-  extra primaries is deterministic and cheap — **counts only, no sorting**. Per the AI defaults in
-  CLAUDE.md, structure a model returns is checked in code rather than trusted.
-- **Confirm the shape against more than one sample before choosing the rule.** One program is the
-  evidence here. Whether the cap is "exactly one primary, at most one secondary" or something looser
-  should be read off several generations at the owner's real settings — a rule fitted to a single
-  roll is how a legitimate 2-compound Pull day gets forbidden.
-- **Reversal cost:** low — one pure function over the parsed response, before it is returned.
-
 ### [workouts] BF-129 — 22 library exercises have no equipment listed, and empty means "everyone owns it" 🔴 LIVE
 
 - **Lane:** A — `app/api/generate-program/route.ts` and the `exercise_library` rows; the swap filter in `components/workout-builder/builder-review.tsx` is the Lane B half of the same read.
