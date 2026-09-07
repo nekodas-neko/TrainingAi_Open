@@ -173,9 +173,39 @@ describe('cache group helpers', () => {
     ]))
   })
 
-  it('invalidatePrescriptionChanged skips the workout-card key when no session id is given', async () => {
+  it('invalidatePrescriptionChanged never builds a workout-card:undefined key', async () => {
     await invalidatePrescriptionChanged()
     expect(invalidated).not.toContain('workout-card:undefined')
+    expect(invalidated).not.toContain('ai-periodization-session:undefined')
+  })
+
+  // RV-49 — the owner confirmed a deload on Home and the screen kept full-intensity weights.
+  // `handleEarlyDeloadConfirm` calls this with NO id (a deload is not scoped to one session), and
+  // the per-id eviction Q-117 added was conditional, so that call evicted no cards at all — the
+  // exact keys Q-117 was filed about. `next-session` was not in the group either, so Home's
+  // recommendation card kept the pre-deload plan too. Both are load-bearing rather than first-paint
+  // accelerators: `workout-card:` is fetched with freshWithinTtl and `next-session` has seed-only
+  // readers, so this was hard staleness for up to TTL_LONG, not a flash.
+  it('invalidatePrescriptionChanged drops EVERY session\'s cards when called with no id', async () => {
+    await invalidatePrescriptionChanged()
+    expect(invalidated).toEqual(expect.arrayContaining([
+      'workout-card:', 'ai-periodization-session:',
+    ]))
+  })
+
+  it('invalidatePrescriptionChanged clears Home\'s recommendation key either way', async () => {
+    await invalidatePrescriptionChanged()
+    expect(invalidated).toContain('next-session')
+    invalidated.length = 0
+    await invalidatePrescriptionChanged('sess-1')
+    expect(invalidated).toContain('next-session')
+  })
+
+  it('invalidatePrescriptionChanged stays PRECISE when an id is given — no prefix sweep', async () => {
+    await invalidatePrescriptionChanged('sess-1')
+    expect(invalidated).toContain('workout-card:sess-1')
+    expect(invalidated).not.toContain('workout-card:')
+    expect(invalidated).not.toContain('ai-periodization-session:')
   })
 
   // Soreness re-derives per-exercise deloads server-side on the next real workout-data

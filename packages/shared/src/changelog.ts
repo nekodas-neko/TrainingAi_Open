@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.34",
+    date: "2026-09-07",
+    changes: [
+      "Starting a deload week now updates the weights on screen straight away. Confirming it changed your program but left the cached session cards and the home recommendation showing full-intensity targets \u2014 for up to six hours, or until you restarted the app.",
+    ],
+  },
+  {
     version: "1.436.33",
     date: "2026-09-07",
     changes: [

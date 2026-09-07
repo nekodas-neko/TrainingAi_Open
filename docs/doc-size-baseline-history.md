@@ -8520,3 +8520,17 @@ session added 7 of them.
 Recorded here as well as there because this file is where the next person raising a baseline will
 look, and the question they will have — *"why is the entries count allowed to keep climbing?"* — has
 an answer that is nobody's to fix inside a feature PR.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18788, `projectOverview.md` → 10330 (RV-49 shipped)
+
+Backlog down 23, and the `projectOverview.md` row that replaces it is longer than the fix because
+two things are owed rather than none: the eviction is verified in Chromium but **not on the APK the
+owner reported it from**, and the e2e asserts the caches clear rather than that the card repaints
+with deloaded numbers. Both are stated as limits of the verification, not as future work someone
+must schedule — the first is a re-check, the second needs a multi-table fixture that is only worth
+building if the symptom returns.
+
+Also recorded there, and in the journal entry, are the three dead ends the e2e cost: `/session-select`
+redirects to `/workout`, the route is `/api/readiness-score`, and the morning check-in sheet hides
+Home's buttons while leaving their text in the DOM — a failure that reads as "the button does not
+exist".

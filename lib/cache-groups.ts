@@ -365,15 +365,36 @@ export async function invalidateAiPeriodization(): Promise<void> {
 /** A prescription was accepted/dismissed or a phase transition executed (CCH-1) —
  *  the pre-workout card's freshWithinTtl `workout-card:<id>` prefetch and the
  *  `workout-data:<tab>` exercise list it derives from both go stale. Call before
- *  the respond/transition success callback fires (invalidate-before-refetch). */
+ *  the respond/transition success callback fires (invalidate-before-refetch).
+ *
+ *  **RV-49: the id is optional, and when it is absent this evicts EVERY session's card rather
+ *  than none.** Q-117 added the per-id eviction and reached `ai-prescription-card.tsx`, which
+ *  passes an id; Home's "Start deload week" confirm
+ *  (`session-select-content.tsx:handleEarlyDeloadConfirm`) calls this with no id, because a deload
+ *  is not scoped to one session. Under the old conditional that call evicted no cards at all —
+ *  the exact keys Q-117 was filed about — and the pre-workout screen kept full-intensity weights
+ *  for up to TTL_LONG (6 h) after the owner confirmed a deload. Both keys are load-bearing rather
+ *  than first-paint accelerators, so this is hard staleness, not a brief flash: `workout-card:` is
+ *  fetched with `freshWithinTtl`, and `next-session` has seed-only read paths
+ *  (`use-deload-choice.ts`, `workout-select-content.tsx`, `session-select-content.tsx` all
+ *  `readTodayCacheSync` it) — one of which reads the deload state itself.
+ *
+ *  `next-session` is Home's recommendation key and was not in this group at all, which is why the
+ *  recommendation card kept the pre-deload plan too. `clearLegacyHomeSeeds()` below is what makes
+ *  that eviction stick — `ta_recommendation_v1` survives a plain `invalidateCache('next-session')`
+ *  (see invalidateRestDayChoice). */
 export async function invalidatePrescriptionChanged(programSessionId?: string): Promise<void> {
   await Promise.all([
     invalidateCache('workout-data'),
     // The done screen's "Next workout" card renders this same prescription.
     invalidateCache('next-session-prescription'),
+    // Home's recommendation card, and the seed `use-deload-choice` reads the deload flag from.
+    invalidateCache('next-session'),
+    // With an id, evict precisely that session; without one the change is program-wide, so drop
+    // the whole prefix — the shape invalidateInjuryWrites already uses for the same two keys.
     ...(programSessionId
       ? [invalidateCache(`workout-card:${programSessionId}`), invalidateCache(`ai-periodization-session:${programSessionId}`)]
-      : []),
+      : [invalidateCache('workout-card:'), invalidateCache('ai-periodization-session:')]),
     invalidateAiPeriodization(),
   ])
   // B7: `invalidateCache('workout-data')` prefix-drops `workout-data:meta`, so this

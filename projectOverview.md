@@ -1726,6 +1726,31 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [workouts][app-shell] 🟡 The deload confirm now evicts what the screen reads, but not on the device the owner reported it from (RV-49, 2026-09-07)
+
+**What shipped.** `handleEarlyDeloadConfirm` called `invalidatePrescriptionChanged()` with no session
+id — a deload is not scoped to one session — and the per-id eviction Q-117 added was conditional on
+that id, so the confirm evicted **no cards at all**: the exact keys Q-117 was filed about.
+`next-session`, Home's recommendation key, was never in the group. Both are load-bearing rather than
+first-paint accelerators (`workout-card:` uses `freshWithinTtl`; `next-session` has seed-only readers,
+one of which reads the deload flag itself), so the screen kept full-intensity weights for up to 6
+hours after the owner confirmed a deload. The group now prefix-drops both keys when no id is given
+and clears `next-session` either way.
+
+**What is owed: the device.** The eviction is client-side and a Playwright spec drives the real
+browser storage — confirmed binding, since reverting the fix fails it by name — but **the owner's
+report was on the APK and this has not been re-checked there.** The web path and the device path
+share this code, so the risk is low; it is listed because "verified in Chromium" is not "verified
+where it was reported".
+
+**The e2e is an eviction assertion, not the repaint assertion RV-49 asked for.** It proves the caches
+clear in a real browser, which the unit test cannot (it mocks `invalidateCache`). It does not prove
+the card then paints *deloaded* numbers, because that needs the server to return a deloaded
+prescription, which needs `earlyDeloadRecommended` to arise from real data — automatic phase mode, a
+phase list, a baseline HRV and an ACWR over threshold, across several tables. The stub used here
+short-circuits exactly that. Worth building if the symptom is ever reported again; not worth the
+fixture on its own.
+
 ### [platform] ⚠️ The journal ceiling now goes quiet once the base is over it, and 286 of 295 entries cannot be folded (LB-58, 2026-09-07)
 
 **What shipped.** The total-entry ceiling in `entriesVerdict` failed whichever PR was open when the

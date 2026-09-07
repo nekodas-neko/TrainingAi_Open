@@ -1062,29 +1062,6 @@ and Samsung does not honour `autoConnect = true`, so direct connect plus a bound
 isolation stands and wiring it into scoring waits on the H10 session. It does not resolve steps,
 calories or the stage mapping (PS-16, PS-19).
 
-### [workouts][app-shell] RV-49 — the Home deload confirm evicts neither key the visible screen reads
-
-- **Lane: A** — was filed B, and re-laned 2026-09-06 by Lane B on picking it up. **The whole fix is
-  in `lib/cache-groups.ts`**, which CLAUDE.md names in Lane A's path list *and* which the lane rule
-  independently sends to A: it is reached from `app/api/coach/apply/route.ts` and
-  `app/api/coach/apply/[id]/undo/route.ts`. The call site the entry also names
-  (`session-select-content.tsx:887-892`) needs **no change** — it already calls
-  `invalidatePrescriptionChanged()` with no id, and the fix is to make that call evict what it
-  claims to. So there is no Lane B half to ship first, and the e2e repaint assertion has to ride
-  with the group change or it is a test with nothing to assert against.
-- **Added:** 2026-09-06, Review sweep 49 —
-  [write-up](reviews/2026-09-06-deload-confirm-eviction-gap.md). Owner-reported symptom.
-
-`handleEarlyDeloadConfirm` carries Q-117's fix comment and then calls
-`invalidatePrescriptionChanged()` **with no sessionId** — and in the group, `workout-card:<id>`
-eviction is conditional on the id (so the call evicts no cards, the exact keys Q-117 names) and
-`next-session` is not in the group at all (it is Home's recommendation key). After "Start deload
-week", the recommendation card and every per-session card keep full-intensity weights out of cache
-for up to TTL_LONG (6 h). Q-117's fix reached the other caller (`ai-prescription-card.tsx:106`
-passes the id); the surface Q-117 was filed about still misses. Fix: add
-`invalidateCache('next-session')` to the group and make `workout-card:` a prefix drop when no id is
-given (the injuries group at `:238` is the pattern). Add a Playwright repaint assertion with the fix.
-
 ### [app-shell] RV-50 — three raw seed-only `workout-card` reads never revalidate
 
 - **Lane:** B — `app/session-select/components/recommendation-card.tsx:23`,
