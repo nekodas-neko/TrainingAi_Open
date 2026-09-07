@@ -8572,3 +8572,11 @@ Down 16, and shorter because two thirds of the entry was argument rather than fa
 at length from an idle Postgres log toward "a startup timeout"; running the suite settled it in one
 pass — 147 passed, 9 failed — so the reasoning is gone and the nine spec names are what remains.
 An entry that argues is an entry whose evidence was never gathered.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18794 (LA-73 shipped)
+
+Up 3. LA-73 asked a question — does any stored name carry a control character — and the answer was
+no across all 155 exercise, 5 program, 22 session and 25 style names, so it shipped as a guard on
+the write. What replaces it is longer because it is a different finding: LA-74, the two program
+write routes that have no request schema at all, which is *why* the guard reached one table out of
+four rather than a scoping choice.
