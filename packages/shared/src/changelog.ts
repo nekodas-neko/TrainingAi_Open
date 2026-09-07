@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.28",
+    date: "2026-09-07",
+    changes: [
+      "The first-session banner no longer suggests a weight for bodyweight exercises. It was telling you to load 82.5 kg on a pull-up \u2014 that number is an internal strength index, not kilograms, and 70% of it means nothing. Bodyweight movements now say so, with your rep max beside them.",
+    ],
+  },
+  {
     version: "1.436.27",
     date: "2026-09-07",
     changes: [

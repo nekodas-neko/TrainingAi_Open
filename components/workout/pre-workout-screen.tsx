@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@trainingai/shared/utils";
 import type { WorkoutExercise } from "@/app/api/workout-data/route";
 import type { SessionLogEntry } from "./types";
-import { formatSheetDate, mround125, modalWeight, avgReps, deloadOverrideOutcome } from "./utils";
+import { formatSheetDate, modalWeight, avgReps, deloadOverrideOutcome } from "./utils";
+import { baselineHint } from "@/components/workout/baseline-hints";
 import { displayOneRm } from "@trainingai/shared/1rm";
 import { RoleChip } from "./role-chip";
 import type { PrescriptionStatus } from "@trainingai/shared/types/ai-periodization";
@@ -159,6 +160,9 @@ export function PreWorkoutScreen({
       exerciseTypeById[pe.sessionExerciseId] = typeByIdSrc.get(pe.sessionExerciseId);
     }
   }
+  // BF-127: the baseline banner needs the exercise type too, and it runs BEFORE any prescription
+  // exists — so it cannot use `exerciseTypeById` above, which is only populated once there is one.
+  const baselineTypeById = new Map(exercises.map((e) => [e.sessionExerciseId, e.exerciseType]));
   const exerciseSignalsById: Record<string, { role: string; rm1Trend: 'up' | 'flat' | 'down'; rm1ChangeKg: number }> = {};
   for (const se of periodization?.signals.exercises ?? []) {
     exerciseSignalsById[se.sessionExerciseId] = { role: se.role, rm1Trend: se.rm1Trend, rm1ChangeKg: se.rm1ChangeKg };
@@ -243,7 +247,13 @@ export function PreWorkoutScreen({
               <AiBaselineBanner
                 exercises={periodization.signals.exercises.map(ex => ({
                   name: ex.name,
-                  suggestedWeightKg: ex.current1rm != null ? mround125(ex.current1rm * 0.7) : null,
+                  // BF-127. The type comes from `exercises` (workout-data), joined on
+                  // `sessionExerciseId` — the same source the card below already uses to render
+                  // `RM`. It is NOT on the card signal: `CardExerciseSignal` omits it, and the
+                  // `exerciseType` at signals.ts:277 is on the LLM-prompt shape, which never
+                  // reaches the client. Keyed by id rather than name because one session can hold
+                  // two exercises with the same name.
+                  hint: baselineHint(ex.current1rm, baselineTypeById.get(ex.sessionExerciseId)),
                 }))}
               />
             ) : periodization.state.prescription && periodization.state.prescriptionStatus !== 'consumed' ? (
