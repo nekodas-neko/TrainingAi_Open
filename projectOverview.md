@@ -2096,12 +2096,12 @@ id-passing caller. One-line fixes each; a Playwright repaint assertion rides the
 swept in the same pass and is **clean at source** — if the food-add symptom persists after RV-49
 ships, one repro (which screen added from, which screen stale) routes it.
 
-### [devices][readiness] 🟡 The ring's stored wear time read 0.3–1.5 h on 20 consecutive scored nights (PS-30, 2026-09-06)
+### [devices][readiness] 🟡 22 days of wear time are still wrong; only an owner-run Redecode fixes them (PS-30 → LA-68, 2026-09-07)
 
-2026-08-14→09-02, `oura_daily.non_wear_time_sec` says the ring was barely worn on days whose
-summaries carry 7–9 h nights with HRV — feeding `isLowWearToday`, the baseline exclusions and the
-wear chart a false signal. 09-03+ is sane; mechanism not established (suspect the incremental
-rollup's narrowed window). [Checkpoint](docs/reviews/2026-09-05-app-checkpoint.md) §P5.
+**Fixed forward** (`lib/oura-ble/rollup/run.ts`): the rollup wrote a wear row for the day its window floor landed
+part-way through, replacing a complete day with the 15–90 min after the cutoff — and the floor only moves forward, so
+that was the day's last value. **Still owed:** 2026-08-14→09-04 still hold those values, so `excludeLowWearDays` drops
+all 22 from the HRV/RHR baselines; one owner-run **fullHistory** Redecode rebuilds them. [Journal](docs/overview/entries/2026-09-07-fix-oura-nonwear-overwrite.md).
 
 ### [devices][body] 🟡 The scale's "Weighing you…" gate shipped UNVERIFIED on device (Q-104/Q-114, 2026-09-04)
 
