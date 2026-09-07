@@ -8565,3 +8565,10 @@ comment gives a **false negative**, which reports clean over unparsed code, whil
 is only a false positive. That argument is now in `scripts/lib/strip-comments.js`'s header, where
 the next person changing the stripper will actually read it, so the entry's replacement (LA-72,
 the ~30 checks that strip nothing) only has to name the residue.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18791 (LA-63 rewritten)
+
+Down 16, and shorter because two thirds of the entry was argument rather than fact. LA-63 reasoned
+at length from an idle Postgres log toward "a startup timeout"; running the suite settled it in one
+pass — 147 passed, 9 failed — so the reasoning is gone and the nine spec names are what remains.
+An entry that argues is an entry whose evidence was never gathered.

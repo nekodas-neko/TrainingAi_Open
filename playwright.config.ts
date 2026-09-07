@@ -35,7 +35,13 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   timeout: 45_000,
   expect: { timeout: 10_000 },
-  reporter: process.env.CI ? [['github'], ['list']] : [['list']],
+  // LA-63: `github` writes annotations and `list` writes stdout — **neither writes a file**. CI's
+  // failure artifact points at `playwright-report/`, so for as long as this list had no `html` in
+  // it the upload had nothing to take: `actions/upload-artifact` warned, reported success, and the
+  // run's artifact count stayed at zero. Three sessions read "the artifact is the thing to read"
+  // and could not read it. Measured 2026-09-07 on a 9-failure run: no `playwright-report/` at all,
+  // and 20 trace/screenshot directories sitting unclaimed in `test-results/`.
+  reporter: process.env.CI ? [['github'], ['list'], ['html', { open: 'never' }]] : [['list']],
   use: {
     baseURL: BASE_URL,
     // The S25 Ultra is the canonical target. Testing at a desktop viewport would walk straight past
