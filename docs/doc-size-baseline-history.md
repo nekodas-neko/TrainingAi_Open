@@ -8677,3 +8677,9 @@ Up 24, for a section that had to go in now rather than at wrap-up: `Build` is no
 required check here, three PRs merged with it red on 2026-09-07, and the container is ephemeral, so
 a gotcha that lives only in a session is a gotcha that is learned again. The rest of this baton is
 from 2026-09-02 and stale; a full rewrite is owed and this is not it.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18751 (LA-72 shipped)
+
+Down 16. LA-72 asked which source-scanning checks needed a comment stripper and said nobody knew.
+The answer is now a test rather than an entry: `scripts/__tests__/check-comment-blindness.test.ts`
+measures it per check, so the next one is classified by running it rather than by reading it.

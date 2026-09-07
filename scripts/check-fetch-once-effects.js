@@ -22,6 +22,7 @@
 const fs = require('fs');
 const path = require('path');
 const { resolveBaseRef, countAtBase, verdict } = require('./lib/base-ref');
+const { stripComments } = require('./lib/strip-comments');
 
 const root = path.join(__dirname, '..');
 const DIRS = ['app', 'components', 'lib'];
@@ -166,7 +167,7 @@ const baseRef = resolveBaseRef();
 
 for (const abs of files) {
   const rel = path.relative(root, abs).replace(/\\/g, '/');
-  const { count, lines } = countFetchOnce(fs.readFileSync(abs, 'utf8'));
+  const { count, lines } = countFetchOnce(stripComments(fs.readFileSync(abs, 'utf8')));
   if (count === 0) continue;
   perFile.set(rel, count);
   for (const ln of lines) detail.push(`${rel}:${ln}`);

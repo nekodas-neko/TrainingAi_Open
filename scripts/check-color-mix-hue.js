@@ -20,6 +20,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { stripComments } = require('./lib/strip-comments');
 
 // Chroma-0 in both themes, so all of these trigger the bug.
 const ACHROMATIC = /^(?:var\(--color-muted\)|var\(--color-background\)|var\(--card\)|var\(--background\)|var\(--muted\)|var\(--popover\)|#000|#000000|#fff|#ffffff|white|black)$/;
@@ -28,7 +29,7 @@ const root = path.join(__dirname, '..');
 const offenders = new Map();
 
 function scan(file, rel) {
-  const s = fs.readFileSync(file, 'utf8');
+  const s = stripComments(fs.readFileSync(file, 'utf8'));
   for (const m of s.matchAll(/color-mix\(in oklch,/g)) {
     // Walk to this call's matching close paren so nested var(...) don't end it early.
     let depth = 0, k = s.indexOf('(', m.start ?? m.index);
