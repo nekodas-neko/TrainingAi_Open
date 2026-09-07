@@ -8,6 +8,7 @@ import { sql } from 'drizzle-orm'
 import type { LeaderboardEntry } from '@trainingai/shared/types/friends'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { computeStreak } from '@/lib/achievements'
+import { maxCompliantRestGapFor } from '@trainingai/shared/schedule-utils'
 import { longestWeeklyStreak } from '@trainingai/shared/workout/year-review'
 import { startOfWeek, format } from 'date-fns'
 import { toZonedTime } from 'date-fns-tz'
@@ -33,7 +34,7 @@ export async function GET(req: Request) {
   const monday = getMondayUtc(tz)
   const streakFrom = new Date(Date.now() - STREAK_WINDOW_DAYS * 24 * 60 * 60 * 1000)
 
-  const [userRows, weeklyRows, allTimeRows, streakRows] = await Promise.all([
+  const [userRows, weeklyRows, allTimeRows, streakRows, scheduleRows] = await Promise.all([
     db.select({
       id: s.users.id,
       displayName: s.users.displayName,
@@ -71,6 +72,20 @@ export async function GET(req: Request) {
     }).from(s.workoutSessions)
       .innerJoin(s.exerciseLogs, and(eq(s.exerciseLogs.workoutSessionId, s.workoutSessions.id), isNull(s.exerciseLogs.deletedAt)))
       .where(and(inArray(s.workoutSessions.userId, allIds), gte(s.workoutSessions.startedAt, streakFrom), isNull(s.workoutSessions.deletedAt))),
+
+    // BF-122a — every user's active schedule in ONE query, so the streak's rest-day allowance is
+    // read off their plan rather than hardcoded. Batched with `inArray` like every other query in
+    // this block: a per-user fetch here would be an N+1 over the whole friends list.
+    db.select({
+      userId: s.programs.userId,
+      type: s.schedules.type,
+      restAfterN: s.schedules.restAfterN,
+      dayOfWeek: s.scheduleDays.dayOfWeek,
+      sessionId: s.scheduleDays.sessionId,
+    }).from(s.programs)
+      .innerJoin(s.schedules, eq(s.schedules.programId, s.programs.id))
+      .leftJoin(s.scheduleDays, eq(s.scheduleDays.scheduleId, s.schedules.id))
+      .where(and(inArray(s.programs.userId, allIds), eq(s.programs.isActive, true))),
   ])
 
   const weeklyMap = new Map(weeklyRows.map(r => [r.userId, r]))
@@ -80,6 +95,23 @@ export async function GET(req: Request) {
     const arr = daysByUser.get(r.userId)
     if (arr) arr.push(r.day)
     else daysByUser.set(r.userId, [r.day])
+  }
+
+  // BF-122a — one Schedule per user, rebuilt from the flat join above.
+  const scheduleByUser = new Map<string, { type: 'rotation' | 'weekly'; restAfterN?: number; days: { dayOfWeek: number; sessionId?: string }[] }>()
+  for (const r of scheduleRows) {
+    let entry = scheduleByUser.get(r.userId)
+    if (!entry) {
+      entry = {
+        type: r.type === 'weekly' ? 'weekly' : 'rotation',
+        restAfterN: r.restAfterN ?? undefined,
+        days: [],
+      }
+      scheduleByUser.set(r.userId, entry)
+    }
+    // A day with no session is a configured rest day — carried through rather than dropped, since
+    // the helper is what decides that, not this loop.
+    if (r.dayOfWeek != null) entry.days.push({ dayOfWeek: r.dayOfWeek, sessionId: r.sessionId ?? undefined })
   }
 
   const entries: LeaderboardEntry[] = userRows.map(u => {
@@ -98,7 +130,10 @@ export async function GET(req: Request) {
       weeklyStreak: longestWeeklyStreak(days),
       allTimeSessions: a?.sessions ?? 0,
       allTimeVolumeKg: Number(a?.volumeKg ?? 0),
-      allTimeStreak: computeStreak(days, tz, 1).best,
+      // BF-122a — the allowance comes from each user's own schedule. A literal 1 here was right
+      // only for a rotation: someone training Mon+Tue is compliant across a five-day hole, and
+      // their leaderboard streak broke every week.
+      allTimeStreak: computeStreak(days, tz, maxCompliantRestGapFor(scheduleByUser.get(u.id))).best,
     }
   })
 

@@ -8400,3 +8400,14 @@ four-run table across three sessions showing E2E fails whenever it RUNS and is s
 passes. It also has to say what is *not* established — nobody has read the Playwright output, so the
 timeout reading is inferred from timing and an idle database, and the entry says so rather than
 letting the next session close it on the inference.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18951, `projectOverview.md` → 10083 (BF-122a shipped, LA-64 filed)
+
+The backlog is roughly flat: BF-122a's 90 lines left the queue and LA-64 took part of the space —
+the three Custom Rules greps that match their own explanatory comments, filed because three
+occurrences in one session is a pattern rather than a coincidence.
+
+`projectOverview.md` gains a row for the thing genuinely outstanding: BF-122a changes the workout
+streak's rest-day allowance for non-rotation schedules, and nobody has looked at the achievements
+grid or the leaderboard since. Derived numbers that are correct in a test and unseen on a screen are
+exactly what that section is for.

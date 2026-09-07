@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.25",
+    date: "2026-09-07",
+    changes: [
+      "Your workout streak now allows the rest days your own schedule has in it. It assumed one day off was the most you could take, which broke the streak every week for anyone training two days a week with a gap between them \u2014 the app knew the schedule and was not reading it.",
+    ],
+  },
+  {
     version: "1.436.24",
     date: "2026-09-06",
     changes: [

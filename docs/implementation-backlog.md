@@ -507,97 +507,6 @@ OR-102a/b will read dose history to recommend the next dose. A tracker that read
 - **Reversal cost:** low. No migration; existing rows keep whatever they were stamped with, which is
   the point of the stamp.
 
-### [app-shell][platform] BF-122a — the cat collection, engine half: the ladder derivation and a decay window read off the schedule
-
-- **Lane:** A — `packages/shared/**`. No migration, no API route, no table: the whole thing is a pure
-  function over day series the app already stores.
-- **Added:** 2026-09-06 · owner, after a design pass in the BugFix session: *"1 workout = 1 slime …
-  if you collect x amount, they merge into a bigger one … a big item gets broken down into its
-  smaller ones … if you had 1 big and 1 small when the decay happens it would take the small first"*,
-  then *"yes file it!"* with the four deliverables: **the increase mechanism · the character models ·
-  a widget on the home screen · some information on it somewhere in the app**. This entry is the
-  first of those; **BF-122b** is the other three.
-- **Needs:** — nothing. It reads tables that are already populated.
-
-**The mechanic, as the owner settled it.** Three ladders, one per faucet, each a chain of merges:
-
-| faucet | spawns on | ladder |
-|---|---|---|
-| a logged workout | `workout_sessions` completion day | cat slime → … → **cat Tank** |
-| a step day | `body_metrics.steps` day | cat slime → … → **cat Archer** |
-| a slept night | `sleep_sessions` night | cat slime → … → **cat Cleric** |
-
-`N` of a tier merge into one of the next. Decay removes stock when the faucet goes quiet, and the two
-rules that make it a game rather than a punishment are the owner's:
-
-- **A big item breaks down into its components, it is never deleted.** Losing a Tank costs you the
-  merge, not the five workouts under it. Progress is recoverable; the top of the ladder is not free.
-- **Decay takes the smallest item first.** Loose stock is the buffer, so the visible cost of a missed
-  day lands on the thing you were about to merge — which is where the pull to log comes from.
-
-**Spawn on *logging*, not on hitting a target.** Rewarding a hit calorie goal creates a standing
-incentive to under-eat to keep a collection alive, and the collection is on the Home screen where it
-is seen daily. Every faucet above is "you recorded a thing", which is safe to want more of.
-
-**The decay window is derived from the schedule, and this is the part the owner called out.** *"when
-you setup a workout it asks how many days you can train a week — it should consider that, cause if
-you choose 2 workouts a week that could have up to 5 days between workout 1 and 2 and you are still
-following."* A fixed 2-day clock is right for the owner and wrong for the setting the app itself
-offers, so:
-
-- **`rotation`** (`schedules.type`, `schedules.rest_after_n`): the cycle is *N* training days then a
-  rest day, so the largest compliant gap is **1 day**. The owner is on `rotation` / `rest_after_n = 3`.
-- **`weekly`** (`schedule_days` rows with a non-null `session_id`): the largest compliant gap is the
-  **widest wrap-around gap between consecutive scheduled days**, not `7 ÷ count`. Mon+Tue is two days
-  a week with a five-day hole in it, which is exactly the owner's example.
-- **`getScheduledSessionsPerWeek()`** (`packages/shared/src/schedule-utils.ts`) already collapses both
-  shapes to a per-week *count* for the Home "This Week X/Y" chip. **It is the wrong input here** — a
-  count cannot see where the hole is. Add the gap helper beside it, in the same file, and leave the
-  count alone.
-- **Steps and sleep have no schedule**, so their windows are constants. They are also nearly
-  gap-free in practice, which is the calibration note below.
-
-**The window is calibrated, not guessed** — measured over the owner's last 120 days:
-
-| gap between workout days | times | rest days in it |
-|---|---|---|
-| 1 day | 44 | 0 — safe |
-| 2 days | 26 | 1 — safe |
-| 3 days | 5 | 2 — decays |
-| 6 days | 1 | 5 — decays hard |
-
-So a 1-rest-day allowance fires **6 times in 120 days**, about monthly, with 92% of gaps inside it.
-That is a live clock rather than a decorative one, and the owner's instinct was better calibrated
-than the "that is too harsh" reading it was checked against. **Steps and sleep are not comparable** —
-steps logged 129 of 129 days and sleep lands nightly, so those two ladders will essentially never
-decay and are the calm half of the widget by construction. Do not tighten them to manufacture
-tension; the workout ladder is where the tension is.
-
-**Three traps, each of which turns the mechanic against the user:**
-
-1. **A rest day the app itself recommended must not decay anything.** Deload weeks and the
-   recommendation engine's own rest days are compliance, not neglect. Pause the clock on them.
-2. **`computeStreak(dates, tz, maxRestGap)` already hardcodes this number as a literal `1`** at three
-   sites — `lib/achievements.ts:212` and `app/api/friends/leaderboard/route.ts:101` — for exactly the
-   same question the decay clock asks. Per **One Formula, One Place** the schedule-derived allowance
-   is one helper and those sites adopt it, in this PR. Two answers to "was that gap OK" is a bug by
-   definition, and it is currently right only for a schedule shaped like the owner's.
-3. **A user-configurable threshold breaks the no-table design.** Because the collection is *replayed*
-   from the day series on every read, changing `N` or the window retroactively rewrites all of
-   history — a Tank you earned last month silently un-merges. If the threshold is ever exposed,
-   version it with an effective-from date and replay each span under the rule that was live then.
-   Ship it as a constant first.
-
-- **Why no game-state table.** Merges are automatic and the inputs are immutable day series, so the
-  collection is a pure fold and there is nothing to keep in sync, migrate, or repair when a
-  back-dated workout lands. This is only true while (2) and (3) hold — the moment a merge needs a
-  user decision, or the threshold moves without versioning, it needs state and that is a different
-  entry.
-- **Reversal cost:** near zero. One shared module and one call site; deleting it deletes the feature.
-- **One caveat for whoever builds it:** the `maxRestGap` unification in trap (2) is the only part of
-  this entry that changes existing behaviour, and it changes the workout streak's tolerance for
-  anyone not on the owner's schedule. Say so in the journal.
-
 ### [app-shell] BF-122b — the cat collection, surface half: the sprites, the home widget, and where you read about it
 
 - **Lane:** B — `components/home/**`, `lib/home/home-prefs.ts`, `components/more/**` and the art.
@@ -1419,6 +1328,36 @@ BF, metabolic age 37 on a DOB-less profile). Skip composition and store weight-o
 `compositionSkipped` already can. And `scale_raw_samples` has no unique key (157's two indexes are
 non-unique) — a byte-identical re-send inserts a second raw row, unlike `oura_raw_samples`'s dedup;
 the trend survived (lowest-wins) but the archive double-counts.
+
+### [platform] LA-64 — three Custom Rules greps match their own explanatory comments
+
+- **Lane:** A — `.github/workflows/ci.yml` (the inline greps), `scripts/check-*.js`.
+- **Added:** 2026-09-06, after hitting it a third time in one session.
+
+A source-scanning rule that reads prose is checking the wrong file. Three instances, all today:
+
+1. **`check-icon-button-names.js`'s companion scan (PS-34)** was **green against a fully reverted
+   fix**, because its regex matched the word `routeErrorResponse` in the fix's own comment. Fixed by
+   stripping comments and requiring a call form.
+2. **The typed-error-mapper scan**, same PR, same cause — that is the one above; it is listed
+   separately because it was found by mutation rather than by CI, which is the only reason it was
+   found at all.
+3. **`No UTC date slicing`** (ci.yml, an inline grep) flagged BF-122a's comment explaining that the
+   module deliberately does *not* use the banned expression. The code was correct; the sentence
+   describing it was the violation.
+
+**The costly direction is (1), not (3).** A rule matching a comment gives a **false negative** when
+the comment sits in the file being checked — the scan reports clean over code it never parsed. (3)
+is only a false positive, which is loud and gets worked around in a minute.
+
+**The fix is not "ban quoting the pattern in comments".** That trades a real explanation for a green
+check, and the explanation is what stops the next person reintroducing the thing. Strip comments
+before scanning: the `.js` checks can do it properly, and the inline greps in `ci.yml` can filter
+`^\s*(//|#|\*)` before the match, which covers the shape all three took.
+
+**Not urgent, and worth saying so:** nothing is currently mis-reporting. Both `.js` cases are fixed
+and (3) is a one-line reword. This entry exists because three occurrences in one session is a
+pattern, and the next one will be a false negative that nobody notices.
 
 ### [platform] LA-63 — E2E fails on every PR that touches code, and has for at least three sessions
 
