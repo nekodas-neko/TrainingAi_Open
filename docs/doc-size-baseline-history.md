@@ -8232,7 +8232,7 @@ Two shorter alternatives were rejected. Cutting the measurement leaves the next 
 it from production. Putting it in a plan doc under `docs/superpowers/plans/` is the usual home for
 this much reasoning, but nothing is designed yet — there is no implementation to plan, and a plan
 that is only a restated brief is a second place for the brief to go stale.
-## 2026-09-06 — `docs/implementation-backlog.md` → 18652, `projectOverview.md` → 10004 (PS-26 shipped)
+## 2026-09-06 — `docs/implementation-backlog.md` → 18978, `projectOverview.md` → 10059 (PS-26 shipped)
 
 `projectOverview.md` is **down** 7: PS-26's Known-Issues row was struck and moved whole to
 `known-issues-resolved.md` rather than ticked in place.
@@ -8356,3 +8356,20 @@ conflict on these files is a genuine disagreement rather than two independent ad
 sides are describing the same number. Recomputed from the merged file rather than taking either
 side. The two reasoning notes above are unaffected and both stand; this line only records why the
 number is neither PR's.
+## 2026-09-06 — `docs/implementation-backlog.md` → 18408 (PS-24 fixed, entry kept for its residue)
+
+Upward by 38 lines on a fix, which is the opposite of the usual shape and is the entry earning its
+keep. PS-24 stays queued because the Edge middleware still gates on a claim it cannot verify, and the
+two ways to close that — Node middleware runtime, or accepting `auth()` as the authoritative point —
+are written down with their costs so the next session decides rather than re-derives. Also recorded
+there: the once-a-day read that never throttles is now load-bearing and must not be "optimised", and
+one of the entry's own sub-claims about `isAdmin` is refuted by measurement.
+
+## 2026-09-06 — `projectOverview.md` → 9925 (PS-24 fixed, row kept open)
+
+Seven lines, on a row that was already there. The 🔴 row said one thing — deactivation does not
+deactivate. Its replacement has to say three: the defect is fixed and how that was measured, why the
+row nonetheless stays open, and that two of the checkpoint's own claims about it are wrong. The last
+of those is the part worth the lines — an `isAdmin` staleness that does not exist, and a per-request
+read filed as a cost that is now the mechanism, are both things a future session would otherwise act
+on. The row was drafted at 27 lines and cut to 17 first; the detail lives in the journal entry.
