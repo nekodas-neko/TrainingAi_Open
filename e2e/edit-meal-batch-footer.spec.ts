@@ -22,8 +22,12 @@ const FOODS = [
   ['bf31bf31-bf31-4bf3-8bf3-eeeeeeeeeeee', 'BF31 Vanilla', 12, 0, 1, 0],
 ] as const
 const MEAL_NAME = 'BF31 Batch Recipe'
-// 555 kcal, 59 P, 48 C, 13 F for the batch; 2 portions → 278 each.
+// 555 kcal, 59 P, 48 C, 13 F for the batch; 2 portions → 278 kcal, 30 P, 24 C, 7 F each.
 const BATCH_KCAL = FOODS.reduce((a, f) => a + f[2], 0)
+const SERVINGS = 2
+/** Derived, not transcribed: a fixture edit that changed the totals would otherwise pass silently. */
+const batchMacro = (i: 3 | 4 | 5) => FOODS.reduce((a, f) => a + f[i], 0)
+const perPortionMacro = (i: 3 | 4 | 5) => Math.round(batchMacro(i) / SERVINGS)
 
 async function withDb<T>(fn: (db: Client) => Promise<T>): Promise<T> {
   const db = new Client({ connectionString: process.env.DATABASE_URL })
@@ -95,14 +99,26 @@ test('the batch figures stay on screen while the ingredients are scrolled', asyn
   await expect(footer, 'the batch line scrolled away with the list').toBeInViewport()
   await expect(page.getByRole('button', { name: /^(Update|Save) Meal$/ })).toBeInViewport()
 
-  // The numbers themselves: the batch total, and the per-portion figure beside it.
-  await expect(page.getByText(`${BATCH_KCAL} kcal`)).toBeVisible()
-  await expect(page.getByText(`${Math.round(BATCH_KCAL / 2)} / portion`)).toBeVisible()
+  // The numbers themselves. **BF-121 changed the shape here and the intent is unchanged**: the
+  // footer used to divide the calories only, printing `278 / portion` beside three raw BATCH macro
+  // figures — one row, two denominators, one of them labelled. It is now two labelled lines.
+  await expect(page.getByText('Per portion', { exact: true })).toBeInViewport()
+  await expect(page.getByText(`${BATCH_KCAL} kcal`, { exact: true })).toBeVisible()
+  await expect(page.getByText(`${Math.round(BATCH_KCAL / SERVINGS)} / portion`), 'the old one-row form')
+    .toHaveCount(0)
+  // The per-portion line carries NO kcal: the header already prints `Makes 2 portions · 278 kcal
+  // each` under the same condition, so a third statement of that number is the redundancy BF-120
+  // removed one screen over. This assertion is what stops it coming back — 2, not 3.
+  await expect(page.getByText(`${Math.round(BATCH_KCAL / SERVINGS)} kcal`)).toHaveCount(2)
 
   // The macro split carries its letters, and each is coloured from MACRO_COLORS rather than
   // relying on colour alone (the split without the letters would be the colour-only violation).
-  for (const letter of ['P', 'C', 'F']) {
-    await expect(page.getByText(new RegExp(`^\\d+ ${letter}$`))).toBeVisible()
+  // Both lines now carry them, so each letter appears twice — and asserting the two VALUES is what
+  // proves the macros are divided rather than repeated, which is the defect BF-121 fixed.
+  for (const [i, letter] of ([[3, 'P'], [4, 'C'], [5, 'F']] as const)) {
+    await expect(page.getByText(new RegExp(`^\\d+ ${letter}$`))).toHaveCount(2)
+    await expect(page.getByText(`${batchMacro(i)} ${letter}`, { exact: true })).toBeVisible()
+    await expect(page.getByText(`${perPortionMacro(i)} ${letter}`, { exact: true })).toBeVisible()
   }
 })
 

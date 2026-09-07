@@ -1,6 +1,6 @@
 # 2026-09-07 — BF-127: the app told him to load 82.5 kg on a pull-up
 
-**Branch:** `fix/bf-127-bodyweight-baseline-unit` · **Lane B** · v1.436.26
+**Branch:** `fix/bf-127-bodyweight-baseline-unit` · **Lane B** · v1.436.28
 
 The owner, on a Pull session: *"pull up = weight"*. The baseline banner listed **Pull-Up — 82.5 kg**
 under *"Suggested starting weights (≈70% of PR)"*.

@@ -8401,6 +8401,17 @@ passes. It also has to say what is *not* established — nobody has read the Pla
 timeout reading is inferred from timing and an idle database, and the entry says so rather than
 letting the next session close it on the inference.
 
+## 2026-09-07 — `docs/implementation-backlog.md` → 18977, `projectOverview.md` → 10083 (BF-122a shipped, LA-64 filed)
+
+The backlog is roughly flat: BF-122a's 90 lines left the queue and LA-64 took part of the space —
+the three Custom Rules greps that match their own explanatory comments, filed because three
+occurrences in one session is a pattern rather than a coincidence.
+
+`projectOverview.md` gains a row for the thing genuinely outstanding: BF-122a changes the workout
+streak's rest-day allowance for non-rotation schedules, and nobody has looked at the achievements
+grid or the leaderboard since. Derived numbers that are correct in a test and unseen on a screen are
+exactly what that section is for.
+
 ## 2026-09-07 — `docs/implementation-backlog.md` → 19038 (LB-59, and PS-38's lane tag)
 
 Twenty-six lines for a defect whose fix was one word. The length is the *measurement* and the trap,
@@ -8410,7 +8421,21 @@ READY lists for a day. The entry also records why the safe failure must stay "vi
 version of `lane.js` that let an unmatched value through once hid 96 of 203 entries from everyone.
 Without that line the obvious fix is to filter, which is the worse bug.
 
-## 2026-09-07 — `projectOverview.md` → 10092 (BF-127's status paragraph and device row)
+## 2026-09-07 — `projectOverview.md` → 10090 (BF-121's status paragraph and its device row)
+
+Twenty-three lines, split the same way as BF-120's earlier today and for the same reason. The status
+half carries the correction that makes the fix legible — one row was mixing two denominators with
+only one labelled, which is a different complaint from the one the owner filed and is what the detail
+sheet already disagreed with. The Known-Issues half exists because a device check is still owed.
+It was first written as "the width has not been measured" and is now narrower than that: updating
+`edit-meal-batch-footer.spec.ts` — which this change broke, and which the repo-wide E2E redness would
+have hidden — turned the width question into a permanent assertion at 412 × 915. What the row names
+now is the thing a spec cannot reach: the per-portion figures read against the detail sheet and the
+diary on the S25.
+
+The backlog moves the other way: BF-121's 40-line entry goes on shipping.
+
+## 2026-09-07 — `projectOverview.md` → 10131 (BF-127's status paragraph and device row)
 
 Twenty-five lines for a two-file fix, and most of them are the two corrections a reader needs before
 the diff makes sense. The status half has to explain why `118.25` is not a weight — without `BW_REF`
