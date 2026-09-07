@@ -8420,3 +8420,15 @@ unmatched field reads as "unstated", that one printed at the top of **both** imp
 READY lists for a day. The entry also records why the safe failure must stay "visible to both" — a
 version of `lane.js` that let an unmatched value through once hid 96 of 203 entries from everyone.
 Without that line the obvious fix is to filter, which is the worse bug.
+
+## 2026-09-07 — `docs/implementation-backlog.md` → 18991, `projectOverview.md` → 10110 (BF-128 shipped, LA-65 filed)
+
+Net +14 on the backlog for a fix that was one line of code. BF-128's 31 lines left; LA-65's 42
+arrived. The trade is deliberate and worth naming: BF-128 asked for a measurement pass on the
+transition constant "while the data is open", and the pass came back **contradictory** — 240 s
+assumed, reading as 249 s, 316 s, or an implied +20.8 min over-prediction depending purely on how
+136 NULL rows are treated. A contradiction is a finding, and the entry that records it has to carry
+the numbers or the next session repeats the measurement and reaches the same standstill.
+
+`projectOverview.md` gains 27 for the thing genuinely outstanding: the fix adds up to one exercise to
+every generated session at every budget, and nobody has trained one yet.

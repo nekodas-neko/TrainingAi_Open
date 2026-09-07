@@ -588,37 +588,6 @@ new reward currency.
   resolver; it did not prove every caller uses it.
 - **Reversal cost:** low — one field threaded through and one formatter swapped.
 
-### [workouts] BF-128 — the session planner charges rest after the final set, and prescribes 4 exercises where the owner's own history does 5
-
-- **Lane:** A — `packages/shared/src/workout/duration-model.ts`, consumed by `app/api/generate-program/route.ts`.
-- **Added:** 2026-09-06 · owner, on a generated 60-minute session: *"also its given 4 excercises for a 60min session is this right?"*
-- **Needs:** — nothing.
-- **The 4 is not the model ignoring the budget — it is what the budget says.** `route.ts:195–210`
-  computes the target: `workingBudgetMin(60)` = 51 min after the 15% warm-up carve-out, then a 60/40
-  blend of the goal's primary and accessory styles. For powerbuilding that is 856 s and 450 s, a
-  694 s average, `floor(3060 / 694)` = **4**. Hypertrophy also gives 4; strength gives 3.
-- **`styleWorkSec` charges `restSec` for every set, including the last**
-  (`duration-model.ts:201`). A powerbuilding primary is 4 × 120 s of rest where only three of those
-  rests are taken before the exercise ends — and the walk to the next station is *already* charged
-  separately as `TRANSITION_SEC_BARBELL = 240 s`. So the final rest is counted twice.
-- **It is worth exactly one exercise.** Dropping the trailing rest lowers the blended average by
-  ~96 s to 598 s, and `floor(3060 / 598)` = **5**.
-- **The owner's history says 5 is right.** Over 90 days, 62 completed sessions: **median 5 exercises**
-  (mean 4.77, max 5) in a **median 56.2 minutes** (mean 54.3) against a 60-minute budget. So five
-  exercises fit with room to spare, and the planner is one short — the same one the double-count
-  explains.
-- **Do not just delete the term.** Two other things use `styleWorkSec`, and a planner that suddenly
-  fits more work everywhere is a worse failure than one that fits slightly less: check
-  `packages/shared/src/workout/time-audit.ts` and the `signals.ts:508` budget consumer, and validate
-  the change against the same 62 sessions rather than against the arithmetic alone. The honest
-  framing is that the model has a defensible reason to over-reserve (a missed rest is time the lifter
-  never gets back) — but 4 vs a measured 5 says the reserve is currently too large.
-- **`TRANSITION_SEC_BARBELL = 240 s` deserves the same measurement pass** while the data is open —
-  `exercise_logs` stores `inter_exercise_rest_sec` and `prep_time_sec`, so the real transition is
-  recorded and does not need to be assumed.
-- **Reversal cost:** low as code, higher as behaviour — it changes every future generated program's
-  volume, so it wants the validation above before it ships, not after.
-
 ### [app-shell] BF-123 — the global 48 px tap floor turns every sub-48 px `<button>` into a circle; the opt-out exists and was never swept
 
 - **Lane:** B — `app/globals.css` opt-out classes at the call sites; `components/config/**` and the sibling chips.
@@ -754,8 +723,10 @@ new reward currency.
   worst case"*). So `Diamond Push-Up`, `Pike Push-Up`, `Weighted Dip`, `Burpee`, `Inverted Row`,
   `Side Plank`, `Pallof Press`, `V-Up`, `Mountain Climbers` and the rest are each budgeted as a
   four-minute barbell lift instead of a one-minute bodyweight one. Costing bodyweight work at 4×
-  makes the session planner fit fewer exercises — the same symptom BF-128 measures, from a second
-  cause.
+  makes the session planner fit fewer exercises — the same symptom BF-128 measured, from a second
+  cause. **BF-128 shipped on 2026-09-07** (the trailing rest is no longer charged, which moved a
+  60-min powerbuilding session from 4 exercises to a verified 5); this half is untouched by it, so
+  the under-count it describes is still live and still worth exactly this entry.
 - **Both halves are one fix: fill the column in.** The worst-case default is defensible for an
   unknown; what is not defensible is 22 knowns being unknown. Set the 22 rows from their names and
   movements — the three `Machine %` rows to `['machine']`, the calisthenics to `['bodyweight']`,
@@ -771,6 +742,49 @@ new reward currency.
 - **`Dumbbell Lunges` is a duplicate of `Dumbbell Lunge`** and surfaced in the same sweep — it wants
   a `merged_into`, not an equipment value.
 - **Reversal cost:** low. Data plus one predicate.
+
+### [workouts] LA-65 — the planner's transition constant is the last unmeasured term, and the data disagrees with itself about it
+
+- **Lane:** A — `packages/shared/src/workout/duration-model.ts` (`TRANSITION_SEC_*`), `packages/shared/src/workout/time-audit.ts`.
+- **Added:** 2026-09-07 · Lane A, from the BF-128 measurement pass. BF-128 explicitly asked for this
+  while the data was open; it is filed rather than shipped because the measurement came back
+  **contradictory**, which is a finding rather than a number.
+- **Needs:** — nothing.
+- **What BF-128 settled, so this entry does not re-litigate it.** The trailing per-set rest is not
+  taken: over 90 days and 309 exercises, all 517 non-final sets recorded a real rest (mean 126 s,
+  median 124 s, zero nulls) while **289 of 309 final sets — 93.5% — recorded NULL or 0**.
+  `styleWorkSec` no longer charges it.
+- **The contradiction.** `TRANSITION_SEC_BARBELL = 240 s` is the planner's per-exercise assumption.
+  Measured three ways over the same window, it reads:
+  - **249 s** mean across all 309 exercise logs, counting an unstamped row as 0 — which flatters it,
+    because **136 of 309 have a NULL `inter_exercise_rest_sec`** and only ~65 of those are the
+    first exercise of a session that genuinely has no preceding gap.
+  - **316 s** mean where `inter_exercise_rest_sec` is actually recorded (mean `prep_time_sec` 140 s
+    on top, itself NULL on 150 rows).
+  - and **feeding the recorded per-exercise transition into the model makes it over-predict the
+    measured working window by a median +20.8 min across all 36 warm-up-stamped sessions** — 36 of
+    36 over-estimates. With the planner's flat blend instead, the same 36 sessions come out at
+    **−3.6 min** median.
+- **So the recorded transition cannot be purely additive to the working window**, which is what the
+  `estimateExerciseDurationSec` comment currently assumes on the strength of one session
+  (2026-07-28). Either `inter_exercise_rest_sec` overlaps something already counted, or it is
+  stamped across pauses that are not transitions (a phone call, a set someone else was using the
+  rack for). **Deciding which is the entry** — the constant cannot be retuned on a number whose
+  meaning is unsettled, and raising 240 s toward the recorded 316 s would make the planner fit
+  *fewer* exercises, which is the direction the owner just reported as wrong.
+- **Start here:** compare `inter_exercise_rest_sec` against the gap implied by the neighbouring
+  sets' `set_end_ms`/`set_start_ms`, which is an independent clock the field does not derive from.
+  Where the two agree, the field means what it says; where they diverge, the divergence names the
+  overlap. `time-audit.ts` already has the robust-median machinery and an outlier band
+  (`[median × 0.25, median × 4]`) — the same band is the obvious first filter here.
+- **The second half, once the meaning is settled:** `estimateExerciseDurationSec` still charges
+  `sets × restSec`, and its `measuredRestSec` comes from a `time-audit.ts` median that filters
+  `> 0` and so **excludes exactly the trailing zeros** this class is about. That path very likely
+  wants BF-128's fix too. It was deliberately left alone because its own validation flips sign with
+  the transition term — which is this entry.
+- **Reversal cost:** low as code (one constant, one multiplier), high as behaviour — it moves every
+  generated program's volume, and it moves the stored session estimates users read. Wants the
+  measurement first, which is why nothing here is a patch.
 
 ### [workouts] BF-130 — the library has no home-gym knee-flexion hamstring exercise, so the gap is unfillable from the app
 

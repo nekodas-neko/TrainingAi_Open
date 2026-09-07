@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.26",
+    date: "2026-09-07",
+    changes: [
+      "A generated session now fits the number of exercises you actually do. The planner was reserving a rest period after the last set of every exercise \u2014 a rest you never take, because what follows the last set is walking to the next station, which it was already counting. On a 60-minute session that one double-count was worth a whole exercise: it prescribed four where your own history has five.",
+    ],
+  },
+  {
     version: "1.436.25",
     date: "2026-09-07",
     changes: [
