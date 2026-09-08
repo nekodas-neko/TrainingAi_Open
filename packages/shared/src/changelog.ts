@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.438.3",
+    date: "2026-09-08",
+    changes: [
+      "When a Readiness, Sleep or Activity score cannot be worked out, the screen now says which of two things happened instead of just showing a dash. \u0027Nothing recorded for today\u0027 means it needs data; \u0027Not enough history to score this yet\u0027 means it just needs more days \u2014 only the second one fixes itself.",
+      "The score circles on Home say the same thing to a screen reader, which previously heard only \u0027Readiness: dash\u0027.",
+    ],
+  },
+  {
     version: "1.438.1",
     date: "2026-09-08",
     changes: [
