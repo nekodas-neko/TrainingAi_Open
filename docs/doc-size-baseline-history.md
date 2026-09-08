@@ -8744,3 +8744,16 @@ new entry nobody owns.
 
 Up 1, from 10418: one Document Map row for `history-2026-09-08.md`. The map is the index's job — a
 history file nobody can find from the map is a history file nobody reads.
+
+## 2026-09-08 — backlog → 18748, `docs/agents/state/tuning.md` → 411 (TN-24, the walk)
+
+One entry that also **closes the open question on Q-523** — `zoneMinutes` floored at 0 on 53 of 59
+days, cause unestablished for weeks. The cause is arithmetic: Z1 spans **52–122 bpm**, 60% of the
+usable range, and the owner's best-ever walk interval averaged **110.6**. Stating that needs the zone
+table and the 88-interval cadence→HR fit, because the obvious fix — lower the boundaries — is the
+wrong one and the entry has to say why.
+
+The ⛔ lines are the load-bearing part. **The 168 max is genuine** (140 samples above 150), so the
+zones are anchored correctly and the training simply never reaches them; and **cadence is nearly
+exhausted as a lever** (31% cadence separation buys 7.9 bpm; Z2 would need ~198 spm), so a cadence
+target — which is what the app currently prescribes — cannot move the number.

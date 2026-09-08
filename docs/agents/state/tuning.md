@@ -3,7 +3,7 @@
 > **Successor sessions are titled `🎶 Tuning Agent 🟢`** — exactly, both emoji. Leading emoji = role,
 > trailing = this session's status, set by the session itself. See `docs/agents/README.md` §4.
 
-**Updated:** 2026-08-26 · **By:** `session_01VVfZtbCftbwaUHtBLJoxVr` · **Next ID:** `TN-24`.
+**Updated:** 2026-08-26 · **By:** `session_01VVfZtbCftbwaUHtBLJoxVr` · **Next ID:** `TN-25`.
 Find next free: `grep -rhoE '\bTN-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. Legacy `Q-` numbers
 stay valid. **Rewritten in full, never appended** — narrative lives in the linked reviews.
 
@@ -237,6 +237,22 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
   2026-09-02: the ten contributors blend to **76.04**, `SCORE_CALIBRATION` ships **63**. Two minutes of
   arithmetic separated *"the model is wrong"* from *"the display curve costs 11.9 points"*.
   [`review`](../../reviews/2026-09-03-why-a-good-night-scored-63.md).
+- **⛔ Z2 IS UNREACHABLE ON FOOT FOR THIS OWNER — 122 bpm, and his best walk interval averaged 110.6**
+  (TN-24). `hr-zones.ts:38` gives **Z1 = 52–122 bpm, 60% of the usable range in one bucket**, so
+  sitting still and a brisk interval walk score identically. **This is Q-523's mechanism** — that
+  entry had `zoneMinutes` floored on 53/59 days with no cause for weeks.
+  [`review`](../../reviews/2026-09-08-walk-intensity-calibration.md).
+- **The 168 max is GENUINE — do not treat the zones as a stale anchor.** 140 samples above 150 bpm, a
+  real 168 on 2026-07-05. The zones are anchored correctly; **nothing above 140 bpm since
+  2026-07-24**, because the training is walking and lifting. **⛔ Do not lower the boundaries to make
+  walks qualify** — that redefines the label everywhere else and silently re-scores history.
+- **Cadence is nearly exhausted as an intensity lever for walking.** 88 intervals:
+  `corr(cadence, HR)` **+0.512**, slope **0.288 bpm per spm**. A **31% cadence separation buys
+  7.9 bpm**; Z2 would need **≈198 spm**. **Do not propose a cadence target to raise intensity** —
+  grade and carried load are what remain. Mean fast-interval intensity is **40.1% of reserve**.
+- **`activity_logs.segments` is the richest per-interval source in the app** — `avgCadenceSpm`,
+  `avgHr`, `maxHr`, `distanceKm` per set. 106 segments across 11 sessions; **88 carry cadence+HR but
+  only 17 carry distance**, so build on cadence/HR and never assume pace.
 - **⛔ The SLEEP score's autonomic baseline is NOT `hrv_baseline_mean_x8`.** `buildSleepAudit` calls
   `sleepScoreBaselines(prior, tz)` (`sleep-score.ts:359`) — a **trailing window over prior nights'
   own readings**, newest last, excluding the night being scored. Comparing a stored `hrv`/`hr`

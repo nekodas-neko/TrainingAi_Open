@@ -399,6 +399,44 @@ below threshold and left in place for next time.
 
 
 
+### [cardio][activity][heart-rate] TN-24 — Zone 2 is unreachable on foot, so the walk's zone bar carries no information (and this is Q-523's mechanism)
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-08 · owner: *"can we make any calibrations or formulas for this to optimise the walk?"* after a 30-minute interval walk logged **30:00 Z1 / 0:00 everything else**
+- **Lane: A** — the reported metric, not the zone constants.
+- **Supplies the mechanism for Q-523** (`zoneMinutes` floored at 0 on 53 of 59 days, cause never established).
+- **Reference:** [`review`](reviews/2026-09-08-walk-intensity-calibration.md).
+- **⛔ Do NOT fix this by lowering the zone boundaries.** The Karvonen fractions are conventional and the max is genuine; moving Z2 down would make the label mean something different from every other use of it and would silently re-score history. **Change what the app reports, not where the boundaries sit.**
+
+`hr-zones.ts:38` builds zones as fractions of heart-rate reserve with **Z1 spanning 0.0 → 0.6**. For
+this owner (resting **52**, max **168**, reserve **116**) **Z1 is 52–122 bpm — 60% of the usable range
+in one bucket.** Sitting still and a brisk interval walk are the same zone.
+
+**The max is real, so this is not a stale anchor:** `oura_heartrate` holds **140 samples above 150**
+and a genuine **168** (2026-07-05). The zones are anchored correctly; the training never reaches them
+— **nothing above 140 bpm since 2026-07-24.**
+
+**Cadence is nearly exhausted as a lever.** Across **88 intervals / 10 sessions**:
+`corr(cadence, HR)` = **+0.512**, slope **0.288 bpm per spm**. A **31% cadence separation buys 7.9 bpm**;
+mean fast-interval intensity is **40.1% of reserve** against Z2's 60%, best ever **50.5%**.
+Extrapolated, averaging 122 bpm needs **≈198 spm** — a run. At the measured **0.739 m** stride
+(TN-22's review) the achievable walking speed simply does not demand more. **Grade and carried load
+are the levers that remain.**
+
+**And the protocol is not progressing:** fast/slow HR separation trends **−0.11 bpm per session** across
+ten sessions, while fast cadence fell **123.5 → 112.3 spm**. The *contrast* improved while the *effort*
+declined. **⚠ Description, not diagnosis** — ten sessions, one subject, no controlled comparison.
+
+**What to build, in order:**
+1. **Report intensity as % of heart-rate reserve** on the walk summary. 40.1% is meaningful and
+   movable; "Z1, 30:00" is not.
+2. **Prescribe a heart-rate band with grade/load as the adjustment**, not a cadence target — cadence
+   is at its ceiling for this purpose.
+3. **Progress on measured fast/slow HR separation.** **Do not ship a target number from this review** —
+   ten sessions cannot set one, and an unreachable target is the Q-504 mistake.
+
+**Pass test:** the walk summary shows a number that differs between the owner's 2026-08-14 session
+(30.0% reserve) and 2026-08-18 (50.5%), where the zone bar reads identically for both.
+
 ### [nutrition][body] OR-102b — the reta tracker: vial setup, dose calculator, dose timeline, weight response
 
 - **Lane:** B — a new section under Nutrition, plus the supplement sheet.
