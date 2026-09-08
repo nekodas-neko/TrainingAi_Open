@@ -83,15 +83,75 @@ comparison. The declining trend could equally be seasonal, terrain, or deliberat
 
 ---
 
+## 4. Is the session *efficient*? — it hits its prescription exactly, and the prescription is mislabelled
+
+The owner's real question was efficiency: *"should steps increase or longer durations?"* That depends
+on what the session is for, and `prescribed_runs` answers it:
+
+| field | value |
+|---|---|
+| `run_type` | **easy** |
+| `target_hr_low` / `high` | **68 – 97 bpm** |
+| `target_zone_ids` | `[1, 2]` |
+| `rationale` | *"A steady **Zone-2 aerobic** session — you should be able to hold a conversation."* |
+| `duration_min` | 30 |
+
+**The session averaged 89 bpm — dead centre of a 68–97 target. It is executed correctly.**
+
+**But the prescription contradicts itself twice:**
+
+1. **It calls itself "Zone-2 aerobic" while targeting 68–97 bpm, and Zone 2 starts at 122.** The
+   target band lies **entirely inside Zone 1**. The label and the number cannot both be right.
+2. **It prescribes a *steady* session; the walk player runs fast/slow cadence intervals.** Two
+   different sessions under one prescription.
+
+**⚑ This corrects an earlier line in this review**, which said *"the app currently prescribes
+cadence"*. It prescribes **both** — an HR band in `prescribed_runs` and a cadence-interval structure
+in the player — and they are not reconciled.
+
+### So: steps, or duration?
+
+**For the goal as actually targeted (68–97 bpm, conversational, easy aerobic), the intensity is
+already right and duration is the correct lever.** That is what an easy aerobic session is: the
+adaptation comes from time at a low intensity, not from raising it. **Increasing cadence would move
+the session *away* from its own target**, not toward it.
+
+**The interval structure is the inefficient part.** Measured across nine sessions:
+
+| | |
+|---|---|
+| within-session HR drift (first → last fast block) | **+7.1 bpm** |
+| fast-vs-slow contrast | **+7.7 bpm** |
+| sessions where **drift exceeded contrast** | **5 of 9** |
+
+**Simply staying on your feet for 30 minutes raises HR about as much as the intervals do.** The
+"slow" halves sit at **33.3% of reserve** against the fast blocks' **40.1%** — so half the session is
+spent giving back what the other half earned, for a 7.7 bpm contrast that time-on-feet supplies
+anyway.
+
+**Energy return, for scale:** 101 kcal over 30 min = **3.37 kcal/min gross**, about **2.29 kcal/min
+net** of resting. So **+15 minutes ≈ +34 net kcal** — real, linear, and modest. Duration does not
+compound; it adds.
+
+**⛔ None of this makes the session bad.** At 33–40% of reserve for 30 minutes it is a good
+easy-aerobic / step-accumulation session and it hits its target. **It is inefficient only against the
+"Zone-2" label it carries**, which walking cannot satisfy at all.
+
 ## What to build
 
 **(a) Report intensity against something a walk can reach.** The zone bar is structurally uninformative
 for this training. Either add a walking-appropriate band below Z2, or surface **% of heart-rate
 reserve** directly on the summary — 40.1% is a meaningful, movable number where "Z1, 30:00" is not.
 
-**(b) Coach the lever that works.** The app currently prescribes cadence. The data says cadence is
-near its ceiling for HR purposes. **A prescription targeting a heart-rate band, with grade or load as
-the suggested adjustment, is the one that can actually move the number.**
+**(b) Reconcile the prescription with itself.** `prescribed_runs` already carries an HR band
+(68–97 bpm) and the owner hits it. **Fix the label, not the target** — calling a 68–97 bpm session
+"Zone-2 aerobic" when Zone 2 starts at 122 is what makes the whole pillar read as broken. And decide
+whether the session is *steady* (as the rationale says) or *intervals* (as the player runs); shipping
+both is why the contrast is only 7.7 bpm.
+
+**(b2) If a genuine Zone-2 stimulus is the goal, walking cannot supply it** — grade or carried load
+are the only levers that reach 122 bpm. That is a product decision, not a calibration: an easy
+aerobic walk and a Zone-2 session are different sessions.
 
 **(c) Progress on measured separation, not on prescribed cadence.** The natural target is fast/slow HR
 separation, which has been flat at 7.9 bpm. **Do not ship a target number from this review** — ten

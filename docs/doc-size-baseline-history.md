@@ -8745,7 +8745,7 @@ new entry nobody owns.
 Up 1, from 10418: one Document Map row for `history-2026-09-08.md`. The map is the index's job — a
 history file nobody can find from the map is a history file nobody reads.
 
-## 2026-09-08 — backlog → 18748, `docs/agents/state/tuning.md` → 411 (TN-24, the walk)
+## 2026-09-08 — backlog → 18770, `docs/agents/state/tuning.md` → 422 (TN-24, the walk)
 
 One entry that also **closes the open question on Q-523** — `zoneMinutes` floored at 0 on 53 of 59
 days, cause unestablished for weeks. The cause is arithmetic: Z1 spans **52–122 bpm**, 60% of the

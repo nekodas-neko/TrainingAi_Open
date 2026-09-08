@@ -237,6 +237,17 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
   2026-09-02: the ten contributors blend to **76.04**, `SCORE_CALIBRATION` ships **63**. Two minutes of
   arithmetic separated *"the model is wrong"* from *"the display curve costs 11.9 points"*.
   [`review`](../../reviews/2026-09-03-why-a-good-night-scored-63.md).
+- **The walk PRESCRIPTION contradicts itself, and the owner executes it correctly** (TN-24).
+  `prescribed_runs`: `target_hr_low/high` **68–97 bpm**, rationale *"a steady **Zone-2 aerobic**
+  session"*. **68–97 lies entirely inside Zone 1** (Z2 starts at 122), and the rationale says
+  *steady* while the player runs fast/slow intervals. The owner averaged **89** — dead centre.
+  **Fix the label, not the target.**
+- **For an EASY aerobic session, duration is the right lever and cadence is the wrong one.** Measured:
+  within-session HR drift **+7.1 bpm** vs fast/slow contrast **+7.7 bpm**, with **drift exceeding
+  contrast on 5 of 9 sessions** — time on feet supplies as much as the intervals do. The "slow"
+  halves sit at **33.3% reserve** against fast **40.1%**. Energy return **≈2.29 kcal/min net**
+  (+15 min ≈ +34 kcal): linear, not compounding. **⛔ Do not call the session bad** — it is a good
+  easy-aerobic session, inefficient only against a label walking cannot satisfy.
 - **⛔ Z2 IS UNREACHABLE ON FOOT FOR THIS OWNER — 122 bpm, and his best walk interval averaged 110.6**
   (TN-24). `hr-zones.ts:38` gives **Z1 = 52–122 bpm, 60% of the usable range in one bucket**, so
   sitting still and a brisk interval walk score identically. **This is Q-523's mechanism** — that

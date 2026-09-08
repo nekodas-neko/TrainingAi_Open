@@ -426,11 +426,33 @@ are the levers that remain.**
 ten sessions, while fast cadence fell **123.5 → 112.3 spm**. The *contrast* improved while the *effort*
 declined. **⚠ Description, not diagnosis** — ten sessions, one subject, no controlled comparison.
 
+**⚑ THE PRESCRIPTION CONTRADICTS ITSELF, and this is the sharper half of the entry.**
+`prescribed_runs` for these walks carries `run_type: easy`, **`target_hr_low/high` = 68–97 bpm**,
+`target_zone_ids [1,2]`, and a rationale reading *"A steady **Zone-2 aerobic** session."*
+**The owner averaged 89 bpm — dead centre of target. The session is executed correctly.** But:
+1. **The 68–97 band lies entirely inside Zone 1**, while the label says Zone 2 (which starts at 122).
+   The label and the number cannot both be right.
+2. **The rationale says *steady*; the walk player runs fast/slow cadence intervals.** Two different
+   sessions under one prescription.
+
+**The interval structure is not earning its complexity.** Across nine sessions, **within-session HR
+drift is +7.1 bpm** (first fast block → last) against a **fast-vs-slow contrast of +7.7 bpm**, and
+**drift exceeded contrast on 5 of 9 sessions**. Time on feet supplies about as much as the intervals
+do, while the "slow" halves sit at **33.3% of reserve** against the fast blocks' **40.1%** — half the
+session giving back what the other half earned.
+
+**For the goal as actually targeted (68–97 bpm, conversational), the intensity is already right and
+DURATION is the correct lever** — that is what an easy aerobic session is. **Raising cadence would
+move the session away from its own target.** Energy return is **≈2.29 kcal/min net**, so +15 min ≈
++34 net kcal: real, linear, modest. **⛔ The session is not bad** — it is a good easy-aerobic session
+that is inefficient only against a "Zone-2" label walking cannot satisfy.
+
 **What to build, in order:**
 1. **Report intensity as % of heart-rate reserve** on the walk summary. 40.1% is meaningful and
    movable; "Z1, 30:00" is not.
-2. **Prescribe a heart-rate band with grade/load as the adjustment**, not a cadence target — cadence
-   is at its ceiling for this purpose.
+2. **Fix the prescription's label, not its target** — 68–97 bpm is right for an easy session; calling
+   it "Zone-2 aerobic" is what makes the pillar read as broken. And decide whether the session is
+   *steady* or *intervals*; shipping both is why the contrast is only 7.7 bpm.
 3. **Progress on measured fast/slow HR separation.** **Do not ship a target number from this review** —
    ten sessions cannot set one, and an unreachable target is the Q-504 mistake.
 
