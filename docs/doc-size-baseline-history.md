@@ -8744,3 +8744,12 @@ new entry nobody owns.
 
 Up 1, from 10418: one Document Map row for `history-2026-09-08.md`. The map is the index's job — a
 history file nobody can find from the map is a history file nobody reads.
+
+## 2026-09-08 — `docs/implementation-backlog.md` → 18711 (LA-75 shipped)
+
+Up 2 on balance: LA-75's own 15-line entry came out, and LB-63 went in at 17. That is a net add for
+a PR that closed an item, which is worth stating rather than hiding — the new entry exists because
+looking at the screen LA-75 changed showed a second thing wrong with it, and CLAUDE.md's **No
+orphaned findings** rule makes recording that mandatory, not optional. The alternative was to fix
+both in one PR, which would have mixed a design judgement (how an input is drawn) into a
+correctness fix (a placeholder claiming a number the app never recommends).

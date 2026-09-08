@@ -1156,21 +1156,6 @@ bests are windowed correctly and are the pattern. (c) Zone-minutes doubles Z3 as
 zone-targets counts Z3 once — both cite WHO 2020; the filed Tuning band is a third position and
 names neither file.
 
-### [nutrition] LA-75 — the goals form suggests a water number the app's own recommender never produces
-
-- **Lane:** B — `components/profile/goal-targets-section.tsx:163,204` (placeholder copy only).
-- **Added:** 2026-09-07, Lane A — the residue of PS-37, which named two 2500s and there are four.
-
-`placeholder="2500"` and `placeholder="e.g. 2500"` sit on the water-goal inputs, **beside the control
-that fills in the real recommendation** — `weightKg * 33 + WATER_BUMP_BY_ACTIVITY[activity]`, which
-for any real body weight lands nowhere near 2500 (the changelog even advertises "33 ml per kg of body
-weight, plus your activity bump"). PS-37 read the same number in two other places as a hardcoded goal;
-those two turned out to be a **no-goal-set fallback** (now `DEFAULT_WATER_GOAL_ML`, named as a
-placeholder rather than a recommendation) and a **population anchor** for a 1-5 prefill scale, which
-is deliberately not personal. The form is the one place where 2500 is genuinely wrong: it suggests a
-goal. Show the recommendation, or nothing. Left to Lane B because it is placeholder copy on a screen
-this session cannot see rendered.
-
 ### [platform] PS-38 — checkpoint docs sweep: seven stale CLAUDE.md claims, a duplicated Q-479 row, 13 Needs→KEEP edges
 
 - **Lane:** O — the Orchestrator's; docs only. **Reference:** the full dispositions live in the
@@ -18163,6 +18148,23 @@ reads.
   because it is queued work.
 - **Reversal cost:** low, one line — but it is seen everywhere, so it wants the owner's eye before
   it lands.
+
+### [app-shell] LB-63 — one field on the goals form is drawn as a different kind of control from its three siblings
+
+- **Lane:** B — `components/profile/goal-targets-section.tsx:147` (the Sleep Goal input's `className`).
+- **Added:** 2026-09-08 · Lane B, seen on screen while shipping LA-75 on the same form.
+- **What it looks like.** Steps, Water and Calories are `border-border bg-muted/60` — bordered boxes
+  that read as text fields. Sleep alone carries `border-0 bg-transparent p-0 h-auto` plus a dimmer
+  `placeholder:text-muted-foreground/50`, so on the S25 it renders as an unbordered strip while the
+  three fields around it render as inputs. LA-75's longer placeholder makes it more obvious, but the
+  divergence predates it — the file was extracted whole in one commit, so there is no blame trail and
+  no comment saying the difference is meant.
+- **Left alone deliberately, and this entry is why.** LA-75 was a copy fix on the same four fields;
+  restyling a control in the same PR would have mixed a design judgement into a correctness one and
+  made the diff harder to read. Filed under **No orphaned findings** rather than queued as urgent.
+- **What it needs is a look, not a decision.** Almost certainly the sleep field should just match its
+  siblings. Confirm on the S25 first — the difference is much clearer rendered than in the class list.
+- **Reversal cost:** one line.
 
 ### [platform] LB-62 — a zero-argument `vi.fn` whose recorded calls are then indexed; red `main` three times in one day
 
