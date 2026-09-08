@@ -9281,6 +9281,16 @@ file and missed here. Nothing had been pushed, so the cost was three lines. The 
 `grep -c '^<<<<<<<' ` on the file, not a reading of the diff, is what found it, because the markers sit
 9,000 lines into a document nobody reads end to end.
 
+## 2026-09-08 — `docs/implementation-backlog.md` → 19442 (OR-105, the premature-`Verify:` trap)
+
+Fifty lines: a 30-line entry, an 11-line field rule, and prose replacing the two bad `Verify:` fields
+it was written about. The rule is the part that earns its length. A premature `Gate:` was already
+documented with three outbreaks; the same mistake in the newer `Verify:` field is **worse** and the
+rule has to say why, or it reads as a restatement — a wrong gate parks an entry where PARKED invites
+the question, while a wrong `Verify:` prints *"nothing is blocked"* and nobody looks in either place.
+The measured case is what makes it land: the reta tracker's entire surface, 64 lines of unwritten
+spec, filed as shipped for two days in the lane whose READY list held two items.
+
 ## 2026-09-08 — `docs/implementation-backlog.md` 19,392 → 19,378 (−14), BF-132 shipped and LB-66 filed
 
 BF-132's 35 lines come out and LB-66's 21 go in, which is what a completed entry with a residue looks
@@ -9301,3 +9311,9 @@ tables with no `deleted_at`, and nothing on the screen says so once Save is pres
 The row is not a duplicate of LB-66. The backlog is what an implementer reads; this file is what the
 owner reads before a session, and the owner is the person who lost a session to this. It leaves when
 LB-66 lands, not when the confirmation shipped.
+
+### Reconciled on merge — 19428 (BF-132 branch)
+
+Three PRs landed under this branch while it was being verified, taking the backlog from 19,392 to
+19,442. Recomputed from the merged file rather than spliced: **19,442 − 14 = 19,428**, so the −14
+above (BF-132 out, LB-66 in) is unchanged and is the only part of the number this diff owns.
