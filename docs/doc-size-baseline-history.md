@@ -8739,3 +8739,8 @@ than one: measurements on LB-52 (four base re-merges on one PR, every conflict t
 file, and its required-checks list wrong about E2E) and on LB-56 (an E2E job that ate itself at 23
 minutes and did not reproduce). Evidence attached to the entry that will act on it, rather than a
 new entry nobody owns.
+
+## 2026-09-08 — `projectOverview.md` → 10419 (the journal fold)
+
+Up 1, from 10418: one Document Map row for `history-2026-09-08.md`. The map is the index's job — a
+history file nobody can find from the map is a history file nobody reads.

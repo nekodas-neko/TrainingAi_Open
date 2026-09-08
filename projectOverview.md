@@ -10381,6 +10381,7 @@ append-only session journal and the batched archives live under `docs/`:
 | `docs/overview/history-2026-07-16.md` | **Completed journal (batched)** — sessions 2026-07-16 → 2026-07-17, newest at top |
 | `docs/overview/history-current.md` | Sessions ~287 → 2026-07-16 (closed batch) |
 | `docs/overview/history-newer.md` | Sessions ~217–286 (closed batch) |
+| `docs/overview/history-2026-09-08.md` | Journal entries folded 2026-09-08 — the unlinked ones only; anything another doc cited stayed loose in `entries/` |
 | `docs/overview/history-newest.md` | Sessions ~209–216 (closed batch) |
 | `docs/overview/history-latest.md` | Sessions ~177–209 (closed batch) |
 | `docs/overview/history-recent.md` | Sessions ~105–176 + roadmap / version-history tables |
