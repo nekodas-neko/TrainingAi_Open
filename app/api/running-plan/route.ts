@@ -3,7 +3,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { z } from 'zod'
-import { DEFAULT_TZ, todayInTz, normalizeDateParam } from '@trainingai/shared/date-utils'
+import { DEFAULT_TZ, todayInTz, normalizeDateParamIso } from '@trainingai/shared/date-utils'
 import { prescribeNextRun, OVERRIDE_RATIONALE_PREFIX } from '@trainingai/shared/running/prescription'
 import { defaultFrameworkForGoal, CARDIO_GOALS } from '@trainingai/shared/running/cardio-goals'
 import { weeklyZoneTargets } from '@trainingai/shared/running/zone-targets'
@@ -134,6 +134,21 @@ export async function POST(req: Request) {
   const parsed = CreateBody.safeParse(read.body)
   if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
 
+  // LA-79. `normalizeDateParam` returns the SLASH form — that is its job, for the day-scoped readers
+  // that want it — and `running_plans.target_date` is a Postgres `date` column, so the slash string
+  // was parsed under whatever `DateStyle` the server has. Correct under the default `ISO, MDY`;
+  // under `DMY` the day and month swap and a target date moves by up to eleven months. Nothing sets
+  // `DateStyle`, so that correctness rested on a default nobody had written down.
+  // `normalizeDateParamIso` exists for exactly this — "consumers that do dash-based arithmetic …
+  // dash-keyed DB columns" — and the supplements validator already solves the same hazard.
+  //
+  // A supplied date that is not a real day is now refused rather than stored as null: dropping it
+  // silently left a distance-event plan with no deadline and no way to tell why.
+  const targetDate = parsed.data.targetDate ? normalizeDateParamIso(parsed.data.targetDate) : null
+  if (parsed.data.targetDate && targetDate === null) {
+    return NextResponse.json({ error: 'Invalid target date' }, { status: 400 })
+  }
+
   const tz = session.user?.timezone ?? DEFAULT_TZ
   const repo = await getRepository()
   // Framework defaults from the chosen goal (speed→VO₂max intervals, heart_health→Zone 2,
@@ -144,7 +159,7 @@ export async function POST(req: Request) {
   const plan = await repo.saveRunningPlan(userId, {
     goalKind: parsed.data.goalKind,
     targetDistanceKm: parsed.data.targetDistanceKm ?? null,
-    targetDate: parsed.data.targetDate ? normalizeDateParam(parsed.data.targetDate) : null,
+    targetDate,
     frameworkKey,
     timePerSessionMinutes: parsed.data.timePerSessionMinutes ?? null,
     fitnessSnapshot: fitness,

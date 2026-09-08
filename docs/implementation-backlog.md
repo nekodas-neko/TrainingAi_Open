@@ -1080,33 +1080,6 @@ two are `first-run-empty-states` and `preferences-survive-reinstall`. **Order ma
 least some of these are shared-state, not the spec's own logic. Read the artifact this PR makes real
 before assuming a local-DB artifact — that mistake has already been made once on `plan-rescale`.
 
-### [cardio][platform] LA-79 — `POST /api/running-plan` writes a slash date into a `date` column
-
-- **Lane:** A — `app/api/running-plan/route.ts`, one identifier.
-- **Added:** 2026-09-08, Lane A — found writing that route's PS-39 tests, then checked against the
-  local database rather than reasoned about.
-
-The route stores `targetDate: normalizeDateParam(parsed.data.targetDate)`. **`normalizeDateParam`
-returns the SLASH form** (`2026/12/01`) — that is its documented job, because `getDayLog` and the
-other day-scoped readers want slashes. `running_plans.target_date` is a Postgres **`date`** column,
-so the slash string is parsed by the server under whatever `DateStyle` the session has.
-
-**Latent, not live.** Under the default `ISO, MDY` — what this project's databases run, verified
-2026-09-08 — `2026/12/01` reads as 2026-12-01 and `2026/01/12` as 2026-01-12, both correct. Under
-`DMY` the day and month swap and a target date silently moves by up to eleven months. Nothing sets
-`DateStyle` explicitly, so the correctness rests on a server default nobody has written down.
-
-- **The fix is one identifier**: `normalizeDateParamIso`, which exists for exactly this ("use for
-  consumers that do dash-based arithmetic … dash-keyed DB columns"). The supplements validator
-  already solves the same hazard with a transform, and its comment says why — *"the difference
-  between one rule and two routes that must both remember it."* This is the second route.
-- **Also worth deciding while there:** an unparseable `targetDate` is stored as `null` rather than
-  refused, so `2026-13-45` silently loses the user's goal date. Lenient-optional is defensible; it
-  should be deliberate rather than a side effect of `normalizeDateParam` returning null.
-- **When fixing, add the assertion the PS-39 batch deliberately left out**: the stored form is
-  dashes. `lib/__tests__/running-plan-routes.test.ts` currently matches `/^2026[-/]12[-/]01$/` and
-  says why, rather than pinning the current behaviour as correct.
-
 ### [platform] LA-77 — 60% of the lint warnings are deliberate, so the 60 real ones are invisible
 
 - **Lane:** O — `eslint.config.mjs` is repo-level tooling in neither implementer lane's paths, the

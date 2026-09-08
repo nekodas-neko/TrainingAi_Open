@@ -8912,3 +8912,9 @@ the caller's active program before it writes, so the entry owes nothing.
 form into a Postgres `date` column, found while writing that route's PS-39 tests and checked
 against the local database. Raised because a new queue entry is what this index is for; the PS-39
 status update in the same PR was net-negative.
+
+## 2026-09-08 — `docs/implementation-backlog.md` → 18793 (LA-79 shipped)
+
+18824 → 18793. LA-79's entry removed on shipping — `POST /api/running-plan` now stores the dash form
+via `normalizeDateParamIso` and refuses a date-shaped string that is not a real day, so the entry
+owes nothing.
