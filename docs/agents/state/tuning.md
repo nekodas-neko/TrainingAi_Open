@@ -3,7 +3,7 @@
 > **Successor sessions are titled `🎶 Tuning Agent 🟢`** — exactly, both emoji. Leading emoji = role,
 > trailing = this session's status, set by the session itself. See `docs/agents/README.md` §4.
 
-**Updated:** 2026-08-26 · **By:** `session_01VVfZtbCftbwaUHtBLJoxVr` · **Next ID:** `TN-24`.
+**Updated:** 2026-09-09 · **By:** `session_01VVfZtbCftbwaUHtBLJoxVr` · **Next ID:** `TN-30`.
 Find next free: `grep -rhoE '\bTN-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. Legacy `Q-` numbers
 stay valid. **Rewritten in full, never appended** — narrative lives in the linked reviews.
 
@@ -11,76 +11,68 @@ stay valid. **Rewritten in full, never appended** — narrative lives in the lin
 
 ## Now
 
-**Nothing is blocked on the owner, and nothing is blocked on you.** Every decision these batches
-needed was asked plainly and answered — 2026-08-24 for TN-5/TN-6/TN-6a and the history policy,
-2026-08-26 for TN-9's intent and **TN-15's redesign**. TN-2's offset is the only thing still open,
-and it is a fit Lane A must run, not a decision.
+**Nothing is blocked on the owner.** Every decision the queue needed has been asked and answered —
+2026-08-24 (TN-5/TN-6/TN-6a, history policy), 2026-08-26 (TN-9's intent, TN-15's redesign),
+2026-08-31 (the step goal: **manual wins**), and **2026-09-09** (*"make all the changes you
+recommend"* — TN-29 then TN-27 option 3). **TN-25 is the one open owner question**: three options for
+the guided walk's fast target, filed 2026-09-08, not yet chosen.
 
 **The owner's standing verdict, 2026-08-26:** *"Overall the pillars are not working great and not
-very useful. Requires tuning."* Read that as the frame for everything below — the queue is long
-because the pillars were measured, not because they are fine.
+very useful. Requires tuning."* The queue is long because the pillars were measured.
 
-Filed this session, all propose-only, all in the queue:
+**⚠ The battery chain has still shipped nothing** and the owner has reported it twice. TN-15/18/6a/6/2
+all carry sign-off and all sit unbuilt. That is a prioritisation question only the owner can answer —
+say so plainly rather than re-measuring the pillar a fourth time.
+
+**Filed 2026-09-08/09, the nutrition and cardio batches:**
 
 | ID | What | State |
 |---|---|---|
-| **TN-2** | Body Battery charge window is below the owner's 5th-pct waking HR; floors by ~12:30pm | direction signed off, offset unfitted (**+8…+12**) |
-| **TN-3a/b** | per-bucket stress series is computed then discarded — no hour-of-day question is answerable | 3b `Needs: 3a` |
-| **TN-4** | `/api/body-battery` 500s on a stress-model failure | **SHIPPED** #415; root cause still open |
-| **TN-5** | `SCORE_CALIBRATION` gain varies 8-fold | **signed off** — build it |
-| **TN-6** | temp baseline 0.363 °C low → −16 pts/day on 89% of days | **signed off**; batched with Q-506 + **BF-13** |
-| **TN-6a** | suspend the temperature penalty until the baseline is centred | **signed off**, ships alone, outside the batch |
-| **TN-7** | TN-4's catch only `console.error`s, disarming LA-20's verification | one line, Lane A |
-| **TN-8** | chronic-stress fever mask = a **fourth** consumer of the broken temp baseline | batched with BF-13; fixed by that seed fix |
-| **TN-9** | readiness moves when the check-in is logged; owner wants it final at first open | intent signed off — drop `checkin`, renormalise |
-| **TN-10** | `TOTAL_SLEEP`'s comment and curve disagree by ~15 pts on the heaviest contributor | `Gate: owner`; sequence after TN-5 |
-| **TN-11** | "moved this hour" = one reading over a resting boundary → **99.8%** of waking hours qualify | answers Q-522's open half; **TN-2 does not fix it** |
-| **TN-12** | no hourly-movement surface worth having; the one that exists is pinned at full | Lane B, `Needs: TN-11` |
-| **TN-13** | the HR tile shows a 7-day average and discards 84% of the movement in the best predictor there is | Lane B, one field |
-| **TN-14** | 2026-08-19's 3.50 h night still stored, still feeding every baseline | `Needs: Q-520`; decode the frames first |
-| **TN-15** | Body Battery: drain ignores exercise, no recharge at all | **signed off**; `Needs: TN-2`; supersedes the old "do not redesign" line |
-| **TN-16** | prolonged-stress warning + calm-down prompt | **parked** `Needs: Q-507` — the metric points the wrong way |
-| **TN-17** | Activity as a pace-to-goal score (owner's design) | mechanic sound; `Needs: Q-524`, `Gate: owner` — the goals make it punishing |
-| **TN-18** | TN-6a gated the readiness ladder, NOT the deload banner — the surface the owner reads | one condition, Lane A, do not batch |
-| **TN-19** | the HOW IT MOVES card promises 5 mechanisms; **4 inert or backwards** | `Needs: TN-15`; ⛔ do not reword the card |
-| **TN-20** | a recompute **overwrites a completed day with an empty result** | data integrity, do not batch, do not re-run to "fix" |
-| **TN-21** | "daytime stress" is **55% night buckets**, night/day opposite signs | window finding stands; its Q-507 candidate superseded by TN-22 |
-| **TN-22** | stored `stress_high_minutes` disagrees with the model's own buckets, **8 of 9 days** | **explains Q-507 and reverses it**; likely same defect as TN-20 |
-| **TN-23** | sleep's `hrv` + `hr` are one autonomic event scored twice, **25% of the score** | r=+0.869; ⛔ don't delete a contributor — collapse or down-weight |
+| **TN-24** | Zone 1 spans 52–122 bpm, so Zone 2 is unreachable on foot and the walk's zone bar carries nothing | supplies **Q-523's** mechanism; PR #998 |
+| **TN-25** | the walk's fast target (≥133 bpm) met **0 of 44 times**; fast blocks average the slow target | **`Gate: owner`** — three options, unanswered |
+| **TN-26** | cadence and speed mean different things per surface; prescribe heart rate, demote the controls | rewritten after the owner declined treadmill tuning |
+| **TN-27** | maintenance rejects its 28-day window and falls back to the noisy 14-day one → **2,245 kcal** | **owner chose option 3**, after TN-29 |
+| **TN-28** | the one card that writes the calorie goal hides the `low confidence` its siblings show | Lane B, independent |
+| **TN-29** | two independent maintenance estimates computed per request, never compared; gate on the activity factor | **owner-approved, build first** |
 
-**Owner decisions, 2026-08-24 — recorded on the entries, nothing gated on them.** TN-5 and TN-6
-signed off; **TN-6a** added (suspend the temperature penalty on a self-clearing condition, outside the
-batch, all three consumers). **History policy: leave stored days alone and stamp the new model** —
-which leans on a stamp Q-518 says gets erased, so **Q-518 is load-bearing**. On **BF-13**: re-derive
-the baselines, fix the seed for all six, re-derive only what is measurably wrong — **measured, only
-`temp` is** (+2.80 sd; the other five ≤0.28 sd).
+**Earlier batches, all still queued and none blocked:** TN-2 (battery charge window, offset unfitted)
+· TN-5 (`SCORE_CALIBRATION` 8-fold gain) · TN-6/6a/8/18 (the temperature baseline and its four
+consumers) · TN-9 (readiness final at first open — **two fixes, not one**) · TN-11/12/13 (move-hours,
+the HR tile's smoothing) · TN-15/19 (Body Battery drain and recharge) · TN-17 (Activity pacing,
+`Needs: Q-524`) · TN-20/21/22 (the stress and recompute persistence defects) · TN-23 (sleep's `hrv`
+and `hr` are one signal scored twice).
 
-**BF-14 refuted 2026-08-24** — breathing baseline is fed `rpm × 10`, so rpm = `meanX8 / 80`; corrected it is **+0.27 sd, clean**. Reasoning on the entry.
-
-Reviews: [four tiles at 55](../../reviews/2026-08-31-four-tiles-at-55.md) · [HR tile + pacing](../../reviews/2026-08-26-hr-tile-and-activity-pacing.md) · [pillar review](../../reviews/2026-08-26-pillar-review.md) · [check-in lookback](../../reviews/2026-08-26-checkin-lookback.md) · [threshold sweep](../../reviews/2026-08-25-threshold-sweep.md) · [battery](../../reviews/2026-08-24-body-battery-charge-window-collapse.md) ·
+Reviews: [maintenance 2,245](../../reviews/2026-09-09-maintenance-2245-is-too-high.md) ·
+[walk intensity](../../reviews/2026-09-08-walk-intensity-calibration.md) ·
+[why a good night scored 63](../../reviews/2026-09-03-why-a-good-night-scored-63.md) ·
+[stress sign explained](../../reviews/2026-09-01-stress-sign-explained.md) ·
+[recompute wipes completed days](../../reviews/2026-09-01-recompute-wipes-completed-days.md) ·
+[four tiles at 55](../../reviews/2026-08-31-four-tiles-at-55.md) ·
+[HRV as a tile metric](../../reviews/2026-08-31-hrv-as-a-tile-metric.md) ·
+[measured stride](../../reviews/2026-08-31-measured-stride-from-cadence.md) ·
+[HR tile + pacing](../../reviews/2026-08-26-hr-tile-and-activity-pacing.md) ·
+[pillar review](../../reviews/2026-08-26-pillar-review.md) ·
+[check-in lookback](../../reviews/2026-08-26-checkin-lookback.md) ·
+[threshold sweep](../../reviews/2026-08-25-threshold-sweep.md) ·
+[battery](../../reviews/2026-08-24-body-battery-charge-window-collapse.md) ·
 [sleep](../../reviews/2026-08-24-sleep-score-volatility.md) ·
 [temperature](../../reviews/2026-08-24-readiness-temperature-penalty.md) ·
 [handoff](../../handoff-2026-08-24-readiness-scores-owner-batch.md).
 
-**Lane A is already working from these** — #415 shipped TN-4, #417 landed a TN-2 enabling refactor,
-and `426cbfbb` records that TN-2's fit **cannot run from a session container** (vendored constants
-Q-49 removed; `oura_raw_samples` holds ~7 of the 56 days needed; `decoded` NULL on those).
-
 ## Next
 
-1. **Re-measure after Lane A lands any of TN-2/5/6 or Q-506** — each carries its own pass test.
-2. **The threshold sweep is done** — see the do-not-re-litigate list. What it left is the ~13
-   thresholds whose inputs are never persisted; those need the pipeline, not SQL.
-3. **Activity volatility at n ≥ 20.** It read 7.2 → 12.2 day-to-day, which would be a real change of
-   character for the most compressed score in the app. **Six deltas cannot tell that from a run of
-   unusual days** — deliberately not filed.
-4. **Earlier open findings, none built:** illness radar cannot fire (Q-506) · stress override fires
-   on the *best* days (Q-507) · resilience has emitted one value ever (Q-508/510) · BLE input drift,
-   anchor must not move (Q-509) · battery anchor flip (Q-511) · ACWR call-site windows (Q-512/513) ·
-   64% of back-off cuts are a clamp artefact (Q-514) · rest/active boundary shrinks with fitness
-   (Q-515) · `PEAK_BANDS` unreachable (Q-516) · adaptive-TDEE below BMR (Q-517) · model stamp erased
-   (Q-518) · manual bedtime (Q-519) · partial-night flag (Q-520) · battery drain model (Q-527) ·
-   `replaceOuraDailySummary` delete-before-guard (Q-528) · chronic stress (Q-525, TN-1).
+1. **Re-measure after Lane A lands anything.** Every entry carries its own pass test; that is the work,
+   not finding a new pillar.
+2. **TN-25 needs the owner's pick** before the walk batch can go further. Ask once, do not re-measure.
+3. **The threshold sweep and the check-in lookback are DONE** — see the do-not-re-litigate list.
+4. **Activity volatility at n ≥ 20** — read 7.2 → 12.2 day-to-day on six deltas, which cannot tell a
+   change of character from a run of unusual days. Deliberately not filed.
+5. **Earlier open findings, none built:** illness radar cannot fire (Q-506) · resilience has emitted
+   one value ever (Q-508/510) · BLE input drift (Q-509) · battery anchor flip (Q-511) · ACWR call-site
+   windows (Q-512/513) · 64% of back-off cuts are a clamp artefact (Q-514) · rest/active boundary
+   shrinks with fitness (Q-515) · `PEAK_BANDS` unreachable (Q-516) · **adaptive-TDEE below BMR
+   (Q-517 — TN-29 is its other half)** · model stamp erased (Q-518) · manual bedtime (Q-519) ·
+   partial-night flag (Q-520) · battery drain model (Q-527) · chronic stress (Q-525, TN-1).
 
 ## Pillar coverage
 
@@ -367,6 +359,49 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
 - **Activity's 100 is not reachable by behaviour, and saying "train harder" would be wrong.**
   `zoneMinutes` floored on 53/59 days (Q-523), `activeEnergy` present on 8/51, `moveHours` meaningless
   (TN-11). Three of six contributors are structurally broken; the ceiling is a data problem.
+- **⛔⛔ WHEN A MODEL COMPUTES THE SAME QUANTITY TWICE, THE DISAGREEMENT IS THE FINDING — AND THIS ONE
+  NEVER COMPARES THEM.** `computeEnergyBalance` derives maintenance from intake-and-weight *and* from
+  resting-rate-plus-measured-movement on every request, then lets the first silently override the
+  second. Over one 28-day window they read **2,245** and **1,895**. They fail in unrelated ways, which
+  is exactly what makes the second a free check on the first (TN-29). **Before proposing a new signal,
+  check whether the app already computes a second answer and throws it away.**
+- **Divide any expenditure number by the measured resting rate before believing it.** Maintenance ÷ RMR
+  is an activity factor, and a factor is legible where a kcal figure is not: 2,245 / 1,345 = **1.67**,
+  *hard exercise 6–7 days a week*, for an owner averaging **3,572 steps/day**. The three honest
+  estimates sit at 1.23–1.41. **This is the cheapest sanity test in the nutrition pillar** — and
+  Q-517's one-sided BMR floor is the same idea already half-built.
+- **⛔ A coverage gate whose DENOMINATOR is the window length steers toward the noisiest window.** The
+  maintenance estimator's `MIN_LOGGED_FRACTION` reads 71% at 14 days and 36% at 28 **with an identical
+  mean intake of 1,612**, because complete-logging began on a fixed date and the numerator cannot grow.
+  So it rejects 27 weigh-ins over 27 days, accepts 14 over 13, and lands on the window the module's own
+  header calls *"dominated by water-weight swings"* — hardest exactly when logging is sparsest.
+  **Check whether a ratio's numerator can move before trusting it as a quality signal.**
+- **The gate protected the mean; the SLOPE was what moved.** Both windows shared their mean intake, so
+  100% of a 591 kcal spread was the weight fit — which nothing gated at all. `MIN_WEIGH_INS` and
+  `MIN_WEIGHT_SPAN_DAYS` check that a slope EXISTS, never that it is precise. **Report the standard
+  error: 14 days gave [1,990–2,500], 28 gave [1,526–1,781], and the intervals do not overlap.**
+- **A window sweep is the fastest proof that a fit is noise.** 10d → 2,414, 14d → 2,245, 22d → 1,774,
+  28d → 1,654, with the intake identical from 14 days out. **A 760 kcal range produced by nothing but
+  window length** says more in one row than any argument about the formula.
+- **⚠ `activity_level` no longer touches the calorie path and overstating it would be wrong.** Q-401
+  removed `ACTIVITY_MULTIPLIERS`. What it still reaches is small and worth naming exactly: the VO₂max
+  **crosscheck only** (37.3 → 41.1 light→moderate; the Uth-Sørensen headline of 55.0 does not move),
+  the step goal (moot — manual wins), the water goal (+250 ml), and the AI coach's context. **Measure a
+  field's blast radius before proposing to fix it.**
+- **⛔ Heart rate is the only walk control that transfers across surfaces (TN-26).** 120 spm is 4.0 km/h
+  on a belt (0.556 m stride) and 5.3 km/h outdoors (0.739 m); % of heart-rate reserve is defined
+  against the user's own resting and max, so it means the same thing everywhere. **Do not tune the
+  guided walk to the treadmill** — the owner declined that directly on 2026-09-08, and was right.
+- **⛔ Two speed points cannot extrapolate a walk prescription.** 2 km/h → 90.7 bpm and 4 km/h → 98.5
+  gives ≈3.9 bpm/km/h, which puts 70% reserve at **~12.9 km/h**. The slope was measured in the flattest
+  part of the curve; the response steepens toward the walk/run transition.
+- **⚠ Read the column TYPES before writing the join.** The `date`/`log_date` columns in `claude_ro` are
+  **text**, not `date`, so `generate_series` joins fail three different ways before landing. Three
+  round-trips of `operator does not exist` cost more than one `information_schema` query would have.
+- **⚠ A branch cut from a shallow clone has NO MERGE BASE after `git fetch --unshallow`.** PR #948 sat
+  at `total_count: 0` looking like slow CI; the branch could never merge and no amount of re-merging
+  fixes it. **Rebuild the content on a fresh `origin/main` branch and close the original** — for a
+  docs-only PR that is ten minutes, and fighting the history is not.
 - **The threshold is usually right and the input usually wrong** — Q-506, Q-512, Q-514, now TN-6.
   Check the input's distribution before touching any constant.
 - **Do NOT lift the sleep scale toward its old mean** — sleep/readiness agreeing is load-bearing for
