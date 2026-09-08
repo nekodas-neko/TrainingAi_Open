@@ -8850,3 +8850,16 @@ miniature: this file changes length on essentially every merge, so its baseline 
 everything, and the delta is the only part of the number that means anything.
 The −17 is unchanged across both, which is the whole reason the number comes from the merged file
 rather than being carried across.
+
+## 2026-09-08 — `docs/agents/state/implementation-lane-b.md` → 156 (the twenty-third run's rewrite)
+
+Down 36, and the number is the least of it. The baton was dated **2026-09-03** and still said `main`
+was at v1.436.3, `check:rules` was 67 of 67, and the next free ID was `LB-54` — eleven behind. It also
+carried, in bold, *"E2E IS required now — wait for SIX checks, not five"*, which LB-52's measurement
+and this run's own merge of #954 both contradict. CLAUDE.md's rule is that a baton is rewritten in
+full and never appended to, *"because a baton that is half last week's is worse than none: it gets
+trusted"* — and a wrong required-checks list is exactly the kind of thing that gets trusted.
+
+PS-4 asks for all six under ~150 lines and says the work is not a separate task but a by-product of
+each role rewriting its own. This is that: 156 with the stale run-specific narrative gone and this
+run's lessons in its place.
