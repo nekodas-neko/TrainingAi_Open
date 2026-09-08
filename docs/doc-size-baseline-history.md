@@ -9076,3 +9076,28 @@ exercise list changed and re-measuring is the point. And the partial-baseline bu
 card to say **which** state it is in; "Baseline needed" reading identically after zero sessions and
 after two is what made this unreportable until it was traced, and a fix that leaves that in place
 invites the same report again.
+## 2026-09-08 — `docs/implementation-backlog.md` → 18983 (PS-39: the trap's general form)
+
+18977 → 18983. The fixture trap recurred three more times in the HR batch, all one shape: every
+fixture where the resolved ceiling equalled the age estimate could not tell the two apart, so three
+values derived from the ceiling were silently readable from the estimate. The entry now states the
+general form — when two quantities are equal in your fixture, nothing that reads either is under
+test — which is what makes the checklist usable on a case it has not seen.
+
+## 2026-09-08 — `docs/overview/entries/` total ceiling → 331 (LA-80, eleventh PR running)
+
+330 → 331. Eleventh consecutive raise, one per PR, as LA-80 describes.
+
+### Reconciled on merge — 19,012 (BF-131 amendment branch)
+
+`main` gained two PS-39 route-test batches while this branch was open, so the `.size` file conflicted
+— both sides describing the same number, which is the genuine-disagreement case. Recomputed from the
+merged file; the append-only history conflict beside it was two independent additions and both are
+kept.
+
+The merge itself needed the clone unshallowed first. `git merge origin/main` failed with *"refusing
+to merge unrelated histories"* — not a real divergence, but an artefact of the session's depth-1
+clone: a later `git fetch origin main` had replaced `origin/main` with an isolated commit carrying no
+parents, so no merge base existed locally. GitHub's own `update_pull_request_branch` refused too, but
+for the real reason (the `.size` conflict), which is what separated the two causes. `git fetch
+--unshallow` then made the merge ordinary.
