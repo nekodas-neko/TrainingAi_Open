@@ -9068,3 +9068,14 @@ sentence asserting it would not be.
 TN-28 is short and rides along: the nudge card writes the number into the calorie goal on one tap
 while omitting the `low confidence, 10 of 14 days logged` qualifier that both its sibling cards
 already render from the same payload.
+## 2026-09-08 — `docs/implementation-backlog.md` → 18983 (PS-39: the trap's general form)
+
+18977 → 18983. The fixture trap recurred three more times in the HR batch, all one shape: every
+fixture where the resolved ceiling equalled the age estimate could not tell the two apart, so three
+values derived from the ceiling were silently readable from the estimate. The entry now states the
+general form — when two quantities are equal in your fixture, nothing that reads either is under
+test — which is what makes the checklist usable on a case it has not seen.
+
+## 2026-09-08 — `docs/overview/entries/` total ceiling → 331 (LA-80, eleventh PR running)
+
+330 → 331. Eleventh consecutive raise, one per PR, as LA-80 describes.

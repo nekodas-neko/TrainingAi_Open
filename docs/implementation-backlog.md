@@ -1395,7 +1395,7 @@ repair the 22 dead backlog paths and 43 doubled `docs/overview/overview/` labels
 unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge candidates
 (led by `oura-ring-data-reference.md`, a retired-API reference with no retirement note).
 
-### [platform] PS-39 — 66 API routes still have no test that imports their handler
+### [platform] PS-39 — 62 API routes still have no test that imports their handler
 
 - **Lane:** A. Regenerate the list with `node scripts/check-route-test-coverage.js` — it prints every
   uncovered route when it fails, and the ratchet now holds the number.
@@ -1431,10 +1431,16 @@ mutation and never by reading:
 > **A fixture that trips two rules at once tests neither.** The case names one guard; a different
 > guard rejects it first; deleting the named guard changes nothing.
 
-It appeared **twice more in the batch written straight after this was recorded**, which is the
-argument for the checklist rather than against it: a single-word query cannot tell "every term
-matches" from "any term matches", and a product with empty nutriments cannot tell "no product" from
-"no usable product" because the mapper rejects it either way.
+It appeared **twice more in the batch written straight after this was recorded, and three times in
+the one after that** — the argument for the checklist rather than against it. A single-word query
+cannot tell "every term matches" from "any term matches"; a product with empty nutriments cannot
+tell "no product" from "no usable product", because the mapper rejects it either way; and, in the
+HR batch, **every fixture where the resolved ceiling happened to EQUAL the age estimate** could not
+tell the two apart, so three separate values derived from the ceiling were all silently readable
+from the estimate instead.
+
+That last one names the general form: **when two quantities are equal in your fixture, nothing that
+reads either one is under test.** Vary them.
 
 The three, so the shape is recognisable rather than abstract:
 
@@ -1452,15 +1458,15 @@ testing X. Two more classes worth the same suspicion: a fixture whose timezone I
 proves nothing about which zone the route read, and a fixture already in sorted order proves
 nothing about a sort.
 
-**The count was 93 and is really 66**, by the mechanism the entry half-noticed: it counted a route
+**The count was 93 and is really 62**, by the mechanism the entry half-noticed: it counted a route
 covered when any test mentioned its URL, so `calendar-data` and `training-load` "appearing only as
 cache-key strings" counted. Asking instead whether a test imports the handler gives 150 of 222, less
-the eighty-four paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
+the eighty-eight paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
 honest in both directions (see above), so the list can be worked from. **The actionable core
 named by this entry is now CLEAR**: the home aggregates, both ingest routes and `program-week` are
 done; so are ai-periodization, `friends/leaderboard`, the account cluster, the supplement/vial chain,
 a meal plan's lifecycle + reshape, the workout write path, the running plan and the four body/health
-writes, the goal-target-adherence loop, the home week/streak reads, the AI Coach lifecycle, the cardio hub, the strength/volume trends, the day timeline and the food-input path. Work by feature — batching on what is *verified together* twice found a defect (LA-78, LA-79). `scripts/check-route-test-coverage.js` ratchets it, so the debt
+writes, the goal-target-adherence loop, the home week/streak reads, the AI Coach lifecycle, the cardio hub, the strength/volume trends, the day timeline, the food-input path and the four heart-rate reads. Work by feature — batching on what is *verified together* twice found a defect (LA-78, LA-79). `scripts/check-route-test-coverage.js` ratchets it, so the debt
 only shrinks, a NEW route arrives uncovered and fails, and since LA-81 a route that LOSES its test fails whatever the total does.
 
 ### [app-shell][platform] LA-76 — a deload PHASE still decays the collection, and nothing dates one
