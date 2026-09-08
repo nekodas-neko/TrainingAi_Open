@@ -848,12 +848,104 @@ random, and worse than no colour because it looks authoritative.
 - **Revisit the plateau call once 6+ weeks of on-drug data exist** to test it against — not before.
 
 - **Reversal cost:** low. A section and a card; no data, no migration (those are OR-102a's).
+- **Keep:** ③ and ④. **① and ② shipped in #1007** — vial setup and the dose calculator, reached from
+  a syringe control on any milligram-dosed supplement row, with the owner-verified figures
+  (`10 mg ÷ 3 mL = 3.33 mg/mL`, `0.5 mg → 15 units`) covered by unit tests and an e2e.
+  - **③ the dose on the day timeline is Lane A's**, and only its *render* is left: the tick already
+    stamps `taken_at` (`adapter.ts:6557`, OR-102a), so what is missing is an event type in
+    `app/api/day-timeline/route.ts` — an `app/api/**` path Lane B may not touch.
+  - **④ the weight-response chip is blocked on LB-67, not on data.** The series is reachable from
+    Lane B — `store.getBodyMetrics(cutoff)` returns every local row with `weightKg`, which is the
+    local-first read this should use anyway. What stops it is the formula: shipping a third
+    kg/week estimator beside the two that exist, one of which is wrong, is the bug class the
+    One Formula rule exists to prevent. Do ④ once LB-67 lands.
+  - **The estimator ④ needs was worked out and is worth not re-deriving.** Trailing 7-day means at
+    each end; standard error `sd × √(1/n₁ + 1/n₂)` over the span in weeks; the verdict withheld
+    unless the **whole** 95% interval falls on one side of the band, because an interval straddling
+    a boundary rounded to the nearer side is the authoritative-looking coin-flip this entry's own
+    measurements rule out. Residual SD from the user's own readings once there are ≥10, else the
+    measured 1.203 kg. **And a floor on that SD:** a fixture on a perfect line measured a residual
+    of **1.2e-13**, which passes a plain `> 0` guard and then makes every delta look significant by
+    dividing by nothing. A 0.1 kg scale cannot produce a residual under ~0.029 kg, so anything
+    below that is a degenerate series, not a consistent one.
 - **On completion, the device check is:** the calculator's arithmetic against the owner's own
   third-party app, and whether the colour chip reads correctly at a glance on the S25. **Written as
-  prose on purpose — this is NOT a `Verify:` field**, because nothing here has been built. Carrying
+  prose on purpose — this is NOT a `Verify:` field**, because ③ and ④ are not built. Carrying
   one filed this entry under VERIFY ("shipped; a look is owed") for two days while Lane B's READY
   list held two items and the owner believed the tracker had shipped. Add the field when the code
   merges, not before.
+
+### [platform] LB-68 — Playwright's synthetic input does not reach the Nutrition day-tools buttons, and two sessions have now lost time to it
+
+- **Lane: O** — it is about `e2e/` and the harness, not a screen. **Branch:** unassigned.
+- **Added:** 2026-09-08, after the second session hit it.
+- **Needs:** — nothing.
+- **Reference:** — this exists so the next session recognises it in one minute instead of an hour.
+
+**The symptom.** `page.click()` and `page.touchscreen.tap()` on `Manage` (and on `End of Day`) in the
+Nutrition tab's day-tools section do nothing: the sheet never mounts. Measured over **~18 retried
+taps across 90 s**, with the button focused afterwards, **no page error, no console error**, and no
+sheet appearing at any point from 50 ms to 3 s after the tap.
+
+**`el.click()` on the same locator opens it inside 50 ms.** So the handler is wired, React is
+hydrated, and nothing is overlaying the control — Playwright's synthetic event is simply not
+reaching it. **The app is not broken here**; a spec that fails on this is not evidence of a defect.
+
+**The corrected attribution matters.** A session on 2026-09-08 saw the same thing on `End of Day`,
+found that `el.click()` worked while synthetic clicks did not, and put it down to a hand-rolled
+Playwright context. It reproduces in the project's own harness, on the config's own device profile,
+so that explanation was wrong and the finding was dropped rather than filed.
+
+**It is not the whole tab.** `My Foods`, on the same screen, opens under synthetic input — which is
+why `nutrition-sheet-surface.spec.ts` passes. Whatever the cause, it is specific to this section.
+`serviceWorkers: 'block'` and `storageState` were both ruled out by direct comparison.
+
+- **The workaround, in use in `e2e/vial-dose-calculator.spec.ts`:** a `domClick` helper that calls
+  `locator.evaluate(el => el.click())` after asserting visibility. It costs the hit test — the spec
+  proves the control is *wired and correct*, not that it is *reachable by a finger* — so a control
+  behind it owes a device look.
+- **What to actually investigate:** why this section swallows synthetic events. A pointer-events or
+  overlay difference against the `My Foods` trigger is the obvious first place, and the fact that
+  `el.click()` works rules out most of the alternatives.
+- **Reversal cost:** nil. A test helper and a note.
+
+### [body][nutrition] LB-67 — the weekly weight rate is fitted against the array index, so a gappy series overstates it 🔴 LIVE
+
+- **Lane: A** — `packages/shared/src/health/long-term-goal-progress.ts`, reached by
+  `app/api/progress-summary`. **Branch:** unassigned.
+- **Added:** 2026-09-08, found while building OR-102b ④, which needs this figure and cannot add a
+  third one beside it.
+- **Needs:** — nothing.
+
+**`computeWeightRateKgPerWeek(weights)` takes an array of numbers and fits `x = the array index`,
+then multiplies the slope by 7 as though the readings were one day apart.** They are not: rows exist
+only on days with a metric, and the owner weighs in on about three days in four. So the slope is
+*per reading* and is reported as *per day*.
+
+**Measured on a 14-day window, true trend −0.70 kg/wk:**
+
+| readings in the window | reported | true | overstated |
+|---|---|---|---|
+| 14 of 14 days | −0.70 kg/wk | −0.70 | 1.00× |
+| **10 of 14** (the owner's rate) | **−1.04 kg/wk** | −0.70 | **1.48×** |
+| 6 of 14 | −1.76 kg/wk | −0.70 | 2.51× |
+
+**This is live and it changes what the screen says, not just the digits.**
+`evaluateWeightRateVsGoalBand` calls anything past 1.0 kg/wk `too_fast`, so the middle row — an
+ordinary, healthy −0.70 kg/wk — renders on Health → Body as **"Faster than ideal pace"** in amber.
+
+**The fix already exists in this repo, one directory away.** `packages/shared/src/nutrition/adaptive-tdee.ts`
+fits against the weigh-in's *day index within the window* and its comment states this exact failure:
+*"an unevenly spaced series (weighed Mon, Tue, then Sunday) would otherwise report a slope
+per-reading and badly overstate the rate"*. So the app already holds two weekly-weight-rate figures,
+computed differently, disagreeing by about 1.5× on this owner's data, on two different screens —
+which is what the One Formula rule is for.
+
+- **What to do:** give the shared function dated points instead of a bare number array, and converge
+  the `adaptive-tdee` copy onto it. **While it is open, add the standard error** — OR-102b ④ needs
+  the interval, not just the point estimate, and adding it in the same pass avoids a third caller
+  inventing one.
+- **Reversal cost:** low. One formula, two call sites, no data and no migration.
 
 ### [platform] OR-105 — 17 more entries may be filed as shipped without having been built
 
