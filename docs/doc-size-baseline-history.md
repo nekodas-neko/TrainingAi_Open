@@ -9016,7 +9016,6 @@ rules at once tests neither. Three instances in ten batches, every one passing, 
 mutation rather than by reading. Raised because it belongs where the next batch is written from —
 the entry is what an implementer reads before starting, and the lesson was otherwise session-local.
 
-<<<<<<< HEAD
 ## 2026-09-08 — `docs/implementation-backlog.md` → 18963 (LB-61 shipped)
 
 Down 20. LB-61 was a decision brief — the count, the recommendation, the argument against, the
@@ -9031,7 +9030,6 @@ parking anything.
 The absolute is 18963 rather than the 18863 this branch computed: Lane A landed PS-39 work underneath
 it that added 100. The **−20 is unchanged**, which is the only part of the number that belongs to
 this diff.
-=======
 ## 2026-09-08 — `docs/implementation-backlog.md` 18,883 → 18,972 (+89), BF-131 and BF-132
 
 Two owner reports from one screenshot of Health → Training.
@@ -9078,4 +9076,3 @@ test — which is what makes the checklist usable on a case it has not seen.
 ## 2026-09-08 — `docs/overview/entries/` total ceiling → 331 (LA-80, eleventh PR running)
 
 330 → 331. Eleventh consecutive raise, one per PR, as LA-80 describes.
->>>>>>> origin/main
