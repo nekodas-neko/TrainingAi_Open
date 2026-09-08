@@ -9,8 +9,8 @@
 // test merely mentions its URL. Under that rule a cache-invalidation test covers a route it never
 // calls. The honest question is whether anything imports the handler, and by that rule it was **150
 // of 222**, not 93. Eight have come off since — `health-connect/ingest`, `client-error`, the home
-// aggregates (`training-load`, `calendar-data`, `muscle-recovery`), and `colmi/samples`,
-// `program-week`, `oura/hr-day` — so the number here is 142.
+// aggregates (`training-load`, `calendar-data`, `muscle-recovery`), `colmi/samples`,
+// `program-week`, `oura/hr-day` and `oura-ble/samples` — so the number here is 141.
 //
 // So this counts a route as covered when a test file imports its `route` module. An e2e spec that
 // merely navigates a page does not count either: it exercises the route through a browser, which is
@@ -18,14 +18,15 @@
 //
 // Shrink-only per the house pattern (check-hex-literals, check-fetch-once-effects): the baseline is
 // a count, a route leaving the list may never rejoin it, and a NEW route arrives uncovered and
-// therefore fails. That last part is the point — the 142 are debt, and the ratchet is about the
-// 143rd.
+// therefore fails. That last part is the point — the 141 are debt, and the ratchet is about the
+// 142nd.
 
 const fs = require('fs');
 const path = require('path');
 
 const root = path.join(__dirname, '..');
-// 142 → 141 (Q-112d). The route that came off is `day-review/week-window`, and it is worth saying
+// 142 → 140. Two routes came off together: `oura-ble/samples`, which got a handler test (PS-39),
+// and `day-review/week-window` (Q-112d) — and the second is worth saying
 // how, because it is not a test that was written: it already HAD one, in
 // `app/api/day-review/week-window/__tests__/`, which loads the handler as `await import('../route')`
 // — a relative specifier the substring below cannot match. A type-only import of the same module
@@ -33,7 +34,7 @@ const root = path.join(__dirname, '..');
 // made the route visible. See PS-39 for the measurement: **15 of the routes on this list have a
 // co-located test importing the handler relatively**, `sync/push`, `sync/pull`, `next-session` and
 // `user/goals` among them, so the debt this number reports is overstated by that much.
-const BASELINE = 141;
+const BASELINE = 140;
 
 function walk(dir, out = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
