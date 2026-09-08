@@ -23,10 +23,11 @@ import { recoveryBand } from '@trainingai/shared/health/recovery-band'
 
 const HrDayChart = dynamic(() => import('@/components/health/hr-day-chart').then(m => m.HrDayChart), { ssr: false })
 const HomeEnergyBalanceCard = dynamic(() => import('@/components/home/home-energy-balance-card').then(m => m.HomeEnergyBalanceCard), { ssr: false })
+const CollectionCard = dynamic(() => import('@/components/home/collection-card').then(m => m.CollectionCard), { ssr: false })
 
-type CardWidgetKey =
-  | 'weightSparkline' | 'nutritionDonut' | 'sleepWidget' | 'stepsWidget' | 'moodWidget'
-  | 'acwrWidget' | 'muscleStatusWidget' | 'hrChartWidget' | 'energyBalanceWidget'
+// Type-only, so the cycle with `home-prefs` (which imports `CardSectionKey` back from here) is
+// erased at compile time and never exists at runtime.
+import type { CardWidgetKey } from '@/lib/home/home-prefs'
 
 export type CardSectionKey = `card_${CardWidgetKey}`
 
@@ -309,6 +310,25 @@ export const HomeCardWidget = React.memo(function HomeCardWidget(props: HomeCard
                 the payload is this card's alone, and the hook already owns the cache-seeded
                 instant paint so Home does not gain another prop or another fetch to keep in sync. */}
             <HomeEnergyBalanceCard />
+          </div>
+        </div>
+      )
+    }
+    case 'card_collectionWidget': {
+      if (!activeCardWidgets.includes('collectionWidget')) return null
+      const _c = cardColors['collectionWidget'] ?? CARD_DEFAULT_COLORS.collectionWidget
+      return (
+        <div className="px-4 pb-3">
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => { if (!sectionEditMode) navigateWithTransition(router, pathname, "/collection"); }}
+            className={cn("w-full rounded-2xl text-left active:scale-95 transition cursor-pointer", sectionEditMode && "pointer-events-none")}
+            style={accentCardStyle(_c)}
+          >
+            {/* Self-fetching, like the energy-balance card above and for the same reason: the
+                payload is this card's alone and the hook owns the cache-seeded instant paint. */}
+            <CollectionCard />
           </div>
         </div>
       )

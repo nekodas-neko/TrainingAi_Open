@@ -169,6 +169,12 @@ Live at the time of writing (2026-07-30):
   interchangeable. See
   [`the journal entry`](../../overview/history-2026-08-08.md).
 
+- ⚠️ **The cat collection's surface** (BF-122b, 2026-09-07, v1.437.0) — a tenth `CardWidgetKey`
+  (off by default), `/collection`, and the rules screen. `components/home/collection-summary.ts`
+  owns the decisions as pure functions; `collection-sprites.ts` is emoji standing in for the drawn
+  art (BF-126, owner-gated). `CardWidgetKey` now has ONE declaration, in `lib/home/home-prefs.ts` —
+  it had three. **Not device-verified.** See
+  [`the journal entry`](../../overview/entries/2026-09-07-feat-bf-122b-cat-collection-surface.md).
 - ⚠️ **The three exercise roles are named once** (BF-124/BF-125, 2026-09-07, v1.436.40) —
   `components/workout/exercise-role-labels.ts`, as Main / Secondary / Accessory. The editor's role
   row wraps and marks the chosen option in `bg-brand`; the near-white `bg-primary` selected slab is

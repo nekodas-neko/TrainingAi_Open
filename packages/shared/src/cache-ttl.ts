@@ -141,3 +141,14 @@ export function floorSeedTtl(ttlSeconds: number): number {
  * the same run explained about seven times, each time in different words.
  */
 export const RUNNING_PLAN_EXPLAIN_TTL = TTL_LONG;
+
+/**
+ * The cat collection (BF-122b). `TTL_SHORT` because it moves only when a faucet day is added — a
+ * workout, a step-count, a night's sleep — and every one of those already invalidates it by group.
+ * The TTL is the backstop for the decay clock, which advances on its own with the calendar rather
+ * than on any write this app can see.
+ *
+ * Read at two sites (the home widget and the collection screen), which is what makes a named
+ * constant mandatory here rather than two spellings of the same number.
+ */
+export const COLLECTION_TTL = TTL_SHORT;
