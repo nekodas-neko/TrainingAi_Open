@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.438.5",
+    version: "1.438.6",
     date: "2026-09-08",
     changes: [
       "Fixed a way to permanently break your own Profile tab. A handful of reserved words \u2014 \u0027constructor\u0027 and seven others \u2014 were accepted as a title even though they are not titles, and once one was saved the Profile tab failed to draw at all, including the screen you would use to change it back. Those are now refused like any other unknown title.",
+    ],
+  },
+  {
+    version: "1.438.5",
+    date: "2026-09-08",
+    changes: [
+      "Deleting a session in the program editor now asks first, and says what goes with it \u2014 \u0027Delete Lower and its 5 exercises?\u0027 rather than deleting on the tap. If you delete one anyway, an Undo appears in the editor until you save.",
     ],
   },
   {

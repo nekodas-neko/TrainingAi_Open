@@ -1078,40 +1078,26 @@ produced.
   seeds and advances to `accumulation`.
 - **Reversal cost:** low — one read and one call on an existing write path; smaller since the amendment, because the derivation is not being written.
 
-### [workouts][app-shell] BF-132 — one tap on the trash icon deletes a whole session, with no confirmation and no tombstone 🔴 LIVE
+### [workouts][platform] LB-66 — a saved session delete is still a hard delete, with no tombstone
 
-- **Lane:** B — `components/config/program-editor-sheet.tsx`. The tombstone half, if taken, is Lane A.
-- **Added:** 2026-09-08 · owner, after losing a session: *"it looked like you can delete the day in the builder with no confirmation needed so if you accidently press the trash jts gone. I will need to remake with my lower session details"*.
+- **Branch:** _unassigned_ · **Added:** 2026-09-08, filing the third of BF-132's three fixes; the
+  first two (a confirmation naming the exercise count, and an in-sheet undo) shipped in #1004.
+- **Lane: A** — `program_sessions` and `session_exercises` need a `deleted_at`, so this is a
+  migration and belongs to the lane that owns them.
 - **Needs:** — nothing.
-- **Traced.** `removeSession` (`program-editor-sheet.tsx:187`) is
-  `onProgramSessionsChange(programSessions.filter((_, i) => i !== si))` — a one-line array filter,
-  fired directly from the trash `<button>` at `:688`. **There are zero `confirm(` calls in the entire
-  file**, so `removeExercise` has the same shape. The button sits in the session header row beside the
-  emoji picker and the name field, both of which are ordinary edit controls.
-- **The blast radius is the whole session**, not a row: deleting it takes its exercise list, and on
-  save the rows are gone from `program_sessions` and `session_exercises`, **neither of which has a
-  `deleted_at` column**. This is a hard delete. The only thing between a mis-tap and permanent loss is
-  not pressing Save — and the sheet gives no signal that Save is now destructive.
-- **What made this recoverable was luck, and it should be written down as such.** The owner's Lower
-  session was reconstructable only because (a) a BugFix session had read and quoted the program's full
-  structure two days earlier, and (b) six months of `exercise_logs` carry `exercise_name` and
-  `style_name`, so the *trained* version could be rebuilt from history. Neither is a feature. A user
-  who deleted a session they had not yet trained would have nothing.
-- **Fix, in the order that buys the most per unit of work:**
-  1. **A confirmation naming what is lost** — *"Delete Lower and its 5 exercises?"* — on session
-     delete. The count is the part that matters; a generic "Are you sure?" trains the reflex to
-     dismiss it.
-  2. **An undo** on the sheet's own state, since the delete is local until Save. Cheaper than it
-     sounds and it covers the mis-tap without adding a dialog to the deliberate case. A toast with
-     *Undo* is the established pattern elsewhere in the app.
-  3. **A `deleted_at` on `program_sessions`** so a saved delete is recoverable at all. Lane A, and a
-     migration — worth deciding separately, because the offline-first rule in CLAUDE.md already says a
-     server hard DELETE is invisible to devices that have not synced, which applies here.
-- **Do not put a confirm on exercise delete without checking the exercise-add flow first** — removing
-  and re-adding an exercise is a normal editing action, and a dialog on every one of those is the kind
-  of friction that gets a confirmation removed again a month later. The session-level delete is the
-  one that is rare and expensive.
-- **Reversal cost:** low for 1 and 2 (local state and a dialog). 3 is a migration and is separable.
+- **What is still true after BF-132.** The confirmation makes the mis-tap unlikely and the undo
+  covers a wrong confirm, but both live entirely in the editor's local state. Press Save and the
+  rows are gone from both tables, neither of which has a `deleted_at`. Nothing is recoverable after
+  that, and there is no dialog left to add — the guard has already fired by then.
+- **Why it is separable rather than shrugged off.** CLAUDE.md's offline-first rule already says a
+  server hard DELETE is invisible to devices that have not synced, which applies to these two tables
+  as much as to any other domain with delete UI. So the tombstone is owed for cross-device
+  correctness independently of recovery.
+- **What made BF-132's loss recoverable was luck, and it is worth restating here** because this is
+  the entry that would remove the luck: a BugFix session had quoted the program's structure two days
+  earlier, and six months of `exercise_logs` carry `exercise_name`/`style_name`, so the *trained*
+  version could be rebuilt. A session deleted before it was ever trained leaves nothing.
+- **Reversal cost:** a migration, so the usual — a corrective migration rather than a revert.
 
 ### [body][app-shell] BF-133 — a full user overview: every metric the app has recorded, in one place
 

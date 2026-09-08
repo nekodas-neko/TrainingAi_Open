@@ -11,8 +11,10 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@trainingai/shared/utils";
 import { EXERCISE_ROLES, EXERCISE_ROLE_LABEL } from "@/components/workout/exercise-role-labels";
 import { getPaletteEntry } from "@trainingai/shared/session-palette";
-import { FITNESS_ICONS, getSessionIcon } from "@/lib/session-icon";
 import { SortableRow } from "@/components/config/sortable-row";
+import { SessionHeaderRow } from "@/components/config/session-header-row";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { sessionDeletePrompt, sessionLabel } from "@/components/config/session-delete-prompt";
 import { DragDropProvider, PointerSensor, type DragOverEvent } from "@dnd-kit/react";
 import type { ProgressionStyle } from "@trainingai/shared/types";
 import type { ExerciseRole, PhaseSetWithPhases } from "@trainingai/shared/types/program";
@@ -133,6 +135,9 @@ export function ProgramEditorSheet({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerTarget, setPickerTarget] = useState<{ si: number; ei: number } | null>(null);
   const [previewExercise, setPreviewExercise] = useState<ExerciseLibraryEntry | null>(null);
+  const [pendingSessionDelete, setPendingSessionDelete] = useState<number | null>(null);
+  const [lastDeleted, setLastDeleted] = useState<{ session: EditableSession; index: number } | null>(null);
+  const pendingSession = pendingSessionDelete === null ? null : programSessions[pendingSessionDelete] ?? null;
 
   function openPicker(si: number, ei: number) {
     setPickerTarget({ si, ei });
@@ -185,7 +190,18 @@ export function ProgramEditorSheet({
   };
 
   const removeSession = (si: number) => {
+    const removed = programSessions[si];
+    if (!removed) return;
     onProgramSessionsChange(programSessions.filter((_, i) => i !== si));
+    setLastDeleted({ session: removed, index: si });
+  };
+
+  const undoRemoveSession = () => {
+    if (!lastDeleted) return;
+    const next = [...programSessions];
+    next.splice(Math.min(lastDeleted.index, next.length), 0, lastDeleted.session);
+    onProgramSessionsChange(next);
+    setLastDeleted(null);
   };
 
   const renameSession = (si: number, name: string) => {
@@ -326,7 +342,7 @@ export function ProgramEditorSheet({
 
   return (
     <>
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={isOpen => { if (!isOpen) setLastDeleted(null); onOpenChange(isOpen); }}>
       <SheetContent side="bottom" className="max-h-[90dvh] flex flex-col">
         <SheetHeader className="flex-none">
           <SheetTitle>{programEditId ? "Edit Program" : "New Program"}</SheetTitle>
@@ -632,67 +648,18 @@ export function ProgramEditorSheet({
               >
                 {({ handleRef }) => (
                   <>
-                    {/* Session header: emoji picker + name input + delete */}
-                    <div className="flex items-center gap-2">
-                      <button
-                        ref={el => handleRef(el)}
-                        type="button"
-                        className="cursor-grab active:cursor-grabbing touch-none flex-none"
-                        aria-label="Reorder session"
-                      >
-                        <GripVertical className="h-4 w-4 text-muted-foreground/40" />
-                      </button>
-                      {/* Icon picker button */}
-                      <div className="relative flex-none">
-                        <button
-                          type="button"
-                          onClick={() => onEmojiPickerSessionChange(emojiPickerSession === si ? null : si)}
-                          className="tap-dense tap-target-44 w-9 h-9 flex items-center justify-center rounded-lg border border-border bg-background hover:bg-muted transition"
-                          title="Pick icon"
-                        >
-                          {(() => {
-                            const Icon = getSessionIcon(sess.icon, si);
-                            return <Icon className="h-5 w-5 text-muted-foreground" />;
-                          })()}
-                        </button>
-                        {emojiPickerSession === si && (
-                          <div
-                            ref={emojiPickerRef}
-                            className="absolute left-0 top-10 z-50 rounded-xl border border-border bg-popover shadow-lg p-2 grid grid-cols-5 gap-1 w-48"
-                          >
-                            {FITNESS_ICONS.map(({ emoji, Icon, label }) => (
-                              <button
-                                key={emoji}
-                                type="button"
-                                onClick={() => setSessionIcon(si, emoji)}
-                                title={label}
-                                className={cn(
-                                  "tap-dense tap-target-dot w-8 h-8 flex items-center justify-center rounded-lg hover:bg-muted transition",
-                                  sess.icon === emoji && "bg-brand/20 ring-1 ring-brand"
-                                )}
-                              >
-                                <Icon className="h-4 w-4 text-muted-foreground" />
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <Input
-                        value={sess.name}
-                        onChange={e => renameSession(si, e.target.value)}
-                        placeholder="Session name (e.g. Push)"
-                        className="text-sm font-semibold flex-1"
-                      />
-                      {programSessions.length > 1 && (
-                        <button
-                          onClick={() => { removeSession(si); onEmojiPickerSessionChange(null); }}
-                          className="rounded-lg p-2 text-muted-foreground hover:text-destructive transition flex-none"
-                          title="Remove session"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
+                    <SessionHeaderRow
+                      session={sess}
+                      index={si}
+                      handleRef={handleRef}
+                      iconPickerOpen={emojiPickerSession === si}
+                      onIconPickerToggle={() => onEmojiPickerSessionChange(emojiPickerSession === si ? null : si)}
+                      iconPickerRef={emojiPickerRef}
+                      onIconChange={icon => setSessionIcon(si, icon)}
+                      onNameChange={name => renameSession(si, name)}
+                      canDelete={programSessions.length > 1}
+                      onRequestDelete={() => { setPendingSessionDelete(si); onEmojiPickerSessionChange(null); }}
+                    />
 
                     {/* Time budget */}
                     <div className="flex items-center gap-2 pl-6">
@@ -926,6 +893,20 @@ export function ProgramEditorSheet({
             ))}
           </DragDropProvider>
 
+          {lastDeleted && (
+            <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/40 px-3 py-2">
+              <span className="flex-1 text-sm text-muted-foreground">
+                {sessionLabel(lastDeleted.session)} deleted
+              </span>
+              <button
+                onClick={undoRemoveSession}
+                className="px-3 text-sm font-semibold text-brand"
+              >
+                Undo
+              </button>
+            </div>
+          )}
+
           {/* Add session */}
           <button
             onClick={addSession}
@@ -957,6 +938,18 @@ export function ProgramEditorSheet({
       open={previewExercise !== null}
       onOpenChange={isOpen => { if (!isOpen) setPreviewExercise(null); }}
       exercise={previewExercise}
+    />
+    <ConfirmDialog
+      open={pendingSessionDelete !== null}
+      onOpenChange={isOpen => { if (!isOpen) setPendingSessionDelete(null); }}
+      title={pendingSession ? sessionDeletePrompt(pendingSession) : ""}
+      message="You can undo this until you save. Once the program is saved, the session cannot be recovered."
+      confirmLabel="Delete"
+      cancelLabel="Keep"
+      onConfirm={() => {
+        if (pendingSessionDelete !== null) removeSession(pendingSessionDelete);
+        setPendingSessionDelete(null);
+      }}
     />
     </>
   );
