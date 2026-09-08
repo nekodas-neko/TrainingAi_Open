@@ -56,4 +56,33 @@ function laneFromLines(lines) {
   return loose[0];
 }
 
-module.exports = { laneFromLines, LANE_FIELD_RE, LANE_LOOSE_RE };
+/**
+ * The offending text when a line DECLARES a `Lane:` field the reader above cannot read, else null.
+ *
+ * LB-59. `LANE_FIELD_RE` needs a word boundary after the letter, so `**Lane:** O` classifies and
+ * **`**Lane:** Orchestrator` does not** — the `O` is followed by `r`. An unmatched field returns
+ * `null` from `laneFromLines`, which the caller reads as "unstated, so the path rule answers it",
+ * and the entry then prints in BOTH implementer lanes' READY lists. PS-38 sat at the top of Lane B's
+ * READY list for a day on exactly that, and a Lane B session picked up work that was nobody's.
+ *
+ * Printing in both lists is the SAFE failure and stays — a version that hid an unmatched entry took
+ * 96 of 203 out of both lanes at once. What this adds is a signal at the point of WRITING, which is
+ * the only place the mistake is cheap: the check fails exactly when the reader cannot read the
+ * value, so the two can never disagree about what counts as valid.
+ *
+ * Only the FIELD form is judged. Three quarters of the queue names its lane bare (`— Lane A`,
+ * `**Lane B**`) and prose mentions one constantly; both are read loosely on purpose and neither is
+ * a declaration. Anchoring at the bullet is what makes the other exemptions free: a doc example
+ * (`` - `**Lane:** <letter>` ``) and a struck-through, superseded line (`- ~~**Lane:** X~~`) both put
+ * a character before the field name and so never match. An explicit `~~` guard was written first and
+ * a mutation test showed it changed nothing — worse, it would have let a HALF-struck live value
+ * (`- **Lane:** ~~O~~ B`) through unflagged.
+ */
+function laneFieldProblem(line) {
+  if (!/^\s*[-*]\s*\*{0,2}Lane:/.test(line)) return null;
+  if (LANE_FIELD_RE.test(line)) return null;
+  const value = line.replace(/^\s*[-*]\s*\*{0,2}Lane:\*{0,2}\s*/, '').trim();
+  return value === '' ? '(empty)' : value.slice(0, 60);
+}
+
+module.exports = { laneFromLines, laneFieldProblem, LANE_FIELD_RE, LANE_LOOSE_RE };

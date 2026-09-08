@@ -35,6 +35,7 @@ const { announcesCompletion } = require('./lib/completion-words');
 const { referenceFromLines, hasProseMarker, PROSE_MARKERS } = require('./lib/reference');
 const { verifyFromLines, verifyProblem } = require('./lib/verify');
 const { laneDrift } = require('./lib/lane-drift');
+const { laneFieldProblem, LANE_LOOSE_RE } = require('./lib/lane');
 const { keepFromLines } = require('./lib/keep');
 const { keepKind } = require('./lib/keep-kind');
 const { decoratedField } = require('./lib/decorated-field');
@@ -133,8 +134,20 @@ for (let i = 0; i < queue.length; i++) {
       // Collected whole so the `Reference:` ratchet below sees the same lines `next-item.js` does.
       meta.get(currentId).lines.push(line);
 
-      const lane = line.match(/\*{0,2}Lane:?\*{0,2}\s*\*{0,2}(A\b|B\b|O\b|\?)/);
+      // The pattern is imported rather than repeated: a private copy here would be a second reader
+      // of the same field, free to disagree with the one `next-item.js` uses.
+      const lane = line.match(LANE_LOOSE_RE);
       if (lane && !meta.get(currentId).lane) meta.get(currentId).lane = lane[1].trim();
+
+      const laneProblem = laneFieldProblem(line);
+      if (laneProblem) {
+        failures.push(
+          `${currentId} declares \`Lane: ${laneProblem}\`, which the lane reader cannot parse — so ` +
+            `the entry counts as UNSTATED and prints in BOTH implementer lanes' READY lists. ` +
+            `The convention is the letter: \`A\`, \`B\`, \`O\` (Orchestrator) or \`?\`. ` +
+            `Put any explanation after it (\`- **Lane:** O — the Orchestrator owns CI config\`).`,
+        );
+      }
     }
     continue;
   }

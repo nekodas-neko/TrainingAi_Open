@@ -1080,32 +1080,6 @@ two are `first-run-empty-states` and `preferences-survive-reinstall`. **Order ma
 least some of these are shared-state, not the spec's own logic. Read the artifact this PR makes real
 before assuming a local-DB artifact — that mistake has already been made once on `plan-rescale`.
 
-### [platform] LB-59 — a lane written as a word instead of its letter is silently unclassified
-
-- **Lane:** A — `scripts/lib/lane.js` and/or `scripts/check-backlog-pointers.js`. Neither implementer
-  lane's paths reach `scripts/`, and the path rule sends it to A.
-- **Added:** 2026-09-07, by Lane B on picking up an entry that was not Lane B's.
-
-`LANE_FIELD_RE` matches `A\b|B\b|O\b|\?`, so `**Lane:** O` classifies and **`**Lane:** Orchestrator`
-does not** — the `O` is followed by `r`, and `\b` fails. An unmatched field returns `null`, which the
-caller reads as *"unstated, so the path rule answers it"*, and the entry then prints in **BOTH**
-implementer lanes' READY lists.
-
-**Measured 2026-09-07: 4 entries wrote `O`, 1 wrote `Orchestrator`** (PS-38, a docs sweep that is
-nobody's implementation work). It printed at the **top of Lane B's READY list** for a day. The entry
-itself is fixed; what is not fixed is that the next person to write the word out gets the same result
-with no signal.
-
-- **The convention is the letter**, and this entry does not propose changing it. Two ways to hold it,
-  and the second is probably better: widen the regex to accept the spelled-out word, **or** have
-  `check-backlog-pointers.js` fail on a `Lane:` field whose value is not one of `A`/`B`/`O`/`?`. The
-  check catches typos the regex would still miss (`Lane: Lane A`, `Lane: b/A`) and puts the error at
-  the point of writing rather than at the point of reading.
-- **⚠ Do not make an unmatched lane hide the entry.** `lane.js`'s own header records that a version
-  letting `undefined` through hid **96 of 203** entries from both lanes at once. Printing in both
-  lists is the safe failure and must stay the failure mode until the value is validated at write time.
-- **Not urgent.** One malformed entry in 322, now corrected.
-
 ### [app-shell] PS-35 — five zero-content pages, a wrong PWA start_url, and boot-time paper cuts
 
 - **Lane:** B — `app/{workout-select,session-select,stats,config,profile}/page.tsx`,
@@ -2213,8 +2187,10 @@ on a production measurement.
 
 ### [platform] BF-106 — press the `VACUUM FULL` on `oura_raw_samples`; the packer freed the space and nothing returned it
 
-- **Lane:** none — this is an **owner action against production**, not a code change. Filed so it is
-  not lost, and so the reading that follows it has somewhere to land.
+- **Lane:** O — an **owner action against production**, not a code change, so it is in neither
+  implementer lane; `Gate: owner` below parks it regardless. (Was `Lane: none`, which the lane
+  reader cannot parse — LB-59.) Filed so it is not lost, and so the reading that follows it has
+  somewhere to land.
 - **Gate:** owner
 - **Added:** 2026-09-01 · found in the session-start database-size read, following up the third
   reading that `projectOverview.md`'s growth row asked for.
