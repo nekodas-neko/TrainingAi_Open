@@ -25,7 +25,15 @@ const fs = require('fs');
 const path = require('path');
 
 const root = path.join(__dirname, '..');
-const BASELINE = 142;
+// 142 → 141 (Q-112d). The route that came off is `day-review/week-window`, and it is worth saying
+// how, because it is not a test that was written: it already HAD one, in
+// `app/api/day-review/week-window/__tests__/`, which loads the handler as `await import('../route')`
+// — a relative specifier the substring below cannot match. A type-only import of the same module
+// from a component test, written for its response type, happens to use the alias path and is what
+// made the route visible. See PS-39 for the measurement: **15 of the routes on this list have a
+// co-located test importing the handler relatively**, `sync/push`, `sync/pull`, `next-session` and
+// `user/goals` among them, so the debt this number reports is overstated by that much.
+const BASELINE = 141;
 
 function walk(dir, out = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {

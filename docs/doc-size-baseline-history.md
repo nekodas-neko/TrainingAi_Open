@@ -8785,7 +8785,25 @@ Recomputing from the merged file is the rule, and this is why: the +2 is a prope
 survives any base, while the absolute figure belongs to whatever `main` happens to be when the PR
 merges.
 
-## 2026-09-08 — `docs/implementation-backlog.md` → 18717 (LB-61 measured and gated)
+## 2026-09-08 — `docs/implementation-backlog.md` → 18710 (Q-112d shipped)
+
+Up 16 on balance, from 18694, and it moved twice. Q-112d's own 11-line entry came out and 9 lines went onto **LB-24**,
+which had written down a decision it could not yet take: *"the decision point is after Q-112d — if
+the trends phase has not re-homed the chart by then, delete."* It has not, and it did not reuse the
+route either, so the answer is now determinable and is recorded where the lane that owns it will
+read it. Nine lines against a session of re-deriving the same conclusion is the trade this file
+exists to make. That left it at 18692.
+
+Then 18 more went onto **PS-39**, and those are the ones worth defending. Its ratchet counts a route
+covered when a test file contains the string `app/api/<route>/route`, which a *relative* import
+never produces — so fifteen routes with a co-located handler test sit on its uncovered list,
+`sync/push` and `sync/pull` among them. That was measured rather than asserted, and the fifteen are
+named, because a list claiming the sync push route is untested is a list somebody will act on.
+Eighteen lines is the cost of not making the next session re-derive it from the accident that
+surfaced it: a type-only import, which tests nothing, took a route off the list while that route's
+own real test had been invisible the whole time.
+
+## 2026-09-08 — `docs/implementation-backlog.md` → 18733 (LB-61 measured and gated)
 
 Up 23, all of it onto LB-61, which asked for exactly this: *"count the switches before proposing
 either."* The count is 25 across 14 files, and the split it predicted between settings toggles and
@@ -8796,3 +8814,8 @@ so the lane runner stops printing it as startable work when what it needs is one
 
 Twenty-three lines to turn "somebody must go and count 25 controls, then think about it" into a
 question that can be answered in a sentence. This file exists to make that trade.
+
+The number is 18733 rather than the 18717 this branch computed, because Q-112d landed underneath it
+and took the file to 18710. Recomputed from the merged file, per the rule — and the +23 is unchanged
+across the rebase, which is the point: the delta belongs to the diff, the absolute belongs to
+whatever `main` is when the PR merges.
