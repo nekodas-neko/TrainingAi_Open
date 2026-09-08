@@ -8757,3 +8757,19 @@ The ⛔ lines are the load-bearing part. **The 168 max is genuine** (140 samples
 zones are anchored correctly and the training simply never reaches them; and **cadence is nearly
 exhausted as a lever** (31% cadence separation buys 7.9 bpm; Z2 would need ~198 spm), so a cadence
 target — which is what the app currently prescribes — cannot move the number.
+
+## 2026-09-08 — `docs/implementation-backlog.md` 18852 → 18863 (+11), TN-26 rewritten
+
+The owner declined the treadmill-specific direction TN-26 was first written around (*"let's not tune
+to the treadmill — like you said it changes based on location, what do you suggest we do?"*), so the
+entry was rewritten from "capture belt speed" to "prescribe heart rate, demote cadence and speed to
+observations". The replacement is 11 lines longer because it now has to carry the comparison that
+justifies the unit change — the same cadence number is 4.0 km/h on a belt and 5.3 km/h on a footpath,
+while % of heart-rate reserve means the same thing on both — plus the two surface-independent
+calibration metrics (fast-block compliance, currently 0 of 44; interval contrast, currently 6.8
+points against the protocol's 30) that replace the speed→HR curve as what the app should trend.
+
+The ⛔ line is the part worth keeping short of the entry itself: the two indoor speed points
+extrapolate 70% reserve to ~12.9 km/h, and the owner's proposed cadence tweak is worth ≈+2 bpm
+against a 34.7 bpm shortfall — which is why the control is the wrong lever rather than one that needs
+a bigger setting.

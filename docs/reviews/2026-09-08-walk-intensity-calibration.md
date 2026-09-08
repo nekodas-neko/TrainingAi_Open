@@ -336,3 +336,53 @@ that directly caused the question.
 
 **⚠ What this review does not settle:** what the fast-phase intensity *should* be for this user. That
 is TN-25's owner decision, and it cannot be answered before the speed→HR curve exists.
+
+---
+
+## Addendum 3 — the owner declined to tune to the treadmill; heart rate is the answer
+
+**Owner, 2026-09-08:** *"let's not tune to the treadmill — like you said it changes based on
+location, what do you suggest we do?"* This retires the belt-speed direction that addendum 2 was
+built around, and it is the right call. What follows replaces it, and TN-26 was rewritten to match.
+
+**Why the redirect is correct.** Every control this walk could be prescribed in is surface-dependent
+except one:
+
+| prescribed in | treadmill | footpath | hill | portable? |
+|---|---|---|---|---|
+| cadence (spm) | 120 spm ≈ 4.0 km/h (0.556 m stride) | 120 spm ≈ 5.3 km/h (0.739 m stride) | same spm, more work | **no** |
+| speed (km/h) | readable off the belt | not recorded on 89 of 106 segments | same speed, more work | **no** |
+| **% HR reserve** | **same meaning** | **same meaning** | **same meaning** | **yes** |
+
+Heart-rate reserve is defined against this user's own resting HR and max, not against the ground, so
+it is the only unit in which "the fast block" is the same instruction indoors and out. Everything
+addendum 2 wanted the belt speed for — knowing whether the fast phase is actually hard — heart rate
+already answers, and answers everywhere.
+
+**So the prescription changes unit, not ambition.** The pacer already computes the band
+(`hrReserveTarget`); what is missing is an achievable target (**TN-25**, still the owner's decision)
+and an instruction phrased as a loop — *raise effort until HR reaches X* — instead of a fixed control
+(*walk at 120 spm*). Cadence stays as a starting hint and a reported stat; it is a genuinely good
+read on effort outdoors and a dependent variable indoors.
+
+**And the two calibration metrics the owner asked for are already surface-independent**, which is the
+part worth keeping from the whole thread:
+
+- **Fast-block compliance** — share of fast blocks whose steady HR reached target. **0 of 44 today.**
+- **Interval contrast** — mean fast %reserve minus mean slow %reserve. **6.8 points today**, against
+  the protocol's own targets implying **30**.
+
+Both are computed from `activity_logs.segments` and HR alone. A treadmill session and an outdoor
+session produce numbers that can sit in the same trend line without any surface adjustment — which
+is exactly what a calibration metric has to do to be worth trending.
+
+**What is still worth capturing, demoted.** Recording belt speed indoors and distance outdoors is
+still useful, but as *evidence*, not as the target: it lets the app learn *this surface, this control
+→ this HR* and offer a better opening hint. It no longer gates anything, and specifically it no
+longer blocks TN-25 — the fast-block reserve fraction is answerable from HR data that already exists.
+
+**⛔ Unchanged from addendum 2:** do not extrapolate a speed prescription from the two indoor points.
+2 km/h → 90.7 bpm and 4 km/h → 98.5 bpm gives ≈3.9 bpm/km/h, which puts 70% reserve at ~12.9 km/h.
+The owner's proposed tweak (slow 90→100 spm, fast 120→130 spm) is worth ≈**+0.9** and **+1.3 bpm**
+against a **34.7 bpm** shortfall — the clearest single piece of evidence that the control is the
+wrong lever rather than one that needs a bigger setting.
