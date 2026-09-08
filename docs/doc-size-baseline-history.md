@@ -9062,6 +9062,44 @@ test — which is what makes the checklist usable on a case it has not seen.
 ## 2026-09-08 — `docs/overview/entries/` total ceiling → 331 (LA-80, eleventh PR running)
 
 330 → 331. Eleventh consecutive raise, one per PR, as LA-80 describes.
+## 2026-09-08 — `docs/implementation-backlog.md` 18,977 → 19,064 (+87), BF-133
+
+The owner asked for a card showing *"essentially every metric we have recorded"*. The entry is 87
+lines because the phrase does not survive contact with the data, and every line of the inventory
+below changes what gets built:
+
+- **`body_metrics` is not evenly populated.** Steps are 132 of 132; the six smart-scale fields are 40
+  each; and **six tape-measure columns — waist, chest, arm, thigh, hip, neck — are 0 of 132**, never
+  written by anything. `sleep_sessions.sleep_score` is 0 of 109 on the same footing. So "render every
+  column" ships a card with at least seven permanently blank rows and two empty blood sections. The
+  measured fill rates are what turn that from an opinion into a spec: **omit, do not blank**.
+- **Three of the owner's own examples are not what they sound like**, and each would have been built
+  wrong from the request alone: stride length is `height × 0.415`, a population constant, not a
+  measurement; "low/avg/high HR" is three stores with three different windows (asleep, working,
+  resting); and there are already **two RMR numbers** — one lab-measured row and 40 scale estimates —
+  that a card showing both must distinguish.
+- **BF-118 part 3 already describes a "User Information" screen**, so the entry opens by forcing that
+  collision rather than leaving two entries to build two pages with the same name. The split
+  recorded: BF-118 is what you *tell* the app and it constrains AI generation; BF-133 is what the app
+  has *measured*, read-only.
+
+Kept short deliberately: the UI section is five bullets, because "good UI" for a dense read-only list
+is mostly grouping and dates, and the one durable rule — every value carries its "as of" — is stated
+once rather than argued.
+
+### Reconciled on merge — 19,070
+
+`main` advanced twice while BF-133 was being written (#990 and #993, both PS-39 route-test batches),
+so the `.size` file conflicted — the genuine-disagreement case, since both sides describe the same
+number. Recomputed from the merged file rather than taking either side; the history conflict beside
+it was two independent additions and both are kept.
+
+Worth recording why this merge happened at all: `pnpm check:rules` failed locally on *"Every API route
+has a test that imports its handler"*, naming four heart-rate routes as having lost their tests. They
+had not. **#993 added those tests to `main` mid-session**, and the check compares the working tree
+against the merge base — so a stale branch reads as a regression it did not cause. The check was
+right and the branch was old. Confirmed before acting by stashing the changes and re-running against
+a clean tree, which reproduced it, and then by fetching `origin/main` and finding the new commit.
 
 ## 2026-09-08 — `docs/overview/entries/` folded 331 → 292 (the second sweep of the day)
 

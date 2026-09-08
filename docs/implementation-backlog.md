@@ -722,6 +722,93 @@ OR-102a/b will read dose history to recommend the next dose. A tracker that read
   one that is rare and expensive.
 - **Reversal cost:** low for 1 and 2 (local state and a dialog). 3 is a migration and is separable.
 
+### [body][app-shell] BF-133 — a full user overview: every metric the app has recorded, in one place
+
+- **Lane:** B — a new surface under `components/health/` or the User Information screen of **BF-118**; the assembler behind it may be Lane A if it needs a route.
+- **Added:** 2026-09-08 · owner: *"I'd like a full user overview card - having every metric we have for the user - like height/weight/body fat/ stride length/low-avg-high HR/ rmr/ essentially every metric we have recorded - such as avg sleep duration/time etc. just a massive user overview card with a good ui"*.
+- **Needs:** — nothing. It reads stores that are already populated.
+
+**⚠ FIRST: decide against BF-118, because both entries describe a screen called "user information".**
+BF-118 part 3 is *"a More → User Information screen showing what the app knows, per source,
+editable"*. **They are not the same screen and must not become two screens with the same name.** The
+honest split, and the recommendation: **BF-118's screen is what you TELL the app** (injuries,
+constraints, schedule, DEXA/RMR entry — editable, and it constrains AI generation); **this is what the
+app has MEASURED about you** — read-only, dense, no inputs. Build it as a section of BF-118's screen
+rather than a second destination, or the app grows two "about you" pages that each look incomplete.
+
+**The inventory, measured on the owner's live data 2026-09-08 — this is what "every metric" actually
+is, and it is not evenly populated.** `body_metrics` holds **132 rows**:
+
+| field | rows with a value | note |
+|---|---|---|
+| `steps` | **132 / 132** | the only complete series |
+| `weight_kg` · `body_fat_pct` | 96 · 91 | scale |
+| `resting_heart_rate` · `hrv_ms` · `spo2_pct` | 81 · 79 · 79 | ring |
+| `distance_km` | 50 | |
+| `skeletal_muscle_pct` · `muscle_mass_kg` · `body_water_pct` · `visceral_fat_index` · `bmr_kcal` · `metabolic_age` | **40 each** | all six arrive together from the smart scale |
+| `waist_cm` · `chest_cm` · `arm_cm` · `thigh_cm` · `hip_cm` · `neck_cm` | **0 · 0 · 0 · 0 · 0 · 0** | six tape-measure columns, never written by anything |
+
+Elsewhere: `sleep_sessions` **109** rows (mean duration **6.23 h**, mean efficiency **80.2**, mean
+sleep start **23:17**, `respiratory_rate` 91, `lowest_heart_rate` 92 — but **`sleep_score` is 0 of
+109**, a column that exists and has never been populated); `workout_hr_stats` 91; `oura_daily` 80;
+`body_battery_daily` 72; `personal_records` 33; `fitness_tests` **2** (a 6MWT giving
+`vo2max_est` 18.8 and a resting-HRR test giving RHR 94, both 2026-07-19); `measured_rmr` **1**;
+`dexa_scans` **1** (40+ columns of regional composition); `injuries` **1** (`lower back`, mild —
+recorded since 2026-09-06, when it was still empty); `blood_panels` and `blood_analytes` **0** — the
+stores exist and nothing has ever been written to them.
+
+**So "render every column" is the wrong spec, and would ship a card with at least seven permanently
+empty rows on it** (six tape measurements plus Sleep Score) plus two whole sections showing nothing
+(blood). **Rule for this card: a metric with no data is omitted, not shown blank** — the exception
+being where an empty state is itself an invitation ("no blood panel recorded — add one"), which is a
+deliberate choice per group rather than a default.
+
+**Three of the owner's named examples need answering before this is built, because each is not what it
+sounds like:**
+
+1. **Stride length is not measured.** `lib/activity/treadmill-utils.ts:3` computes
+   `(heightCm / 100) * 0.415` — a population constant applied to height. Rendering that as a *user
+   metric* presents an anthropometric assumption as a measurement. What IS measured is **stride
+   frequency** (`strideHz`, `lib/activity/cadence-tracker.ts:263`) from the ring. Show cadence, or
+   show stride length labelled as estimated-from-height; do not show it as recorded data.
+2. **"low / avg / high HR" is three different things from three stores**, not one range:
+   `sleep_sessions.lowest_heart_rate` and `avg_heart_rate` (overnight, 92 rows),
+   `workout_hr_stats` (per-session, 91 rows), and `body_metrics.resting_heart_rate` (daily, 81 rows).
+   A single "HR: low–avg–high" row silently merges a sleeping heart rate with a working one. Decide
+   the window it describes and label it.
+3. **There are already two RMR numbers and they disagree by construction.** `measured_rmr` holds the
+   owner's **one lab-measured value**; `body_metrics.bmr_kcal` holds **40 scale-estimated** ones. Both
+   are "RMR" to a reader. The card must show which is which — this is the same class as BF-33's
+   measured-vs-estimated split and should follow whatever it settled rather than inventing a second
+   convention.
+
+**Design, and the part that decides whether this is useful or just long:**
+- **Group by what a number is for, not by which table it came from** — Body composition · Vitals ·
+  Sleep · Training · Performance tests · Goals. The tables are an implementation detail and grouping
+  by them puts `bmr_kcal` next to `steps` because they share a row.
+- **Every value carries its date.** This is the difference between a useful card and a misleading
+  one: a DEXA from one scan and a lab RMR from one visit will sit beside today's step count, and
+  without "as of" they read as equally current. The owner's own examples are heavily weighted to
+  one-off measurements.
+- **Show a range or trend where the series supports it, a single value where it does not.** 132 step
+  days deserve a sparkline; one DEXA does not.
+- **Profile facts belong in it too** — height, date of birth, sex, activity level, fitness goal, and
+  the goals (`steps_goal` 7000, `target_weight_kg`, `target_bf_pct`). Note **`sleep_goal_hours` is
+  NULL** while a sleep goal is implied elsewhere in the app; surfacing that gap is one of the things
+  this card is for.
+- **Read-only.** Every field here has an existing editor somewhere; a second write path is how two
+  surfaces start disagreeing. Link to the editor, per the rule BF-118 already states — *"the
+  canonical editor lives in the user section; every other surface links to it"*.
+
+- **Check the existing Body tab first.** `components/health/body-cards/`, `body-fat-card.tsx`,
+  `body-muscle-card.tsx` and `hr-recovery-profile-card.tsx` already render parts of this. The value of
+  this entry is the *single dense view*; if it is built by duplicating those cards' internals rather
+  than reusing them, it becomes a second place every body metric is formatted. Reuse or extract.
+- **Reversal cost:** low — one read-only screen over existing stores. No migration, no new data.
+- **A device look is owed when it ships:** this is a long screen on a phone, and "good UI" for a dense
+  read-only list is mostly about scanning — group headers that stick, numbers aligned, and the S25's
+  fold not landing mid-group.
+
 ### [platform] LB-56 — E2E costs 26 minutes a UI PR and currently gates nothing; decide which of those to change
 
 - **Lane:** O — the Orchestrator's, not an implementer's. `.github/workflows/ci.yml`, `playwright.config.ts` and the required-checks
