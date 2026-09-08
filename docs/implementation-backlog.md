@@ -419,33 +419,6 @@ the domain indexes) need to point at the batched `docs/overview/history-*.md` fo
 enough to have been folded, after which the fold is unblocked and the directory can shrink to a
 recent window again. Doing it the other way round — folding first — breaks 292 live links.
 
-### [platform] LA-83 — two DB tests have no tolerance for the contention the config already names
-
-- **Lane:** A — `vitest.config.ts` (the `unit` project), `lib/data/postgres/__tests__/dexa-scans.test.ts`,
-  `lib/data/postgres/__tests__/error-events-prune.test.ts`.
-- **Added:** 2026-09-08, Lane A — hit while running the full suite for an unrelated test PR, then
-  reproduced by running the suite clean, changed, and changed again.
-
-Adding one mock-only test file turned the full local suite red in two DB-touching files. **Neither
-failure is caused by that file** — it touches no database. Measured across three full runs: clean
-tree **826 passed**; with the new file **2 failed**; with the same file again **827 passed**. So it
-is scheduling, and the two tests are what cannot absorb it:
-
-- `dexa-scans` died on `Test timed out in 5000ms` — the `unit` project's default.
-- `error-events-prune` read 2 rows where it expects 0, waiting a fixed `setTimeout(250)` for a
-  `DELETE` the write path deliberately does not await.
-
-**The repo has already diagnosed this exact class and fixed it in one project only.** The `rollup`
-project carries `testTimeout: 60_000` with the reason written beside it — *"Contention is what tips
-these over, and the full suite runs them alongside ~380 other files against one shared Postgres."*
-The `unit` project, which holds every other DB test, kept the 5-second default.
-
-Raise the `unit` project's `testTimeout` for the same stated reason, and give the prune test a
-condition to wait on rather than a fixed sleep — poll for the row count with a deadline, so it is
-slow under load instead of wrong under load. **CI is not affected** (no `DATABASE_URL` there, so
-these skip); what it costs is the local full-suite gate every agent runs before merging, which is
-worse than it sounds — a red that is not yours trains you to re-run rather than read.
-
 ### [devices][readiness] LA-82 — the cardio hub catches nine reads and dies on the two it cannot see
 
 - **Lane:** A — `packages/shared/src/health/hr-profile.ts:68`, plus the four routes that call it.
