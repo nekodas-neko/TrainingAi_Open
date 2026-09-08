@@ -399,6 +399,318 @@ below threshold and left in place for next time.
 
 
 
+### [nutrition] TN-29 — the app measures this owner's activity factor at 1.41 and then accepts a maintenance implying 1.67, because nothing cross-checks the two estimates it already computes
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-09 · owner: *"I wonder if we could estimate the activity level value or tune how we do ours."*
+- **Lane: A** — `packages/shared/src/nutrition/adaptive-tdee.ts` (`estimateMaintenance`, the `minMaintenanceKcal` floor), fed from `lib/health/energy-balance-service.ts:236-260` where both estimates already sit in scope.
+- **Owner-approved 2026-09-09** — *"make all the changes you recommend."* Not gated; start here.
+- **Recommended over TN-27's three options, and independent of them** — this gate holds whichever window wins. Build this before TN-27.
+- **Reference:** [`review`](reviews/2026-09-09-maintenance-2245-is-too-high.md) §7.
+
+**`computeEnergyBalance` computes two independent maintenance estimates on every request and
+compares them never.** The calibrated one comes from intake and scale weight; the formula one comes
+from resting rate plus measured movement. They fail in unrelated ways, which is what makes the
+second a usable check on the first — and it is already in the same function, as the fallback the
+calibration overrides.
+
+Run over 2026-08-12 → 09-08 with the app's own code:
+
+| | |
+|---|---|
+| `personalRmr` (measured 1,325 rescaled to today's FFM 52.4 kg) | **1,345** |
+| × `SEDENTARY_MULTIPLIER` 1.2 | **1,614** |
+| average measured movement — 3,572 steps/day plus training | **+281** |
+| **measured-movement maintenance** | **1,895** |
+
+**Divided by the resting rate, the four estimates are an activity factor, and one of them is not a
+metabolism:**
+
+| estimate | maintenance | factor |
+|---|---|---|
+| 28-day calibration | 1,654 | 1.23 |
+| 30-day scale trend | ~1,693 | 1.26 |
+| measured movement | 1,895 | **1.41** |
+| **what shipped** | **2,245** | **1.67** — hard exercise 6–7 days/week |
+
+**1.67 for someone averaging 3,572 steps a day is an artefact, and the app holds the measurement
+that says so.**
+
+**The proposal: make Q-517's floor two-sided.** `estimateMaintenance` already takes the user's BMR as
+`minMaintenanceKcal` and rejects anything below it — *a maintenance below resting burn is impossible
+by definition*. The same argument runs the other way with better evidence: **a maintenance implying
+training the user demonstrably did not do is impossible by measurement.** Reject when the implied
+factor falls outside a plausible band around the measured-movement estimate, and let
+`resolveMaintenance` fall back as it already does for `below_bmr`.
+
+- It rejects **2,245** and lands near **1,895** — inside the owner's own stated expectation of 1,600–1,800.
+- No new data, no new window, no owner input, and one new `MaintenanceExclusion` variant.
+- **⚠ Band width is the one thing this entry does not settle.** Too tight and it rejects a genuine
+  training block; the measured-movement estimate already contains that training, so the band tracks
+  it rather than a constant — but the multiplier wants fitting against more than one owner-month.
+
+**Second half — stop asking the user to grade themselves.** `users.activity_level` reads `moderate`
+against a measured **1.41**, between light (1.375) and moderate (1.55). One notch high, as
+self-report usually is. **⚠ Its blast radius is small and this entry does not inflate it:** Q-401
+already removed `ACTIVITY_MULTIPLIERS` from the calorie path, so the field no longer touches the
+daily target. It still reaches the VO₂max **crosscheck** (37.3 → 41.1 between light and moderate;
+the Uth-Sørensen headline of 55.0 does not move), the step goal (moot — the owner set 7,000 by hand
+and manual wins), the water goal (+250 ml), and the context handed to the AI coach. So: **show the
+measured factor and offer it**, rather than keeping a guess beside a measurement.
+
+**⚠ How many other days this moves:** none of it is stored. Maintenance and the activity factor are
+recomputed per request from a trailing window, so no history is re-scored. The one written artefact
+is `nutrition_targets.calories` (**1,660**, set 2026-08-31) — which this gate protects rather than
+changes: at a `recomp` delta of −200 the honest band is **1,450–1,700**, and 1,660 already sits
+inside it.
+
+**Pass test:** with the owner's current data the calibrated maintenance is rejected, the card falls
+back near 1,895, and no accepted estimate implies an activity factor above ~1.55 while measured
+movement stays near 280 kcal/day.
+
+### [nutrition] TN-27 — the maintenance estimator rejects its reliable window and falls back to its noisiest one, and the owner is shown 2,245 kcal instead of ~1,700
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-09 · owner: *"this is the maint calories derived from the app — i don't think it's right. with RMR at 1350 and calories well under that and barely maintaining weight."*
+- **Lane: A** — `packages/shared/src/nutrition/adaptive-tdee.ts` (`MIN_LOGGED_FRACTION`, `resolveMaintenance`), consumed by `lib/health/energy-balance-service.ts:260`.
+- **Owner decision, 2026-09-09: option 3, after TN-29** — *"make all the changes you recommend."*
+  The gate is cleared; this is Lane A's to build. Options 1 and 2 stay recorded below as the
+  better-but-later versions, not as an open question.
+- **Reference:** [`review`](reviews/2026-09-09-maintenance-2245-is-too-high.md).
+
+**The arithmetic is right and the window is wrong.** `1,612 − (−0.0822 × 7700) = 2,245`, matching
+the screenshot to the kcal. What produced it is window selection:
+
+| | 28-day window | 14-day window (shipped) |
+|---|---|---|
+| complete-logged days | 10 | 10 |
+| **mean intake** | **1,612** | **1,612** |
+| coverage vs `MIN_LOGGED_FRACTION` 0.7 | 36% — **rejected** | 71% — **accepted** |
+| weigh-ins / span | 27 over 27 days | 14 over 13 days |
+| weight slope | −0.038 kg/wk | −0.575 kg/wk |
+| **maintenance** | **1,654** | **2,245** |
+
+**The mean intake is identical in both**, so the gate that exists to protect the mean cannot
+distinguish them — and **the whole 591 kcal spread is the weight slope**, which nothing gates.
+
+**The gate is self-defeating for this shape of data.** Complete-logging began 2026-08-26, so the
+numerator is fixed at ten and coverage falls purely as the window grows. `resolveMaintenance`'s own
+comment tries the long window first *"for more noise cancellation"*; the gate makes the long window
+**harder** to pass, and the fallback lands on the window this module's own header calls *"dominated
+by water-weight swings"*. It steers hardest toward noise exactly when logging is sparsest.
+
+The window sweep is the proof — mean intake is 1,612 in every column from 14 days out:
+
+| window | 10d | 14d | 18d | 22d | 26d | 28d |
+|---|---|---|---|---|---|---|
+| maintenance | 2,414 | **2,245** | 1,909 | 1,774 | 1,651 | **1,654** |
+
+**Three independent readings put the truth near 1,700–1,800:** the 28-day window (**1,654**), the
+30-day scale trend against the same intake (**~1,693**), and measured RMR **1,325** × 1.2 sedentary
+(**~1,590**) plus ~3,300 steps/day of movement. **2,245 would need ~650 kcal/day above resting**,
+which this owner's step and training record does not contain. **So the card reads ~450–550 high.**
+
+**Build TN-29 first, then option 3 below** — owner signed off 2026-09-09. TN-29 gates on the implied
+activity factor and holds whichever window wins; option 3 is the cheapest correct change to the
+window rule itself. **Options 1 and 2 are the durable versions and are deliberately deferred**:
+each needs a second signal (slope standard error; a per-user "logging began" date) that is worth
+having once the two cheap fixes prove the shape of the problem.
+
+**The three options, 3 chosen:**
+1. **Prefer the window with the tighter slope, not the higher coverage.** Both windows share their
+   mean here; slope standard error separates them and already falls out of the fit.
+2. **Measure coverage over days that could have been logged**, not over the whole window — ten of
+   ten since complete-logging began is a different fact from ten of twenty-eight.
+3. **✅ CHOSEN — stop falling back from a rejected long window to a short one** — report
+   `logging_too_sparse` and hold the formula baseline. Cheapest of the three, and it alone would have
+   put this owner within ~150 kcal instead of 550 out.
+
+**⛔ Do not widen the mean by counting part-logged days.** Every day with any food logged gives
+**1,495** at 28 days and **1,954** at 14 — worse both ways, and the exact failure Q-387 documented.
+The completion flag is working; the window selection is not.
+
+**⚠ How many other days this moves:** maintenance is recomputed per request from a trailing window,
+never stored, so no history is re-scored — the change moves today's number and every future one.
+The one written artefact is `nutrition_targets.calories`, currently **1,660** (set 2026-08-31), which
+this card offers to overwrite with 2,045.
+
+**Pass test:** with the owner's current data the calibrated maintenance lands between 1,600 and
+1,850, and lengthening the window by a fortnight moves it by less than 100 kcal.
+
+### [nutrition] TN-28 — the one card that can act on the maintenance estimate is the one that hides how good it is
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-09 · found while answering TN-27.
+- **Lane: B** — `components/nutrition/tdee-adaptation-card.tsx:118-124`.
+- **Sibling of TN-27** — TN-27 makes the number better; this makes its uncertainty visible. Fix either order.
+- **Reference:** [`review`](reviews/2026-09-09-maintenance-2245-is-too-high.md) §5.
+
+`TdeeAdaptationCard` renders the maintenance figure and a one-tap **Use 2,045** that writes straight
+into the calorie goal through `PUT /api/nutrition/targets`. The estimate behind the owner's
+screenshot carries `confidence: 'low'` (coverage 0.714, under the 0.85 medium threshold) and a 95%
+interval of **[1,990 – 2,500] kcal** — a 510 kcal band presented as one number with a button under it.
+
+**Its two siblings already print it.** `energy-card.tsx:260` and `calorie-balance-bar.tsx:100` both
+render *"(low confidence, 10 of 14 days logged)"* beside the same value, from the same payload
+(`maintenance.confidence`, `daysLogged`, `daysInWindow` are already on the wire). Only the card that
+can change the user's calorie goal omits it.
+
+**Do not gate the action on confidence** — that is TN-27's job and a different trade. Show the
+qualifier the siblings show, on the surface where it costs something to be wrong.
+
+**Pass test:** the nudge card names its confidence and day count in the same sentence as the
+maintenance figure, matching the wording already on the energy card.
+
+### [cardio][heart-rate] TN-26 — the walk prescribes a control that means something different on every surface; prescribe heart rate and record the rest
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-08 · owner: *"let's not tune to the treadmill — like you said it changes based on location, what do you suggest we do?"*
+- **Lane: A** — `lib/walk/walk-pacer.ts:66` (cadence targets), `components/guided-walk/walk-active.tsx:67-68` (HR targets), `components/guided-walk/walk-summary.tsx:141-146` (what is stored).
+- **Pairs with TN-25** — TN-25 chooses *what* the fast block should demand; this entry decides *in what unit* it is demanded and how compliance is measured.
+- **Reference:** [`review`](reviews/2026-09-08-walk-intensity-calibration.md) (addendum 3).
+
+**Cadence and speed are not portable; heart rate is.** The owner's own indoor mapping — 90 spm at
+2 km/h, 120 spm at 4 km/h — implies strides of **0.370 m** and **0.556 m**, against **0.739 m**
+measured outdoors. So 120 spm is roughly 4 km/h on the belt and roughly 5.3 km/h on a footpath, and
+uphill it is a different effort again at the same number. **A cadence target is a different workout
+on every surface, and the app cannot tell which one the owner is on** — treadmill walks save with
+`is_distance_based = false`, and only **17 of 106** stored segments carry a distance at all.
+**% of heart-rate reserve is the one quantity that means the same thing everywhere**, because it is
+defined against this user's own resting HR and max rather than against the ground.
+
+**So: make the heart-rate band the prescription, and demote cadence and speed to observations.**
+The pacer already computes the band (`hrReserveTarget` in `hr-zones.ts`) and already renders a live
+verdict — what it lacks is an achievable target (TN-25) and an instruction phrased as a loop
+(*"raise effort until HR reaches X"*) rather than as a fixed control (*"walk at 120 spm"*). The
+current `DEFAULT_CADENCE_TARGETS = { fast: 120, slow: 95 }` becomes a starting hint, not the goal.
+
+**Two surface-independent calibration metrics fall out of that, and both are computable today:**
+1. **Fast-block compliance** — the share of fast blocks whose steady-state HR reached the target.
+   Currently **0 of 44**.
+2. **Interval contrast** — mean fast %reserve minus mean slow %reserve, the thing that makes an
+   interval walk an interval walk. Currently **6.8 points**; the protocol's own targets imply **30**.
+   Contrast is also what TN-24 measured against within-session drift (+7.7 vs +7.1 bpm) — it is the
+   number that says whether two speeds are happening at all.
+
+**Keep recording the controls — per surface, as evidence, never as the target.** Capturing belt
+speed on treadmill walks (currently absent entirely) and distance outdoors is still worth doing: it
+lets the app learn *this surface, this control → this HR* and offer a better starting hint next
+time. It is a convenience layer over the HR loop, not a second prescription, and it does not gate
+TN-25.
+
+**⛔ Do not derive a speed prescription from the two indoor points that exist.** 2 km/h → 90.7 bpm
+and 4 km/h → 98.5 bpm gives ≈3.9 bpm/km/h, which extrapolates 70% reserve to **~12.9 km/h** —
+obviously wrong. The slope was measured in the flattest part of the curve; the response steepens
+sharply toward the walk/run transition at ~7–8 km/h. The owner's proposed tweak (slow 90→100 spm,
+fast 120→130 spm) is directionally right and worth ≈**+0.9** and **+1.3 bpm** against a 34.7 bpm
+shortfall — which is the clearest evidence that the control is the wrong lever, not that it needs a
+bigger setting.
+
+**Pass test:** a guided walk states its fast and slow blocks as heart-rate targets, the summary
+reports fast-block compliance and interval contrast for the session, and both numbers are comparable
+between a treadmill walk and an outdoor walk without any surface-specific adjustment.
+
+### [cardio][heart-rate] TN-25 — the guided walk's fast target has never been met in 44 attempts, and the live pacer says "push" every time
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-08 · owner: *"what makes it effective is the 2 speeds — should I be walking faster or slower during any phases?"*
+- **Lane: A** — `components/guided-walk/walk-active.tsx:67-68` sets the targets; `classifyZone` in `hr-zones.ts` renders the verdict.
+- **Reference:** [`review`](reviews/2026-09-08-walk-intensity-calibration.md) (addendum). Sibling of **TN-24**; fix together or in either order.
+- **Gate: owner** — the three options below are a product choice, not a calibration.
+
+`walk-active.tsx:67-68` sets the pacer from the app's own Karvonen helper: **fast ≥ 0.70 of reserve,
+slow ≤ 0.40**. For this owner that is **fast ≥ 133 bpm, slow ≤ 98**.
+
+| | measured |
+|---|---|
+| fast blocks | **98.5 bpm mean (40.1% reserve)**, best single **115** |
+| **fast blocks meeting the target** | **0 of 44 — 0%** |
+| slow blocks | 90.7 bpm (33.3%) |
+| slow blocks within the ceiling | 35 of 45 — **78%** |
+
+**The owner's FAST average (98.5) is the app's SLOW target (98).** The session runs one phase low
+throughout. And `classifyZone` returns `'push'` for any fast block under target, so **the live pacer
+has shown "push" on 100% of fast intervals across ten sessions** — a cue that can only ever say
+*push* is the Q-504 failure rendered live.
+
+**The target is not reachable by walking.** Closing **34.7 bpm** at the measured **0.288 bpm/spm**
+needs **+121 spm → 233 spm**. The 0.70 fraction is right for the protocol and wrong for this user's
+mode: guided interval walking is validated largely in older adults, for whom brisk walking does reach
+70% of reserve; a 33-year-old with a 168 max cannot on flat ground at a 0.739 m stride.
+
+**Three options — owner's choice:**
+1. **Make the fast block a jog or an incline** — keeps the 70% target honest and the protocol intact.
+2. **Re-anchor the fast target to what walking reaches** (~50–55% reserve = 110–116 bpm) **and rename
+   the session** so it stops claiming a stimulus it does not deliver.
+3. **Leave the target, stop rendering an always-"push" verdict** — weakest, but better than now.
+
+**⛔ Do not silently lower the target to make the cue turn green.** A target met by redefinition
+teaches nothing. Whichever option wins, the session's **name and its target must agree**.
+
+**Two metrics worth surfacing, both computable from `activity_logs.segments` today:** fast-block
+compliance (**currently 0%**) and interval contrast, fast minus slow %reserve (**currently 6.8 points
+against the protocol's 30**). **⚠ Do not ship a target for either from this review** — ten sessions
+cannot calibrate one, and compliance reads 0% because the target above is unreachable. Fix that
+first, then measure.
+
+**Pass test:** after the change, a fast block that the owner experiences as hard renders a non-`push`
+verdict; and fast-block compliance over a month is neither 0% nor 100%.
+
+### [cardio][activity][heart-rate] TN-24 — Zone 2 is unreachable on foot, so the walk's zone bar carries no information (and this is Q-523's mechanism)
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-08 · owner: *"can we make any calibrations or formulas for this to optimise the walk?"* after a 30-minute interval walk logged **30:00 Z1 / 0:00 everything else**
+- **Lane: A** — the reported metric, not the zone constants.
+- **Supplies the mechanism for Q-523** (`zoneMinutes` floored at 0 on 53 of 59 days, cause never established).
+- **Reference:** [`review`](reviews/2026-09-08-walk-intensity-calibration.md).
+- **⛔ Do NOT fix this by lowering the zone boundaries.** The Karvonen fractions are conventional and the max is genuine; moving Z2 down would make the label mean something different from every other use of it and would silently re-score history. **Change what the app reports, not where the boundaries sit.**
+
+`hr-zones.ts:38` builds zones as fractions of heart-rate reserve with **Z1 spanning 0.0 → 0.6**. For
+this owner (resting **52**, max **168**, reserve **116**) **Z1 is 52–122 bpm — 60% of the usable range
+in one bucket.** Sitting still and a brisk interval walk are the same zone.
+
+**The max is real, so this is not a stale anchor:** `oura_heartrate` holds **140 samples above 150**
+and a genuine **168** (2026-07-05). The zones are anchored correctly; the training never reaches them
+— **nothing above 140 bpm since 2026-07-24.**
+
+**Cadence is nearly exhausted as a lever.** Across **88 intervals / 10 sessions**:
+`corr(cadence, HR)` = **+0.512**, slope **0.288 bpm per spm**. A **31% cadence separation buys 7.9 bpm**;
+mean fast-interval intensity is **40.1% of reserve** against Z2's 60%, best ever **50.5%**.
+Extrapolated, averaging 122 bpm needs **≈198 spm** — a run. At the measured **0.739 m** stride
+(TN-22's review) the achievable walking speed simply does not demand more. **Grade and carried load
+are the levers that remain.**
+
+**And the protocol is not progressing:** fast/slow HR separation trends **−0.11 bpm per session** across
+ten sessions, while fast cadence fell **123.5 → 112.3 spm**. The *contrast* improved while the *effort*
+declined. **⚠ Description, not diagnosis** — ten sessions, one subject, no controlled comparison.
+
+**⚑ THE PRESCRIPTION CONTRADICTS ITSELF, and this is the sharper half of the entry.**
+`prescribed_runs` for these walks carries `run_type: easy`, **`target_hr_low/high` = 68–97 bpm**,
+`target_zone_ids [1,2]`, and a rationale reading *"A steady **Zone-2 aerobic** session."*
+**The owner averaged 89 bpm — dead centre of target. The session is executed correctly.** But:
+1. **The 68–97 band lies entirely inside Zone 1**, while the label says Zone 2 (which starts at 122).
+   The label and the number cannot both be right.
+2. **The rationale says *steady*; the walk player runs fast/slow cadence intervals.** Two different
+   sessions under one prescription.
+
+**The interval structure is not earning its complexity.** Across nine sessions, **within-session HR
+drift is +7.1 bpm** (first fast block → last) against a **fast-vs-slow contrast of +7.7 bpm**, and
+**drift exceeded contrast on 5 of 9 sessions**. Time on feet supplies about as much as the intervals
+do, while the "slow" halves sit at **33.3% of reserve** against the fast blocks' **40.1%** — half the
+session giving back what the other half earned.
+
+**For the goal as actually targeted (68–97 bpm, conversational), the intensity is already right and
+DURATION is the correct lever** — that is what an easy aerobic session is. **Raising cadence would
+move the session away from its own target.** Energy return is **≈2.29 kcal/min net**, so +15 min ≈
++34 net kcal: real, linear, modest. **⛔ The session is not bad** — it is a good easy-aerobic session
+that is inefficient only against a "Zone-2" label walking cannot satisfy.
+
+**What to build, in order:**
+1. **Report intensity as % of heart-rate reserve** on the walk summary. 40.1% is meaningful and
+   movable; "Z1, 30:00" is not.
+2. **Fix the prescription's label, not its target** — 68–97 bpm is right for an easy session; calling
+   it "Zone-2 aerobic" is what makes the pillar read as broken. And decide whether the session is
+   *steady* or *intervals*; shipping both is why the contrast is only 7.7 bpm.
+3. **Progress on measured fast/slow HR separation.** **Do not ship a target number from this review** —
+   ten sessions cannot set one, and an unreachable target is the Q-504 mistake.
+
+**Pass test:** the walk summary shows a number that differs between the owner's 2026-08-14 session
+(30.0% reserve) and 2026-08-18 (50.5%), where the zone bar reads identically for both.
+
 ### [platform] LA-80 — the journal's entry ceiling is now binding, and a sweep alone cannot clear it
 
 - **Lane:** O — `docs/overview/entries/`, plus the durable docs that cite it.
@@ -661,20 +973,49 @@ OR-102a/b will read dose history to recommend the next dose. A tracker that read
 - **The UI states the unbuilt behaviour as fact**, which is what makes this a live defect rather than
   a gap: `components/workout/ai-baseline-banner.tsx:22` reads *"For each exercise, load the bar and do
   as many clean reps as you can (AMRAP). The AI will calculate your 1RM and start prescribing from the
-  next session."* Nothing calculates it and nothing prescribes.
-- **Fix: derive the baseline from the session that was just completed.** The primitives exist —
-  `calcAmrap1RM` (`packages/shared/src/1rm.ts`) is the AMRAP estimator, and `setBaselineComplete`
-  already takes a `Record<exerciseId, Baseline1rmEntry>` with a `source` tag. On completing a workout
-  whose session is in `baseline`, build that map from the session's set logs and call it, tagging
-  `source` distinctly from the existing `'existing'` so a measured anchor is distinguishable from a
-  carried-over PR. Key it by **session-exercise id**, matching what the route already does and what the
-  signals read.
+  next session."* Nothing prescribes — but, per the amendment below, something **does** calculate.
+
+**⚠ AMENDED 2026-09-08 — THE DERIVATION ALREADY RUNS. THIS IS ONE HOP, NOT A NEW CALCULATION.**
+The entry first said to *"derive the baseline from the session that was just completed"*, which sends
+an implementer to build something that exists. Traced after the owner asked why the AMRAP was not
+already producing the anchor:
+
+- **`estimateOneRm` takes an `isBaseline` flag** (`packages/shared/src/1rm.ts:170`) and routes to
+  `amrapAverage1Rm` when it is set — the AMRAP estimator, not the ordinary one.
+- **The workout screen passes it**: `workout-screen.tsx:1212` reads
+  `phaseStatus?.isBaseline` and hands it to the `estimateOneRm` call at `:1221`.
+- **The result is already persisted.** It lands in `exercise_logs.estimated_1rm`, and `:1294` lets a
+  baseline set count toward a PR even under a session-level deload — a deliberate carve-out that only
+  makes sense because these sets are understood to be the anchor.
+- **So the number exists in the owner's data right now.** What never happens is the copy into
+  `session_periodization.baseline1rm` and the flip of `baseline_complete`.
+
+**So the work is: on completing a workout whose session is in `baseline`, read the per-exercise
+`estimated_1rm` this session already wrote, key it by session-exercise id, and pass it to
+`setBaselineComplete` with a `source` tag distinct from the existing `'existing'` so a measured anchor
+stays distinguishable from a carried-over PR.** Do **not** compute a fresh AMRAP 1RM at the
+periodization layer — that is a second implementation of a formula this repo already has one of, which
+**One Formula, One Place** exists to prevent, and it would silently disagree with the PR the same sets
+produced.
+
+- **Do NOT make "Use prior data" automatic — it is the escape hatch, and the codebase says so.** The
+  route's own comment calls it the **"skip-baseline flow"** and refuses to run when no PR or estimate
+  is found rather than *"silently completing with an empty, unusable anchor"*. The design is AMRAP by
+  default, prior-data by choice. Firing it automatically inverts that: every user gets carried-over
+  numbers and the baseline session becomes decorative — worst on a **rebuilt program**, where the
+  exercise list changed and re-measuring is the whole point. It reads as though it should be automatic
+  only because the default it is an alternative to was never wired up. Fix the hop and the button
+  returns to being a deliberate choice.
 - **Two things to get right, both of which the current shape hides:**
   1. **A partial baseline must not silently complete.** If the lifter logs 3 of 5 exercises, the
      anchor is missing two — decide between completing with a PR fallback for the gaps (tagged) and
      staying in `baseline` with the screen naming what is outstanding. Do not complete with an empty
      entry; the route's own comment already warns against *"silently completing with an empty,
-     unusable anchor"*.
+     unusable anchor"*. **Either way the card must say which state it is in** — today it reads
+     "Baseline needed" identically after zero baseline sessions and after two, which is what made this
+     unreportable until it was traced. *"3 of 5 exercises logged"* is the fix, and it belongs in the
+     same PR: a partial baseline that looks exactly like no baseline will produce this same report
+     again.
   2. **`incrementSessionsInPhase` is fire-and-forget** and must stay that way — a completion must
      never fail on a periodization write. The new call needs the same posture, which means the flag
      can lag a completion and the screen must tolerate it.
@@ -685,7 +1026,7 @@ OR-102a/b will read dose history to recommend the next dose. A tracker that read
   with `baseline_complete = true` beside the new ones.
 - **Owner workaround, valid today:** tap **"Use prior data →"**. He has PRs for these exercises, so it
   seeds and advances to `accumulation`.
-- **Reversal cost:** low — one derivation and one call on an existing write path.
+- **Reversal cost:** low — one read and one call on an existing write path; smaller since the amendment, because the derivation is not being written.
 
 ### [workouts][app-shell] BF-132 — one tap on the trash icon deletes a whole session, with no confirmation and no tombstone 🔴 LIVE
 
