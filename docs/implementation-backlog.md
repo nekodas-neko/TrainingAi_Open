@@ -419,25 +419,6 @@ the domain indexes) need to point at the batched `docs/overview/history-*.md` fo
 enough to have been folded, after which the fold is unblocked and the directory can shrink to a
 recent window again. Doing it the other way round — folding first — breaks 292 live links.
 
-### [platform] LA-81 — the coverage ratchet cannot see a swap, so a deleted test reads as progress
-
-- **Lane:** A — `scripts/check-route-test-coverage.js`.
-- **Added:** 2026-09-08, Lane A — hit while writing PS-39 tests, then measured rather than assumed.
-
-`check-route-test-coverage.js` compares one number against a baseline, so **covering five routes
-while un-covering three passes as a two-route improvement**. That is not hypothetical: a new test
-file was written to a path that already held one (`lib/__tests__/home-aggregate-routes.test.ts`),
-destroying the tests for `calendar-data`, `training-load` and `muscle-recovery`. The count went
-87 → 85, the check said OK, and only diffing the uncovered lists by hand showed three routes had
-gone backwards. Nothing in CI would have said so.
-
-**The fix is a set comparison, not a bigger number.** Fail when a route covered at the merge base is
-uncovered on the branch, whatever the total does — the same shape as the other shrink-only ratchets,
-which also compare content rather than a count. `scripts/lib/base-ref.js` already resolves the base
-ref and reads a file at it (`resolveBaseRef`, `fileAtBase`), so the checker can compute its own
-uncovered list at the base and diff. Deleting a test on purpose then states itself in the diff,
-which is the point.
-
 ### [nutrition][body] OR-102b — the reta tracker: vial setup, dose calculator, dose timeline, weight response
 
 - **Lane:** B — a new section under Nutrition, plus the supplement sheet.
@@ -1233,7 +1214,7 @@ named by this entry is now CLEAR**: the home aggregates, both ingest routes and 
 done; so are ai-periodization, `friends/leaderboard`, the account cluster, the supplement/vial chain,
 a meal plan's lifecycle + reshape, the workout write path, the running plan and the four body/health
 writes, the goal-target-adherence loop and the home week/streak reads. Work by feature — batching on what is *verified together* twice found a defect (LA-78, LA-79). `scripts/check-route-test-coverage.js` ratchets it, so the debt
-only shrinks and a NEW route arrives uncovered and fails — but see LA-81 for what it cannot see.
+only shrinks, a NEW route arrives uncovered and fails, and since LA-81 a route that LOSES its test fails whatever the total does.
 
 ### [app-shell][platform] LA-76 — a deload PHASE still decays the collection, and nothing dates one
 
