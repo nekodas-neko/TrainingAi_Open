@@ -9015,3 +9015,13 @@ the entry says more than it did; nothing else in this PR.
 rules at once tests neither. Three instances in ten batches, every one passing, every one found by
 mutation rather than by reading. Raised because it belongs where the next batch is written from —
 the entry is what an implementer reads before starting, and the lesson was otherwise session-local.
+
+## 2026-09-08 — `docs/implementation-backlog.md` → 18888 (PS-39: the trap recurred immediately)
+
+18883 → 18888. Five lines: the fixture trap recorded one PR earlier appeared twice more in the very
+next batch, and the entry now says so. That it recurred while its own warning was being written is
+the argument for the checklist, so it belongs beside it rather than in a journal file.
+
+## 2026-09-08 — `docs/overview/entries/` total ceiling → 330 (LA-80, tenth PR running)
+
+329 → 330. Tenth consecutive raise, one per PR, as LA-80 describes.
