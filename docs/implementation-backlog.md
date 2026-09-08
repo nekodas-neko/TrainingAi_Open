@@ -1081,7 +1081,7 @@ produced.
 ### [workouts][platform] LB-66 — a saved session delete is still a hard delete, with no tombstone
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-08, filing the third of BF-132's three fixes; the
-  first two (a confirmation naming the exercise count, and an in-sheet undo) shipped in #1001.
+  first two (a confirmation naming the exercise count, and an in-sheet undo) shipped in #1004.
 - **Lane: A** — `program_sessions` and `session_exercises` need a `deleted_at`, so this is a
   migration and belongs to the lane that owns them.
 - **Needs:** — nothing.

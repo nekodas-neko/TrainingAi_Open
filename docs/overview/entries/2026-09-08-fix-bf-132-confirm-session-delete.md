@@ -1,6 +1,6 @@
 ## 2026-09-08 — Deleting a session asks first, and can be undone (BF-132)
 
-**Branch:** `fix/bf-132-confirm-session-delete` · **Lane B** · PR #1001
+**Branch:** `fix/bf-132-confirm-session-delete` · **Lane B** · PR #1004
 
 ### The report
 
