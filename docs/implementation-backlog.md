@@ -1164,6 +1164,24 @@ unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge
   `oura/hr-day`; the rest is buildable work rather than a residue, so it keeps no `Keep:` — that
   would file it under a heading telling the lane not to look (OR-100).
 
+- **⚠️ THE 142 IS ITSELF OVERSTATED BY 15, MEASURED 2026-09-08 (Q-112d).** The scan asks whether any
+  test file contains the substring `app/api/<route>/route`, which a **relative** import never
+  produces. Fifteen routes on the uncovered list have a co-located test in their own `__tests__/`
+  loading the handler as `await import('../route')`: `sync/push`, `sync/pull`, `next-session`,
+  `next-session/prescription`, `user/goals`, `workout-sessions`, `body-battery`, `health-trends`,
+  `health/trends`, `ai/health-insight`, `oura/stats`, `oura/hr-window`, `oura-ble/accel-chunks`,
+  `oura-ble/live-steps`, `admin/backfill-derived-scores`. So the real debt is nearer **126**, and
+  four of the fifteen are among the most consequential routes in the app — a list that says
+  `sync/push` is untested is a list nobody should act on before this is fixed.
+  - **How it surfaced is the argument for fixing it rather than re-counting by hand.** Q-112d took
+    `day-review/week-window` off the list with a **type-only** import written for a response type —
+    it tests nothing — while that route's own real handler test had been invisible the whole time.
+    The signal is not just noisy, it points the wrong way in both directions at once.
+  - **The fix is to resolve the specifier rather than match the string**: for a test under
+    `app/api/<route>/`, a relative `../route` (or `../../route`) resolves to that route's module.
+    That is a path join, not a parser. Whoever does it must re-baseline in the same PR, and the
+    number will DROP by about 15 — which is a check becoming honest, not debt being paid.
+
 **The count was 93 and is really 142**, by the mechanism the entry half-noticed: it counted a route
 covered when any test mentioned its URL, so `calendar-data` and `training-load` "appearing only as
 cache-key strings" counted. Asking instead whether a test imports the handler gives 150 of 222, less
@@ -16431,17 +16449,6 @@ per-field merge where an AI write has no honest source rank to claim.
   reusable components. What is missing is one entry point instead of two, three stats, a 7-day
   comparison, and the wrap-up continuing from the read-through. Reasoning and alternatives: the plan.
 
-### [nutrition][app-shell] Q-112d — draw the trends, on four stats not fourteen
-
-- **Branch:** `feat/day-review-trends` · **Lane: B** · **Plan:** the above, §4
-- **Needs: Q-112c**
-- Resting HR, steps, session volume, weight. Composition percentages move too slowly to read as
-  anything but noise; scores already carry `scoreBand()`'s word. **The primitive can draw these now**
-  — Q-154 shipped its missing props on 2026-08-30 (`pad`, `valuePadding`, `strokeWidth`, `gridLines`,
-  `emphasizeLast`, `valueLabel`, all defaulted), so use `components/ui/sparkline.tsx` rather than the
-  delta chip this used to fall back to. **Pass `valuePadding={0}`** unless a padded domain is wanted:
-  the default 0.5 halves the amplitude of a small spread.
-
 ### [nutrition][app-shell] Q-112e — the weekly recap gets the same treatment
 
 - **Branch:** `feat/weekly-recap-uplift` · **Lane: B** · **Plan:** the above, §4
@@ -16477,6 +16484,15 @@ per-field merge where an AI write has no honest source rank to claim.
   series it reuses for the 7-day comparison window, so a tidy-up now is work Q-112c would have to
   undo. The decision point is *after* Q-112d: if the trends phase has not re-homed the chart by
   then, delete component + route + the cache-group line together.
+- **⚑ THE DECISION POINT HAS PASSED, AND THE ANSWER IS DELETE (2026-09-08, Q-112d shipped).** The
+  trends phase did **not** re-home `workout-load-comparison-chart`, and it did not reuse the route
+  either: `/api/day-review/week-window` derives session volume itself from `getWorkoutSessionsFrom`,
+  so Q-112c's plan text about reusing `/api/workout-load-history` describes an intention the shipped
+  route did not follow. That leaves the component with zero renderers, the route with zero client
+  callers and the `workout-load-history:` line in `invalidateWorkoutSummaries()` clearing nothing —
+  the state this entry describes, now with nothing left that might rescue it. Verify the zero call
+  sites at the head you delete from rather than trusting this line; the point of the note is that
+  the *blocker* is gone, not that the grep is stale-proof.
 - **What "re-home" would mean.** Per-session load-vs-history is a workout read, and the natural
   surfaces are `/health/day` (which already draws per-session volume) or Q-112b's read-through step
   — not the evening wrap-up, where it was one more chart nobody had asked for.

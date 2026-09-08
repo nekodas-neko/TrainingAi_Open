@@ -152,3 +152,15 @@ export const RUNNING_PLAN_EXPLAIN_TTL = TTL_LONG;
  * constant mandatory here rather than two spellings of the same number.
  */
 export const COLLECTION_TTL = TTL_SHORT;
+
+/**
+ * The day review's 7-day comparison window (Q-112d). `TTL_MEDIUM` because everything in it is a
+ * completed-day aggregate: resting heart rate, steps, session volume and weight, keyed by date.
+ *
+ * **The key carries the date, so it is not the "today goes stale across midnight" case** the short
+ * TTLs guard against — a request for yesterday's window is asking for a settled answer. What can
+ * still change under it is *today's* own point, which is why every write that touches those four
+ * stats clears the key by group (`invalidateBodyMetricWrite`, `invalidateWorkoutSummaries`,
+ * `invalidateOuraSync`) rather than waiting on this number.
+ */
+export const DAY_REVIEW_WEEK_WINDOW_TTL = TTL_MEDIUM;

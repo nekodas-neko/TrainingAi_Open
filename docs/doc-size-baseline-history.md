@@ -8784,3 +8784,21 @@ The number is 18694 rather than the 18711 this branch computed before LA-62 land
 Recomputing from the merged file is the rule, and this is why: the +2 is a property of the diff and
 survives any base, while the absolute figure belongs to whatever `main` happens to be when the PR
 merges.
+
+## 2026-09-08 — `docs/implementation-backlog.md` → 18710 (Q-112d shipped)
+
+Up 16 on balance, from 18694, and it moved twice. Q-112d's own 11-line entry came out and 9 lines went onto **LB-24**,
+which had written down a decision it could not yet take: *"the decision point is after Q-112d — if
+the trends phase has not re-homed the chart by then, delete."* It has not, and it did not reuse the
+route either, so the answer is now determinable and is recorded where the lane that owns it will
+read it. Nine lines against a session of re-deriving the same conclusion is the trade this file
+exists to make. That left it at 18692.
+
+Then 18 more went onto **PS-39**, and those are the ones worth defending. Its ratchet counts a route
+covered when a test file contains the string `app/api/<route>/route`, which a *relative* import
+never produces — so fifteen routes with a co-located handler test sit on its uncovered list,
+`sync/push` and `sync/pull` among them. That was measured rather than asserted, and the fifteen are
+named, because a list claiming the sync push route is untested is a list somebody will act on.
+Eighteen lines is the cost of not making the next session re-derive it from the accident that
+surfaced it: a type-only import, which tests nothing, took a route off the list while that route's
+own real test had been invisible the whole time.

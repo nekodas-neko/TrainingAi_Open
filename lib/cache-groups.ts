@@ -30,6 +30,9 @@ export async function invalidateWorkoutSummaries(): Promise<void> {
     // a trained day is a faucet day for the collection's workout ladder, and it also ends whatever
     // gap was decaying it (BF-122b)
     invalidateCache('collection'),
+    // session volume is one of the four stats the day review draws a week of (Q-112d), and a
+    // completed workout changes today's point in that window
+    invalidateCache('day-review-week-window:'),
     // a lifting session's HR feeds the same whole-day zone series as any cardio activity
     invalidateCache('cardio-week'),
     invalidateCache('calendar-data:'),
@@ -199,6 +202,9 @@ export async function invalidateOuraSync(): Promise<void> {
     // a synced night is a faucet day for the collection's sleep ladder, and a synced step day for
     // its steps one (BF-122b)
     invalidateCache('collection'),
+    // a sync writes the resting heart rate and step count the day review's week window plots
+    // (Q-112d) — three of its four stats come from `body_metrics`, which this path fills
+    invalidateCache('day-review-week-window:'),
     // A BLE sync drains new keepalive battery polls, so the latest-battery read is stale after
     // one. Read by both Ring Status cards (More/Profile and Health) on this single shared key.
     invalidateCache('oura-ble-battery-latest'),
@@ -324,6 +330,9 @@ export async function invalidateBodyMetricWrite(): Promise<void> {
     invalidateCache('achievements:'),
     // a recorded step day is a faucet day for the collection's steps ladder (BF-122b)
     invalidateCache('collection'),
+    // weight, steps and resting heart rate are three of the day review's four trended stats
+    // (Q-112d); the prefix clears every dated window, since a backdated entry moves an older one
+    invalidateCache('day-review-week-window:'),
   ])
 }
 
