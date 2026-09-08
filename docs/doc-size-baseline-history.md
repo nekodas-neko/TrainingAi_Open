@@ -8802,3 +8802,15 @@ named, because a list claiming the sync push route is untested is a list somebod
 Eighteen lines is the cost of not making the next session re-derive it from the accident that
 surfaced it: a type-only import, which tests nothing, took a route off the list while that route's
 own real test had been invisible the whole time.
+
+## 2026-09-08 — `docs/implementation-backlog.md` → 18752 (Q-112e split, LB-64 filed)
+
+Up 42, and the entry it grew is one that could not be built. Q-112e asked for the weekly recap to get
+Q-112d's trends; re-verifying against `main` found `/api/weekly-digest` spends every number it
+computes on the model's prompt and returns prose, over a 14-day window rather than the month the plan
+attributes to the owner. So the trends half is Lane A's and is now **LB-64**, with the two candidate
+route shapes and the reason one wins; Q-112e keeps a `Keep:` naming what is left and a `Needs:` on it.
+
+Forty-two lines is the cost of the next session not re-discovering, from the same starting point,
+that the surface it was asked to build has no data behind it. The alternative was a Lane B PR that
+implemented half a feature against a route that cannot serve it.
