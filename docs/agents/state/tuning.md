@@ -413,13 +413,24 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
   protocol and had to correct it when the owner asked for the research.
 - **The same two rows measure TN-26's surface effect:** an outdoor walk averaged **117 bpm** against
   the treadmill's **89–91** for the same activity. 27 bpm apart.
-- **⛔⛔ "ZONE 2" MEANS TWO DIFFERENT THINGS AND THIS APP MIXES THEM (TN-25, addendum 4).** The guided
-  walk's copy says *"conversational Zone-2 aerobic"* — language from the **%HRmax** model, where Z2 is
-  **101–118 bpm** for the owner — while `ZONE_DEFS` sets thresholds from the **%HR-reserve** model,
-  where it is **122–133**. At a resting HR of 52 the two differ by **21 bpm**, which is the whole gap
-  three addenda spent measuring. **17 of 44 fast blocks already reached 101+ and the pacer said "push"
-  on every one.** Before calling a target unreachable, check WHICH zone model the copy beside it
-  assumes — `hr-zones.ts` is internally consistent and neither model is wrong.
+- **⛔⛔ THE ZONE MODEL IS SINGLE-SOURCED; THE MAX-HR ANCHOR IS NOT — FOUR RESOLVERS (TN-30).**
+  `ZONE_DEFS` is the only set of fractions in the app and nothing re-bands HR anywhere. But
+  `hrMaxFromAge` (**187**), `resolveMaxHr` (**187** — observed only if ≥ age), `targetAnchorMax`
+  (**168** — walk and fitness tests) and `resolveBatteryHrMax` (**168** — Body Battery) are four
+  answers to "what is this user's max", and **three are live at once**: the zone bar says the range
+  ends at 187 while the walk and the Body Battery say 168. **⚠ They agree BY COINCIDENCE today** —
+  the walk's fast target is `0.70 × 116 + 52 = 133` and the Zone-2 floor is `0.60 × 135 + 52 = 133`,
+  same number, unrelated arithmetic, nothing holding them equal. **Always name WHICH max a zone
+  number came from.**
+- **⚠⚠ ADDENDUM 4'S "%HRmax vs %HR-reserve, two models" CLAIM WAS WRONG AND IS RETRACTED (addendum
+  6).** The app does not mix zone models. This agent invented that framing, published it, and had to
+  correct it a second time in the same thread. **The real two-model mismatch is in the framework
+  PROSE** — `zone2-base.ts:6` says *"Zone-2 (60–70% HRmax)"* while the engine bands on %reserve, a
+  ~20 bpm gap (TN-32). **Read the code before naming a model.**
+- **⚠ TN-24's "Z1 = 52–122" WAS WRONG; it is 52–132**, because zone bands use `maxHr` (187) and the
+  entry used the observed max (168). Corrected in place 2026-09-09, along with the cadence
+  extrapolation (≈198 → **≈238 spm**, now consistent across TN-24 and TN-25). The conclusion held: Z1
+  is 60% of the range and the fast blocks reach Z2 **0 of 44** against either anchor.
 - **The owner's observed max of 168 is a FLOOR, not a test** (63 samples at 160+, so not an artefact;
   age-predicted is ~180–187). A higher true max moves classic Z2 up and makes the walks look easier —
   state that direction rather than treating 168 as measured.

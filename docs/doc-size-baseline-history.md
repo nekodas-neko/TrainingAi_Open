@@ -9335,3 +9335,30 @@ So option 1 becomes the recommendation and option 4 the fallback, with a ⛔ lin
 the target is right and the copy is wrong: *"a steady Zone-2 aerobic session"* describes neither the
 protocol nor its intensity. The baton records the reversal against this agent by name, since the wrong
 version was published before the owner asked.
+
+## 2026-09-09 — backlog → 19586, `tuning.md` → 471: the zone audit (TN-30, TN-31, TN-32)
+
+The owner asked for one heart-rate zone calculation. An audit of every zone definition in the repo
+answered it, and the answer was not the one the previous amendment had guessed.
+
+**The zone model is genuinely single-sourced.** `ZONE_DEFS` is the only set of fractions and nothing
+re-bands heart rate anywhere. **The max HR those fractions apply to is not**: four resolvers exist and
+three are live at once — the zone bar grades against **187** (220−age) while the guided walk and the
+Body Battery grade against **168** (corroborated observed). The table naming all four is the entry,
+because "which max did this number come from" is the question every future zone finding has to answer
+first.
+
+The line that earns the most room is the coincidence: the walk's fast target is `0.70 × 116 + 52` and
+the Zone-2 floor is `0.60 × 135 + 52`, both **133**, by unrelated arithmetic with nothing holding them
+equal. Two numbers that agree for different reasons are worse than two that disagree, and a successor
+who does not know that will read the agreement as evidence the anchors are consistent.
+
+TN-31 records the owner's product split — a jog belongs under Run, a walk stays a walk — which
+dissolves TN-25's open question instead of answering it, and notes that `RunType` already carries
+`'interval'` so this is routing rather than new machinery. TN-32 collects three copy defects the audit
+turned up, including a Heart Rate page that colours 60–100 bpm red while calling it "Normal".
+
+The baton grew by eleven lines and two of them are retractions: addendum 4's "%HRmax vs %HR-reserve"
+framing was invented by this agent and is withdrawn, and TN-24's Zone 1 boundary was corrected from
+52–122 to 52–132 (with the cadence extrapolation recomputed to ≈238 spm across both entries). Both are
+recorded against the agent by name — the wrong versions were published before the owner asked.

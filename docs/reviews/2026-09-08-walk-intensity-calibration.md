@@ -517,3 +517,81 @@ it is backwards: the target is right and **the copy is wrong**. *"A steady Zone-
 you should be able to hold a conversation"* describes neither the protocol nor its intensity. The
 session should say what it is — a hard interval session with easy recovery — which also resolves the
 contradiction TN-24 found without touching a threshold.
+
+---
+
+## Addendum 6 — the actual zone inconsistency: ONE model, TWO max-HR anchors
+
+**Owner, 2026-09-09:** *"we should only have one calculation for our heart rate zones so try make them
+consistent."*
+
+**Addendum 4's central claim was wrong and this addendum retracts it.** It said the app mixes a
+%HRmax model with a %HR-reserve model. It does not. `hr-zones.ts` is the only zone model in the app
+and every band comes from `computeHrZones`. The real inconsistency is different, narrower, and
+genuinely worth fixing.
+
+### The app resolves TWO different max heart rates, on purpose
+
+`resolveHrProfile` (`hr-profile.ts:61`) returns both, and `hr-profile.ts:17-38` documents why:
+
+| field | value here | rule | what uses it |
+|---|---|---|---|
+| **`maxHr`** | **187** | observed only if **≥** age-predicted, so 220−33 wins over 168 | **every zone band** |
+| **`targetAnchorMax`** | **168** | the corroborated observed max | **the guided walk's targets** |
+
+The reasoning on each is sound in isolation — anchoring a *ceiling* on a low observed max makes every
+hard effort read over 100%, and anchoring a *reachable target* on 220−age puts the fast block out of
+reach. **But the walk screen shows both at once**, so the target and the zone bar it sits beside are
+computed against denominators 19 bpm apart.
+
+### The numbers coincide by accident, and that is worse than disagreeing
+
+- Walk fast target: `0.70 × 116` (observed reserve) + 52 = **133 bpm**
+- Zone 2 floor: `0.60 × 135` (age reserve) + 52 = **133 bpm**
+
+**They are the same number for entirely different reasons.** Nothing holds them together: a corroborated
+observed max of 175, or a resting HR drifting to 55, separates them silently and the walk starts
+targeting a boundary that is no longer Zone 2. **The copy's "Zone 2" is currently correct by
+coincidence.**
+
+### ⚠ Correction to TN-24: Zone 1 is 52–132, not 52–122
+
+TN-24 states Zone 1 spans **52–122 bpm**. That was computed against the observed max of 168. The zone
+bands use `maxHr` = **187**, so the true bands are:
+
+| zone | name | bpm |
+|---|---|---|
+| 1 | Recovery | 52–132 |
+| 2 | Light | 133–145 |
+| 3 | Aerobic | 146–159 |
+| 4 | Hard | 160–173 |
+| 5 | Peak | 174+ |
+
+**TN-24's conclusion survives and gets stronger**: Zone 1 is **81 bpm wide, 60% of the whole range**,
+and the 44 fast blocks reach it 0 times out of 44 either way. Only the boundary number changes.
+
+**⚠ Note also that the app's Zone 2 is named "Light" and Zone 3 is "Aerobic".** The walk's copy says
+*"Zone-2 aerobic"*, which pairs the number of one band with the name of the next. That phrase matches
+nothing in `ZONE_DEFS`.
+
+### 220 − age is the weaker half, and it is 19 bpm above anything he has recorded
+
+Every zone the owner sees is anchored to **187** against **107,255 HR samples** whose maximum is
+**168** — including a run at 161. Re-read against that anchor his efforts land low: the 2026-07-24 run
+at 145 bpm average reads **Zone 2**, and his best walk block reads Zone 1 at **61.5% of max**.
+
+**Recommendation: one anchor, and it should be the corroborated observed max.** 220−age is a
+population formula with a standard deviation around 10–12 bpm; using it as a personal ceiling for
+someone with a six-figure sample count is the weaker of the two claims about this owner's physiology.
+The documented objection — that a low observed max makes hard efforts read over 100% — is real but
+smaller: a reading above the anchor is informative (it *raises* the observed max next time), whereas a
+ceiling nobody can reach silently under-rates every session forever.
+
+**⛔ Do not "fix" this by deleting `targetAnchorMax`.** Two named anchors beat the three accidental
+resolvers they replaced, and the walk's target would jump from 133 to **147** overnight if it took
+`maxHr` instead. The fix is to make **one** of them the truth for both uses, not to collapse the
+naming.
+
+**⚠ Not yet audited: every other `computeHrZones` call site.** `build-day-audit.ts:134` and
+`score-audit/heart-rate.ts:58` pass `hrMaxFromAge(...)` directly rather than a resolved profile, which
+is a third path to a max. Whether they agree with the two above is open and is TN-30's first job.

@@ -399,6 +399,130 @@ below threshold and left in place for next time.
 
 
 
+### [heart-rate][cardio] TN-30 — one zone model, four max-HR anchors: the walk, the zone bar and the Body Battery grade the same heartbeat against three different ceilings
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-09 · owner: *"we should only have one calculation for our heart rate zones so try make them consistent."*
+- **Lane: A** — `packages/shared/src/health/observed-hr.ts:110` (`resolveMaxHr`), `health/hr-profile.ts:86` (`targetAnchorMax`), `health/body-battery-inputs.ts:51` (`resolveBatteryHrMax`), `health/hr-zones.ts:9` (`hrMaxFromAge`), plus `lib/health/readiness-payload.ts:397`.
+- **Gate: owner** — the choice of anchor changes every zone boundary the app has ever shown, so it is a calibration decision, not a refactor.
+- **Reference:** [`review`](reviews/2026-09-08-walk-intensity-calibration.md) §addendum 6.
+
+**The zone MODEL is genuinely single-sourced and that is not the problem.** `ZONE_DEFS`
+(`hr-zones.ts:38`) is the only set of zone fractions in the app; every band is built by
+`computeHrZones`; no file re-bands heart rate anywhere. **What is not single-sourced is the max HR
+those fractions are applied to — there are four resolvers, and three of them are live for this owner
+right now:**
+
+| resolver | rule | this owner | what it drives |
+|---|---|---|---|
+| `hrMaxFromAge` (`hr-zones.ts:9`) | `220 − age`, 190 if age unknown | **187** | readiness / Activity Score zone-minutes |
+| `resolveMaxHr` (`observed-hr.ts:110`) | observed **only if ≥** age-predicted | **187** (168 loses) | `maxHr` → **every zone band** |
+| `targetAnchorMax` (`hr-profile.ts:86`) | corroborated observed, else age | **168** | **guided-walk targets**, fitness tests |
+| `resolveBatteryHrMax` (`body-battery-inputs.ts:51`) | `max(90-day observed peak, rest + 60)` after 14 peak days | **168** | **Body Battery** |
+
+**So the owner reads three surfaces daily that disagree by 19 bpm about the top of their own range.**
+The zone bar says his range ends at 187; the walk and the Body Battery say 168.
+
+**Each is individually defensible and `hr-profile.ts:17-38` argues its case honestly** — a ceiling
+anchored on a low observed max makes every hard effort read over 100%, and a target anchored on
+220−age is unreachable. **The defect is that both appear on the same screen.** `hr-profile.ts:47`
+claims to have consolidated three resolvers; `resolveBatteryHrMax` is a fourth that survived it.
+
+**⚠ The numbers currently agree BY COINCIDENCE, which is worse than disagreeing.** The guided walk's
+fast target is `0.70 × 116` (observed reserve) + 52 = **133**. The Zone-2 floor is `0.60 × 135` (age
+reserve) + 52 = **133**. Same number, unrelated arithmetic. A corroborated observed max of 175 — or a
+resting HR drifting from 52 to 55 — separates them silently, and the walk begins targeting a boundary
+that is no longer Zone 2. **Nothing in code or test holds them equal.**
+
+**A second, smaller live split: the RESTING anchor.** `resolveHrProfile` averages `resting_heart_rate`
+over a fixed 28 days, rounded (**52**); `readiness-payload.ts:343` averages its own window with
+low-wear days excluded, unrounded. Measured: **52.23 over 28 days, 53.39 over 60, 55.75 over 90** —
+about **1.5 bpm** on the Zone-2 floor today. Small now, and it is the same class of defect.
+
+**Recommendation: one anchor, and it should be the corroborated observed max.** `220 − age` is a
+population formula with a standard deviation around 10–12 bpm, and here it sits **19 bpm above the
+maximum of 107,255 recorded samples** — including a run that peaked at 161. The documented objection
+(a low observed max makes hard efforts read >100%) is real but the smaller cost: a reading above the
+anchor is self-correcting, because it raises the observed max next time, whereas a ceiling nobody can
+reach under-rates every session indefinitely.
+
+**⛔ Do not "fix" this by deleting `targetAnchorMax`.** Two explicitly-named anchors beat the three
+accidental ones they replaced, and the walk's fast target would jump **133 → 147** overnight if it
+simply took `maxHr`. Make one of them the truth for both uses; do not collapse the naming.
+
+**⚠ How many other days this moves:** `daily_zone_minutes` is CACHED, so changing the anchor
+re-scores stored zone history. That is the opposite of the 2026-08-24 history policy and needs the
+same treatment — stamp the model, leave stored days, or re-derive deliberately. **Size this before
+building.**
+
+**Pass test:** one query of the HR profile answers "what is this user's max" with one number; the
+guided-walk target, the zone bar, the Body Battery and the Activity Score's zone-minutes all derive
+from it; and a test asserts the walk's fast target equals the Zone-2 floor **because** they share an
+anchor, not by arithmetic coincidence.
+
+### [cardio] TN-31 — split the interval JOG out of Guided Walk into a Run type; a walk and a jog are two sessions, not two speeds
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-09 · owner: *"these should be 2 different options then… if we are doing jogging it should fall under the Run category in cardio… Run could consist of that interval Jog as a style; whereas the walk is more a walk."*
+- **Lane: B** — `components/cardio/modality-picker.tsx` (the three-way picker), `components/guided-walk/**`, `app/running/**`. **Lane A** for `packages/shared/src/running/hr-targets.ts` if a new run type is added.
+- **Gate: owner** — product structure. The owner has stated the shape; what needs deciding is which existing run type absorbs it.
+- **Reference:** [`review`](reviews/2026-09-08-walk-intensity-calibration.md) addenda 4–6. **Resolves TN-25's owner question** by splitting it rather than answering it.
+
+**The cardio section is already `Run · Guided Walk · Other Activity`, and `RunType` already includes
+`'interval'`** (`packages/shared/src/running/types.ts:3`), targeting zones **[4, 5]** via
+`ZONES_BY_TYPE` (`running/hr-targets.ts:12`). **So the structure the owner is asking for mostly
+exists** — this is routing, not new machinery.
+
+**Why the split is right, and it dissolves TN-24's and TN-25's contradiction rather than patching
+it.** One session currently tries to be both: a walk (its name, its copy, its cadence targets) and an
+interval protocol whose fast phase is unreachable on foot (**0 of 44**, needing ≈238 spm). Splitting
+gives each half an honest target:
+
+- **Guided Walk → a walk.** Its honest zone is **Zone 1**, which is where every one of the 44 fast
+  blocks landed. Judge it on duration, consistency and steps — not on zone compliance it cannot meet.
+  **Drop the fast/slow structure or keep it as a comfort feature, but stop scoring it as intervals.**
+- **Run → the interval jog.** The fast phase then targets a reachable zone and the pacer's cue
+  becomes informative instead of permanently "push".
+
+**⚠ `interval` targets zones 4–5 (160+ bpm here) and the walking protocol's fast phase is ~70% of peak
+— nearer `tempo` (zones 3–4, 146+).** Neither is an exact fit, so the owner's decision is: reuse
+`tempo`, or add a sixth run type for the 3-on/3-off walking-derived protocol. **Do not silently map it
+to `interval`** — that prescribes a materially harder session than the research it comes from.
+
+**Reference point from the owner's own data:** a 9.2-minute run on 2026-07-24 averaged **145 bpm**,
+which is Zone 2 under the current 187 anchor and Zone 3 under 168 — **so which run type this maps to
+depends on TN-30's outcome.** Sequence TN-30 first, or the new session type gets built against an
+anchor that then moves.
+
+**Pass test:** the cardio picker offers a walk that is scored as a walk and a run type whose fast
+phase the owner reaches; and TN-25's three options no longer need answering, because no single session
+is claiming to be both.
+
+### [cardio][heart-rate] TN-32 — three user-facing surfaces describe zones in a model the engine does not use
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-09 · found in the zone audit TN-30 came out of.
+- **Lane: B** — `packages/shared/src/running/frameworks/zone2-base.ts:6`, `frameworks/norwegian-4x4.ts:6`, `app/health/heart-rate/page.tsx:69-72`, `packages/shared/src/health/session-picker.ts:85`.
+- **Sibling of TN-30**, independent of it. Copy and labels only — no threshold moves.
+
+Three separate places tell the user something the zone engine does not do:
+
+1. **The framework prose quotes %HRmax while the engine uses %reserve.** `zone2-base.ts:6` says
+   *"Zone-2 emphasis (**60–70% HRmax**)"* and `norwegian-4x4.ts:6` says Z4–5 is *"**85–95% max HR**"*.
+   `targetsForRunType` reads the Karvonen bands, where Zone 2 is 60–70% of **reserve** — **133–145 bpm
+   for this owner, or 71–78% of HRmax.** The prose promises 112–131 and the engine prescribes
+   133–145: a ~20 bpm gap between what the framework says and what it does.
+2. **The Heart Rate page classifies HR with no profile at all.** `heart-rate/page.tsx:69` uses fixed
+   cuts — `<60` "Resting", `<100` "Normal", else "Elevated" — the only place in the app where a heart
+   rate is graded without the user's own resting and max. **And it colours 60–100 bpm `#f87171`, a
+   RED**, while the zone palette colours that same range blue-green. A resting-adjacent heart rate is
+   rendered as an alarm.
+3. **Zone names are typed twice.** `HR_ZONE_META` (`hr-zones.ts:48`) and `ZONE_LABELS`
+   (`session-picker.ts:85`) are identical today and unlinked. One-line fix; the cheapest of the three.
+
+**⛔ Do not resolve (1) by changing the zone fractions.** The bands are conventional and shared; the
+prose is what is wrong. Same principle as TN-25's — the target is right and the copy is wrong.
+
+**Pass test:** every user-visible sentence describing a zone states the same basis the engine uses,
+and no heart rate is coloured as an alarm at a value inside the user's own Zone 1.
+
 ### [nutrition] TN-29 — the app measures this owner's activity factor at 1.41 and then accepts a maintenance implying 1.67, because nothing cross-checks the two estimates it already computes
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · owner: *"I wonder if we could estimate the activity level value or tune how we do ours."*
@@ -629,7 +753,7 @@ has shown "push" on 100% of fast intervals across ten sessions** — a cue that 
 *push* is the Q-504 failure rendered live.
 
 **The target is not reachable by walking.** Closing **34.7 bpm** at the measured **0.288 bpm/spm**
-needs **+121 spm → 233 spm**. The 0.70 fraction is right for the protocol and wrong for this user's
+needs **+119 spm → ≈238 spm** (mean fast cadence 118.6 at 98.5 bpm; recomputed 2026-09-09, and TN-24 now carries the same figure). The 0.70 fraction is right for the protocol and wrong for this user's
 mode: guided interval walking is validated largely in older adults, for whom brisk walking does reach
 70% of reserve; a 33-year-old with a 168 max cannot on flat ground at a 0.739 m stride.
 
@@ -662,7 +786,7 @@ Across 318 minutes walked in 11 sessions:
 quadruples Z2 minutes for the same 30 minutes of the owner's time; one instruction instead of two
 speeds that cannot be separated enough for the structure to pay for itself. Contrast measures
 **7.7 bpm** (range 4.4–10.0), so the session is already a continuous walk with a wobble — and a
-genuinely hard fast half needs **233 spm**, which is a jog. **Keep the intervals only if the owner
+genuinely hard fast half needs **≈238 spm**, which is a jog. **Keep the intervals only if the owner
 will jog them.** Reversal cost is a target constant and a session label.
 
 **⛔ Continuous at the CURRENT fast pace gives ZERO Z2 minutes** — 98.5 bpm sits 3 bpm under the
@@ -724,8 +848,14 @@ verdict; and fast-block compliance over a month is neither 0% nor 100%.
 - **⛔ Do NOT fix this by lowering the zone boundaries.** The Karvonen fractions are conventional and the max is genuine; moving Z2 down would make the label mean something different from every other use of it and would silently re-score history. **Change what the app reports, not where the boundaries sit.**
 
 `hr-zones.ts:38` builds zones as fractions of heart-rate reserve with **Z1 spanning 0.0 → 0.6**. For
-this owner (resting **52**, max **168**, reserve **116**) **Z1 is 52–122 bpm — 60% of the usable range
-in one bucket.** Sitting still and a brisk interval walk are the same zone.
+this owner **Z1 is 52–132 bpm — 81 bpm wide, 60% of the usable range in one bucket.** Sitting still
+and a brisk interval walk are the same zone.
+
+**⚠ CORRECTED 2026-09-09: this entry first said 52–122**, computed against the observed max of 168.
+The zone bands use `maxHr` = **187** (220−age), because `resolveMaxHr` takes the observed max only
+when it is ≥ the age prediction. The walk's *targets* use `targetAnchorMax` = **168**. Two anchors,
+19 bpm apart, on one screen — see **TN-30** and addendum 6. The conclusion is unchanged and slightly
+stronger: the fast blocks reach Zone 2 **0 times out of 44** against either anchor.
 
 **The max is real, so this is not a stale anchor:** `oura_heartrate` holds **140 samples above 150**
 and a genuine **168** (2026-07-05). The zones are anchored correctly; the training never reaches them
@@ -734,7 +864,7 @@ and a genuine **168** (2026-07-05). The zones are anchored correctly; the traini
 **Cadence is nearly exhausted as a lever.** Across **88 intervals / 10 sessions**:
 `corr(cadence, HR)` = **+0.512**, slope **0.288 bpm per spm**. A **31% cadence separation buys 7.9 bpm**;
 mean fast-interval intensity is **40.1% of reserve** against Z2's 60%, best ever **50.5%**.
-Extrapolated, averaging 122 bpm needs **≈198 spm** — a run. At the measured **0.739 m** stride
+Extrapolated, averaging 133 bpm (the Zone-2 floor) needs **≈238 spm** — a run. (Recomputed 2026-09-09 from the corrected boundary: mean fast cadence 118.6 spm at 98.5 bpm, 0.288 bpm/spm. The old figure, ≈198 spm, targeted the wrong 122 bpm boundary.) At the measured **0.739 m** stride
 (TN-22's review) the achievable walking speed simply does not demand more. **Grade and carried load
 are the levers that remain.**
 
