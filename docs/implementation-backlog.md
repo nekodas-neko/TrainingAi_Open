@@ -1128,7 +1128,7 @@ repair the 22 dead backlog paths and 43 doubled `docs/overview/overview/` labels
 unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge candidates
 (led by `oura-ring-data-reference.md`, a retired-API reference with no retirement note).
 
-### [platform] PS-39 — 128 API routes still have no test that imports their handler
+### [platform] PS-39 — 125 API routes still have no test that imports their handler
 
 - **Lane:** A. Regenerate the list with `node scripts/check-route-test-coverage.js` — it prints every
   uncovered route when it fails, and the ratchet now holds the number.
@@ -1152,17 +1152,17 @@ unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge
     The old number was accidentally close to right for two wrong reasons, which is why the
     prediction from one direction missed. The checker now resolves the specifier and ignores
     type-only imports, so both directions are honest.
-  - **Ten of the twelve now have real tests** (2026-09-08): `scale-ble/pending/[id]/{confirm,dismiss}`,
+  - **Eleven of the twelve now have real tests** (2026-09-08): `scale-ble/pending/[id]/{confirm,dismiss}`,
     `nutrition/energy-balance`, `session-explain/insight`, `running-plan/explain`, `weekly-digest`,
-    `nutrition/saved-meals/[id]`, `nutrition/meal-plans/generate/meal`, `nutrition-goals/recommend`
-    and `workout-review/session/[sessionId]` — batched with its own `…/apply`, uncovered too and the
-    write half of the same feature → **128**. Two remain, still the best candidates *because*
-    everyone believed they were covered: `workout-data` (600 lines) and `ai-periodization/…/prescribe`.
+    `nutrition/saved-meals/[id]`, `nutrition/meal-plans/generate/meal`, `nutrition-goals/recommend`,
+    `workout-review/session/[sessionId]` + its `…/apply`, and `ai-periodization/session/[sessionId]`
+    + `…/prescribe` + `…/respond` — each batched with the uncovered siblings it verifies alongside
+    → **125**. One remains: `workout-data` (600 lines), the biggest.
 
-**The count was 93 and is really 128**, by the mechanism the entry half-noticed: it counted a route
+**The count was 93 and is really 125**, by the mechanism the entry half-noticed: it counted a route
 covered when any test mentioned its URL, so `calendar-data` and `training-load` "appearing only as
 cache-key strings" counted. Asking instead whether a test imports the handler gives 150 of 222, less
-the twenty-two paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
+the twenty-five paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
 honest in both directions (see above), so the list can be worked from. **The actionable core
 named by this entry is now CLEAR**: the home aggregates, both ingest routes and `program-week` are
 done. What is left is the long tail, which is real work but no longer has a shortlist. `scripts/check-route-test-coverage.js` is the ratchet, so the debt can only
