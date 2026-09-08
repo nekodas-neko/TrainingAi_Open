@@ -8740,9 +8740,11 @@ file, and its required-checks list wrong about E2E) and on LB-56 (an E2E job tha
 minutes and did not reproduce). Evidence attached to the entry that will act on it, rather than a
 new entry nobody owns.
 
-## 2026-09-08 — `docs/implementation-backlog.md` → 18679 (LA-62 shipped)
+## 2026-09-08 — `docs/implementation-backlog.md` → 18678 (LA-62 shipped)
 
-Down 31 with nothing added back. LA-62 needed a long entry because it had to explain how a rule
+Down 32 with nothing added back — 31 from removing LA-62's own entry, and one more that arrived
+with #945 on the base merged in before this landed; the number is recomputed from the merged file,
+never carried across from the branch. LA-62 needed a long entry because it had to explain how a rule
 written to prevent the class had been reporting clean over code it never parsed; the fix is eighteen
 `aria-label`s and an empty baseline, and an empty baseline needs no entry to describe it — a file
 absent from the list must have zero, which is the whole rule.
