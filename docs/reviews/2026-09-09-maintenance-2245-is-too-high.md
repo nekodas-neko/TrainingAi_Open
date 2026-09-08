@@ -223,3 +223,25 @@ Goal is `recomp`, so `CALORIE_ADJUSTMENT_BY_GOAL` is **−200**.
 **A target of 1,450–1,700, and the stored 1,660 sits inside it.** Keeping it was the right call;
 the **2,045** the card offered was not. If the owner wants the middle rather than the top of the
 band, ~1,550–1,600 is the number — but 1,660 needs no correction, which is the more useful answer.
+
+---
+
+## 8. Owner decision, 2026-09-09
+
+**Owner:** *"make all the changes you recommend; or place in backlog."*
+
+Both recommendations are approved and their gates are cleared. **Tuning does not ship a scoring
+change** — this one decides what the app tells the owner to eat, and the standing rule exists for
+exactly that case — so the work is Lane A's, in this order:
+
+1. **TN-29** — the two-sided activity-factor gate. Build first; it holds whichever window wins.
+2. **TN-27 option 3** — stop falling back from a rejected long window to a short one.
+3. **TN-28** — the nudge card names its own confidence. Lane B, independent of both.
+
+TN-27's options 1 and 2 stay recorded as the durable versions and are deliberately deferred: each
+needs a second signal (slope standard error; a per-user "logging began" date) worth building once
+the two cheap fixes have shown the shape of the problem.
+
+**Nothing here changes stored history.** Maintenance and the activity factor are recomputed per
+request from a trailing window. The one written artefact is `nutrition_targets.calories` — **1,660**,
+inside the honest 1,450–1,700 band, and left alone.

@@ -9051,7 +9051,7 @@ the argument for the checklist, so it belongs beside it rather than in a journal
 
 329 → 330. Tenth consecutive raise, one per PR, as LA-80 describes.
 
-## 2026-09-09 — `docs/implementation-backlog.md` 18983 → 19136 (+153), TN-27, TN-28 and TN-29
+## 2026-09-09 — `docs/implementation-backlog.md` 19252 → 19258 (+159 across the PR), TN-27, TN-28 and TN-29
 
 The owner reported the Nutrition tab's Calorie Nudge claiming a measured maintenance of 2,245 kcal
 against a measured RMR of 1,325 and a scale that has barely moved. It reproduces exactly, and the
@@ -9080,6 +9080,31 @@ resting rate of 1,345 turns them into activity factors of 1.23, 1.26, **1.41** a
 proposal — make Q-517's one-sided BMR floor two-sided — and it does not survive being compressed
 into a sentence, because the argument is the arithmetic.
 
+## 2026-09-08 — `docs/implementation-backlog.md` 18,977 → 19,006 (+29), BF-131 amended
+
+The owner asked why the baseline was not generated from the AMRAP automatically, and the trace that
+followed **narrowed the entry rather than adding to it** — which is why it is worth 29 lines that
+mostly replace existing ones.
+
+BF-131 originally said to *"derive the baseline from the session that was just completed"*. That is
+wrong in the expensive direction: `estimateOneRm` already takes an `isBaseline` flag routing to
+`amrapAverage1Rm` (`1rm.ts:170`), `workout-screen.tsx:1212` already passes it, and the result already
+lands in `exercise_logs.estimated_1rm` — the PR carve-out at `:1294` that lets a baseline set count
+through a deload only makes sense because those sets are understood to be the anchor. So the number
+exists in the owner's data today and the gap is a single copy into `session_periodization`.
+
+Left unamended, the entry would have sent an implementer to write a second AMRAP 1RM formula — the
+exact failure **One Formula, One Place** exists to prevent, and one that would silently disagree with
+the PR the same sets produced. The amendment is kept visible in place rather than rewritten away, so
+the narrowing is legible as a correction.
+
+Two additions came out of the same question. The **"do not make Use prior data automatic"** paragraph
+records why the button is a button: the route calls itself the *skip-baseline flow* and refuses on an
+empty anchor, so automating it inverts a deliberate design — worst on a rebuilt program, where the
+exercise list changed and re-measuring is the point. And the partial-baseline bullet now requires the
+card to say **which** state it is in; "Baseline needed" reading identically after zero sessions and
+after two is what made this unreportable until it was traced, and a fix that leaves that in place
+invites the same report again.
 ## 2026-09-08 — `docs/implementation-backlog.md` → 18983 (PS-39: the trap's general form)
 
 18977 → 18983. The fixture trap recurred three more times in the HR batch, all one shape: every
@@ -9091,3 +9116,61 @@ test — which is what makes the checklist usable on a case it has not seen.
 ## 2026-09-08 — `docs/overview/entries/` total ceiling → 331 (LA-80, eleventh PR running)
 
 330 → 331. Eleventh consecutive raise, one per PR, as LA-80 describes.
+
+### Reconciled on merge — 19,012 (BF-131 amendment branch)
+
+`main` gained two PS-39 route-test batches while this branch was open, so the `.size` file conflicted
+— both sides describing the same number, which is the genuine-disagreement case. Recomputed from the
+merged file; the append-only history conflict beside it was two independent additions and both are
+kept.
+
+The merge itself needed the clone unshallowed first. `git merge origin/main` failed with *"refusing
+to merge unrelated histories"* — not a real divergence, but an artefact of the session's depth-1
+clone: a later `git fetch origin main` had replaced `origin/main` with an isolated commit carrying no
+parents, so no merge base existed locally. GitHub's own `update_pull_request_branch` refused too, but
+for the real reason (the `.size` conflict), which is what separated the two causes. `git fetch
+--unshallow` then made the merge ordinary.
+## 2026-09-08 — `docs/implementation-backlog.md` 18,977 → 19,064 (+87), BF-133
+
+The owner asked for a card showing *"essentially every metric we have recorded"*. The entry is 87
+lines because the phrase does not survive contact with the data, and every line of the inventory
+below changes what gets built:
+
+- **`body_metrics` is not evenly populated.** Steps are 132 of 132; the six smart-scale fields are 40
+  each; and **six tape-measure columns — waist, chest, arm, thigh, hip, neck — are 0 of 132**, never
+  written by anything. `sleep_sessions.sleep_score` is 0 of 109 on the same footing. So "render every
+  column" ships a card with at least seven permanently blank rows and two empty blood sections. The
+  measured fill rates are what turn that from an opinion into a spec: **omit, do not blank**.
+- **Three of the owner's own examples are not what they sound like**, and each would have been built
+  wrong from the request alone: stride length is `height × 0.415`, a population constant, not a
+  measurement; "low/avg/high HR" is three stores with three different windows (asleep, working,
+  resting); and there are already **two RMR numbers** — one lab-measured row and 40 scale estimates —
+  that a card showing both must distinguish.
+- **BF-118 part 3 already describes a "User Information" screen**, so the entry opens by forcing that
+  collision rather than leaving two entries to build two pages with the same name. The split
+  recorded: BF-118 is what you *tell* the app and it constrains AI generation; BF-133 is what the app
+  has *measured*, read-only.
+
+Kept short deliberately: the UI section is five bullets, because "good UI" for a dense read-only list
+is mostly grouping and dates, and the one durable rule — every value carries its "as of" — is stated
+once rather than argued.
+
+### Reconciled on merge — 19,070
+
+`main` advanced twice while BF-133 was being written (#990 and #993, both PS-39 route-test batches),
+so the `.size` file conflicted — the genuine-disagreement case, since both sides describe the same
+number. Recomputed from the merged file rather than taking either side; the history conflict beside
+it was two independent additions and both are kept.
+
+Worth recording why this merge happened at all: `pnpm check:rules` failed locally on *"Every API route
+has a test that imports its handler"*, naming four heart-rate routes as having lost their tests. They
+had not. **#993 added those tests to `main` mid-session**, and the check compares the working tree
+against the merge base — so a stale branch reads as a regression it did not cause. The check was
+right and the branch was old. Confirmed before acting by stashing the changes and re-running against
+a clean tree, which reproduced it, and then by fetching `origin/main` and finding the new commit.
+
+The owner then signed off both recommendations the same day (*"make all the changes you recommend"*),
+which added six more lines: TN-27's `Gate: owner` bullet became a dated decision record naming option
+3, TN-29 gained an approval line, and the two deferred options carry a sentence each on the second
+signal they need — slope standard error, and a per-user "logging began" date — so a later session
+does not re-derive why the cheap fixes went first.

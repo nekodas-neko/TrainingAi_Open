@@ -403,7 +403,8 @@ below threshold and left in place for next time.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · owner: *"I wonder if we could estimate the activity level value or tune how we do ours."*
 - **Lane: A** — `packages/shared/src/nutrition/adaptive-tdee.ts` (`estimateMaintenance`, the `minMaintenanceKcal` floor), fed from `lib/health/energy-balance-service.ts:236-260` where both estimates already sit in scope.
-- **Recommended over TN-27's three options, and independent of them** — this gate holds whichever window wins. Fix either order; this one first.
+- **Owner-approved 2026-09-09** — *"make all the changes you recommend."* Not gated; start here.
+- **Recommended over TN-27's three options, and independent of them** — this gate holds whichever window wins. Build this before TN-27.
 - **Reference:** [`review`](reviews/2026-09-09-maintenance-2245-is-too-high.md) §7.
 
 **`computeEnergyBalance` computes two independent maintenance estimates on every request and
@@ -470,7 +471,9 @@ movement stays near 280 kcal/day.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · owner: *"this is the maint calories derived from the app — i don't think it's right. with RMR at 1350 and calories well under that and barely maintaining weight."*
 - **Lane: A** — `packages/shared/src/nutrition/adaptive-tdee.ts` (`MIN_LOGGED_FRACTION`, `resolveMaintenance`), consumed by `lib/health/energy-balance-service.ts:260`.
-- **Gate: owner** — this changes the number the app recommends eating, and the three options below trade differently. Tuning proposes; it does not ship a scoring change.
+- **Owner decision, 2026-09-09: option 3, after TN-29** — *"make all the changes you recommend."*
+  The gate is cleared; this is Lane A's to build. Options 1 and 2 stay recorded below as the
+  better-but-later versions, not as an open question.
 - **Reference:** [`review`](reviews/2026-09-09-maintenance-2245-is-too-high.md).
 
 **The arithmetic is right and the window is wrong.** `1,612 − (−0.0822 × 7700) = 2,245`, matching
@@ -505,17 +508,20 @@ The window sweep is the proof — mean intake is 1,612 in every column from 14 d
 (**~1,590**) plus ~3,300 steps/day of movement. **2,245 would need ~650 kcal/day above resting**,
 which this owner's step and training record does not contain. **So the card reads ~450–550 high.**
 
-**Recommended: TN-29 first, then option 3 below.** TN-29 gates on the implied activity factor and
-holds whichever window wins; option 3 is the cheapest correct change to the window rule itself.
+**Build TN-29 first, then option 3 below** — owner signed off 2026-09-09. TN-29 gates on the implied
+activity factor and holds whichever window wins; option 3 is the cheapest correct change to the
+window rule itself. **Options 1 and 2 are the durable versions and are deliberately deferred**:
+each needs a second signal (slope standard error; a per-user "logging began" date) that is worth
+having once the two cheap fixes prove the shape of the problem.
 
-**Three options — owner's choice:**
+**The three options, 3 chosen:**
 1. **Prefer the window with the tighter slope, not the higher coverage.** Both windows share their
    mean here; slope standard error separates them and already falls out of the fit.
 2. **Measure coverage over days that could have been logged**, not over the whole window — ten of
    ten since complete-logging began is a different fact from ten of twenty-eight.
-3. **Stop falling back from a rejected long window to a short one** — report `logging_too_sparse`
-   and hold the formula baseline. Cheapest of the three, and it alone would have put this owner
-   within ~150 kcal instead of 550 out.
+3. **✅ CHOSEN — stop falling back from a rejected long window to a short one** — report
+   `logging_too_sparse` and hold the formula baseline. Cheapest of the three, and it alone would have
+   put this owner within ~150 kcal instead of 550 out.
 
 **⛔ Do not widen the mean by counting part-logged days.** Every day with any food logged gives
 **1,495** at 28 days and **1,954** at 14 — worse both ways, and the exact failure Q-387 documented.
@@ -814,20 +820,49 @@ OR-102a/b will read dose history to recommend the next dose. A tracker that read
 - **The UI states the unbuilt behaviour as fact**, which is what makes this a live defect rather than
   a gap: `components/workout/ai-baseline-banner.tsx:22` reads *"For each exercise, load the bar and do
   as many clean reps as you can (AMRAP). The AI will calculate your 1RM and start prescribing from the
-  next session."* Nothing calculates it and nothing prescribes.
-- **Fix: derive the baseline from the session that was just completed.** The primitives exist —
-  `calcAmrap1RM` (`packages/shared/src/1rm.ts`) is the AMRAP estimator, and `setBaselineComplete`
-  already takes a `Record<exerciseId, Baseline1rmEntry>` with a `source` tag. On completing a workout
-  whose session is in `baseline`, build that map from the session's set logs and call it, tagging
-  `source` distinctly from the existing `'existing'` so a measured anchor is distinguishable from a
-  carried-over PR. Key it by **session-exercise id**, matching what the route already does and what the
-  signals read.
+  next session."* Nothing prescribes — but, per the amendment below, something **does** calculate.
+
+**⚠ AMENDED 2026-09-08 — THE DERIVATION ALREADY RUNS. THIS IS ONE HOP, NOT A NEW CALCULATION.**
+The entry first said to *"derive the baseline from the session that was just completed"*, which sends
+an implementer to build something that exists. Traced after the owner asked why the AMRAP was not
+already producing the anchor:
+
+- **`estimateOneRm` takes an `isBaseline` flag** (`packages/shared/src/1rm.ts:170`) and routes to
+  `amrapAverage1Rm` when it is set — the AMRAP estimator, not the ordinary one.
+- **The workout screen passes it**: `workout-screen.tsx:1212` reads
+  `phaseStatus?.isBaseline` and hands it to the `estimateOneRm` call at `:1221`.
+- **The result is already persisted.** It lands in `exercise_logs.estimated_1rm`, and `:1294` lets a
+  baseline set count toward a PR even under a session-level deload — a deliberate carve-out that only
+  makes sense because these sets are understood to be the anchor.
+- **So the number exists in the owner's data right now.** What never happens is the copy into
+  `session_periodization.baseline1rm` and the flip of `baseline_complete`.
+
+**So the work is: on completing a workout whose session is in `baseline`, read the per-exercise
+`estimated_1rm` this session already wrote, key it by session-exercise id, and pass it to
+`setBaselineComplete` with a `source` tag distinct from the existing `'existing'` so a measured anchor
+stays distinguishable from a carried-over PR.** Do **not** compute a fresh AMRAP 1RM at the
+periodization layer — that is a second implementation of a formula this repo already has one of, which
+**One Formula, One Place** exists to prevent, and it would silently disagree with the PR the same sets
+produced.
+
+- **Do NOT make "Use prior data" automatic — it is the escape hatch, and the codebase says so.** The
+  route's own comment calls it the **"skip-baseline flow"** and refuses to run when no PR or estimate
+  is found rather than *"silently completing with an empty, unusable anchor"*. The design is AMRAP by
+  default, prior-data by choice. Firing it automatically inverts that: every user gets carried-over
+  numbers and the baseline session becomes decorative — worst on a **rebuilt program**, where the
+  exercise list changed and re-measuring is the whole point. It reads as though it should be automatic
+  only because the default it is an alternative to was never wired up. Fix the hop and the button
+  returns to being a deliberate choice.
 - **Two things to get right, both of which the current shape hides:**
   1. **A partial baseline must not silently complete.** If the lifter logs 3 of 5 exercises, the
      anchor is missing two — decide between completing with a PR fallback for the gaps (tagged) and
      staying in `baseline` with the screen naming what is outstanding. Do not complete with an empty
      entry; the route's own comment already warns against *"silently completing with an empty,
-     unusable anchor"*.
+     unusable anchor"*. **Either way the card must say which state it is in** — today it reads
+     "Baseline needed" identically after zero baseline sessions and after two, which is what made this
+     unreportable until it was traced. *"3 of 5 exercises logged"* is the fix, and it belongs in the
+     same PR: a partial baseline that looks exactly like no baseline will produce this same report
+     again.
   2. **`incrementSessionsInPhase` is fire-and-forget** and must stay that way — a completion must
      never fail on a periodization write. The new call needs the same posture, which means the flag
      can lag a completion and the screen must tolerate it.
@@ -838,7 +873,7 @@ OR-102a/b will read dose history to recommend the next dose. A tracker that read
   with `baseline_complete = true` beside the new ones.
 - **Owner workaround, valid today:** tap **"Use prior data →"**. He has PRs for these exercises, so it
   seeds and advances to `accumulation`.
-- **Reversal cost:** low — one derivation and one call on an existing write path.
+- **Reversal cost:** low — one read and one call on an existing write path; smaller since the amendment, because the derivation is not being written.
 
 ### [workouts][app-shell] BF-132 — one tap on the trash icon deletes a whole session, with no confirmation and no tombstone 🔴 LIVE
 
@@ -874,6 +909,93 @@ OR-102a/b will read dose history to recommend the next dose. A tracker that read
   of friction that gets a confirmation removed again a month later. The session-level delete is the
   one that is rare and expensive.
 - **Reversal cost:** low for 1 and 2 (local state and a dialog). 3 is a migration and is separable.
+
+### [body][app-shell] BF-133 — a full user overview: every metric the app has recorded, in one place
+
+- **Lane:** B — a new surface under `components/health/` or the User Information screen of **BF-118**; the assembler behind it may be Lane A if it needs a route.
+- **Added:** 2026-09-08 · owner: *"I'd like a full user overview card - having every metric we have for the user - like height/weight/body fat/ stride length/low-avg-high HR/ rmr/ essentially every metric we have recorded - such as avg sleep duration/time etc. just a massive user overview card with a good ui"*.
+- **Needs:** — nothing. It reads stores that are already populated.
+
+**⚠ FIRST: decide against BF-118, because both entries describe a screen called "user information".**
+BF-118 part 3 is *"a More → User Information screen showing what the app knows, per source,
+editable"*. **They are not the same screen and must not become two screens with the same name.** The
+honest split, and the recommendation: **BF-118's screen is what you TELL the app** (injuries,
+constraints, schedule, DEXA/RMR entry — editable, and it constrains AI generation); **this is what the
+app has MEASURED about you** — read-only, dense, no inputs. Build it as a section of BF-118's screen
+rather than a second destination, or the app grows two "about you" pages that each look incomplete.
+
+**The inventory, measured on the owner's live data 2026-09-08 — this is what "every metric" actually
+is, and it is not evenly populated.** `body_metrics` holds **132 rows**:
+
+| field | rows with a value | note |
+|---|---|---|
+| `steps` | **132 / 132** | the only complete series |
+| `weight_kg` · `body_fat_pct` | 96 · 91 | scale |
+| `resting_heart_rate` · `hrv_ms` · `spo2_pct` | 81 · 79 · 79 | ring |
+| `distance_km` | 50 | |
+| `skeletal_muscle_pct` · `muscle_mass_kg` · `body_water_pct` · `visceral_fat_index` · `bmr_kcal` · `metabolic_age` | **40 each** | all six arrive together from the smart scale |
+| `waist_cm` · `chest_cm` · `arm_cm` · `thigh_cm` · `hip_cm` · `neck_cm` | **0 · 0 · 0 · 0 · 0 · 0** | six tape-measure columns, never written by anything |
+
+Elsewhere: `sleep_sessions` **109** rows (mean duration **6.23 h**, mean efficiency **80.2**, mean
+sleep start **23:17**, `respiratory_rate` 91, `lowest_heart_rate` 92 — but **`sleep_score` is 0 of
+109**, a column that exists and has never been populated); `workout_hr_stats` 91; `oura_daily` 80;
+`body_battery_daily` 72; `personal_records` 33; `fitness_tests` **2** (a 6MWT giving
+`vo2max_est` 18.8 and a resting-HRR test giving RHR 94, both 2026-07-19); `measured_rmr` **1**;
+`dexa_scans` **1** (40+ columns of regional composition); `injuries` **1** (`lower back`, mild —
+recorded since 2026-09-06, when it was still empty); `blood_panels` and `blood_analytes` **0** — the
+stores exist and nothing has ever been written to them.
+
+**So "render every column" is the wrong spec, and would ship a card with at least seven permanently
+empty rows on it** (six tape measurements plus Sleep Score) plus two whole sections showing nothing
+(blood). **Rule for this card: a metric with no data is omitted, not shown blank** — the exception
+being where an empty state is itself an invitation ("no blood panel recorded — add one"), which is a
+deliberate choice per group rather than a default.
+
+**Three of the owner's named examples need answering before this is built, because each is not what it
+sounds like:**
+
+1. **Stride length is not measured.** `lib/activity/treadmill-utils.ts:3` computes
+   `(heightCm / 100) * 0.415` — a population constant applied to height. Rendering that as a *user
+   metric* presents an anthropometric assumption as a measurement. What IS measured is **stride
+   frequency** (`strideHz`, `lib/activity/cadence-tracker.ts:263`) from the ring. Show cadence, or
+   show stride length labelled as estimated-from-height; do not show it as recorded data.
+2. **"low / avg / high HR" is three different things from three stores**, not one range:
+   `sleep_sessions.lowest_heart_rate` and `avg_heart_rate` (overnight, 92 rows),
+   `workout_hr_stats` (per-session, 91 rows), and `body_metrics.resting_heart_rate` (daily, 81 rows).
+   A single "HR: low–avg–high" row silently merges a sleeping heart rate with a working one. Decide
+   the window it describes and label it.
+3. **There are already two RMR numbers and they disagree by construction.** `measured_rmr` holds the
+   owner's **one lab-measured value**; `body_metrics.bmr_kcal` holds **40 scale-estimated** ones. Both
+   are "RMR" to a reader. The card must show which is which — this is the same class as BF-33's
+   measured-vs-estimated split and should follow whatever it settled rather than inventing a second
+   convention.
+
+**Design, and the part that decides whether this is useful or just long:**
+- **Group by what a number is for, not by which table it came from** — Body composition · Vitals ·
+  Sleep · Training · Performance tests · Goals. The tables are an implementation detail and grouping
+  by them puts `bmr_kcal` next to `steps` because they share a row.
+- **Every value carries its date.** This is the difference between a useful card and a misleading
+  one: a DEXA from one scan and a lab RMR from one visit will sit beside today's step count, and
+  without "as of" they read as equally current. The owner's own examples are heavily weighted to
+  one-off measurements.
+- **Show a range or trend where the series supports it, a single value where it does not.** 132 step
+  days deserve a sparkline; one DEXA does not.
+- **Profile facts belong in it too** — height, date of birth, sex, activity level, fitness goal, and
+  the goals (`steps_goal` 7000, `target_weight_kg`, `target_bf_pct`). Note **`sleep_goal_hours` is
+  NULL** while a sleep goal is implied elsewhere in the app; surfacing that gap is one of the things
+  this card is for.
+- **Read-only.** Every field here has an existing editor somewhere; a second write path is how two
+  surfaces start disagreeing. Link to the editor, per the rule BF-118 already states — *"the
+  canonical editor lives in the user section; every other surface links to it"*.
+
+- **Check the existing Body tab first.** `components/health/body-cards/`, `body-fat-card.tsx`,
+  `body-muscle-card.tsx` and `hr-recovery-profile-card.tsx` already render parts of this. The value of
+  this entry is the *single dense view*; if it is built by duplicating those cards' internals rather
+  than reusing them, it becomes a second place every body metric is formatted. Reuse or extract.
+- **Reversal cost:** low — one read-only screen over existing stores. No migration, no new data.
+- **A device look is owed when it ships:** this is a long screen on a phone, and "good UI" for a dense
+  read-only list is mostly about scanning — group headers that stick, numbers aligned, and the S25's
+  fold not landing mid-group.
 
 ### [platform] LB-56 — E2E costs 26 minutes a UI PR and currently gates nothing; decide which of those to change
 
