@@ -36,7 +36,7 @@ export function AddedWeightToggle({ value, onChange }: AddedWeightToggleProps) {
     <div id={contentId} className="rounded-xl border border-border bg-muted/30 p-2">
       <div className="flex items-center justify-between mb-1 px-1">
         <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Added weight</p>
-        <button onClick={() => setOpen(false)} aria-expanded={true} aria-controls={contentId} className="text-muted-foreground">
+        <button aria-label="Hide added weight" onClick={() => setOpen(false)} aria-expanded={true} aria-controls={contentId} className="text-muted-foreground">
           <ChevronUpIcon className="h-3.5 w-3.5" />
         </button>
       </div>

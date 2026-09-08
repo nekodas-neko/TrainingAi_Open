@@ -146,7 +146,7 @@ export function PhaseEditor({
               className="h-7 text-sm font-medium flex-1 border-0 bg-transparent p-0 focus-visible:ring-0"
               placeholder="Phase name"
             />
-            <button onClick={() => removeMain(idx)} className="text-muted-foreground hover:text-destructive transition ml-auto">
+            <button aria-label={`Remove ${phase.name || "phase"}`} onClick={() => removeMain(idx)} className="text-muted-foreground hover:text-destructive transition ml-auto">
               <X className="h-4 w-4" />
             </button>
           </div>

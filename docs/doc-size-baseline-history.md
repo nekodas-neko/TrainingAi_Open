@@ -8740,12 +8740,38 @@ file, and its required-checks list wrong about E2E) and on LB-56 (an E2E job tha
 minutes and did not reproduce). Evidence attached to the entry that will act on it, rather than a
 new entry nobody owns.
 
+## 2026-09-08 — `docs/implementation-backlog.md` → 18692 (LA-62 shipped)
+
+Net down 18 from 18710, and it moved twice. Removing LA-62's own entry took it to 18678 — 31 lines,
+plus one that arrived with #945 on the base merged in before this landed; the number is recomputed
+from the merged file, never carried across from the branch. Then 14 went back on to LB-56, because
+this PR's E2E run reproduced a failure that entry had on file as unreproduced, and the second
+sighting carried the diagnosis the first one lacked (a browser process dying, taking whichever four
+specs were in the window). That is the entry doing its job: it exists to hold the evidence a
+decision about the E2E job will be made from, so evidence belongs in it rather than in a journal
+entry nobody will open when the decision is taken. LA-62 needed a long entry because it had to explain how a rule
+written to prevent the class had been reporting clean over code it never parsed; the fix is eighteen
+`aria-label`s and an empty baseline, and an empty baseline needs no entry to describe it — a file
+absent from the list must have zero, which is the whole rule.
+
 ## 2026-09-08 — `projectOverview.md` → 10419 (the journal fold)
 
 Up 1, from 10418: one Document Map row for `history-2026-09-08.md`. The map is the index's job — a
 history file nobody can find from the map is a history file nobody reads.
 
-## 2026-09-08 — `docs/implementation-backlog.md` → 18711 (LA-75 shipped)
+## 2026-09-08 — `projectOverview.md` → 10419 (LA-62)
+
+Up 1, and it is the Document Map naming the newest batch file. **My own compaction sweep was thrown
+away to get here.** The entries directory hit its 320 ceiling while this branch was open, so the
+branch folded 28 entries — and #947 landed the same chore first, from another session, creating the
+same `history-2026-09-08.md`. The merge was an add/add conflict on that file, resolved by taking
+main's whole sweep and discarding mine, which is the outcome CLAUDE.md predicts when two sessions
+of one role run the same chore.
+
+What survived is the half #947 missed: it created the batch file and left this row pointing at
+`history-2026-09-06.md`, so the newest archive was one nothing routed a reader to.
+
+## 2026-09-08 — `docs/implementation-backlog.md` → 18694 (LA-75 shipped)
 
 Up 2 on balance: LA-75's own 15-line entry came out, and LB-63 went in at 17. That is a net add for
 a PR that closed an item, which is worth stating rather than hiding — the new entry exists because
@@ -8753,3 +8779,8 @@ looking at the screen LA-75 changed showed a second thing wrong with it, and CLA
 orphaned findings** rule makes recording that mandatory, not optional. The alternative was to fix
 both in one PR, which would have mixed a design judgement (how an input is drawn) into a
 correctness fix (a placeholder claiming a number the app never recommends).
+
+The number is 18694 rather than the 18711 this branch computed before LA-62 landed underneath it.
+Recomputing from the merged file is the rule, and this is why: the +2 is a property of the diff and
+survives any base, while the absolute figure belongs to whatever `main` happens to be when the PR
+merges.
