@@ -419,6 +419,67 @@ the domain indexes) need to point at the batched `docs/overview/history-*.md` fo
 enough to have been folded, after which the fold is unblocked and the directory can shrink to a
 recent window again. Doing it the other way round — folding first — breaks 292 live links.
 
+### [platform] LA-83 — two DB tests have no tolerance for the contention the config already names
+
+- **Lane:** A — `vitest.config.ts` (the `unit` project), `lib/data/postgres/__tests__/dexa-scans.test.ts`,
+  `lib/data/postgres/__tests__/error-events-prune.test.ts`.
+- **Added:** 2026-09-08, Lane A — hit while running the full suite for an unrelated test PR, then
+  reproduced by running the suite clean, changed, and changed again.
+
+Adding one mock-only test file turned the full local suite red in two DB-touching files. **Neither
+failure is caused by that file** — it touches no database. Measured across three full runs: clean
+tree **826 passed**; with the new file **2 failed**; with the same file again **827 passed**. So it
+is scheduling, and the two tests are what cannot absorb it:
+
+- `dexa-scans` died on `Test timed out in 5000ms` — the `unit` project's default.
+- `error-events-prune` read 2 rows where it expects 0, waiting a fixed `setTimeout(250)` for a
+  `DELETE` the write path deliberately does not await.
+
+**The repo has already diagnosed this exact class and fixed it in one project only.** The `rollup`
+project carries `testTimeout: 60_000` with the reason written beside it — *"Contention is what tips
+these over, and the full suite runs them alongside ~380 other files against one shared Postgres."*
+The `unit` project, which holds every other DB test, kept the 5-second default.
+
+Raise the `unit` project's `testTimeout` for the same stated reason, and give the prune test a
+condition to wait on rather than a fixed sleep — poll for the row count with a deadline, so it is
+slow under load instead of wrong under load. **CI is not affected** (no `DATABASE_URL` there, so
+these skip); what it costs is the local full-suite gate every agent runs before merging, which is
+worse than it sounds — a red that is not yours trains you to re-run rather than read.
+
+### [devices][readiness] LA-82 — the cardio hub catches nine reads and dies on the two it cannot see
+
+- **Lane:** A — `packages/shared/src/health/hr-profile.ts:68`, plus the four routes that call it.
+- **Added:** 2026-09-08, Lane A — found while writing the hub's PS-39 tests, then measured by
+  failing each read in turn rather than read off the source.
+
+`GET /api/cardio-week` wraps nine of its eleven repository calls in `.catch(() => [])`, which is a
+clear statement that the hub should degrade rather than fail. **It does not, for two of them.**
+`resolveHrProfile` runs before the `Promise.all` and guards only one of its own three reads:
+
+```ts
+const [user, bodyMetrics, hrRows] = await Promise.all([
+  repo.getUserById(userId),                                            // unguarded
+  repo.listBodyMetrics(userId, from28dIso, todayIso),                  // unguarded
+  repo.getHrForWindow(userId, observedFrom, new Date()).catch(() => []),
+])
+```
+
+Measured by failing each read in turn: `getUserById` and `listBodyMetrics` take the whole route
+down; the other five are absorbed. **So the route's own four `.catch`es on `listBodyMetrics` are
+dead defence** — the profile has already thrown before any of them can run. `cardio-trends`,
+`hr-profile` and `zone-minutes` call the same resolver and inherit the same shape.
+
+**The asymmetry inside one `Promise.all` is the tell**: one of three lines has a catch. And the
+resolver is already built for missing data — `RESTING_HR_DEFAULT` covers no readings, and
+`ageFromDob` handles a null user — so it survives *empty* results and only dies on a *failed* read.
+
+**This is a design question, not an obvious bug, which is why it is filed rather than fixed.** A hub
+that paints a default resting HR of 60 as though it were measured may be worse than one that errors.
+Recommendation: **guard both and mark the profile as degraded** — add `restingHrSource: 'unavailable'`
+beside the existing `'measured' | 'default'`, so a consumer can tell "we know it is 60" from "we
+could not ask". That keeps the nine deliberate catches meaningful without inventing confidence.
+Cheap to reverse: two `.catch`es and one enum value.
+
 ### [nutrition][body] OR-102b — the reta tracker: vial setup, dose calculator, dose timeline, weight response
 
 - **Lane:** B — a new section under Nutrition, plus the supplement sheet.
@@ -1176,7 +1237,7 @@ repair the 22 dead backlog paths and 43 doubled `docs/overview/overview/` labels
 unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge candidates
 (led by `oura-ring-data-reference.md`, a retired-API reference with no retirement note).
 
-### [platform] PS-39 — 78 API routes still have no test that imports their handler
+### [platform] PS-39 — 75 API routes still have no test that imports their handler
 
 - **Lane:** A. Regenerate the list with `node scripts/check-route-test-coverage.js` — it prints every
   uncovered route when it fails, and the ratchet now holds the number.
@@ -1205,15 +1266,15 @@ unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge
     and `ai-periodization/session/[sessionId]` + `…/prescribe` + `…/respond` — each batched with the
     uncovered siblings it verifies alongside.
 
-**The count was 93 and is really 78**, by the mechanism the entry half-noticed: it counted a route
+**The count was 93 and is really 75**, by the mechanism the entry half-noticed: it counted a route
 covered when any test mentioned its URL, so `calendar-data` and `training-load` "appearing only as
 cache-key strings" counted. Asking instead whether a test imports the handler gives 150 of 222, less
-the seventy-two paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
+the seventy-five paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
 honest in both directions (see above), so the list can be worked from. **The actionable core
 named by this entry is now CLEAR**: the home aggregates, both ingest routes and `program-week` are
 done; so are ai-periodization, `friends/leaderboard`, the account cluster, the supplement/vial chain,
 a meal plan's lifecycle + reshape, the workout write path, the running plan and the four body/health
-writes, the goal-target-adherence loop, the home week/streak reads and the AI Coach lifecycle. Work by feature — batching on what is *verified together* twice found a defect (LA-78, LA-79). `scripts/check-route-test-coverage.js` ratchets it, so the debt
+writes, the goal-target-adherence loop, the home week/streak reads, the AI Coach lifecycle and the cardio hub. Work by feature — batching on what is *verified together* twice found a defect (LA-78, LA-79). `scripts/check-route-test-coverage.js` ratchets it, so the debt
 only shrinks, a NEW route arrives uncovered and fails, and since LA-81 a route that LOSES its test fails whatever the total does.
 
 ### [app-shell][platform] LA-76 — a deload PHASE still decays the collection, and nothing dates one
