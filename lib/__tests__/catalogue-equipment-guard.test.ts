@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { buildEquipmentSet, equipmentEligible } from '@trainingai/shared/workout/equipment'
+import { execSync } from 'node:child_process'
+import { join } from 'node:path'
 
 /**
  * BF-129 — an `exercise_library` row with no equipment passes EVERY equipment filter, because both
@@ -143,5 +145,46 @@ describe('buildEquipmentSet', () => {
 
   it('grants only what was ticked, plus bodyweight', () => {
     expect([...buildEquipmentSet(['cable'])].sort()).toEqual(['bodyweight', 'cable'])
+  })
+})
+
+/**
+ * LA-66 — the guard the behaviour tests above cannot give.
+ *
+ * They exercise the shared predicate, so they keep passing if a call site quietly stops calling it.
+ * `builder-review.tsx` was exactly that: BF-129 fixed two of the three byte-identical copies and
+ * left the third, still on the permissive `equipment.length === 0 ||` branch, deciding which
+ * alternatives the swap sheet offers. This searches instead of listing files, because the next copy
+ * will be in a file no list written today contains.
+ */
+describe('the equipment rule has one home (LA-66)', () => {
+  const root = join(__dirname, '..', '..')
+
+  /**
+   * Comment lines are dropped before matching, and this file is excluded.
+   *
+   * Written without that first, and it failed on its own doc comment and on the one in
+   * `app/api/exercises/route.ts` that quotes the removed branch to explain it — a check that reads
+   * its own prose, which is the class LA-72 measured and converted eleven of. A rule that fires on
+   * the sentence describing it teaches the next person to delete the sentence.
+   */
+  const grep = (pattern: string): string[] =>
+    execSync(`grep -rn ${JSON.stringify(pattern)} --include=*.ts --include=*.tsx app components lib packages || true`,
+      { cwd: root, encoding: 'utf8' })
+      .trim().split('\n').filter(Boolean)
+      .filter(line => {
+        const [file, , ...rest] = line.split(':')
+        if (file.endsWith('catalogue-equipment-guard.test.ts')) return false
+        return !/^\s*(\/\/|\*|\/\*)/.test(rest.join(':'))
+      })
+
+  it('no file re-declares buildEquipmentSet', () => {
+    const files = [...new Set(grep('function buildEquipmentSet').map(l => l.split(':')[0]))]
+    expect(files).toEqual(['packages/shared/src/workout/equipment.ts'])
+  })
+
+  it('and no call site re-implements the eligibility check inline', () => {
+    // The permissive shape BF-129 removed: an empty equipment list short-circuiting to eligible.
+    expect(grep('equipment.length === 0 ||'), 'the branch BF-129 removed, back at a call site').toEqual([])
   })
 })
