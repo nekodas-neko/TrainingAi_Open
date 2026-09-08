@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
-import { CheckIcon, SettingsIcon } from "lucide-react";
+import { CheckIcon, SettingsIcon, SyringeIcon } from "lucide-react";
 import { ManageSupplementsSheet } from "./manage-supplements-sheet";
+import { VialSheet } from "@/components/nutrition/reta/vial-sheet";
+import { isMilligramDosed } from "@/components/nutrition/reta/vial-plan";
 import { EmptyState } from "@/components/ui/empty-state";
 import { supplementSubtitle } from "@/components/nutrition/supplement-subtitle";
 import { applyManualToggle } from "@/components/nutrition/supplement-day-totals";
@@ -32,6 +34,7 @@ export function SupplementsSection({ supplements, loading, onChanged, userId , g
   const [toggling, setToggling] = useState<string | null>(null)
   const [promptFor, setPromptFor] = useState<SupplementWithStatus | null>(null)
   const [promptAmount, setPromptAmount] = useState('')
+  const [vialFor, setVialFor] = useState<SupplementWithStatus | null>(null)
 
   const active = supplements.filter(s => s.active)
 
@@ -144,13 +147,13 @@ export function SupplementsSection({ supplements, loading, onChanged, userId , g
         ) : (
           <div className="rounded-2xl bg-muted/40 border border-border overflow-hidden divide-y divide-border">
             {active.map(s => (
+              <div key={s.id} className="flex items-stretch">
               <button
-                key={s.id}
                 type="button"
                 onClick={() => toggleLog(s)}
                 disabled={toggling === s.id}
                 aria-pressed={s.loggedToday}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/60 transition-colors"
+                className="flex-1 min-w-0 flex items-center gap-3 px-4 py-3 hover:bg-muted/60 transition-colors"
               >
                 <div
                   className={cn(
@@ -173,10 +176,35 @@ export function SupplementsSection({ supplements, loading, onChanged, userId , g
                   )}
                 </div>
               </button>
+              {/* Shown for a milligram dose, which is the set a mg→syringe-units conversion means
+                  anything for. A heuristic, and the honest one available here: whether a supplement
+                  is injected is not a field, and the vial that would answer it properly is a
+                  per-supplement fetch this list must not make one of per row. */}
+              {isMilligramDosed(s) && (
+                <button
+                  type="button"
+                  onClick={() => setVialFor(s)}
+                  aria-label={`Vial and dose calculator for ${s.name}`}
+                  className="px-4 flex items-center border-l border-border text-muted-foreground hover:text-brand transition-colors"
+                >
+                  <SyringeIcon className="h-4 w-4" />
+                </button>
+              )}
+              </div>
             ))}
           </div>
         )}
       </div>
+
+      {vialFor && (
+        <VialSheet
+          open
+          onOpenChange={open => { if (!open) setVialFor(null) }}
+          supplementId={vialFor.id}
+          supplementName={vialFor.name}
+          defaultDoseMg={vialFor.defaultAmount ?? null}
+        />
+      )}
 
       {/* BF-112: the titration prompt. Confirming closes it and re-enters `toggleLog` with the
           number, which is the same path a plain tick takes — there is no second write path. */}
