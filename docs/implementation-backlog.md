@@ -1252,6 +1252,29 @@ unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge
     and `ai-periodization/session/[sessionId]` + `…/prescribe` + `…/respond` — each batched with the
     uncovered siblings it verifies alongside.
 
+**HOW THESE TESTS GO WRONG, measured across ten batches on 2026-09-08.** Every batch here ran a
+mutation pass, and the same defect appeared **three times** — always passing, always found by
+mutation and never by reading:
+
+> **A fixture that trips two rules at once tests neither.** The case names one guard; a different
+> guard rejects it first; deleting the named guard changes nothing.
+
+The three, so the shape is recognisable rather than abstract:
+
+- *"below the distance floor"* was 749 m over half an hour — 1.5 km/h, so the **speed** check
+  rejected it. Its sibling *"too slow"* was 166 m, rejected by the **distance** check.
+- *"the max-HR delta needs both windows reliable"* gave the prior window one reading. One reading
+  has no corroborated max at all, so `max != null` rejected it and the reliability guard was never
+  reached.
+- *"only the accepted change ids are written"* sent a patch of one change and accepted it — so
+  "accepted ids" and "all ids" were the same list.
+
+**The check, before writing the case:** if it is meant to fail on guard X, does it satisfy every
+other guard? And the cheap tell afterwards — mutate X away; a case that still passes was never
+testing X. Two more classes worth the same suspicion: a fixture whose timezone IS `DEFAULT_TZ`
+proves nothing about which zone the route read, and a fixture already in sorted order proves
+nothing about a sort.
+
 **The count was 93 and is really 70**, by the mechanism the entry half-noticed: it counted a route
 covered when any test mentioned its URL, so `calendar-data` and `training-load` "appearing only as
 cache-key strings" counted. Asking instead whether a test imports the handler gives 150 of 222, less
