@@ -9008,3 +9008,10 @@ the entry says more than it did; nothing else in this PR.
 ## 2026-09-08 — `docs/overview/entries/` total ceiling → 329 (LA-80, ninth PR running)
 
 328 → 329. Ninth consecutive raise, one per PR, as LA-80 describes.
+
+## 2026-09-08 — `docs/implementation-backlog.md` → 18883 (PS-39 gains the fixture trap)
+
+18860 → 18883. PS-39 now carries the defect its own batches kept producing: a fixture that trips two
+rules at once tests neither. Three instances in ten batches, every one passing, every one found by
+mutation rather than by reading. Raised because it belongs where the next batch is written from —
+the entry is what an implementer reads before starting, and the lesson was otherwise session-local.
