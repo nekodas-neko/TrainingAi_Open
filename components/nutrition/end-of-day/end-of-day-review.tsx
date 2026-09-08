@@ -24,6 +24,7 @@ import { JournalSection } from './journal-section'
 import { TodayInsightCard } from './today-insight-card'
 import { DayDigestCard } from './day-digest-card'
 import { DayReadThroughSection } from './day-read-through-section'
+import { DayTrendsSection } from './day-trends-section'
 import { visibleReviewSteps, STEP_TITLES } from './review-steps'
 
 interface BodyBattery {
@@ -243,6 +244,7 @@ export function EndOfDayReview({ open, onClose, mealTypes, logs, date, userId, t
                   day's totals, then the read-through those totals came out of (Q-112b). */}
               <DayDigestCard active={open} />
               <DaySummaryCard totals={totals} targets={targets} battery={battery} />
+              <DayTrendsSection date={date} />
               <DayReadThroughSection date={date} tz={tz} logs={logs} />
             </>
           )}
