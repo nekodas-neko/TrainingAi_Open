@@ -1776,7 +1776,7 @@ repair the 22 dead backlog paths and 43 doubled `docs/overview/overview/` labels
 unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge candidates
 (led by `oura-ring-data-reference.md`, a retired-API reference with no retirement note).
 
-### [platform] PS-39 — 54 API routes still have no test that imports their handler
+### [platform] PS-39 — 50 API routes still have no test that imports their handler
 
 - **Lane:** A. Regenerate the list with `node scripts/check-route-test-coverage.js` — it prints every
   uncovered route when it fails, and the ratchet now holds the number.
@@ -1839,16 +1839,16 @@ testing X. Two more classes worth the same suspicion: a fixture whose timezone I
 proves nothing about which zone the route read, and a fixture already in sorted order proves
 nothing about a sort.
 
-**The count was 93 and is really 54**, by the mechanism the entry half-noticed: it counted a route
+**The count was 93 and is really 50**, by the mechanism the entry half-noticed: it counted a route
 covered when any test mentioned its URL, so `calendar-data` and `training-load` "appearing only as
 cache-key strings" counted. Asking instead whether a test imports the handler gives 150 of 222, less
-the ninety-six paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
+the one hundred paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
 honest in both directions (see above), so the list can be worked from. **The actionable core
 named by this entry is now CLEAR**: the home aggregates, both ingest routes and `program-week` are
 done; so are ai-periodization, `friends/leaderboard` (its scoping was left uncovered when a mock
 could not see it, and is covered against real rows now), the account cluster, the supplement/vial chain,
 a meal plan's lifecycle + reshape, the workout write path, the running plan and the four body/health
-writes, the goal-target-adherence loop, the home week/streak reads, the AI Coach lifecycle, the cardio hub, the strength/volume trends, the day timeline, the food-input path, the four heart-rate reads, the exercise catalogue and the nutrition day-completion trio. Work by feature — batching on what is *verified together* twice found a defect (LA-78, LA-79). `scripts/check-route-test-coverage.js` ratchets it, so the debt
+writes, the goal-target-adherence loop, the home week/streak reads, the AI Coach lifecycle, the cardio hub, the strength/volume trends, the day timeline, the food-input path, the four heart-rate reads, the exercise catalogue, the nutrition day-completion trio and the platform-meta four. Work by feature — batching on what is *verified together* twice found a defect (LA-78, LA-79). `scripts/check-route-test-coverage.js` ratchets it, so the debt
 only shrinks, a NEW route arrives uncovered and fails, and since LA-81 a route that LOSES its test fails whatever the total does.
 
 ### [app-shell][platform] LA-76 — a deload PHASE still decays the collection, and nothing dates one
@@ -18912,6 +18912,33 @@ reads.
   merge. That fixes the *class* of "only CI sees test type errors" rather than this one shape, and it
   may make the bespoke check unnecessary.
 - **Reversal cost:** low — a script and a CI step, deletable.
+
+### [platform] LA-84 — a failed export produces a truncated file that looks complete
+
+- **Lane:** A — `app/api/export/route.ts`, and whatever consumes an export.
+- **Added:** 2026-09-08, Lane A — found while writing the route's first tests (PS-39), and pinned
+  there as current behaviour rather than fixed, because the remedy changes the file's contract.
+
+`exportUserData` is an async generator and the route enqueues each line as it arrives. **The
+response headers are already sent by the time it can throw**, so the `catch` cannot change the
+status: it logs to the console and closes the stream. The user gets a `200`, an
+`attachment; filename="trainingai-export-<date>.ndjson"`, and a file that ends wherever the failure
+happened — with nothing in it saying so.
+
+This is the takeout feature, so the whole point is that the file is a complete copy. A short one
+that looks complete is worse than an error, because the failure is only discoverable by counting
+rows against a database the user no longer has.
+
+**Why this is not a one-line fix.** The obvious remedy is a terminal `{ "_error": … }` line, which
+means the file's contract becomes *"the last line may be an error"* — every consumer has to know
+that, including the manifest-first shape the first line already establishes. A trailer that mirrors
+the manifest (`{"_complete": true}` on success, `{"_error": …}` otherwise) is probably the right
+answer, since it makes truncation detectable by absence rather than by presence, and a file cut off
+by a dropped connection then reads as incomplete too. That is a decision about the format, not a
+patch.
+
+- **Keep:** the test at `lib/__tests__/platform-meta-routes.test.ts` asserts the CURRENT behaviour
+  and says so; it will need inverting when this ships.
 
 ### [platform] LB-37 — bring the 320 recorded test-file type errors down
 
