@@ -8691,9 +8691,16 @@ Down 16. LA-72 asked which source-scanning checks needed a comment stripper and 
 The answer is now a test rather than an entry: `scripts/__tests__/check-comment-blindness.test.ts`
 measures it per check, so the next one is classified by running it rather than by reading it.
 
-## 2026-09-08 — `docs/implementation-backlog.md` → 18688 (LA-66 shipped)
+## 2026-09-08 — `docs/implementation-backlog.md` → 18662 (LA-66 shipped)
 
 Down 26 with nothing added back. LA-66 was a two-line change that needed a long entry only because
 it had to explain why deleting a third copy of a rule mattered when the rule's *behaviour* was
 already correct everywhere. That explanation now lives in the guard test that keeps it true, which
-is where it will be read.
+is where it will be read. Re-derived from the merged file after LA-60 (#942) landed under this
+branch.
+## 2026-09-07 — `docs/implementation-backlog.md` → 18725 (LA-60 shipped)
+
+Down 26. LA-60 was long because it could not choose between its two options without knowing what
+Railway runs, and said so. That question is now answered by measurement rather than argument —
+production stack traces place it on Node 22 — so the entry's whole "two candidate fixes" section is
+spent, and what replaces it is a CI rule that fails when the two disagree.
