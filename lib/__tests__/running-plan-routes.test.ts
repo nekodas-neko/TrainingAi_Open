@@ -234,15 +234,30 @@ describe('POST /api/running-plan — create', () => {
     expect((saveRunningPlan.mock.calls[0][1] as Row).frameworkKey).toBe('custom_block')
   })
 
-  it('validates the target date, storing null rather than a date-shaped string that is not a day', async () => {
-    // Both separators are accepted (the client's `localDateString()` emits slashes). The stored
-    // FORM is deliberately not asserted here — the route uses `normalizeDateParam`, which returns
-    // the slash form, against a Postgres `date` column; see LA-79.
-    await post({ goalKind: 'distance_event', targetDistanceKm: 21.1, targetDate: '2026/12/01' })
-    expect((saveRunningPlan.mock.calls[0][1] as Row).targetDate).toMatch(/^2026[-/]12[-/]01$/)
+  // LA-79. `target_date` is a Postgres `date` column, and the slash form is parsed under whatever
+  // `DateStyle` the server has — correct under the default `ISO, MDY`, day-and-month-swapped under
+  // `DMY`. Both separators are accepted on the way in (the client's `localDateString()` emits
+  // slashes); dashes are what gets stored.
+  it('stores the target date in the dash form a date column reads unambiguously', async () => {
+    for (const sent of ['2026/12/01', '2026-12-01']) {
+      saveRunningPlan.mockClear()
+      await post({ goalKind: 'distance_event', targetDistanceKm: 21.1, targetDate: sent })
+      expect((saveRunningPlan.mock.calls[0][1] as Row).targetDate).toBe('2026-12-01')
+    }
+  })
 
-    saveRunningPlan.mockClear()
-    await post({ goalKind: 'distance_event', targetDate: '2026-13-45' })
+  // Storing null silently left a distance-event plan with no deadline and no way to tell why.
+  it('refuses a date-shaped string that is not a real day, rather than dropping it', async () => {
+    for (const bad of ['2026-13-45', '2026-02-31', '0000-00-00', 'next tuesday']) {
+      const res = await post({ goalKind: 'distance_event', targetDate: bad })
+      expect(res.status).toBe(400)
+      expect(await res.json()).toEqual({ error: 'Invalid target date' })
+    }
+    expect(saveRunningPlan).not.toHaveBeenCalled()
+  })
+
+  it('leaves an omitted target date null without refusing anything', async () => {
+    expect((await post({ goalKind: 'heart_health' })).status).toBe(200)
     expect((saveRunningPlan.mock.calls[0][1] as Row).targetDate).toBeNull()
   })
 
