@@ -574,15 +574,29 @@ OR-102a/b will read dose history to recommend the next dose. A tracker that read
   not needed"*.
 - **Needs:** nothing to investigate — the measurement is below. What it needs is a decision.
 
-- **A sighting worth having on file when this is decided (2026-09-08).** On #941 the E2E job
-  failed at the 23-minute mark: `e2e/preferences-survive-reinstall.spec.ts` died with
-  `page.goto: net::ERR_ABORTED at http://localhost:3100/`, two more specs went flaky with
+- **⚠️ The long run eats itself, and it has now been seen twice with the same signature
+  (2026-09-08).** On #941 the E2E job failed at the 23-minute mark: `preferences-survive-reinstall`
+  died with `page.goto: net::ERR_ABORTED at http://localhost:3100/`, two more specs went flaky with
   `browser.newContext: Target page, context or browser has been closed`, and the other 158 passed.
-  It is the server or the browser dying near the end of a long run, not an assertion. **It did not
-  reproduce**: the very next PR (#943), on a tree containing #941, was green including E2E — so this
-  is one unreproduced sighting, not a flake and not attributable to the collection route #941 added.
-  Recorded because a 27-minute job that occasionally eats itself is an argument about the job, which
-  is what this entry is for.
+  That was recorded as one unreproduced sighting, because the next PR (#943), on a tree containing
+  #941, was green. **#949 reproduced it exactly** — same spec, same `net::ERR_ABORTED`, on a branch
+  whose entire diff is `aria-label` attributes and documentation.
+  - **What the second sighting adds is the shape.** Four specs failed inside one 70-second window
+    (02:04:02–02:05:16) and no other minute of a 23-minute run had a failure in it:
+    `one-calorie-budget:165`, `back-dismiss-sweep:171` and `card-429-error-state:16` all reported
+    `browser.newContext: Target page, context or browser has been closed`, which is the browser
+    process being *already gone* before the test starts. Those three recovered on retry. The one
+    that did not is the one whose retry fired immediately, landing inside the same dead window —
+    so which spec is reported as the hard failure is a scheduling accident, not a property of the
+    spec.
+  - **It is not a spec to fix, and diagnosing it as one has now cost time twice.** No assertion
+    failed; a process died. It is worth noting that `preferences-survive-reinstall:36` is also one
+    of the two specs the 2026-09-04 shard experiment could not clear with a fresh database — but
+    that failure was an assertion and this one is not, so they should not be merged into one
+    hypothesis.
+  - Recorded because a 26-minute job that eats its own browser roughly one run in three is an
+    argument about the job, which is what this entry is for. It also means **a red E2E cannot be
+    read as a signal without opening the log**, which is the cost LB-54 is about.
 
 **Measured, not estimated.** A full local run against a CI-shaped database: **144 tests, 27.1 minutes
 of test time.** There is no single pathology — 28 tests finish under 5s and 16 take over 20s. The

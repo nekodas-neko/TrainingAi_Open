@@ -8740,11 +8740,16 @@ file, and its required-checks list wrong about E2E) and on LB-56 (an E2E job tha
 minutes and did not reproduce). Evidence attached to the entry that will act on it, rather than a
 new entry nobody owns.
 
-## 2026-09-08 — `docs/implementation-backlog.md` → 18678 (LA-62 shipped)
+## 2026-09-08 — `docs/implementation-backlog.md` → 18692 (LA-62 shipped)
 
-Down 32 with nothing added back — 31 from removing LA-62's own entry, and one more that arrived
-with #945 on the base merged in before this landed; the number is recomputed from the merged file,
-never carried across from the branch. LA-62 needed a long entry because it had to explain how a rule
+Net down 18 from 18710, and it moved twice. Removing LA-62's own entry took it to 18678 — 31 lines,
+plus one that arrived with #945 on the base merged in before this landed; the number is recomputed
+from the merged file, never carried across from the branch. Then 14 went back on to LB-56, because
+this PR's E2E run reproduced a failure that entry had on file as unreproduced, and the second
+sighting carried the diagnosis the first one lacked (a browser process dying, taking whichever four
+specs were in the window). That is the entry doing its job: it exists to hold the evidence a
+decision about the E2E job will be made from, so evidence belongs in it rather than in a journal
+entry nobody will open when the decision is taken. LA-62 needed a long entry because it had to explain how a rule
 written to prevent the class had been reporting clean over code it never parsed; the fix is eighteen
 `aria-label`s and an empty baseline, and an empty baseline needs no entry to describe it — a file
 absent from the list must have zero, which is the whole rule.
