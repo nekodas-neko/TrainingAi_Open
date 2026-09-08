@@ -8992,3 +8992,11 @@ waits on the row count rather than on a fixed 250 ms. The entry owes nothing.
 ## 2026-09-08 — `docs/overview/entries/` total ceiling → 327 (LA-80, seventh PR running)
 
 326 → 327. Seventh consecutive raise, one per PR, as LA-80 describes.
+
+## 2026-09-08 — `docs/implementation-backlog.md` → 18860 (LA-82 sharpened)
+
+18847 → 18860. LA-82's recommendation was measured before implementing and turned out to be
+incomplete: guarding the resting-HR read is safe, guarding the age read shifts the estimated max
+184 → 190 for this owner — 6 bpm across the whole zone scale — with `maxHrSource` unable to
+distinguish it from an ordinary estimate. The second half now carries `Gate: owner`. Raised because
+the entry says more than it did; nothing else in this PR.

@@ -446,12 +446,25 @@ dead defence** — the profile has already thrown before any of them can run. `c
 resolver is already built for missing data — `RESTING_HR_DEFAULT` covers no readings, and
 `ageFromDob` handles a null user — so it survives *empty* results and only dies on a *failed* read.
 
-**This is a design question, not an obvious bug, which is why it is filed rather than fixed.** A hub
-that paints a default resting HR of 60 as though it were measured may be worse than one that errors.
-Recommendation: **guard both and mark the profile as degraded** — add `restingHrSource: 'unavailable'`
-beside the existing `'measured' | 'default'`, so a consumer can tell "we know it is 60" from "we
-could not ask". That keeps the nine deliberate catches meaningful without inventing confidence.
-Cheap to reverse: two `.catch`es and one enum value.
+**The two halves are not equally safe, and the first version of this entry missed that.** Measured
+2026-09-08 before implementing: they need different fixes, and one of them is the owner's.
+
+- **`listBodyMetrics` (resting HR) is safe to guard.** `restingHrSource` already distinguishes
+  `'measured'` from `'default'`, so adding `'unavailable'` makes a failed read legible rather than
+  silently confident. Two lines, cheap to reverse.
+- **`getUserById` (age) silently moves the training zones, and nothing marks it.** Age feeds
+  `hrMaxFromAge`, which returns `220 − age` or **190** when there is no age. For this owner that is
+  **184 → 190, a 6 bpm shift across the whole zone scale** — and `maxHrSource` still reads
+  `'estimated'`, identical to the ordinary estimated case. So guarding it without a marker converts
+  a loud failure into a quiet wrong answer, which is the shape this repo keeps paying for.
+
+- **Gate:** owner — for the second half only. Two questions, and neither is derivable from the code:
+  whether a degraded profile should render zones at all (a quota measured against a guessed max is
+  wrong in a way the screen cannot show), and whether the marker belongs on `maxHrSource` as a new
+  value or as a separate `degraded` flag. Only one consumer reads the source today
+  (`app/api/hr-profile/route.ts:49`, as `workingMaxSource`), so either shape is cheap to wire.
+
+Ship the resting half whenever; it needs no decision.
 
 ### [nutrition][body] OR-102b — the reta tracker: vial setup, dose calculator, dose timeline, weight response
 
