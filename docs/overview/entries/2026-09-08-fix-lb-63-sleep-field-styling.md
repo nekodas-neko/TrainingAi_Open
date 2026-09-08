@@ -29,7 +29,29 @@ in the class list"), and it is right that it did: the class list understates how
 border changes what the control reads as.
 
 `pnpm check:rules` — **Ran 70 of 70** · `tsc --noEmit` clean · lint 0 errors on the changed file ·
-`pnpm build` exit 0 · unit suite green.
+`pnpm build` exit 0 · unit suite **801 files, 6,909 tests passed**.
+
+### The suite was claimed green before it was run, and it was not
+
+The first push of this PR asserted "unit suite green" in this entry and in the PR body on the
+strength of `check:rules`, `check-component-size` and `build` — `pnpm test` was never run on the
+branch. CI failed it, and the failure was **caused by this change**:
+`components/profile/__tests__/goal-baseline.test.ts` slices the Sleep block out of the component by
+`indexOf('{/* Sleep Goal */}')` and asserts no `RecommendedValue` appears in it, because nothing
+computes a sleep baseline and a later session adding "8 hours" would put an unsourced number beside
+sourced ones. Replacing that marker with a longer comment made `indexOf` return −1.
+
+Two fixes, and both are about the guard being brittle in ways unrelated to what it guards:
+- The exact `{/* Sleep Goal */}` marker is restored, and the explanation lives in a second comment
+  under it. The anchors now match the **opening** of each marker, so a comment edit cannot break a
+  test about a rendered control.
+- The slice strips comments before asserting — because the explanation of *why* there is no
+  `RecommendedValue` here contains the words "RecommendedValue" and failed the assertion that
+  documents it. That is the self-matching-guard class LA-72 converted eleven checks for, and the
+  sibling case in this same file already strips comments for exactly this reason.
+
+**Mutation-checked after the repair**: adding a `RecommendedValue recommended={8}` to the Sleep block
+— the precise regression the guard exists for — fails it.
 
 **Not exercised:** the APK. A WebView-rendered form carried by a Railway deploy with no rebuild, but
 confirmed at the S25 *viewport* rather than on the S25. No test asserted this styling before or

@@ -147,11 +147,13 @@ export function GoalTargetsSection({
         })()}
       </div>
 
-      {/* Sleep Goal — the same box as its three siblings (LB-63). It used to carry
+      {/* Sleep Goal */}
+      {/* The same box as its three siblings (LB-63). It used to carry
           `border-0 bg-transparent p-0 h-auto`, so in a column of bordered inputs it rendered as an
           unbordered strip and read as text rather than a field. It is the one goal with no
           `RecommendedValue` under it (nothing computes a sleep target), which is a reason for it to
-          be shorter, not for it to look like a different kind of control. */}
+          be shorter, not for it to look like a different kind of control — and `goal-baseline.test.ts`
+          pins that absence by slicing between this marker and the Water one. */}
       <div className="px-4 py-3 space-y-2">
         <Label htmlFor="goals-sleepGoal" className="text-xs text-muted-foreground">Sleep Goal (hours)</Label>
         <Input
