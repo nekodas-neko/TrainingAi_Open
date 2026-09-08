@@ -399,6 +399,26 @@ below threshold and left in place for next time.
 
 
 
+### [platform] LA-80 — the journal's entry ceiling is now binding, and a sweep alone cannot clear it
+
+- **Lane:** O — `docs/overview/entries/`, plus the durable docs that cite it.
+- **Added:** 2026-09-08, Lane A — hit while landing a PS-39 journal entry, then read out of the
+  checker rather than guessed.
+
+`docs/overview/entries/` holds **321** files against a 320 ceiling, so the next feature PR fails
+`check-doc-index-size` on its own journal entry. The ceiling was raised to 321 to land that PR; that
+is a stopgap and the number moves again at 322.
+
+**The compaction chore does not fix this, which is the part worth knowing before starting.** A
+durable doc citing an entry exempts it from folding, and **292 of the 321 are cited** — only **29**
+are foldable. Two sweep branches are already in flight (`chore/fold-journal-entries`,
+`chore/fold-unlinked-journal-entries-0908`) and between them reach at most those 29.
+
+So the work is the citations, not the entries: the durable docs (`projectOverview.md`, the backlog,
+the domain indexes) need to point at the batched `docs/overview/history-*.md` for anything old
+enough to have been folded, after which the fold is unblocked and the directory can shrink to a
+recent window again. Doing it the other way round — folding first — breaks 292 live links.
+
 ### [nutrition][body] OR-102b — the reta tracker: vial setup, dose calculator, dose timeline, weight response
 
 - **Lane:** B — a new section under Nutrition, plus the supplement sheet.
@@ -1156,7 +1176,7 @@ repair the 22 dead backlog paths and 43 doubled `docs/overview/overview/` labels
 unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge candidates
 (led by `oura-ring-data-reference.md`, a retired-API reference with no retirement note).
 
-### [platform] PS-39 — 96 API routes still have no test that imports their handler
+### [platform] PS-39 — 92 API routes still have no test that imports their handler
 
 - **Lane:** A. Regenerate the list with `node scripts/check-route-test-coverage.js` — it prints every
   uncovered route when it fails, and the ratchet now holds the number.
@@ -1185,15 +1205,15 @@ unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge
     and `ai-periodization/session/[sessionId]` + `…/prescribe` + `…/respond` — each batched with the
     uncovered siblings it verifies alongside.
 
-**The count was 93 and is really 96**, by the mechanism the entry half-noticed: it counted a route
+**The count was 93 and is really 92**, by the mechanism the entry half-noticed: it counted a route
 covered when any test mentioned its URL, so `calendar-data` and `training-load` "appearing only as
 cache-key strings" counted. Asking instead whether a test imports the handler gives 150 of 222, less
-the fifty-four paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
+the fifty-eight paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
 honest in both directions (see above), so the list can be worked from. **The actionable core
 named by this entry is now CLEAR**: the home aggregates, both ingest routes and `program-week` are
-done; so are ai-periodization, the social graph bar `friends/leaderboard`, the account cluster, the
-supplement/vial chain, a meal plan's lifecycle + reshape, the workout write path and the running
-plan. Work by feature. `scripts/check-route-test-coverage.js` is the ratchet, so the debt can only
+done; so are ai-periodization, `friends/leaderboard`, the account cluster, the supplement/vial chain,
+a meal plan's lifecycle + reshape, the workout write path, the running plan and the four body/health
+writes. Work by feature — batching on what is *verified together* twice found a defect (LA-78, LA-79). `scripts/check-route-test-coverage.js` is the ratchet, so the debt can only
 shrink and a NEW route arrives uncovered and fails — which is the half that matters.
 
 ### [app-shell][platform] LA-76 — a deload PHASE still decays the collection, and nothing dates one
