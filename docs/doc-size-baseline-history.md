@@ -8770,3 +8770,17 @@ of one role run the same chore.
 
 What survived is the half #947 missed: it created the batch file and left this row pointing at
 `history-2026-09-06.md`, so the newest archive was one nothing routed a reader to.
+
+## 2026-09-08 — `docs/implementation-backlog.md` → 18694 (LA-75 shipped)
+
+Up 2 on balance: LA-75's own 15-line entry came out, and LB-63 went in at 17. That is a net add for
+a PR that closed an item, which is worth stating rather than hiding — the new entry exists because
+looking at the screen LA-75 changed showed a second thing wrong with it, and CLAUDE.md's **No
+orphaned findings** rule makes recording that mandatory, not optional. The alternative was to fix
+both in one PR, which would have mixed a design judgement (how an input is drawn) into a
+correctness fix (a placeholder claiming a number the app never recommends).
+
+The number is 18694 rather than the 18711 this branch computed before LA-62 landed underneath it.
+Recomputing from the merged file is the rule, and this is why: the +2 is a property of the diff and
+survives any base, while the absolute figure belongs to whatever `main` happens to be when the PR
+merges.

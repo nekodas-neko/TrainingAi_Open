@@ -94,6 +94,17 @@ export function GoalTargetsSection({
         </div>
       </div>
 
+      {/* Every placeholder on this form names a UNIT, never a number, and that is deliberate (LA-75).
+          A number in a goal field reads as advice, and the advice is already on screen — the
+          `RecommendedValue` below each field is the app's own computed figure with a button that
+          applies it. The two disagreed: the water field suggested 2500 while the recommender
+          produces `weightKg * 33` plus an activity bump, and the steps field suggested 10,000 while
+          a sedentary profile is recommended 7,000. It is worst where `RecommendedValue` renders
+          nothing — on an incomplete profile it hides rather than guess, leaving the placeholder as
+          the only figure on screen and no recommendation for it to contradict. The unit is also the
+          one thing the field genuinely needs to say: all three toggles store a DAILY figure and
+          multiply by 7 only for the bar, so "per day" holds in Weekly mode too. */}
+
       {/* Steps Goal */}
       <div className="px-4 py-3 space-y-2">
         <Label htmlFor="goals-stepsGoal" className="text-xs text-muted-foreground">Steps Goal</Label>
@@ -102,7 +113,7 @@ export function GoalTargetsSection({
           id="goals-stepsGoal"
           value={stepsGoalStr}
           onChange={e => onStepsGoalChange(e.target.value)}
-          placeholder="10000"
+          placeholder="steps per day"
           min={1000}
           step={500}
           className="border-border bg-muted/60 text-sm font-medium"
@@ -144,7 +155,7 @@ export function GoalTargetsSection({
           id="goals-sleepGoal"
           value={sleepGoalStr}
           onChange={e => onSleepGoalChange(e.target.value)}
-          placeholder="8"
+          placeholder="hours per night"
           min={4}
           max={12}
           step={0.5}
@@ -160,7 +171,7 @@ export function GoalTargetsSection({
           id="goals-waterGoal"
           value={waterGoalStr}
           onChange={e => onWaterGoalChange(e.target.value)}
-          placeholder="2500"
+          placeholder="ml per day"
           min={500}
           step={250}
           className="border-border bg-muted/60 text-sm font-medium"
@@ -201,7 +212,7 @@ export function GoalTargetsSection({
           id="goals-calorieGoal"
           value={calorieGoalStr}
           onChange={e => onCalorieGoalChange(e.target.value)}
-          placeholder="e.g. 2500"
+          placeholder="kcal per day"
           className="border-border bg-muted/60 text-sm font-medium"
         />
         <div className="flex items-center gap-0.5 rounded-xl bg-muted p-0.5 text-xs font-semibold border border-border self-start">

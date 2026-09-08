@@ -26,8 +26,8 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.436.28 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-09-07.
+**Version:** v1.437.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-09-08.
 
 
 **The baseline banner told him to load 82.5 kg on a pull-up (BF-127).** Owner, mid-session: *"pull

@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.437.1",
+    date: "2026-09-08",
+    changes: [
+      "The goal fields on the Goals screen no longer show an example number in the empty box. They say what the field wants \u2014 \u0027ml per day\u0027, \u0027kcal per day\u0027 \u2014 because the number the app actually recommends for you is on the button right below each one, and the two did not agree.",
+    ],
+  },
+  {
     version: "1.437.0",
     date: "2026-09-07",
     changes: [
