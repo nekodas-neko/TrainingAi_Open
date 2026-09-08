@@ -8819,3 +8819,11 @@ The number is 18733 rather than the 18717 this branch computed, because Q-112d l
 and took the file to 18710. Recomputed from the merged file, per the rule — and the +23 is unchanged
 across the rebase, which is the point: the delta belongs to the diff, the absolute belongs to
 whatever `main` is when the PR merges.
+
+## 2026-09-08 — `docs/implementation-backlog.md` → 18716 (LB-63 shipped)
+
+Down 17 with nothing added back, which is what a one-line fix should cost the index. LB-63 was filed
+in the first place because the defect was seen in a screenshot taken to verify a different change,
+and it was deliberately not fixed there — restyling a control inside a copy fix would have mixed a
+design judgement into a correctness one. It cost 17 lines to carry that judgement between two PRs
+rather than losing it.

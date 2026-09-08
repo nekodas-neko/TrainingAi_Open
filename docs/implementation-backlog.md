@@ -18171,23 +18171,6 @@ reads.
 - **Reversal cost:** low, one line — but it is seen everywhere, so it wants the owner's eye before
   it lands.
 
-### [app-shell] LB-63 — one field on the goals form is drawn as a different kind of control from its three siblings
-
-- **Lane:** B — `components/profile/goal-targets-section.tsx:147` (the Sleep Goal input's `className`).
-- **Added:** 2026-09-08 · Lane B, seen on screen while shipping LA-75 on the same form.
-- **What it looks like.** Steps, Water and Calories are `border-border bg-muted/60` — bordered boxes
-  that read as text fields. Sleep alone carries `border-0 bg-transparent p-0 h-auto` plus a dimmer
-  `placeholder:text-muted-foreground/50`, so on the S25 it renders as an unbordered strip while the
-  three fields around it render as inputs. LA-75's longer placeholder makes it more obvious, but the
-  divergence predates it — the file was extracted whole in one commit, so there is no blame trail and
-  no comment saying the difference is meant.
-- **Left alone deliberately, and this entry is why.** LA-75 was a copy fix on the same four fields;
-  restyling a control in the same PR would have mixed a design judgement into a correctness one and
-  made the diff harder to read. Filed under **No orphaned findings** rather than queued as urgent.
-- **What it needs is a look, not a decision.** Almost certainly the sleep field should just match its
-  siblings. Confirm on the S25 first — the difference is much clearer rendered than in the class list.
-- **Reversal cost:** one line.
-
 ### [platform] LB-62 — a zero-argument `vi.fn` whose recorded calls are then indexed; red `main` three times in one day
 
 - **Lane:** A — `scripts/` (a new Custom Rules check).
