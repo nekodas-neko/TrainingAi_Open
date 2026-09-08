@@ -9051,6 +9051,35 @@ the argument for the checklist, so it belongs beside it rather than in a journal
 
 329 → 330. Tenth consecutive raise, one per PR, as LA-80 describes.
 
+## 2026-09-09 — `docs/implementation-backlog.md` 19252 → 19258 (+159 across the PR), TN-27, TN-28 and TN-29
+
+The owner reported the Nutrition tab's Calorie Nudge claiming a measured maintenance of 2,245 kcal
+against a measured RMR of 1,325 and a scale that has barely moved. It reproduces exactly, and the
+arithmetic is correct — the estimator picked the wrong window.
+
+Most of the 83 lines are the two tables that carry the finding, and neither compresses. The first
+shows the 28-day and 14-day windows side by side with an **identical mean intake of 1,612 kcal**,
+which is what proves `MIN_LOGGED_FRACTION` cannot distinguish them: it gates the mean, the mean is
+the same, and the entire 591 kcal spread is the weight slope, which nothing gates at all. The second
+is the window sweep — 2,414 at ten days down to 1,654 at twenty-eight — because a 760 kcal range
+produced by nothing but window length is the evidence that the slope is noise-dominated, and a
+sentence asserting it would not be.
+
+TN-28 is short and rides along: the nudge card writes the number into the calorie goal on one tap
+while omitting the `low confidence, 10 of 14 days logged` qualifier that both its sibling cards
+already render from the same payload.
+The same PR then grew by a further 69 lines for **TN-29**, which is the entry that actually resolves
+the owner's question and outranks TN-27's three window options. `computeEnergyBalance` computes two
+independent maintenance estimates on every request — one from intake and scale weight, one from
+resting rate plus measured movement — and compares them never. Run over the same 28 days the second
+gives **1,895 kcal**, against the **2,245** that shipped.
+
+The table that carries it is the one that cannot be cut: dividing each estimate by the measured
+resting rate of 1,345 turns them into activity factors of 1.23, 1.26, **1.41** and **1.67**, and
+1.67 for someone averaging 3,572 steps a day is visibly not a metabolism. That reframing is the
+proposal — make Q-517's one-sided BMR floor two-sided — and it does not survive being compressed
+into a sentence, because the argument is the arithmetic.
+
 ## 2026-09-08 — `docs/implementation-backlog.md` 18,977 → 19,006 (+29), BF-131 amended
 
 The owner asked why the baseline was not generated from the AMRAP automatically, and the trace that
@@ -9140,6 +9169,67 @@ against the merge base — so a stale branch reads as a regression it did not ca
 right and the branch was old. Confirmed before acting by stashing the changes and re-running against
 a clean tree, which reproduced it, and then by fetching `origin/main` and finding the new commit.
 
-## 2026-09-08 — `docs/overview/entries/` total ceiling → 332 (LA-80, twelfth PR running)
+The owner then signed off both recommendations the same day (*"make all the changes you recommend"*),
+which added six more lines: TN-27's `Gate: owner` bullet became a dated decision record naming option
+3, TN-29 gained an approval line, and the two deferred options carry a sentence each on the second
+signal they need — slope standard error, and a per-user "logging began" date — so a later session
+does not re-derive why the cheap fixes went first.
 
-331 → 332. Twelfth consecutive raise, one per PR, as LA-80 describes.
+
+## 2026-09-08 — `docs/implementation-backlog.md` → 19252, the guided-walk batch (TN-24, TN-25, TN-26)
+
+Three entries and a review answering the owner's question about making the interval walk more
+efficient. The measurements are what take the room, and each is load-bearing rather than
+illustrative.
+
+**TN-24** — Zone 1 spans **52–122 bpm** for this owner, 60% of the whole range, so walking and
+lifting can never reach Zone 2 and the walk's zone bar carries no information. That is also Q-523's
+mechanism, open for weeks. The prescription contradicts itself twice over: a 68–97 bpm band labelled
+*"Zone-2 aerobic"*, and a rationale describing a steady session while the app runs intervals.
+
+**TN-25** — the fast target of ≥133 bpm (0.70 of reserve) has been met **0 of 44 times**; fast blocks
+average **98.5 bpm**, which is the app's *slow* target of 98. `classifyZone` has therefore rendered
+"push" on 100% of fast intervals across ten sessions — the Q-504 failure shown live. Closing the
+34.7 bpm gap at the measured 0.288 bpm/spm would need 233 spm, so the target is not reachable by
+walking and the three options are a product choice.
+
+**TN-26** — rewritten mid-PR after the owner declined tuning to the treadmill. Cadence and speed mean
+different things on every surface (120 spm is 4.0 km/h indoors at a 0.556 m stride, 5.3 km/h outdoors
+at 0.739 m) while % of heart-rate reserve transfers unchanged, so the prescription moves to heart
+rate and the controls become observations. The ⛔ line is the part worth keeping: two indoor speed
+points extrapolate 70% reserve to ~12.9 km/h, and the owner's proposed cadence tweak is worth ≈+2 bpm
+against a 34.7 bpm shortfall — which is why the control is the wrong lever rather than one needing a
+bigger setting.
+
+## 2026-09-09 — `docs/agents/state/tuning.md` 395 → 430 (+35), the baton rewritten to 2026-09-09
+
+The `Now` and `Next` sections were still dated 2026-08-26 and shrank by eight lines when rewritten
+against reality — the twenty-odd earlier entries collapse to one paragraph of "still queued, none
+blocked" now that their state is stable, and the six new entries carry the table instead.
+
+The growth is all in `Do not re-litigate`, which is the half that earns its length. Ten lessons went
+in, and the load-bearing one is general: **when a model computes the same quantity twice, the
+disagreement is the finding** — `computeEnergyBalance` derives maintenance two independent ways on
+every request and lets the first silently override the second, reading 2,245 against 1,895 over one
+window. Beside it sit the two that make that finding cheap to reach next time: divide any expenditure
+figure by the measured resting rate before believing it (2,245 ÷ 1,345 = 1.67, which is legible where
+the kcal figure is not), and distrust a coverage ratio whose numerator cannot grow.
+
+Two are process rather than physiology and both cost real time this session: `claude_ro`'s date
+columns are text, and a branch cut from a shallow clone has no merge base after unshallowing — it
+reads as slow CI and can never merge, so rebuild it rather than fight the history.
+
+## 2026-09-08 — `docs/overview/entries/` folded 331 → 292 (the second sweep of the day)
+
+The directory hit its **331 ceiling** and every implementer PR that writes a journal entry — which is
+all of them — began failing on it. Three other agents had PRs open at the time. This is a shared
+blocker rather than one branch's problem, which is why it went out on its own before anything else.
+
+39 unlinked entries folded into `history-2026-09-08.md`, which #947 created earlier the same day, so
+the batch file is appended rather than duplicated. Only entries **no other document links to** were
+folded, and `check-doc-links` passes on 1,032 files afterwards, so no citation broke.
+
+**The ceiling is not raised, deliberately.** The check's own message is the argument: only 40 of the
+331 were foldable, so the other 292 are pinned by durable docs citing them directly. A sweep buys
+room; it does not fix the shape. Raising the number would trade the one signal that says so for
+another few weeks of quiet.
