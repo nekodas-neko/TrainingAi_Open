@@ -610,7 +610,7 @@ between a treadmill walk and an outdoor walk without any surface-specific adjust
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-08 · owner: *"what makes it effective is the 2 speeds — should I be walking faster or slower during any phases?"*
 - **Lane: A** — `components/guided-walk/walk-active.tsx:67-68` sets the targets; `classifyZone` in `hr-zones.ts` renders the verdict.
-- **Reference:** [`review`](reviews/2026-09-08-walk-intensity-calibration.md) (addendum). Sibling of **TN-24**; fix together or in either order.
+- **Reference:** [`review`](reviews/2026-09-08-walk-intensity-calibration.md) (**addendum 4** carries the amendment below). Sibling of **TN-24**; fix together or in either order.
 - **Gate: owner** — the three options below are a product choice, not a calibration.
 
 `walk-active.tsx:67-68` sets the pacer from the app's own Karvonen helper: **fast ≥ 0.70 of reserve,
@@ -633,7 +633,45 @@ needs **+121 spm → 233 spm**. The 0.70 fraction is right for the protocol and 
 mode: guided interval walking is validated largely in older adults, for whom brisk walking does reach
 70% of reserve; a 33-year-old with a 168 max cannot on flat ground at a 0.739 m stride.
 
-**Three options — owner's choice:**
+**⚑ AMENDED 2026-09-09 — a FOURTH option, and it supersedes the three below.** The owner asked
+whether the session is working correctly and whether continuous brisk walking would beat it. Both
+questions have the same answer, and it is that **133 bpm is not Zone 2 for this owner under the model
+the session's own copy is written in.**
+
+| model | Zone 2 is | for this owner |
+|---|---|---|
+| **% of HRmax** — where *"conversational aerobic"* comes from | 60–70% of max | **101–118 bpm** |
+| **% of reserve** (Karvonen) — what `ZONE_DEFS` uses | 60–70% of reserve | **122–133 bpm** |
+
+**The prescription takes its words from one model and its thresholds from the other**, and for a
+resting HR of 52 they differ by **21 bpm**. Fast blocks average **98.5 bpm = 58.6% HRmax**, just under
+classic Zone 2; the best block reached **115 = 68.5% HRmax**, inside it. **17 of 44 fast blocks
+already reached 101+ bpm and `classifyZone` said "push" on every one.** That is the fourth
+contradiction in this prescription and the one that explains the other three.
+
+**Zone-2 minutes is the metric worth trending, and it is surface-independent** (no speed, no cadence).
+Across 318 minutes walked in 11 sessions:
+
+| | Z2 min/week |
+|---|---|
+| today, intervals as executed | **~13** |
+| intervals, if every fast block reached 105–115 | ~29 |
+| **30 min continuous at 105+ bpm** | **~60** |
+
+**4. ✅ RECOMMENDED — a 30-minute continuous brisk walk against one band, 105–118 bpm.** Roughly
+quadruples Z2 minutes for the same 30 minutes of the owner's time; one instruction instead of two
+speeds that cannot be separated enough for the structure to pay for itself. Contrast measures
+**7.7 bpm** (range 4.4–10.0), so the session is already a continuous walk with a wobble — and a
+genuinely hard fast half needs **233 spm**, which is a jog. **Keep the intervals only if the owner
+will jog them.** Reversal cost is a target constant and a session label.
+
+**⛔ Continuous at the CURRENT fast pace gives ZERO Z2 minutes** — 98.5 bpm sits 3 bpm under the
+floor. The continuous option wins only at a genuinely brisker hold.
+
+**⛔ Do not read this as "Karvonen is wrong".** `hr-zones.ts` is internally consistent; the defect is
+one prescription drawing copy from one model and thresholds from another.
+
+**The original three options — kept, all now second-best:**
 1. **Make the fast block a jog or an incline** — keeps the 70% target honest and the protocol intact.
 2. **Re-anchor the fast target to what walking reaches** (~50–55% reserve = 110–116 bpm) **and rename
    the session** so it stops claiming a stimulus it does not deliver.

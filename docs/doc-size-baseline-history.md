@@ -9280,3 +9280,37 @@ merge *before* this one had committed that file with its markers still in it, re
 file and missed here. Nothing had been pushed, so the cost was three lines. The tell is worth keeping:
 `grep -c '^<<<<<<<' ` on the file, not a reading of the diff, is what found it, because the markers sit
 9,000 lines into a document nobody reads end to end.
+
+## 2026-09-09 — `docs/implementation-backlog.md` → 19430, TN-25 amended with a fourth option
+
+The owner asked whether the guided walk is working correctly and whether 30 minutes of continuous
+brisk walking would beat it. Both questions have one answer, and it retires the premise the entry's
+three existing options were built on: **133 bpm is not Zone 2 for this owner under the model the
+session's own copy is written in.**
+
+The table that carries it cannot be cut. *"Conversational aerobic"* is language from the %HRmax model,
+where Zone 2 is **101–118 bpm** for a max of 168; `ZONE_DEFS` sets thresholds from the %HR-reserve
+model, where it is **122–133**. For a resting HR of 52 the two differ by 21 bpm, which is the entire
+gap this review has been measuring — so the owner has been following the words while the app graded
+him against the numbers. **17 of 44 fast blocks already reached 101+ bpm and the pacer said "push" on
+every one.**
+
+The second table is the decision: at classic Zone-2 intensity the current intervals yield ~13
+min/week, intervals with genuinely brisk fast blocks ~29, and a 30-minute continuous walk at 105+
+about **60** — for the same 30 minutes of the owner's time. The two ⛔ lines stop the obvious
+misreadings: continuous at the *current* fast pace yields zero, because 98.5 bpm sits three under the
+floor; and none of this makes the Karvonen model wrong, since `hr-zones.ts` is internally consistent
+and the defect is one prescription mixing two models.
+
+## 2026-09-09 — `docs/agents/state/tuning.md` 430 → 449 (+19), the zone-model lesson
+
+Four lessons from TN-25's amendment, and the first is the one a successor most needs before touching
+any heart-rate prescription: **"Zone 2" means two different things and this app mixes them.** The
+guided walk's copy is written in the %HRmax model and its thresholds come from the %HR-reserve model,
+which for a resting HR of 52 differ by 21 bpm — three addenda were spent measuring that gap before
+anyone checked which model the words assumed.
+
+The other three keep the next session honest about the same data: the observed max of 168 is a floor
+rather than a test, Zone-2 *minutes* is the metric rather than target compliance, and an interval
+protocol earns its structure only through contrast — 7.7 bpm here, which is a continuous walk with a
+wobble in it.

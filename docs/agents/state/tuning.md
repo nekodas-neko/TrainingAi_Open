@@ -29,7 +29,7 @@ say so plainly rather than re-measuring the pillar a fourth time.
 | ID | What | State |
 |---|---|---|
 | **TN-24** | Zone 1 spans 52–122 bpm, so Zone 2 is unreachable on foot and the walk's zone bar carries nothing | supplies **Q-523's** mechanism; PR #998 |
-| **TN-25** | the walk's fast target (≥133 bpm) met **0 of 44 times**; fast blocks average the slow target | **`Gate: owner`** — three options, unanswered |
+| **TN-25** | the walk's fast target (≥133 bpm) met **0 of 44 times**; fast blocks average the slow target | **`Gate: owner`** — **amended 2026-09-09 with a recommended 4th option** |
 | **TN-26** | cadence and speed mean different things per surface; prescribe heart rate, demote the controls | rewritten after the owner declined treadmill tuning |
 | **TN-27** | maintenance rejects its 28-day window and falls back to the noisy 14-day one → **2,245 kcal** | **owner chose option 3**, after TN-29 |
 | **TN-28** | the one card that writes the calorie goal hides the `low confidence` its siblings show | Lane B, independent |
@@ -402,6 +402,25 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
   at `total_count: 0` looking like slow CI; the branch could never merge and no amount of re-merging
   fixes it. **Rebuild the content on a fresh `origin/main` branch and close the original** — for a
   docs-only PR that is ten minutes, and fighting the history is not.
+- **⛔⛔ "ZONE 2" MEANS TWO DIFFERENT THINGS AND THIS APP MIXES THEM (TN-25, addendum 4).** The guided
+  walk's copy says *"conversational Zone-2 aerobic"* — language from the **%HRmax** model, where Z2 is
+  **101–118 bpm** for the owner — while `ZONE_DEFS` sets thresholds from the **%HR-reserve** model,
+  where it is **122–133**. At a resting HR of 52 the two differ by **21 bpm**, which is the whole gap
+  three addenda spent measuring. **17 of 44 fast blocks already reached 101+ and the pacer said "push"
+  on every one.** Before calling a target unreachable, check WHICH zone model the copy beside it
+  assumes — `hr-zones.ts` is internally consistent and neither model is wrong.
+- **The owner's observed max of 168 is a FLOOR, not a test** (63 samples at 160+, so not an artefact;
+  age-predicted is ~180–187). A higher true max moves classic Z2 up and makes the walks look easier —
+  state that direction rather than treating 168 as measured.
+- **Trend Z2 MINUTES, not target compliance.** Across 318 minutes walked in 11 sessions the owner gets
+  **~13 min/week** at ≥101 bpm; brisk fast blocks would give ~29 and a 30-min continuous walk at 105+
+  about **60**. **⛔ Continuous at the CURRENT fast pace gives zero** — 98.5 sits 3 bpm under the floor.
+  Two sessions (2026-08-18, 2026-09-02) already produced 18–21 minutes in band, so this is an
+  execution range and not a ceiling.
+- **An interval protocol earns its structure only through CONTRAST.** Fast-minus-slow measures
+  **7.7 bpm** here (4.4–10.0 per session), so the session is a continuous walk with a wobble, and a
+  genuinely hard fast half needs 233 spm — a jog. **Do not defend an interval structure whose contrast
+  is within noise of its own blocks.**
 - **The threshold is usually right and the input usually wrong** — Q-506, Q-512, Q-514, now TN-6.
   Check the input's distribution before touching any constant.
 - **Do NOT lift the sleep scale toward its old mean** — sleep/readiness agreeing is load-bearing for

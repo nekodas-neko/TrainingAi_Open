@@ -386,3 +386,74 @@ longer blocks TN-25 — the fast-block reserve fraction is answerable from HR da
 The owner's proposed tweak (slow 90→100 spm, fast 120→130 spm) is worth ≈**+0.9** and **+1.3 bpm**
 against a **34.7 bpm** shortfall — the clearest single piece of evidence that the control is the
 wrong lever rather than one that needs a bigger setting.
+
+---
+
+## Addendum 4 — the fourth contradiction: two zone models, and the app mixes them
+
+**Owner, 2026-09-09:** *"is it working correctly I guess is the question — would it be more beneficial
+to just speed walk for the 30 minutes instead… IS that the goal; do we want more Z2 time?"*
+
+This addendum supersedes TN-25's recommended option. The three options in that entry were all built
+on the premise that **133 bpm is Zone 2 for this owner**. It is not — not under the model the
+session's own copy is written in.
+
+### The prescription's words and its numbers come from different zone models
+
+| model | Zone 2 is | for this owner (RHR 52, max 168) |
+|---|---|---|
+| **% of HRmax** — where *"conversational aerobic base"* comes from | 60–70% of max | **101–118 bpm** |
+| **% of HR reserve** (Karvonen) — what `ZONE_DEFS` uses | 60–70% of reserve | **122–133 bpm** |
+
+Both are legitimate. The app uses the **language** of the first (*"a steady Zone-2 aerobic session —
+you should be able to hold a conversation"*) and the **thresholds** of the second. For a user with a
+resting HR of 52 they differ by **21 bpm**, which is the whole of the gap this review has been
+measuring.
+
+**So the owner has been following the words while the app graded him against the numbers.** Measured
+across 44 fast blocks: mean **98.5 bpm = 58.6% of HRmax**, just under classic Zone 2; best single
+block **115 bpm = 68.5% HRmax**, comfortably inside it. **17 of 44 fast blocks already reached
+101 bpm or more, and `classifyZone` returned `'push'` on every one.**
+
+**⚠ The 168 max is observed, not tested** — 63 samples at 160+, so it is not one artefact, but it is a
+floor on the true max rather than a measurement of it. A higher true max moves classic Zone 2 up and
+makes these walks look *easier*, not harder. The direction of this finding does not depend on it.
+
+### Zone-2 minutes is the metric, and it is surface-independent
+
+Minutes at classic Zone-2 intensity (≥101 bpm) across the 11 recorded sessions, 318 minutes walked:
+
+| | Z2 min/week |
+|---|---|
+| **today, intervals as executed** | **~13** |
+| intervals, if every fast block reached 105–115 | ~29 |
+| **30 min continuous at 105+ bpm** | **~60** |
+
+**⛔ Continuous at the CURRENT fast pace gives zero** — 98.5 bpm sits 3 bpm under the floor. The
+continuous option only wins at a genuinely brisker hold, not at today's fast-block effort.
+
+**It is already reachable and has already happened:** 2026-08-18 produced **21 minutes** in band and
+2026-09-02 **18**. The four most recent sessions produced **none**. This is an execution range, not a
+physiological ceiling.
+
+### Why the interval structure is not earning itself
+
+Fast-minus-slow contrast measures **7.7 bpm** (per-session range 4.4–10.0). Interval walking beats
+continuous walking when the fast half is genuinely hard — that is its entire mechanism. At this
+contrast the session is a continuous walk with a wobble. And TN-25's own arithmetic puts a genuinely
+hard fast half at **233 spm**, which is a jog.
+
+### Recommended: a fourth option, and it is better than the other three
+
+**A 30-minute continuous brisk walk against one band, 105–118 bpm.** Roughly **quadruples** Z2
+minutes for the same 30 minutes; one instruction instead of two speeds that cannot be separated
+enough for the structure to pay; and it changes nothing mechanically — the pacer already computes an
+HR band, only the target it compares against moves, and the cue stops saying "push" every three
+minutes. **Keep the intervals only if the owner will jog the fast blocks**, which is the honest
+condition rather than a hedge.
+
+Reversal cost is near zero: a target constant and a session label.
+
+**⛔ Do not read this as "the Karvonen model is wrong".** It is a standard model and `hr-zones.ts` is
+internally consistent. The defect is that one prescription draws its copy from one model and its
+thresholds from another, so the session cannot be both what it says and what it measures.
