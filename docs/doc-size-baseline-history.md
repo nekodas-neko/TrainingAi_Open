@@ -9015,3 +9015,14 @@ the entry says more than it did; nothing else in this PR.
 rules at once tests neither. Three instances in ten batches, every one passing, every one found by
 mutation rather than by reading. Raised because it belongs where the next batch is written from —
 the entry is what an implementer reads before starting, and the lesson was otherwise session-local.
+
+## 2026-09-08 — `docs/implementation-backlog.md` → 18863 (LB-61 shipped)
+
+Down 20. LB-61 was a decision brief — the count, the recommendation, the argument against, the
+fallback — and once the owner took the decision most of that stopped being something anyone needs to
+read. What is left is what shipped and the one look still owed on the device, which is the shape a
+`Verify:` entry should have.
+
+The entry is **not** removed. Twenty-five controls changed appearance at once and nobody has seen
+one; that is a look owed, not work owed, and `Verify: device` is the field that says so without
+parking anything.

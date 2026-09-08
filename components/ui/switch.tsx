@@ -13,7 +13,12 @@ function Switch({
     <SwitchPrimitive.Root
       data-slot="switch"
       className={cn(
-        "peer data-[state=checked]:bg-primary data-[state=unchecked]:bg-input dark:data-[state=unchecked]:bg-input/80",
+        // On = `--brand`, not `--primary` (LB-61). This app ships dark only, where `--primary` is
+        // `oklch(0.922 0 0)` — near-white with **zero chroma**, the shadcn light-first default — so an
+        // on switch read as an inert slab rather than a chosen state. That is the same value that made
+        // BF-124's selected role pill look switched off. `--brand` is overridden at runtime by the
+        // owner's own colour, so the switches follow it rather than being a greyscale island.
+        "peer data-[state=checked]:bg-brand data-[state=unchecked]:bg-input dark:data-[state=unchecked]:bg-input/80",
         "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
         "relative inline-flex h-5 w-9 flex-none cursor-pointer items-center rounded-full border-2 border-transparent",
         // Radix's Switch root IS a <button>, so the global 48px tap-target floor in globals.css
@@ -35,7 +40,9 @@ function Switch({
           "pointer-events-none block size-4 rounded-full bg-white shadow-md ring-0",
           "transition-transform duration-200",
           "data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0",
-          "dark:data-[state=unchecked]:bg-foreground dark:data-[state=checked]:bg-primary-foreground",
+          // `--brand-foreground` exists precisely to stay legible on a `--brand` fill, so the thumb
+          // follows the track rather than keeping `--primary-foreground`'s near-black.
+          "dark:data-[state=unchecked]:bg-foreground dark:data-[state=checked]:bg-brand-foreground",
         )}
       />
     </SwitchPrimitive.Root>
