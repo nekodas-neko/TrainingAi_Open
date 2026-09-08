@@ -73,6 +73,18 @@ export default defineConfig({
           environment: 'node',
           env: { OURA_CONSTANTS_DIR: CONSTANTS_DIR },
           setupFiles: ['./vitest.setup.ts'],
+          // LA-83: the same contention the `rollup` project above already names, reaching the 189
+          // DB-gated files in this project — which kept the 5-second default while `rollup` was
+          // given 60. Two of them went red on one full run and green on the next two with no code
+          // between them: `dexa-scans` on `Test timed out in 5000ms`, against a solo maximum across
+          // the whole DB directory of **2.16 s**. Nothing was slow; one round-trip queued.
+          //
+          // 20 s is ~9x the slowest DB test measured under full-suite contention (2.29 s) rather
+          // than 4x its solo time, because the tail is what tips these over and the tail is not
+          // measured. It is deliberately far short of `rollup`'s 60 s: a genuinely hung test still
+          // fails inside a third of a minute, and the reporter keeps printing durations, so a test
+          // that gets slower stays visible instead of merely staying green.
+          testTimeout: 20_000,
           // `e2e/**` is Playwright's (`pnpm e2e`), not vitest's. Without this, vitest picks up the
           // browser specs, fails to run them, and reports "1 failed file / 0 failed tests" — the
           // shape that reads like a flaky hook and sends you looking in the wrong place (Q-249).

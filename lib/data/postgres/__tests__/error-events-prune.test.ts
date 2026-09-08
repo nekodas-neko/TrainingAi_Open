@@ -32,6 +32,16 @@ describe.skipIf(!canRun)('error_events retention', () => {
     `SELECT count(*)::int AS n FROM error_events
       WHERE user_id = $1 AND created_at < now() - make_interval(days => $2)`, [USER, days])).rows[0].n)
 
+  /** Poll until `check` holds or the deadline passes — the caller still asserts afterwards, so a
+   *  timeout produces the real assertion failure rather than a bare "timed out". */
+  const waitFor = async (check: () => Promise<boolean>, timeoutMs = 5_000) => {
+    const deadline = Date.now() + timeoutMs
+    while (Date.now() < deadline) {
+      if (await check()) return
+      await new Promise(r => setTimeout(r, 25))
+    }
+  }
+
   const seedAged = async (daysAgo: number, message: string) => {
     await pool.query(
       `INSERT INTO error_events (user_id, source, message, created_at)
@@ -70,9 +80,12 @@ describe.skipIf(!canRun)('error_events retention', () => {
 
     await repo.insertErrorEvent({ userId: USER, source: 'server', message: 'BF-93 fresh fault' })
 
-    // Fired from the write path, so it has run by the time the insert resolves — or shortly after;
-    // the DELETE is deliberately not awaited so a slow prune cannot delay recording a fault.
-    await new Promise(r => setTimeout(r, 250))
+    // The DELETE is deliberately not awaited, so a slow prune cannot delay recording a fault —
+    // which means this has to wait for the effect rather than for a duration. LA-83: a fixed
+    // 250 ms sleep was wrong under full-suite contention, where one queued round-trip made the
+    // prune land late and the test report 2 rows where it wanted 0. Polling to a deadline is slow
+    // under load instead of wrong under load.
+    await waitFor(async () => (await countOlderThan(30)) === 0)
 
     expect(await countOlderThan(30), 'rows past the window survived a write').toBe(0)
     // And nothing inside the window was taken with them.

@@ -8982,3 +8982,13 @@ the same PR was net-neutral.
 ## 2026-09-08 — `docs/overview/entries/` total ceiling → 326 (LA-80, sixth PR running)
 
 325 → 326. Sixth consecutive raise, one per PR, as LA-80 describes.
+
+## 2026-09-08 — `docs/implementation-backlog.md` → 18847 (LA-83 shipped)
+
+18874 → 18847. LA-83's entry removed on shipping — the `unit` project now carries a 20-second
+`testTimeout` for the reason the `rollup` project already states, and the `error_events` prune test
+waits on the row count rather than on a fixed 250 ms. The entry owes nothing.
+
+## 2026-09-08 — `docs/overview/entries/` total ceiling → 327 (LA-80, seventh PR running)
+
+326 → 327. Seventh consecutive raise, one per PR, as LA-80 describes.
