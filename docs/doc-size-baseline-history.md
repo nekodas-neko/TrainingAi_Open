@@ -8784,3 +8784,15 @@ The number is 18694 rather than the 18711 this branch computed before LA-62 land
 Recomputing from the merged file is the rule, and this is why: the +2 is a property of the diff and
 survives any base, while the absolute figure belongs to whatever `main` happens to be when the PR
 merges.
+
+## 2026-09-08 — `docs/implementation-backlog.md` → 18717 (LB-61 measured and gated)
+
+Up 23, all of it onto LB-61, which asked for exactly this: *"count the switches before proposing
+either."* The count is 25 across 14 files, and the split it predicted between settings toggles and
+in-form choices is real (about 15 and 10) but does not decide anything — so the entry now carries the
+count, a recommendation with the reason it wins a year out, the alternative and what it is genuinely
+better at, and the reversal cost, per **Decisions That Come Back To Me**. It also gains `Gate: owner`,
+so the lane runner stops printing it as startable work when what it needs is one yes or no.
+
+Twenty-three lines to turn "somebody must go and count 25 controls, then think about it" into a
+question that can be answered in a sentence. This file exists to make that trade.

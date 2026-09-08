@@ -18117,6 +18117,7 @@ reads.
 
 - **Lane:** B — `components/ui/switch.tsx`.
 - **Added:** 2026-09-07 · Lane B, found while fixing BF-124's selected-state slab.
+- **Gate:** owner — the measuring and the proposal are done (below); what is left is one yes or no.
 - **Same token, wider blast radius.** `switch.tsx:16` marks the on state with
   `data-[state=checked]:bg-primary`. `--primary` is `oklch(0.922 0 0)` in dark — near-white — which
   is exactly why BF-124's selected role pill read as disabled rather than chosen. The switch has the
@@ -18126,6 +18127,28 @@ reads.
   other chosen state in the app) or stay neutral-white (the shadcn default, and arguably right for a
   binary that is not a *selection* among options). Count the switches before proposing either — the
   answer probably differs between a settings toggle and an in-form choice.
+
+- **COUNTED 2026-09-08 (Lane B).** **25 switches, 14 files.** The split the line above predicted is
+  real — about **15 are persisted preferences** (five in `more/settings-panel.tsx` alone, plus the
+  supplements, meal-type, dynamic-background and admin sheets) and about **10 are in-form choices**
+  made while composing something (`walk-config`, `builder-review`, `goal-recommendation-sheet`,
+  `my-meals-picker`, the meal-plan steps, `coach/change-preview`). It does not decide anything:
+  nobody classifies a toggle before looking at it, they read on or off, so two on-colours would be a
+  distinction the user has to learn in order not to be confused by it.
+- **RECOMMENDATION: `--brand` for the on state, one line, no split.** In dark — the only theme this
+  app ships — `--primary` is `oklch(0.922 0 0)`, near-white and **chroma 0**, the shadcn light-first
+  default, and the same value that made BF-124's selected role pill read as switched off. `--brand`
+  is already **overridden at runtime by the owner's own choice**, and `--brand-foreground` exists to
+  keep a thumb legible on it — so this uses the colour they picked and follows it if they change it.
+  A year out the durable property is that "on" and "chosen" look alike everywhere; recolouring only
+  the screens someone happens to notice is how the pill and the switch came to disagree.
+- **The alternative, and what it is better at: keep the near-white.** Five brand-green pills in the
+  `settings-panel` column are loud, and green in this app already means *good / achieved* (score
+  bands, streaks) rather than *enabled*. That is the real argument against, and it is about that one
+  screen. Fallback if the column is the only place it looks wrong: brand for in-form, neutral for
+  settings — rejected above, but available.
+- **Reversal cost: one line in `components/ui/switch.tsx`.** Visual only — no state, no storage, no
+  API. What makes it the owner's call is that 25 controls change at once, not that it is hard to undo.
 - **Not urgent and not a defect on its own** — nobody has reported a switch reading as off. It is
   filed because the finding was made and CLAUDE.md's **No orphaned findings** rule applies, not
   because it is queued work.
