@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 const invalidated: string[] = []
 
@@ -218,5 +220,61 @@ describe('cache group helpers', () => {
       'workout-data', 'workout-card:', 'ai-periodization-session:', 'next-session',
       'readiness-score', 'ai-periodization-overview',
     ]))
+  })
+})
+
+/**
+ * RV-50, and what it turned out to be.
+ *
+ * The entry reported three raw `readCacheSync('workout-card:<id>')` reads that "never revalidate" —
+ * the Q-260 seed-only shape, where an evicted key goes blank until something else refills it.
+ * Checked against the code, they are not that: `session-select-content.tsx` and
+ * `workout-select-content.tsx` both fetch **`workout-data:all`** on mount and seed every
+ * `workout-card:<id>` from its `onData`, then bump an epoch counter (`dataEpoch`,
+ * `workoutCardEpoch`) that is threaded into the reading `useMemo`s precisely so the synchronous
+ * reads re-run once the batch lands. Those counters exist as the fixes for Q-89 and Q-106, which
+ * are the bug RV-50 describes. A scan keyed on "is the key this component reads also fetched here"
+ * cannot see that pairing, because the key fetched is a different one.
+ *
+ * What IS unguarded is the invariant the pairing rests on. `workout-data:all` is fetched with
+ * `freshWithinTtl: true` at `TTL_LONG`, so if a group ever evicted `workout-card:` while leaving
+ * `workout-data:all` fresh, the batch would not refetch, nothing would re-seed the card, and those
+ * reads would go blank for up to six hours — which after RV-49 made the eviction actually fire is a
+ * worse outcome than the staleness it replaced. Every group pairs them today. Nothing enforced it.
+ */
+describe('workout-card: is never evicted without the batch that re-seeds it (RV-50)', () => {
+  const GROUPS: [string, () => Promise<void>][] = [
+    ['invalidateWorkoutSummaries', invalidateWorkoutSummaries],
+    ['invalidateExerciseLogged', invalidateExerciseLogged],
+    ['invalidateProgramStructure', invalidateProgramStructure],
+    ['invalidateInjuryWrites', invalidateInjuryWrites],
+    ['invalidatePrescriptionChanged', invalidatePrescriptionChanged],
+    ['invalidateCheckinAffectsPrescription', invalidateCheckinAffectsPrescription],
+  ]
+
+  it.each(GROUPS)('%s evicts workout-data alongside the card keys', async (_name, run) => {
+    await run()
+    const evictsCard = invalidated.some(k => k.startsWith('workout-card'))
+    if (!evictsCard) return
+    // `workout-data` is a PREFIX invalidation, so it covers `workout-data:all` — the batch key —
+    // as well as the per-tab ones.
+    expect(invalidated.some(k => k === 'workout-data' || k.startsWith('workout-data')),
+      'evicted workout-card: without the workout-data batch that re-seeds it').toBe(true)
+  })
+
+  it('holds for the per-session form too, which evicts one card rather than the prefix', async () => {
+    await invalidatePrescriptionChanged('session-1')
+    expect(invalidated).toContain('workout-card:session-1')
+    expect(invalidated.some(k => k.startsWith('workout-data'))).toBe(true)
+  })
+
+  it('and the six groups above are still all of them', async () => {
+    // A seventh group evicting the card key would not be covered by the cases above, and the
+    // pairing is exactly what stops the reads going blank.
+    const src = readFileSync(join(__dirname, '..', 'cache-groups.ts'), 'utf8')
+    const owners = [...src.matchAll(/export async function (invalidate\w+)[\s\S]*?\n\}/g)]
+      .filter(m => /workout-card/.test(m[0]))
+      .map(m => m[1])
+    expect(owners.sort()).toEqual(GROUPS.map(([n]) => n).sort())
   })
 })

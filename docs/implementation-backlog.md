@@ -574,6 +574,16 @@ OR-102a/b will read dose history to recommend the next dose. A tracker that read
   not needed"*.
 - **Needs:** nothing to investigate — the measurement is below. What it needs is a decision.
 
+- **A sighting worth having on file when this is decided (2026-09-08).** On #941 the E2E job
+  failed at the 23-minute mark: `e2e/preferences-survive-reinstall.spec.ts` died with
+  `page.goto: net::ERR_ABORTED at http://localhost:3100/`, two more specs went flaky with
+  `browser.newContext: Target page, context or browser has been closed`, and the other 158 passed.
+  It is the server or the browser dying near the end of a long run, not an assertion. **It did not
+  reproduce**: the very next PR (#943), on a tree containing #941, was green including E2E — so this
+  is one unreproduced sighting, not a flake and not attributable to the collection route #941 added.
+  Recorded because a 27-minute job that occasionally eats itself is an argument about the job, which
+  is what this entry is for.
+
 **Measured, not estimated.** A full local run against a CI-shaped database: **144 tests, 27.1 minutes
 of test time.** There is no single pathology — 28 tests finish under 5s and 16 take over 20s. The
 heaviest files are `meal-plan-library-surface` **136s**, `recipe-url-to-meal` **90s**,
@@ -921,20 +931,6 @@ and Samsung does not honour `autoConnect = true`, so direct connect plus a bound
 **Out of scope on purpose:** this does not put the ring's data on any screen — learning-mode
 isolation stands and wiring it into scoring waits on the H10 session. It does not resolve steps,
 calories or the stage mapping (PS-16, PS-19).
-
-### [app-shell] RV-50 — three raw seed-only `workout-card` reads never revalidate
-
-- **Lane:** B — `app/session-select/components/recommendation-card.tsx:23`,
-  `app/workout-select/workout-select-content.tsx:32`, `components/workout-screen.tsx`.
-- **Added:** 2026-09-06, Review sweep 49 —
-  [write-up](reviews/2026-09-06-deload-confirm-eviction-gap.md). The reader half of RV-49.
-- **Needs:** RV-49
-
-Raw `readCacheSync('workout-card:<id>')` with no fetch of the key in the component — two of the
-three sites say so in their own comments. The Q-260 seed-only shape: an evicted key goes blank until
-something else refills it; a missed eviction serves the snapshot for the full TTL. Scanned all 80
-`readCacheSync` sites: these three are the live cluster after discarding fallback-paired seeds.
-Convert to `useCachedValue` or fold into the RV-49 fix and its test.
 
 ### [workouts] PS-27 — 1RM arithmetic: non-monotone in reps, bodyweight ratchets down, two rep-ceiling behaviours
 
@@ -8481,6 +8477,18 @@ without a queue entry is a dropped finding.*
   and again on **PR #853 (2026-09-03)**, a fresh PR with checks in flight, against that same repo.
   **GitHub's auto-merge API is looking for CLASSIC branch protection and does not recognise a
   Ruleset.** That is a gap on GitHub's side, not a misconfiguration.
+- **Measured cost, 2026-09-08.** One PR (#943) needed **four** base re-merges in ninety minutes,
+  each one a full CI cycle. Every single conflict was the same file —
+  `docs/doc-size/docs/implementation-backlog.md.size` — and never anything in the diff. That is
+  structural rather than bad luck: every merged PR removes a backlog entry, so every merge changes
+  that file's line count, so any two concurrent PRs conflict there by construction. LA-33's per-file
+  split of the doc-size map fixed the cross-*document* case and cannot fix this one. Worth weighing
+  when this entry is decided: auto-merge would not remove the conflict, but it would stop a human
+  paying for each round.
+- **The six-check list above includes E2E, and that is not what the Ruleset enforces.** Four PRs
+  merged on 2026-09-07/08 (#930, #934, #941, #943) with the E2E job still `in_progress` —
+  `merge_pull_request` validates against real branch-protection state and would have refused a
+  genuinely required check. So E2E is advisory today. Recheck the Ruleset before quoting the list.
 - **Recommendation: add a classic branch-protection rule on `main` alongside the ruleset**, naming
   the same six checks. The two coexist and GitHub takes the most restrictive, so enforcement does not
   weaken — the classic rule exists only to give the auto-merge API the object it looks for. Reversal

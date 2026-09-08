@@ -8730,3 +8730,12 @@ The added lines are mostly the reasoning that stops the obvious wrong move being
   Q-189 deleted that route", which reads as precedent against a voice cue. What Q-189 deleted was a
   server-side Gemini read-aloud endpoint for an unreachable chat screen. Left uncorrected, the entry
   argues against its own new plan.
+
+## 2026-09-08 — `docs/implementation-backlog.md` → 18710 (RV-50 reconciled)
+
+Up 8 on a net removal, which is the right shape here. RV-50's own entry is gone — it described a
+defect that is not there — and what replaces it is shorter but lands in two other entries rather
+than one: measurements on LB-52 (four base re-merges on one PR, every conflict the same doc-size
+file, and its required-checks list wrong about E2E) and on LB-56 (an E2E job that ate itself at 23
+minutes and did not reproduce). Evidence attached to the entry that will act on it, rather than a
+new entry nobody owns.
