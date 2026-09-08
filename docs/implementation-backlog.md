@@ -399,6 +399,159 @@ below threshold and left in place for next time.
 
 
 
+### [cardio][heart-rate] TN-26 — the walk prescribes a control that means something different on every surface; prescribe heart rate and record the rest
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-08 · owner: *"let's not tune to the treadmill — like you said it changes based on location, what do you suggest we do?"*
+- **Lane: A** — `lib/walk/walk-pacer.ts:66` (cadence targets), `components/guided-walk/walk-active.tsx:67-68` (HR targets), `components/guided-walk/walk-summary.tsx:141-146` (what is stored).
+- **Pairs with TN-25** — TN-25 chooses *what* the fast block should demand; this entry decides *in what unit* it is demanded and how compliance is measured.
+- **Reference:** [`review`](reviews/2026-09-08-walk-intensity-calibration.md) (addendum 3).
+
+**Cadence and speed are not portable; heart rate is.** The owner's own indoor mapping — 90 spm at
+2 km/h, 120 spm at 4 km/h — implies strides of **0.370 m** and **0.556 m**, against **0.739 m**
+measured outdoors. So 120 spm is roughly 4 km/h on the belt and roughly 5.3 km/h on a footpath, and
+uphill it is a different effort again at the same number. **A cadence target is a different workout
+on every surface, and the app cannot tell which one the owner is on** — treadmill walks save with
+`is_distance_based = false`, and only **17 of 106** stored segments carry a distance at all.
+**% of heart-rate reserve is the one quantity that means the same thing everywhere**, because it is
+defined against this user's own resting HR and max rather than against the ground.
+
+**So: make the heart-rate band the prescription, and demote cadence and speed to observations.**
+The pacer already computes the band (`hrReserveTarget` in `hr-zones.ts`) and already renders a live
+verdict — what it lacks is an achievable target (TN-25) and an instruction phrased as a loop
+(*"raise effort until HR reaches X"*) rather than as a fixed control (*"walk at 120 spm"*). The
+current `DEFAULT_CADENCE_TARGETS = { fast: 120, slow: 95 }` becomes a starting hint, not the goal.
+
+**Two surface-independent calibration metrics fall out of that, and both are computable today:**
+1. **Fast-block compliance** — the share of fast blocks whose steady-state HR reached the target.
+   Currently **0 of 44**.
+2. **Interval contrast** — mean fast %reserve minus mean slow %reserve, the thing that makes an
+   interval walk an interval walk. Currently **6.8 points**; the protocol's own targets imply **30**.
+   Contrast is also what TN-24 measured against within-session drift (+7.7 vs +7.1 bpm) — it is the
+   number that says whether two speeds are happening at all.
+
+**Keep recording the controls — per surface, as evidence, never as the target.** Capturing belt
+speed on treadmill walks (currently absent entirely) and distance outdoors is still worth doing: it
+lets the app learn *this surface, this control → this HR* and offer a better starting hint next
+time. It is a convenience layer over the HR loop, not a second prescription, and it does not gate
+TN-25.
+
+**⛔ Do not derive a speed prescription from the two indoor points that exist.** 2 km/h → 90.7 bpm
+and 4 km/h → 98.5 bpm gives ≈3.9 bpm/km/h, which extrapolates 70% reserve to **~12.9 km/h** —
+obviously wrong. The slope was measured in the flattest part of the curve; the response steepens
+sharply toward the walk/run transition at ~7–8 km/h. The owner's proposed tweak (slow 90→100 spm,
+fast 120→130 spm) is directionally right and worth ≈**+0.9** and **+1.3 bpm** against a 34.7 bpm
+shortfall — which is the clearest evidence that the control is the wrong lever, not that it needs a
+bigger setting.
+
+**Pass test:** a guided walk states its fast and slow blocks as heart-rate targets, the summary
+reports fast-block compliance and interval contrast for the session, and both numbers are comparable
+between a treadmill walk and an outdoor walk without any surface-specific adjustment.
+
+### [cardio][heart-rate] TN-25 — the guided walk's fast target has never been met in 44 attempts, and the live pacer says "push" every time
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-08 · owner: *"what makes it effective is the 2 speeds — should I be walking faster or slower during any phases?"*
+- **Lane: A** — `components/guided-walk/walk-active.tsx:67-68` sets the targets; `classifyZone` in `hr-zones.ts` renders the verdict.
+- **Reference:** [`review`](reviews/2026-09-08-walk-intensity-calibration.md) (addendum). Sibling of **TN-24**; fix together or in either order.
+- **Gate: owner** — the three options below are a product choice, not a calibration.
+
+`walk-active.tsx:67-68` sets the pacer from the app's own Karvonen helper: **fast ≥ 0.70 of reserve,
+slow ≤ 0.40**. For this owner that is **fast ≥ 133 bpm, slow ≤ 98**.
+
+| | measured |
+|---|---|
+| fast blocks | **98.5 bpm mean (40.1% reserve)**, best single **115** |
+| **fast blocks meeting the target** | **0 of 44 — 0%** |
+| slow blocks | 90.7 bpm (33.3%) |
+| slow blocks within the ceiling | 35 of 45 — **78%** |
+
+**The owner's FAST average (98.5) is the app's SLOW target (98).** The session runs one phase low
+throughout. And `classifyZone` returns `'push'` for any fast block under target, so **the live pacer
+has shown "push" on 100% of fast intervals across ten sessions** — a cue that can only ever say
+*push* is the Q-504 failure rendered live.
+
+**The target is not reachable by walking.** Closing **34.7 bpm** at the measured **0.288 bpm/spm**
+needs **+121 spm → 233 spm**. The 0.70 fraction is right for the protocol and wrong for this user's
+mode: guided interval walking is validated largely in older adults, for whom brisk walking does reach
+70% of reserve; a 33-year-old with a 168 max cannot on flat ground at a 0.739 m stride.
+
+**Three options — owner's choice:**
+1. **Make the fast block a jog or an incline** — keeps the 70% target honest and the protocol intact.
+2. **Re-anchor the fast target to what walking reaches** (~50–55% reserve = 110–116 bpm) **and rename
+   the session** so it stops claiming a stimulus it does not deliver.
+3. **Leave the target, stop rendering an always-"push" verdict** — weakest, but better than now.
+
+**⛔ Do not silently lower the target to make the cue turn green.** A target met by redefinition
+teaches nothing. Whichever option wins, the session's **name and its target must agree**.
+
+**Two metrics worth surfacing, both computable from `activity_logs.segments` today:** fast-block
+compliance (**currently 0%**) and interval contrast, fast minus slow %reserve (**currently 6.8 points
+against the protocol's 30**). **⚠ Do not ship a target for either from this review** — ten sessions
+cannot calibrate one, and compliance reads 0% because the target above is unreachable. Fix that
+first, then measure.
+
+**Pass test:** after the change, a fast block that the owner experiences as hard renders a non-`push`
+verdict; and fast-block compliance over a month is neither 0% nor 100%.
+
+### [cardio][activity][heart-rate] TN-24 — Zone 2 is unreachable on foot, so the walk's zone bar carries no information (and this is Q-523's mechanism)
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-08 · owner: *"can we make any calibrations or formulas for this to optimise the walk?"* after a 30-minute interval walk logged **30:00 Z1 / 0:00 everything else**
+- **Lane: A** — the reported metric, not the zone constants.
+- **Supplies the mechanism for Q-523** (`zoneMinutes` floored at 0 on 53 of 59 days, cause never established).
+- **Reference:** [`review`](reviews/2026-09-08-walk-intensity-calibration.md).
+- **⛔ Do NOT fix this by lowering the zone boundaries.** The Karvonen fractions are conventional and the max is genuine; moving Z2 down would make the label mean something different from every other use of it and would silently re-score history. **Change what the app reports, not where the boundaries sit.**
+
+`hr-zones.ts:38` builds zones as fractions of heart-rate reserve with **Z1 spanning 0.0 → 0.6**. For
+this owner (resting **52**, max **168**, reserve **116**) **Z1 is 52–122 bpm — 60% of the usable range
+in one bucket.** Sitting still and a brisk interval walk are the same zone.
+
+**The max is real, so this is not a stale anchor:** `oura_heartrate` holds **140 samples above 150**
+and a genuine **168** (2026-07-05). The zones are anchored correctly; the training never reaches them
+— **nothing above 140 bpm since 2026-07-24.**
+
+**Cadence is nearly exhausted as a lever.** Across **88 intervals / 10 sessions**:
+`corr(cadence, HR)` = **+0.512**, slope **0.288 bpm per spm**. A **31% cadence separation buys 7.9 bpm**;
+mean fast-interval intensity is **40.1% of reserve** against Z2's 60%, best ever **50.5%**.
+Extrapolated, averaging 122 bpm needs **≈198 spm** — a run. At the measured **0.739 m** stride
+(TN-22's review) the achievable walking speed simply does not demand more. **Grade and carried load
+are the levers that remain.**
+
+**And the protocol is not progressing:** fast/slow HR separation trends **−0.11 bpm per session** across
+ten sessions, while fast cadence fell **123.5 → 112.3 spm**. The *contrast* improved while the *effort*
+declined. **⚠ Description, not diagnosis** — ten sessions, one subject, no controlled comparison.
+
+**⚑ THE PRESCRIPTION CONTRADICTS ITSELF, and this is the sharper half of the entry.**
+`prescribed_runs` for these walks carries `run_type: easy`, **`target_hr_low/high` = 68–97 bpm**,
+`target_zone_ids [1,2]`, and a rationale reading *"A steady **Zone-2 aerobic** session."*
+**The owner averaged 89 bpm — dead centre of target. The session is executed correctly.** But:
+1. **The 68–97 band lies entirely inside Zone 1**, while the label says Zone 2 (which starts at 122).
+   The label and the number cannot both be right.
+2. **The rationale says *steady*; the walk player runs fast/slow cadence intervals.** Two different
+   sessions under one prescription.
+
+**The interval structure is not earning its complexity.** Across nine sessions, **within-session HR
+drift is +7.1 bpm** (first fast block → last) against a **fast-vs-slow contrast of +7.7 bpm**, and
+**drift exceeded contrast on 5 of 9 sessions**. Time on feet supplies about as much as the intervals
+do, while the "slow" halves sit at **33.3% of reserve** against the fast blocks' **40.1%** — half the
+session giving back what the other half earned.
+
+**For the goal as actually targeted (68–97 bpm, conversational), the intensity is already right and
+DURATION is the correct lever** — that is what an easy aerobic session is. **Raising cadence would
+move the session away from its own target.** Energy return is **≈2.29 kcal/min net**, so +15 min ≈
++34 net kcal: real, linear, modest. **⛔ The session is not bad** — it is a good easy-aerobic session
+that is inefficient only against a "Zone-2" label walking cannot satisfy.
+
+**What to build, in order:**
+1. **Report intensity as % of heart-rate reserve** on the walk summary. 40.1% is meaningful and
+   movable; "Z1, 30:00" is not.
+2. **Fix the prescription's label, not its target** — 68–97 bpm is right for an easy session; calling
+   it "Zone-2 aerobic" is what makes the pillar read as broken. And decide whether the session is
+   *steady* or *intervals*; shipping both is why the contrast is only 7.7 bpm.
+3. **Progress on measured fast/slow HR separation.** **Do not ship a target number from this review** —
+   ten sessions cannot set one, and an unreachable target is the Q-504 mistake.
+
+**Pass test:** the walk summary shows a number that differs between the owner's 2026-08-14 session
+(30.0% reserve) and 2026-08-18 (50.5%), where the zone bar reads identically for both.
+
 ### [platform] LA-80 — the journal's entry ceiling is now binding, and a sweep alone cannot clear it
 
 - **Lane:** O — `docs/overview/entries/`, plus the durable docs that cite it.

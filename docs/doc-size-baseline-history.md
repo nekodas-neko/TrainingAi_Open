@@ -9139,3 +9139,28 @@ had not. **#993 added those tests to `main` mid-session**, and the check compare
 against the merge base — so a stale branch reads as a regression it did not cause. The check was
 right and the branch was old. Confirmed before acting by stashing the changes and re-running against
 a clean tree, which reproduced it, and then by fetching `origin/main` and finding the new commit.
+
+## 2026-09-08 — `docs/implementation-backlog.md` → 19252, the guided-walk batch (TN-24, TN-25, TN-26)
+
+Three entries and a review answering the owner's question about making the interval walk more
+efficient. The measurements are what take the room, and each is load-bearing rather than
+illustrative.
+
+**TN-24** — Zone 1 spans **52–122 bpm** for this owner, 60% of the whole range, so walking and
+lifting can never reach Zone 2 and the walk's zone bar carries no information. That is also Q-523's
+mechanism, open for weeks. The prescription contradicts itself twice over: a 68–97 bpm band labelled
+*"Zone-2 aerobic"*, and a rationale describing a steady session while the app runs intervals.
+
+**TN-25** — the fast target of ≥133 bpm (0.70 of reserve) has been met **0 of 44 times**; fast blocks
+average **98.5 bpm**, which is the app's *slow* target of 98. `classifyZone` has therefore rendered
+"push" on 100% of fast intervals across ten sessions — the Q-504 failure shown live. Closing the
+34.7 bpm gap at the measured 0.288 bpm/spm would need 233 spm, so the target is not reachable by
+walking and the three options are a product choice.
+
+**TN-26** — rewritten mid-PR after the owner declined tuning to the treadmill. Cadence and speed mean
+different things on every surface (120 spm is 4.0 km/h indoors at a 0.556 m stride, 5.3 km/h outdoors
+at 0.739 m) while % of heart-rate reserve transfers unchanged, so the prescription moves to heart
+rate and the controls become observations. The ⛔ line is the part worth keeping: two indoor speed
+points extrapolate 70% reserve to ~12.9 km/h, and the owner's proposed cadence tweak is worth ≈+2 bpm
+against a 34.7 bpm shortfall — which is why the control is the wrong lever rather than one needing a
+bigger setting.
