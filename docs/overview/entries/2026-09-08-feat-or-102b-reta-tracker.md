@@ -1,6 +1,6 @@
 ## 2026-09-08 — The vial and the dose calculator (OR-102b ①②)
 
-**Branch:** `feat/or-102b-reta-tracker` · **Lane B** · PR #1006
+**Branch:** `feat/or-102b-reta-tracker` · **Lane B** · PR #1007
 
 ### What shipped
 

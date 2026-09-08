@@ -848,7 +848,7 @@ random, and worse than no colour because it looks authoritative.
 - **Revisit the plateau call once 6+ weeks of on-drug data exist** to test it against — not before.
 
 - **Reversal cost:** low. A section and a card; no data, no migration (those are OR-102a's).
-- **Keep:** ③ and ④. **① and ② shipped in #1006** — vial setup and the dose calculator, reached from
+- **Keep:** ③ and ④. **① and ② shipped in #1007** — vial setup and the dose calculator, reached from
   a syringe control on any milligram-dosed supplement row, with the owner-verified figures
   (`10 mg ÷ 3 mL = 3.33 mg/mL`, `0.5 mg → 15 units`) covered by unit tests and an e2e.
   - **③ the dose on the day timeline is Lane A's**, and only its *render* is left: the tick already
