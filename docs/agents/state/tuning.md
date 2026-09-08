@@ -3,7 +3,7 @@
 > **Successor sessions are titled `🎶 Tuning Agent 🟢`** — exactly, both emoji. Leading emoji = role,
 > trailing = this session's status, set by the session itself. See `docs/agents/README.md` §4.
 
-**Updated:** 2026-08-26 · **By:** `session_01VVfZtbCftbwaUHtBLJoxVr` · **Next ID:** `TN-25`.
+**Updated:** 2026-08-26 · **By:** `session_01VVfZtbCftbwaUHtBLJoxVr` · **Next ID:** `TN-26`.
 Find next free: `grep -rhoE '\bTN-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. Legacy `Q-` numbers
 stay valid. **Rewritten in full, never appended** — narrative lives in the linked reviews.
 
@@ -47,6 +47,8 @@ Filed this session, all propose-only, all in the queue:
 | **TN-21** | "daytime stress" is **55% night buckets**, night/day opposite signs | window finding stands; its Q-507 candidate superseded by TN-22 |
 | **TN-22** | stored `stress_high_minutes` disagrees with the model's own buckets, **8 of 9 days** | **explains Q-507 and reverses it**; likely same defect as TN-20 |
 | **TN-23** | sleep's `hrv` + `hr` are one autonomic event scored twice, **25% of the score** | r=+0.869; ⛔ don't delete a contributor — collapse or down-weight |
+| **TN-24** | Z2 unreachable on foot; the walk's zone bar carries no information | **Q-523's mechanism**; ⛔ do not lower the boundaries |
+| **TN-25** | the walk's fast target met **0 of 44 times**; pacer says "push" every interval | `Gate: owner` — jog/incline, re-anchor, or stop the verdict |
 
 **Owner decisions, 2026-08-24 — recorded on the entries, nothing gated on them.** TN-5 and TN-6
 signed off; **TN-6a** added (suspend the temperature penalty on a self-clearing condition, outside the
@@ -237,6 +239,17 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
   2026-09-02: the ten contributors blend to **76.04**, `SCORE_CALIBRATION` ships **63**. Two minutes of
   arithmetic separated *"the model is wrong"* from *"the display curve costs 11.9 points"*.
   [`review`](../../reviews/2026-09-03-why-a-good-night-scored-63.md).
+- **⛔ THE GUIDED WALK'S FAST TARGET IS UNREACHABLE, AND THE PACER SAYS "PUSH" EVERY TIME** (TN-25).
+  `walk-active.tsx:67-68` sets **fast ≥ 0.70 reserve (133 bpm)**, **slow ≤ 0.40 (98 bpm)**. Measured:
+  **fast blocks average 98.5 — the SLOW target — and 0 of 44 have ever met the fast one.**
+  `classifyZone` returns `'push'` below target, so the live cue has read *push* on **100% of fast
+  intervals across ten sessions**. Closing 34.7 bpm needs **+121 spm → 233 spm**: not a walk. The
+  0.70 fraction suits the protocol's usual population (older adults), not a 33-year-old with a 168
+  max. **⛔ Do not silently lower it to make the cue turn green** — name and target must agree.
+- **The two metrics that answer "is the interval walk working" already exist in
+  `activity_logs.segments`:** **fast-block compliance** (currently **0%**) and **interval contrast**,
+  fast minus slow %reserve (currently **6.8 points** against the protocol's 30). **⚠ Do not set a
+  target for either yet** — compliance is 0% because the target is unreachable; fix TN-25 first.
 - **The walk PRESCRIPTION contradicts itself, and the owner executes it correctly** (TN-24).
   `prescribed_runs`: `target_hr_low/high` **68–97 bpm**, rationale *"a steady **Zone-2 aerobic**
   session"*. **68–97 lies entirely inside Zone 1** (Z2 starts at 122), and the rationale says

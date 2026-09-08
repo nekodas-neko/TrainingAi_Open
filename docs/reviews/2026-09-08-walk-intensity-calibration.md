@@ -172,3 +172,88 @@ zone bounds were computed by hand from `ZONE_DEFS` and the owner's profile, not 
 ~26% of the variance) and is used only to show that the required cadence is far outside the observed
 range, not to predict any individual interval. **17 of 106 segments carry a distance**, so nothing
 here rests on pace. Ten sessions, single subject.
+
+---
+
+# ADDENDUM — the app's own fast target has never been met, in 44 attempts (TN-25)
+
+Owner: *"the interval walk is a known effective exercise — what makes it effective is the 2 speeds.
+Should I be walking faster or slower during any phases?"*
+
+**The app already answers this, and it has been saying "push" on every fast block for ten sessions.**
+
+`walk-active.tsx:67-68` sets the live pacer's targets from the app's own Karvonen helper:
+
+```ts
+fast: hrReserveTarget(0.70, restingHr, hrMax),   // 133 bpm for this owner
+slow: hrReserveTarget(0.40, restingHr, hrMax),   //  98 bpm
+```
+
+Those fractions — **70% of reserve fast, 40% slow** — are the guided-interval-walking protocol the
+feature implements. They are the *definition* of the two speeds the owner is asking about.
+
+## Measured against the app's own targets
+
+| | |
+|---|---|
+| fast target | **≥ 133 bpm** |
+| **your fast blocks** | **98.5 bpm mean (40.1% reserve)**, best single block **115** |
+| **fast blocks meeting the target** | **0 of 44 — 0%** |
+| slow ceiling | ≤ 98 bpm |
+| your slow blocks | 90.7 bpm mean (33.3%) |
+| slow blocks within the ceiling | 35 of 45 — **78%** |
+
+### The finding, in one line
+
+**Your fast average (98.5 bpm) is the app's slow target (98 bpm).** The whole session runs one phase
+low: the fast blocks are working at the intensity prescribed for recovery, and the slow blocks sit
+below that again.
+
+**`classifyZone` returns `'push'` whenever a fast block is under target — so the pacer has shown
+"push" on 100% of fast intervals across ten sessions.** A live cue that can only ever say *push* is
+not coaching; it is the Q-504 failure in real time.
+
+### And the target is not reachable by walking
+
+Closing a **34.7 bpm** gap at the measured **0.288 bpm/spm** needs **+121 spm → 233 spm**. The best
+single fast block ever recorded is **115 bpm**, still 18 short.
+
+| date | fast avg | vs target |
+|---|---|---|
+| 2026-08-18 (best) | 110.6 | **−22.6** |
+| 2026-09-08 (latest) | 93.4 | **−39.8** |
+
+**So the answer to "faster or slower" is: faster on the fast blocks, and by more than walking can
+deliver.** The slow blocks are compliant and need no change.
+
+## What this means for the calibration
+
+**The 0.70 fraction is right for the protocol and wrong for this user's mode of exercise.** Guided
+interval walking is validated largely in older adults, for whom brisk walking does reach ~70% of
+reserve; a 33-year-old with a 168 bpm max cannot get there on flat ground at a 0.739 m stride.
+
+**Three options, and the choice is the owner's:**
+1. **Make the fast block a jog or an incline** — keeps the 70% target honest and the protocol intact.
+2. **Re-anchor the fast target to what walking can reach** (~50–55% of reserve, i.e. 110–116 bpm) and
+   rename the session so it is not claiming a stimulus it does not deliver.
+3. **Leave the target and stop showing a verdict that is always "push"** — the weakest option, but
+   better than the current state.
+
+**⛔ Do not silently lower the target to make the cue turn green.** That is the Q-504 mistake in the
+other direction: a target met by redefinition teaches nothing. Whichever option is chosen, the
+session's *name* and its *target* have to agree.
+
+## The efficiency metric the owner asked for
+
+Both halves are computable from `activity_logs.segments` today, with no new capture:
+
+- **Fast-block compliance** — % of fast blocks reaching the fast target. **Currently 0%.**
+- **Interval contrast** — fast %reserve minus slow %reserve. **Currently 6.8 points against the
+  protocol's 30.**
+
+Those two numbers say more about whether a session did its job than anything on the summary screen
+now, and the second is the direct read on *"what makes it effective is the 2 speeds"*.
+
+**⚠ Do not ship a target for either number from this review.** Ten sessions cannot calibrate one, and
+the fast-block figure is 0% precisely because the target above is unreachable — fix that first, then
+measure.

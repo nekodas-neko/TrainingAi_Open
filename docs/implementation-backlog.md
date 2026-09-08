@@ -399,6 +399,51 @@ below threshold and left in place for next time.
 
 
 
+### [cardio][heart-rate] TN-25 — the guided walk's fast target has never been met in 44 attempts, and the live pacer says "push" every time
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-08 · owner: *"what makes it effective is the 2 speeds — should I be walking faster or slower during any phases?"*
+- **Lane: A** — `components/guided-walk/walk-active.tsx:67-68` sets the targets; `classifyZone` in `hr-zones.ts` renders the verdict.
+- **Reference:** [`review`](reviews/2026-09-08-walk-intensity-calibration.md) (addendum). Sibling of **TN-24**; fix together or in either order.
+- **Gate: owner** — the three options below are a product choice, not a calibration.
+
+`walk-active.tsx:67-68` sets the pacer from the app's own Karvonen helper: **fast ≥ 0.70 of reserve,
+slow ≤ 0.40**. For this owner that is **fast ≥ 133 bpm, slow ≤ 98**.
+
+| | measured |
+|---|---|
+| fast blocks | **98.5 bpm mean (40.1% reserve)**, best single **115** |
+| **fast blocks meeting the target** | **0 of 44 — 0%** |
+| slow blocks | 90.7 bpm (33.3%) |
+| slow blocks within the ceiling | 35 of 45 — **78%** |
+
+**The owner's FAST average (98.5) is the app's SLOW target (98).** The session runs one phase low
+throughout. And `classifyZone` returns `'push'` for any fast block under target, so **the live pacer
+has shown "push" on 100% of fast intervals across ten sessions** — a cue that can only ever say
+*push* is the Q-504 failure rendered live.
+
+**The target is not reachable by walking.** Closing **34.7 bpm** at the measured **0.288 bpm/spm**
+needs **+121 spm → 233 spm**. The 0.70 fraction is right for the protocol and wrong for this user's
+mode: guided interval walking is validated largely in older adults, for whom brisk walking does reach
+70% of reserve; a 33-year-old with a 168 max cannot on flat ground at a 0.739 m stride.
+
+**Three options — owner's choice:**
+1. **Make the fast block a jog or an incline** — keeps the 70% target honest and the protocol intact.
+2. **Re-anchor the fast target to what walking reaches** (~50–55% reserve = 110–116 bpm) **and rename
+   the session** so it stops claiming a stimulus it does not deliver.
+3. **Leave the target, stop rendering an always-"push" verdict** — weakest, but better than now.
+
+**⛔ Do not silently lower the target to make the cue turn green.** A target met by redefinition
+teaches nothing. Whichever option wins, the session's **name and its target must agree**.
+
+**Two metrics worth surfacing, both computable from `activity_logs.segments` today:** fast-block
+compliance (**currently 0%**) and interval contrast, fast minus slow %reserve (**currently 6.8 points
+against the protocol's 30**). **⚠ Do not ship a target for either from this review** — ten sessions
+cannot calibrate one, and compliance reads 0% because the target above is unreachable. Fix that
+first, then measure.
+
+**Pass test:** after the change, a fast block that the owner experiences as hard renders a non-`push`
+verdict; and fast-block compliance over a month is neither 0% nor 100%.
+
 ### [cardio][activity][heart-rate] TN-24 — Zone 2 is unreachable on foot, so the walk's zone bar carries no information (and this is Q-523's mechanism)
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-08 · owner: *"can we make any calibrations or formulas for this to optimise the walk?"* after a 30-minute interval walk logged **30:00 Z1 / 0:00 everything else**
