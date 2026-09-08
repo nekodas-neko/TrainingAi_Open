@@ -1154,17 +1154,17 @@ repair the 22 dead backlog paths and 43 doubled `docs/overview/overview/` labels
 unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge candidates
 (led by `oura-ring-data-reference.md`, a retired-API reference with no retirement note).
 
-### [platform] PS-39 — 142 API routes still have no test that imports their handler
+### [platform] PS-39 — 140 API routes still have no test that imports their handler
 
 - **Lane:** A. Regenerate the list with `node scripts/check-route-test-coverage.js` — it prints every
   uncovered route when it fails, and the ratchet now holds the number.
 - **Added:** 2026-09-06, app checkpoint — [report](reviews/2026-09-05-app-checkpoint.md) lane 25.
   The scan shipped 2026-09-07 with `health-connect/ingest` and `client-error`, then
-  `training-load`, `calendar-data` and `muscle-recovery`, then `colmi/samples`, `program-week` and
-  `oura/hr-day`; the rest is buildable work rather than a residue, so it keeps no `Keep:` — that
+  `training-load`, `calendar-data` and `muscle-recovery`, then `colmi/samples`, `program-week`,
+  `oura/hr-day` and `oura-ble/samples`; the rest is buildable work rather than a residue, so it keeps no `Keep:` — that
   would file it under a heading telling the lane not to look (OR-100).
 
-- **⚠️ THE 142 IS ITSELF OVERSTATED BY 15, MEASURED 2026-09-08 (Q-112d).** The scan asks whether any
+- **⚠️ THE 140 IS ITSELF OVERSTATED BY 15, MEASURED 2026-09-08 (Q-112d).** The scan asks whether any
   test file contains the substring `app/api/<route>/route`, which a **relative** import never
   produces. Fifteen routes on the uncovered list have a co-located test in their own `__tests__/`
   loading the handler as `await import('../route')`: `sync/push`, `sync/pull`, `next-session`,
@@ -1182,11 +1182,13 @@ unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge
     That is a path join, not a parser. Whoever does it must re-baseline in the same PR, and the
     number will DROP by about 15 — which is a check becoming honest, not debt being paid.
 
-**The count was 93 and is really 142**, by the mechanism the entry half-noticed: it counted a route
+**The count was 93 and is really 140**, by the mechanism the entry half-noticed: it counted a route
 covered when any test mentioned its URL, so `calendar-data` and `training-load` "appearing only as
 cache-key strings" counted. Asking instead whether a test imports the handler gives 150 of 222, less
-the eight paid down so far. Not a call to write 142 files — 18 are admin/debug. What is left of the
-actionable core: **`oura-ble/samples/*`**, the last of the ingest routes and the largest. `scripts/check-route-test-coverage.js` is the ratchet, so the debt can only
+the ten paid down so far. Not a call to write 140 files — 18 are admin/debug, and per the warning
+above ~15 more are miscounted. **The actionable core
+named by this entry is now CLEAR**: the home aggregates, both ingest routes and `program-week` are
+done. What is left is the long tail, which is real work but no longer has a shortlist. `scripts/check-route-test-coverage.js` is the ratchet, so the debt can only
 shrink and a NEW route arrives uncovered and fails — which is the half that matters.
 
 ### [app-shell][platform] LA-76 — a deload PHASE still decays the collection, and nothing dates one
