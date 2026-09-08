@@ -9062,3 +9062,7 @@ test — which is what makes the checklist usable on a case it has not seen.
 ## 2026-09-08 — `docs/overview/entries/` total ceiling → 331 (LA-80, eleventh PR running)
 
 330 → 331. Eleventh consecutive raise, one per PR, as LA-80 describes.
+
+## 2026-09-08 — `docs/overview/entries/` total ceiling → 332 (LA-80, twelfth PR running)
+
+331 → 332. Twelfth consecutive raise, one per PR, as LA-80 describes.
