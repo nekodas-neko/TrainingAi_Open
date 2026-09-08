@@ -11,6 +11,7 @@ import type { ExerciseLibraryEntry } from '@trainingai/shared/types/program'
 import { AddExerciseSheet } from '@/components/exercises/add-exercise-sheet'
 import { WeeklyMuscleSetsCard } from '@/components/health/weekly-muscle-sets-card'
 import { goalRange, formatGoalRange } from '@trainingai/shared/ai-periodization/goal-ranges'
+import { buildEquipmentSet, equipmentEligible } from '@trainingai/shared/workout/equipment'
 import { Switch } from '@/components/ui/switch'
 import { useScrollToBottom } from '@/lib/hooks/use-scroll-to-bottom'
 import { useExerciseMedia } from '@/lib/hooks/use-exercise-media'
@@ -165,16 +166,6 @@ export default function BuilderReview({ program, inputs, onBack, onSaved, onProg
     })
   }, [program, onProgramChange])
 
-  function buildEquipmentSet(selected: string[]): Set<string> {
-    const set = new Set<string>(['bodyweight'])
-    if (selected.includes('full_gym')) {
-      ;['barbell', 'dumbbell', 'cable', 'kettlebell', 'machine', 'bodyweight'].forEach(e => set.add(e))
-    } else {
-      selected.forEach(e => set.add(e))
-    }
-    return set
-  }
-
   function getAlternatives(exercise: GeneratedExercise): ExerciseLibraryEntry[] {
     const equipmentSet = buildEquipmentSet(inputs.equipment)
     const mainMuscles = new Set(exercise.mainMuscles.map(m => m.toLowerCase()))
@@ -186,7 +177,7 @@ export default function BuilderReview({ program, inputs, onBack, onSaved, onProg
         if (ex.name === exercise.name) return false
         if (ex.mergedInto) return false
         if (isPrimarySlot && ex.muscles.length <= 1) return false
-        const hasEquip = ex.equipment.length === 0 || ex.equipment.some(e => equipmentSet.has(e.toLowerCase()))
+        const hasEquip = equipmentEligible(ex.equipment, equipmentSet)
         const sharesMain = ex.muscles.some(m => m.role === 'main' && mainMuscles.has(m.muscle.toLowerCase()))
         return hasEquip && sharesMain
       })

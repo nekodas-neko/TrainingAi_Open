@@ -566,32 +566,6 @@ OR-102a/b will read dose history to recommend the next dose. A tracker that read
   worst-case default for unknown equipment.
 - **Reversal cost:** low as code, high as behaviour — it moves every generated program's volume, at
   every budget except five exercises.
-### [workouts][app-shell] LA-66 — the swap sheet still carries its own copy of the equipment filter, and it is the permissive one
-
-- **Lane:** B — `components/workout-builder/builder-review.tsx`.
-- **Added:** 2026-09-07 · Lane A, from BF-129. The entry itself named this the Lane B half of the same read, so this is that half filed rather than reached across the lane boundary.
-- **Needs:** — nothing.
-- **What BF-129 did, so this entry does not repeat it.** `buildEquipmentSet` existed as **three
-  byte-identical copies**; two of them (`app/api/generate-program/route.ts`,
-  `app/api/builder-chat/route.ts`) now import `buildEquipmentSet` / `equipmentEligible` from
-  `packages/shared/src/workout/equipment.ts`, where an exercise declaring **no** equipment is
-  excluded rather than passed. `builder-review.tsx:177` keeps the third copy, and its filter at
-  `:198` is still `ex.equipment.length === 0 || ex.equipment.some(...)`.
-- **The change is two lines**: delete the local `buildEquipmentSet`, import both helpers from the
-  shared module, and call `equipmentEligible(ex.equipment, equipmentSet)` at `:198`. The shared
-  module's doc comment carries the reasoning; nothing needs restating at the call site.
-- **This is hardening, not a live defect, and the distinction is worth keeping straight.** Migration
-  269 labelled the 22 rows that had drifted and `POST /api/exercises` now refuses to create another,
-  so there should be no unlabelled row for the permissive branch to let through. What this fixes is
-  the *third* divergent copy of a rule that decides whether a lifter is offered an exercise they
-  cannot perform — and the reason BF-129 existed at all is that the rule had three homes and only
-  one of them got looked at.
-- **Verify by reading, not by generating.** The swap sheet's alternatives list is the surface: with
-  a home-gym equipment selection, no `Machine %` exercise should appear among the eight offered.
-  That is already true from the data fix, which is exactly why the code change needs its own check
-  rather than a screenshot.
-- **Reversal cost:** trivial — one import and one predicate, on one component.
-
 ### [platform] LB-56 — E2E costs 26 minutes a UI PR and currently gates nothing; decide which of those to change
 
 - **Lane:** O — the Orchestrator's, not an implementer's. `.github/workflows/ci.yml`, `playwright.config.ts` and the required-checks
