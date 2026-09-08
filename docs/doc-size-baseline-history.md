@@ -9139,3 +9139,9 @@ had not. **#993 added those tests to `main` mid-session**, and the check compare
 against the merge base — so a stale branch reads as a regression it did not cause. The check was
 right and the branch was old. Confirmed before acting by stashing the changes and re-running against
 a clean tree, which reproduced it, and then by fetching `origin/main` and finding the new commit.
+
+## 2026-09-08 — `docs/overview/entries/` total ceiling → 332 (LA-80, thirteenth PR running)
+
+331 → 332. Thirteenth consecutive raise, one per PR, as LA-80 describes. The number this branch
+raises from is whatever its base holds — it is cut from main rather than from a sibling PR, so a
+raise landing in parallel is resolved on the merge, not predicted here.
