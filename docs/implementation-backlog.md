@@ -1154,7 +1154,7 @@ repair the 22 dead backlog paths and 43 doubled `docs/overview/overview/` labels
 unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge candidates
 (led by `oura-ring-data-reference.md`, a retired-API reference with no retirement note).
 
-### [platform] PS-39 — 140 API routes still have no test that imports their handler
+### [platform] PS-39 — 139 API routes still have no test that imports their handler
 
 - **Lane:** A. Regenerate the list with `node scripts/check-route-test-coverage.js` — it prints every
   uncovered route when it fails, and the ratchet now holds the number.
@@ -1164,29 +1164,26 @@ unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge
   `oura/hr-day` and `oura-ble/samples`; the rest is buildable work rather than a residue, so it keeps no `Keep:` — that
   would file it under a heading telling the lane not to look (OR-100).
 
-- **⚠️ THE 140 IS ITSELF OVERSTATED BY 15, MEASURED 2026-09-08 (Q-112d).** The scan asks whether any
-  test file contains the substring `app/api/<route>/route`, which a **relative** import never
-  produces. Fifteen routes on the uncovered list have a co-located test in their own `__tests__/`
-  loading the handler as `await import('../route')`: `sync/push`, `sync/pull`, `next-session`,
-  `next-session/prescription`, `user/goals`, `workout-sessions`, `body-battery`, `health-trends`,
-  `health/trends`, `ai/health-insight`, `oura/stats`, `oura/hr-window`, `oura-ble/accel-chunks`,
-  `oura-ble/live-steps`, `admin/backfill-derived-scores`. So the real debt is nearer **126**, and
-  four of the fifteen are among the most consequential routes in the app — a list that says
-  `sync/push` is untested is a list nobody should act on before this is fixed.
-  - **How it surfaced is the argument for fixing it rather than re-counting by hand.** Q-112d took
-    `day-review/week-window` off the list with a **type-only** import written for a response type —
-    it tests nothing — while that route's own real handler test had been invisible the whole time.
-    The signal is not just noisy, it points the wrong way in both directions at once.
-  - **The fix is to resolve the specifier rather than match the string**: for a test under
-    `app/api/<route>/`, a relative `../route` (or `../../route`) resolves to that route's module.
-    That is a path join, not a parser. Whoever does it must re-baseline in the same PR, and the
-    number will DROP by about 15 — which is a check becoming honest, not debt being paid.
+- **✅ THE SCAN'S RULE IS FIXED (2026-09-08), and Q-112d's diagnosis was half of it.** The scan used
+  to ask whether a test *contained the substring* `app/api/<route>/route`. Q-112d spotted that a
+  **relative** import never produces that substring, so a route whose own `__tests__/` loads the
+  handler as `await import('../route')` read as untested — right, and it affected **13** routes
+  (`sync/push`, `sync/pull`, `body-battery`, `ai/health-insight`, `user/goals` and eight more).
+  - **The opposite error was the same size and nobody had counted it.** A substring is not an
+    import: **12 routes read as COVERED because a test merely mentioned the path**, almost always
+    `import type { Response } from '@/app/api/<route>/route'` — borrowing a type and calling
+    nothing. `workout-data`, `nutrition/energy-balance` and `weekly-digest` were all believed tested
+    and are not.
+  - **So the debt is 139, not the ~126 predicted from the false negatives alone** (140 − 13 + 12).
+    The old number was accidentally close to right for two wrong reasons, which is why the
+    prediction from one direction missed. The checker now resolves the specifier and ignores
+    type-only imports, so both directions are honest.
 
-**The count was 93 and is really 140**, by the mechanism the entry half-noticed: it counted a route
+**The count was 93 and is really 139**, by the mechanism the entry half-noticed: it counted a route
 covered when any test mentioned its URL, so `calendar-data` and `training-load` "appearing only as
 cache-key strings" counted. Asking instead whether a test imports the handler gives 150 of 222, less
-the ten paid down so far. Not a call to write 140 files — 18 are admin/debug, and per the warning
-above ~15 more are miscounted. **The actionable core
+the ten paid down so far. Not a call to write 139 files — 18 are admin/debug. The count is now
+honest in both directions (see above), so the list can be worked from. **The actionable core
 named by this entry is now CLEAR**: the home aggregates, both ingest routes and `program-week` are
 done. What is left is the long tail, which is real work but no longer has a shortlist. `scripts/check-route-test-coverage.js` is the ratchet, so the debt can only
 shrink and a NEW route arrives uncovered and fails — which is the half that matters.
