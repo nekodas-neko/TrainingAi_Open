@@ -9280,3 +9280,24 @@ merge *before* this one had committed that file with its markers still in it, re
 file and missed here. Nothing had been pushed, so the cost was three lines. The tell is worth keeping:
 `grep -c '^<<<<<<<' ` on the file, not a reading of the diff, is what found it, because the markers sit
 9,000 lines into a document nobody reads end to end.
+
+## 2026-09-08 — `docs/implementation-backlog.md` 19,392 → 19,378 (−14), BF-132 shipped and LB-66 filed
+
+BF-132's 35 lines come out and LB-66's 21 go in, which is what a completed entry with a residue looks
+like: the two fixes that shipped stop being something to read, and the third — a `deleted_at` on
+`program_sessions` and `session_exercises` — moves to an entry of its own rather than staying as a
+`Keep:` line under work that is finished. It is Lane A's, because it is a migration.
+
+The new entry carries forward the one paragraph from BF-132 worth keeping: what made the owner's loss
+recoverable was luck (a BugFix session had quoted the structure two days earlier, and `exercise_logs`
+carry the names), and LB-66 is the entry that would remove the need for it.
+
+## 2026-09-08 — `projectOverview.md` 10,419 → 10,431 (+12), the saved-delete risk (BF-132 → LB-66)
+
+Raised for a Known-Issues row that says the half of BF-132 which did **not** ship. The confirmation
+and the undo are in v1.438.5 and read as a fix; a saved delete is still a hard delete against two
+tables with no `deleted_at`, and nothing on the screen says so once Save is pressed.
+
+The row is not a duplicate of LB-66. The backlog is what an implementer reads; this file is what the
+owner reads before a session, and the owner is the person who lost a session to this. It leaves when
+LB-66 lands, not when the confirmation shipped.
