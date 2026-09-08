@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.438.5",
+    date: "2026-09-08",
+    changes: [
+      "Fixed a way to permanently break your own Profile tab. A handful of reserved words \u2014 \u0027constructor\u0027 and seven others \u2014 were accepted as a title even though they are not titles, and once one was saved the Profile tab failed to draw at all, including the screen you would use to change it back. Those are now refused like any other unknown title.",
+    ],
+  },
+  {
     version: "1.438.4",
     date: "2026-09-08",
     changes: [
