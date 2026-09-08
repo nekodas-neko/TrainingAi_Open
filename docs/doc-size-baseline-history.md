@@ -8881,3 +8881,9 @@ trusted"* — and a wrong required-checks list is exactly the kind of thing that
 PS-4 asks for all six under ~150 lines and says the work is not a separate task but a by-product of
 each role rewriting its own. This is that: 156 with the stale run-specific narrative gone and this
 run's lessons in its place.
+
+## 2026-09-08 — `docs/implementation-backlog.md` → 18765 (LB-59 shipped)
+
+18789 → 18765, a 24-line fall. LB-59's entry removed on shipping (a lane written as a word now fails
+`check-backlog-pointers.js` rather than silently reading as unstated), less four lines added to
+BF-106 explaining why its lane went from the unparseable `none` to `O`.

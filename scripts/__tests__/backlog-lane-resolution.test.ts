@@ -4,8 +4,9 @@
 // sitting at the top of the other lane's list.
 import { describe, it, expect } from 'vitest'
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { laneFromLines } = require('../lib/lane.js') as {
+const { laneFromLines, laneFieldProblem } = require('../lib/lane.js') as {
   laneFromLines: (lines: string[]) => 'A' | 'B' | '?' | null
+  laneFieldProblem: (line: string) => string | null
 }
 
 describe('backlog lane resolution', () => {
@@ -86,5 +87,64 @@ describe('backlog lane resolution', () => {
 
   it('will not confuse an Orchestrator lane with the word it starts', () => {
     expect(laneFromLines(['- **Lane:** Orchestrator-adjacent, but really Lane B'])).toBe('B')
+  })
+})
+
+// LB-59. The reader above cannot see `**Lane:** Orchestrator` — `LANE_FIELD_RE` needs a boundary
+// after the letter and the `O` is followed by `r` — so the field returns "unstated", and an unstated
+// entry prints in BOTH implementer lanes' READY lists. PS-38 sat at the top of Lane B's for a day on
+// that, and a Lane B session picked up work that was nobody's. Measured 2026-09-07: 4 entries wrote
+// `O`, 1 wrote the word.
+//
+// Printing in both lists stays the failure mode — hiding an unmatched entry once took 96 of 203 out
+// of both lanes at once. This is the signal at the point of WRITING, where the mistake is cheap.
+describe('backlog lane field validation', () => {
+  it('passes every shape the reader can actually read', () => {
+    for (const line of [
+      '- **Lane:** A — `app/api/**`, plus a migration.',
+      '- **Lane: A**',
+      '- **Lane:** B.',
+      '- **Lane: O** — the Orchestrator owns `.github/workflows/`.',
+      '- Lane: ?',
+      '- **Lane: ?** — whichever role does its handoff next',
+    ]) expect(laneFieldProblem(line)).toBeNull()
+  })
+
+  it('flags the spelled-out lane that reads as unstated', () => {
+    expect(laneFieldProblem('- **Lane:** Orchestrator')).toBe('Orchestrator')
+  })
+
+  it('flags the typos the regex would still misread or miss', () => {
+    expect(laneFieldProblem('- **Lane:** b/A')).toBe('b/A')
+    expect(laneFieldProblem('- **Lane: Lane A**')).toContain('Lane A')
+    // A real entry: BF-106 wrote `none` for an owner action against production.
+    expect(laneFieldProblem('- **Lane:** none — an owner action, not a code change.')).toContain('none')
+  })
+
+  it('flags a field declared with no value at all', () => {
+    expect(laneFieldProblem('- **Lane:**')).toBe('(empty)')
+  })
+
+  // Three quarters of the queue names its lane bare and prose mentions one constantly. Judging
+  // those would turn a deliberately loose reader into a style checker over 200 entries.
+  it('judges only the field form, never the bare one or prose', () => {
+    for (const line of [
+      '- **Surface:** `components/**` — **Lane B**',
+      '- **Lane B.** The engine half shipped.',
+      '  - **Re-scoped from Lane A to Lane B.** Not a missing recompute path.',
+      'What is left is Lane A\'s, and it needs a migration.',
+    ]) expect(laneFieldProblem(line)).toBeNull()
+  })
+
+  // Both fall out of anchoring at the bullet — each puts a character before the field name. An
+  // explicit `~~` guard was written first and mutating it away failed nothing, which is how it was
+  // found to be dead; it would also have let a HALF-struck live value through unflagged.
+  it('leaves a struck-through field and a documented example alone', () => {
+    expect(laneFieldProblem('- ~~**Lane:** Orchestrator~~ — superseded')).toBeNull()
+    expect(laneFieldProblem('- `**Lane:** <letter>` names the lane.')).toBeNull()
+  })
+
+  it('still flags a value only half struck through', () => {
+    expect(laneFieldProblem('- **Lane:** ~~Orchestrator~~ nobody')).toContain('Orchestrator')
   })
 })
