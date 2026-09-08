@@ -8697,3 +8697,29 @@ Down 26. LA-60 was long because it could not choose between its two options with
 Railway runs, and said so. That question is now answered by measurement rather than argument —
 production stack traces place it on Node 22 — so the entry's whole "two candidate fixes" section is
 spent, and what replaces it is a CI rule that fails when the two disagree.
+
+## 2026-09-07 — `docs/implementation-backlog.md` 18,688 → 18,728 (+40), BF-105 respecified
+
+No new entry. The owner reported that a walk cue ducks his music without playing a sound, then chose
+what should replace it — *"Yes lets have beeps and sound saying Fast/Slow"* — which supersedes the
+half of BF-105 still queued. That half was specced as two notification channels with different tones;
+it is now a tone plus a spoken word, played natively.
+
+Amended in place rather than filed fresh, because two entries for one cue is how the queue grows a
+contradiction. The lane moves B → A with it: the work is Kotlin and `res/raw` audio, not the TSX the
+shipped half touched.
+
+The added lines are mostly the reasoning that stops the obvious wrong move being made twice:
+
+- **Priority is not the lever.** The channel is already `importance: 4`. Written down because
+  "raise the priority" is the first thing anyone tries, including the owner in his report.
+- **The symptom is a stream problem.** A notification plays on the notification stream — separate
+  volume from media, silenced in vibrate mode — which produces a duck with no sound exactly as
+  reported. The recommendation (`AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK` + `USAGE_ASSISTANCE_NAVIGATION_GUIDANCE`)
+  follows from that and would not follow from the symptom alone.
+- **Clips, not TTS**, with the reason stated: five fixed phrases, and a cue that must land on the
+  second cannot wait on a synthesiser's cold start.
+- **A disclaimer on this entry's own earlier text.** It already said "there is no TTS in the app —
+  Q-189 deleted that route", which reads as precedent against a voice cue. What Q-189 deleted was a
+  server-side Gemini read-aloud endpoint for an unreachable chat screen. Left uncorrected, the entry
+  argues against its own new plan.

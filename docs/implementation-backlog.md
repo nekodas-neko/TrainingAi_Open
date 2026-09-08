@@ -2295,11 +2295,13 @@ while the file has not.
   fourth size reading confirming the trend line is flat, or a correction to `CLAUDE.md`'s 0.4 MB/day.
 
 
-### [activity][app-shell] BF-105 — the interval-walk phase change fires one generic ping and nothing in-app (in-app half shipped; the channel split needs an APK)
+### [activity][app-shell] BF-105 — the interval-walk phase change fires one generic ping and nothing in-app (in-app half shipped; spoken cues need an APK)
 
-- **Lane:** B — `components/guided-walk/walk-active.tsx`, `lib/walk/walk-cues.ts`,
-  `components/capacitor-native-init.tsx` (channel definitions).
-- **Keep:** the channel half, which is now known to need an APK, and the device verification below.
+- **Lane:** A for the remaining half — it is now Kotlin plus `android/app/src/main/res/raw/`
+  audio files. The shipped in-app half was Lane B (`components/guided-walk/walk-active.tsx`,
+  `lib/walk/walk-cues.ts`, `components/capacitor-native-init.tsx`).
+- **Keep:** the audible-cue half, respecified by the owner on 2026-09-07 — see **THE OWNER CHOSE
+  SPOKEN CUES** below, which supersedes the two-channel plan. Plus the device verification.
   The in-app half — the reported failure — shipped 2026-09-02.
 - **Gate:** device — what is left needs a new APK (an audio file in `res/raw/`) and then a listening
   test with the phone pocketed. Neither is reachable from the sandbox. The same gate carries the
@@ -2387,12 +2389,50 @@ The two-channel split is the second half and only pays off when the screen is of
   `workout-screen.tsx:1373` does — so the screen sleeps mid-walk and the notification is the primary
   channel by default. That is arguably correct for a 30-minute walk and is not being changed here, but
   it is why finding 1 matters more than finding 2 in practice.
+**THE OWNER CHOSE SPOKEN CUES, AND THAT REPLACES THE TWO-CHANNEL PLAN (2026-09-07).** Reported
+mid-walk: *"while walking and listening to music it seems like it gets muted and the indicator sound
+doesnt play through - it might need a higher priority"*, then, asked to choose between a tone and a
+voice: *"Yes lets have beeps and sound saying Fast/Slow"*. So the target is a **short tone followed
+by a spoken word** — Fast · Slow · Cool down · Warm up · Walk complete.
+
+- **Priority is not the lever, and this is worth stating because it is the obvious first move.**
+  `capacitor-native-init.tsx:157` already creates `workout-timers` at `importance: 4`
+  (`IMPORTANCE_HIGH`) — heads-up plus sound, the top of the non-critical range. There is nothing
+  above it that changes audio behaviour.
+- **The reported symptom is a STREAM problem, not a priority one.** A notification plays on the
+  notification stream: a separate volume slider from media on Samsung, and silenced outright in
+  silent/vibrate mode while media keeps playing. That produces exactly what was reported — the duck
+  without the sound. **The owner's status bar shows the mute icon in every screenshot from that day**,
+  so confirm the phone's sound mode before treating the silence itself as a defect; the design below
+  is right either way.
+- **Build it as a native player with navigation-style audio focus**, not as a notification sound.
+  `AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK` with `USAGE_ASSISTANCE_NAVIGATION_GUIDANCE` is what a
+  turn-by-turn app uses: it ducks the music, plays over it, and is governed by media volume rather
+  than ring volume. A `res/raw` notification sound cannot do any of that.
+- **Pre-recorded clips, NOT text-to-speech.** The vocabulary is five fixed phrases, which is exactly
+  the case where TTS's one advantage — arbitrary text — buys nothing, against a plugin dependency and
+  an init latency of hundreds of ms to seconds on a cold start. A cue that must land on the second
+  cannot wait on a synthesiser warming up. Clips can also be mastered loud enough to cut through
+  music, which a system voice cannot be.
+- **`Q-189 deleted the TTS route` is in this entry above and must not be read as precedent.** What it
+  deleted was a **server-side Gemini read-aloud endpoint for the chat screen**, reachable only from a
+  page nothing linked to. It says nothing about an on-device voice cue and is not an argument against
+  one.
+- **The cheap foreground half still stands and ships without an APK:** extract `playBeep()` out of
+  `components/workout-screen.tsx:86` into `lib/`, which **One Formula, One Place** requires anyway now
+  that it has a second caller, and fire it on segment change. Be honest about what it buys — Web Audio
+  is suspended in a backgrounded WebView and the walk screen never calls `setKeepAwake`, so it reaches
+  a walker with the app open and the screen awake, which is not the reported case.
+
 - **Verification (device):** with the app foregrounded, a fast→slow boundary produces a haptic and a
   visible transition without the phone being raised; with the screen off and the phone pocketed, the
   two directions are distinguishable by sound or vibration alone; the cue still fires at the right
   second after the app has been backgrounded for several minutes (the exact-alarm path, worth
   re-confirming rather than assuming); and the walk's cues are cancelled on leaving so a stopped walk
-  does not keep pinging.
+  does not keep pinging. **Added for the spoken cue:** with music playing, a boundary ducks the track,
+  the tone and word are both audible over it, and the music returns to full volume afterwards — tested
+  with the phone pocketed and the screen off, and repeated with the phone in silent mode, which is
+  where the notification path fails today.
 
 
 ### [nutrition] BF-104 — log a meal at ½× / 1× / 1½× (shipped; device check owed)
