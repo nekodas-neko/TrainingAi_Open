@@ -399,6 +399,43 @@ below threshold and left in place for next time.
 
 
 
+### [cardio][devices] TN-26 — treadmill walks record no belt speed, so the one control variable that exists indoors is invisible
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-08 · owner: *"I mostly do this on a treadmill so we can't add incline… should slow go to 100 spm and fast to 130?"*
+- **Lane: A** — capture; `components/guided-walk/walk-summary.tsx:141-146`, `lib/walk/interval-plan.ts`.
+- **Blocks TN-25's owner decision** — the fast-phase intensity cannot be chosen before this user's speed→HR curve exists, and it cannot exist without this.
+- **Reference:** [`review`](reviews/2026-09-08-walk-intensity-calibration.md) (addendum 2).
+
+**On a treadmill, cadence is not a control.** The owner's own mapping — 90 spm at 2 km/h, 120 spm at
+4 km/h — implies strides of **0.370 m** and **0.556 m** against the **0.739 m** measured outdoors.
+At a fixed belt speed, more steps means shorter steps. **Cadence follows speed indoors; it does not
+drive it.** So a cadence target is the wrong instruction for the majority of these sessions.
+
+**And the app cannot see the right one.** `walk-summary.tsx:141-146` saves treadmill walks as
+activity type `treadmill` with `is_distance_based = false` — **no distance, no pace, no speed**.
+Treadmill sessions capture **cadence and HR only**, and there is no belt-speed field anywhere. **Only
+17 of 106 stored segments carry a distance**, so this is the majority case.
+
+**The owner's proposed change is directionally right and ≈+2 bpm in size:** slow 90→100 spm is
+2.0→2.2 km/h (**+0.9 bpm**), fast 120→130 spm is 4.0→4.3 km/h (**+1.3 bpm**), against a 34.7 bpm
+shortfall on the fast target.
+
+**⛔ Do not derive a belt-speed prescription from the two points that exist.** 2 km/h → 90.7 bpm and
+4 km/h → 98.5 bpm gives ≈3.9 bpm/km/h, which extrapolates 70% reserve to **~12.9 km/h** — obviously
+wrong. The slope was measured in the flattest part of the curve; the response steepens sharply toward
+the walk/run transition at ~7–8 km/h.
+
+**What to build, in order:**
+1. **Capture belt speed on treadmill walks** — one field per phase set once, or a session-level pair.
+   Without it nothing here is learnable.
+2. **Prescribe treadmill blocks in km/h, not spm.** Keep cadence as a *reported* stat — a good read on
+   effort outdoors, a dependent variable indoors.
+3. **Then run a speed ramp** (3 min each at 3/4/5/6/7 km/h, steady HR at each) to build the personal
+   speed→HR curve that TN-25's decision needs.
+
+**Pass test:** a treadmill walk stores a belt speed for each phase, and two sessions at different
+belt speeds produce different stored speeds with correspondingly different HRs.
+
 ### [cardio][heart-rate] TN-25 — the guided walk's fast target has never been met in 44 attempts, and the live pacer says "push" every time
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-08 · owner: *"what makes it effective is the 2 speeds — should I be walking faster or slower during any phases?"*

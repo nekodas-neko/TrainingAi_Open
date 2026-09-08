@@ -257,3 +257,82 @@ now, and the second is the direct read on *"what makes it effective is the 2 spe
 **⚠ Do not ship a target for either number from this review.** Ten sessions cannot calibrate one, and
 the fast-block figure is 0% precisely because the target above is unreachable — fix that first, then
 measure.
+
+---
+
+# ADDENDUM 2 — on a treadmill the control variable is belt speed, and the app never records it (TN-26)
+
+Owner: *"I mostly do this on a treadmill so we can't add incline… currently slow is below 90 spm
+(2 km/h) and fast above 120 (4 km/h). If we moved slow to below 100 and fast to above 130 — what's
+best?"*
+
+## The proposal is directionally right and about **+2 bpm** in size
+
+Using the owner's own speed↔cadence mapping and holding each phase's stride constant:
+
+| phase | cadence | belt speed | HR effect |
+|---|---|---|---|
+| slow | 90 → **100** spm | 2.0 → **2.2** km/h | **+0.9 bpm** |
+| fast | 120 → **130** spm | 4.0 → **4.3** km/h | **+1.3 bpm** |
+
+Against a **34.7 bpm** shortfall on the fast target, that is not the lever.
+
+## The deeper problem: on a treadmill, cadence is not a control at all
+
+The owner's mapping implies a stride of **0.370 m at 2 km/h** and **0.556 m at 4 km/h** — both far
+below the **0.739 m** measured outdoors. That is the giveaway: **at a fixed belt speed, taking more
+steps means taking shorter ones.** Cadence follows speed on a treadmill; it does not drive it.
+
+**So a cadence target is the wrong instruction for a treadmill walk.** The only lever on a flat belt
+is **km/h**.
+
+## And the app cannot see it
+
+`walk-summary.tsx:141-146` saves treadmill walks as activity type `treadmill` with
+`is_distance_based = false` — **no distance, no pace, no speed.** Treadmill sessions capture
+**cadence and heart rate only**, and there is no belt-speed field anywhere.
+
+**Consequence: the app cannot learn this user's speed→HR relationship, and cannot prescribe in the
+one unit that would work.** Most of the owner's walks are treadmill sessions — only **17 of 106
+segments carry a distance** — so this is the majority case, not an edge.
+
+## Why the numbers cannot be extrapolated
+
+Two speed points exist (2 km/h → 90.7 bpm, 4 km/h → 98.5 bpm), giving **≈3.9 bpm per km/h**.
+Extrapolated, 70% of reserve would need **~12.9 km/h** — which is obviously wrong: that is a run, and
+HR would arrive far sooner. **The slope was measured in the flattest part of the curve and does not
+survive extension.** The walk/run transition sits around 7–8 km/h and the HR response steepens
+sharply approaching it.
+
+**⛔ Do not set a belt-speed prescription from these two points.** It is the same error as fitting a
+threshold to a saturated input.
+
+## The calibration this actually needs
+
+**One session, and it produces the curve the app is missing:** 3 minutes each at **3, 4, 5, 6, 7
+km/h**, recording steady-state HR at each step. That yields a personal speed→HR curve, from which
+fast and slow blocks can be set in **km/h** — the unit the treadmill actually exposes.
+
+**Then the prescription becomes:** *"fast blocks at X km/h, slow at Y"*, with X chosen from the
+measured curve at whatever reserve fraction the protocol settles on (see TN-25 — the current 0.70 is
+unreachable on foot).
+
+**Two changes make this possible, in order:**
+1. **Capture belt speed on treadmill walks** — a single per-block field the owner sets once per
+   phase, or a session-level pair. Without it nothing here is learnable.
+2. **Prescribe treadmill blocks in km/h, not spm.** Keep cadence as a *reported* stat; it is a good
+   read on effort outdoors and a dependent variable indoors.
+
+## On "conversational" — the owner is applying the slow-phase rule to the fast phase
+
+The prescription's rationale reads *"a steady Zone-2 aerobic session — you should be able to hold a
+conversation."* The owner reasonably concluded a harder fast block would breach it.
+
+**But that guidance describes a steady easy session, not the fast half of an interval walk.** The
+same session simultaneously carries a pacer target of **70% of reserve**, which is by definition not
+conversational. **The app is issuing two incompatible instructions and the owner has been following
+the conservative one.** That is the third contradiction in this prescription (see TN-24) and the one
+that directly caused the question.
+
+**⚠ What this review does not settle:** what the fast-phase intensity *should* be for this user. That
+is TN-25's owner decision, and it cannot be answered before the speed→HR curve exists.

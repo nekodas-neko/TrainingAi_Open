@@ -3,7 +3,7 @@
 > **Successor sessions are titled `🎶 Tuning Agent 🟢`** — exactly, both emoji. Leading emoji = role,
 > trailing = this session's status, set by the session itself. See `docs/agents/README.md` §4.
 
-**Updated:** 2026-08-26 · **By:** `session_01VVfZtbCftbwaUHtBLJoxVr` · **Next ID:** `TN-26`.
+**Updated:** 2026-08-26 · **By:** `session_01VVfZtbCftbwaUHtBLJoxVr` · **Next ID:** `TN-27`.
 Find next free: `grep -rhoE '\bTN-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. Legacy `Q-` numbers
 stay valid. **Rewritten in full, never appended** — narrative lives in the linked reviews.
 
@@ -49,6 +49,7 @@ Filed this session, all propose-only, all in the queue:
 | **TN-23** | sleep's `hrv` + `hr` are one autonomic event scored twice, **25% of the score** | r=+0.869; ⛔ don't delete a contributor — collapse or down-weight |
 | **TN-24** | Z2 unreachable on foot; the walk's zone bar carries no information | **Q-523's mechanism**; ⛔ do not lower the boundaries |
 | **TN-25** | the walk's fast target met **0 of 44 times**; pacer says "push" every interval | `Gate: owner` — jog/incline, re-anchor, or stop the verdict |
+| **TN-26** | treadmill walks record **no belt speed** — the only indoor control is invisible | blocks TN-25's decision; prescribe km/h, not spm |
 
 **Owner decisions, 2026-08-24 — recorded on the entries, nothing gated on them.** TN-5 and TN-6
 signed off; **TN-6a** added (suspend the temperature penalty on a self-clearing condition, outside the
@@ -239,6 +240,20 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
   2026-09-02: the ten contributors blend to **76.04**, `SCORE_CALIBRATION` ships **63**. Two minutes of
   arithmetic separated *"the model is wrong"* from *"the display curve costs 11.9 points"*.
   [`review`](../../reviews/2026-09-03-why-a-good-night-scored-63.md).
+- **⛔ ON A TREADMILL, CADENCE IS NOT A CONTROL — belt speed is, and the app never records it**
+  (TN-26). Owner's mapping: 90 spm = 2 km/h, 120 spm = 4 km/h → strides of **0.370 m / 0.556 m**
+  against **0.739 m** outdoors. At fixed belt speed, more steps = shorter steps. `walk-summary.tsx`
+  saves treadmill walks with `is_distance_based = false` — **cadence and HR only, no speed field
+  anywhere** — and **only 17 of 106 segments carry a distance**, so indoors is the majority case.
+  **Prescribing spm indoors is prescribing a dependent variable.**
+- **⛔ Do NOT extrapolate a belt-speed prescription from the two points that exist.** 2 km/h → 90.7
+  bpm and 4 km/h → 98.5 gives 3.9 bpm/km/h, which puts 70% reserve at **~12.9 km/h** — obviously
+  wrong. That slope is from the flattest part of the curve; response steepens toward the walk/run
+  transition (~7–8 km/h). **The fix is a speed ramp**, not a longer extrapolation.
+- **The "hold a conversation" guidance is the SLOW-phase rule and the owner applied it to the fast
+  phase** — reasonably, because the app's rationale says it while the pacer simultaneously targets
+  70% of reserve. **Two incompatible instructions on one session**, and the owner followed the
+  conservative one. Third contradiction in this prescription (TN-24).
 - **⛔ THE GUIDED WALK'S FAST TARGET IS UNREACHABLE, AND THE PACER SAYS "PUSH" EVERY TIME** (TN-25).
   `walk-active.tsx:67-68` sets **fast ≥ 0.70 reserve (133 bpm)**, **slow ≤ 0.40 (98 bpm)**. Measured:
   **fast blocks average 98.5 — the SLOW target — and 0 of 44 have ever met the fast one.**
