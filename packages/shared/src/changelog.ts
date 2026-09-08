@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.438.2",
+    date: "2026-09-08",
+    changes: [
+      "The Sleep Goal box on the Goals screen is drawn like the Steps, Water and Calorie boxes above and below it. It had no border, so in a column of boxes it read as text rather than something you can type in.",
+    ],
+  },
+  {
     version: "1.438.1",
     date: "2026-09-08",
     changes: [
