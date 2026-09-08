@@ -1080,6 +1080,34 @@ two are `first-run-empty-states` and `preferences-survive-reinstall`. **Order ma
 least some of these are shared-state, not the spec's own logic. Read the artifact this PR makes real
 before assuming a local-DB artifact — that mistake has already been made once on `plan-rescale`.
 
+### [platform] LA-77 — 60% of the lint warnings are deliberate, so the 60 real ones are invisible
+
+- **Lane:** O — `eslint.config.mjs` is repo-level tooling in neither implementer lane's paths, the
+  same category as `.github/workflows/` (OR-103). The follow-on dead-code cleanup splits by file and
+  goes to whichever lane owns each.
+- **Added:** 2026-09-08, Lane A — noticed while landing the last PS-39 test file, then measured.
+
+`pnpm lint` reports **290 warnings, 0 errors**. **174 of them (60%) are `'_x' is defined but never
+used`** — the underscore-prefixed parameter convention this repo uses deliberately in every mocked
+`vi.fn` signature, precisely so an assertion can read `mock.calls[0][1]` with the parameter typed.
+They are not defects and can never be fixed, because the naming IS the intent.
+
+**The cost is the other 60.** `no-unused-vars` also catches genuine dead code, and there is some:
+an unused `clamp`, an unused `gte`/`sum` import pair, an unused `z`, a `req` a handler stopped
+reading. Those are real and each is a one-line deletion — but they sit in a list where six of every
+ten lines are noise, so nobody reads it and a new one lands silently. That is the same shape as
+Q-282, where an accessibility rule reporting at warning meant `pnpm lint` exited 0 with violations
+present.
+
+- **The fix is one line**: `'@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_',
+  varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }]`. It is the standard convention and it
+  turns the warning list back into signal.
+- **Then clear what is left** (~60) and consider whether the rule should be an **error**, which is
+  what would stop the next one landing silently. Deleting first and raising the severity second is
+  the order — the reverse fails CI on debt nobody has had a chance to pay.
+- **Not urgent, and small.** Nothing is broken; the Lint job passes on warnings today and would keep
+  passing. This is about whether the output can be read at all.
+
 ### [app-shell] PS-35 — five zero-content pages, a wrong PWA start_url, and boot-time paper cuts
 
 - **Lane:** B — `app/{workout-select,session-select,stats,config,profile}/page.tsx`,
@@ -1128,7 +1156,7 @@ repair the 22 dead backlog paths and 43 doubled `docs/overview/overview/` labels
 unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge candidates
 (led by `oura-ring-data-reference.md`, a retired-API reference with no retirement note).
 
-### [platform] PS-39 — 125 API routes still have no test that imports their handler
+### [platform] PS-39 — 124 API routes still have no test that imports their handler
 
 - **Lane:** A. Regenerate the list with `node scripts/check-route-test-coverage.js` — it prints every
   uncovered route when it fails, and the ratchet now holds the number.
@@ -1145,27 +1173,27 @@ unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge
   (`sync/push`, `sync/pull`, `body-battery`, `ai/health-insight`, `user/goals` and eight more).
   - **The opposite error was the same size and nobody had counted it.** A substring is not an
     import: **12 routes read as COVERED because a test merely mentioned the path**, almost always
-    `import type { Response } from '@/app/api/<route>/route'` — borrowing a type and calling
-    nothing. `workout-data`, `nutrition/energy-balance` and `weekly-digest` were all believed tested
-    and are not.
-  - **So the debt was 139, not the ~126 predicted from the false negatives alone** (140 − 13 + 12).
-    The old number was accidentally close to right for two wrong reasons, which is why the
-    prediction from one direction missed. The checker now resolves the specifier and ignores
-    type-only imports, so both directions are honest.
-  - **Eleven of the twelve now have real tests** (2026-09-08): `scale-ble/pending/[id]/{confirm,dismiss}`,
-    `nutrition/energy-balance`, `session-explain/insight`, `running-plan/explain`, `weekly-digest`,
-    `nutrition/saved-meals/[id]`, `nutrition/meal-plans/generate/meal`, `nutrition-goals/recommend`,
-    `workout-review/session/[sessionId]` + its `…/apply`, and `ai-periodization/session/[sessionId]`
-    + `…/prescribe` + `…/respond` — each batched with the uncovered siblings it verifies alongside
-    → **125**. One remains: `workout-data` (600 lines), the biggest.
+    `import type { Response } from '@/app/api/<route>/route'` — borrowing a type and calling nothing.
+  - **So the debt was 139, not the ~126 predicted from the false negatives alone** (140 − 13 + 12) —
+    accidentally close to right for two wrong reasons, which is why predicting from one direction
+    missed. The checker now resolves the specifier and ignores type-only imports, so both are honest.
+  - **✅ ALL TWELVE now have real tests** (2026-09-08) → **124**, the last being `workout-data`, 600
+    lines behind one GET serving three shapes with four production incidents named in its own
+    comments. The others: `scale-ble/pending/[id]/{confirm,dismiss}`, `nutrition/energy-balance`,
+    `session-explain/insight`, `running-plan/explain`, `weekly-digest`, `nutrition/saved-meals/[id]`,
+    `nutrition/meal-plans/generate/meal`, `nutrition-goals/recommend`, `workout-review/…` + `…/apply`
+    and `ai-periodization/session/[sessionId]` + `…/prescribe` + `…/respond` — each batched with the
+    uncovered siblings it verifies alongside.
 
-**The count was 93 and is really 125**, by the mechanism the entry half-noticed: it counted a route
+**The count was 93 and is really 124**, by the mechanism the entry half-noticed: it counted a route
 covered when any test mentioned its URL, so `calendar-data` and `training-load` "appearing only as
 cache-key strings" counted. Asking instead whether a test imports the handler gives 150 of 222, less
-the twenty-five paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
+the twenty-six paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
 honest in both directions (see above), so the list can be worked from. **The actionable core
 named by this entry is now CLEAR**: the home aggregates, both ingest routes and `program-week` are
-done. What is left is the long tail, which is real work but no longer has a shortlist. `scripts/check-route-test-coverage.js` is the ratchet, so the debt can only
+done. What is left is the long tail; the next coherent batch is the four remaining
+`ai-periodization` routes (`baseline/complete`, `program-overview`, `…/transition`, `weekly-volume`),
+which share fixtures with the file already landed. `scripts/check-route-test-coverage.js` is the ratchet, so the debt can only
 shrink and a NEW route arrives uncovered and fails — which is the half that matters.
 
 ### [app-shell][platform] LA-76 — a deload PHASE still decays the collection, and nothing dates one
