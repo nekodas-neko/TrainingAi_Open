@@ -1156,7 +1156,7 @@ repair the 22 dead backlog paths and 43 doubled `docs/overview/overview/` labels
 unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge candidates
 (led by `oura-ring-data-reference.md`, a retired-API reference with no retirement note).
 
-### [platform] PS-39 — 104 API routes still have no test that imports their handler
+### [platform] PS-39 — 103 API routes still have no test that imports their handler
 
 - **Lane:** A. Regenerate the list with `node scripts/check-route-test-coverage.js` — it prints every
   uncovered route when it fails, and the ratchet now holds the number.
@@ -1185,14 +1185,14 @@ unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge
     and `ai-periodization/session/[sessionId]` + `…/prescribe` + `…/respond` — each batched with the
     uncovered siblings it verifies alongside.
 
-**The count was 93 and is really 104**, by the mechanism the entry half-noticed: it counted a route
+**The count was 93 and is really 103**, by the mechanism the entry half-noticed: it counted a route
 covered when any test mentioned its URL, so `calendar-data` and `training-load` "appearing only as
 cache-key strings" counted. Asking instead whether a test imports the handler gives 150 of 222, less
-the forty-six paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
+the forty-seven paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
 honest in both directions (see above), so the list can be worked from. **The actionable core
 named by this entry is now CLEAR**: the home aggregates, both ingest routes and `program-week` are
 done; so are ai-periodization, the social graph bar `friends/leaderboard`, the account cluster, the
-supplement/vial chain and a plan's lifecycle. Work the tail by feature, not by list position. `scripts/check-route-test-coverage.js` is the ratchet, so the debt can only
+supplement/vial chain and a meal plan's lifecycle + reshape. Work the tail by feature, not position. `scripts/check-route-test-coverage.js` is the ratchet, so the debt can only
 shrink and a NEW route arrives uncovered and fails — which is the half that matters.
 
 ### [app-shell][platform] LA-76 — a deload PHASE still decays the collection, and nothing dates one
