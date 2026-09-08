@@ -8905,3 +8905,10 @@ PS-39 status update in the same PR was net-negative.
 
 18825 → 18792. LA-78's entry removed on shipping — `baseline/complete` now verifies the session is in
 the caller's active program before it writes, so the entry owes nothing.
+
+## 2026-09-08 — `docs/implementation-backlog.md` → 18820 (LA-79 filed)
+
+18792 → 18820. One new entry: LA-79, `POST /api/running-plan` writing `normalizeDateParam`'s slash
+form into a Postgres `date` column, found while writing that route's PS-39 tests and checked
+against the local database. Raised because a new queue entry is what this index is for; the PS-39
+status update in the same PR was net-negative.

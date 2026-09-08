@@ -1080,6 +1080,33 @@ two are `first-run-empty-states` and `preferences-survive-reinstall`. **Order ma
 least some of these are shared-state, not the spec's own logic. Read the artifact this PR makes real
 before assuming a local-DB artifact — that mistake has already been made once on `plan-rescale`.
 
+### [cardio][platform] LA-79 — `POST /api/running-plan` writes a slash date into a `date` column
+
+- **Lane:** A — `app/api/running-plan/route.ts`, one identifier.
+- **Added:** 2026-09-08, Lane A — found writing that route's PS-39 tests, then checked against the
+  local database rather than reasoned about.
+
+The route stores `targetDate: normalizeDateParam(parsed.data.targetDate)`. **`normalizeDateParam`
+returns the SLASH form** (`2026/12/01`) — that is its documented job, because `getDayLog` and the
+other day-scoped readers want slashes. `running_plans.target_date` is a Postgres **`date`** column,
+so the slash string is parsed by the server under whatever `DateStyle` the session has.
+
+**Latent, not live.** Under the default `ISO, MDY` — what this project's databases run, verified
+2026-09-08 — `2026/12/01` reads as 2026-12-01 and `2026/01/12` as 2026-01-12, both correct. Under
+`DMY` the day and month swap and a target date silently moves by up to eleven months. Nothing sets
+`DateStyle` explicitly, so the correctness rests on a server default nobody has written down.
+
+- **The fix is one identifier**: `normalizeDateParamIso`, which exists for exactly this ("use for
+  consumers that do dash-based arithmetic … dash-keyed DB columns"). The supplements validator
+  already solves the same hazard with a transform, and its comment says why — *"the difference
+  between one rule and two routes that must both remember it."* This is the second route.
+- **Also worth deciding while there:** an unparseable `targetDate` is stored as `null` rather than
+  refused, so `2026-13-45` silently loses the user's goal date. Lenient-optional is defensible; it
+  should be deliberate rather than a side effect of `normalizeDateParam` returning null.
+- **When fixing, add the assertion the PS-39 batch deliberately left out**: the stored form is
+  dashes. `lib/__tests__/running-plan-routes.test.ts` currently matches `/^2026[-/]12[-/]01$/` and
+  says why, rather than pinning the current behaviour as correct.
+
 ### [platform] LA-77 — 60% of the lint warnings are deliberate, so the 60 real ones are invisible
 
 - **Lane:** O — `eslint.config.mjs` is repo-level tooling in neither implementer lane's paths, the
@@ -1156,7 +1183,7 @@ repair the 22 dead backlog paths and 43 doubled `docs/overview/overview/` labels
 unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge candidates
 (led by `oura-ring-data-reference.md`, a retired-API reference with no retirement note).
 
-### [platform] PS-39 — 100 API routes still have no test that imports their handler
+### [platform] PS-39 — 96 API routes still have no test that imports their handler
 
 - **Lane:** A. Regenerate the list with `node scripts/check-route-test-coverage.js` — it prints every
   uncovered route when it fails, and the ratchet now holds the number.
@@ -1185,14 +1212,15 @@ unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge
     and `ai-periodization/session/[sessionId]` + `…/prescribe` + `…/respond` — each batched with the
     uncovered siblings it verifies alongside.
 
-**The count was 93 and is really 100**, by the mechanism the entry half-noticed: it counted a route
+**The count was 93 and is really 96**, by the mechanism the entry half-noticed: it counted a route
 covered when any test mentioned its URL, so `calendar-data` and `training-load` "appearing only as
 cache-key strings" counted. Asking instead whether a test imports the handler gives 150 of 222, less
-the fifty paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
+the fifty-four paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
 honest in both directions (see above), so the list can be worked from. **The actionable core
 named by this entry is now CLEAR**: the home aggregates, both ingest routes and `program-week` are
 done; so are ai-periodization, the social graph bar `friends/leaderboard`, the account cluster, the
-supplement/vial chain, a meal plan's lifecycle + reshape, and the workout write path. Work by feature. `scripts/check-route-test-coverage.js` is the ratchet, so the debt can only
+supplement/vial chain, a meal plan's lifecycle + reshape, the workout write path and the running
+plan. Work by feature. `scripts/check-route-test-coverage.js` is the ratchet, so the debt can only
 shrink and a NEW route arrives uncovered and fails — which is the half that matters.
 
 ### [app-shell][platform] LA-76 — a deload PHASE still decays the collection, and nothing dates one
