@@ -8956,3 +8956,13 @@ status update in the same PR was net-neutral.
 rather than batching it, because the count of raises is the evidence that the entry is real work
 rather than a tidy-up: the number will keep moving by one until the citations point at the batched
 history.
+
+## 2026-09-08 — `docs/implementation-backlog.md` → 18813 (LA-81 shipped)
+
+18832 → 18813. LA-81's entry removed on shipping — `check-route-test-coverage.js` now runs its scan
+over the merge base and fails on any route that loses its handler test, whatever the total does, so
+the entry owes nothing.
+
+## 2026-09-08 — `docs/overview/entries/` total ceiling → 324 (LA-80, fourth PR running)
+
+323 → 324. Fourth consecutive raise, one per PR, as LA-80 describes.
