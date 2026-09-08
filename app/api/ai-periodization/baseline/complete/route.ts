@@ -42,8 +42,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Baseline already complete' }, { status: 409 })
   }
 
-  await repo.ensureSessionPeriodization(userId, sessionId)
-
   const baseline1rm: Record<string, Baseline1rmEntry> = {}
 
   // Build the baseline from existing PRs, keyed by this session's exercise ids (the
@@ -62,6 +60,16 @@ export async function POST(req: NextRequest) {
   const estimateMap = new Map(estimates.map(e => [e.exerciseName, e.estimated1rm]))
   const programSession = program?.sessions.find(s => s.id === sessionId)
   if (!programSession) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  // LA-78: verify before writing, not after. This used to sit ~20 lines above the check, and the
+  // ordering had two outcomes, neither of them the 404 meant here. A real `program_sessions` row of
+  // the caller's from an *inactive* program inserted a stray `session_periodization` row and then
+  // 404'd. A uuid matching no session hit the `program_session_id` foreign key — verified against
+  // the database: `violates foreign key constraint
+  // "session_periodization_program_session_id_fkey"` — which nothing caught, so the caller got a
+  // framework 500. The program read this check needs already happened above, so moving it costs
+  // nothing.
+  await repo.ensureSessionPeriodization(userId, sessionId)
   for (const ex of programSession.exercises) {
     const pr = prMap.get(ex.exerciseName)
     if (pr != null) {
