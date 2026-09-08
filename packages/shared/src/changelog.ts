@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.439.0",
+    date: "2026-09-08",
+    changes: [
+      "A dose calculator for anything you measure in milligrams. Enter what went into the vial and how much water, and it shows the concentration \u2014 then type a dose in mg and it gives you the units to draw, how many doses are left in the vial, and a warning if one dose is more than the syringe holds. Open it from the syringe icon on the supplement.",
+    ],
+  },
+  {
     version: "1.438.6",
     date: "2026-09-08",
     changes: [

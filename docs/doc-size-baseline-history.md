@@ -9317,3 +9317,23 @@ LB-66 lands, not when the confirmation shipped.
 Three PRs landed under this branch while it was being verified, taking the backlog from 19,392 to
 19,442. Recomputed from the merged file rather than spliced: **19,442 − 14 = 19,428**, so the −14
 above (BF-132 out, LB-66 in) is unchanged and is the only part of the number this diff owns.
+
+## 2026-09-08 — `docs/implementation-backlog.md` 19,455 → 19,547 (+92), OR-102b ①② and two findings
+
+OR-102b keeps its entry rather than leaving: ① and ② shipped, ③ and ④ did not, and the `Keep:` says
+which and why. Most of the growth is the two findings the build turned up, both of which cost more to
+rediscover than to write down.
+
+**LB-67** carries a measured table because the defect is invisible without one: a weekly weight rate
+fitted against the array index reads −1.04 kg/wk for a true −0.70 at this owner's weigh-in frequency,
+which is the wrong side of the "faster than ideal pace" threshold the screen renders. The fix already
+exists one directory away in `adaptive-tdee.ts`, whose comment describes the same failure — so the
+entry is as much about the two copies disagreeing as about either one.
+
+**LB-68** is a `Reference:` entry and is deliberately long. It records that synthetic Playwright input
+does not reach one section's buttons while `el.click()` does, with the negative results that rule out
+the obvious causes, because a session already lost time to this and filed nothing — attributing it to
+a hand-rolled context that turns out not to be the cause.
+
+Also kept: the estimator design OR-102b ④ needs, including the residual-SD floor. A perfect-line
+fixture measured 1.2e-13, which passes a `> 0` guard and then makes every delta significant.
