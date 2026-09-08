@@ -1275,7 +1275,7 @@ sounds like:**
   than reusing them, it becomes a second place every body metric is formatted. Reuse or extract.
 - **Reversal cost:** low — one read-only screen over existing stores. No migration, no new data.
 - **Keep:** the training and performance sections. **Body composition, vitals, metabolism, daily
-  movement and sleep shipped in #1008**, as a read-only section under the editable fields on
+  movement and sleep shipped in #1009**, as a read-only section under the editable fields on
   **More → Profile details** — see the decision below. Still unbuilt: `personal_records`,
   `fitness_tests`, `dexa_scans` and `measured_rmr` in this view. The clinical two are reachable today
   at More → DEXA & RMR results and the scale's resting-rate row now points there, so the gap is a
