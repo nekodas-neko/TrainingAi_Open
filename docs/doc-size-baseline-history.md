@@ -9016,6 +9016,20 @@ rules at once tests neither. Three instances in ten batches, every one passing, 
 mutation rather than by reading. Raised because it belongs where the next batch is written from —
 the entry is what an implementer reads before starting, and the lesson was otherwise session-local.
 
+## 2026-09-08 — `docs/implementation-backlog.md` → 18963 (LB-61 shipped)
+
+Down 20. LB-61 was a decision brief — the count, the recommendation, the argument against, the
+fallback — and once the owner took the decision most of that stopped being something anyone needs to
+read. What is left is what shipped and the one look still owed on the device, which is the shape a
+`Verify:` entry should have.
+
+The entry is **not** removed. Twenty-five controls changed appearance at once and nobody has seen
+one; that is a look owed, not work owed, and `Verify: device` is the field that says so without
+parking anything.
+
+The absolute is 18963 rather than the 18863 this branch computed: Lane A landed PS-39 work underneath
+it that added 100. The **−20 is unchanged**, which is the only part of the number that belongs to
+this diff.
 ## 2026-09-08 — `docs/implementation-backlog.md` 18,883 → 18,972 (+89), BF-131 and BF-132
 
 Two owner reports from one screenshot of Health → Training.
@@ -9169,6 +9183,26 @@ against the merge base — so a stale branch reads as a regression it did not ca
 right and the branch was old. Confirmed before acting by stashing the changes and re-running against
 a clean tree, which reproduced it, and then by fetching `origin/main` and finding the new commit.
 
+## 2026-09-08 — `docs/agents/state/bugfix.md` 277 → 329 (+52), baton refreshed
+
+The BugFix baton's newest reference was **BF-88** while the role had filed through **BF-133** — and
+its own ID line still read *"Current: BF-88 filed, next is BF-89"*, beside a warning that the line
+"was four sessions stale before it was noticed". It had gone stale a second time, so the line now
+carries its own count of that.
+
+Refreshed rather than rewritten in full: this is not a handover, the session continues, and the
+standing-facts / traps / method-notes sections were re-read and are still true. What was added is one
+session-log section in the shape the file already uses — entries filed, what the owner still owes,
+and four practices worth copying. The additions are deliberately things the traps list does **not**
+already hold: the shallow-clone false alarms and the doc-size baseline chore are both already in it,
+so they are not repeated.
+
+The four kept: retract a contradicted finding **in place and visibly**, because a silently deleted
+one gets re-derived from the same screenshot; trace an owner's *"why doesn't it just…"* before
+answering, since it shrank BF-131 from "build a derivation" to "copy a value" and stopped a second
+AMRAP formula being written; look for a hard-deleted record in history before declaring it lost, and
+say plainly when recovery was luck; and measure a feature request before filing it, because *"every
+metric we have"* turned out to include seven fields that are empty in every row.
 The owner then signed off both recommendations the same day (*"make all the changes you recommend"*),
 which added six more lines: TN-27's `Gate: owner` bullet became a dated decision record naming option
 3, TN-29 gained an approval line, and the two deferred options carry a sentence each on the second
@@ -9233,3 +9267,16 @@ folded, and `check-doc-links` passes on 1,032 files afterwards, so no citation b
 331 were foldable, so the other 292 are pinned by durable docs citing them directly. A sweep buys
 room; it does not fix the shape. Raising the number would trade the one signal that says so for
 another few weeks of quiet.
+
+### Reconciled on merge — 19391 (LB-61 branch)
+
+Four PRs landed under this branch while it waited on the entries-ceiling sweep, taking the backlog
+from 18,983 to 19,411. The `.size` file conflicted because both sides describe the same number, so it
+was recomputed from the merged file rather than spliced: **19,411 − 20 = 19,391**, and the −20 is the
+only part of the figure this diff owns.
+
+The append-only history conflict beside it was two independent additions and both are kept — but the
+merge *before* this one had committed that file with its markers still in it, resolved on the backlog
+file and missed here. Nothing had been pushed, so the cost was three lines. The tell is worth keeping:
+`grep -c '^<<<<<<<' ` on the file, not a reading of the diff, is what found it, because the markers sit
+9,000 lines into a document nobody reads end to end.

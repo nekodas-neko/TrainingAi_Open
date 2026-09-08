@@ -1740,7 +1740,7 @@ repair the 22 dead backlog paths and 43 doubled `docs/overview/overview/` labels
 unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge candidates
 (led by `oura-ring-data-reference.md`, a retired-API reference with no retirement note).
 
-### [platform] PS-39 — 61 API routes still have no test that imports their handler
+### [platform] PS-39 — 57 API routes still have no test that imports their handler
 
 - **Lane:** A. Regenerate the list with `node scripts/check-route-test-coverage.js` — it prints every
   uncovered route when it fails, and the ratchet now holds the number.
@@ -1803,16 +1803,16 @@ testing X. Two more classes worth the same suspicion: a fixture whose timezone I
 proves nothing about which zone the route read, and a fixture already in sorted order proves
 nothing about a sort.
 
-**The count was 93 and is really 61**, by the mechanism the entry half-noticed: it counted a route
+**The count was 93 and is really 57**, by the mechanism the entry half-noticed: it counted a route
 covered when any test mentioned its URL, so `calendar-data` and `training-load` "appearing only as
 cache-key strings" counted. Asking instead whether a test imports the handler gives 150 of 222, less
-the eighty-nine paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
+the ninety-three paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
 honest in both directions (see above), so the list can be worked from. **The actionable core
 named by this entry is now CLEAR**: the home aggregates, both ingest routes and `program-week` are
 done; so are ai-periodization, `friends/leaderboard` (its scoping was left uncovered when a mock
 could not see it, and is covered against real rows now), the account cluster, the supplement/vial chain,
 a meal plan's lifecycle + reshape, the workout write path, the running plan and the four body/health
-writes, the goal-target-adherence loop, the home week/streak reads, the AI Coach lifecycle, the cardio hub, the strength/volume trends, the day timeline, the food-input path and the four heart-rate reads. Work by feature — batching on what is *verified together* twice found a defect (LA-78, LA-79). `scripts/check-route-test-coverage.js` ratchets it, so the debt
+writes, the goal-target-adherence loop, the home week/streak reads, the AI Coach lifecycle, the cardio hub, the strength/volume trends, the day timeline, the food-input path, the four heart-rate reads and the exercise catalogue. Work by feature — batching on what is *verified together* twice found a defect (LA-78, LA-79). `scripts/check-route-test-coverage.js` ratchets it, so the debt
 only shrinks, a NEW route arrives uncovered and fails, and since LA-81 a route that LOSES its test fails whatever the total does.
 
 ### [app-shell][platform] LA-76 — a deload PHASE still decays the collection, and nothing dates one
@@ -18825,48 +18825,28 @@ reads.
   closes the four that exist, it does not make future collisions safe.
 
 
-### [app-shell] LB-61 — every switch in the app is white when it is on, for the reason the role pill was
+### [app-shell] LB-61 — every switch in the app was white when it was on, for the reason the role pill was
 
-- **Lane:** B — `components/ui/switch.tsx`.
-- **Added:** 2026-09-07 · Lane B, found while fixing BF-124's selected-state slab.
-- **Gate:** owner — the measuring and the proposal are done (below); what is left is one yes or no.
-- **Same token, wider blast radius.** `switch.tsx:16` marks the on state with
-  `data-[state=checked]:bg-primary`. `--primary` is `oklch(0.922 0 0)` in dark — near-white — which
-  is exactly why BF-124's selected role pill read as disabled rather than chosen. The switch has the
-  same problem and it was left alone on purpose: this is the shared primitive, so recolouring it
-  changes every toggle in the app at once, which is a design decision rather than a bug fix.
-- **What to decide, not what to do.** Whether an on switch should be brand-coloured (matching every
-  other chosen state in the app) or stay neutral-white (the shadcn default, and arguably right for a
-  binary that is not a *selection* among options). Count the switches before proposing either — the
-  answer probably differs between a settings toggle and an in-form choice.
-
-- **COUNTED 2026-09-08 (Lane B).** **25 switches, 14 files.** The split the line above predicted is
-  real — about **15 are persisted preferences** (five in `more/settings-panel.tsx` alone, plus the
-  supplements, meal-type, dynamic-background and admin sheets) and about **10 are in-form choices**
-  made while composing something (`walk-config`, `builder-review`, `goal-recommendation-sheet`,
-  `my-meals-picker`, the meal-plan steps, `coach/change-preview`). It does not decide anything:
-  nobody classifies a toggle before looking at it, they read on or off, so two on-colours would be a
-  distinction the user has to learn in order not to be confused by it.
-- **RECOMMENDATION: `--brand` for the on state, one line, no split.** In dark — the only theme this
-  app ships — `--primary` is `oklch(0.922 0 0)`, near-white and **chroma 0**, the shadcn light-first
-  default, and the same value that made BF-124's selected role pill read as switched off. `--brand`
-  is already **overridden at runtime by the owner's own choice**, and `--brand-foreground` exists to
-  keep a thumb legible on it — so this uses the colour they picked and follows it if they change it.
-  A year out the durable property is that "on" and "chosen" look alike everywhere; recolouring only
-  the screens someone happens to notice is how the pill and the switch came to disagree.
-- **The alternative, and what it is better at: keep the near-white.** Five brand-green pills in the
-  `settings-panel` column are loud, and green in this app already means *good / achieved* (score
-  bands, streaks) rather than *enabled*. That is the real argument against, and it is about that one
-  screen. Fallback if the column is the only place it looks wrong: brand for in-form, neutral for
-  settings — rejected above, but available.
-- **Reversal cost: one line in `components/ui/switch.tsx`.** Visual only — no state, no storage, no
-  API. What makes it the owner's call is that 25 controls change at once, not that it is hard to undo.
-- **Not urgent and not a defect on its own** — nobody has reported a switch reading as off. It is
-  filed because the finding was made and CLAUDE.md's **No orphaned findings** rule applies, not
-  because it is queued work.
-- **Reversal cost:** low, one line — but it is seen everywhere, so it wants the owner's eye before
-  it lands.
-
+- **Lane:** B — `components/ui/switch.tsx`. **Added:** 2026-09-07, found while fixing BF-124's
+  selected-state slab. **Owner decision taken 2026-09-08: go with the recommendation.**
+- **Verify: device** — the look, and only that. 25 switches across 14 files changed appearance at
+  once, and the one place worth an eye is `more/settings-panel.tsx`, where five sit in a column:
+  the argument against was that five brand-green pills there might read as loud, and green in this
+  app already means *good / achieved* (score bands, streaks) rather than *enabled*. If it does read
+  wrong, the fallback is brand for in-form choices and neutral for the settings column — rejected
+  as a distinction the user must learn, but available.
+- **What shipped.** The on state is `--brand`, the thumb `--brand-foreground`. In dark — the only
+  theme this app ships — `--primary` is `oklch(0.922 0 0)`: near-white with **zero chroma**, the
+  shadcn light-first default, and the same value that made BF-124's selected role pill read as
+  switched off. `--brand` is overridden at runtime by the owner's own colour, so the switches follow
+  it rather than being a greyscale island, and `--brand-foreground` exists precisely to stay legible
+  on a `--brand` fill.
+- **NOT rendered-verified locally, and the reason is worth carrying**: no switch is reachable on this
+  seed. The Goals AI sheet needs `GOOGLE_GENERATIVE_AI_API_KEY`, which the sandbox lacks, and the
+  `more/settings-panel.tsx` collapsible yielded no `[data-slot="switch"]` in 24 seconds. What was
+  verified is the compiled CSS: `.bg-brand{background-color:var(--color-brand)}` and the dark
+  `[data-state=checked]` thumb rule resolving to `--brand-foreground: oklch(100% 0 0)`.
+- **Reversal cost:** one line, visual only — no state, no storage, no API.
 ### [platform] LB-62 — a zero-argument `vi.fn` whose recorded calls are then indexed; red `main` three times in one day
 
 - **Lane:** A — `scripts/` (a new Custom Rules check).
