@@ -10,13 +10,16 @@
 // migration 238 — deriving rather than storing, as the Stored Counters rule asks. So no migration,
 // no SQLite version, no sync chain: the only thing missing was an unfiltered query.
 //
-// Runs only against a local dev Postgres — skips in CI's "Tests" job.
+// Runs only against a local dev Postgres.
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 
+// `canRun` was computed here and never used — the bare `describe` below meant `beforeAll` ran
+// whatever the environment, so a run with no `DATABASE_URL` failed with "DATABASE_URL is not set"
+// instead of skipping. 166 of the 167 DB-backed files already guard this way; this was the one.
 const canRun = !!process.env.DATABASE_URL
 const USER = '00000000-0000-4000-8000-00000000b518'
 
-describe('recent food items, unscoped by meal bucket (LB-18)', () => {
+describe.skipIf(!canRun)('recent food items, unscoped by meal bucket (LB-18)', () => {
   let pool: import('pg').Pool
   let repo: import('@/lib/data/repository').WorkoutRepository
   let breakfast: string
