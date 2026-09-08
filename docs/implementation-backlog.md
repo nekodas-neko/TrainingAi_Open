@@ -399,6 +399,73 @@ below threshold and left in place for next time.
 
 
 
+### [nutrition] TN-29 — the app measures this owner's activity factor at 1.41 and then accepts a maintenance implying 1.67, because nothing cross-checks the two estimates it already computes
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-09 · owner: *"I wonder if we could estimate the activity level value or tune how we do ours."*
+- **Lane: A** — `packages/shared/src/nutrition/adaptive-tdee.ts` (`estimateMaintenance`, the `minMaintenanceKcal` floor), fed from `lib/health/energy-balance-service.ts:236-260` where both estimates already sit in scope.
+- **Recommended over TN-27's three options, and independent of them** — this gate holds whichever window wins. Fix either order; this one first.
+- **Reference:** [`review`](reviews/2026-09-09-maintenance-2245-is-too-high.md) §7.
+
+**`computeEnergyBalance` computes two independent maintenance estimates on every request and
+compares them never.** The calibrated one comes from intake and scale weight; the formula one comes
+from resting rate plus measured movement. They fail in unrelated ways, which is what makes the
+second a usable check on the first — and it is already in the same function, as the fallback the
+calibration overrides.
+
+Run over 2026-08-12 → 09-08 with the app's own code:
+
+| | |
+|---|---|
+| `personalRmr` (measured 1,325 rescaled to today's FFM 52.4 kg) | **1,345** |
+| × `SEDENTARY_MULTIPLIER` 1.2 | **1,614** |
+| average measured movement — 3,572 steps/day plus training | **+281** |
+| **measured-movement maintenance** | **1,895** |
+
+**Divided by the resting rate, the four estimates are an activity factor, and one of them is not a
+metabolism:**
+
+| estimate | maintenance | factor |
+|---|---|---|
+| 28-day calibration | 1,654 | 1.23 |
+| 30-day scale trend | ~1,693 | 1.26 |
+| measured movement | 1,895 | **1.41** |
+| **what shipped** | **2,245** | **1.67** — hard exercise 6–7 days/week |
+
+**1.67 for someone averaging 3,572 steps a day is an artefact, and the app holds the measurement
+that says so.**
+
+**The proposal: make Q-517's floor two-sided.** `estimateMaintenance` already takes the user's BMR as
+`minMaintenanceKcal` and rejects anything below it — *a maintenance below resting burn is impossible
+by definition*. The same argument runs the other way with better evidence: **a maintenance implying
+training the user demonstrably did not do is impossible by measurement.** Reject when the implied
+factor falls outside a plausible band around the measured-movement estimate, and let
+`resolveMaintenance` fall back as it already does for `below_bmr`.
+
+- It rejects **2,245** and lands near **1,895** — inside the owner's own stated expectation of 1,600–1,800.
+- No new data, no new window, no owner input, and one new `MaintenanceExclusion` variant.
+- **⚠ Band width is the one thing this entry does not settle.** Too tight and it rejects a genuine
+  training block; the measured-movement estimate already contains that training, so the band tracks
+  it rather than a constant — but the multiplier wants fitting against more than one owner-month.
+
+**Second half — stop asking the user to grade themselves.** `users.activity_level` reads `moderate`
+against a measured **1.41**, between light (1.375) and moderate (1.55). One notch high, as
+self-report usually is. **⚠ Its blast radius is small and this entry does not inflate it:** Q-401
+already removed `ACTIVITY_MULTIPLIERS` from the calorie path, so the field no longer touches the
+daily target. It still reaches the VO₂max **crosscheck** (37.3 → 41.1 between light and moderate;
+the Uth-Sørensen headline of 55.0 does not move), the step goal (moot — the owner set 7,000 by hand
+and manual wins), the water goal (+250 ml), and the context handed to the AI coach. So: **show the
+measured factor and offer it**, rather than keeping a guess beside a measurement.
+
+**⚠ How many other days this moves:** none of it is stored. Maintenance and the activity factor are
+recomputed per request from a trailing window, so no history is re-scored. The one written artefact
+is `nutrition_targets.calories` (**1,660**, set 2026-08-31) — which this gate protects rather than
+changes: at a `recomp` delta of −200 the honest band is **1,450–1,700**, and 1,660 already sits
+inside it.
+
+**Pass test:** with the owner's current data the calibrated maintenance is rejected, the card falls
+back near 1,895, and no accepted estimate implies an activity factor above ~1.55 while measured
+movement stays near 280 kcal/day.
+
 ### [nutrition] TN-27 — the maintenance estimator rejects its reliable window and falls back to its noisiest one, and the owner is shown 2,245 kcal instead of ~1,700
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · owner: *"this is the maint calories derived from the app — i don't think it's right. with RMR at 1350 and calories well under that and barely maintaining weight."*
@@ -437,6 +504,9 @@ The window sweep is the proof — mean intake is 1,612 in every column from 14 d
 30-day scale trend against the same intake (**~1,693**), and measured RMR **1,325** × 1.2 sedentary
 (**~1,590**) plus ~3,300 steps/day of movement. **2,245 would need ~650 kcal/day above resting**,
 which this owner's step and training record does not contain. **So the card reads ~450–550 high.**
+
+**Recommended: TN-29 first, then option 3 below.** TN-29 gates on the implied activity factor and
+holds whichever window wins; option 3 is the cheapest correct change to the window rule itself.
 
 **Three options — owner's choice:**
 1. **Prefer the window with the tighter slope, not the higher coverage.** Both windows share their

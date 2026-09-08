@@ -9051,7 +9051,7 @@ the argument for the checklist, so it belongs beside it rather than in a journal
 
 329 → 330. Tenth consecutive raise, one per PR, as LA-80 describes.
 
-## 2026-09-09 — `docs/implementation-backlog.md` 18977 → 19060 (+83), TN-27 and TN-28
+## 2026-09-09 — `docs/implementation-backlog.md` 18983 → 19136 (+153), TN-27, TN-28 and TN-29
 
 The owner reported the Nutrition tab's Calorie Nudge claiming a measured maintenance of 2,245 kcal
 against a measured RMR of 1,325 and a scale that has barely moved. It reproduces exactly, and the
@@ -9068,6 +9068,18 @@ sentence asserting it would not be.
 TN-28 is short and rides along: the nudge card writes the number into the calorie goal on one tap
 while omitting the `low confidence, 10 of 14 days logged` qualifier that both its sibling cards
 already render from the same payload.
+The same PR then grew by a further 69 lines for **TN-29**, which is the entry that actually resolves
+the owner's question and outranks TN-27's three window options. `computeEnergyBalance` computes two
+independent maintenance estimates on every request — one from intake and scale weight, one from
+resting rate plus measured movement — and compares them never. Run over the same 28 days the second
+gives **1,895 kcal**, against the **2,245** that shipped.
+
+The table that carries it is the one that cannot be cut: dividing each estimate by the measured
+resting rate of 1,345 turns them into activity factors of 1.23, 1.26, **1.41** and **1.67**, and
+1.67 for someone averaging 3,572 steps a day is visibly not a metabolism. That reframing is the
+proposal — make Q-517's one-sided BMR floor two-sided — and it does not survive being compressed
+into a sentence, because the argument is the arithmetic.
+
 ## 2026-09-08 — `docs/implementation-backlog.md` → 18983 (PS-39: the trap's general form)
 
 18977 → 18983. The fixture trap recurred three more times in the HR batch, all one shape: every

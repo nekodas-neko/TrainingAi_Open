@@ -133,3 +133,93 @@ all**, while its two siblings, `energy-card.tsx:260` and `calorie-balance-bar.ts
 Cheapest correct subset, if only one lands: **stop falling back from a rejected long window to a
 short one**. Reporting `logging_too_sparse` and holding the formula baseline (~1,590 + movement)
 would have shown this owner a number within ~150 kcal of the truth instead of one 550 kcal above it.
+
+---
+
+## 7. The recommendation, and the third estimate that settles it
+
+**Owner, 2026-09-09:** *"1600-1800 for me sounds right… from that I wonder if we could estimate the
+activity level value or tune how we do ours."* Those turn out to be one question, because **the
+activity factor is the sanity gate the maintenance estimator is missing.**
+
+### The app already owns a second, independent estimate — and never consults it
+
+`computeActiveEnergy` measures this owner's movement every day from steps, logged activities and
+workouts. Run over the same 28 days (2026-08-12 → 09-08), using the app's own code:
+
+| | |
+|---|---|
+| `personalRmr` from the measured RMR 1,325, rescaled to today's FFM 52.4 kg | **1,345 kcal** |
+| × 1.2 sedentary base | **1,614** |
+| average measured movement (3,572 steps/day + training) | **+281** |
+| **measured-movement maintenance** | **1,895** |
+
+**No scale weight enters this at all.** It is built from resting rate and measured movement, so it
+fails in completely different ways from the intake-and-weight calibration — which is exactly what
+makes it a usable cross-check. And it is *already computed*, on the same request, as the formula
+fallback. It is simply never compared against the calibrated number that overrides it.
+
+### Read as an activity factor, 2,245 is self-evidently wrong
+
+Divide each estimate by the measured resting rate of 1,345:
+
+| estimate | maintenance | **activity factor** | what that factor means |
+|---|---|---|---|
+| 28-day calibration | 1,654 | **1.23** | just above sedentary |
+| 30-day scale trend | ~1,693 | **1.26** | sedentary–light |
+| **measured movement** | **1,895** | **1.41** | lightly-to-moderately active |
+| **shipped card** | **2,245** | **1.67** | *hard exercise 6–7 days a week* |
+
+**A factor of 1.67 for someone averaging 3,572 steps a day is not a metabolism, it is an artefact.**
+The first three cluster at **1.23–1.41**; the fourth is a fifth again above the highest of them.
+
+### So: gate on the activity factor, not on logging coverage
+
+**This is the recommendation, and it is better than any of TN-27's three window options because it
+holds whichever window wins.** `estimateMaintenance` already receives the user's BMR as
+`minMaintenanceKcal` (Q-517) and uses it as a one-sided floor. Make it two-sided: reject a
+calibration whose implied factor falls outside a plausible band for this user's *measured* movement.
+
+- It would have rejected **2,245** (1.67) outright and fallen back to a number near 1,895.
+- Q-517's `below_bmr` floor is the same idea already half-built — a maintenance below resting burn is
+  impossible by definition. A maintenance implying training this user demonstrably did not do is
+  impossible by measurement, and the app holds the measurement.
+- It needs no new data, no new window, and no owner input.
+
+**Order of work:** the factor gate first (it is the one that holds regardless), then TN-27 option 3 —
+stop falling back from a rejected long window to a short one. The two window-rule options above it
+are genuine improvements and can wait.
+
+### On the self-reported activity level — worth fixing, but not for calories
+
+`users.activity_level` reads **`moderate`**; the measured factor is **1.41**, between light (1.375)
+and moderate (1.55). One notch high, as self-report usually is.
+
+**⚠ Its blast radius is smaller than it looks, and overstating it would be wrong.** Q-401 already
+removed `ACTIVITY_MULTIPLIERS` from the calorie path, so this field no longer touches the daily
+target. What it still reaches:
+
+- **VO₂max — the crosscheck only, not the headline.** `deriveVo2Max` returns Uth-Sørensen (55.0)
+  regardless; the Jackson non-exercise crosscheck moves 37.3 → 41.1 between light and moderate.
+- **Step goal** — `moderate` maps to 10,000, but the owner set 7,000 by hand and manual wins
+  (owner decision, 2026-08-31), so this is already overridden.
+- **Water goal** — +250 ml at moderate against 0 at light.
+- **The AI coach and readiness payload**, which are told "moderate" as context.
+
+So the fix is worth making and is not urgent: **show the measured factor and offer it, rather than
+asking the user to grade themselves.** The measurement exists; the self-report is a guess sitting
+next to it.
+
+### What the owner should eat
+
+Goal is `recomp`, so `CALORIE_ADJUSTMENT_BY_GOAL` is **−200**.
+
+| maintenance | daily target |
+|---|---|
+| 1,654 (calibration, conservative) | 1,454 |
+| ~1,750 (midpoint of the three) | ~1,550 |
+| 1,895 (measured movement) | 1,695 |
+
+**A target of 1,450–1,700, and the stored 1,660 sits inside it.** Keeping it was the right call;
+the **2,045** the card offered was not. If the owner wants the middle rather than the top of the
+band, ~1,550–1,600 is the number — but 1,660 needs no correction, which is the more useful answer.
