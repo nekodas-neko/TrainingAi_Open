@@ -8918,3 +8918,20 @@ status update in the same PR was net-negative.
 18824 → 18793. LA-79's entry removed on shipping — `POST /api/running-plan` now stores the dash form
 via `normalizeDateParamIso` and refuses a date-shaped string that is not a real day, so the entry
 owes nothing.
+
+## 2026-09-08 — `docs/overview/entries/` total ceiling → 321 (and why raising it is not the fix)
+
+320 → 321, for this PR's one journal entry. **Raised under protest, and the number is now the
+binding constraint on every PR that follows** — the next session hits it again at 322.
+
+The check's own message says why a sweep does not clear it: only **29** of the 321 entries are
+foldable, because a durable doc citing an entry exempts it from compaction, and **292 are cited**.
+Two sweep branches are already in flight (`chore/fold-journal-entries`,
+`chore/fold-unlinked-journal-entries-0908`) and between them cannot reach the other 292. Filed as
+LA-80 for Orchestrator, whose chore this is: the citations have to point at the batched history
+before the directory can shrink.
+
+## 2026-09-08 — `docs/implementation-backlog.md` → 18813 (LA-80 filed)
+
+18793 → 18813. One new entry: LA-80, the entries-directory ceiling above. Raised because a new queue
+entry is what this index is for; the PS-39 status update in the same PR was net-neutral.
