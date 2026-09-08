@@ -661,20 +661,49 @@ OR-102a/b will read dose history to recommend the next dose. A tracker that read
 - **The UI states the unbuilt behaviour as fact**, which is what makes this a live defect rather than
   a gap: `components/workout/ai-baseline-banner.tsx:22` reads *"For each exercise, load the bar and do
   as many clean reps as you can (AMRAP). The AI will calculate your 1RM and start prescribing from the
-  next session."* Nothing calculates it and nothing prescribes.
-- **Fix: derive the baseline from the session that was just completed.** The primitives exist —
-  `calcAmrap1RM` (`packages/shared/src/1rm.ts`) is the AMRAP estimator, and `setBaselineComplete`
-  already takes a `Record<exerciseId, Baseline1rmEntry>` with a `source` tag. On completing a workout
-  whose session is in `baseline`, build that map from the session's set logs and call it, tagging
-  `source` distinctly from the existing `'existing'` so a measured anchor is distinguishable from a
-  carried-over PR. Key it by **session-exercise id**, matching what the route already does and what the
-  signals read.
+  next session."* Nothing prescribes — but, per the amendment below, something **does** calculate.
+
+**⚠ AMENDED 2026-09-08 — THE DERIVATION ALREADY RUNS. THIS IS ONE HOP, NOT A NEW CALCULATION.**
+The entry first said to *"derive the baseline from the session that was just completed"*, which sends
+an implementer to build something that exists. Traced after the owner asked why the AMRAP was not
+already producing the anchor:
+
+- **`estimateOneRm` takes an `isBaseline` flag** (`packages/shared/src/1rm.ts:170`) and routes to
+  `amrapAverage1Rm` when it is set — the AMRAP estimator, not the ordinary one.
+- **The workout screen passes it**: `workout-screen.tsx:1212` reads
+  `phaseStatus?.isBaseline` and hands it to the `estimateOneRm` call at `:1221`.
+- **The result is already persisted.** It lands in `exercise_logs.estimated_1rm`, and `:1294` lets a
+  baseline set count toward a PR even under a session-level deload — a deliberate carve-out that only
+  makes sense because these sets are understood to be the anchor.
+- **So the number exists in the owner's data right now.** What never happens is the copy into
+  `session_periodization.baseline1rm` and the flip of `baseline_complete`.
+
+**So the work is: on completing a workout whose session is in `baseline`, read the per-exercise
+`estimated_1rm` this session already wrote, key it by session-exercise id, and pass it to
+`setBaselineComplete` with a `source` tag distinct from the existing `'existing'` so a measured anchor
+stays distinguishable from a carried-over PR.** Do **not** compute a fresh AMRAP 1RM at the
+periodization layer — that is a second implementation of a formula this repo already has one of, which
+**One Formula, One Place** exists to prevent, and it would silently disagree with the PR the same sets
+produced.
+
+- **Do NOT make "Use prior data" automatic — it is the escape hatch, and the codebase says so.** The
+  route's own comment calls it the **"skip-baseline flow"** and refuses to run when no PR or estimate
+  is found rather than *"silently completing with an empty, unusable anchor"*. The design is AMRAP by
+  default, prior-data by choice. Firing it automatically inverts that: every user gets carried-over
+  numbers and the baseline session becomes decorative — worst on a **rebuilt program**, where the
+  exercise list changed and re-measuring is the whole point. It reads as though it should be automatic
+  only because the default it is an alternative to was never wired up. Fix the hop and the button
+  returns to being a deliberate choice.
 - **Two things to get right, both of which the current shape hides:**
   1. **A partial baseline must not silently complete.** If the lifter logs 3 of 5 exercises, the
      anchor is missing two — decide between completing with a PR fallback for the gaps (tagged) and
      staying in `baseline` with the screen naming what is outstanding. Do not complete with an empty
      entry; the route's own comment already warns against *"silently completing with an empty,
-     unusable anchor"*.
+     unusable anchor"*. **Either way the card must say which state it is in** — today it reads
+     "Baseline needed" identically after zero baseline sessions and after two, which is what made this
+     unreportable until it was traced. *"3 of 5 exercises logged"* is the fix, and it belongs in the
+     same PR: a partial baseline that looks exactly like no baseline will produce this same report
+     again.
   2. **`incrementSessionsInPhase` is fire-and-forget** and must stay that way — a completion must
      never fail on a periodization write. The new call needs the same posture, which means the flag
      can lag a completion and the screen must tolerate it.
@@ -685,7 +714,7 @@ OR-102a/b will read dose history to recommend the next dose. A tracker that read
   with `baseline_complete = true` beside the new ones.
 - **Owner workaround, valid today:** tap **"Use prior data →"**. He has PRs for these exercises, so it
   seeds and advances to `accumulation`.
-- **Reversal cost:** low — one derivation and one call on an existing write path.
+- **Reversal cost:** low — one read and one call on an existing write path; smaller since the amendment, because the derivation is not being written.
 
 ### [workouts][app-shell] BF-132 — one tap on the trash icon deletes a whole session, with no confirmation and no tombstone 🔴 LIVE
 
