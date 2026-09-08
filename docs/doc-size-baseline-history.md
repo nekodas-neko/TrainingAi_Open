@@ -8966,3 +8966,7 @@ the entry owes nothing.
 ## 2026-09-08 — `docs/overview/entries/` total ceiling → 324 (LA-80, fourth PR running)
 
 323 → 324. Fourth consecutive raise, one per PR, as LA-80 describes.
+
+## 2026-09-08 — `docs/overview/entries/` total ceiling → 325 (LA-80, fifth PR running)
+
+324 → 325. Fifth consecutive raise, one per PR, as LA-80 describes.

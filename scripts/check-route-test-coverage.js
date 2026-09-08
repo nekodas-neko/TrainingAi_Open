@@ -71,7 +71,7 @@ const SCAN_DIRS = ['app', 'lib', 'packages', 'components', 'e2e', 'scripts'];
 // This resolves the specifier instead. A relative one resolves against the importing file; an alias
 // or bare one resolves against the repo root; a type-only import does not count at all.
 //
-const BASELINE = 82;
+const BASELINE = 78;
 
 function walk(dir, out = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
