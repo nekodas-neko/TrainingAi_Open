@@ -4,8 +4,17 @@
 
 ### What shipped
 
-7 tests on `POST /api/oura-ble/samples`; `BASELINE` **142 → 141**. That clears the last route on
+7 tests on `POST /api/oura-ble/samples`; `BASELINE` **142 → 140**. That clears the last route on
 PS-39's named actionable core — the home aggregates, `program-week`, and both ingest routes are done.
+
+**The baseline drops by two, not one.** Q-112d landed on `main` while this was in flight and took
+`day-review/week-window` off as well, so the merged number is 140. Their finding is the more
+important half and it is now in the entry: **the scan's rule is wrong, and the debt it reports is
+overstated by about 15.** It asks whether a test contains the substring `app/api/<route>/route`,
+which a *relative* import never produces — so fifteen routes with a co-located test loading the
+handler as `await import('../route')` read as untested, `sync/push` and `sync/pull` among them. The
+real debt is nearer 126. Nothing here fixes that; the entry now says so at the top, because a list
+claiming `sync/push` is untested is one nobody should work from.
 
 ### The test worth having
 

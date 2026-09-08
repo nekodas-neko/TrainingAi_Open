@@ -574,15 +574,29 @@ OR-102a/b will read dose history to recommend the next dose. A tracker that read
   not needed"*.
 - **Needs:** nothing to investigate — the measurement is below. What it needs is a decision.
 
-- **A sighting worth having on file when this is decided (2026-09-08).** On #941 the E2E job
-  failed at the 23-minute mark: `e2e/preferences-survive-reinstall.spec.ts` died with
-  `page.goto: net::ERR_ABORTED at http://localhost:3100/`, two more specs went flaky with
+- **⚠️ The long run eats itself, and it has now been seen twice with the same signature
+  (2026-09-08).** On #941 the E2E job failed at the 23-minute mark: `preferences-survive-reinstall`
+  died with `page.goto: net::ERR_ABORTED at http://localhost:3100/`, two more specs went flaky with
   `browser.newContext: Target page, context or browser has been closed`, and the other 158 passed.
-  It is the server or the browser dying near the end of a long run, not an assertion. **It did not
-  reproduce**: the very next PR (#943), on a tree containing #941, was green including E2E — so this
-  is one unreproduced sighting, not a flake and not attributable to the collection route #941 added.
-  Recorded because a 27-minute job that occasionally eats itself is an argument about the job, which
-  is what this entry is for.
+  That was recorded as one unreproduced sighting, because the next PR (#943), on a tree containing
+  #941, was green. **#949 reproduced it exactly** — same spec, same `net::ERR_ABORTED`, on a branch
+  whose entire diff is `aria-label` attributes and documentation.
+  - **What the second sighting adds is the shape.** Four specs failed inside one 70-second window
+    (02:04:02–02:05:16) and no other minute of a 23-minute run had a failure in it:
+    `one-calorie-budget:165`, `back-dismiss-sweep:171` and `card-429-error-state:16` all reported
+    `browser.newContext: Target page, context or browser has been closed`, which is the browser
+    process being *already gone* before the test starts. Those three recovered on retry. The one
+    that did not is the one whose retry fired immediately, landing inside the same dead window —
+    so which spec is reported as the hard failure is a scheduling accident, not a property of the
+    spec.
+  - **It is not a spec to fix, and diagnosing it as one has now cost time twice.** No assertion
+    failed; a process died. It is worth noting that `preferences-survive-reinstall:36` is also one
+    of the two specs the 2026-09-04 shard experiment could not clear with a fresh database — but
+    that failure was an assertion and this one is not, so they should not be merged into one
+    hypothesis.
+  - Recorded because a 26-minute job that eats its own browser roughly one run in three is an
+    argument about the job, which is what this entry is for. It also means **a red E2E cannot be
+    read as a signal without opening the log**, which is the cost LB-54 is about.
 
 **Measured, not estimated.** A full local run against a CI-shaped database: **144 tests, 27.1 minutes
 of test time.** There is no single pathology — 28 tests finish under 5s and 16 take over 20s. The
@@ -1092,37 +1106,6 @@ with no signal.
   lists is the safe failure and must stay the failure mode until the value is validated at write time.
 - **Not urgent.** One malformed entry in 322, now corrected.
 
-### [app-shell] LA-62 — eighteen icon-only buttons announce as "button" and nothing else
-
-- **Lane:** B — `components/**` and two `app/**` pages; the list is in
-  `scripts/check-icon-button-names.js`'s `BASELINE`.
-- **Added:** 2026-09-06, surfaced by PS-34 widening the guard that was supposed to be catching them.
-- **Needs:** nothing — the guard is on `main` and frozen shrink-only.
-
-An icon-only control with no accessible name is announced by a screen reader as "button", with
-nothing to say what it does. Q-162 found six in 2026-08 and the rule was written to stop the class
-recurring. It did not: its opening-tag regex ended at the `>` of `=>`, so every button with an
-inline-arrow handler — which is most of them — was skipped without a word, and the rule reported
-clean over code it had never parsed.
-
-| file | count |
-|---|---|
-| `components/config-screen.tsx` | 6 |
-| `components/more/manage-friends-sheet.tsx` | 3 |
-| `app/admin/admin-content.tsx` · `app/profile/[userId]/page.tsx` | 1 each |
-| `components/admin/activity-type-manager.tsx` · `components/admin/exercise-manager.tsx` | 1 each |
-| `components/config/phase-editor.tsx` · `program-editor-sheet.tsx` · `style-editor-sheet.tsx` | 1 each |
-| `components/more/feedback-sheet.tsx` · `components/workout/added-weight-toggle.tsx` | 1 each |
-
-The icons are `Pencil`, `Trash2`, `X`, `Check`, `ArrowLeft`, `UserMinus`, `ChevronUpIcon` — every
-one of which has an obvious name, so this is `aria-label="Edit"` / `"Delete"` / `"Close"` and no
-design decision. Clearing a file means lowering its number in the baseline in the same PR; the check
-fails on a stale-high number, so the list cannot quietly stop shrinking.
-
-**Do not "fix" it by making the scan narrower again.** The baseline pins the scanner's reach as well
-as the debt: breaking the brace-aware walk makes files read as zero against a non-zero number, and
-the check fails for that too — verified by mutation.
-
 ### [app-shell] PS-35 — five zero-content pages, a wrong PWA start_url, and boot-time paper cuts
 
 - **Lane:** B — `app/{workout-select,session-select,stats,config,profile}/page.tsx`,
@@ -1156,21 +1139,6 @@ bests are windowed correctly and are the pattern. (c) Zone-minutes doubles Z3 as
 zone-targets counts Z3 once — both cite WHO 2020; the filed Tuning band is a third position and
 names neither file.
 
-### [nutrition] LA-75 — the goals form suggests a water number the app's own recommender never produces
-
-- **Lane:** B — `components/profile/goal-targets-section.tsx:163,204` (placeholder copy only).
-- **Added:** 2026-09-07, Lane A — the residue of PS-37, which named two 2500s and there are four.
-
-`placeholder="2500"` and `placeholder="e.g. 2500"` sit on the water-goal inputs, **beside the control
-that fills in the real recommendation** — `weightKg * 33 + WATER_BUMP_BY_ACTIVITY[activity]`, which
-for any real body weight lands nowhere near 2500 (the changelog even advertises "33 ml per kg of body
-weight, plus your activity bump"). PS-37 read the same number in two other places as a hardcoded goal;
-those two turned out to be a **no-goal-set fallback** (now `DEFAULT_WATER_GOAL_ML`, named as a
-placeholder rather than a recommendation) and a **population anchor** for a 1-5 prefill scale, which
-is deliberately not personal. The form is the one place where 2500 is genuinely wrong: it suggests a
-goal. Show the recommendation, or nothing. Left to Lane B because it is placeholder copy on a screen
-this session cannot see rendered.
-
 ### [platform] PS-38 — checkpoint docs sweep: seven stale CLAUDE.md claims, a duplicated Q-479 row, 13 Needs→KEEP edges
 
 - **Lane:** O — the Orchestrator's; docs only. **Reference:** the full dispositions live in the
@@ -1186,7 +1154,7 @@ repair the 22 dead backlog paths and 43 doubled `docs/overview/overview/` labels
 unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge candidates
 (led by `oura-ring-data-reference.md`, a retired-API reference with no retirement note).
 
-### [platform] PS-39 — 141 API routes still have no test that imports their handler
+### [platform] PS-39 — 140 API routes still have no test that imports their handler
 
 - **Lane:** A. Regenerate the list with `node scripts/check-route-test-coverage.js` — it prints every
   uncovered route when it fails, and the ratchet now holds the number.
@@ -1196,10 +1164,29 @@ unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge
   `oura/hr-day` and `oura-ble/samples`; the rest is buildable work rather than a residue, so it keeps no `Keep:` — that
   would file it under a heading telling the lane not to look (OR-100).
 
-**The count was 93 and is really 141**, by the mechanism the entry half-noticed: it counted a route
+- **⚠️ THE 140 IS ITSELF OVERSTATED BY 15, MEASURED 2026-09-08 (Q-112d).** The scan asks whether any
+  test file contains the substring `app/api/<route>/route`, which a **relative** import never
+  produces. Fifteen routes on the uncovered list have a co-located test in their own `__tests__/`
+  loading the handler as `await import('../route')`: `sync/push`, `sync/pull`, `next-session`,
+  `next-session/prescription`, `user/goals`, `workout-sessions`, `body-battery`, `health-trends`,
+  `health/trends`, `ai/health-insight`, `oura/stats`, `oura/hr-window`, `oura-ble/accel-chunks`,
+  `oura-ble/live-steps`, `admin/backfill-derived-scores`. So the real debt is nearer **126**, and
+  four of the fifteen are among the most consequential routes in the app — a list that says
+  `sync/push` is untested is a list nobody should act on before this is fixed.
+  - **How it surfaced is the argument for fixing it rather than re-counting by hand.** Q-112d took
+    `day-review/week-window` off the list with a **type-only** import written for a response type —
+    it tests nothing — while that route's own real handler test had been invisible the whole time.
+    The signal is not just noisy, it points the wrong way in both directions at once.
+  - **The fix is to resolve the specifier rather than match the string**: for a test under
+    `app/api/<route>/`, a relative `../route` (or `../../route`) resolves to that route's module.
+    That is a path join, not a parser. Whoever does it must re-baseline in the same PR, and the
+    number will DROP by about 15 — which is a check becoming honest, not debt being paid.
+
+**The count was 93 and is really 140**, by the mechanism the entry half-noticed: it counted a route
 covered when any test mentioned its URL, so `calendar-data` and `training-load` "appearing only as
 cache-key strings" counted. Asking instead whether a test imports the handler gives 150 of 222, less
-the nine paid down so far. Not a call to write 141 files — 18 are admin/debug. **The actionable core
+the ten paid down so far. Not a call to write 140 files — 18 are admin/debug, and per the warning
+above ~15 more are miscounted. **The actionable core
 named by this entry is now CLEAR**: the home aggregates, both ingest routes and `program-week` are
 done. What is left is the long tail, which is real work but no longer has a shortlist. `scripts/check-route-test-coverage.js` is the ratchet, so the debt can only
 shrink and a NEW route arrives uncovered and fails — which is the half that matters.
@@ -16464,23 +16451,54 @@ per-field merge where an AI write has no honest source rank to claim.
   reusable components. What is missing is one entry point instead of two, three stats, a 7-day
   comparison, and the wrap-up continuing from the read-through. Reasoning and alternatives: the plan.
 
-### [nutrition][app-shell] Q-112d — draw the trends, on four stats not fourteen
+### [nutrition][app-shell] LB-64 — the weekly recap has no numbers to draw, because the route keeps them
 
-- **Branch:** `feat/day-review-trends` · **Lane: B** · **Plan:** the above, §4
-- **Needs: Q-112c**
-- Resting HR, steps, session volume, weight. Composition percentages move too slowly to read as
-  anything but noise; scores already carry `scoreBand()`'s word. **The primitive can draw these now**
-  — Q-154 shipped its missing props on 2026-08-30 (`pad`, `valuePadding`, `strokeWidth`, `gridLines`,
-  `emphasizeLast`, `valueLabel`, all defaulted), so use `components/ui/sparkline.tsx` rather than the
-  delta chip this used to fall back to. **Pass `valuePadding={0}`** unless a padded domain is wanted:
-  the default 0.5 halves the amplitude of a small spread.
+- **Lane: A** — `app/api/**`. Filed by Lane B while starting Q-112e; the letter records who found it.
+- **Added:** 2026-09-08, from Q-112e's own investigation. **Q-112e `Needs:` this.**
+
+**Q-112e says the weekly recap gets "the pattern Q-112a–d proves out", and it cannot, because the
+data does not reach the client.** `/api/weekly-digest` assembles a rich weekly picture — volume and
+its week-over-week change, weighted sets per muscle, body metrics, sleep, Oura rows, derived scores,
+PRs — and uses **all of it to build the model's prompt**, returning only `{ digest, weekStart }`.
+The numbers exist, are already computed, and are thrown away.
+
+**The lookback is also wrong for the ask.** The plan attributes a *"monthly scale"* lookback to the
+owner; the route reads **14 days** (the recap week plus the prior week, for its comparison line).
+Nothing in the app currently serves a month of these series — `/api/day-review/week-window` is fixed
+at 8 points by construction (`shiftDateStr(date, -7)` and a `length: 8` array), so it is not a
+parameter away from answering this either.
+
+**What this needs is Q-112c's shape at a monthly scale**, and the decision is which of two:
+- **Return what `weekly-digest` already computed**, beside the prose. Cheapest — the arithmetic is
+  done and it is one response-shape change — but it welds a *series* onto a **POST that runs an
+  LLM**, rate-limited and cached as prose, which is the wrong cache and the wrong method for a chart.
+- **A sibling window route**, as Q-112c is for the day. Costs a route, and is the shape that already
+  works: cacheable GET, its own TTL, its own invalidation-group entry, no model in the path.
+- **Recommendation: the sibling route**, and only that. The prose route's caching is the argument —
+  Q-293's note in its own source says the digest is deliberately re-derived because a late ring
+  back-fill changes its inputs, and a chart wants that freshness on a different clock from a
+  paragraph the model wrote.
+- **Reversal cost:** a new unused route, if Q-112e is later cut. Low.
+
+**Do not batch this with a migration** — it needs none; it is a read over `body_metrics`,
+`workout_sessions` and the derived tables, exactly as `day-review/week-window` is.
 
 ### [nutrition][app-shell] Q-112e — the weekly recap gets the same treatment
 
 - **Branch:** `feat/weekly-recap-uplift` · **Lane: B** · **Plan:** the above, §4
-- **Needs: Q-112d**
+- **Needs: LB-64**
 - `weekly-recap-banner.tsx` + `/api/weekly-digest` at the owner's "monthly scale" lookback.
   Deliberately last, so the daily version settles the layout first.
+- **⚑ PART SHIPPED 2026-09-08; the trends half is BLOCKED on LB-64, not merely unstarted.** The
+  banner's silent-vanish error state is fixed — a failed recap used to `return null`, so the user
+  could not tell a quiet week from a broken one, and the once-per-week `hasFetched` guard meant a
+  single failure cost the whole week's recap. It now says so and the tap retries. That is the half of
+  "the pattern Q-112a–d proves out" that needed nothing from the engine (the plan asks for exactly
+  this fix by name for the daily digest in Q-112a).
+- **Keep:** the trends themselves. `/api/weekly-digest` returns prose only — see **LB-64** for the
+  measurement and the route recommendation. Q-112d's `day-trends.ts` is the render to copy; its
+  `TREND_SPECS`/`trendRows` are shaped around a `WeekWindowResponse` and will want widening, not
+  rewriting, once a monthly window exists.
 
 ### [workouts][platform] LB-24 — deleting the Home day-review orphaned a chart, a route and a cache group
 
@@ -16510,6 +16528,15 @@ per-field merge where an AI write has no honest source rank to claim.
   series it reuses for the 7-day comparison window, so a tidy-up now is work Q-112c would have to
   undo. The decision point is *after* Q-112d: if the trends phase has not re-homed the chart by
   then, delete component + route + the cache-group line together.
+- **⚑ THE DECISION POINT HAS PASSED, AND THE ANSWER IS DELETE (2026-09-08, Q-112d shipped).** The
+  trends phase did **not** re-home `workout-load-comparison-chart`, and it did not reuse the route
+  either: `/api/day-review/week-window` derives session volume itself from `getWorkoutSessionsFrom`,
+  so Q-112c's plan text about reusing `/api/workout-load-history` describes an intention the shipped
+  route did not follow. That leaves the component with zero renderers, the route with zero client
+  callers and the `workout-load-history:` line in `invalidateWorkoutSummaries()` clearing nothing —
+  the state this entry describes, now with nothing left that might rescue it. Verify the zero call
+  sites at the head you delete from rather than trusting this line; the point of the note is that
+  the *blocker* is gone, not that the grep is stale-proof.
 - **What "re-home" would mean.** Per-session load-vs-history is a workout read, and the natural
   surfaces are `/health/day` (which already draws per-session volume) or Q-112b's read-through step
   — not the evening wrap-up, where it was one more chart nobody had asked for.
@@ -18150,6 +18177,7 @@ reads.
 
 - **Lane:** B — `components/ui/switch.tsx`.
 - **Added:** 2026-09-07 · Lane B, found while fixing BF-124's selected-state slab.
+- **Gate:** owner — the measuring and the proposal are done (below); what is left is one yes or no.
 - **Same token, wider blast radius.** `switch.tsx:16` marks the on state with
   `data-[state=checked]:bg-primary`. `--primary` is `oklch(0.922 0 0)` in dark — near-white — which
   is exactly why BF-124's selected role pill read as disabled rather than chosen. The switch has the
@@ -18159,11 +18187,50 @@ reads.
   other chosen state in the app) or stay neutral-white (the shadcn default, and arguably right for a
   binary that is not a *selection* among options). Count the switches before proposing either — the
   answer probably differs between a settings toggle and an in-form choice.
+
+- **COUNTED 2026-09-08 (Lane B).** **25 switches, 14 files.** The split the line above predicted is
+  real — about **15 are persisted preferences** (five in `more/settings-panel.tsx` alone, plus the
+  supplements, meal-type, dynamic-background and admin sheets) and about **10 are in-form choices**
+  made while composing something (`walk-config`, `builder-review`, `goal-recommendation-sheet`,
+  `my-meals-picker`, the meal-plan steps, `coach/change-preview`). It does not decide anything:
+  nobody classifies a toggle before looking at it, they read on or off, so two on-colours would be a
+  distinction the user has to learn in order not to be confused by it.
+- **RECOMMENDATION: `--brand` for the on state, one line, no split.** In dark — the only theme this
+  app ships — `--primary` is `oklch(0.922 0 0)`, near-white and **chroma 0**, the shadcn light-first
+  default, and the same value that made BF-124's selected role pill read as switched off. `--brand`
+  is already **overridden at runtime by the owner's own choice**, and `--brand-foreground` exists to
+  keep a thumb legible on it — so this uses the colour they picked and follows it if they change it.
+  A year out the durable property is that "on" and "chosen" look alike everywhere; recolouring only
+  the screens someone happens to notice is how the pill and the switch came to disagree.
+- **The alternative, and what it is better at: keep the near-white.** Five brand-green pills in the
+  `settings-panel` column are loud, and green in this app already means *good / achieved* (score
+  bands, streaks) rather than *enabled*. That is the real argument against, and it is about that one
+  screen. Fallback if the column is the only place it looks wrong: brand for in-form, neutral for
+  settings — rejected above, but available.
+- **Reversal cost: one line in `components/ui/switch.tsx`.** Visual only — no state, no storage, no
+  API. What makes it the owner's call is that 25 controls change at once, not that it is hard to undo.
 - **Not urgent and not a defect on its own** — nobody has reported a switch reading as off. It is
   filed because the finding was made and CLAUDE.md's **No orphaned findings** rule applies, not
   because it is queued work.
 - **Reversal cost:** low, one line — but it is seen everywhere, so it wants the owner's eye before
   it lands.
+
+### [app-shell] LB-63 — one field on the goals form is drawn as a different kind of control from its three siblings
+
+- **Lane:** B — `components/profile/goal-targets-section.tsx:147` (the Sleep Goal input's `className`).
+- **Added:** 2026-09-08 · Lane B, seen on screen while shipping LA-75 on the same form.
+- **What it looks like.** Steps, Water and Calories are `border-border bg-muted/60` — bordered boxes
+  that read as text fields. Sleep alone carries `border-0 bg-transparent p-0 h-auto` plus a dimmer
+  `placeholder:text-muted-foreground/50`, so on the S25 it renders as an unbordered strip while the
+  three fields around it render as inputs. LA-75's longer placeholder makes it more obvious, but the
+  divergence predates it — the file was extracted whole in one commit, so there is no blame trail and
+  no comment saying the difference is meant.
+- **Left alone deliberately, and this entry is why.** LA-75 was a copy fix on the same four fields;
+  restyling a control in the same PR would have mixed a design judgement into a correctness one and
+  made the diff harder to read. Filed under **No orphaned findings** rather than queued as urgent.
+- **What it needs is a look, not a decision.** Almost certainly the sleep field should just match its
+  siblings. Confirm on the S25 first — the difference is much clearer rendered than in the class list.
+- **Reversal cost:** one line.
 
 ### [platform] LB-62 — a zero-argument `vi.fn` whose recorded calls are then indexed; red `main` three times in one day
 

@@ -64,3 +64,35 @@ test('the wrap-up steps through to a Save', async ({ page }) => {
   await review.getByRole('button', { name: 'Previous' }).click()
   await expect(review.getByRole('button', { name: 'Next' })).toBeVisible()
 })
+
+/**
+ * The week-window fetch is gated on the wrap-up being OPEN (Q-112d).
+ *
+ * `EndOfDayReview` is rendered unconditionally by `nutrition-content`; `open` only drives Radix.
+ * So a hook in that component's body would fire on every visit to the Nutrition tab, for a payload
+ * nobody has asked to see — which is why `DayTrendsSection` is its own child of `SheetContent`,
+ * exactly as `DayReadThroughSection` is.
+ *
+ * **This is the half no unit test can reach**, and it is written against the request rather than
+ * the rendered rows on purpose: whether any row draws depends on what the seed recorded in the
+ * eight days before today, and encoding that here would make the test a statement about fixtures.
+ * Whether the request happens at all does not.
+ */
+test('the week window is fetched when the wrap-up opens, and not before', async ({ page }) => {
+  const calls: string[] = []
+  page.on('request', req => {
+    if (new URL(req.url()).pathname === '/api/day-review/week-window') calls.push(req.url())
+  })
+
+  await page.goto('/nutrition')
+  await settleRouteBoundary(page)
+  // Something on the tab must have settled before "no request yet" means anything — otherwise this
+  // passes on a page that has not finished loading.
+  await expect(page.getByRole('button', { name: 'End of Day', exact: true })).toBeVisible({ timeout: 60_000 })
+  expect(calls, 'the Nutrition tab must not pay for a sheet nobody opened').toHaveLength(0)
+
+  await page.goto('/nutrition?review=day')
+  await settleRouteBoundary(page)
+  await expect(page.getByRole('dialog')).toBeVisible({ timeout: 60_000 })
+  await expect.poll(() => calls.length, { timeout: 30_000 }).toBeGreaterThan(0)
+})

@@ -6,6 +6,28 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.438.1",
+    date: "2026-09-08",
+    changes: [
+      "If your week in review fails to load, the banner on Home now says so and you can tap to try again. It used to disappear \u2014 and because it only tries once a week, one failure quietly cost you that week\u0027s recap with nothing on screen to explain it.",
+    ],
+  },
+  {
+    version: "1.438.0",
+    date: "2026-09-08",
+    changes: [
+      "The End of Day wrap-up now shows how today compares with the last week. Resting heart rate, steps, session volume and weight each get a small chart of the past eight days and a line saying how far today sits above or below the week\u0027s average.",
+      "Only the stats you actually recorded appear \u2014 a stat with nothing in the last eight days is left out rather than shown empty, and one with history but no reading today keeps its chart and says so.",
+    ],
+  },
+  {
+    version: "1.437.1",
+    date: "2026-09-08",
+    changes: [
+      "The goal fields on the Goals screen no longer show an example number in the empty box. They say what the field wants \u2014 \u0027ml per day\u0027, \u0027kcal per day\u0027 \u2014 because the number the app actually recommends for you is on the button right below each one, and the two did not agree.",
+    ],
+  },
+  {
     version: "1.437.0",
     date: "2026-09-07",
     changes: [

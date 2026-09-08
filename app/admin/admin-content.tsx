@@ -150,7 +150,7 @@ export default function AdminContent() {
     <div className="min-h-screen bg-page px-6 pt-safe pb-nav-safe">
       <div className="mx-auto max-w-2xl space-y-6">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => router.back()}>
+          <Button variant="ghost" size="icon" aria-label="Go back" onClick={() => router.back()}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
