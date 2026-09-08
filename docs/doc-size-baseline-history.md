@@ -8935,3 +8935,10 @@ before the directory can shrink.
 
 18793 → 18813. One new entry: LA-80, the entries-directory ceiling above. Raised because a new queue
 entry is what this index is for; the PS-39 status update in the same PR was net-neutral.
+
+## 2026-09-08 — `docs/overview/entries/` total ceiling → 322 (LA-80, one PR later)
+
+321 → 322, for this PR's journal entry. This is the second raise in two PRs and it is the behaviour
+LA-80 describes: the ceiling now moves by one every time a feature PR lands, because the fold that
+would reclaim the space is blocked on 292 citations pointing at entries rather than at the batched
+history. Raising it is bookkeeping, not a fix — the entry says what the fix is.
