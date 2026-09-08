@@ -1080,6 +1080,38 @@ two are `first-run-empty-states` and `preferences-survive-reinstall`. **Order ma
 least some of these are shared-state, not the spec's own logic. Read the artifact this PR makes real
 before assuming a local-DB artifact — that mistake has already been made once on `plan-rescale`.
 
+### [workouts][platform] LA-78 — `baseline/complete` writes before it checks the session is yours
+
+- **Lane:** A — `app/api/ai-periodization/baseline/complete/route.ts`, a three-line reorder.
+- **Added:** 2026-09-08, Lane A — found writing that route's PS-39 tests, then verified against the
+  local database rather than reasoned about.
+
+`ensureSessionPeriodization(userId, sessionId)` runs at line ~45; the check that `sessionId` is
+actually in the caller's **active program** runs ~20 lines later and answers 404. So the ordering is
+write-then-verify, which CLAUDE.md's write-path ownership discipline says it must not be.
+
+**Two outcomes, neither of them the 404 the route means to give:**
+
+- A **real** `program_sessions` row of the caller's, in a *different* (inactive) program: the insert
+  succeeds and leaves a stray `session_periodization` row for a session no active program contains,
+  then the request 404s. The row is harmless but it is state nobody asked for.
+- A **uuid that matches no session**: `program_session_id` carries a foreign key to
+  `program_sessions.id`, so Postgres rejects the insert. Verified 2026-09-08 against the local
+  database — `insert or update on table "session_periodization" violates foreign key constraint
+  "session_periodization_program_session_id_fkey"`. Nothing catches it, so the caller gets a
+  framework **500** where a **404** was intended.
+
+**Not a cross-user hole** — every path is scoped to `userId` and the FK bounds the rest. It is a
+correctness and error-shape defect, which is why it is small rather than urgent.
+
+- **The fix**: move the `getActiveProgram` read and its `programSession`/404 check **above**
+  `ensureSessionPeriodization`. The program read already happens in the same handler, so this costs
+  nothing — it is purely an ordering change.
+- **Add the two cases** to `lib/__tests__/ai-periodization-program-routes.test.ts` when fixing:
+  a session from an inactive program writes nothing, and an unknown uuid answers 404 rather than
+  500. They were deliberately left out of the PS-39 batch rather than pinning current behaviour as
+  correct.
+
 ### [platform] LA-77 — 60% of the lint warnings are deliberate, so the 60 real ones are invisible
 
 - **Lane:** O — `eslint.config.mjs` is repo-level tooling in neither implementer lane's paths, the
@@ -1156,7 +1188,7 @@ repair the 22 dead backlog paths and 43 doubled `docs/overview/overview/` labels
 unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge candidates
 (led by `oura-ring-data-reference.md`, a retired-API reference with no retirement note).
 
-### [platform] PS-39 — 124 API routes still have no test that imports their handler
+### [platform] PS-39 — 120 API routes still have no test that imports their handler
 
 - **Lane:** A. Regenerate the list with `node scripts/check-route-test-coverage.js` — it prints every
   uncovered route when it fails, and the ratchet now holds the number.
@@ -1185,15 +1217,14 @@ unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge
     and `ai-periodization/session/[sessionId]` + `…/prescribe` + `…/respond` — each batched with the
     uncovered siblings it verifies alongside.
 
-**The count was 93 and is really 124**, by the mechanism the entry half-noticed: it counted a route
+**The count was 93 and is really 120**, by the mechanism the entry half-noticed: it counted a route
 covered when any test mentioned its URL, so `calendar-data` and `training-load` "appearing only as
 cache-key strings" counted. Asking instead whether a test imports the handler gives 150 of 222, less
-the twenty-six paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
+the thirty paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
 honest in both directions (see above), so the list can be worked from. **The actionable core
 named by this entry is now CLEAR**: the home aggregates, both ingest routes and `program-week` are
-done. What is left is the long tail; the next coherent batch is the four remaining
-`ai-periodization` routes (`baseline/complete`, `program-overview`, `…/transition`, `weekly-volume`),
-which share fixtures with the file already landed. `scripts/check-route-test-coverage.js` is the ratchet, so the debt can only
+done, and so is every `ai-periodization` route. What is left is the long tail, worked by picking a
+feature whose routes verify together rather than by position in the printed list. `scripts/check-route-test-coverage.js` is the ratchet, so the debt can only
 shrink and a NEW route arrives uncovered and fails — which is the half that matters.
 
 ### [app-shell][platform] LA-76 — a deload PHASE still decays the collection, and nothing dates one

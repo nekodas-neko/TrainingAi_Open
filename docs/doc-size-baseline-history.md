@@ -8893,3 +8893,10 @@ BF-106 explaining why its lane went from the unparseable `none` to `O`.
 18765 → 18793, a 28-line rise: one new entry (LA-77, the lint-warning signal-to-noise measurement),
 raised rather than absorbed because a new queue entry is what this index is *for*. The PS-39 status
 rewrite that rode in the same PR was compressed back to net zero rather than added to this number.
+
+## 2026-09-08 — `docs/implementation-backlog.md` → 18824 (LA-78 filed)
+
+18793 → 18824. One new entry: LA-78, a write-before-ownership-check ordering defect in
+`baseline/complete`, found while writing that route's PS-39 tests and verified against the local
+database. Raised rather than absorbed, because a new queue entry is what this index is for; the
+PS-39 status update in the same PR was net-negative.
