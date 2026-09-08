@@ -8835,7 +8835,7 @@ implemented half a feature against a route that cannot serve it.
 18775 rather than the 18752 this branch computed: LB-61's own 23 lines landed underneath it. The +42
 is unchanged across that, which is the property recomputing from the merged file preserves.
 
-## 2026-09-08 — `docs/implementation-backlog.md` → 18760 (LB-63 shipped)
+## 2026-09-08 — `docs/implementation-backlog.md` → 18757 (LB-63 shipped)
 
 Down 17 with nothing added back, which is what a one-line fix should cost the index. LB-63 was filed
 in the first place because the defect was seen in a screenshot taken to verify a different change,
@@ -8844,6 +8844,7 @@ design judgement into a correctness one. It cost 17 lines to carry that judgemen
 rather than losing it.
 
 18760 rather than the 18716 this branch computed. Two PRs landed underneath it while it was open —
-Q-112e's split (+42) and PS-39's route pin (+2) — and the recompute happened twice, once per rebase.
+Q-112e's split (+42), PS-39's route pin (+2) and PS-39's specifier fix (−3) — and the recompute
+happened three times, once per rebase.
 The −17 is unchanged across both, which is the whole reason the number comes from the merged file
 rather than being carried across.
