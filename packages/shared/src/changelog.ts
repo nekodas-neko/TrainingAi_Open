@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.438.1",
+    date: "2026-09-08",
+    changes: [
+      "If your week in review fails to load, the banner on Home now says so and you can tap to try again. It used to disappear \u2014 and because it only tries once a week, one failure quietly cost you that week\u0027s recap with nothing on screen to explain it.",
+    ],
+  },
+  {
     version: "1.438.0",
     date: "2026-09-08",
     changes: [

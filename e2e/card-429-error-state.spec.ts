@@ -44,3 +44,21 @@ test('a card whose endpoint 429s shows an error state instead of vanishing (AI P
   await page.goto('/health', { waitUntil: 'networkidle' })
   await expect(page.getByText("Couldn’t load AI Periodization")).toBeVisible({ timeout: 10_000 })
 })
+
+/**
+ * The weekly recap banner, same class with one extra edge (Q-112e).
+ *
+ * Unlike the cards above it fetches **once per completed week**, behind a `hasFetched` ref and a
+ * localStorage cache — so a `return null` on failure did not merely hide one paint, it cost the
+ * whole week's recap with nothing on screen to say so. Hence the retry: the assertion is that the
+ * banner appears at all, and the affordance is what makes appearing useful.
+ */
+test('the weekly recap says it failed instead of vanishing, and offers a retry', async ({ page }) => {
+  await page.route(u => new URL(u).pathname === '/api/weekly-digest', r =>
+    r.fulfill({ status: 429, contentType: 'application/json', body: '{"error":"Too many requests"}' }))
+  // Home, not `/session-select` — that path redirects to the Workout tab. `SessionSelectContent` is
+  // rendered by the tab shell at `/`, which is where this banner actually lives.
+  await page.goto('/', { waitUntil: 'networkidle' })
+  await expect(page.getByText('Your week in review didn’t load')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText('Tap to try again')).toBeVisible()
+})

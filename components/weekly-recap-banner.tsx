@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { SparklesIcon } from "lucide-react";
 import dynamic from "next/dynamic";
 import { startOfWeekInTz, shiftDateStr } from "@trainingai/shared/date-utils";
@@ -42,6 +42,24 @@ export function WeeklyRecapBanner({ forceOpen = false }: Props) {
   const [error, setError] = useState(false);
   const hasFetched = useRef(false);
 
+  // Held in a ref so the effect below does not depend on it — `cacheKey` is derived from
+  // `weekStart`, which the effect already tracks.
+  const cacheKeyRef = useRef(cacheKey);
+  cacheKeyRef.current = cacheKey;
+
+  const load = useCallback(() => {
+    setError(false);
+    setIsLoading(true);
+    fetch("/api/weekly-digest", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
+      .then(res => { if (!res.ok) throw new Error("failed"); return res.json(); })
+      .then((data: { digest: string; weekStart: string }) => {
+        setContent(data.digest);
+        localStorage.setItem(cacheKeyRef.current, JSON.stringify({ content: data.digest, weekStart: data.weekStart }));
+      })
+      .catch(() => setError(true))
+      .finally(() => setIsLoading(false));
+  }, []);
+
   useEffect(() => {
     const alreadyDismissed = !forceOpen && !!localStorage.getItem(dismissKey);
     setDismissed(alreadyDismissed);
@@ -64,15 +82,7 @@ export function WeeklyRecapBanner({ forceOpen = false }: Props) {
       }
     } catch { /* fall through to fetch */ }
 
-    setIsLoading(true);
-    fetch("/api/weekly-digest", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
-      .then(res => { if (!res.ok) throw new Error("failed"); return res.json(); })
-      .then((data: { digest: string; weekStart: string }) => {
-        setContent(data.digest);
-        localStorage.setItem(cacheKey, JSON.stringify({ content: data.digest, weekStart: data.weekStart }));
-      })
-      .catch(() => setError(true))
-      .finally(() => setIsLoading(false));
+    load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [weekStart, forceOpen]);
 
@@ -81,7 +91,24 @@ export function WeeklyRecapBanner({ forceOpen = false }: Props) {
     setDismissed(true);
   }
 
-  if (dismissed || error || (!isLoading && !content)) return null;
+  if (dismissed || (!isLoading && !content && !error)) return null;
+
+  // A failed recap used to return null, so the request simply never produced anything and the user
+  // had no way to tell a quiet week from a broken one (Q-499's class; the plan calls for the same
+  // fix the daily digest got in Q-112a). It says so instead, and the tap retries rather than making
+  // the user relaunch the app — the fetch runs once per week behind a `hasFetched` guard, so
+  // without a retry a single failure costs the whole week's recap.
+  if (error) {
+    return (
+      <DismissibleBanner
+        icon={<SparklesIcon className="h-4 w-4 text-muted-foreground" />}
+        title="Your week in review didn’t load"
+        subtitle="Tap to try again"
+        onActivate={load}
+        onDismiss={handleDismiss}
+      />
+    );
+  }
 
   return (
     <DismissibleBanner
