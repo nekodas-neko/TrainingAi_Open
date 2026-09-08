@@ -14216,8 +14216,27 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Branch:** `feat/score-coverage-surfacing`
 - **Plan:** none yet
 - **Added:** 2026-08-15 · from the comprehensive review §1.1
-- **Lane:** B — **was A, flipped 2026-09-04 once the engine half shipped.** Derived 2026-08-31 by the path rule while selecting Lane B's next item: `lib/health/score-availability.ts` is reached by `app/api/readiness-score`, `app/api/body-battery` and `app/api/ai/health-insight`, so the engine half was Lane A's and went first. It is done; every path still open here is a surface, and leaving the lane at A had `next-item.js --lane A` offering this as its fourth READY item with nothing in it for that lane to build.
-- **Keep:** Lane B's half — consume `availability` on the surfaces that already render an em dash, starting from the fallback `ReadinessScoreResponse` literal in `health-score-detail.tsx`.
+- **Lane:** A — **was B, flipped BACK 2026-09-08 once the surface half shipped.** It was A while the
+  engine was owed, B while the surfaces were, and is A again because what is left is the route
+  emitting two more metrics. The lane follows the open path, which is the rule working rather than
+  churn: `next-item.js` offers an entry to whichever lane can actually start it.
+- **✅ THE SURFACE HALF SHIPPED 2026-09-08 (Lane B).** `scoreGapText`
+  (`components/health/score-gap-copy.ts`) turns a metric's `availability` into the line beside its em
+  dash, and `health-score-detail.tsx` renders it under the hero on all three score screens — keyed on
+  `aiSection`, which already carried exactly the three metric names, so no new prop. The Home chip row
+  carries it in the **accessible name** instead: those cells are 92–96 px circles with no room for a
+  sentence, a sighted user taps through to the screen that now explains, and a screen-reader user
+  otherwise heard only "Readiness: —".
+  The two sentences differ because only one is fixed by waiting — "Nothing recorded for today" versus
+  "Not enough history to score this yet" — which is the whole distinction the engine half preserved.
+  [journal](overview/entries/2026-09-08-feat-q278-availability-surfaces.md)
+- **Keep:** the route emits `availability` for **readiness, sleep and activity only**. Daytime stress
+  and resilience — the two lowest-coverage pillars in the table below, at 55% and 33% — still render
+  without one, so their dashes cannot be explained by any surface. `metricAvailability` is keyed on
+  the metric name precisely so a sixth costs nothing; what is missing is the route adding them to the
+  array in `lib/health/readiness-payload.ts`. **Sleep and activity report present/absent only** (they
+  have no contributor breakdown), so neither will ever say `awaiting_baseline` — that is honest, not a
+  gap, and should not be "fixed" by inventing contributors for them.
 - **Measured** over 40 post-re-key days (`claude_ro.oura_daily_derived`):
 
   | Pillar | days with a value | coverage |

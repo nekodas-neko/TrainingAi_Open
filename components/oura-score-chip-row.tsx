@@ -11,6 +11,7 @@ import {
   SolidRingFrame, OpenRingFrame, PerforatedRingFrame, AccentRingFrame, HaloFrame,
 } from "@/components/home/score-ring-frames";
 import type { ReadinessScoreResponse } from "@/app/api/readiness-score/route";
+import { scoreGapText } from "@/components/health/score-gap-copy";
 
 interface Props {
   readiness: ReadinessScoreResponse;
@@ -77,6 +78,13 @@ interface CellProps {
   Icon: LucideIcon;
   ringStyle: ScoreRingStyle;
   lowWear?: boolean;
+  /**
+   * Why this cell shows an em dash (Q-278). Carried in the ACCESSIBLE NAME only, and deliberately:
+   * these cells are 92–96 px circles already holding a number, an icon and a label, with no room for
+   * a sentence. A sighted user taps through to the detail screen, which now says the same thing
+   * under its own dash; a screen-reader user otherwise hears "Readiness: —" and gets nothing.
+   */
+  gapReason?: string | null;
   /** Score computed from fewer than the usual inputs. Marked, not dimmed — the reading itself is
    *  trustworthy, there is just less behind it. */
   limited?: boolean;
@@ -95,8 +103,11 @@ function useScoreNav(href: string) {
   return () => router.push(href);
 }
 
-function ariaLabelFor({ label, display, cue, lowWear, limited, provisional }: CellProps) {
-  return `${label}: ${display}${cue ? `, ${cue.word}` : ""}${qualifierPhrase({ lowWear, limited, provisional })}`;
+function ariaLabelFor({ label, display, cue, lowWear, limited, provisional, gapReason }: CellProps) {
+  // The gap reason goes after the value and before the qualifiers, because it explains the value
+  // rather than qualifying it — and a cell with no value has no qualifiers to speak of anyway.
+  const gap = gapReason ? `, ${gapReason.toLowerCase()}` : "";
+  return `${label}: ${display}${cue ? `, ${cue.word}` : ""}${gap}${qualifierPhrase({ lowWear, limited, provisional })}`;
 }
 
 /** The label line under a cell, plus the warning glyph when the reading is qualified. */
@@ -407,6 +418,7 @@ export const OuraScoreChipRow = memo(function OuraScoreChipRow({ readiness, slee
       accent: "#60a5fa",
       href: "/health/readiness",
       Icon: Zap,
+      gapReason: scoreGapText(readiness.availability, "readiness"),
       ringStyle,
       lowWear: readiness.isLowWearToday,
       limited: readiness.limited,
@@ -429,6 +441,7 @@ export const OuraScoreChipRow = memo(function OuraScoreChipRow({ readiness, slee
       accent: "#a78bfa",
       href: "/health/sleep",
       Icon: Moon,
+      gapReason: scoreGapText(readiness.availability, "sleep"),
       ringStyle,
       // Q-529: the score is derived from the night, so while the night can still grow this number
       // can still move. Measured on 2026-08-20 — it read 47 during the sync and 62 once settled,
@@ -443,6 +456,7 @@ export const OuraScoreChipRow = memo(function OuraScoreChipRow({ readiness, slee
       accent: "#f97316",
       href: "/health/activity",
       Icon: Flame,
+      gapReason: scoreGapText(readiness.availability, "activity"),
       ringStyle,
     },
   ];

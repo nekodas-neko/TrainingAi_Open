@@ -7,6 +7,7 @@ import { HEALTH_TRENDS_SUMMARY_TTL, READINESS_SCORE_TTL } from '@trainingai/shar
 import { todayInTz, DEFAULT_TZ } from "@trainingai/shared/date-utils";
 import { getLocalStore } from "@/lib/local-store";
 import type { ReadinessScoreResponse } from "@/app/api/readiness-score/route";
+import { scoreGapText } from "@/components/health/score-gap-copy";
 import type { HealthTrendsResponse, HealthTrendDay } from "@/app/api/health/trends/route";
 import { DetailHero, usePageGradient, useHeroColorScheme, type ColorScheme } from "@/components/health/detail-hero";
 import { TrendSparkline } from "@/components/health/trend-sparkline-lazy";
@@ -202,6 +203,10 @@ export function HealthScoreDetail({
   const color = bandColor(score, scheme);
   const pageGradient = usePageGradient(theme);
   const avg = averageContext ? averageChip(trends?.trends, trendField) : null;
+  // Q-278: the reason behind the em dash. Keyed on `aiSection`, which already carries exactly the
+  // three metric names the route reports availability for — no new prop for a value the component
+  // is holding.
+  const gapText = scoreGapText(data?.availability, aiSection);
 
   return (
     <div className="min-h-screen pb-safe" style={{ background: pageGradient }}>
@@ -215,6 +220,18 @@ export function HealthScoreDetail({
       <div className="px-4 py-5 space-y-5">
         {subtitle && (
           <p className="-mt-1 text-center text-[12px] leading-snug text-muted-foreground">{subtitle}</p>
+        )}
+        {/* Under the hero rather than inside the ring: the ring is a 128 px circle already holding a
+            number, a band word and a label, and a sentence in it would wrap to nothing legible. This
+            is the row the average chip already uses, so the explanation lands where a reader's eye
+            goes after the score. The two are mutually exclusive in practice — `averageChip` needs
+            two scored days and this only renders when today has none — but neither depends on that. */}
+        {gapText && (
+          <div className="-mt-1 flex justify-center">
+            <span className="rounded-full border border-border bg-muted/40 px-3 py-1 text-[11px] font-medium text-muted-foreground">
+              {gapText}
+            </span>
+          </div>
         )}
         {avg && (
           <div className="-mt-1 flex justify-center">
