@@ -50,7 +50,7 @@ const root = path.join(__dirname, '..');
 // This resolves the specifier instead. A relative one resolves against the importing file; an alias
 // or bare one resolves against the repo root; a type-only import does not count at all.
 //
-const BASELINE = 124;
+const BASELINE = 120;
 
 function walk(dir, out = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
