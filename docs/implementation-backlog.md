@@ -1264,32 +1264,6 @@ this is a future gap rather than a dead one.
 a migration and an owner call on whether a deload becomes first-class stored state. Deriving it
 instead is the option that loses: a replay with no window gets one wrong answer and keeps it forever.
 
-### [platform] LA-60 — the sandbox runs Node 22 and every CI job pins Node 20
-
-- **Lane:** A — `.github/workflows/ci.yml`, `package.json` (`engines`), `.claude/hooks/`.
-- **Added:** 2026-09-06, found when RV-46's PR went red on `globSync is not a function`.
-
-The three CI jobs set `node-version: '20'`; the sandbox this repo is developed in runs **22.22.2**.
-So a local `pnpm test` can pass on an API the job does not have. Measured once, live:
-`fs.globSync` is Node 22+, a new test used it, the full local suite was green and the Tests job
-threw `TypeError: globSync is not a function`.
-
-**Nothing catches this.** `tsc` is happy — `@types/node` describes the installed runtime, not the
-one CI pins — and lint has no opinion about it. The failure surfaces only after a push, one CI cycle
-at a time, and only for the subset of Node-22 APIs a change happens to use.
-
-**Two candidate fixes, and the choice is the entry.**
-1. **Pin the sandbox to Node 20** so local and CI agree. Removes the class rather than detecting it,
-   and is the only option that also covers behaviour differences rather than missing functions. Cost
-   is whatever in the sandbox wants 22.
-2. **Raise CI to 22 and add `engines.node`.** Also removes the class, and forward rather than back —
-   but Railway's build image decides what production runs, so this cannot be done from the workflow
-   file alone without checking that first.
-
-Not a detection rule: a hardcoded list of Node-22 APIs goes stale the moment Node 23 ships, and the
-thing that actually needs to be true is that the two runtimes match.
-
-
 ### [platform][nutrition] 🟡 RV-45 — the six sibling deletes now 404; the device path is unchecked
 
 > **✅ SWEPT 2026-09-05.** All seven now answer **404** when a delete matched no row, matching the
