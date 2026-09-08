@@ -9051,6 +9051,31 @@ the argument for the checklist, so it belongs beside it rather than in a journal
 
 329 → 330. Tenth consecutive raise, one per PR, as LA-80 describes.
 
+## 2026-09-08 — `docs/implementation-backlog.md` 18,977 → 19,006 (+29), BF-131 amended
+
+The owner asked why the baseline was not generated from the AMRAP automatically, and the trace that
+followed **narrowed the entry rather than adding to it** — which is why it is worth 29 lines that
+mostly replace existing ones.
+
+BF-131 originally said to *"derive the baseline from the session that was just completed"*. That is
+wrong in the expensive direction: `estimateOneRm` already takes an `isBaseline` flag routing to
+`amrapAverage1Rm` (`1rm.ts:170`), `workout-screen.tsx:1212` already passes it, and the result already
+lands in `exercise_logs.estimated_1rm` — the PR carve-out at `:1294` that lets a baseline set count
+through a deload only makes sense because those sets are understood to be the anchor. So the number
+exists in the owner's data today and the gap is a single copy into `session_periodization`.
+
+Left unamended, the entry would have sent an implementer to write a second AMRAP 1RM formula — the
+exact failure **One Formula, One Place** exists to prevent, and one that would silently disagree with
+the PR the same sets produced. The amendment is kept visible in place rather than rewritten away, so
+the narrowing is legible as a correction.
+
+Two additions came out of the same question. The **"do not make Use prior data automatic"** paragraph
+records why the button is a button: the route calls itself the *skip-baseline flow* and refuses on an
+empty anchor, so automating it inverts a deliberate design — worst on a rebuilt program, where the
+exercise list changed and re-measuring is the point. And the partial-baseline bullet now requires the
+card to say **which** state it is in; "Baseline needed" reading identically after zero sessions and
+after two is what made this unreportable until it was traced, and a fix that leaves that in place
+invites the same report again.
 ## 2026-09-08 — `docs/implementation-backlog.md` → 18983 (PS-39: the trap's general form)
 
 18977 → 18983. The fixture trap recurred three more times in the HR batch, all one shape: every
@@ -9062,6 +9087,20 @@ test — which is what makes the checklist usable on a case it has not seen.
 ## 2026-09-08 — `docs/overview/entries/` total ceiling → 331 (LA-80, eleventh PR running)
 
 330 → 331. Eleventh consecutive raise, one per PR, as LA-80 describes.
+
+### Reconciled on merge — 19,012 (BF-131 amendment branch)
+
+`main` gained two PS-39 route-test batches while this branch was open, so the `.size` file conflicted
+— both sides describing the same number, which is the genuine-disagreement case. Recomputed from the
+merged file; the append-only history conflict beside it was two independent additions and both are
+kept.
+
+The merge itself needed the clone unshallowed first. `git merge origin/main` failed with *"refusing
+to merge unrelated histories"* — not a real divergence, but an artefact of the session's depth-1
+clone: a later `git fetch origin main` had replaced `origin/main` with an isolated commit carrying no
+parents, so no merge base existed locally. GitHub's own `update_pull_request_branch` refused too, but
+for the real reason (the `.size` conflict), which is what separated the two causes. `git fetch
+--unshallow` then made the merge ordinary.
 ## 2026-09-08 — `docs/implementation-backlog.md` 18,977 → 19,064 (+87), BF-133
 
 The owner asked for a card showing *"essentially every metric we have recorded"*. The entry is 87
