@@ -8835,7 +8835,7 @@ implemented half a feature against a route that cannot serve it.
 18775 rather than the 18752 this branch computed: LB-61's own 23 lines landed underneath it. The +42
 is unchanged across that, which is the property recomputing from the merged file preserves.
 
-## 2026-09-08 — `docs/implementation-backlog.md` → 18794 (Q-278's surface half shipped)
+## 2026-09-08 — `docs/implementation-backlog.md` → 18793 (Q-278's surface half shipped)
 
 Up 19, on an entry that got smaller in what it asks for. Q-278's `Keep:` was "consume `availability`
 on the surfaces that already render an em dash"; that shipped, so the Keep is rewritten to the half
