@@ -9051,6 +9051,35 @@ the argument for the checklist, so it belongs beside it rather than in a journal
 
 329 → 330. Tenth consecutive raise, one per PR, as LA-80 describes.
 
+## 2026-09-09 — `docs/implementation-backlog.md` 19252 → 19258 (+159 across the PR), TN-27, TN-28 and TN-29
+
+The owner reported the Nutrition tab's Calorie Nudge claiming a measured maintenance of 2,245 kcal
+against a measured RMR of 1,325 and a scale that has barely moved. It reproduces exactly, and the
+arithmetic is correct — the estimator picked the wrong window.
+
+Most of the 83 lines are the two tables that carry the finding, and neither compresses. The first
+shows the 28-day and 14-day windows side by side with an **identical mean intake of 1,612 kcal**,
+which is what proves `MIN_LOGGED_FRACTION` cannot distinguish them: it gates the mean, the mean is
+the same, and the entire 591 kcal spread is the weight slope, which nothing gates at all. The second
+is the window sweep — 2,414 at ten days down to 1,654 at twenty-eight — because a 760 kcal range
+produced by nothing but window length is the evidence that the slope is noise-dominated, and a
+sentence asserting it would not be.
+
+TN-28 is short and rides along: the nudge card writes the number into the calorie goal on one tap
+while omitting the `low confidence, 10 of 14 days logged` qualifier that both its sibling cards
+already render from the same payload.
+The same PR then grew by a further 69 lines for **TN-29**, which is the entry that actually resolves
+the owner's question and outranks TN-27's three window options. `computeEnergyBalance` computes two
+independent maintenance estimates on every request — one from intake and scale weight, one from
+resting rate plus measured movement — and compares them never. Run over the same 28 days the second
+gives **1,895 kcal**, against the **2,245** that shipped.
+
+The table that carries it is the one that cannot be cut: dividing each estimate by the measured
+resting rate of 1,345 turns them into activity factors of 1.23, 1.26, **1.41** and **1.67**, and
+1.67 for someone averaging 3,572 steps a day is visibly not a metabolism. That reframing is the
+proposal — make Q-517's one-sided BMR floor two-sided — and it does not survive being compressed
+into a sentence, because the argument is the arithmetic.
+
 ## 2026-09-08 — `docs/implementation-backlog.md` 18,977 → 19,006 (+29), BF-131 amended
 
 The owner asked why the baseline was not generated from the AMRAP automatically, and the trace that
@@ -9140,6 +9169,13 @@ against the merge base — so a stale branch reads as a regression it did not ca
 right and the branch was old. Confirmed before acting by stashing the changes and re-running against
 a clean tree, which reproduced it, and then by fetching `origin/main` and finding the new commit.
 
+The owner then signed off both recommendations the same day (*"make all the changes you recommend"*),
+which added six more lines: TN-27's `Gate: owner` bullet became a dated decision record naming option
+3, TN-29 gained an approval line, and the two deferred options carry a sentence each on the second
+signal they need — slope standard error, and a per-user "logging began" date — so a later session
+does not re-derive why the cheap fixes went first.
+
+
 ## 2026-09-08 — `docs/implementation-backlog.md` → 19252, the guided-walk batch (TN-24, TN-25, TN-26)
 
 Three entries and a review answering the owner's question about making the interval walk more
@@ -9164,3 +9200,21 @@ rate and the controls become observations. The ⛔ line is the part worth keepin
 points extrapolate 70% reserve to ~12.9 km/h, and the owner's proposed cadence tweak is worth ≈+2 bpm
 against a 34.7 bpm shortfall — which is why the control is the wrong lever rather than one needing a
 bigger setting.
+
+## 2026-09-09 — `docs/agents/state/tuning.md` 395 → 430 (+35), the baton rewritten to 2026-09-09
+
+The `Now` and `Next` sections were still dated 2026-08-26 and shrank by eight lines when rewritten
+against reality — the twenty-odd earlier entries collapse to one paragraph of "still queued, none
+blocked" now that their state is stable, and the six new entries carry the table instead.
+
+The growth is all in `Do not re-litigate`, which is the half that earns its length. Ten lessons went
+in, and the load-bearing one is general: **when a model computes the same quantity twice, the
+disagreement is the finding** — `computeEnergyBalance` derives maintenance two independent ways on
+every request and lets the first silently override the second, reading 2,245 against 1,895 over one
+window. Beside it sit the two that make that finding cheap to reach next time: divide any expenditure
+figure by the measured resting rate before believing it (2,245 ÷ 1,345 = 1.67, which is legible where
+the kcal figure is not), and distrust a coverage ratio whose numerator cannot grow.
+
+Two are process rather than physiology and both cost real time this session: `claude_ro`'s date
+columns are text, and a branch cut from a shallow clone has no merge base after unshallowing — it
+reads as slow CI and can never merge, so rebuild it rather than fight the history.
