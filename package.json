@@ -1,6 +1,6 @@
 {
   "name": "trainingai",
-  "version": "1.438.0",
+  "version": "1.438.2",
   "engines": { "node": "22.x" },
   "private": true,
   "packageManager": "pnpm@10.33.0",

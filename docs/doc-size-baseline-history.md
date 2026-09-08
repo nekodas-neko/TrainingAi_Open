@@ -8820,10 +8820,29 @@ and took the file to 18710. Recomputed from the merged file, per the rule — an
 across the rebase, which is the point: the delta belongs to the diff, the absolute belongs to
 whatever `main` is when the PR merges.
 
-## 2026-09-08 — `docs/implementation-backlog.md` → 18716 (LB-63 shipped)
+## 2026-09-08 — `docs/implementation-backlog.md` → 18775 (Q-112e split, LB-64 filed)
+
+Up 42, and the entry it grew is one that could not be built. Q-112e asked for the weekly recap to get
+Q-112d's trends; re-verifying against `main` found `/api/weekly-digest` spends every number it
+computes on the model's prompt and returns prose, over a 14-day window rather than the month the plan
+attributes to the owner. So the trends half is Lane A's and is now **LB-64**, with the two candidate
+route shapes and the reason one wins; Q-112e keeps a `Keep:` naming what is left and a `Needs:` on it.
+
+Forty-two lines is the cost of the next session not re-discovering, from the same starting point,
+that the surface it was asked to build has no data behind it. The alternative was a Lane B PR that
+implemented half a feature against a route that cannot serve it.
+
+18775 rather than the 18752 this branch computed: LB-61's own 23 lines landed underneath it. The +42
+is unchanged across that, which is the property recomputing from the merged file preserves.
+
+## 2026-09-08 — `docs/implementation-backlog.md` → 18758 (LB-63 shipped)
 
 Down 17 with nothing added back, which is what a one-line fix should cost the index. LB-63 was filed
 in the first place because the defect was seen in a screenshot taken to verify a different change,
 and it was deliberately not fixed there — restyling a control inside a copy fix would have mixed a
 design judgement into a correctness one. It cost 17 lines to carry that judgement between two PRs
 rather than losing it.
+
+18758 rather than the 18716 this branch computed: Q-112e's split landed underneath it and added 42.
+The −17 is unchanged across that, which is why the number is recomputed from the merged file rather
+than carried.
