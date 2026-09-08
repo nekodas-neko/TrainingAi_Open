@@ -8690,3 +8690,10 @@ from 2026-09-02 and stale; a full rewrite is owed and this is not it.
 Down 16. LA-72 asked which source-scanning checks needed a comment stripper and said nobody knew.
 The answer is now a test rather than an entry: `scripts/__tests__/check-comment-blindness.test.ts`
 measures it per check, so the next one is classified by running it rather than by reading it.
+
+## 2026-09-08 — `docs/implementation-backlog.md` → 18688 (LA-66 shipped)
+
+Down 26 with nothing added back. LA-66 was a two-line change that needed a long entry only because
+it had to explain why deleting a third copy of a rule mattered when the rule's *behaviour* was
+already correct everywhere. That explanation now lives in the guard test that keeps it true, which
+is where it will be read.
