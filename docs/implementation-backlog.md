@@ -8469,6 +8469,13 @@ without a queue entry is a dropped finding.*
   split of the doc-size map fixed the cross-*document* case and cannot fix this one. Worth weighing
   when this entry is decided: auto-merge would not remove the conflict, but it would stop a human
   paying for each round.
+  - **A sharper instance the same day: #954, whose entire diff is one `className`.** It needed
+    **four** base re-merges and **five** CI cycles across roughly two hours, every conflict on that
+    one `.size` file, while Lane A landed #955–#957 underneath it. Two of the four also hit
+    *"refusing to merge unrelated histories"* — the shallow-clone graft, fixed by
+    `git fetch origin --deepen=500`, which adds a step to a loop that is already pure overhead. The
+    cost of this entry does not scale with the size of the change, which is the argument for fixing
+    it rather than absorbing it.
 - **The six-check list above includes E2E, and that is not what the Ruleset enforces.** Four PRs
   merged on 2026-09-07/08 (#930, #934, #941, #943) with the E2E job still `in_progress` —
   `merge_pull_request` validates against real branch-protection state and would have refused a

@@ -8835,7 +8835,7 @@ implemented half a feature against a route that cannot serve it.
 18775 rather than the 18752 this branch computed: LB-61's own 23 lines landed underneath it. The +42
 is unchanged across that, which is the property recomputing from the merged file preserves.
 
-## 2026-09-08 — `docs/implementation-backlog.md` → 18793 (Q-278's surface half shipped)
+## 2026-09-08 — `docs/implementation-backlog.md` → 18800 (Q-278's surface half shipped)
 
 Up 19, on an entry that got smaller in what it asks for. Q-278's `Keep:` was "consume `availability`
 on the surfaces that already render an em dash"; that shipped, so the Keep is rewritten to the half
@@ -8847,3 +8847,8 @@ The lane flips **B → A** with it, having gone A → B when the engine half shi
 working rather than churn: the lane follows the open path, so `next-item.js` offers an entry to
 whichever lane can actually start it. Nineteen lines is what stops the next Lane B session picking
 this up and finding nothing in it to build.
+
+Seven more went onto **LB-52**, from the same session that produced them: #954 is a one-`className`
+diff that took four base re-merges and five CI cycles, every conflict on the doc-size baseline this
+very file governs. That entry is where the decision gets made, and a cost that does not scale with
+the size of the change is the argument it needs.
