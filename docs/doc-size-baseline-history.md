@@ -9399,3 +9399,22 @@ LB-66 lands, not when the confirmation shipped.
 Three PRs landed under this branch while it was being verified, taking the backlog from 19,392 to
 19,442. Recomputed from the merged file rather than spliced: **19,442 − 14 = 19,428**, so the −14
 above (BF-132 out, LB-66 in) is unchanged and is the only part of the number this diff owns.
+
+## 2026-09-09 — backlog → 19637: the ≈238 spm figure is qualified after the owner pushed back
+
+*"I don't think your estimation for HR is right — I reckon if I walk for longer at a faster pace it
+will increase my HR."* Checked, and the owner is right to doubt it.
+
+The cadence→HR slope is fitted over 88 blocks spanning **76–132 spm**, so the 238 spm needed to reach
+133 bpm extrapolates **106 spm past anything observed** — its own 95% interval runs **176 to 369**,
+r is 0.512, and the residual sd is 8.1 bpm. **This is the same error the review's own ⛔ line flags on
+the treadmill speed curve**, committed one addendum later against cadence instead of speed, which is
+why the warning is worth its lines rather than a one-word hedge.
+
+The second half is the owner's actual mechanism and the model omits it entirely: there is **no
+duration term**, while TN-24 measured within-session drift at **+7.1 bpm** — larger than the fast/slow
+contrast. A longer, faster walk collects both effects and the static slope sees only one.
+
+What survives is the bounded claim: inside the observed range cadence is nearly exhausted as a lever
+(120 spm → 99.0 bpm, 130 → 101.9, 140 → 104.8). What does not survive is any specific spm target for
+reaching 133.

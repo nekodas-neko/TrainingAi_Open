@@ -762,7 +762,7 @@ has shown "push" on 100% of fast intervals across ten sessions** — a cue that 
 *push* is the Q-504 failure rendered live.
 
 **The target is not reachable by walking.** Closing **34.7 bpm** at the measured **0.288 bpm/spm**
-needs **+119 spm → ≈238 spm** (mean fast cadence 118.6 at 98.5 bpm; recomputed 2026-09-09, and TN-24 now carries the same figure). The 0.70 fraction is right for the protocol and wrong for this user's
+needs a cadence far outside the **76–132 spm** ever observed — **⚠ the point estimate of ≈238 spm is not quotable**, see TN-24; its 95% interval spans 176–369 and the model has no duration term. The 0.70 fraction is right for the protocol and wrong for this user's
 mode: guided interval walking is validated largely in older adults, for whom brisk walking does reach
 70% of reserve; a 33-year-old with a 168 max cannot on flat ground at a 0.739 m stride.
 
@@ -795,7 +795,7 @@ Across 318 minutes walked in 11 sessions:
 quadruples Z2 minutes for the same 30 minutes of the owner's time; one instruction instead of two
 speeds that cannot be separated enough for the structure to pay for itself. Contrast measures
 **7.7 bpm** (range 4.4–10.0), so the session is already a continuous walk with a wobble — and a
-genuinely hard fast half needs **≈238 spm**, which is a jog. **Keep the intervals only if the owner
+genuinely hard fast half is far outside the observed cadence range (see TN-24's ⚠⚠ on why the ≈238 spm figure is not quotable). **Keep the intervals only if the owner
 will jog them.** Reversal cost is a target constant and a session label.
 
 **⛔ Continuous at the CURRENT fast pace gives ZERO Z2 minutes** — 98.5 bpm sits 3 bpm under the
@@ -873,7 +873,22 @@ and a genuine **168** (2026-07-05). The zones are anchored correctly; the traini
 **Cadence is nearly exhausted as a lever.** Across **88 intervals / 10 sessions**:
 `corr(cadence, HR)` = **+0.512**, slope **0.288 bpm per spm**. A **31% cadence separation buys 7.9 bpm**;
 mean fast-interval intensity is **40.1% of reserve** against Z2's 60%, best ever **50.5%**.
-Extrapolated, averaging 133 bpm (the Zone-2 floor) needs **≈238 spm** — a run. (Recomputed 2026-09-09 from the corrected boundary: mean fast cadence 118.6 spm at 98.5 bpm, 0.288 bpm/spm. The old figure, ≈198 spm, targeted the wrong 122 bpm boundary.) At the measured **0.739 m** stride
+Extrapolated, averaging 133 bpm (the Zone-2 floor) needs **≈238 spm** — a run.
+
+**⚠⚠ THAT 238 IS A WEAK NUMBER AND SHOULD NOT BE QUOTED AS IF IT WERE MEASURED (added 2026-09-09,
+after the owner pushed back).** The slope is fitted over 88 blocks spanning **76–132 spm**, so 238
+extrapolates **106 spm beyond anything observed** — more than doubling the range. Its own 95%
+interval puts the answer anywhere from **176 to 369 spm**; r is **0.512** and the residual sd is
+**8.1 bpm**, so a single block is ±16. **This is the same error this review's own ⛔ line flags on the
+treadmill speed curve** (two points extrapolating 70% reserve to ~12.9 km/h), committed one addendum
+later against cadence instead of speed.
+
+**And the model has no DURATION term at all, which is the owner's actual point.** TN-24 measured
+within-session drift at **+7.1 bpm**, larger than the fast/slow contrast itself — so a longer, faster
+walk gains both the cadence effect and the drift, and the static slope captures only the first.
+**What the entry can defend: cadence alone is nearly exhausted as a lever inside the observed range**
+(120 spm → 99.0 bpm, 130 → 101.9, 140 → 104.8). **What it cannot: a specific spm figure for reaching
+133.** Treat 238 as "far outside walking", not as a target. At the measured **0.739 m** stride
 (TN-22's review) the achievable walking speed simply does not demand more. **Grade and carried load
 are the levers that remain.**
 
