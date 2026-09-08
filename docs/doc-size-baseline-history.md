@@ -8970,3 +8970,15 @@ the entry owes nothing.
 ## 2026-09-08 — `docs/overview/entries/` total ceiling → 325 (LA-80, fifth PR running)
 
 324 → 325. Fifth consecutive raise, one per PR, as LA-80 describes.
+
+## 2026-09-08 — `docs/implementation-backlog.md` → 18874 (LA-82 and LA-83 filed)
+
+18813 → 18874. Two new entries, both found while writing one test batch: LA-82, the cardio hub
+catching nine reads and dying on the two `resolveHrProfile` leaves unguarded; and LA-83, two DB
+tests with no tolerance for the suite contention `vitest.config.ts` already names for its other
+project. Raised because new queue entries are what this index is for; the PS-39 status update in
+the same PR was net-neutral.
+
+## 2026-09-08 — `docs/overview/entries/` total ceiling → 326 (LA-80, sixth PR running)
+
+325 → 326. Sixth consecutive raise, one per PR, as LA-80 describes.
