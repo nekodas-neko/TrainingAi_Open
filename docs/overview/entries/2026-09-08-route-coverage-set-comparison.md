@@ -54,8 +54,17 @@ comparison" to "for the ratchets' base comparison", since it now serves two.
 
 **It costs about 1.7 seconds** — the checker went from ~0.6 s to 2.3 s, in a job that runs at ~25 s.
 
+## The line says which halves ran
+
+A clean run used to read identically whether the base comparison happened or not, which made the
+"did it actually run in CI" question unanswerable from the log — and a check that silently does
+nothing is worse than no check. It now ends `base comparison ran against origin/main` or `no base
+resolved, count only`. Same reason `check-cache-ttl-divergence.js` prints how many sites it had to
+skip: a clean run should never be mistaken for full coverage. Both branches were exercised, the
+second against a clone with no reachable base.
+
 ## Not exercised
 
 Node-only, no runtime surface: no device, no database, no UI. The CI path specifically — `git
 archive` against a depth-1 fetched `origin/main` on a GitHub runner — is exercised for the first time
-by this PR's own Custom Rules run, not locally.
+by this PR's own Custom Rules run, not locally; the line above is what confirms it from the log.

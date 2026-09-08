@@ -145,8 +145,12 @@ const { routes, covered, uncovered } = scan(root);
 const baseRef = resolveBaseRef();
 const baseDir = materialiseBaseTree(baseRef, SCAN_DIRS);
 let lostCoverage = [];
+// Whether the base half actually ran, so a clean line is never mistaken for both halves passing —
+// the same reason `check-cache-ttl-divergence.js` prints how many sites it had to skip.
+let baseNote = 'no base resolved, count only';
 try {
   const base = baseDir ? scan(baseDir) : null;
+  if (base) baseNote = `base comparison ran against ${baseRef}`;
   lostCoverage = lostRouteCoverage({ routes, covered, baseCovered: base ? base.covered : null });
 } finally {
   cleanupBaseTree(baseDir);
@@ -180,10 +184,13 @@ if (uncovered.length > BASELINE) {
 if (uncovered.length < BASELINE) {
   console.log(
     `check-route-test-coverage: OK — ${uncovered.length} of ${routes.length} uncovered, ` +
-    `${BASELINE - uncovered.length} below the ${BASELINE} baseline. Lower BASELINE to ` +
-    `${uncovered.length} in this PR, or the list can regrow into the slack unnoticed.`,
+    `${BASELINE - uncovered.length} below the ${BASELINE} baseline (${baseNote}). Lower BASELINE ` +
+    `to ${uncovered.length} in this PR, or the list can regrow into the slack unnoticed.`,
   );
   process.exit(1);
 }
 
-console.log(`check-route-test-coverage: OK — ${uncovered.length} of ${routes.length} uncovered (baseline held).`);
+console.log(
+  `check-route-test-coverage: OK — ${uncovered.length} of ${routes.length} uncovered ` +
+  `(baseline held; ${baseNote}).`,
+);
