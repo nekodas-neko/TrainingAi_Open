@@ -9281,7 +9281,6 @@ file and missed here. Nothing had been pushed, so the cost was three lines. The 
 `grep -c '^<<<<<<<' ` on the file, not a reading of the diff, is what found it, because the markers sit
 9,000 lines into a document nobody reads end to end.
 
-<<<<<<< HEAD
 ## 2026-09-09 — `docs/implementation-backlog.md` → 19430, TN-25 amended with a fourth option
 
 The owner asked whether the guided walk is working correctly and whether 30 minutes of continuous
@@ -9337,7 +9336,7 @@ the target is right and the copy is wrong: *"a steady Zone-2 aerobic session"* d
 protocol nor its intensity. The baton records the reversal against this agent by name, since the wrong
 version was published before the owner asked.
 
-## 2026-09-09 — backlog → 19586, `tuning.md` → 471: the zone audit (TN-30, TN-31, TN-32)
+## 2026-09-09 — backlog → 19622, `tuning.md` → 471: the zone audit (TN-30, TN-31, TN-32)
 
 The owner asked for one heart-rate zone calculation. An audit of every zone definition in the repo
 answered it, and the answer was not the one the previous amendment had guessed.
@@ -9363,7 +9362,7 @@ The baton grew by eleven lines and two of them are retractions: addendum 4's "%H
 framing was invented by this agent and is withdrawn, and TN-24's Zone 1 boundary was corrected from
 52–122 to 52–132 (with the cadence extrapolation recomputed to ≈238 spm across both entries). Both are
 recorded against the agent by name — the wrong versions were published before the owner asked.
-=======
+
 ## 2026-09-08 — `docs/implementation-backlog.md` → 19442 (OR-105, the premature-`Verify:` trap)
 
 Fifty lines: a 30-line entry, an 11-line field rule, and prose replacing the two bad `Verify:` fields
@@ -9400,4 +9399,3 @@ LB-66 lands, not when the confirmation shipped.
 Three PRs landed under this branch while it was being verified, taking the backlog from 19,392 to
 19,442. Recomputed from the merged file rather than spliced: **19,442 − 14 = 19,428**, so the −14
 above (BF-132 out, LB-66 in) is unchanged and is the only part of the number this diff owns.
->>>>>>> origin/main
