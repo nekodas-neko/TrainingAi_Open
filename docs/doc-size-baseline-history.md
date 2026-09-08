@@ -9000,3 +9000,7 @@ incomplete: guarding the resting-HR read is safe, guarding the age read shifts t
 184 → 190 for this owner — 6 bpm across the whole zone scale — with `maxHrSource` unable to
 distinguish it from an ordinary estimate. The second half now carries `Gate: owner`. Raised because
 the entry says more than it did; nothing else in this PR.
+
+## 2026-09-08 — `docs/overview/entries/` total ceiling → 328 (LA-80, eighth PR running)
+
+327 → 328. Eighth consecutive raise, one per PR, as LA-80 describes.
