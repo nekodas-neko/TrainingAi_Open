@@ -9218,3 +9218,18 @@ the kcal figure is not), and distrust a coverage ratio whose numerator cannot gr
 Two are process rather than physiology and both cost real time this session: `claude_ro`'s date
 columns are text, and a branch cut from a shallow clone has no merge base after unshallowing — it
 reads as slow CI and can never merge, so rebuild it rather than fight the history.
+
+## 2026-09-08 — `docs/overview/entries/` folded 331 → 292 (the second sweep of the day)
+
+The directory hit its **331 ceiling** and every implementer PR that writes a journal entry — which is
+all of them — began failing on it. Three other agents had PRs open at the time. This is a shared
+blocker rather than one branch's problem, which is why it went out on its own before anything else.
+
+39 unlinked entries folded into `history-2026-09-08.md`, which #947 created earlier the same day, so
+the batch file is appended rather than duplicated. Only entries **no other document links to** were
+folded, and `check-doc-links` passes on 1,032 files afterwards, so no citation broke.
+
+**The ceiling is not raised, deliberately.** The check's own message is the argument: only 40 of the
+331 were foldable, so the other 292 are pinned by durable docs citing them directly. A sweep buys
+room; it does not fix the shape. Raising the number would trade the one signal that says so for
+another few weeks of quiet.
