@@ -101,6 +101,15 @@ silently misdirecting the next session. Update them in the same PR that consumes
 >   **⚠ A `Verify:` is not discharged by reasoning about it.** These are unseen on the canonical
 >   runtime, and the sandbox cannot run the local store at all — "probably fine" is the judgement
 >   that has shipped bugs here before. The field makes the debt countable; only the S25 clears it.
+>   **⚠ `Verify:` means SHIPPED — never "this is how it should be checked once built."** It is the
+>   `Gate: device` trap wearing the newer field's name, and it is worse: a premature gate at least
+>   parks an entry where PARKED invites a reader to ask why, while a premature `Verify:` files
+>   unbuilt work under *"shipped; a look is owed, nothing is blocked"* — so nobody is looking for it
+>   in either place. **Measured 2026-09-08 (`OR-105`): OR-102b, the reta tracker's entire surface —
+>   64 lines of unwritten spec, and the thing the owner had asked for by name — sat under VERIFY for
+>   two days while Lane B's READY list held two items and the owner believed it had shipped.** OR-104
+>   did the same. Write the check as **prose** in the body while the entry is open, and add the field
+>   in the PR that merges the code.
 >
 > - **`Lane: O`** — the **Orchestrator's** lane, added 2026-09-06 (`OR-103`). For work in neither
 >   implementer's paths: `.github/workflows/**`, `playwright.config.ts`, repository settings and
@@ -839,8 +848,45 @@ random, and worse than no colour because it looks authoritative.
 - **Revisit the plateau call once 6+ weeks of on-drug data exist** to test it against — not before.
 
 - **Reversal cost:** low. A section and a card; no data, no migration (those are OR-102a's).
-- **Verify:** device — the calculator's arithmetic against the owner's own third-party app, and
-  whether the colour chip reads correctly at a glance on the S25.
+- **On completion, the device check is:** the calculator's arithmetic against the owner's own
+  third-party app, and whether the colour chip reads correctly at a glance on the S25. **Written as
+  prose on purpose — this is NOT a `Verify:` field**, because nothing here has been built. Carrying
+  one filed this entry under VERIFY ("shipped; a look is owed") for two days while Lane B's READY
+  list held two items and the owner believed the tracker had shipped. Add the field when the code
+  merges, not before.
+
+### [platform] OR-105 — 17 more entries may be filed as shipped without having been built
+
+- **Lane:** O — reading the queue against the code, then editing entries. Neither implementer's paths.
+- **Added:** 2026-09-08 by Orchestrator, from the OR-102b find. **Branch:** unassigned.
+- **Two were proven and are fixed in this same PR.** OR-102b carried a forward-looking `Verify:`
+  while none of its four parts existed — grep for `vial` across `components/**` and `app/**` returns
+  no `.tsx` at all — so `next-item.js` filed the reta tracker's whole surface under *"shipped; a look
+  is owed"* and the owner reasonably believed it had shipped. OR-104 was the same, plus a `Gate:`
+  that parked the very code fix its own next line said must not wait.
+
+**The scan that found them, and its honest limit.** 19 entries carry a `Verify:` with **no `Branch:`
+field and no ship evidence** (no PR number, no "shipped"/"merged" in the body):
+
+> OR-102b · PS-24 · RV-44 · RV-42 · RV-41 · RV-40 · RV-38 · RV-39 · RV-35 · RV-36 · BF-119 · BF-98 ·
+> BF-96 · BF-95 · BF-72 · BF-74 · BF-76 · BF-53 · LA-57
+
+**That list over-catches and must not be treated as 19 defects.** BF-72, BF-95 and BF-98 were checked
+on the S25 on 2026-09-06 and are genuinely shipped — they simply never recorded a branch. The signal
+that separated OR-102b was **a full unwritten build spec still in the body** (64 lines of "build it
+as…"), which a shipped entry does not carry. The long ones are therefore the suspects: PS-24 (56),
+LA-57 (57), BF-119 (58), BF-98 (51), RV-40 (46).
+
+**What to do:** for each of the 17 remaining, grep for the thing it claims to have shipped. Built →
+add the `Branch:`/PR it merged in, so the next scan stops flagging it. Not built → strip the
+`Verify:` to prose per the field rule above, and it returns to READY.
+
+**Why this is worth a pass rather than waiting for each to surface.** A wrong `Gate:` is discoverable
+— PARKED prints the reason and invites the question. A wrong `Verify:` prints *"nothing is blocked"*,
+so neither the implementer nor the owner has any reason to look. OR-102b was invisible for two days
+in the one lane whose READY list was nearly empty, which is exactly when a hidden entry costs most.
+
+- **Reversal cost:** nil. Editing queue fields; no code, no data.
 
 ### [nutrition][body] OR-104 — a supplement can carry two contradicting doses, and the wrong one is what history keeps 🔴 LIVE
 
@@ -878,11 +924,15 @@ OR-102a/b will read dose history to recommend the next dose. A tracker that read
 3. **The existing row is the owner's** — see `Gate:`. Nothing in this entry repairs it, because the
    freeze is deliberate.
 
-- **Gate:** owner — the live `Retatrutide` definition and its 2026-09-07 log need correcting in the
-  app by hand (clear the free-text `Dose`; delete and re-log the day). Production is read-only from
-  a session, so no agent can do it. The code fix does not depend on this and should not wait for it.
-- **Verify:** device — add a supplement with an amount and a unit, confirm the sheet does not also
-  invite a free-text dose, log it, and confirm the stored `dose_text` no longer contradicts.
+- **The live row is the owner's to correct** and is deliberately **not** a `Gate:` — clearing the
+  free-text `Dose` on `Retatrutide` is a hand edit in the app, production being read-only from a
+  session. A gate would park the whole entry, which is what happened for two days: this entry's own
+  next line said the code fix "should not wait for it", and the gate hid it from Lane A anyway.
+  **A `Gate:` blocks the CODE; it is not a way to note an owner errand.**
+- **On completion, the device check is:** add a supplement with an amount and a unit, confirm the
+  sheet does not also invite a free-text dose, log it, and confirm the stored `dose_text` no longer
+  contradicts. **Prose, not a `Verify:` field** — same reason as OR-102b: nothing is built yet, and
+  a `Verify:` on unbuilt work files it under "shipped; a look is owed".
 - **Reversal cost:** low. No migration; existing rows keep whatever they were stamped with, which is
   the point of the stamp.
 
@@ -1740,7 +1790,7 @@ repair the 22 dead backlog paths and 43 doubled `docs/overview/overview/` labels
 unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge candidates
 (led by `oura-ring-data-reference.md`, a retired-API reference with no retirement note).
 
-### [platform] PS-39 — 54 API routes still have no test that imports their handler
+### [platform] PS-39 — 51 API routes still have no test that imports their handler
 
 - **Lane:** A. Regenerate the list with `node scripts/check-route-test-coverage.js` — it prints every
   uncovered route when it fails, and the ratchet now holds the number.
@@ -1803,16 +1853,16 @@ testing X. Two more classes worth the same suspicion: a fixture whose timezone I
 proves nothing about which zone the route read, and a fixture already in sorted order proves
 nothing about a sort.
 
-**The count was 93 and is really 54**, by the mechanism the entry half-noticed: it counted a route
+**The count was 93 and is really 51**, by the mechanism the entry half-noticed: it counted a route
 covered when any test mentioned its URL, so `calendar-data` and `training-load` "appearing only as
 cache-key strings" counted. Asking instead whether a test imports the handler gives 150 of 222, less
-the ninety-six paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
+the ninety-nine paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
 honest in both directions (see above), so the list can be worked from. **The actionable core
 named by this entry is now CLEAR**: the home aggregates, both ingest routes and `program-week` are
 done; so are ai-periodization, `friends/leaderboard` (its scoping was left uncovered when a mock
 could not see it, and is covered against real rows now), the account cluster, the supplement/vial chain,
 a meal plan's lifecycle + reshape, the workout write path, the running plan and the four body/health
-writes, the goal-target-adherence loop, the home week/streak reads, the AI Coach lifecycle, the cardio hub, the strength/volume trends, the day timeline, the food-input path, the four heart-rate reads, the exercise catalogue and the year-review/identity trio. Work by feature — batching on what is *verified together* twice found a defect (LA-78, LA-79). `scripts/check-route-test-coverage.js` ratchets it, so the debt
+writes, the goal-target-adherence loop, the home week/streak reads, the AI Coach lifecycle, the cardio hub, the strength/volume trends, the day timeline, the food-input path, the four heart-rate reads, the exercise catalogue, the nutrition day-completion trio and the year-review/identity trio. Work by feature — batching on what is *verified together* twice found a defect (LA-78, LA-79). `scripts/check-route-test-coverage.js` ratchets it, so the debt
 only shrinks, a NEW route arrives uncovered and fails, and since LA-81 a route that LOSES its test fails whatever the total does.
 
 ### [app-shell][platform] LA-76 — a deload PHASE still decays the collection, and nothing dates one

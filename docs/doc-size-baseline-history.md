@@ -9280,3 +9280,13 @@ merge *before* this one had committed that file with its markers still in it, re
 file and missed here. Nothing had been pushed, so the cost was three lines. The tell is worth keeping:
 `grep -c '^<<<<<<<' ` on the file, not a reading of the diff, is what found it, because the markers sit
 9,000 lines into a document nobody reads end to end.
+
+## 2026-09-08 — `docs/implementation-backlog.md` → 19442 (OR-105, the premature-`Verify:` trap)
+
+Fifty lines: a 30-line entry, an 11-line field rule, and prose replacing the two bad `Verify:` fields
+it was written about. The rule is the part that earns its length. A premature `Gate:` was already
+documented with three outbreaks; the same mistake in the newer `Verify:` field is **worse** and the
+rule has to say why, or it reads as a restatement — a wrong gate parks an entry where PARKED invites
+the question, while a wrong `Verify:` prints *"nothing is blocked"* and nobody looks in either place.
+The measured case is what makes it land: the reta tracker's entire surface, 64 lines of unwritten
+spec, filed as shipped for two days in the lane whose READY list held two items.
