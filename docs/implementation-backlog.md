@@ -658,7 +658,7 @@ Across 318 minutes walked in 11 sessions:
 | intervals, if every fast block reached 105–115 | ~29 |
 | **30 min continuous at 105+ bpm** | **~60** |
 
-**4. ✅ RECOMMENDED — a 30-minute continuous brisk walk against one band, 105–118 bpm.** Roughly
+**4. The fallback IF THE SESSION STAYS A WALK — a 30-minute continuous brisk walk, 105–118 bpm.** Roughly
 quadruples Z2 minutes for the same 30 minutes of the owner's time; one instruction instead of two
 speeds that cannot be separated enough for the structure to pay for itself. Contrast measures
 **7.7 bpm** (range 4.4–10.0), so the session is already a continuous walk with a wobble — and a
@@ -671,8 +671,34 @@ floor. The continuous option wins only at a genuinely brisker hold.
 **⛔ Do not read this as "Karvonen is wrong".** `hr-zones.ts` is internally consistent; the defect is
 one prescription drawing copy from one model and thresholds from another.
 
-**The original three options — kept, all now second-best:**
-1. **Make the fast block a jog or an incline** — keeps the 70% target honest and the protocol intact.
+**⚑ CORRECTED 2026-09-09, same day — option 1 is the recommendation and option 4 is the fallback.**
+The owner asked whether this contradicts the interval-walking research. It does not, and the first
+version of this amendment overstated the case for continuous walking.
+
+**The protocol (Nemoto/Masuki/Nose, Shinshu University) puts its fast phase at ~70% of peak aerobic
+capacity, and `hrReserveTarget(0.70, …)` renders that faithfully — 133 bpm is the RIGHT number.** The
+app is not misconfigured. What does not transfer is the population: those cohorts were ~60–70 years
+old, for whom brisk walking does reach 70% of peak. At 33 with a max of 168 it does not.
+
+**And the owner has already exceeded the fast-phase target on foot:**
+
+| | avg HR | % reserve | pace |
+|---|---|---|---|
+| **2026-07-24, a 9.2-min run** | **145** | **80.2%** | 6.4 min/km |
+| 2026-07-19, outdoor walk | 117 | 56.0% | 11.0 min/km |
+| treadmill fast blocks | 98.5 | 40.1% | — |
+
+Five bouts of three minutes at 133+ is inside what nine minutes at 145 already demonstrates. (The same
+table measures TN-26's surface effect: an outdoor walk at **117 bpm** against the treadmill's 89–91.)
+
+**⛔ Do not lower the 133 bpm target to match the copy — the target is right and the COPY is wrong.**
+*"A steady Zone-2 aerobic session — you should be able to hold a conversation"* describes neither the
+protocol nor its intensity. Saying what the session is — a hard interval session with easy recovery —
+also resolves TN-24's contradiction without touching a threshold.
+
+**The three original options, with 1 now recommended:**
+1. **✅ RECOMMENDED — make the fast block a jog** (incline is treadmill-only, see TN-26) — keeps the
+   70% target honest and the protocol intact, and the owner has already run 9 min at 145 bpm.
 2. **Re-anchor the fast target to what walking reaches** (~50–55% reserve = 110–116 bpm) **and rename
    the session** so it stops claiming a stimulus it does not deliver.
 3. **Leave the target, stop rendering an always-"push" verdict** — weakest, but better than now.

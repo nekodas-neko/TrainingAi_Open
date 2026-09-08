@@ -9314,3 +9314,24 @@ The other three keep the next session honest about the same data: the observed m
 rather than a test, Zone-2 *minutes* is the metric rather than target compliance, and an interval
 protocol earns its structure only through contrast — 7.7 bpm here, which is a continuous walk with a
 wobble in it.
+
+## 2026-09-09 — backlog → 19456, `tuning.md` → 460: correcting the walk recommendation the same day
+
+The owner asked whether the previous amendment contradicted the interval-walking research. It did,
+and the correction is worth its 26 lines because a successor reading only addendum 4 would lower a
+threshold that is correct.
+
+**The protocol is sound and the app implements it faithfully.** Nemoto/Masuki/Nose put the fast phase
+at ~70% of peak aerobic capacity and `hrReserveTarget(0.70, …)` renders exactly that — **133 bpm is
+the right number**. What does not transfer is the population: those cohorts were around 60–70, and
+brisk walking does reach 70% of peak for them. At 33 with a max of 168 it does not.
+
+The table that settles it is three rows: a 9.2-minute run on 2026-07-24 at **145 bpm average = 80% of
+reserve**, an outdoor walk at 117, and the treadmill's fast blocks at 98.5. The owner has already
+exceeded the protocol's fast phase on foot, so the fix is to jog the fast blocks rather than lower the
+target — and the same rows measure TN-26's surface effect at 27 bpm.
+
+So option 1 becomes the recommendation and option 4 the fallback, with a ⛔ line saying plainly that
+the target is right and the copy is wrong: *"a steady Zone-2 aerobic session"* describes neither the
+protocol nor its intensity. The baton records the reversal against this agent by name, since the wrong
+version was published before the owner asked.

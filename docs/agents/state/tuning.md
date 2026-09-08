@@ -29,7 +29,7 @@ say so plainly rather than re-measuring the pillar a fourth time.
 | ID | What | State |
 |---|---|---|
 | **TN-24** | Zone 1 spans 52–122 bpm, so Zone 2 is unreachable on foot and the walk's zone bar carries nothing | supplies **Q-523's** mechanism; PR #998 |
-| **TN-25** | the walk's fast target (≥133 bpm) met **0 of 44 times**; fast blocks average the slow target | **`Gate: owner`** — **amended 2026-09-09 with a recommended 4th option** |
+| **TN-25** | the walk's fast target (≥133 bpm) met **0 of 44 times**; fast blocks average the slow target | **`Gate: owner`** — **jog the fast blocks** (addendum 5 corrects 4) |
 | **TN-26** | cadence and speed mean different things per surface; prescribe heart rate, demote the controls | rewritten after the owner declined treadmill tuning |
 | **TN-27** | maintenance rejects its 28-day window and falls back to the noisy 14-day one → **2,245 kcal** | **owner chose option 3**, after TN-29 |
 | **TN-28** | the one card that writes the calorie goal hides the `low confidence` its siblings show | Lane B, independent |
@@ -402,6 +402,17 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
   at `total_count: 0` looking like slow CI; the branch could never merge and no amount of re-merging
   fixes it. **Rebuild the content on a fresh `origin/main` branch and close the original** — for a
   docs-only PR that is ten minutes, and fighting the history is not.
+- **⛔⛔ THE INTERVAL-WALKING PROTOCOL IS SOUND AND THE APP IMPLEMENTS IT CORRECTLY (TN-25, addendum
+  5 — which CORRECTS addendum 4).** Nemoto/Masuki/Nose put the fast phase at ~70% of peak aerobic
+  capacity and `hrReserveTarget(0.70, …)` renders exactly that: **133 bpm is the right number.** What
+  does not transfer is the population — those cohorts were ~60–70, for whom brisk walking reaches 70%
+  of peak; at 33 with a max of 168 it does not. **And the owner has already exceeded it on foot:**
+  2026-07-24, a 9.2-min run at **145 bpm average = 80% reserve**. So the fix is to JOG the fast
+  blocks, not to lower the target. **⛔ Do not lower 133 to match the copy — the target is right and
+  the copy is wrong.** A predecessor (this agent, same day) recommended continuous walking over the
+  protocol and had to correct it when the owner asked for the research.
+- **The same two rows measure TN-26's surface effect:** an outdoor walk averaged **117 bpm** against
+  the treadmill's **89–91** for the same activity. 27 bpm apart.
 - **⛔⛔ "ZONE 2" MEANS TWO DIFFERENT THINGS AND THIS APP MIXES THEM (TN-25, addendum 4).** The guided
   walk's copy says *"conversational Zone-2 aerobic"* — language from the **%HRmax** model, where Z2 is
   **101–118 bpm** for the owner — while `ZONE_DEFS` sets thresholds from the **%HR-reserve** model,

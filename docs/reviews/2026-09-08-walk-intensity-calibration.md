@@ -457,3 +457,63 @@ Reversal cost is near zero: a target constant and a session label.
 **⛔ Do not read this as "the Karvonen model is wrong".** It is a standard model and `hr-zones.ts` is
 internally consistent. The defect is that one prescription draws its copy from one model and its
 thresholds from another, so the session cannot be both what it says and what it measures.
+
+---
+
+## Addendum 5 — correcting addendum 4: the protocol is right, and he can already do it
+
+**Owner, 2026-09-09:** *"there was meant to be some research on the interval walking for 30 mins which
+showed great cardio results — are you saying it would be better to just walk for 30 mins at a fast
+speed?"*
+
+**No, and addendum 4 implied otherwise. That was an overstatement and this addendum corrects it.**
+
+### The research holds and the app implements it faithfully
+
+The interval-walking protocol (Nemoto, Masuki and Nose, Shinshu University) is 3 min fast / 3 min
+slow × 5, four-plus days a week, over months, with the **fast phase at ~70% of peak aerobic
+capacity** — and it beat a continuous moderate-walking control on peak VO₂, leg strength and blood
+pressure. **`walk-active.tsx:67`'s `hrReserveTarget(0.70, …)` is a correct rendering of that
+parameter**, and 133 bpm is the right number for this owner. The app is not misconfigured.
+
+**⚠ Recalled from the study design rather than read from the papers here** — treat the specific
+outcome measures as approximate. The load-bearing parameter, the fast-phase intensity, is the part
+this review verifies from the owner's own data, which does not depend on the citation.
+
+**What does not transfer is the population.** Those cohorts were roughly 60–70 years old, and for
+them brisk walking genuinely reaches 70% of peak capacity. At 33 with a max of 168 it does not — which
+is what TN-24 and TN-25 already measured, and is a statement about walking, not about the protocol.
+
+### The owner has already exceeded the fast-phase target, on foot
+
+| | avg HR | % reserve | pace |
+|---|---|---|---|
+| **2026-07-24, a 9.2-min run (1.43 km)** | **145** | **80.2%** | 6.4 min/km — 9.4 km/h |
+| 2026-07-19, outdoor walk (1.29 km, 14.2 min) | 117 | 56.0% | 11.0 min/km — 5.4 km/h |
+| treadmill fast blocks | 98.5 | 40.1% | — |
+| treadmill session average | ~90 | 32.8% | — |
+
+**Nine minutes at 145 bpm average is above the protocol's fast phase.** Five bouts of three minutes at
+133+ is inside what this owner has already demonstrated. The 60-day HR record puts ≥133 bpm on
+**two days out of sixty** (2026-07-19 and 07-24), so the capacity is there and the recent training
+simply has not used it.
+
+**Note the surface effect in the same table:** an outdoor walk averaged **117 bpm** against the
+treadmill's **89–91**. Same activity, 27 bpm apart — TN-26's argument, measured.
+
+### So the recommendation inverts
+
+**⚑ Option 1 — jog the fast blocks — is the recommendation, and addendum 4 was wrong to rank it last.**
+It is the protocol executed as designed, the owner has the capacity for it, the 133 bpm target becomes
+correct and reachable, and the pacer stops rendering a cue that can only say "push". The slow blocks
+stay a walk; that half already works.
+
+**Option 4 (continuous brisk walk, 105–118 bpm) is the FALLBACK if the session stays a walk** — more
+Zone-2 volume than today (~60 against ~13 min/week, and the 07-19 walk shows the band is holdable) but
+**it is not the interval protocol and must not be described as one.**
+
+**⛔ Do not lower the 133 bpm target to match the copy.** That was addendum 4's implicit direction and
+it is backwards: the target is right and **the copy is wrong**. *"A steady Zone-2 aerobic session —
+you should be able to hold a conversation"* describes neither the protocol nor its intensity. The
+session should say what it is — a hard interval session with easy recovery — which also resolves the
+contradiction TN-24 found without touching a threshold.
