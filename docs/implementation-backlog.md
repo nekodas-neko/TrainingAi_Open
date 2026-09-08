@@ -1154,7 +1154,7 @@ repair the 22 dead backlog paths and 43 doubled `docs/overview/overview/` labels
 unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge candidates
 (led by `oura-ring-data-reference.md`, a retired-API reference with no retirement note).
 
-### [platform] PS-39 — 139 API routes still have no test that imports their handler
+### [platform] PS-39 — 134 API routes still have no test that imports their handler
 
 - **Lane:** A. Regenerate the list with `node scripts/check-route-test-coverage.js` — it prints every
   uncovered route when it fails, and the ratchet now holds the number.
@@ -1174,15 +1174,21 @@ unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge
     `import type { Response } from '@/app/api/<route>/route'` — borrowing a type and calling
     nothing. `workout-data`, `nutrition/energy-balance` and `weekly-digest` were all believed tested
     and are not.
-  - **So the debt is 139, not the ~126 predicted from the false negatives alone** (140 − 13 + 12).
+  - **So the debt was 139, not the ~126 predicted from the false negatives alone** (140 − 13 + 12).
     The old number was accidentally close to right for two wrong reasons, which is why the
     prediction from one direction missed. The checker now resolves the specifier and ignores
     type-only imports, so both directions are honest.
+  - **Five of the twelve now have real tests** (2026-09-08): `scale-ble/pending/[id]/confirm`,
+    `…/dismiss`, `nutrition/energy-balance`, `session-explain/insight` and `running-plan/explain`
+    → **134**. The remaining seven are the best next candidates *because* everyone believed they
+    were covered: `workout-data` (600 lines, the biggest), `weekly-digest`,
+    `nutrition-goals/recommend`, `nutrition/meal-plans/generate/meal`, `nutrition/saved-meals/[id]`,
+    `workout-review/session/[sessionId]`, `ai-periodization/session/[sessionId]/prescribe`.
 
-**The count was 93 and is really 139**, by the mechanism the entry half-noticed: it counted a route
+**The count was 93 and is really 134**, by the mechanism the entry half-noticed: it counted a route
 covered when any test mentioned its URL, so `calendar-data` and `training-load` "appearing only as
 cache-key strings" counted. Asking instead whether a test imports the handler gives 150 of 222, less
-the ten paid down so far. Not a call to write 139 files — 18 are admin/debug. The count is now
+the fifteen paid down so far. Not a call to write 134 files — 18 are admin/debug. The count is now
 honest in both directions (see above), so the list can be worked from. **The actionable core
 named by this entry is now CLEAR**: the home aggregates, both ingest routes and `program-week` are
 done. What is left is the long tail, which is real work but no longer has a shortlist. `scripts/check-route-test-coverage.js` is the ratchet, so the debt can only
@@ -18237,23 +18243,6 @@ reads.
   because it is queued work.
 - **Reversal cost:** low, one line — but it is seen everywhere, so it wants the owner's eye before
   it lands.
-
-### [app-shell] LB-63 — one field on the goals form is drawn as a different kind of control from its three siblings
-
-- **Lane:** B — `components/profile/goal-targets-section.tsx:147` (the Sleep Goal input's `className`).
-- **Added:** 2026-09-08 · Lane B, seen on screen while shipping LA-75 on the same form.
-- **What it looks like.** Steps, Water and Calories are `border-border bg-muted/60` — bordered boxes
-  that read as text fields. Sleep alone carries `border-0 bg-transparent p-0 h-auto` plus a dimmer
-  `placeholder:text-muted-foreground/50`, so on the S25 it renders as an unbordered strip while the
-  three fields around it render as inputs. LA-75's longer placeholder makes it more obvious, but the
-  divergence predates it — the file was extracted whole in one commit, so there is no blame trail and
-  no comment saying the difference is meant.
-- **Left alone deliberately, and this entry is why.** LA-75 was a copy fix on the same four fields;
-  restyling a control in the same PR would have mixed a design judgement into a correctness one and
-  made the diff harder to read. Filed under **No orphaned findings** rather than queued as urgent.
-- **What it needs is a look, not a decision.** Almost certainly the sleep field should just match its
-  siblings. Confirm on the S25 first — the difference is much clearer rendered than in the class list.
-- **Reversal cost:** one line.
 
 ### [platform] LB-62 — a zero-argument `vi.fn` whose recorded calls are then indexed; red `main` three times in one day
 
