@@ -9169,13 +9169,13 @@ against the merge base — so a stale branch reads as a regression it did not ca
 right and the branch was old. Confirmed before acting by stashing the changes and re-running against
 a clean tree, which reproduced it, and then by fetching `origin/main` and finding the new commit.
 
-<<<<<<< HEAD
 The owner then signed off both recommendations the same day (*"make all the changes you recommend"*),
 which added six more lines: TN-27's `Gate: owner` bullet became a dated decision record naming option
 3, TN-29 gained an approval line, and the two deferred options carry a sentence each on the second
 signal they need — slope standard error, and a per-user "logging began" date — so a later session
 does not re-derive why the cheap fixes went first.
-=======
+
+
 ## 2026-09-08 — `docs/implementation-backlog.md` → 19252, the guided-walk batch (TN-24, TN-25, TN-26)
 
 Three entries and a review answering the owner's question about making the interval walk more
@@ -9200,4 +9200,21 @@ rate and the controls become observations. The ⛔ line is the part worth keepin
 points extrapolate 70% reserve to ~12.9 km/h, and the owner's proposed cadence tweak is worth ≈+2 bpm
 against a 34.7 bpm shortfall — which is why the control is the wrong lever rather than one needing a
 bigger setting.
->>>>>>> origin/main
+
+## 2026-09-09 — `docs/agents/state/tuning.md` 395 → 430 (+35), the baton rewritten to 2026-09-09
+
+The `Now` and `Next` sections were still dated 2026-08-26 and shrank by eight lines when rewritten
+against reality — the twenty-odd earlier entries collapse to one paragraph of "still queued, none
+blocked" now that their state is stable, and the six new entries carry the table instead.
+
+The growth is all in `Do not re-litigate`, which is the half that earns its length. Ten lessons went
+in, and the load-bearing one is general: **when a model computes the same quantity twice, the
+disagreement is the finding** — `computeEnergyBalance` derives maintenance two independent ways on
+every request and lets the first silently override the second, reading 2,245 against 1,895 over one
+window. Beside it sit the two that make that finding cheap to reach next time: divide any expenditure
+figure by the measured resting rate before believing it (2,245 ÷ 1,345 = 1.67, which is legible where
+the kcal figure is not), and distrust a coverage ratio whose numerator cannot grow.
+
+Two are process rather than physiology and both cost real time this session: `claude_ro`'s date
+columns are text, and a branch cut from a shallow clone has no merge base after unshallowing — it
+reads as slow CI and can never merge, so rebuild it rather than fight the history.
