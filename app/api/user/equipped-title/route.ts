@@ -17,7 +17,14 @@ export async function PATCH(req: Request) {
       : NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
   const { titleId } = (read.body ?? {}) as { titleId?: unknown }
-  if (titleId !== null && (typeof titleId !== 'string' || !TITLES[titleId])) {
+  // `hasOwnProperty`, not `TITLES[titleId]`: the catalogue is a plain object literal, so a bare
+  // lookup reaches Object.prototype and `constructor`, `toString`, `valueOf`, `__proto__` and four
+  // more siblings all read as truthy — eight ids that passed this guard, got stored, and then failed
+  // to render. `profile-tab.tsx` mounts `<title.Icon />` from the same map, and
+  // `(Object).Icon` is undefined, which React answers with a hard "element type is invalid" crash.
+  // The stored value survives a reload, so the profile tab stays white until the row is edited.
+  const known = typeof titleId === 'string' && Object.prototype.hasOwnProperty.call(TITLES, titleId)
+  if (titleId !== null && !known) {
     return NextResponse.json({ error: 'Invalid title' }, { status: 400 })
   }
   const repo = await getRepositoryAsync()
