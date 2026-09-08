@@ -9016,6 +9016,20 @@ rules at once tests neither. Three instances in ten batches, every one passing, 
 mutation rather than by reading. Raised because it belongs where the next batch is written from —
 the entry is what an implementer reads before starting, and the lesson was otherwise session-local.
 
+## 2026-09-08 — `docs/implementation-backlog.md` → 18963 (LB-61 shipped)
+
+Down 20. LB-61 was a decision brief — the count, the recommendation, the argument against, the
+fallback — and once the owner took the decision most of that stopped being something anyone needs to
+read. What is left is what shipped and the one look still owed on the device, which is the shape a
+`Verify:` entry should have.
+
+The entry is **not** removed. Twenty-five controls changed appearance at once and nobody has seen
+one; that is a look owed, not work owed, and `Verify: device` is the field that says so without
+parking anything.
+
+The absolute is 18963 rather than the 18863 this branch computed: Lane A landed PS-39 work underneath
+it that added 100. The **−20 is unchanged**, which is the only part of the number that belongs to
+this diff.
 ## 2026-09-08 — `docs/implementation-backlog.md` 18,883 → 18,972 (+89), BF-131 and BF-132
 
 Two owner reports from one screenshot of Health → Training.
@@ -9233,3 +9247,16 @@ folded, and `check-doc-links` passes on 1,032 files afterwards, so no citation b
 331 were foldable, so the other 292 are pinned by durable docs citing them directly. A sweep buys
 room; it does not fix the shape. Raising the number would trade the one signal that says so for
 another few weeks of quiet.
+
+### Reconciled on merge — 19391 (LB-61 branch)
+
+Four PRs landed under this branch while it waited on the entries-ceiling sweep, taking the backlog
+from 18,983 to 19,411. The `.size` file conflicted because both sides describe the same number, so it
+was recomputed from the merged file rather than spliced: **19,411 − 20 = 19,391**, and the −20 is the
+only part of the figure this diff owns.
+
+The append-only history conflict beside it was two independent additions and both are kept — but the
+merge *before* this one had committed that file with its markers still in it, resolved on the backlog
+file and missed here. Nothing had been pushed, so the cost was three lines. The tell is worth keeping:
+`grep -c '^<<<<<<<' ` on the file, not a reading of the diff, is what found it, because the markers sit
+9,000 lines into a document nobody reads end to end.

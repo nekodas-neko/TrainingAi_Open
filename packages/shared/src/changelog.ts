@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.438.4",
+    date: "2026-09-08",
+    changes: [
+      "Switches are green when they are on, instead of near-white. A white pill on a dark screen read as switched off \u2014 the same thing that made the selected exercise-role badge look disabled. They follow your chosen accent colour, so they change with it.",
+    ],
+  },
+  {
     version: "1.438.3",
     date: "2026-09-08",
     changes: [
