@@ -9016,7 +9016,8 @@ rules at once tests neither. Three instances in ten batches, every one passing, 
 mutation rather than by reading. Raised because it belongs where the next batch is written from —
 the entry is what an implementer reads before starting, and the lesson was otherwise session-local.
 
-## 2026-09-08 — `docs/implementation-backlog.md` → 18863 (LB-61 shipped)
+<<<<<<< HEAD
+## 2026-09-08 — `docs/implementation-backlog.md` → 18963 (LB-61 shipped)
 
 Down 20. LB-61 was a decision brief — the count, the recommendation, the argument against, the
 fallback — and once the owner took the decision most of that stopped being something anyone needs to
@@ -9026,3 +9027,55 @@ read. What is left is what shipped and the one look still owed on the device, wh
 The entry is **not** removed. Twenty-five controls changed appearance at once and nobody has seen
 one; that is a look owed, not work owed, and `Verify: device` is the field that says so without
 parking anything.
+
+The absolute is 18963 rather than the 18863 this branch computed: Lane A landed PS-39 work underneath
+it that added 100. The **−20 is unchanged**, which is the only part of the number that belongs to
+this diff.
+=======
+## 2026-09-08 — `docs/implementation-backlog.md` 18,883 → 18,972 (+89), BF-131 and BF-132
+
+Two owner reports from one screenshot of Health → Training.
+
+**BF-131** — the AI-periodization baseline never completes from the baseline session. The length is
+the trace, and the trace is the finding: the owner ran both baseline sessions correctly (Push 5/5,
+Pull 4/4, both completed), and `session_periodization` reads `baseline_complete = false` with
+`sessions_in_phase = 1`. That counter is what proves completion is wired and writes the wrong field.
+Recorded in full because the entry has to name a **deadlock**, not a missing call: the only caller of
+`setBaselineComplete` is the "Use prior data" button, which by construction discards the baseline
+session, and the other exit — the `baseline → accumulation` transition — needs a prescription that
+`generate-prescription.ts:201` refuses to produce while the flag is false. An implementer who adds
+the derivation without seeing the circular gate will not understand why more baseline sessions never
+helped. The entry also records that regenerating a program re-arms the whole thing, since
+`session_periodization` keys on `program_session_id` — which is how the owner got here.
+
+**BF-132** — a session delete with no confirmation and no tombstone. Short by comparison, because the
+code is one line (`removeSession` is an array filter) and the argument is about what to build, not
+what is wrong. The paragraph that earns its space is the one recording that this owner's data was
+recoverable **by luck** — a BugFix session had quoted the structure two days earlier, and six months
+of `exercise_logs` carry exercise and style names — so the next reader does not mistake one lucky
+recovery for a safety net that exists.
+
+Both entries head their lanes on `next-item.js`, which is the intended priority: one is a live
+blocker on the periodization engine, the other destroys user data on a single tap.
+## 2026-09-08 — `docs/implementation-backlog.md` → 18888 (PS-39: the trap recurred immediately)
+
+18883 → 18888. Five lines: the fixture trap recorded one PR earlier appeared twice more in the very
+next batch, and the entry now says so. That it recurred while its own warning was being written is
+the argument for the checklist, so it belongs beside it rather than in a journal file.
+
+## 2026-09-08 — `docs/overview/entries/` total ceiling → 330 (LA-80, tenth PR running)
+
+329 → 330. Tenth consecutive raise, one per PR, as LA-80 describes.
+
+## 2026-09-08 — `docs/implementation-backlog.md` → 18983 (PS-39: the trap's general form)
+
+18977 → 18983. The fixture trap recurred three more times in the HR batch, all one shape: every
+fixture where the resolved ceiling equalled the age estimate could not tell the two apart, so three
+values derived from the ceiling were silently readable from the estimate. The entry now states the
+general form — when two quantities are equal in your fixture, nothing that reads either is under
+test — which is what makes the checklist usable on a case it has not seen.
+
+## 2026-09-08 — `docs/overview/entries/` total ceiling → 331 (LA-80, eleventh PR running)
+
+330 → 331. Eleventh consecutive raise, one per PR, as LA-80 describes.
+>>>>>>> origin/main

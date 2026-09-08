@@ -633,6 +633,95 @@ OR-102a/b will read dose history to recommend the next dose. A tracker that read
   worst-case default for unknown equipment.
 - **Reversal cost:** low as code, high as behaviour — it moves every generated program's volume, at
   every budget except five exercises.
+### [workouts][platform] BF-131 — the AMRAP baseline session is never consumed, and the only exit from `baseline` is a button that ignores it 🔴 LIVE
+
+- **Lane:** A — `packages/shared/src/workout/complete-workout.ts`, `lib/data/postgres/slices/periodization.ts`, `app/api/ai-periodization/**`.
+- **Added:** 2026-09-08 · owner, on Health → Training: *"even though the session was done it's saying baseline needed"*.
+- **Needs:** — nothing.
+- **Measured on the owner's live data.** He ran both baseline sessions exactly as instructed —
+  **Push 2026-09-07 (5 exercises, 5 sets)** and **Pull 2026-09-06 (4 exercises, 4 sets)**, one AMRAP
+  set per exercise, both `completed_at` set. `session_periodization` for both reads
+  `phase = 'baseline'`, `baseline_complete = false`, `sessions_in_phase = 1`.
+- **`sessions_in_phase = 1` is the tell: completion IS wired, and it writes the wrong field.**
+  `complete-workout.ts:88` calls `incrementSessionsInPhase` — advisory, fire-and-forget. Nothing on
+  that path calls `setBaselineComplete`, and no code anywhere derives a baseline 1RM from the AMRAP
+  set logs. The counter moves; the flag never does.
+- **`setBaselineComplete` has exactly one caller in the app:**
+  `app/api/ai-periodization/baseline/complete/route.ts`, whose only caller in turn is the
+  **"Use prior data →"** button (`components/health/ai-periodization-status-card.tsx:76`). That route
+  builds `baseline1rm` from `personal_records` and `exercise_estimates` — from *prior* data, by
+  construction. **So the only way out of `baseline` is the path that discards the baseline session.**
+- **And the alternative exit is a deadlock, which is why this cannot resolve itself.** The
+  `baseline → accumulation` transition exists (`transition/route.ts:23`) but the card only offers it
+  when the stored prescription carries a `phaseAction` — and prescription generation returns a **400**
+  while `phase === 'baseline' && !baselineComplete` (`generate-prescription.ts:201`, and the same gate
+  again at `workout-review/session/[sessionId]/route.ts:62` and `.../apply/route.ts:68`). No
+  prescription → no recommendation → no transition → still `baseline`. Doing more baseline sessions
+  raises `sessions_in_phase` and changes nothing else.
+- **The UI states the unbuilt behaviour as fact**, which is what makes this a live defect rather than
+  a gap: `components/workout/ai-baseline-banner.tsx:22` reads *"For each exercise, load the bar and do
+  as many clean reps as you can (AMRAP). The AI will calculate your 1RM and start prescribing from the
+  next session."* Nothing calculates it and nothing prescribes.
+- **Fix: derive the baseline from the session that was just completed.** The primitives exist —
+  `calcAmrap1RM` (`packages/shared/src/1rm.ts`) is the AMRAP estimator, and `setBaselineComplete`
+  already takes a `Record<exerciseId, Baseline1rmEntry>` with a `source` tag. On completing a workout
+  whose session is in `baseline`, build that map from the session's set logs and call it, tagging
+  `source` distinctly from the existing `'existing'` so a measured anchor is distinguishable from a
+  carried-over PR. Key it by **session-exercise id**, matching what the route already does and what the
+  signals read.
+- **Two things to get right, both of which the current shape hides:**
+  1. **A partial baseline must not silently complete.** If the lifter logs 3 of 5 exercises, the
+     anchor is missing two — decide between completing with a PR fallback for the gaps (tagged) and
+     staying in `baseline` with the screen naming what is outstanding. Do not complete with an empty
+     entry; the route's own comment already warns against *"silently completing with an empty,
+     unusable anchor"*.
+  2. **`incrementSessionsInPhase` is fire-and-forget** and must stay that way — a completion must
+     never fail on a periodization write. The new call needs the same posture, which means the flag
+     can lag a completion and the screen must tolerate it.
+- **Regenerating a program re-arms this for every session.** `session_periodization` keys on
+  `program_session_id`, and saving a rebuilt program creates new session rows, so a user who has been
+  training for months lands back in `baseline` on a fresh id with no way through except the button.
+  That is the owner's exact situation — his older program's rows still read `accumulation`/`deload`
+  with `baseline_complete = true` beside the new ones.
+- **Owner workaround, valid today:** tap **"Use prior data →"**. He has PRs for these exercises, so it
+  seeds and advances to `accumulation`.
+- **Reversal cost:** low — one derivation and one call on an existing write path.
+
+### [workouts][app-shell] BF-132 — one tap on the trash icon deletes a whole session, with no confirmation and no tombstone 🔴 LIVE
+
+- **Lane:** B — `components/config/program-editor-sheet.tsx`. The tombstone half, if taken, is Lane A.
+- **Added:** 2026-09-08 · owner, after losing a session: *"it looked like you can delete the day in the builder with no confirmation needed so if you accidently press the trash jts gone. I will need to remake with my lower session details"*.
+- **Needs:** — nothing.
+- **Traced.** `removeSession` (`program-editor-sheet.tsx:187`) is
+  `onProgramSessionsChange(programSessions.filter((_, i) => i !== si))` — a one-line array filter,
+  fired directly from the trash `<button>` at `:688`. **There are zero `confirm(` calls in the entire
+  file**, so `removeExercise` has the same shape. The button sits in the session header row beside the
+  emoji picker and the name field, both of which are ordinary edit controls.
+- **The blast radius is the whole session**, not a row: deleting it takes its exercise list, and on
+  save the rows are gone from `program_sessions` and `session_exercises`, **neither of which has a
+  `deleted_at` column**. This is a hard delete. The only thing between a mis-tap and permanent loss is
+  not pressing Save — and the sheet gives no signal that Save is now destructive.
+- **What made this recoverable was luck, and it should be written down as such.** The owner's Lower
+  session was reconstructable only because (a) a BugFix session had read and quoted the program's full
+  structure two days earlier, and (b) six months of `exercise_logs` carry `exercise_name` and
+  `style_name`, so the *trained* version could be rebuilt from history. Neither is a feature. A user
+  who deleted a session they had not yet trained would have nothing.
+- **Fix, in the order that buys the most per unit of work:**
+  1. **A confirmation naming what is lost** — *"Delete Lower and its 5 exercises?"* — on session
+     delete. The count is the part that matters; a generic "Are you sure?" trains the reflex to
+     dismiss it.
+  2. **An undo** on the sheet's own state, since the delete is local until Save. Cheaper than it
+     sounds and it covers the mis-tap without adding a dialog to the deliberate case. A toast with
+     *Undo* is the established pattern elsewhere in the app.
+  3. **A `deleted_at` on `program_sessions`** so a saved delete is recoverable at all. Lane A, and a
+     migration — worth deciding separately, because the offline-first rule in CLAUDE.md already says a
+     server hard DELETE is invisible to devices that have not synced, which applies here.
+- **Do not put a confirm on exercise delete without checking the exercise-add flow first** — removing
+  and re-adding an exercise is a normal editing action, and a dialog on every one of those is the kind
+  of friction that gets a confirmation removed again a month later. The session-level delete is the
+  one that is rare and expensive.
+- **Reversal cost:** low for 1 and 2 (local state and a dialog). 3 is a migration and is separable.
+
 ### [platform] LB-56 — E2E costs 26 minutes a UI PR and currently gates nothing; decide which of those to change
 
 - **Lane:** O — the Orchestrator's, not an implementer's. `.github/workflows/ci.yml`, `playwright.config.ts` and the required-checks
@@ -1223,7 +1312,7 @@ repair the 22 dead backlog paths and 43 doubled `docs/overview/overview/` labels
 unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge candidates
 (led by `oura-ring-data-reference.md`, a retired-API reference with no retirement note).
 
-### [platform] PS-39 — 70 API routes still have no test that imports their handler
+### [platform] PS-39 — 62 API routes still have no test that imports their handler
 
 - **Lane:** A. Regenerate the list with `node scripts/check-route-test-coverage.js` — it prints every
   uncovered route when it fails, and the ratchet now holds the number.
@@ -1259,6 +1348,17 @@ mutation and never by reading:
 > **A fixture that trips two rules at once tests neither.** The case names one guard; a different
 > guard rejects it first; deleting the named guard changes nothing.
 
+It appeared **twice more in the batch written straight after this was recorded, and three times in
+the one after that** — the argument for the checklist rather than against it. A single-word query
+cannot tell "every term matches" from "any term matches"; a product with empty nutriments cannot
+tell "no product" from "no usable product", because the mapper rejects it either way; and, in the
+HR batch, **every fixture where the resolved ceiling happened to EQUAL the age estimate** could not
+tell the two apart, so three separate values derived from the ceiling were all silently readable
+from the estimate instead.
+
+That last one names the general form: **when two quantities are equal in your fixture, nothing that
+reads either one is under test.** Vary them.
+
 The three, so the shape is recognisable rather than abstract:
 
 - *"below the distance floor"* was 749 m over half an hour — 1.5 km/h, so the **speed** check
@@ -1275,15 +1375,15 @@ testing X. Two more classes worth the same suspicion: a fixture whose timezone I
 proves nothing about which zone the route read, and a fixture already in sorted order proves
 nothing about a sort.
 
-**The count was 93 and is really 70**, by the mechanism the entry half-noticed: it counted a route
+**The count was 93 and is really 62**, by the mechanism the entry half-noticed: it counted a route
 covered when any test mentioned its URL, so `calendar-data` and `training-load` "appearing only as
 cache-key strings" counted. Asking instead whether a test imports the handler gives 150 of 222, less
-the eighty paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
+the eighty-eight paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
 honest in both directions (see above), so the list can be worked from. **The actionable core
 named by this entry is now CLEAR**: the home aggregates, both ingest routes and `program-week` are
 done; so are ai-periodization, `friends/leaderboard`, the account cluster, the supplement/vial chain,
 a meal plan's lifecycle + reshape, the workout write path, the running plan and the four body/health
-writes, the goal-target-adherence loop, the home week/streak reads, the AI Coach lifecycle, the cardio hub, the strength/volume trends and the day timeline. Work by feature — batching on what is *verified together* twice found a defect (LA-78, LA-79). `scripts/check-route-test-coverage.js` ratchets it, so the debt
+writes, the goal-target-adherence loop, the home week/streak reads, the AI Coach lifecycle, the cardio hub, the strength/volume trends, the day timeline, the food-input path and the four heart-rate reads. Work by feature — batching on what is *verified together* twice found a defect (LA-78, LA-79). `scripts/check-route-test-coverage.js` ratchets it, so the debt
 only shrinks, a NEW route arrives uncovered and fails, and since LA-81 a route that LOSES its test fails whatever the total does.
 
 ### [app-shell][platform] LA-76 — a deload PHASE still decays the collection, and nothing dates one
