@@ -9004,3 +9004,7 @@ the entry says more than it did; nothing else in this PR.
 ## 2026-09-08 — `docs/overview/entries/` total ceiling → 328 (LA-80, eighth PR running)
 
 327 → 328. Eighth consecutive raise, one per PR, as LA-80 describes.
+
+## 2026-09-08 — `docs/overview/entries/` total ceiling → 329 (LA-80, ninth PR running)
+
+328 → 329. Ninth consecutive raise, one per PR, as LA-80 describes.
