@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.438.5",
+    date: "2026-09-08",
+    changes: [
+      "Deleting a session in the program editor now asks first, and says what goes with it \u2014 \u0027Delete Lower and its 5 exercises?\u0027 rather than deleting on the tap. If you delete one anyway, an Undo appears in the editor until you save.",
+    ],
+  },
+  {
     version: "1.438.4",
     date: "2026-09-08",
     changes: [
