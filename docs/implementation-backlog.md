@@ -1223,7 +1223,7 @@ repair the 22 dead backlog paths and 43 doubled `docs/overview/overview/` labels
 unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge candidates
 (led by `oura-ring-data-reference.md`, a retired-API reference with no retirement note).
 
-### [platform] PS-39 — 71 API routes still have no test that imports their handler
+### [platform] PS-39 — 70 API routes still have no test that imports their handler
 
 - **Lane:** A. Regenerate the list with `node scripts/check-route-test-coverage.js` — it prints every
   uncovered route when it fails, and the ratchet now holds the number.
@@ -1252,15 +1252,15 @@ unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge
     and `ai-periodization/session/[sessionId]` + `…/prescribe` + `…/respond` — each batched with the
     uncovered siblings it verifies alongside.
 
-**The count was 93 and is really 71**, by the mechanism the entry half-noticed: it counted a route
+**The count was 93 and is really 70**, by the mechanism the entry half-noticed: it counted a route
 covered when any test mentioned its URL, so `calendar-data` and `training-load` "appearing only as
 cache-key strings" counted. Asking instead whether a test imports the handler gives 150 of 222, less
-the seventy-nine paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
+the eighty paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
 honest in both directions (see above), so the list can be worked from. **The actionable core
 named by this entry is now CLEAR**: the home aggregates, both ingest routes and `program-week` are
 done; so are ai-periodization, `friends/leaderboard`, the account cluster, the supplement/vial chain,
 a meal plan's lifecycle + reshape, the workout write path, the running plan and the four body/health
-writes, the goal-target-adherence loop, the home week/streak reads, the AI Coach lifecycle, the cardio hub and the strength/volume trends. Work by feature — batching on what is *verified together* twice found a defect (LA-78, LA-79). `scripts/check-route-test-coverage.js` ratchets it, so the debt
+writes, the goal-target-adherence loop, the home week/streak reads, the AI Coach lifecycle, the cardio hub, the strength/volume trends and the day timeline. Work by feature — batching on what is *verified together* twice found a defect (LA-78, LA-79). `scripts/check-route-test-coverage.js` ratchets it, so the debt
 only shrinks, a NEW route arrives uncovered and fails, and since LA-81 a route that LOSES its test fails whatever the total does.
 
 ### [app-shell][platform] LA-76 — a deload PHASE still decays the collection, and nothing dates one
