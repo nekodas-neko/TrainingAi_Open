@@ -86,12 +86,20 @@ describe('no button where there is no baseline', () => {
   it('Sleep Goal has no Recommended control', () => {
     // `BaselineResult` carries no sleep field. The failure this pins is not a typo but a later
     // session adding "8 hours" to be consistent — an unsourced number sitting beside sourced ones.
+    // Anchored on the OPENING of each marker, not the whole `{/* … */}`. The exact-string form
+    // broke on a one-line styling change that only lengthened the Sleep comment (LB-63) — a failure
+    // about comment text, not about the thing being guarded, which is that no `RecommendedValue`
+    // appears between the two markers.
     const src = read('components/profile/goal-targets-section.tsx')
-    const start = src.indexOf('{/* Sleep Goal */}')
-    const end = src.indexOf('{/* Water Goal */}')
+    const start = src.indexOf('{/* Sleep Goal')
+    const end = src.indexOf('{/* Water Goal')
     expect(start).toBeGreaterThan(-1)
     expect(end).toBeGreaterThan(start)
-    expect(src.slice(start, end)).not.toContain('RecommendedValue')
+    // Comments stripped, exactly as the `no model call` case above does and for the same reason: a
+    // comment explaining WHY there is no `RecommendedValue` here would otherwise fail the assertion
+    // that documents it. What is guarded is a rendered control, not a mention of one.
+    const block = src.slice(start, end).replace(/\/\*[\s\S]*?\*\//g, '')
+    expect(block).not.toContain('RecommendedValue')
   })
 
   it('Fiber has no baseline key in the macro pane', () => {
