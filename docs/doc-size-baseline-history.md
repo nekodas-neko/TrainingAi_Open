@@ -8887,3 +8887,9 @@ run's lessons in its place.
 18789 → 18765, a 24-line fall. LB-59's entry removed on shipping (a lane written as a word now fails
 `check-backlog-pointers.js` rather than silently reading as unstated), less four lines added to
 BF-106 explaining why its lane went from the unparseable `none` to `O`.
+
+## 2026-09-08 — `docs/implementation-backlog.md` → 18793 (LA-77 filed)
+
+18765 → 18793, a 28-line rise: one new entry (LA-77, the lint-warning signal-to-noise measurement),
+raised rather than absorbed because a new queue entry is what this index is *for*. The PS-39 status
+rewrite that rode in the same PR was compressed back to net zero rather than added to this number.
