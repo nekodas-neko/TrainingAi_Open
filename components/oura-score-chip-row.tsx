@@ -441,12 +441,16 @@ export const OuraScoreChipRow = memo(function OuraScoreChipRow({ readiness, slee
       accent: "#a78bfa",
       href: "/health/sleep",
       Icon: Moon,
-      gapReason: scoreGapText(readiness.availability, "sleep"),
       ringStyle,
       // Q-529: the score is derived from the night, so while the night can still grow this number
       // can still move. Measured on 2026-08-20 — it read 47 during the sync and 62 once settled,
       // and nothing on screen distinguished the two.
       provisional: sleepProvisional,
+      // After `provisional`, not before it: `sleep-provisional-surfaces.test.ts` pins
+      // `href: "/health/sleep"` and `provisional: sleepProvisional` inside one 120-character window,
+      // deliberately, so a cell cannot read the flag and then not use it. A line inserted between
+      // them breaks that guard without breaking anything it guards.
+      gapReason: scoreGapText(readiness.availability, "sleep"),
     },
     {
       label: "Activity",

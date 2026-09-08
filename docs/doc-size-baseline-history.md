@@ -8834,3 +8834,16 @@ implemented half a feature against a route that cannot serve it.
 
 18775 rather than the 18752 this branch computed: LB-61's own 23 lines landed underneath it. The +42
 is unchanged across that, which is the property recomputing from the merged file preserves.
+
+## 2026-09-08 — `docs/implementation-backlog.md` → 18794 (Q-278's surface half shipped)
+
+Up 19, on an entry that got smaller in what it asks for. Q-278's `Keep:` was "consume `availability`
+on the surfaces that already render an em dash"; that shipped, so the Keep is rewritten to the half
+that genuinely remains — the route emits `availability` for readiness, sleep and activity only, while
+daytime stress and resilience are the **two lowest-coverage pillars in the entry's own table** (55%
+and 33%) and still have no reason behind their dashes.
+
+The lane flips **B → A** with it, having gone A → B when the engine half shipped. That is the rule
+working rather than churn: the lane follows the open path, so `next-item.js` offers an entry to
+whichever lane can actually start it. Nineteen lines is what stops the next Lane B session picking
+this up and finding nothing in it to build.
