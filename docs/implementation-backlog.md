@@ -1274,6 +1274,24 @@ sounds like:**
   this entry is the *single dense view*; if it is built by duplicating those cards' internals rather
   than reusing them, it becomes a second place every body metric is formatted. Reuse or extract.
 - **Reversal cost:** low — one read-only screen over existing stores. No migration, no new data.
+- **Keep:** the training and performance sections. **Body composition, vitals, metabolism, daily
+  movement and sleep shipped in #1008**, as a read-only section under the editable fields on
+  **More → Profile details** — see the decision below. Still unbuilt: `personal_records`,
+  `fitness_tests`, `dexa_scans` and `measured_rmr` in this view. The clinical two are reachable today
+  at More → DEXA & RMR results and the scale's resting-rate row now points there, so the gap is a
+  single dense view rather than an unreachable number.
+- **⚠ The BF-118 decision is TAKEN, and it is not the one this entry proposed.** BF-118's screen does
+  not exist and is a large unbuilt entry. What does exist is **`/more/details` ("Profile details",
+  BF-79)** — name, biological sex, birth year, height, editable, one PATCH — which is precisely
+  BF-118's *"what you TELL the app"* half already built under another name. So this shipped as a
+  section of **that** screen: told above, measured below, one page about you. Do not add a second
+  destination when BF-118 is built; fold BF-118's intake into `/more/details` instead.
+- **The read is local-first, and that is required rather than preferred.** `/api/body-metadata`
+  returns **seven days**, and this card is about the LATEST reading of each metric — a scale session
+  or a DEXA figure is routinely older than that, so read from the server alone most of these read as
+  absent when they exist. `store.getBodyMetrics(cutoff)` returns the full local history, and
+  `body_metrics` is a domain the app writes locally, so CLAUDE.md's offline-first rule already
+  required this. The seven-day payload stays as the web fallback, where `getLocalStore` returns null.
 - **A device look is owed when it ships:** this is a long screen on a phone, and "good UI" for a dense
   read-only list is mostly about scanning — group headers that stick, numbers aligned, and the S25's
   fold not landing mid-group.

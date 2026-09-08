@@ -9337,3 +9337,18 @@ a hand-rolled context that turns out not to be the cause.
 
 Also kept: the estimator design OR-102b ④ needs, including the residual-SD floor. A perfect-line
 fixture measured 1.2e-13, which passes a `> 0` guard and then makes every delta significant.
+
+## 2026-09-08 — `docs/implementation-backlog.md` 19,547 → 19,565 (+18), BF-133 shipped in part
+
+BF-133 keeps its entry, and the growth is the two things that would otherwise be re-derived.
+
+**The BF-118 decision, which is not the one the entry proposed.** BF-133 opened by demanding a
+decision against BF-118's "User Information" screen and recommending this be a section of it. That
+screen does not exist and BF-118 is large and unbuilt; `/more/details` (BF-79) does exist and is
+already BF-118's *"what you tell the app"* half under another name. So the recommendation stands and
+the target changed, which is worth stating outright rather than leaving the next session to rediscover
+that the named screen is not there.
+
+**Why the read is local-first**, in one line so it is not "improved" back to a server fetch:
+`/api/body-metadata` returns seven days, and a card about the latest reading of each metric shows
+most of them as absent on a seven-day window.
