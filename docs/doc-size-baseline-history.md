@@ -8900,3 +8900,8 @@ rewrite that rode in the same PR was compressed back to net zero rather than add
 `baseline/complete`, found while writing that route's PS-39 tests and verified against the local
 database. Raised rather than absorbed, because a new queue entry is what this index is for; the
 PS-39 status update in the same PR was net-negative.
+
+## 2026-09-08 — `docs/implementation-backlog.md` → 18792 (LA-78 shipped)
+
+18825 → 18792. LA-78's entry removed on shipping — `baseline/complete` now verifies the session is in
+the caller's active program before it writes, so the entry owes nothing.

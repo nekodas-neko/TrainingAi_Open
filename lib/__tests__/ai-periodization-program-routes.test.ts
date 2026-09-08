@@ -165,10 +165,26 @@ describe('POST /api/ai-periodization/baseline/complete', () => {
     expect(setBaselineComplete).not.toHaveBeenCalled()
   })
 
-  it('404s a session that is not in the active program', async () => {
+  // LA-78. `ensureSessionPeriodization` used to run ~20 lines ABOVE this check, and the ordering
+  // had two outcomes, neither of them this 404. A real session of the caller's from an *inactive*
+  // program left a stray `session_periodization` row before answering; a uuid matching no session
+  // hit the `program_session_id` foreign key, which nothing caught, so the caller got a framework
+  // 500. Both are the same one-line ordering, so both are pinned here.
+  it('404s a session that is not in the active program, without writing anything first', async () => {
     getActiveProgram.mockResolvedValue(program({ sessions: [] }))
     expect((await completePost({ sessionId: SESSION_ID })).status).toBe(404)
+    expect(ensureSessionPeriodization).not.toHaveBeenCalled()
     expect(setBaselineComplete).not.toHaveBeenCalled()
+  })
+
+  it('404s an id that matches no session at all, rather than reaching the foreign key', async () => {
+    // The stray-write path in reverse: the insert would be REJECTED by the FK, uncaught, and the
+    // caller would see a 500. Simulated by making the write throw the way Postgres does.
+    ensureSessionPeriodization.mockRejectedValue(
+      new Error('insert or update on table "session_periodization" violates foreign key constraint'))
+    const res = await completePost({ sessionId: '00000000-0000-4000-8000-00000000dead' })
+    expect(res.status).toBe(404)
+    expect(ensureSessionPeriodization).not.toHaveBeenCalled()
   })
 
   it('seeds the anchor from earned records, keyed by session-exercise id', async () => {

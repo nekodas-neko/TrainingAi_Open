@@ -1080,38 +1080,6 @@ two are `first-run-empty-states` and `preferences-survive-reinstall`. **Order ma
 least some of these are shared-state, not the spec's own logic. Read the artifact this PR makes real
 before assuming a local-DB artifact — that mistake has already been made once on `plan-rescale`.
 
-### [workouts][platform] LA-78 — `baseline/complete` writes before it checks the session is yours
-
-- **Lane:** A — `app/api/ai-periodization/baseline/complete/route.ts`, a three-line reorder.
-- **Added:** 2026-09-08, Lane A — found writing that route's PS-39 tests, then verified against the
-  local database rather than reasoned about.
-
-`ensureSessionPeriodization(userId, sessionId)` runs at line ~45; the check that `sessionId` is
-actually in the caller's **active program** runs ~20 lines later and answers 404. So the ordering is
-write-then-verify, which CLAUDE.md's write-path ownership discipline says it must not be.
-
-**Two outcomes, neither of them the 404 the route means to give:**
-
-- A **real** `program_sessions` row of the caller's, in a *different* (inactive) program: the insert
-  succeeds and leaves a stray `session_periodization` row for a session no active program contains,
-  then the request 404s. The row is harmless but it is state nobody asked for.
-- A **uuid that matches no session**: `program_session_id` carries a foreign key to
-  `program_sessions.id`, so Postgres rejects the insert. Verified 2026-09-08 against the local
-  database — `insert or update on table "session_periodization" violates foreign key constraint
-  "session_periodization_program_session_id_fkey"`. Nothing catches it, so the caller gets a
-  framework **500** where a **404** was intended.
-
-**Not a cross-user hole** — every path is scoped to `userId` and the FK bounds the rest. It is a
-correctness and error-shape defect, which is why it is small rather than urgent.
-
-- **The fix**: move the `getActiveProgram` read and its `programSession`/404 check **above**
-  `ensureSessionPeriodization`. The program read already happens in the same handler, so this costs
-  nothing — it is purely an ordering change.
-- **Add the two cases** to `lib/__tests__/ai-periodization-program-routes.test.ts` when fixing:
-  a session from an inactive program writes nothing, and an unknown uuid answers 404 rather than
-  500. They were deliberately left out of the PS-39 batch rather than pinning current behaviour as
-  correct.
-
 ### [platform] LA-77 — 60% of the lint warnings are deliberate, so the 60 real ones are invisible
 
 - **Lane:** O — `eslint.config.mjs` is repo-level tooling in neither implementer lane's paths, the
