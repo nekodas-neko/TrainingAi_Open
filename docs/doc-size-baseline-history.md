@@ -8747,12 +8747,19 @@ written to prevent the class had been reporting clean over code it never parsed;
 `aria-label`s and an empty baseline, and an empty baseline needs no entry to describe it — a file
 absent from the list must have zero, which is the whole rule.
 
-## 2026-09-08 — compaction sweep, `docs/overview/entries/` 321 → 294
+## 2026-09-08 — `projectOverview.md` → 10419 (the journal fold)
 
-Folded 28 unlinked entries into `docs/overview/history-2026-09-08.md`. The directory hit its 320
-total ceiling two days after the 2026-09-06 sweep took it to 274, which is the cadence to expect
-when six sessions are filing entries, not a surprise.
+Up 1, from 10418: one Document Map row for `history-2026-09-08.md`. The map is the index's job — a
+history file nobody can find from the map is a history file nobody reads.
 
-Folded only entries dated 2026-09-07 and earlier. Three of the 31 unlinked were written the same
-night — unlinked because they are reconciliations and guards with nothing owed, so they earned no
-`projectOverview.md` row — and a recent-window that folds tonight's work is not a recent window.
+## 2026-09-08 — `projectOverview.md` → 10419 (LA-62)
+
+Up 1, and it is the Document Map naming the newest batch file. **My own compaction sweep was thrown
+away to get here.** The entries directory hit its 320 ceiling while this branch was open, so the
+branch folded 28 entries — and #947 landed the same chore first, from another session, creating the
+same `history-2026-09-08.md`. The merge was an add/add conflict on that file, resolved by taking
+main's whole sweep and discarding mine, which is the outcome CLAUDE.md predicts when two sessions
+of one role run the same chore.
+
+What survived is the half #947 missed: it created the batch file and left this row pointing at
+`history-2026-09-06.md`, so the newest archive was one nothing routed a reader to.
