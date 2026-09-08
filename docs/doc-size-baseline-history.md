@@ -9016,6 +9016,31 @@ rules at once tests neither. Three instances in ten batches, every one passing, 
 mutation rather than by reading. Raised because it belongs where the next batch is written from —
 the entry is what an implementer reads before starting, and the lesson was otherwise session-local.
 
+## 2026-09-08 — `docs/implementation-backlog.md` 18,883 → 18,972 (+89), BF-131 and BF-132
+
+Two owner reports from one screenshot of Health → Training.
+
+**BF-131** — the AI-periodization baseline never completes from the baseline session. The length is
+the trace, and the trace is the finding: the owner ran both baseline sessions correctly (Push 5/5,
+Pull 4/4, both completed), and `session_periodization` reads `baseline_complete = false` with
+`sessions_in_phase = 1`. That counter is what proves completion is wired and writes the wrong field.
+Recorded in full because the entry has to name a **deadlock**, not a missing call: the only caller of
+`setBaselineComplete` is the "Use prior data" button, which by construction discards the baseline
+session, and the other exit — the `baseline → accumulation` transition — needs a prescription that
+`generate-prescription.ts:201` refuses to produce while the flag is false. An implementer who adds
+the derivation without seeing the circular gate will not understand why more baseline sessions never
+helped. The entry also records that regenerating a program re-arms the whole thing, since
+`session_periodization` keys on `program_session_id` — which is how the owner got here.
+
+**BF-132** — a session delete with no confirmation and no tombstone. Short by comparison, because the
+code is one line (`removeSession` is an array filter) and the argument is about what to build, not
+what is wrong. The paragraph that earns its space is the one recording that this owner's data was
+recoverable **by luck** — a BugFix session had quoted the structure two days earlier, and six months
+of `exercise_logs` carry exercise and style names — so the next reader does not mistake one lucky
+recovery for a safety net that exists.
+
+Both entries head their lanes on `next-item.js`, which is the intended priority: one is a live
+blocker on the periodization engine, the other destroys user data on a single tap.
 ## 2026-09-08 — `docs/implementation-backlog.md` → 18888 (PS-39: the trap recurred immediately)
 
 18883 → 18888. Five lines: the fixture trap recorded one PR earlier appeared twice more in the very
