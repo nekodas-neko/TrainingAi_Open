@@ -41,16 +41,16 @@ const root = path.join(__dirname, '..');
 // So the honest number was **139**, not the ~126 predicted from the false negatives alone: 140 − 13
 // + 12. The old count was accidentally close to right for two wrong reasons.
 //
-// **139 → 132**: seven of the routes the correction exposed now have real tests —
+// **139 → 131**: eight of the routes the correction exposed now have real tests —
 // `scale-ble/pending/[id]/{confirm,dismiss}`, `nutrition/energy-balance`,
 // `session-explain/insight`, `running-plan/explain`, `nutrition/saved-meals/[id]` and
-// `nutrition/meal-plans/generate/meal`. Chosen because the gap between belief and reality was
-// widest there, not because they were easiest.
+// `nutrition/meal-plans/generate/meal` and `weekly-digest`. Chosen because the gap between belief
+// and reality was widest there, not because they were easiest.
 //
 // This resolves the specifier instead. A relative one resolves against the importing file; an alias
 // or bare one resolves against the repo root; a type-only import does not count at all.
 //
-const BASELINE = 132;
+const BASELINE = 131;
 
 function walk(dir, out = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
