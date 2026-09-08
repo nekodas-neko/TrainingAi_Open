@@ -8942,3 +8942,17 @@ entry is what this index is for; the PS-39 status update in the same PR was net-
 LA-80 describes: the ceiling now moves by one every time a feature PR lands, because the fold that
 would reclaim the space is blocked on 292 citations pointing at entries rather than at the batched
 history. Raising it is bookkeeping, not a fix — the entry says what the fix is.
+
+## 2026-09-08 — `docs/implementation-backlog.md` → 18832 (LA-81 filed)
+
+18813 → 18832. One new entry: LA-81, the route-coverage ratchet passing a swap — five routes covered
+while three were un-covered reads as a two-route improvement, which is how a destroyed test file
+nearly shipped as progress. Raised because a new queue entry is what this index is for; the PS-39
+status update in the same PR was net-neutral.
+
+## 2026-09-08 — `docs/overview/entries/` total ceiling → 323 (LA-80, third PR running)
+
+322 → 323. Third consecutive raise, one per feature PR, exactly as LA-80 describes. Recording it
+rather than batching it, because the count of raises is the evidence that the entry is real work
+rather than a tidy-up: the number will keep moving by one until the citations point at the batched
+history.
