@@ -20,7 +20,7 @@ Rewrite this file **in full** — never append — before the session ends or co
   `docs/agents/README.md` §3). Find your next number with
   `grep -rhoE '\bBF-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1` — **run it, do not trust this line**,
   which was four sessions stale before it was noticed. This role's last band entry was **Q-424**
-  (2026-08-20); everything after it is `BF-`. **Current: `BF-88` filed, next is `BF-89`.**
+  (2026-08-20); everything after it is `BF-`. **Current: `BF-133` filed, next is `BF-134`** (2026-09-08 — and this line has now gone stale twice, so run the grep).
 - **No migration numbers.** Intake never claims one. If an entry needs a corrective migration or a new
   column, say so in the entry and hand the number to Lane A.
 - **Docs-only PRs, opened and merged without asking** (CLAUDE.md Standing Instructions). CI still has
@@ -251,6 +251,58 @@ already too late.**
 **Owner still owes:** device checks on **BF-61**, **BF-62**, **BF-63**, **BF-45**, **BF-53**; the
 **BF-83** sleep check next morning (note the end time on open, then query the row immediately); and
 the Orchestrator prompt, handed over but never run.
+
+### 2026-09-06 → 09-08 — the game feature, a program pass, and two live engine defects (BF-105 → BF-133)
+
+**Filed:** BF-122a/b (the cat collection — three ladders fed by workouts/steps/sleep, decay window
+derived from the training schedule) · BF-123/124 (the 48 px tap floor turning sub-48 px `<button>`
+chips into circles; the role picker's overflow) · BF-125 (the builder review shows the role badge and
+cannot edit it) · BF-126 (no cap on primaries/secondaries per generated session) · BF-127 (the
+baseline banner renders a bodyweight 1RM index as kilograms — *"load 82.5 kg on a pull-up"*) ·
+BF-128 (the session planner charges rest after the final set, prescribing 4 exercises where 90 days
+of history does 5) · BF-129/130 (22 library rows with no equipment, so machines pass a home-gym
+filter; no home-gym knee-flexion hamstring exercise exists) · BF-131/132 (the AMRAP baseline never
+completes; one tap deletes a program session with no confirmation and no tombstone) · BF-133 (the
+full user overview card). BF-105 was **respecified**, not re-filed, when the owner chose spoken cues.
+
+**Owner still owes:** tapping **"Use prior data →"** on Push and Pull to clear the stuck baseline
+(BF-131's workaround, valid today); **rebuilding the deleted Lower session** — both candidate
+exercise lists are in the 2026-09-08 chat and reconstructable again from `exercise_logs`; and
+confirming his **phone's sound mode**, since the mute icon in every screenshot that day would explain
+BF-105's silent cue on its own.
+
+**Four things this generation did that are worth copying:**
+
+- **Retract in place, visibly, when the owner contradicts a finding.** BF-126 claimed the generated
+  `primary` sitting second was a defect. The owner: *"that order is how I want it!"* — and
+  `builder-review.tsx:229` already documented the reorder as deliberate, in a comment that had been
+  read past. The ordering half is struck **inside the entry** with the quote attached and the title
+  no longer advertises it, rather than being deleted. A silently removed finding gets re-derived from
+  the same screenshot by the next session.
+- **When the owner asks "why doesn't it just do X", trace before answering — the answer may shrink
+  the entry.** BF-131 first said to *derive* the baseline 1RM from the completed session. Tracing the
+  question showed `estimateOneRm` already takes an `isBaseline` flag routing to `amrapAverage1Rm`,
+  the workout screen already passes it, and the number already lands in `exercise_logs.estimated_1rm`.
+  The gap was a single copy into `session_periodization`. Left unamended the entry would have produced
+  a **second AMRAP 1RM formula** disagreeing with the PR the same sets produced.
+- **A hard delete is often recoverable from history — look before telling the owner it is gone.** The
+  deleted Lower session was rebuilt two ways: from a structure this role had quoted in chat two days
+  earlier, and from six months of `exercise_logs`, which carry `exercise_name` and `style_name`. Say
+  plainly that this was luck, not a safety net — BF-132 records it so the next reader does not treat
+  recovery as a given.
+- **Measure a feature request before writing the entry; the request usually does not survive it.** The
+  owner asked for a card with *"essentially every metric we have recorded"*. Six tape-measure columns
+  are 0 of 132 rows, `sleep_score` is 0 of 109, and two blood stores are empty — so "render every
+  column" ships seven blank rows. Three of his own named examples were also not what they sound like
+  (stride length is `height × 0.415`; "low/avg/high HR" is three stores; two RMR numbers already
+  exist). None of that is visible without the queries.
+
+**One field-semantics trap, learned the hard way earlier in this generation:** `Verify:` means
+**shipped, awaiting a look** — using it for *"this will need a device check once built"* sorts an
+unbuilt entry into `next-item.js`'s VERIFY section and hides it from READY. Three entries were filed
+that way and Lane B reported READY (1) with two of its own items invisible. Same shape for `Keep:`
+(shipped, residue owed) and `Reference:` (read by others, never next). **Run `node scripts/next-item.js
+--lane A|B` after filing** — the file cannot tell you where an entry actually landed.
 
 ## What this session learned that the traps list did not already say
 

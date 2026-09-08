@@ -9183,6 +9183,26 @@ against the merge base — so a stale branch reads as a regression it did not ca
 right and the branch was old. Confirmed before acting by stashing the changes and re-running against
 a clean tree, which reproduced it, and then by fetching `origin/main` and finding the new commit.
 
+## 2026-09-08 — `docs/agents/state/bugfix.md` 277 → 329 (+52), baton refreshed
+
+The BugFix baton's newest reference was **BF-88** while the role had filed through **BF-133** — and
+its own ID line still read *"Current: BF-88 filed, next is BF-89"*, beside a warning that the line
+"was four sessions stale before it was noticed". It had gone stale a second time, so the line now
+carries its own count of that.
+
+Refreshed rather than rewritten in full: this is not a handover, the session continues, and the
+standing-facts / traps / method-notes sections were re-read and are still true. What was added is one
+session-log section in the shape the file already uses — entries filed, what the owner still owes,
+and four practices worth copying. The additions are deliberately things the traps list does **not**
+already hold: the shallow-clone false alarms and the doc-size baseline chore are both already in it,
+so they are not repeated.
+
+The four kept: retract a contradicted finding **in place and visibly**, because a silently deleted
+one gets re-derived from the same screenshot; trace an owner's *"why doesn't it just…"* before
+answering, since it shrank BF-131 from "build a derivation" to "copy a value" and stopped a second
+AMRAP formula being written; look for a hard-deleted record in history before declaring it lost, and
+say plainly when recovery was luck; and measure a feature request before filing it, because *"every
+metric we have"* turned out to include seven fields that are empty in every row.
 The owner then signed off both recommendations the same day (*"make all the changes you recommend"*),
 which added six more lines: TN-27's `Gate: owner` bullet became a dated decision record naming option
 3, TN-29 gained an approval line, and the two deferred options carry a sentence each on the second
