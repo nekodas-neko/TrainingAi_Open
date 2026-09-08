@@ -8851,6 +8851,24 @@ everything, and the delta is the only part of the number that means anything.
 The −17 is unchanged across both, which is the whole reason the number comes from the merged file
 rather than being carried across.
 
+## 2026-09-08 — `docs/implementation-backlog.md` → 18789 (Q-278's surface half shipped)
+
+Up 19, on an entry that got smaller in what it asks for. Q-278's `Keep:` was "consume `availability`
+on the surfaces that already render an em dash"; that shipped, so the Keep is rewritten to the half
+that genuinely remains — the route emits `availability` for readiness, sleep and activity only, while
+daytime stress and resilience are the **two lowest-coverage pillars in the entry's own table** (55%
+and 33%) and still have no reason behind their dashes.
+
+The lane flips **B → A** with it, having gone A → B when the engine half shipped. That is the rule
+working rather than churn: the lane follows the open path, so `next-item.js` offers an entry to
+whichever lane can actually start it. Nineteen lines is what stops the next Lane B session picking
+this up and finding nothing in it to build.
+
+Seven more went onto **LB-52**, from the same session that produced them: #954 is a one-`className`
+diff that took four base re-merges and five CI cycles, every conflict on the doc-size baseline this
+very file governs. That entry is where the decision gets made, and a cost that does not scale with
+the size of the change is the argument it needs.
+
 ## 2026-09-08 — `docs/agents/state/implementation-lane-b.md` → 156 (the twenty-third run's rewrite)
 
 Down 36, and the number is the least of it. The baton was dated **2026-09-03** and still said `main`
