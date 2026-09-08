@@ -86,19 +86,18 @@ function openingTags(src) {
  * fix. Shrink-only, per file: a new one fails, and clearing one without lowering the number here
  * also fails, so the list cannot quietly stop shrinking.
  */
-const BASELINE = {
-  'app/admin/admin-content.tsx': 1,
-  'app/profile/[userId]/page.tsx': 1,
-  'components/admin/activity-type-manager.tsx': 1,
-  'components/admin/exercise-manager.tsx': 1,
-  'components/config-screen.tsx': 6,
-  'components/config/phase-editor.tsx': 1,
-  'components/config/program-editor-sheet.tsx': 1,
-  'components/config/style-editor-sheet.tsx': 1,
-  'components/more/feedback-sheet.tsx': 1,
-  'components/more/manage-friends-sheet.tsx': 3,
-  'components/workout/added-weight-toggle.tsx': 1,
-};
+/**
+ * **Empty, and that is the point** — LA-62 cleared all eighteen on 2026-09-08.
+ *
+ * A file listed here must not exceed its number and a file absent must have zero, so with nothing
+ * listed every icon-only control in the app needs a name. The check also fails on a stale-HIGH
+ * number, which is what stops a cleared file leaving slack behind for the next one to grow into.
+ *
+ * Do not re-add a row to get a build green. The eighteen were `Pencil`, `Trash2`, `X`, `Check`,
+ * `ArrowLeft`, `UserMinus` and `ChevronUpIcon` — every one an obvious name, no design decision in
+ * any of them. A nineteenth will be the same.
+ */
+const BASELINE = {};
 
 const offenders = [];
 for (const file of ROOTS.flatMap(r => (fs.existsSync(r) ? walk(r) : []))) {

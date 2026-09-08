@@ -135,6 +135,7 @@ export function FeedbackSheet({ open, onOpenChange }: Props) {
                 <img src={screenshot} alt="Screenshot" className="rounded-xl max-h-40 object-contain border border-border" />
                 <button
                   type="button"
+                  aria-label="Remove screenshot"
                   onClick={() => setScreenshot(null)}
                   className="tap-dense tap-target-44 absolute -top-2 -right-2 rounded-full bg-destructive text-destructive-foreground w-5 h-5 flex items-center justify-center"
                 >

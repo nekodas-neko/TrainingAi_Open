@@ -1092,37 +1092,6 @@ with no signal.
   lists is the safe failure and must stay the failure mode until the value is validated at write time.
 - **Not urgent.** One malformed entry in 322, now corrected.
 
-### [app-shell] LA-62 — eighteen icon-only buttons announce as "button" and nothing else
-
-- **Lane:** B — `components/**` and two `app/**` pages; the list is in
-  `scripts/check-icon-button-names.js`'s `BASELINE`.
-- **Added:** 2026-09-06, surfaced by PS-34 widening the guard that was supposed to be catching them.
-- **Needs:** nothing — the guard is on `main` and frozen shrink-only.
-
-An icon-only control with no accessible name is announced by a screen reader as "button", with
-nothing to say what it does. Q-162 found six in 2026-08 and the rule was written to stop the class
-recurring. It did not: its opening-tag regex ended at the `>` of `=>`, so every button with an
-inline-arrow handler — which is most of them — was skipped without a word, and the rule reported
-clean over code it had never parsed.
-
-| file | count |
-|---|---|
-| `components/config-screen.tsx` | 6 |
-| `components/more/manage-friends-sheet.tsx` | 3 |
-| `app/admin/admin-content.tsx` · `app/profile/[userId]/page.tsx` | 1 each |
-| `components/admin/activity-type-manager.tsx` · `components/admin/exercise-manager.tsx` | 1 each |
-| `components/config/phase-editor.tsx` · `program-editor-sheet.tsx` · `style-editor-sheet.tsx` | 1 each |
-| `components/more/feedback-sheet.tsx` · `components/workout/added-weight-toggle.tsx` | 1 each |
-
-The icons are `Pencil`, `Trash2`, `X`, `Check`, `ArrowLeft`, `UserMinus`, `ChevronUpIcon` — every
-one of which has an obvious name, so this is `aria-label="Edit"` / `"Delete"` / `"Close"` and no
-design decision. Clearing a file means lowering its number in the baseline in the same PR; the check
-fails on a stale-high number, so the list cannot quietly stop shrinking.
-
-**Do not "fix" it by making the scan narrower again.** The baseline pins the scanner's reach as well
-as the debt: breaking the brace-aware walk makes files read as zero against a non-zero number, and
-the check fails for that too — verified by mutation.
-
 ### [app-shell] PS-35 — five zero-content pages, a wrong PWA start_url, and boot-time paper cuts
 
 - **Lane:** B — `app/{workout-select,session-select,stats,config,profile}/page.tsx`,

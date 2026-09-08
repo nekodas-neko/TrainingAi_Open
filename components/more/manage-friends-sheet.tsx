@@ -112,10 +112,10 @@ export function ManageFriendsSheet({ open, onOpenChange, friendships, onRefresh 
                       <p className="text-xs text-muted-foreground font-mono">{f.otherUser.friendCode}</p>
                     </div>
                     <div className="flex gap-1">
-                      <Button size="sm" variant="default" onClick={() => handleAccept(f.id)}>
+                      <Button size="sm" variant="default" aria-label={`Accept ${f.otherUser.displayName ?? f.otherUser.name ?? 'friend request'}`} onClick={() => handleAccept(f.id)}>
                         <Check className="w-3 h-3" />
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={() => handleDecline(f.id)}>
+                      <Button size="sm" variant="ghost" aria-label={`Decline ${f.otherUser.displayName ?? f.otherUser.name ?? 'friend request'}`} onClick={() => handleDecline(f.id)}>
                         <X className="w-3 h-3" />
                       </Button>
                     </div>
@@ -146,7 +146,7 @@ export function ManageFriendsSheet({ open, onOpenChange, friendships, onRefresh 
                       <p className="text-sm font-semibold truncate">{f.otherUser.displayName ?? f.otherUser.name ?? 'Unknown'}</p>
                       <p className="text-xs text-muted-foreground font-mono">{f.otherUser.friendCode}</p>
                     </div>
-                    <Button size="sm" variant="ghost" onClick={() => handleRemove(f.id)}>
+                    <Button size="sm" variant="ghost" aria-label={`Remove ${f.otherUser.displayName ?? f.otherUser.name ?? 'friend'}`} onClick={() => handleRemove(f.id)}>
                       <UserMinus className="w-4 h-4 text-muted-foreground" />
                     </Button>
                   </div>

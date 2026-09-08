@@ -583,6 +583,7 @@ export default function ExerciseManager() {
                     </button>
                     {/* Edit */}
                     <button
+                      aria-label={`Edit ${ex.name}`}
                       onClick={() => { setEditingId(ex.id); setAdding(false); }}
                       className="text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-muted"
                     >

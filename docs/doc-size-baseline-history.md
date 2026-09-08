@@ -8739,3 +8739,20 @@ than one: measurements on LB-52 (four base re-merges on one PR, every conflict t
 file, and its required-checks list wrong about E2E) and on LB-56 (an E2E job that ate itself at 23
 minutes and did not reproduce). Evidence attached to the entry that will act on it, rather than a
 new entry nobody owns.
+
+## 2026-09-08 — `docs/implementation-backlog.md` → 18679 (LA-62 shipped)
+
+Down 31 with nothing added back. LA-62 needed a long entry because it had to explain how a rule
+written to prevent the class had been reporting clean over code it never parsed; the fix is eighteen
+`aria-label`s and an empty baseline, and an empty baseline needs no entry to describe it — a file
+absent from the list must have zero, which is the whole rule.
+
+## 2026-09-08 — compaction sweep, `docs/overview/entries/` 321 → 294
+
+Folded 28 unlinked entries into `docs/overview/history-2026-09-08.md`. The directory hit its 320
+total ceiling two days after the 2026-09-06 sweep took it to 274, which is the cadence to expect
+when six sessions are filing entries, not a surprise.
+
+Folded only entries dated 2026-09-07 and earlier. Three of the 31 unlinked were written the same
+night — unlinked because they are reconciliations and guards with nothing owed, so they earned no
+`projectOverview.md` row — and a recent-window that folds tonight's work is not a recent window.
