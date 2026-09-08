@@ -899,6 +899,7 @@ export function ProgramEditorSheet({
                                     </div>
                                   </div>
                                   <button
+                                    aria-label={`Remove ${ex.name || "exercise"}`}
                                     onClick={() => removeExercise(si, ei)}
                                     className="mt-1 rounded-lg p-2 text-muted-foreground hover:text-destructive transition"
                                   >

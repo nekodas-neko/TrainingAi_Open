@@ -574,15 +574,29 @@ OR-102a/b will read dose history to recommend the next dose. A tracker that read
   not needed"*.
 - **Needs:** nothing to investigate — the measurement is below. What it needs is a decision.
 
-- **A sighting worth having on file when this is decided (2026-09-08).** On #941 the E2E job
-  failed at the 23-minute mark: `e2e/preferences-survive-reinstall.spec.ts` died with
-  `page.goto: net::ERR_ABORTED at http://localhost:3100/`, two more specs went flaky with
+- **⚠️ The long run eats itself, and it has now been seen twice with the same signature
+  (2026-09-08).** On #941 the E2E job failed at the 23-minute mark: `preferences-survive-reinstall`
+  died with `page.goto: net::ERR_ABORTED at http://localhost:3100/`, two more specs went flaky with
   `browser.newContext: Target page, context or browser has been closed`, and the other 158 passed.
-  It is the server or the browser dying near the end of a long run, not an assertion. **It did not
-  reproduce**: the very next PR (#943), on a tree containing #941, was green including E2E — so this
-  is one unreproduced sighting, not a flake and not attributable to the collection route #941 added.
-  Recorded because a 27-minute job that occasionally eats itself is an argument about the job, which
-  is what this entry is for.
+  That was recorded as one unreproduced sighting, because the next PR (#943), on a tree containing
+  #941, was green. **#949 reproduced it exactly** — same spec, same `net::ERR_ABORTED`, on a branch
+  whose entire diff is `aria-label` attributes and documentation.
+  - **What the second sighting adds is the shape.** Four specs failed inside one 70-second window
+    (02:04:02–02:05:16) and no other minute of a 23-minute run had a failure in it:
+    `one-calorie-budget:165`, `back-dismiss-sweep:171` and `card-429-error-state:16` all reported
+    `browser.newContext: Target page, context or browser has been closed`, which is the browser
+    process being *already gone* before the test starts. Those three recovered on retry. The one
+    that did not is the one whose retry fired immediately, landing inside the same dead window —
+    so which spec is reported as the hard failure is a scheduling accident, not a property of the
+    spec.
+  - **It is not a spec to fix, and diagnosing it as one has now cost time twice.** No assertion
+    failed; a process died. It is worth noting that `preferences-survive-reinstall:36` is also one
+    of the two specs the 2026-09-04 shard experiment could not clear with a fresh database — but
+    that failure was an assertion and this one is not, so they should not be merged into one
+    hypothesis.
+  - Recorded because a 26-minute job that eats its own browser roughly one run in three is an
+    argument about the job, which is what this entry is for. It also means **a red E2E cannot be
+    read as a signal without opening the log**, which is the cost LB-54 is about.
 
 **Measured, not estimated.** A full local run against a CI-shaped database: **144 tests, 27.1 minutes
 of test time.** There is no single pathology — 28 tests finish under 5s and 16 take over 20s. The
@@ -1091,37 +1105,6 @@ with no signal.
   letting `undefined` through hid **96 of 203** entries from both lanes at once. Printing in both
   lists is the safe failure and must stay the failure mode until the value is validated at write time.
 - **Not urgent.** One malformed entry in 322, now corrected.
-
-### [app-shell] LA-62 — eighteen icon-only buttons announce as "button" and nothing else
-
-- **Lane:** B — `components/**` and two `app/**` pages; the list is in
-  `scripts/check-icon-button-names.js`'s `BASELINE`.
-- **Added:** 2026-09-06, surfaced by PS-34 widening the guard that was supposed to be catching them.
-- **Needs:** nothing — the guard is on `main` and frozen shrink-only.
-
-An icon-only control with no accessible name is announced by a screen reader as "button", with
-nothing to say what it does. Q-162 found six in 2026-08 and the rule was written to stop the class
-recurring. It did not: its opening-tag regex ended at the `>` of `=>`, so every button with an
-inline-arrow handler — which is most of them — was skipped without a word, and the rule reported
-clean over code it had never parsed.
-
-| file | count |
-|---|---|
-| `components/config-screen.tsx` | 6 |
-| `components/more/manage-friends-sheet.tsx` | 3 |
-| `app/admin/admin-content.tsx` · `app/profile/[userId]/page.tsx` | 1 each |
-| `components/admin/activity-type-manager.tsx` · `components/admin/exercise-manager.tsx` | 1 each |
-| `components/config/phase-editor.tsx` · `program-editor-sheet.tsx` · `style-editor-sheet.tsx` | 1 each |
-| `components/more/feedback-sheet.tsx` · `components/workout/added-weight-toggle.tsx` | 1 each |
-
-The icons are `Pencil`, `Trash2`, `X`, `Check`, `ArrowLeft`, `UserMinus`, `ChevronUpIcon` — every
-one of which has an obvious name, so this is `aria-label="Edit"` / `"Delete"` / `"Close"` and no
-design decision. Clearing a file means lowering its number in the baseline in the same PR; the check
-fails on a stale-high number, so the list cannot quietly stop shrinking.
-
-**Do not "fix" it by making the scan narrower again.** The baseline pins the scanner's reach as well
-as the debt: breaking the brace-aware walk makes files read as zero against a non-zero number, and
-the check fails for that too — verified by mutation.
 
 ### [app-shell] PS-35 — five zero-content pages, a wrong PWA start_url, and boot-time paper cuts
 

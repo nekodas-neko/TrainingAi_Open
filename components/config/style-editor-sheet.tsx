@@ -116,6 +116,7 @@ export function StyleEditorSheet({
                   </button>
                   {styleSets.length > 1 && (
                     <button
+                      aria-label={`Remove set ${i + 1}`}
                       onClick={() => onRemoveSet(i)}
                       className="rounded-lg p-1.5 text-muted-foreground hover:text-destructive transition"
                     >

@@ -727,13 +727,13 @@ export default function ConfigScreen({ userId, openNewProgram }: { userId?: stri
                                 </button>
                               )}
                               <button
-                                onClick={() => openEditProgram(program)}
+                                aria-label={`Edit ${program.name}`} onClick={() => openEditProgram(program)}
                                 className="rounded-lg p-2 text-muted-foreground hover:bg-background transition"
                               >
                                 <Pencil className="h-4 w-4" />
                               </button>
                               <button
-                                onClick={() => deleteProgramById(program)}
+                                aria-label={`Delete ${program.name}`} onClick={() => deleteProgramById(program)}
                                 disabled={deleting === `program:${program.id}`}
                                 className="rounded-lg p-2 text-muted-foreground hover:text-destructive hover:bg-background transition disabled:opacity-40"
                               >
@@ -817,8 +817,8 @@ export default function ConfigScreen({ userId, openNewProgram }: { userId?: stri
                                         </div>
                                       </div>
                                       <div className="flex gap-1 ml-3 flex-none">
-                                        <button onClick={() => openEditStyle(style)} className="rounded-lg p-2 text-muted-foreground hover:bg-background transition"><Pencil className="h-4 w-4" /></button>
-                                        <button onClick={() => deleteStyle(style)} disabled={deleting === `style:${style.id}`} className="rounded-lg p-2 text-muted-foreground hover:text-destructive hover:bg-background transition disabled:opacity-40"><Trash2 className="h-4 w-4" /></button>
+                                        <button aria-label={`Edit ${style.name}`} onClick={() => openEditStyle(style)} className="rounded-lg p-2 text-muted-foreground hover:bg-background transition"><Pencil className="h-4 w-4" /></button>
+                                        <button aria-label={`Delete ${style.name}`} onClick={() => deleteStyle(style)} disabled={deleting === `style:${style.id}`} className="rounded-lg p-2 text-muted-foreground hover:text-destructive hover:bg-background transition disabled:opacity-40"><Trash2 className="h-4 w-4" /></button>
                                       </div>
                                     </div>
                                   ))}
@@ -861,8 +861,8 @@ export default function ConfigScreen({ userId, openNewProgram }: { userId?: stri
                                             <button onClick={() => clonePhaseSet(ps)} className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-background transition">Clone</button>
                                           ) : (
                                             <>
-                                              <button onClick={() => openPhaseSetEditor(ps)} className="rounded-lg p-2 text-muted-foreground hover:bg-background transition"><Pencil className="h-4 w-4" /></button>
-                                              <button onClick={() => deletePhaseSetById(ps)} disabled={deleting === `phaseset:${ps.id}`} className="rounded-lg p-2 text-muted-foreground hover:text-destructive hover:bg-background transition disabled:opacity-40"><Trash2 className="h-4 w-4" /></button>
+                                              <button aria-label={`Edit ${ps.name}`} onClick={() => openPhaseSetEditor(ps)} className="rounded-lg p-2 text-muted-foreground hover:bg-background transition"><Pencil className="h-4 w-4" /></button>
+                                              <button aria-label={`Delete ${ps.name}`} onClick={() => deletePhaseSetById(ps)} disabled={deleting === `phaseset:${ps.id}`} className="rounded-lg p-2 text-muted-foreground hover:text-destructive hover:bg-background transition disabled:opacity-40"><Trash2 className="h-4 w-4" /></button>
                                             </>
                                           )}
                                         </div>
