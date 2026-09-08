@@ -9050,3 +9050,21 @@ the argument for the checklist, so it belongs beside it rather than in a journal
 ## 2026-09-08 — `docs/overview/entries/` total ceiling → 330 (LA-80, tenth PR running)
 
 329 → 330. Tenth consecutive raise, one per PR, as LA-80 describes.
+
+## 2026-09-09 — `docs/implementation-backlog.md` 18977 → 19060 (+83), TN-27 and TN-28
+
+The owner reported the Nutrition tab's Calorie Nudge claiming a measured maintenance of 2,245 kcal
+against a measured RMR of 1,325 and a scale that has barely moved. It reproduces exactly, and the
+arithmetic is correct — the estimator picked the wrong window.
+
+Most of the 83 lines are the two tables that carry the finding, and neither compresses. The first
+shows the 28-day and 14-day windows side by side with an **identical mean intake of 1,612 kcal**,
+which is what proves `MIN_LOGGED_FRACTION` cannot distinguish them: it gates the mean, the mean is
+the same, and the entire 591 kcal spread is the weight slope, which nothing gates at all. The second
+is the window sweep — 2,414 at ten days down to 1,654 at twenty-eight — because a 760 kcal range
+produced by nothing but window length is the evidence that the slope is noise-dominated, and a
+sentence asserting it would not be.
+
+TN-28 is short and rides along: the nudge card writes the number into the calorie goal on one tap
+while omitting the `low confidence, 10 of 14 days logged` qualifier that both its sibling cards
+already render from the same payload.

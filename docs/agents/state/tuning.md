@@ -3,7 +3,7 @@
 > **Successor sessions are titled `🎶 Tuning Agent 🟢`** — exactly, both emoji. Leading emoji = role,
 > trailing = this session's status, set by the session itself. See `docs/agents/README.md` §4.
 
-**Updated:** 2026-08-26 · **By:** `session_01VVfZtbCftbwaUHtBLJoxVr` · **Next ID:** `TN-24`.
+**Updated:** 2026-09-09 · **By:** `session_01VVfZtbCftbwaUHtBLJoxVr` · **Next ID:** `TN-29`.
 Find next free: `grep -rhoE '\bTN-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. Legacy `Q-` numbers
 stay valid. **Rewritten in full, never appended** — narrative lives in the linked reviews.
 

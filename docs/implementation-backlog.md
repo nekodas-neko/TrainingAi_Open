@@ -399,6 +399,89 @@ below threshold and left in place for next time.
 
 
 
+### [nutrition] TN-27 — the maintenance estimator rejects its reliable window and falls back to its noisiest one, and the owner is shown 2,245 kcal instead of ~1,700
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-09 · owner: *"this is the maint calories derived from the app — i don't think it's right. with RMR at 1350 and calories well under that and barely maintaining weight."*
+- **Lane: A** — `packages/shared/src/nutrition/adaptive-tdee.ts` (`MIN_LOGGED_FRACTION`, `resolveMaintenance`), consumed by `lib/health/energy-balance-service.ts:260`.
+- **Gate: owner** — this changes the number the app recommends eating, and the three options below trade differently. Tuning proposes; it does not ship a scoring change.
+- **Reference:** [`review`](reviews/2026-09-09-maintenance-2245-is-too-high.md).
+
+**The arithmetic is right and the window is wrong.** `1,612 − (−0.0822 × 7700) = 2,245`, matching
+the screenshot to the kcal. What produced it is window selection:
+
+| | 28-day window | 14-day window (shipped) |
+|---|---|---|
+| complete-logged days | 10 | 10 |
+| **mean intake** | **1,612** | **1,612** |
+| coverage vs `MIN_LOGGED_FRACTION` 0.7 | 36% — **rejected** | 71% — **accepted** |
+| weigh-ins / span | 27 over 27 days | 14 over 13 days |
+| weight slope | −0.038 kg/wk | −0.575 kg/wk |
+| **maintenance** | **1,654** | **2,245** |
+
+**The mean intake is identical in both**, so the gate that exists to protect the mean cannot
+distinguish them — and **the whole 591 kcal spread is the weight slope**, which nothing gates.
+
+**The gate is self-defeating for this shape of data.** Complete-logging began 2026-08-26, so the
+numerator is fixed at ten and coverage falls purely as the window grows. `resolveMaintenance`'s own
+comment tries the long window first *"for more noise cancellation"*; the gate makes the long window
+**harder** to pass, and the fallback lands on the window this module's own header calls *"dominated
+by water-weight swings"*. It steers hardest toward noise exactly when logging is sparsest.
+
+The window sweep is the proof — mean intake is 1,612 in every column from 14 days out:
+
+| window | 10d | 14d | 18d | 22d | 26d | 28d |
+|---|---|---|---|---|---|---|
+| maintenance | 2,414 | **2,245** | 1,909 | 1,774 | 1,651 | **1,654** |
+
+**Three independent readings put the truth near 1,700–1,800:** the 28-day window (**1,654**), the
+30-day scale trend against the same intake (**~1,693**), and measured RMR **1,325** × 1.2 sedentary
+(**~1,590**) plus ~3,300 steps/day of movement. **2,245 would need ~650 kcal/day above resting**,
+which this owner's step and training record does not contain. **So the card reads ~450–550 high.**
+
+**Three options — owner's choice:**
+1. **Prefer the window with the tighter slope, not the higher coverage.** Both windows share their
+   mean here; slope standard error separates them and already falls out of the fit.
+2. **Measure coverage over days that could have been logged**, not over the whole window — ten of
+   ten since complete-logging began is a different fact from ten of twenty-eight.
+3. **Stop falling back from a rejected long window to a short one** — report `logging_too_sparse`
+   and hold the formula baseline. Cheapest of the three, and it alone would have put this owner
+   within ~150 kcal instead of 550 out.
+
+**⛔ Do not widen the mean by counting part-logged days.** Every day with any food logged gives
+**1,495** at 28 days and **1,954** at 14 — worse both ways, and the exact failure Q-387 documented.
+The completion flag is working; the window selection is not.
+
+**⚠ How many other days this moves:** maintenance is recomputed per request from a trailing window,
+never stored, so no history is re-scored — the change moves today's number and every future one.
+The one written artefact is `nutrition_targets.calories`, currently **1,660** (set 2026-08-31), which
+this card offers to overwrite with 2,045.
+
+**Pass test:** with the owner's current data the calibrated maintenance lands between 1,600 and
+1,850, and lengthening the window by a fortnight moves it by less than 100 kcal.
+
+### [nutrition] TN-28 — the one card that can act on the maintenance estimate is the one that hides how good it is
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-09 · found while answering TN-27.
+- **Lane: B** — `components/nutrition/tdee-adaptation-card.tsx:118-124`.
+- **Sibling of TN-27** — TN-27 makes the number better; this makes its uncertainty visible. Fix either order.
+- **Reference:** [`review`](reviews/2026-09-09-maintenance-2245-is-too-high.md) §5.
+
+`TdeeAdaptationCard` renders the maintenance figure and a one-tap **Use 2,045** that writes straight
+into the calorie goal through `PUT /api/nutrition/targets`. The estimate behind the owner's
+screenshot carries `confidence: 'low'` (coverage 0.714, under the 0.85 medium threshold) and a 95%
+interval of **[1,990 – 2,500] kcal** — a 510 kcal band presented as one number with a button under it.
+
+**Its two siblings already print it.** `energy-card.tsx:260` and `calorie-balance-bar.tsx:100` both
+render *"(low confidence, 10 of 14 days logged)"* beside the same value, from the same payload
+(`maintenance.confidence`, `daysLogged`, `daysInWindow` are already on the wire). Only the card that
+can change the user's calorie goal omits it.
+
+**Do not gate the action on confidence** — that is TN-27's job and a different trade. Show the
+qualifier the siblings show, on the surface where it costs something to be wrong.
+
+**Pass test:** the nudge card names its confidence and day count in the same sentence as the
+maintenance figure, matching the wording already on the energy card.
+
 ### [platform] LA-80 — the journal's entry ceiling is now binding, and a sweep alone cannot clear it
 
 - **Lane:** O — `docs/overview/entries/`, plus the durable docs that cite it.
