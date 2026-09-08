@@ -91,7 +91,7 @@ beforeEach(() => {
                    replaceUserDietaryRestrictions, rateLimit]) m.mockClear()
   rateLimit.mockReturnValue(true)
   getDayCheckin.mockResolvedValue(null)
-  saveDayCheckin.mockImplementation(async (_u: unknown, c: Row) => ({ ...c }))
+  saveDayCheckin.mockImplementation(async (...args: unknown[]) => ({ ...(args[1] as Row) }))
   savePlanMealAnswer.mockResolvedValue({ id: ANSWER_ID })
   deletePlanMealAnswer.mockResolvedValue(true)
   sessionUser = { id: 'u-1' }
