@@ -507,61 +507,24 @@ OR-102a/b will read dose history to recommend the next dose. A tracker that read
 - **Reversal cost:** low. No migration; existing rows keep whatever they were stamped with, which is
   the point of the stamp.
 
-### [app-shell] BF-122b — the cat collection, surface half: the sprites, the home widget, and where you read about it
+### [app-shell] BF-126 — the cat collection's drawn art, once the mechanic has been lived with
 
-- **Lane:** B — `components/home/**`, `lib/home/home-prefs.ts`, `components/more/**` and the art.
-- **Added:** 2026-09-06 · owner, same conversation as **BF-122a** — *"ideally it's a small widget card
-  on the home screen, so I don't know if it can be too big"* and *"rather than a humanoid character
-  could we have a cat variant? cat tank, cat slime etc"*.
-- **Needs:** LB-60
-- **⚠ BF-122a shipped the fold and no way to feed it — checked 2026-09-07 before starting this.**
-  `replayCollection` has **no caller**, and nothing the client can reach assembles a `ReplayInput`:
-  `/api/streak-data` gives workout days only, over a window; there is no steps or sleep day series
-  (`health-trends` serves analysis views, not days); and neither the schedule that
-  `maxCompliantRestGap` reads nor the app's own recommended rest/deload days — `pausedDays`, without
-  which compliance decays and the mechanic turns against the user — is on the client at all. **Not
-  even a workout-only version is buildable from here.** That is LB-60, and it is Lane A's.
-
-**The art brief, sized so it can actually get drawn.** Four classes × several tiers is forty sprites
-if each is unique, and forty sprites is how this never ships. **One cat silhouette, tiers signalled by
-props and scale** — a slime blob, then a shield, then a bow, then a staff — is roughly **twelve**
-assets and stays legible at widget size, which is the binding constraint. Whatever the count, the
-sprites need to read at ~32 px on the S25 before anything else is drawn.
-
-**The widget is a tenth `CardWidgetKey`.** `lib/home/home-prefs.ts:5` holds the union, the Home
-screen gates each card on `activeCardWidgets.includes(...)`, and `components/more/home-widgets-section.tsx`
-is where it gets toggled on — an existing, opt-in, reorderable slot, which is the right shape for a
-feature not everyone wants. Note `DEFAULT_CARD_WIDGETS` is empty, so it ships off by default and that
-is correct.
-
-**One line of content, chosen by the app, not by a tab bar.** Three ladders do not fit a card that
-has to sit under the nutrition donut. Show **the ladder nearest its next merge** and let it rotate
-itself — `🛡️ Tank ●●●●○ — one more workout`. It answers "what do I do today" in one glance, which a
-three-column collection grid does not, and it needs no interaction to be useful. Tap navigates to the
-full collection, matching every other card's navigate-on-tap behaviour.
-
-**The information surface is the fourth deliverable and the one most likely to get dropped.** A decay
-that is never explained reads as a bug — the owner will lose a Tank and there will be nothing in the
-app that says why, or that the workouts underneath it survived. The collection screen states, in
-plain words: what each faucet spawns, how many merge, how long the gap can be **and that the gap
-comes from their own schedule**, and that big items break down rather than vanish.
-
-**What already exists and should not be rebuilt:** XP, levels and `getLevelLabel`
-(`lib/achievements.ts`), ~48 achievement definitions, `users.equippedTitle`, `users.friendCode`, the
-friends feed and leaderboard, and `components/profile/level-sheet.tsx`. The collection is a *new
-display* over faucets those already count — completing a ladder is a natural `equippedTitle`, not a
-new reward currency.
-
-- **Parked, deliberately, as phase two:** the owner asked what a finished team is *for* and then
-  answered it himself — *"maybe it would be better to just have it be a collection game"*. A weekly
-  encounter auto-resolved from the real week (a narrative wrapper on the weekly summary, not a combat
-  engine, no input, no numbers to balance) is the cheapest version of "for", and it is not in scope
-  here. Do not build a battle system.
-- **Reversal cost:** low — one opt-in widget key and one screen. The art is the only unrecoverable
-  spend, which is the argument for the twelve-asset brief over the forty.
-- **When it ships it needs a device look** — sprite legibility at widget size, and whether the card
-  pushes the fold on the S25 with several widgets enabled. That is a check on the built thing, so it
-  is not a field on this entry.
+- **Lane:** B — `components/home/collection-sprites.ts` and whatever it points at.
+- **Added:** 2026-09-07 · Lane B, deferred out of BF-122b rather than dropped.
+- **Gate:** owner
+- **BF-122b shipped every code deliverable and glyphs in place of sprites.** The widget, the
+  collection screen and the information surface are live; `collection-sprites.ts` maps tier → emoji
+  and is the only file that would change. That was deliberate: the entry called the art *"the only
+  unrecoverable spend"*, and spending it before the owner has seen the mechanic working is the
+  wrong order.
+- **What the owner decides:** whether the drawn set is worth it at all now the glyphs are running,
+  and if so whether the brief is still one cat silhouette with props by tier (~12 assets) or
+  something smaller. Nine glyphs cover the three ladders today, since the bottom rung is shared.
+- **The binding constraint has not changed:** they have to read at **~32 px** on the S25. That is
+  what an emoji is designed for and a detailed sprite is not, so a drawn set is a real risk of
+  looking worse, not just costing more. Check the glyphs on device first — that check is owed by
+  BF-122b anyway.
+- **Reversal cost:** none while it is glyphs. Once assets exist, reverting means deleting them.
 
 ### [workouts] LA-65 — the transition constant is charged once too often at a value that is too low, and the two errors cancel at five exercises
 

@@ -2,9 +2,15 @@ import { Scale, Footprints, Flame, Route, Beef, Wheat, Droplets, type LucideIcon
 import type { CardSectionKey } from "@/components/home/home-card-widget";
 
 export type MetaKey = "weightKg" | "steps" | "calories" | "protein" | "carb" | "fat" | "distanceKm" | "waterIntake";
+/**
+ * The Home card slots. **This is the only declaration** — `home-card-widget.tsx` and
+ * `home-widgets-section.tsx` used to carry their own copies of the union, so adding a slot meant
+ * editing three lists and a missed one failed silently as a card that could never be switched on.
+ */
 export type CardWidgetKey =
   | "weightSparkline" | "nutritionDonut" | "sleepWidget" | "stepsWidget" | "moodWidget"
-  | "acwrWidget" | "muscleStatusWidget" | "hrChartWidget" | "energyBalanceWidget";
+  | "acwrWidget" | "muscleStatusWidget" | "hrChartWidget" | "energyBalanceWidget"
+  | "collectionWidget";
 
 export interface WidgetDef {
   key: MetaKey;

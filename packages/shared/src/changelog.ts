@@ -6,6 +6,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.437.0",
+    date: "2026-09-07",
+    changes: [
+      "A cat collection. Every day you train gives you a cat, and so does every day with steps and every night you sleep. Five turn into a bigger one, four of those into a bigger one again \u2014 three separate rows, one per habit.",
+      "Leave it too long between days and a row loses its smallest cat, one at a time, and a big one breaks back down rather than disappearing. Rest days you chose, and deloads the app asked you to take, do not count against you at all \u2014 how long a gap can be comes from your own schedule.",
+      "There is a Collection card for the home screen, off until you switch it on in More \u2192 Home Widgets. It shows whichever row is closest to its next cat and how many more days that takes. Tapping it opens the full collection, which explains all of the above in plain words.",
+      "The cats are emoji for now rather than drawn characters, so the drawing can wait until the collection has been used for a while.",
+    ],
+  },
+  {
     version: "1.436.41",
     date: "2026-09-07",
     changes: [

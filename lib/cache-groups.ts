@@ -27,6 +27,9 @@ export async function invalidateWorkoutSummaries(): Promise<void> {
     invalidateCache('progress-summary'),
     // streak count and calendar dots both change after a workout is logged
     invalidateCache('streak-data'),
+    // a trained day is a faucet day for the collection's workout ladder, and it also ends whatever
+    // gap was decaying it (BF-122b)
+    invalidateCache('collection'),
     // a lifting session's HR feeds the same whole-day zone series as any cardio activity
     invalidateCache('cardio-week'),
     invalidateCache('calendar-data:'),
@@ -139,6 +142,9 @@ export async function invalidateProgramStructure(): Promise<void> {
     // per-session prescription seed and the AI overview must drop too — otherwise the
     // screen re-paints the pre-edit prescription from cache before the refetch lands.
     invalidateCache('ai-periodization-session:'),
+    // the collection's allowed rest gap comes from `maxCompliantRestGap` over the ACTIVE schedule,
+    // so editing the program changes how fast it decays (BF-122b)
+    invalidateCache('collection'),
     invalidateAiPeriodization(),
   ])
   clearLegacyHomeSeeds()
@@ -190,6 +196,9 @@ export async function invalidateOuraSync(): Promise<void> {
     invalidateCache('sleep-sessions'),
     invalidateCache('readiness-score'),
     invalidateCache('oura-stats'),
+    // a synced night is a faucet day for the collection's sleep ladder, and a synced step day for
+    // its steps one (BF-122b)
+    invalidateCache('collection'),
     // A BLE sync drains new keepalive battery polls, so the latest-battery read is stale after
     // one. Read by both Ring Status cards (More/Profile and Health) on this single shared key.
     invalidateCache('oura-ble-battery-latest'),
@@ -313,6 +322,8 @@ export async function invalidateBodyMetricWrite(): Promise<void> {
     // invalidateActivityWrites — without this the Profile achievements card stays stale
     // for a full TTL after a weight/step entry.
     invalidateCache('achievements:'),
+    // a recorded step day is a faucet day for the collection's steps ladder (BF-122b)
+    invalidateCache('collection'),
   ])
 }
 
@@ -440,6 +451,9 @@ export async function invalidateRestDayChoice(): Promise<void> {
   await Promise.all([
     invalidateCache('next-session'),
     invalidateCache('next-session-prescription'),
+    // a chosen rest day is a PAUSED day for the collection — the whole point of which is that
+    // complying with your own schedule never costs you cats (BF-122b)
+    invalidateCache('collection'),
   ])
   clearLegacyHomeSeeds()
 }

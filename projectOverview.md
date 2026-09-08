@@ -1726,6 +1726,26 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [app-shell] ⚠️ The cat collection has a surface — with emoji standing in for the art, and no device look yet (BF-122b, 2026-09-07, v1.437.0)
+
+BF-122a's fold got a route in LB-60 (#933); this is everything the user sees. A tenth Home card slot
+(**off by default**, switched on in More → Home Widgets) showing the ladder nearest its next merge,
+a `/collection` screen with all three ladders, and the rules in plain words — the last of which the
+entry called the deliverable most likely to be dropped, since a decay nobody explains reads as a bug.
+[Journal](docs/overview/entries/2026-09-07-feat-bf-122b-cat-collection-surface.md).
+
+**What is owed.** The device look the entry names: glyph legibility at ~32 px on the S25, and whether
+the card pushes the fold with several widgets on. Verified only in the 412 dp harness (card renders
+380×135).
+
+**The art is deferred, not done** — `collection-sprites.ts` maps tier → emoji and is the only file a
+drawn set would change. The entry calls the art *"the only unrecoverable spend"*, so it waits until
+the mechanic has been lived with. **BF-126**, `Gate: owner`.
+
+**One limit worth knowing before reading the card:** the decay note is a **lifetime** count. The fold
+carries no recency, so "11 have wandered off" only ever grows; wording it as recent would be a claim
+the engine cannot make.
+
 ### [workouts][app-shell] ⚠️ The review screen can now set an exercise's role — and that control is the one thing not rendered in a harness (BF-124, BF-125, 2026-09-07, v1.436.40)
 
 The three exercise roles are named once, in `components/workout/exercise-role-labels.ts`, as **Main /
