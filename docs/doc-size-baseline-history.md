@@ -9281,6 +9281,7 @@ file and missed here. Nothing had been pushed, so the cost was three lines. The 
 `grep -c '^<<<<<<<' ` on the file, not a reading of the diff, is what found it, because the markers sit
 9,000 lines into a document nobody reads end to end.
 
+<<<<<<< HEAD
 ## 2026-09-09 — `docs/implementation-backlog.md` → 19430, TN-25 amended with a fourth option
 
 The owner asked whether the guided walk is working correctly and whether 30 minutes of continuous
@@ -9362,3 +9363,41 @@ The baton grew by eleven lines and two of them are retractions: addendum 4's "%H
 framing was invented by this agent and is withdrawn, and TN-24's Zone 1 boundary was corrected from
 52–122 to 52–132 (with the cadence extrapolation recomputed to ≈238 spm across both entries). Both are
 recorded against the agent by name — the wrong versions were published before the owner asked.
+=======
+## 2026-09-08 — `docs/implementation-backlog.md` → 19442 (OR-105, the premature-`Verify:` trap)
+
+Fifty lines: a 30-line entry, an 11-line field rule, and prose replacing the two bad `Verify:` fields
+it was written about. The rule is the part that earns its length. A premature `Gate:` was already
+documented with three outbreaks; the same mistake in the newer `Verify:` field is **worse** and the
+rule has to say why, or it reads as a restatement — a wrong gate parks an entry where PARKED invites
+the question, while a wrong `Verify:` prints *"nothing is blocked"* and nobody looks in either place.
+The measured case is what makes it land: the reta tracker's entire surface, 64 lines of unwritten
+spec, filed as shipped for two days in the lane whose READY list held two items.
+
+## 2026-09-08 — `docs/implementation-backlog.md` 19,392 → 19,378 (−14), BF-132 shipped and LB-66 filed
+
+BF-132's 35 lines come out and LB-66's 21 go in, which is what a completed entry with a residue looks
+like: the two fixes that shipped stop being something to read, and the third — a `deleted_at` on
+`program_sessions` and `session_exercises` — moves to an entry of its own rather than staying as a
+`Keep:` line under work that is finished. It is Lane A's, because it is a migration.
+
+The new entry carries forward the one paragraph from BF-132 worth keeping: what made the owner's loss
+recoverable was luck (a BugFix session had quoted the structure two days earlier, and `exercise_logs`
+carry the names), and LB-66 is the entry that would remove the need for it.
+
+## 2026-09-08 — `projectOverview.md` 10,419 → 10,431 (+12), the saved-delete risk (BF-132 → LB-66)
+
+Raised for a Known-Issues row that says the half of BF-132 which did **not** ship. The confirmation
+and the undo are in v1.438.5 and read as a fix; a saved delete is still a hard delete against two
+tables with no `deleted_at`, and nothing on the screen says so once Save is pressed.
+
+The row is not a duplicate of LB-66. The backlog is what an implementer reads; this file is what the
+owner reads before a session, and the owner is the person who lost a session to this. It leaves when
+LB-66 lands, not when the confirmation shipped.
+
+### Reconciled on merge — 19428 (BF-132 branch)
+
+Three PRs landed under this branch while it was being verified, taking the backlog from 19,392 to
+19,442. Recomputed from the merged file rather than spliced: **19,442 − 14 = 19,428**, so the −14
+above (BF-132 out, LB-66 in) is unchanged and is the only part of the number this diff owns.
+>>>>>>> origin/main

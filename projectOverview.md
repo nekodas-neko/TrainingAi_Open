@@ -1726,6 +1726,18 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [workouts][platform] ⚠️ A *saved* session delete is still unrecoverable — no tombstone (BF-132 → LB-66, 2026-09-08, v1.438.5)
+
+The owner lost a session to a one-tap trash icon in the program editor. Deleting now asks first and
+names what goes with it (*"Delete Lower and its 5 exercises?"*), and an Undo sits in the editor until
+you save — but both live in the editor's local state. **Press Save and the rows are hard-deleted**
+from `program_sessions` and `session_exercises`, neither of which has a `deleted_at`, so nothing is
+recoverable and no dialog is left to fire. Queued as **LB-66** (Lane A — it is a migration). What
+made the original loss recoverable was luck: the structure had been quoted in a session two days
+earlier, and `exercise_logs` carry the exercise and style names, so the *trained* version could be
+rebuilt. A session deleted before it was ever trained leaves nothing.
+[Journal](docs/overview/entries/2026-09-08-fix-bf-132-confirm-session-delete.md).
+
 ### [app-shell] ⚠️ The cat collection has a surface — with emoji standing in for the art, and no device look yet (BF-122b, 2026-09-07, v1.437.0)
 
 BF-122a's fold got a route in LB-60 (#933); this is everything the user sees. A tenth Home card slot
