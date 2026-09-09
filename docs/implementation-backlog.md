@@ -412,7 +412,8 @@ below threshold and left in place for next time.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · owner: *"we should only have one calculation for our heart rate zones so try make them consistent."*
 - **Lane: A** — `packages/shared/src/health/observed-hr.ts:110` (`resolveMaxHr`), `health/hr-profile.ts:86` (`targetAnchorMax`), `health/body-battery-inputs.ts:51` (`resolveBatteryHrMax`), `health/hr-zones.ts:9` (`hrMaxFromAge`), plus `lib/health/readiness-payload.ts:397`.
-- **Gate: owner** — the choice of anchor changes every zone boundary the app has ever shown, so it is a calibration decision, not a refactor.
+- **✅ OWNER DECISION, 2026-09-09 — blend the two at 50/50 and PIN it: `(168 + 187) / 2 = 177.5 → 178`.** *"Just because my HR got up to 168 doesn't mean it's the MAX… then when the Cooper 12-minute run is done and a new max is gotten, we can assess what's better."* Gate cleared; build to the spec below.
+- **Needs: TN-25** — unifying the anchor at 178 raises the walk's 0.70 target from **133 to 140**, so it must not land before the walk stops using 0.70. Sequencing, not a blocker on the anchor itself.
 - **Reference:** [`review`](reviews/2026-09-08-walk-intensity-calibration.md) §addendum 6.
 
 **The zone MODEL is genuinely single-sourced and that is not the problem.** `ZONE_DEFS`
@@ -458,7 +459,42 @@ over a fixed 28 days, rounded (**52**); `readiness-payload.ts:343` averages its 
 low-wear days excluded, unrounded. Measured: **52.23 over 28 days, 53.39 over 60, 55.75 over 90** —
 about **1.5 bpm** on the Zone-2 floor today. Small now, and it is the same class of defect.
 
-**Recommendation: one anchor, and it should be the corroborated observed max.** `220 − age` is a
+## The decision, and the spec
+
+**⚑ The owner's objection retired this entry's original recommendation, and they were right.** This
+entry first proposed the corroborated observed max (168). That argument treated *"no reading above
+168"* as evidence of a low ceiling — but nothing in the record is a maximal effort, so it was absence
+of evidence. **The data says which way it errs:** on 2026-07-05 the owner ran 25 minutes and held
+**156–168 bpm for the last 13 minutes straight** (16:55–17:08, multiple samples per minute — not a
+spike). Nobody holds their max for 13 minutes; a hard 13-minute effort sits at roughly 92–95% of max,
+so **168 ÷ 0.95 ≈ 177 and 168 ÷ 0.92 ≈ 183.** True max is about **177–183**, and 168 is a floor.
+
+**So the owner's 50/50 blend lands at the bottom of the physiologically-inferred band, and 168 would
+have over-credited every session.**
+
+| max | reserve | Z1 | Z2 | Z3 | Z4 | Z5 | walk 0.70 |
+|---|---|---|---|---|---|---|---|
+| 168 (was recommended) | 116 | 52–121 | 122–132 | 133–144 | 145–155 | 156+ | 133 |
+| **178 — CHOSEN** | **126** | **52–127** | **128–139** | **140–152** | **153–164** | **165+** | **140** |
+| 187 (today's bands) | 135 | 52–132 | 133–145 | 146–159 | 160–173 | 174+ | 146 |
+
+**⛔ PIN IT AS A STORED CONSTANT, NEVER AS A LIVE FORMULA.** A blend recomputed each request drifts
+every time the observed max moves, so the zones shift for reasons unconnected to the owner's fitness —
+that was this entry's stated objection to blending and it is answered by freezing, not by arguing.
+Store **178** with `source: 'blended'` and a note of its two inputs; **replace it wholesale with
+`source: 'measured'` when the Cooper test lands.** One value, one write, trivially swappable.
+
+**⚠ Sequencing, and this is the half that bites.** Unifying at 178 raises the guided walk's `0.70`
+target from **133 to 140** — *harder*, the opposite of what TN-25 is trying to fix. **Land TN-25's
+retarget (a 105–118 bpm band, no 0.70 fraction) first or in the same PR.** After that the walk does
+not use a reserve fraction at all and the unification is harmless.
+
+**Follow-up, owner-agreed:** run the **Cooper 12-Minute Run** already in
+`packages/shared/src/fitness-tests/protocols.ts` (`effortFrac: 0.85`), take the peak, and re-assess
+178 against it. Twelve minutes maximal reaches within a few beats of true max, which retires this
+entry's guesswork permanently.
+
+**The original recommendation, kept for the record and now superseded:** `220 − age` is a
 population formula with a standard deviation around 10–12 bpm, and here it sits **19 bpm above the
 maximum of 107,255 recorded samples** — including a run that peaked at 161. The documented objection
 (a low observed max makes hard efforts read >100%) is real but the smaller cost: a reading above the
@@ -483,7 +519,7 @@ anchor, not by arithmetic coincidence.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · owner: *"these should be 2 different options then… if we are doing jogging it should fall under the Run category in cardio… Run could consist of that interval Jog as a style; whereas the walk is more a walk."*
 - **Lane: B** — `components/cardio/modality-picker.tsx` (the three-way picker), `components/guided-walk/**`, `app/running/**`. **Lane A** for `packages/shared/src/running/hr-targets.ts` if a new run type is added.
-- **Gate: owner** — product structure. The owner has stated the shape; what needs deciding is which existing run type absorbs it.
+- **✅ OWNER DECISION, 2026-09-09 — yes, move it to Run, as an ASSIGNED run type among several.** *"Move into run; and have it be a run type that gets assigned. Interval sprints / Interval Jog / Consistent run / Slow Jog — these + more should be on the cards for variation — also decided scientifically based on my week/day."* Gate cleared.
 - **Reference:** [`review`](reviews/2026-09-08-walk-intensity-calibration.md) addenda 4–6. **Resolves TN-25's owner question** by splitting it rather than answering it.
 
 **The cardio section is already `Run · Guided Walk · Other Activity`, and `RunType` already includes
@@ -502,8 +538,28 @@ gives each half an honest target:
 - **Run → the interval jog.** The fast phase then targets a reachable zone and the pacer's cue
   becomes informative instead of permanently "push".
 
-**⚠ `interval` targets zones 4–5 (160+ bpm here) and the walking protocol's fast phase is ~70% of peak
-— nearer `tempo` (zones 3–4, 146+).** Neither is an exact fit, so the owner's decision is: reuse
+## The mapping — four of the owner's five names already exist
+
+**`RunType` is `recovery | easy | long | interval | tempo`** and six frameworks already sit on top
+(polarized, Norwegian 4×4, zone-2 base, speed/VO₂max, aerobic recovery, density progression). The
+owner's names are mostly a relabelling:
+
+| owner's name | existing type | zones |
+|---|---|---|
+| Slow jog | `recovery` / `easy` | 1 / 1–2 |
+| Consistent run | `easy` / `long` | 1–2 |
+| **Interval jog** | **`tempo`** | 3–4 |
+| Interval sprints | `interval` | 4–5 |
+
+**And "decided scientifically based on my week/day" is `recommendRunType(quota)`, which already
+exists and is already deterministic** — it picks whichever type fills the week's biggest open zone
+gap. **So the work is: expose the existing types under names the owner recognises, route the walking
+interval protocol to `tempo`, and surface the selector.** A sixth bespoke type for the 3-on/3-off
+protocol is deferred — `tempo` covers the intensity and a new type is only worth it once these are
+run regularly.
+
+**⚠ `interval` targets zones 4–5 (153–164 bpm at the pinned 178 anchor) and the walking protocol's
+fast phase is ~70% of peak — nearer `tempo`.** Neither is an exact fit, so the owner's decision is: reuse
 `tempo`, or add a sixth run type for the 3-on/3-off walking-derived protocol. **Do not silently map it
 to `interval`** — that prescribes a materially harder session than the research it comes from.
 
@@ -755,7 +811,8 @@ between a treadmill walk and an outdoor walk without any surface-specific adjust
 - **Branch:** _unassigned_ · **Added:** 2026-09-08 · owner: *"what makes it effective is the 2 speeds — should I be walking faster or slower during any phases?"*
 - **Lane: A** — `components/guided-walk/walk-active.tsx:67-68` sets the targets; `classifyZone` in `hr-zones.ts` renders the verdict.
 - **Reference:** [`review`](reviews/2026-09-08-walk-intensity-calibration.md) (**addendum 4** carries the amendment below). Sibling of **TN-24**; fix together or in either order.
-- **Gate: owner** — the three options below are a product choice, not a calibration.
+- **✅ OWNER DECISION, 2026-09-09 — keep the fast/slow structure, VARY it, and have the app assign it.** *"No jog; but I'd like the fast/slow rates to be varying and assigned to me. I.e. one day could be 5min fast with 1min rest… It could in fact all be slow or all be fast as well — but I'd like that to be determined for me. If we need more zone 2 maybe it's more fast? If we have zone 2 done maybe it's just light interval for steps."* Gate cleared. **Options 1–4 are all superseded: the walk stays a walk, the jog moves to Run (TN-31), and the block pattern becomes prescribed.**
+- **⚠ This entry does NOT wait on TN-30, and the dependency runs the other way.** The band is stated in absolute bpm (**105–118**) precisely so it is independent of the anchor — that is what breaks the coupling. TN-30 carries the `Needs:` because unifying at 178 would raise the walk's `0.70` target to 140 if this entry had not already retired the fraction.
 
 `walk-active.tsx:67-68` sets the pacer from the app's own Karvonen helper: **fast ≥ 0.70 of reserve,
 slow ≤ 0.40**. For this owner that is **fast ≥ 133 bpm, slow ≤ 98**.
@@ -776,6 +833,42 @@ has shown "push" on 100% of fast intervals across ten sessions** — a cue that 
 needs a cadence far outside the **76–132 spm** ever observed — **⚠ the point estimate of ≈238 spm is not quotable**, see TN-24; its 95% interval spans 176–369 and the model has no duration term. The 0.70 fraction is right for the protocol and wrong for this user's
 mode: guided interval walking is validated largely in older adults, for whom brisk walking does reach
 70% of reserve; a 33-year-old with a 168 max cannot on flat ground at a 0.739 m stride.
+
+## The decision: a prescribed, varying walk — and the engine for it already exists
+
+**⚑ SUPERSEDES EVERY OPTION BELOW.** The owner does not want a jog in this session and does not want to
+choose the pattern. They want **the block structure varied and assigned**, driven by what the week
+needs — which is a description of a function this repo already has.
+
+**`recommendRunType(quota)` (`packages/shared/src/running/recommend-run-type.ts:26`) already does
+exactly this for runs:** *"deterministically recommends whichever run type would put the most time
+toward the week's biggest OPEN zone gap… No LLM number gates this — pure math over the same
+`ZoneQuota` the Cardiovascular hub already shows."* **So this is extending an existing deterministic
+selector to walks, not inventing a prescription engine.**
+
+**The shape:** a small table of walk patterns, each with a block structure and an HR band, chosen by
+the same zone-gap arithmetic plus yesterday's load. The owner's own examples map onto it directly:
+
+| pattern | structure | when the selector picks it |
+|---|---|---|
+| Steady brisk | one continuous block | the Zone-2 gap is large and time is short |
+| Long intervals | 5 fast / 2 slow | the Zone-2 gap is large — **the 2026-09-09 structure that worked** |
+| Short intervals | 3 fast / 3 slow | moderate gap, or returning from a hard day |
+| Easy steps walk | all slow | Zone-2 quota already met; this is step volume, not stimulus |
+
+**⚠ Do NOT let an LLM choose the pattern.** `recommendRunType` is deliberately deterministic and its
+comment says why. A model picking today's workout is a self-reported number gating an automatic
+action, which the AI defaults forbid. Same rule here.
+
+**⚠ The band, not the fraction.** Target **105–118 bpm** directly; do not re-derive it as a fraction of
+reserve, or TN-30's anchor change silently moves the walk. This is the coupling TN-30's sequencing
+note names.
+
+**⛔ One session, three variables.** 2026-09-09 changed block length (3→5 min), recovery (3→2) and
+total (30→35) at once. **The pattern table is fine to ship; a claim about which pattern is best is
+not** — let the selector run and measure.
+
+**The four options as they stood before the decision, kept for the record:**
 
 **⚑ AMENDED 2026-09-09 — a FOURTH option, and it supersedes the three below.** The owner asked
 whether the session is working correctly and whether continuous brisk walking would beat it. Both

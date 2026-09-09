@@ -9476,3 +9476,28 @@ that the named screen is not there.
 **Why the read is local-first**, in one line so it is not "improved" back to a server fetch:
 `/api/body-metadata` returns seven days, and a card about the latest reading of each metric shows
 most of them as absent on a seven-day window.
+
+## 2026-09-09 — backlog → 19902, `tuning.md` → 517: the owner's three cardio decisions
+
+All three gates cleared in one exchange, and one of them overturned a recommendation this review had
+already published.
+
+**Max HR: a pinned 50/50 blend at 178.** The owner objected that 168 is not a max, and the record
+proves them right — 2026-07-05 holds **156–168 bpm for 13 unbroken minutes**, and a hard 13-minute
+effort runs at ~92–95% of max, so the true value is **177–183**. The entry keeps the zone table across
+all three candidate anchors because the differences are the decision: Zone 2 starts at 122, 128 or 133
+depending on which number wins, and the walk's `0.70` target moves 133 → 140 → 146 with it. Two
+constraints ride along and neither compresses: **pin the blend as a stored constant** (a live blend
+drifts as the observed max moves, which was the objection to blending in the first place), and **land
+TN-25's absolute band first** or unifying the anchor makes the walk harder rather than easier.
+
+**The walk keeps its intervals, varied and prescribed**, superseding all four options the entry had
+accumulated. **The jog moves to Run as an assigned type.** Both shrink to routing rather than
+building, because `recommendRunType(quota)` already picks the session that fills the week's biggest
+open zone gap, deterministically — so the mapping table (slow jog → `recovery`, interval jog →
+`tempo`, and so on) is most of the work and is worth writing down once.
+
+The baton grew by thirty lines, and the last of them is the uncomfortable one: three published
+recommendations were withdrawn in this thread, each to an owner objection, plus two numbers corrected
+in place. What survived every round was measured rather than modelled. That belongs in the baton more
+than any of the individual findings do.

@@ -678,3 +678,79 @@ things at once (block length 3→5 min, recovery 3→2 min, total 30→35 min), 
 it cannot keep adding 19 bpm every session. **What is established is that the duration term exists and
 is large; what is not established is its shape.** Two or three more sessions at this structure would
 settle it, and the per-block data to fit it is already stored.
+
+---
+
+## Addendum 8 — the owner's three decisions, 2026-09-09
+
+All three gates are cleared. **Tuning does not ship these** — they change the numbers the app
+prescribes, so Lane A and Lane B build them.
+
+### Decision 1 — the max-HR anchor: **pin a 50/50 blend at 178**
+
+*"Just because my HR got up to 168 doesn't mean it's the MAX… maybe we should use something in
+between… then when the Cooper 12-minute run is done and a new max is gotten, we can assess."*
+
+**This retires addendum 6's recommendation, and the owner's objection is what retired it.** That
+addendum argued for the observed max of 168 on the grounds that 187 sits *"19 bpm above anything he
+has ever recorded"*. Nothing in the record is a maximal effort, so that was absence of evidence
+dressed as evidence.
+
+**The record says which way it errs.** 2026-07-05: a 25-minute run holding **156–168 bpm for the last
+13 minutes** (16:55–17:08, multiple samples per minute, not a spike). A hard 13-minute effort runs at
+roughly 92–95% of max, so **168 ÷ 0.95 ≈ 177** and **168 ÷ 0.92 ≈ 183**. **True max ≈ 177–183, and 168
+is a floor.** The owner's blend lands at the bottom of that band; the recommendation this review made
+would have over-credited every session.
+
+| max | reserve | Z2 | Z3 | walk `0.70` |
+|---|---|---|---|---|
+| 168 — was recommended here | 116 | 122–132 | 133–144 | 133 |
+| **178 — chosen** | **126** | **128–139** | **140–152** | **140** |
+| 187 — today's bands | 135 | 133–145 | 146–159 | 146 |
+
+**⛔ Pin it as a stored constant, never a live formula.** A recomputed blend drifts whenever the
+observed max moves, shifting the zones for reasons unconnected to fitness — which was this review's
+own objection to blending, and freezing answers it. Store **178**, `source: 'blended'`, both inputs
+noted; swap wholesale for `source: 'measured'` after the Cooper test.
+
+**⚠ Sequencing bites here:** unifying at 178 raises the walk's `0.70` target from **133 → 140**, the
+opposite of what TN-25 is fixing. **TN-25's band lands first or in the same PR.**
+
+### Decision 2 — the Guided Walk: **keep the intervals, vary them, and assign them**
+
+*"No jog; but I'd like the fast/slow rates to be varying and assigned to me… It could in fact all be
+slow or all be fast as well… If we need more zone 2 maybe it's more fast? If we have zone 2 done maybe
+it's just light interval for steps."*
+
+**This supersedes all four options in TN-25**, including addendum 7's promotion of the continuous
+walk. The owner wants the structure kept and the *pattern* prescribed.
+
+**The engine exists.** `recommendRunType(quota)` (`recommend-run-type.ts:26`) already picks whichever
+session fills the week's biggest open zone gap, deterministically, with a comment stating that no LLM
+number gates it. Extending that selector to a table of walk patterns — steady brisk / 5-on-2-off /
+3-on-3-off / easy steps walk — is the whole feature.
+
+**⚠ Two constraints carried into the entry:** the pattern selector stays deterministic (an LLM
+choosing today's workout is a self-reported number gating an automatic action), and the target is an
+**absolute band, 105–118 bpm**, never a fraction of reserve — that is what stops Decision 1 moving the
+walk underneath it.
+
+### Decision 3 — the jog: **a Run type, assigned among several**
+
+*"Move into run; and have it be a run type that gets assigned. Interval sprints / Interval Jog /
+Consistent run / Slow Jog — these + more… also decided scientifically based on my week/day."*
+
+Four of the five names already exist: slow jog → `recovery`/`easy`, consistent run → `easy`/`long`,
+**interval jog → `tempo`**, interval sprints → `interval`. The scientific assignment is
+`recommendRunType`. **So the work is relabelling and surfacing, not building.** A bespoke sixth type
+for the 3-on/3-off protocol is deferred until these are run regularly.
+
+### What this thread cost, and what it is worth recording
+
+Three published recommendations were withdrawn here: continuous-beats-intervals (addendum 4, wrong
+about the research), the "%HRmax vs %HR-reserve two models" claim (addendum 6, invented), and the
+observed-max anchor (this addendum, wrong about what 168 means). **In each case the owner's objection
+was the thing that found it.** Two numbers were also corrected in place — Zone 1's boundary and the
+cadence extrapolation. The findings that survived every round are the ones measured rather than
+modelled: 0 of 44 fast blocks reaching target, Zone 1 covering 60% of the range, four max-HR
+resolvers, and the +19 bpm within-session rise the owner produced by walking.

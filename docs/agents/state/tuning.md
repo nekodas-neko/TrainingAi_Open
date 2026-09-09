@@ -29,7 +29,7 @@ say so plainly rather than re-measuring the pillar a fourth time.
 | ID | What | State |
 |---|---|---|
 | **TN-24** | Zone 1 spans 52–122 bpm, so Zone 2 is unreachable on foot and the walk's zone bar carries nothing | supplies **Q-523's** mechanism; PR #998 |
-| **TN-25** | the walk's fast target (≥133 bpm) met **0 of 44 times**; fast blocks average the slow target | **`Gate: owner`** — option 4 (continuous) now best-evidenced, addendum 7 |
+| **TN-25** | the walk's fast target (≥133 bpm) met **0 of 44 times**; fast blocks average the slow target | **✅ decided** — varied prescribed patterns, 105–118 bpm band |
 | **TN-26** | cadence and speed mean different things per surface; prescribe heart rate, demote the controls | rewritten after the owner declined treadmill tuning |
 | **TN-27** | maintenance rejects its 28-day window and falls back to the noisy 14-day one → **2,245 kcal** | **owner chose option 3**, after TN-29 |
 | **TN-28** | the one card that writes the calorie goal hides the `low confidence` its siblings show | Lane B, independent |
@@ -459,6 +459,36 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
   figure was fitted over 76–132 spm, a 95% interval of 176–369, r = 0.512. It was quotable-looking and
   worthless, and it was the same error this agent had flagged one addendum earlier on the treadmill
   speed curve. **Owner scepticism about a modelled number has been right twice in this thread.**
+- **✅ THE THREE CARDIO DECISIONS ARE MADE, 2026-09-09 — do not re-open them.** (1) **Max HR: a pinned
+  50/50 blend, `(168 + 187) / 2 = 178`**, stored as a constant with `source: 'blended'`, replaced
+  wholesale when the **Cooper 12-Minute Run** (already in `fitness-tests/protocols.ts`) gives a
+  measured value. (2) **The Guided Walk keeps its intervals, varied and PRESCRIBED** — pattern chosen
+  by the deterministic zone-gap selector, target an absolute **105–118 bpm band**, never a reserve
+  fraction. (3) **The jog moves to Run as an assigned run type**; interval jog → `tempo`, and
+  `recommendRunType` does the assigning.
+- **⛔ 168 IS A FLOOR, NOT A MAX, AND THIS AGENT RECOMMENDED IT ANYWAY.** The argument was *"187 sits
+  19 bpm above anything ever recorded"* — but nothing in the record is a maximal effort, so that was
+  absence of evidence. **The refutation is in the data and took one query:** 2026-07-05 holds
+  **156–168 bpm for 13 unbroken minutes**, and a hard 13-minute effort runs at ~92–95% of max, so the
+  true max is **177–183**. **Before treating an observed maximum as a ceiling, find the longest
+  sustained effort and divide.**
+- **⚠ A BLENDED CONSTANT MUST BE PINNED, NEVER RECOMPUTED.** A live `(observed + predicted) / 2`
+  drifts every time the observed max moves, so zones shift for reasons unconnected to fitness. Freezing
+  the value answers the objection; arguing against the blend does not.
+- **⚠ The anchor and the walk target are COUPLED and the sequencing bites.** Unifying at 178 raises the
+  walk's `0.70` target from **133 → 140**, the opposite of the fix. TN-25's absolute band must land
+  first or in the same PR — which is also why the band is stated in bpm rather than as a fraction.
+- **⚑ THE PRESCRIPTION ENGINE ALREADY EXISTS — `recommendRunType(quota)`
+  (`recommend-run-type.ts:26`).** It deterministically picks whichever session fills the week's biggest
+  open zone gap, and its own comment says no LLM number gates it. The owner asked for *"decided
+  scientifically based on my week/day"* for both walks and runs; that is this function extended, not a
+  new engine. **⛔ Do not let a model pick the session** — that is a self-reported number gating an
+  automatic action.
+- **⚠⚠ THREE PUBLISHED RECOMMENDATIONS WERE WITHDRAWN IN ONE THREAD, EACH TO AN OWNER OBJECTION:**
+  continuous-beats-intervals (wrong about the research), *"the app mixes two zone models"* (invented),
+  and the observed-max anchor (wrong about what 168 means). Two numbers were corrected in place besides.
+  **The findings that survived every round were measured, not modelled** — 0 of 44, Zone 1 at 60% of
+  the range, four resolvers, +19 bpm in one session. **Model output is a hypothesis; state it as one.**
 - **The threshold is usually right and the input usually wrong** — Q-506, Q-512, Q-514, now TN-6.
   Check the input's distribution before touching any constant.
 - **Do NOT lift the sleep scale toward its old mean** — sleep/readiness agreeing is load-bearing for
