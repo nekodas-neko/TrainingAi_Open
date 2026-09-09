@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.443.1",
+    date: "2026-09-09",
+    changes: [
+      "The AI Periodization card now says how much of a session\u0027s baseline is done \u2014 \u00273 of 5 exercises logged\u0027 \u2014 instead of showing the same \u0027Baseline needed\u0027 whether you had done none of it or nearly all of it.",
+    ],
+  },
+  {
     version: "1.443.0",
     date: "2026-09-09",
     changes: [

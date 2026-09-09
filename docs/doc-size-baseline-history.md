@@ -9725,3 +9725,21 @@ space: every gate is now cleared, so a successor should not go looking for a dec
 the owner still owes is an **action** rather than an answer — run the Cooper 12-Minute Run so the
 pinned 178 can be replaced by a measured max — and saying that explicitly is what stops the next
 session re-deriving the anchor from the same inconclusive data this one did twice.
+
+## 2026-09-09 — `docs/implementation-backlog.md` 19,587 → 19,600 (+13), LA-92 shipped and LB-93 filed
+
+The entry leaves whole: nothing is still owed. Its trace lives in the journal instead, including the
+one correction worth carrying — the entry called this "a rendering job rather than a data one", and
+the count's denominator was not in the card's payload. It came from `workout-data:meta` rather than
+from a route change, so the classification held, but "just the surface" was again not quite true.
+
+LA-92 out is −21; **LB-93 in is +34**, and it is the longer half deliberately. It carries a five-row
+table of runs because the finding is *"this fails on branches that did not cause it"* — a claim one
+red run cannot support and which cost five runs to establish. Without the table the next author to
+see it red starts the same elimination from scratch, which is the whole expense of this flake.
+
+### Reconciled on merge — 19937 (LA-92 branch)
+
+`main` gained ~340 backlog lines while this branch was in verification, so the `.size` file
+conflicted with both sides describing the same number. Recomputed from the merged file rather than
+spliced; the branch's own delta (−21 for LA-92 leaving, +34 for LB-93 arriving) is unchanged.
