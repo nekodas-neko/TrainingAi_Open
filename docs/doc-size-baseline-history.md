@@ -10214,3 +10214,19 @@ approve "some numbers might change"; with it, the question is "two in five sessi
 chart about your current plan or the plan at the time?".
 
 Entries ceiling untouched at 360, as intended since #1052.
+
+---
+
+## 2026-09-09 — backlog 20,167 → 20,181 (+14), no ceiling raise (Q-1a precondition)
+
+Fourteen lines on a security precondition that had gone stale in the dangerous direction. Q-1a's
+"read first" line said `isActive` is enforced only in middleware and an API client evades it; LA-58
+fixed that on 2026-09-04, so an implementer who checks it against `main` concludes the precondition
+is discharged — and ships a deactivation bypass, because the gate keys on `req.auth`, the cookie
+session, and Q-1a's entire purpose is a client that does not send one.
+
+A one-line "LA-58 fixed this" would have been shorter, accurate, and worse. The lines are spent
+saying why the hazard survives its own fix, because that is the part a reader cannot reconstruct and
+the part that decides whether the next PR is safe.
+
+Entries ceiling untouched at 360.

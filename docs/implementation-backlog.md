@@ -18367,9 +18367,23 @@ describing a safety net that no longer exists.
 - **Already decided, do not re-open:** Q-1's Task 1 chose **bearer-token-in-Capacitor-secure-storage
   reusing the existing NextAuth session JWT** — not a new credential; the PKCE mobile flow already
   mints it.
-- **Read first — three load-bearing corrections** are in Q-1's Task 2b (auth preconditions) below,
-  the sharpest being that `isActive === false` is enforced **only** in `middleware.ts:18`, so a
-  client that talks to the API directly bypasses the deactivation check entirely.
+- **Read first — three load-bearing corrections** are in Q-1's Task 2b (auth preconditions) below.
+- **⚠ THE SHARPEST OF THOSE CORRECTIONS IS ITSELF STALE, AND RE-READING IT NAIVELY SHIPS A BYPASS
+  (checked against `main` 2026-09-09).** It said `isActive === false` is enforced *only* in
+  `middleware.ts:18`, so a client talking to the API directly evades it. **LA-58 fixed that on
+  2026-09-04:** the matcher excluded `api` as its first term and now excludes `api/auth` only, so
+  `/api` requests do reach the gate (`middleware.ts:33-38`) and a deactivated session gets a 403.
+  Reading only that far, an implementer concludes the precondition is discharged. **It is not — it
+  has changed shape, and Q-1a is the exact change that re-opens it.** The gate is
+  `if (req.auth && req.auth.isActive === false)`, and `req.auth` is the **cookie** session. Its own
+  neighbouring comment says so: *"a session-less request falls straight through."* There is no
+  bearer path in `auth.ts` today (grepped: no `Authorization`/`Bearer` handling), so nothing bypasses
+  anything right now. The moment this entry adds one, a deactivated user holding a valid bearer token
+  reaches every `/api` route with `req.auth` empty and the 403 never fires.
+- **So the precondition for Q-1a is not "check whether LA-58 fixed it" — it is:** whatever resolves a
+  bearer token must enforce `isActive` itself, at the same point it establishes identity, and a test
+  must pin a deactivated bearer holder getting 403 rather than 200. Enforcement that lives in
+  middleware keyed on a cookie cannot cover a client built not to send one.
 - **Scope:** the bearer-token client + an `apiUrl()` indirection so every fetch can target either
   origin. **Not** the workspace split, **not** `output: 'export'` — those are Q-1b.
 
