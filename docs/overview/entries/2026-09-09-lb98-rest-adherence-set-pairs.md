@@ -59,6 +59,21 @@ were failing on something with no behavioural difference. Reproducing it by hand
 cleanly: the harness had mis-applied the rename. A control that fails to build proves nothing, so it
 was worth the minute to tell those two apart rather than recording a number that looked stricter.
 
+## A local-environment trap this session created for itself
+
+The first full run on this branch reported **7 failures across 4 files** — none of them LB-98's. The
+local database still carried Q-44's table rename (migrations 273/274, applied to verify that branch),
+so it matched no branch's code: `main`'s export map and catalogue reads name tables the database had
+renamed underneath them.
+
+**The tell was the shape rather than the count.** This branch's own tests passed 46/46 while
+unrelated export and catalogue tests failed — a failure set that carefully avoids the thing you
+changed is evidence about the environment. Read the other way, it costs a rework of code that was
+fine. Reverting also needed an order (`DROP SCHEMA claude_ro CASCADE` first, because the `claude_ro`
+views depend on the compatibility views). Both are now in
+[`docs/local-dev-database.md`](../../local-dev-database.md), which already catalogues two other ways
+a local result can lie.
+
 **Not exercised:** the card itself. Wiring its fallback is `components/**` and therefore Lane B's;
 the read exists, nothing consumes it yet, and the verification gap is not closed until that lands.
 That is recorded as a `Keep:` on the entry rather than implied.
