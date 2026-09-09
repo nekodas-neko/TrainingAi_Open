@@ -9754,3 +9754,13 @@ entry is just a finished entry that still prints in the queue.
 Its 74 lines were mostly the trace of *why* a supplement could carry two contradicting doses, which
 belongs in the journal. The one thing worth carrying forward is on LA-90 already: the two write paths
 merge a caller-supplied dose differently, which OR-104 found and deliberately did not bundle in.
+
+## 2026-09-09 — `docs/implementation-backlog.md` 19,873 → 19,882 (+9), BF-51 ③ shipped
+
+The entry stays: ① and ② are still held, so only ③'s line changes, and it grows because two of the
+three lines it becomes are decisions rather than status.
+
+The load-bearing one is the naming. The owner said *"a tab like the other place"*, and copying that
+place literally would have put `My Foods` on this screen — where it would mean single foods, while
+one screen away the same label means saved meals. That is the confusion BF-103 removed by owner
+decision, and it would have come straight back from following the instruction to the letter.
