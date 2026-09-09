@@ -1,9 +1,10 @@
 import {
   pgTable, text, boolean, timestamp, uuid,
-  integer, doublePrecision, date, time, primaryKey, unique, jsonb, bigint, bigserial, smallint,
+  integer, doublePrecision, date, time, primaryKey, unique, uniqueIndex, jsonb, bigint, bigserial, smallint,
   customType,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core'
+import { sql } from 'drizzle-orm'
 
 /** `bytea` — drizzle-orm/pg-core has no built-in for it. The driver hands back a Node `Buffer`,
  *  which is a `Uint8Array`, so the codec in `lib/oura-ble/frame-pack.ts` consumes it directly. */
@@ -116,8 +117,18 @@ export const programSessions = pgTable('program_sessions', {
   position:          integer('position').notNull(),
   icon:              text('icon'),
   timeBudgetMinutes: integer('time_budget_minutes').notNull().default(60),
+  // LB-66: a removed session is tombstoned, not deleted — the two workout_sessions FKs are
+  // ON DELETE SET NULL and session_periodization is ON DELETE CASCADE, so a hard delete severed
+  // logged workouts from their session and destroyed its phase state.
+  deletedAt:         timestamp('deleted_at', { withTimezone: true }),
   updatedAt:         timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-}, t => [unique().on(t.programId, t.position)])
+}, t => [
+  // Partial, over live rows only: a tombstone keeps its position, and the client re-saves the
+  // survivors compacted, so a plain unique would 23505 on every delete of a non-last session.
+  uniqueIndex('program_sessions_program_id_position_live')
+    .on(t.programId, t.position)
+    .where(sql`deleted_at IS NULL`),
+])
 
 export const programPhases = pgTable('program_phases', {
   id:               uuid('id').primaryKey().defaultRandom(),
@@ -141,8 +152,13 @@ export const sessionExercises = pgTable('session_exercises', {
   position:     integer('position').notNull(),
   exerciseRole: text('exercise_role').notNull().default('primary'),
   supersetGroup: smallint('superset_group'),
+  deletedAt:    timestamp('deleted_at', { withTimezone: true }),
   updatedAt:    timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-}, t => [unique().on(t.sessionId, t.position)])
+}, t => [
+  uniqueIndex('session_exercises_session_id_position_live')
+    .on(t.sessionId, t.position)
+    .where(sql`deleted_at IS NULL`),
+])
 
 export const schedules = pgTable('schedules', {
   id:              uuid('id').primaryKey().defaultRandom(),

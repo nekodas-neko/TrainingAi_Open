@@ -81,7 +81,7 @@ export async function listPrograms(db: Db, userId: string): Promise<Program[]> {
   const programIds = pRows.map(p => p.id)
   const [sRows, schedRows] = await Promise.all([
     db.select().from(s.programSessions)
-      .where(inArray(s.programSessions.programId, programIds))
+      .where(and(inArray(s.programSessions.programId, programIds), isNull(s.programSessions.deletedAt)))
       .orderBy(asc(s.programSessions.programId), asc(s.programSessions.position)),
     db.select().from(s.schedules)
       .where(inArray(s.schedules.programId, programIds)),
@@ -92,7 +92,7 @@ export async function listPrograms(db: Db, userId: string): Promise<Program[]> {
   const [exRows, dayRows] = await Promise.all([
     sessionIds.length
       ? db.select().from(s.sessionExercises)
-          .where(inArray(s.sessionExercises.sessionId, sessionIds))
+          .where(and(inArray(s.sessionExercises.sessionId, sessionIds), isNull(s.sessionExercises.deletedAt)))
           .orderBy(asc(s.sessionExercises.sessionId), asc(s.sessionExercises.position))
       : Promise.resolve([]),
     scheduleIds.length
@@ -218,8 +218,15 @@ export async function saveProgram(db: Db, userId: string, program: Program): Pro
         .where(and(eq(s.programs.userId, userId), sql`${s.programs.id} != ${programId}`))
     }
 
-    const oldSessions = await tx.select({ id: s.programSessions.id, position: s.programSessions.position })
-      .from(s.programSessions).where(eq(s.programSessions.programId, programId))
+    // Tombstoned rows are included: they are still this program's, so they must not read as
+    // "belongs to another program" below, and a supplied id that names one is a resurrection
+    // that has to be hard-deleted before it can be re-inserted under the same primary key.
+    const allSessions = await tx.select({
+      id: s.programSessions.id,
+      position: s.programSessions.position,
+      deletedAt: s.programSessions.deletedAt,
+    }).from(s.programSessions).where(eq(s.programSessions.programId, programId))
+    const oldSessions = allSessions.filter(r => r.deletedAt == null)
     // ON DELETE SET NULL on workout_sessions.session_id means deleting program_sessions
     // below severs the link from already-logged workouts to their session — even ones
     // logged moments before this save. The save UI now round-trips session ids for
@@ -229,18 +236,8 @@ export async function saveProgram(db: Db, userId: string, program: Program): Pro
     let orphanedWorkoutSessions: { id: string; programSessionId: string | null }[] = []
     const oldByPosition = new Map(oldSessions.map(r => [r.position, r.id]))
     const oldIdSet = new Set(oldSessions.map(r => r.id))
+    const ownedIdSet = new Set(allSessions.map(r => r.id))
     let savedPeriodizationRows: (typeof s.sessionPeriodization.$inferSelect)[] = []
-    if (oldSessions.length) {
-      const oldIds = oldSessions.map(r => r.id)
-      orphanedWorkoutSessions = await tx.select({ programSessionId: s.workoutSessions.programSessionId, id: s.workoutSessions.id })
-        .from(s.workoutSessions)
-        .where(inArray(s.workoutSessions.programSessionId, oldIds))
-      savedPeriodizationRows = await tx.select()
-        .from(s.sessionPeriodization)
-        .where(inArray(s.sessionPeriodization.programSessionId, oldIds))
-      await tx.delete(s.sessionExercises).where(inArray(s.sessionExercises.sessionId, oldIds))
-      await tx.delete(s.programSessions).where(eq(s.programSessions.programId, programId))
-    }
 
     // RV-34: `sessions[].id` is the client's, used verbatim as the new row's primary key so a program
     // edit does not sever `workout_sessions.session_id` from already-logged workouts. Unchecked, an
@@ -256,7 +253,7 @@ export async function saveProgram(db: Db, userId: string, program: Program): Pro
       // Would reach the driver as `22P02` on insert and surface as the same opaque 500.
       throw new UserFacingError('This program contains a malformed session id. Reload and try again.', 400)
     }
-    const foreignIds = suppliedSessionIds.filter(id => !oldIdSet.has(id))
+    const foreignIds = suppliedSessionIds.filter(id => !ownedIdSet.has(id))
     if (foreignIds.length) {
       const taken = await tx.select({ id: s.programSessions.id })
         .from(s.programSessions)
@@ -264,6 +261,40 @@ export async function saveProgram(db: Db, userId: string, program: Program): Pro
       if (taken.length) {
         throw new UserFacingError('This program refers to a session that belongs to another program. Reload and try again.', 409)
       }
+    }
+
+    // LB-66: there is no delete endpoint for a program session — removing one is expressed as
+    // saving the program without it. So the replace-all below is only a real deletion for the ids
+    // that do NOT come back; those are tombstoned, and everything else keeps the existing
+    // hard-delete + re-insert (which is what round-trips ids and rebuilds positions).
+    const suppliedSet = new Set(suppliedSessionIds)
+    const removedIds = oldSessions.filter(r => !suppliedSet.has(r.id)).map(r => r.id)
+    const replacedIds = allSessions.filter(r => suppliedSet.has(r.id)).map(r => r.id)
+
+    if (removedIds.length) {
+      const now = new Date()
+      await tx.update(s.sessionExercises).set({ deletedAt: now })
+        .where(and(inArray(s.sessionExercises.sessionId, removedIds), isNull(s.sessionExercises.deletedAt)))
+      await tx.update(s.programSessions).set({ deletedAt: now })
+        .where(inArray(s.programSessions.id, removedIds))
+      // The FK used to do this: `schedule_days.session_id` is ON DELETE SET NULL, so the hard
+      // delete cleared the slot. A tombstone does not fire it, and a schedule day pointing at a
+      // session the user removed would still resolve on the workout screen.
+      await tx.update(s.scheduleDays).set({ sessionId: null })
+        .where(inArray(s.scheduleDays.sessionId, removedIds))
+    }
+    if (replacedIds.length) {
+      // Captured for the rows actually being deleted. Tombstoned sessions are deliberately not in
+      // here: nothing fires on them, so their workout links and periodization state survive
+      // untouched, which is the point of the tombstone.
+      orphanedWorkoutSessions = await tx.select({ programSessionId: s.workoutSessions.programSessionId, id: s.workoutSessions.id })
+        .from(s.workoutSessions)
+        .where(inArray(s.workoutSessions.programSessionId, replacedIds))
+      savedPeriodizationRows = await tx.select()
+        .from(s.sessionPeriodization)
+        .where(inArray(s.sessionPeriodization.programSessionId, replacedIds))
+      await tx.delete(s.sessionExercises).where(inArray(s.sessionExercises.sessionId, replacedIds))
+      await tx.delete(s.programSessions).where(inArray(s.programSessions.id, replacedIds))
     }
 
     const sessionsWithIds = program.sessions.map(sess => ({
@@ -375,7 +406,13 @@ export async function saveProgram(db: Db, userId: string, program: Program): Pro
       if (schedulePayload.days) {
         for (const day of schedulePayload.days) {
           await tx.insert(s.scheduleDays)
-            .values({ scheduleId, dayOfWeek: day.dayOfWeek, sessionId: day.sessionId ?? null })
+            .values({
+              scheduleId,
+              dayOfWeek: day.dayOfWeek,
+              // A stale client can still name a session this same save removed; the FK used to
+              // null it on delete and no longer fires.
+              sessionId: day.sessionId && !removedIds.includes(day.sessionId) ? day.sessionId : null,
+            })
         }
       }
     }
@@ -401,16 +438,26 @@ export async function deleteProgram(db: Db, userId: string, programId: string): 
 
 export async function removeSessionExercise(db: Db, userId: string, sessionExerciseId: string): Promise<boolean> {
   // Ownership: the row's session must belong to a program the user owns. Verify via join,
-  // then delete by id (session_exercises has no user_id column of its own).
+  // then tombstone by id (session_exercises has no user_id column of its own).
   const [owned] = await db
-    .select({ id: s.sessionExercises.id })
+    .select({ id: s.sessionExercises.id, programId: s.programs.id })
     .from(s.sessionExercises)
     .innerJoin(s.programSessions, eq(s.sessionExercises.sessionId, s.programSessions.id))
     .innerJoin(s.programs, eq(s.programSessions.programId, s.programs.id))
-    .where(and(eq(s.sessionExercises.id, sessionExerciseId), eq(s.programs.userId, userId)))
+    .where(and(
+      eq(s.sessionExercises.id, sessionExerciseId),
+      eq(s.programs.userId, userId),
+      isNull(s.sessionExercises.deletedAt),
+    ))
     .limit(1)
   if (!owned) return false
-  await db.delete(s.sessionExercises).where(eq(s.sessionExercises.id, sessionExerciseId))
+  // LB-66: tombstone rather than delete, and bump the parent program so the pull delta re-sends
+  // the subtree — the delta only carries a program whose `updated_at` moved, and it replaces the
+  // client's children wholesale, so the bump is what makes the removal reach other devices at all.
+  await db.update(s.sessionExercises).set({ deletedAt: new Date() })
+    .where(eq(s.sessionExercises.id, sessionExerciseId))
+  await db.update(s.programs).set({ updatedAt: new Date() })
+    .where(eq(s.programs.id, owned.programId))
   return true
 }
 
@@ -662,7 +709,7 @@ export async function countAllSessionsSinceStart(db: Db, userId: string, program
   const progSessions = await db
     .select({ id: s.programSessions.id, name: s.programSessions.name })
     .from(s.programSessions)
-    .where(eq(s.programSessions.programId, programId))
+    .where(and(eq(s.programSessions.programId, programId), isNull(s.programSessions.deletedAt)))
   const idByNameLower = new Map(progSessions.map(ps => [ps.name.toLowerCase(), ps.id]))
 
   const sessionNameLower = sql<string>`lower(${s.workoutSessions.sessionName})`

@@ -99,6 +99,17 @@ production DB (and fail, since `DATABASE_SSL=true` makes `pg` require SSL,
 which the local Postgres doesn't support) unless both are unset first. The
 `session-start.sh` hook writes `unset DATABASE_URL` / `unset DATABASE_SSL` to
 `$CLAUDE_ENV_FILE`, so a fresh shell in the session picks this up automatically.
+
+**The consequence, which is a false green and was measured on 2026-09-09:** nothing in
+`vitest.config.ts` or `vitest.setup.ts` loads `.env.local`, so with `DATABASE_URL` unset every
+DB-backed file hits its `describe.skipIf(!canRun)` and **skips silently**. A bare `pnpm test` or
+`pnpm ci:local` from a session shell therefore reports **678 passed / 191 skipped files (6,941
+passed / 1,247 skipped tests)** and exits 0 — against **862 passed / 5 skipped files (8,098 passed /
+86 skipped)** for the same tree with `DATABASE_URL` set, where four real failures surfaced. The
+skipped count is the only tell, and it is easy to read past. **Always run the suite as
+`DATABASE_URL=postgresql://postgres:postgres@/trainingai_dev?host=/tmp&port=5433 pnpm test`** (or
+`env DATABASE_URL=… pnpm ci:local`) before calling a change tested; CI sets the variable, so a green
+here that CI then fails is this gap, not flake.
 The test user `test@local.dev` has password `testpass123` (seeded with a bcrypt
 hash) for credentials-login testing.
 

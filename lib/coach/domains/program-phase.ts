@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq, isNull, sql } from 'drizzle-orm'
 import * as s from '@/lib/data/postgres/schema'
 import { FIELD_LABEL, type PatchChange } from '../patch'
 import type { Consequence, DomainHandler, Db, PreviewResult } from './types'
@@ -46,7 +46,11 @@ async function loadState(db: Db, userId: string): Promise<PhaseState | null> {
     .select({ id: s.sessionExercises.id })
     .from(s.sessionExercises)
     .innerJoin(s.programSessions, eq(s.sessionExercises.sessionId, s.programSessions.id))
-    .where(eq(s.programSessions.programId, program.id))
+    .where(and(
+      eq(s.programSessions.programId, program.id),
+      isNull(s.sessionExercises.deletedAt),
+      isNull(s.programSessions.deletedAt),
+    ))
 
   return {
     programId: program.id,
