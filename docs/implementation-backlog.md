@@ -4604,31 +4604,6 @@ deletes nothing on tap, which is what makes an icon-only entry point defensible 
   matches `maintenanceKcal / bmr` for the same window; and an under-calibrated account gets the
   reason rather than a number.
 
-### [nutrition][platform] LB-51 — the plan card had no e2e, because the seed has no meal plan (fixed)
-
-- **✅ SHIPPED** (`docs/lane-b-queue-hygiene`, 2026-09-02 — no version bump; a spec and queue
-  edits change nothing a user can see). `e2e/plan-rescale.spec.ts`
-  covers Q-187's two states: the remaining meals re-scaled to what is left of the day, and the floor
-  leaving them as planned with its sentence. **Four mutations kill it** — removing the re-scale,
-  removing the floor, next-meal-only, and dropping the `(planned N)` figure from the row.
-- **⚠ This entry's own recommendation was the wrong shape, and the correction is the useful part.**
-  It proposed stubbing `GET /api/nutrition/meal-plans` the way `walk-pacer-speed-rung.spec.ts` stubs
-  `segment-stats`. **A spec here can talk to Postgres directly** — `food-logging-complete.spec.ts`
-  opens a `pg` `Client` on `process.env.DATABASE_URL` — so the fixture is built in the database and
-  torn down in `afterAll`, which works on CI's fresh instance with no stub at all. A stubbed plan
-  against real food would have tested half the sum anyway: `eaten` comes from the day's real
-  `food_logs` through the page's own pipeline.
-- **The assertion is the invariant, not a number:** the adjusted figures sum to the target minus what
-  was eaten, **both read off the card**, so the fixture's calories can change without touching it.
-  It also asserts the direction — scaled *down* when the day is over its share — because "different
-  from planned" would pass against an arbitrary rewrite.
-- **⚠ The tap gotcha is now written into the spec itself.** `Show N meals` needs `tapCentre`; a
-  forced `.click()` leaves `aria-expanded` at `false`. That is Q-354 on the Nutrition screen, and it
-  cost the most time of anything in Q-187.
-- **Keep:** the rest of the plan card is still uncovered — the log-all action, the per-meal log and
-  decline, and save-to-My-Foods. The fixture in this spec is the hard part and they can reuse it.
-- **Added:** 2026-09-01 · Lane B, while shipping Q-187 without one.
-
 ### [platform] OR-100 — `Keep:` files buildable work under a heading that tells the lane not to look
 
 - **Keep — THE DETECTION SHIPPED 2026-09-01, ENFORCEMENT OFF as this entry requires; the splits are

@@ -1750,6 +1750,19 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [nutrition] ⚠️ A declined plan meal could revert; the fix has only been seen on the web path (LB-51, 2026-09-09, v1.443.4)
+
+Declining a planned meal flips the row optimistically and writes behind it. `loadAnswers` re-runs
+while the card is on screen, so a read already in flight when you tap returns the state from
+*before* it — and applying that verbatim silently undid the answer, so the meal asked again.
+Measured on two runs in three while covering the surface; fixed in
+`app/nutrition/use-plan-meal-logging.ts` by holding this device's own answers until a read agrees
+with them, and covered by `e2e/plan-meal-log-decline.spec.ts` (3 of 3 green after, 1 of 3 before).
+[Journal](docs/overview/entries/2026-09-09-feat-plan-meal-answer-e2e.md).
+**Owed: the device check.** `plan_meal_answers` is an offline-first domain and the browser has no
+native SQLite, so only the API fallback ran here — the `store.getPlanMealAnswers` branch of the same
+reconcile, the local-store write and the outbox mutation have not been exercised on hardware.
+
 ### [workouts][platform] ⚠️ A saved session delete is now a tombstone — not yet seen doing it on the device (BF-132 → LB-66, 2026-09-09, v1.443.0)
 
 BF-132 made deleting ask first, with an Undo until you save; **LB-66 (migration 271) makes the save
