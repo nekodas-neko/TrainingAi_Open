@@ -1857,6 +1857,28 @@ build. **Not verified on the S25**; no APK needed, it deploys through the WebVie
 :629/:639 (two-line cards), the `admin/` and `oura-ble/` debug consoles, and every site declaring its
 own `min-h-*`. One of those reading wrong on device is a deliberate omission, not a miss.
 
+### [sleep][devices] 🟡 Every background ring drain repainted the screens from PRE-rollup data — fixed, NOT device-verified (Q-91-followup, 2026-09-09)
+
+- **The signal existed and fired too early, which is worse than not firing.** `sync-provider.tsx`
+  watched the native `ouraStatus` counter and invalidated **1500 ms** after it advanced. But
+  `ingestStored` advances the instant the server has *stored* rows — the same instant it schedules
+  its rollup on a **3-second** trailing-edge debounce. So the invalidation landed before the rollup
+  had started, and the refetch it triggered read pre-rollup data **and cached it**. A stale entry is
+  corrected by the next mount; one refilled from a pre-rollup read looks fresh and is held for the
+  full TTL. This was happening on every autonomous drain.
+- **Fixed** by waiting for the rollup watermark to actually move: new
+  `GET /api/oura-ble/rollup-state` exposes `oura_rollup_state`'s `last_rolled_ds`/`epoch` (it was
+  persisted but never readable over HTTP), and `waitForRollup` polls it on a bounded backoff before
+  announcing. The manual pull-to-sync path had the same race and now shares the helper.
+- **⚠️ NOT verified on device, and cannot be here** — `getOuraBle()` returns null off-device, so the
+  entire listener path is unreachable in the sandbox. The route and the wait helper are unit-tested
+  (8 mutants, all caught); the *behaviour* is not observed. **Owed on the S25, ring attached:** an
+  hourly background drain with a sleep screen mounted updates it without a remount; a drain carrying
+  nothing the rollup changes stops at the backoff ceiling instead of spinning; pull-to-sync still
+  behaves as before.
+- Plan and the correction to its premise:
+  [`docs/superpowers/plans/2026-09-09-oura-ble-rollup-invalidation-signal.md`](docs/superpowers/plans/2026-09-09-oura-ble-rollup-invalidation-signal.md).
+
 ### [sleep] 🟡 The sleep–performance insight now reports 48 paired days instead of 233, and nobody has seen the new number (PS-29, 2026-09-07)
 
 **What shipped.** `/api/sleep-performance-correlation` pushed one point per **exercise** with one

@@ -5582,6 +5582,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return ms == null ? null : new Date(ms)
   }
 
+  async getOuraRollupState(userId: string): Promise<{ lastRolledDs: number; epoch: number } | null> {
+    return oura.getOuraRollupState(this.db, userId)
+  }
+
   async getDaytimeTagCoverage(userId: string, tz: string, days: number): Promise<import('../repository').DaytimeTagCoverage> {
     // Tags that drive the daytime-signal model builds (plus HRV/IBI/SpO₂ for reference). The gate
     // is whether temp/MET/motion/steps show up during daytime hours or only cluster around sleep.

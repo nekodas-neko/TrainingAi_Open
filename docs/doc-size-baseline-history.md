@@ -10016,3 +10016,20 @@ work, `Verify: device` files unbuilt work among shipped work.
 
 The ceiling raise is the usual +1 for this PR's own journal entry; the measurement behind it has not
 changed.
+
+---
+
+## 2026-09-09 — projectOverview 10,494 → 10,516 (+22), backlog 19,946 → 19,909 (−37) (Q-91-followup build)
+
+The backlog gives back 37: the entry shipped and left the queue. The orientation doc takes 22 for a
+Known-Issues row, and this is the case the section exists for rather than a raise to argue about —
+a fix that is **not device-verified**, which is exactly the state the Canonical Runtime rule says
+must be written down rather than assumed away. The row spends most of its length on the three checks
+owed on the S25, because that list is the thing a later session needs and the thing nobody can
+reconstruct from the diff.
+
+It also records a defect that was live in production and invisible: the background drain listener
+invalidated 1500 ms after the ingest counter advanced, while the server schedules its rollup on a
+3-second debounce — so every autonomous drain repainted from pre-rollup data and cached it. Worth
+its lines because the symptom (data that looks fresh and is not) gives no hint of the cause, and the
+previous framing in the backlog said the opposite: that no signal existed at all.

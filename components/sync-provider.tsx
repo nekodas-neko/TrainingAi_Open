@@ -28,6 +28,8 @@ import { BODY_BATTERY_TTL, TTL_MEDIUM, TTL_LONG, READINESS_SCORE_TTL, MUSCLE_REC
 import { getStepOrchestrator } from '@/lib/oura-ble/step-orchestrator';
 import { getContinuousCapture, isContinuousCaptureEnabled } from '@/lib/oura-ble/continuous-capture';
 import { getOuraBle } from '@/lib/oura-ble/plugin';
+import { readRollupState, announceOuraSynced } from '@/lib/oura-ble/sync';
+import { waitForRollup, type RollupState } from '@/lib/oura-ble/rollup-wait';
 
 interface CacheTask {
   key: string;
@@ -399,16 +401,41 @@ export function SyncProvider({ userId }: SyncProviderProps) {
   // manual sync (or a redeploy that busts the SW cache). Watch the plugin's ingest counter:
   // when it advances, coalesce a burst of batch completions and fire the same invalidation
   // afterDrainSettles() does for manual drains, so screens refetch on their own.
+  //
+  // **Q-91-followup: this used to fire 1500 ms after the counter advanced, which was always too
+  // early.** `ingestStored` advances the moment the server has STORED the rows — the same moment
+  // it schedules its rollup on a 3 s trailing-edge debounce. So a 1.5 s wait invalidated before
+  // the rollup had even started, and the refetch it triggered read pre-rollup data and cached it.
+  // That is worse than the staleness it was written to fix: a stale entry is corrected by the next
+  // mount, whereas one refilled from a pre-rollup read looks fresh and is held for the full TTL.
+  // The debounce still coalesces the burst; what follows it now waits for the rollup watermark to
+  // actually move before announcing.
   useEffect(() => {
+    const sleepMs = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
     let cancelled = false;
     let handle: { remove: () => Promise<void> } | undefined;
     let lastIngestStored: number | null = null;
     let debounce: ReturnType<typeof setTimeout> | null = null;
+    // Captured when the burst STARTS, not when it settles: by the time the debounce fires the
+    // rollup may already have run, and a baseline read then would be the post-rollup value —
+    // which would make the wait time out waiting for progress that had already happened.
+    let baseline: Promise<RollupState | null> | null = null;
 
     const flush = () => {
       debounce = null;
-      void invalidateOuraSync().catch(() => {});
-      window.dispatchEvent(new Event('ta:oura-ble-synced'));
+      const captured = baseline;
+      baseline = null;
+      void (async () => {
+        // A `timeout` here is not a failure: a drain carrying nothing the rollup changes never
+        // moves the watermark, and announcing anyway is correct — the raw rows did land.
+        await waitForRollup({
+          read: readRollupState,
+          sleep: sleepMs,
+          baseline: captured ? await captured : null,
+        });
+        if (cancelled) return;
+        await announceOuraSynced();
+      })();
     };
 
     (async () => {
@@ -420,6 +447,7 @@ export function SyncProvider({ userId }: SyncProviderProps) {
         if (lastIngestStored === null) { lastIngestStored = stored; return; } // seed; don't fire on mount
         if (stored <= lastIngestStored) return;
         lastIngestStored = stored;
+        if (!baseline) baseline = readRollupState();            // first advance of this burst
         if (debounce) clearTimeout(debounce);
         debounce = setTimeout(flush, 1500);                     // one invalidation per drain, not per batch
       });

@@ -1922,6 +1922,22 @@ export async function setOuraRollupWatermark(db: Db, userId: string, lastRolledD
     })
 }
 
+/**
+ * The watermark row as stored, epoch included and unfiltered — unlike `getOuraRollupWatermark`,
+ * which nulls on an epoch mismatch because its caller is narrowing a re-derivation span and a
+ * counter from a previous epoch is not comparable. A client watching for "the rollup has advanced"
+ * needs the opposite: an epoch CHANGE is itself the signal (a re-key invalidates everything), so it
+ * must see the epoch rather than have the row hidden behind it.
+ */
+export async function getOuraRollupState(db: Db, userId: string): Promise<{ lastRolledDs: number; epoch: number } | null> {
+  const rows = await db
+    .select({ lastRolledDs: s.ouraRollupState.lastRolledDs, epoch: s.ouraRollupState.epoch })
+    .from(s.ouraRollupState)
+    .where(eq(s.ouraRollupState.userId, userId))
+    .limit(1)
+  return rows[0] ?? null
+}
+
 export async function getOuraRollupWatermark(db: Db, userId: string, currentEpoch: number): Promise<number | null> {
   const rows = await db
     .select({ lastRolledDs: s.ouraRollupState.lastRolledDs, epoch: s.ouraRollupState.epoch })
