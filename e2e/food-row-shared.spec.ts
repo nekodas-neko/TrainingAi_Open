@@ -116,6 +116,11 @@ test('the external food-database row is the shared row, and keeps its mismatch w
   await expect(search).toBeVisible({ timeout: 30_000 })
   await search.fill('spec mismatch')
 
+  // BF-51 (#1038) put the picker's two sources behind a tab strip that opens on `Your foods`, so
+  // the food-database results no longer render until this tab is selected. Navigation only — the
+  // row, its shared shape and the mismatch warning below are asserted exactly as before.
+  await tap(page, page.getByRole('tab', { name: 'Food database' }))
+
   const row = page.getByRole('button', { name: /Spec Dairy — Spec Mismatch Yoghurt/ }).first()
   await expect(row).toBeVisible({ timeout: 30_000 })
 
