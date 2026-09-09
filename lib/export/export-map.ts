@@ -48,6 +48,8 @@ export const SOFT_DELETED: Record<string, string> = {
   plan_meal_answers: 'deleted_at',
   blood_panels: 'deleted_at',
   prescribed_runs: 'deleted_at',
+  program_sessions: 'deleted_at',
+  session_exercises: 'deleted_at',
   rest_days: 'deleted_at',
   set_logs: 'deleted_at',
   supplement_logs: 'deleted_at',

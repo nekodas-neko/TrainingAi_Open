@@ -9540,3 +9540,15 @@ and the two single-row delete sites the entry does not mention.
 
 Cheaper here than in a corrective migration. This is what "re-verify the plan against current main"
 is for, and the first time this session it has actually changed an implementation.
+
+---
+
+## 2026-09-09 — `docs/implementation-backlog.md` ratcheted DOWN 19705 → 19641 (LB-66 shipped)
+
+The entry that raised it (+43, the day before) is gone: LB-66 is implemented, so the queue heading
+and its reconciliation come out with it. Ratcheting down rather than leaving 64 lines of slack is
+the point of the ratchet — slack the document can regrow into is a baseline that says nothing.
+
+`projectOverview.md` is unchanged at 10455. Its LB-66 Known Issue was rewritten in place rather than
+struck: the hard delete is fixed, but the on-device sync check is still owed, and an entry with
+something outstanding stays in `projectOverview.md` rather than moving to the resolved archive.

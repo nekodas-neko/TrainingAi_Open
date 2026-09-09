@@ -71,7 +71,12 @@ async function affectedExercises(db: Db, userId: string, muscleName: string): Pr
     .from(s.sessionExercises)
     .innerJoin(s.programSessions, eq(s.sessionExercises.sessionId, s.programSessions.id))
     .innerJoin(s.programs, eq(s.programSessions.programId, s.programs.id))
-    .where(and(eq(s.programs.userId, userId), eq(s.programs.isActive, true)))
+    .where(and(
+      eq(s.programs.userId, userId),
+      eq(s.programs.isActive, true),
+      isNull(s.sessionExercises.deletedAt),
+      isNull(s.programSessions.deletedAt),
+    ))
   const target = injuryMuscleKey(muscleName)
   return rows.filter(r => (r.muscles ?? []).some(m => injuryMuscleKey(m) === target)).map(r => r.name)
 }

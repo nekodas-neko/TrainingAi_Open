@@ -583,8 +583,12 @@ describe.skipIf(!canRun)('repository ownership scoping (Q-155)', () => {
        VALUES ($1, 'A OWN PRESS', 0) RETURNING id`, [sess.rows[0].id])
 
     expect(await repo.removeSessionExercise(USER_A, se.rows[0].id)).toBe(true)
-    const { rows } = await pool.query(`SELECT id FROM session_exercises WHERE id = $1`, [se.rows[0].id])
-    expect(rows).toHaveLength(0)
+    // LB-66: removal is a tombstone, so the row survives with a `deleted_at` — every read filters
+    // it out, and the ownership join this case is about is unchanged either way.
+    const { rows } = await pool.query(
+      `SELECT deleted_at FROM session_exercises WHERE id = $1`, [se.rows[0].id])
+    expect(rows).toHaveLength(1)
+    expect(rows[0].deleted_at).toBeInstanceOf(Date)
   })
 
   it('ensureWorkoutSession refuses to adopt another user\'s session id', async () => {

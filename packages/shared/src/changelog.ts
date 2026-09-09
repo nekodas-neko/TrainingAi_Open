@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.443.0",
+    date: "2026-09-09",
+    changes: [
+      "Deleting a training session from a program no longer throws it away. Saving used to erase the session and its exercises for good; now the rows are kept behind the scenes, so a delete you regret is recoverable rather than final.",
+      "Workouts you already logged stay attached to the session you trained them under. Removing that session from your program used to cut the link \u2014 the history stayed, but it no longer knew which session it belonged to \u2014 and it took the session\u0027s phase and cycle progress with it.",
+    ],
+  },
+  {
     version: "1.442.0",
     date: "2026-09-09",
     changes: [

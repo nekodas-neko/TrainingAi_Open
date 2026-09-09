@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **271** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **273** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v38** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -1067,70 +1067,6 @@ OR-102a/b will read dose history to recommend the next dose. A tracker that read
   worst-case default for unknown equipment.
 - **Reversal cost:** low as code, high as behaviour — it moves every generated program's volume, at
   every budget except five exercises.
-### [workouts][platform] LB-66 — a saved session delete is still a hard delete, with no tombstone
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-08, filing the third of BF-132's three fixes; the
-  first two (a confirmation naming the exercise count, and an in-sheet undo) shipped in #1004.
-- **Lane: A** — `program_sessions` and `session_exercises` need a `deleted_at`, so this is a
-  migration and belongs to the lane that owns them.
-- **Needs:** — nothing.
-- **What is still true after BF-132.** The confirmation makes the mis-tap unlikely and the undo
-  covers a wrong confirm, but both live entirely in the editor's local state. Press Save and the
-  rows are gone from both tables, neither of which has a `deleted_at`. Nothing is recoverable after
-  that, and there is no dialog left to add — the guard has already fired by then.
-- **Why it is separable rather than shrugged off.** CLAUDE.md's offline-first rule already says a
-  server hard DELETE is invisible to devices that have not synced, which applies to these two tables
-  as much as to any other domain with delete UI. So the tombstone is owed for cross-device
-  correctness independently of recovery.
-- **What made BF-132's loss recoverable was luck, and it is worth restating here** because this is
-  the entry that would remove the luck: a BugFix session had quoted the program's structure two days
-  earlier, and six months of `exercise_logs` carry `exercise_name`/`style_name`, so the *trained*
-  version could be rebuilt. A session deleted before it was ever trained leaves nothing.
-
-**⚠ RECONCILED 2026-09-09 against current `main` — "add a `deleted_at`" is not the whole plan, and
-the obvious reading of it fires on every save.**
-
-**There is no delete endpoint for a program session.** Removing one is expressed as *saving the
-program without it*, and `saveProgram` (`lib/data/postgres/slices/programs.ts:233-242`) hard-deletes
-**every** session and session-exercise of the program inside a transaction and re-inserts them,
-round-tripping the client's ids so `workout_sessions.session_id` survives:
-
-```
-await tx.delete(s.sessionExercises).where(inArray(s.sessionExercises.sessionId, oldIds))
-await tx.delete(s.programSessions).where(eq(s.programSessions.programId, programId))
-```
-
-So replacing those two `delete`s with a soft delete would tombstone the whole program on **every**
-save, and the rows would then collide with their own re-insert on id. An implementer following the
-entry as written lands exactly that.
-
-**The shape that works, and it is smaller than a rewrite.** The replace-all is fine for rows that
-come *back*; only rows that do **not** come back are a real deletion. Both sets are already computed
-in that function:
-
-- `oldIdSet` — the program's current session ids.
-- `suppliedSessionIds` — the ids the save carries.
-- `removed = oldIdSet − suppliedSessionIds` is precisely the sessions the user deleted.
-
-So: tombstone `removed` (and their `session_exercises`) instead of hard-deleting them, keep the
-hard delete + re-insert for everything else, and there is no id collision because a removed id is by
-definition not re-inserted. Reads filter `deleted_at IS NULL`; the sync delta carries the tombstones,
-which is the half CLAUDE.md's offline-first rule actually requires.
-
-**Two things to get right, neither obvious from the entry:**
-1. **`session_periodization` and `workout_sessions` are restored after the delete-all** (the
-   `savedPeriodizationRows` / `orphanedWorkoutSessions` capture above it). A tombstoned session must
-   keep its periodization row rather than have it re-linked to nothing — check what the restore loop
-   does with an id that is no longer re-inserted.
-2. **`programs.ts:413` deletes a single session-exercise** and `lib/coach/domains/session-exercise.ts:295`
-   deletes another; both are real deletions and want the same tombstone. The local mirror
-   (`sqlite-backend.ts:1793-1802`) deletes both tables by program id and needs the columns at
-   SQLite v39.
-
-- **Reversal cost:** a migration, so the usual — a corrective migration rather than a revert.
-  Additive columns only (`deleted_at timestamptz`), so nothing is dropped and the migration itself
-  is not the risky half; the read-filtering sweep is.
-
 ### [body][app-shell] BF-133 — a full user overview: every metric the app has recorded, in one place
 
 - **Lane:** B — a new surface under `components/health/` or the User Information screen of **BF-118**; the assembler behind it may be Lane A if it needs a route.

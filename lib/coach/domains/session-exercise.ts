@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm'
 import { recommendExerciseRole, UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role'
 import type { ExerciseRole } from '@trainingai/shared/types/program'
 import * as s from '@/lib/data/postgres/schema'
@@ -17,6 +17,15 @@ interface TargetRow {
   muscleGroups: string[]
   exerciseRole: ExerciseRole
   sessionName: string
+  programId: string
+}
+
+/** A program only enters the pull delta when its `updated_at` moves, and the delta is what carries
+ *  a session-exercise change to another device (the client replaces a changed program's children
+ *  wholesale). Every write here that is not a `saveProgram` has to move it itself. */
+function bumpProgramOfSession(db: Db, sessionId: string) {
+  return db.update(s.programs).set({ updatedAt: new Date() })
+    .where(sql`${s.programs.id} = (SELECT program_id FROM program_sessions WHERE id = ${sessionId})`)
 }
 
 /** Ownership by join: `session_exercises` has no `user_id`, and the id comes from the client. */
@@ -32,11 +41,17 @@ async function loadTarget(db: Db, userId: string, id: string): Promise<TargetRow
       muscleGroups: s.sessionExercises.muscleGroups,
       exerciseRole: s.sessionExercises.exerciseRole,
       sessionName: s.programSessions.name,
+      programId: s.programs.id,
     })
     .from(s.sessionExercises)
     .innerJoin(s.programSessions, eq(s.sessionExercises.sessionId, s.programSessions.id))
     .innerJoin(s.programs, eq(s.programSessions.programId, s.programs.id))
-    .where(and(eq(s.sessionExercises.id, id), eq(s.programs.userId, userId)))
+    .where(and(
+      eq(s.sessionExercises.id, id),
+      eq(s.programs.userId, userId),
+      isNull(s.sessionExercises.deletedAt),
+      isNull(s.programSessions.deletedAt),
+    ))
     .limit(1)
   return (row as TargetRow) ?? null
 }
@@ -292,7 +307,12 @@ export const sessionExerciseHandler: DomainHandler = {
     const beforeState = captureBefore(accepted, row)
 
     if (accepted.some(c => c.field === 'removed')) {
-      await db.delete(s.sessionExercises).where(eq(s.sessionExercises.id, row.id))
+      // LB-66: tombstone, and bump the parent program so the pull delta re-sends the subtree —
+      // see `bumpProgramOfSession`. `undo` lifts the tombstone off this same row.
+      await db.update(s.sessionExercises).set({ deletedAt: new Date() })
+        .where(eq(s.sessionExercises.id, row.id))
+      await db.update(s.programs).set({ updatedAt: new Date() })
+        .where(eq(s.programs.id, row.programId))
     } else {
       const set: Record<string, unknown> = { updatedAt: new Date() }
       for (const c of accepted) {
@@ -313,6 +333,19 @@ export const sessionExerciseHandler: DomainHandler = {
   async undo(db, userId, targetId, before) {
     if (before.removed) {
       const r = before.removed as Record<string, unknown>
+      // LB-66: the removal is a tombstone, so undo lifts it off the SAME row — re-inserting a
+      // replacement would strand the original id, and the Coach addresses an exercise by id.
+      // Ownership is already settled upstream: `undoCoachChange` loads the change record scoped
+      // to the caller before it reaches any handler.
+      const [lifted] = await db.update(s.sessionExercises)
+        .set({ deletedAt: null, updatedAt: new Date() })
+        .where(and(eq(s.sessionExercises.id, targetId), isNotNull(s.sessionExercises.deletedAt)))
+        .returning({ id: s.sessionExercises.id })
+      if (lifted) {
+        await bumpProgramOfSession(db, r.sessionId as string)
+        return { ok: true }
+      }
+      // A change applied before LB-66 hard-deleted its row, and its undo window can still be open.
       await db.insert(s.sessionExercises).values({
         sessionId: r.sessionId as string,
         exerciseName: r.exerciseName as string,
@@ -322,6 +355,7 @@ export const sessionExerciseHandler: DomainHandler = {
         muscleGroups: (r.muscleGroups as string[]) ?? [],
         exerciseRole: (r.exerciseRole as ExerciseRole | undefined) ?? 'primary',
       })
+      await bumpProgramOfSession(db, r.sessionId as string)
       return { ok: true }
     }
 

@@ -4209,6 +4209,13 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // updatedAt on every edit, so a changed parent implies a changed subtree.
     // Re-send the full subtree for any changed program/style and let the client
     // replace its children on receipt (delete-then-insert by parent id).
+    //
+    // LB-66: this is also the tombstone channel for `program_sessions`/`session_exercises`, and it
+    // is why neither needs a `deleted_at` in the local mirror. The subtree here is LIVE rows only,
+    // and the client deletes every child of a changed program before re-inserting what arrives — so
+    // a tombstoned session is simply absent from the replacement and disappears locally. That works
+    // only because every write that tombstones one also bumps `programs.updated_at`, which is what
+    // puts the program in this delta at all; a tombstone without that bump would never propagate.
     const programIds = (programs as { id: string }[]).map(p => p.id)
     const styleIds   = (progressionStyles as { id: string }[]).map(p => p.id)
 
@@ -4222,7 +4229,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             icon:              s.programSessions.icon,
             timeBudgetMinutes: s.programSessions.timeBudgetMinutes,
           }).from(s.programSessions)
-            .where(inArray(s.programSessions.programId, programIds))
+            .where(and(inArray(s.programSessions.programId, programIds), isNull(s.programSessions.deletedAt)))
         : Promise.resolve([] as unknown[]),
       programIds.length
         ? this.db.select({
@@ -4236,7 +4243,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             supersetGroup: s.sessionExercises.supersetGroup,
           }).from(s.sessionExercises)
             .innerJoin(s.programSessions, eq(s.sessionExercises.sessionId, s.programSessions.id))
-            .where(inArray(s.programSessions.programId, programIds))
+            .where(and(
+              inArray(s.programSessions.programId, programIds),
+              isNull(s.sessionExercises.deletedAt),
+              isNull(s.programSessions.deletedAt),
+            ))
         : Promise.resolve([] as unknown[]),
       programIds.length
         ? this.db.select({

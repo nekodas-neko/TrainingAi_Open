@@ -212,7 +212,7 @@ export async function clearProgramPrescriptions(db: Db, userId: string, programI
   const sessionRows = await db
     .select({ id: s.programSessions.id })
     .from(s.programSessions)
-    .where(eq(s.programSessions.programId, programId))
+    .where(and(eq(s.programSessions.programId, programId), isNull(s.programSessions.deletedAt)))
   const sessionIds = sessionRows.map(r => r.id)
   if (sessionIds.length === 0) return
   await db
@@ -302,7 +302,7 @@ export async function reconcileSessionsInPhase(db: Db, userId: string, programId
        AND ws.deleted_at IS NULL
        AND ws.completed_at IS NOT NULL
        AND EXISTS (SELECT 1 FROM exercise_logs el WHERE el.workout_session_id = ws.id AND el.deleted_at IS NULL)
-      WHERE sp2.user_id = ${userId} AND ps.program_id = ${programId}
+      WHERE sp2.user_id = ${userId} AND ps.program_id = ${programId} AND ps.deleted_at IS NULL
       GROUP BY sp2.id
     ) sub
     WHERE sp.id = sub.id AND sp.sessions_in_phase <> sub.cnt
@@ -330,6 +330,9 @@ export async function listSessionPeriodizationForProgram(db: Db, userId: string,
     .where(and(
       eq(s.sessionPeriodization.userId, userId),
       eq(s.programSessions.programId, programId),
+      // LB-66: a tombstoned session keeps its periodization row (the ON DELETE CASCADE that used
+      // to destroy it no longer fires), so the filter has to be here rather than implied.
+      isNull(s.programSessions.deletedAt),
     ))
   return rows.map(r => mapPeriodization(r.sp))
 }

@@ -38,6 +38,7 @@ describe.skipIf(!canRun)('AI Coach — apply path', () => {
   let applyCoachPatch: typeof import('@/lib/coach/apply').applyCoachPatch
   let undoCoachChange: typeof import('@/lib/coach/apply').undoCoachChange
   let previewPatch: typeof import('@/lib/coach/consequences').previewPatch
+  let sessionExerciseHandler: typeof import('@/lib/coach/domains/session-exercise').sessionExerciseHandler
 
   beforeAll(async () => {
     const client = await import('@/lib/data/postgres/client')
@@ -45,6 +46,7 @@ describe.skipIf(!canRun)('AI Coach — apply path', () => {
     db = client.getDb()
     ;({ applyCoachPatch, undoCoachChange } = await import('@/lib/coach/apply'))
     ;({ previewPatch } = await import('@/lib/coach/consequences'))
+    ;({ sessionExerciseHandler } = await import('@/lib/coach/domains/session-exercise'))
 
     for (const [id, tag] of [[OWNER, 'owner'], [STRANGER, 'stranger']] as const) {
       await pool.query(
@@ -100,11 +102,11 @@ describe.skipIf(!canRun)('AI Coach — apply path', () => {
   beforeEach(async () => {
     await pool.query(`DELETE FROM coach_changes WHERE user_id = ANY($1)`, [[OWNER, STRANGER]])
     for (const [sessId, exId] of [[SESSION, EXERCISE_ROW], [STRANGER_SESSION, STRANGER_EXERCISE_ROW]] as const) {
-      // Clear strays FIRST. The removal test's undo re-inserts a fresh row rather than restoring
-      // the original id, and `session_exercises` is UNIQUE on (session_id, position) — so an
-      // upsert-then-clean order collides with the leftover row still holding position 0.
+      // Clear strays FIRST: the unique index over live rows is on (session_id, position), so a
+      // leftover row still holding position 0 collides with an upsert-then-clean order.
       await pool.query(`DELETE FROM session_exercises WHERE session_id = $1 AND id <> $2`, [sessId, exId])
-      // The removal test deletes its row, so re-create it if it is gone; otherwise just reset it.
+      // `deleted_at` is part of the reset since LB-66 — the removal test leaves the row tombstoned
+      // rather than gone, and every later case addresses it by id.
       await pool.query(
         `INSERT INTO session_exercises (id, session_id, exercise_name, muscle_groups, position)
          VALUES ($1, $2, $3, ARRAY['lower back','hamstrings'], 0)
@@ -113,10 +115,16 @@ describe.skipIf(!canRun)('AI Coach — apply path', () => {
            muscle_groups = EXCLUDED.muscle_groups,
            position      = EXCLUDED.position,
            exercise_id   = NULL,
-           style_id      = NULL`,
+           style_id      = NULL,
+           deleted_at    = NULL`,
         [exId, sessId, HINGE])
     }
   })
+
+  const deletedAtOf = async (id: string) => {
+    const { rows } = await pool.query(`SELECT deleted_at FROM session_exercises WHERE id = $1`, [id])
+    return (rows[0] as { deleted_at: Date | null } | undefined)?.deleted_at ?? null
+  }
 
   const nameOf = async (id: string) => {
     const { rows } = await pool.query(`SELECT exercise_name, muscle_groups FROM session_exercises WHERE id = $1`, [id])
@@ -296,14 +304,22 @@ describe.skipIf(!canRun)('AI Coach — apply path', () => {
     }
     const applied = await applyCoachPatch(db, OWNER, patch, ['c1'])
     expect(applied.ok).toBe(true)
-    expect(await nameOf(EXERCISE_ROW)).toBeUndefined()
+    // LB-66: removal is a tombstone, so the row survives — what must be gone is the Coach's view
+    // of it, which is what `currentState` reads.
+    expect(await sessionExerciseHandler.currentState(db, OWNER, EXERCISE_ROW)).toBeNull()
+    expect((await deletedAtOf(EXERCISE_ROW))).not.toBeNull()
 
     if (!applied.ok) return
     await undoCoachChange(db, OWNER, applied.changeId)
 
+    // Restored on the SAME id, not as a replacement row: the Coach addresses an exercise by id,
+    // and a re-insert would strand every change that still names the original.
+    expect(await deletedAtOf(EXERCISE_ROW)).toBeNull()
     const { rows } = await pool.query(
-      `SELECT exercise_name FROM session_exercises WHERE session_id = $1`, [SESSION])
-    expect(rows.map(r => r.exercise_name)).toContain(HINGE)
+      `SELECT id, exercise_name FROM session_exercises WHERE session_id = $1`, [SESSION])
+    expect(rows).toHaveLength(1)
+    expect(rows[0].id).toBe(EXERCISE_ROW)
+    expect(rows[0].exercise_name).toBe(HINGE)
   })
 
   describe('preview', () => {
