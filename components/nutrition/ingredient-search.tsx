@@ -1,11 +1,12 @@
 'use client'
 
-import { memo, useCallback } from 'react'
+import { memo, useCallback, useState } from 'react'
 import { Search, X, Loader2, Sparkles, Link2, ScanBarcode } from 'lucide-react'
 import { asHttpsUrl, hostOf } from './recipe-url'
 import type { FoodItem } from '@trainingai/shared/types/nutrition'
 import { FoodRow } from '@/components/nutrition/food-row'
 import { FoodDatabaseResults } from './food-database-results'
+import { SegmentedTabs } from '@/components/ui/segmented-tabs'
 import type { ExternalFood } from '@/lib/hooks/use-food-database-search'
 
 interface Props {
@@ -48,13 +49,37 @@ interface Props {
  * but it is a third party that rate-limits and goes down, so nothing here depends on it — and its
  * rows carry a warning when their own macros and calories disagree.
  */
+/**
+ * BF-51 ③ — the owner: *"this should probably be a tab like the other place"*, of `Recently used`
+ * sitting in the middle of the ingredient list.
+ *
+ * **It read as mid-list because it was**: your own foods, then the estimate/import action, then the
+ * food database. Two lists with an action between them. The tabs put the two lists in one place and
+ * leave the actions below, where they apply whichever list you are looking at.
+ *
+ * **Named for the headings already on screen, not for Log Food's tabs.** "the other place" is Log
+ * Food's `Recent · My Foods · Search`, and its `My Foods` means *saved meals* — a different thing
+ * from this screen's single foods, one screen away. Reusing that label here would rebuild exactly
+ * the confusion BF-103 removed. The distinction Log Food's own note rests on is the one kept:
+ * one side is what you already own, the other reaches beyond it.
+ */
+const SOURCE_TABS = [
+  { value: 'yours' as const, label: 'Your foods' },
+  { value: 'database' as const, label: 'Food database' },
+]
+type SourceTab = (typeof SOURCE_TABS)[number]['value']
+
 export function IngredientSearch({
   query, onQueryChange, searchResults, onAdd,
   estimating, onEstimate, importing, onImportRecipe,
   dbResults, dbSearching, dbUnavailable, addingExternal, onAddExternal,
   showAddFood, onAddByHand, onScan, lookingUpBarcode,
 }: Props) {
+  const [source, setSource] = useState<SourceTab>('yours')
   const recipeUrl = asHttpsUrl(query.trim())
+  // A pasted link replaces both lists, so the strip would be choosing between two things that are
+  // not being shown.
+  const showTabs = !recipeUrl
   return (
     <>
       {/* Ingredient search */}
@@ -91,7 +116,15 @@ export function IngredientSearch({
         </div>
       </div>
 
-      {searchResults.length > 0 && (
+      {showTabs && (
+        <SegmentedTabs
+          tabs={SOURCE_TABS}
+          value={source}
+          onValueChange={setSource}
+        />
+      )}
+
+      {showTabs && source === 'yours' && searchResults.length > 0 && (
         <div className="space-y-1.5">
           {/* Headed, because the list was already here and read as unexplained (BF-11c §5.3).
               `searchFoodItems('')` returns the twenty most recently updated foods — the browse-all
@@ -160,7 +193,13 @@ export function IngredientSearch({
         </button>
       )}
 
-      {!recipeUrl && query.trim().length >= 2 && (dbSearching || dbResults.length > 0 || dbUnavailable) && (
+      {showTabs && source === 'database' && query.trim().length < 2 && (
+        <p className="text-sm text-muted-foreground">
+          Type at least two letters to search the food database.
+        </p>
+      )}
+
+      {showTabs && source === 'database' && query.trim().length >= 2 && (dbSearching || dbResults.length > 0 || dbUnavailable) && (
         <FoodDatabaseResults
           results={dbResults}
           searching={dbSearching}
@@ -171,7 +210,7 @@ export function IngredientSearch({
         />
       )}
 
-      {!recipeUrl && query.trim() && searchResults.length === 0 && dbResults.length === 0 && !dbSearching && !showAddFood && (
+      {showTabs && source === 'yours' && query.trim() && searchResults.length === 0 && !showAddFood && (
         <p className="text-sm text-muted-foreground">
           No results for &ldquo;{query}&rdquo;.{' '}
           <button
