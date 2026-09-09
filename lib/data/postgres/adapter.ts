@@ -5718,7 +5718,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const now = Date.now()
     if (shouldPrune(lastBatteryPollPrune, now, BATTERY_POLL_PRUNE_THROTTLE_MS)) {
       lastBatteryPollPrune = now
-      this.db.execute(sql`DELETE FROM oura_ble_battery_poll WHERE measured_at < now() - interval '90 days'`).catch(err => console.error('[prune] oura_ble_battery_poll failed:', err))
+      this.db.execute(sql`DELETE FROM ring_battery_poll WHERE measured_at < now() - interval '90 days'`).catch(err => console.error('[prune] ring_battery_poll failed:', err))
     }
   }
 

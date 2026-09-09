@@ -100,7 +100,7 @@ export async function upsertOuraDaily(db: Db, userId: string, rows: OuraDailyRow
     .onConflictDoUpdate({
       target: [s.ouraDaily.userId, s.ouraDaily.date],
       set: {
-        ...mergeSet('oura_daily', OURA_DAILY_SOURCE_COLS, source),
+        ...mergeSet('sensor_daily', OURA_DAILY_SOURCE_COLS, source),
         syncedAt: sql`NOW()`,
       },
     })
@@ -562,7 +562,7 @@ export async function upsertOuraHeartrate(db: Db, userId: string, rows: { timest
   const now = Date.now()
   if (shouldPrune(lastHeartrateStorePrune, now, HR_PRUNE_THROTTLE_MS)) {
     lastHeartrateStorePrune = now
-    db.execute(sql`DELETE FROM oura_heartrate WHERE timestamp < now() - (${HR_RETENTION_DAYS} || ' days')::interval`).catch(err => console.error('[prune] oura_heartrate failed:', err))
+    db.execute(sql`DELETE FROM sensor_heartrate WHERE timestamp < now() - (${HR_RETENTION_DAYS} || ' days')::interval`).catch(err => console.error('[prune] sensor_heartrate failed:', err))
   }
 }
 
@@ -675,7 +675,7 @@ export const TIMESERIES_ROW_BUDGET = 2000
 
 async function pullKeyset<T>(
   client: import('pg').PoolClient,
-  table: 'oura_heartrate' | 'oura_bucket',
+  table: 'sensor_heartrate' | 'sensor_bucket',
   columns: string,
   userId: string,
   cursor: TimeseriesCursor | null,
@@ -754,7 +754,7 @@ export async function getOuraTimeseriesDelta(
     // Sequential on the SAME connection — never Promise.all (that checks out two pooled
     // connections at once and can starve the pool under a concurrent restore loop).
     const heartrate = await pullKeyset<OuraHrDeltaRow>(
-      client, 'oura_heartrate', 'id, timestamp, bpm, source', userId, opts.heartrate ?? null, budget,
+      client, 'sensor_heartrate', 'id, timestamp, bpm, source', userId, opts.heartrate ?? null, budget,
       (r) => ({
         id: r.id as string,
         timestamp: new Date(r.timestamp as string | Date).toISOString(),
@@ -764,7 +764,7 @@ export async function getOuraTimeseriesDelta(
       }),
     )
     const bucket = await pullKeyset<OuraBucketDeltaRow>(
-      client, 'oura_bucket',
+      client, 'sensor_bucket',
       'id, tier, bucket_start_ms AS "bucketStartMs", bucket_start_ds AS "bucketStartDs", ' +
       'local_date AS "localDate", hr_mean AS "hrMean", hr_min AS "hrMin", hr_max AS "hrMax", ' +
       'hrv_rmssd_ms AS "hrvRmssdMs", spo2_pct AS "spo2Pct", perfusion_index AS "perfusionIndex", ' +
@@ -1586,8 +1586,8 @@ export async function upsertOuraDailyDerived(db: Db, userId: string, day: string
     // statement makes a stamp additive by construction: each pillar writes only its own key, no
     // writer can clobber another, and no caller needs a read-merge. Q-273.
     set[k] = k === 'modelVersions'
-      ? sql.raw(`COALESCE(oura_daily_derived.${col}, '{}'::jsonb) || COALESCE(excluded.${col}, '{}'::jsonb)`)
-      : sql.raw(`COALESCE(excluded.${col}, oura_daily_derived.${col})`)
+      ? sql.raw(`COALESCE(sensor_daily_derived.${col}, '{}'::jsonb) || COALESCE(excluded.${col}, '{}'::jsonb)`)
+      : sql.raw(`COALESCE(excluded.${col}, sensor_daily_derived.${col})`)
   }
   await db
     .insert(s.ouraDailyDerived)
