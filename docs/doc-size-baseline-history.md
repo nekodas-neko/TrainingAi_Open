@@ -9998,3 +9998,21 @@ warning has to sit in the orientation doc because that is where someone would re
 it. The *reasoning* went to the journal entry, which is what the checker's "move it where it
 belongs" is for — I first wrote seven lines here and cut them to two, and the two that remain say
 re-measure, not what the new number is, because I did not take one.
+
+---
+
+## 2026-09-09 — backlog 19,925 → 19,946 (+21), entries ceiling 339 → 340 (Q-91-followup)
+
+The 21 lines are a decision and the trap under it, written onto an entry that previously said only
+"needs a scoped design". They earn the space because the obvious implementation is the wrong one:
+an `ouraStatus` listener that invalidates when `draining` goes false will refetch before the 3 s
+debounced rollup has written and cache a pre-rollup read, which is worse than the staleness it
+replaces. An entry that did not say so would be read as a two-line fix by whoever picks it up, and
+the failure is silent.
+
+Also on the entry: why it carries **no** `Gate:`/`Verify:` field, after I tried both. That is three
+lines to stop the next person re-deriving the same wrong answers — `Gate: device` parks buildable
+work, `Verify: device` files unbuilt work among shipped work.
+
+The ceiling raise is the usual +1 for this PR's own journal entry; the measurement behind it has not
+changed.

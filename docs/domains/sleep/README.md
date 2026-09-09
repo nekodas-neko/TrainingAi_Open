@@ -74,6 +74,7 @@ canonical-display-source table in the same section).
   production sleep-integrity sweep came back clean beyond one n=1 edge case (a 45-minute nap stored
   with all sleep-stage fields zeroed — noted for awareness, not filed as a bug).
 - Plans: `ls docs/superpowers/plans/*sleep*` (7 today, plus archived ones under `plans/archive/`).
+  Not matched by that glob: [`2026-09-09-oura-ble-rollup-invalidation-signal.md`](../../superpowers/plans/2026-09-09-oura-ble-rollup-invalidation-signal.md) (Q-91-followup).
 
 - Reviews: [`docs/reviews/2026-08-07-full-app-review.md`](../../reviews/2026-08-07-full-app-review.md) — **full-app deep review, 2026-08-07** (saving/caching/performance/logic across all 201 routes and 40 pages; 53 findings queued as Q-117…Q-138, plus root cause for Q-73 and mechanisms for Q-72/Q-107)
 
@@ -167,7 +168,11 @@ Live at the time of writing (2026-07-30) — always re-run the grep rather than 
   [`docs/overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md).
   **Deferred, filed separately:** the BLE ingest route's own background rollup still emits no
   invalidation signal at all for the ordinary (non-manual) flow — `docs/implementation-backlog.md`
-  Q-91-followup.
+  Q-91-followup. **Now scoped (2026-09-09), not yet built:**
+  [`docs/superpowers/plans/2026-09-09-oura-ble-rollup-invalidation-signal.md`](../../superpowers/plans/2026-09-09-oura-ble-rollup-invalidation-signal.md)
+  — the answer is that the rollup should *not* emit its own signal: the client can already hear
+  drain-end via the native `ouraStatus` event, and what it needs from the server is confirmation
+  that the rollup watermark advanced, not a push.
 - ✅ **Q-90 — the sleep screen gained phase-hours/bedtime/wake-time 14-day trend charts + a skin
   temperature card** — shipped 2026-08-06 (v1.267.1). The owner's "toggle between, or combine"
   request was resolved as a segmented control (`SegmentedTabs`) over one shared chart area, per
