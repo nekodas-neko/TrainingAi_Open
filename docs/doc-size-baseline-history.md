@@ -9912,3 +9912,14 @@ bigger call than the +1 it replaces. Put to the owner instead, alongside priorit
 
 The backlog's +20 is Q-491's ratchet result — the three detector generations and their hit counts,
 which is the evidence for "worth building" and the thing a future session would otherwise re-measure.
+
+## 2026-09-09 — `docs/implementation-backlog.md` 19,989 → 20,001 (+12), LB-56's fourth sighting
+
+The twelve lines are the mechanism, not a tally. #1044 produced the browser `SIGSEGV` and the
+`net::ERR_ABORTED` in the **same test** — attempt 1 and retry 1 — which settles a question the first
+three sightings left open: they are one fault, and `ERR_ABORTED` is what a test sees after the
+renderer is already gone. An entry that just incremented a count would have lost that.
+
+**No journal entry with this one, deliberately.** The PR is the record — a paragraph on an existing
+entry — and writing a journal entry about writing a backlog note is ceremony that would also cost a
+fifth ceiling raise for nothing.
