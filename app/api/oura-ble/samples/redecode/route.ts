@@ -162,8 +162,12 @@ export async function GET(req: Request) {
   await repo.reapStaleRedecodeJobs(userId)
 
   const idParam = new URL(req.url).searchParams.get('jobId')
-  const id = idParam != null ? Number.parseInt(idParam, 10) : null
-  if (idParam != null && !Number.isInteger(id)) {
+  // `Number`, not `parseInt`. parseInt TRUNCATES and stops at the first non-digit, so `?jobId=1.5`
+  // and `?jobId=77abc` used to poll jobs 1 and 77 — a 200 describing a different job than the caller
+  // asked about, which is the same shape as a correct answer. The empty string is excluded
+  // separately because `Number('')` is 0, which would poll job 0 rather than being refused.
+  const id = idParam != null && idParam.trim() !== '' ? Number(idParam) : null
+  if (idParam != null && (id == null || !Number.isInteger(id))) {
     return NextResponse.json({ error: 'Invalid jobId' }, { status: 400 })
   }
 
