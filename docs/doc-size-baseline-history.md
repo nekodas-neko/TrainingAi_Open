@@ -9441,3 +9441,38 @@ And it gives TN-30 a live consequence rather than a tidiness argument: the same 
 under the observed-max anchor of 168 and misses it by 10 bpm under the age anchor of 187. The app
 reported Z1 Recovery 34:59 and 0:00 everywhere else — the best walk in the record rendered as
 thirty-five minutes of recovery.
+
+## 2026-09-08 — `docs/implementation-backlog.md` 19,455 → 19,547 (+92), OR-102b ①② and two findings
+
+OR-102b keeps its entry rather than leaving: ① and ② shipped, ③ and ④ did not, and the `Keep:` says
+which and why. Most of the growth is the two findings the build turned up, both of which cost more to
+rediscover than to write down.
+
+**LB-67** carries a measured table because the defect is invisible without one: a weekly weight rate
+fitted against the array index reads −1.04 kg/wk for a true −0.70 at this owner's weigh-in frequency,
+which is the wrong side of the "faster than ideal pace" threshold the screen renders. The fix already
+exists one directory away in `adaptive-tdee.ts`, whose comment describes the same failure — so the
+entry is as much about the two copies disagreeing as about either one.
+
+**LB-68** is a `Reference:` entry and is deliberately long. It records that synthetic Playwright input
+does not reach one section's buttons while `el.click()` does, with the negative results that rule out
+the obvious causes, because a session already lost time to this and filed nothing — attributing it to
+a hand-rolled context that turns out not to be the cause.
+
+Also kept: the estimator design OR-102b ④ needs, including the residual-SD floor. A perfect-line
+fixture measured 1.2e-13, which passes a `> 0` guard and then makes every delta significant.
+
+## 2026-09-08 — `docs/implementation-backlog.md` 19,547 → 19,565 (+18), BF-133 shipped in part
+
+BF-133 keeps its entry, and the growth is the two things that would otherwise be re-derived.
+
+**The BF-118 decision, which is not the one the entry proposed.** BF-133 opened by demanding a
+decision against BF-118's "User Information" screen and recommending this be a section of it. That
+screen does not exist and BF-118 is large and unbuilt; `/more/details` (BF-79) does exist and is
+already BF-118's *"what you tell the app"* half under another name. So the recommendation stands and
+the target changed, which is worth stating outright rather than leaving the next session to rediscover
+that the named screen is not there.
+
+**Why the read is local-first**, in one line so it is not "improved" back to a server fetch:
+`/api/body-metadata` returns seven days, and a card about the latest reading of each metric shows
+most of them as absent on a seven-day window.

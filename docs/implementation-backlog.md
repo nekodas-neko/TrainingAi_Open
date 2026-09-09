@@ -1092,12 +1092,104 @@ random, and worse than no colour because it looks authoritative.
 - **Revisit the plateau call once 6+ weeks of on-drug data exist** to test it against — not before.
 
 - **Reversal cost:** low. A section and a card; no data, no migration (those are OR-102a's).
+- **Keep:** ③ and ④. **① and ② shipped in #1007** — vial setup and the dose calculator, reached from
+  a syringe control on any milligram-dosed supplement row, with the owner-verified figures
+  (`10 mg ÷ 3 mL = 3.33 mg/mL`, `0.5 mg → 15 units`) covered by unit tests and an e2e.
+  - **③ the dose on the day timeline is Lane A's**, and only its *render* is left: the tick already
+    stamps `taken_at` (`adapter.ts:6557`, OR-102a), so what is missing is an event type in
+    `app/api/day-timeline/route.ts` — an `app/api/**` path Lane B may not touch.
+  - **④ the weight-response chip is blocked on LB-67, not on data.** The series is reachable from
+    Lane B — `store.getBodyMetrics(cutoff)` returns every local row with `weightKg`, which is the
+    local-first read this should use anyway. What stops it is the formula: shipping a third
+    kg/week estimator beside the two that exist, one of which is wrong, is the bug class the
+    One Formula rule exists to prevent. Do ④ once LB-67 lands.
+  - **The estimator ④ needs was worked out and is worth not re-deriving.** Trailing 7-day means at
+    each end; standard error `sd × √(1/n₁ + 1/n₂)` over the span in weeks; the verdict withheld
+    unless the **whole** 95% interval falls on one side of the band, because an interval straddling
+    a boundary rounded to the nearer side is the authoritative-looking coin-flip this entry's own
+    measurements rule out. Residual SD from the user's own readings once there are ≥10, else the
+    measured 1.203 kg. **And a floor on that SD:** a fixture on a perfect line measured a residual
+    of **1.2e-13**, which passes a plain `> 0` guard and then makes every delta look significant by
+    dividing by nothing. A 0.1 kg scale cannot produce a residual under ~0.029 kg, so anything
+    below that is a degenerate series, not a consistent one.
 - **On completion, the device check is:** the calculator's arithmetic against the owner's own
   third-party app, and whether the colour chip reads correctly at a glance on the S25. **Written as
-  prose on purpose — this is NOT a `Verify:` field**, because nothing here has been built. Carrying
+  prose on purpose — this is NOT a `Verify:` field**, because ③ and ④ are not built. Carrying
   one filed this entry under VERIFY ("shipped; a look is owed") for two days while Lane B's READY
   list held two items and the owner believed the tracker had shipped. Add the field when the code
   merges, not before.
+
+### [platform] LB-68 — Playwright's synthetic input does not reach the Nutrition day-tools buttons, and two sessions have now lost time to it
+
+- **Lane: O** — it is about `e2e/` and the harness, not a screen. **Branch:** unassigned.
+- **Added:** 2026-09-08, after the second session hit it.
+- **Needs:** — nothing.
+- **Reference:** — this exists so the next session recognises it in one minute instead of an hour.
+
+**The symptom.** `page.click()` and `page.touchscreen.tap()` on `Manage` (and on `End of Day`) in the
+Nutrition tab's day-tools section do nothing: the sheet never mounts. Measured over **~18 retried
+taps across 90 s**, with the button focused afterwards, **no page error, no console error**, and no
+sheet appearing at any point from 50 ms to 3 s after the tap.
+
+**`el.click()` on the same locator opens it inside 50 ms.** So the handler is wired, React is
+hydrated, and nothing is overlaying the control — Playwright's synthetic event is simply not
+reaching it. **The app is not broken here**; a spec that fails on this is not evidence of a defect.
+
+**The corrected attribution matters.** A session on 2026-09-08 saw the same thing on `End of Day`,
+found that `el.click()` worked while synthetic clicks did not, and put it down to a hand-rolled
+Playwright context. It reproduces in the project's own harness, on the config's own device profile,
+so that explanation was wrong and the finding was dropped rather than filed.
+
+**It is not the whole tab.** `My Foods`, on the same screen, opens under synthetic input — which is
+why `nutrition-sheet-surface.spec.ts` passes. Whatever the cause, it is specific to this section.
+`serviceWorkers: 'block'` and `storageState` were both ruled out by direct comparison.
+
+- **The workaround, in use in `e2e/vial-dose-calculator.spec.ts`:** a `domClick` helper that calls
+  `locator.evaluate(el => el.click())` after asserting visibility. It costs the hit test — the spec
+  proves the control is *wired and correct*, not that it is *reachable by a finger* — so a control
+  behind it owes a device look.
+- **What to actually investigate:** why this section swallows synthetic events. A pointer-events or
+  overlay difference against the `My Foods` trigger is the obvious first place, and the fact that
+  `el.click()` works rules out most of the alternatives.
+- **Reversal cost:** nil. A test helper and a note.
+
+### [body][nutrition] LB-67 — the weekly weight rate is fitted against the array index, so a gappy series overstates it 🔴 LIVE
+
+- **Lane: A** — `packages/shared/src/health/long-term-goal-progress.ts`, reached by
+  `app/api/progress-summary`. **Branch:** unassigned.
+- **Added:** 2026-09-08, found while building OR-102b ④, which needs this figure and cannot add a
+  third one beside it.
+- **Needs:** — nothing.
+
+**`computeWeightRateKgPerWeek(weights)` takes an array of numbers and fits `x = the array index`,
+then multiplies the slope by 7 as though the readings were one day apart.** They are not: rows exist
+only on days with a metric, and the owner weighs in on about three days in four. So the slope is
+*per reading* and is reported as *per day*.
+
+**Measured on a 14-day window, true trend −0.70 kg/wk:**
+
+| readings in the window | reported | true | overstated |
+|---|---|---|---|
+| 14 of 14 days | −0.70 kg/wk | −0.70 | 1.00× |
+| **10 of 14** (the owner's rate) | **−1.04 kg/wk** | −0.70 | **1.48×** |
+| 6 of 14 | −1.76 kg/wk | −0.70 | 2.51× |
+
+**This is live and it changes what the screen says, not just the digits.**
+`evaluateWeightRateVsGoalBand` calls anything past 1.0 kg/wk `too_fast`, so the middle row — an
+ordinary, healthy −0.70 kg/wk — renders on Health → Body as **"Faster than ideal pace"** in amber.
+
+**The fix already exists in this repo, one directory away.** `packages/shared/src/nutrition/adaptive-tdee.ts`
+fits against the weigh-in's *day index within the window* and its comment states this exact failure:
+*"an unevenly spaced series (weighed Mon, Tue, then Sunday) would otherwise report a slope
+per-reading and badly overstate the rate"*. So the app already holds two weekly-weight-rate figures,
+computed differently, disagreeing by about 1.5× on this owner's data, on two different screens —
+which is what the One Formula rule is for.
+
+- **What to do:** give the shared function dated points instead of a bare number array, and converge
+  the `adaptive-tdee` copy onto it. **While it is open, add the standard error** — OR-102b ④ needs
+  the interval, not just the point estimate, and adding it in the same pass avoids a third caller
+  inventing one.
+- **Reversal cost:** low. One formula, two call sites, no data and no migration.
 
 ### [platform] OR-105 — 17 more entries may be filed as shipped without having been built
 
@@ -1426,6 +1518,24 @@ sounds like:**
   this entry is the *single dense view*; if it is built by duplicating those cards' internals rather
   than reusing them, it becomes a second place every body metric is formatted. Reuse or extract.
 - **Reversal cost:** low — one read-only screen over existing stores. No migration, no new data.
+- **Keep:** the training and performance sections. **Body composition, vitals, metabolism, daily
+  movement and sleep shipped in #1009**, as a read-only section under the editable fields on
+  **More → Profile details** — see the decision below. Still unbuilt: `personal_records`,
+  `fitness_tests`, `dexa_scans` and `measured_rmr` in this view. The clinical two are reachable today
+  at More → DEXA & RMR results and the scale's resting-rate row now points there, so the gap is a
+  single dense view rather than an unreachable number.
+- **⚠ The BF-118 decision is TAKEN, and it is not the one this entry proposed.** BF-118's screen does
+  not exist and is a large unbuilt entry. What does exist is **`/more/details` ("Profile details",
+  BF-79)** — name, biological sex, birth year, height, editable, one PATCH — which is precisely
+  BF-118's *"what you TELL the app"* half already built under another name. So this shipped as a
+  section of **that** screen: told above, measured below, one page about you. Do not add a second
+  destination when BF-118 is built; fold BF-118's intake into `/more/details` instead.
+- **The read is local-first, and that is required rather than preferred.** `/api/body-metadata`
+  returns **seven days**, and this card is about the LATEST reading of each metric — a scale session
+  or a DEXA figure is routinely older than that, so read from the server alone most of these read as
+  absent when they exist. `store.getBodyMetrics(cutoff)` returns the full local history, and
+  `body_metrics` is a domain the app writes locally, so CLAUDE.md's offline-first rule already
+  required this. The seven-day payload stays as the web fallback, where `getLocalStore` returns null.
 - **A device look is owed when it ships:** this is a long screen on a phone, and "good UI" for a dense
   read-only list is mostly about scanning — group headers that stick, numbers aligned, and the S25's
   fold not landing mid-group.
@@ -2020,7 +2130,7 @@ repair the 22 dead backlog paths and 43 doubled `docs/overview/overview/` labels
 unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge candidates
 (led by `oura-ring-data-reference.md`, a retired-API reference with no retirement note).
 
-### [platform] PS-39 — 51 API routes still have no test that imports their handler
+### [platform] PS-39 — 45 API routes still have no test that imports their handler
 
 - **Lane:** A. Regenerate the list with `node scripts/check-route-test-coverage.js` — it prints every
   uncovered route when it fails, and the ratchet now holds the number.
@@ -2083,16 +2193,16 @@ testing X. Two more classes worth the same suspicion: a fixture whose timezone I
 proves nothing about which zone the route read, and a fixture already in sorted order proves
 nothing about a sort.
 
-**The count was 93 and is really 51**, by the mechanism the entry half-noticed: it counted a route
+**The count was 93 and is really 45**, by the mechanism the entry half-noticed: it counted a route
 covered when any test mentioned its URL, so `calendar-data` and `training-load` "appearing only as
 cache-key strings" counted. Asking instead whether a test imports the handler gives 150 of 222, less
-the ninety-nine paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
+the one hundred and five paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
 honest in both directions (see above), so the list can be worked from. **The actionable core
 named by this entry is now CLEAR**: the home aggregates, both ingest routes and `program-week` are
 done; so are ai-periodization, `friends/leaderboard` (its scoping was left uncovered when a mock
 could not see it, and is covered against real rows now), the account cluster, the supplement/vial chain,
 a meal plan's lifecycle + reshape, the workout write path, the running plan and the four body/health
-writes, the goal-target-adherence loop, the home week/streak reads, the AI Coach lifecycle, the cardio hub, the strength/volume trends, the day timeline, the food-input path, the four heart-rate reads, the exercise catalogue, the nutrition day-completion trio and the year-review/identity trio. Work by feature — batching on what is *verified together* twice found a defect (LA-78, LA-79). `scripts/check-route-test-coverage.js` ratchets it, so the debt
+writes, the goal-target-adherence loop, the home week/streak reads, the AI Coach lifecycle, the cardio hub, the strength/volume trends, the day timeline, the food-input path, the four heart-rate reads, the exercise catalogue, the nutrition day-completion trio, the year-review/identity trio, the platform-meta four and the two program-phase writes. Work by feature — batching on what is *verified together* twice found a defect (LA-78, LA-79). `scripts/check-route-test-coverage.js` ratchets it, so the debt
 only shrinks, a NEW route arrives uncovered and fails, and since LA-81 a route that LOSES its test fails whatever the total does.
 
 ### [app-shell][platform] LA-76 — a deload PHASE still decays the collection, and nothing dates one
@@ -19156,6 +19266,33 @@ reads.
   merge. That fixes the *class* of "only CI sees test type errors" rather than this one shape, and it
   may make the bespoke check unnecessary.
 - **Reversal cost:** low — a script and a CI step, deletable.
+
+### [platform] LA-84 — a failed export produces a truncated file that looks complete
+
+- **Lane:** A — `app/api/export/route.ts`, and whatever consumes an export.
+- **Added:** 2026-09-08, Lane A — found while writing the route's first tests (PS-39), and pinned
+  there as current behaviour rather than fixed, because the remedy changes the file's contract.
+
+`exportUserData` is an async generator and the route enqueues each line as it arrives. **The
+response headers are already sent by the time it can throw**, so the `catch` cannot change the
+status: it logs to the console and closes the stream. The user gets a `200`, an
+`attachment; filename="trainingai-export-<date>.ndjson"`, and a file that ends wherever the failure
+happened — with nothing in it saying so.
+
+This is the takeout feature, so the whole point is that the file is a complete copy. A short one
+that looks complete is worse than an error, because the failure is only discoverable by counting
+rows against a database the user no longer has.
+
+**Why this is not a one-line fix.** The obvious remedy is a terminal `{ "_error": … }` line, which
+means the file's contract becomes *"the last line may be an error"* — every consumer has to know
+that, including the manifest-first shape the first line already establishes. A trailer that mirrors
+the manifest (`{"_complete": true}` on success, `{"_error": …}` otherwise) is probably the right
+answer, since it makes truncation detectable by absence rather than by presence, and a file cut off
+by a dropped connection then reads as incomplete too. That is a decision about the format, not a
+patch.
+
+- **Keep:** the test at `lib/__tests__/platform-meta-routes.test.ts` asserts the CURRENT behaviour
+  and says so; it will need inverting when this ships.
 
 ### [platform] LB-37 — bring the 320 recorded test-file type errors down
 
