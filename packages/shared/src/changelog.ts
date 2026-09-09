@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.441.2",
+    date: "2026-09-09",
+    changes: [
+      "When last night is still syncing, it no longer counts towards the \u0027vs your recent nights\u0027 comparison it is being measured against \u2014 so the bars stop shifting under the reading while the night fills in.",
+    ],
+  },
+  {
     version: "1.441.1",
     date: "2026-09-09",
     changes: [
