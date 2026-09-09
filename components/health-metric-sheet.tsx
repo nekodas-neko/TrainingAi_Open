@@ -10,6 +10,7 @@ import { Hypnogram, STAGE_COLOR } from "@/components/health/hypnogram";
 import { EmptyState } from "@/components/ui/empty-state";
 import { actualSleepWindow } from "@/lib/sleep/actual-window";
 import { MetricScale, rangeStats } from "@/components/health/metric-scale";
+import { settledNights } from "@/components/health/sleep/settled-nights";
 
 export interface HealthReading {
   date: string;
@@ -37,6 +38,8 @@ export interface SleepDetailReading {
   respiratoryRate?: number | null;
   sleepScore?: number | null;
   sleepTimeRecommendation?: string | null;
+  /** True while the night is still filling (BF-83) — excluded from the comparison baseline. */
+  provisional?: boolean;
 }
 
 interface HealthMetricSheetProps {
@@ -146,11 +149,17 @@ function SleepDetailView({ r, allNights = [], color, onBack }: { r: SleepDetailR
   const recommendation = r.sleepTimeRecommendation ? SLEEP_TIME_RECOMMENDATION_LABELS[r.sleepTimeRecommendation] : null
 
   // Distributions over the recent nights, for the "vs your recent nights" scales below.
-  const durStats  = rangeStats(allNights.map(n => n.durationHours))
-  const effStats  = rangeStats(allNights.map(n => n.efficiency))
-  const hrvStats  = rangeStats(allNights.map(n => n.averageHrvMs))
-  const rhrStats  = rangeStats(allNights.map(n => n.lowestHeartRate))
-  const brStats   = rangeStats(allNights.map(n => n.respiratoryRate))
+  //
+  // BF-83 — a night still filling is left out of its own baseline. The owner opened one night four
+  // minutes apart and every number moved, the comparison scale included: a provisional night is the
+  // newest and the one whose numbers are known to be incomplete, so leaving it in means the reading
+  // and the context it is judged against move together.
+  const baseline  = settledNights(allNights)
+  const durStats  = rangeStats(baseline.map(n => n.durationHours))
+  const effStats  = rangeStats(baseline.map(n => n.efficiency))
+  const hrvStats  = rangeStats(baseline.map(n => n.averageHrvMs))
+  const rhrStats  = rangeStats(baseline.map(n => n.lowestHeartRate))
+  const brStats   = rangeStats(baseline.map(n => n.respiratoryRate))
 
   // Secondary metric tiles the list card shows but this view previously dropped.
   const extraTiles = [
@@ -225,7 +234,7 @@ function SleepDetailView({ r, allNights = [], color, onBack }: { r: SleepDetailR
         )}
 
         {/* How this night compares to your recent nights */}
-        {allNights.length >= 3 && (durStats.max != null || effStats.max != null || hrvStats.max != null || rhrStats.max != null) && (
+        {baseline.length >= 3 && (durStats.max != null || effStats.max != null || hrvStats.max != null || rhrStats.max != null) && (
           <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-4">
             <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Vs your recent nights</p>
             <MetricScale label="Time asleep" value={r.durationHours} min={durStats.min} max={durStats.max} avg={durStats.avg} accent={color} format={v => fmtHours(v)} optimal="high" />

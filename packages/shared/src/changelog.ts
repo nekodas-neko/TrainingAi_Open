@@ -6,6 +6,27 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.441.2",
+    date: "2026-09-09",
+    changes: [
+      "When last night is still syncing, it no longer counts towards the \u0027vs your recent nights\u0027 comparison it is being measured against \u2014 so the bars stop shifting under the reading while the night fills in.",
+    ],
+  },
+  {
+    version: "1.441.1",
+    date: "2026-09-09",
+    changes: [
+      "Recent on Log Food now shows everything you have logged lately, not just the foods from whichever meal the time of day suggested. It also shows twelve instead of five, and appears as soon as the sheet opens.",
+    ],
+  },
+  {
+    version: "1.441.0",
+    date: "2026-09-09",
+    changes: [
+      "If your ring missed the start of a night, you can now tell it what time you actually went to bed \u2014 on the Sleep screen, under the stages. It only affects your bedtime average; the recorded night is left exactly as it was.",
+    ],
+  },
+  {
     version: "1.440.0",
     date: "2026-09-08",
     changes: [

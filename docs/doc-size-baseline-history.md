@@ -9477,7 +9477,7 @@ that the named screen is not there.
 `/api/body-metadata` returns seven days, and a card about the latest reading of each metric shows
 most of them as absent on a seven-day window.
 
-## 2026-09-09 — backlog → 19902, `tuning.md` → 517: the owner's three cardio decisions
+## 2026-09-09 — backlog → 19972, `tuning.md` → 517: the owner's three cardio decisions
 
 All three gates cleared in one exchange, and one of them overturned a recommendation this review had
 already published.
@@ -9501,3 +9501,56 @@ The baton grew by thirty lines, and the last of them is the uncomfortable one: t
 recommendations were withdrawn in this thread, each to an owner objection, plus two numbers corrected
 in place. What survived every round was measured rather than modelled. That belongs in the baton more
 than any of the individual findings do.
+
+## 2026-09-09 — `docs/implementation-backlog.md` 19,565 → 19,580 (+15), Q-519's UI half shipped
+
+The `Keep:` describing the unbuilt control comes out; three things go in, and each is a thing the next
+session would otherwise pay for.
+
+**A new `Keep:` for Lane A**: `/api/sleep-sessions` does not return `manualSleepStart` even though the
+repository maps it, so the card reads the column from the local store and the saved value is invisible
+on the web build. One line in an `app/api/**` path.
+
+**The date rule**, because it is the trap in this entry and it is not obvious: a night dated `D` begins
+the evening before when the remembered time is before midnight, so the split is at noon. It changes
+nothing the app computes today — the sole reader sees only the clock time — which is exactly why
+someone would remove it.
+
+**And the note that displaying it is still unanswered**, so shipping the control is not mistaken for
+having decided where a remembered bedtime belongs on the screen.
+
+## 2026-09-09 — `docs/implementation-backlog.md` 19,580 → 19,587 (+7), LB-18 shipped
+
+The `Keep:` describing the unbuilt swap comes out and three shorter lines go in: what shipped, why the
+cache key sits inside the old `nutrition-recent-for-meal:` family rather than beside it, and the half
+that is still owed.
+
+That last one is the reason this is +7 rather than −10. The owner asked for *"all recently entered
+foods/meals"* and this delivered the bucket half; `Recent` is still foods only. Recording it as a
+`Keep:` stops the entry reading as fully answered when half the sentence is unbuilt — and it carries
+the correction that the `lastUsedAt` this entry once called missing has existed since migration 238.
+
+## 2026-09-09 — `docs/implementation-backlog.md` 19,587 → 19,586 (−1), BF-83's last half shipped
+
+The `Keep:` naming two unbuilt pieces comes out; three lines go in saying all three halves are done
+and stating the two distinctions that make the fix correct rather than merely applied.
+
+The first is that the night being **viewed** is never filtered — it is the reading, not the baseline,
+and a provisional night still shows its own numbers under its own badge. The owner's report was that
+the comparison moved as well as the reading, so what changed is the context.
+
+The second is that an **absent** flag counts as settled. Every night predating the flag carries no
+value, and reading those as provisional would empty the baseline rather than protect it — which is
+the failure a stricter-looking filter would have shipped.
+
+### Reconciled on merge — 19593 (BF-83 branch)
+
+LB-18 landed under this branch while it was in CI, and the `.size` file conflicted with both sides
+describing the same number. Recomputed from the merged file rather than spliced.
+
+The version conflict beside it was rebuilt from `origin/main` rather than resolved hunk-by-hunk, per
+the standing rule: two same-day bumps put the conflict *inside* an entry's `changes:` array, where
+both sides share the `version:`/`date:` header above the marker, so a splice produces a headerless
+entry and silently drops the other PR's version. `main` read 1.441.1, so this took 1.441.2 rather
+than skipping to .3 — a gap in the sequence is a small thing, but it is also a question someone asks
+later.

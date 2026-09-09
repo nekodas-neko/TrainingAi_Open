@@ -528,16 +528,6 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
     }
   }, [userId, tz])
 
-  /**
-   * Which bucket `Recent` reads. Pinned for the life of the sheet rather than recomputed per render:
-   * the hour ticking over mid-session is not a reason to swap the list under a thumb, and a value
-   * that changes every render would be an unstable prop.
-   */
-  const recentMealTypeId = useMemo(
-    () => preselectedMealTypeId ?? mealTypeForHour(mealTypes, new Date().getHours()) ?? null,
-    [preselectedMealTypeId, mealTypes],
-  )
-
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" surface="page" className="h-[90vh] flex flex-col" bottomInset="takeover">
@@ -591,7 +581,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
                 />
               )}
               {listTab === 'recent' ? (
-                <RecentFoodsPanel mealTypeId={recentMealTypeId} userId={userId} onSelectFood={onSelectFood} />
+                <RecentFoodsPanel userId={userId} onSelectFood={onSelectFood} />
               ) : (
                 <FoodList
                   show={listTab}
