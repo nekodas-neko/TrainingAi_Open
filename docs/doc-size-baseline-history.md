@@ -9419,7 +9419,7 @@ What survives is the bounded claim: inside the observed range cadence is nearly 
 (120 spm → 99.0 bpm, 130 → 101.9, 140 → 104.8). What does not survive is any specific spm target for
 reaching 133.
 
-## 2026-09-09 — backlog → 19672, `tuning.md` → 487: the owner's walk settled it
+## 2026-09-09 — backlog → 19809, `tuning.md` → 487: the owner's walk settled it
 
 The owner disputed this agent's heart-rate estimate, walked 35 minutes at 5 min fast / 2 min slow, and
 was right. The measurement is worth its lines because it overturns a conclusion this review had
