@@ -17439,47 +17439,6 @@ per-field merge where an AI write has no honest source rank to claim.
   `TREND_SPECS`/`trendRows` are shaped around a `WeekWindowResponse` and want widening to the
   `MonthWindowResponse` shape, not rewriting.
 
-### [workouts][platform] LB-24 — deleting the Home day-review orphaned a chart, a route and a cache group
-
-- **Branch:** `chore/load-comparison-rehome-or-delete` · **Lane: A** — the decision reaches
-  `app/api/workout-load-history/route.ts`; the re-home half alone would be Lane B.
-- **Needs: Q-112d**
-- **Added:** 2026-08-27 · Lane B, from Q-112a's own diff. Filed rather than acted on, because the
-  right answer depends on Q-112b–d, which are not built yet. **The dependency is a field as of
-  2026-09-04**: the entry's own body says "do not delete the route yet" because Q-112c reuses it,
-  and Q-112c shipped that day — so the blocker is now Q-112d, and it is written where the lane
-  runner can read it instead of in prose it prints as READY over.
-- **What Q-112a removed.** `components/day-review-sheet.tsx` was the **only** renderer of
-  `components/health/workout-load-comparison-chart.tsx` and the only caller of
-  `/api/workout-load-history`. After Q-112a shipped:
-  - the chart component has zero call sites (`app/api/workout-load-history/route.ts:5` imports its
-    `LoadComparisonEntry` *type*, which is not a render — the type lives in the component file, so
-    even a type-only import keeps the file alive to `tsc` while nothing draws it);
-  - the route has zero client callers;
-  - `invalidateWorkoutSummaries()` still prefix-clears `workout-load-history:`
-    (`lib/cache-groups.ts:65`), which is now inert. Harmless, and deliberately left — it is correct
-    the moment anything fetches the key again, and removing it is the half that has to be
-    remembered.
-- **Nothing else was lost.** The sheet's other chart, `HrDayChart`, has three surviving renderers
-  (`app/health/heart-rate/page.tsx`, `components/home/home-card-widget.tsx`,
-  `components/health/hr-day-card.tsx`), so that deletion cost no surface.
-- **Do not delete the route yet.** Q-112c's plan names `/api/workout-load-history` as one of the
-  series it reuses for the 7-day comparison window, so a tidy-up now is work Q-112c would have to
-  undo. The decision point is *after* Q-112d: if the trends phase has not re-homed the chart by
-  then, delete component + route + the cache-group line together.
-- **⚑ THE DECISION POINT HAS PASSED, AND THE ANSWER IS DELETE (2026-09-08, Q-112d shipped).** The
-  trends phase did **not** re-home `workout-load-comparison-chart`, and it did not reuse the route
-  either: `/api/day-review/week-window` derives session volume itself from `getWorkoutSessionsFrom`,
-  so Q-112c's plan text about reusing `/api/workout-load-history` describes an intention the shipped
-  route did not follow. That leaves the component with zero renderers, the route with zero client
-  callers and the `workout-load-history:` line in `invalidateWorkoutSummaries()` clearing nothing —
-  the state this entry describes, now with nothing left that might rescue it. Verify the zero call
-  sites at the head you delete from rather than trusting this line; the point of the note is that
-  the *blocker* is gone, not that the grep is stale-proof.
-- **What "re-home" would mean.** Per-session load-vs-history is a workout read, and the natural
-  surfaces are `/health/day` (which already draws per-session volume) or Q-112b's read-through step
-  — not the evening wrap-up, where it was one more chart nobody had asked for.
-
 ### [devices][app-shell] Q-111 — device battery chips on the Home header (ring + strap shipped; scale is native, and one owner question)
 
 - **Keep — TWO things, neither of them ordinary implementation work:**

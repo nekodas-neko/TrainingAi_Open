@@ -9975,3 +9975,26 @@ cite the journal, and that is not this PR's to make.
 
 `docs/implementation-backlog.md` also drops 19,997 → 19,966 in the same PR: LB-64's own entry left
 the queue (32 lines) and Q-112e's pointer into it was rewritten to name the shipped route (+1).
+
+---
+
+## 2026-09-09 — backlog 19,966 → 19,925 (−41), entries ceiling 338 → 339 (LB-24)
+
+The backlog drops 41 lines because LB-24's entry left the queue whole. It was a long entry for a
+deletion, and deservedly so: most of its length was the record of *why not yet* — the dependency on
+Q-112b–d, the "do not delete the route yet" note, and then the dated ⚑ recording that the decision
+point had passed. An entry that parks itself correctly costs lines while it waits and returns them
+all at once.
+
+The entries ceiling goes up one again, and the measurement behind the last raise still holds: the
+foldable entries are the newest ones, so a sweep would fold the recent window rather than the spent
+part of it. Nothing new to add beyond the count moving 39 → 40 with the same shape.
+
+`projectOverview.md` goes 10,492 → 10,494 for two lines, and they are the two the ratchet is
+supposed to make me argue for. Q-489's entry says "12 instances remain" and lists
+`workout-load-history` among the three that are correct; that route is now deleted, and it had
+already been converted to the anchored form, so the count is stale for two independent reasons. The
+warning has to sit in the orientation doc because that is where someone would read the 12 and quote
+it. The *reasoning* went to the journal entry, which is what the checker's "move it where it
+belongs" is for — I first wrote seven lines here and cut them to two, and the two that remain say
+re-measure, not what the new number is, because I did not take one.

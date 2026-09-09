@@ -28,7 +28,7 @@ describe('cache group helpers', () => {
       'weekly-stats', 'weights-summary', 'next-session',
       'muscle-recovery', 'readiness-score', 'achievements:', 'progress-summary',
       'friends-leaderboard', 'exercise-history:', 'program-week', 'health-trends:',
-      'workout-card:', 'health-trends-summary', 'muscle-tonnage-trend', 'workout-load-history:',
+      'workout-card:', 'health-trends-summary', 'muscle-tonnage-trend',
       // done-screen per-session payloads + the next-workout preview
       'workout-recap:', 'workout-timing:', 'workout-energy:', 'workout-hr:',
       'next-session-prescription',
