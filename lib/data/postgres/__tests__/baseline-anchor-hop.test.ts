@@ -14,7 +14,7 @@ const USER = '00000000-0000-4000-8000-0000000bf131'
 
 describe.skipIf(!canRun)('the baseline hop (BF-131)', () => {
   let pool: import('pg').Pool
-  let repo: import('@/lib/data/repository').Repository
+  let repo: import('@/lib/data/repository').WorkoutRepository
 
   beforeAll(async () => {
     const { getPool } = await import('@/lib/data/postgres/client')
@@ -135,9 +135,11 @@ describe.skipIf(!canRun)('the baseline hop (BF-131)', () => {
 
     const state = await stateOf(sessionId)
     expect(state?.baselineComplete).toBe(true)
-    expect(Object.keys(state?.baseline1rm ?? {})).toHaveLength(3)
+    // Annotated because `?? {}` widens the record away and `Object.values` then yields `unknown[]`.
+    const anchors: Record<string, { kg: number }> = state?.baseline1rm ?? {}
+    expect(Object.keys(anchors)).toHaveLength(3)
     // The earlier anchors survived — merged, not replaced by the later session's subset.
-    expect(Object.values(state?.baseline1rm ?? {}).map(e => e.kg).sort((a, b) => a - b)).toEqual([80, 90, 100])
+    expect(Object.values(anchors).map(e => e.kg).sort((a, b) => a - b)).toEqual([80, 90, 100])
   })
 
   it('ignores a log with no 1RM rather than anchoring on nothing', async () => {
