@@ -5,6 +5,8 @@ import { toast } from 'sonner'
 import { MoreSubScreen } from '@/components/more/sub-screen'
 import { PersonalDetailsSection, type PersonalDetailsValues } from '@/components/profile/personal-details-section'
 import { useCachedValue } from '@/lib/hooks/use-cached-value'
+import { MeasuredOverviewSection } from '@/components/more/details/measured-overview-section'
+import type { MetricRow } from '@/components/more/details/measured-overview'
 import { invalidateGoalRecommendations, invalidateUserProfile } from '@/lib/cache-groups'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { formatDateDisplay, todayInTz } from '@trainingai/shared/date-utils'
@@ -129,6 +131,11 @@ export function DetailsContent() {
         saving={saving}
         namePlaceholder={user?.name ?? undefined}
       />
+
+      {/* BF-133 — the read-only half of the same subject. It sits under the editable fields rather
+          than on a destination of its own: two "about you" screens each look incomplete, and this
+          one is what the app measured while the fields above are what it was told. */}
+      <MeasuredOverviewSection userId={user?.id} serverRecent={bodyMeta?.recent as MetricRow[] | undefined} />
     </MoreSubScreen>
   )
 }

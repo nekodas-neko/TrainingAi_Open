@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.440.0",
+    date: "2026-09-08",
+    changes: [
+      "More \u2192 Profile details now shows everything the app has measured about you underneath the fields you fill in \u2014 body composition, vitals, resting rate and your sleep averages, each with the date it was taken. Anything that has never been measured is left out rather than shown blank.",
+    ],
+  },
+  {
     version: "1.439.0",
     date: "2026-09-08",
     changes: [
