@@ -44,7 +44,11 @@ export async function GET(req: Request) {
 
   const userId = session.user.id
   const tz = session.user?.timezone ?? DEFAULT_TZ
-  const days = Math.min(14, Math.max(1, Number(new URL(req.url).searchParams.get('days') ?? '3')))
+  // `Number.isFinite` first: `Math.min(14, Math.max(1, NaN))` is NaN, so a non-numeric `?days=`
+  // used to survive BOTH this clamp and the adapter's, reaching `Date.now() - NaN * 86_400_000`.
+  // The panel then read empty — a diagnostic answering "no data" where the truth is three days of it.
+  const rawDays = Number(new URL(req.url).searchParams.get('days') ?? '3')
+  const days = Number.isFinite(rawDays) ? Math.min(14, Math.max(1, rawDays)) : 3
 
   const repo = await getRepositoryAsync()
   const rows = await repo.getOuraRawSamplesForTags(userId, BIOMETRIC_TAGS, days)
