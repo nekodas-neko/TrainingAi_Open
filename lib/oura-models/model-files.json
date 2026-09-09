@@ -12,6 +12,11 @@
     "sleepnet_moonstone_1_2_0_core.onnx",
     "step_counter_1_3_0_core.onnx"
   ],
+  "_commentKept": "`keptNotLoaded` is the deliberate opposite of `required`: files that live in the bucket beside the loaded models and that NO loader names. They are uploaded and preserved, and the boot check must never demand them — a missing file here is not a degraded deployment, because nothing reads it. The owner decided on 2026-08-03 to keep rather than delete them (Q-50 item 2); they are extracted weights that cannot be re-derived from this repo, and a future BDI revision is exactly what would want them. If a loader ever starts naming one, MOVE it to `required` — required-models.test.ts fails if a referenced .onnx is missing from `required`, and a second test fails if a kept file becomes referenced while still listed here.",
+  "keptNotLoaded": [
+    "sleepnet_bdi_0_3_0_core.onnx",
+    "sleepnet_bdi_0_4_0_core.onnx"
+  ],
   "constantsPrefix": "oura-model-constants",
   "constantsRequired": [
     "MANIFEST.json",

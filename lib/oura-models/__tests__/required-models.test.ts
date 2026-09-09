@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
-import { REQUIRED_MODEL_FILES, verifyModelAssets, describeModelAssetReport } from '../required-models'
+import { REQUIRED_MODEL_FILES, KEPT_MODEL_FILES, verifyModelAssets, describeModelAssetReport } from '../required-models'
 import modelFiles from '../model-files.json'
 import { hasRealConstants } from '../__fixtures__/real-constants'
 
@@ -41,6 +41,38 @@ describe('REQUIRED_MODEL_FILES', () => {
       expect(report.ok).toBe(true)
     },
   )
+})
+
+// Q-50 item 2. The point of a second list is that it is NOT the first one: these files are kept in
+// the bucket and read by nothing, so the boot check must ignore them. Without these cases the list
+// is a comment — nothing would notice it being folded into `required` (which would make a healthy
+// deployment report a fault) or a loader quietly starting to depend on a file the check never
+// verifies (which is the invisible-degradation failure `required` exists to prevent).
+describe('KEPT_MODEL_FILES', () => {
+  it('is disjoint from the required set, so the boot check never demands one', () => {
+    const required = new Set(REQUIRED_MODEL_FILES)
+    expect(KEPT_MODEL_FILES.filter(f => required.has(f))).toEqual([])
+    expect(KEPT_MODEL_FILES.length).toBeGreaterThan(0)
+  })
+
+  it('names nothing any inference module loads — a kept file that gains a loader must move', () => {
+    const dir = path.join(ROOT, 'lib/oura-models/inference')
+    const referenced = new Set<string>()
+    for (const f of fs.readdirSync(dir)) {
+      if (!f.endsWith('.ts')) continue
+      for (const m of fs.readFileSync(path.join(dir, f), 'utf8').matchAll(/'([\w.]+\.onnx)'/g)) {
+        referenced.add(m[1])
+      }
+    }
+    // If this fails, the fix is to MOVE the file into `required` in model-files.json, not to relax
+    // the check: a loaded model that the boot check ignores is the silent-degradation case.
+    expect(KEPT_MODEL_FILES.filter(f => referenced.has(f))).toEqual([])
+  })
+
+  it('is absent from a verify report, which only ever speaks about required files', async () => {
+    const report = await verifyModelAssets(path.join(ROOT, 'no-such-dir-for-tests'))
+    for (const f of KEPT_MODEL_FILES) expect(report.missing).not.toContain(f)
+  })
 })
 
 describe('verifyModelAssets', () => {

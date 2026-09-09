@@ -10016,3 +10016,23 @@ work, `Verify: device` files unbuilt work among shipped work.
 
 The ceiling raise is the usual +1 for this PR's own journal entry; the measurement behind it has not
 changed.
+
+---
+
+## 2026-09-09 — backlog 19,946 → 19,959 (+13), entries ceiling 340 → 341 (Q-50 item 2)
+
+An entry that shipped half its work and grew, which is the right direction here. The +13 is what
+`Keep:` costs when it has to say *why* the remaining half is not startable: item 1 (`inference/dhrv`)
+is deferred to D7 because its golden test pins our D5 replacement against Oura's original, and
+deleting it early discards the validation. Without that sentence the entry reads as ordinary
+buildable work and gets picked up again.
+
+Four of those lines are a correction. The entry claimed both BDI files were registered in the
+dormancy `KEEP` map; Q-49 A4b removed every vendored-asset entry from that map once the files became
+gitignored, on the reasoning that an exemption for an unlistable file exempts nothing. Nothing broke
+— but "there is a safety net" and "there is no safety net" are different states to plan from, and
+this entry asserted the wrong one.
+
+**Note this is the second stale factual claim found in a backlog entry today** (Q-91-followup was the
+other, and it was hiding a live bug). Both were found by *building* the entry rather than reading it.
+That is not an argument for a doc sweep — a sweep would have read them and agreed.

@@ -30,10 +30,26 @@ import modelFiles from './model-files.json'
  * listing it fails there.
  *
  * NOT listed, deliberately: `sleepnet_bdi_0_3_0_core.onnx` and `sleepnet_bdi_0_4_0_core.onnx`. No
- * loader names them — BDI comes from the moonstone model's own apnea head — and their fate is
- * backlog Q-50.
+ * loader names them — BDI comes from the moonstone model's own apnea head. Q-50 settled their fate
+ * on 2026-08-03: keep them. They are `KEPT_MODEL_FILES` below, which the upload preserves and this
+ * check deliberately ignores.
  */
 export const REQUIRED_MODEL_FILES: readonly string[] = modelFiles.required
+
+/**
+ * Files kept in the bucket that NO loader reads. The boot check must never demand them: a missing
+ * file here degrades nothing, because nothing loads it, and listing it as required would turn a
+ * healthy deployment into a reported fault.
+ *
+ * They exist because they are extracted weights that cannot be re-derived from this repo and a
+ * future BDI revision would want them (owner decision, Q-50 item 2). The bucket is the only place
+ * they survive, so `scripts/upload-model-assets.js` sends them — the list is what stops "keep them"
+ * decaying into "lose them" the next time the bucket is rebuilt from this manifest.
+ *
+ * If a loader ever starts naming one, move it to `required`. `__tests__/required-models.test.ts`
+ * fails in both directions on that.
+ */
+export const KEPT_MODEL_FILES: readonly string[] = modelFiles.keptNotLoaded
 
 export interface ModelAssetReport {
   ok: boolean

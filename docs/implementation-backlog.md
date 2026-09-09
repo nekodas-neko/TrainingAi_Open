@@ -17986,14 +17986,27 @@ corrected in the three docs that carried it.
 derived from the moonstone model's own apnea head via `bdiFromApnea` (`sleepnet-assemble.ts:131`).
 They look genuinely unused, but they are extracted weights and a future BDI revision is exactly what
 would want them. ~~Owner call: delete, or move to private storage with the rest under Q-49 A1.~~
-✅ **ANSWERED 2026-08-03: keep them** (owner: *"yes lets keep then"*). So they move to the bucket
-with the other eight under Q-49 A1 rather than being deleted — add them to
-`lib/oura-models/model-files.json` as a **separate, non-required list** when A1's remaining step
-runs, so the boot check does not start demanding files no loader reads. **Item 1 (`inference/dhrv`)
-is still open and still deferred to D7** — that one is not covered by this answer.
+✅ **ANSWERED 2026-08-03: keep them** (owner: *"yes lets keep then"*).
+✅ **DONE 2026-09-09.** `model-files.json` grew a `keptNotLoaded` list holding both, exported as
+`KEPT_MODEL_FILES` and uploaded by `scripts/upload-model-assets.js` alongside the required eight.
+The boot check still ignores them, which is the point — a missing file there degrades nothing
+because nothing loads it, and listing it as required would make a healthy deployment report a fault.
+**The bucket is the only place these survive**, so omitting them from the upload is how "keep them"
+quietly becomes "lose them" the next time the bucket is rebuilt from this manifest. Two tests pin it
+in both directions (kept ∩ required = ∅; no kept file is named by an `inference/` loader), so a file
+that gains a loader must be MOVED rather than left unverified.
 
-Both are registered in `scripts/check-oura-models-dormancy.js`'s `KEEP` map with these reasons, so CI
-passes and the inventory is explicit rather than forgotten.
+- **Keep: item 1 (`inference/dhrv`) only, and it is not startable yet.** Still deferred to **D7**,
+  per this entry's own reasoning: the ONNX path is unreachable from production on purpose and its
+  golden test is what pins our D5 regression replacement against Oura's original. Deleting it now
+  discards the validation while the replacement is still young.
+
+**Correction 2026-09-09 — the last line of this entry was stale.** It said both files are registered
+in `scripts/check-oura-models-dormancy.js`'s `KEEP` map. They are not: Q-49 A4b removed every
+vendored-asset entry from that map, because the files became gitignored and *"an exemption for a file
+that cannot be listed exempts nothing"*. The map now holds one entry (`session-web.ts`). Nothing was
+broken by the staleness — the dormancy sweep cannot see these files either way — but the entry was
+describing a safety net that no longer exists.
 
 ### [platform][app-shell] 🟠 Q-48 — roadmap gaps found by the 2026-08-02 native-convergence review
 
