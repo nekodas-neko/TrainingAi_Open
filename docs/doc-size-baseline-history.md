@@ -9951,3 +9951,27 @@ The remaining ~9 lines are Q-220's re-measurement: `projectOverview.md` is **10,
 against the entry's quoted 8,068 / 669 KB and `CLAUDE.md` is **774** against 918, so the orientation
 cost the entry exists to reduce has grown ~30% since it was filed. Recorded rather than acted on —
 the restructure is Orchestrator's and conflicts with every live session.
+
+---
+
+## 2026-09-09 — entries ceiling 337 → 338, and the sweep is still inverted (LB-64)
+
+**One entry, one raise, and the measurement that says a sweep would not have helped.** The check
+names 39 foldable (unlinked) entries against 338 total and suggests a sweep. Re-measured here rather
+than taken on trust, and the answer is the same one an earlier raise recorded, now sharper: **all 39
+are from the newest two days** — 11 from 2026-09-08, 28 from 2026-09-09. They are unlinked because
+they are new, not because they are spent. Folding them would fold precisely the recent window the
+directory exists to be.
+
+The other 299 are each cited by a durable doc, so clearing any of them means re-pointing those
+citations at the batched history first. That is the Orchestrator's compaction sweep and it conflicts
+with every live session; a Lane A feature PR is the wrong place for it.
+
+**What would actually move this number is the citation direction, not the entry count.** Two days of
+entries produce 39 foldable and roughly 39 new citations behind them, so the directory grows at about
+the rate work lands and the ceiling gets raised one at a time, which is what has been happening. Left
+here as the measurement rather than a proposal — the fix is a policy change about how durable docs
+cite the journal, and that is not this PR's to make.
+
+`docs/implementation-backlog.md` also drops 19,997 → 19,966 in the same PR: LB-64's own entry left
+the queue (32 lines) and Q-112e's pointer into it was rewritten to name the shipped route (+1).

@@ -17421,54 +17421,23 @@ per-field merge where an AI write has no honest source rank to claim.
   reusable components. What is missing is one entry point instead of two, three stats, a 7-day
   comparison, and the wrap-up continuing from the read-through. Reasoning and alternatives: the plan.
 
-### [nutrition][app-shell] LB-64 — the weekly recap has no numbers to draw, because the route keeps them
-
-- **Lane: A** — `app/api/**`. Filed by Lane B while starting Q-112e; the letter records who found it.
-- **Added:** 2026-09-08, from Q-112e's own investigation. **Q-112e `Needs:` this.**
-
-**Q-112e says the weekly recap gets "the pattern Q-112a–d proves out", and it cannot, because the
-data does not reach the client.** `/api/weekly-digest` assembles a rich weekly picture — volume and
-its week-over-week change, weighted sets per muscle, body metrics, sleep, Oura rows, derived scores,
-PRs — and uses **all of it to build the model's prompt**, returning only `{ digest, weekStart }`.
-The numbers exist, are already computed, and are thrown away.
-
-**The lookback is also wrong for the ask.** The plan attributes a *"monthly scale"* lookback to the
-owner; the route reads **14 days** (the recap week plus the prior week, for its comparison line).
-Nothing in the app currently serves a month of these series — `/api/day-review/week-window` is fixed
-at 8 points by construction (`shiftDateStr(date, -7)` and a `length: 8` array), so it is not a
-parameter away from answering this either.
-
-**What this needs is Q-112c's shape at a monthly scale**, and the decision is which of two:
-- **Return what `weekly-digest` already computed**, beside the prose. Cheapest — the arithmetic is
-  done and it is one response-shape change — but it welds a *series* onto a **POST that runs an
-  LLM**, rate-limited and cached as prose, which is the wrong cache and the wrong method for a chart.
-- **A sibling window route**, as Q-112c is for the day. Costs a route, and is the shape that already
-  works: cacheable GET, its own TTL, its own invalidation-group entry, no model in the path.
-- **Recommendation: the sibling route**, and only that. The prose route's caching is the argument —
-  Q-293's note in its own source says the digest is deliberately re-derived because a late ring
-  back-fill changes its inputs, and a chart wants that freshness on a different clock from a
-  paragraph the model wrote.
-- **Reversal cost:** a new unused route, if Q-112e is later cut. Low.
-
-**Do not batch this with a migration** — it needs none; it is a read over `body_metrics`,
-`workout_sessions` and the derived tables, exactly as `day-review/week-window` is.
-
 ### [nutrition][app-shell] Q-112e — the weekly recap gets the same treatment
 
 - **Branch:** `feat/weekly-recap-uplift` · **Lane: B** · **Plan:** the above, §4
-- **Needs: LB-64**
 - `weekly-recap-banner.tsx` + `/api/weekly-digest` at the owner's "monthly scale" lookback.
   Deliberately last, so the daily version settles the layout first.
-- **⚑ PART SHIPPED 2026-09-08; the trends half is BLOCKED on LB-64, not merely unstarted.** The
+- **⚑ PART SHIPPED 2026-09-08; the trends half is now UNBLOCKED — LB-64 shipped 2026-09-09.** The
   banner's silent-vanish error state is fixed — a failed recap used to `return null`, so the user
   could not tell a quiet week from a broken one, and the once-per-week `hasFetched` guard meant a
   single failure cost the whole week's recap. It now says so and the tap retries. That is the half of
   "the pattern Q-112a–d proves out" that needed nothing from the engine (the plan asks for exactly
   this fix by name for the daily digest in Q-112a).
-- **Keep:** the trends themselves. `/api/weekly-digest` returns prose only — see **LB-64** for the
-  measurement and the route recommendation. Q-112d's `day-trends.ts` is the render to copy; its
-  `TREND_SPECS`/`trendRows` are shaped around a `WeekWindowResponse` and will want widening, not
-  rewriting, once a monthly window exists.
+- **Keep:** the trends themselves. `/api/weekly-digest` still returns prose only, and it is not the
+  route to draw from — LB-64 shipped `GET /api/weekly-review/month-window` instead, five weekly
+  buckets of the same four metrics `day-review/week-window` serves daily, with `priorAverages` over
+  the four completed weeks. Q-112d's `day-trends.ts` is the render to copy; its
+  `TREND_SPECS`/`trendRows` are shaped around a `WeekWindowResponse` and want widening to the
+  `MonthWindowResponse` shape, not rewriting.
 
 ### [workouts][platform] LB-24 — deleting the Home day-review orphaned a chart, a route and a cache group
 
