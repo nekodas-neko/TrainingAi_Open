@@ -46,3 +46,39 @@ export function computeRecoveryIndex(input: RecoveryIndexInput): RecoveryIndexRe
 
   return { hoursToSettle, settledAt, lowestBpm: smoothed[minIdx] }
 }
+
+/** One sleep window of a night, for {@link nightRecoveryIndexHours}. */
+export interface NightRecoverySegment {
+  /** When this window ended. The LAST window's end is the night's wake time. */
+  sleepEnd: Date
+  /** This window's own {@link computeRecoveryIndex} result, or null when it had too few points. */
+  recovery: { settledAt: Date; lowestBpm: number } | null
+}
+
+/**
+ * Q-509. The night's Recovery Index when sleep was fragmented into several windows.
+ *
+ * The metric is *hours between the overnight HR minimum and waking*, and "overnight" is the whole
+ * period — so the minimum is taken across every window and the wake time from the last. The rollup
+ * previously used the FINAL window's own value, which measures from the lowest point of the last
+ * fragment rather than of the night: on a 10pm–2am / 3am–7am night whose true minimum is at 1am, it
+ * reported the 3–7am segment's minimum and the number described a different sleep episode.
+ *
+ * Returns null when no window produced a minimum. Ties keep the EARLIER minimum, matching
+ * `computeRecoveryIndex`'s own strict `<` scan, so a night whose two windows bottom out at the same
+ * bpm reads the same way a single window would.
+ *
+ * **This is latent, not observed.** Over 61 BLE-era nights of the owner's data not one night is
+ * fragmented under `groupSleepPeriods` — every second window is a daytime nap outside the night
+ * band, a zero-duration row, or more than `MAX_INTRA_NIGHT_GAP_HOURS` away — so the merge path has
+ * never run in production. It is fixed because the rule is wrong, not because a number moved.
+ */
+export function nightRecoveryIndexHours(segments: NightRecoverySegment[]): number | null {
+  const withMin = segments.filter(
+    (s): s is NightRecoverySegment & { recovery: NonNullable<NightRecoverySegment['recovery']> } => s.recovery != null,
+  )
+  if (withMin.length === 0) return null
+  const best = withMin.reduce((a, b) => (b.recovery.lowestBpm < a.recovery.lowestBpm ? b : a))
+  const wake = segments[segments.length - 1].sleepEnd.getTime()
+  return Math.max(0, (wake - best.recovery.settledAt.getTime()) / 3_600_000)
+}
