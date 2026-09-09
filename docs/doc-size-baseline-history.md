@@ -9369,3 +9369,14 @@ someone would remove it.
 
 **And the note that displaying it is still unanswered**, so shipping the control is not mistaken for
 having decided where a remembered bedtime belongs on the screen.
+
+## 2026-09-09 — `docs/implementation-backlog.md` 19,580 → 19,587 (+7), LB-18 shipped
+
+The `Keep:` describing the unbuilt swap comes out and three shorter lines go in: what shipped, why the
+cache key sits inside the old `nutrition-recent-for-meal:` family rather than beside it, and the half
+that is still owed.
+
+That last one is the reason this is +7 rather than −10. The owner asked for *"all recently entered
+foods/meals"* and this delivered the bucket half; `Recent` is still foods only. Recording it as a
+`Keep:` stops the entry reading as fully answered when half the sentence is unbuilt — and it carries
+the correction that the `lastUsedAt` this entry once called missing has existed since migration 238.

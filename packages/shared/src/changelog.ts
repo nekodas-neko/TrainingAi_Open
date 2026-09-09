@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.441.1",
+    date: "2026-09-09",
+    changes: [
+      "Recent on Log Food now shows everything you have logged lately, not just the foods from whichever meal the time of day suggested. It also shows twelve instead of five, and appears as soon as the sheet opens.",
+    ],
+  },
+  {
     version: "1.441.0",
     date: "2026-09-09",
     changes: [
