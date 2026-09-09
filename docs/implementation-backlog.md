@@ -436,6 +436,17 @@ anchored on a low observed max makes every hard effort read over 100%, and a tar
 220−age is unreachable. **The defect is that both appear on the same screen.** `hr-profile.ts:47`
 claims to have consolidated three resolvers; `resolveBatteryHrMax` is a fourth that survived it.
 
+**⚑ THE ANCHOR NOW DECIDES WHETHER A REAL SESSION COUNTED (2026-09-09).** The owner's hardest
+recorded walk — 35 min, average **104 bpm**, peak **123**, fast blocks averaging **107** — lands on
+opposite sides of Zone 2 depending on which anchor reads it:
+
+| anchor | Zone 2 floor | peak 123 |
+|---|---|---|
+| **observed 168** — what the walk's own targets and the Body Battery use | **122** | **crosses it** |
+| **age 187** — what the zone bar uses | **133** | 10 bpm short |
+
+The app reported **Z1 Recovery 34:59, everything else 0:00.** This is no longer a tidiness argument.
+
 **⚠ The numbers currently agree BY COINCIDENCE, which is worse than disagreeing.** The guided walk's
 fast target is `0.70 × 116` (observed reserve) + 52 = **133**. The Zone-2 floor is `0.60 × 135` (age
 reserve) + 52 = **133**. Same number, unrelated arithmetic. A corroborated observed max of 175 — or a
@@ -791,7 +802,12 @@ Across 318 minutes walked in 11 sessions:
 | intervals, if every fast block reached 105–115 | ~29 |
 | **30 min continuous at 105+ bpm** | **~60** |
 
-**4. The fallback IF THE SESSION STAYS A WALK — a 30-minute continuous brisk walk, 105–118 bpm.** Roughly
+**4. ⚑ NOW THE BEST-EVIDENCED OPTION — a continuous brisk walk, 105–118 bpm.** On 2026-09-09 the
+owner ran the experiment: 35 min at 5 fast / 2 slow gave a session average of **104 bpm** against ~90
+across the previous ten, with fast blocks at **107**. The per-set contrast collapsed to **+24, +8,
++10, +2, +9** because the slow blocks stopped recovering — by set 4 the "slow" block was at **108,
+above the historical FAST average**. **The session succeeded by becoming continuous, not by being
+better intervals.** Addendum 7. Roughly
 quadruples Z2 minutes for the same 30 minutes of the owner's time; one instruction instead of two
 speeds that cannot be separated enough for the structure to pay for itself. Contrast measures
 **7.7 bpm** (range 4.4–10.0), so the session is already a continuous walk with a wobble — and a
@@ -860,6 +876,10 @@ verdict; and fast-block compliance over a month is neither 0% nor 100%.
 this owner **Z1 is 52–132 bpm — 81 bpm wide, 60% of the usable range in one bucket.** Sitting still
 and a brisk interval walk are the same zone.
 
+**⚑ THE DEMONSTRATION, 2026-09-09:** a 35-minute walk with HR climbing throughout, session average
+**104**, peak **123**, best block **116** — reported as **Z1 Recovery 34:59, everything else 0:00.**
+The best walk in the record renders as thirty-five minutes of recovery.
+
 **⚠ CORRECTED 2026-09-09: this entry first said 52–122**, computed against the observed max of 168.
 The zone bands use `maxHr` = **187** (220−age), because `resolveMaxHr` takes the observed max only
 when it is ≥ the age prediction. The walk's *targets* use `targetAnchorMax` = **168**. Two anchors,
@@ -889,8 +909,23 @@ walk gains both the cadence effect and the drift, and the static slope captures 
 **What the entry can defend: cadence alone is nearly exhausted as a lever inside the observed range**
 (120 spm → 99.0 bpm, 130 → 101.9, 140 → 104.8). **What it cannot: a specific spm figure for reaching
 133.** Treat 238 as "far outside walking", not as a target. At the measured **0.739 m** stride
-(TN-22's review) the achievable walking speed simply does not demand more. **Grade and carried load
-are the levers that remain.**
+(TN-22's review) the achievable walking speed simply does not demand more. **⚑ AND THE LEVER IS DURATION — measured 2026-09-09, after the owner disputed this entry.** They
+walked **35 min at 5 fast / 2 slow** and the fast blocks rose **97 → 116 bpm within the session
+(+19)** on **+11.7 spm** of cadence, which the slope predicts would buy **+3.4**. Session average
+**104 bpm against ~90** across the previous ten; fast-block average **107 against 98.5**, on **+2.7
+spm**. **82% of the movement is duration, and this entry had no duration term** — every figure above
+was fitted ACROSS blocks, so a within-session effect was invisible by construction. *"Cadence is
+nearly exhausted"* is confirmed; *"grade and carried load are the levers that remain"* was wrong,
+because it never considered time. See addendum 7.
+
+**⚠ The mechanism is accumulated load, not contrast.** Per-set contrast ran **+24, +8, +10, +2, +9** —
+it collapsed after set 1 because the slow blocks stopped recovering: by set 4 the "slow" block sat at
+**108 bpm, above the historical FAST average of 98.5**. The session became a continuous brisk walk
+with a ripple, which is what produced the gain — evidence for the continuous option in TN-25, arrived
+at empirically. **⛔ One session that changed three variables at once; the duration term is
+established as large, its shape is not.**
+
+**Grade and carried load remain untested.**
 
 **And the protocol is not progressing:** fast/slow HR separation trends **−0.11 bpm per session** across
 ten sessions, while fast cadence fell **123.5 → 112.3 spm**. The *contrast* improved while the *effort*

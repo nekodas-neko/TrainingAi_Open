@@ -9418,3 +9418,26 @@ contrast. A longer, faster walk collects both effects and the static slope sees 
 What survives is the bounded claim: inside the observed range cadence is nearly exhausted as a lever
 (120 spm → 99.0 bpm, 130 → 101.9, 140 → 104.8). What does not survive is any specific spm target for
 reaching 133.
+
+## 2026-09-09 — backlog → 19672, `tuning.md` → 487: the owner's walk settled it
+
+The owner disputed this agent's heart-rate estimate, walked 35 minutes at 5 min fast / 2 min slow, and
+was right. The measurement is worth its lines because it overturns a conclusion this review had
+already published twice.
+
+**Fast blocks rose 97 → 116 bpm within the session — +19 — on +11.7 spm of cadence, which the fitted
+slope predicts would buy +3.4.** Session average 104 against ~90 across the previous ten; fast-block
+average 107 against 98.5 on just +2.7 spm. **82% of the movement is duration, and the model had no
+duration term at all** — every figure in the review was fitted across blocks, so a within-session
+effect was invisible by construction. TN-24's *"cadence is nearly exhausted"* survives; its *"grade
+and carried load are the levers that remain"* does not, because it never considered time.
+
+The second finding is why the per-set contrast table stays: it ran +24, +8, +10, +2, +9, collapsing
+after set 1 because the slow blocks stopped recovering — by set 4 the "slow" block sat at 108 bpm,
+above the historical *fast* average. **The session succeeded by becoming continuous, not by being
+better intervals**, which moves TN-25's option 4 from fallback to best-evidenced.
+
+And it gives TN-30 a live consequence rather than a tidiness argument: the same session crosses Zone 2
+under the observed-max anchor of 168 and misses it by 10 bpm under the age anchor of 187. The app
+reported Z1 Recovery 34:59 and 0:00 everywhere else — the best walk in the record rendered as
+thirty-five minutes of recovery.

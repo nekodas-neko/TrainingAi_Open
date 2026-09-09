@@ -595,3 +595,86 @@ naming.
 **⚠ Not yet audited: every other `computeHrZones` call site.** `build-day-audit.ts:134` and
 `score-audit/heart-rate.ts:58` pass `hrMaxFromAge(...)` directly rather than a resolved profile, which
 is a third path to a max. Whether they agree with the two above is open and is TN-30's first job.
+
+---
+
+## Addendum 7 — the owner ran the experiment and won it: DURATION is the lever, not cadence
+
+**Owner, 2026-09-09:** *"I don't think your estimation for HR is right — I reckon if I walk for longer
+at a faster pace it will increase my HR."* They then walked **35 minutes at 5 min fast / 2 min slow**
+and sent the summary. **The hypothesis is confirmed and this review's model is the thing that was
+wrong.**
+
+### The session against the ten that preceded it
+
+| | previous 10 sessions | **2026-09-09** | delta |
+|---|---|---|---|
+| fast-block cadence | 118.6 spm | 121.3 | **+2.7 spm** |
+| **fast-block HR** | 98.5 bpm | **107.0** | **+8.5 bpm** |
+| slow-block HR | 90.7 bpm | 96.4 | +5.7 bpm |
+| **session average HR** | ~90 bpm | **104** | **+14 bpm** |
+| contrast (fast − slow) | 7.8 bpm | 10.6 | +2.8 bpm |
+
+**+8.5 bpm on the fast blocks for +2.7 spm of cadence.** The cadence slope predicts **+0.8 bpm** for
+that. Nearly all of the gain came from somewhere the model has no term for.
+
+### Within the session, the model misses by a factor of five
+
+| set | 1 | 2 | 3 | 4 | 5 | rise |
+|---|---|---|---|---|---|---|
+| fast cadence (spm) | 116 | 119 | 122 | 122 | 128 | **+11.7** |
+| **fast HR (bpm)** | **97** | 103 | 109 | 110 | **116** | **+19** |
+| slow HR (bpm) | 73 | 95 | 99 | 108 | 107 | **+34** |
+
+**The cadence rise of +11.7 spm predicts +3.4 bpm. The fast blocks rose +19.** **15.6 bpm — 82% of the
+movement — is duration, and the model contained no duration term at all.**
+
+**⚠ TN-24's conclusion was half right and its prescription was wrong.** *"Cadence is nearly exhausted
+as a lever"* is confirmed here — 2.7 spm bought almost nothing directly. But the entry then said
+*"grade and carried load are the levers that remain"*, **and it never considered duration**, which is
+the lever that actually moved 19 bpm on flat ground with no load. The reason is structural: every
+figure in this review was fitted **across blocks**, so a within-session effect was invisible to it by
+construction.
+
+### The mechanism is accumulated load, not interval contrast — and that matters
+
+Per-set contrast: **+24, +8, +10, +2, +9**. It collapsed after set 1 and never returned. Look at why:
+**the slow blocks stopped recovering.** By set 4 the "slow" block sat at **108 bpm — above the
+historical FAST average of 98.5** — and the last two slow blocks (108, 107) were harder than the first
+three fast blocks.
+
+**So the session did not become better intervals. It became a continuous brisk walk with a ripple on
+it, and that is what produced the 14 bpm.** The owner's own experiment is the strongest evidence yet
+for the continuous option (addendum 4's option 4) — arrived at empirically rather than argued.
+
+### The app reported 35 minutes of "Recovery"
+
+**Time in zone: Z5 0:00 · Z4 0:00 · Z3 0:00 · Z2 0:00 · Z1 Recovery 34:59.**
+
+The best walk in the record — 35 minutes, HR climbing the entire time, peaking at 123 — is rendered as
+35 minutes of recovery. **This is TN-24 and TN-30 demonstrated on one screen**, and which of the two
+it is depends entirely on the anchor:
+
+| anchor | Zone 2 floor | fast avg 107 | peak 123 |
+|---|---|---|---|
+| **observed max 168** (walk targets, Body Battery) | **122** | 47% reserve, 64% HRmax | **crosses it** |
+| **age max 187** (the zone bar) | **133** | 41% reserve, 57% HRmax | 10 bpm short |
+
+**Under the anchor the walk's own targets use, this session reached Zone 2. Under the anchor the zone
+bar uses, it did not.** TN-30 is no longer a tidiness argument — it decides whether this session
+earned anything.
+
+### What this review got wrong, plainly
+
+1. **The static cadence model was the wrong instrument** and its ≈238 spm figure should never have
+   been written. Already qualified in TN-24; this addendum is the measurement that retires it.
+2. **"Walking cannot raise this owner's HR meaningfully" was wrong.** 104 average and a 123 peak from
+   a walk, unaided by incline or load.
+3. **The prediction that held was the pessimistic one, and it is the app's fault, not the owner's:**
+   the session still reports 0:00 in Zone 2.
+
+**⛔ Do not now swing to "duration is the whole answer".** This is **one session**, it changed three
+things at once (block length 3→5 min, recovery 3→2 min, total 30→35 min), and drift has a ceiling —
+it cannot keep adding 19 bpm every session. **What is established is that the duration term exists and
+is large; what is not established is its shape.** Two or three more sessions at this structure would
+settle it, and the per-block data to fit it is already stored.

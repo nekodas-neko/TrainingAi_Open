@@ -29,7 +29,7 @@ say so plainly rather than re-measuring the pillar a fourth time.
 | ID | What | State |
 |---|---|---|
 | **TN-24** | Zone 1 spans 52–122 bpm, so Zone 2 is unreachable on foot and the walk's zone bar carries nothing | supplies **Q-523's** mechanism; PR #998 |
-| **TN-25** | the walk's fast target (≥133 bpm) met **0 of 44 times**; fast blocks average the slow target | **`Gate: owner`** — **jog the fast blocks** (addendum 5 corrects 4) |
+| **TN-25** | the walk's fast target (≥133 bpm) met **0 of 44 times**; fast blocks average the slow target | **`Gate: owner`** — option 4 (continuous) now best-evidenced, addendum 7 |
 | **TN-26** | cadence and speed mean different things per surface; prescribe heart rate, demote the controls | rewritten after the owner declined treadmill tuning |
 | **TN-27** | maintenance rejects its 28-day window and falls back to the noisy 14-day one → **2,245 kcal** | **owner chose option 3**, after TN-29 |
 | **TN-28** | the one card that writes the calorie goal hides the `low confidence` its siblings show | Lane B, independent |
@@ -443,6 +443,22 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
   **7.7 bpm** here (4.4–10.0 per session), so the session is a continuous walk with a wobble, and a
   genuinely hard fast half needs 233 spm — a jog. **Do not defend an interval structure whose contrast
   is within noise of its own blocks.**
+- **⛔⛔ DURATION WAS THE MISSING TERM, AND THE OWNER FOUND IT BY WALKING (addendum 7, 2026-09-09).**
+  This agent told them cadence would buy ~3 bpm and they should not expect much. They walked 35 min
+  at 5 fast / 2 slow: fast blocks **97 → 116 within the session (+19 bpm)** on **+11.7 spm**, session
+  average **104 against ~90** across the previous ten. **82% of the movement was duration.** The
+  reason it was invisible: every figure in that review was fitted **ACROSS blocks**, so a
+  within-session effect could not appear in it by construction. **When a model says an input is
+  exhausted as a lever, check what the model has no term for at all.**
+- **⚠ And the mechanism was accumulated load, not interval contrast.** Per-set contrast ran +24, +8,
+  +10, +2, +9 — it collapsed because the slow blocks stopped recovering (set 4's "slow" block, 108
+  bpm, sat above the historical FAST average of 98.5). **A session that gets harder by having its
+  recovery fail is a continuous effort, not better intervals** — which is evidence for the continuous
+  option, not the interval one.
+- **⚠ When the owner disputes a number, price the extrapolation before defending it.** The ≈238 spm
+  figure was fitted over 76–132 spm, a 95% interval of 176–369, r = 0.512. It was quotable-looking and
+  worthless, and it was the same error this agent had flagged one addendum earlier on the treadmill
+  speed curve. **Owner scepticism about a modelled number has been right twice in this thread.**
 - **The threshold is usually right and the input usually wrong** — Q-506, Q-512, Q-514, now TN-6.
   Check the input's distribution before touching any constant.
 - **Do NOT lift the sleep scale toward its old mean** — sleep/readiness agreeing is load-bearing for
