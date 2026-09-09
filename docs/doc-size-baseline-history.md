@@ -9445,3 +9445,22 @@ This is the second checker in a month found blind to its own class, after
 `check-admin-guard-catch.js` in #1019 (a one-line regex that matched 0 of 2 real defects while 12
 live sites carried them). Worth stating here, in the one file that spans months: **when a check is
 cheap to satisfy structurally, verify it fires on a real instance of the thing it names.**
+
+## 2026-09-09 — `docs/implementation-backlog.md` 19,732 → 19,684 (−48), PS-39 struck
+
+The route-test sweep finished: **0 of 222** API routes are without a test importing their handler,
+and the ratchet's baseline is 0, so a new route now arrives uncovered and fails CI. The queue entry
+came out whole (77 lines), and LA-89 went in (29) — `oura/hr-sync` has no callers and a name that
+says something untrue about what it does.
+
+**The entry carried a checklist that outlived it**, so it was moved rather than deleted:
+[`docs/route-test-fixtures.md`](route-test-fixtures.md) holds the fifteen fixture shapes that passed
+review and were caught only by mutation, plus what the ratchet does and does not measure. It is
+linked from `docs/module-map.md` and named in the checker's own failure message, which is where
+someone writing a new route test will actually meet it.
+
+No `Keep:` line: PS-39's stated goal is complete at 0. The caveat that a *count* is not a
+*sufficiency* measure — `admin/exercises` counted as covered on one guard assertion — is a permanent
+property of the metric rather than outstanding work, so it belongs in the reference doc. Leaving a
+finished entry in the queue to carry a caveat is exactly what the "a finished entry must not still
+be in the queue" rule exists to stop.
