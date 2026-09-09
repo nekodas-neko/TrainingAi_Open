@@ -14159,11 +14159,26 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   function; the local SQLite column via `RECONCILE_COLUMNS` (**no version bump** — additive, the
   Batch F pattern) with the pull mapping; and `bedtime-estimate` reading
   `manualSleepStart ?? sleepStart`, which is **the only read site in the codebase**.
-- **Keep: the UI half, Lane B's.** Nothing can write a bedtime yet — there is no control. What it
-  needs: a way to set and clear it on a night, `POST /api/sleep/manual-bedtime` (`{date, at|null}`,
-  404 when no session exists for the date), and a `queueMutation({domain: 'manual_bedtime'})` beside
-  the POST so it survives offline. Displaying it is a separate decision: the sleep card currently
-  shows the measured start, and whether a remembered bedtime should appear there has not been asked.
+- **✅ The UI half shipped in #1010** — a card on Health → Sleep for the latest night: set, change and
+  clear, queued through `manual_bedtime` so it survives offline, with the direct POST as the fallback
+  where there is no local store. The measured start is shown beside it as the contrast that makes the
+  control make sense, and nothing else on the screen changed.
+- **Keep: `/api/sleep-sessions` does not return `manualSleepStart`, so the card reads it from the
+  local store.** The repository maps the column (`adapter.ts:2716`) and the route's field list omits
+  it — one line, in an `app/api/**` path, so **Lane A's**. Until it lands, the saved value is
+  invisible on the **web** build (`getLocalStore` returns null there) while the write works; on the
+  APK it reads correctly. Worth doing because the screen's own local rows are overwritten by the
+  network reply, so nothing else on that screen can see the column either.
+- **The date rule is the part not to re-derive.** A night dated `D` begins the *evening before* when
+  the remembered time is before midnight and on `D` itself when it is after, so the split is at
+  **noon** — the same anchor `minutesFromNoon` uses, and for the same reason: nobody's bedtime lands
+  at midday. `bedtimeInstant` in `components/health/sleep/manual-bedtime.ts` owns it, tested across
+  the noon boundary, month ends and a leap-adjacent February. **It changes nothing the app computes
+  today** — the sole reader passes the value through `minutesFromNoon` and sees only the clock — so
+  it is there for the row being honest and for the first display that shows it.
+- **Keep: displaying it is still a separate decision.** The sleep card shows the measured start;
+  whether a remembered bedtime should appear there has not been asked, and this shipped the control
+  without answering it.
 - **Keep: not device-verified.** The engine half is server-side and web-testable, but the local column
   arrives through `reconcileSchema` on a real device and no APK has run.
 - **Manual bedtime writes the new column and NOTHING else** — not `sleep_start`, not duration, not

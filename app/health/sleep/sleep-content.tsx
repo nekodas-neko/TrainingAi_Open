@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { HealthScoreDetail } from "@/components/health/health-score-detail";
+import { ManualBedtimeCard } from "@/components/health/sleep/manual-bedtime-card";
 import { ProvisionalBadge } from "@/components/health/provisional-badge";
 import { Hypnogram } from "@/components/health/hypnogram";
 import { TrendSparkline } from "@/components/health/trend-sparkline-lazy";
@@ -123,6 +124,10 @@ export function SleepContent({ userId }: { userId?: string }) {
                 </p>
               )}
             </div>
+          )}
+
+          {latest && (
+            <ManualBedtimeCard date={latest.date} measuredStart={latest.sleepStart} userId={userId} />
           )}
 
           {consistency.sdMinutes != null && (

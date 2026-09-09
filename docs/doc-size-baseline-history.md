@@ -9352,3 +9352,20 @@ that the named screen is not there.
 **Why the read is local-first**, in one line so it is not "improved" back to a server fetch:
 `/api/body-metadata` returns seven days, and a card about the latest reading of each metric shows
 most of them as absent on a seven-day window.
+
+## 2026-09-09 — `docs/implementation-backlog.md` 19,565 → 19,580 (+15), Q-519's UI half shipped
+
+The `Keep:` describing the unbuilt control comes out; three things go in, and each is a thing the next
+session would otherwise pay for.
+
+**A new `Keep:` for Lane A**: `/api/sleep-sessions` does not return `manualSleepStart` even though the
+repository maps it, so the card reads the column from the local store and the saved value is invisible
+on the web build. One line in an `app/api/**` path.
+
+**The date rule**, because it is the trap in this entry and it is not obvious: a night dated `D` begins
+the evening before when the remembered time is before midnight, so the split is at noon. It changes
+nothing the app computes today — the sole reader sees only the clock time — which is exactly why
+someone would remove it.
+
+**And the note that displaying it is still unanswered**, so shipping the control is not mistaken for
+having decided where a remembered bedtime belongs on the screen.
