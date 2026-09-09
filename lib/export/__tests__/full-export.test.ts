@@ -44,7 +44,7 @@ describe.skipIf(!canRun)('full export (Q-288)', () => {
 
     // One table pushed past the 5,000-row chunk, so the keyset boundary is actually crossed.
     await pool.query(`
-      INSERT INTO oura_heartrate (user_id, timestamp, bpm)
+      INSERT INTO sensor_heartrate (user_id, timestamp, bpm)
       SELECT $1, timestamp '2026-08-01 00:00:00+00' + (g || ' seconds')::interval, 60
       FROM generate_series(1, 5001) g`, [A])
   }, 60_000)
@@ -61,12 +61,12 @@ describe.skipIf(!canRun)('full export (Q-288)', () => {
     // The point of the manifest: an omission the reader can see, rather than one they must infer
     // from the file's size.
     expect(m.excluded.find(e => e.table === 'oura_raw_samples')?.reason).toMatch(/decoded values are exported/)
-    expect(m.exportedTables).toContain('oura_daily_derived')
+    expect(m.exportedTables).toContain('sensor_daily_derived')
   })
 
   it('exports the tables that used to be missing entirely', async () => {
     // A sample of the 56 absent-by-accident tables, chosen across the domains the entry named.
-    for (const t of ['oura_daily_derived', 'oura_daily_summary', 'ai_health_insights', 'meal_plans',
+    for (const t of ['sensor_daily_derived', 'sensor_daily_summary', 'ai_health_insights', 'meal_plans',
                      'fitness_tests', 'running_plans', 'user_stats', 'users']) {
       expect(Object.keys(EXPORTED)).toContain(t)
     }
@@ -91,7 +91,7 @@ describe.skipIf(!canRun)('full export (Q-288)', () => {
     // The pagination fix. The old read was a single buffering SELECT; this crosses the 5,000-row
     // chunk boundary, which is where a keyset cursor drops or repeats rows if it is wrong.
     const lines = await collect(A)
-    const hr = lines.filter(l => l.domain === 'oura_heartrate').map(l => (l.row as { id: string }).id)
+    const hr = lines.filter(l => l.domain === 'sensor_heartrate').map(l => (l.row as { id: string }).id)
     expect(hr).toHaveLength(5001)
     expect(new Set(hr).size).toBe(5001)
   })

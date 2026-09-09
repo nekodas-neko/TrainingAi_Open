@@ -84,13 +84,19 @@ export const EXPORTED: Record<string, ExportScope> = {
   measured_rmr: { kind: 'user_id' },
   mood_logs: { kind: 'user_id' },
   nutrition_targets: { kind: 'user_id' },
-  oura_daily: { kind: 'user_id' },
-  oura_daily_derived: { kind: 'user_id' },
-  oura_daily_summary: { kind: 'user_id' },
-  oura_daytime_hrv_model: { kind: 'user_id' },
+  // **PHYSICAL table names, and they must stay physical (Q-44 Phase 3).** The vendor rename left
+  // compatibility views at the old names so ordinary reads and writes keep working, but the export
+  // is not an ordinary read: `streamTable` discovers each table's PRIMARY KEY from the catalogue to
+  // paginate safely, and a view has none — so naming a view here does not degrade that table, it
+  // throws and takes the WHOLE user export down with it. Tables that keep a vendor name below
+  // (`oura_tokens`, `oura_raw_samples`, `oura_raw_packed`, …) were never renamed; see migration 273.
+  sensor_daily: { kind: 'user_id' },
+  sensor_daily_derived: { kind: 'user_id' },
+  sensor_daily_summary: { kind: 'user_id' },
+  daytime_hrv_model: { kind: 'user_id' },
   oura_daytime_stress_buckets: { kind: 'user_id' },
-  oura_tags: { kind: 'user_id' },
-  oura_workouts: { kind: 'user_id' },
+  sensor_tags: { kind: 'user_id' },
+  sensor_workouts: { kind: 'user_id' },
   personal_records: { kind: 'user_id' },
   phase_sets: { kind: 'user_id' },
   plan_meal_answers: { kind: 'user_id' },
@@ -125,7 +131,7 @@ export const EXPORTED: Record<string, ExportScope> = {
   // The ring's raw frames. Exported rather than excluded: they are the archival source the decoded
   // rows are read from, so an export without them cannot be re-decoded if a decoder turns out wrong.
   colmi_raw_frames: { kind: 'user_id' },
-  oura_heartrate: { kind: 'user_id' },
+  sensor_heartrate: { kind: 'user_id' },
   rr_intervals: { kind: 'user_id' },
 
   // ── Reachable only through a parent. Predicates mirror generate-claude-ro-views.js's `VIA`,
@@ -177,10 +183,10 @@ export const EXCLUDED: Record<string, Exclusion> = {
   db_query_log: { category: 'ops', reason: 'admin SQL audit trail' },
   error_events: { category: 'ops', reason: 'fault telemetry, pruned at 30 days' },
   feedback_submissions: { category: 'ops', reason: 'support tickets, not part of the user\'s record' },
-  oura_ble_battery_poll: { category: 'ops', reason: 'ring battery poll bookkeeping' },
-  oura_ble_clock_anchors: { category: 'ops', reason: 'ring-epoch↔UTC anchors; decoder state' },
+  ring_battery_poll: { category: 'ops', reason: 'ring battery poll bookkeeping' },
+  ring_clock_anchors: { category: 'ops', reason: 'ring-epoch↔UTC anchors; decoder state' },
   oura_ble_rekey_declarations: { category: 'ops', reason: 'ring re-key bookkeeping' },
-  oura_bucket: { category: 'ops', reason: 'rollup working set' },
+  sensor_bucket: { category: 'ops', reason: 'rollup working set' },
   oura_redecode_jobs: { category: 'ops', reason: 'decoder backfill job state' },
   oura_rollup_state: { category: 'ops', reason: 'rollup cursor' },
   rate_limits: { category: 'ops', reason: 'request-timing keys that embed other users\' ids' },
@@ -192,7 +198,7 @@ export const EXCLUDED: Record<string, Exclusion> = {
   //    Written down as a deliberate exclusion rather than absent by accident, per the entry.
   oura_raw_samples: { category: 'raw-frames', reason: 'undecoded BLE frames (58 MB of hex); the decoded values are exported' },
   oura_raw_packed: { category: 'raw-frames', reason: 'packed archival blobs of the same frames' },
-  oura_accel_chunks: { category: 'raw-frames', reason: 'raw accelerometer chunks' },
+  sensor_accel_chunks: { category: 'raw-frames', reason: 'raw accelerometer chunks' },
 
   // ── Jointly about another account. ───────────────────────────────────────────
   friendships: { category: 'third-party', reason: 'each row is also the other account\'s relationship record, and the counterparty is an opaque uuid here' },

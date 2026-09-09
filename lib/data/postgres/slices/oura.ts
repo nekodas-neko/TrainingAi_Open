@@ -740,7 +740,7 @@ async function pullKeyset<T>(
  * change as the driver rather than in a later "why is restore slow" investigation:
  *
  * ```sql
- * CREATE INDEX IF NOT EXISTS oura_heartrate_user_updated ON oura_heartrate(user_id, updated_at, id);
+ * CREATE INDEX IF NOT EXISTS sensor_heartrate_user_updated ON sensor_heartrate(user_id, updated_at, id);
  * ```
  */
 export async function getOuraTimeseriesDelta(
@@ -1665,13 +1665,18 @@ const BODY_COMP_MODEL_VERSION = 'atlas_2_1_0'
 // is only the ROW columns of `pg_stat_user_tables` that are estimates. Counting 14 tables is a seq
 // scan of tens of MB on a screen pressed occasionally, and the raw-sample split below already does a
 // far more expensive full scan with `pg_column_size` on the largest table of the set.
+// **These are PHYSICAL table names and must stay that way (Q-44 Phase 3).** The vendor rename put
+// compatibility views at the old names so ordinary reads and writes keep working, but this list is
+// not an ordinary read: `pg_stat_user_tables` contains TABLES ONLY, so a view name silently
+// contributes no row and the footprint quietly reports fewer tables than it lists. That is the whole
+// class the compatibility views cannot cover — DML goes through a view, catalogue lookups do not.
 const OURA_FOOTPRINT_TABLES = [
   // `oura_raw_packed` (Q-541) is listed beside `oura_raw_samples` deliberately: packing is only
   // observable as the two moving in opposite directions, and this readout is where the owner watches
-  // that happen.
-  'oura_raw_samples', 'oura_raw_packed', 'oura_accel_chunks', 'oura_heartrate', 'step_live_windows',
-  'oura_daily', 'oura_daily_summary', 'oura_daily_derived', 'sleep_sessions', 'body_metrics',
-  'oura_tags', 'oura_workouts', 'oura_ble_clock_anchors', 'oura_tokens',
+  // that happen. Those two keep their vendor names for good reasons — see migration 273's header.
+  'oura_raw_samples', 'oura_raw_packed', 'sensor_accel_chunks', 'sensor_heartrate', 'step_live_windows',
+  'sensor_daily', 'sensor_daily_summary', 'sensor_daily_derived', 'sleep_sessions', 'body_metrics',
+  'sensor_tags', 'sensor_workouts', 'ring_clock_anchors', 'oura_tokens',
 ]
 
 export async function getOuraStorageStats(db: Db): Promise<import('../../repository').OuraStorageStats> {

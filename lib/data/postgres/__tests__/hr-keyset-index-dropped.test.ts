@@ -32,7 +32,7 @@ import { join } from 'node:path'
 const canRun = !!process.env.DATABASE_URL
 const ROOT = join(__dirname, '..', '..', '..', '..')
 
-describe.skipIf(!canRun)('oura_heartrate indexes after BF-55', () => {
+describe.skipIf(!canRun)('sensor_heartrate indexes after BF-55', () => {
   let pool: import('pg').Pool
 
   beforeAll(async () => {
@@ -41,11 +41,14 @@ describe.skipIf(!canRun)('oura_heartrate indexes after BF-55', () => {
   })
 
   const indexes = async () => (await pool.query<{ indexname: string }>(
-    `SELECT indexname FROM pg_indexes WHERE tablename = 'oura_heartrate' ORDER BY indexname`
+    // PHYSICAL name: Q-44 Phase 3 renamed the table and left a compatibility view at the old name.
+    // `pg_indexes` lists indexes on TABLES, so querying the view's name returns an empty set — which
+    // would read as "the index was dropped" and is the false green this file exists to prevent.
+    `SELECT indexname FROM pg_indexes WHERE tablename = 'sensor_heartrate' ORDER BY indexname`
   )).rows.map(r => r.indexname)
 
   it('the unused keyset index is gone', async () => {
-    expect(await indexes()).not.toContain('oura_heartrate_user_updated')
+    expect(await indexes()).not.toContain('sensor_heartrate_user_updated')
   })
 
   /**
@@ -54,8 +57,8 @@ describe.skipIf(!canRun)('oura_heartrate indexes after BF-55', () => {
    */
   it('the index the planner actually uses is untouched, and so is the primary key', async () => {
     const names = await indexes()
-    expect(names).toContain('oura_heartrate_user_id_timestamp_key')
-    expect(names).toContain('oura_heartrate_pkey')
+    expect(names).toContain('sensor_heartrate_user_id_timestamp_key')
+    expect(names).toContain('sensor_heartrate_pkey')
   })
 })
 
@@ -69,8 +72,10 @@ describe('the restore driver is told to recreate the index', () => {
   const doc = src.slice(0, src.indexOf('export async function getOuraTimeseriesDelta'))
 
   it('names the index and carries the statement that recreates it', () => {
-    expect(doc).toContain('oura_heartrate_user_updated')
-    expect(doc).toMatch(/CREATE INDEX IF NOT EXISTS oura_heartrate_user_updated ON oura_heartrate\(user_id, updated_at, id\)/)
+    expect(doc).toContain('sensor_heartrate_user_updated')
+    // The recreate statement must name the PHYSICAL table: `CREATE INDEX` cannot target a view,
+    // so a restore driver pointed at the compatibility name would fail at the moment it is needed.
+    expect(doc).toMatch(/CREATE INDEX IF NOT EXISTS sensor_heartrate_user_updated ON sensor_heartrate\(user_id, updated_at, id\)/)
   })
 
   it('and retracts the claim that made it look free', () => {
