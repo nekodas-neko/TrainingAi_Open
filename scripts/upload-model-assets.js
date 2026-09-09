@@ -30,6 +30,7 @@ const { S3Client, PutObjectCommand, GetObjectCommand, HeadObjectCommand, ListObj
  *  under a new tree. */
 const {
   REQUIRED_MODEL_FILES,
+  KEPT_MODEL_FILES,
   BUCKET_PREFIX: PREFIX,
   REQUIRED_CONSTANTS_FILES,
   CONSTANTS_BUCKET_PREFIX: CONSTANTS_PREFIX,
@@ -76,7 +77,17 @@ async function main() {
     process.exit(1)
   }
 
-  const groups = [{ label: 'models', dir: ONNX_DIR, prefix: PREFIX, files: [...REQUIRED_MODEL_FILES] }]
+  // Q-50 item 2: the kept-but-unloaded weights upload alongside the required ones. They are
+  // extracted assets that cannot be re-derived from this repo, so the bucket is the only place they
+  // survive — omitting them here is how "keep them" quietly becomes "lose them" the next time the
+  // bucket is rebuilt from this manifest. They are NOT in REQUIRED_MODEL_FILES, so the boot check
+  // still does not demand them.
+  const groups = [{
+    label: 'models',
+    dir: ONNX_DIR,
+    prefix: PREFIX,
+    files: [...REQUIRED_MODEL_FILES, ...KEPT_MODEL_FILES],
+  }]
   if (withConstants) {
     // What to upload comes from the tree, not from the pinned list: the constants set is defined by
     // what the extraction produced, and uploading only what a hand-maintained list names would
