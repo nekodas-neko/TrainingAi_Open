@@ -1,6 +1,6 @@
 ## 2026-09-09 — A night still filling is not part of its own baseline (BF-83)
 
-**Branch:** `fix/bf-83-provisional-baseline` · **Lane B** · PR #1013
+**Branch:** `fix/bf-83-provisional-baseline` · **Lane B** · PR #1014
 
 ### What shipped
 

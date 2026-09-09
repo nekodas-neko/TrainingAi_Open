@@ -3833,7 +3833,7 @@ two screens, and a user who sets one has no way to know the other exists.
 - **✅ ALL THREE HALVES SHIPPED.** The engine landed 2026-08-31 (`provisional: boolean` on every
   `/api/sleep-sessions` row, defined by `lib/sleep/provisional.ts`); the **badge** renders on the
   sleep detail, the Body tab's sleep card and Home's score chip row; and the **baseline exclusion
-  shipped in #1013** — `health-metric-sheet.tsx`'s "vs your recent nights" scales are built from
+  shipped in #1014** — `health-metric-sheet.tsx`'s "vs your recent nights" scales are built from
   `settledNights(allNights)`, so a night still filling no longer sits in the distribution it is
   being measured against.
 - **The night being VIEWED is never filtered**, and that distinction is the whole of it: a
