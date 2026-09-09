@@ -429,6 +429,32 @@ below threshold and left in place for next time.
 - **Added:** 2026-09-09 · Lane B, on being blocked by the ceiling twice in one hour.
 
 
+### [workouts] LB-95 — personal records are the one half of the measured overview with no route to read them
+
+- **Lane:** A — it needs `app/api/**`, which is Lane A's. Filed by Lane B, which hit the wall while
+  building the rest of the section.
+- **Needs:** BF-133.
+- **What is missing is a read, not a screen.** `personal_records` holds 33 rows — exercise name,
+  `estimated_1rm`, `achieved_at` — and nothing exposes them to the user's own client.
+  `repo.listPersonalRecords` returns a `Map<string, number>` with **the date thrown away**, and the
+  only route that reads them for the current user is `/api/weights-summary`, which reports a
+  `personalRecord1rm` per exercise **of the active program** and carries no date either.
+  `/api/friends/feed` selects `achievedAt` — for other people's records.
+- **⚠ Neither existing source is usable here, and the reason is the card's own rule.** BF-133 is
+  built on *every value carries the date it was read*; a record rendered without one sits beside a
+  dated scan and reads as current. And an active-program filter would silently drop the records for
+  everything not currently programmed — a lifetime best on an exercise you have stopped doing is
+  exactly what a lifetime-best list is for, so a partial list is worse than none.
+- **What to build:** a `GET /api/personal-records` returning `{ exerciseName, estimated1rm,
+  achievedAt }` for the caller, all exercises, newest first, `private, no-store` like its siblings —
+  plus a repository read that keeps the date. Widening `listPersonalRecords` in place would touch
+  its five existing callers, which all want the map; a second read beside it is the smaller change.
+- **Then the surface is small:** a `Training` group in `components/more/details/`, built with the
+  `readingGroups`-shaped rows the section already renders. Lane B's, and roughly an hour once the
+  route exists.
+- **Added:** 2026-09-09 · Lane B, while shipping BF-133's clinical half.
+
+
 ### [heart-rate][cardio] TN-30 — one zone model, four max-HR anchors: the walk, the zone bar and the Body Battery grade the same heartbeat against three different ceilings
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · owner: *"we should only have one calculation for our heart rate zones so try make them consistent."*
@@ -1444,12 +1470,14 @@ sounds like:**
   this entry is the *single dense view*; if it is built by duplicating those cards' internals rather
   than reusing them, it becomes a second place every body metric is formatted. Reuse or extract.
 - **Reversal cost:** low — one read-only screen over existing stores. No migration, no new data.
-- **Keep:** the training and performance sections. **Body composition, vitals, metabolism, daily
-  movement and sleep shipped in #1009**, as a read-only section under the editable fields on
-  **More → Profile details** — see the decision below. Still unbuilt: `personal_records`,
-  `fitness_tests`, `dexa_scans` and `measured_rmr` in this view. The clinical two are reachable today
-  at More → DEXA & RMR results and the scale's resting-rate row now points there, so the gap is a
-  single dense view rather than an unreachable number.
+- **Keep:** the device check, and only that. Body composition, vitals, metabolism, daily movement
+  and sleep shipped in #1009; **`fitness_tests`, `dexa_scans` and `measured_rmr` shipped as the
+  "Tests and scans" section**, a second section on the same screen so that each half renders when
+  the other has nothing. `personal_records` is **not** in this view and is now **LB-95**: it needs a
+  route, which is Lane A's, exactly as this entry's `Lane:` line anticipated.
+- **Verify device:** the S25. `fitness_tests` is read local-first and the browser has no native
+  SQLite, so only the `cachedFetch` fallback ran — the `getFitnessTests` branch is unexercised, as is
+  how a now-noticeably longer dense list reads on the phone.
 - **⚠ The BF-118 decision is TAKEN, and it is not the one this entry proposed.** BF-118's screen does
   not exist and is a large unbuilt entry. What does exist is **`/more/details` ("Profile details",
   BF-79)** — name, biological sex, birth year, height, editable, one PATCH — which is precisely
@@ -1494,6 +1522,14 @@ sounds like:**
     of the two specs the 2026-09-04 shard experiment could not clear with a fresh database — but
     that failure was an assertion and this one is not, so they should not be merged into one
     hypothesis.
+  - **⚠ THIRD SIGHTING 2026-09-09 (#1041), and it names the mechanism.** Same spec
+    (`preferences-survive-reinstall:36`), but this time the log carries a browser **`SIGSEGV` with a
+    full stack trace** — `Received signal`, `SEGV_MAPERR`, `cr2: 0x1b0` — and **no `ERR_ABORTED` at
+    all**. `touch-target-size:53` went flaky in the same run; 171 passed. So `net::ERR_ABORTED` and
+    `browser.newContext: … has been closed` are both *downstream* of the renderer crashing, not two
+    separate faults, and this run caught the crash itself. It also confirms the scheduling accident:
+    `preferences-survive-reinstall` is once again the hard failure and once again nothing about it
+    asserted wrongly — the spec run locally on the same commit passes.
   - Recorded because a 26-minute job that eats its own browser roughly one run in three is an
     argument about the job, which is what this entry is for. It also means **a red E2E cannot be
     read as a signal without opening the log**, which is the cost LB-54 is about.
@@ -3964,6 +4000,11 @@ two screens, and a user who sets one has no way to know the other exists.
 - **Lane: B** — reassigned 2026-09-01. It was Lane A while the storage was owed; what is left is a
   rendering condition in `app/session-select/components/recommendation-card.tsx`, which is Lane B's
   file and touches no storage.
+- **Needs:** BF-94 — it settles the SHAPE of this residue, and it is `Gate: device`. Stated only in
+  prose until 2026-09-09, so `next-item.js` offered this entry as buildable while the entry's own
+  body says not to build it: *"do not build the greyed second button and then have BF-94 delete
+  it"*. A reader following the tool would have shipped exactly that. Recorded as a field so the
+  block is visible without reading two entries.
 - **⚠ BF-94 supersedes the SHAPE of this half — read it before building.** Filed later the same day
   from a second owner request (*"can we have the full button for workout; that lets you swipe it to
   turn it to rest?"*), it replaces the two-button row described below with a swipe on the full-width

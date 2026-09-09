@@ -6,6 +6,7 @@ import { MoreSubScreen } from '@/components/more/sub-screen'
 import { PersonalDetailsSection, type PersonalDetailsValues } from '@/components/profile/personal-details-section'
 import { useCachedValue } from '@/lib/hooks/use-cached-value'
 import { MeasuredOverviewSection } from '@/components/more/details/measured-overview-section'
+import { PerformanceOverviewSection } from '@/components/more/details/performance-overview-section'
 import type { MetricRow } from '@/components/more/details/measured-overview'
 import { invalidateGoalRecommendations, invalidateUserProfile } from '@/lib/cache-groups'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
@@ -136,6 +137,11 @@ export function DetailsContent() {
           than on a destination of its own: two "about you" screens each look incomplete, and this
           one is what the app measured while the fields above are what it was told. */}
       <MeasuredOverviewSection userId={user?.id} serverRecent={bodyMeta?.recent as MetricRow[] | undefined} />
+
+      {/* The one-off half: a scan, a lab test, a timed test. Separate from the daily readings
+          because they do not update on their own and because each half has to be able to render
+          when the other has nothing. */}
+      <PerformanceOverviewSection userId={user?.id} />
     </MoreSubScreen>
   )
 }

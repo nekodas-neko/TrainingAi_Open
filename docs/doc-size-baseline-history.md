@@ -9809,3 +9809,32 @@ LB-51's removal took one out (−25) — so the `.size` conflicted, which is the
 conflict on: they genuinely disagree about one number. Resolved by measuring the merged file rather
 than by picking a side or splicing the hunks, per the standing rule that only the delta survives a
 rebase.
+
+## 2026-09-09 — `docs/overview/entries/` ceiling 333 → 334, the SECOND raise in an hour
+
+Raised again, one PR after the last one, by a PR that has nothing to do with the journal. That is the
+drift the check is built to make visible, and it is working: the number is now moving once per PR
+because `main` sits on the ceiling and every session writes an entry.
+
+**The raise is the wrong response and is recorded as such.** The right one is **LB-94** — 298 of the
+334 entries are pinned by citations in durable docs, so the compaction sweep tops out at 36 and
+cannot get under any number. Until those citations point at the batched history instead, every PR
+either raises this line or cannot merge. Folding one entry per PR to stay level was considered and
+rejected as the same treadmill wearing a different hat.
+
+## 2026-09-09 — `docs/implementation-backlog.md` 19,878 → 19,919 (+41), LB-95 filed and two entries corrected
+
+LB-95 is BF-133's `personal_records` half, which needs a route and is therefore Lane A's. Most of its
+length is the two things that are **not** usable and why — `listPersonalRecords` drops the date, and
+`/api/weights-summary` covers only the active program — because both look like they would do, and an
+entry that just said "add a route" invites a reviewer to point at either.
+
+The rest is BF-84 gaining a `Needs: BF-94` field. That block existed only in prose, so the queue tool
+offered BF-84 as buildable while BF-84's own body says not to build it.
+
+## 2026-09-09 — `projectOverview.md` 10,468 → 10,480 (+12), BF-133's clinical half is not device-verified
+
+The row covers **both** halves of the screen, because #1009's daily half never got one either — its
+journal said "not exercised" and nothing reached the file every session actually reads. Twelve lines
+is what it takes to say which branch ran (`cachedFetch`) and which did not (`getFitnessTests`), which
+is the part a device check needs to know.

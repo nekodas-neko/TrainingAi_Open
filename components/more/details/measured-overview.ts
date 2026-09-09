@@ -86,7 +86,7 @@ export const METRIC_GROUPS: MetricGroup[] = [
         field: 'bmrKcal',
         label: 'Resting rate',
         unit: 'kcal',
-        note: 'estimated by the scale — a lab-measured RMR, if you have one, is under DEXA & RMR results',
+        note: 'estimated by the scale — a lab-measured one, if you have had one, is under Tests and scans',
       },
       { field: 'metabolicAge', label: 'Metabolic age', unit: 'years' },
     ],
