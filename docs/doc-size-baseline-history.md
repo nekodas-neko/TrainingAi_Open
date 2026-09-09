@@ -9522,3 +9522,21 @@ the ones beside it. Longer than most because the useful part is what was NOT fix
 stay at `baseline_complete = false`, the card still reads "Baseline needed" until LA-92, and nothing
 has been seen on the device. A status line that said only "baseline now completes" would be read as
 "the owner's two stuck sessions are unstuck", and they are not.
+
+## 2026-09-09 — `docs/implementation-backlog.md` 19,662 → 19,705 (+43), LB-66 reconciled
+
+The entry said "`program_sessions` and `session_exercises` need a `deleted_at`, so this is a
+migration" and stopped there. Re-verified against `main` before implementing, per the standing rule,
+and the premise is incomplete in a way that produces a wrong implementation: **there is no delete
+endpoint for a program session.** Removing one means saving the program without it, and
+`saveProgram` hard-deletes every session and exercise then re-inserts them — so swapping those
+deletes for a soft delete tombstones the whole program on every save, and the rows then collide with
+their own re-insert.
+
+The +43 is the shape that does work (tombstone only the ids the save does not carry back —
+`oldIdSet − suppliedSessionIds`, both already computed in that function) plus the two non-obvious
+hazards beside it: the periodization/workout-session restore loop that runs after the delete-all,
+and the two single-row delete sites the entry does not mention.
+
+Cheaper here than in a corrective migration. This is what "re-verify the plan against current main"
+is for, and the first time this session it has actually changed an implementation.
