@@ -9764,3 +9764,19 @@ The load-bearing one is the naming. The owner said *"a tab like the other place"
 place literally would have put `My Foods` on this screen — where it would mean single foods, while
 one screen away the same label means saved meals. That is the confusion BF-103 removed by owner
 decision, and it would have come straight back from following the instruction to the letter.
+
+## 2026-09-09 — `projectOverview.md` 10,455 → 10,468 (+13), LB-51's decline fix is not device-verified
+
+The growth is one Known-Issues row, and it is the row the Canonical Runtime gate requires rather than
+one this PR chose to write: `plan_meal_answers` is an offline-first domain, the browser has no native
+SQLite, so the `store.getPlanMealAnswers` branch of the same reconcile ran nowhere. Thirteen lines is
+what it takes to say which half was exercised and which was not — a shorter row would have to drop
+that distinction, which is the only part a future session needs.
+
+## 2026-09-09 — `docs/implementation-backlog.md` 19,882 → 19,857 (−25), LB-51 removed
+
+Its `Keep:` named three uncovered plan-card actions. Two had already been covered by later work — the
+log-all action by `plan-day-fill.spec.ts`, the copy by `plan-meal-to-saved-meal.spec.ts` — and this PR
+covers the third, so nothing is owed and the entry goes rather than shrinking. Worth recording that
+the residue was two-thirds stale before it was read: a `Keep:` naming several items ages one item at
+a time, and only re-reading it against the specs that exist showed which third was real.

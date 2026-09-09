@@ -143,6 +143,31 @@ export function usePlanMealLogging({ mealPlan, mealTypes, logs, userId, dateRef,
   // or unanswered — meal cannot move the day's totals, because there is no row to move them.
   const [declinedMealIds, setDeclinedMealIds] = useState<Set<string>>(new Set())
 
+  /**
+   * Answers made on this device that a read has not agreed with yet.
+   *
+   * `loadAnswers` re-runs while the card is on screen, so a read can already be in flight when the
+   * user taps — and it returns the state from *before* the tap. Applying it verbatim silently undid
+   * the answer, which is the optimistic-write rule this repo learned from the mood-checkin
+   * re-prompt, in the one place where nothing else can reveal it: a decline writes no food and
+   * moves no total, so the only sign it was lost is the meal asking again. Measured on the web path
+   * while covering this surface — the revert reproduced on two runs in three.
+   *
+   * An override is dropped the moment a read agrees with it, so this converges rather than pinning
+   * the value against the server.
+   */
+  const pendingAnswers = useRef(new Map<string, boolean>())
+
+  const applyAnswers = useCallback((serverIds: string[]) => {
+    const server = new Set(serverIds)
+    const next = new Set(server)
+    for (const [id, declined] of pendingAnswers.current) {
+      if (server.has(id) === declined) { pendingAnswers.current.delete(id); continue }
+      if (declined) next.add(id); else next.delete(id)
+    }
+    setDeclinedMealIds(next)
+  }, [])
+
   const loadAnswers = useCallback(async (date: string) => {
     if (!userId) return
     // Local-first: a decline made offline must survive an app restart, or the prompt reappears.
@@ -150,7 +175,7 @@ export function usePlanMealLogging({ mealPlan, mealTypes, logs, userId, dateRef,
     if (store) {
       try {
         const rows = await store.getPlanMealAnswers(date)
-        setDeclinedMealIds(new Set(rows.map(r => r.planMealId)))
+        applyAnswers(rows.map(r => r.planMealId))
         return
       } catch { /* fall through to the online read */ }
     }
@@ -158,16 +183,18 @@ export function usePlanMealLogging({ mealPlan, mealTypes, logs, userId, dateRef,
       const res = await fetch(`/api/nutrition/plan-meal-answers?date=${date}`)
       if (!res.ok) return
       const data = await res.json() as { answers?: { planMealId: string }[] }
-      setDeclinedMealIds(new Set((data.answers ?? []).map(a => a.planMealId)))
+      applyAnswers((data.answers ?? []).map(a => a.planMealId))
     } catch { /* offline and no store — leave the set as it is */ }
-  }, [userId])
+  }, [userId, applyAnswers])
 
   useEffect(() => { void loadAnswers(dateRef.current) }, [loadAnswers, dateRef, mealPlan?.id])
 
   const setDeclined = useCallback(async (meal: MealPlanMeal, declined: boolean) => {
     if (!userId) return
     const date = dateRef.current
-    // Flip first: the tap is the feedback, and the write reconciles behind it.
+    // Flip first: the tap is the feedback, and the write reconciles behind it. The override is
+    // recorded in the same breath, so a read already in flight cannot land on top of it.
+    pendingAnswers.current.set(meal.id, declined)
     setDeclinedMealIds(prev => {
       const next = new Set(prev)
       if (declined) next.add(meal.id); else next.delete(meal.id)
