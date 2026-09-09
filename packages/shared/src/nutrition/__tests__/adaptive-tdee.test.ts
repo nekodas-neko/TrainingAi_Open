@@ -37,6 +37,16 @@ function window(opts: {
 }
 
 describe('estimateMaintenance — the maths', () => {
+  it('multiplies the UNROUNDED slope, not the reported 2-dp weekly rate (LB-67)', () => {
+    // The reported figure is rounded for display; the maintenance is not derived from it. A −0.9 kg
+    // fortnight fits −0.48462 kg/wk, which reports as −0.48 — and re-deriving the daily slope from
+    // that rounded value gives 2528 instead of 2533. Five kcal, on a fixture chosen because most
+    // round-numbered ones make the two agree and test nothing.
+    const e = estimateMaintenance(window({ days: 14, intake: 2000, kgTotal: -0.9 }), 14)
+    expect(e.weightRateKgPerWeek).toBe(-0.48)
+    expect(e.maintenanceKcal).toBe(2533)
+  })
+
   it('returns mean intake when weight is flat', () => {
     const e = estimateMaintenance(window({ days: 14, intake: 2000, kgTotal: 0 }), 14)
     expect(e.maintenanceKcal).toBe(2000)

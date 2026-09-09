@@ -854,11 +854,13 @@ random, and worse than no colour because it looks authoritative.
   - **③ the dose on the day timeline is Lane A's**, and only its *render* is left: the tick already
     stamps `taken_at` (`adapter.ts:6557`, OR-102a), so what is missing is an event type in
     `app/api/day-timeline/route.ts` — an `app/api/**` path Lane B may not touch.
-  - **④ the weight-response chip is blocked on LB-67, not on data.** The series is reachable from
-    Lane B — `store.getBodyMetrics(cutoff)` returns every local row with `weightKg`, which is the
-    local-first read this should use anyway. What stops it is the formula: shipping a third
-    kg/week estimator beside the two that exist, one of which is wrong, is the bug class the
-    One Formula rule exists to prevent. Do ④ once LB-67 lands.
+  - **④ the weight-response chip is UNBLOCKED — LB-67 shipped 2026-09-09.** It was held back on the
+    formula, not the data: a third kg/week estimator beside the two that existed, one of them
+    wrong, is the bug class the One Formula rule exists to prevent. There is now one,
+    `computeWeightRateFit` in `packages/shared/src/health/long-term-goal-progress.ts`, and it
+    returns `stdErrKgPerWeek` **because ④ needs the interval rather than the point estimate** — that
+    was added in the same pass so ④ would not have to invent one. The series is reachable from Lane
+    B via `store.getBodyMetrics(cutoff)`, which is the local-first read this should use anyway.
   - **The estimator ④ needs was worked out and is worth not re-deriving.** Trailing 7-day means at
     each end; standard error `sd × √(1/n₁ + 1/n₂)` over the span in weeks; the verdict withheld
     unless the **whole** 95% interval falls on one side of the band, because an interval straddling
@@ -908,44 +910,6 @@ why `nutrition-sheet-surface.spec.ts` passes. Whatever the cause, it is specific
   overlay difference against the `My Foods` trigger is the obvious first place, and the fact that
   `el.click()` works rules out most of the alternatives.
 - **Reversal cost:** nil. A test helper and a note.
-
-### [body][nutrition] LB-67 — the weekly weight rate is fitted against the array index, so a gappy series overstates it 🔴 LIVE
-
-- **Lane: A** — `packages/shared/src/health/long-term-goal-progress.ts`, reached by
-  `app/api/progress-summary`. **Branch:** unassigned.
-- **Added:** 2026-09-08, found while building OR-102b ④, which needs this figure and cannot add a
-  third one beside it.
-- **Needs:** — nothing.
-
-**`computeWeightRateKgPerWeek(weights)` takes an array of numbers and fits `x = the array index`,
-then multiplies the slope by 7 as though the readings were one day apart.** They are not: rows exist
-only on days with a metric, and the owner weighs in on about three days in four. So the slope is
-*per reading* and is reported as *per day*.
-
-**Measured on a 14-day window, true trend −0.70 kg/wk:**
-
-| readings in the window | reported | true | overstated |
-|---|---|---|---|
-| 14 of 14 days | −0.70 kg/wk | −0.70 | 1.00× |
-| **10 of 14** (the owner's rate) | **−1.04 kg/wk** | −0.70 | **1.48×** |
-| 6 of 14 | −1.76 kg/wk | −0.70 | 2.51× |
-
-**This is live and it changes what the screen says, not just the digits.**
-`evaluateWeightRateVsGoalBand` calls anything past 1.0 kg/wk `too_fast`, so the middle row — an
-ordinary, healthy −0.70 kg/wk — renders on Health → Body as **"Faster than ideal pace"** in amber.
-
-**The fix already exists in this repo, one directory away.** `packages/shared/src/nutrition/adaptive-tdee.ts`
-fits against the weigh-in's *day index within the window* and its comment states this exact failure:
-*"an unevenly spaced series (weighed Mon, Tue, then Sunday) would otherwise report a slope
-per-reading and badly overstate the rate"*. So the app already holds two weekly-weight-rate figures,
-computed differently, disagreeing by about 1.5× on this owner's data, on two different screens —
-which is what the One Formula rule is for.
-
-- **What to do:** give the shared function dated points instead of a bare number array, and converge
-  the `adaptive-tdee` copy onto it. **While it is open, add the standard error** — OR-102b ④ needs
-  the interval, not just the point estimate, and adding it in the same pass avoids a third caller
-  inventing one.
-- **Reversal cost:** low. One formula, two call sites, no data and no migration.
 
 ### [platform] OR-105 — 17 more entries may be filed as shipped without having been built
 

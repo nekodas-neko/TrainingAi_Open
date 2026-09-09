@@ -26,8 +26,19 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.437.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-09-08.
+**Version:** v1.441.5 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-09-09.
+
+**The weekly weight trend was measuring change per weigh-in, not per day (LB-67).**
+`computeWeightRateKgPerWeek` fitted the array index, and rows exist only on days carrying a metric —
+so weighing in about three days in four made a true −0.70 kg/wk report as **−1.04** (−1.76 at six
+readings in fourteen days). Past 1.0 kg/wk the band says `too_fast`, so an ordinary healthy rate
+rendered on Health → Body as **"Faster than ideal pace"** in amber. The correct fit already existed
+in `adaptive-tdee`, so the app held two weekly-rate figures disagreeing by ~1.5× on one data set;
+both now call `computeWeightRateFit`, which also returns a standard error (OR-102b ④ needed the
+interval and would otherwise have invented a third). **Not seen on a screen** — the band is asserted
+in a unit test, not observed turning green on the S25
+([journal](docs/overview/entries/2026-09-09-lb67-weight-rate-day-index.md)).
 
 
 **The baseline banner told him to load 82.5 kg on a pull-up (BF-127).** Owner, mid-session: *"pull

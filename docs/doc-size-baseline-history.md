@@ -9464,3 +9464,21 @@ No `Keep:` line: PS-39's stated goal is complete at 0. The caveat that a *count*
 property of the metric rather than outstanding work, so it belongs in the reference doc. Leaving a
 finished entry in the queue to carry a caveat is exactly what the "a finished entry must not still
 be in the queue" rule exists to stop.
+
+## 2026-09-09 — `docs/implementation-backlog.md` 19,684 → 19,648 (−36), LB-67 shipped
+
+The weekly weight rate was fitted against the array index, so a gappy series reported a slope per
+*reading* as though it were per *day*. Entry removed (38 lines), and OR-102b ④ rewritten from
+"blocked on LB-67" to unblocked (+2) — it needed the interval, not the point estimate, so
+`stdErrKgPerWeek` shipped in the same pass rather than leaving a third estimator to be invented.
+
+## 2026-09-09 — `projectOverview.md` 10,431 → 10,442 (+11), LB-67's status paragraph
+
+A user-visible fix, so it takes a Current Status paragraph like the ones beside it — the weekly
+weight trend was fitted against the array index and reported an ordinary −0.70 kg/wk as −1.04,
+which the goal band renders as amber "Faster than ideal pace". The compaction sweep folds these
+paragraphs out again; this is the shape they are supposed to have while current.
+
+The version line was **five releases stale** (v1.437.1 against a package.json at 1.441.5) and is
+corrected in the same edit. That line is the first thing every session reads, and it had been
+drifting because a version bump and this file are edited by different steps of the ritual.

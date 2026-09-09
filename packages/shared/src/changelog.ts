@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.441.5",
+    date: "2026-09-09",
+    changes: [
+      "Your weekly weight trend is no longer overstated on days you skip the scale. It was measuring change per weigh-in rather than per day, so weighing in about three days in four made a steady 0.7 kg/week read as 1.0 \u2014 which tipped it past the healthy range and showed \u0027Faster than ideal pace\u0027 in amber for an ordinary rate.",
+      "The weight trend on the Body screen and the one behind your calorie targets are now the same calculation. They disagreed by about 1.5x on the same data.",
+    ],
+  },
+  {
     version: "1.441.4",
     date: "2026-09-09",
     changes: [
