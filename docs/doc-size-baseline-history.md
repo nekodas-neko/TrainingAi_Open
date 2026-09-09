@@ -10050,3 +10050,33 @@ invalidated 1500 ms after the ingest counter advanced, while the server schedule
 3-second debounce — so every autonomous drain repainted from pre-rollup data and cached it. Worth
 its lines because the symptom (data that looks fresh and is not) gives no hint of the cause, and the
 previous framing in the backlog said the opposite: that no signal existed at all.
+
+## 2026-09-09 — `docs/implementation-backlog.md` 19,922 → 19,981 (+59), BF-134
+
+The owner asked whether his calorie budget had 200 deducted twice. It had not — and roughly a third
+of the entry is spent establishing that, because an entry that only described the *real* defect would
+leave the next reader hunting the double deduction he reported.
+
+What earns the length is that the reported symptom and the actual defect are different things sitting
+two lines apart on one card:
+
+- **Not a defect:** `1,453 base − 200 = 1,253` is one subtraction, printed as two separate terms by
+  `calorie-zone-bar.tsx:44`.
+- **Why it reads like two:** `1,453` is not his RMR of 1,325. It is `bmr × 1.2` less the energy of
+  the first 3,000 steps, held back so those steps can be earned later. A subtraction that is not the
+  goal delta, invisible on the label, is what makes a correct number look wrong to someone who knows
+  his own resting rate.
+- **The real defect:** the macro row totals **1,659 kcal** beside a **1,253** budget. The grams are
+  the stored whole-day target scaled by earned movement; the calories start at zero movement and
+  grow. They agree only after ~406 kcal is earned.
+
+Two cross-references are load-bearing rather than decorative. `energy-card.tsx:44-52` already records
+that *"Q-401 found two budgets on one screen"* and guarantees the donut, headline and burned figure
+cannot disagree — a guarantee that does not extend to the macro row, which is precisely the gap. And
+**TN-29** protects `nutrition_targets.calories = 1,660` with a stated honest band of 1,450–1,700; the
+1,253 sits below it legitimately, so an implementer reconciling the two numbers without reading TN-29
+would move a target that entry deliberately left alone.
+
+The recommendation section argues *against* the obvious fix — scaling grams down to the current
+budget prints a morning protein target near 113 g that climbs all day, on the goal and the day where
+holding protein matters most — and points at the `WHY TWO NUMBERS` block the card already has.
