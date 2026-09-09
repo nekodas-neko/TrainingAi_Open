@@ -325,5 +325,3 @@ function SetCardComponent({
 }
 
 export const SetCard = memo(SetCardComponent);
-
-style={{ color: "#ff0000" }}
