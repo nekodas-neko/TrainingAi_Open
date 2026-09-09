@@ -13664,11 +13664,11 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Do NOT move `RECOVERY_INDEX_OPTIMAL_HOURS`.** A second anchor change inside two days, same
   direction, fitted to an input that moved for measurement reasons, is how a scoring constant gets
   quietly re-purposed into a bias correction.
-- **Next action (supersedes the one below, which has run):** the residue is in well-detected nights,
-  so the mechanical explanations are spent — test candidate 3 before writing any more estimator
-  code. `recoveryIndexHours: last.recoveryIndexHours` (`run.ts`) searches only the night's FINAL
-  segment for the minimum and is worth fixing on its own terms, but it is **not** the gap:
-  fragmented nights average 2.719 h against 2.639 h for single-window nights.
+- **✅ `last.recoveryIndexHours` SHIPPED 2026-09-09** — `nightRecoveryIndexHours` takes the minimum across every window, the wake from the last ([journal](overview/entries/2026-09-09-q509-fragmented-night-recovery-index.md)).
+  **⚠ Its quoted measurement was unsound: "fragmented nights average 2.719 h against 2.639 h" cannot
+  be of this path — under `groupSleepPeriods`' rules NOT ONE of the 61 BLE-era nights is fragmented,
+  so the branch has never run and the fix is latent.** Rows-per-date gives 13; every second row is a
+  nap, a 0-duration row, or 4.96 h away. Measure fragmentation by those rules, never by date.
 - **Superseded first action, kept because its pass test is still the pass test:** treat the hours estimator's BLE behaviour as the work item. It is a global argmin
   over an overnight HR series; at 2× the sample-to-sample noise it settles at a systematically
   different point. **Concrete experiment:** smooth the BLE series to Cloud-like noise *before* the

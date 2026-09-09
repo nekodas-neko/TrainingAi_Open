@@ -13,7 +13,7 @@ import { lfhfFromIbi } from '@trainingai/shared/health/hrv-frequency'
 import { spo2VariabilityFromSamples } from '@trainingai/shared/health/spo2-variability'
 import { nightlyTemperatureCentiC, temperatureFrameSeries } from '@trainingai/shared/health/temperature-baseline'
 import { groupSleepPeriods, nightPeriodsByDate } from '@trainingai/shared/health/sleep-night'
-import { computeRecoveryIndex } from '@trainingai/shared/health/recovery-index'
+import { computeRecoveryIndex, nightRecoveryIndexHours } from '@trainingai/shared/health/recovery-index'
 import { type ExclusionWindow } from '@trainingai/shared/health/daily-medians'
 import { metExclusionWindows, rmssdSamples, hrvMsFromSamples, nightlyHeartRate, HR_BIN_DS, numericField as numArr } from '@trainingai/shared/health/night-vitals'
 import { clampToDenseSensing } from '@/lib/sleep/sensing-span'
@@ -233,7 +233,14 @@ export async function runOuraRollup(
   const sleepRows: import('@/lib/data/repository').OuraSleepUpsertRow[] = []
   const nightInputsByDate = new Map<string, NightInput>()
   // One entry per sleep WINDOW; collapsed into one NightInput per night below.
-  const nightCandidates: { sleepStart: Date; sleepEnd: Date; durationHours: number | null; input: NightInput }[] = []
+  // `recovery` rides alongside `input` rather than inside it: `NightInput` is the shared shape
+  // `computeDailySummaries` consumes, and the merge below needs the minimum's absolute TIME, which a
+  // scalar hours-to-settle cannot carry (Q-509).
+  const nightCandidates: {
+    sleepStart: Date; sleepEnd: Date; durationHours: number | null
+    input: NightInput
+    recovery: { settledAt: Date; lowestBpm: number } | null
+  }[] = []
   const bdiByDate = new Map<string, number>()
   /** BDI per sleep WINDOW (keyed by sleepStart ms), collapsed to one per date once the night
    *  resolution below has decided which period actually is that date's night. */
@@ -556,6 +563,7 @@ export async function runOuraRollup(
       metAvg: null, // filled in below from calendar-day MET frames
       breathAvgRpm: respiratoryRate, // same value written to sleep_sessions.respiratory_rate
       },
+      recovery: recovery ? { settledAt: recovery.settledAt, lowestBpm: recovery.lowestBpm } : null,
     })
 
     // Stash the granular raw signals the chronic-stress model needs but the DailySummaryRow does
@@ -625,7 +633,6 @@ export async function runOuraRollup(
       return v.length ? v.reduce((a, b) => a + b, 0) : null
     }
     const first = parts[0].input
-    const last = parts[parts.length - 1].input
     if (parts.length === 1) { nightInputsByDate.set(period.date, { ...first, date: period.date }); continue }
     const timeInBed = (parts[parts.length - 1].sleepEnd.getTime() - parts[0].sleepStart.getTime()) / 3_600_000
     nightInputsByDate.set(period.date, {
@@ -646,8 +653,8 @@ export async function runOuraRollup(
         const v = parts.map(p => p.input.rhrLowBpm).filter((x): x is number => x != null)
         return v.length ? Math.min(...v) : null
       })(),
-      // Hours from the overnight HR minimum to waking — a property of the final segment.
-      recoveryIndexHours: last.recoveryIndexHours,
+      // Q-509. Across every window, not the final one — see `nightRecoveryIndexHours`.
+      recoveryIndexHours: nightRecoveryIndexHours(parts),
       metAvg: null,
     })
   }
