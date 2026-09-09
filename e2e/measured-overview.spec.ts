@@ -25,7 +25,15 @@ test('the measured card dates every reading and omits what was never measured', 
   }
 
   // Every rendered reading is dated. A one-off scale figure sits beside today's step count.
+  //
+  // **Waited for, not counted on sight.** The heading renders as soon as EITHER half of the card has
+  // something, and the sleep average arrives from its own fetch — so `/api/body-metadata` can still
+  // be in flight when the heading appears, and a count taken then is legitimately 0. It read as a
+  // stable pass only because body-metadata happened to win the race; adding two more fetches to the
+  // screen was enough to lose it one run in two.
   const dates = section.locator('p.tabular-nums.text-right')
+  await expect(dates.first(), 'the daily readings must arrive, not just the heading')
+    .toBeVisible({ timeout: 30_000 })
   const rows = await dates.count()
   expect(rows).toBeGreaterThan(0)
   for (let i = 0; i < rows; i++) {
