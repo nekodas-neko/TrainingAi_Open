@@ -9369,3 +9369,16 @@ someone would remove it.
 
 **And the note that displaying it is still unanswered**, so shipping the control is not mistaken for
 having decided where a remembered bedtime belongs on the screen.
+
+## 2026-09-09 — `docs/implementation-backlog.md` 19,587 → 19,586 (−1), BF-83's last half shipped
+
+The `Keep:` naming two unbuilt pieces comes out; three lines go in saying all three halves are done
+and stating the two distinctions that make the fix correct rather than merely applied.
+
+The first is that the night being **viewed** is never filtered — it is the reading, not the baseline,
+and a provisional night still shows its own numbers under its own badge. The owner's report was that
+the comparison moved as well as the reading, so what changed is the context.
+
+The second is that an **absent** flag counts as settled. Every night predating the flag carries no
+value, and reading those as provisional would empty the baseline rather than protect it — which is
+the failure a stricter-looking filter would have shipped.

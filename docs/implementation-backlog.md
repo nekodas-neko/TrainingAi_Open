@@ -3830,12 +3830,18 @@ two screens, and a user who sets one has no way to know the other exists.
 
 ### [sleep] BF-83 — last night's sleep grows while you look at it, and nothing says it is still filling
 
-- **Keep — THE ENGINE HALF SHIPPED 2026-08-31; the badge and the average are Lane B's.**
-  `/api/sleep-sessions` now returns **`provisional: boolean`** on every row, and
-  `lib/sleep/provisional.ts` is the definition of what it means. What is owed, and only this:
-  render the badge on the sleep detail, and **exclude a provisional night from the recent-nights
-  average it is compared against** — the moving baseline in the table below is that omission.
-  The flag is computed per request, so a client that ignores it is no worse off than today.
+- **✅ ALL THREE HALVES SHIPPED.** The engine landed 2026-08-31 (`provisional: boolean` on every
+  `/api/sleep-sessions` row, defined by `lib/sleep/provisional.ts`); the **badge** renders on the
+  sleep detail, the Body tab's sleep card and Home's score chip row; and the **baseline exclusion
+  shipped in #1013** — `health-metric-sheet.tsx`'s "vs your recent nights" scales are built from
+  `settledNights(allNights)`, so a night still filling no longer sits in the distribution it is
+  being measured against.
+- **The night being VIEWED is never filtered**, and that distinction is the whole of it: a
+  provisional night still shows its own numbers under its own badge. What changed is the *context* —
+  the owner's report was that the comparison moved too, so the reading and the thing judging it were
+  drifting together.
+- **An absent flag counts as settled.** Every night predating the flag carries no value, and reading
+  those as provisional would empty the baseline rather than protect it.
 - **⚑ The measure is the ROLLUP's coverage, and a third mechanism was found while settling it.**
   Two candidate mechanisms are listed below; neither is what happened. Production says the batch
   covering 4:46 → 6:38 was already ingested at **6:42**, two minutes before the 6:44 screenshot —
