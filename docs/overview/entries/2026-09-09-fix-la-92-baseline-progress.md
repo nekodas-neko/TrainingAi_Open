@@ -1,6 +1,6 @@
 ## 2026-09-09 — The baseline card says how far along it is (LA-92)
 
-**Branch:** `fix/la-92-baseline-progress` · **Lane B** · PR #1035
+**Branch:** `fix/la-92-baseline-progress` · **Lane B** · PR #1036
 
 ### What shipped
 
