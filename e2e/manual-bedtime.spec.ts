@@ -9,6 +9,8 @@ import { settleRouteBoundary } from './fixtures'
  * `/api/sleep/manual-bedtime` with the instant the entered clock time means, and that clearing sends
  * an explicit null rather than omitting the field.
  */
+test.use({ serviceWorkers: 'block' })
+
 test('saving a remembered bedtime posts the instant, and clearing posts null', async ({ page }) => {
   const posted: unknown[] = []
   await page.route('**/api/sleep/manual-bedtime', async route => {
