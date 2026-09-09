@@ -9838,3 +9838,31 @@ The row covers **both** halves of the screen, because #1009's daily half never g
 journal said "not exercised" and nothing reached the file every session actually reads. Twelve lines
 is what it takes to say which branch ran (`cachedFetch`) and which did not (`getFitnessTests`), which
 is the part a device check needs to know.
+
+## 2026-09-09 — `docs/overview/entries/` ceiling 334 → 335, and the sweep was tried first this time
+
+Third raise in a session, and the previous note called a raise the wrong response — so the compaction
+sweep was attempted instead of raised straight past. **It cannot be run.** The directory spans
+2026-08-16 to 2026-09-09 and **all 36 foldable entries are dated 2026-09-08 or 2026-09-09**:
+citations accrete with age, so the unlinked set is the *newest* entries, which are precisely the
+recent window the directory exists to hold. `README.md`'s "fold the UNLINKED ones oldest-first" would
+fold the last two days and leave three weeks loose.
+
+So the remedy is inverted, not just inadequate, and the measurement is now on **LB-94** with a note
+not to run the sweep as written. Raised by 1 again rather than by a margin, because the number is
+still the only thing making this visible.
+
+## 2026-09-09 — `docs/implementation-backlog.md` 19,919 → 19,969 (+50), LB-96 and LB-97 filed, OR-102b ④ closed
+
+Two entries, both Lane A's, both found by being unable to finish ④ properly: no route returns a
+weight series longer than seven days, and the target band has no setting to come from. Each carries
+the measurement that makes it actionable — the `metrics.slice(0, 7)` with no parameter, and the grep
+across `users`, the goals tables and the shared types that found no band. OR-102b's own `Keep:`
+shrinks from "③ and ④" to ③, which is Lane A's.
+
+## 2026-09-09 — `projectOverview.md` 10,480 → 10,492 (+12), the reta card is unverifiable on web
+
+The row says what the e2e could and could not reach, which is the unusual part: the coloured branch
+is only reachable in a browser with an absurd fixture, because the seven-day server window makes the
+interval ±4 kg/wk. A shorter row would say "device check owed" and lose the reason it is the *only*
+place the realistic case exists.

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { Client } from 'pg'
 import { STORAGE_STATE, settleRouteBoundary } from './fixtures'
 
 /**
@@ -17,6 +18,26 @@ test.use({ storageState: STORAGE_STATE, serviceWorkers: 'block' })
 test.setTimeout(150_000)
 
 const NAME = 'Vial E2E'
+
+/**
+ * The supplement this spec creates is removed afterwards.
+ *
+ * It was not, and on a database that survives between runs — every local one — the second run found
+ * two rows called `Vial E2E` and the trigger locator failed on a strict-mode violation. CI never
+ * showed it because CI gets a fresh database, so the cost lands entirely on whoever runs the suite
+ * twice. Deleted by name because the id is the app's, not this spec's.
+ */
+test.afterAll(async () => {
+  const db = new Client({ connectionString: process.env.DATABASE_URL })
+  await db.connect()
+  try {
+    await db.query(
+      `DELETE FROM supplement_vials WHERE supplement_id IN (SELECT id FROM supplements WHERE name = $1)`,
+      [NAME],
+    )
+    await db.query('DELETE FROM supplements WHERE name = $1', [NAME])
+  } finally { await db.end() }
+})
 
 test('the calculator shows its working, and the owner-verified draw', async ({ page }) => {
   await page.goto('/nutrition')

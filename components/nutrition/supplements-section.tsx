@@ -203,6 +203,7 @@ export function SupplementsSection({ supplements, loading, onChanged, userId , g
           supplementId={vialFor.id}
           supplementName={vialFor.name}
           defaultDoseMg={vialFor.defaultAmount ?? null}
+          userId={userId}
         />
       )}
 

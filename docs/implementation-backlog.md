@@ -416,8 +416,16 @@ below threshold and left in place for next time.
   a durable doc, so the sweep tops out at 35 and cannot get under the ceiling. Raising the number is
   what has actually been happening instead; it was raised to 333 on 2026-09-09 to unblock two PRs
   that had nothing to do with the journal, and that is the third such raise.
+- **⚠ MEASURED 2026-09-09, and the prescribed remedy is not merely insufficient — it is INVERTED.**
+  The directory spans **2026-08-16 → 2026-09-09**, and **every one of the 36 foldable entries is
+  dated 2026-09-08 or 2026-09-09**. Citations accrete over time, so the older an entry is the more
+  likely something links it; the unlinked set is therefore the *newest* entries, which are exactly
+  the recent window this directory exists to hold. `README.md` says to *"fold the UNLINKED ones
+  oldest-first"* — run literally, that folds the last two days and leaves three weeks of older
+  entries loose. Nobody should run the sweep as written until this entry is done.
 - **What is owed:** re-point the durable docs' citations at the batched history rather than at the
-  loose entry, so those 297 become foldable, then run the sweep. Mechanically the entry's body moves
+  loose entry, so those 299 become foldable, then run the sweep — and fix the README, whose
+  oldest-first instruction is safe only once the linked/unlinked split stops correlating with age. Mechanically the entry's body moves
   into a `history-*.md` and the citation gains an anchor; the work is deciding which citations are
   load-bearing enough to keep pointing at a whole entry.
 - **⚠ Do not "fix" this by widening the sweep's definition of foldable.** A citation exists because
@@ -453,6 +461,42 @@ below threshold and left in place for next time.
   `readingGroups`-shaped rows the section already renders. Lane B's, and roughly an hour once the
   route exists.
 - **Added:** 2026-09-09 · Lane B, while shipping BF-133's clinical half.
+
+
+### [body][platform] LB-96 — no route returns a weight series longer than seven days, so a browser cannot see a dosing period
+
+- **Lane:** A — `app/api/body-metadata/route.ts` (or a new route), which Lane B may not touch.
+- **Needs:** OR-102b.
+- **Measured 2026-09-09 while shipping OR-102b ④.** `/api/body-metadata` hard-codes
+  `metrics.slice(0, 7)` and takes no range parameter, and it is the **only** server read of
+  `body_metrics` a client has. The whole history lives in the local store, which `getLocalStore`
+  returns null for in a browser — so on the web build the weight-response card, which needs a
+  multi-week window, can only ever render its empty state.
+- **This is not a product bug — the canonical runtime is the APK and the local store is there.** It
+  is a *verification* gap, and it cost real coverage: `e2e/reta-weight-response.spec.ts` has to build
+  its fixture inside seven days, where the 95% interval is about ±4 kg/wk, so the coloured branch is
+  only reachable with an absurd loss rate. The realistic case cannot be exercised anywhere but the
+  device.
+- **What to build:** a `days` (or `from`) parameter on `/api/body-metadata`'s `recent`, bounded like
+  `/api/fitness-tests` bounds its own (365 default, 730 max), defaulting to today's 7 so no existing
+  caller changes. Not a new route — a second one over the same table is how two readers start
+  disagreeing.
+- **Added:** 2026-09-09 · Lane B, on being unable to e2e the realistic case.
+
+### [body] LB-97 — the weight-response band is a constant; the owner asked for it to be their setting
+
+- **Lane:** A — a user preference is storage, and OR-102b calls the band *"the owner's setting"*.
+- **Needs:** OR-102b.
+- OR-102b ④ shipped with `DEFAULT_BAND_PCT_PER_WEEK = { lo: 0.5, hi: 1.0 }` — a named constant the
+  card already threads through as a parameter, so the surface work once a stored value exists is
+  passing it in. **No such setting exists anywhere:** grepped 2026-09-09 for a rate/percentage goal
+  on `users`, the goals tables and the shared types, and there is none.
+- **⚠ It is a percentage of bodyweight per week, not kilograms.** The card converts against the
+  latest weigh-in, so a stored kg figure would silently mean something different as the body changes
+  — which is the whole reason the entry specified a percentage.
+- **Sanity-bound whatever stores it.** A band with `lo > hi`, or a ceiling of 10 %/wk, produces a
+  verdict that is confidently wrong rather than an obvious mistake.
+- **Added:** 2026-09-09 · Lane B, while shipping ④ against the default.
 
 
 ### [heart-rate][cardio] TN-30 — one zone model, four max-HR anchors: the walk, the zone bar and the Body Battery grade the same heartbeat against three different ceilings
@@ -1232,13 +1276,19 @@ random, and worse than no colour because it looks authoritative.
 - **Revisit the plateau call once 6+ weeks of on-drug data exist** to test it against — not before.
 
 - **Reversal cost:** low. A section and a card; no data, no migration (those are OR-102a's).
-- **Keep:** ③ and ④. **① and ② shipped in #1007** — vial setup and the dose calculator, reached from
+- **Keep:** ③ only — it is **Lane A's**, and it is the last part. **① and ② shipped in #1007** — vial setup and the dose calculator, reached from
   a syringe control on any milligram-dosed supplement row, with the owner-verified figures
   (`10 mg ÷ 3 mL = 3.33 mg/mL`, `0.5 mg → 15 units`) covered by unit tests and an e2e.
   - **③ the dose on the day timeline is Lane A's**, and only its *render* is left: the tick already
     stamps `taken_at` (`adapter.ts:6557`, OR-102a), so what is missing is an event type in
     `app/api/day-timeline/route.ts` — an `app/api/**` path Lane B may not touch.
-  - **④ the weight-response chip is UNBLOCKED — LB-67 shipped 2026-09-09.** It was held back on the
+  - **④ SHIPPED 2026-09-09** as `weight-response.ts` + a card in the vial sheet, anchored on the
+    current vial rather than on the last injection: the vial is the span over which the dose is
+    actually constant, and seven days of weigh-ins resolve a rate to about ±1.3 kg/wk against a
+    band 0.35 kg wide. The band is `DEFAULT_BAND_PCT_PER_WEEK` (0.5–1 %/wk); **making it the
+    owner's setting is not built and is LB-97**. The web build can only ever show the empty state —
+    see LB-96.
+  - **④'s history (kept — it is why the shape is what it is): LB-67 shipped 2026-09-09.** It was held back on the
     formula, not the data: a third kg/week estimator beside the two that existed, one of them
     wrong, is the bug class the One Formula rule exists to prevent. There is now one,
     `computeWeightRateFit` in `packages/shared/src/health/long-term-goal-progress.ts`, and it
