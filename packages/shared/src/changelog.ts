@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.444.0",
+    date: "2026-09-09",
+    changes: [
+      "The vial sheet now shows how your weight has responded since you opened the current vial \u2014 the rate per week, the range it could really be, and your target band. The colour only appears once the whole range falls on one side of that band; until then it says so rather than guessing, because a couple of weigh-ins cannot tell 0.4 kg a week from 1.2.",
+    ],
+  },
+  {
     version: "1.443.5",
     date: "2026-09-09",
     changes: [
