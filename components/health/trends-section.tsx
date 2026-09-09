@@ -7,6 +7,7 @@ import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache";
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl';
 import { accentCardStyle } from "@trainingai/shared/utils";
 import type { TrendsResponse } from "@/app/api/health-trends/route";
+import { RestPrescriptionCard } from "./rest-prescription-card";
 
 const TrendChart = dynamic(
   () => import("./trend-chart").then(m => ({ default: m.TrendChart })),
@@ -58,7 +59,7 @@ function CorrelationBars({ buckets, signed }: { buckets: TrendsResponse["buckets
   );
 }
 
-export const TrendsSection = memo(function TrendsSection() {
+export const TrendsSection = memo(function TrendsSection({ userId }: { userId?: string }) {
   const [view, setView] = useState(VIEWS[0].key);
   const [data, setData] = useState<TrendsResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -124,6 +125,10 @@ export const TrendsSection = memo(function TrendsSection() {
             ) : (
               <CorrelationBars buckets={data.buckets} signed={SIGNED_VIEWS.has(view)} />
             )}
+            {/* Q-300. The bars answer "does resting to plan go with lifting better?"; this answers
+                what the plan asks against what is actually taken, which the measurement found to be
+                the useful half. Renders nothing off-device — see the card. */}
+            {view === 'rest-adherence' && <RestPrescriptionCard userId={userId} />}
           </>
         )}
       </div>

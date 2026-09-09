@@ -1750,6 +1750,18 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [workouts] ⚠️ Rest vs the plan is on the Trends card, and it renders nowhere but the phone (Q-300, 2026-09-09, v1.445.0)
+
+Health → Trends → Rest discipline now shows what the plan prescribes for rest against what is
+actually taken, per prescription, with the signed difference and set count. No score and no nudge:
+39.8% of sets are "rushed" *uniformly* — every session rushes something, none is mostly rushed — so
+a discipline reading is meaningless, and the owner chose a plain fact card.
+[Journal](docs/overview/entries/2026-09-09-feat-rest-vs-prescription.md).
+**Owed: the device check, which is the only place it renders at all.** It reads
+`set_logs.planned_rest_sec` (the snapshot at log time, so a later style edit cannot rewrite the past)
+from the local store, and no route publishes that field — so a browser shows nothing and CI can only
+assert its absence. Second such card today; filed as a class in **LB-98**.
+
 ### [nutrition][body] ⚠️ The reta weight-response card is unverifiable on web, and unseen on the phone (OR-102b ④, 2026-09-09, v1.444.0)
 
 The vial sheet now reports the weight-change rate since the vial was opened, its 95% interval and the

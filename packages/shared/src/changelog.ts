@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.445.0",
+    date: "2026-09-09",
+    changes: [
+      "Health \u2192 Trends \u2192 Rest discipline now also shows what your plan asks for rest against what you actually take, per prescription. It is a plain table, not a score \u2014 the point is whether the numbers in your program are the ones you want, since your rest tends to sit at its own pace rather than follow them.",
+    ],
+  },
+  {
     version: "1.444.0",
     date: "2026-09-09",
     changes: [
