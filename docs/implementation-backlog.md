@@ -1886,7 +1886,7 @@ repair the 22 dead backlog paths and 43 doubled `docs/overview/overview/` labels
 unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge candidates
 (led by `oura-ring-data-reference.md`, a retired-API reference with no retirement note).
 
-### [platform] PS-39 — 27 API routes still have no test that imports their handler
+### [platform] PS-39 — 24 API routes still have no test that imports their handler
 
 - **Lane:** A. Regenerate the list with `node scripts/check-route-test-coverage.js` — it prints every
   uncovered route when it fails, and the ratchet now holds the number.
@@ -1949,16 +1949,16 @@ testing X. Two more classes worth the same suspicion: a fixture whose timezone I
 proves nothing about which zone the route read, and a fixture already in sorted order proves
 nothing about a sort.
 
-**The count was 93 and is really 27**, by the mechanism the entry half-noticed: it counted a route
+**The count was 93 and is really 24**, by the mechanism the entry half-noticed: it counted a route
 covered when any test mentioned its URL, so `calendar-data` and `training-load` "appearing only as
 cache-key strings" counted. Asking instead whether a test imports the handler gives 150 of 222, less
-the one hundred and twenty-three paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
+the one hundred and twenty-six paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
 honest in both directions (see above), so the list can be worked from. **The actionable core
 named by this entry is now CLEAR**: the home aggregates, both ingest routes and `program-week` are
 done; so are ai-periodization, `friends/leaderboard` (its scoping was left uncovered when a mock
 could not see it, and is covered against real rows now), the account cluster, the supplement/vial chain,
 a meal plan's lifecycle + reshape, the workout write path, the running plan and the four body/health
-writes, the goal-target-adherence loop, the home week/streak reads, the AI Coach lifecycle, the cardio hub, the strength/volume trends, the day timeline, the food-input path, the four heart-rate reads, the exercise catalogue, the nutrition day-completion trio, the year-review/identity trio, the platform-meta four, the two program-phase writes, the walk/sleep analysis pair, the feedback/calendar/scale trio the four Oura-BLE reads the two destructive Oura-BLE levers the four admin reports and the three ring-device probes. Work by feature — batching on what is *verified together* twice found a defect (LA-78, LA-79). `scripts/check-route-test-coverage.js` ratchets it, so the debt
+writes, the goal-target-adherence loop, the home week/streak reads, the AI Coach lifecycle, the cardio hub, the strength/volume trends, the day timeline, the food-input path, the four heart-rate reads, the exercise catalogue, the nutrition day-completion trio, the year-review/identity trio, the platform-meta four, the two program-phase writes, the walk/sleep analysis pair, the feedback/calendar/scale trio the four Oura-BLE reads the two destructive Oura-BLE levers the four admin reports the three ring-device probes and the admin triage queues. Work by feature — batching on what is *verified together* twice found a defect (LA-78, LA-79). `scripts/check-route-test-coverage.js` ratchets it, so the debt
 only shrinks, a NEW route arrives uncovered and fails, and since LA-81 a route that LOSES its test fails whatever the total does.
 
 ### [app-shell][platform] LA-76 — a deload PHASE still decays the collection, and nothing dates one
@@ -19050,6 +19050,40 @@ reads.
   merge. That fixes the *class* of "only CI sees test type errors" rather than this one shape, and it
   may make the bespoke check unnecessary.
 - **Reversal cost:** low — a script and a CI step, deletable.
+
+### [platform] LA-86 — a Postgres DEADLOCK between parallel DB test files, seen once
+
+- **Lane:** A — the DB-backed files under `lib/data/postgres/__tests__/` and their cleanup shape.
+- **Added:** 2026-09-09, Lane A — observed once during a full-suite run, recorded rather than
+  dismissed. **Not reproduced:** the file passed 3 of 3 in isolation and the very next full run was
+  green, so this is a note about a hazard, not a diagnosis.
+
+`user-stats-soft-delete.test.ts` failed with `error: deadlock detected` inside its `beforeEach`, on
+the second of two cleanup statements:
+
+```
+DELETE FROM user_stats        WHERE user_id = $1
+DELETE FROM workout_sessions  WHERE user_id = $1
+```
+
+Every DB test file uses its own `TEST_USER_ID` — the UUID-collision check enforces that — so the
+rows do not overlap. A deadlock therefore points at **lock ordering rather than row overlap**: two
+files deleting from the same pair of tables in different orders can take index or page locks in
+opposite sequence under vitest's parallelism.
+
+**Why it matters beyond one red run:** CI runs the same suite against the same schema. A spurious
+deadlock there is a red PR with no defect behind it, which is exactly the kind of failure that
+teaches people to re-run rather than read. This is a different class from the statement-timeout
+contention already fixed (vitest `testTimeout` raised to 20 s) — a timeout is slowness, a deadlock is
+ordering.
+
+**Worth trying, cheapest first:** give every DB file the same cleanup ORDER (children before
+parents, one canonical helper), which removes the cycle by construction; or run the DB project
+single-threaded, which trades wall-clock for determinism and should be measured before being
+adopted.
+
+- **Keep:** do not close this on "it has not happened again" — an intermittent lock-ordering bug is
+  precisely the thing that looks fixed for weeks.
 
 ### [platform] LA-85 — the calendar route's scope check may not match what Google actually throws
 

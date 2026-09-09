@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/auth';
-import { requireAdmin } from '@/lib/admin';
+import { requireAdmin, adminErrorResponse } from '@/lib/admin';
 import { rateLimit } from '@/lib/rate-limit';
 import { getDb, ensureSchema } from '@/lib/data/postgres/client';
 import { exerciseMedia } from '@/lib/data/postgres/schema';
@@ -23,8 +23,8 @@ export async function POST(req: Request) {
   const session = await auth();
   try {
     await requireAdmin(session?.user?.id ?? '', session?.user?.isAdmin);
-  } catch {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  } catch (err) {
+    return adminErrorResponse(err);
   }
 
   // Q-134: these media routes were the only admin routes with no limit at all, while every

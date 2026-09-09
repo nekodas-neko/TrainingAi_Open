@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.441.4",
+    date: "2026-09-09",
+    changes: [
+      "More admin screens now tell a database problem apart from a permissions one \u2014 the feedback list, the user list, the exercise and media tools all used to answer \u0027forbidden\u0027 for any failure. Deleting a feedback item with a mistyped id now says the id is wrong instead.",
+      "Removing someone from the invite list now works whatever capitalisation or spacing you type. It previously had to match the stored address exactly, and a mismatch quietly did nothing while still reporting success.",
+    ],
+  },
+  {
     version: "1.441.3",
     date: "2026-09-09",
     changes: [
