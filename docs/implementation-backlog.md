@@ -1886,7 +1886,7 @@ repair the 22 dead backlog paths and 43 doubled `docs/overview/overview/` labels
 unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge candidates
 (led by `oura-ring-data-reference.md`, a retired-API reference with no retirement note).
 
-### [platform] PS-39 — 40 API routes still have no test that imports their handler
+### [platform] PS-39 — 36 API routes still have no test that imports their handler
 
 - **Lane:** A. Regenerate the list with `node scripts/check-route-test-coverage.js` — it prints every
   uncovered route when it fails, and the ratchet now holds the number.
@@ -1949,16 +1949,16 @@ testing X. Two more classes worth the same suspicion: a fixture whose timezone I
 proves nothing about which zone the route read, and a fixture already in sorted order proves
 nothing about a sort.
 
-**The count was 93 and is really 40**, by the mechanism the entry half-noticed: it counted a route
+**The count was 93 and is really 36**, by the mechanism the entry half-noticed: it counted a route
 covered when any test mentioned its URL, so `calendar-data` and `training-load` "appearing only as
 cache-key strings" counted. Asking instead whether a test imports the handler gives 150 of 222, less
-the one hundred and ten paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
+the one hundred and fourteen paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
 honest in both directions (see above), so the list can be worked from. **The actionable core
 named by this entry is now CLEAR**: the home aggregates, both ingest routes and `program-week` are
 done; so are ai-periodization, `friends/leaderboard` (its scoping was left uncovered when a mock
 could not see it, and is covered against real rows now), the account cluster, the supplement/vial chain,
 a meal plan's lifecycle + reshape, the workout write path, the running plan and the four body/health
-writes, the goal-target-adherence loop, the home week/streak reads, the AI Coach lifecycle, the cardio hub, the strength/volume trends, the day timeline, the food-input path, the four heart-rate reads, the exercise catalogue, the nutrition day-completion trio, the year-review/identity trio, the platform-meta four, the two program-phase writes, the walk/sleep analysis pair and the feedback/calendar/scale trio. Work by feature — batching on what is *verified together* twice found a defect (LA-78, LA-79). `scripts/check-route-test-coverage.js` ratchets it, so the debt
+writes, the goal-target-adherence loop, the home week/streak reads, the AI Coach lifecycle, the cardio hub, the strength/volume trends, the day timeline, the food-input path, the four heart-rate reads, the exercise catalogue, the nutrition day-completion trio, the year-review/identity trio, the platform-meta four, the two program-phase writes, the walk/sleep analysis pair, the feedback/calendar/scale trio and the four Oura-BLE reads. Work by feature — batching on what is *verified together* twice found a defect (LA-78, LA-79). `scripts/check-route-test-coverage.js` ratchets it, so the debt
 only shrinks, a NEW route arrives uncovered and fails, and since LA-81 a route that LOSES its test fails whatever the total does.
 
 ### [app-shell][platform] LA-76 — a deload PHASE still decays the collection, and nothing dates one
