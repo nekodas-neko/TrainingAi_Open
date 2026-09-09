@@ -1886,83 +1886,6 @@ repair the 22 dead backlog paths and 43 doubled `docs/overview/overview/` labels
 unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge candidates
 (led by `oura-ring-data-reference.md`, a retired-API reference with no retirement note).
 
-### [platform] PS-39 — 3 API routes still have no test that imports their handler
-
-- **Lane:** A. Regenerate the list with `node scripts/check-route-test-coverage.js` — it prints every
-  uncovered route when it fails, and the ratchet now holds the number.
-- **Added:** 2026-09-06, app checkpoint — [report](reviews/2026-09-05-app-checkpoint.md) lane 25.
-  The scan shipped 2026-09-07 with `health-connect/ingest` and `client-error`, then
-  `training-load`, `calendar-data` and `muscle-recovery`, then `colmi/samples`, `program-week`,
-  `oura/hr-day` and `oura-ble/samples`; the rest is buildable work rather than a residue, so it keeps no `Keep:` — that
-  would file it under a heading telling the lane not to look (OR-100).
-
-- **✅ THE SCAN'S RULE IS FIXED (2026-09-08), and Q-112d's diagnosis was half of it.** The scan used
-  to ask whether a test *contained the substring* `app/api/<route>/route`. Q-112d spotted that a
-  **relative** import never produces that substring, so a route whose own `__tests__/` loads the
-  handler as `await import('../route')` read as untested — right, and it affected **13** routes
-  (`sync/push`, `sync/pull`, `body-battery`, `ai/health-insight`, `user/goals` and eight more).
-  - **The opposite error was the same size and nobody had counted it.** A substring is not an
-    import: **12 routes read as COVERED because a test merely mentioned the path**, almost always
-    `import type { Response } from '@/app/api/<route>/route'` — borrowing a type and calling nothing.
-  - **So the debt was 139, not the ~126 predicted from the false negatives alone** (140 − 13 + 12) —
-    accidentally close to right for two wrong reasons, which is why predicting from one direction
-    missed. The checker now resolves the specifier and ignores type-only imports, so both are honest.
-  - **✅ ALL TWELVE now have real tests** (2026-09-08) → **124**, the last being `workout-data`, 600
-    lines behind one GET serving three shapes with four production incidents named in its own
-    comments. The others: `scale-ble/pending/[id]/{confirm,dismiss}`, `nutrition/energy-balance`,
-    `session-explain/insight`, `running-plan/explain`, `weekly-digest`, `nutrition/saved-meals/[id]`,
-    `nutrition/meal-plans/generate/meal`, `nutrition-goals/recommend`, `workout-review/…` + `…/apply`
-    and `ai-periodization/session/[sessionId]` + `…/prescribe` + `…/respond` — each batched with the
-    uncovered siblings it verifies alongside.
-
-**HOW THESE TESTS GO WRONG, measured across ten batches on 2026-09-08.** Every batch here ran a
-mutation pass, and the same defect appeared **three times** — always passing, always found by
-mutation and never by reading:
-
-> **A fixture that trips two rules at once tests neither.** The case names one guard; a different
-> guard rejects it first; deleting the named guard changes nothing.
-
-It appeared **twice more in the batch written straight after this was recorded, and three times in
-the one after that** — the argument for the checklist rather than against it. A single-word query
-cannot tell "every term matches" from "any term matches"; a product with empty nutriments cannot
-tell "no product" from "no usable product", because the mapper rejects it either way; and, in the
-HR batch, **every fixture where the resolved ceiling happened to EQUAL the age estimate** could not
-tell the two apart, so three separate values derived from the ceiling were all silently readable
-from the estimate instead.
-
-That last one names the general form: **when two quantities are equal in your fixture, nothing that
-reads either one is under test.** Vary them.
-
-The three, so the shape is recognisable rather than abstract:
-
-- *"below the distance floor"* was 749 m over half an hour — 1.5 km/h, so the **speed** check
-  rejected it. Its sibling *"too slow"* was 166 m, rejected by the **distance** check.
-- *"the max-HR delta needs both windows reliable"* gave the prior window one reading. One reading
-  has no corroborated max at all, so `max != null` rejected it and the reliability guard was never
-  reached.
-- *"only the accepted change ids are written"* sent a patch of one change and accepted it — so
-  "accepted ids" and "all ids" were the same list.
-
-**The check, before writing the case:** if it is meant to fail on guard X, does it satisfy every
-other guard? And the cheap tell afterwards — mutate X away; a case that still passes was never
-testing X. Three more worth the same suspicion: a fixture whose timezone IS `DEFAULT_TZ` proves
-nothing about which zone the route read; one already in sorted order proves nothing about a sort;
-and a symmetric pair with equal totals — one male row and one female makes `generatedMale` and
-`generatedFemale` both read 1 — tests neither counter, the balanced-looking fixture being the one
-shape where the two predicates cannot be told apart.
-
-**The count was 93 and is really 3**, by the mechanism the entry half-noticed: it counted a route
-covered when any test mentioned its URL, so `calendar-data` and `training-load` "appearing only as
-cache-key strings" counted. Asking instead whether a test imports the handler gives 150 of 222, less
-the one hundred and forty-seven paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
-honest in both directions (see above), so the list can be worked from. **The actionable core
-named by this entry is now CLEAR**: the home aggregates, both ingest routes and `program-week` are
-done; so are ai-periodization, `friends/leaderboard` (its scoping was left uncovered when a mock
-could not see it, and is covered against real rows now), the account cluster, the supplement/vial chain,
-a meal plan's lifecycle + reshape, the workout write path, the running plan and the four body/health
-writes, the goal-target-adherence loop, the home week/streak reads, the AI Coach lifecycle, the cardio hub, the strength/volume trends, the day timeline, the food-input path, the four heart-rate reads, the exercise catalogue, the nutrition day-completion trio, the year-review/identity trio, the platform-meta four, the two program-phase writes, the walk/sleep analysis pair, the feedback/calendar/scale trio the four Oura-BLE reads the two destructive Oura-BLE levers the four admin reports the three ring-device probes the admin triage queues, the two admin media tools and the three admin tools (media generation, model assets, the lbs→kg repair) the three admin reports (app-load, timing baseline, sleep-feel calibration) the three admin maintenance routes (db-snapshot, vacuum, program-export) the three Oura-BLE backfill levers (redecode, step-backfill preview, HR-stats backfill) the ring-device three (rekey declaration, device metrics, colmi status) and the last Oura-BLE reads (step-counter export, workout sensors, comparison harness) with the NextAuth re-export. Work by feature — batching on what is *verified together* twice found a defect (LA-78, LA-79). `scripts/check-route-test-coverage.js` ratchets it, so the debt
-only shrinks, a NEW route arrives uncovered and fails, and since LA-81 a route that LOSES its test fails whatever the total does.
-
 ### [app-shell][platform] LA-76 — a deload PHASE still decays the collection, and nothing dates one
 
 - **Lane:** A — `app/api/collection/route.ts`, plus a migration.
@@ -19086,6 +19009,35 @@ adopted.
 
 - **Keep:** do not close this on "it has not happened again" — an intermittent lock-ordering bug is
   precisely the thing that looks fixed for weeks.
+
+### [platform] LA-89 — `oura/hr-sync` has no callers, and its name says something that is not true
+
+- **Lane:** A — `app/api/oura/hr-sync/route.ts`.
+- **Added:** 2026-09-09, Lane A — found while writing the route's first tests (PS-39). Tested and
+  pinned as it stands; **not deleted**, because removing an HTTP surface is the owner's call.
+
+Two separate things, and only the second is a decision:
+
+**The name is stale.** It is not an Oura *Cloud* sync. That call was removed 2026-08-13 — the ring
+has been on our own BLE key since the 2026-07-07 re-key, so it could only ever earn a 401 — and the
+route is now a thin wrapper over `syncAndAttributeSessionHr`, which attributes HR the BLE pipeline
+has already ingested. Live code, wrong name. Anyone grepping `oura/` while working the Cloud
+retirement will read it as a leftover and may delete the wrong thing.
+
+**It has no callers.** Searched across `app/`, `components/`, `lib/` and `android/`: every remaining
+reference is a comment or a test asserting it is *not* called. `complete-workout` used to POST to it
+server-to-self, which burned a second request worker and a second pool connection per completion and
+failed outright ("fetch failed") **9 times in production**; Q-122 replaced that with a direct call to
+the shared function. The route was left behind.
+
+**The decision, and why it is not mine to take:** an HTTP endpoint can have callers this repo cannot
+see — a curl in a runbook, a Tasker profile, an old APK build. The safe order is to confirm nothing
+external uses it (a week of `error_events`/access observation, or the owner simply saying so), then
+delete the route and its test together. Renaming instead is the worse option: it keeps a second way
+to reach the pipeline, which is what Q-122 was removing.
+
+Cheap either way — the route is 50 lines and tested, so it costs nothing to leave until someone
+answers.
 
 ### [platform] LA-88 — five routes satisfy the `.strict()` check while the strictness cannot fire
 

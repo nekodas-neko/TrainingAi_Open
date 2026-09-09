@@ -71,7 +71,7 @@ const SCAN_DIRS = ['app', 'lib', 'packages', 'components', 'e2e', 'scripts'];
 // This resolves the specifier instead. A relative one resolves against the importing file; an alias
 // or bare one resolves against the repo root; a type-only import does not count at all.
 //
-const BASELINE = 3;
+const BASELINE = 0;
 
 function walk(dir, out = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -176,6 +176,9 @@ if (uncovered.length > BASELINE) {
   console.error('      A new route needs a test that imports its handler and calls it — mock `@/auth` and');
   console.error('      `@/lib/data` the way `lib/__tests__/collection-route.test.ts` does. If you removed a');
   console.error("      route's test, restore it rather than raising the number: this list only shrinks.\n");
+  console.error('      Before writing the cases, read docs/route-test-fixtures.md — the ways these');
+  console.error('      tests come out green while testing nothing, measured over the sweep that');
+  console.error('      took this count to 0.\n');
   console.error('  Uncovered routes:');
   for (const r of uncovered) console.error(`      ${r}`);
   process.exit(1);
