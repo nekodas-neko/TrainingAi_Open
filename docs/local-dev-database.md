@@ -110,6 +110,27 @@ skipped count is the only tell, and it is easy to read past. **Always run the su
 `DATABASE_URL=postgresql://postgres:postgres@/trainingai_dev?host=/tmp&port=5433 pnpm test`** (or
 `env DATABASE_URL=… pnpm ci:local`) before calling a change tested; CI sets the variable, so a green
 here that CI then fails is this gap, not flake.
+
+**Second blind spot, same shape, found the same day: the socket URL disables the TCP-only tests.**
+The value provisioned into `.env.local` and printed by the session-start hook is the **Unix-socket**
+form, `postgresql://postgres:postgres@/trainingai_dev?host=/tmp&port=5433`. Three `claude_ro` files
+and `lib/export/__tests__/db-snapshot-integration.test.ts` gate on `isTcpUrl(DATABASE_URL)` — they
+provision a real read-only role, which needs a password login over TCP — so with the socket form
+they **skip**, and the CI run executes 27 tests the local run never reaches. That is exactly how
+LB-66 shipped a red `Tests` job past a green local suite: migration 271 added two columns and
+`db-snapshot-integration.test.ts`'s drift check is what enforces regenerating the `claude_ro`
+views, and it had skipped locally. **The same server also listens on `localhost:5433`, so use the
+TCP form for any run you intend to trust:**
+
+```
+DATABASE_URL=postgresql://postgres:postgres@localhost:5433/trainingai_dev pnpm test
+```
+
+**Corollary worth its own line: any migration that adds a column to a table with a `claude_ro` view
+needs a regenerated view migration in the SAME PR** (`CLAUDE_RO_OWNER_USER_ID=<uuid> node
+scripts/generate-claude-ro-views.js > lib/data/postgres/migrations/<next>_claude_ro_views_<reason>.sql`,
+always a new number — `ensureSchema` tracks by filename). The generator emits an explicit column
+list per view, so a new column is invisible to `/api/admin/db-query` until the views are rebuilt.
 The test user `test@local.dev` has password `testpass123` (seeded with a bcrypt
 hash) for credentials-login testing.
 

@@ -89,6 +89,20 @@ pass — the schedule clear, the exercise-level read filter, and the workout cap
 each now separated by its own fixture rather than by an assertion added to a fixture that could not
 tell the two guards apart.
 
+## The green local suite was wrong twice, and CI caught the second one
+
+**`claude_ro` views are an explicit column list, so a new column is invisible until they are
+rebuilt.** Migration 271 added two; `db-snapshot-integration.test.ts`'s drift check exists to catch
+exactly that, and it **skips locally** — it gates on `isTcpUrl(DATABASE_URL)` because it provisions a
+real read-only role over a password login, and the value the container provisions is the Unix-socket
+form. So the local suite ran 27 fewer tests than CI and the `Tests` job went red on a green local
+run. Migration **272** is the regenerated views; diffed against 268, it differs by exactly
+`program_sessions.deleted_at` and `session_exercises.deleted_at` and nothing else.
+
+Reproduced before fixing, per the drive-to-green rule: the same file over
+`postgresql://postgres:postgres@localhost:5433/trainingai_dev` fails with CI's exact message, and
+passes with 272 applied (37 of 37 across all four `claude_ro` files).
+
 ## A false green found on the way, worth more than the entry it interrupted
 
 `pnpm ci:local` from a session shell reported **678 passed / 191 skipped files** and exited 0 — while
@@ -97,7 +111,10 @@ the same tree run as `DATABASE_URL=… pnpm test` reported **862 passed / 5 skip
 pointing at production, so `session-start.sh` unsets it (correctly — otherwise `pnpm dev` talks to
 prod), and nothing in `vitest.config.ts`/`vitest.setup.ts` loads `.env.local` back. Every DB-backed
 file then hits `describe.skipIf(!canRun)` and skips silently; the skip count is the only tell.
-Recorded in [`docs/local-dev-database.md`](../../local-dev-database.md) with both measurements.
+Recorded in [`docs/local-dev-database.md`](../../local-dev-database.md) with both measurements, and
+beside it the socket-vs-TCP gap above — **the local command to trust is
+`DATABASE_URL=postgresql://postgres:postgres@localhost:5433/trainingai_dev pnpm test`**, which is
+what closes both.
 
 **Not exercised:** the APK. This is server-side only, so it reaches the device through a Railway
 deploy with no rebuild — but the on-device sync that turns a tombstone into a disappeared session in
