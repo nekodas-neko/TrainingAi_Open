@@ -27,6 +27,15 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   be excluded from aggregates rather than counted as zero. **Stage 1 shipped 2026-09-01**, so the
   unique constraint it says has to go is already gone.
 
+- [`docs/overview/entries/2026-09-09-fix-macro-budget-anchor-label.md`](../../overview/entries/2026-09-09-fix-macro-budget-anchor-label.md)
+  — **the macro grams and the calorie budget are two denominators, and the card says so (BF-134),
+  2026-09-09.** The grams come from stored `nutrition_targets`; the budget from
+  `restingBase + goalDelta + earned`. **The gap is a CONSTANT** — `scaleMacrosForEarnedKcal` grows
+  the grams by the same `earned` that grows the budget, so it cancels and 406 kcal is left at every
+  hour of every day. BF-134's own text says they converge at ~406 earned; they do not, and
+  `components/nutrition/__tests__/macro-budget-gap.test.ts` pins it. Q-401's "one budget, three
+  views" guarantee on `energy-card.tsx` covers the calorie half only — the macro row was never in
+  it. **Whether the two should share an anchor is the owner's and Lane A's**, and untouched.
 - [`docs/overview/entries/2026-09-02-q517-tdee-bmr-floor.md`](../../overview/entries/2026-09-02-q517-tdee-bmr-floor.md) — **the calibrated maintenance is floored at BMR, 2026-09-02 (Q-517).** `adaptive-tdee.ts` clamped at a universal **1000** against its own header's prediction that the failure would land at 1200; the owner's worst window computed **1052**. The floor is now the user's own BMR — the **measured** resting rate where one exists, because `energy-balance-service.ts` already resolves `personalRmr(measured) ?? comp.bmrKcal ?? mifflinStJeorBmr` two dozen lines above the call, which also disposes of the addendum's fallback ladder. Below it the window is **rejected, not clamped**, so the resolver falls back to the formula baseline. **The right floor already existed one line below on `restingBaseKcal`** — protecting what the balance *displays*, not the maintenance that becomes the recommendation and then `users.calorie_goal`. **SAFE, not CORRECT:** survivors still sit under the formula's 2,397, and within-day incompleteness detection stays on the `Keep:`.
 - [`docs/overview/entries/2026-09-06-bf-112-dose-entry.md`](../../overview/entries/2026-09-06-bf-112-dose-entry.md)
   — **the dose can be typed in (BF-112, BF-69 stage 2), 2026-09-06.** The manage sheet writes

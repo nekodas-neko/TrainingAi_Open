@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.445.1",
+    date: "2026-09-09",
+    changes: [
+      "The Nutrition energy card now says why your macro grams and your calorie budget do not add up to the same number. They are anchored to different things \u2014 the grams to your stored daily goal, the budget to your resting burn plus what you have moved \u2014 and they stay that far apart all day rather than meeting later. The \u24d8 also explains that your resting burn already has your habitual movement taken out of it, so the figure beside \"for your goal\" is not a second deduction.",
+    ],
+  },
+  {
     version: "1.445.0",
     date: "2026-09-09",
     changes: [

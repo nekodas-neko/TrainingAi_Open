@@ -8115,7 +8115,9 @@ made the entry's own proposed wording false.
 Sixteen lines for the stage-2 dose-entry paragraph in **Current Status**, which is the section this
 document exists to be: what shipped, what it cost, and the one thing left owed. The detail — the two
 defects found while verifying, the live round trip, the surfaces not exercised — is in the journal
-entry, not here. Raised rather than absorbed because the previous session's paragraph is still the
+entry, not here. **The number here is the merged file**: BF-135's filing raised the same baseline in
+parallel, so the two `.size` files conflicted — the case that check *should* conflict on, since both
+sides genuinely disagree about one number. Recomputed rather than picking a side. Raised rather than absorbed because the previous session's paragraph is still the
 one above it; the compaction sweep is what removes both, not this PR.
 
 ## 2026-09-06 — `projectOverview.md` → 9947 (BF-113's device gate, which was missing)
@@ -10145,3 +10147,19 @@ The recommendation moves both banners to the ready screen — which already scro
 weight-and-swap decision is actually made — leaving a chip during the set. It also carries an
 explicit **do not** with a reason: making a safety warning dismissible or set-conditional is the
 shape that gets someone hurt, and this owner's lumbar constraint is why the banner exists.
+
+## 2026-09-09 — `docs/implementation-backlog.md` raised to 20088 for BF-134's residue
+
+BF-134's labelling half shipped and its anchor half did not, so the entry gained `Gate: owner`, a
+`Keep:` line naming what is still owed, and two corrections measured while implementing it — that
+the macro/budget gap is a constant offset rather than one the day closes, and that the surface the
+entry proposed to extend is gated on conditions unrelated to the gap. Both would be re-derived by
+whoever takes the anchor decision, which is what the index is for. The narrative went to the journal
+entry, not here.
+
+## 2026-09-09 — `projectOverview.md` raised to 10529 for BF-134's owner row
+
+One row in **Waiting on the owner**: the macro/budget anchor. BF-134's labelling half shipped and
+the anchor half is the owner's, so it belongs on the one table that lists everything the engine
+cannot unblock itself. No Known-Issues row — the change is WebView copy with no native, offline-first,
+safe-area or gesture path, so the device gate does not apply to it.
