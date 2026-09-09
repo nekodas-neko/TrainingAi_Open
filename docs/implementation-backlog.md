@@ -434,6 +434,10 @@ below threshold and left in place for next time.
   the failure mode the linked/unlinked split exists to prevent.
 - **Lane:** ? — it is a docs restructuring, so Orchestrator's by the standing split, but it touches
   no code and any lane can run it. Filed by Lane B, which found it.
+- **✅ THE OWNER DECIDED 2026-09-09: raise the ceiling to 360 and do this properly later**, rather
+  than fix it under a PR that had nothing to do with the journal. So the next time the number is
+  reached, **this entry is the work** — not another raise. That is ~25 PRs of headroom, chosen
+  knowing it buys days rather than solving anything.
 - **Added:** 2026-09-09 · Lane B, on being blocked by the ceiling twice in one hour.
 
 

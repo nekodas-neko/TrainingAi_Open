@@ -10016,3 +10016,25 @@ work, `Verify: device` files unbuilt work among shipped work.
 
 The ceiling raise is the usual +1 for this PR's own journal entry; the measurement behind it has not
 changed.
+
+## 2026-09-09 — `docs/overview/entries/` ceiling 340 → 360, by owner decision
+
+**The owner was asked and chose the raise over fixing it now.** The number had been moving +1 per PR
+all day, by PRs with nothing to do with the journal, because `main` sits exactly on the ceiling and
+the standing rule is that every session writes an entry. That is a toll, not a ratchet.
+
+**Why the prescribed remedy could not be used.** The compaction sweep archives *unlinked* entries
+oldest-first. Citations accrete with age, so the unlinked set is the **newest** entries — measured
+2026-09-09, every foldable entry was from the previous two days against a directory spanning three
+weeks. Running the sweep as written would archive the last two days and leave three weeks in place.
+The remedy is inverted, not merely inadequate.
+
+**360 is roughly 25 PRs, a few days.** Deliberately not larger: the number is still the only thing
+making the underlying problem visible, and **LB-94** remains the real fix — re-point the ~299
+citations at the batched history so old entries become archivable, then sweep. When this line is
+reached again, that is the work to do, not another raise.
+
+## 2026-09-09 — `docs/implementation-backlog.md` 19,946 → 19,950 (+4), the ceiling decision on LB-94
+
+Four lines recording that the raise was a deliberate choice with a known cost, so the next session to
+hit 360 reaches for LB-94 rather than for the number again.
