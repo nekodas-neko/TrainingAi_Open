@@ -9405,3 +9405,25 @@ both sides share the `version:`/`date:` header above the marker, so a splice pro
 entry and silently drops the other PR's version. `main` read 1.441.1, so this took 1.441.2 rather
 than skipping to .3 — a gap in the sequence is a small thing, but it is also a question someone asks
 later.
+
+## 2026-09-09 — `docs/implementation-backlog.md` 19,669 → 19,696 (+27), PS-39 admin-tools batch
+
+Two lines, and they buy a checklist item rather than a status line. PS-39 keeps a running list of
+the ways these route tests come out green while testing nothing, and this batch produced a new one:
+a **symmetric pair with equal totals** — one male row and one female makes `generatedMale` and
+`generatedFemale` both read 1, so a mutant computing either counter from the other's rows survives.
+The balanced-looking fixture is the single shape where the two predicates cannot be told apart.
+
+It is folded into the existing paragraph rather than added as its own, which is why the cost is two
+lines and not nine. The full account is in the journal entry
+(`docs/overview/entries/2026-09-09-admin-tool-routes-test.md`); what stays here is the part an
+implementer needs *before* writing the case, which is the whole reason that checklist lives in the
+queue entry instead of the archive.
+
+The other +25 is **LA-87**, a finding this batch pinned rather than fixed: a *configured* upload that
+resolves null falls into the same data-URL branch as an unconfigured one, and the response still
+says `storageMode: 's3'`. That is a queue entry rather than a Known-Issues row because it is
+buildable work with a real choice in it — report the path taken, or refuse the write — and per
+**No orphaned findings** it had to land in the same PR as the test that found it. Twenty-five lines
+is most of that cost being the reasoning for the choice, which is the part that would otherwise be
+re-derived.
