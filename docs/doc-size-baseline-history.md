@@ -10163,3 +10163,23 @@ One row in **Waiting on the owner**: the macro/budget anchor. BF-134's labelling
 the anchor half is the owner's, so it belongs on the one table that lists everything the engine
 cannot unblock itself. No Known-Issues row — the change is WebView copy with no native, offline-first,
 safe-area or gesture path, so the device gate does not apply to it.
+
+---
+
+## 2026-09-09 — backlog 20,088 → 20,129 (+41), no ceiling raise (LB-98)
+
+**The entries ceiling is not touched, and that is the point of #1052's raise to 360.** This PR adds a
+journal entry and the number stays where the owner put it; the +1-per-PR treadmill is over until 360
+is reached, at which point LB-94 does the real work rather than the number moving again.
+
+The +41 is two entries earning their length. **LB-98** gains a ✅ and a two-part `Keep:` — the card's
+fallback wiring is Lane B's and the read is inert until it lands, so an entry that just said "shipped"
+would have claimed a verification gap was closed when it is not. It also keeps the production
+measurement (442 of 841 sets in the window carry both rest columns), because the next session to
+touch this will otherwise re-run that query.
+
+**LA-95** is new: the same route now serves two prescriptions — the bars from today's progression
+style, the new pairs from the logged snapshot. Filed rather than fixed, because reconciling them
+moves numbers the owner already reads. Most of its length is the argument for why it is a decision
+and not a bug, which is exactly what stops it being "fixed" by a later sweep that reads only the
+title.
