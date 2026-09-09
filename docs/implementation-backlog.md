@@ -1576,9 +1576,22 @@ sounds like:**
 
 ### [nutrition] BF-134 — the macro targets and the calorie budget on one card are anchored to different days, and disagree by 406 kcal before you move
 
-- **Lane:** B for the labelling fix (`components/nutrition/energy-card.tsx`, `calorie-zone-bar.tsx`). The anchor decision itself reaches `lib/health/energy-balance-service.ts`, which is Lane A's — settle the wording before touching it.
+- **Lane:** A. The labelling half shipped (see **Keep** below); what is left is the anchor decision itself, which reaches `lib/health/energy-balance-service.ts`.
 - **Added:** 2026-09-09 · owner, on the Nutrition tab: *"is this the right number? looks like its took 200 off the base then 200 off again?"*
 - **Needs:** — nothing.
+- **Gate:** owner — the anchor is a scoring-shaped decision and TN-29 protects the stored 1,660.
+- **Keep:** the anchor decision, and only that. **The labelling shipped 2026-09-09** —
+  `macro-budget-gap.ts` + `energy-card.tsx` name what the grams add up to, how far that sits from the
+  budget, and that the ⓘ's resting burn already has habitual movement removed (the invisible
+  subtraction read as a second one). See [`docs/overview/entries/2026-09-09-fix-macro-budget-anchor-label.md`](overview/entries/2026-09-09-fix-macro-budget-anchor-label.md).
+
+**⚠ Two corrections to this entry, measured while implementing it.** (1) **The gap does NOT
+converge.** `scaleMacrosForEarnedKcal` grows the grams by `earned` at the same moment
+`budgetProvenance` grows the budget by `earned`, so the addend cancels and a constant
+`storedGoal − (restingBase + goalDelta)` is left — 406 kcal all day, and earning 406 moves *both*.
+Pinned in `components/nutrition/__tests__/macro-budget-gap.test.ts`. (2) **`Why two numbers` cannot
+carry the explanation**: it is gated on `maintenance.source === 'formula'` **and** goal drift,
+neither related to this gap, so it would stay silent on a calibrated account.
 
 **First, the reported symptom is NOT a defect, and the entry has to say so or it gets "fixed".** The
 line reads *"1,453 base − 200 for your goal — no movement recorded yet today"* against a budget of

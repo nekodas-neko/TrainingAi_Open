@@ -10124,3 +10124,19 @@ holding protein matters most — and points at the `WHY TWO NUMBERS` block the c
 Two branches moved this number within the hour — BF-134's filing and Q-300's entry — so the `.size`
 conflicted, which is the case it *should* conflict on: they genuinely disagree about one number.
 Resolved by measuring the merged file rather than picking a side.
+
+## 2026-09-09 — `docs/implementation-backlog.md` raised to 20037 for BF-134's residue
+
+BF-134's labelling half shipped and its anchor half did not, so the entry gained `Gate: owner`, a
+`Keep:` line naming what is still owed, and two corrections measured while implementing it — that
+the macro/budget gap is a constant offset rather than one the day closes, and that the surface the
+entry proposed to extend is gated on conditions unrelated to the gap. Both would be re-derived by
+whoever takes the anchor decision, which is what the index is for. The narrative went to the journal
+entry, not here.
+
+## 2026-09-09 — `projectOverview.md` raised to 10529 for BF-134's owner row
+
+One row in **Waiting on the owner**: the macro/budget anchor. BF-134's labelling half shipped and
+the anchor half is the owner's, so it belongs on the one table that lists everything the engine
+cannot unblock itself. No Known-Issues row — the change is WebView copy with no native, offline-first,
+safe-area or gesture path, so the device gate does not apply to it.

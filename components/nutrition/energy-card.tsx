@@ -7,6 +7,7 @@ import type { NutritionTargets } from '@trainingai/shared/types/nutrition'
 import type { EnergyBalanceResponse } from '@/app/api/nutrition/energy-balance/route'
 import { CalorieZoneBar } from './calorie-zone-bar'
 import { macroShares } from './macro-energy'
+import { macroBudgetGap } from './macro-budget-gap'
 
 interface Props {
   data: EnergyBalanceResponse | null
@@ -78,6 +79,10 @@ export const EnergyCard = memo(function EnergyCard({
   const overTarget = remaining != null && remaining < 0
 
   const shares = macroShares({ proteinG, carbsG, fatG })
+  // BF-134. Not a fourth budget: this adds up the gram targets **already on this card** and compares
+  // them with the budget **already on this card**, which is the arithmetic the owner did by hand
+  // before asking. Nothing here composes a calorie figure from parts.
+  const macroGap = macroBudgetGap(targets, goal)
   const pct = goal != null && goal > 0 ? Math.min(100, (calories / goal) * 100) : 0
   const sweep = pct * 3.6
   const proteinEnd = shares.protein * sweep
@@ -158,6 +163,27 @@ export const EnergyCard = memo(function EnergyCard({
           </div>
         </div>
       </div>
+
+      {/* BF-134. The reconciliation Q-401 built for the calorie half never covered the macro row:
+          the donut, the headline and `+N burned` are one quantity seen three ways, and the grams are
+          a fourth thing sitting beside them. On the owner's account they read 406 kcal apart at
+          every hour of every day — see `macro-budget-gap.ts` for why that offset is constant rather
+          than something the day closes.
+
+          Said on the card rather than folded into `TdeeAdaptationCard`'s `Why two numbers` block,
+          which the entry proposed: that block is gated on `maintenance.source === 'formula'` AND
+          the stored goal drifting from the recommendation, neither of which has anything to do with
+          this gap. It would explain the macros in the one case and stay silent in the rest. */}
+      {macroGap != null && (
+        <p className="mt-2.5 text-[10px] leading-snug text-muted-foreground">
+          Macro targets add up to{' '}
+          <span className="font-semibold tabular-nums text-foreground">{macroGap.targetKcal.toLocaleString()} kcal</span>
+          {' '}&mdash; {Math.abs(macroGap.gapKcal).toLocaleString()} {macroGap.gapKcal > 0 ? 'above' : 'below'} the
+          calorie budget. The grams come from your stored daily goal; the budget is built from your
+          resting burn, your goal adjustment, and the movement recorded today. Two different
+          denominators, not a miscalculation.
+        </p>
+      )}
 
       {/* Below the drawing, inside the same card. Artboard 1 stops at the two rows above, but the
           band is the only thing that says whether "left" is on track or merely arithmetic — and
@@ -273,6 +299,18 @@ function EnergyDetail({ data }: { data: EnergyBalanceResponse }) {
           <span className="font-semibold text-foreground">Calories out</span> = your resting burn
           ({b.restingBaseKcal.toLocaleString()} kcal) plus measured movement ({b.activeKcal.toLocaleString()} kcal
           from workouts, activities, and every step you take).
+        </p>
+        {/* BF-134's reported symptom. The owner read `1,453 base − 200 for your goal` as two
+            deductions, because one of them is: the resting burn already has habitual movement
+            removed. That subtraction is real, it is not the goal delta, and nothing on the card
+            named it. The mechanism differs by path — the formula base holds back the energy of
+            the first steps, the calibrated base subtracts the window's average movement — so this
+            says the thing true of both rather than a figure only one of them produces. */}
+        <p className="text-[10px] leading-relaxed text-muted-foreground">
+          Your <span className="font-semibold text-foreground">resting burn</span> already has your
+          habitual daily movement taken out of it, which is why it sits below your maintenance. That
+          is what lets the movement you record be added once rather than counted twice — it is not a
+          second deduction for your goal.
         </p>
         <p className="text-[10px] leading-relaxed text-muted-foreground">
           <span className="font-semibold text-foreground">On target</span> means your net
