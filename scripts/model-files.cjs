@@ -2,12 +2,14 @@
 // One source of truth — see that file's comment.
 const {
   required,
+  keptNotLoaded,
   bucketPrefix,
   constantsRequired,
   constantsPrefix,
 } = require('../lib/oura-models/model-files.json')
 module.exports = {
   REQUIRED_MODEL_FILES: required,
+  KEPT_MODEL_FILES: keptNotLoaded,
   BUCKET_PREFIX: bucketPrefix,
   REQUIRED_CONSTANTS_FILES: constantsRequired,
   CONSTANTS_BUCKET_PREFIX: constantsPrefix,

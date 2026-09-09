@@ -1,7 +1,35 @@
 # Q-91-followup — the BLE rollup's invalidation signal: the decision, and the design
 
-**Status:** design only. Nothing here is implemented. **Lane A**, JS/server only, **device-gated**.
-**Written:** 2026-09-09, against `main` at `24f95074`.
+**Status:** BUILT 2026-09-09, same day — see the correction immediately below, which changed what
+the work was. **Lane A**, JS/server only. **Not device-verified** (`getOuraBle()` returns null in
+the sandbox); Known-Issues row filed.
+**Written:** 2026-09-09 against `main` at `24f95074`; corrected against `e6fbf749`.
+
+---
+
+## ⚠️ Correction — the premise below was wrong, and the real defect is worse than the one it describes
+
+**This plan claimed the ordinary flow emits no client invalidation at all. That is false, and I had
+the evidence in hand when I wrote it.** `components/sync-provider.tsx` has watched the native
+`ouraStatus` event's `ingestStored` counter since before this plan existed, debounced 1500 ms, and
+fired `invalidateOuraSync()` + `ta:oura-ble-synced`. It appeared in my own grep as a
+`ta:oura-ble-synced` dispatch site and I read it as the manual path without opening the file. The
+backlog entry said the same thing and had gone stale; agreeing with a stale entry is not
+verification.
+
+**What that changes: this was never a missing feature, it was a live bug, and a nastier one.**
+`ingestStored` advances the instant the server has STORED rows — the same instant it schedules its
+rollup on a **3-second** trailing-edge debounce. The listener waited **1500 ms**. So every
+autonomous drain invalidated *before the rollup had even started*, and the refetch it triggered read
+pre-rollup data and cached it. The trap this plan describes as a thing to avoid was already
+happening on every background drain in production.
+
+Everything below about **why** — that the signal belongs on the client, that drain-end is not
+rollup-done, that the fix is confirming the watermark rather than guessing at a delay — survives the
+correction intact and is what the build implemented. Only the "nothing exists yet" framing was
+wrong: the mechanism existed and fired too early.
+
+---
 
 ---
 
@@ -11,8 +39,9 @@ Q-91 fixed reactivity for the two signals that already existed — a manual Rede
 drain settling — both of which end in `invalidateOuraSync()` + a `ta:oura-ble-synced` window event.
 The **ordinary** flow does not: the native service drains hourly, POSTs to
 `/api/oura-ble/samples`, and the route schedules a debounced rollup that writes `sleep_sessions` and
-`body_metrics`. Nothing tells the client. A mounted sleep screen holds its cache until the next
-natural mount or the 30-minute TTL.
+`body_metrics`. ~~Nothing tells the client.~~ **(Corrected above: something does — it just fires too
+early.)** A mounted sleep screen holds its cache until the next natural mount or the 30-minute TTL,
+or repaints from a pre-rollup read, which is worse.
 
 The entry asked whether the ingest rollup should emit its own client invalidation, and flagged the
 risk: the rollup is deliberately fire-and-forget for latency reasons (I20), and hanging a signal off
@@ -30,7 +59,9 @@ event through the plugin bridge, carrying the same `OuraBleStatus` the manual pa
 `draining`. It is called on every state change, forced, and it does not care whether the drain was
 manual or the hourly background one. The plugin already declares the listener
 (`lib/oura-ble/plugin.ts:112`). So a `draining` **true → false** transition is observable in the
-WebView right now, for the ordinary flow, with **no native change and no server change**.
+WebView right now, for the ordinary flow, with **no native change and no server change** — and, as
+the correction above records, it is already being listened to. The server change this needed turned
+out to be one small GET, so that the listener can wait for the derivation instead of a fixed 1.5 s.
 
 That removes the I20 trade entirely. The signal does not come off the rollup.
 

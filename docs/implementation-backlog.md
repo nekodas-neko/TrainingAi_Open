@@ -17567,43 +17567,6 @@ per-field merge where an AI write has no honest source rank to claim.
   stranding the user on a navless route. Both already ship for the meal and sleep cards, so this is
   confirmation, not discovery. Strike once pressed.
 
-### [sleep] Q-91-followup — decide whether the BLE ingest rollup should emit its own invalidation signal
-
-- **Lane:** A
-- **Added:** 2026-08-06 · deferred decision point from Q-91 (see
-  `docs/overview/entries/2026-08-06-sleep-screen-oura-sync-refetch.md`), not a bug.
-- **Context:** Q-91 fixed the reactivity gap for the two signals that already existed (a manual
-  Redecode / a BLE drain settling → `ta:oura-ble-synced`). The ingest route's own background
-  rollup (`app/api/oura-ble/samples/route.ts:82-124`, the I20-documented lag path) is fire-and-forget
-  and still emits no client invalidation at all — for the *ordinary* (non-manual) flow, the sleep
-  screens' only guaranteed refresh is still the next natural mount or the 30-min TTL.
-- **✅ SCOPED 2026-09-09 — the design is written and the decision is made.**
-  **Plan:** [`docs/superpowers/plans/2026-09-09-oura-ble-rollup-invalidation-signal.md`](superpowers/plans/2026-09-09-oura-ble-rollup-invalidation-signal.md).
-  **Answer: no, the rollup should not emit its own signal — and it does not need to.** The question
-  assumed the server was the only place to hang one, which is what made it look like an I20 latency
-  trade. It is not: `OuraRingService.emitStatus()` already pushes `ouraStatus` (carrying `draining`)
-  through the plugin bridge on every state change, background drains included, and
-  `lib/oura-ble/plugin.ts:112` already declares the listener. The client can hear drain-end today
-  with no native and no server change.
-- **The trap, and why this is still not a two-line fix:** drain-end is not rollup-done. The rollup is
-  a 3 s trailing-edge debounce and then runs off-loop, so invalidating on `draining` going false can
-  refetch pre-rollup data **and cache it** — old data wearing a fresh timestamp, held for the full
-  TTL, which is worse than the staleness it replaces. The naive `ouraStatus` listener is the obvious
-  implementation and the wrong one. The design instead confirms the watermark advanced:
-  `oura_rollup_state` (migration 184) already persists `last_rolled_ds`/`epoch` per user after each
-  successful run and is **not exposed over HTTP** — that one small GET is the missing piece.
-- **Sibling surface:** `afterDrainSettles` (`lib/oura-ble/sync.ts:12`) has the same race today and
-  converges onto the same helper — one mechanism, not a second beside it.
-- **No `Gate:` or `Verify:` field, deliberately — this stays ordinary READY work.** The build is
-  doable here: the new GET and the poll/backoff helper are unit-testable like any route and any
-  pure function with an injected clock. Only *observing* the result is device-bound —
-  `getOuraBle()` returns null off-device, so the listener path is unreachable and a green
-  `pnpm dev` proves nothing about the behaviour being changed. That is the ordinary Canonical
-  Runtime case: ship with a Known-Issues row marking it not-yet-device-verified. `Gate: device`
-  would park buildable work (the unstartable-queue-head problem #1047 fixed) and `Verify: device`
-  would file unbuilt work among entries that have already shipped and owe only a check.
-- **JS-only** once built.
-
 ### [app-shell] 🔴 Q-51 — the perf work is not aimed at the screen the owner actually uses
 
 > **⚑ Now has evidence, 2026-08-05 — and it points HERE rather than at the network.** The device
@@ -17990,14 +17953,27 @@ corrected in the three docs that carried it.
 derived from the moonstone model's own apnea head via `bdiFromApnea` (`sleepnet-assemble.ts:131`).
 They look genuinely unused, but they are extracted weights and a future BDI revision is exactly what
 would want them. ~~Owner call: delete, or move to private storage with the rest under Q-49 A1.~~
-✅ **ANSWERED 2026-08-03: keep them** (owner: *"yes lets keep then"*). So they move to the bucket
-with the other eight under Q-49 A1 rather than being deleted — add them to
-`lib/oura-models/model-files.json` as a **separate, non-required list** when A1's remaining step
-runs, so the boot check does not start demanding files no loader reads. **Item 1 (`inference/dhrv`)
-is still open and still deferred to D7** — that one is not covered by this answer.
+✅ **ANSWERED 2026-08-03: keep them** (owner: *"yes lets keep then"*).
+✅ **DONE 2026-09-09.** `model-files.json` grew a `keptNotLoaded` list holding both, exported as
+`KEPT_MODEL_FILES` and uploaded by `scripts/upload-model-assets.js` alongside the required eight.
+The boot check still ignores them, which is the point — a missing file there degrades nothing
+because nothing loads it, and listing it as required would make a healthy deployment report a fault.
+**The bucket is the only place these survive**, so omitting them from the upload is how "keep them"
+quietly becomes "lose them" the next time the bucket is rebuilt from this manifest. Two tests pin it
+in both directions (kept ∩ required = ∅; no kept file is named by an `inference/` loader), so a file
+that gains a loader must be MOVED rather than left unverified.
 
-Both are registered in `scripts/check-oura-models-dormancy.js`'s `KEEP` map with these reasons, so CI
-passes and the inventory is explicit rather than forgotten.
+- **Keep: item 1 (`inference/dhrv`) only, and it is not startable yet.** Still deferred to **D7**,
+  per this entry's own reasoning: the ONNX path is unreachable from production on purpose and its
+  golden test is what pins our D5 regression replacement against Oura's original. Deleting it now
+  discards the validation while the replacement is still young.
+
+**Correction 2026-09-09 — the last line of this entry was stale.** It said both files are registered
+in `scripts/check-oura-models-dormancy.js`'s `KEEP` map. They are not: Q-49 A4b removed every
+vendored-asset entry from that map, because the files became gitignored and *"an exemption for a file
+that cannot be listed exempts nothing"*. The map now holds one entry (`session-web.ts`). Nothing was
+broken by the staleness — the dormancy sweep cannot see these files either way — but the entry was
+describing a safety net that no longer exists.
 
 ### [platform][app-shell] 🟠 Q-48 — roadmap gaps found by the 2026-08-02 native-convergence review
 

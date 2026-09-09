@@ -1083,6 +1083,9 @@ export interface WorkoutRepository {
    *  A night ending within `PROVISIONAL_COVERAGE_MARGIN_MS` of this can still grow (BF-83); see
    *  lib/sleep/provisional.ts for why this is the rollup's reach and not the raw table's. */
   getSleepCoverageEnd(userId: string): Promise<Date | null>
+  /** The BLE rollup's persisted watermark, epoch included. Q-91-followup: a client that has just
+   *  seen a drain finish polls this to learn the rollup actually ran before invalidating caches. */
+  getOuraRollupState(userId: string): Promise<{ lastRolledDs: number; epoch: number } | null>
   /** Store (or idempotently re-confirm) a live-counted step window — Tier 2 of the step
    *  orchestration plan. ON CONFLICT (user_id, start_ds) DO UPDATE, so a client retry of
    *  the same window is a no-op rather than a duplicate. */
