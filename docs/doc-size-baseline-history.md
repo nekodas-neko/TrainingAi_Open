@@ -9482,3 +9482,24 @@ paragraphs out again; this is the shape they are supposed to have while current.
 The version line was **five releases stale** (v1.437.1 against a package.json at 1.441.5) and is
 corrected in the same edit. That line is the first thing every session reads, and it had been
 drifting because a version bump and this file are edited by different steps of the ritual.
+
+## 2026-09-09 — `docs/implementation-backlog.md` 19,648 → 19,724 (+76), OR-104 engine half + two findings
+
+OR-104's engine half shipped, so the entry is rewritten rather than removed: the surface half
+(`manage-supplements-sheet.tsx` still offering `amount`+`unit` and a free-text `Dose` together) is
+Lane B's and takes a `Keep:` line.
+
+The other two are findings from doing the work, and neither belonged in the fix:
+
+**LA-90** — the two supplement write paths merge a caller-supplied dose differently: the server per
+field, the local store all-or-nothing. No caller hits it today, which is exactly why it is a trap
+for the next one, and bundling a second divergence into a dose-text fix would have made both
+unreviewable.
+
+**LA-91** — no CI job sets `timeout-minutes`, so a hung run holds a runner for GitHub's 360-minute
+default. Filed with the **measured** per-job durations from run 34326591694 rather than guesses,
+because the near-miss is the point: a check-in of mine had asserted "25 minutes is beyond plausible"
+for the E2E suite, and the real run took **24:36**. Acting on that guess would have re-triggered a
+healthy run two minutes before it went green. Most PRs skip E2E in ~35s via its UI gate, so nobody
+has a feel for the real number — reading `playwright.config.ts` (77 specs, `workers: 1`) answered it
+in a minute.
