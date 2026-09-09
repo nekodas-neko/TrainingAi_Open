@@ -9503,3 +9503,22 @@ for the E2E suite, and the real run took **24:36**. Acting on that guess would h
 healthy run two minutes before it went green. Most PRs skip E2E in ~35s via its UI gate, so nobody
 has a feel for the real number — reading `playwright.config.ts` (77 specs, `workers: 1`) answered it
 in a minute.
+
+## 2026-09-09 — `docs/implementation-backlog.md` 19,724 → 19,662 (−62), BF-131 shipped
+
+The AMRAP baseline session is consumed now: completion copies the 1RM the session already measured
+into `session_periodization.baseline1rm` and exits the phase. The 83-line entry came out; LA-92 went
+in for the surface half (the card that reads "Baseline needed" identically after zero baseline
+sessions and after four of five exercises).
+
+**LA-92, not LB-92**, though Lane B ships it: the letter records who FOUND an item, never who ships
+it. First draft used `LB-68` — which is both the wrong letter and an id already taken — and the
+duplicate would have failed `check-backlog-pointers` in CI rather than reaching main.
+
+## 2026-09-09 — `projectOverview.md` 10,442 → 10,455 (+13), BF-131's status paragraph
+
+An owner-reported live defect with a user-visible fix, so it takes a Current Status paragraph like
+the ones beside it. Longer than most because the useful part is what was NOT fixed: existing rows
+stay at `baseline_complete = false`, the card still reads "Baseline needed" until LA-92, and nothing
+has been seen on the device. A status line that said only "baseline now completes" would be read as
+"the owner's two stuck sessions are unstuck", and they are not.

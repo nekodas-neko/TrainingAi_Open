@@ -1128,6 +1128,10 @@ export interface WorkoutRepository {
   // Creates the row if it doesn't exist yet; otherwise returns the existing row unchanged.
   ensureSessionPeriodization(userId: string, programSessionId: string): Promise<SessionPeriodization>
   setBaselineComplete(userId: string, programSessionId: string, baseline1rm: Record<string, Baseline1rmEntry>): Promise<SessionPeriodization>
+  /** BF-131 — the per-exercise 1RM a completed session already wrote, for the baseline hop. */
+  getSessionExercise1rms(userId: string, workoutSessionId: string): Promise<{ exerciseName: string; estimated1rm: number }[]>
+  /** BF-131 — merge measured anchors in, completing the phase only when every exercise has one. */
+  recordBaselineAnchors(userId: string, programSessionId: string, anchors: Record<string, Baseline1rmEntry>, complete: boolean): Promise<SessionPeriodization | null>
   advancePhase(userId: string, programSessionId: string, newPhase: PeriodizationPhase): Promise<SessionPeriodization>
   /** `status` is written atomically with the prescription — see the slice for why (Q-54). */
   storePrescription(userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date, status?: PrescriptionStatus): Promise<void>

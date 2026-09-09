@@ -1067,89 +1067,6 @@ OR-102a/b will read dose history to recommend the next dose. A tracker that read
   worst-case default for unknown equipment.
 - **Reversal cost:** low as code, high as behaviour — it moves every generated program's volume, at
   every budget except five exercises.
-### [workouts][platform] BF-131 — the AMRAP baseline session is never consumed, and the only exit from `baseline` is a button that ignores it 🔴 LIVE
-
-- **Lane:** A — `packages/shared/src/workout/complete-workout.ts`, `lib/data/postgres/slices/periodization.ts`, `app/api/ai-periodization/**`.
-- **Added:** 2026-09-08 · owner, on Health → Training: *"even though the session was done it's saying baseline needed"*.
-- **Needs:** — nothing.
-- **Measured on the owner's live data.** He ran both baseline sessions exactly as instructed —
-  **Push 2026-09-07 (5 exercises, 5 sets)** and **Pull 2026-09-06 (4 exercises, 4 sets)**, one AMRAP
-  set per exercise, both `completed_at` set. `session_periodization` for both reads
-  `phase = 'baseline'`, `baseline_complete = false`, `sessions_in_phase = 1`.
-- **`sessions_in_phase = 1` is the tell: completion IS wired, and it writes the wrong field.**
-  `complete-workout.ts:88` calls `incrementSessionsInPhase` — advisory, fire-and-forget. Nothing on
-  that path calls `setBaselineComplete`, and no code anywhere derives a baseline 1RM from the AMRAP
-  set logs. The counter moves; the flag never does.
-- **`setBaselineComplete` has exactly one caller in the app:**
-  `app/api/ai-periodization/baseline/complete/route.ts`, whose only caller in turn is the
-  **"Use prior data →"** button (`components/health/ai-periodization-status-card.tsx:76`). That route
-  builds `baseline1rm` from `personal_records` and `exercise_estimates` — from *prior* data, by
-  construction. **So the only way out of `baseline` is the path that discards the baseline session.**
-- **And the alternative exit is a deadlock, which is why this cannot resolve itself.** The
-  `baseline → accumulation` transition exists (`transition/route.ts:23`) but the card only offers it
-  when the stored prescription carries a `phaseAction` — and prescription generation returns a **400**
-  while `phase === 'baseline' && !baselineComplete` (`generate-prescription.ts:201`, and the same gate
-  again at `workout-review/session/[sessionId]/route.ts:62` and `.../apply/route.ts:68`). No
-  prescription → no recommendation → no transition → still `baseline`. Doing more baseline sessions
-  raises `sessions_in_phase` and changes nothing else.
-- **The UI states the unbuilt behaviour as fact**, which is what makes this a live defect rather than
-  a gap: `components/workout/ai-baseline-banner.tsx:22` reads *"For each exercise, load the bar and do
-  as many clean reps as you can (AMRAP). The AI will calculate your 1RM and start prescribing from the
-  next session."* Nothing prescribes — but, per the amendment below, something **does** calculate.
-
-**⚠ AMENDED 2026-09-08 — THE DERIVATION ALREADY RUNS. THIS IS ONE HOP, NOT A NEW CALCULATION.**
-The entry first said to *"derive the baseline from the session that was just completed"*, which sends
-an implementer to build something that exists. Traced after the owner asked why the AMRAP was not
-already producing the anchor:
-
-- **`estimateOneRm` takes an `isBaseline` flag** (`packages/shared/src/1rm.ts:170`) and routes to
-  `amrapAverage1Rm` when it is set — the AMRAP estimator, not the ordinary one.
-- **The workout screen passes it**: `workout-screen.tsx:1212` reads
-  `phaseStatus?.isBaseline` and hands it to the `estimateOneRm` call at `:1221`.
-- **The result is already persisted.** It lands in `exercise_logs.estimated_1rm`, and `:1294` lets a
-  baseline set count toward a PR even under a session-level deload — a deliberate carve-out that only
-  makes sense because these sets are understood to be the anchor.
-- **So the number exists in the owner's data right now.** What never happens is the copy into
-  `session_periodization.baseline1rm` and the flip of `baseline_complete`.
-
-**So the work is: on completing a workout whose session is in `baseline`, read the per-exercise
-`estimated_1rm` this session already wrote, key it by session-exercise id, and pass it to
-`setBaselineComplete` with a `source` tag distinct from the existing `'existing'` so a measured anchor
-stays distinguishable from a carried-over PR.** Do **not** compute a fresh AMRAP 1RM at the
-periodization layer — that is a second implementation of a formula this repo already has one of, which
-**One Formula, One Place** exists to prevent, and it would silently disagree with the PR the same sets
-produced.
-
-- **Do NOT make "Use prior data" automatic — it is the escape hatch, and the codebase says so.** The
-  route's own comment calls it the **"skip-baseline flow"** and refuses to run when no PR or estimate
-  is found rather than *"silently completing with an empty, unusable anchor"*. The design is AMRAP by
-  default, prior-data by choice. Firing it automatically inverts that: every user gets carried-over
-  numbers and the baseline session becomes decorative — worst on a **rebuilt program**, where the
-  exercise list changed and re-measuring is the whole point. It reads as though it should be automatic
-  only because the default it is an alternative to was never wired up. Fix the hop and the button
-  returns to being a deliberate choice.
-- **Two things to get right, both of which the current shape hides:**
-  1. **A partial baseline must not silently complete.** If the lifter logs 3 of 5 exercises, the
-     anchor is missing two — decide between completing with a PR fallback for the gaps (tagged) and
-     staying in `baseline` with the screen naming what is outstanding. Do not complete with an empty
-     entry; the route's own comment already warns against *"silently completing with an empty,
-     unusable anchor"*. **Either way the card must say which state it is in** — today it reads
-     "Baseline needed" identically after zero baseline sessions and after two, which is what made this
-     unreportable until it was traced. *"3 of 5 exercises logged"* is the fix, and it belongs in the
-     same PR: a partial baseline that looks exactly like no baseline will produce this same report
-     again.
-  2. **`incrementSessionsInPhase` is fire-and-forget** and must stay that way — a completion must
-     never fail on a periodization write. The new call needs the same posture, which means the flag
-     can lag a completion and the screen must tolerate it.
-- **Regenerating a program re-arms this for every session.** `session_periodization` keys on
-  `program_session_id`, and saving a rebuilt program creates new session rows, so a user who has been
-  training for months lands back in `baseline` on a fresh id with no way through except the button.
-  That is the owner's exact situation — his older program's rows still read `accumulation`/`deload`
-  with `baseline_complete = true` beside the new ones.
-- **Owner workaround, valid today:** tap **"Use prior data →"**. He has PRs for these exercises, so it
-  seeds and advances to `accumulation`.
-- **Reversal cost:** low — one read and one call on an existing write path; smaller since the amendment, because the derivation is not being written.
-
 ### [workouts][platform] LB-66 — a saved session delete is still a hard delete, with no tombstone
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-08, filing the third of BF-132's three fixes; the
@@ -19024,6 +18941,27 @@ config was the answer and reading it took a minute** — the E2E gate ("Does thi
 UI?") means most PRs skip the job in ~35 seconds, so nobody has a feel for the real duration.
 
 - **Reversal cost:** trivial. One line per job.
+
+### [workouts] LA-92 — the baseline card cannot say how much of the baseline is done
+
+- **Lane:** B — `components/health/ai-periodization-status-card.tsx`. (`LA-` because the letter
+  records who FOUND an item, never who ships it.)
+- **Added:** 2026-09-09, Lane A — the surface half of BF-131, whose engine half shipped the same
+  day. **Unblocked, and the data it needs now exists.**
+
+The card reads *"Baseline needed"* identically after zero baseline sessions and after four of five
+exercises, which is what made BF-131 unreportable until someone traced it — the owner could only say
+*"even though the session was done it's saying baseline needed"*.
+
+**BF-131 made this a rendering job rather than a data one.** A partial baseline now accumulates its
+measured anchors into `session_periodization.baseline1rm` while `baseline_complete` stays false, so
+`Object.keys(state.baseline1rm).length` against the session's exercise count is the whole
+calculation. *"3 of 5 exercises logged"* is the fix.
+
+Worth stating for whoever takes it: the anchors are keyed by **session-exercise id**, so the count
+needs the session's exercise list, not the log's exercise names.
+
+- **Reversal cost:** trivial, one label.
 
 ### [platform][nutrition] LA-90 — the two supplement write paths merge a caller-supplied dose differently
 

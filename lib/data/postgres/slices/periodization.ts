@@ -79,6 +79,83 @@ export async function setBaselineComplete(db: Db, userId: string, programSession
   return mapPeriodization(row)
 }
 
+/**
+ * The per-exercise 1RM a completed session already wrote (BF-131).
+ *
+ * The AMRAP baseline estimator is NOT re-run here. `estimateOneRm` takes an `isBaseline` flag, the
+ * workout screen passes it, and the result is already persisted to `exercise_logs.estimated_1rm` —
+ * so the anchor exists in the data the moment the session is completed. Computing a fresh one at
+ * the periodization layer would be a second implementation of a formula this repo has one of, and
+ * it would silently disagree with the personal record the same sets produced.
+ *
+ * Scoped through `workout_sessions` because `exercise_logs` carries no `user_id` of its own.
+ */
+export async function getSessionExercise1rms(
+  db: Db, userId: string, workoutSessionId: string,
+): Promise<{ exerciseName: string; estimated1rm: number }[]> {
+  const rows = await db
+    .select({ exerciseName: s.exerciseLogs.exerciseName, estimated1rm: s.exerciseLogs.estimated1rm })
+    .from(s.exerciseLogs)
+    .innerJoin(s.workoutSessions, eq(s.workoutSessions.id, s.exerciseLogs.workoutSessionId))
+    .where(and(
+      eq(s.exerciseLogs.workoutSessionId, workoutSessionId),
+      eq(s.workoutSessions.userId, userId),
+    ))
+  return rows
+    .filter((r): r is { exerciseName: string; estimated1rm: number } => r.estimated1rm != null && r.estimated1rm > 0)
+    .map(r => ({ exerciseName: r.exerciseName, estimated1rm: r.estimated1rm }))
+}
+
+/**
+ * Merge measured baseline anchors into `baseline1rm`, completing the phase only when every
+ * exercise has one (BF-131).
+ *
+ * **A partial baseline stays in `baseline` and keeps what it measured.** Completing on three of
+ * five exercises would leave two anchors missing from the map the prescription reads, which is the
+ * "empty, unusable anchor" the skip-baseline route already refuses to write — and the exercises
+ * without one are precisely those a rebuilt program added, where re-measuring is the point.
+ * Accumulating instead means a second session finishes what the first started, and the stored map
+ * is what lets a screen say *which* exercises are outstanding rather than "Baseline needed" for
+ * both none and nearly-all.
+ *
+ * Merged, never replaced: an exercise anchored by an earlier session keeps its entry when a later
+ * one re-logs a different subset.
+ */
+export async function recordBaselineAnchors(
+  db: Db,
+  userId: string,
+  programSessionId: string,
+  anchors: Record<string, Baseline1rmEntry>,
+  complete: boolean,
+): Promise<SessionPeriodization | null> {
+  const [current] = await db.select().from(s.sessionPeriodization).where(and(
+    eq(s.sessionPeriodization.userId, userId),
+    eq(s.sessionPeriodization.programSessionId, programSessionId),
+  )).limit(1)
+  // Deliberately redundant with the caller's own `!baselineComplete` check: this one is the
+  // invariant (it holds for any future caller), that one avoids a pointless read. Measured — each
+  // alone is masked by the other, and removing BOTH is caught.
+  if (!current || current.baselineComplete) return current ? mapPeriodization(current) : null
+
+  const merged = { ...((current.baseline1rm ?? {}) as Record<string, Baseline1rmEntry>), ...anchors }
+  const [row] = await db
+    .update(s.sessionPeriodization)
+    .set(complete
+      ? {
+          baseline1rm: merged, baselineComplete: true, phase: 'accumulation',
+          phaseStartedAt: new Date(), sessionsInPhase: 0, updatedAt: new Date(),
+        }
+      // Still in `baseline`: the phase clock and the session counter are untouched, because the
+      // lifter has not left the phase and `sessions_in_phase` is already advanced by the completion.
+      : { baseline1rm: merged, updatedAt: new Date() })
+    .where(and(
+      eq(s.sessionPeriodization.userId, userId),
+      eq(s.sessionPeriodization.programSessionId, programSessionId),
+    ))
+    .returning()
+  return row ? mapPeriodization(row) : null
+}
+
 export async function advancePhase(db: Db, userId: string, programSessionId: string, newPhase: PeriodizationPhase): Promise<SessionPeriodization> {
   const [row] = await db
     .update(s.sessionPeriodization)
