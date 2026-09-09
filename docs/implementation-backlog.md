@@ -1886,7 +1886,7 @@ repair the 22 dead backlog paths and 43 doubled `docs/overview/overview/` labels
 unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge candidates
 (led by `oura-ring-data-reference.md`, a retired-API reference with no retirement note).
 
-### [platform] PS-39 — 22 API routes still have no test that imports their handler
+### [platform] PS-39 — 19 API routes still have no test that imports their handler
 
 - **Lane:** A. Regenerate the list with `node scripts/check-route-test-coverage.js` — it prints every
   uncovered route when it fails, and the ratchet now holds the number.
@@ -1945,20 +1945,22 @@ The three, so the shape is recognisable rather than abstract:
 
 **The check, before writing the case:** if it is meant to fail on guard X, does it satisfy every
 other guard? And the cheap tell afterwards — mutate X away; a case that still passes was never
-testing X. Two more classes worth the same suspicion: a fixture whose timezone IS `DEFAULT_TZ`
-proves nothing about which zone the route read, and a fixture already in sorted order proves
-nothing about a sort.
+testing X. Three more worth the same suspicion: a fixture whose timezone IS `DEFAULT_TZ` proves
+nothing about which zone the route read; one already in sorted order proves nothing about a sort;
+and a symmetric pair with equal totals — one male row and one female makes `generatedMale` and
+`generatedFemale` both read 1 — tests neither counter, the balanced-looking fixture being the one
+shape where the two predicates cannot be told apart.
 
-**The count was 93 and is really 22**, by the mechanism the entry half-noticed: it counted a route
+**The count was 93 and is really 19**, by the mechanism the entry half-noticed: it counted a route
 covered when any test mentioned its URL, so `calendar-data` and `training-load` "appearing only as
 cache-key strings" counted. Asking instead whether a test imports the handler gives 150 of 222, less
-the one hundred and twenty-eight paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
+the one hundred and thirty-one paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
 honest in both directions (see above), so the list can be worked from. **The actionable core
 named by this entry is now CLEAR**: the home aggregates, both ingest routes and `program-week` are
 done; so are ai-periodization, `friends/leaderboard` (its scoping was left uncovered when a mock
 could not see it, and is covered against real rows now), the account cluster, the supplement/vial chain,
 a meal plan's lifecycle + reshape, the workout write path, the running plan and the four body/health
-writes, the goal-target-adherence loop, the home week/streak reads, the AI Coach lifecycle, the cardio hub, the strength/volume trends, the day timeline, the food-input path, the four heart-rate reads, the exercise catalogue, the nutrition day-completion trio, the year-review/identity trio, the platform-meta four, the two program-phase writes, the walk/sleep analysis pair, the feedback/calendar/scale trio the four Oura-BLE reads the two destructive Oura-BLE levers the four admin reports the three ring-device probes the admin triage queues and the two admin media tools. Work by feature — batching on what is *verified together* twice found a defect (LA-78, LA-79). `scripts/check-route-test-coverage.js` ratchets it, so the debt
+writes, the goal-target-adherence loop, the home week/streak reads, the AI Coach lifecycle, the cardio hub, the strength/volume trends, the day timeline, the food-input path, the four heart-rate reads, the exercise catalogue, the nutrition day-completion trio, the year-review/identity trio, the platform-meta four, the two program-phase writes, the walk/sleep analysis pair, the feedback/calendar/scale trio the four Oura-BLE reads the two destructive Oura-BLE levers the four admin reports the three ring-device probes the admin triage queues, the two admin media tools and the three admin tools (media generation, model assets, the lbs→kg repair). Work by feature — batching on what is *verified together* twice found a defect (LA-78, LA-79). `scripts/check-route-test-coverage.js` ratchets it, so the debt
 only shrinks, a NEW route arrives uncovered and fails, and since LA-81 a route that LOSES its test fails whatever the total does.
 
 ### [app-shell][platform] LA-76 — a deload PHASE still decays the collection, and nothing dates one
@@ -19084,6 +19086,31 @@ adopted.
 
 - **Keep:** do not close this on "it has not happened again" — an intermittent lock-ordering bug is
   precisely the thing that looks fixed for weeks.
+
+### [platform] LA-87 — a configured upload that returns nothing is reported as if it succeeded
+
+- **Lane:** A — `app/api/admin/generate-exercise-media/route.ts`, and check the sibling
+  `mirror-dataset-gifs`, which builds the same `store()` helper.
+- **Added:** 2026-09-09, Lane A — found while writing the route's first tests (PS-39) and pinned
+  there as current behaviour, because the fix is a small decision rather than an obvious line.
+
+`store()` falls back to a base64 data URL when object storage is unconfigured **and** when a
+configured `uploadExerciseMedia` resolves null. The response reports `storageMode` from
+`isStorageConfigured()` alone, so the second case answers **`'s3'` while the row holds base64** — a
+report saying the upload path ran, on the one occasion it silently did not.
+
+Nothing breaks: the picture renders either way, which is why this has never been noticed. What it
+costs is the next person's diagnosis. A `data:` gif is roughly 200 kB of base64 in a Postgres column
+that is expected to hold a URL, and the admin screen's own status line is the thing that would
+otherwise say so. Silent per-row growth in a table nobody watches is the shape of the 2026-08-17
+`disk_full` outage, arriving from the other direction.
+
+**The fix is one line and the decision is which line.** Either report the path actually taken
+(`storageMode` from whether every `store()` call returned a real URL), or treat a null from a
+*configured* uploader as a failure and answer 502 — object storage being up and refusing a write is
+a different condition from it not being configured, and the current code cannot tell the reader
+which one happened. The first is a better report; the second refuses to record a row whose bytes are
+in the wrong place. Prefer the first unless the sweep finds the null branch actually firing.
 
 ### [platform] LA-85 — the calendar route's scope check may not match what Google actually throws
 
