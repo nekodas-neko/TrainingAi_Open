@@ -758,7 +758,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
       );
       }
       case "strengthTrend": return <StrengthTrendCard key="strengthTrend" exercises={strengthTrend ?? []} loading={strengthTrend === null} />;
-      case "trends": return <TrendsSection key="trends" />;
+      case "trends": return <TrendsSection key="trends" userId={userId} />;
       default: return null;
     }
   }

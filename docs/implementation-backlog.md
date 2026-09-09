@@ -434,6 +434,10 @@ below threshold and left in place for next time.
   the failure mode the linked/unlinked split exists to prevent.
 - **Lane:** ? — it is a docs restructuring, so Orchestrator's by the standing split, but it touches
   no code and any lane can run it. Filed by Lane B, which found it.
+- **✅ THE OWNER DECIDED 2026-09-09: raise the ceiling to 360 and do this properly later**, rather
+  than fix it under a PR that had nothing to do with the journal. So the next time the number is
+  reached, **this entry is the work** — not another raise. That is ~25 PRs of headroom, chosen
+  knowing it buys days rather than solving anything.
 - **Added:** 2026-09-09 · Lane B, on being blocked by the ceiling twice in one hour.
 
 
@@ -497,6 +501,32 @@ below threshold and left in place for next time.
 - **Sanity-bound whatever stores it.** A band with `lo > hi`, or a ceiling of 10 %/wk, produces a
   verdict that is confidently wrong rather than an obvious mistake.
 - **Added:** 2026-09-09 · Lane B, while shipping ④ against the default.
+
+
+### [platform] LB-98 — local-only data has no read path, so a whole class of surface cannot be verified in CI
+
+- **Lane:** A — it is `app/api/**` either way.
+- **Needs:** nothing.
+- **Measured 2026-09-09, twice in one session, on unrelated features.** A surface that reads a
+  local-first domain has no server fallback when no route publishes the field, so it renders its
+  empty state in a browser and can only be seen on the device. Two shipped that day:
+  - **OR-102b ④** (weight response) — `body_metrics` beyond seven days. `/api/body-metadata`
+    hard-codes `metrics.slice(0, 7)` and takes no range. Filed separately as **LB-96**.
+  - **Q-300** (rest vs prescription) — `set_logs.planned_rest_sec` and `rest_time_sec` per set.
+    Nothing publishes them; `/api/health-trends?view=rest-adherence` computes an adherence
+    *percentage* from the live style and does not emit the pairs.
+- **⚠ The cost is verification, not the product.** The canonical runtime is the APK, where the local
+  store is present and both cards work. What is lost is CI: the e2e can only assert the empty state,
+  so the rendering path ships unexercised and every such card arrives owing a device check. That is
+  two of the eleven device checks currently outstanding, both created the same day.
+- **What to build:** a read for each domain that a client can call, shaped like the local one so the
+  fallback is a swap rather than a second aggregate — a bounded `days`/`from` on
+  `/api/body-metadata` (LB-96), and per-set `plannedRestSec`/`restTimeSec` on the existing
+  rest-adherence view rather than a new route.
+- **⚠ Do not "fix" this by moving the computation server-side.** Both cards deliberately read the
+  logged *snapshot* rather than today's configuration; a server aggregate derived from live styles
+  or a 7-day window answers a different question, which is how two numbers for one metric start.
+- **Added:** 2026-09-09 · Lane B, after hitting it twice in one session.
 
 
 ### [heart-rate][cardio] TN-30 — one zone model, four max-HR anchors: the walk, the zone bar and the Body Battery grade the same heartbeat against three different ceilings
@@ -1543,6 +1573,65 @@ sounds like:**
 - **A device look is owed when it ships:** this is a long screen on a phone, and "good UI" for a dense
   read-only list is mostly about scanning — group headers that stick, numbers aligned, and the S25's
   fold not landing mid-group.
+
+### [nutrition] BF-134 — the macro targets and the calorie budget on one card are anchored to different days, and disagree by 406 kcal before you move
+
+- **Lane:** B for the labelling fix (`components/nutrition/energy-card.tsx`, `calorie-zone-bar.tsx`). The anchor decision itself reaches `lib/health/energy-balance-service.ts`, which is Lane A's — settle the wording before touching it.
+- **Added:** 2026-09-09 · owner, on the Nutrition tab: *"is this the right number? looks like its took 200 off the base then 200 off again?"*
+- **Needs:** — nothing.
+
+**First, the reported symptom is NOT a defect, and the entry has to say so or it gets "fixed".** The
+line reads *"1,453 base − 200 for your goal — no movement recorded yet today"* against a budget of
+**1,253**. That is one subtraction, not two: `calorie-zone-bar.tsx:44` prints `restingBase` and
+`goalDelta` as separate terms and `budgetProvenance` sums them once. **Do not go looking for a double
+deduction.**
+
+**Why it reads like one, which IS worth fixing.** `1,453` is not the owner's resting rate. His
+measured RMR is **1,325** (`measured_rmr`, 2026-08-27). The base is
+`bmr × SEDENTARY_MULTIPLIER (1.2)` **minus the energy of the first `STEP_BASE_CREDIT` (3,000) steps**
+— `energy-balance-service.ts:295` — held back so those steps can be *earned* later without being
+counted twice. 1,325 × 1.2 ≈ 1,590, less ~137 for 3,000 steps, ≈ **1,453**. So the number is right,
+and it is reached by a subtraction that is **not** the goal delta and is invisible on the label. A
+user who knows his own RMR sees a base above it, a −200 beside it, and reasonably infers a second
+deduction. The ⓘ already on that card is where the breakdown belongs.
+
+**The actual defect is one line higher.** The macro targets read **150 P / 141 C / 55 F**. That is
+`150×4 + 141×4 + 55×9 = 1,659 kcal`, sitting beside a **1,253** budget — **406 kcal apart**. Eat to
+the macros and the calorie figure is overshot by a third; eat to the calories and every macro reads
+short all day.
+
+- **They are anchored to different things.** The grams come from stored `nutrition_targets`
+  (**1,660**, matching to the kcal) scaled up by *earned* movement — `macroTargetsFor(earned)` at
+  `energy-balance-service.ts:184`. The calorie budget is `restingBase + goalDelta + earned`, which
+  **starts the day at zero movement and grows**. The two converge only once ~406 kcal is earned. On a
+  rest morning they are a full day's movement apart.
+- **The card's own comment says it exists to prevent exactly this**, and its guarantee is narrower
+  than it reads: `energy-card.tsx:44-52` records that *"Q-401 found two budgets on one screen"* and
+  that the donut, the headline and `+N burned` all come from one `budgetProvenance` call so they
+  *"cannot disagree"*. True — and the macro row is not in that set. The reconciliation covers the
+  calorie half of the card only.
+- **Cross-check against TN-29 before changing any number.** That entry protects
+  `nutrition_targets.calories = 1,660` and states the honest band at a `recomp` −200 as
+  **1,450–1,700**. The 1,253 on screen sits *below* that band — which is not a contradiction, it is
+  the whole point: a so-far-today budget and a whole-day target are different quantities. Anyone
+  "fixing" one to match the other without reading TN-29 will move a number that entry deliberately
+  left alone.
+
+**Recommendation: label the macros, do NOT scale the grams down to the current budget.**
+
+- Scaling grams to a zero-movement budget prints a morning protein target near **113 g** that climbs
+  through the day. Protein is the macro this owner's `recomp` goal most depends on holding, and a
+  target that starts low and rises invites under-eating it on a rest day — the worst day to.
+- The honest version is that the grams assume a normal day's movement and the calories do not *yet*.
+  **The card already has the mechanism**: the `WHY TWO NUMBERS` block directly below explains the
+  daily-goal-vs-today's-budget split for calories. Extending it to cover the grams is a copy change
+  against an existing surface, and it fixes the reported confusion without moving a target.
+- **The alternative worth stating:** show the macro row against the *daily goal* (1,660) with the
+  budget row clearly separate, rather than implying both describe the same denominator. More layout,
+  strictly clearer, and the better answer if the copy fix does not land.
+
+- **Reversal cost:** near zero for the labelling. Any change to the macro *anchor* is a behaviour
+  change on a shared service, needs TN-29 read first, and is not this entry's recommendation.
 
 ### [platform] LB-56 — E2E costs 26 minutes a UI PR and currently gates nothing; decide which of those to change
 
@@ -12342,7 +12431,9 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 - **Branch:** `feat/rest-adherence-signal`
 - **Plan:** none yet
-- **Gate:** owner — the residue is *"a Lane B UI change **once the owner has seen the framing**"*,
+- **✅ Gate DISCHARGED 2026-09-09** — the owner saw the framing and chose to surface it. Kept below
+  because the reasoning is why the card says what it says.
+- **~~Gate:~~ owner** — the residue was *"a Lane B UI change **once the owner has seen the framing**"*,
   and the framing is the finding, not a detail: the obvious coaching line (*"you rushed today"*) is
   meaningless when 40% of every session rushes, and the measured one is *"your rest ignores the
   plan"* (planned 60 s → 75 s taken, 90 → 65, 120 → 110, 187 → 133). Stated only in the `Keep:` until
@@ -12402,9 +12493,20 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   session rushes. **Within-session drift is real but secondary** (0.32 at exercise 1 → 0.47 at
   exercise 5): time pressure explains the slope, not the 0.32 intercept, and the intercept is most
   of it.
-- **Keep:** the surfacing itself is unbuilt, and the primary half (Q-289's bucket table split by
-  rest band) is already measured — see the ✅ above it. Surfacing is a Lane B UI change once the
-  owner has seen the framing; nothing here licenses a rest term in `expectedRpe`.
+- **✅ THE SURFACING SHIPPED 2026-09-09, and the owner chose the framing.** Asked directly, they
+  took *"a plain fact card"* over dropping it. It renders under the **Rest discipline** trend on the
+  Health tab: each prescription against the rest actually taken, the signed difference, and the set
+  count — no score, no verdict, no nudge, because 39.8% rushed *uniformly* makes a discipline
+  reading meaningless. The one sentence it adds appears only when the actual span is ≤ ⅔ of the
+  planned span, and is withheld (not negated) on a single prescription, where there is no span.
+  `components/health/rest-prescription.ts` + `rest-prescription-card.tsx`.
+- **⚠ It reads `set_logs.planned_rest_sec`, not the style — deliberately.** The snapshot is what was
+  prescribed *at log time*; deriving it from the live style would let a later style edit silently
+  rewrite what "prescribed" meant for a past set. The `rest-adherence` trend above it does derive
+  from the style, which is right for its own question and would be wrong for this one.
+- **Keep:** the device check, and only that. `planned_rest_sec` is in the local store and no route
+  publishes it, so the card is **absent in a browser** and cannot be verified in CI — see LB-98.
+  Nothing here licenses a rest term in `expectedRpe`.
 
 ### [workouts] Q-289 — `expectedRpe` misses by more than the autoregulation dead band at both ends of its own range
 
