@@ -14,6 +14,7 @@ import { pushThenRevalidate } from "@/lib/local-store/push-then-revalidate";
 import { invalidateSupplements } from "@/lib/cache-groups";
 import { cancelSupplementReminder } from "@/lib/supplement-reminders";
 import { todayInTz } from "@trainingai/shared/date-utils";
+import { definitionDose, hasFreeTextBesideAmount } from "@/components/nutrition/definition-dose";
 
 interface Props {
   open: boolean
@@ -262,19 +263,10 @@ export function ManageSupplementsSheet({ open, onOpenChange, supplements, onChan
                 className="w-full rounded-xl bg-muted/60 border border-border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground mb-1.5">Dose <span className="font-normal">(optional)</span></p>
-              <input
-                type="text"
-                value={dose}
-                onChange={e => setDose(e.target.value)}
-                placeholder="e.g. 5g, 1 capsule"
-                className="w-full rounded-xl bg-muted/60 border border-border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-            </div>
-            {/* BF-112 stage 2. The free-text `Dose` above stays — it is what BF-3 freezes onto each
-                log — and these are the structured fields beside it, so a dose can be a number the
-                app can add up rather than a string it can only display. */}
+            {/* OR-104 — the structured pair comes FIRST because it is the dose the app actually
+                uses. Reading order was half the defect: a free-text field labelled `Dose` sitting
+                above these read as the answer, so the vial strength got typed into it and the app
+                went on computing with a number 20x smaller that nothing on screen showed. */}
             <div className="grid grid-cols-[1fr_5rem] gap-2">
               <div>
                 <p className="text-xs font-semibold text-muted-foreground mb-1.5">Amount <span className="font-normal">(optional)</span></p>
@@ -300,6 +292,27 @@ export function ManageSupplementsSheet({ open, onOpenChange, supplements, onChan
                 />
               </div>
             </div>
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground mb-1.5">
+                {amount.trim() ? 'Note' : 'Dose'} <span className="font-normal">(optional)</span>
+              </p>
+              <input
+                type="text"
+                value={dose}
+                onChange={e => setDose(e.target.value)}
+                placeholder={amount.trim() ? 'e.g. with food, morning only' : 'e.g. 5g, 1 capsule'}
+                className="w-full rounded-xl bg-muted/60 border border-border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+              {/* Relabelled rather than hidden. Hiding it once an amount exists would strand the
+                  text already in it — the live Retatrutide row holds "10mg" there, and a field you
+                  cannot see is a field you cannot correct. */}
+              {amount.trim() && (
+                <p className="mt-1.5 text-[11px] text-muted-foreground">
+                  The amount above is the dose. This line is just a note — it is not counted.
+                </p>
+              )}
+            </div>
+
             <div className="rounded-xl bg-muted/60 border border-border px-4 py-3 flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-semibold">Ask for the amount each time</p>
@@ -382,7 +395,13 @@ export function ManageSupplementsSheet({ open, onOpenChange, supplements, onChan
               <GripVerticalIcon className="h-4 w-4 text-muted-foreground shrink-0" />
               <button type="button" onClick={() => openEdit(s)} className="flex-1 text-left min-w-0">
                 <p className={`text-sm font-medium ${!s.active ? 'line-through text-muted-foreground' : ''}`}>{s.name}</p>
-                {s.dose && <p className="text-xs text-muted-foreground">{s.dose}</p>}
+                {/* OR-104 — the structured dose, not the free text. This row was the only place
+                    the contradiction showed, and it showed the wrong side of it: `10mg` under the
+                    name while the app dosed 0.5 mg. */}
+                {definitionDose(s) && <p className="text-xs text-muted-foreground">{definitionDose(s)}</p>}
+                {hasFreeTextBesideAmount(s) && (
+                  <p className="text-[10px] text-muted-foreground/80">Note: {s.dose}</p>
+                )}
                 {s.reminderEnabled && s.reminderTime && (
                   <p className="text-[10px] text-muted-foreground flex items-center gap-1">
                     <ClockIcon className="w-3 h-3" /> {s.reminderTime}
