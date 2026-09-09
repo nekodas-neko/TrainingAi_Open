@@ -42,11 +42,17 @@ function ingredient(name: string) {
   return { name, weightG: 100, caloriesPer100g: 100, proteinPer100g: 5, carbsPer100g: 15, fatPer100g: 2 }
 }
 
+/** 2026-03-10 14:30 in Brisbane (UTC+10) — a fixed past instant, so nothing here moves with the
+ *  clock. Any mid-afternoon hour works; what matters is that it is neither 00 nor 23, so a meal can
+ *  sit strictly on each side of it. See the note above `test` for why this is pinned at all. */
+const FIXED_AFTERNOON = new Date('2026-03-10T04:30:00Z')
+const PINNED_HOUR = 14
+
 function planResponse(nowHour: number) {
-  // One meal an hour behind the clock and one an hour ahead, so "so far" has exactly one answer
-  // whatever time the suite runs at. Clamped so the pair stays inside 00–23.
-  const past = Math.max(0, Math.min(22, nowHour)) 
-  const future = Math.min(23, past + 1)
+  // One meal strictly behind the clock and one strictly ahead, so "so far" has exactly one answer.
+  // `fillableMeals` compares `hour <= nowHour`, so "ahead" must be at least nowHour + 1.
+  const past = nowHour - 1
+  const future = nowHour + 1
   return {
     plans: [{
       id: 'plan-e2e', userId: 'u', name: 'E2E plan', mealsPerDay: 2, isActive: true,
@@ -73,11 +79,24 @@ function planResponse(nowHour: number) {
   }
 }
 
+/**
+ * The clock is PINNED rather than read, and that is the fix for a once-a-day red.
+ *
+ * This used to read the current Brisbane hour and build the pair around it, clamped into 00–23:
+ * `past = min(22, nowHour)`, `future = past + 1`. At **hour 23** that yields 22 and 23, and
+ * `fillableMeals` offers every meal whose hour is `<= nowHour` — so BOTH were offered, the label read
+ * "Log the 2 meals so far", and the `1 meal` locator found nothing. It failed on every run between
+ * 23:00 and 23:59 Brisbane and passed the other 23 hours, which is the shape CLAUDE.md's date rules
+ * warn about: a test that only fails at one hour is a test nobody can reproduce.
+ *
+ * The clamp could not be fixed in place. The comparison is hour-granular, so "strictly ahead of now"
+ * needs `nowHour + 1`, and at 23 there is no such hour in the day. Pinning is the only shape that
+ * holds at every wall-clock hour — and it is already this suite's pattern, see
+ * `day-rollover-checkin.spec.ts`.
+ */
 test('the plan offers only the meals whose time has come, and logging them clears the offer', async ({ page }) => {
-  // The app reads "now" in the user's timezone; read it the same way rather than from the runner's
-  // clock, which is UTC and would put the pair on the wrong side of the boundary.
-  const nowHour = await page.evaluate(() =>
-    Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Australia/Brisbane', hour: '2-digit', hour12: false }).format(new Date())))
+  await page.clock.install({ time: FIXED_AFTERNOON })
+  const nowHour = PINNED_HOUR
 
   await page.route('**/api/nutrition/meal-plans', route =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(planResponse(nowHour)) }))
