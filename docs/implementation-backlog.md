@@ -1580,6 +1580,18 @@ sounds like:**
     separate faults, and this run caught the crash itself. It also confirms the scheduling accident:
     `preferences-survive-reinstall` is once again the hard failure and once again nothing about it
     asserted wrongly — the spec run locally on the same commit passes.
+  - **⚠ FOURTH SIGHTING 2026-09-09 (#1044), and it SETTLES the mechanism — both signatures are one
+    fault, in one test.** `home-device-battery-chips.spec.ts:52` died on its first attempt with the
+    browser `SIGSEGV` (`Received signal 11 SEGV_MAPERR 0000000001b0`, `cr2: 0x1b0` — the same address
+    as the third sighting), and **Retry #1 of the same test** then died with
+    `page.goto: net::ERR_ABORTED at http://localhost:3100/`. So `ERR_ABORTED` is what a later test
+    sees after the renderer is already gone, not a second failure mode: attempt and retry of one test
+    produced one of each. 177 passed.
+  - **Four sightings, four different specs** — `preferences-survive-reinstall` (×3, twice as the hard
+    failure), `touch-target-size`, `one-calorie-budget`, `back-dismiss-sweep`, `card-429-error-state`,
+    `home-device-battery-chips`. Which spec is reported is a scheduling accident, as this entry said
+    at the second sighting; the constant is a renderer crash inside a 21–26 minute run. **It has now
+    cost four log reads in one session.**
   - Recorded because a 26-minute job that eats its own browser roughly one run in three is an
     argument about the job, which is what this entry is for. It also means **a red E2E cannot be
     read as a signal without opening the log**, which is the cost LB-54 is about.
