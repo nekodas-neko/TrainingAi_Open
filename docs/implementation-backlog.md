@@ -1646,11 +1646,31 @@ short all day.
 - **Reversal cost:** near zero for the labelling. Any change to the macro *anchor* is a behaviour
   change on a shared service, needs TN-29 read first, and is not this entry's recommendation.
 
-### [workouts][app-shell] BF-135 — two stacked banners squeeze the set list on an injured exercise, and the header cannot scroll
+### [workouts][app-shell] BF-135 — two stacked banners squeeze the set list on an injured exercise (shipped; device owed)
 
 - **Lane:** B — `components/workout/active-workout-screen.tsx`.
 - **Added:** 2026-09-09 · owner, mid-set on Legs: *"ui gets a bit quoted for injury ones"* — screenshot of Barbell Hip Thrust with the injury banner, the AMRAP banner, and set 1 disappearing behind the logging sheet.
 - **Needs:** — nothing.
+- **Verify:** device — the failure is vertical space on the S25 with the log sheet open, which is not
+  reproducible from dimensions alone. Two things the sandbox could not produce: **(a)** an injured
+  exercise on a **baseline** session (the two-banner worst case the owner reported — the seeded
+  account is mid-`Accumulation`, and forcing `isBaseline` wants the program's phase set rewritten),
+  and **(b)** the same screen with the logging sheet actually over the bottom half. Check set 1 is
+  reachable and the `⚠ Injury: …  Swap` chip is tappable with a thumb.
+- **✅ SHIPPED 2026-09-09** (`fix/injury-header-crowding`) — the whole recommendation.
+  [Journal](overview/entries/2026-09-09-fix-injury-header-crowding.md). The full banner moved to the
+  ready screen (which **had no injury warning at all** before this, so the warning used to arrive
+  after the weight was chosen); during the set it is a chip with Swap; the header gained
+  `max-h-[45%] overflow-y-auto` so the next thing added to it scrolls rather than pushing set 1 off.
+- **The AMRAP banner is deleted rather than made conditional, which is a change from this entry's
+  recommendation.** The ready screen already carries the same instruction in fuller form for **every**
+  exercise, and every exercise passes through it — including one resumed from a superset buffer,
+  whose `timerStarted: true` only exists because it was started there. So "first exercise only" is
+  still one row of duplication of copy the lifter has just read.
+- **Two defects found in the same code and fixed here:** the muscle filter never de-duplicated, so an
+  exercise listing the injured muscle as both main and secondary read *"Lower back, Lower back"*; and
+  it hand-rolled the lowercase match instead of `activeInjuredMuscles()`, the shared list the swap
+  sheet's own filter reads.
 
 **Traced.** The active-exercise column is `flex flex-col flex-1 min-h-0` (`:439`) and its header is
 **`flex-none space-y-2 mb-2`** (`:441`) — a block that holds the exercise name, the injury banner

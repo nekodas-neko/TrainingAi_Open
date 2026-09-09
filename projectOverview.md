@@ -1751,6 +1751,22 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [workouts][app-shell] ⚠️ The injured-exercise header was rebuilt, and the case that prompted it was never rendered (BF-135, 2026-09-09, v1.446.0)
+
+The active-exercise header is `flex-none` above a `min-h-0` set list and **that branch has no scroll
+container at all**, so two stacked banners pushed set 1 under the logging sheet with nothing to
+recover it. The full injury banner moved to the ready screen — which carried **no injury warning
+before this**, so it used to arrive after the weight was already chosen — and during the set it is a
+chip with Swap intact; the AMRAP banner is gone, since the ready screen already says the same thing
+at more length for every exercise; the header gained `max-h-[45%] overflow-y-auto`.
+[Journal](docs/overview/entries/2026-09-09-fix-injury-header-crowding.md).
+**Owed: the device check, and two gaps behind it.** The reported case is an injured exercise on a
+**baseline** session — the two-banner worst case — and the seeded account is mid-`Accumulation`, so
+that state was reasoned about and pinned by a source test but **never rendered**. Nor was any of it
+seen with the logging sheet actually covering the bottom half of an S25, which is where the squeeze
+lives. `isBaseline` never clears while **BF-131** is open, so the banner it removes was permanent
+rather than a first-session artefact.
+
 ### [workouts] ⚠️ Rest vs the plan is on the Trends card, and it renders nowhere but the phone (Q-300, 2026-09-09, v1.445.0)
 
 Health → Trends → Rest discipline now shows what the plan prescribes for rest against what is

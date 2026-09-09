@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.446.0",
+    date: "2026-09-09",
+    changes: [
+      "An injured exercise no longer squeezes the set list mid-workout. The full injury warning now sits on the ready screen \u2014 above the bar weight and the set targets, where you actually decide whether to swap the movement or go lighter \u2014 and during the set it is a chip beside the exercise name, with Swap still one tap away. The AMRAP instruction is gone from the set screen: the ready screen already says it, at more length.",
+    ],
+  },
+  {
     version: "1.445.1",
     date: "2026-09-09",
     changes: [
