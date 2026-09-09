@@ -10,61 +10,62 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { FoodRow } from './food-row'
 
 interface Props {
-  /**
-   * The bucket to read recency from — the one the sheet was opened on, or the time-of-day one the
-   * parent resolved. Null while the meal types are still loading, which renders as loading rather
-   * than as "nothing here".
-   */
-  mealTypeId: string | null
   userId?: string
   onSelectFood: (item: FoodItem) => void
 }
 
 /**
- * `Recent` — what you last logged, as the screen's default content (LB-16).
+ * Under the `nutrition-recent-for-meal:` prefix on purpose, not beside it. `invalidateCache` deletes
+ * `WHERE key LIKE 'prefix%'` and `invalidateFoodLogWrites()` clears that exact prefix, so this key is
+ * already evicted by every food write. A name outside the family — `nutrition-recent-all` — would
+ * have needed a new group in `lib/cache-groups.ts`, which is not this lane's file.
+ */
+const RECENT_KEY = 'nutrition-recent-for-meal:all'
+
+/**
+ * `Recent` — what you last logged, as the screen's default content (LB-16, LB-18).
  *
- * **It is scoped to a meal bucket, and that is a data limit rather than a design choice.** The only
- * recency source the app has is `listRecentFoodItemsForMealType`, on both the server route and the
- * local store; there is no unfiltered "recent food items" query on either side, and adding one
- * touches `app/api/**` and `lib/local-store/**`, which is Lane A's. So the parent resolves a bucket
- * — the preselected one, else `mealTypeForHour` — and this reads that.
+ * **Every bucket, not the one the hour suggests.** It used to scope to a meal type, which was a data
+ * limit rather than a choice: there was no unfiltered recency query on either side. The owner
+ * answered it on the device — *"Recent doesnt need to be scoped to current meal bracket; I think it
+ * should just be all recently entered foods/meals"* — and the sources landed in LB-18's Lane A half,
+ * so this is the swap that entry predicted: *"the swap is this component's fetch and nothing else."*
  *
- * It reads defensibly rather than merely acceptably: opening Log Food at 7 pm and being shown what
- * you usually eat at dinner beats a global list topped by breakfast coffee. If use says otherwise,
- * the swap is this component's fetch and nothing else.
+ * A consequence worth keeping: nothing here waits on the meal types any more, so the list paints as
+ * soon as the sheet opens rather than after a bucket resolves.
  *
- * Local-first, because `getRecentFoodItemsForMeal` works offline and the network read is only a
+ * Local-first, because `getRecentFoodItems` works offline and the network read is only a
  * revalidation — the same shape the strip this replaced already used.
  */
-export function RecentFoodsPanel({ mealTypeId, userId, onSelectFood }: Props) {
+export function RecentFoodsPanel({ userId, onSelectFood }: Props) {
   const [items, setItems] = useState<FoodItem[]>([])
   const [loaded, setLoaded] = useState(false)
 
   // Seeded in an effect, never a `useState` initializer — a cache read in an initializer is the
   // hydration mismatch CLAUDE.md's instant-paint rule names.
   useLayoutEffect(() => {
-    if (!mealTypeId) return
-    const seeded = readCacheSync<FoodItem[]>(`nutrition-recent-for-meal:${mealTypeId}`)
+    const seeded = readCacheSync<FoodItem[]>(RECENT_KEY)
     if (Array.isArray(seeded)) { setItems(seeded); setLoaded(true) }
-  }, [mealTypeId])
+  }, [])
 
   useEffect(() => {
-    if (!mealTypeId) return
     let cancelled = false
     const store = userId ? getLocalStore(userId) : null
     if (store) {
-      store.getRecentFoodItemsForMeal(mealTypeId, 12)
+      store.getRecentFoodItems(12)
         .then(local => { if (!cancelled && local.length > 0) { setItems(local); setLoaded(true) } })
         .catch(() => {})
     }
+    // No `mealTypeId` param: the route treats its absence as every bucket and returns 12 rather
+    // than 5, which is the Lane A half of LB-18.
     cachedFetch<FoodItem[]>(
-      `nutrition-recent-for-meal:${mealTypeId}`,
-      `/api/nutrition/recent-for-meal?mealTypeId=${mealTypeId}`,
+      RECENT_KEY,
+      '/api/nutrition/recent-for-meal',
       TTL_MEDIUM,
       list => { if (!cancelled && Array.isArray(list)) { setItems(list); setLoaded(true) } },
     ).catch(() => { if (!cancelled) setLoaded(true) })
     return () => { cancelled = true }
-  }, [mealTypeId, userId])
+  }, [userId])
 
   if (items.length === 0) {
     return (

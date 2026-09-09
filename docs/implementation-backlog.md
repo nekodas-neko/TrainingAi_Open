@@ -7505,13 +7505,20 @@ place to start rendering pictures.
 > **which is a Lane A schema change, not a Lane B sort.** Say so in the plan rather than discovering
 > it mid-PR.
 
-- **Keep — THE LANE A SOURCE SHIPPED 2026-09-02; Lane B's swap is what remains.**
-  `listRecentFoodItems(userId, limit)` (repository + `slices/nutrition.ts`) and
-  `getRecentFoodItems(limit)` (local store) are the unfiltered queries whose absence was the only
-  reason `RecentFoodsPanel` resolves a bucket — its own comment said so. `mealTypeId` is now
-  **optional** on `GET /api/nutrition/recent-for-meal`; absent means every bucket and returns 12
-  rather than 5. **Lane B's half is dropping the query param**, which is exactly what that
-  component's comment predicts: *"the swap is this component's fetch and nothing else."*
+- **✅ BOTH HALVES SHIPPED.** The Lane A sources landed 2026-09-02; **Lane B's swap shipped in
+  #1012** — `RecentFoodsPanel` now reads `getRecentFoodItems(12)` locally and
+  `/api/nutrition/recent-for-meal` with **no** `mealTypeId`, which the route reads as every bucket.
+  The `mealTypeId` prop and the `recentMealTypeId` `useMemo` that fed it are gone, so nothing on that
+  panel waits for the meal types any more and the list paints as the sheet opens.
+- **The cache key is `nutrition-recent-for-meal:all`, inside the old family rather than beside it.**
+  `invalidateFoodLogWrites()` clears the prefix `nutrition-recent-for-meal:`, so the new key is
+  already evicted by every food write. A name outside that prefix would have needed a new group in
+  `lib/cache-groups.ts` — Lane A's file — for no behavioural gain.
+- **Keep: `Recent` is still foods only.** The owner's answer was *"all recently entered
+  foods/meals"*, and this delivered the bucket half of it. Mixing saved meals in is buildable —
+  `listSavedMeals` already derives `lastUsedAt` from `max(food_logs.logged_at)` and orders by it
+  (migration 238), so the timestamp this entry once said was missing exists — but it needs a source
+  returning both kinds interleaved, which is a route change and therefore Lane A's.
 - **⚠ THIS ENTRY'S CENTRAL CLAIM WAS FALSE, and no schema change was made.** It said a saved meal
   has no last-used timestamp, that this is why `My Foods` can only order by `createdAt DESC`, and
   that ordering foods and meals together therefore needs a Lane A schema change. **`listSavedMeals`
