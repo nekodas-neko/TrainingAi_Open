@@ -15,7 +15,7 @@
 // advice. So an un-gated number is never returned: `maintenanceKcal` is null unless the window
 // clears every threshold below, and `excludedReason` says which one failed.
 
-import { linearFit } from '../health/strength-projection'
+import { computeWeightRateFit } from '../health/long-term-goal-progress'
 import { KCAL_PER_KG } from './tdee-adaptation'
 
 /** Days of history the estimator looks back over. Shorter windows are dominated by water-weight
@@ -129,21 +129,22 @@ export function estimateMaintenance(
     ? Math.round(logged.reduce((s, d) => s + d.intakeKcal!, 0) / logged.length)
     : null
 
-  // Slope is fitted against the weigh-in's day index within the window, not its position in the
-  // weighed array — an unevenly spaced series (weighed Mon, Tue, then Sunday) would otherwise
-  // report a slope per-reading and badly overstate the rate.
-  const dayIndex = new Map(sorted.map((d, i) => [d.date, i]))
-  const fit = weighed.length >= 2
-    ? linearFit(weighed.map(d => ({ x: dayIndex.get(d.date)!, y: d.weightKg! })))
-    : null
-  const slopeKgPerDay = fit?.slope ?? null
-  const weightRateKgPerWeek = slopeKgPerDay != null
-    ? Math.round(slopeKgPerDay * 7 * 100) / 100
+  // Slope is fitted against the weigh-in's DAY, not its position in the weighed array — an unevenly
+  // spaced series (weighed Mon, Tue, then Sunday) would otherwise report a slope per-reading and
+  // badly overstate the rate. This used to be a local fit against a day index built here; LB-67
+  // found the health screen's copy of the same figure fitting the array index and overstating the
+  // owner's rate by 1.48×, so the two converged on `computeWeightRateFit` — one formula, one place.
+  //
+  // The maintenance below multiplies the UNROUNDED kg/day. Measured, not assumed: rounding kg/week
+  // to 2 dp first moves the estimate by ~5 kcal/day at most, and by 5 on the fixture the test
+  // below pins. Small — but a display rounding has no business reaching the kcal arithmetic.
+  const fit = computeWeightRateFit(weighed.map(d => ({ date: d.date, weightKg: d.weightKg })))
+  const slopeKgPerDay = fit?.slopeKgPerDay ?? null
+  const weightRateKgPerWeek = fit != null
+    ? Math.round(fit.rateKgPerWeek * 100) / 100
     : null
 
-  const weightSpanDays = weighed.length >= 2
-    ? dayIndex.get(weighed[weighed.length - 1].date)! - dayIndex.get(weighed[0].date)!
-    : 0
+  const weightSpanDays = fit?.spanDays ?? 0
 
   const base: Omit<MaintenanceEstimate, 'maintenanceKcal' | 'confidence' | 'excludedReason'> = {
     daysInWindow: sorted.length,
