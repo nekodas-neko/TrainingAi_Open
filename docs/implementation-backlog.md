@@ -1633,6 +1633,57 @@ short all day.
 - **Reversal cost:** near zero for the labelling. Any change to the macro *anchor* is a behaviour
   change on a shared service, needs TN-29 read first, and is not this entry's recommendation.
 
+### [workouts][app-shell] BF-135 — two stacked banners squeeze the set list on an injured exercise, and the header cannot scroll
+
+- **Lane:** B — `components/workout/active-workout-screen.tsx`.
+- **Added:** 2026-09-09 · owner, mid-set on Legs: *"ui gets a bit quoted for injury ones"* — screenshot of Barbell Hip Thrust with the injury banner, the AMRAP banner, and set 1 disappearing behind the logging sheet.
+- **Needs:** — nothing.
+
+**Traced.** The active-exercise column is `flex flex-col flex-1 min-h-0` (`:439`) and its header is
+**`flex-none space-y-2 mb-2`** (`:441`) — a block that holds the exercise name, the injury banner
+(`:459`), the AMRAP banner (`:479`) and the `SetsGrid`, and that **never shrinks**. Below it,
+`:509` is the flexible region. **Nothing in this branch has `overflow-y-auto`** — the only scroll
+container on the screen is `:243`, which belongs to the *ready* state, not this one. So when the
+header grows, the region below is squeezed and the set rows end up under the log sheet with no scroll
+to recover them.
+
+**Two banners is the worst case, and it is the case the owner is in right now:**
+- The **injury banner** fires when any of the exercise's main or secondary muscles matches an active
+  injury. Measured against his live program: **3 of Bankai's 24 exercises** trigger it — Barbell Hip
+  Thrust (in Legs *and* Lower) and Single Leg Romanian Deadlift, all on `lower back`.
+- The **AMRAP banner** is gated on `isBaseline`. **BF-131 is why that gate never clears**: the
+  baseline never completes, so this banner is not a one-session artefact — it is permanent until that
+  entry ships. The crowding therefore has a fixed cause and an indefinite duration, which is worth
+  saying because "it will sort itself out after baseline" is the natural and wrong assumption.
+
+**Both banners are static, per-exercise, and permanent for the whole exercise.** Neither changes
+between set 1 and set 5, and the AMRAP one is instructional copy — *"pick a challenging weight and do
+as many reps as possible with good form"* — which is useful the first time and noise on every
+exercise thereafter. They occupy the most valuable vertical space on the screen at the moment the log
+sheet is open over the bottom half of it.
+
+**Recommendation: move the guidance to where the decision is made, and leave a chip where it is not.**
+- **Both facts are needed *before* the weight is chosen**, not while the sheet is open — so the
+  natural home is the **ready screen for that exercise** (the `:243` branch, which already scrolls and
+  has room). That is where a lifter decides whether to swap the movement or how heavy to go.
+- **During the set, collapse the injury banner to a single chip** beside the exercise name — `⚠ Lower
+  back` — with **Swap** kept reachable. Do not delete the swap affordance: it is the entry's only
+  action, and an injury warning you cannot act on is worse than none.
+- **Show the AMRAP instruction on the first exercise of a baseline session only**, not on all five.
+- **Whatever is kept, give the header a scroll or a cap.** A `flex-none` block whose height depends
+  on data will overflow again the next time something conditional is added to it — a third banner is
+  one feature away.
+
+- **⚠ Do not fix this by making the injury banner conditional on set number or dismissible per
+  session.** A dismissed safety warning that stays dismissed is the shape that gets someone hurt, and
+  this owner's lumbar constraint is the reason the banner exists at all. Relocating it is fine;
+  suppressing it is not.
+- **Check the sibling surface**: the same two-banner stack renders for any user with an injury on a
+  baseline session, and the ready screen already scrolls, so moving them there costs no layout work.
+- **Reversal cost:** low — layout and placement in one component, no data change.
+- **Worth a device look when it ships**, since the failure is vertical space on the S25 with the log
+  sheet open, which is not reproducible from the dimensions alone.
+
 ### [platform] LB-56 — E2E costs 26 minutes a UI PR and currently gates nothing; decide which of those to change
 
 - **Lane:** O — the Orchestrator's, not an implementer's. `.github/workflows/ci.yml`, `playwright.config.ts` and the required-checks

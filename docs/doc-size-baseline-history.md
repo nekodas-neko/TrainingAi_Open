@@ -10124,3 +10124,24 @@ holding protein matters most — and points at the `WHY TWO NUMBERS` block the c
 Two branches moved this number within the hour — BF-134's filing and Q-300's entry — so the `.size`
 conflicted, which is the case it *should* conflict on: they genuinely disagree about one number.
 Resolved by measuring the merged file rather than picking a side.
+
+## 2026-09-09 — `docs/implementation-backlog.md` 20,024 → 20,075 (+51), BF-135
+
+The owner reported the set list being squeezed on an exercise with an active injury. The entry is 51
+lines because the layout cause is one line of code and everything that decides the *fix* is not:
+
+- The header is `flex-none` (`active-workout-screen.tsx:441`) and this branch of the screen has **no
+  scroll container** — the only one belongs to the ready state. So a header that grows with data
+  pushes content under the log sheet with nothing to recover it. Stated explicitly because the
+  obvious patch is to shrink a banner, which leaves the same trap for the next conditional block.
+- **Measured how often it fires:** 3 of Bankai's 24 exercises, all `lower back` — Barbell Hip Thrust
+  in two sessions plus the Single Leg RDL. Not everywhere, which matters for how aggressive the fix
+  should be.
+- **The two-banner worst case is caused by BF-131.** The AMRAP banner is gated on `isBaseline`, and
+  the baseline never completes, so this is permanent rather than a one-session artefact. Recorded
+  because "it clears after baseline" is the natural assumption and is currently false.
+
+The recommendation moves both banners to the ready screen — which already scrolls, and is where the
+weight-and-swap decision is actually made — leaving a chip during the set. It also carries an
+explicit **do not** with a reason: making a safety warning dismissible or set-conditional is the
+shape that gets someone hurt, and this owner's lumbar constraint is why the banner exists.
