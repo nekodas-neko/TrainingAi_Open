@@ -6248,8 +6248,17 @@ sheets are at the artboards' 16 px gutter now. See BF-45 ③ for why the fix is 
 - **Keep — ② the two photo controls.** This is **BF-46 ①(a)** seen from the device and it settles the
   design: the top control is the one users reach, so that is the one that must pick a photo. Also
   built and held — see BF-46 for the measurement, because the same finding blocks both.
-- **Keep — ③ `Recently used` sits in the middle of the ingredient list.** *"this should probably be a
-  tab like the other place"* — matching Log Food's `Recent · Meals · Single foods`. Untouched.
+- **✅ ③ SHIPPED in #1038.** The ingredient picker's two lists are tabs — `Your foods` and
+  `Food database` — with the estimate and recipe-import actions below them, where they apply
+  whichever list is showing. It read as mid-list because it *was*: own foods, then an action, then
+  the database.
+- **③'s naming is deliberately NOT Log Food's.** "the other place" is `Recent · My Foods · Search`,
+  and its `My Foods` means **saved meals** — a different thing from this screen's single foods, one
+  screen away. Reusing that label here would rebuild the exact confusion BF-103 removed. The two
+  headings already on this screen were used instead; the distinction Log Food's own note rests on
+  (what you own vs what reaches beyond it) is the one kept.
+- **A pasted recipe URL hides the strip**, because it replaces both lists — a tab bar choosing
+  between two things that are not being shown is worse than none.
 
 - **The owner asked to stop here:** *"Lets get this into the right section and UI before we deep dive
   this more."* So N5's recipe-import checks (yield, multi-dish, duplicate handling) are **not
