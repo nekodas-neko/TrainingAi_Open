@@ -5,7 +5,7 @@ import { cachedFetchToday, readTodayCacheSync } from "@/lib/sqlite/cache";
 import { TTL_MEDIUM } from "@trainingai/shared/cache-ttl";
 import { getLocalStore } from "@/lib/local-store";
 import { todayInTz } from "@trainingai/shared/date-utils";
-import { summariseSupplementDay } from "@/components/nutrition/supplement-day-totals";
+import { summariseSupplementDay } from "@trainingai/shared/nutrition/supplement-day-totals";
 import type { SupplementWithStatus } from "@trainingai/shared/types/supplement";
 
 /**

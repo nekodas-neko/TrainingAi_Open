@@ -9565,3 +9565,11 @@ entry still owing a device check states so with `Keep:` rather than being delete
 `Keep:` entry naming the one owed check, plus the non-obvious mechanism (the measure is the rollup
 watermark, not the newest ingested sample) and the two journals. It now sorts into KEEP instead of
 heading the work list.
+
+---
+
+## 2026-09-09 — `docs/implementation-backlog.md` ratcheted DOWN 19587 → 19558 (LB-57 shipped)
+
+The entry is removed because the work is done: `summariseSupplementDay` is hoisted into
+`packages/shared/src/nutrition/supplement-day-totals.ts` and both the adapter and the device call it.
+Nothing is owed, so this is a deletion rather than a `Keep:`.

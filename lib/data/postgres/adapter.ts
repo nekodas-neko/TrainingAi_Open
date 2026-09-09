@@ -40,6 +40,7 @@ import { MoodFieldsSchema } from '@trainingai/shared/validation/mood-log'
 import { FoodItemPushSchema } from '@trainingai/shared/validation/food-item'
 import { sanitiseNutrition } from '@trainingai/shared/nutrition/scan-totals'
 import { normalizeMealGroupName } from '@trainingai/shared/nutrition/meal-group-name'
+import { summariseSupplementDay } from '@trainingai/shared/nutrition/supplement-day-totals'
 import { freezableDoseText } from '@trainingai/shared/nutrition/supplement-dose-freeze'
 import { OuraDailySummaryPushSchema, OuraDailyDerivedPushSchema } from '@trainingai/shared/validation/oura-summary'
 import { SessionRpeSchema } from '@trainingai/shared/validation/session-rpe'
@@ -6421,35 +6422,19 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // "the row" any more. `loggedAmount` is the day's exposure — the SUM, derived on read rather
     // than stored, per the Stored Counters rule. `loggedDose` keeps its meaning for the single
     // manual contribution the supplements page ticks, which is what that screen shows and unticks.
-    const manual = new Map<string, { amount: number | null; unit: string | null; doseText: string | null }>()
-    const summed = new Map<string, { amount: number | null; unit: string | null; count: number }>()
-    for (const l of logs) {
-      if (l.source === 'manual') {
-        manual.set(l.supplementId, { amount: l.amount ?? null, unit: l.unit ?? null, doseText: l.doseText ?? null })
-      }
-      const acc = summed.get(l.supplementId) ?? { amount: null as number | null, unit: null as string | null, count: 0 }
-      if (l.amount != null) acc.amount = (acc.amount ?? 0) + l.amount
-      acc.unit ??= l.unit ?? null
-      acc.count += 1
-      summed.set(l.supplementId, acc)
-    }
+    //
+    // LB-57: the derivation itself is shared with the device, which never reaches this code — the
+    // nutrition page's local-first branch returns early, so it derived the same three rules a second
+    // time. `summariseSupplementDay` is now the only implementation; its doc comment carries what
+    // each rule is load-bearing for.
+    const day = summariseSupplementDay(logs)
     return rows.map(r => {
-      const log = manual.get(r.id)
-      const total = summed.get(r.id)
+      const d = day.get(r.id)
       return {
         ...this.rowToSupplement(r),
-        // `loggedToday` tracks the MANUAL contribution specifically, not "was it taken today".
-        // It is the checked state of the supplements page's tick, and that tick writes and removes
-        // exactly the manual row — so a meal's dose turning it on would leave a control that
-        // refuses to turn off. What answers "was it taken today" is `loggedAmount`, which counts
-        // every contribution.
-        loggedToday: log != null,
-        loggedDose: log ?? null,
-        // Present whenever the day has ANY live contribution; its `amount` is null when none of
-        // them carried a number. Reporting that as 0 would be the "unknown coerced to zero" mistake
-        // the presence model exists to prevent, one level down: a tick means "taken", not "took
-        // none of it".
-        loggedAmount: total ? { amount: total.amount, unit: total.unit, contributions: total.count } : null,
+        loggedToday: d?.loggedToday === true,
+        loggedDose: d?.loggedDose ?? null,
+        loggedAmount: d?.loggedAmount ?? null,
       }
     })
   }

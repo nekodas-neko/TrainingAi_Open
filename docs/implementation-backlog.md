@@ -5151,35 +5151,6 @@ a finding — it does not by itself explain a plain `GET` hanging beside it.
 - **Added:** 2026-08-30 · measured against production while checking BF-54. **These are the size
   columns, read from the filesystem, so they are exact** — unlike the row counts BF-54 is about.
 
-### [nutrition] LB-57 — the day's supplement exposure is derived in two places, one per lane
-
-- **Lane:** A — the hoist lands in `packages/shared/`, which Lane B may not write.
-- **Added:** 2026-09-06, by the lane that created the second copy — see
-  [journal](overview/entries/2026-09-06-bf-112-dose-entry.md).
-
-`listSupplements` (`lib/data/postgres/adapter.ts`, around the `manual`/`summed` maps) and
-`summariseSupplementDay` (`components/nutrition/supplement-day-totals.ts`) compute the same two
-values from the same rows: `loggedToday` from the manual contribution only, and `loggedAmount` as
-the sum over every live contribution with its count. Both must keep three behaviours identical —
-manual-only for the tick, null rather than 0 when no contribution carried a number, and the unit
-taken from the first contribution that has one.
-
-**Why there are two.** The device never reaches the server's copy: the nutrition page's local-first
-branch returns early once the local store has definitions, so BF-112 had to derive the same totals
-from `getSupplementLogs`. The correct single home is `packages/shared/`, and both `packages/shared/**`
-and `lib/data/**` are Lane A's, so the extraction was not Lane B's to make.
-
-**The fix:** move the derivation into `packages/shared/src/supplements/day-totals.ts` over a minimal
-row shape (`{ supplementId, amount, unit, source, deletedAt }`), have the adapter and the client
-helper both call it, and keep
-`components/nutrition/__tests__/supplement-day-totals.test.ts` pointed at the shared version —
-its cases were written against the adapter's semantics on purpose, including the two the adapter's
-own comments call load-bearing.
-
-**Not urgent.** Both copies agree today and both are covered by tests. What this costs is the next
-change to the rule: a `source` value added on one side, or a mixed-unit day handled on one side, and
-the device silently disagrees with the server.
-
 ### [nutrition][platform] BF-69 — dosed substances are stored but nothing reads them; make exposure an analysable variable
 
 - **⚠ 2026-09-03 — STAGE 2 WAS SPLIT OUT AS BF-112, because this one prints under KEEP.**

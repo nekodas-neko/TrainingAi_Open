@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { applyManualToggle, summariseSupplementDay } from '@/components/nutrition/supplement-day-totals';
+import { applyManualToggle } from '@/components/nutrition/supplement-day-totals';
+// LB-57: the derivation is shared now — this file's cases were written against the ADAPTER's
+// semantics on purpose, so they are the right ones to hold the shared version to.
+import { summariseSupplementDay } from '@trainingai/shared/nutrition/supplement-day-totals';
 import type { LocalSupplementLog } from '@/lib/local-store/types';
 
 const log = (o: Partial<LocalSupplementLog> & { supplementId: string }): LocalSupplementLog => ({
@@ -47,6 +50,37 @@ describe('summariseSupplementDay — the device half of what listSupplements der
       log({ supplementId: 'a', amount: 5, source: 'manual', deletedAt: '2026-09-06T01:00:00Z' }),
     ]);
     expect(day.has('a')).toBe(false);
+  });
+
+  it('keeps the FIRST unit any contribution supplies, not the last', () => {
+    // The sum-and-count case above uses one unit on both rows, so first-wins and last-wins agree
+    // there and neither is tested by it. A day whose contributions disagree is what separates them.
+    const day = summariseSupplementDay([
+      log({ supplementId: 'a', amount: 5, unit: 'mg', source: 'manual' }),
+      log({ supplementId: 'a', amount: 3, unit: 'g', source: 'meal' }),
+    ]);
+    expect(day.get('a')!.loggedAmount.unit).toBe('mg');
+  });
+
+  it('takes the unit from the first contribution that HAS one', () => {
+    const day = summariseSupplementDay([
+      log({ supplementId: 'a', amount: 5, source: 'manual' }),
+      log({ supplementId: 'a', amount: 3, unit: 'g', source: 'meal' }),
+    ]);
+    expect(day.get('a')!.loggedAmount.unit).toBe('g');
+  });
+
+  it('takes loggedDose from the manual row, and a meal contribution never sets it', () => {
+    // The server's half of the same rule: `loggedDose` is what the supplements page shows and
+    // unticks, so a meal's dose must not become "the row".
+    const day = summariseSupplementDay([
+      log({ supplementId: 'a', amount: 3, unit: 'mg', doseText: '3 mg', source: 'meal' }),
+      log({ supplementId: 'a', amount: 5, unit: 'mg', doseText: '5 mg', source: 'manual' }),
+      log({ supplementId: 'b', amount: 2, unit: 'mg', doseText: '2 mg', source: 'meal' }),
+    ]);
+    expect(day.get('a')!.loggedDose).toEqual({ amount: 5, unit: 'mg', doseText: '5 mg' });
+    expect(day.get('b')!.loggedDose).toBeNull();
+    expect(day.get('b')!.loggedToday).toBe(false);
   });
 
   it('keeps supplements apart', () => {
