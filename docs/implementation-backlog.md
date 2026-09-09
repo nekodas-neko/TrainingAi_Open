@@ -503,6 +503,32 @@ below threshold and left in place for next time.
 - **Added:** 2026-09-09 · Lane B, while shipping ④ against the default.
 
 
+### [platform] LB-98 — local-only data has no read path, so a whole class of surface cannot be verified in CI
+
+- **Lane:** A — it is `app/api/**` either way.
+- **Needs:** nothing.
+- **Measured 2026-09-09, twice in one session, on unrelated features.** A surface that reads a
+  local-first domain has no server fallback when no route publishes the field, so it renders its
+  empty state in a browser and can only be seen on the device. Two shipped that day:
+  - **OR-102b ④** (weight response) — `body_metrics` beyond seven days. `/api/body-metadata`
+    hard-codes `metrics.slice(0, 7)` and takes no range. Filed separately as **LB-96**.
+  - **Q-300** (rest vs prescription) — `set_logs.planned_rest_sec` and `rest_time_sec` per set.
+    Nothing publishes them; `/api/health-trends?view=rest-adherence` computes an adherence
+    *percentage* from the live style and does not emit the pairs.
+- **⚠ The cost is verification, not the product.** The canonical runtime is the APK, where the local
+  store is present and both cards work. What is lost is CI: the e2e can only assert the empty state,
+  so the rendering path ships unexercised and every such card arrives owing a device check. That is
+  two of the eleven device checks currently outstanding, both created the same day.
+- **What to build:** a read for each domain that a client can call, shaped like the local one so the
+  fallback is a swap rather than a second aggregate — a bounded `days`/`from` on
+  `/api/body-metadata` (LB-96), and per-set `plannedRestSec`/`restTimeSec` on the existing
+  rest-adherence view rather than a new route.
+- **⚠ Do not "fix" this by moving the computation server-side.** Both cards deliberately read the
+  logged *snapshot* rather than today's configuration; a server aggregate derived from live styles
+  or a 7-day window answers a different question, which is how two numbers for one metric start.
+- **Added:** 2026-09-09 · Lane B, after hitting it twice in one session.
+
+
 ### [heart-rate][cardio] TN-30 — one zone model, four max-HR anchors: the walk, the zone bar and the Body Battery grade the same heartbeat against three different ceilings
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · owner: *"we should only have one calculation for our heart rate zones so try make them consistent."*
@@ -12405,7 +12431,9 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 - **Branch:** `feat/rest-adherence-signal`
 - **Plan:** none yet
-- **Gate:** owner — the residue is *"a Lane B UI change **once the owner has seen the framing**"*,
+- **✅ Gate DISCHARGED 2026-09-09** — the owner saw the framing and chose to surface it. Kept below
+  because the reasoning is why the card says what it says.
+- **~~Gate:~~ owner** — the residue was *"a Lane B UI change **once the owner has seen the framing**"*,
   and the framing is the finding, not a detail: the obvious coaching line (*"you rushed today"*) is
   meaningless when 40% of every session rushes, and the measured one is *"your rest ignores the
   plan"* (planned 60 s → 75 s taken, 90 → 65, 120 → 110, 187 → 133). Stated only in the `Keep:` until
@@ -12465,9 +12493,20 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   session rushes. **Within-session drift is real but secondary** (0.32 at exercise 1 → 0.47 at
   exercise 5): time pressure explains the slope, not the 0.32 intercept, and the intercept is most
   of it.
-- **Keep:** the surfacing itself is unbuilt, and the primary half (Q-289's bucket table split by
-  rest band) is already measured — see the ✅ above it. Surfacing is a Lane B UI change once the
-  owner has seen the framing; nothing here licenses a rest term in `expectedRpe`.
+- **✅ THE SURFACING SHIPPED 2026-09-09, and the owner chose the framing.** Asked directly, they
+  took *"a plain fact card"* over dropping it. It renders under the **Rest discipline** trend on the
+  Health tab: each prescription against the rest actually taken, the signed difference, and the set
+  count — no score, no verdict, no nudge, because 39.8% rushed *uniformly* makes a discipline
+  reading meaningless. The one sentence it adds appears only when the actual span is ≤ ⅔ of the
+  planned span, and is withheld (not negated) on a single prescription, where there is no span.
+  `components/health/rest-prescription.ts` + `rest-prescription-card.tsx`.
+- **⚠ It reads `set_logs.planned_rest_sec`, not the style — deliberately.** The snapshot is what was
+  prescribed *at log time*; deriving it from the live style would let a later style edit silently
+  rewrite what "prescribed" meant for a past set. The `rest-adherence` trend above it does derive
+  from the style, which is right for its own question and would be wrong for this one.
+- **Keep:** the device check, and only that. `planned_rest_sec` is in the local store and no route
+  publishes it, so the card is **absent in a browser** and cannot be verified in CI — see LB-98.
+  Nothing here licenses a rest term in `expectedRpe`.
 
 ### [workouts] Q-289 — `expectedRpe` misses by more than the autoregulation dead band at both ends of its own range
 

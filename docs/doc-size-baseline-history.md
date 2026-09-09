@@ -10072,6 +10072,23 @@ invalidated 1500 ms after the ingest counter advanced, while the server schedule
 its lines because the symptom (data that looks fresh and is not) gives no hint of the cause, and the
 previous framing in the backlog said the opposite: that no signal existed at all.
 
+## 2026-09-09 — `docs/implementation-backlog.md` 19,926 → 19,965 (+39), Q-300 shipped and LB-98 filed
+
+Q-300's entry gains the framing the owner chose and the reason the card reads
+`set_logs.planned_rest_sec` rather than the live style — the snapshot is what was prescribed at log
+time, and deriving it from the style would let an edit rewrite what "prescribed" meant for a past
+set. That distinction is the thing a future session would otherwise re-litigate, since the trend
+directly above the card derives from the style and is right to.
+
+**LB-98 is the larger part, and it is filed as a class rather than per feature.** Two cards shipped
+today that render only on the device, because the data they read is local-only and no route
+publishes it. Recording it twice as two separate gaps would have hidden that it is one shape.
+
+## 2026-09-09 — `projectOverview.md` 10,516 → 10,528 (+12), Q-300's device check
+
+Twelve lines because the row has to say *why* the card is invisible in a browser, not just that a
+device check is owed — otherwise the next reader sees an empty Trends card in dev and files it as a
+bug.
 ## 2026-09-09 — `docs/implementation-backlog.md` 19,922 → 19,981 (+59), BF-134
 
 The owner asked whether his calorie budget had 200 deducted twice. It had not — and roughly a third
@@ -10101,3 +10118,9 @@ would move a target that entry deliberately left alone.
 The recommendation section argues *against* the obvious fix — scaling grams down to the current
 budget prints a morning protein target near 113 g that climbs all day, on the goal and the day where
 holding protein matters most — and points at the `WHY TWO NUMBERS` block the card already has.
+
+## 2026-09-09 — `docs/implementation-backlog.md` recomputed at 20,024 on the merged file
+
+Two branches moved this number within the hour — BF-134's filing and Q-300's entry — so the `.size`
+conflicted, which is the case it *should* conflict on: they genuinely disagree about one number.
+Resolved by measuring the merged file rather than picking a side.
