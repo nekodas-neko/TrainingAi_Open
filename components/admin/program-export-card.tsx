@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { ClipboardListIcon, CopyIcon, CheckIcon, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function ProgramExportCard() {
   const [open, setOpen] = useState(false);
+  const contentId = useId();
   const [loading, setLoading] = useState(false);
   const [text, setText] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +45,8 @@ export default function ProgramExportCard() {
     <div className="rounded-xl border border-border p-4 space-y-3">
       <button
         className="w-full flex items-center justify-between"
+        aria-expanded={open}
+        aria-controls={contentId}
         onClick={() => {
           setOpen(v => !v);
           if (!open && !text && !loading) load();
@@ -56,7 +59,7 @@ export default function ProgramExportCard() {
       </button>
 
       {open && (
-        <div className="space-y-3">
+        <div id={contentId} className="space-y-3">
           {loading && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" /> Building export…
