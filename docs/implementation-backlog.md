@@ -566,9 +566,27 @@ below threshold and left in place for next time.
 - **What to build, if the owner wants it:** prefer `set_logs.planned_rest_sec` and fall back to the
   live style only where the logged value is absent — measured 2026-09-09 as **442 of 841** sets in
   the window carrying it, so the fallback is load-bearing and cannot be dropped.
-- **⚠ It will move published numbers.** State how many sessions change before shipping it; a
-  correlation re-derived against a different denominator is a rewrite of a trend the owner has
-  already read, which is the same bar Tuning proposals are held to.
+- **Gate: owner** — the measurement below is taken, and it says this is a re-scoring rather than a
+  fix. Held to the same bar as a Tuning proposal: the owner decides, Lane A implements.
+- **✅ MEASURED against production 2026-09-09, which is what the entry asked for before shipping.**
+  Over the route's own 90-day window, restricted to sets carrying both rest columns:
+  - **231 of 442 sets (52%) disagree** between today's `style_sets.rest_sec` and the logged
+    `planned_rest_sec`. Every set had a live style to compare against, so none of that is missing data.
+  - **28 of 36 sessions (78%) change their adherence percentage**, mean shift **11.2 points**, max
+    **31 points**.
+  - **14 of 36 sessions (39%) cross a bucket boundary** (`<70 / 70–90 / 90–115 / 115+`). That is the
+    number that matters: the chart visibly redraws, and the `insight` sentence is re-derived from
+    different bars.
+- **What the measurement settles, and what it does not.** It settles that this is not a rounding
+  correction — half the sets disagree and two in five sessions move bucket, so "just fix it quietly"
+  is off the table. It does **not** settle which number is right. The logged snapshot is the honest
+  record of what was asked at the time; today's style is what the owner is training to now. A trend
+  meant to answer *"does resting to plan go with lifting better?"* has a defensible reading either
+  way, and only the owner knows which question the chart is being read for.
+- **If the answer is the logged snapshot:** prefer `set_logs.planned_rest_sec`, fall back to the live
+  style where it is absent (442 of 841 sets in the window carry it, so the fallback is load-bearing
+  and cannot be dropped), and say in the PR that 14 sessions changed bucket — a trend the owner has
+  already read does not get rewritten silently.
 
 ### [heart-rate][cardio] TN-30 — one zone model, four max-HR anchors: the walk, the zone bar and the Body Battery grade the same heartbeat against three different ceilings
 
