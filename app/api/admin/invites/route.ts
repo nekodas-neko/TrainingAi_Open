@@ -62,6 +62,10 @@ export async function DELETE(req: NextRequest) {
   const { email } = (read.body ?? {}) as { email?: unknown }
   if (typeof email !== 'string' || !email) return NextResponse.json({ error: 'email required' }, { status: 400 })
   const repo = await getRepository()
-  await repo.removeInvite(email)
+  // The SAME normalisation POST applies. `removeInvite` is an exact-match delete on the stored
+  // value, which POST lowercases and trims — so passing the raw string here made a delete typed as
+  // `Foo@Bar.com ` match nothing while still answering `{ ok: true }`. A revoked invite that was
+  // never revoked is the worst possible silent failure on this route.
+  await repo.removeInvite(email.toLowerCase().trim())
   return NextResponse.json({ ok: true })
 }

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { refusalResponse, isRefusal, invalidUuidResponse } from "@/lib/api/route-errors";
 import { reportServerError } from "@/lib/observability";
 import { auth } from "@/auth";
-import { requireAdmin } from "@/lib/admin";
+import { requireAdmin, adminErrorResponse } from "@/lib/admin";
 import { getRepository } from "@/lib/data";
 import { getDb, ensureSchema } from "@/lib/data/postgres/client";
 import { exerciseGifCache } from "@/lib/data/postgres/schema";
@@ -29,8 +29,8 @@ export async function GET() {
   const session = await auth();
   try {
     await requireAdmin(session?.user?.id ?? "", session?.user?.isAdmin);
-  } catch {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  } catch (err) {
+    return adminErrorResponse(err);
   }
 
   const repo = await getRepository();
@@ -58,8 +58,8 @@ export async function POST(req: NextRequest) {
   const session = await auth();
   try {
     await requireAdmin(session?.user?.id ?? "", session?.user?.isAdmin);
-  } catch {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  } catch (err) {
+    return adminErrorResponse(err);
   }
 
   const read = await readJsonLimited(req, MAX_BODY_BYTES);
@@ -100,8 +100,8 @@ export async function PATCH(req: NextRequest) {
   const session = await auth();
   try {
     await requireAdmin(session?.user?.id ?? "", session?.user?.isAdmin);
-  } catch {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  } catch (err) {
+    return adminErrorResponse(err);
   }
 
   const read = await readJsonLimited(req, MAX_BODY_BYTES);
@@ -162,8 +162,8 @@ export async function DELETE(req: NextRequest) {
   const session = await auth();
   try {
     await requireAdmin(session?.user?.id ?? "", session?.user?.isAdmin);
-  } catch {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  } catch (err) {
+    return adminErrorResponse(err);
   }
 
   const { searchParams } = new URL(req.url);
