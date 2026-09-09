@@ -170,7 +170,7 @@ fresh · the service worker's `/api/` bypass and precache list · retry policy a
 **Mandate:** every number derived from a set log.
 **Surfaces:** `packages/shared/src/1rm.ts`, `packages/shared/src/workout/`, `app/api/log-exercise/`,
 `app/api/next-session/`, `app/api/exercise-estimates/`, `app/api/strength-trend/`,
-`app/api/workout-load-history/`, `components/workout/utils.ts`, `personal_records`.
+`components/workout/utils.ts`, `personal_records`.
 **Checklist:** one implementation of 1RM, and the high-rep guard on it · prescription rounding and
 the ratchet already filed as RV-43 — has it moved · `upsertPersonalRecordIfBetter` monotonicity vs
 deload/baseline gates · AMRAP handling · unit assumptions (kg only?) · what the strength card shows

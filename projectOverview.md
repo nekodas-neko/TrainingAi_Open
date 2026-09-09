@@ -3307,9 +3307,11 @@ opens one, a right-drag closes it, a second row closes the first; a 92vh action 
   ones that do not. [`docs/reviews/2026-08-18-ms-offset-to-calendar-day.md`](docs/reviews/2026-08-18-ms-offset-to-calendar-day.md).
 - **⚠️ Most of the 12 are CORRECT and filing them would be wrong.** The rule's harm is *"ms-offset
   windows straddle two AEST days and merge them"* — that is about **day-bucketed** aggregation.
-  `muscle-recovery`, `workout-load-history` and `friends/feed` use a **rolling instant** filter feeding
+  `muscle-recovery` and `friends/feed` use a **rolling instant** filter feeding
   consumers that work in hours (`computeMuscleRecovery` reads `ws.startedAt.getTime()`), which for a
-  physiological window is *more* correct than a calendar day.
+  physiological window is *more* correct than a calendar day. **⚠️ Re-measure the 12 before quoting
+  it (LB-24):** `workout-load-history` was the third of these, is now deleted, and already read the
+  *anchored* form — so one was stale independently. No new count taken.
 - **Five sites do produce a calendar day, and the failure is measured** in `America/New_York`:
   ```
   ** MISMATCH **  local 2026-11-01 23:30   now-24h → 2026-11-01   true yesterday 2026-10-31

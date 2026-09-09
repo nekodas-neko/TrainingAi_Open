@@ -67,8 +67,6 @@ export async function invalidateWorkoutSummaries(): Promise<void> {
     // family — see `health-trends-summary`'s consumers for the full explanation)
     invalidateCache('health-trends-summary'),
     invalidateCache('muscle-tonnage-trend'),
-    // prefix-invalidate every `workout-load-history:<sessionName>` entry
-    invalidateCache('workout-load-history:'),
     // B2: a completed workout changes the running gate (hoursSinceLowerBodyStrength,
     // ACWR/strain) → the running-plan prescription.
     invalidateCache('running-plan'),
