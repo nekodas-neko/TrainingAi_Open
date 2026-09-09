@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useId, useState, useEffect } from "react";
 import type { AchievementResult } from "@/components/profile/achievements-grid";
 import { ACHIEVEMENT_ICONS, CATEGORY_COLORS } from "@/components/profile/achievements-grid";
 import { Dumbbell, Lock } from "lucide-react";
@@ -81,6 +81,7 @@ function BadgeSlot({ achievement, onUnpin }: { achievement?: AchievementResult; 
 export function TrophyCase({ achievements, readOnly = false, pinnedIds: externalPinnedIds }: TrophyCaseProps) {
   const [pinnedIds, setPinnedIds] = useState<string[]>(() => externalPinnedIds ?? loadTrophy());
   const [pickerOpen, setPickerOpen] = useState(false);
+  const pickerId = useId();
 
   useEffect(() => {
     if (!externalPinnedIds) {
@@ -114,7 +115,12 @@ export function TrophyCase({ achievements, readOnly = false, pinnedIds: external
       <div className="flex items-center justify-between mb-3">
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Trophy Case</p>
         {!readOnly && (
-          <button onClick={() => setPickerOpen(v => !v)} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+          <button
+            onClick={() => setPickerOpen(v => !v)}
+            aria-expanded={pickerOpen}
+            aria-controls={pickerId}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
             {pickerOpen ? "Done" : "Edit"}
           </button>
         )}
@@ -131,7 +137,7 @@ export function TrophyCase({ achievements, readOnly = false, pinnedIds: external
       </div>
 
       {!readOnly && pickerOpen && unlockedAchievements.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-border/30">
+        <div id={pickerId} className="mt-4 pt-4 border-t border-border/30">
           <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Pin an Achievement</p>
           <div className="grid grid-cols-4 gap-2">
             {unlockedAchievements.map(a => {

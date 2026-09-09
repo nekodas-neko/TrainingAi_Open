@@ -392,6 +392,9 @@ jobs:
       - name: Day windows take the user's timezone
         run: node scripts/check-aest-midnight-timezone.js
 
+      - name: A click-toggled disclosure declares its ARIA state
+        run: node scripts/check-toggle-aria.js
+
       - name: memo() call sites pass stable props
         run: node scripts/check-memo-prop-stability.js
 

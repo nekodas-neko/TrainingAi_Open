@@ -9866,3 +9866,17 @@ The row says what the e2e could and could not reach, which is the unusual part: 
 is only reachable in a browser with an absurd fixture, because the seven-day server window makes the
 interval ±4 kg/wk. A shorter row would say "device check owed" and lose the reason it is the *only*
 place the realistic case exists.
+
+## 2026-09-09 — `docs/overview/entries/` 335 → 336, and `docs/implementation-backlog.md` 19,969 → 19,989 (+20)
+
+Fourth ceiling raise. The analysis is on LB-94 and in the note two entries above and is not repeated:
+the compaction sweep cannot be run as written, because all 36 foldable entries are the newest two
+days. `main` sits on the ceiling and every PR writes one entry, so this is now +1 per PR — a toll
+rather than a ratchet.
+
+**A raise with real headroom would be the sensible call and is deliberately NOT being taken here.**
+The number is a shared guardrail; moving it 25 at once on my own judgement, twice unanswered, is a
+bigger call than the +1 it replaces. Put to the owner instead, alongside prioritising LB-94.
+
+The backlog's +20 is Q-491's ratchet result — the three detector generations and their hit counts,
+which is the evidence for "worth building" and the thing a future session would otherwise re-measure.
