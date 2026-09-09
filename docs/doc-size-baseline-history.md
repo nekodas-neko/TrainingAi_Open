@@ -9743,3 +9743,14 @@ see it red starts the same elimination from scratch, which is the whole expense 
 `main` gained ~340 backlog lines while this branch was in verification, so the `.size` file
 conflicted with both sides describing the same number. Recomputed from the merged file rather than
 spliced; the branch's own delta (−21 for LA-92 leaving, +34 for LB-93 arriving) is unchanged.
+
+## 2026-09-09 — `docs/implementation-backlog.md` 19,937 → 19,873 (−64), OR-104 shipped and removed
+
+The entry leaves whole. `check-backlog-pointers.js` is what insisted: the first draft annotated the
+heading with what shipped and the check failed on *"these queue entries announce their own completion
+in the heading"* — correctly, because with both halves done nothing was owed and an annotated finished
+entry is just a finished entry that still prints in the queue.
+
+Its 74 lines were mostly the trace of *why* a supplement could carry two contradicting doses, which
+belongs in the journal. The one thing worth carrying forward is on LA-90 already: the two write paths
+merge a caller-supplied dose differently, which OR-104 found and deliberately did not bundle in.

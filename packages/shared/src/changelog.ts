@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.443.2",
+    date: "2026-09-09",
+    changes: [
+      "A supplement can no longer hold two different doses. Amount and unit come first and are what the app counts; the free-text line below becomes a Note once you set an amount, and the supplement list now shows the amount rather than the note.",
+    ],
+  },
+  {
     version: "1.443.1",
     date: "2026-09-09",
     changes: [
