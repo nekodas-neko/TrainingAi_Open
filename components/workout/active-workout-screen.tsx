@@ -2,7 +2,7 @@
 
 import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
-import { CalculatorIcon, ChevronLeftIcon, DumbbellIcon, ListIcon, SkipForwardIcon, ZapIcon, TriangleAlertIcon } from "lucide-react";
+import { CalculatorIcon, ChevronLeftIcon, DumbbellIcon, ListIcon, SkipForwardIcon, ZapIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { WorkoutExercise, PhaseStatus } from "@/app/api/workout-data/route";
 import { formatSheetDate, mround125, mroundStep, mroundStepUp, weightStepFor, plateBreakdown } from "./utils";
@@ -22,6 +22,8 @@ import { todayInTz, shiftDateStr } from "@trainingai/shared/date-utils";
 import { SessionRing, SessionPill, ExerciseClock, WarmupRampProgress, RestTimer } from "./workout-clocks";
 import { useWorkoutStore } from "@/lib/stores/workout-store";
 import { ExerciseMediaPanel } from "./exercise-media-panel";
+import { InjuryBanner, InjuryChip } from "./injury-notice";
+import { injuredMusclesFor } from "./injury-muscles";
 import { warmupRampSectionSec } from "@trainingai/shared/workout/duration-model";
 
 interface ActiveWorkoutScreenProps {
@@ -200,6 +202,17 @@ export function ActiveWorkoutScreen({
     ...(exercise?.secondaryMuscles ?? []).map(m => ({ muscle: m, role: "secondary" as const })),
   ], [exercise?.mainMuscles, exercise?.secondaryMuscles]);
 
+  // BF-135. Computed once and rendered on BOTH branches — the ready screen (where swapping the
+  // movement is actually decided) and, as a chip, during the set. It used to exist only inside the
+  // active branch's JSX, which is why the warning arrived after the weight was already chosen.
+  const injuredMuscles = useMemo(
+    () => injuredMusclesFor(exercise, activeInjuries),
+    [exercise, activeInjuries],
+  );
+  const requestSwap = onRequestInjurySwap && injuredMuscles.length > 0
+    ? () => onRequestInjurySwap(exerciseIndex, injuredMuscles)
+    : undefined;
+
   const WARMUP_SECTION_SEC = warmupRampSectionSec(exercise?.equipment, warmupSets?.length ?? 0);
 
   return (
@@ -254,6 +267,11 @@ export function ActiveWorkoutScreen({
             {exercise?.name
               ? <ExerciseMediaPanel name={exercise.name} />
               : <h2 className="text-3xl font-bold text-center w-full leading-tight" />}
+
+            {/* BF-135. Above everything the weight is chosen from — the bar-load card, the set
+                targets, the warmup ramp — because those are the decisions this warning is meant to
+                change. This screen scrolls, so it costs no other content. */}
+            <InjuryBanner muscles={injuredMuscles} onSwap={requestSwap} />
 
             {/* Last session */}
             {exercise?.lastDate && exercise.lastReps.length > 0 && (
@@ -438,53 +456,40 @@ export function ActiveWorkoutScreen({
         <>
           <div className="flex flex-col flex-1 min-h-0 px-4 pt-2.5 pb-2">
 
-            {/* ── Top: exercise name + banners + done chips ── */}
-            <div className="flex-none space-y-2 mb-2">
-              <div>
-                <h2 className="text-xl font-bold leading-tight truncate">{exercise?.name}</h2>
-                {exercise?.lastDate && (
-                  <p className="text-[11px] text-muted-foreground mt-0.5">
-                    Last: {exercise.lastReps.join(", ")} reps · {formatSheetDate(exercise.lastDate)}
-                  </p>
-                )}
+            {/* ── Top: exercise name + injury chip + done chips ──
+
+                BF-135. This block is `flex-none` above the set list, so every row it grows squeezes
+                the rows below — and with the log sheet open over the bottom half, a squeezed set
+                list has nowhere to go. It held two full-width banners on an injured baseline
+                exercise, which is the case the owner reported. `max-h`/`overflow-y-auto` is the
+                structural half of the fix: with the banners gone it never engages, and it means the
+                next conditional thing added here scrolls instead of pushing set 1 off-screen. */}
+            <div className="flex-none max-h-[45%] overflow-y-auto overscroll-contain space-y-2 mb-2">
+              <div className="flex items-start gap-2">
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-xl font-bold leading-tight truncate">{exercise?.name}</h2>
+                  {exercise?.lastDate && (
+                    <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
+                      Last: {exercise.lastReps.join(", ")} reps · {formatSheetDate(exercise.lastDate)}
+                    </p>
+                  )}
+                </div>
+                {/* The full banner is on the ready screen now. Shrunk, not dropped, and Swap comes
+                    with it: BF-135 rules out suppressing this warning, and the swap is its only
+                    action. */}
+                <InjuryChip muscles={injuredMuscles} onSwap={requestSwap} />
               </div>
 
-              {/* Injury warning */}
-              {(() => {
-                const exerciseMuscles = [...(exercise?.mainMuscles ?? []), ...(exercise?.secondaryMuscles ?? [])];
-                const injuredMuscles = exerciseMuscles.filter(mg =>
-                  activeInjuries.some(i => i.muscleName.toLowerCase() === mg.toLowerCase())
-                );
-                return injuredMuscles.length > 0 ? (
-                  <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 px-3 py-2.5 flex items-start gap-2">
-                    <TriangleAlertIcon className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
-                    <div className="flex-1 flex items-start justify-between gap-2">
-                      <p className="text-xs text-amber-400">
-                        <span className="font-semibold">Injury active: </span>
-                        {injuredMuscles.map(m => m.charAt(0).toUpperCase() + m.slice(1)).join(', ')} — train with caution
-                      </p>
-                      {onRequestInjurySwap && (
-                        <button
-                          onClick={() => onRequestInjurySwap(exerciseIndex, injuredMuscles)}
-                          className="text-xs font-semibold text-amber-400 underline shrink-0"
-                        >
-                          Swap →
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ) : null;
-              })()}
-
-              {/* AMRAP banner */}
-              {isBaseline && (
-                <div
-                  className="rounded-xl px-3 py-2 text-xs text-center"
-                  style={{ background: 'color-mix(in oklch, var(--color-brand) 10%, transparent)', color: 'var(--color-brand)' }}
-                >
-                  AMRAP Test — pick a challenging weight and do as many reps as possible with good form
-                </div>
-              )}
+              {/* The AMRAP banner that used to sit here is GONE rather than made conditional.
+                  The ready screen for this exact exercise already carries the same instruction in
+                  fuller form — *"pick a weight you can manage for 8–15 reps … this sets your working
+                  weights for the whole program"* — and every exercise passes through it before its
+                  sets, including one resumed from a superset buffer, whose `timerStarted: true`
+                  only exists because it was started there. So this was a strict duplicate of copy
+                  already read, costing a full row on the most contested space on the screen.
+                  BF-135 proposed "first exercise of the session only"; that is still one row of
+                  duplication, and the reason the banner never stops appearing is BF-131 — the
+                  baseline never completes, so `isBaseline` is permanent. */}
 
               {/* Sets grid — pre-allocates ALL cells so height never changes as sets complete.
                   Self-subscribing leaf: a dial detent re-renders it, not this screen. */}
