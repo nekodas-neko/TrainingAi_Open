@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.443.4",
+    date: "2026-09-09",
+    changes: [
+      "Telling the plan you did not eat a meal now sticks. The answer could quietly come back a moment later and the meal would ask again \u2014 nothing was lost, but you had to answer it twice.",
+    ],
+  },
+  {
     version: "1.443.3",
     date: "2026-09-09",
     changes: [
