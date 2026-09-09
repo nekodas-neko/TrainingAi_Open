@@ -9780,3 +9780,32 @@ log-all action by `plan-day-fill.spec.ts`, the copy by `plan-meal-to-saved-meal.
 covers the third, so nothing is owed and the entry goes rather than shrinking. Worth recording that
 the residue was two-thirds stale before it was read: a `Keep:` naming several items ages one item at
 a time, and only re-reading it against the specs that exist showed which third was real.
+## 2026-09-09 — `docs/overview/entries/` ceiling 331 → 333, because `main` sat exactly on it
+
+`main` reached 331 entries, which **is** the ceiling, so every branch that writes a journal entry
+crosses it — and the standing rule is that every session writes one. Two PRs hit it within the hour
+(this one and LB-51's), neither of which has anything to do with the journal.
+
+Raised by 2 rather than 1 so the pair clears, and deliberately not further: the check is designed to
+fail the branch that crosses it precisely so the number cannot drift quietly upward.
+
+**This is not the fix, and the raise must not read as one.** The check's own note says the ceiling
+cannot be paid off by the branch it blocks: only 35 of the 332 are foldable, and the other 297 are
+cited by durable docs that would have to be re-pointed at the batched history first. That is the
+Orchestrator's restructuring job, and it is filed as **LB-94** so the raise does not become the
+whole of the response.
+
+## 2026-09-09 — `docs/implementation-backlog.md` 19,882 → 19,903 (+21), LB-94 filed
+
+The new entry is the restructuring the ceiling raise above is *not*. Most of its length is the
+warning rather than the task: the cheap way to make 297 entries foldable is to widen what the sweep
+counts as foldable, which turns every citation into a 404 while the ratchet reads clean. An entry
+that only said "re-point the citations" would invite exactly that.
+
+## 2026-09-09 — `docs/implementation-backlog.md` 19,903 → 19,878 (−25), recomputed on the merged file
+
+Two branches moved this number in opposite directions within the hour — LB-94 added an entry (+21),
+LB-51's removal took one out (−25) — so the `.size` conflicted, which is the case it *should*
+conflict on: they genuinely disagree about one number. Resolved by measuring the merged file rather
+than by picking a side or splicing the hunks, per the standing rule that only the delta survives a
+rebase.
