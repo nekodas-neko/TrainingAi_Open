@@ -40,6 +40,7 @@ import { MoodFieldsSchema } from '@trainingai/shared/validation/mood-log'
 import { FoodItemPushSchema } from '@trainingai/shared/validation/food-item'
 import { sanitiseNutrition } from '@trainingai/shared/nutrition/scan-totals'
 import { normalizeMealGroupName } from '@trainingai/shared/nutrition/meal-group-name'
+import { freezableDoseText } from '@trainingai/shared/nutrition/supplement-dose-freeze'
 import { OuraDailySummaryPushSchema, OuraDailyDerivedPushSchema } from '@trainingai/shared/validation/oura-summary'
 import { SessionRpeSchema } from '@trainingai/shared/validation/session-rpe'
 import {
@@ -6548,10 +6549,13 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       .orderBy(desc(s.supplementVials.openedOn), desc(s.supplementVials.createdAt))
       .limit(1)
 
+    // OR-104 — whether the definition's free text is frozen beside a structured amount is decided
+    // by `freezableDoseText`, shared with the offline store so the two write paths cannot drift.
+    const stampedAmount = dose?.amount ?? owns.defaultAmount ?? null
     const stamped = {
-      amount: dose?.amount ?? owns.defaultAmount ?? null,
+      amount: stampedAmount,
       unit: dose?.unit ?? owns.unit ?? null,
-      doseText: dose?.doseText ?? owns.dose ?? null,
+      doseText: dose?.doseText ?? freezableDoseText(stampedAmount, owns.dose),
       // An explicit `takenAt` wins; otherwise the moment of the tick, which is what the owner
       // means by ticking it now. Never back-filled onto rows that predate the column.
       takenAt: dose?.takenAt != null ? new Date(dose.takenAt) : new Date(),

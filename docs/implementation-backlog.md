@@ -944,11 +944,27 @@ in the one lane whose READY list was nearly empty, which is exactly when a hidde
 
 - **Reversal cost:** nil. Editing queue fields; no code, no data.
 
-### [nutrition][body] OR-104 — a supplement can carry two contradicting doses, and the wrong one is what history keeps 🔴 LIVE
+### [nutrition][body] OR-104 — a supplement can carry two contradicting doses (engine half SHIPPED; the sheet still offers both)
 
-- **Lane:** A — the stamping is in `lib/data/postgres/adapter.ts` and `lib/local-store/sqlite-backend.ts`;
-  the surface half (`components/nutrition/manage-supplements-sheet.tsx`) follows, engine first per §3.
-- **Added:** 2026-09-06 by Orchestrator. **Branch:** unassigned.
+- **Lane:** B now. The engine half shipped 2026-09-09; what is left is
+  `components/nutrition/manage-supplements-sheet.tsx`.
+- **Added:** 2026-09-06 by Orchestrator. **Branch:** `fix/or104-supplement-dose` (engine half).
+- **Keep:** the SURFACE half — the sheet still offers `amount`+`unit` and the free-text `Dose`
+  together with nothing reconciling them. New logs no longer freeze the contradiction, but a user
+  can still type one into the definition, and the manage sheet's own row (`:385`) still renders it
+  under the name. Either hide the free-text field once `amount`+`unit` are set, or relabel it to
+  what it is now used for — a note, not a dose.
+- **✅ ENGINE HALF SHIPPED 2026-09-09.** Both write paths stopped stamping the definition's free
+  text beside a structured amount, via a shared `freezableDoseText`
+  (`packages/shared/src/nutrition/supplement-dose-freeze.ts`) so the server and the offline store
+  cannot drift. **Existing rows are untouched, deliberately** — the freeze is the point of BF-3, and
+  the live `Retatrutide` row remains the owner's to correct by hand.
+- **Found while fixing it, and worth knowing before the surface half:** the two write paths merge a
+  caller-supplied dose DIFFERENTLY. The server merges per field (`dose?.amount ?? owns.defaultAmount`),
+  the local store is all-or-nothing (it reads the definition only when amount, unit **and** doseText
+  are all null). So a caller supplying only `amount` gets the definition's `unit` on the server and
+  a null unit offline. Not touched here — it is a second divergence with its own blast radius, and
+  bundling it into a dose-text fix would have made both unreviewable. Filed as **LA-90**.
 - **Live in production right now, on the one supplement that matters most.** `Retatrutide` reads
   `default_amount 0.5 · unit mg` **and** free-text `dose '10mg'` — the second is the *vial strength*,
   entered in the field the sheet labels `Dose`. The 2026-09-07 log has already frozen both:
@@ -18973,6 +18989,66 @@ adopted.
 
 - **Keep:** do not close this on "it has not happened again" — an intermittent lock-ordering bug is
   precisely the thing that looks fixed for weeks.
+
+### [platform] LA-91 — no CI job has a `timeout-minutes`, so a hung run burns six hours
+
+- **Lane:** A — `.github/workflows/ci.yml`.
+- **Added:** 2026-09-09, Lane A — found while waiting on #1029's E2E, and measured from that run
+  rather than guessed.
+
+`grep -n timeout-minutes .github/workflows/ci.yml` returns nothing, so every job inherits GitHub's
+**360-minute** default. A genuinely hung step — a Playwright run that never exits, a webServer that
+never binds — holds a runner for six hours, and the PR sits unmergeable the whole time with
+`mergeable_state: unstable` and nothing to distinguish it from a slow job.
+
+**Measured, so the limits are sized rather than invented** (run 34326591694, the first UI-touching
+PR in a long while, which is what made E2E run its real path at all):
+
+| job | duration |
+|---|---|
+| Custom Rules | 0:19 |
+| Migration Check | 1:06 |
+| Lint | 0:50 |
+| Build | 5:27 |
+| Tests | 6:01 |
+| **E2E** | **24:36** (the `pnpm e2e` step alone, 23:06) |
+
+E2E is the one that matters: `playwright.config.ts` runs **77 spec files at `workers: 1`**, so it is
+serial by design, with `retries: 1` in CI. A limit has to clear a bad-luck run where several specs
+retry — 45 minutes leaves real headroom while still cutting a hang at an eighth of the current cost.
+
+**The near-miss that produced this entry is the useful part.** A check-in of mine had guessed that
+"25 minutes is beyond plausible for this suite" with no evidence. The real run took 24:36. Acting on
+that guess would have re-triggered a healthy run about two minutes before it went green. **The
+config was the answer and reading it took a minute** — the E2E gate ("Does this change touch the
+UI?") means most PRs skip the job in ~35 seconds, so nobody has a feel for the real duration.
+
+- **Reversal cost:** trivial. One line per job.
+
+### [platform][nutrition] LA-90 — the two supplement write paths merge a caller-supplied dose differently
+
+- **Lane:** A — `lib/data/postgres/adapter.ts` (`logSupplement`) and `lib/local-store/sqlite-backend.ts`
+  (`upsertSupplementLog`).
+- **Added:** 2026-09-09, Lane A — found while shipping OR-104's engine half, and deliberately left
+  out of it: bundling a second divergence into a dose-text fix would have made both unreviewable.
+
+The server merges the caller's dose against the definition **per field**:
+`amount: dose?.amount ?? owns.defaultAmount`, and the same for `unit`. The local store is
+**all-or-nothing** — it reads the definition only when `amount`, `unit` and `doseText` are *all*
+null, and otherwise takes the caller's triple as given.
+
+So a caller supplying only `amount` gets the definition's `unit` on the server and a **null** unit
+offline. The same tick, the same supplement, two different rows depending on connectivity — and the
+offline one syncs up and wins, because a pushed mutation carries what the device recorded.
+
+**No caller does this today**, which is why it has not bitten: the supplements page passes no dose
+at all and the sync engine replays a complete triple. It is a trap laid for the next caller, and the
+kind that surfaces as "the unit vanished on one of my logs" months later.
+
+**The fix is to share the merge, as OR-104 shared the free-text decision** — one function taking the
+caller's partial and the definition, returning the triple, called by both. Cheap while
+`freezableDoseText` is fresh and its shared module already exists. No migration; existing rows keep
+what they were stamped with.
 
 ### [platform] LA-89 — `oura/hr-sync` has no callers, and its name says something that is not true
 

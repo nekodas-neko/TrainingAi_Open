@@ -42,6 +42,19 @@ describe('the local write freezes the dose (BF-3)', () => {
     expect(upsert).toMatch(/SELECT dose, default_amount, unit FROM supplements WHERE id = \?/)
   })
 
+  // OR-104 — the definition's free text is frozen only when it has no structured amount, and that
+  // decision is SHARED with the server so the two write paths cannot drift. Asserted here as a
+  // delegation rather than a behaviour: this suite greps source (no local SQLite in node), so a
+  // change back to the old expression passes every behavioural test in the repo. The rule itself is
+  // executed in `packages/shared/src/nutrition/__tests__/supplement-dose-freeze.test.ts`; this is
+  // the half that catches the wiring being undone.
+  it('delegates the free-text decision to the shared rule', () => {
+    expect(upsert).toContain('freezableDoseText(amount,')
+    expect(backend).toContain("from '@trainingai/shared/nutrition/supplement-dose-freeze'")
+    // The shape it replaced, which stamped the prose whatever the amount said.
+    expect(upsert).not.toContain('doseText: def.dose ? String(def.dose) : null')
+  })
+
   // …and a caller that DOES supply one wins, which is how a replayed offline log keeps the dose it
   // was taken at rather than the one the definition shows now.
   it('prefers what the caller supplied', () => {
