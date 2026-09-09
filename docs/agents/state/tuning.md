@@ -13,9 +13,13 @@ stay valid. **Rewritten in full, never appended** — narrative lives in the lin
 
 **Nothing is blocked on the owner.** Every decision the queue needed has been asked and answered —
 2026-08-24 (TN-5/TN-6/TN-6a, history policy), 2026-08-26 (TN-9's intent, TN-15's redesign),
-2026-08-31 (the step goal: **manual wins**), and **2026-09-09** (*"make all the changes you
-recommend"* — TN-29 then TN-27 option 3). **TN-25 is the one open owner question**: three options for
-the guided walk's fast target, filed 2026-09-08, not yet chosen.
+2026-08-31 (the step goal: **manual wins**), and **2026-09-09** twice — *"make all the changes you
+recommend"* (TN-29 then TN-27 option 3) and the three cardio decisions (**TN-30's pinned 178**,
+TN-25's varied prescribed walk, TN-31's move to Run). **Nothing carries an open owner question.**
+
+**The one thing owed by the owner is an ACTION, not a decision: run the Cooper 12-Minute Run**
+(`fitness-tests/protocols.ts`) so the pinned 178 can be replaced by a measured max. Ask once; do not
+re-derive the anchor while waiting.
 
 **The owner's standing verdict, 2026-08-26:** *"Overall the pillars are not working great and not
 very useful. Requires tuning."* The queue is long because the pillars were measured.
@@ -28,12 +32,15 @@ say so plainly rather than re-measuring the pillar a fourth time.
 
 | ID | What | State |
 |---|---|---|
-| **TN-24** | Zone 1 spans 52–122 bpm, so Zone 2 is unreachable on foot and the walk's zone bar carries nothing | supplies **Q-523's** mechanism; PR #998 |
+| **TN-24** | Zone 1 spans **52–132** bpm, so Zone 2 is unreachable on foot and the walk's zone bar carries nothing | supplies **Q-523's** mechanism; boundary corrected 2026-09-09 |
 | **TN-25** | the walk's fast target (≥133 bpm) met **0 of 44 times**; fast blocks average the slow target | **✅ decided** — varied prescribed patterns, 105–118 bpm band |
 | **TN-26** | cadence and speed mean different things per surface; prescribe heart rate, demote the controls | rewritten after the owner declined treadmill tuning |
 | **TN-27** | maintenance rejects its 28-day window and falls back to the noisy 14-day one → **2,245 kcal** | **owner chose option 3**, after TN-29 |
 | **TN-28** | the one card that writes the calorie goal hides the `low confidence` its siblings show | Lane B, independent |
 | **TN-29** | two independent maintenance estimates computed per request, never compared; gate on the activity factor | **owner-approved, build first** |
+| **TN-30** | one zone model, **four** max-HR resolvers; three live and 19 bpm apart, agreeing only by coincidence | **✅ decided** — pin a 50/50 blend at **178**, `Needs: TN-25` |
+| **TN-31** | split the interval jog into Run as an assigned run type; interval jog → `tempo` | **✅ decided** — routing, `recommendRunType` already exists |
+| **TN-32** | three surfaces describe zones in a model the engine does not use | Lane B, not gated |
 
 **Earlier batches, all still queued and none blocked:** TN-2 (battery charge window, offset unfitted)
 · TN-5 (`SCORE_CALIBRATION` 8-fold gain) · TN-6/6a/8/18 (the temperature baseline and its four

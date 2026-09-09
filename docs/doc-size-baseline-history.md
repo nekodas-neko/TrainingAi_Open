@@ -9714,3 +9714,14 @@ entry still owing a device check states so with `Keep:` rather than being delete
 `Keep:` entry naming the one owed check, plus the non-obvious mechanism (the measure is the rollup
 watermark, not the newest ingested sample) and the two journals. It now sorts into KEEP instead of
 heading the work list.
+
+## 2026-09-09 — `docs/agents/state/tuning.md` 517 → 524 (+7), the baton's Now section reconciled
+
+Three rows for TN-30, TN-31 and TN-32, which the entry table was missing, plus a corrected TN-24
+boundary (52–122 → 52–132) that would otherwise have sent a successor to the wrong number.
+
+The four lines that replace the stale *"TN-25 is the one open owner question"* are the ones worth the
+space: every gate is now cleared, so a successor should not go looking for a decision to chase. What
+the owner still owes is an **action** rather than an answer — run the Cooper 12-Minute Run so the
+pinned 178 can be replaced by a measured max — and saying that explicitly is what stops the next
+session re-deriving the anchor from the same inconclusive data this one did twice.
