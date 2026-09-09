@@ -22,7 +22,7 @@
  * Fixture discipline (the PS-39 note): each case fails on the ONE rule it names and satisfies the
  * others.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { MIN_RELIABLE_SAMPLES, CORROBORATION } from '@trainingai/shared/health/observed-hr'
 
 type Row = Record<string, unknown>
@@ -86,6 +86,8 @@ let seq = 0
 const freshUser = (over: { timezone?: string } = {}) => {
   sessionUser = { id: `u-${++seq}`, timezone: 'Australia/Brisbane', ...over }
 }
+
+afterEach(() => { vi.useRealTimers() })
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -207,9 +209,20 @@ describe('/api/hr-profile', () => {
 })
 
 describe('/api/health/hr-recovery-profile', () => {
+  /**
+   * `floor`, not `round` — defensively, though this route does not currently need it.
+   *
+   * `computeHrRecoveryProfile` anchors on an ms offset from now, so the elapsed fraction here is
+   * ~0 and the two agree at every hour; a timezone sweep from UTC+14 to UTC−12 confirmed that.
+   * Its sibling `exercise-hr-trend` anchors at the caller's LOCAL MIDNIGHT, where `now − since` is
+   * N days plus however much of today has elapsed, and `round` answers **N + 1** after local
+   * midday — which is what turned this file red on every branch from 02:00 UTC (12:00 Brisbane).
+   * `floor` is exact either way, so both sites use it rather than depending on which anchor a
+   * route happens to have today.
+   */
   const daysAsked = () => {
     const since = getSetHrStatsSince.mock.calls[0][1] as Date
-    return Math.round((Date.now() - since.getTime()) / 86_400_000)
+    return Math.floor((Date.now() - since.getTime()) / 86_400_000)
   }
 
   it('refuses without a session', async () => {
@@ -262,10 +275,15 @@ describe('/api/workout/exercise-hr-trend', () => {
   const sinceOf = () => (getSetHrStatsForExercise.mock.calls[0][1] as { since: Date }).since
 
   it('clamps the window the same way its sibling does', async () => {
+    // Pinned to mid-afternoon in the fixture's zone — the half of the day that used to fail. See
+    // `daysAsked` above: with a local-midnight anchor, `round` flips to N+1 after local midday, so
+    // this case has to be both floored AND clock-independent to mean anything.
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-03-10T05:00:00Z'))   // 15:00 in Australia/Brisbane
     for (const [query, expected] of [['', 180], ['?days=30', 30], ['?days=9999', 730], ['?days=banana', 180], ['?days=0', 180]] as const) {
       getSetHrStatsForExercise.mockClear()
       await trend(`?exerciseName=Press${query.replace('?', '&')}`)
-      expect(Math.round((Date.now() - sinceOf().getTime()) / 86_400_000), query || 'default').toBe(expected)
+      expect(Math.floor((Date.now() - sinceOf().getTime()) / 86_400_000), query || 'default').toBe(expected)
     }
   })
 
