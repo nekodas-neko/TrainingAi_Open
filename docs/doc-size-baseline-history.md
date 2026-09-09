@@ -10197,3 +10197,20 @@ A layout change on the canonical target that could not be device-verified in-ses
 Canonical Runtime rule says gets a row rather than a silent merge. It names the two states that were
 never rendered — the two-banner baseline case and the screen with the logging sheet over it — so the
 next reader does not mistake a green harness run for having seen the reported failure.
+
+---
+
+## 2026-09-09 — backlog 20,149 → 20,167 (+18), no ceiling raise (LA-95)
+
+Eighteen lines buy a decision the owner can actually make. LA-95 was filed an hour earlier saying
+"this is a decision, not a tidy-up" and then printed as READY (1) on the next run, because the reason
+lived in prose and `next-item.js` classifies on fields. The `Gate: owner` line is the fix; the rest is
+the measurement the entry's own last line demanded before anyone ships it.
+
+The numbers are worth their space because they cannot be re-derived from the repo — they came from
+production: 231 of 442 sets disagree between today's style and the logged snapshot, 28 of 36 sessions
+move, and **14 of 36 cross a bucket boundary**. Without that last figure the owner is being asked to
+approve "some numbers might change"; with it, the question is "two in five sessions redraw, is the
+chart about your current plan or the plan at the time?".
+
+Entries ceiling untouched at 360, as intended since #1052.
