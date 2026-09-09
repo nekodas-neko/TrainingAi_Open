@@ -9923,3 +9923,31 @@ renderer is already gone. An entry that just incremented a count would have lost
 **No journal entry with this one, deliberately.** The PR is the record — a paragraph on an existing
 entry — and writing a journal entry about writing a backlog note is ceremony that would also cost a
 fifth ceiling raise for nothing.
+
+---
+
+## 2026-09-09 — `docs/implementation-backlog.md` 19,972 → 19,997 (+25), four queue heads fielded
+
+**The whole +25 buys back a queue that was lying about what is startable.** `next-item.js --lane A`
+printed 27 READY entries of which the top four could not be started at all, and it had done so for
+three sessions:
+
+- **Q-509** — its one buildable half shipped in #1040, all three candidates are closed, and both
+  remaining knobs (`MEDIAN_WINDOW`, `RECOVERY_INDEX_OPTIMAL_HOURS`) are under standing do-not-move
+  orders. `Keep:` names the unexplained ~0.39 h residue.
+- **Q-251** — shape (a) shipped as Q-530; shape (b) is a second Railway service, which costs money
+  to run. `Gate: owner`.
+- **Q-181** — the title already said WATCH ONLY. `Keep:`.
+- **Q-151** — **the entry's own next line has said "skip this when working the queue top-down" since
+  2026-08-08.** That is prose, and `next-item.js` classifies on `Keep:`/`Needs:`/`Gate:` fields, so
+  it printed as buildable regardless. `Keep:`.
+
+**That is the mechanism worth remembering, and it is not a bug in the tool:** an entry that is
+finished, parked, or explicitly skippable *in prose* still prints as READY unless someone gives it a
+field. Three sessions in a row here opened a top-of-queue entry and found nothing to build.
+READY went 27 → 23.
+
+The remaining ~9 lines are Q-220's re-measurement: `projectOverview.md` is **10,454 lines / 924 KB**
+against the entry's quoted 8,068 / 669 KB and `CLAUDE.md` is **774** against 918, so the orientation
+cost the entry exists to reduce has grown ~30% since it was filed. Recorded rather than acted on —
+the restructure is Orchestrator's and conflicts with every live session.

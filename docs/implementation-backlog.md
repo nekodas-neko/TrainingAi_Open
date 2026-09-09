@@ -13656,6 +13656,16 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [devices][readiness] Q-509 — the BLE-era Recovery Index refit lands at 3.31 h against a shipped anchor of 5: the input moved, not the physiology
 
+- **Keep:** the unexplained residue, and nothing buildable. **There is no next action** — every
+  mechanical candidate is closed (smoothing 0.487 h, bin occupancy 0.000, window geometry ~0.06,
+  candidate 3 closed 2026-09-04), the one buildable half shipped 2026-09-09
+  ([#1040](overview/entries/2026-09-09-q509-fragmented-night-recovery-index.md)), and **both knobs
+  that remain are under standing do-not-move orders**: do not widen `MEDIAN_WINDOW`, do not move
+  `RECOVERY_INDEX_OPTIMAL_HOURS`. What is owed is an explanation for the **~0.39 h in ordinary
+  full-length nights**, which needs a new idea rather than a new implementation. This entry printed
+  as READY for three sessions with nothing in it to start; the `Keep:` is what sorts it out of the
+  work list.
+
 > **⚑ CANDIDATE 3's NATURAL READING IS REFUTED (2026-09-03) —**
 > [`review`](reviews/2026-09-03-recovery-index-remainder-and-hrv-step.md). If the remaining ~0.39 h
 > were *a real change over the six weeks*, the series would be moving. Over **58 BLE-era nights** it
@@ -15808,6 +15818,8 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [platform] Q-251 — a staging environment, so a migration's first real run is not production
 
+- **Gate: owner** — shape (a) shipped as Q-530; all that remains is **shape (b), a second Railway
+  service**, which costs money to run and is the owner's call to authorise, not an implementation.
 - **Lane:** A
 - **Branch:** `feat/staging-environment`
 - **Added:** 2026-08-14 · same owner ask
@@ -16115,6 +16127,13 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [platform] Q-220 — every session pays ~194,000 tokens of orientation before it starts
 
+- **⚠ RE-MEASURED 2026-09-09, and the cost has moved the WRONG WAY.** The entry's own figures are a
+  month stale and now understate it: `projectOverview.md` is **10,454 lines / 924 KB** against the
+  quoted 8,068 / 669 KB (**+30%**), while `CLAUDE.md` has shrunk to **774** lines from 918. So the
+  ~194k headline is a floor, not a ceiling, and the doc-size ratchets have not held the orientation
+  read — they hold each file against *its own* baseline, which rises whenever a raise is justified.
+  Nothing else in the entry is disturbed by this; the plan and the "archiving the fixed ones only
+  removes 17%" caveat still stand.
 - **Lane:** A
 - **Branch:** none yet · **Added:** 2026-08-10, raised by the owner during the public-repo migration.
 - **Plan:** [`2026-08-10-orientation-cost.md`](superpowers/plans/2026-08-10-orientation-cost.md)
@@ -16338,6 +16357,9 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 ### [platform] ⏳ Q-181 — a schema per vitest worker: WATCH ONLY, deferral re-confirmed by measurement
 
 - **Lane:** A
+- **Keep:** the watch, not the work. The title says WATCH ONLY and the deferral has been
+  re-confirmed by measurement — there is nothing to implement until the shared-database contention
+  this describes actually costs a run.
 - **Branch:** `test/db-per-worker-schema` (unclaimed)
 - **Added:** 2026-08-10 · what Q-177 concluded rather than what it left undone
 - **The open question is unchanged:** every DB test shares one `trainingai_dev` (CI: `trainingai_ci`),
@@ -16550,6 +16572,9 @@ its own maintenance hazard. Recorded here as the shape to re-enumerate rather th
 ### [app-shell] ⏳ Q-151 — WATCH ONLY, nothing to implement — the sign-in React #418 did not reproduce and the whole series stopped
 
 - **Lane:** A
+- **Keep:** the re-check, and only that. **The entry's own next line has said "skip this when
+  working the queue top-down" since 2026-08-08, but that is prose and `next-item.js` classifies on
+  fields — so it printed as READY regardless.** Nothing to implement unless the mismatch returns.
 - **Skip this when working the queue top-down.** It is a dated re-check, not a task.
 - **Added:** 2026-08-08 · [review §2](reviews/2026-08-08-running-app-review.md) ·
   **investigated and refuted 2026-08-08**, see
