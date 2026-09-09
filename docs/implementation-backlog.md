@@ -1886,7 +1886,7 @@ repair the 22 dead backlog paths and 43 doubled `docs/overview/overview/` labels
 unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge candidates
 (led by `oura-ring-data-reference.md`, a retired-API reference with no retirement note).
 
-### [platform] PS-39 — 19 API routes still have no test that imports their handler
+### [platform] PS-39 — 16 API routes still have no test that imports their handler
 
 - **Lane:** A. Regenerate the list with `node scripts/check-route-test-coverage.js` — it prints every
   uncovered route when it fails, and the ratchet now holds the number.
@@ -1951,16 +1951,16 @@ and a symmetric pair with equal totals — one male row and one female makes `ge
 `generatedFemale` both read 1 — tests neither counter, the balanced-looking fixture being the one
 shape where the two predicates cannot be told apart.
 
-**The count was 93 and is really 19**, by the mechanism the entry half-noticed: it counted a route
+**The count was 93 and is really 16**, by the mechanism the entry half-noticed: it counted a route
 covered when any test mentioned its URL, so `calendar-data` and `training-load` "appearing only as
 cache-key strings" counted. Asking instead whether a test imports the handler gives 150 of 222, less
-the one hundred and thirty-one paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
+the one hundred and thirty-four paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
 honest in both directions (see above), so the list can be worked from. **The actionable core
 named by this entry is now CLEAR**: the home aggregates, both ingest routes and `program-week` are
 done; so are ai-periodization, `friends/leaderboard` (its scoping was left uncovered when a mock
 could not see it, and is covered against real rows now), the account cluster, the supplement/vial chain,
 a meal plan's lifecycle + reshape, the workout write path, the running plan and the four body/health
-writes, the goal-target-adherence loop, the home week/streak reads, the AI Coach lifecycle, the cardio hub, the strength/volume trends, the day timeline, the food-input path, the four heart-rate reads, the exercise catalogue, the nutrition day-completion trio, the year-review/identity trio, the platform-meta four, the two program-phase writes, the walk/sleep analysis pair, the feedback/calendar/scale trio the four Oura-BLE reads the two destructive Oura-BLE levers the four admin reports the three ring-device probes the admin triage queues, the two admin media tools and the three admin tools (media generation, model assets, the lbs→kg repair). Work by feature — batching on what is *verified together* twice found a defect (LA-78, LA-79). `scripts/check-route-test-coverage.js` ratchets it, so the debt
+writes, the goal-target-adherence loop, the home week/streak reads, the AI Coach lifecycle, the cardio hub, the strength/volume trends, the day timeline, the food-input path, the four heart-rate reads, the exercise catalogue, the nutrition day-completion trio, the year-review/identity trio, the platform-meta four, the two program-phase writes, the walk/sleep analysis pair, the feedback/calendar/scale trio the four Oura-BLE reads the two destructive Oura-BLE levers the four admin reports the three ring-device probes the admin triage queues, the two admin media tools and the three admin tools (media generation, model assets, the lbs→kg repair) and the three admin reports (app-load, timing baseline, sleep-feel calibration). Work by feature — batching on what is *verified together* twice found a defect (LA-78, LA-79). `scripts/check-route-test-coverage.js` ratchets it, so the debt
 only shrinks, a NEW route arrives uncovered and fails, and since LA-81 a route that LOSES its test fails whatever the total does.
 
 ### [app-shell][platform] LA-76 — a deload PHASE still decays the collection, and nothing dates one
@@ -19086,6 +19086,42 @@ adopted.
 
 - **Keep:** do not close this on "it has not happened again" — an intermittent lock-ordering bug is
   precisely the thing that looks fixed for weeks.
+
+### [platform] LA-88 — five routes satisfy the `.strict()` check while the strictness cannot fire
+
+- **Lane:** A — `scripts/check-strict-request-schemas.js`. The routes themselves may well be fine;
+  the checker is the thing reporting a guard that is not there.
+- **Added:** 2026-09-09, Lane A — found while writing PS-39 tests for `admin/app-load-report`, and
+  measured across `app/api` rather than assumed from the one case.
+
+Q-464's checker asks whether a request schema carries `.strict()`, because a permissive one silently
+drops a mistyped key and answers 200. It cannot see whether the strictness has anything to act on.
+**A route that hands its schema an object it built itself has already discarded every unknown key
+before validation runs**, so `.strict()` there guards nothing and the check still reports it clean.
+
+Measured, all `Schema.safeParse({ ... })` with a hand-built object and a `.strict()` schema:
+
+- `admin/app-load-report` — `{ days: searchParams.get('days') ?? undefined }`
+- `admin/ai-usage` — three named params, confirmed by test: `?unknown=1` answers 200
+- `coach/options` — `{ source, sourceId }`
+- `exercise-gif` — `{ name }`
+- `nutrition/barcode` — `{ code }`
+
+`running-plan/runs/[id]` spreads the real body before adding `id`, so its `.strict()` **does** fire —
+which is what makes the difference structural rather than stylistic, and detectable.
+
+**This is not five bugs.** For a GET whose only input is one named param, dropping the rest is
+arguably right, and 400-ing on a cache-buster would be worse. The cost is the report: the checker
+says these routes are protected, and the next person to add a second param will believe the typo
+guard is already in place. That is the shape [#1019](https://github.com/nekodas-neko/TrainingAi_Open/pull/1019)
+fixed for `check-admin-guard-catch.js`, whose one-line regex matched 0 of 2 real defects while 12
+live sites carried them — a check blind to its own class is worse than no check, because it is
+believed.
+
+**The fix is in the checker, not the routes:** when a `.strict()` schema's only `safeParse` call site
+passes an object literal whose keys are all written out, report it as inert — a third state beside
+pass and fail, the way the TTL-divergence check prints how many helper-built keys it had to skip. A
+clean run should never be mistaken for full coverage.
 
 ### [platform] LA-87 — a configured upload that returns nothing is reported as if it succeeded
 

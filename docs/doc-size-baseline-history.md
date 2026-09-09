@@ -9427,3 +9427,21 @@ buildable work with a real choice in it — report the path taken, or refuse the
 **No orphaned findings** it had to land in the same PR as the test that found it. Twenty-five lines
 is most of that cost being the reasoning for the choice, which is the part that would otherwise be
 re-derived.
+
+## 2026-09-09 — `docs/implementation-backlog.md` 19,696 → 19,732 (+36), LA-88
+
+One entry, and it is about a **checker** rather than a route, which is why it is worth its length.
+Q-464's `check-strict-request-schemas.js` asks whether a request schema carries `.strict()`; it
+cannot see whether the strictness has anything to act on. A route that hands its schema an object it
+built itself has already dropped every unknown key before validation runs, so the guard is inert and
+the check still reports it clean. Five routes are in that state, measured across `app/api` rather
+than inferred from the one that surfaced it.
+
+The measurement is most of the +36 — the five routes, the one counter-example whose `.strict()` does
+fire, and the reason this is not five bugs. A future reader who has only the conclusion will re-run
+the same grep; a reader who has the list will not.
+
+This is the second checker in a month found blind to its own class, after
+`check-admin-guard-catch.js` in #1019 (a one-line regex that matched 0 of 2 real defects while 12
+live sites carried them). Worth stating here, in the one file that spans months: **when a check is
+cheap to satisfy structurally, verify it fires on a real instance of the thing it names.**
