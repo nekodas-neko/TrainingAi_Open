@@ -42,11 +42,29 @@ function ingredient(name: string) {
   return { name, weightG: 100, caloriesPer100g: 100, proteinPer100g: 5, carbsPer100g: 15, fatPer100g: 2 }
 }
 
-function planResponse(nowHour: number) {
-  // One meal an hour behind the clock and one an hour ahead, so "so far" has exactly one answer
-  // whatever time the suite runs at. Clamped so the pair stays inside 00–23.
-  const past = Math.max(0, Math.min(22, nowHour)) 
-  const future = Math.min(23, past + 1)
+/**
+ * Noon in the user's zone on today's date, as a fixed instant to pin the page's clock to.
+ *
+ * The two meals were previously placed at `nowHour` and `nowHour + 1` read from the real clock and
+ * clamped into 00–23. At 23:xx Brisbane that clamp collapses the pair onto 22:00 and 23:00 — both
+ * already past — so the offer counted two meals and this spec failed for one hour every day, on
+ * every branch. There is no "an hour from now" at 23:00, so the fixture cannot be expressed against
+ * the real clock at all; pin the clock instead, per the repo rule that a date-boundary case drives
+ * the boundary rather than waiting for it. Only the hour is controlled — the date stays today's, so
+ * the day the tab opens on and the rows this spec writes are unchanged.
+ */
+function fixedNoon(): Date {
+  // Brisbane is UTC+10 year-round, so noon there is 02:00Z on the same date.
+  const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Brisbane' }).format(new Date())
+  return new Date(`${day}T02:00:00Z`)
+}
+
+const PAST_HOUR = 11
+const FUTURE_HOUR = 13
+
+function planResponse() {
+  const past = PAST_HOUR
+  const future = FUTURE_HOUR
   return {
     plans: [{
       id: 'plan-e2e', userId: 'u', name: 'E2E plan', mealsPerDay: 2, isActive: true,
@@ -74,13 +92,12 @@ function planResponse(nowHour: number) {
 }
 
 test('the plan offers only the meals whose time has come, and logging them clears the offer', async ({ page }) => {
-  // The app reads "now" in the user's timezone; read it the same way rather than from the runner's
-  // clock, which is UTC and would put the pair on the wrong side of the boundary.
-  const nowHour = await page.evaluate(() =>
-    Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Australia/Brisbane', hour: '2-digit', hour12: false }).format(new Date())))
+  // Fixed rather than installed: the app only needs `Date.now()` to be a known hour, and faking the
+  // timers as well would stop the screen's own timeouts.
+  await page.clock.setFixedTime(fixedNoon())
 
   await page.route('**/api/nutrition/meal-plans', route =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(planResponse(nowHour)) }))
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(planResponse()) }))
 
   await page.goto('/nutrition')
   await settleRouteBoundary(page)
