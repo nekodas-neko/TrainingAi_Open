@@ -1886,7 +1886,7 @@ repair the 22 dead backlog paths and 43 doubled `docs/overview/overview/` labels
 unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge candidates
 (led by `oura-ring-data-reference.md`, a retired-API reference with no retirement note).
 
-### [platform] PS-39 — 39 API routes still have no test that imports their handler
+### [platform] PS-39 — 36 API routes still have no test that imports their handler
 
 - **Lane:** A. Regenerate the list with `node scripts/check-route-test-coverage.js` — it prints every
   uncovered route when it fails, and the ratchet now holds the number.
@@ -1949,16 +1949,16 @@ testing X. Two more classes worth the same suspicion: a fixture whose timezone I
 proves nothing about which zone the route read, and a fixture already in sorted order proves
 nothing about a sort.
 
-**The count was 93 and is really 39**, by the mechanism the entry half-noticed: it counted a route
+**The count was 93 and is really 36**, by the mechanism the entry half-noticed: it counted a route
 covered when any test mentioned its URL, so `calendar-data` and `training-load` "appearing only as
 cache-key strings" counted. Asking instead whether a test imports the handler gives 150 of 222, less
-the one hundred and eleven paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
+the one hundred and fourteen paid down so far. Not a call to write 131 files — 18 are admin/debug. The count is now
 honest in both directions (see above), so the list can be worked from. **The actionable core
 named by this entry is now CLEAR**: the home aggregates, both ingest routes and `program-week` are
 done; so are ai-periodization, `friends/leaderboard` (its scoping was left uncovered when a mock
 could not see it, and is covered against real rows now), the account cluster, the supplement/vial chain,
 a meal plan's lifecycle + reshape, the workout write path, the running plan and the four body/health
-writes, the goal-target-adherence loop, the home week/streak reads, the AI Coach lifecycle, the cardio hub, the strength/volume trends, the day timeline, the food-input path, the four heart-rate reads, the exercise catalogue, the nutrition day-completion trio, the year-review/identity trio, the platform-meta four, the two program-phase writes and the walk/sleep analysis pair and the four Oura-BLE reads. Work by feature — batching on what is *verified together* twice found a defect (LA-78, LA-79). `scripts/check-route-test-coverage.js` ratchets it, so the debt
+writes, the goal-target-adherence loop, the home week/streak reads, the AI Coach lifecycle, the cardio hub, the strength/volume trends, the day timeline, the food-input path, the four heart-rate reads, the exercise catalogue, the nutrition day-completion trio, the year-review/identity trio, the platform-meta four, the two program-phase writes, the walk/sleep analysis pair, the feedback/calendar/scale trio and the four Oura-BLE reads. Work by feature — batching on what is *verified together* twice found a defect (LA-78, LA-79). `scripts/check-route-test-coverage.js` ratchets it, so the debt
 only shrinks, a NEW route arrives uncovered and fails, and since LA-81 a route that LOSES its test fails whatever the total does.
 
 ### [app-shell][platform] LA-76 — a deload PHASE still decays the collection, and nothing dates one
@@ -19044,6 +19044,48 @@ reads.
   merge. That fixes the *class* of "only CI sees test type errors" rather than this one shape, and it
   may make the bespoke check unnecessary.
 - **Reversal cost:** low — a script and a CI step, deletable.
+
+### [platform] LA-85 — the calendar route's scope check may not match what Google actually throws
+
+- **Lane:** A — `app/api/log-calendar-event/route.ts`.
+- **Added:** 2026-09-09, Lane A — found while writing the route's first tests (PS-39), and pinned
+  there as current behaviour. **Not fixed, deliberately:** narrowing or widening an error classifier
+  without a real error sample is exactly the guess the external-API rule exists to stop.
+- **Gate:** owner — needs one live failure captured from the device, below.
+
+The route sorts a failed `calendar.events.insert` into two answers, and the split is load-bearing in
+BOTH directions: a **403 `CALENDAR_SCOPE_MISSING`** is a consent state the user has not given, so it
+is deliberately NOT sent to `reportServerError`; anything else is a fault and is. Getting it wrong
+either buries real faults in `error_events` — the table every session reads to orient — or hides
+them from it entirely.
+
+**Read from the pinned `gaxios@7.1.4` source, not from memory:**
+
+- `GaxiosError` sets `this.code` **only** from an underlying `cause.code`, or from the response
+  body's `error.code`, which for Google is the **number** `403`. The route tests
+  `errCode === 'ERR_HTTP_403'` — a strict compare against a string — which cannot match either.
+- The HTTP status lands on `.status`, which the route never reads.
+- `extractAPIErrorFromResponse` builds the message from `error.message` and, when present, the
+  `errors[].message` values. The `reason` field (`insufficientPermissions`) is **not** joined in.
+  Calendar's scope failure reads *"Insufficient Permission"*, which contains none of `403`,
+  `forbidden`, `insufficientpermissions` or `calendar`.
+
+If that holds at runtime, a genuinely missing scope answers **500** and is recorded as a fault,
+which is the opposite of the decision written into the route.
+
+**The other half of the same classifier is too WIDE**, and the two are worth fixing together: a bare
+`errMsg.toLowerCase().includes('calendar')` means any failure whose text happens to name the API —
+a transient outage, say — is answered as "grant permission" *and* kept out of `error_events`.
+Invisible in both directions at once.
+
+**What settles it:** one real failure from the device, in each direction — revoke the Calendar scope
+and complete a workout, then capture what `error_events` (or the console) actually holds for the
+resulting error: its `message`, `code`, `status` and `String(err)`. The fix is then a status-based
+test (`err.status === 403`) rather than a string search, but which strings to keep is a judgement
+about shapes I have not seen.
+
+- **Keep:** `lib/__tests__/feedback-calendar-scale-routes.test.ts` asserts the CURRENT behaviour in
+  both directions and says so; both cases invert when this ships.
 
 ### [platform] LA-84 — a failed export produces a truncated file that looks complete
 
