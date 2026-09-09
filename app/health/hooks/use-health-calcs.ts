@@ -30,10 +30,11 @@ export function useBmiClassification(
 }
 
 export function useWeightTrend(metaRecent: BodyMetaRow[]) {
-  return useMemo(() => {
-    const weights = [...metaRecent].reverse().map(r => r.weightKg).filter((w): w is number => w != null);
-    return computeWeightRateKgPerWeek(weights);
-  }, [metaRecent]);
+  // Dated points, not bare numbers (LB-67). Rows exist only on days carrying a metric, so fitting
+  // the array position reported a slope per READING as though it were per day — which pushed an
+  // ordinary −0.7 kg/wk past the 1.0 band and rendered "Faster than ideal pace". The shared fit
+  // sorts and drops nulls itself, so the reverse here is no longer needed.
+  return useMemo(() => computeWeightRateKgPerWeek(metaRecent), [metaRecent]);
 }
 
 /**

@@ -12,17 +12,20 @@ export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  // Q-548 — the check answers 403 or 503; the listing is outside it, so a failed query surfaces as
+  // the fault it is rather than as a revoked credential.
   try {
     await requireAdmin(session.user.id, session.user.isAdmin)
-    const { searchParams } = new URL(req.url)
-    const limit = Math.min(parseInt(searchParams.get('limit') ?? '100', 10) || 100, 200)
-    const offset = parseInt(searchParams.get('offset') ?? '0', 10) || 0
-    const repo = await getRepository()
-    const users = await repo.listUsers(limit, offset)
-    return NextResponse.json({ users })
-  } catch {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  } catch (err) {
+    return adminErrorResponse(err)
   }
+
+  const { searchParams } = new URL(req.url)
+  const limit = Math.min(parseInt(searchParams.get('limit') ?? '100', 10) || 100, 200)
+  const offset = parseInt(searchParams.get('offset') ?? '0', 10) || 0
+  const repo = await getRepository()
+  const users = await repo.listUsers(limit, offset)
+  return NextResponse.json({ users })
 }
 
 export async function PATCH(req: NextRequest) {

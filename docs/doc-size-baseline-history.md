@@ -9554,3 +9554,163 @@ both sides share the `version:`/`date:` header above the marker, so a splice pro
 entry and silently drops the other PR's version. `main` read 1.441.1, so this took 1.441.2 rather
 than skipping to .3 — a gap in the sequence is a small thing, but it is also a question someone asks
 later.
+
+## 2026-09-09 — `docs/implementation-backlog.md` 19,669 → 19,696 (+27), PS-39 admin-tools batch
+
+Two lines, and they buy a checklist item rather than a status line. PS-39 keeps a running list of
+the ways these route tests come out green while testing nothing, and this batch produced a new one:
+a **symmetric pair with equal totals** — one male row and one female makes `generatedMale` and
+`generatedFemale` both read 1, so a mutant computing either counter from the other's rows survives.
+The balanced-looking fixture is the single shape where the two predicates cannot be told apart.
+
+It is folded into the existing paragraph rather than added as its own, which is why the cost is two
+lines and not nine. The full account is in the journal entry
+(`docs/overview/entries/2026-09-09-admin-tool-routes-test.md`); what stays here is the part an
+implementer needs *before* writing the case, which is the whole reason that checklist lives in the
+queue entry instead of the archive.
+
+The other +25 is **LA-87**, a finding this batch pinned rather than fixed: a *configured* upload that
+resolves null falls into the same data-URL branch as an unconfigured one, and the response still
+says `storageMode: 's3'`. That is a queue entry rather than a Known-Issues row because it is
+buildable work with a real choice in it — report the path taken, or refuse the write — and per
+**No orphaned findings** it had to land in the same PR as the test that found it. Twenty-five lines
+is most of that cost being the reasoning for the choice, which is the part that would otherwise be
+re-derived.
+
+## 2026-09-09 — `docs/implementation-backlog.md` 19,696 → 19,732 (+36), LA-88
+
+One entry, and it is about a **checker** rather than a route, which is why it is worth its length.
+Q-464's `check-strict-request-schemas.js` asks whether a request schema carries `.strict()`; it
+cannot see whether the strictness has anything to act on. A route that hands its schema an object it
+built itself has already dropped every unknown key before validation runs, so the guard is inert and
+the check still reports it clean. Five routes are in that state, measured across `app/api` rather
+than inferred from the one that surfaced it.
+
+The measurement is most of the +36 — the five routes, the one counter-example whose `.strict()` does
+fire, and the reason this is not five bugs. A future reader who has only the conclusion will re-run
+the same grep; a reader who has the list will not.
+
+This is the second checker in a month found blind to its own class, after
+`check-admin-guard-catch.js` in #1019 (a one-line regex that matched 0 of 2 real defects while 12
+live sites carried them). Worth stating here, in the one file that spans months: **when a check is
+cheap to satisfy structurally, verify it fires on a real instance of the thing it names.**
+
+## 2026-09-09 — `docs/implementation-backlog.md` 19,732 → 19,684 (−48), PS-39 struck
+
+The route-test sweep finished: **0 of 222** API routes are without a test importing their handler,
+and the ratchet's baseline is 0, so a new route now arrives uncovered and fails CI. The queue entry
+came out whole (77 lines), and LA-89 went in (29) — `oura/hr-sync` has no callers and a name that
+says something untrue about what it does.
+
+**The entry carried a checklist that outlived it**, so it was moved rather than deleted:
+[`docs/route-test-fixtures.md`](route-test-fixtures.md) holds the fifteen fixture shapes that passed
+review and were caught only by mutation, plus what the ratchet does and does not measure. It is
+linked from `docs/module-map.md` and named in the checker's own failure message, which is where
+someone writing a new route test will actually meet it.
+
+No `Keep:` line: PS-39's stated goal is complete at 0. The caveat that a *count* is not a
+*sufficiency* measure — `admin/exercises` counted as covered on one guard assertion — is a permanent
+property of the metric rather than outstanding work, so it belongs in the reference doc. Leaving a
+finished entry in the queue to carry a caveat is exactly what the "a finished entry must not still
+be in the queue" rule exists to stop.
+
+## 2026-09-09 — `docs/implementation-backlog.md` 19,684 → 19,648 (−36), LB-67 shipped
+
+The weekly weight rate was fitted against the array index, so a gappy series reported a slope per
+*reading* as though it were per *day*. Entry removed (38 lines), and OR-102b ④ rewritten from
+"blocked on LB-67" to unblocked (+2) — it needed the interval, not the point estimate, so
+`stdErrKgPerWeek` shipped in the same pass rather than leaving a third estimator to be invented.
+
+## 2026-09-09 — `projectOverview.md` 10,431 → 10,442 (+11), LB-67's status paragraph
+
+A user-visible fix, so it takes a Current Status paragraph like the ones beside it — the weekly
+weight trend was fitted against the array index and reported an ordinary −0.70 kg/wk as −1.04,
+which the goal band renders as amber "Faster than ideal pace". The compaction sweep folds these
+paragraphs out again; this is the shape they are supposed to have while current.
+
+The version line was **five releases stale** (v1.437.1 against a package.json at 1.441.5) and is
+corrected in the same edit. That line is the first thing every session reads, and it had been
+drifting because a version bump and this file are edited by different steps of the ritual.
+
+## 2026-09-09 — `docs/implementation-backlog.md` 19,648 → 19,724 (+76), OR-104 engine half + two findings
+
+OR-104's engine half shipped, so the entry is rewritten rather than removed: the surface half
+(`manage-supplements-sheet.tsx` still offering `amount`+`unit` and a free-text `Dose` together) is
+Lane B's and takes a `Keep:` line.
+
+The other two are findings from doing the work, and neither belonged in the fix:
+
+**LA-90** — the two supplement write paths merge a caller-supplied dose differently: the server per
+field, the local store all-or-nothing. No caller hits it today, which is exactly why it is a trap
+for the next one, and bundling a second divergence into a dose-text fix would have made both
+unreviewable.
+
+**LA-91** — no CI job sets `timeout-minutes`, so a hung run holds a runner for GitHub's 360-minute
+default. Filed with the **measured** per-job durations from run 34326591694 rather than guesses,
+because the near-miss is the point: a check-in of mine had asserted "25 minutes is beyond plausible"
+for the E2E suite, and the real run took **24:36**. Acting on that guess would have re-triggered a
+healthy run two minutes before it went green. Most PRs skip E2E in ~35s via its UI gate, so nobody
+has a feel for the real number — reading `playwright.config.ts` (77 specs, `workers: 1`) answered it
+in a minute.
+
+## 2026-09-09 — `docs/implementation-backlog.md` 19,724 → 19,662 (−62), BF-131 shipped
+
+The AMRAP baseline session is consumed now: completion copies the 1RM the session already measured
+into `session_periodization.baseline1rm` and exits the phase. The 83-line entry came out; LA-92 went
+in for the surface half (the card that reads "Baseline needed" identically after zero baseline
+sessions and after four of five exercises).
+
+**LA-92, not LB-92**, though Lane B ships it: the letter records who FOUND an item, never who ships
+it. First draft used `LB-68` — which is both the wrong letter and an id already taken — and the
+duplicate would have failed `check-backlog-pointers` in CI rather than reaching main.
+
+## 2026-09-09 — `projectOverview.md` 10,442 → 10,455 (+13), BF-131's status paragraph
+
+An owner-reported live defect with a user-visible fix, so it takes a Current Status paragraph like
+the ones beside it. Longer than most because the useful part is what was NOT fixed: existing rows
+stay at `baseline_complete = false`, the card still reads "Baseline needed" until LA-92, and nothing
+has been seen on the device. A status line that said only "baseline now completes" would be read as
+"the owner's two stuck sessions are unstuck", and they are not.
+
+## 2026-09-09 — `docs/implementation-backlog.md` 19,662 → 19,705 (+43), LB-66 reconciled
+
+The entry said "`program_sessions` and `session_exercises` need a `deleted_at`, so this is a
+migration" and stopped there. Re-verified against `main` before implementing, per the standing rule,
+and the premise is incomplete in a way that produces a wrong implementation: **there is no delete
+endpoint for a program session.** Removing one means saving the program without it, and
+`saveProgram` hard-deletes every session and exercise then re-inserts them — so swapping those
+deletes for a soft delete tombstones the whole program on every save, and the rows then collide with
+their own re-insert.
+
+The +43 is the shape that does work (tombstone only the ids the save does not carry back —
+`oldIdSet − suppliedSessionIds`, both already computed in that function) plus the two non-obvious
+hazards beside it: the periodization/workout-session restore loop that runs after the delete-all,
+and the two single-row delete sites the entry does not mention.
+
+Cheaper here than in a corrective migration. This is what "re-verify the plan against current main"
+is for, and the first time this session it has actually changed an implementation.
+
+---
+
+## 2026-09-09 — `docs/implementation-backlog.md` ratcheted DOWN 19705 → 19641 (LB-66 shipped)
+
+The entry that raised it (+43, the day before) is gone: LB-66 is implemented, so the queue heading
+and its reconciliation come out with it. Ratcheting down rather than leaving 64 lines of slack is
+the point of the ratchet — slack the document can regrow into is a baseline that says nothing.
+
+`projectOverview.md` is unchanged at 10455. Its LB-66 Known Issue was rewritten in place rather than
+struck: the hard delete is fixed, but the on-device sync check is still owed, and an entry with
+something outstanding stays in `projectOverview.md` rather than moving to the resolved archive.
+
+---
+
+## 2026-09-09 — `docs/implementation-backlog.md` ratcheted DOWN 19641 → 19587 (BF-83 compacted)
+
+BF-83 headed the Lane A READY list with all three of its halves already shipped and verified in
+`main` — the engine, the badge on three surfaces, and the baseline exclusion — so 65 lines of settled
+deliberation were sitting where buildable work should be. It is not deletable either: its acceptance
+test is a morning with the ring mid-upload, which the sandbox cannot produce, and CLAUDE.md says an
+entry still owing a device check states so with `Keep:` rather than being deleted. Compacted to a
+`Keep:` entry naming the one owed check, plus the non-obvious mechanism (the measure is the rollup
+watermark, not the newest ingested sample) and the two journals. It now sorts into KEEP instead of
+heading the work list.

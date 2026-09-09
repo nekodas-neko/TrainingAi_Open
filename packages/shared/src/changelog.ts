@@ -6,6 +6,45 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.443.0",
+    date: "2026-09-09",
+    changes: [
+      "Deleting a training session from a program no longer throws it away. Saving used to erase the session and its exercises for good; now the rows are kept behind the scenes, so a delete you regret is recoverable rather than final.",
+      "Workouts you already logged stay attached to the session you trained them under. Removing that session from your program used to cut the link \u2014 the history stayed, but it no longer knew which session it belonged to \u2014 and it took the session\u0027s phase and cycle progress with it.",
+    ],
+  },
+  {
+    version: "1.442.0",
+    date: "2026-09-09",
+    changes: [
+      "Finishing your AMRAP baseline session now actually completes the baseline. It used to stay on \u0027Baseline needed\u0027 no matter how many you did \u2014 the only way forward was the \u0027Use prior data\u0027 button, which skips the session you just ran. Your measured 1RM from those sets is what the AI starts prescribing from.",
+      "A part-finished baseline keeps what it measured. Log three of five exercises and those three are saved, so a later session finishes the job instead of starting over.",
+    ],
+  },
+  {
+    version: "1.441.5",
+    date: "2026-09-09",
+    changes: [
+      "Your weekly weight trend is no longer overstated on days you skip the scale. It was measuring change per weigh-in rather than per day, so weighing in about three days in four made a steady 0.7 kg/week read as 1.0 \u2014 which tipped it past the healthy range and showed \u0027Faster than ideal pace\u0027 in amber for an ordinary rate.",
+      "The weight trend on the Body screen and the one behind your calorie targets are now the same calculation. They disagreed by about 1.5x on the same data.",
+    ],
+  },
+  {
+    version: "1.441.4",
+    date: "2026-09-09",
+    changes: [
+      "More admin screens now tell a database problem apart from a permissions one \u2014 the feedback list, the user list, the exercise and media tools all used to answer \u0027forbidden\u0027 for any failure. Deleting a feedback item with a mistyped id now says the id is wrong instead.",
+      "Removing someone from the invite list now works whatever capitalisation or spacing you type. It previously had to match the stored address exactly, and a mismatch quietly did nothing while still reporting success.",
+    ],
+  },
+  {
+    version: "1.441.3",
+    date: "2026-09-09",
+    changes: [
+      "The admin error log and pending-count screens now say \u0027service unavailable\u0027 when the database cannot be reached, instead of \u0027forbidden\u0027. They previously reported a permissions problem for any failure \u2014 including on the error log itself, which is the screen you open when something is already wrong.",
+    ],
+  },
+  {
     version: "1.441.2",
     date: "2026-09-09",
     changes: [

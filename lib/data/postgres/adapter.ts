@@ -40,6 +40,7 @@ import { MoodFieldsSchema } from '@trainingai/shared/validation/mood-log'
 import { FoodItemPushSchema } from '@trainingai/shared/validation/food-item'
 import { sanitiseNutrition } from '@trainingai/shared/nutrition/scan-totals'
 import { normalizeMealGroupName } from '@trainingai/shared/nutrition/meal-group-name'
+import { freezableDoseText } from '@trainingai/shared/nutrition/supplement-dose-freeze'
 import { OuraDailySummaryPushSchema, OuraDailyDerivedPushSchema } from '@trainingai/shared/validation/oura-summary'
 import { SessionRpeSchema } from '@trainingai/shared/validation/session-rpe'
 import {
@@ -4208,6 +4209,13 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // updatedAt on every edit, so a changed parent implies a changed subtree.
     // Re-send the full subtree for any changed program/style and let the client
     // replace its children on receipt (delete-then-insert by parent id).
+    //
+    // LB-66: this is also the tombstone channel for `program_sessions`/`session_exercises`, and it
+    // is why neither needs a `deleted_at` in the local mirror. The subtree here is LIVE rows only,
+    // and the client deletes every child of a changed program before re-inserting what arrives — so
+    // a tombstoned session is simply absent from the replacement and disappears locally. That works
+    // only because every write that tombstones one also bumps `programs.updated_at`, which is what
+    // puts the program in this delta at all; a tombstone without that bump would never propagate.
     const programIds = (programs as { id: string }[]).map(p => p.id)
     const styleIds   = (progressionStyles as { id: string }[]).map(p => p.id)
 
@@ -4221,7 +4229,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             icon:              s.programSessions.icon,
             timeBudgetMinutes: s.programSessions.timeBudgetMinutes,
           }).from(s.programSessions)
-            .where(inArray(s.programSessions.programId, programIds))
+            .where(and(inArray(s.programSessions.programId, programIds), isNull(s.programSessions.deletedAt)))
         : Promise.resolve([] as unknown[]),
       programIds.length
         ? this.db.select({
@@ -4235,7 +4243,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             supersetGroup: s.sessionExercises.supersetGroup,
           }).from(s.sessionExercises)
             .innerJoin(s.programSessions, eq(s.sessionExercises.sessionId, s.programSessions.id))
-            .where(inArray(s.programSessions.programId, programIds))
+            .where(and(
+              inArray(s.programSessions.programId, programIds),
+              isNull(s.sessionExercises.deletedAt),
+              isNull(s.programSessions.deletedAt),
+            ))
         : Promise.resolve([] as unknown[]),
       programIds.length
         ? this.db.select({
@@ -6548,10 +6560,13 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       .orderBy(desc(s.supplementVials.openedOn), desc(s.supplementVials.createdAt))
       .limit(1)
 
+    // OR-104 — whether the definition's free text is frozen beside a structured amount is decided
+    // by `freezableDoseText`, shared with the offline store so the two write paths cannot drift.
+    const stampedAmount = dose?.amount ?? owns.defaultAmount ?? null
     const stamped = {
-      amount: dose?.amount ?? owns.defaultAmount ?? null,
+      amount: stampedAmount,
       unit: dose?.unit ?? owns.unit ?? null,
-      doseText: dose?.doseText ?? owns.dose ?? null,
+      doseText: dose?.doseText ?? freezableDoseText(stampedAmount, owns.dose),
       // An explicit `takenAt` wins; otherwise the moment of the tick, which is what the owner
       // means by ticking it now. Never back-filled onto rows that predate the column.
       takenAt: dose?.takenAt != null ? new Date(dose.takenAt) : new Date(),
@@ -6717,6 +6732,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getSessionPeriodization(userId: string, programSessionId: string) { return period.getSessionPeriodization(this.db, userId, programSessionId) }
   async ensureSessionPeriodization(userId: string, programSessionId: string) { return period.ensureSessionPeriodization(this.db, userId, programSessionId) }
   async setBaselineComplete(userId: string, programSessionId: string, baseline1rm: Record<string, Baseline1rmEntry>) { return period.setBaselineComplete(this.db, userId, programSessionId, baseline1rm) }
+  async getSessionExercise1rms(userId: string, workoutSessionId: string) { return period.getSessionExercise1rms(this.db, userId, workoutSessionId) }
+  async recordBaselineAnchors(userId: string, programSessionId: string, anchors: Record<string, Baseline1rmEntry>, complete: boolean) { return period.recordBaselineAnchors(this.db, userId, programSessionId, anchors, complete) }
   async advancePhase(userId: string, programSessionId: string, newPhase: PeriodizationPhase) { return period.advancePhase(this.db, userId, programSessionId, newPhase) }
   async storePrescription(userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date, status?: PrescriptionStatus) { return period.storePrescription(this.db, userId, programSessionId, prescription, expiresAt, status) }
   async clearProgramPrescriptions(userId: string, programId: string) { return period.clearProgramPrescriptions(this.db, userId, programId) }

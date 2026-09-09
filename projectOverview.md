@@ -26,8 +26,32 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.437.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-09-08.
+**Version:** v1.442.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-09-09.
+
+**The AMRAP baseline session was never consumed (BF-131).** Owner: *"even though the session was
+done it's saying baseline needed"*. He ran both baseline sessions as instructed and
+`session_periodization` still read `baseline_complete = false` — completion WAS wired and wrote the
+wrong field, moving `sessions_in_phase` while the flag never flipped, so the only exit was the "Use
+prior data →" button that discards the session you just ran. The 1RM already existed: the screen runs
+the AMRAP estimator and persists it to `exercise_logs.estimated_1rm`; what was missing was the copy
+into `baseline_1rm`. Completion now does that hop, tagged `source: 'amrap'`, and a **partial**
+baseline accumulates rather than completing on a gap. **Existing rows are untouched** — this fixes
+new completions, not the two already sitting at false; "Use prior data" remains valid and is now a
+choice rather than the only way through. The card still reads "Baseline needed" until LA-92 (Lane B)
+lands, and **none of this has been seen on the S25**
+([journal](docs/overview/entries/2026-09-09-bf131-baseline-anchor-hop.md)).
+
+**The weekly weight trend was measuring change per weigh-in, not per day (LB-67).**
+`computeWeightRateKgPerWeek` fitted the array index, and rows exist only on days carrying a metric —
+so weighing in about three days in four made a true −0.70 kg/wk report as **−1.04** (−1.76 at six
+readings in fourteen days). Past 1.0 kg/wk the band says `too_fast`, so an ordinary healthy rate
+rendered on Health → Body as **"Faster than ideal pace"** in amber. The correct fit already existed
+in `adaptive-tdee`, so the app held two weekly-rate figures disagreeing by ~1.5× on one data set;
+both now call `computeWeightRateFit`, which also returns a standard error (OR-102b ④ needed the
+interval and would otherwise have invented a third). **Not seen on a screen** — the band is asserted
+in a unit test, not observed turning green on the S25
+([journal](docs/overview/entries/2026-09-09-lb67-weight-rate-day-index.md)).
 
 
 **The baseline banner told him to load 82.5 kg on a pull-up (BF-127).** Owner, mid-session: *"pull
@@ -1726,17 +1750,17 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
-### [workouts][platform] ⚠️ A *saved* session delete is still unrecoverable — no tombstone (BF-132 → LB-66, 2026-09-08, v1.438.5)
+### [workouts][platform] ⚠️ A saved session delete is now a tombstone — not yet seen doing it on the device (BF-132 → LB-66, 2026-09-09, v1.443.0)
 
-The owner lost a session to a one-tap trash icon in the program editor. Deleting now asks first and
-names what goes with it (*"Delete Lower and its 5 exercises?"*), and an Undo sits in the editor until
-you save — but both live in the editor's local state. **Press Save and the rows are hard-deleted**
-from `program_sessions` and `session_exercises`, neither of which has a `deleted_at`, so nothing is
-recoverable and no dialog is left to fire. Queued as **LB-66** (Lane A — it is a migration). What
-made the original loss recoverable was luck: the structure had been quoted in a session two days
-earlier, and `exercise_logs` carry the exercise and style names, so the *trained* version could be
-rebuilt. A session deleted before it was ever trained leaves nothing.
-[Journal](docs/overview/entries/2026-09-08-fix-bf-132-confirm-session-delete.md).
+BF-132 made deleting ask first, with an Undo until you save; **LB-66 (migration 271) makes the save
+itself recoverable.** The session and its exercises are tombstoned, which also stops the two
+`ON DELETE SET NULL` FKs severing already-logged workouts from it and `ON DELETE CASCADE` destroying
+its phase state; both unique constraints became partial indexes over live rows, or a non-last
+removal 23505s against its own tombstone.
+[Journal](docs/overview/entries/2026-09-09-lb66-program-session-tombstones.md).
+**Owed: the device check** — server-side only, so a Railway deploy delivers it, but the half that
+matters on hardware is the sync and it has not been run there. **No recovery UI**: reading a
+tombstone back is a DB query.
 
 ### [app-shell] ⚠️ The cat collection has a surface — with emoji standing in for the art, and no device look yet (BF-122b, 2026-09-07, v1.437.0)
 

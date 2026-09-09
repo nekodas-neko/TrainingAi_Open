@@ -34,6 +34,62 @@ export function resolveCompletedAt(
   return new Date(completedAtMs)
 }
 
+/**
+ * Copy the AMRAP anchors this session already measured into `session_periodization.baseline1rm`.
+ *
+ * Keyed by session-exercise id, because the periodization signals look the baseline up that way —
+ * the same keying `baseline/complete` uses for its prior-data path. `exercise_logs` carries the
+ * exercise NAME, so the join is name → the program session's exercise id, which is also how the
+ * prior-data path maps a personal record onto a session.
+ *
+ * `source: 'amrap'` distinguishes a measured anchor from a carried-over PR (`'existing'`) or a
+ * number typed in the builder (`'estimate'`), so the prescription prompt can weigh them
+ * differently. The tag already existed in `Baseline1rmEntry` and had no producer.
+ *
+ * The phase completes only when EVERY exercise in the session has an anchor. A lifter who logs
+ * three of five keeps those three and stays in `baseline` — see `recordBaselineAnchors`.
+ */
+async function recordBaselineAnchorsFrom(
+  // Structural, not the Repository type: `packages/shared` must not depend on `lib/data`, and
+  // naming only what this needs keeps the coupling visible.
+  repo: {
+    getSessionExercise1rms(userId: string, workoutSessionId: string): Promise<{ exerciseName: string; estimated1rm: number }[]>
+    getActiveProgram(userId: string): Promise<{ sessions: { id: string; exercises: { id: string; exerciseName: string }[] }[] } | null>
+    getSessionPeriodization(userId: string, programSessionId: string): Promise<{ baseline1rm?: Record<string, unknown> } | null>
+    recordBaselineAnchors(
+      userId: string, programSessionId: string,
+      anchors: Record<string, { kg: number; source: 'amrap' }>, complete: boolean,
+    ): Promise<unknown>
+  },
+  userId: string,
+  programSessionId: string,
+  workoutSessionId: string,
+): Promise<void> {
+  const [logged, program] = await Promise.all([
+    repo.getSessionExercise1rms(userId, workoutSessionId),
+    repo.getActiveProgram(userId),
+  ])
+  const programSession = program?.sessions.find(ps => ps.id === programSessionId)
+  if (!programSession || programSession.exercises.length === 0) return
+
+  const byName = new Map(logged.map(l => [l.exerciseName, l.estimated1rm]))
+  const anchors: Record<string, { kg: number; source: 'amrap' }> = {}
+  for (const ex of programSession.exercises) {
+    const kg = byName.get(ex.exerciseName)
+    if (kg != null) anchors[ex.id] = { kg, source: 'amrap' }
+  }
+  if (Object.keys(anchors).length === 0) return
+
+  // Complete against the SESSION's exercise list, not against what this workout logged: a lifter
+  // who skipped one has an incomplete anchor even though everything they did log has an entry.
+  // Counted over the merged map, so a second session can finish what the first started.
+  const existing = await repo.getSessionPeriodization(userId, programSessionId).catch(() => null)
+  const covered = new Set([...Object.keys(existing?.baseline1rm ?? {}), ...Object.keys(anchors)])
+  const complete = programSession.exercises.every(ex => covered.has(ex.id))
+
+  await repo.recordBaselineAnchors(userId, programSessionId, anchors, complete)
+}
+
 // Shared by the web route (app/api/complete-workout) and the offline outbox
 // replay (pushMutations' complete_workout branch) so the two paths can't drift.
 // Idempotent: a retried/replayed completion (network retry, or an outbox
@@ -88,6 +144,22 @@ export async function completeWorkoutFromPayload(
     repo.incrementSessionsInPhase(userId, programSessionId).catch(e =>
       console.error('incrementSessionsInPhase failed (advisory, workout completion unaffected):', e)
     )
+
+    // BF-131 — the baseline hop. Completion WAS wired and wrote the wrong field: the counter moved,
+    // `baseline_complete` never did, and the only exit from `baseline` was the "Use prior data"
+    // button — the one path that discards the baseline session. The owner ran both AMRAP sessions
+    // exactly as the banner instructs and the screen still read "baseline needed".
+    //
+    // The 1RM is NOT recomputed here. The workout screen already ran the AMRAP estimator and
+    // persisted the result to `exercise_logs.estimated_1rm`; this reads it back. Same posture as
+    // the increment above — advisory, fire-and-forget, because a completion must never fail on a
+    // periodization write, which means the flag may lag a completion and the screen has to tolerate
+    // that.
+    if (periodizationState?.phase === 'baseline' && !periodizationState.baselineComplete) {
+      recordBaselineAnchorsFrom(repo, userId, programSessionId, workoutSessionId).catch(e =>
+        console.error('baseline anchor write failed (advisory, workout completion unaffected):', e)
+      )
+    }
 
     // The next prescription for this session is generated on demand when it is next opened
     // (isAiPrescriptionPending, keyed on prescriptionStatus === 'consumed'), not eagerly here —

@@ -65,9 +65,33 @@ describe.skipIf(!canRun)('the dose is stamped on the log (BF-3)', () => {
     await repo.updateSupplement(sup.id, USER, { dose: '4 mg', defaultAmount: 4 })
     await repo.logSupplement(sup.id, USER, '2026-09-07')
 
-    expect(await logRow(sup.id, '2026-08-24')).toMatchObject({ amount: 2, unit: 'mg', dose_text: '2 mg' })
-    expect(await logRow(sup.id, '2026-08-31')).toMatchObject({ amount: 2, unit: 'mg', dose_text: '2 mg' })
-    expect(await logRow(sup.id, '2026-09-07')).toMatchObject({ amount: 4, unit: 'mg', dose_text: '4 mg' })
+    // `dose_text` is null on all three, and the freeze is unweakened: it now rests on the
+    // structured pair alone (OR-104). Stamping the definition's free text BESIDE an amount is what
+    // froze a 20× contradiction into the archive, and this fixture cannot show that — `'2 mg'` and
+    // `2 mg` agree, so it could never tell which of the two was being read. The contradiction case
+    // is its own test below.
+    expect(await logRow(sup.id, '2026-08-24')).toMatchObject({ amount: 2, unit: 'mg', dose_text: null })
+    expect(await logRow(sup.id, '2026-08-31')).toMatchObject({ amount: 2, unit: 'mg', dose_text: null })
+    expect(await logRow(sup.id, '2026-09-07')).toMatchObject({ amount: 4, unit: 'mg', dose_text: null })
+  })
+
+  // OR-104 — the production shape, and the reason the fixtures above had to change.
+  it('never freezes a free text that CONTRADICTS the structured amount', async () => {
+    // `Retatrutide` carried `default_amount 0.5 · unit mg` beside `dose '10mg'` — the vial
+    // strength, typed into a field labelled `Dose`. The 2026-09-07 log froze both, 20× apart, and
+    // nothing showed it: `supplementSubtitle()` reaches for `dose` last, so the list read
+    // "0.5 mg today" while the archive kept the wrong number for any future reader.
+    const sup = await create({ dose: '10mg', defaultAmount: 0.5, unit: 'mg' })
+    await repo.logSupplement(sup.id, USER, '2026-08-24')
+    expect(await logRow(sup.id, '2026-08-24')).toMatchObject({ amount: 0.5, unit: 'mg', dose_text: null })
+  })
+
+  it('still freezes the free text when an EXPLICIT amount is supplied with none', async () => {
+    // The condition is "no structured amount was stamped", not "the definition supplied none" — a
+    // caller passing an amount while the definition holds contradicting prose is the same hazard.
+    const sup = await create({ dose: '10mg', defaultAmount: null, unit: null })
+    await repo.logSupplement(sup.id, USER, '2026-08-24', { amount: 0.5, unit: 'mg' })
+    expect(await logRow(sup.id, '2026-08-24')).toMatchObject({ amount: 0.5, unit: 'mg', dose_text: null })
   })
 
   // The half that makes this work today rather than after a data-entry chore: every existing
@@ -102,7 +126,7 @@ describe.skipIf(!canRun)('the dose is stamped on the log (BF-3)', () => {
     await repo.updateSupplement(sup.id, USER, { dose: '4 mg', defaultAmount: 4 })
     await repo.logSupplement(sup.id, USER, '2026-08-24')
 
-    expect(await logRow(sup.id, '2026-08-24')).toMatchObject({ amount: 4, dose_text: '4 mg' })
+    expect(await logRow(sup.id, '2026-08-24')).toMatchObject({ amount: 4, dose_text: null })
   })
 
   describe('what the screen reads', () => {
@@ -113,7 +137,7 @@ describe.skipIf(!canRun)('the dose is stamped on the log (BF-3)', () => {
 
       const [row] = await repo.listSupplements(USER, '2026-08-24')
       expect(row.loggedToday).toBe(true)
-      expect(row.loggedDose).toEqual({ amount: 2, unit: 'mg', doseText: '2 mg' })
+      expect(row.loggedDose).toEqual({ amount: 2, unit: 'mg', doseText: null })
       // …while the definition reads what you would take now. Both are true and they differ, which
       // is the distinction the whole entry rests on.
       expect(row.defaultAmount).toBe(4)
@@ -140,7 +164,7 @@ describe.skipIf(!canRun)('the dose is stamped on the log (BF-3)', () => {
 
       const log = (delta.supplementLogs as { supplementId: string; amount?: number; doseText?: string }[])
         .find(r => r.supplementId === sup.id)
-      expect(log).toMatchObject({ amount: 2, doseText: '2 mg' })
+      expect(log).toMatchObject({ amount: 2, doseText: null })
     })
 
     // Where a new column on a synced table normally gets half-done, and the case the offline push
@@ -163,7 +187,7 @@ describe.skipIf(!canRun)('the dose is stamped on the log (BF-3)', () => {
         payload: { supplementId: sup.id, logDate: '2026-08-24' },
       }])
       expect(res.errors).toEqual([])
-      expect(await logRow(sup.id, '2026-08-24')).toMatchObject({ amount: 4, dose_text: '4 mg' })
+      expect(await logRow(sup.id, '2026-08-24')).toMatchObject({ amount: 4, dose_text: null })
     })
 
     it('carries the structured dose through a pushed supplement definition', async () => {

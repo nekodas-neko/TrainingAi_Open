@@ -34,8 +34,17 @@ export async function GET() {
     requiredCount: REQUIRED_MODEL_FILES.length,
     bucket,
     disk,
-    // `getSession` reads the bucket first, so this is what production is actually serving from.
-    servingFrom: bucket.verdict === 'complete' ? 'object storage' : 'the repo tree (fallback)',
+    // `getSession` reads the bucket first and the repo tree second, so this is what production is
+    // actually serving from — and the second branch has to be checked, not assumed. Q-49 A4b deleted
+    // the local `.onnx` copies, so a non-complete bucket used to be reported as "the repo tree
+    // (fallback)" while `disk` in the same payload listed every file as missing. `disk.ok` is
+    // already in hand; the answer comes from both halves.
+    servingFrom:
+      bucket.verdict === 'complete'
+        ? 'object storage'
+        : disk.ok
+          ? 'the repo tree (fallback)'
+          : 'nothing — neither source has every model',
     constants: {
       requiredCount: modelFiles.constantsRequired.length,
       bucket: constantsBucket,

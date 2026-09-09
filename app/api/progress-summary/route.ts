@@ -40,11 +40,10 @@ export async function GET() {
     repo.listBodyMetrics(userId, fourteenDaysAgo, today),
   ]);
 
-  const orderedWeights = [...weightHistory]
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .map(m => m.weightKg)
-    .filter((w): w is number => w != null);
-  const weightRateKgPerWeek = computeWeightRateKgPerWeek(orderedWeights);
+  // Dated points, not bare numbers (LB-67): rows exist only on days carrying a metric, so a fit
+  // against array position reports a slope per READING as though it were per day. The sort and the
+  // null filter live inside the shared fit now.
+  const weightRateKgPerWeek = computeWeightRateKgPerWeek(weightHistory);
 
   // "Last night" and "this week" are counts of nights, not of rows (Q-76). Sorting the raw list by
   // date descending picks arbitrarily between an evening nap and the night that followed it on the

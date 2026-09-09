@@ -11,6 +11,7 @@ import type {
   LocalExerciseLibraryEntry, LocalMealType, LocalPlanMealAnswer,
 } from './types';
 import type { LogExercisePayload } from '@trainingai/shared/workout/log-exercise';
+import { freezableDoseText } from '@trainingai/shared/nutrition/supplement-dose-freeze';
 import { defaultUseFor1rm } from '@trainingai/shared/workout/default-use-for-1rm';
 import { assembleLocalActiveProgram, type LocalActiveProgram } from './program-assembler';
 
@@ -2766,10 +2767,14 @@ export class SQLiteLocalStore implements LocalStore {
       const [def] = await querySQL<Record<string, unknown>>(
         `SELECT dose, default_amount, unit FROM supplements WHERE id = ?`, [record.supplementId]);
       if (def) {
+        // OR-104 — whether the definition's free text is frozen beside a structured amount is
+        // decided by `freezableDoseText`, shared with the server so the two write paths cannot
+        // drift. A log written offline must not disagree with one written online.
+        const amount = def.default_amount == null ? null : Number(def.default_amount);
         dose = {
-          amount: def.default_amount == null ? null : Number(def.default_amount),
+          amount,
           unit: def.unit ? String(def.unit) : null,
-          doseText: def.dose ? String(def.dose) : null,
+          doseText: freezableDoseText(amount, def.dose == null ? null : String(def.dose)),
         };
       }
     }
