@@ -408,6 +408,27 @@ below threshold and left in place for next time.
 
 
 
+### [platform] LB-94 — the journal's recent window is 332 entries, and 297 of them are pinned by a citation
+
+- **The ceiling is not a size problem, it is a linking problem.** `docs/overview/entries/` is meant
+  to be the *readable recent* window, folded into the batched `docs/overview/history-*.md` by the
+  compaction sweep. The sweep can only fold an entry nothing cites — and 297 of the 332 are cited by
+  a durable doc, so the sweep tops out at 35 and cannot get under the ceiling. Raising the number is
+  what has actually been happening instead; it was raised to 333 on 2026-09-09 to unblock two PRs
+  that had nothing to do with the journal, and that is the third such raise.
+- **What is owed:** re-point the durable docs' citations at the batched history rather than at the
+  loose entry, so those 297 become foldable, then run the sweep. Mechanically the entry's body moves
+  into a `history-*.md` and the citation gains an anchor; the work is deciding which citations are
+  load-bearing enough to keep pointing at a whole entry.
+- **⚠ Do not "fix" this by widening the sweep's definition of foldable.** A citation exists because
+  a durable doc needed that entry's reasoning; folding it without rewriting the link turns the
+  citation into a 404, and the ratchet would then read as clean while the docs got worse. That is
+  the failure mode the linked/unlinked split exists to prevent.
+- **Lane:** ? — it is a docs restructuring, so Orchestrator's by the standing split, but it touches
+  no code and any lane can run it. Filed by Lane B, which found it.
+- **Added:** 2026-09-09 · Lane B, on being blocked by the ceiling twice in one hour.
+
+
 ### [heart-rate][cardio] TN-30 — one zone model, four max-HR anchors: the walk, the zone bar and the Body Battery grade the same heartbeat against three different ceilings
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · owner: *"we should only have one calculation for our heart rate zones so try make them consistent."*
