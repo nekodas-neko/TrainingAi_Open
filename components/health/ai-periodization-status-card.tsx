@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useLayoutEffect, useState, useCallback } from "react";
+import { memo, useLayoutEffect, useMemo, useState, useCallback } from "react";
 import { toast } from "sonner";
 import { SparklesIcon, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,8 +8,22 @@ import { getSessionIcon } from "@/lib/session-icon";
 import { cn } from "@trainingai/shared/utils";
 import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache";
 import { invalidateAiPeriodization } from "@/lib/cache-groups";
-import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl';
+import { TTL_LONG, TTL_MEDIUM } from '@trainingai/shared/cache-ttl';
+import { useCachedValue } from '@/lib/hooks/use-cached-value';
+import { baselineProgress, baselineProgressLabel } from '@/components/health/periodization/baseline-progress';
 import type { SessionPeriodization } from "@trainingai/shared/types/ai-periodization";
+
+/**
+ * The exercise list per session, for LA-92's denominator.
+ *
+ * Read from `workout-data:meta` rather than added to `/api/ai-periodization/program-overview`: that
+ * route has `ps.exercises` in scope and does not emit it, but it is an `app/api/**` path and this is
+ * Lane B. The key is already in the sync provider's warm list at TTL_LONG, so this is a cache read
+ * in the ordinary case rather than a second request for a label.
+ */
+interface WorkoutMeta {
+  program?: { sessions?: { id: string; exercises?: { id?: string }[] }[] } | null;
+}
 
 interface SessionOverview {
   sessionId: string;
@@ -50,6 +64,17 @@ export const AiPeriodizationStatusCard = memo(function AiPeriodizationStatusCard
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+
+  // No `onError`: a missing exercise list degrades to the old wording, which is a worse label rather
+  // than a broken card, so there is no error state to raise for it.
+  const meta = useCachedValue<WorkoutMeta>('workout-data:meta', '/api/workout-data?tab=meta', TTL_LONG);
+  const exerciseIdsBySession = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const ps of meta?.program?.sessions ?? []) {
+      map.set(ps.id, (ps.exercises ?? []).map(e => e.id).filter((id): id is string => typeof id === 'string'));
+    }
+    return map;
+  }, [meta]);
 
   const loadSessions = useCallback(() => {
     setFailed(false);
@@ -129,6 +154,7 @@ export const AiPeriodizationStatusCard = memo(function AiPeriodizationStatusCard
             const phase = state?.phase ?? 'baseline';
             const sessionsInPhase = state?.sessionsInPhase ?? 0;
             const baselineComplete = state?.baselineComplete ?? false;
+            const progress = baselineProgress(state?.baseline1rm, exerciseIdsBySession.get(s.sessionId));
 
             // A-7: render the session's Lucide icon via the shared mapping instead of
             // the raw stored emoji — every other session surface uses getSessionIcon.
@@ -143,7 +169,11 @@ export const AiPeriodizationStatusCard = memo(function AiPeriodizationStatusCard
                   <p className="text-sm font-medium truncate">{s.sessionName}</p>
                   {state != null && phase === 'baseline' && !baselineComplete ? (
                     <div className="flex items-center gap-2">
-                      <p className={cn("text-[11px] font-medium", PHASE_COLORS[phase])}>Baseline needed</p>
+                      {/* LA-92 — "Baseline needed" read the same after zero sessions and after
+                          four of five exercises, which is why BF-131 could not be reported. */}
+                      <p className={cn("text-[11px] font-medium", PHASE_COLORS[phase])}>
+                        {progress ? baselineProgressLabel(progress) : 'Baseline needed'}
+                      </p>
                       {/* A-8: a baseline-applying action was a ~14px bare button. Use the
                           shared Button primitive (focus ring, disabled handling, a real
                           padded hit area) in place of the raw text link. */}

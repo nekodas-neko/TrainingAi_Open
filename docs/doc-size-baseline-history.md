@@ -9565,3 +9565,15 @@ entry still owing a device check states so with `Keep:` rather than being delete
 `Keep:` entry naming the one owed check, plus the non-obvious mechanism (the measure is the rollup
 watermark, not the newest ingested sample) and the two journals. It now sorts into KEEP instead of
 heading the work list.
+
+## 2026-09-09 — `docs/implementation-backlog.md` 19,587 → 19,600 (+13), LA-92 shipped and LB-93 filed
+
+The entry leaves whole: nothing is still owed. Its trace lives in the journal instead, including the
+one correction worth carrying — the entry called this "a rendering job rather than a data one", and
+the count's denominator was not in the card's payload. It came from `workout-data:meta` rather than
+from a route change, so the classification held, but "just the surface" was again not quite true.
+
+LA-92 out is −21; **LB-93 in is +34**, and it is the longer half deliberately. It carries a five-row
+table of runs because the finding is *"this fails on branches that did not cause it"* — a claim one
+red run cannot support and which cost five runs to establish. Without the table the next author to
+see it red starts the same elimination from scratch, which is the whole expense of this flake.
