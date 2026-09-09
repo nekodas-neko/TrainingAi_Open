@@ -13,9 +13,13 @@ stay valid. **Rewritten in full, never appended** — narrative lives in the lin
 
 **Nothing is blocked on the owner.** Every decision the queue needed has been asked and answered —
 2026-08-24 (TN-5/TN-6/TN-6a, history policy), 2026-08-26 (TN-9's intent, TN-15's redesign),
-2026-08-31 (the step goal: **manual wins**), and **2026-09-09** (*"make all the changes you
-recommend"* — TN-29 then TN-27 option 3). **TN-25 is the one open owner question**: three options for
-the guided walk's fast target, filed 2026-09-08, not yet chosen.
+2026-08-31 (the step goal: **manual wins**), and **2026-09-09** twice — *"make all the changes you
+recommend"* (TN-29 then TN-27 option 3) and the three cardio decisions (**TN-30's pinned 178**,
+TN-25's varied prescribed walk, TN-31's move to Run). **Nothing carries an open owner question.**
+
+**The one thing owed by the owner is an ACTION, not a decision: run the Cooper 12-Minute Run**
+(`fitness-tests/protocols.ts`) so the pinned 178 can be replaced by a measured max. Ask once; do not
+re-derive the anchor while waiting.
 
 **The owner's standing verdict, 2026-08-26:** *"Overall the pillars are not working great and not
 very useful. Requires tuning."* The queue is long because the pillars were measured.
@@ -28,12 +32,15 @@ say so plainly rather than re-measuring the pillar a fourth time.
 
 | ID | What | State |
 |---|---|---|
-| **TN-24** | Zone 1 spans 52–122 bpm, so Zone 2 is unreachable on foot and the walk's zone bar carries nothing | supplies **Q-523's** mechanism; PR #998 |
-| **TN-25** | the walk's fast target (≥133 bpm) met **0 of 44 times**; fast blocks average the slow target | **`Gate: owner`** — three options, unanswered |
+| **TN-24** | Zone 1 spans **52–132** bpm, so Zone 2 is unreachable on foot and the walk's zone bar carries nothing | supplies **Q-523's** mechanism; boundary corrected 2026-09-09 |
+| **TN-25** | the walk's fast target (≥133 bpm) met **0 of 44 times**; fast blocks average the slow target | **✅ decided** — varied prescribed patterns, 105–118 bpm band |
 | **TN-26** | cadence and speed mean different things per surface; prescribe heart rate, demote the controls | rewritten after the owner declined treadmill tuning |
 | **TN-27** | maintenance rejects its 28-day window and falls back to the noisy 14-day one → **2,245 kcal** | **owner chose option 3**, after TN-29 |
 | **TN-28** | the one card that writes the calorie goal hides the `low confidence` its siblings show | Lane B, independent |
 | **TN-29** | two independent maintenance estimates computed per request, never compared; gate on the activity factor | **owner-approved, build first** |
+| **TN-30** | one zone model, **four** max-HR resolvers; three live and 19 bpm apart, agreeing only by coincidence | **✅ decided** — pin a 50/50 blend at **178**, `Needs: TN-25` |
+| **TN-31** | split the interval jog into Run as an assigned run type; interval jog → `tempo` | **✅ decided** — routing, `recommendRunType` already exists |
+| **TN-32** | three surfaces describe zones in a model the engine does not use | Lane B, not gated |
 
 **Earlier batches, all still queued and none blocked:** TN-2 (battery charge window, offset unfitted)
 · TN-5 (`SCORE_CALIBRATION` 8-fold gain) · TN-6/6a/8/18 (the temperature baseline and its four
@@ -402,6 +409,93 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
   at `total_count: 0` looking like slow CI; the branch could never merge and no amount of re-merging
   fixes it. **Rebuild the content on a fresh `origin/main` branch and close the original** — for a
   docs-only PR that is ten minutes, and fighting the history is not.
+- **⛔⛔ THE INTERVAL-WALKING PROTOCOL IS SOUND AND THE APP IMPLEMENTS IT CORRECTLY (TN-25, addendum
+  5 — which CORRECTS addendum 4).** Nemoto/Masuki/Nose put the fast phase at ~70% of peak aerobic
+  capacity and `hrReserveTarget(0.70, …)` renders exactly that: **133 bpm is the right number.** What
+  does not transfer is the population — those cohorts were ~60–70, for whom brisk walking reaches 70%
+  of peak; at 33 with a max of 168 it does not. **And the owner has already exceeded it on foot:**
+  2026-07-24, a 9.2-min run at **145 bpm average = 80% reserve**. So the fix is to JOG the fast
+  blocks, not to lower the target. **⛔ Do not lower 133 to match the copy — the target is right and
+  the copy is wrong.** A predecessor (this agent, same day) recommended continuous walking over the
+  protocol and had to correct it when the owner asked for the research.
+- **The same two rows measure TN-26's surface effect:** an outdoor walk averaged **117 bpm** against
+  the treadmill's **89–91** for the same activity. 27 bpm apart.
+- **⛔⛔ THE ZONE MODEL IS SINGLE-SOURCED; THE MAX-HR ANCHOR IS NOT — FOUR RESOLVERS (TN-30).**
+  `ZONE_DEFS` is the only set of fractions in the app and nothing re-bands HR anywhere. But
+  `hrMaxFromAge` (**187**), `resolveMaxHr` (**187** — observed only if ≥ age), `targetAnchorMax`
+  (**168** — walk and fitness tests) and `resolveBatteryHrMax` (**168** — Body Battery) are four
+  answers to "what is this user's max", and **three are live at once**: the zone bar says the range
+  ends at 187 while the walk and the Body Battery say 168. **⚠ They agree BY COINCIDENCE today** —
+  the walk's fast target is `0.70 × 116 + 52 = 133` and the Zone-2 floor is `0.60 × 135 + 52 = 133`,
+  same number, unrelated arithmetic, nothing holding them equal. **Always name WHICH max a zone
+  number came from.**
+- **⚠⚠ ADDENDUM 4'S "%HRmax vs %HR-reserve, two models" CLAIM WAS WRONG AND IS RETRACTED (addendum
+  6).** The app does not mix zone models. This agent invented that framing, published it, and had to
+  correct it a second time in the same thread. **The real two-model mismatch is in the framework
+  PROSE** — `zone2-base.ts:6` says *"Zone-2 (60–70% HRmax)"* while the engine bands on %reserve, a
+  ~20 bpm gap (TN-32). **Read the code before naming a model.**
+- **⚠ TN-24's "Z1 = 52–122" WAS WRONG; it is 52–132**, because zone bands use `maxHr` (187) and the
+  entry used the observed max (168). Corrected in place 2026-09-09, along with the cadence
+  extrapolation (≈198 → **≈238 spm**, now consistent across TN-24 and TN-25). The conclusion held: Z1
+  is 60% of the range and the fast blocks reach Z2 **0 of 44** against either anchor.
+- **The owner's observed max of 168 is a FLOOR, not a test** (63 samples at 160+, so not an artefact;
+  age-predicted is ~180–187). A higher true max moves classic Z2 up and makes the walks look easier —
+  state that direction rather than treating 168 as measured.
+- **Trend Z2 MINUTES, not target compliance.** Across 318 minutes walked in 11 sessions the owner gets
+  **~13 min/week** at ≥101 bpm; brisk fast blocks would give ~29 and a 30-min continuous walk at 105+
+  about **60**. **⛔ Continuous at the CURRENT fast pace gives zero** — 98.5 sits 3 bpm under the floor.
+  Two sessions (2026-08-18, 2026-09-02) already produced 18–21 minutes in band, so this is an
+  execution range and not a ceiling.
+- **An interval protocol earns its structure only through CONTRAST.** Fast-minus-slow measures
+  **7.7 bpm** here (4.4–10.0 per session), so the session is a continuous walk with a wobble, and a
+  genuinely hard fast half needs 233 spm — a jog. **Do not defend an interval structure whose contrast
+  is within noise of its own blocks.**
+- **⛔⛔ DURATION WAS THE MISSING TERM, AND THE OWNER FOUND IT BY WALKING (addendum 7, 2026-09-09).**
+  This agent told them cadence would buy ~3 bpm and they should not expect much. They walked 35 min
+  at 5 fast / 2 slow: fast blocks **97 → 116 within the session (+19 bpm)** on **+11.7 spm**, session
+  average **104 against ~90** across the previous ten. **82% of the movement was duration.** The
+  reason it was invisible: every figure in that review was fitted **ACROSS blocks**, so a
+  within-session effect could not appear in it by construction. **When a model says an input is
+  exhausted as a lever, check what the model has no term for at all.**
+- **⚠ And the mechanism was accumulated load, not interval contrast.** Per-set contrast ran +24, +8,
+  +10, +2, +9 — it collapsed because the slow blocks stopped recovering (set 4's "slow" block, 108
+  bpm, sat above the historical FAST average of 98.5). **A session that gets harder by having its
+  recovery fail is a continuous effort, not better intervals** — which is evidence for the continuous
+  option, not the interval one.
+- **⚠ When the owner disputes a number, price the extrapolation before defending it.** The ≈238 spm
+  figure was fitted over 76–132 spm, a 95% interval of 176–369, r = 0.512. It was quotable-looking and
+  worthless, and it was the same error this agent had flagged one addendum earlier on the treadmill
+  speed curve. **Owner scepticism about a modelled number has been right twice in this thread.**
+- **✅ THE THREE CARDIO DECISIONS ARE MADE, 2026-09-09 — do not re-open them.** (1) **Max HR: a pinned
+  50/50 blend, `(168 + 187) / 2 = 178`**, stored as a constant with `source: 'blended'`, replaced
+  wholesale when the **Cooper 12-Minute Run** (already in `fitness-tests/protocols.ts`) gives a
+  measured value. (2) **The Guided Walk keeps its intervals, varied and PRESCRIBED** — pattern chosen
+  by the deterministic zone-gap selector, target an absolute **105–118 bpm band**, never a reserve
+  fraction. (3) **The jog moves to Run as an assigned run type**; interval jog → `tempo`, and
+  `recommendRunType` does the assigning.
+- **⛔ 168 IS A FLOOR, NOT A MAX, AND THIS AGENT RECOMMENDED IT ANYWAY.** The argument was *"187 sits
+  19 bpm above anything ever recorded"* — but nothing in the record is a maximal effort, so that was
+  absence of evidence. **The refutation is in the data and took one query:** 2026-07-05 holds
+  **156–168 bpm for 13 unbroken minutes**, and a hard 13-minute effort runs at ~92–95% of max, so the
+  true max is **177–183**. **Before treating an observed maximum as a ceiling, find the longest
+  sustained effort and divide.**
+- **⚠ A BLENDED CONSTANT MUST BE PINNED, NEVER RECOMPUTED.** A live `(observed + predicted) / 2`
+  drifts every time the observed max moves, so zones shift for reasons unconnected to fitness. Freezing
+  the value answers the objection; arguing against the blend does not.
+- **⚠ The anchor and the walk target are COUPLED and the sequencing bites.** Unifying at 178 raises the
+  walk's `0.70` target from **133 → 140**, the opposite of the fix. TN-25's absolute band must land
+  first or in the same PR — which is also why the band is stated in bpm rather than as a fraction.
+- **⚑ THE PRESCRIPTION ENGINE ALREADY EXISTS — `recommendRunType(quota)`
+  (`recommend-run-type.ts:26`).** It deterministically picks whichever session fills the week's biggest
+  open zone gap, and its own comment says no LLM number gates it. The owner asked for *"decided
+  scientifically based on my week/day"* for both walks and runs; that is this function extended, not a
+  new engine. **⛔ Do not let a model pick the session** — that is a self-reported number gating an
+  automatic action.
+- **⚠⚠ THREE PUBLISHED RECOMMENDATIONS WERE WITHDRAWN IN ONE THREAD, EACH TO AN OWNER OBJECTION:**
+  continuous-beats-intervals (wrong about the research), *"the app mixes two zone models"* (invented),
+  and the observed-max anchor (wrong about what 168 means). Two numbers were corrected in place besides.
+  **The findings that survived every round were measured, not modelled** — 0 of 44, Zone 1 at 60% of
+  the range, four resolvers, +19 bpm in one session. **Model output is a hypothesis; state it as one.**
 - **The threshold is usually right and the input usually wrong** — Q-506, Q-512, Q-514, now TN-6.
   Check the input's distribution before touching any constant.
 - **Do NOT lift the sleep scale toward its old mean** — sleep/readiness agreeing is load-bearing for
