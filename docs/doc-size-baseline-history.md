@@ -9822,20 +9822,79 @@ conflict on: they genuinely disagree about one number. Resolved by measuring the
 than by picking a side or splicing the hunks, per the standing rule that only the delta survives a
 rebase.
 
----
+## 2026-09-09 — `docs/overview/entries/` ceiling: I raised it to 400, then took someone else's 335
 
-## 2026-09-09 — `docs/overview/entries/` total ceiling 333 → 400
+**Superseded the same day by a better-informed decision; kept because the reasoning is the useful
+part.** `main` sat at exactly **333**, so the next journal entry from any agent failed CI for all six
+sessions — it landed on #1035 only because that PR was next through. Foldable was **37 against a
+limit of 60**, nowhere near, so by the README's own precedent (250 → 320 on 2026-09-02) the ceiling
+was punishing *well-cited* entries, and I raised to **400** for roughly four days of headroom at the
+measured ~17 entries/day.
 
-**The same shape as the 2026-09-02 raise to 320, and the README's own answer to it.** `main` sat at
-exactly **333**, the ceiling, so the next entry from any agent — and the standing rule puts one in
-every PR — failed CI for all six sessions. It landed on this one only because this PR happened to be
-the next through.
+**A concurrent session had already done better.** They *attempted* the sweep rather than assuming it
+would work, and found the remedy is inverted: all 36 foldable entries are dated 2026-09-08/09,
+because citations accrete with age, so "fold the unlinked oldest-first" would fold the newest two
+days and leave three weeks loose. They raised by **1** deliberately — so the ceiling keeps firing and
+stays visible — and filed **LB-94** for the real fix.
 
-**The sweep is not behind.** Foldable (unlinked) entries are **37 against a limit of 60**, nowhere
-near, so the ceiling is firing on entries that are *well cited by durable docs* — the habit
-`entries/README.md` spends most of its length establishing. Punishing that is backwards, which is the
-conclusion that file already reached.
+Theirs wins; 400 is dropped, and this PR's own entry takes it **335 → 336** by the same +1. Four
+days of headroom would have hidden the problem and removed the pressure driving LB-94, which is the
+opposite of what the number is for — the treadmill is the point until LB-94 lands. **The lesson worth
+keeping: a documented precedent is not a current measurement, and they had one I did not.**
 
-400 buys roughly four days at the measured ~17 entries/day, matching the headroom the 250 → 320
-raise bought. **The trip-wire is unchanged and is the unlinked count, not this one:** if foldable
-starts approaching 60, that is a real compaction, not another raise.
+## 2026-09-09 — `docs/overview/entries/` ceiling 333 → 334, the SECOND raise in an hour
+
+Raised again, one PR after the last one, by a PR that has nothing to do with the journal. That is the
+drift the check is built to make visible, and it is working: the number is now moving once per PR
+because `main` sits on the ceiling and every session writes an entry.
+
+**The raise is the wrong response and is recorded as such.** The right one is **LB-94** — 298 of the
+334 entries are pinned by citations in durable docs, so the compaction sweep tops out at 36 and
+cannot get under any number. Until those citations point at the batched history instead, every PR
+either raises this line or cannot merge. Folding one entry per PR to stay level was considered and
+rejected as the same treadmill wearing a different hat.
+
+## 2026-09-09 — `docs/implementation-backlog.md` 19,878 → 19,919 (+41), LB-95 filed and two entries corrected
+
+LB-95 is BF-133's `personal_records` half, which needs a route and is therefore Lane A's. Most of its
+length is the two things that are **not** usable and why — `listPersonalRecords` drops the date, and
+`/api/weights-summary` covers only the active program — because both look like they would do, and an
+entry that just said "add a route" invites a reviewer to point at either.
+
+The rest is BF-84 gaining a `Needs: BF-94` field. That block existed only in prose, so the queue tool
+offered BF-84 as buildable while BF-84's own body says not to build it.
+
+## 2026-09-09 — `projectOverview.md` 10,468 → 10,480 (+12), BF-133's clinical half is not device-verified
+
+The row covers **both** halves of the screen, because #1009's daily half never got one either — its
+journal said "not exercised" and nothing reached the file every session actually reads. Twelve lines
+is what it takes to say which branch ran (`cachedFetch`) and which did not (`getFitnessTests`), which
+is the part a device check needs to know.
+
+## 2026-09-09 — `docs/overview/entries/` ceiling 334 → 335, and the sweep was tried first this time
+
+Third raise in a session, and the previous note called a raise the wrong response — so the compaction
+sweep was attempted instead of raised straight past. **It cannot be run.** The directory spans
+2026-08-16 to 2026-09-09 and **all 36 foldable entries are dated 2026-09-08 or 2026-09-09**:
+citations accrete with age, so the unlinked set is the *newest* entries, which are precisely the
+recent window the directory exists to hold. `README.md`'s "fold the UNLINKED ones oldest-first" would
+fold the last two days and leave three weeks loose.
+
+So the remedy is inverted, not just inadequate, and the measurement is now on **LB-94** with a note
+not to run the sweep as written. Raised by 1 again rather than by a margin, because the number is
+still the only thing making this visible.
+
+## 2026-09-09 — `docs/implementation-backlog.md` 19,919 → 19,969 (+50), LB-96 and LB-97 filed, OR-102b ④ closed
+
+Two entries, both Lane A's, both found by being unable to finish ④ properly: no route returns a
+weight series longer than seven days, and the target band has no setting to come from. Each carries
+the measurement that makes it actionable — the `metrics.slice(0, 7)` with no parameter, and the grep
+across `users`, the goals tables and the shared types that found no band. OR-102b's own `Keep:`
+shrinks from "③ and ④" to ③, which is Lane A's.
+
+## 2026-09-09 — `projectOverview.md` 10,480 → 10,492 (+12), the reta card is unverifiable on web
+
+The row says what the e2e could and could not reach, which is the unusual part: the coloured branch
+is only reachable in a browser with an absurd fixture, because the seven-day server window makes the
+interval ±4 kg/wk. A shorter row would say "device check owed" and lose the reason it is the *only*
+place the realistic case exists.

@@ -13,6 +13,7 @@ import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { todayInTz } from "@trainingai/shared/date-utils";
 import type { SupplementVial } from "@trainingai/shared/types/supplement";
 import { concentrationWorking, doseWorking, planDose, DEFAULT_BARREL_UNITS } from "./vial-plan";
+import { WeightResponseCard } from "./weight-response-card";
 
 /**
  * The vial's key is `supplements-vials:<id>` on purpose, and it depends on prefix semantics:
@@ -32,9 +33,11 @@ interface Props {
   supplementName: string
   /** Seeds the calculator with the dose the definition carries, when it has a numeric one. */
   defaultDoseMg?: number | null
+  /** Reads `body_metrics` from the local store for the weight-response card. */
+  userId?: string
 }
 
-export function VialSheet({ open, onOpenChange, supplementId, supplementName, defaultDoseMg }: Props) {
+export function VialSheet({ open, onOpenChange, supplementId, supplementName, defaultDoseMg, userId }: Props) {
   const tz = useUserTimezone()
   const [failed, setFailed] = useState(false)
   // Not gated on `open`, and that is deliberate twice over. An empty key would subscribe to every
@@ -144,6 +147,10 @@ export function VialSheet({ open, onOpenChange, supplementId, supplementName, de
               </p>
             )}
           </section>
+
+          {/* ④. Under the calculator rather than on a screen of its own: the owner asked for the
+              four parts in one place, and this is the one that answers "is it working". */}
+          <WeightResponseCard userId={userId} sinceDate={current?.openedOn ?? null} />
         </div>
 
         <div className="flex-none px-4 pt-2 border-t">

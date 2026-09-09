@@ -416,8 +416,16 @@ below threshold and left in place for next time.
   a durable doc, so the sweep tops out at 35 and cannot get under the ceiling. Raising the number is
   what has actually been happening instead; it was raised to 333 on 2026-09-09 to unblock two PRs
   that had nothing to do with the journal, and that is the third such raise.
+- **⚠ MEASURED 2026-09-09, and the prescribed remedy is not merely insufficient — it is INVERTED.**
+  The directory spans **2026-08-16 → 2026-09-09**, and **every one of the 36 foldable entries is
+  dated 2026-09-08 or 2026-09-09**. Citations accrete over time, so the older an entry is the more
+  likely something links it; the unlinked set is therefore the *newest* entries, which are exactly
+  the recent window this directory exists to hold. `README.md` says to *"fold the UNLINKED ones
+  oldest-first"* — run literally, that folds the last two days and leaves three weeks of older
+  entries loose. Nobody should run the sweep as written until this entry is done.
 - **What is owed:** re-point the durable docs' citations at the batched history rather than at the
-  loose entry, so those 297 become foldable, then run the sweep. Mechanically the entry's body moves
+  loose entry, so those 299 become foldable, then run the sweep — and fix the README, whose
+  oldest-first instruction is safe only once the linked/unlinked split stops correlating with age. Mechanically the entry's body moves
   into a `history-*.md` and the citation gains an anchor; the work is deciding which citations are
   load-bearing enough to keep pointing at a whole entry.
 - **⚠ Do not "fix" this by widening the sweep's definition of foldable.** A citation exists because
@@ -427,6 +435,68 @@ below threshold and left in place for next time.
 - **Lane:** ? — it is a docs restructuring, so Orchestrator's by the standing split, but it touches
   no code and any lane can run it. Filed by Lane B, which found it.
 - **Added:** 2026-09-09 · Lane B, on being blocked by the ceiling twice in one hour.
+
+
+### [workouts] LB-95 — personal records are the one half of the measured overview with no route to read them
+
+- **Lane:** A — it needs `app/api/**`, which is Lane A's. Filed by Lane B, which hit the wall while
+  building the rest of the section.
+- **Needs:** BF-133.
+- **What is missing is a read, not a screen.** `personal_records` holds 33 rows — exercise name,
+  `estimated_1rm`, `achieved_at` — and nothing exposes them to the user's own client.
+  `repo.listPersonalRecords` returns a `Map<string, number>` with **the date thrown away**, and the
+  only route that reads them for the current user is `/api/weights-summary`, which reports a
+  `personalRecord1rm` per exercise **of the active program** and carries no date either.
+  `/api/friends/feed` selects `achievedAt` — for other people's records.
+- **⚠ Neither existing source is usable here, and the reason is the card's own rule.** BF-133 is
+  built on *every value carries the date it was read*; a record rendered without one sits beside a
+  dated scan and reads as current. And an active-program filter would silently drop the records for
+  everything not currently programmed — a lifetime best on an exercise you have stopped doing is
+  exactly what a lifetime-best list is for, so a partial list is worse than none.
+- **What to build:** a `GET /api/personal-records` returning `{ exerciseName, estimated1rm,
+  achievedAt }` for the caller, all exercises, newest first, `private, no-store` like its siblings —
+  plus a repository read that keeps the date. Widening `listPersonalRecords` in place would touch
+  its five existing callers, which all want the map; a second read beside it is the smaller change.
+- **Then the surface is small:** a `Training` group in `components/more/details/`, built with the
+  `readingGroups`-shaped rows the section already renders. Lane B's, and roughly an hour once the
+  route exists.
+- **Added:** 2026-09-09 · Lane B, while shipping BF-133's clinical half.
+
+
+### [body][platform] LB-96 — no route returns a weight series longer than seven days, so a browser cannot see a dosing period
+
+- **Lane:** A — `app/api/body-metadata/route.ts` (or a new route), which Lane B may not touch.
+- **Needs:** OR-102b.
+- **Measured 2026-09-09 while shipping OR-102b ④.** `/api/body-metadata` hard-codes
+  `metrics.slice(0, 7)` and takes no range parameter, and it is the **only** server read of
+  `body_metrics` a client has. The whole history lives in the local store, which `getLocalStore`
+  returns null for in a browser — so on the web build the weight-response card, which needs a
+  multi-week window, can only ever render its empty state.
+- **This is not a product bug — the canonical runtime is the APK and the local store is there.** It
+  is a *verification* gap, and it cost real coverage: `e2e/reta-weight-response.spec.ts` has to build
+  its fixture inside seven days, where the 95% interval is about ±4 kg/wk, so the coloured branch is
+  only reachable with an absurd loss rate. The realistic case cannot be exercised anywhere but the
+  device.
+- **What to build:** a `days` (or `from`) parameter on `/api/body-metadata`'s `recent`, bounded like
+  `/api/fitness-tests` bounds its own (365 default, 730 max), defaulting to today's 7 so no existing
+  caller changes. Not a new route — a second one over the same table is how two readers start
+  disagreeing.
+- **Added:** 2026-09-09 · Lane B, on being unable to e2e the realistic case.
+
+### [body] LB-97 — the weight-response band is a constant; the owner asked for it to be their setting
+
+- **Lane:** A — a user preference is storage, and OR-102b calls the band *"the owner's setting"*.
+- **Needs:** OR-102b.
+- OR-102b ④ shipped with `DEFAULT_BAND_PCT_PER_WEEK = { lo: 0.5, hi: 1.0 }` — a named constant the
+  card already threads through as a parameter, so the surface work once a stored value exists is
+  passing it in. **No such setting exists anywhere:** grepped 2026-09-09 for a rate/percentage goal
+  on `users`, the goals tables and the shared types, and there is none.
+- **⚠ It is a percentage of bodyweight per week, not kilograms.** The card converts against the
+  latest weigh-in, so a stored kg figure would silently mean something different as the body changes
+  — which is the whole reason the entry specified a percentage.
+- **Sanity-bound whatever stores it.** A band with `lo > hi`, or a ceiling of 10 %/wk, produces a
+  verdict that is confidently wrong rather than an obvious mistake.
+- **Added:** 2026-09-09 · Lane B, while shipping ④ against the default.
 
 
 ### [heart-rate][cardio] TN-30 — one zone model, four max-HR anchors: the walk, the zone bar and the Body Battery grade the same heartbeat against three different ceilings
@@ -1206,13 +1276,19 @@ random, and worse than no colour because it looks authoritative.
 - **Revisit the plateau call once 6+ weeks of on-drug data exist** to test it against — not before.
 
 - **Reversal cost:** low. A section and a card; no data, no migration (those are OR-102a's).
-- **Keep:** ③ and ④. **① and ② shipped in #1007** — vial setup and the dose calculator, reached from
+- **Keep:** ③ only — it is **Lane A's**, and it is the last part. **① and ② shipped in #1007** — vial setup and the dose calculator, reached from
   a syringe control on any milligram-dosed supplement row, with the owner-verified figures
   (`10 mg ÷ 3 mL = 3.33 mg/mL`, `0.5 mg → 15 units`) covered by unit tests and an e2e.
   - **③ the dose on the day timeline is Lane A's**, and only its *render* is left: the tick already
     stamps `taken_at` (`adapter.ts:6557`, OR-102a), so what is missing is an event type in
     `app/api/day-timeline/route.ts` — an `app/api/**` path Lane B may not touch.
-  - **④ the weight-response chip is UNBLOCKED — LB-67 shipped 2026-09-09.** It was held back on the
+  - **④ SHIPPED 2026-09-09** as `weight-response.ts` + a card in the vial sheet, anchored on the
+    current vial rather than on the last injection: the vial is the span over which the dose is
+    actually constant, and seven days of weigh-ins resolve a rate to about ±1.3 kg/wk against a
+    band 0.35 kg wide. The band is `DEFAULT_BAND_PCT_PER_WEEK` (0.5–1 %/wk); **making it the
+    owner's setting is not built and is LB-97**. The web build can only ever show the empty state —
+    see LB-96.
+  - **④'s history (kept — it is why the shape is what it is): LB-67 shipped 2026-09-09.** It was held back on the
     formula, not the data: a third kg/week estimator beside the two that existed, one of them
     wrong, is the bug class the One Formula rule exists to prevent. There is now one,
     `computeWeightRateFit` in `packages/shared/src/health/long-term-goal-progress.ts`, and it
@@ -1444,12 +1520,14 @@ sounds like:**
   this entry is the *single dense view*; if it is built by duplicating those cards' internals rather
   than reusing them, it becomes a second place every body metric is formatted. Reuse or extract.
 - **Reversal cost:** low — one read-only screen over existing stores. No migration, no new data.
-- **Keep:** the training and performance sections. **Body composition, vitals, metabolism, daily
-  movement and sleep shipped in #1009**, as a read-only section under the editable fields on
-  **More → Profile details** — see the decision below. Still unbuilt: `personal_records`,
-  `fitness_tests`, `dexa_scans` and `measured_rmr` in this view. The clinical two are reachable today
-  at More → DEXA & RMR results and the scale's resting-rate row now points there, so the gap is a
-  single dense view rather than an unreachable number.
+- **Keep:** the device check, and only that. Body composition, vitals, metabolism, daily movement
+  and sleep shipped in #1009; **`fitness_tests`, `dexa_scans` and `measured_rmr` shipped as the
+  "Tests and scans" section**, a second section on the same screen so that each half renders when
+  the other has nothing. `personal_records` is **not** in this view and is now **LB-95**: it needs a
+  route, which is Lane A's, exactly as this entry's `Lane:` line anticipated.
+- **Verify device:** the S25. `fitness_tests` is read local-first and the browser has no native
+  SQLite, so only the `cachedFetch` fallback ran — the `getFitnessTests` branch is unexercised, as is
+  how a now-noticeably longer dense list reads on the phone.
 - **⚠ The BF-118 decision is TAKEN, and it is not the one this entry proposed.** BF-118's screen does
   not exist and is a large unbuilt entry. What does exist is **`/more/details` ("Profile details",
   BF-79)** — name, biological sex, birth year, height, editable, one PATCH — which is precisely
@@ -1494,6 +1572,14 @@ sounds like:**
     of the two specs the 2026-09-04 shard experiment could not clear with a fresh database — but
     that failure was an assertion and this one is not, so they should not be merged into one
     hypothesis.
+  - **⚠ THIRD SIGHTING 2026-09-09 (#1041), and it names the mechanism.** Same spec
+    (`preferences-survive-reinstall:36`), but this time the log carries a browser **`SIGSEGV` with a
+    full stack trace** — `Received signal`, `SEGV_MAPERR`, `cr2: 0x1b0` — and **no `ERR_ABORTED` at
+    all**. `touch-target-size:53` went flaky in the same run; 171 passed. So `net::ERR_ABORTED` and
+    `browser.newContext: … has been closed` are both *downstream* of the renderer crashing, not two
+    separate faults, and this run caught the crash itself. It also confirms the scheduling accident:
+    `preferences-survive-reinstall` is once again the hard failure and once again nothing about it
+    asserted wrongly — the spec run locally on the same commit passes.
   - Recorded because a 26-minute job that eats its own browser roughly one run in three is an
     argument about the job, which is what this entry is for. It also means **a red E2E cannot be
     read as a signal without opening the log**, which is the cost LB-54 is about.
@@ -3964,6 +4050,11 @@ two screens, and a user who sets one has no way to know the other exists.
 - **Lane: B** — reassigned 2026-09-01. It was Lane A while the storage was owed; what is left is a
   rendering condition in `app/session-select/components/recommendation-card.tsx`, which is Lane B's
   file and touches no storage.
+- **Needs:** BF-94 — it settles the SHAPE of this residue, and it is `Gate: device`. Stated only in
+  prose until 2026-09-09, so `next-item.js` offered this entry as buildable while the entry's own
+  body says not to build it: *"do not build the greyed second button and then have BF-94 delete
+  it"*. A reader following the tool would have shipped exactly that. Recorded as a field so the
+  block is visible without reading two entries.
 - **⚠ BF-94 supersedes the SHAPE of this half — read it before building.** Filed later the same day
   from a second owner request (*"can we have the full button for workout; that lets you swipe it to
   turn it to rest?"*), it replaces the two-button row described below with a swipe on the full-width

@@ -6,6 +6,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.444.0",
+    date: "2026-09-09",
+    changes: [
+      "The vial sheet now shows how your weight has responded since you opened the current vial \u2014 the rate per week, the range it could really be, and your target band. The colour only appears once the whole range falls on one side of that band; until then it says so rather than guessing, because a couple of weigh-ins cannot tell 0.4 kg a week from 1.2.",
+    ],
+  },
+  {
+    version: "1.443.5",
+    date: "2026-09-09",
+    changes: [
+      "Profile details now shows your tests and scans too \u2014 a DEXA scan, a lab-measured resting rate and a fitness test, each with the day it was taken. Numbers that share a name with something else on the page say which one they are: the scan\u0027s body fat is not the scale\u0027s, and a measured resting rate is not the scale\u0027s estimate.",
+    ],
+  },
+  {
     version: "1.443.4",
     date: "2026-09-09",
     changes: [

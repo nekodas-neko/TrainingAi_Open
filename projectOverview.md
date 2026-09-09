@@ -1750,6 +1750,30 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [nutrition][body] ⚠️ The reta weight-response card is unverifiable on web, and unseen on the phone (OR-102b ④, 2026-09-09, v1.444.0)
+
+The vial sheet now reports the weight-change rate since the vial was opened, its 95% interval and the
+target band, colouring the chip only when the whole interval clears a boundary.
+[Journal](docs/overview/entries/2026-09-09-feat-reta-weight-response.md).
+**Owed: the device check, and it is the only place the realistic case exists.** The card reads
+`body_metrics` local-first; a browser has no local store, and `/api/body-metadata` — the only server
+read of that table — returns seven days with no range parameter, so on web the interval is about
+±4 kg/wk and the coloured branch is reachable only with an absurd fixture. The e2e proves the
+rendering, not the behaviour over a real dosing period (LB-96 asks Lane A for the range).
+**Also open:** the band is the constant 0.5–1 %/wk, not yet the owner's setting (LB-97).
+
+### [body][app-shell] ⚠️ Profile details now lists tests and scans, and nobody has seen the longer page on the phone (BF-133, 2026-09-09, v1.443.5)
+
+`fitness_tests`, `dexa_scans` and `measured_rmr` render as a "Tests and scans" section under the
+daily readings #1009 added, each row dated and each labelled apart from its same-named neighbour —
+the scan's body fat is not the scale's, and a measured resting rate is not the scale's estimate.
+[Journal](docs/overview/entries/2026-09-09-feat-details-tests-and-scans.md).
+**Owed: the device check**, and it covers both halves of this screen — #1009's never had one either.
+`fitness_tests` is read local-first and the browser has no native SQLite, so only the `cachedFetch`
+fallback ran; the `getFitnessTests` branch is unexercised. And this is now a long dense list on a
+412 dp phone, which is the reading the entry itself flagged as the real check.
+**Not included:** `personal_records`, which has no route that keeps the date — filed as LB-95.
+
 ### [nutrition] ⚠️ A declined plan meal could revert; the fix has only been seen on the web path (LB-51, 2026-09-09, v1.443.4)
 
 Declining a planned meal flips the row optimistically and writes behind it. `loadAnswers` re-runs
