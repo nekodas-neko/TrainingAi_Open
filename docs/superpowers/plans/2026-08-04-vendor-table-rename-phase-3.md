@@ -78,6 +78,20 @@ Also in PR 1, because they break the moment the table moves:
 - **Indexes and constraints keep their old names** after a table rename. Cosmetic, but rename them
   in the same migration or the next reader will think the rename was half-done.
 
+> **⚑ Correction from building PR 1 (2026-09-09): this plan's division of labour was wrong in one
+> important way.** "Code still uses the old names in PR 1" is true of **DML** and false of anything
+> that addresses the **catalogue**. A compatibility view has no primary key, no indexes and no row in
+> `pg_stat_user_tables`. So `full-export.ts` (which discovers the PK to paginate) **threw and took
+> the entire user-data export down**, `getOuraStorageStats` silently reported 6 tables instead of 14,
+> an index test read an empty `pg_indexes` result as "the index was dropped", and a `CREATE INDEX`
+> restore recipe in a source comment would have failed at the moment it was needed. All four had to
+> move in **PR 1**. Carry the rule into PR 2 and PR 3: **DDL, `pg_*`, `information_schema` and PK
+> discovery move with the rename; only DML can wait.**
+>
+> The good news, also measured rather than assumed: composite `ON CONFLICT DO UPDATE` and
+> `ON CONFLICT … DO UPDATE … WHERE` **do** work through an auto-updatable view. That is the
+> assumption the whole compatibility story rests on, and it holds.
+
 ### PR 2 — move the code onto the new names
 
 Drizzle table consts (`ouraDaily` → `sensorDaily`), adapter, slices, tests. Mechanical, and the

@@ -1234,7 +1234,14 @@ export const ouraTokens = pgTable('oura_tokens', {
   updatedAt:           timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
-export const ouraDaily = pgTable('oura_daily', {
+// Q-44 Phase 3 PR 1: the TABLE STRINGS below point at the renamed physical tables; the TypeScript
+// identifiers (`ouraDaily`, …) are deliberately unchanged and are PR 2's job. Splitting it this way
+// keeps the running app talking to real tables rather than depending on the compatibility views for
+// its everyday queries — the views exist for the overlapping-container window during a Railway
+// deploy, which is a much smaller thing to rely on. It also keeps this file agreeing with
+// `lib/export/export-map.ts`, which MUST name physical tables because the export discovers each
+// table's primary key to paginate and a view has none.
+export const ouraDaily = pgTable('sensor_daily', {
   id:     uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   date:   date('date', { mode: 'string' }).notNull(),
@@ -1296,7 +1303,7 @@ export const ouraDaily = pgTable('oura_daily', {
   syncedAt: timestamp('synced_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [unique().on(t.userId, t.date)])
 
-export const ouraHeartrate = pgTable('oura_heartrate', {
+export const ouraHeartrate = pgTable('sensor_heartrate', {
   id:        uuid('id').primaryKey().defaultRandom(),
   userId:    uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   timestamp: timestamp('timestamp', { withTimezone: true }).notNull(),
@@ -1309,7 +1316,7 @@ export const ouraHeartrate = pgTable('oura_heartrate', {
 // Server mirror of the on-device `oura_bucket` coarse-tier RRD trend ladder (migration 137,
 // Phase-2 B1). Durable backup destination for Track-B — device-computed, never server-computed.
 // Coarse tiers are forever-retained (no prune). Keyed `(user_id, tier, bucket_start_ms)`.
-export const ouraBucket = pgTable('oura_bucket', {
+export const ouraBucket = pgTable('sensor_bucket', {
   id:             uuid('id').primaryKey().defaultRandom(),
   userId:         uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   tier:           text('tier').notNull(),
@@ -1432,7 +1439,7 @@ export const ouraDaytimeStressBuckets = pgTable('oura_daytime_stress_buckets', {
 
 // D5 — own daytime-HRV: per-user regression replacing Oura's dhrv_imputation ONNX model
 // (migration 149). One row per user, upserted on refit. See lib/health/daytime-hrv-model.ts.
-export const ouraDaytimeHrvModel = pgTable('oura_daytime_hrv_model', {
+export const ouraDaytimeHrvModel = pgTable('daytime_hrv_model', {
   userId:      uuid('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
   intercept:   doublePrecision('intercept').notNull(),
   hrCoef:      doublePrecision('hr_coef').notNull(),
@@ -1476,7 +1483,7 @@ export const scaleRawSamples = pgTable('scale_raw_samples', {
 
 // Live keepalive battery poll (migration 133) — the 5-min reqBattery() reading persisted
 // so active-use drain rate is captured. measured_at is server-stamped (the poll is live).
-export const ouraBleBatteryPoll = pgTable('oura_ble_battery_poll', {
+export const ouraBleBatteryPoll = pgTable('ring_battery_poll', {
   id:         bigserial('id', { mode: 'number' }).primaryKey(),
   userId:     uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   measuredAt: timestamp('measured_at', { withTimezone: true }).notNull().defaultNow(),
@@ -1487,7 +1494,7 @@ export const ouraBleBatteryPoll = pgTable('oura_ble_battery_poll', {
 // One (anchor_ds ↔ anchor_utc) correspondence per ring-clock epoch (migration 115).
 // A ring reset (re-key / dead battery) starts a new epoch → a new row; older rows
 // keep dating their epoch's samples via created_at ordering.
-export const ouraBleClockAnchors = pgTable('oura_ble_clock_anchors', {
+export const ouraBleClockAnchors = pgTable('ring_clock_anchors', {
   id:        bigserial('id', { mode: 'number' }).primaryKey(),
   userId:    uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   anchorDs:  bigint('anchor_ds', { mode: 'number' }).notNull(),
@@ -1579,7 +1586,7 @@ export const stepLiveWindows = pgTable('step_live_windows', {
 // Raw accel-magnitude chunks from the continuous daytime capture (migration 122).
 // Gait-counted on ingest into step_live_windows; raw retained 7 days for
 // recount/calibration, pruned opportunistically on ingest.
-export const ouraAccelChunks = pgTable('oura_accel_chunks', {
+export const ouraAccelChunks = pgTable('sensor_accel_chunks', {
   id:         bigserial('id', { mode: 'number' }).primaryKey(),
   userId:     uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   startedAt:  timestamp('started_at', { withTimezone: true }).notNull(),
@@ -1594,7 +1601,7 @@ export const ouraAccelChunks = pgTable('oura_accel_chunks', {
 // Phase 5 addendum A3) — the substrate for baseline-relative readiness contributors.
 // Baseline state (ecore-style asymmetric EMA, ×8 fixed-point) is carried forward
 // night to night; n_history is the shared age counter across all six metrics.
-export const ouraDailySummary = pgTable('oura_daily_summary', {
+export const ouraDailySummary = pgTable('sensor_daily_summary', {
   id:     uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   date:   date('date', { mode: 'string' }).notNull(),
@@ -1639,7 +1646,7 @@ export const ouraDailySummary = pgTable('oura_daily_summary', {
 // (scores + contributors, illness radar, stress, training load, energy, body comp, vascular
 // age). Analysis-first + optional read-path acceleration; NOT authoritative over the measured
 // tables. Server-side only (rollup writes, readiness route reads); every column nullable.
-export const ouraDailyDerived = pgTable('oura_daily_derived', {
+export const ouraDailyDerived = pgTable('sensor_daily_derived', {
   id:     uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   day:    date('day', { mode: 'string' }).notNull(),
@@ -1702,7 +1709,7 @@ export const ouraDailyDerived = pgTable('oura_daily_derived', {
 }, t => [unique().on(t.userId, t.day)])
 
 
-export const ouraWorkouts = pgTable('oura_workouts', {
+export const ouraWorkouts = pgTable('sensor_workouts', {
   id:             text('id').primaryKey(),
   userId:         uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   day:            date('day', { mode: 'string' }).notNull(),
@@ -1719,7 +1726,7 @@ export const ouraWorkouts = pgTable('oura_workouts', {
 
 // Oura enhanced tags, sessions (breathing/meditation/nap moments) and rest-mode
 // periods — one row per Oura document, deduped on oura_id. Migration 106.
-export const ouraTags = pgTable('oura_tags', {
+export const ouraTags = pgTable('sensor_tags', {
   id:         uuid('id').primaryKey().defaultRandom(),
   userId:     uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   ouraId:     text('oura_id').notNull().unique(),

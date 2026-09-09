@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **273** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **275** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v38** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -18023,6 +18023,19 @@ describing a safety net that no longer exists.
 - **What is left is hygiene, not the owner request.** Phase 2 is 182 identifiers and Phase 3 is the
   schema tables (~2,813 repo-wide references). Both carry real regression risk — Phase 2's trap is
   cache keys. Neither is urgent now that Phase 1 has landed.
+- ⏳ **Phase 3 PR 1 BUILT 2026-09-09, awaiting the owner's merge decision** —
+  `lane-a/q44-phase3-pr1-table-rename`, migrations 273 (rename + 11 compatibility views) and 274
+  (regenerated `claude_ro`). **It found the plan's blind spot, and PR 2 needs the rule:**
+  *"code keeps using the old names"* holds for **DML only**. A view has no primary key, no indexes
+  and no row in `pg_stat_user_tables`, so `full-export.ts` **threw and took the whole user-data
+  export down**, `getOuraStorageStats` silently reported 6 tables instead of 14, and an index test
+  read an empty set as *"the index was dropped"*. A `CREATE INDEX` restore recipe in a source comment
+  was a fourth. All four moved to physical names in PR 1. **Anything that addresses the catalogue —
+  DDL, `pg_*`, `information_schema`, PK discovery — belongs in the PR that renames, not the one that
+  moves code.** Also proven rather than assumed: composite `ON CONFLICT DO UPDATE` and
+  `ON CONFLICT … WHERE` DO work through an auto-updatable view, which is what the safety story rests
+  on. `lib/sqlite/migrations.ts` is untouched on purpose — same names, different (device-local)
+  schema; renaming there strands installed devices.
 - ✅ **Phase 3 now HAS its plan (2026-08-04):**
   [`docs/superpowers/plans/2026-08-04-vendor-table-rename-phase-3.md`](superpowers/plans/2026-08-04-vendor-table-rename-phase-3.md).
   Three PRs, not one: rename behind compatibility **views** (an `ALTER TABLE … RENAME` is

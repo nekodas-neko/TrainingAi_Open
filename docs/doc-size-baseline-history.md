@@ -10050,3 +10050,21 @@ invalidated 1500 ms after the ingest counter advanced, while the server schedule
 3-second debounce — so every autonomous drain repainted from pre-rollup data and cached it. Worth
 its lines because the symptom (data that looks fresh and is not) gives no hint of the cause, and the
 previous framing in the backlog said the opposite: that no signal existed at all.
+
+---
+
+## 2026-09-09 — backlog 19,922 → 19,935 (+13), entries ceiling 342 → 343 (Q-44 Phase 3 PR 1)
+
+Thirteen lines recording a rule the next two PRs of this sequence need, on an entry that will be
+read by whoever picks them up: **a compatibility view carries DML and nothing else.** PR 1 found it
+the expensive way — `full-export.ts` discovers a primary key to paginate and a view has none, so the
+whole user-data export threw; the storage footprint silently halved; an index test read an empty
+`pg_indexes` result as a dropped index.
+
+Without those lines PR 2 inherits the same wrong division of labour the plan had, and the next
+catalogue-addressing site fails the same way. The plan document carries the correction too, at the
+head of the PR 2 section where it will actually be read, rather than only here.
+
+A note on the counting: this PR's own migration pointer moved 273 → 275, caught by
+`check-backlog-pointers` rather than by me. Two migrations in one PR is correct here (the rename, and
+the regenerated `claude_ro` views that a rename invalidates) and the pointer has to skip both.
