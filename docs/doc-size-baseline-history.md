@@ -8115,7 +8115,9 @@ made the entry's own proposed wording false.
 Sixteen lines for the stage-2 dose-entry paragraph in **Current Status**, which is the section this
 document exists to be: what shipped, what it cost, and the one thing left owed. The detail — the two
 defects found while verifying, the live round trip, the surfaces not exercised — is in the journal
-entry, not here. Raised rather than absorbed because the previous session's paragraph is still the
+entry, not here. **The number here is the merged file**: BF-135's filing raised the same baseline in
+parallel, so the two `.size` files conflicted — the case that check *should* conflict on, since both
+sides genuinely disagree about one number. Recomputed rather than picking a side. Raised rather than absorbed because the previous session's paragraph is still the
 one above it; the compaction sweep is what removes both, not this PR.
 
 ## 2026-09-06 — `projectOverview.md` → 9947 (BF-113's device gate, which was missing)
@@ -10125,7 +10127,28 @@ Two branches moved this number within the hour — BF-134's filing and Q-300's e
 conflicted, which is the case it *should* conflict on: they genuinely disagree about one number.
 Resolved by measuring the merged file rather than picking a side.
 
-## 2026-09-09 — `docs/implementation-backlog.md` raised to 20037 for BF-134's residue
+## 2026-09-09 — `docs/implementation-backlog.md` 20,024 → 20,075 (+51), BF-135
+
+The owner reported the set list being squeezed on an exercise with an active injury. The entry is 51
+lines because the layout cause is one line of code and everything that decides the *fix* is not:
+
+- The header is `flex-none` (`active-workout-screen.tsx:441`) and this branch of the screen has **no
+  scroll container** — the only one belongs to the ready state. So a header that grows with data
+  pushes content under the log sheet with nothing to recover it. Stated explicitly because the
+  obvious patch is to shrink a banner, which leaves the same trap for the next conditional block.
+- **Measured how often it fires:** 3 of Bankai's 24 exercises, all `lower back` — Barbell Hip Thrust
+  in two sessions plus the Single Leg RDL. Not everywhere, which matters for how aggressive the fix
+  should be.
+- **The two-banner worst case is caused by BF-131.** The AMRAP banner is gated on `isBaseline`, and
+  the baseline never completes, so this is permanent rather than a one-session artefact. Recorded
+  because "it clears after baseline" is the natural assumption and is currently false.
+
+The recommendation moves both banners to the ready screen — which already scrolls, and is where the
+weight-and-swap decision is actually made — leaving a chip during the set. It also carries an
+explicit **do not** with a reason: making a safety warning dismissible or set-conditional is the
+shape that gets someone hurt, and this owner's lumbar constraint is why the banner exists.
+
+## 2026-09-09 — `docs/implementation-backlog.md` raised to 20088 for BF-134's residue
 
 BF-134's labelling half shipped and its anchor half did not, so the entry gained `Gate: owner`, a
 `Keep:` line naming what is still owed, and two corrections measured while implementing it — that
