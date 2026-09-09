@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.441.3",
+    date: "2026-09-09",
+    changes: [
+      "The admin error log and pending-count screens now say \u0027service unavailable\u0027 when the database cannot be reached, instead of \u0027forbidden\u0027. They previously reported a permissions problem for any failure \u2014 including on the error log itself, which is the screen you open when something is already wrong.",
+    ],
+  },
+  {
     version: "1.441.2",
     date: "2026-09-09",
     changes: [
