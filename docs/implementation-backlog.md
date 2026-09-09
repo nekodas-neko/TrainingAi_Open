@@ -1574,6 +1574,65 @@ sounds like:**
   read-only list is mostly about scanning — group headers that stick, numbers aligned, and the S25's
   fold not landing mid-group.
 
+### [nutrition] BF-134 — the macro targets and the calorie budget on one card are anchored to different days, and disagree by 406 kcal before you move
+
+- **Lane:** B for the labelling fix (`components/nutrition/energy-card.tsx`, `calorie-zone-bar.tsx`). The anchor decision itself reaches `lib/health/energy-balance-service.ts`, which is Lane A's — settle the wording before touching it.
+- **Added:** 2026-09-09 · owner, on the Nutrition tab: *"is this the right number? looks like its took 200 off the base then 200 off again?"*
+- **Needs:** — nothing.
+
+**First, the reported symptom is NOT a defect, and the entry has to say so or it gets "fixed".** The
+line reads *"1,453 base − 200 for your goal — no movement recorded yet today"* against a budget of
+**1,253**. That is one subtraction, not two: `calorie-zone-bar.tsx:44` prints `restingBase` and
+`goalDelta` as separate terms and `budgetProvenance` sums them once. **Do not go looking for a double
+deduction.**
+
+**Why it reads like one, which IS worth fixing.** `1,453` is not the owner's resting rate. His
+measured RMR is **1,325** (`measured_rmr`, 2026-08-27). The base is
+`bmr × SEDENTARY_MULTIPLIER (1.2)` **minus the energy of the first `STEP_BASE_CREDIT` (3,000) steps**
+— `energy-balance-service.ts:295` — held back so those steps can be *earned* later without being
+counted twice. 1,325 × 1.2 ≈ 1,590, less ~137 for 3,000 steps, ≈ **1,453**. So the number is right,
+and it is reached by a subtraction that is **not** the goal delta and is invisible on the label. A
+user who knows his own RMR sees a base above it, a −200 beside it, and reasonably infers a second
+deduction. The ⓘ already on that card is where the breakdown belongs.
+
+**The actual defect is one line higher.** The macro targets read **150 P / 141 C / 55 F**. That is
+`150×4 + 141×4 + 55×9 = 1,659 kcal`, sitting beside a **1,253** budget — **406 kcal apart**. Eat to
+the macros and the calorie figure is overshot by a third; eat to the calories and every macro reads
+short all day.
+
+- **They are anchored to different things.** The grams come from stored `nutrition_targets`
+  (**1,660**, matching to the kcal) scaled up by *earned* movement — `macroTargetsFor(earned)` at
+  `energy-balance-service.ts:184`. The calorie budget is `restingBase + goalDelta + earned`, which
+  **starts the day at zero movement and grows**. The two converge only once ~406 kcal is earned. On a
+  rest morning they are a full day's movement apart.
+- **The card's own comment says it exists to prevent exactly this**, and its guarantee is narrower
+  than it reads: `energy-card.tsx:44-52` records that *"Q-401 found two budgets on one screen"* and
+  that the donut, the headline and `+N burned` all come from one `budgetProvenance` call so they
+  *"cannot disagree"*. True — and the macro row is not in that set. The reconciliation covers the
+  calorie half of the card only.
+- **Cross-check against TN-29 before changing any number.** That entry protects
+  `nutrition_targets.calories = 1,660` and states the honest band at a `recomp` −200 as
+  **1,450–1,700**. The 1,253 on screen sits *below* that band — which is not a contradiction, it is
+  the whole point: a so-far-today budget and a whole-day target are different quantities. Anyone
+  "fixing" one to match the other without reading TN-29 will move a number that entry deliberately
+  left alone.
+
+**Recommendation: label the macros, do NOT scale the grams down to the current budget.**
+
+- Scaling grams to a zero-movement budget prints a morning protein target near **113 g** that climbs
+  through the day. Protein is the macro this owner's `recomp` goal most depends on holding, and a
+  target that starts low and rises invites under-eating it on a rest day — the worst day to.
+- The honest version is that the grams assume a normal day's movement and the calories do not *yet*.
+  **The card already has the mechanism**: the `WHY TWO NUMBERS` block directly below explains the
+  daily-goal-vs-today's-budget split for calories. Extending it to cover the grams is a copy change
+  against an existing surface, and it fixes the reported confusion without moving a target.
+- **The alternative worth stating:** show the macro row against the *daily goal* (1,660) with the
+  budget row clearly separate, rather than implying both describe the same denominator. More layout,
+  strictly clearer, and the better answer if the copy fix does not land.
+
+- **Reversal cost:** near zero for the labelling. Any change to the macro *anchor* is a behaviour
+  change on a shared service, needs TN-29 read first, and is not this entry's recommendation.
+
 ### [platform] LB-56 — E2E costs 26 minutes a UI PR and currently gates nothing; decide which of those to change
 
 - **Lane:** O — the Orchestrator's, not an implementer's. `.github/workflows/ci.yml`, `playwright.config.ts` and the required-checks
