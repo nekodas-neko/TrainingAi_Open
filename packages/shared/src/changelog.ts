@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.441.0",
+    date: "2026-09-09",
+    changes: [
+      "If your ring missed the start of a night, you can now tell it what time you actually went to bed \u2014 on the Sleep screen, under the stages. It only affects your bedtime average; the recorded night is left exactly as it was.",
+    ],
+  },
+  {
     version: "1.440.0",
     date: "2026-09-08",
     changes: [
