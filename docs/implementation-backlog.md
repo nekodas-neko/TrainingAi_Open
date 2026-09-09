@@ -10804,10 +10804,25 @@ screenshot is a **1:39** walk with the screen on, which exercises none of it.
 
 - **Branch:** `fix/aria-expanded-collapsibles`
 - **Lane:** B
-- **Keep:** a real ratchet script, if one is worth building — it needs to recognize a Radix
-  `CollapsibleTrigger` (direct or via `asChild`/`Slot`) as already-covered and distinguish a
-  collapse chevron from a navigation chevron, neither of which a text grep can do reliably. Also
-  not done: screen-reader/TalkBack verification on either fixed component, and no device check.
+- **✅ THE RATCHET SHIPPED 2026-09-09 — `scripts/check-toggle-aria.js`, and it answers the "if one
+  is worth building" question with a different signal rather than a better grep.** It does not look
+  at icons at all: the shape it matches is a `set…(v => !v)` **inside an `onClick`** whose state
+  also gates a conditional render. A back-button chevron navigates and never matches; derived state
+  like `setLoading(!seeded)` is not in a click handler and never matches.
+  - **Measured on the same tree the 34-file attempt was measured on: 8 candidates, 4 real.** Then,
+    with the toggle required to sit inside the `onClick` and files carrying `aria-pressed` excluded:
+    **1**, also real. **All five are fixed and the baseline is EMPTY** — `program-export-card`,
+    `injury-card`, `trophy-case` and `oura-ble-debug` took `aria-expanded` + `aria-controls`;
+    `session-select-content`'s reorder button took `aria-pressed`.
+  - **⚠ The finding that made the earlier version dangerous rather than merely noisy.** A static
+    check cannot tell a disclosure from a mode toggle, and the right attribute differs:
+    `app/coach/coach-content.tsx` swaps a whole panel and is correctly `aria-pressed`, while
+    `session-select-content` had neither. A check that said *"add aria-expanded"* would have pushed
+    the wrong attribute onto both. **This one reports the question** — reveal a region, or turn a
+    mode on — and says so in its failure text.
+- **Keep:** the device check, and only that. Screen-reader/TalkBack verification on any of the fixed
+  components — an attribute being right in the DOM is not the same as the announcement reading well,
+  and nothing in the sandbox can hear it.
 
 ### [app-shell][platform] Q-477 — the Profile "Auto-detect timezone" button is what breaks the app's dates: the server honours the new zone, the client did not
 
@@ -12315,6 +12330,11 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 - **Branch:** `feat/rest-adherence-signal`
 - **Plan:** none yet
+- **Gate:** owner — the residue is *"a Lane B UI change **once the owner has seen the framing**"*,
+  and the framing is the finding, not a detail: the obvious coaching line (*"you rushed today"*) is
+  meaningless when 40% of every session rushes, and the measured one is *"your rest ignores the
+  plan"* (planned 60 s → 75 s taken, 90 → 65, 120 → 110, 187 → 133). Stated only in the `Keep:` until
+  2026-09-09, so the queue tool offered this as startable UI work.
 - **Added:** 2026-08-15 · from the pillar-soundness review §1.4
 - **Measured** where both planned and actual rest are recorded (n = 276):
   ```

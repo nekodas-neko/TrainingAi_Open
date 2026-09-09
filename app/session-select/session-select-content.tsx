@@ -1060,10 +1060,13 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
             </h1>
           </div>
           <div className="flex items-center gap-2 flex-none">
+            {/* `aria-pressed`, not `aria-expanded`: this puts the sections into reorder mode rather
+                than revealing a region, and without it the only cue that the mode is on is colour. */}
             <button
               onClick={() => setSectionEditMode(e => !e)}
               className={cn("rounded-xl p-2 min-h-11 min-w-11 flex items-center justify-center transition", sectionEditMode ? "text-brand bg-brand/10" : "text-muted-foreground hover:bg-muted")}
               aria-label="Reorder sections"
+              aria-pressed={sectionEditMode}
             >
               <LayoutGridIcon className="h-4 w-4" />
             </button>

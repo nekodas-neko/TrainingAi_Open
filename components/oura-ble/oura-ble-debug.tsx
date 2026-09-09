@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import {
   Activity, Battery, Bluetooth, BluetoothOff, Cloud, Droplet, Footprints,
   HeartPulse, History, KeyRound, Moon, Play, RefreshCw, ScrollText, Square,
@@ -97,6 +97,7 @@ export function OuraBleDebug() {
   const [sent, setSent] = useState({ frames: 0, stored: 0 })
   const [pendingCount, setPendingCount] = useState(0)
   const [showAllEvents, setShowAllEvents] = useState(false)
+  const eventListId = useId()
   const [batteryExempt, setBatteryExempt] = useState<boolean | null>(null)
   const pendingLines = useRef<string[]>([])
   // History-event frames awaiting a confirmed POST. Each carries its ring
@@ -553,14 +554,19 @@ export function OuraBleDebug() {
           </p>
         )}
         {summary && summary.byEventName.length > 0 && (
-          <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs">
+          <div id={eventListId} className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs">
             {(showAllEvents ? summary.byEventName : summary.byEventName.slice(0, 8)).map((b) => (
               <span key={`${b.tag}-${b.eventName}`} className={b.eventName === 'unknown' ? 'text-amber-500' : 'text-muted-foreground'}>
                 {eventLabel(b.tag, b.eventName)}×{b.count}
               </span>
             ))}
             {summary.byEventName.length > 8 && (
-              <button onClick={() => setShowAllEvents((v) => !v)} className="text-primary hover:underline">
+              <button
+                onClick={() => setShowAllEvents((v) => !v)}
+                aria-expanded={showAllEvents}
+                aria-controls={eventListId}
+                className="text-primary hover:underline"
+              >
                 {showAllEvents ? 'show less' : `+${summary.byEventName.length - 8} more`}
               </button>
             )}
