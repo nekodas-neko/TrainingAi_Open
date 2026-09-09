@@ -9715,6 +9715,18 @@ entry still owing a device check states so with `Keep:` rather than being delete
 watermark, not the newest ingested sample) and the two journals. It now sorts into KEEP instead of
 heading the work list.
 
+---
+
+## 2026-09-09 — `docs/implementation-backlog.md` ratcheted DOWN (LB-57 shipped)
+
+The entry is removed because the work is done: `summariseSupplementDay` is hoisted into
+`packages/shared/src/nutrition/supplement-day-totals.ts` and both the adapter and the device call it.
+Nothing is owed, so this is a deletion rather than a `Keep:`. Landed as 19587 → 19558 and rebased to
+**19878 → 19849** when #1002 and #1036-#1042 merged first — the delta is the 29 lines of the
+entry either way, which is the number this record is actually about.
+
+---
+
 ## 2026-09-09 — `docs/agents/state/tuning.md` 517 → 524 (+7), the baton's Now section reconciled
 
 Three rows for TN-30, TN-31 and TN-32, which the entry table was missing, plus a corrected TN-24
@@ -9809,6 +9821,26 @@ LB-51's removal took one out (−25) — so the `.size` conflicted, which is the
 conflict on: they genuinely disagree about one number. Resolved by measuring the merged file rather
 than by picking a side or splicing the hunks, per the standing rule that only the delta survives a
 rebase.
+
+## 2026-09-09 — `docs/overview/entries/` ceiling: I raised it to 400, then took someone else's 335
+
+**Superseded the same day by a better-informed decision; kept because the reasoning is the useful
+part.** `main` sat at exactly **333**, so the next journal entry from any agent failed CI for all six
+sessions — it landed on #1035 only because that PR was next through. Foldable was **37 against a
+limit of 60**, nowhere near, so by the README's own precedent (250 → 320 on 2026-09-02) the ceiling
+was punishing *well-cited* entries, and I raised to **400** for roughly four days of headroom at the
+measured ~17 entries/day.
+
+**A concurrent session had already done better.** They *attempted* the sweep rather than assuming it
+would work, and found the remedy is inverted: all 36 foldable entries are dated 2026-09-08/09,
+because citations accrete with age, so "fold the unlinked oldest-first" would fold the newest two
+days and leave three weeks loose. They raised by **1** deliberately — so the ceiling keeps firing and
+stays visible — and filed **LB-94** for the real fix.
+
+Theirs wins; 400 is dropped, and this PR's own entry takes it up by the same +1 (335 → 336, then → 337 as main kept moving). Four
+days of headroom would have hidden the problem and removed the pressure driving LB-94, which is the
+opposite of what the number is for — the treadmill is the point until LB-94 lands. **The lesson worth
+keeping: a documented precedent is not a current measurement, and they had one I did not.**
 
 ## 2026-09-09 — `docs/overview/entries/` ceiling 333 → 334, the SECOND raise in an hour
 

@@ -1,41 +1,4 @@
-import type { LocalSupplementLog } from '@/lib/local-store/types'
 import type { SupplementDayAmount } from '@trainingai/shared/types/supplement'
-
-/**
- * BF-112. The day's exposure to each substance, derived from its live contributions.
- *
- * The Postgres adapter derives the same two values on read (`listSupplements`), and the device
- * cannot reach that code — the nutrition page returns early on its local-first branch, so on the
- * APK these fields would otherwise never be populated at all. **This is a second implementation of
- * one formula and is filed as LB-57 for Lane A to hoist into `packages/shared`**; `packages/shared`
- * and `lib/data` are Lane A's, so the extraction is not this lane's to make.
- *
- * The semantics that must match, and each is load-bearing:
- * - `loggedToday` counts the MANUAL contribution only. It is the tick's checked state, and the tick
- *   writes and removes exactly that row — a meal's dose turning it on leaves a control that refuses
- *   to turn off.
- * - `loggedAmount` counts EVERY live contribution, which is what answers "was it taken today".
- * - its `amount` stays null when no contribution carried a number. A tick means "taken", not "took
- *   none of it", and 0 is the unknown-coerced-to-zero mistake the presence model exists to prevent.
- */
-export function summariseSupplementDay(
-  logs: LocalSupplementLog[],
-): Map<string, { loggedToday: boolean; loggedAmount: SupplementDayAmount }> {
-  const out = new Map<string, { loggedToday: boolean; loggedAmount: SupplementDayAmount }>()
-  for (const l of logs) {
-    if (l.deletedAt) continue
-    const acc = out.get(l.supplementId)
-      ?? { loggedToday: false, loggedAmount: { amount: null, unit: null, contributions: 0 } }
-    // `source` is optional on the type because every writer that predates BF-69 omits it, and
-    // `upsertSupplementLog` defaults it to 'manual' — so an absent source is a manual tick.
-    if ((l.source ?? 'manual') === 'manual') acc.loggedToday = true
-    if (l.amount != null) acc.loggedAmount.amount = (acc.loggedAmount.amount ?? 0) + l.amount
-    acc.loggedAmount.unit ??= l.unit ?? null
-    acc.loggedAmount.contributions += 1
-    out.set(l.supplementId, acc)
-  }
-  return out
-}
 
 /**
  * The same total after the page's own tick, without waiting for a round trip.
