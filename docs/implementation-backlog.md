@@ -527,7 +527,48 @@ below threshold and left in place for next time.
   logged *snapshot* rather than today's configuration; a server aggregate derived from live styles
   or a 7-day window answers a different question, which is how two numbers for one metric start.
 - **Added:** 2026-09-09 · Lane B, after hitting it twice in one session.
+- **✅ THE Q-300 HALF SHIPPED 2026-09-09** (`lane-a/lb98-rest-adherence-set-pairs`).
+  `/api/health-trends?view=rest-adherence` now returns `restSets` — per-set
+  `{ plannedRestSec, restTimeSec }` from the **logged** columns, shaped as the card's own `RestSet`
+  so the fallback is a swap into the same `restByPrescription` rather than a second aggregate. Only
+  sets carrying both are emitted; a prescription of `0` is dropped ("none planned", not a target)
+  while a rest **taken** of `0` is kept (a real measurement — discarding it biases the mean upward).
+  Five mutants, all caught, including one that swaps the logged snapshot for the live style.
+- **Keep: TWO things, and neither is the route.**
+  1. **The card's fallback wiring is Lane B's** — `components/health/rest-prescription-card.tsx`
+     still returns `null` when `getLocalStore` is null. The read now exists; nothing consumes it yet,
+     so the verification gap is not closed until that lands.
+  2. **The `body_metadata` half is LB-96**, still parked on `Needs: OR-102b`.
+- **Measured in production while building this, and worth keeping:** of 1,189 set logs, **462** carry
+  `planned_rest_sec` and **838** carry `rest_time_sec`; **442** carry both, all inside the route's
+  90-day window (841 sets). So the column started being written recently and covers ~53% of the
+  window — enough to be worth publishing, and far from enough to assume present.
 
+
+### [workouts] LA-95 — the rest-discipline bars grade past sessions against today's prescription
+
+- **Lane: A** — `app/api/health-trends/route.ts`, the `rest-adherence` branch.
+- **Added:** 2026-09-09 by Lane A, while shipping LB-98's half of the same view. Filed rather than
+  fixed: changing it moves numbers the owner already reads, so it is a decision, not a tidy-up.
+- **The finding.** The view's buckets derive `prescribedRestSec` from `listProgressionStyles(userId)`
+  — the style as it is **now** — and correlate that against session performance over 90 days. But
+  `set_logs.planned_rest_sec` records what the plan actually asked when the set was logged, and
+  LB-98 now publishes it from the same route. So one response carries two prescriptions: the bars
+  use today's, the `restSets` pairs use the logged one.
+- **The card in the same view says the logged value is the honest one, in as many words:** *"a later
+  style edit would silently rewrite what 'prescribed' meant for a past set"*
+  (`rest-prescription-card.tsx`). That reasoning applies to the bars too — they are the surface where
+  a style edit rewrites history.
+- **Why it is not simply a bug.** The two halves are documented as answering different questions:
+  the bars ask *"does resting to plan go with lifting better?"*, the card asks *"what does the plan
+  ask, and what do you take?"*. Against **today's** plan the bars' framing is defensible. It stops
+  being defensible for a 90-day window in which the style changed, and nothing records whether it did.
+- **What to build, if the owner wants it:** prefer `set_logs.planned_rest_sec` and fall back to the
+  live style only where the logged value is absent — measured 2026-09-09 as **442 of 841** sets in
+  the window carrying it, so the fallback is load-bearing and cannot be dropped.
+- **⚠ It will move published numbers.** State how many sessions change before shipping it; a
+  correlation re-derived against a different denominator is a rewrite of a trend the owner has
+  already read, which is the same bar Tuning proposals are held to.
 
 ### [heart-rate][cardio] TN-30 — one zone model, four max-HR anchors: the walk, the zone bar and the Body Battery grade the same heartbeat against three different ceilings
 

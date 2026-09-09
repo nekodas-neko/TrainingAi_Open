@@ -23,6 +23,16 @@ export interface TrendsResponse {
   stats?: CorrelationStats
   /** Set when a sentence was deliberately withheld, and why. */
   withheld?: WithheldReason
+  /**
+   * `rest-adherence` only (LB-98). Per-set **logged** rest pairs — what the plan asked when the set
+   * was logged, and what was actually taken — so the Rest-vs-plan card has a read path when the
+   * local store is absent (a browser, and therefore CI). Shaped as `RestSet` so the card's fallback
+   * is a swap into the same `restByPrescription`, not a second aggregate that could disagree.
+   *
+   * NOT the numbers `buckets` is built from: those use the CURRENT progression style, which answers
+   * a different question. See the comment at the emit site.
+   */
+  restSets?: { plannedRestSec: number; restTimeSec: number }[]
 }
 
 const RECOVERY_BUCKETS: BucketDef[] = [
@@ -199,7 +209,35 @@ export async function GET(req: Request) {
       undefined, undefined,
       { points, control },
     )
-    result = { view, insight, buckets: toBucketResponse(buckets), hasSufficientData, stats, withheld }
+
+    // LB-98: the per-set pairs the Rest-vs-plan card needs, so it has a read path off the device.
+    // Local-only data cannot be exercised in CI — the card renders its empty state in a browser and
+    // ships owing a device check — and this is the swap that closes it.
+    //
+    // **These are the LOGGED columns, deliberately, and they are NOT the numbers the buckets above
+    // are built from.** `prescribedRestSec` in the correlation comes from the CURRENT progression
+    // style, which answers "does resting to plan go with lifting better?" against today's plan. The
+    // card asks a different question — what the plan asked AT THE TIME versus what was taken — and a
+    // later style edit would silently rewrite the first half of that for every past set. Emitting
+    // the live-style value here would look consistent and answer the wrong question.
+    //
+    // Only sets carrying both are emitted: `restByPrescription` discards the rest anyway (a
+    // prescription of 0 is "no rest planned", not a target), so sending them would be payload for
+    // nothing. Measured in production 2026-09-09: 442 of 841 sets in the 90-day window carry both.
+    const restSetPairs: { plannedRestSec: number; restTimeSec: number }[] = []
+    for (const ws of workoutSessions) {
+      for (const ex of ws.exercises) {
+        for (const set of ex.sets) {
+          const planned = set.plannedRestSec
+          const actual = set.restTimeSec
+          if (typeof planned !== 'number' || !Number.isFinite(planned) || planned <= 0) continue
+          if (typeof actual !== 'number' || !Number.isFinite(actual) || actual < 0) continue
+          restSetPairs.push({ plannedRestSec: planned, restTimeSec: actual })
+        }
+      }
+    }
+
+    result = { view, insight, buckets: toBucketResponse(buckets), hasSufficientData, stats, withheld, restSets: restSetPairs }
 
   } else if (view === 'hrv-volume') {
     // Measured over production before it was built: overnight HRV → same-day tonnage r|t = +0.495,

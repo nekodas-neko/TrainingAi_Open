@@ -131,6 +131,27 @@ needs a regenerated view migration in the SAME PR** (`CLAUDE_RO_OWNER_USER_ID=<u
 scripts/generate-claude-ro-views.js > lib/data/postgres/migrations/<next>_claude_ro_views_<reason>.sql`,
 always a new number — `ensureSchema` tracks by filename). The generator emits an explicit column
 list per view, so a new column is invisible to `/api/admin/db-query` until the views are rebuilt.
+**Third blind spot, and this one is self-inflicted: applying a BRANCH's migration to the shared
+local database poisons every later run in the session.** The database outlives the checkout. Apply a
+migration that exists only on one branch, switch to another, and the schema no longer matches any
+branch's code — so a full run reports failures that belong to neither.
+
+Measured 2026-09-09. Q-44's table rename (migrations 273/274) was applied locally to verify it; a
+later branch then ran the full suite and reported **7 failures across 4 files** — the export
+manifest, the storage footprint, an index assertion and the `claude_ro` drift gate. None were that
+branch's. All were code on `main` still naming tables the local database had renamed underneath it.
+
+**The tell is the shape, not the count:** the branch's OWN tests passed (46/46) while unrelated
+catalogue- and export-level tests failed. A failure set that avoids the thing you changed is
+evidence about the environment, not the diff. Read it that way before debugging code that is fine —
+the opposite reading costs a rework of working code, or a false "this branch is broken".
+
+**Reverting needs an order.** The compatibility views were depended on by the `claude_ro` views, so
+a straight reverse fails with `cannot drop view … because other objects depend on it`. The sequence
+that works: `DROP SCHEMA claude_ro CASCADE`, reverse the renames, then re-apply the last
+`claude_ro` migration on the branch you are returning to. Deriving the reverse by parsing the
+migration file beats re-deriving it from the catalogue, which by then describes the renamed world.
+
 The test user `test@local.dev` has password `testpass123` (seeded with a bcrypt
 hash) for credentials-login testing.
 
