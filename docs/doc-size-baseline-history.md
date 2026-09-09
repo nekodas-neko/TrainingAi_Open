@@ -9477,7 +9477,7 @@ that the named screen is not there.
 `/api/body-metadata` returns seven days, and a card about the latest reading of each metric shows
 most of them as absent on a seven-day window.
 
-## 2026-09-09 — backlog → 19972, `tuning.md` → 517: the owner's three cardio decisions
+## 2026-09-09 — backlog → 19924, `tuning.md` → 517: the owner's three cardio decisions
 
 All three gates cleared in one exchange, and one of them overturned a recommendation this review had
 already published.
