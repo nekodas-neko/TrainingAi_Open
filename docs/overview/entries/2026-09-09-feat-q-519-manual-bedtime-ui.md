@@ -1,6 +1,6 @@
 ## 2026-09-09 — The bedtime you remember (Q-519, UI half)
 
-**Branch:** `feat/manual-bedtime-entry` · **Lane B** · PR #1010
+**Branch:** `feat/manual-bedtime-entry` · **Lane B** · PR #1011
 
 ### What shipped
 

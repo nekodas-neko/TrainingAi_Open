@@ -14159,7 +14159,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   function; the local SQLite column via `RECONCILE_COLUMNS` (**no version bump** — additive, the
   Batch F pattern) with the pull mapping; and `bedtime-estimate` reading
   `manualSleepStart ?? sleepStart`, which is **the only read site in the codebase**.
-- **✅ The UI half shipped in #1010** — a card on Health → Sleep for the latest night: set, change and
+- **✅ The UI half shipped in #1011** — a card on Health → Sleep for the latest night: set, change and
   clear, queued through `manual_bedtime` so it survives offline, with the direct POST as the fallback
   where there is no local store. The measured start is shown beside it as the contrast that makes the
   control make sense, and nothing else on the screen changed.
