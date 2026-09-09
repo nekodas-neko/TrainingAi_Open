@@ -9281,6 +9281,88 @@ file and missed here. Nothing had been pushed, so the cost was three lines. The 
 `grep -c '^<<<<<<<' ` on the file, not a reading of the diff, is what found it, because the markers sit
 9,000 lines into a document nobody reads end to end.
 
+## 2026-09-09 — `docs/implementation-backlog.md` → 19430, TN-25 amended with a fourth option
+
+The owner asked whether the guided walk is working correctly and whether 30 minutes of continuous
+brisk walking would beat it. Both questions have one answer, and it retires the premise the entry's
+three existing options were built on: **133 bpm is not Zone 2 for this owner under the model the
+session's own copy is written in.**
+
+The table that carries it cannot be cut. *"Conversational aerobic"* is language from the %HRmax model,
+where Zone 2 is **101–118 bpm** for a max of 168; `ZONE_DEFS` sets thresholds from the %HR-reserve
+model, where it is **122–133**. For a resting HR of 52 the two differ by 21 bpm, which is the entire
+gap this review has been measuring — so the owner has been following the words while the app graded
+him against the numbers. **17 of 44 fast blocks already reached 101+ bpm and the pacer said "push" on
+every one.**
+
+The second table is the decision: at classic Zone-2 intensity the current intervals yield ~13
+min/week, intervals with genuinely brisk fast blocks ~29, and a 30-minute continuous walk at 105+
+about **60** — for the same 30 minutes of the owner's time. The two ⛔ lines stop the obvious
+misreadings: continuous at the *current* fast pace yields zero, because 98.5 bpm sits three under the
+floor; and none of this makes the Karvonen model wrong, since `hr-zones.ts` is internally consistent
+and the defect is one prescription mixing two models.
+
+## 2026-09-09 — `docs/agents/state/tuning.md` 430 → 449 (+19), the zone-model lesson
+
+Four lessons from TN-25's amendment, and the first is the one a successor most needs before touching
+any heart-rate prescription: **"Zone 2" means two different things and this app mixes them.** The
+guided walk's copy is written in the %HRmax model and its thresholds come from the %HR-reserve model,
+which for a resting HR of 52 differ by 21 bpm — three addenda were spent measuring that gap before
+anyone checked which model the words assumed.
+
+The other three keep the next session honest about the same data: the observed max of 168 is a floor
+rather than a test, Zone-2 *minutes* is the metric rather than target compliance, and an interval
+protocol earns its structure only through contrast — 7.7 bpm here, which is a continuous walk with a
+wobble in it.
+
+## 2026-09-09 — backlog → 19456, `tuning.md` → 460: correcting the walk recommendation the same day
+
+The owner asked whether the previous amendment contradicted the interval-walking research. It did,
+and the correction is worth its 26 lines because a successor reading only addendum 4 would lower a
+threshold that is correct.
+
+**The protocol is sound and the app implements it faithfully.** Nemoto/Masuki/Nose put the fast phase
+at ~70% of peak aerobic capacity and `hrReserveTarget(0.70, …)` renders exactly that — **133 bpm is
+the right number**. What does not transfer is the population: those cohorts were around 60–70, and
+brisk walking does reach 70% of peak for them. At 33 with a max of 168 it does not.
+
+The table that settles it is three rows: a 9.2-minute run on 2026-07-24 at **145 bpm average = 80% of
+reserve**, an outdoor walk at 117, and the treadmill's fast blocks at 98.5. The owner has already
+exceeded the protocol's fast phase on foot, so the fix is to jog the fast blocks rather than lower the
+target — and the same rows measure TN-26's surface effect at 27 bpm.
+
+So option 1 becomes the recommendation and option 4 the fallback, with a ⛔ line saying plainly that
+the target is right and the copy is wrong: *"a steady Zone-2 aerobic session"* describes neither the
+protocol nor its intensity. The baton records the reversal against this agent by name, since the wrong
+version was published before the owner asked.
+
+## 2026-09-09 — backlog → 19622, `tuning.md` → 471: the zone audit (TN-30, TN-31, TN-32)
+
+The owner asked for one heart-rate zone calculation. An audit of every zone definition in the repo
+answered it, and the answer was not the one the previous amendment had guessed.
+
+**The zone model is genuinely single-sourced.** `ZONE_DEFS` is the only set of fractions and nothing
+re-bands heart rate anywhere. **The max HR those fractions apply to is not**: four resolvers exist and
+three are live at once — the zone bar grades against **187** (220−age) while the guided walk and the
+Body Battery grade against **168** (corroborated observed). The table naming all four is the entry,
+because "which max did this number come from" is the question every future zone finding has to answer
+first.
+
+The line that earns the most room is the coincidence: the walk's fast target is `0.70 × 116 + 52` and
+the Zone-2 floor is `0.60 × 135 + 52`, both **133**, by unrelated arithmetic with nothing holding them
+equal. Two numbers that agree for different reasons are worse than two that disagree, and a successor
+who does not know that will read the agreement as evidence the anchors are consistent.
+
+TN-31 records the owner's product split — a jog belongs under Run, a walk stays a walk — which
+dissolves TN-25's open question instead of answering it, and notes that `RunType` already carries
+`'interval'` so this is routing rather than new machinery. TN-32 collects three copy defects the audit
+turned up, including a Heart Rate page that colours 60–100 bpm red while calling it "Normal".
+
+The baton grew by eleven lines and two of them are retractions: addendum 4's "%HRmax vs %HR-reserve"
+framing was invented by this agent and is withdrawn, and TN-24's Zone 1 boundary was corrected from
+52–122 to 52–132 (with the cadence extrapolation recomputed to ≈238 spm across both entries). Both are
+recorded against the agent by name — the wrong versions were published before the owner asked.
+
 ## 2026-09-08 — `docs/implementation-backlog.md` → 19442 (OR-105, the premature-`Verify:` trap)
 
 Fifty lines: a 30-line entry, an 11-line field rule, and prose replacing the two bad `Verify:` fields
@@ -9318,6 +9400,48 @@ Three PRs landed under this branch while it was being verified, taking the backl
 19,442. Recomputed from the merged file rather than spliced: **19,442 − 14 = 19,428**, so the −14
 above (BF-132 out, LB-66 in) is unchanged and is the only part of the number this diff owns.
 
+## 2026-09-09 — backlog → 19637: the ≈238 spm figure is qualified after the owner pushed back
+
+*"I don't think your estimation for HR is right — I reckon if I walk for longer at a faster pace it
+will increase my HR."* Checked, and the owner is right to doubt it.
+
+The cadence→HR slope is fitted over 88 blocks spanning **76–132 spm**, so the 238 spm needed to reach
+133 bpm extrapolates **106 spm past anything observed** — its own 95% interval runs **176 to 369**,
+r is 0.512, and the residual sd is 8.1 bpm. **This is the same error the review's own ⛔ line flags on
+the treadmill speed curve**, committed one addendum later against cadence instead of speed, which is
+why the warning is worth its lines rather than a one-word hedge.
+
+The second half is the owner's actual mechanism and the model omits it entirely: there is **no
+duration term**, while TN-24 measured within-session drift at **+7.1 bpm** — larger than the fast/slow
+contrast. A longer, faster walk collects both effects and the static slope sees only one.
+
+What survives is the bounded claim: inside the observed range cadence is nearly exhausted as a lever
+(120 spm → 99.0 bpm, 130 → 101.9, 140 → 104.8). What does not survive is any specific spm target for
+reaching 133.
+
+## 2026-09-09 — backlog → 19809, `tuning.md` → 487: the owner's walk settled it
+
+The owner disputed this agent's heart-rate estimate, walked 35 minutes at 5 min fast / 2 min slow, and
+was right. The measurement is worth its lines because it overturns a conclusion this review had
+already published twice.
+
+**Fast blocks rose 97 → 116 bpm within the session — +19 — on +11.7 spm of cadence, which the fitted
+slope predicts would buy +3.4.** Session average 104 against ~90 across the previous ten; fast-block
+average 107 against 98.5 on just +2.7 spm. **82% of the movement is duration, and the model had no
+duration term at all** — every figure in the review was fitted across blocks, so a within-session
+effect was invisible by construction. TN-24's *"cadence is nearly exhausted"* survives; its *"grade
+and carried load are the levers that remain"* does not, because it never considered time.
+
+The second finding is why the per-set contrast table stays: it ran +24, +8, +10, +2, +9, collapsing
+after set 1 because the slow blocks stopped recovering — by set 4 the "slow" block sat at 108 bpm,
+above the historical *fast* average. **The session succeeded by becoming continuous, not by being
+better intervals**, which moves TN-25's option 4 from fallback to best-evidenced.
+
+And it gives TN-30 a live consequence rather than a tidiness argument: the same session crosses Zone 2
+under the observed-max anchor of 168 and misses it by 10 bpm under the age anchor of 187. The app
+reported Z1 Recovery 34:59 and 0:00 everywhere else — the best walk in the record rendered as
+thirty-five minutes of recovery.
+
 ## 2026-09-08 — `docs/implementation-backlog.md` 19,455 → 19,547 (+92), OR-102b ①② and two findings
 
 OR-102b keeps its entry rather than leaving: ① and ② shipped, ③ and ④ did not, and the `Keep:` says
@@ -9352,6 +9476,31 @@ that the named screen is not there.
 **Why the read is local-first**, in one line so it is not "improved" back to a server fetch:
 `/api/body-metadata` returns seven days, and a card about the latest reading of each metric shows
 most of them as absent on a seven-day window.
+
+## 2026-09-09 — backlog → 19924, `tuning.md` → 517: the owner's three cardio decisions
+
+All three gates cleared in one exchange, and one of them overturned a recommendation this review had
+already published.
+
+**Max HR: a pinned 50/50 blend at 178.** The owner objected that 168 is not a max, and the record
+proves them right — 2026-07-05 holds **156–168 bpm for 13 unbroken minutes**, and a hard 13-minute
+effort runs at ~92–95% of max, so the true value is **177–183**. The entry keeps the zone table across
+all three candidate anchors because the differences are the decision: Zone 2 starts at 122, 128 or 133
+depending on which number wins, and the walk's `0.70` target moves 133 → 140 → 146 with it. Two
+constraints ride along and neither compresses: **pin the blend as a stored constant** (a live blend
+drifts as the observed max moves, which was the objection to blending in the first place), and **land
+TN-25's absolute band first** or unifying the anchor makes the walk harder rather than easier.
+
+**The walk keeps its intervals, varied and prescribed**, superseding all four options the entry had
+accumulated. **The jog moves to Run as an assigned type.** Both shrink to routing rather than
+building, because `recommendRunType(quota)` already picks the session that fills the week's biggest
+open zone gap, deterministically — so the mapping table (slow jog → `recovery`, interval jog →
+`tempo`, and so on) is most of the work and is worth writing down once.
+
+The baton grew by thirty lines, and the last of them is the uncomfortable one: three published
+recommendations were withdrawn in this thread, each to an owner objection, plus two numbers corrected
+in place. What survived every round was measured rather than modelled. That belongs in the baton more
+than any of the individual findings do.
 
 ## 2026-09-09 — `docs/implementation-backlog.md` 19,565 → 19,580 (+15), Q-519's UI half shipped
 
@@ -9565,3 +9714,14 @@ entry still owing a device check states so with `Keep:` rather than being delete
 `Keep:` entry naming the one owed check, plus the non-obvious mechanism (the measure is the rollup
 watermark, not the newest ingested sample) and the two journals. It now sorts into KEEP instead of
 heading the work list.
+
+## 2026-09-09 — `docs/agents/state/tuning.md` 517 → 524 (+7), the baton's Now section reconciled
+
+Three rows for TN-30, TN-31 and TN-32, which the entry table was missing, plus a corrected TN-24
+boundary (52–122 → 52–132) that would otherwise have sent a successor to the wrong number.
+
+The four lines that replace the stale *"TN-25 is the one open owner question"* are the ones worth the
+space: every gate is now cleared, so a successor should not go looking for a decision to chase. What
+the owner still owes is an **action** rather than an answer — run the Cooper 12-Minute Run so the
+pinned 178 can be replaced by a measured max — and saying that explicitly is what stops the next
+session re-deriving the anchor from the same inconclusive data this one did twice.
