@@ -3629,85 +3629,31 @@ two screens, and a user who sets one has no way to know the other exists.
   night, I'd like it to close/do a full reset so I open the fresh app… when I open the app in the
   morning and it just resumes, it doesn't give me the morning check-in."*
 
-### [sleep] BF-83 — last night's sleep grows while you look at it, and nothing says it is still filling
+### [sleep] BF-83 — a night still filling says so; the morning that proves it has not happened
 
-- **✅ ALL THREE HALVES SHIPPED.** The engine landed 2026-08-31 (`provisional: boolean` on every
-  `/api/sleep-sessions` row, defined by `lib/sleep/provisional.ts`); the **badge** renders on the
-  sleep detail, the Body tab's sleep card and Home's score chip row; and the **baseline exclusion
-  shipped in #1014** — `health-metric-sheet.tsx`'s "vs your recent nights" scales are built from
-  `settledNights(allNights)`, so a night still filling no longer sits in the distribution it is
-  being measured against.
-- **The night being VIEWED is never filtered**, and that distinction is the whole of it: a
-  provisional night still shows its own numbers under its own badge. What changed is the *context* —
-  the owner's report was that the comparison moved too, so the reading and the thing judging it were
-  drifting together.
-- **An absent flag counts as settled.** Every night predating the flag carries no value, and reading
-  those as provisional would empty the baseline rather than protect it.
-- **⚑ The measure is the ROLLUP's coverage, and a third mechanism was found while settling it.**
-  Two candidate mechanisms are listed below; neither is what happened. Production says the batch
-  covering 4:46 → 6:38 was already ingested at **6:42**, two minutes before the 6:44 screenshot —
-  so the raw data was there and the ROW was stale, because the rollup had not re-derived from it.
-  A test against `max(oura_raw_samples.measured_at)` would have called that night settled four
-  minutes before it grew by 85 minutes. `getSleepCoverageEnd` reads the rollup watermark instead,
-  which only advances when a run COMPLETES, so it covers the draining case AND this one.
-- **Lane:** A for the definition and the flag (**done**); B for the label and the average.
-- **Added:** 2026-09-01 · owner, with two screenshots of the **same night** four minutes apart:
-  *"sleep changes depending what time you open it. I'd like it to be the final result on open."*
-
-| Opened | Window shown | Time asleep | Efficiency | HRV | Restless | 30-night avg |
-|---|---|---|---|---|---|---|
-| **6:44** | 10:03 pm – **4:46 am** | **6 h 15 m** | 93 % | 61 ms | 1 | 7 h 46 m |
-| **6:48** | 10:03 pm – **6:08 am** | **7 h 40 m** | 95 % | 65 ms | 2 | 7 h 49 m |
-
-**Every number moved, including the baseline it is compared against.** That last part matters: the
-"vs your recent nights" average shifted too, so the *context* changed under the reading as well as
-the reading.
-
-**Production says the stored row is the 6:48 version:** `sleep_sessions` for 2026-09-01 holds
-`12:03 → 20:08 UTC` (10:03 pm → 6:08 am Brisbane), 7.67 h, efficiency 95.
-
-**⚠ Two mechanisms fit, they have different fixes, and `updated_at` cannot separate them here.** All
-four recent rows share `updated_at = 20:43:44 UTC` — the signature of one bulk pass — and this repo
-has already recorded that a bulk job bumps `updated_at` without rewriting a value (Q-501). So:
-  1. **The night was still draining** — the ring had not delivered the last 80 minutes at 6:44, and
-     the row genuinely grew. Fix: do not present an incomplete night as a finished one.
-  2. **The row was already final and the client painted a stale cache** — 20:43:44 UTC is
-     06:43:44 Brisbane, *before* the 6:44 screenshot. Fix: revalidate the sleep detail on open.
-  **The check that separates them:** on the next morning, open the sleep detail, note the end time,
-  then query `sleep_sessions` for that date immediately. Row already final → (2). Row still short →
-  (1).
-
-- **⚑ (2) IS RULED OUT FROM CODE, 2026-08-31 — no waiting for a morning, and this settles the lane.**
-  `app/health/sleep/sleep-content.tsx` seeds from cache and then calls `cachedFetch(...)` **without**
-  `freshWithinTtl`. `lib/sqlite/cache.ts` only short-circuits on a fresh TTL when that flag is
-  passed, so this screen always revalidates over the network on mount — and it carries a
-  `useInvalidationRefetch('sleep-sessions')` listener on top. It is a route, not a persistent tab, so
-  opening it mounts it. **The client cannot have painted a stale row.** The reading changed because
-  the row changed: mechanism (1), the night was still draining at 6:44.
-- **⚑ So the lane is A, and the deliverable is the PROVISIONAL concept, not a refresh.** The
-  recommendation's refresh half is already in place and did not help — a revalidate returns the
-  newest number, which is exactly what made a growing number look final twice. What is missing is
-  the engine knowing whether the ring has reported the wake, so a night can be *labelled* incomplete
-  and **excluded from its own 30-night comparison** (the moving baseline in the table above is that
-  omission, and it is the repo's own partial-day rule). The label is B's; deciding what "complete"
-  means is A's, and nothing can be built until that definition exists.
-
-- **Recommendation, and it holds either way: force a revalidate when the detail opens, and mark the
-  night provisional until the ring has reported the wake.** The owner asks for "the final result on
-  open", and the honest version of that is *don't call a growing number final* — the app cannot know
-  a wake happened before the ring says so. A provisional badge plus a refresh gives him the newest
-  truth and stops the older one reading as settled.
-- **This is the repo's own partial-day rule, on a new surface.** CLAUDE.md already says a cumulative
-  per-day field from an external source must treat today as a partial day, citing the Oura
-  `wornHours` mistake — *"a partial-day cumulative reads as an anomaly if compared against
-  completed-day values"*. A part-drained night compared against a 30-night average is exactly that,
-  and the moving baseline in the table above is it happening.
-- **⚠ Whatever the cause, do not fix it by shortening a TTL.** The instant-paint rules make a cached
-  first paint deliberate; the fix is invalidating or revalidating on open, not making every read
-  slower.
-- **Verification:** open the sleep detail before and after the morning drain completes — the earlier
-  view says it is provisional, the later one does not, and neither silently contradicts the other.
-  The 30-night comparison must exclude a provisional night from its own average.
+- **Keep:** the device check, and only that. All three halves shipped — the engine 2026-08-31
+  (`lib/sleep/provisional.ts`, `/api/sleep-sessions` returns `provisional` per row), the badge on
+  Home's chip row, the Body tab's sleep card and `/health/sleep`, and the baseline exclusion in
+  #1014 (`health-metric-sheet.tsx` builds its "vs your recent nights" scales from
+  `settledNights(allNights)`). Pinned by `lib/__tests__/sleep-provisional-surfaces.test.ts`,
+  `lib/sleep/__tests__/provisional.test.ts` and `components/health/sleep/__tests__/settled-nights.test.ts`.
+- **What is owed is a morning, not a diff.** The entry's own acceptance test is *open the sleep
+  detail before and after the drain completes — the earlier view says provisional, the later one does
+  not, and the 30-night comparison excludes the provisional night from its own average.* That needs a
+  real morning with the ring mid-upload and cannot be produced in the sandbox. **Q-529/LB-53's
+  provisional sleep SCORE marking wants the same morning** — one check settles both.
+- **The mechanism, kept because it is the non-obvious part.** Neither candidate in the original entry
+  was right. Production showed the batch covering the missing 82 minutes was ingested at **6:42**,
+  two minutes before the 6:44 screenshot: the raw data was there and the *row* was stale, because the
+  rollup had not re-derived from it. So the measure is the **rollup watermark**
+  (`getSleepCoverageEnd`), which only advances when a run completes — a test against
+  `max(oura_raw_samples.measured_at)` would have called that night settled four minutes before it
+  grew by 85 minutes. An absent flag counts as settled, or every night predating the flag would empty
+  the baseline rather than protect it.
+- **Added:** 2026-09-01 · owner, two screenshots of the same night four minutes apart (6 h 15 m then
+  7 h 40 m, with the 30-night average it was compared against moving too).
+  [journal](overview/entries/2026-08-31-lane-a-sleep-provisional.md) ·
+  [journal](overview/entries/2026-09-02-q529-provisional-sleep-score.md)
 
 ### [workouts] BF-84 — the Rest button on Home's card, when the app has not suggested rest
 

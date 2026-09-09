@@ -9552,3 +9552,16 @@ the point of the ratchet — slack the document can regrow into is a baseline th
 `projectOverview.md` is unchanged at 10455. Its LB-66 Known Issue was rewritten in place rather than
 struck: the hard delete is fixed, but the on-device sync check is still owed, and an entry with
 something outstanding stays in `projectOverview.md` rather than moving to the resolved archive.
+
+---
+
+## 2026-09-09 — `docs/implementation-backlog.md` ratcheted DOWN 19641 → 19587 (BF-83 compacted)
+
+BF-83 headed the Lane A READY list with all three of its halves already shipped and verified in
+`main` — the engine, the badge on three surfaces, and the baseline exclusion — so 65 lines of settled
+deliberation were sitting where buildable work should be. It is not deletable either: its acceptance
+test is a morning with the ring mid-upload, which the sandbox cannot produce, and CLAUDE.md says an
+entry still owing a device check states so with `Keep:` rather than being deleted. Compacted to a
+`Keep:` entry naming the one owed check, plus the non-obvious mechanism (the measure is the rollup
+watermark, not the newest ingested sample) and the two journals. It now sorts into KEEP instead of
+heading the work list.
