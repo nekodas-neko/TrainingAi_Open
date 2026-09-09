@@ -26,8 +26,21 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.441.5 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.442.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-09.
+
+**The AMRAP baseline session was never consumed (BF-131).** Owner: *"even though the session was
+done it's saying baseline needed"*. He ran both baseline sessions as instructed and
+`session_periodization` still read `baseline_complete = false` — completion WAS wired and wrote the
+wrong field, moving `sessions_in_phase` while the flag never flipped, so the only exit was the "Use
+prior data →" button that discards the session you just ran. The 1RM already existed: the screen runs
+the AMRAP estimator and persists it to `exercise_logs.estimated_1rm`; what was missing was the copy
+into `baseline_1rm`. Completion now does that hop, tagged `source: 'amrap'`, and a **partial**
+baseline accumulates rather than completing on a gap. **Existing rows are untouched** — this fixes
+new completions, not the two already sitting at false; "Use prior data" remains valid and is now a
+choice rather than the only way through. The card still reads "Baseline needed" until LA-92 (Lane B)
+lands, and **none of this has been seen on the S25**
+([journal](docs/overview/entries/2026-09-09-bf131-baseline-anchor-hop.md)).
 
 **The weekly weight trend was measuring change per weigh-in, not per day (LB-67).**
 `computeWeightRateKgPerWeek` fitted the array index, and rows exist only on days carrying a metric —

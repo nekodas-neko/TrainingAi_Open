@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.442.0",
+    date: "2026-09-09",
+    changes: [
+      "Finishing your AMRAP baseline session now actually completes the baseline. It used to stay on \u0027Baseline needed\u0027 no matter how many you did \u2014 the only way forward was the \u0027Use prior data\u0027 button, which skips the session you just ran. Your measured 1RM from those sets is what the AI starts prescribing from.",
+      "A part-finished baseline keeps what it measured. Log three of five exercises and those three are saved, so a later session finishes the job instead of starting over.",
+    ],
+  },
+  {
     version: "1.441.5",
     date: "2026-09-09",
     changes: [
