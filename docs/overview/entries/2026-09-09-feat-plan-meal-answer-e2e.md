@@ -25,6 +25,12 @@ it persisted at all. The fixture is built in Postgres rather than stubbed becaus
 `plan_meal_answers.plan_meal_id` is a foreign key onto `meal_plan_meals`: a stub's invented ids
 cannot be declined.
 
+**One guard is reasoned, not exercised.** The override map is keyed by day as well as by meal,
+because a plan meal keeps the same id on every day it is planned for. Nothing currently reaches the
+hook with a second date — the plan card renders only on today, which an attempt to assert it through
+the day switcher established — so this is belt-and-braces against a future change rather than a bug
+that was happening, and the comment says so rather than claiming a fix.
+
 **Mutation-checked.** Removing the declined filter from `fillableMeals` fails the offer-count
 assertion; making the decline never reach the server fails the persistence half. Both were run.
 

@@ -155,15 +155,25 @@ export function usePlanMealLogging({ mealPlan, mealTypes, logs, userId, dateRef,
    *
    * An override is dropped the moment a read agrees with it, so this converges rather than pinning
    * the value against the server.
+   *
+   * **Keyed by day as well as meal**, because a plan meal keeps the same id on every day it is
+   * planned for: keyed by meal alone, an override would out-vote a read for a *different* day that
+   * correctly has no answer, and could never be dropped, because such a read can never agree with
+   * it. That is belt-and-braces rather than a fixed bug — the plan card renders only on today, so
+   * nothing currently reaches this hook with a second date, and there is no way to assert it from
+   * the screen. It costs one string join and stops the guard from becoming wrong if that changes.
    */
   const pendingAnswers = useRef(new Map<string, boolean>())
+  const answerKey = (date: string, mealId: string) => `${date}:${mealId}`
 
-  const applyAnswers = useCallback((serverIds: string[]) => {
+  const applyAnswers = useCallback((date: string, serverIds: string[]) => {
     const server = new Set(serverIds)
     const next = new Set(server)
-    for (const [id, declined] of pendingAnswers.current) {
-      if (server.has(id) === declined) { pendingAnswers.current.delete(id); continue }
-      if (declined) next.add(id); else next.delete(id)
+    for (const [key, declined] of pendingAnswers.current) {
+      const [keyDate, mealId] = key.split(':')
+      if (keyDate !== date) continue
+      if (server.has(mealId) === declined) { pendingAnswers.current.delete(key); continue }
+      if (declined) next.add(mealId); else next.delete(mealId)
     }
     setDeclinedMealIds(next)
   }, [])
@@ -175,7 +185,7 @@ export function usePlanMealLogging({ mealPlan, mealTypes, logs, userId, dateRef,
     if (store) {
       try {
         const rows = await store.getPlanMealAnswers(date)
-        applyAnswers(rows.map(r => r.planMealId))
+        applyAnswers(date, rows.map(r => r.planMealId))
         return
       } catch { /* fall through to the online read */ }
     }
@@ -183,7 +193,7 @@ export function usePlanMealLogging({ mealPlan, mealTypes, logs, userId, dateRef,
       const res = await fetch(`/api/nutrition/plan-meal-answers?date=${date}`)
       if (!res.ok) return
       const data = await res.json() as { answers?: { planMealId: string }[] }
-      applyAnswers((data.answers ?? []).map(a => a.planMealId))
+      applyAnswers(date, (data.answers ?? []).map(a => a.planMealId))
     } catch { /* offline and no store — leave the set as it is */ }
   }, [userId, applyAnswers])
 
@@ -194,7 +204,7 @@ export function usePlanMealLogging({ mealPlan, mealTypes, logs, userId, dateRef,
     const date = dateRef.current
     // Flip first: the tap is the feedback, and the write reconciles behind it. The override is
     // recorded in the same breath, so a read already in flight cannot land on top of it.
-    pendingAnswers.current.set(meal.id, declined)
+    pendingAnswers.current.set(answerKey(date, meal.id), declined)
     setDeclinedMealIds(prev => {
       const next = new Set(prev)
       if (declined) next.add(meal.id); else next.delete(meal.id)
