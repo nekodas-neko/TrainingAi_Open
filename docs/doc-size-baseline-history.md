@@ -10183,3 +10183,17 @@ style, the new pairs from the logged snapshot. Filed rather than fixed, because 
 moves numbers the owner already reads. Most of its length is the argument for why it is a decision
 and not a bug, which is exactly what stops it being "fixed" by a later sweep that reads only the
 title.
+## 2026-09-09 — `docs/implementation-backlog.md` raised to 20108 for BF-135's shipped state
+
+BF-135 shipped its whole recommendation, so its entry converted from work-to-do into a
+`Verify: device` record: what landed, the two cases the sandbox could not render, and the one place
+the implementation departed from the entry — the AMRAP banner is deleted rather than made
+conditional, because the ready screen already carries it for every exercise. That departure is the
+part a future reader would otherwise re-litigate. The narrative went to the journal entry.
+
+## 2026-09-09 — `projectOverview.md` raised to 10545 for BF-135's Known-Issues row
+
+A layout change on the canonical target that could not be device-verified in-session, which the
+Canonical Runtime rule says gets a row rather than a silent merge. It names the two states that were
+never rendered — the two-banner baseline case and the screen with the logging sheet over it — so the
+next reader does not mistake a green harness run for having seen the reported failure.
