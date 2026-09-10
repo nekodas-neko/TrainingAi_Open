@@ -10584,3 +10584,24 @@ them mine. Worth recording which way this one went, so "re-verify first" does no
 **No journal entry again** — `docs/overview/entries/` is still at its 361 ceiling and LA-100 is still
 the blocker. Same posture as #1078: the record is here, in the PR body, and in the queue-entry
 removal.
+
+## 2026-09-10 — `docs/implementation-backlog.md` −24, LA-87 shipped
+
+LA-87's entry left the queue. Third use of `pnpm fix:baselines`; the number has not been typed by
+hand since LA-99 shipped.
+
+**LA-87's claims all survived, and working it found the cause underneath them.** The entry described
+`storageMode` reporting `'s3'` over a base64 row and proposed reporting the path taken. Correct, and
+the reachability came from somewhere the entry did not look: `getS3()` resolved its env vars with
+`??` while `isStorageConfigured()` used `||`, which differ on the **empty string** — so a blank
+`AWS_ENDPOINT_URL` beside a real `STORAGE_ENDPOINT` had one helper saying ready and the other
+returning null. Two implementations of one predicate, which **One Formula, One Place** calls a bug
+by definition.
+
+That also widened the blast radius past the two routes the entry named. `admin/reference-figure`
+gates a POST on the same predicate and then returns `{ url }` unguarded — so the same blank variable
+answered **200 `{ url: null }`** and dropped the uploaded file, with no base64 fallback to soften it.
+Fixed by the shared predicate rather than by a third patch.
+
+**No journal entry** — `docs/overview/entries/` is still at its 361 ceiling; LA-100 remains the
+blocker and is Gate: owner.

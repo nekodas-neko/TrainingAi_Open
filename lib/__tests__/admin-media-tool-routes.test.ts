@@ -210,6 +210,24 @@ describe('POST /api/admin/mirror-dataset-gifs', () => {
     expect(String((insertValues.mock.calls[0][0] as Row).gifUrl)).toMatch(/^data:image\/gif;base64,/)
   })
 
+  it('reports db-fallback when a CONFIGURED upload returns null (LA-87)', async () => {
+    // The case `storageMode` used to lie about. It came from `isStorageConfigured()` alone, so this
+    // row — base64 in a Postgres column expected to hold a URL — was reported as `'s3'`, i.e. a
+    // report saying the upload path ran on the one occasion it did not.
+    //
+    // Reachable because `getS3()` and `isStorageConfigured()` resolved the same env vars with `??`
+    // and `||`, which differ on the empty string. That divergence is fixed at source in
+    // `lib/exercise-storage.ts`; this asserts the route is honest even if a null ever comes back
+    // again for a different reason.
+    isStorageConfigured.mockReturnValue(true)
+    uploadExerciseMedia.mockResolvedValue(null)
+    findDirectUrl.mockReturnValue({ gifUrl: 'https://dataset.example/squat.gif' })
+    const body = await (await mirrorReq({ exerciseName: 'Squat' })).json()
+    expect(body).toMatchObject({ status: 'mirrored', storageMode: 'db-fallback', gifUrl: '[data-url]' })
+    expect(uploadExerciseMedia).toHaveBeenCalled()
+    expect(String((insertValues.mock.calls[0][0] as Row).gifUrl)).toMatch(/^data:image\/gif;base64,/)
+  })
+
   it('stores the uploaded URL and reports the s3 path when storage is configured', async () => {
     findDirectUrl.mockReturnValue({ gifUrl: 'https://dataset.example/squat.gif' })
     const body = await (await mirrorReq({ exerciseName: 'Squat' })).json()

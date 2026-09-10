@@ -299,14 +299,18 @@ describe('POST /api/admin/generate-exercise-media', () => {
       .toBe(`data:image/gif;base64,${Buffer.from('gif-bytes').toString('base64')}`)
   })
 
-  it('falls back to a data URL when a CONFIGURED upload returns nothing', async () => {
-    // Two different failures reach the same branch, and only this one leaves `storageMode: 's3'` —
-    // a report that says the upload path ran while the row holds base64. Pinned so the disagreement
-    // is on the record rather than discovered from a bloated table.
+  it('falls back to a data URL when a CONFIGURED upload returns nothing, and SAYS so (LA-87)', async () => {
+    // Two different failures reach the same branch. This one used to leave `storageMode: 's3'` — a
+    // report saying the upload path ran while the row holds base64 — and PS-39 pinned that
+    // disagreement deliberately, as current behaviour, because the fix was a decision rather than
+    // an obvious line. LA-87 made the decision: report the path TAKEN.
+    //
+    // The assertion flipping is the point. A characterisation test earns its keep by failing when
+    // the thing it characterises is fixed; this one caught the change on the first full run.
     uploadExerciseMedia.mockResolvedValue(null)
     const res = await genReq(GEN_BODY)
     const body = await res.json()
-    expect(body.storageMode).toBe('s3')
+    expect(body.storageMode).toBe('db-fallback')
     expect(body.gifUrl).toBe('[data-url]')
   })
 

@@ -110,12 +110,23 @@ export async function POST(req: Request) {
   // Upload to S3 if configured, otherwise encode as data URLs
   const storageReady = isStorageConfigured();
 
+  // LA-87 — report the path TAKEN, not the path configured.
+  //
+  // `storageMode` used to come from `isStorageConfigured()` alone, so a row whose bytes landed in
+  // Postgres as base64 was reported as `'s3'` on the one occasion the upload silently did not run.
+  // Nothing breaks — the picture renders either way — which is why it was never noticed. What it
+  // costs is the next person's diagnosis: a `data:` gif is ~200 kB of base64 in a column expected to
+  // hold a URL, and the admin screen's status line is the thing that would otherwise say so. Silent
+  // per-row growth in a table nobody watches is the shape of the 2026-08-17 `disk_full` outage,
+  // arriving from the other direction.
+  let usedFallback = false;
   async function store(buf: Buffer, key: string, mime: string): Promise<string> {
     if (storageReady) {
       const url = await uploadExerciseMedia(key, buf, mime);
       if (url) return url;
     }
     // Fallback: data URL stored directly in Postgres
+    usedFallback = true;
     return `data:${mime};base64,${buf.toString('base64')}`;
   }
 
@@ -139,7 +150,7 @@ export async function POST(req: Request) {
     exerciseName,
     gender,
     model,
-    storageMode: storageReady ? 's3' : 'db-fallback',
+    storageMode: storageReady && !usedFallback ? 's3' : 'db-fallback',
     startUrl: startUrl.startsWith('data:') ? '[data-url]' : startUrl,
     endUrl: endUrl.startsWith('data:') ? '[data-url]' : endUrl,
     gifUrl: gifUrl.startsWith('data:') ? '[data-url]' : gifUrl,
