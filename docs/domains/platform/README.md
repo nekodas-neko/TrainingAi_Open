@@ -111,7 +111,9 @@ layer**) through §16. Read it before building any shared helper.
   below first — it decides *what*, this decides *how it ships*.
 - [`docs/superpowers/plans/2026-08-02-oura-ip-triage.md`](../../superpowers/plans/2026-08-02-oura-ip-triage.md)
   — what to do about the vendored Oura model constants and weights before any public repo cut:
-  seven live imports (not the two Q-31 claims), one dead module deletable today, a
+  seven live imports (not the two Q-31 claims), one production-unreachable module whose deletion is
+  a **D7 decision rather than a sweep** (its golden test pins D5's replacement — see that plan's
+  2026-08-02 correction, and Q-50 item 1), a
   replace/gitignore/delete verdict per module, and the fresh-repo-vs-history question that blocks
   the gitignore half.
 - [`docs/superpowers/plans/2026-08-17-admin-db-snapshot-endpoint.md`](../../superpowers/plans/2026-08-17-admin-db-snapshot-endpoint.md)

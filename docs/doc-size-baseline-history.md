@@ -10230,3 +10230,19 @@ saying why the hazard survives its own fix, because that is the part a reader ca
 the part that decides whether the next PR is safe.
 
 Entries ceiling untouched at 360.
+
+---
+
+## 2026-09-10 — backlog 20,181 → 20,194 (+13), no ceiling raise (dhrv contradiction)
+
+Thirteen lines to stop two backlog entries instructing opposite things about the same deletion. Q-31
+said `inference/dhrv` is "deletable today at zero product cost"; Q-50 says deleting it discards the
+golden test that pins D5's replacement, so D7 decides. Q-50 also claimed the wording had been
+corrected everywhere, and it had not — three live copies survived, including the triage plan where
+the correction sits *above* a paragraph still saying the row "should ship first".
+
+Most of the +13 is spent saying why the surviving copies were dangerous rather than merely untidy: a
+reader working the queue top-down hits the instruction, not the annotation. The strike-through form is
+deliberate — the wrong sentence stays visible as a record while ceasing to read as an instruction.
+
+Entries ceiling untouched at 360.
