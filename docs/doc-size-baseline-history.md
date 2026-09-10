@@ -10288,3 +10288,26 @@ in place — `typecheck:tests` entered `pnpm ci:local` on 2026-09-02, five days 
 incidents it was proposed to prevent — which is the fact that justifies building the bespoke check
 rather than the cheap one. An entry that had only said "build a check" would have got a check with no
 argument behind it.
+
+## 2026-09-10 — `docs/implementation-backlog.md` 20171 → 20234 (+63), Q-52 re-measurement and LA-96
+
+Q-52's outstanding *"re-run once blocks cycle"* note was run and produced a result that has to be
+visible **at queue-read time**, not filed away: the precondition cleared, the program was rebuilt
+four days ago, and the entry's own measurement recipe stopped working *because* the precondition
+cleared. Two sessions have now spent time on this query; a third would too.
+
+The evidence — the full 24-row 1RM table, the program inventory, the per-session phase state, and a
+side finding about ten pre-Q-298 `estimated_1rm = 0` logs — went to
+[`docs/reviews/2026-09-10-q52-phase-hold-remeasure.md`](reviews/2026-09-10-q52-phase-hold-remeasure.md),
+which is where a first draft of this had put 53 lines into the index. What stayed is the conclusion,
+the earliest answerable date, and the instruction not to re-run the query. That is the shape this
+baseline is meant to permit: a queue entry may grow by the fact that changes what you do with it,
+and not by the working that produced the fact.
+
+**+39 of the 63 is LA-96 itself**, a new queue entry the same measurement turned up: the two-marker
+deload gate (`estimated_1rm > 0` AND `exercise_deloaded = false`) is applied at 2 of 6 1RM read
+sites. A new entry is what the index is for, so that half needs no argument — but the entry is
+deliberately front-loaded with the reason NOT to open it in a hurry (0 of 444 rows have the
+offending shape, so today's exposure is nil, and the adapter comment's cited production violation
+no longer exists). An entry that reads as a live bug and turns out to be robustness work costs a
+session; six lines that say so up front are cheaper than the six-line table beneath them.

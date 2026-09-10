@@ -19067,7 +19067,31 @@ if the transition fix means blocks now actually cycle, the picture may change.
 > five sessions (Legs, Pull, Push, Upper) are still in `accumulation`, and only Lower has moved —
 > on 2026-08-01, *before* v1.252.0 landed. **No session has transitioned since the auto-apply fix
 > shipped**, so the picture that fix might change has not had a chance to change yet. Re-run this
-> once at least two sessions have cycled.
+> once at least two sessions have cycled. **↳ Cleared and then invalidated — see the 2026-09-10
+> block below. Do NOT re-run the query; it cannot answer the question yet.**
+
+> **⚠ RE-MEASURED 2026-09-10 — third time. The blocks did cycle, and then the whole program was
+> replaced, so this entry's measurement is not runnable and will not be for weeks. Do NOT re-run
+> the production query; the evidence and the full table are in
+> [`2026-09-10-q52-phase-hold-remeasure.md`](reviews/2026-09-10-q52-phase-hold-remeasure.md).**
+>
+> - **The precondition is met.** Eight `session_periodization` rows carry a `phase_started_at`
+>   after 2026-08-03, each marking at least one transition. The 2026-08-03 finding that *"no
+>   session has transitioned"* is no longer true.
+> - **But the active program is four days old** — **Bankai, created 2026-09-06** — and all eight
+>   transitions belong to its predecessor. Phase state is keyed by `program_session_id`, so the
+>   rebuild reset it: Push and Pull are mid-`baseline`, Legs entered `accumulation` on 09-09,
+>   Upper and Lower have no periodization row yet (lazy insert, not a defect).
+> - **So last-vs-previous 1RM now straddles the rebuild** and reads 6 up · 10 down with five
+>   declining compounds — three of them mid-`baseline` re-anchoring, two just out of realisation.
+>   **The recipe cannot separate a programmed drawdown from a stall once blocks cycle**, which is
+>   the finding: the precondition and the recipe were mutually exclusive all along.
+> - **The 2026-08-03 load-bearing claim** — *"the feature would apply to a single exercise"* — is
+>   now **unsupported rather than refuted**; it was computed against a program that no longer
+>   exists. The design is untouched.
+> - **Answerable no earlier than mid-October**, after Bankai's own sessions complete baseline and
+>   cycle twice. **Deliberately NOT gated:** `Gate:` resolves to a person or the S25, and what is
+>   owed here is elapsed training time. If this reaches the top of the Lane A list first, skip it.
 
 Note the plan's stall escalation (an exercise held two transitions running needs a reset or a swap,
 not more holding) is part of scope, not a nice-to-have — without it the feature hides a stalled lift
@@ -20038,6 +20062,45 @@ which metrics are valid and which camera angle to ask for.
 **Measured prerequisite, worth a cheap data chore before Phase 3: 23 of 149 production exercises
 carry no `equipment` tag** (15%), and 16 carry more than one. The `unknown` profile is a live path
 serving about one exercise in seven, not a defensive branch.
+
+
+### [workouts] LA-96 — the two-marker deload gate is applied at 2 of 6 1RM read sites
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-10 · found while re-measuring Q-52, not from a report.
+- **Lane: A** — `lib/data/postgres/**` and one `app/api` route.
+- **Reference for the measurement:** [`2026-09-10-q52-phase-hold-remeasure.md`](reviews/2026-09-10-q52-phase-hold-remeasure.md) §5.
+- **Low priority on purpose: there is nothing to catch today.** File it so the reasoning is not
+  re-derived a third time, not because a user can see it.
+
+`getLastRealOneRmBatch` filters `estimated_1rm > 0` **AND** `exercise_deloaded = false`, and its own
+comment gives the reason: the `> 0` predicate alone *"trusts the write-time invariant that a deload
+set always stores 0 — and that invariant has been violated in production"*. `reconcilePersonalRecord`
+mirrors it. **Four sibling readers guard on `> 0` alone:**
+
+| site | `> 0` | `deloaded = false` |
+|---|---|---|
+| `getLastRealOneRmBatch` (`adapter.ts:1483`) | ✓ | ✓ |
+| `reconcilePersonalRecord` (`adapter.ts:3402`) | ✓ | ✓ |
+| `getYearReviewTopExercises` (`adapter.ts:1426`) | ✓ | ✗ |
+| `listRecent1rm` (`adapter.ts:1683`) | ✓ | ✗ |
+| `getStrengthTrend` (`slices/periodization.ts:469`) | ✓ | ✗ |
+| `/api/strength-trend` (`route.ts:69`) | ✓ | ✗ |
+
+**⚠ Do not open this expecting to find a bug — measured 2026-09-10, the exposure is zero.** The
+2026-08-06 log the adapter comment cites (`estimated_1rm = 85.75` with `exercise_deloaded = true`)
+**no longer exists**: `0 of 444` logs hold that shape, deleted rows included. The comment's evidence
+is stale; its *argument* is not, which is why the filter stays and why this entry is about the four
+sites that lack it rather than about a wrong number on a screen.
+
+**The other half of the same measurement is genuinely inert and needs nothing:** ten pre-Q-298 logs
+store `estimated_1rm = 0` with `exercise_deloaded = false` (two whole Pull sessions, 2026-08-09 and
+2026-08-16, on real working sets), and every one of the six sites above excludes them via `> 0`.
+
+**Also visible in that table, and probably the better fix:** the last two rows are the *same query*
+duplicated across `slices/periodization.ts` and `app/api/strength-trend/route.ts` — 90-day window,
+same `MAX(estimated_1rm)` grouping, same `to_char` day bucketing. Per **One Formula, One Place** that
+is a bug by definition, and de-duplicating it makes this a three-site change rather than four.
+Confirm the two are really equivalent before merging them; they may have drifted.
 
 ---
 

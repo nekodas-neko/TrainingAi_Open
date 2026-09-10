@@ -1487,6 +1487,19 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         -- deload of 2026-08-06 left one log at estimated_1rm = 85.75 with exercise_deloaded = true,
         -- which this query then handed to resolveWorkingBasis as a real max. Without this filter
         -- there is no read-time backstop for the next write-time regression.
+        --
+        -- Re-measured 2026-09-10: that 2026-08-06 row is GONE — zero of 444 logs now hold
+        -- estimated_1rm > 0 with exercise_deloaded = true, deleted rows included. Keep the
+        -- filter anyway; the sentence above says why (a backstop for the NEXT regression), and
+        -- "the row it was written for has since been corrected" is not "the shape cannot recur".
+        --
+        -- What production does hold is the residue in the OTHER direction, which the
+        -- estimated_1rm > 0 predicate above catches: ten pre-Q-298 logs (two whole Pull
+        -- sessions, 2026-08-09 and 2026-08-16) store estimated_1rm = 0 with
+        -- exercise_deloaded = FALSE, because a phase-level deload zeroed the estimate while the
+        -- row recorded only the AI's per-exercise flag. So each marker has been contradicted by
+        -- real rows at some point and neither is trustworthy alone — which is the argument for
+        -- both predicates, independent of what the table happens to contain today.
         AND el.exercise_deloaded = false
         ${programFilter}
       ORDER BY el.exercise_name, el.logged_at DESC
