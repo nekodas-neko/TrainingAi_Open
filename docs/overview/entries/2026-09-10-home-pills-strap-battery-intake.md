@@ -46,3 +46,41 @@ renders a skeleton and the three-chip width cannot be measured off-device; `getP
 null off-device, so the strap path does not execute at all. Both entries carry `Verify: device`.
 BF-139's one open question — which edge — was closed the same day: the owner confirmed the right
 side, so the `overflow-hidden` clip is the cause and the `pt-safe` hypothesis is ruled out.
+
+## BF-141 — a lb/kg toggle on the weight dial (filed later the same day)
+
+The owner asked for a small unit toggle on the logging dial: enter in pounds for the few dumbbells
+that are imperial, store the kilogram equivalent. Traced, it is prevention rather than convenience.
+
+Session 119 (2026-06-15) records this exact failure on this exact exercise — Dumbbell Lateral
+Raise, along with Preacher Curl and Shoulder Press, logged in pounds into the kilogram field,
+inflating 1RM, target80, volume and personal records. The repair still exists as an admin
+preview/apply tool that rescales derived figures and backdates the personal record. Nothing has
+changed since to prevent a recurrence: the write payload carries no unit and `set_logs.weight_kg`
+has no companion column, so a pound value validates cleanly and lands as kilograms.
+
+The sharper argument is that the kilogram dial cannot express the hardware. It steps 1.25 kg for
+non-barbell equipment, which is 2.76 lb — a grid with no pound dumbbell on it. A 20 lb dumbbell is
+9.07 kg and the dial offers 8.75 or 10.00. The logged Lateral Raise history sits at 5.5–11.25 kg
+across 54 sets: kilogram-grid values standing in for pound hardware.
+
+Most of the plumbing exists — `WeightDial` already takes a `unit` prop. The conversion constant
+exists too, but in the Postgres adapter, so the engine half is moving it to `packages/shared`
+rather than writing a second copy.
+
+The control was re-specified the same day. The first answer was a vertical `SegmentedTabs`, copying
+the units toggle in `quantity-editor.tsx`; the owner corrected that to *"a very small button ...
+something you wouldnt see or hidden in away"*, and that component is 96 px tall. The toggle is now
+the `kg` suffix the dial already prints: tapping it swaps to `lb`, adding no chrome at all. It needs
+the suffix split out of its bare text node, `stopPropagation` so it does not also drive the row's
+select handler, and the repo's existing `.tap-dense` + `.tap-target-44` pair — otherwise the global
+48 px tap-target floor inflates it into a slab, which is the failure already documented on
+`switch.tsx`. `e2e/touch-target-size.spec.ts` keeps an empty allowlist, so any other approach fails
+the spec.
+
+The entry flags one hazard that would silently ruin the feature: `mround125` clamps to [5, 250], so
+a 5 lb dumbbell at 2.27 kg would be floored to 5 kg. Converted values must not pass through it.
+
+Filing this also discharged an orphaned finding. `projectOverview.md` claimed that when the dead
+Kg/Lbs switch was deleted, real unit display was "filed as the feature it would actually be". It
+was not — no such entry existed. That line is corrected to point at BF-141.

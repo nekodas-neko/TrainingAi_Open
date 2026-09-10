@@ -895,7 +895,10 @@ property keeping it client-importable and the one that broke twice
 **Two settings that did nothing, both decided by the owner (LB-41, LB-29).** The **Kg / Lbs switch**
 was `useState('kg')` — never persisted, never read, reset on every reopen, and nothing in the app
 renders pounds; removed rather than left offering what it could not do, with real unit display
-filed as the feature it would actually be. And **a setting could be overwritten by the server's
+filed as the feature it would actually be. **⚑ 2026-09-10 — it was NOT filed.** No such entry
+existed anywhere; the claim was written and the follow-up dropped in the same breath. It exists now
+as **BF-141**, prompted by the owner asking for a lb/kg toggle on the weight dial — scoped to
+conversion at entry rather than the pounds-everywhere display this line implied. And **a setting could be overwritten by the server's
 older copy**: `savePreference` PATCHes fire-and-forget, so a reload before it landed was answered
 with the previous value — permanently offline, where the PATCH never lands. The owner chose *the
 change follows to other devices* over the simpler never-clobber rule, so hydration now skips a key

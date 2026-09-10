@@ -522,6 +522,122 @@ below threshold and left in place for next time.
   screenshot was taken at 07:20, so the worst case is not the one reported.
 - **Needs:** nothing.
 
+### [workouts] BF-141 — a lb/kg toggle on the weight dial, for the equipment that has already corrupted this owner's data once
+
+- **Lane:** A — the shared constant and its de-duplication are engine work; the dial and toggle are
+  Lane B's and hand over after. Both halves, so Lane A first per the lane rule.
+- **Verify:** device — a scroll-snap dial with haptics beside a new control is a touch-target and
+  gesture question, not a rendering one.
+
+- **Added:** 2026-09-10 · owner, from the live logging screen for **Dumbbell Lateral Raise**:
+  *"can there be a 'small' toggle for the weight dial to switch between lb/kg? my Dumbells are
+  pounds and I need to convert it. im 90% in kg but some are lb so a very small switch would be
+  good. then just have it convert to the kg equivalent"*.
+
+- **This is prevention for a failure that has already happened, on this exercise.** Session 119
+  (2026-06-15) records the owner reporting that **Dumbbell Lateral Raise, Dumbbell Preacher Curl and
+  Dumbbell Shoulder Press** had been *"originally logged in lbs but recorded into the kg field,
+  inflating estimated 1RM, target80, volume and personal records"*. The repair was not a one-line
+  correction: it was an admin preview/apply tool that still exists —
+  `app/api/admin/fix-exercise-units/route.ts`, `computeLbsToKgFix` in
+  `lib/data/postgres/adapter.ts`, `components/admin/exercise-unit-fix.tsx` — which converts each
+  set, rescales `estimated1rm`/`target80`, recomputes volume from corrected per-set weights, and
+  **recomputes and backdates the all-time personal record**. Its own verification example was a
+  20 kg Dumbbell Lateral Raise set becoming 9 kg, with 1RM 28.5 → 13. The exercise in the owner's
+  screenshot is that exercise.
+- **Nothing stops it happening again.** The write payload has no unit field:
+  `packages/shared/src/workout/log-exercise.ts:18` is
+  `weights: z.array(z.number().min(-100).max(500))`, and `set_logs.weight_kg`
+  (`lib/data/postgres/schema.ts:239`) has no companion unit column. A pound value validates cleanly
+  and lands as kilograms, exactly as before. **Nothing here proposes adding a unit column** — the
+  fix is to stop pounds reaching the payload, not to record which unit arrived.
+- **And the kg dial cannot express his dumbbells at all, which is the part that is not merely
+  convenience.** The dial steps 1.25 kg for non-barbell equipment (`weightStepFor`,
+  `components/workout/utils.ts:64-66`), and 1.25 kg is 2.76 lb — a grid with no lb dumbbell on it.
+  A 20 lb dumbbell is 9.07 kg; the dial offers 8.75 or 10.00. His logged Lateral Raise history sits
+  at 5.5–11.25 kg (54 sets, measured 2026-09-10) — kg-grid values standing in for lb hardware.
+
+- **Most of the plumbing already exists, which is why this is small:**
+  - `WeightDial` **already takes `unit?: string`** (`components/ui/weight-dial.tsx:29`, defaulting to
+    `'kg'`) and renders it in both the item label (`:169-170`) and the aria-label (`:141`). What is
+    missing is a caller that passes anything else, plus the conversion.
+  - **The conversion constant already exists but is in the wrong place:**
+    `const LBS_TO_KG = 0.45359237` at `lib/data/postgres/adapter.ts:135`. Per **One Formula, One
+    Place**, move it to `packages/shared/src/` and have the adapter import it — do **not** write a
+    second copy for the UI. This is the engine half and the reason the entry is Lane A's first.
+  - **⚑ THE CONTROL IS THE `kg` LABEL ITSELF. Owner, 2026-09-10, correcting this entry's first
+    answer:** *"like I said I want it to be a very small button to swap to lb - something you
+    wouldnt see or hidden in away"*. **`SegmentedTabs` is therefore ruled out** — it was this
+    entry's original recommendation, on the precedent of the vertical units toggle at
+    `components/nutrition/quantity-editor.tsx:117-124`, but `segmented-tabs.tsx:9-15` puts a
+    two-option vertical toggle at **96 px tall**, which is a prominent control and the opposite of
+    what was asked for. Do not reach for it.
+  - **What to build instead: make the unit suffix the button.** The dial already prints it —
+    `{v}{unit ? ` ${unit}` : ""}` at `components/ui/weight-dial.tsx:169-170` — so tapping `kg` to
+    get `lb` adds no chrome whatsoever, which is exactly the ask. Two mechanical changes it needs:
+    - **Split the suffix into its own element.** It is a bare text node today, so it cannot carry a
+      handler until it is a `<span>`/`<button>`.
+    - **`stopPropagation` is mandatory.** The whole row is already a click target that selects that
+      value (`weight-dial.tsx:172-175`), so without it a tap on the unit also drives the dial.
+      Make only the **selected** row's suffix interactive; the unit renders on every visible row and
+      three live toggles in a scrolling column is not what "hidden" means.
+  - **The tap-target floor is the real constraint, and the repo already solved it.** `globals.css`
+    forces `min-height/min-width: 48px` on every `button`/`[role="button"]`, which would blow a
+    small inline control up into a 48 px slab — the exact failure documented on
+    `components/ui/switch.tsx`. The pattern is `.tap-dense` to opt out of the floor plus
+    **`.tap-target-44`** (`app/globals.css:587-600`) to put an invisible 44 px touch box back. Note
+    its stated rule — *never give a control a hit area larger than its clearance* — which is fine
+    here: dial rows are 48 px tall, so a 44 px box stays inside its own row.
+  - **`e2e/touch-target-size.spec.ts` will fail this if it is done any other way.** Its `ALLOWED`
+    map is deliberately **empty** (`:50`), so a new undersized control is a failing spec rather than
+    an allowlist row. That is the check, and it is not to be widened for this.
+  - **One honest cost of "hidden", accepted:** a control with no visual affordance is undiscoverable,
+    and normally that is an argument against it. It does not apply here — this app has one user, he
+    asked for it explicitly, and he is the person who would have to find it. Worth a faint styling
+    cue (a dotted underline or slightly dimmed weight on the suffix) so it reads as tappable once
+    looked at, without becoming furniture.
+
+- **⚠ THE ROUNDING HAZARD, which is the one thing that will silently ruin this.** `mround125`
+  (`components/workout/utils.ts:47-49`) is
+  `Math.max(5, Math.min(250, Math.round(value / 1.25) * 1.25))` — it **clamps to [5, 250]**. A 5 lb
+  dumbbell is 2.27 kg and would be **floored to 5 kg**, silently more than doubling it; `mroundStep`
+  and `mroundStepUp` carry the same clamp. **The converted value must not pass through any of them.**
+  Convert exactly and round for storage only (0.25 kg is the precision the existing repair tool
+  used for derived figures). Snapping a converted weight back onto the 1.25 kg grid would reinstate
+  the exact inaccuracy the toggle exists to remove.
+- **In lb mode the dial needs lb detents**, 2.5 or 5 lb — real dumbbell increments. Reusing the kg
+  `step` and relabelling it is the trap: it would offer 1.25 lb rungs that no dumbbell has.
+
+- **Recommendation on the three open choices, so the implementer does not re-derive them:**
+  1. **Memory: remember the last unit per exercise, in `localStorage` only.** He is "90% kg" with a
+     few lb items, and those are tied to specific exercises — so per-exercise is the only option
+     where he sets it once and stops thinking about it. Transient (reset every open) makes him flip
+     it every session; a global preference is wrong for someone who is mostly metric.
+     **Deliberately not the synced preference bag:** `UserPreferencesSchema`
+     (`packages/shared/src/user/preferences.ts:30-62`) is `.strict()`, so a key there means editing
+     the schema *and* `PREFERENCE_STORAGE`, and this is a fact about which dumbbells are in one
+     room — it should not follow him to another device. Keeping it local also keeps the surface half
+     entirely inside Lane B.
+  2. **Display stays kilograms everywhere.** The owner said *"just have it convert to the kg
+     equivalent"*. The set card's non-editable branch (`set-card.tsx:196-198`), the last-session
+     chips, the 1RM trend and `active-workout-screen.tsx:306` all keep saying kg. Rendering history
+     in pounds is a different, larger feature and is not this one.
+  3. **No plan document.** One shared constant moved, one prop threaded, one existing component
+     reused, no schema change and no migration — a `docs/superpowers/plans/` doc would be longer
+     than the diff. If the implementer finds the per-exercise memory pulls in more than expected,
+     that judgement reverses and a plan is the right call.
+
+- **⚠ This also discharges a finding that was recorded as filed and never was.**
+  `projectOverview.md:895-899` says the dead Kg/Lbs switch was removed *"with real unit display
+  filed as the feature it would actually be"* (LB-41). **No such entry exists** — searched the whole
+  backlog and every doc; the only `LB-41` reference anywhere is one entry citing it as an example of
+  a deletion. So the promised follow-up was dropped at the moment it was claimed. BF-141 is it, and
+  the `projectOverview.md` line is corrected in this same PR to point here.
+- **The deleted switch is not a precedent against this.** It was removed because it was
+  `useState('kg')` that nothing read — an option the app could not honour. This entry is the
+  opposite: a conversion at the point of entry, which the app can honour today.
+- **Needs:** nothing.
+
 ### [platform] LB-94 — the journal's recent window is 332 entries, and 297 of them are pinned by a citation
 
 - **The ceiling is not a size problem, it is a linking problem.** `docs/overview/entries/` is meant

@@ -10795,3 +10795,9 @@ A baton rewrite, so the ratchet correctly demanded the number come down with it 
 successor acts from and the durable gotchas stayed. The rewrite is the point of the file — it is
 overwritten in full at every handoff — so the baseline tracking it downward is the mechanism working,
 not a concession.
+
+## 2026-09-10 — `docs/implementation-backlog.md` and `projectOverview.md` (BF-141)
+
+BF-141 files the owner's lb/kg dial toggle, with the Session 119 unit-corruption history and the
+`mround125` clamp hazard that would silently ruin it. `projectOverview.md` moves because the
+LB-41 line claimed a follow-up had been filed that never was; it now points at BF-141.
