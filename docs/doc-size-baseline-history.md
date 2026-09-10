@@ -10399,6 +10399,22 @@ One explicit do-not added: don't revert to the formula branch. The calibrated pa
 model when it is right, and the defect is that nothing tests whether it is — reverting discards the
 measurement the entry exists to make trustworthy.
 
+## 2026-09-10 — `docs/implementation-backlog.md` raised to 20372 for BF-136's result and LB-99
+
+BF-136's entry gained what shipped, the reason correcting a vial in place is required rather than
+optional (vials sort `openedOn DESC`, so a re-dated new vial sorts below the wrong one), and the
+measurement showing its fix does not clear the reported symptom. That last part is a new entry,
+LB-99, with the branches already ruled out — the payload shape matches and the arithmetic is tested,
+so the suspect is the local-store fall-through. Filing it costs lines and not filing it would have
+left BF-136 reading as closed. Recomputed on the merged file — another lane raised the
+same baseline in parallel, which is the case the per-document `.size` split should conflict on.
+
+## 2026-09-10 — `projectOverview.md` raised to 10561 for BF-136's row
+
+A live owner report whose cause shipped and whose symptom was measured NOT to clear. That gap is
+exactly what a Known-Issues row is for: without it the entry reads as closed, and the next session
+would take the owner's next mention of it as a new bug rather than the open half of this one.
+
 ## 2026-09-10 — `docs/implementation-backlog.md` → 20307 (+21 of it here), LA-90 out, LA-97 in
 
 Net of a 27-line removal and a 48-line addition. LA-90 shipped and left the queue; **LA-97** took
@@ -10431,3 +10447,10 @@ does `SELECT *` and its row→object mapper drops all four OR-102a fields, so `e
 not forward them even if it asked. That turns the entry's fix from three steps into four and
 reorders them — wiring the push path to fields the mapper does not surface ships a silent no-op that
 passes every test. Eleven lines to stop the next session building the wrong three-step version.
+
+**Fourth re-merge, #1073 (BF-136's engine half): 20404.** Recomputed again rather than adjusted.
+Worth recording the near-miss: #1073's diff shows `-### … BF-136 … 🔴 LIVE`, which reads as an entry
+being DELETED and triggered a two-deletions check here. It was a heading **rewrite** — the engine
+half shipped and the surface half stays as Lane B with `Verify: device` — and the merged file is
+byte-identical to `main` for that entry. **A `-###` line in a backlog diff is not evidence of a
+deletion**; compare the resulting blocks, not the diff markers.

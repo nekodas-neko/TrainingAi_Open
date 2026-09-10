@@ -27,6 +27,14 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   be excluded from aggregates rather than counted as zero. **Stage 1 shipped 2026-09-01**, so the
   unique constraint it says has to go is already gone.
 
+- [`docs/overview/entries/2026-09-10-fix-vial-opened-date.md`](../../overview/entries/2026-09-10-fix-vial-opened-date.md)
+  — **a vial records when it was mixed, not when it was entered (BF-136), 2026-09-10.** `openedOn`
+  was `todayInTz(tz)` with no control, and it anchors every figure on the vial card — a vial entered
+  five days late dropped five days of weigh-ins and the card said it had one. Correcting an existing
+  vial in place is **required, not a convenience**: `listSupplementVials` orders by `openedOn DESC`
+  and the sheet reads `vials[0]`, so a re-dated new vial sorts *below* the wrong one. **The fix is
+  the cause, not the symptom** — with the window corrected and the data present, the card still read
+  "Not enough weigh-ins yet"; filed as **LB-99**.
 - [`docs/overview/entries/2026-09-09-fix-macro-budget-anchor-label.md`](../../overview/entries/2026-09-09-fix-macro-budget-anchor-label.md)
   — **the macro grams and the calorie budget are two denominators, and the card says so (BF-134),
   2026-09-09.** The grams come from stored `nutrition_targets`; the budget from
