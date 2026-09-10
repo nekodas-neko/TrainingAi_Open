@@ -10454,3 +10454,14 @@ being DELETED and triggered a two-deletions check here. It was a heading **rewri
 half shipped and the surface half stays as Lane B with `Verify: device` — and the merged file is
 byte-identical to `main` for that entry. **A `-###` line in a backlog diff is not evidence of a
 deletion**; compare the resulting blocks, not the diff markers.
+
+## 2026-09-10 — `docs/implementation-backlog.md` 20404 → 20372 (−32), LA-97 shipped, LA-98 filed
+
+A shrink, so the ratchet asked for this one rather than the reverse. LA-97's 48 lines left the queue
+and LA-98's 24 replaced them.
+
+The trade is worth naming. LA-97's entry was long because it carried a four-step chain in which
+every step looks correct in isolation — the writer freezes, the reader drops, the payload forwards
+what it was given, the server fills what it was not sent — and only the sequence is wrong. That
+entry is what made the fix take an hour instead of a day. LA-98 inherits the same shape at a
+quarter the length, because it is one field and the chain is already documented.

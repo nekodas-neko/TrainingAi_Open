@@ -801,6 +801,18 @@ async function enrichPayload(
       amount: row.amount ?? null,
       unit: row.unit ?? null,
       doseText: row.doseText ?? null,
+      // LA-97 — the same argument as the dose, for the four columns OR-102a added and this payload
+      // never carried. Without them the server stamps `taken_at` at push time and re-reads the
+      // CURRENT vial, so an offline tick's frozen reconstitution is replaced by whichever vial is
+      // current when sync happens. That is the rewrite the freeze exists to prevent, one layer up.
+      //
+      // Sent as explicit nulls rather than omitted: a log genuinely taken with no vial on file must
+      // stay that way, and `frozenReconstitution()` already refuses to render unless all three are
+      // present, so a null triple is a meaningful value rather than a gap to fill.
+      takenAt: row.takenAt ?? null,
+      vialStrengthMg: row.vialStrengthMg ?? null,
+      vialWaterMl: row.vialWaterMl ?? null,
+      vialUnitsPerMl: row.vialUnitsPerMl ?? null,
     };
   } catch {
     return m.payload;
