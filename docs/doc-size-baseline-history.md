@@ -10570,6 +10570,32 @@ and it needs the owner's naming decision before the next entry can land. Recomme
 dated monthly batches (`history-2026-08.md`, `history-2026-09.md`) beside the frozen session-era
 files.
 
+## 2026-09-10 — `docs/implementation-backlog.md` 20,321 → 20,376 (+55), BF-137
+
+The owner pushed back on the raised budget — *"I thought discussed 1650 was like the maint?"* —
+and checking him is what found this. He was right, and the previous day's answer (mine) was wrong in
+the same direction as the app's.
+
+Fitting 29 weigh-ins rather than reading two endpoints splits the picture cleanly: **+0.10 kg/week
+pre-drug over 23 days, −0.95 kg/week over the six days since his first retatrutide dose, −0.12
+overall**. Against logged intake of 1,340–1,530 that puts maintenance near **1,600–1,700** — where his
+stored 1,660 came from — while the estimator reached **2,245** by fitting the drug window, which
+back-calculates to about 2,545 on its own.
+
+Filed separately from TN-29 rather than folded into it, because the mechanism is different and will
+recur on every vial: TN-29 is a cross-check on the *implied activity factor* and would catch this
+instance while attributing it to activity. The entry says so explicitly, and states the two reasons
+the inference is invalid — early GLP-1 loss is largely water and gut content, so the 7,700 kcal/kg
+conversion does not apply at all; and a six-day slope is noise-dominated regardless, which the
+pre/post split demonstrates on one person's own data.
+
+The dependency on **BF-136** is the part most likely to be missed: `supplement_vials.opened_on` is the
+obvious intervention marker and is currently hardcoded to the day the vial is *recorded*, so an
+exclusion keyed on it would exclude the wrong window. Recorded as a prerequisite in fact if not in
+form.
+
+Also records a correction to TN-29's own figure: its "honest" 1,895 is inflated by the same six days,
+just less so. **1,660 stands as the best-supported number**, which is what the owner said.
 ## 2026-09-10 — `docs/implementation-backlog.md` −40, LA-88 shipped (number written by `pnpm fix:baselines`)
 
 LA-88's entry left the queue. Second use of the tool LA-99 shipped an hour earlier, and the second
@@ -10606,11 +10632,12 @@ Fixed by the shared predicate rather than by a third patch.
 **No journal entry** — `docs/overview/entries/` is still at its 361 ceiling; LA-100 remains the
 blocker and is Gate: owner.
 
-## 2026-09-10 — `docs/implementation-backlog.md` → 20349 (OR-106, the queue sweep)
+## 2026-09-10 — `docs/implementation-backlog.md` → 20404 (OR-106, the queue sweep)
 
 Eighty-nine lines, and most of them are one entry becoming two. PS-35 carried `Gate: owner for the
 page deletions` — a gate prose scoped to one paragraph of five, which `next-item.js` can only read as
 a property of the whole entry, so four ungated fixes sat in PARKED behind a decision none of them
 needed. Splitting into PS-35a (the gated deletions) and PS-35b (the four) duplicates the header and
 provenance, which is the cost of making the gate mean what it says. The rest is 25 one-line `Lane:`
-tags and the OR-106 entry recording the 90 still untagged.
+tags and the OR-106 entry recording the 90 still untagged. Re-measured after merging `main`,
+which raised the same baseline in parallel — a raise computed before the rebase is a guess.

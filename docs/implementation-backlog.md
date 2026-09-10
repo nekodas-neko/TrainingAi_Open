@@ -795,6 +795,61 @@ prose is what is wrong. Same principle as TN-25's — the target is right and th
 **Pass test:** every user-visible sentence describing a zone states the same basis the engine uses,
 and no heart rate is coloured as an alarm at a value inside the user's own Zone 1.
 
+### [nutrition][body] BF-137 — the maintenance estimator is fitting a GLP-1 weight drop and calling it metabolic rate 🔴 LIVE
+
+- **Lane:** A — `packages/shared/src/nutrition/adaptive-tdee.ts`, alongside **TN-29** and best built with it.
+- **Added:** 2026-09-10 · owner, after his budget rose 651 kcal: *"I thought discussed 1650 was like the maint? with 200 minus for recomp? how did we go up?"* — he was right, and checking him is what found this.
+- **Needs:** — nothing. **Cross-reference TN-29**, which catches this *instance* through a different mechanism; the cause below is not the one TN-29 names, and will recur on every new vial.
+
+**Measured across 29 weigh-ins, 2026-08-12 → 09-10, by linear fit rather than endpoints:**
+
+| window | weight trend |
+|---|---|
+| whole 29 days | **−0.12 kg/week** — flat |
+| pre-drug, 23 days | **+0.10 kg/week** — slightly rising |
+| **on-drug, 6 days** | **−0.95 kg/week** |
+
+Logged intake over the same period averages **1,340–1,530 kcal/day**. Flat weight on that intake puts
+maintenance at roughly **1,600–1,700** — which is where `nutrition_targets.calories = 1,660` came
+from, and inside the 1,450–1,700 band TN-29 itself calls honest. **The calibrated 2,245 is supported
+by nothing in 29 days of this user's data.**
+
+**Where 2,245 comes from is the finding.** Essentially all of the loss sits in the six days since the
+owner's first retatrutide dose. A −0.95 kg/week slope at ~1,500 kcal intake back-calculates to a
+maintenance near **2,545** — the neighbourhood the estimator reached. It is fitting the drug.
+
+**Two independent reasons that inference is invalid here, and neither is a tuning constant:**
+1. **Early GLP-1/GIP loss is substantially water and gut content, not fat**, so the ~7,700 kcal/kg
+   conversion at the heart of every energy-balance back-calculation does not apply to this span at
+   all. This is not a matter of the window being too short — a longer window with the same drug start
+   inside it is wrong in the same direction.
+2. **Six days is noise-dominated regardless.** The pre/post split above is the demonstration: the same
+   person, the same logging, reads `+0.10` and `−0.95` kg/week depending only on which side of one
+   date the window falls.
+
+**The app already knows when the drug started.** `supplement_vials.opened_on` exists and the reta
+tracker writes it, so this is not an unobservable confound — it is one the estimator does not look
+for. **⚠ But read BF-136 first:** that entry is precisely about `opened_on` being hardcoded to the
+day the vial is *recorded*, so today the field is unreliable as an intervention marker. **BF-136 is a
+prerequisite in fact if not in form** — a drug-start exclusion keyed on a date the user cannot set
+will exclude the wrong window.
+
+**Recommendation: exclude days on the far side of a known intervention start from the maintenance
+window, and say so on the card** — *"calibration paused: 6 days since a new vial"* — rather than
+silently widening the window or clamping the output. The user then knows why the number stopped
+moving, which is the failure mode BF-134 was filed about on the same screen.
+
+- **⚠ Do NOT solve this with a floor or a cap on maintenance.** A clamp would hide a fitted-to-noise
+  estimate behind a plausible number and would keep firing every time a vial opens. TN-29's
+  activity-factor cross-check is the right *general* guard; this entry is the specific cause it would
+  otherwise attribute to activity.
+- **⚠ Do NOT infer that weight loss on the drug is not real.** It is; it is simply not evidence about
+  resting metabolism over these timescales, and that distinction is the whole entry.
+- **What this corrects.** TN-29 states an honest maintenance near **1,895**. The trend fit above does
+  not support that either — it is inflated by the same six days, just less so. **1,660 remains the
+  best-supported figure for this owner**, which is what he said and what sent this back to the data.
+- **Reversal cost:** low — a window filter plus a status string. No stored value changes.
+
 ### [nutrition] TN-29 — the app measures this owner's activity factor at 1.41 and then accepts a maintenance implying 1.67, because nothing cross-checks the two estimates it already computes
 - **Lane:** A — engine only: packages/shared, lib/health.
 
