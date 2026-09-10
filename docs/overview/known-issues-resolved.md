@@ -1109,9 +1109,9 @@ is outstanding, which is what makes this archivable rather than resident.
   unreadable error for two more rounds because the rollup worker flattened errors with
   `err.message`, discarding Drizzle's `cause` and pg's `code` (fixed in v1.318.4).
 - **Still live: Q-314**, the misdetection that caused it. Every re-pair reopens this until it lands.
-- Journal: [`entries/2026-08-17-q536-clock-epoch-diagnosis.md`](entries/2026-08-17-q536-clock-epoch-diagnosis.md) ·
-  [`entries/2026-08-17-q536-migration-statement-timeout.md`](entries/2026-08-17-q536-migration-statement-timeout.md) ·
-  [`entries/2026-08-17-rollup-worker-error-cause.md`](entries/2026-08-17-rollup-worker-error-cause.md)
+- Journal: [`entries/2026-08-17-q536-clock-epoch-diagnosis.md`](history-2026-09-10-folded-1.md#2026-08-17-q536-clock-epoch-diagnosis) ·
+  [`entries/2026-08-17-q536-migration-statement-timeout.md`](history-2026-09-10-folded-1.md#2026-08-17-q536-migration-statement-timeout) ·
+  [`entries/2026-08-17-rollup-worker-error-cause.md`](history-2026-09-10-folded-1.md#2026-08-17-rollup-worker-error-cause)
 
 
 
@@ -1621,7 +1621,7 @@ the dedup that exists to stop a distinct ring event vanishing. **Finding 3 is no
 statistics artifact and autovacuum last ran 2026-08-22. What remains is elsewhere: the `VACUUM FULL`
 press is **Q-315** (now `Gate: owner` — it needs an admin cookie a session cannot obtain), and the
 `bytea` win is Q-540's, superseded by Q-541's packing
-([`journal`](entries/2026-08-23-q534-closed-on-measurement.md)).
+([`journal`](history-2026-09-10-folded-2.md#2026-08-23-q534-closed-on-measurement)).
 
 **Progress, 2026-08-18 — part 2.** Q-534's **finding 4 is done**: both readers of the stored
 `measured_at` were rewritten to convert their window through the clock anchors and read ds-keyed, and
@@ -1896,7 +1896,7 @@ guarding one and not the other leaves the empty bar, which was the reported half
 
 **Prescription was never affected** (`resolveWorkingBasis` already skips deload rows — control held),
 so nothing that was lifted was ever wrong; only what was drawn.
-[Journal](entries/2026-09-06-deload-not-a-crash.md) ·
+[Journal](history-2026-09-10-folded-6.md#2026-09-06-deload-not-a-crash) ·
 [Checkpoint](../reviews/2026-09-05-app-checkpoint.md) §P5.
 ### [platform] ✅ The login rate limiter no longer resets when the email is padded (PS-25, 2026-09-06)
 

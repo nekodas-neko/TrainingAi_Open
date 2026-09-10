@@ -45,7 +45,7 @@ split is "does it feel slow" vs "is it actually slow at the source".
   CAN-BITE group is empty.
 - [`docs/handoff-phase-3-bundled-shell.md`](../../handoff-phase-3-bundled-shell.md) — the live
   Phase 3 baton (bundling the shell into the APK). Task 4 is now **decided** (option B).
-- [`docs/overview/entries/2026-08-19-cache-invalidation-signal.md`](../../overview/entries/2026-08-19-cache-invalidation-signal.md)
+- [`2026-08-19-cache-invalidation-signal`](../../overview/history-2026-09-10-folded-1.md#2026-08-19-cache-invalidation-signal)
   — **Q-402: the shell has no unmount, so a fetch-once effect in it never fetches again.** All six
   write groups evicted `energy-balance:` correctly and the owner still had to restart the app,
   because invalidating a key and re-rendering the component reading it are two different things and
@@ -75,7 +75,7 @@ split is "does it feel slow" vs "is it actually slow at the source".
   is still binding and is the one people re-open by accident:** `GoalsSection`, `StatsGrid`,
   `TrophyCase`, `AchievementsSection`, "Your Year" and the season badges **stay inline on More**, and
   `/more/goals` and `/more/achievements` were never built and are not going to be.
-- [`docs/overview/entries/2026-09-01-personal-details-consolidation.md`](../../overview/entries/2026-09-01-personal-details-consolidation.md)
+- [`2026-09-01-personal-details-consolidation`](../../overview/history-2026-09-10-folded-5.md#2026-09-01-personal-details-consolidation)
   — **BF-79: `More → Profile details` (`app/more/details/`), the ninth sub-route.** Display name,
   biological sex, birth year and height are edited there and **nowhere else**; weight and body fat
   appear as read-only measurements, because an input would open a second write path into
@@ -85,7 +85,7 @@ split is "does it feel slow" vs "is it actually slow at the source".
   (`components/profile/__tests__/personal-details-one-editor.test.ts`) holds the one-writer rule; it
   extracts the request-body spans rather than matching the whole file, because the first version
   could not tell a write from a form seed.
-- [`docs/overview/entries/2026-08-31-nutrition-sheet-surface.md`](../../overview/entries/2026-08-31-nutrition-sheet-surface.md)
+- [`2026-08-31-nutrition-sheet-surface`](../../overview/history-2026-09-10-folded-4.md#2026-08-31-nutrition-sheet-surface)
   — **BF-75: `SheetContent` gained an opt-in `surface="page"`.** The app-wide sheet primitive changed,
   so this is app-shell's as much as nutrition's. Two things bind any future work on it: the layer is
   `-z-10` because `SheetContent` is `fixed z-50` and therefore a stacking context — without it the
@@ -120,7 +120,7 @@ split is "does it feel slow" vs "is it actually slow at the source".
 - [`docs/reviews/2026-08-18-silent-card-failures.md`](../../reviews/2026-08-18-silent-card-failures.md) — **three lenses: leaked error text, AI rate-limit coverage, and cards that vanish, 2026-08-18** (Q-499 — 78 components call `cachedFetch`, **18** reference its `onError` hook; two verified by hand conflate "fetch failed" with "no data" and simply disappear, including on a **429 from the app's own limiter**. **Corrects `CLAUDE.md`'s premise**: `cachedFetch` does *not* unconditionally swallow `!res.ok` — `cachedFetchCore` takes `onError` and swallows only when the caller declines it.) **Two lenses came up clean:** every route returning `err.message` is admin- or session-gated (and `admin/db-query` doing so is correct by design), and every route that actually calls an LLM has a rate limit — the 7 that looked unlimited make **zero** LLM calls.
 - [`docs/reviews/2026-08-18-workout-write-path.md`](../../reviews/2026-08-18-workout-write-path.md) — **the workout write path, driven live and probed cross-user, 2026-08-18** (Q-461 — the infinite `animate-bounce` on Start Set blocks Playwright's stability check, so no E2E spec can drive a workout past set 1). Findings Q-460…Q-462; **cross-user write protection holds across the whole workout surface** (verified against a second live account, with a control for every probe), plus three more clean results.
 
-- [`docs/overview/entries/2026-08-18-training-load-day-flag-inline.md`](../../overview/entries/2026-08-18-training-load-day-flag-inline.md)
+- [`2026-08-18-training-load-day-flag-inline`](../../overview/history-2026-09-10-folded-1.md#2026-08-18-training-load-day-flag-inline)
   — **Q-390, the Training Load bars were not on a common baseline (v1.321.2).** A deload/testing flag
   rendered as a *sibling* of the day label became an extra row, and in an `items-end` row that pushes
   the bar up: two days of identical volume drew **12 px** apart, measured. Carries the correction that
@@ -133,8 +133,8 @@ split is "does it feel slow" vs "is it actually slow at the source".
 - [`docs/reviews/2026-08-18-render-hot-paths.md`](../../reviews/2026-08-18-render-hot-paths.md) — **the other four render rules, 2026-08-18**: index keys in editable lists, the orchestrator's timer, Zustand selector breadth, `readCacheSync` in a render body. **All held.** Records that every mechanical check over-reported — 85 index keys are all on static lists, the 62-field `useShallow` pick contains actions not hot-path values, and the cache-read grep flagged the comment that states the rule.
 - [`docs/reviews/2026-08-18-memo-stability-audit.md`](../../reviews/2026-08-18-memo-stability-audit.md) — **are the memos actually memoising? 2026-08-18**. All 66 `memo(...)` declarations collected and every call site scanned: **64 hold**, no inline arrows anywhere. Q-490 — `MealMacroBars`/`DayMacroTotals` are called with an inline `target={{…}}` inside `variant.meals.map(...)`, so every keystroke in the meal-plan edit sheet re-renders every meal row. Also notes the rule's *"both long-standing memos"* count is stale (66, not 2).
 - [`docs/reviews/2026-08-18-server-only-writes-to-local-first-domains.md`](../../reviews/2026-08-18-server-only-writes-to-local-first-domains.md) — **staleness outside Q-262's test, 2026-08-18** (Q-488 — the activity delete updates the server and the caches but never the local store, so three local-first screens keep showing it until the next pull; self-heals via the tombstone, so a visible inconsistency rather than data loss). Records the unwritten inverse of the offline-first rule.
-- [`docs/reviews/2026-08-18-timezone-non-default-user.md`](../../reviews/2026-08-18-timezone-non-default-user.md) — **the app driven as a user who is not in Brisbane, for the first time, 2026-08-18** (Q-477 — the Profile "Auto-detect timezone" button is what breaks dates: the server honours the new zone, 100 of 125 client call sites do not, and the Health calendar marks the wrong day as today; Q-478 — `isWorkoutDataToday`/`isBodyMetadataFresh` compare a server-stamped date to a client `DEFAULT_TZ` date, so they are false for up to 14 hours a day and session-select's Home skeleton lingers for a network round trip instead of clearing on the cache hit — the review's "never clears" was corrected in place on 2026-08-18; a second unconditional clear runs after the await). **Every API route threads the user's timezone** — all findings are client-side. **Q-478 shipped 2026-08-18** (v1.324.8): both guards take a `tz`, all nine call sites pass one, and `scripts/check-tz-aware-cache-guards.js` keeps it that way — [`the journal entry`](../../overview/entries/2026-08-18-tz-aware-cache-guards.md). Q-477 is still open, including its ratchet on bare `todayInTz()` in client code.
-- [`docs/overview/entries/2026-08-24-memo-call-site-stability.md`](../../overview/entries/2026-08-24-memo-call-site-stability.md) — **Q-357, the memo baseline emptied, 2026-08-24** (four defeated call sites cleared; the `SavedMealCard` one was inside a `.map()`, so its callbacks now take the meal and hand it back rather than being closed over per row). **Render saving not measured.**
+- [`docs/reviews/2026-08-18-timezone-non-default-user.md`](../../reviews/2026-08-18-timezone-non-default-user.md) — **the app driven as a user who is not in Brisbane, for the first time, 2026-08-18** (Q-477 — the Profile "Auto-detect timezone" button is what breaks dates: the server honours the new zone, 100 of 125 client call sites do not, and the Health calendar marks the wrong day as today; Q-478 — `isWorkoutDataToday`/`isBodyMetadataFresh` compare a server-stamped date to a client `DEFAULT_TZ` date, so they are false for up to 14 hours a day and session-select's Home skeleton lingers for a network round trip instead of clearing on the cache hit — the review's "never clears" was corrected in place on 2026-08-18; a second unconditional clear runs after the await). **Every API route threads the user's timezone** — all findings are client-side. **Q-478 shipped 2026-08-18** (v1.324.8): both guards take a `tz`, all nine call sites pass one, and `scripts/check-tz-aware-cache-guards.js` keeps it that way — [`the journal entry`](../../overview/history-2026-09-10-folded-1.md#2026-08-18-tz-aware-cache-guards). Q-477 is still open, including its ratchet on bare `todayInTz()` in client code.
+- [`2026-08-24-memo-call-site-stability`](../../overview/history-2026-09-10-folded-2.md#2026-08-24-memo-call-site-stability) — **Q-357, the memo baseline emptied, 2026-08-24** (four defeated call sites cleared; the `SavedMealCard` one was inside a `.map()`, so its callbacks now take the meal and hand it back rather than being closed over per row). **Render saving not measured.**
 
 - [`docs/reviews/2026-08-18-production-verification.md`](../../reviews/2026-08-18-production-verification.md) — **this run's own findings checked against production, 2026-08-18** (Q-472 — `coach_changes` is empty: the Coach's write capability has produced zero writes, which re-prices Q-467/Q-468 to zero production exposure). Filed Q-472; **amended Q-460, Q-465, Q-467, Q-468** — one refuted, two re-scoped to zero exposure, one shown unprovable either way.
 
@@ -152,14 +152,14 @@ Live at the time of writing (2026-07-30):
   `budgetProvenance(...).total` rather than composing `nutrition_targets.calories` — the **rest-day
   floor** — plus a separately-sourced burn. Follow-up **LB-4** (food logs invalidate before their
   push) and **not device-verified** —
-  [`journal`](../../overview/entries/2026-08-23-one-calorie-budget.md).
+  [`journal`](../../overview/history-2026-09-10-folded-2.md#2026-08-23-one-calorie-budget).
 
 - ✅ **`components/health/day-overlay-sheet.tsx` is gone** (LB-3, 2026-08-24). LB-1 took its
   edit/delete controls onto `/health/day` and left the file because it still owned three affordances
   that screen had not got. Two were ported — tap an exercise name for its history, tap an activity
   for its detail — and the per-session HR recovery chart was dropped, since `done-screen` still
   reaches it at the moment it means something. `health-content.tsx` lost 167 lines with it —
-  [`journal`](../../overview/entries/2026-08-24-retire-day-overlay-sheet.md).
+  [`journal`](../../overview/history-2026-09-10-folded-2.md#2026-08-24-retire-day-overlay-sheet).
 
 - ⚠️ **Q-154 — three inline sparklines remain, and the primitive cannot draw them yet.** Half the
   original list turned out to be *time-axis* charts (the primitive projects x by index) and is now
@@ -174,19 +174,19 @@ Live at the time of writing (2026-07-30):
   owns the decisions as pure functions; `collection-sprites.ts` is emoji standing in for the drawn
   art (BF-126, owner-gated). `CardWidgetKey` now has ONE declaration, in `lib/home/home-prefs.ts` —
   it had three. **Not device-verified.** See
-  [`the journal entry`](../../overview/entries/2026-09-07-feat-bf-122b-cat-collection-surface.md).
+  [`the journal entry`](../../overview/history-2026-09-10-folded-6.md#2026-09-07-feat-bf-122b-cat-collection-surface).
 - ⚠️ **The three exercise roles are named once** (BF-124/BF-125, 2026-09-07, v1.436.40) —
   `components/workout/exercise-role-labels.ts`, as Main / Secondary / Accessory. The editor's role
   row wraps and marks the chosen option in `bg-brand`; the near-white `bg-primary` selected slab is
   gone from both config sheets. **`components/ui/switch.tsx` still carries it** (LB-61) — deliberate,
   it is the shared primitive. See
-  [`the journal entry`](../../overview/entries/2026-09-07-fix-bf-124-125-role-vocabulary.md).
+  [`the journal entry`](../../overview/history-2026-09-10-folded-6.md#2026-09-07-fix-bf-124-125-role-vocabulary).
 - ⚠️ **The 48 px floor's opt-out is now actually swept** (BF-123, 2026-09-07, v1.436.39). The owner
   reported the program editor's muscle chips rendering as filled circles; 48 controls across 24 files
   now carry `tap-dense` plus a restored touch area, and `.tap-target-44`'s `position: relative` moved
   into `@layer components` because unlayered it was beating Tailwind's `absolute` and flowing the
   avatar edit badge inline. 41 of the 48 sites are not on a gated screen — **not device-verified**.
-  See [`the journal entry`](../../overview/entries/2026-09-07-fix-bf-123-tap-floor-sweep.md).
+  See [`the journal entry`](../../overview/history-2026-09-10-folded-6.md#2026-09-07-fix-bf-123-tap-floor-sweep).
 - ✅ **The `tap-dense` audit is complete** (Q-176, 2026-08-10, v1.277.2). Ten users, five different
   correct remedies — bare (inline text), self-restoring (`Switch`), a 24×44 dot box, a 44×44 box, or
   grown ink. What decides each is the clearance to the nearest interactive neighbour. See
@@ -222,7 +222,7 @@ Live at the time of writing (2026-07-30):
   dependency clearing. Guarded by
   [`e2e/timeline-card-navigation.spec.ts`](../../../e2e/timeline-card-navigation.spec.ts), which
   asserts the destination URL — a row wired to nothing renders identically to a wired one. See
-  [`docs/overview/entries/2026-08-25-timeline-workout-day-detail.md`](../../overview/entries/2026-08-25-timeline-workout-day-detail.md).
+  [`2026-08-25-timeline-workout-day-detail`](../../overview/history-2026-09-10-folded-3.md#2026-08-25-timeline-workout-day-detail).
 
 - **The Coach KEEPS its write capability — but undo gets wired before anything drives adoption
   (owner, 2026-08-24 — Q-472, removed from the queue).** Production measured **0 applied Coach
@@ -247,19 +247,19 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
-- **[`docs/overview/entries/2026-08-30-apk-banner-tap-target.md`](../../overview/entries/2026-08-30-apk-banner-tap-target.md)**
+- **[`2026-08-30-apk-banner-tap-target`](../../overview/history-2026-09-10-folded-3.md#2026-08-30-apk-banner-tap-target)**
   — 🆕 **LB-26**: Home's APK-banner link was 258×33 against the 48 dp floor. **⚠ The rule to carry:
   do not raise an undersized `<a>` by adding `a` to `globals.css`'s `button, [role="button"]` floor**
   — the exclusion is deliberate, and a link that IS a control takes `min-h-[48px]` at its own call
   site. `e2e/touch-target-size.spec.ts`'s allowlist is empty now, so a new one fails the spec.
-- **[`docs/overview/entries/2026-08-30-sparkline-primitive-props.md`](../../overview/entries/2026-08-30-sparkline-primitive-props.md)**
+- **[`2026-08-30-sparkline-primitive-props`](../../overview/history-2026-09-10-folded-4.md#2026-08-30-sparkline-primitive-props)**
   — 🆕 **Q-154**: `components/ui/sparkline.tsx` gained the six props that were blocking three callers
   from using it (`pad`, `valuePadding`, `strokeWidth`, `gridLines`, `emphasizeLast`, `valueLabel`),
   all defaulted. **⚠ `valuePadding` defaults to 0.5 and that changes what a chart says** — it halves
   the amplitude of a small spread; pass `0` for exact min/max. Projection extracted to
   `sparkline-geometry.ts` so it is testable in node. Two callers converted;
   `workout/active-workout-screen` stays inline deliberately and is not a to-do.
-- **[`docs/overview/entries/2026-08-25-back-dismiss-sweep.md`](../../overview/entries/2026-08-25-back-dismiss-sweep.md)**
+- **[`2026-08-25-back-dismiss-sweep`](../../overview/history-2026-09-10-folded-2.md#2026-08-25-back-dismiss-sweep)**
   — 🆕 **BF-27**: the Android back gesture now closes the sheet or dialog on top rather than
   navigating the page underneath away. It reached 5 of 45 sheet files and 0 of 6 dialog files
   before. The hook is no longer wired per call site — `SheetContent` and `DialogContent` render
@@ -273,7 +273,7 @@ Live at the time of writing (2026-07-30):
   `sheetId` against its own, so every sheet that was not the one landed on closed itself — right at
   two layers by accident, wrong from three, where back lands on the *middle* sheet's entry and the
   *bottom* one reads a foreign id and closes. Each entry carries the depth it was pushed at now.
-  [`2026-08-26-one-food-list.md`](../../overview/entries/2026-08-26-one-food-list.md) has the trace.
+  [`2026-08-26-one-food-list.md`](../../overview/history-2026-09-10-folded-3.md#2026-08-26-one-food-list) has the trace.
   **And the third — BF-34 (v1.383.1):** the decision logic no longer lives in this hook at all. It is
   [`lib/hooks/sheet-back-stack.ts`](../../../lib/hooks/sheet-back-stack.ts), with the hook reduced to
   React wiring, because all three failures were in *when to close* and none was reachable from a test
@@ -281,7 +281,7 @@ Live at the time of writing (2026-07-30):
   **module-level** now: a sheet closing and a dialog opening in the same tick are different
   instances, so a per-instance flag was invisible to the one that received the pop and the dialog
   closed on the frame it opened.
-  [`2026-08-26-sibling-sheet-back-dismiss.md`](../../overview/entries/2026-08-26-sibling-sheet-back-dismiss.md).
+  [`2026-08-26-sibling-sheet-back-dismiss.md`](../../overview/history-2026-09-10-folded-3.md#2026-08-26-sibling-sheet-back-dismiss).
 
 - **[`docs/handoff-2026-08-25-platform-lane-b-nineteen-prs.md`](../../handoff-2026-08-25-platform-lane-b-nineteen-prs.md)**
   — Lane B, 2026-08-25. The shell-relevant half: **LB-10**, `use-sheet-back-dismiss` was not
@@ -293,7 +293,7 @@ Live at the time of writing (2026-07-30):
   worth knowing before writing any Home spec: **Home's Morning Check-in is a modal**, so Radix
   `aria-hidden`s `<main>` and every `getByRole` on Home returns 0 — the failure reads as *"the
   affordance does not exist"* on correct markup.
-- **[`docs/overview/entries/2026-08-17-radiogroup-keyboard-nav.md`](../../overview/entries/2026-08-17-radiogroup-keyboard-nav.md)**
+- **[`2026-08-17-radiogroup-keyboard-nav`](../../overview/history-2026-09-10-folded-1.md#2026-08-17-radiogroup-keyboard-nav)**
   — 🆕 Q-350: all eight `role="radiogroup"`s now share
   [`lib/hooks/use-roving-radio-group.ts`](../../../lib/hooks/use-roving-radio-group.ts) for arrow keys
   and a roving tabindex. **A hook, not the `components/ui/` component the entry proposed** — the
@@ -301,7 +301,7 @@ Live at the time of writing (2026-07-30):
   up **Q-355**: the three goal groups pass `disabled={saving}` and PATCH on change, so the browser
   drops focus mid-save and ejects the user from the group on every keypress.
 
-- **[`docs/overview/entries/2026-08-17-nutrition-tap-refuted.md`](../../overview/entries/2026-08-17-nutrition-tap-refuted.md)**
+- **[`2026-08-17-nutrition-tap-refuted`](../../overview/history-2026-09-10-folded-1.md#2026-08-17-nutrition-tap-refuted)**
   — 🆕 Q-309 **refuted**: a real touch tap on Nutrition's action row works. `.click()` in Playwright
   dispatches a *mouse* sequence with no touch events, so the suspected `useDrag`/`filterTaps`
   tap-swallowing cannot be the cause; `page.touchscreen.tap()` opens the sheet every time. The spec
@@ -309,7 +309,7 @@ Live at the time of writing (2026-07-30):
   element, handler does not run, this screen only) — low priority on a touch-only target, and its
   entry says not to touch gesture code without a *touch* failure first.
 
-- **[`docs/overview/entries/2026-08-17-ai-insight-sufficiency-gate.md`](../../overview/entries/2026-08-17-ai-insight-sufficiency-gate.md)**
+- **[`2026-08-17-ai-insight-sufficiency-gate`](../../overview/history-2026-09-10-folded-1.md#2026-08-17-ai-insight-sufficiency-gate)**
   — 🆕 Q-452: `AiInsightCard` fired on every mount and the route feeds the model the literal string
   `"no data"` for absent fields, which it reads as a measured zero. The card now takes a **required**
   `hasData`. The heart-rate gate reads the trend series because that mirrors what the *prompt* reads
@@ -318,14 +318,14 @@ Live at the time of writing (2026-07-30):
   `recentHrv` is 65 for the seeded user and that gate works too; the earlier reading was a
   cold-compile timing artifact. The prompt half is **Q-353** (Lane A).
 
-- **[`docs/overview/entries/2026-08-17-scroll-panel-page-jump.md`](../../overview/entries/2026-08-17-scroll-panel-page-jump.md)**
+- **[`2026-08-17-scroll-panel-page-jump`](../../overview/history-2026-09-10-folded-1.md#2026-08-17-scroll-panel-page-jump)**
   — 🆕 Q-532: `scrollIntoView` on a sentinel scrolls **every** scrollable ancestor including the
   document, so a panel appending content drags the whole page. Use
   [`lib/hooks/use-scroll-to-bottom.ts`](../../../lib/hooks/use-scroll-to-bottom.ts) instead — the ref
   goes on the `overflow-y-auto` element. The sibling sweep found a second, unreported instance in
   the workout-builder chat, and confirmed `coach-content.tsx` is correct as written. Not
   device-verified, and no automated guard is possible today — the entry records why.
-- **[`docs/overview/entries/2026-08-17-profile-group-labelling.md`](../../overview/entries/2026-08-17-profile-group-labelling.md)**
+- **[`2026-08-17-profile-group-labelling`](../../overview/history-2026-09-10-folded-1.md#2026-08-17-profile-group-labelling)**
   — 🆕 Q-261, the tail of the Q-258 sweep: the six `<Label>`s in `components/profile/` that front
   button groups rather than controls. Five became `role="radiogroup"` + `aria-labelledby` following
   the three sites that already used that shape; Timezone dropped `<Label>` entirely because nothing
