@@ -19563,30 +19563,77 @@ UI?") means most PRs skip the job in ~35 seconds, so nobody has a feel for the r
 
 - **Reversal cost:** trivial. One line per job.
 
-### [platform][nutrition] LA-98 — a replayed log's null amount picks up the definition's CURRENT default
+### [platform] LA-100 — the entries compaction sweep has no target file, and the ceiling now blocks every lane
 
-- **Branch:** _unassigned_ · **Added:** 2026-09-10, split out of LA-97 rather than bundled into it.
-- **Lane: A** — `packages/shared/src/nutrition/supplement-dose-freeze.ts` (`resolveLoggedDose`),
-  `app/api/supplements/[id]/log/route.ts`, and the `supplement_logs` push branch.
-- **Latent, and measured so: 1 of 4 production logs has the shape**, and that row is long synced —
-  the case fires only on a REPLAY, so it needs a mutation queued before a definition change and
-  drained after one. Nothing is pending.
+- **Branch:** _unassigned_ · **Added:** 2026-09-10, when the ceiling fired and the sweep turned out
+  not to be mechanical.
+- **Lane: A** — the sweep touches `docs/` only, but the naming decision below is the blocker.
+- **Gate:** owner — the open question is a documentation-structure decision, not an implementation
+  one, and the answer changes what every future session's journal entry does. (Filed inline on the
+  Lane bullet first; `check-backlog-pointers` caught it, because an inline field is ignored and the
+  entry would have printed READY. Second field-shaped filing mistake this session — the first was
+  `⛔` on LA-97.)
+- **Blocking-ish:** `main` sits at the ceiling, so the next entry from any of the six agents fails
+  CI. #1077 raised it 360 → 361 to unblock and recorded that this contradicts #1052's intent.
 
-`resolveLoggedDose` merges with `??`, which treats an explicit `null` as absent. A replayed log
-whose amount was genuinely null at tick time therefore picks up whatever `default_amount` the
-definition carries at push time — the same class of retroactive rewrite BF-3 exists to prevent, for
-supplements that had no structured amount when they were taken.
+**The sweep is overdue on the repo's own numbers** — 56 foldable against a chore threshold of 20 and
+a runaway limit of 60, oldest dating to 2026-08-16 — and
+[`docs/overview/entries/README.md`](overview/entries/README.md) says *"the next PR adding an entry
+runs the sweep"*. It was not run, for a reason that is the entry:
 
-**The fix is the `undefined`-vs-`null` distinction**: absent means "not specified, fill from the
-definition"; explicit null means "none was recorded, keep it". `resolveLoggedDose` is where it
-belongs.
+**There is nowhere obvious to fold them TO.** The batched history files are **era-based, not
+date-based**: `history-newest.md` is headed *"recent: Sessions ~105–176"*, and its siblings
+(`-recent`, `-newer`, `-past`) follow the same session-era scheme. The per-entry convention that
+replaced it is dated (`YYYY-MM-DD-<slug>.md`). Nothing bridges the two.
 
-**Why it was NOT folded into LA-97**, which fixed the sibling rewrite in the same functions: it
-needs three surfaces to agree on absence (the shared merge, the log route's body normalisation,
-the push branch's coercion), and **it changes web-route behaviour too** — today a body of
-`{unit: 'mg'}` inherits the definition's amount, and afterwards it would not. A latent case is not
-worth a second semantic change inside a sync-push PR. Fix it on its own, with the same
-mutation-tested shape LA-97 used.
+**The owner's call, and it is genuinely a preference:**
+1. **A dated batch per month** — `history-2026-08.md`, `history-2026-09.md` — alongside the frozen
+   session-era files. Simplest, and `ls` stays chronological. Costs a second naming scheme in one
+   directory, permanently.
+2. **Extend the era scheme** — one more `history-*.md` whose header names a date range instead of
+   sessions. Keeps one scheme; the names stop being meaningful ("newest" already is not).
+3. **Fold into `history-newest.md` regardless** and re-title it by date range. One file, one scheme;
+   rewrites a header 200+ entries already cite.
+
+**Recommendation: (1).** Dates are what the entries are named by, `ls` sorts correctly with no
+convention to remember, and the frozen era files stay untouched — the citations pointing at them
+keep working. The second scheme is a real cost, but it is the one that already exists in the
+directory being compacted.
+
+**Not just a sweep — check the citations.** `linkedEntryNames` walks the **repo root**, so an entry
+is "linked" if `projectOverview.md` or `CLAUDE.md` names it, not only `docs/`. A `docs/`-only measure
+reports 235 foldable where the real number is 56; sweeping on that would delete entries durable docs
+still cite. Whatever the sweep does, it must repoint citations rather than break them.
+
+### [platform] LA-99 — the doc-size baselines are hand-merged, six times in one evening, always identically
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-10, from the friction rather than from a report.
+- **Lane: A** — `.gitattributes`, a driver script under `scripts/`, and a note in
+  `docs/doc-size-baseline-history.md`.
+- **Small, and the payoff is other agents' time as much as this lane's.**
+
+Every PR that touches `docs/implementation-backlog.md` raises
+`docs/doc-size/docs/implementation-backlog.md.size`. On 2026-09-10 six PRs did so within two hours
+(#1070, #1071, #1072, #1073, #1074, #1076), and **every single merge conflicted on that one file and
+was resolved the same way**: recompute the count on the merged document, write it, commit.
+
+**The conflict is CORRECT and should not be suppressed.** LA-33 split a shared map into one file per
+tracked doc precisely so two PRs raising two different documents no longer collide; what is left is
+two PRs raising the *same* document, which genuinely disagree about one number. A union merge or an
+"ours" strategy would silently pick a wrong number. **The waste is the hand-resolution, not the
+conflict** — so the fix is a merge driver that computes the right answer, not one that hides the
+question.
+
+- `.gitattributes`: `docs/doc-size/*.size merge=docsize`
+- the driver recomputes from the merged working tree and writes the result.
+
+**⚠ The driver must NOT use `wc -l`.** The tracked documents have no trailing newline, so
+`check-doc-index-size` counts one more line than `wc -l` reports — an off-by-one that cost two
+retries in this session alone (20246 vs 20247, 20330 vs 20331). **Take the count the check itself
+reports** (`docs/… is N lines`) and write that; it is the only number the gate agrees with.
+
+**Reversal cost: nil.** A merge driver is local config plus one script; delete both and conflicts
+come back exactly as they are today.
 
 ### [platform] LA-89 — `oura/hr-sync` has no callers, and its name says something that is not true
 

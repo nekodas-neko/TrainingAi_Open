@@ -10490,3 +10490,50 @@ LA-98 added here, LA-96 and BF-136 untouched on both sides.
 more, and setting `wc -l` produced an off-by-one twice today (20246 vs 20247, 20330 vs 20331). The
 reliable move is to take **the count the check reports** and write that. This resolution used it and
 landed first try.
+
+## 2026-09-10 — `docs/implementation-backlog.md` 20301 → 20306 (+5), LA-98 shipped, LA-99 filed
+
+LA-98's 24 lines left the queue and LA-99's 29 replaced them. LA-99 is the entry this file has been
+arguing for all evening: six PRs raised this very baseline within two hours, and every merge
+conflicted on it and was resolved the same way.
+
+Set from the count `check-doc-index-size` reported rather than `wc -l` — which is the trap LA-99
+exists to encode, and which cost two retries earlier today before the recipe was corrected.
+
+## 2026-09-10 — entries ceiling 360 → 361, and this one is NOT "as intended since #1052"
+
+**Raising this contradicts a decision the owner made, and the note says so rather than burying it in
+a +1.** Every entry above since #1052 records "ceiling untouched at 360". This one raises it, to
+unblock, and files the durable fix as **LA-100**.
+
+**What fired.** `main` sat at exactly 360, so the next entry from *any* of the six agents crosses
+it — the same all-lanes block the README records from 2026-09-02 at 250. Mine happened to be the
+PR that arrived first.
+
+**Why the 2026-09-02 remedy does not transfer, checked rather than assumed.** That firing was
+resolved by raising, on the reasoning that the ceiling was punishing *well-cited* entries: only 3–4
+were foldable and all were days old, so sweeping would have deleted the newest. **That is no longer
+the shape.** Foldable is now **56 against a chore threshold of 20 and a runaway limit of 60**, and
+the oldest date to 2026-08-16 — nearly a month. The sweep is overdue on the repo's own numbers, and
+`docs/overview/entries/README.md` says outright that *"the next PR adding an entry runs the sweep"*.
+
+**So why raise instead of sweeping?** Because the sweep is not mechanical, and I found that out by
+looking. The batched history files are **era-based, not date-based** — the newest,
+`history-newest.md`, is headed *"recent: Sessions ~105–176"*. There is no file that 56 entries dated
+2026-08-16…2026-09-10 obviously belong in, and inventing one (a new `history-2026-08.md`? a date
+convention alongside the session-era one?) is a documentation-structure decision, not a chore. Doing
+that improvised, inside a code PR, at the end of a long session, is how a doc reorganisation gets
+half-done.
+
+**A correction to my own first instinct, recorded because it nearly became the action.** I measured
+"unlinked" myself and got **235**, which would have made this look like a runaway. The check reports
+**56**, and the check is right: `linkedEntryNames` walks the **repo root**, so it sees citations in
+`projectOverview.md` and `CLAUDE.md` that a `docs/`-only walk misses. Had I acted on 235 I would
+have swept entries that durable docs still cite.
+
+**Reversal: one number.** If the owner would rather the directory shrink than the ceiling rise, drop
+it back to 360 and take LA-100 first; nothing else depends on this line.
+
+**Backlog 20306 → 20348 (+42) in the same PR: LA-99 and LA-100.** Both filed from friction rather
+than from a report — the repeated `.size` hand-merges, and the ceiling that fired with no target
+file to sweep into. Set from the count the check reports, as LA-99 exists to encode.

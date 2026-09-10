@@ -4696,10 +4696,16 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             // (the tick and the stamp are the same instant) and wrong here for the same reason the
             // dose is: a mutation queued offline drains later, and by then the current vial may be
             // a different mix. An older client that sends none still gets the old fallback.
+            //
+            // LA-98 — a key the payload does not carry stays ABSENT, so `resolveLoggedDose` fills
+            // it from the definition; a key present as null is kept as null, because that is what
+            // the device recorded. An older client sends none of them and gets the definition, as
+            // before. The `in` test is what separates the two — `typeof p.amount === 'number'`
+            // alone cannot, since it answers "no" to both.
             await this.logSupplement(String(p.supplementId), userId, String(p.logDate), {
-              amount: typeof p.amount === 'number' ? p.amount : null,
-              unit: typeof p.unit === 'string' ? p.unit : null,
-              doseText: typeof p.doseText === 'string' ? p.doseText : null,
+              ...('amount' in p ? { amount: typeof p.amount === 'number' ? p.amount : null } : {}),
+              ...('unit' in p ? { unit: typeof p.unit === 'string' ? p.unit : null } : {}),
+              ...('doseText' in p ? { doseText: typeof p.doseText === 'string' ? p.doseText : null } : {}),
               takenAt: typeof p.takenAt === 'string' ? p.takenAt : null,
               vialStrengthMg: typeof p.vialStrengthMg === 'number' ? p.vialStrengthMg : null,
               vialWaterMl: typeof p.vialWaterMl === 'number' ? p.vialWaterMl : null,

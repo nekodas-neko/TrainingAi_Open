@@ -84,6 +84,27 @@ describe('resolveLoggedDose (LA-90)', () => {
     expect(resolveLoggedDose({ unit: 'mg' }, { defaultAmount: null, unit: null, dose: '10mg' }).doseText).toBe('10mg')
   })
 
+  // ── LA-98: absent and null are different ────────────────────────────────────────────────────
+  it('KEEPS an explicit null rather than filling it from the definition', () => {
+    // The replay case. A log taken when the definition had no structured amount carries a real
+    // null; filling it from whatever the definition says now is the BF-3 rewrite, one field over
+    // from the one LA-97 fixed.
+    expect(resolveLoggedDose({ amount: null, unit: null, doseText: '10mg' }, def))
+      .toEqual({ amount: null, unit: null, doseText: '10mg' })
+  })
+
+  it('still fills a key that is ABSENT, which is what makes the distinction useful', () => {
+    // Same object shape as far as `??` is concerned — and the opposite answer.
+    expect(resolveLoggedDose({ unit: 'mcg' }, def)).toEqual({ amount: 5, unit: 'mcg', doseText: null })
+  })
+
+  it('freezes the free text against a null amount that was kept, not the definition’s number', () => {
+    // `amount` stays null, so the prose survives — the reading that makes a text-only supplement's
+    // history reconstructable at all.
+    expect(resolveLoggedDose({ amount: null }, { defaultAmount: 5, unit: 'mg', dose: '5mg' }))
+      .toEqual({ amount: null, unit: 'mg', doseText: '5mg' })
+  })
+
   it('survives a missing definition without inventing anything', () => {
     expect(resolveLoggedDose({ amount: 3 }, null)).toEqual({ amount: 3, unit: null, doseText: null })
     expect(resolveLoggedDose(null, null)).toEqual({ amount: null, unit: null, doseText: null })
