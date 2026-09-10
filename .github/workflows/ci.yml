@@ -490,6 +490,9 @@ jobs:
       - name: A zero-argument mock does not have its calls indexed (shrink-only)
         run: node scripts/check-zero-arg-mock-indexed.js
 
+      - name: applyDelta's domain list is frozen (Q-28 tripwire)
+        run: node scripts/check-apply-delta-domains.js
+
       - name: CI, engines.node and production agree on a Node major
         run: node scripts/check-node-version-agreement.js
 

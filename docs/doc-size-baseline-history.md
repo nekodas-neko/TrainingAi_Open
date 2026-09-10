@@ -10326,3 +10326,17 @@ one number in parallel — the case the per-document `.size` split is designed t
 than silently pick a winner. Resolved by recomputing the count on the merged file (20247), not by
 taking either side's number: 20184 + 63 is only right by coincidence when both changes are pure
 additions, and relying on that is how a baseline drifts.
+
+## 2026-09-10 — `docs/implementation-backlog.md` 20247 → 20275 (+28), Q-28 re-measured
+
+Q-28 was re-verified before being worked, and four of its numbers were stale: 20 delta domains → 31,
+≈1,800 restore rows → 3,544, `oura_heartrate` 37,950 → 111,246, and two line references. The
+**verdict is unchanged** — the batching refactor still waits — so the growth is not a new decision,
+it is the correction that keeps the old decision honest. A deprioritised entry whose numbers have
+drifted 92% in five weeks is the one shape that gets re-litigated from scratch by whoever opens it
+next, which is what these 28 lines buy back.
+
+The +28 is also the ceiling on this one: the enforcement it describes went to
+`scripts/check-apply-delta-domains.js` and its header carries the reasoning, so the entry names the
+check rather than re-explaining it. Nothing here went to a review doc, because a re-measurement that
+*confirms* a verdict has no evidence worth a separate document — the table is six rows.
