@@ -10266,3 +10266,14 @@ deletion, both confirm-first. The entry was printing as ordinary READY work whil
 the remaining half is confirm-first — the fifth field/prose mismatch this session.
 
 Entries ceiling untouched at 360.
+
+---
+
+## 2026-09-10 — backlog 20,224 → 20,194 (−30) (LB-62 shipped)
+
+LB-62 left the queue whole. Worth noting what its 30 lines bought: the entry named a cheaper
+alternative and told the implementer to price it *first*. Doing so found the alternative was already
+in place — `typecheck:tests` entered `pnpm ci:local` on 2026-09-02, five days before the three
+incidents it was proposed to prevent — which is the fact that justifies building the bespoke check
+rather than the cheap one. An entry that had only said "build a check" would have got a check with no
+argument behind it.
