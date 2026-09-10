@@ -1885,7 +1885,7 @@ Both are index material rather than narrative. The status entry is seven lines a
 journal for everything else — the two premise corrections the extraction turned up (the port is 22
 store operations, not the five the plan sketched from a line count; `run.ts` still reaches
 `onnxruntime-node`) are 25 lines in
-[the entry](overview/entries/2026-08-23-oura-rollup-io-port.md), not here. The backlog annotation
+[the entry](overview/history-2026-09-10-folded-2.md#2026-08-23-oura-rollup-io-port), not here. The backlog annotation
 stays in the queue because Q-545 is **not finished** — Task 2 of seven shipped, and the next
 implementer needs to read those two corrections *before* sizing Task 3, which is exactly what the
 queue entry is for.
@@ -2358,7 +2358,7 @@ entry's evidence for 2026-08-11/08-13 was overtaken by Q-536's clock repair, and
 was overtaken by `nightSessions`. A reader who re-derives from either goes the wrong way.
 
 **The Q-274 entry was trimmed first, not raised into.** Its first draft ran 34 lines; the narrative
-moved to [`entries/2026-08-25-sleep-fragment-nights.md`](overview/entries/2026-08-25-sleep-fragment-nights.md)
+moved to [`entries/2026-08-25-sleep-fragment-nights.md`](overview/history-2026-09-10-folded-3.md#2026-08-25-sleep-fragment-nights)
 and the queue kept what a queue needs — what is still owed, and what must not be trusted. Raising
 came second, once the entry was as short as it could honestly be.
 ## 2026-08-25 — `docs/implementation-backlog.md` 11532 → 11590 (+58)
@@ -6647,7 +6647,7 @@ user-visible change gets a status paragraph, and a change that could not be exer
 gets a Known-Issues row (CLAUDE.md, Canonical Runtime — the row is the *alternative* to the device
 smoke run, so it is not optional prose). The detail that is not index material — the design argument,
 the verification transcript, the one correction made while building — is in
-[`docs/overview/entries/2026-09-02-la-47-coach-plan-card.md`](overview/entries/2026-09-02-la-47-coach-plan-card.md)
+[`2026-09-02-la-47-coach-plan-card`](overview/history-2026-09-10-folded-5.md#2026-09-02-la-47-coach-plan-card)
 and the paragraph links to it.
 
 Both entries shrink on their own terms rather than needing a sweep: the status paragraph is replaced
@@ -6755,7 +6755,7 @@ those lines a later session reads a fixed entry and closes it with a live fault 
 
 The correction to the entry's diagnosis is four lines and a pointer, cut from twelve after this check
 first failed. The argument belongs in
-[`docs/overview/entries/2026-09-02-ps17-night-selection.md`](overview/entries/2026-09-02-ps17-night-selection.md);
+[`2026-09-02-ps17-night-selection`](overview/history-2026-09-10-folded-5.md#2026-09-02-ps17-night-selection);
 what the queue needs is that the summary does not read `sleep_sessions`, so the next person does not
 build the fix the entry originally described.
 
@@ -10733,3 +10733,14 @@ Worth recording *why* it lingered: the entry's own text had gone stale in both d
 `getLastRealOneRmBatch` never filters on `exercise_deloaded` long after that filter shipped, and
 called it the one query in the family missing the filter when four others were. Nobody re-read it
 because it read as accurate.
+
+## 2026-09-10 — `docs/implementation-backlog.md` → 20437 (LA-80 shipped, and OR-107 with it)
+
+Down 62 lines: two entries left the queue. LA-80 asked for a fold that rewrites citations and this PR
+built it. **OR-107 was a duplicate of LA-80 that I filed two days later** without checking whether the
+problem was already queued — it was, by Lane A, with the same diagnosis and the same 292-of-321
+measurement. Removing both is one shipped item and one that should never have existed.
+
+The lesson is cheaper to write than to repeat: an entry filed *out of* a conversation about a
+blocking gate is exactly the kind most likely to already exist, because whatever blocked you blocked
+someone else first. Grep the queue for the symptom before filing.

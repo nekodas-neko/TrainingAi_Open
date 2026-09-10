@@ -37,7 +37,7 @@ layer**) through §16. Read it before building any shared helper.
   have never run against production**, because a sandbox session cannot authenticate there. Carries
   the paste-ready runbook, the three ways to unblock it, and what protects the run.
 
-- [`docs/overview/entries/2026-08-19-sandbox-energy-constants.md`](../../overview/entries/2026-08-19-sandbox-energy-constants.md)
+- [`2026-08-19-sandbox-energy-constants`](../../overview/history-2026-09-10-folded-2.md#2026-08-19-sandbox-energy-constants)
   — **`pnpm dev` could not render the energy screens at all, and CI could not tell you (Q-361).**
   `/api/nutrition/energy-balance` and `/api/body-metadata` answered **500 in every session** because
   the gitignored model constants are never on disk here; the boot delivery now falls back to the
@@ -228,7 +228,7 @@ Live at the time of writing (2026-07-30):
   offline. The entry found six — its finder looked only *above* each call.
   `scripts/check-invalidate-after-push.js` holds the class shut. **Not device-verified: every
   converted branch takes the web fallback here** —
-  [`journal`](../../overview/entries/2026-08-24-invalidate-after-push-sweep.md).
+  [`journal`](../../overview/history-2026-09-10-folded-2.md#2026-08-24-invalidate-after-push-sweep).
 
 - ⚠️ **Q-155 — the DB suite is largely blind to a loss of user scoping.** Partly mechanised
   2026-08-09: `scripts/check-repository-user-scoping.js` fails any adapter/slice method that takes
@@ -254,7 +254,7 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
-- **[`docs/overview/entries/2026-08-30-meal-label-style-gate.md`](../../overview/entries/2026-08-30-meal-label-style-gate.md)**
+- **[`2026-08-30-meal-label-style-gate`](../../overview/history-2026-09-10-folded-4.md#2026-08-30-meal-label-style-gate)**
   — 🆕 **LB-19**: the meal-label spec's style gate was releasing on the **previous** style's canvas,
   4 of 4 measured, so its decode loop had effectively never checked three of its four layouts — and
   passed anyway, because every style encodes the same meal. **⚠ The general shape is the one to carry
@@ -483,7 +483,7 @@ Live at the time of writing (2026-07-30):
   measured blast radius was 17 files not 16, and the guards had to go finer than per-`describe`.
   Runbook: [`public-repo-cut-runbook.md`](../../public-repo-cut-runbook.md), steps 8–14 remain.
 - [`overview/entries/2026-08-16-public-repo-cut-a4b.md`](../../overview/history-2026-08-15.md)
-- [`docs/overview/entries/2026-08-24-recipe-spec-structural-attribution.md`](../../overview/entries/2026-08-24-recipe-spec-structural-attribution.md) — **LB-7, the recipe spec's attribution guard, 2026-08-24** (`getByText('example.com').last()` matched the row's NAME, which is the host while the scrape resolves — measured passing with the attribution deleted and the mock delayed 8 s. It asserts on a `data-testid` row now.)
-- [`docs/overview/entries/2026-08-24-metric-bounds-at-keyboard.md`](../../overview/entries/2026-08-24-metric-bounds-at-keyboard.md) — **Q-321, bounds asked at the keyboard, 2026-08-24** (`validation/body-metrics.ts` held every threshold and nothing under `components/`/`app/` imported it, so a 5,000 kg weight was queued and dropped server-side. Three sheets now share `components/health/metric-bounds.ts`; `log-value-sheet.tsx` had no check at all across seven fields.) **Device path not exercised.**
-- [`docs/overview/entries/2026-08-24-activity-log-delete-outbox.md`](../../overview/entries/2026-08-24-activity-log-delete-outbox.md) — **Q-328, the activity delete goes through the outbox, 2026-08-24** (the one activity-log write with no outbox domain; `softDeleteActivityLogPending` not `deleteActivityLog`, because a queued delete must stay `pending` until its push is confirmed). **Offline path not exercised** — `Gate: device`.
+- [`2026-08-24-recipe-spec-structural-attribution`](../../overview/history-2026-09-10-folded-2.md#2026-08-24-recipe-spec-structural-attribution) — **LB-7, the recipe spec's attribution guard, 2026-08-24** (`getByText('example.com').last()` matched the row's NAME, which is the host while the scrape resolves — measured passing with the attribution deleted and the mock delayed 8 s. It asserts on a `data-testid` row now.)
+- [`2026-08-24-metric-bounds-at-keyboard`](../../overview/history-2026-09-10-folded-2.md#2026-08-24-metric-bounds-at-keyboard) — **Q-321, bounds asked at the keyboard, 2026-08-24** (`validation/body-metrics.ts` held every threshold and nothing under `components/`/`app/` imported it, so a 5,000 kg weight was queued and dropped server-side. Three sheets now share `components/health/metric-bounds.ts`; `log-value-sheet.tsx` had no check at all across seven fields.) **Device path not exercised.**
+- [`2026-08-24-activity-log-delete-outbox`](../../overview/history-2026-09-10-folded-2.md#2026-08-24-activity-log-delete-outbox) — **Q-328, the activity delete goes through the outbox, 2026-08-24** (the one activity-log write with no outbox domain; `softDeleteActivityLogPending` not `deleteActivityLog`, because a queued delete must stay `pending` until its push is confirmed). **Offline path not exercised** — `Gate: device`.
   — the A4b journal entry.

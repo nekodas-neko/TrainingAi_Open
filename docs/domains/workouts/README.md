@@ -63,7 +63,7 @@ Mode flow and the orchestrator pattern are documented in [`CLAUDE.md`](../../../
   length, for every exercise. `injury-muscles.ts` holds the per-exercise filter, now reading
   `activeInjuredMuscles()` rather than a second hand-rolled one. **The two-banner baseline case was
   never rendered, and none of it has been seen on the S25.**
-- [`docs/overview/entries/2026-09-01-rest-day-stored.md`](../../overview/entries/2026-09-01-rest-day-stored.md) — **a chosen rest day became a stored fact (BF-84, engine half), 2026-09-01.** It was a `localStorage` key and a route that persisted nothing, so the choice never reached the server and a refetch of `/api/next-session` reverted it. `rest_days` (migration 247) + a `rest_days` outbox domain; `getNextSession` prefers the row over inferring rest from a gap, after already-trained and before the readiness branch. **The Home button is Lane B's and still owed**, and the offline outbox path is **not device-verified**.
+- [`2026-09-01-rest-day-stored`](../../overview/history-2026-09-10-folded-5.md#2026-09-01-rest-day-stored) — **a chosen rest day became a stored fact (BF-84, engine half), 2026-09-01.** It was a `localStorage` key and a route that persisted nothing, so the choice never reached the server and a refetch of `/api/next-session` reverted it. `rest_days` (migration 247) + a `rest_days` outbox domain; `getNextSession` prefers the row over inferring rest from a gap, after already-trained and before the readiness branch. **The Home button is Lane B's and still owed**, and the offline outbox path is **not device-verified**.
 - [`docs/reviews/2026-08-24-rest-adherence-clustering.md`](../../reviews/2026-08-24-rest-adherence-clustering.md) — **does rushed rest cluster in time-constrained sessions? 2026-08-24 (Q-300): no.** 39.8% of 344 sets are rushed, and it is uniform — per-session fraction mean 0.411 sd 0.138, with **zero of 26 sessions rush-free and zero mostly-rushed**. Two traps recorded: session duration correlates but **rest is a component of duration**, so the correlation is circular; and **Q-85's shortened-session hypothesis has no instances here** — every shortened session predates `planned_rest_sec`. The real finding is that actual rest barely responds to the prescription (planned 60 s → 75 s *taken*, 90 → 65, 120 → 110, 187 → 133).
 - [`docs/reviews/2026-08-16-deferred-measurements.md`](../../reviews/2026-08-16-deferred-measurements.md)
   — the measurements four entries deferred. **Rest is NOT the confound behind Q-289** (the error
@@ -139,7 +139,7 @@ Mode flow and the orchestrator pattern are documented in [`CLAUDE.md`](../../../
 - [`docs/reviews/2026-08-18-workout-write-path.md`](../../reviews/2026-08-18-workout-write-path.md) — **the workout write path, driven live and probed cross-user, 2026-08-18** (Q-460 the session-RPE route reports success for a write that matched nothing and the outbox then discards it, Q-461 the Start Set bounce makes the core flow un-automatable, Q-462 an ownership refusal reported as a 500). Findings Q-460…Q-462; **cross-user write protection holds across the whole workout surface** (verified against a second live account, with a control for every probe), plus three more clean results.
 
 - [`docs/reviews/2026-08-18-tier-a-enqueue-silence.md`](../../reviews/2026-08-18-tier-a-enqueue-silence.md) — **swallowed failures on write paths, 2026-08-18** (Q-486 — the four `queueMutation` calls in `workout-screen.tsx` are the only ones in the app that swallow, and all four are Tier-A; the surrounding layering is good and the last layer is silent). **Not reproduced** — needs a broken local SQLite on a device.
-- [`docs/overview/entries/2026-08-24-tier-a-enqueue-visibility.md`](../../overview/entries/2026-08-24-tier-a-enqueue-visibility.md) — **Q-486, the four swallowed `queueMutation` calls, 2026-08-24** (they warn and toast now via `reportEnqueueFailure`; the badge deliberately stays out of it, because a thrown enqueue leaves no row for the Data & Sync card to retry). **Still not reproduced** — `Gate: device`.
+- [`2026-08-24-tier-a-enqueue-visibility`](../../overview/history-2026-09-10-folded-2.md#2026-08-24-tier-a-enqueue-visibility) — **Q-486, the four swallowed `queueMutation` calls, 2026-08-24** (they warn and toast now via `reportEnqueueFailure`; the badge deliberately stays out of it, because a thrown enqueue leaves no row for the Data & Sync card to retry). **Still not reproduced** — `Gate: device`.
 - [`docs/reviews/2026-08-18-write-concurrency.md`](../../reviews/2026-08-18-write-concurrency.md) — **write concurrency measured for the first time, 2026-08-18** (Q-473 — four concurrent `complete-workout` calls for one session increment `sessions_in_phase` up to three times, reproduced in 4 of 5 bursts; Q-474 — `workout_sessions` carries a dead second FK to `program_sessions` whose name shadows the live column). Four clean results recorded, one deliberately not filed.
 - [`docs/reviews/2026-08-18-coach-apply-path.md`](../../reviews/2026-08-18-coach-apply-path.md) — **the AI Coach's write path, reviewed for the first time, 2026-08-18** (Q-468 — Coach `undo` writes `beforeState` back without checking the target still holds what the change set; undoing two stacked swaps leaves an exercise nobody chose). Findings Q-467/Q-468; the **apply** path came back clean and is documented at length as the reference for LLM-initiated writes.
 
@@ -167,18 +167,18 @@ Live at the time of writing (2026-07-30):
   once in `components/workout/exercise-role-labels.ts` as Main / Secondary / Accessory (they had two
   wordings across the two screens). **The new control was never rendered in the harness** — reaching
   it needs a live generation — and it is not device-verified.
-  [`journal`](../../overview/entries/2026-09-07-fix-bf-124-125-role-vocabulary.md).
+  [`journal`](../../overview/history-2026-09-10-folded-6.md#2026-09-07-fix-bf-124-125-role-vocabulary).
 - 🔴 **A deload session was invisible on both workout surfaces** (BF-8, fixed 2026-08-24, v1.343.0).
   The Intensity control said "Full · As prescribed" beside a card saying "Deload session ·
   Auto-applied", and the in-workout header showed no marker — the owner trained one believing it was
   a full session. Both asked `isDeloadActive` ("is the PHASE a deload week") instead of whether
   today's session is one. **Not device-verified** —
-  [`journal`](../../overview/entries/2026-08-24-deload-visible-on-both-surfaces.md).
+  [`journal`](../../overview/history-2026-09-10-folded-2.md#2026-08-24-deload-visible-on-both-surfaces).
 - ⚠️ **Editing and deleting logged training was unreachable for a fortnight** (LB-1, fixed 2026-08-23,
   v1.334.0). Q-110 moved the calendar day-tap to `/health/day` and left the four controls on a sheet
   nothing opens. They now live on the day screen, driven by `lib/hooks/use-day-entry-mutations.ts`,
   which `health-content.tsx` shares. **Not device-verified** —
-  [`journal`](../../overview/entries/2026-08-23-day-screen-edit-delete.md).
+  [`journal`](../../overview/history-2026-09-10-folded-2.md#2026-08-23-day-screen-edit-delete).
 
 - 🔴 **`personal_records` is not the all-time best, and "starting weights" never reach the bar** —
   open and enlarged since first found; a corrective migration is written but awaiting the owner.
@@ -232,7 +232,7 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
-- **[`docs/overview/entries/2026-09-02-lb-47-deload-override-honesty.md`](../../overview/entries/2026-09-02-lb-47-deload-override-honesty.md)**
+- **[`2026-09-02-lb-47-deload-override-honesty`](../../overview/history-2026-09-10-folded-5.md#2026-09-02-lb-47-deload-override-honesty)**
   — **LB-47 (2026-09-02).** `deloadOverrideOutcome` and the card's `nothing-to-revert` copy. **Read
   this before reasoning about the `Full` override on a session-level deload:** the toggle is not
   rendered at all in that state (`phase: 'deload'` → `isDeloadActive` → `pre-workout-screen` gates the
@@ -240,13 +240,13 @@ Live at the time of writing (2026-07-30):
   and the mechanism wrong. What the fix corrects is a card that *claimed* a revert when
   `deloadRevertNames` and `deloadOverrideBlocked` both returned empty. Latent — it needs a
   prescription whose `deload` flag and `phase` disagree, 0 of 5 in production.
-- **[`docs/overview/entries/2026-09-01-phase-aware-volume-targets.md`](../../overview/entries/2026-09-01-phase-aware-volume-targets.md)**
+- **[`2026-09-01-phase-aware-volume-targets`](../../overview/history-2026-09-10-folded-5.md#2026-09-01-phase-aware-volume-targets)**
   — 🆕 **BF-59**: the Training card's weekly set targets are **derived** from `volumeLandmarks` scaled
   by the week's phase mix, not read from `program_volume_targets`. Read it before touching volume
   targets anywhere: the stored rows are now a **roster** and re-seeding their numbers recreates the
   second source of truth this removed, and **`signals.ts` still steers off the old stored number**, so
   the engine and the screen currently disagree.
-- **[`docs/overview/entries/2026-08-31-voice-filler-words.md`](../../overview/entries/2026-08-31-voice-filler-words.md)**
+- **[`2026-08-31-voice-filler-words`](../../overview/history-2026-09-10-folded-4.md#2026-08-31-voice-filler-words)**
   — 🆕 BF-66: `parseVoice` stripped every character outside `[0-9.\s kgreps×x]`, a denylist that keeps
   the `r` of `for` and the `es` of `times` — so **`60 by 6` and `60 at 6` worked and `60 for 6` and
   `60 times 6` did not**, and the owner's correct transcript came back in red as if it had been
@@ -266,7 +266,7 @@ Live at the time of writing (2026-07-30):
   all judgements and the 6 floor is a clamp; and that the ONNX energy model is vendored, downloaded
   and tested with **zero production callers**. Owner decisions recorded there and not to be
   re-litigated: no Oura models, and the rounded-mean derivation kept in set-RPE units.
-- **[`docs/overview/entries/2026-08-17-workout-select-empty-state.md`](../../overview/entries/2026-08-17-workout-select-empty-state.md)**
+- **[`2026-08-17-workout-select-empty-state`](../../overview/history-2026-09-10-folded-1.md#2026-08-17-workout-select-empty-state)**
   — 🆕 Q-451: `/workout-select` with no program rendered the carousel anyway (position-0's palette
   emoji standing in for absent content) under a **Start Workout** button that short-circuited on the
   missing `currentSession` and did nothing. Now three states, not one — the new `programLoaded` flag
@@ -395,7 +395,7 @@ Live at the time of writing (2026-07-30):
   session announced a deload and prescribed full weights, and the fatigue that triggered it never
   cleared, so another deload kept being recommended. Both copies of that branch now call
   `aiDynamicFallbackPhaseStatus()` (Q-310,
-  [`entries/2026-08-17-ai-dynamic-deload-fallback-not-flagged.md`](../../overview/entries/2026-08-17-ai-dynamic-deload-fallback-not-flagged.md)).
+  [`entries/2026-08-17-ai-dynamic-deload-fallback-not-flagged.md`](../../overview/history-2026-09-10-folded-1.md#2026-08-17-ai-dynamic-deload-fallback-not-flagged)).
   Two lessons worth carrying: a **catch-all branch whose comment says what it cannot see** is where
   to look first — the comment above this one read "not baseline, not deload" — and a phase **label**
   derived from the same field as a phase **flag** will not disagree visibly, so the label is not

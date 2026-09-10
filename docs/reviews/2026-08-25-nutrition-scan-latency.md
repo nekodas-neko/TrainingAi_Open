@@ -15,7 +15,7 @@ answer the remaining three questions at once.
 - **Gate:** owner — set 2026-08-25; see the re-measurement below. One photo scan unblocks it.
 - Lane: A — **the Lane B half SHIPPED 2026-08-23 (v1.331.0)**: `capture-step.tsx` bounds the photo to
   1024 px, a **-86.6%** payload cut
-  ([`journal`](../overview/entries/2026-08-23-bounded-scan-photo-payload.md)). **It was NOT shown to be the
+  ([`journal`](../overview/history-2026-09-10-folded-2.md#2026-08-23-bounded-scan-photo-payload)). **It was NOT shown to be the
   owner's slowdown** — #112 and the cold-start check are the open half, and both are Lane A's, which
   is why this entry's lane is now A. Nothing here is startable by Lane B.
 
@@ -167,7 +167,7 @@ somewhere, so the next "it feels slow" starts from a number.
 ---
 
 **✅ THE PAYLOAD BOUND SHIPPED 2026-08-23 (v1.333.4, Lane B). The rest of this entry is open and it
-is all Lane A's.** [Journal](../overview/entries/2026-08-23-bounded-scan-photo-payload.md).
+is all Lane A's.** [Journal](../overview/history-2026-09-10-folded-2.md#2026-08-23-bounded-scan-photo-payload).
 
 Both client paths bounded to a 1024 px longest edge — `getPhoto` gains `width`/`height` (the
 `ImageOptions` pair, verified against pinned `@capacitor/camera` 8.2.0, **not** `takePhoto`'s
