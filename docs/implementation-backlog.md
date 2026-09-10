@@ -421,11 +421,55 @@ below threshold and left in place for next time.
 
 
 
+### [readiness] TN-35 — make stress answer "what stressed me", by joining the series to the day's events and letting the owner mark a moment
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-10 · owner: *"I'd like to get stress metric to be a usable value to determine what events stress me."*
+- **Lane: B** for the overlay (`app/api/day-timeline/route.ts` already assembles the events; `components/health/day-detail/**` renders them). **Lane A** for the marker's storage — a timestamped row is a migration.
+- **Needs: TN-3b** — the chart is this entry's first half; do not build the join before the axis exists.
+- **Reference:** [`review`](reviews/2026-09-10-stress-status.md) §9.
+
+**The owner's goal is attribution, not display.** A chart answers *when*; *what* needs the series
+lined up against what he was doing. **Half of that is free and half does not exist.**
+
+**✅ Free — the day timeline already carries typed, timestamped events.**
+`app/api/day-timeline/route.ts:15` emits `wakeup | sleep | workout | meal | walk | bedtime | tag`,
+each with a `timeMs`. Overlaying the 30-minute stress series on that timeline attributes stress to
+**training, food, walks and sleep with no new input from the owner** — and those are exactly the
+things with a plausible mechanism for moving HRV.
+
+**⛔ The `tag` lane is DEAD and will not fill.** `oura_tags` holds **0 rows**; it was fed by the Oura
+Cloud, which was removed 2026-08-13 and must never be re-added. **Do not build the attribution feature
+on top of it**, and do not read its presence in the timeline as an existing marker mechanism.
+
+**❌ Missing — there is no way to mark a moment.** Meetings, commutes, arguments, deadlines, caffeine
+and screens are invisible to the app, and they are most of what the owner means by "events".
+`day_checkins.journal` is the only free-text field, it is **whole-day with no timestamp**, and it has
+been used on **2 of 83** check-ins — so it cannot attribute a moment and is not being used anyway.
+
+**So the second half is a timestamped moment marker:** one tap, `now` by default, an optional short
+label, stored with its own time. **⚠ This is also TN-33's level-2 test.** Marking *"stressful, now"*
+IS the ground-truth collection, so the feature that makes stress useful and the experiment that
+validates it are the same build. That is the argument for doing it rather than the survey first.
+
+**⛔ Do not compute an "X stresses you" verdict from this yet.** Ranking causes needs many marked
+instances per event type, and one month of a single user will not support it. **Ship the join and the
+marker; let the owner read the pattern.** An automatic verdict is the TN-16 shape and stays parked.
+
+**⚠ What the join can and cannot see, stated so the UI does not overclaim:** coverage averages **26.6
+buckets a day — 13.3 of 24 hours** (TN-3b), with real multi-hour holes, so some events will have no
+stress reading beside them at all. Render that as absent, never as calm.
+
+**Pass test:** the owner opens a past day, sees the stress series against that day's workouts, meals
+and walks plus anything they marked, and can name the cause of a stressed window — or can say the
+window does not match anything, which is an equally valid result and the one that would retire the
+metric.
+
 ### [readiness] TN-34 — the stress-deload override fires on 83% of days, off the one number measured to carry no signal
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-10 · found answering the owner's *"is stress a real usable value?"*
 - **Lane: A** — `packages/shared/src/ai-periodization/ai-dynamic.ts:219-225`.
-- **Needs: TN-33** — the decision about what to do depends on whether the daily scalar gets restricted to waking hours or unwired; both are on that entry.
+- **✅ OWNER-APPROVED 2026-09-10** — *"yes lets do all that."* **Option 1: unwire `stressOverride`.** Not gated; one line, reversible.
+- **Needs: TN-33** — only for the later question of what replaces it; the unwiring does not wait.
 - **Reference:** [`review`](reviews/2026-09-10-stress-status.md) §8.
 
 `ai-dynamic.ts:219` gates a **deload recommendation** on `stressHighMinutes >= 120`
@@ -9558,6 +9602,7 @@ record explicitly why not.
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner request
 - **Lane: B**
+- **✅ OWNER-APPROVED 2026-09-10** — *"yes lets do all that. I'd like to get stress metric to be a usable value to determine what events stress me."* **That goal reshapes the entry: the chart is the first half, not the deliverable. See TN-35 for the second.**
 - **⚑ UNPARKED 2026-09-10 — build the chart FIRST, and the owner's request is why.** *"Can we have this displayed on a widget or chart so we can see when the stress occurs. I will be able to match it up based on time to what I was doing around then."*
 - **⚠ TN-3a's persistence SHIPPED** (verified: 478 buckets over 18 days), so this entry's stated blocker is gone. **And the Q-507 parking no longer applies to the chart half** — see below.
 - **Reference:** [`review`](reviews/2026-09-10-stress-status.md) §6, level 2.

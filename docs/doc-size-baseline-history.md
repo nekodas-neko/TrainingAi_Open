@@ -10632,7 +10632,7 @@ Fixed by the shared predicate rather than by a third patch.
 **No journal entry** — `docs/overview/entries/` is still at its 361 ceiling; LA-100 remains the
 blocker and is Gate: owner.
 
-## 2026-09-10 — backlog → 20469, `tuning.md` → 575: the stress verdict (TN-33, TN-3b, TN-34)
+## 2026-09-10 — backlog → 20514, `tuning.md` → 588: the stress verdict and plan (TN-33, TN-3b, TN-34, TN-35)
 
 The owner asked for the state of the stress calculation. Two answers pointing opposite ways, and the
 second is why the entry cannot be short.
@@ -10692,3 +10692,20 @@ information, and its input is the number measured to carry none. The ⛔ line is
 the same file warns eleven lines above against raising `TEMP_ALERT_THRESHOLD_C` for the same reason
 and calls it the fourth instance in this pillar — **this is the fifth**, so the entry names it rather
 than repeating it.
+
+The owner approved the plan and stated the goal in their own words — *"a usable value to determine
+what events stress me"* — which is attribution rather than display, and that produced TN-35.
+
+The entry earns its 45 lines by drawing a line through the middle of the work. **Half the attribution
+is free**: `day-timeline/route.ts:15` already emits typed, timestamped `wakeup | sleep | workout |
+meal | walk | bedtime` events, so overlaying the 30-minute series on them attributes stress to
+training, food, walks and sleep with no new input at all. **⛔ The other lane in that same type union
+is a trap** — `oura_tags` holds 0 rows and was fed by the Oura Cloud retired on 2026-08-13, so it
+reads like an existing marker mechanism and is not one. Recording that stops the next session building
+the feature on a dead table.
+
+**And half does not exist:** nothing can mark a *moment*. `day_checkins.journal` is whole-day,
+untimestamped and used on 2 of 83 check-ins. So the second half is a timestamped marker — and the line
+that makes it worth doing first is that **the marker IS TN-33's level-2 test**, since
+`perceived_recovery` is a constant and the readiness target is circular. The feature that makes stress
+useful and the experiment that validates it are the same build.

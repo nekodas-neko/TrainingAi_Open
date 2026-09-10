@@ -547,6 +547,19 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
   above about exactly that mistake on `TEMP_ALERT_THRESHOLD_C`, calling it the fourth in this pillar.
   **This is the fifth.** Unwire it instead; the condition already falls through when derived stress is
   null.
+- **✅ THE WHOLE STRESS PLAN IS OWNER-APPROVED (2026-09-10) — TN-34, TN-3b, TN-35, in that order.**
+  The goal in the owner's words is **attribution**, not display: *"a usable value to determine what
+  events stress me."* A chart answers *when*; *what* needs the series joined to the day's events.
+- **⚑ HALF THE ATTRIBUTION IS FREE: `day-timeline/route.ts:15` already emits typed, timestamped
+  `wakeup | sleep | workout | meal | walk | bedtime` events.** Overlaying the 30-min series on that
+  attributes stress to training, food, walks and sleep with no new input. **⛔ But the `tag` lane in
+  that same union is DEAD — `oura_tags` holds 0 rows** and was fed by the retired Oura Cloud. It looks
+  like an existing marker mechanism and is not one.
+- **❌ Nothing can mark a MOMENT, which is what the goal needs.** `day_checkins.journal` is whole-day,
+  untimestamped, and used on **2 of 83** check-ins. So TN-35's second half is a timestamped marker —
+  **and that marker IS TN-33's level-2 test**, since `perceived_recovery` is a constant and readiness
+  is circular. **The feature and the experiment are the same build.** ⛔ No "X stresses you" verdict
+  until many marked instances exist; that is TN-16's shape and stays parked.
 - **The threshold is usually right and the input usually wrong** — Q-506, Q-512, Q-514, now TN-6.
   Check the input's distribution before touching any constant.
 - **Do NOT lift the sleep scale toward its old mean** — sleep/readiness agreeing is load-bearing for

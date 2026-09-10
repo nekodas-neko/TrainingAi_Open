@@ -252,3 +252,66 @@ surface that tells the owner whether to train.**
 **⛔ Do not read "the series is real" as "the metric works".** The honest position is that there is a
 genuine signal, its daily summary destroys it, and nobody has yet checked whether the signal means
 what the label says.
+
+---
+
+## 9. The owner's goal changes the target: attribution, not display (TN-35)
+
+**Owner, 2026-09-10:** *"yes lets do all that. I'd like to get stress metric to be a usable value to
+determine what events stress me."*
+
+All of §8's recommendations are approved. **But the goal is not a chart — a chart answers *when*, and
+"what stressed me" needs the series lined up against what he was doing.** Half of that is already
+built and half does not exist at all.
+
+### Free: the day timeline is already the join target
+
+`app/api/day-timeline/route.ts:15` emits typed, timestamped events —
+`wakeup | sleep | workout | meal | walk | bedtime | tag` — each carrying `timeMs`. **Overlaying the
+30-minute series on it attributes stress to training, food, walks and sleep with no new input from
+the owner**, and those are exactly the categories with a plausible mechanism for moving HRV.
+
+### ⛔ But the `tag` lane is dead and must not be built on
+
+`oura_tags` holds **0 rows**. It was fed by the Oura Cloud, removed 2026-08-13 and never to be
+re-added. Its presence in the timeline's type union reads like an existing marker mechanism and is
+not one.
+
+### ❌ Missing: nothing can mark a moment
+
+Meetings, commutes, arguments, deadlines, caffeine, screens — invisible to the app, and most of what
+"events" means here. The only free-text field is `day_checkins.journal`, which is **whole-day with no
+timestamp** and has been used on **2 of 83** check-ins. It cannot attribute a moment, and it is not
+being used regardless.
+
+**So the second half is a timestamped moment marker** — one tap, `now` by default, optional short
+label, its own timestamp.
+
+### Why that ordering is right, and why it is cheap
+
+**⚑ The marker IS §6's level-2 test.** Marking *"stressful, now"* is exactly the ground-truth
+collection that §5 showed is otherwise unavailable — `perceived_recovery` is a constant, and the
+readiness target is partly circular. **The feature that makes stress useful and the experiment that
+validates it are the same build**, which is the argument for building it rather than running a survey
+first.
+
+**⛔ Do not compute an "X stresses you" verdict from this yet.** Ranking causes needs many marked
+instances per event type; one month of one user will not support it. Ship the join and the marker and
+let the owner read the pattern — an automatic verdict is TN-16's shape and stays parked.
+
+**⚠ And state the coverage honestly in the UI.** 26.6 buckets a day against 24 hours, with real
+multi-hour holes (§7), means some events will have **no** stress reading beside them. Render that as
+absent, never as calm.
+
+### The whole plan, in order
+
+| # | entry | what | who |
+|---|---|---|---|
+| 1 | **TN-34** | unwire the 83%-firing deload override | Lane A, one line |
+| 2 | **TN-3b** | the chart — local-time axis, gaps as gaps, night shaded | Lane B |
+| 3 | **TN-35a** | overlay the series on the day timeline | Lane B |
+| 4 | **TN-35b** | the timestamped moment marker | Lane A (migration) + B |
+| 5 | — | the owner marks moments for ~3 weeks; then re-open Q-507 | owner |
+
+**⛔ TN-16 stays parked throughout.** Warnings and prompts are verdicts, and no verdict is earned
+until step 5 returns something.
