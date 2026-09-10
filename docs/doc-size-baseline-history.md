@@ -10605,3 +10605,12 @@ Fixed by the shared predicate rather than by a third patch.
 
 **No journal entry** — `docs/overview/entries/` is still at its 361 ceiling; LA-100 remains the
 blocker and is Gate: owner.
+
+## 2026-09-10 — `docs/implementation-backlog.md` → 20349 (OR-106, the queue sweep)
+
+Eighty-nine lines, and most of them are one entry becoming two. PS-35 carried `Gate: owner for the
+page deletions` — a gate prose scoped to one paragraph of five, which `next-item.js` can only read as
+a property of the whole entry, so four ungated fixes sat in PARKED behind a decision none of them
+needed. Splitting into PS-35a (the gated deletions) and PS-35b (the four) duplicates the header and
+provenance, which is the cost of making the gate mean what it says. The rest is 25 one-line `Lane:`
+tags and the OR-106 entry recording the 90 still untagged.
