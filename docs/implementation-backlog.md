@@ -9511,14 +9511,62 @@ record explicitly why not.
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner request
 - **Lane: B**
-- **Needs: TN-3a**
+- **⚑ UNPARKED 2026-09-10 — build the chart FIRST, and the owner's request is why.** *"Can we have this displayed on a widget or chart so we can see when the stress occurs. I will be able to match it up based on time to what I was doing around then."*
+- **⚠ TN-3a's persistence SHIPPED** (verified: 478 buckets over 18 days), so this entry's stated blocker is gone. **And the Q-507 parking no longer applies to the chart half** — see below.
+- **Reference:** [`review`](reviews/2026-09-10-stress-status.md) §6, level 2.
 
-Two surfaces the owner asked for, both blocked until the buckets are persisted:
+**⛔ THE PARKING RATIONALE WAS RIGHT FOR A SCORE AND IS WRONG FOR A CHART.** TN-3b was parked because
+surfacing a metric whose sign cannot be explained converts a silent doubt into a demonstrated one
+(TN-19's lesson). **But the owner is not asking for a score, a verdict or a warning — he is asking to
+see the raw series against a clock so he can check it against his own memory of the day.** A chart of
+measured levels with no interpretation makes no claim that can be wrong, and **it is the only route
+left to answering Q-507**: TN-33 established there is no independent target with variance
+(`perceived_recovery` is `3` on all 17 days, never touched across 29 check-ins), so the owner's own
+recall *is* the ground truth. **This is level 2 of TN-33's test ladder and the first test that can
+actually fail.**
+
+**What the chart already reveals, before anyone builds it.** 2026-09-10, buckets by local time:
+**06:45 → 15:15 runs unbroken negative with six buckets past −0.5** (−0.52, −0.51, −0.62, −0.69,
+−0.74, −0.80), while 00:15 → 06:15 is almost entirely positive (+0.30 to +0.81). **That is a readable
+answer to "when was I stressed" and the daily scalar for the same day is −0.02** — because the night
+positives cancel the day negatives.
+
+**⚑ Which replicates TN-21 at scale and is the strongest Q-507 candidate standing.** Over all 478
+buckets:
+
+| window | share | mean level | high buckets | recovery buckets |
+|---|---|---|---|---|
+| **night 22–06** | **57%** | **+0.266** | 16 | **98** |
+| day 07–21 | 43% | **−0.405** | **101** | 6 |
+
+**The "daytime stress" daily average is 57% night, and night is systematically positive.** The daily
+number is dominated by sleep, which is a mislabelling defect independent of any correlation.
+**⚠ Restricting to waking hours does NOT rescue the correlation** (TN-33: −0.444 → +0.526 across the
+two halves), so this explains why the daily scalar is uninformative without establishing that a
+waking-only one would be informative.
+
+**Design constraints, each from the measured data:**
+1. **Local-time axis at 30-minute resolution.** The existing `stress-strip.tsx` is a **sparkline with
+   no time axis** — it shows the shape and cannot answer "when", which is the whole request.
+2. **⛔ Render gaps as gaps, never interpolate.** Coverage averages **26.6 buckets/day = 13.3 of 24
+   hours** (range 23–32), and 2026-09-08 jumps **06:45 → 13:15**, a 6.5-hour hole. A joined line there
+   would invent stress that was never measured.
+3. **Shade the night band.** Night is structurally positive; without the band a reader takes it as a
+   judgement about their sleep rather than a property of the series.
+4. **Mark zero and ±0.5.** "High" should be visible from the shape, not only from a label.
+5. **Past days reachable** — buckets exist from 2026-08-24 forward.
+6. **⛔ No score, no verdict, no advice on this surface.** That is exactly what keeps it shippable
+   while Q-507 is open, and what separates it from **TN-16**, which stays parked.
+
+**Pass test:** the owner opens a past day, reads a stressed window off the axis, and can say whether
+it matches what they were doing. A day with a 6-hour coverage gap shows the gap.
+
+Two surfaces the owner asked for:
 
 1. **Stress overlaid on the HR charts.** Today's chart can already do this from the
-   `/api/body-battery` response without any new storage (`stress.series` is in the payload) — but
-   **any past day cannot**, which is why this sits behind TN-3a rather than shipping alone. Doing
-   today-only first would ship a control that silently does nothing on every other day.
+   `/api/body-battery` response (`stress.series` is in the payload); past days now work too, since
+   TN-3a's table is live. **The 2026-08-24 start date is the remaining limit** — TN-3a's back-fill
+   `Keep:` still stands, so anything earlier renders empty.
 2. **A stress-by-hour view** — which hours and which days run hottest, aggregated across the
    back-filled history.
 

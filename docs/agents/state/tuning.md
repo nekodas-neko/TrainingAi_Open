@@ -513,6 +513,22 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
 - **⚠ A queue entry can be filed the day AFTER its fix ships.** TN-22 was filed 2026-09-01 against a
   defect corrected on 2026-08-31, and sat open for ten days. **Check `git log` for the entry's own
   file paths before re-measuring a filed defect** — the queue lags `main` as well as the database.
+- **⚑ THE STRESS CHART (TN-3b) IS UNPARKED AND IS THE CRITICAL PATH TO Q-507 (2026-09-10).** It sat
+  behind Q-507's sign since 2026-08-24. **That parking is right for a SCORE and wrong for a CHART**:
+  the owner asked to see raw levels against a clock so he can match them to his own day, and raw data
+  with no interpretation makes no claim that can be wrong. Since TN-33 established there is **no
+  independent target with variance**, the owner's recall is the only ground truth available — so the
+  chart is not a nice-to-have, it is the instrument. **TN-16 stays parked; the distinction is verdict
+  vs instrument.**
+- **⚠ The "daytime" stress series is 57% NIGHT and night is systematically positive** (+0.266 against
+  the day's −0.405; 98 recovery buckets to 16 high). Replicated on **478 buckets over 18 days**,
+  matching TN-21's original 230-bucket read almost exactly. **So the daily scalar is dominated by
+  sleep — a mislabelling defect independent of any correlation.** ⚠ It does **not** follow that a
+  waking-only aggregate would carry signal: the waking-restricted variant flips just as hard
+  (−0.444 → +0.526).
+- **⚠ Coverage is 26.6 buckets/day — 13.3 of 24 hours** (range 23–32), with real holes: 2026-09-08
+  jumps 06:45 → 13:15. **Any stress chart must render gaps as gaps**; a joined line invents stress
+  that was never measured.
 - **The threshold is usually right and the input usually wrong** — Q-506, Q-512, Q-514, now TN-6.
   Check the input's distribution before touching any constant.
 - **Do NOT lift the sleep scale toward its old mean** — sleep/readiness agreeing is load-bearing for

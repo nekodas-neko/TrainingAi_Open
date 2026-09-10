@@ -143,3 +143,59 @@ number between −0.4 and +0.4 and settle nothing.
 **⛔ Do not build TN-16** (the prolonged-stress warning and calm-down prompt) **until level 2 passes.**
 A warning fired off a metric that has never been shown to track anything is worse than no warning —
 it converts a silent uncertainty into a demonstrated one, which is the TN-19 lesson.
+
+---
+
+## 7. Addendum — the owner asked for the chart, which unparks TN-3b and is the level-2 test
+
+**Owner, 2026-09-10:** *"Can we have this displayed on a widget or chart so we can see when the
+stress occurs. I will be able to match it up based on time to what I was doing around then."*
+
+**Yes, and it should be built next.** TN-3b has been parked on Q-507's sign since 2026-08-24. **That
+parking was right for a score and is wrong for a chart.** The owner is not asking for a verdict — he
+is asking to see measured levels against a clock and supply the ground truth himself. §5 established
+there is no independent target with variance; **his recall is the only one available**, and this is
+the surface that collects it.
+
+**⚠ TN-3a's stated blocker is also gone** — the bucket table is live with **478 buckets over 18
+days**, which nobody had noticed on the entry.
+
+### What the chart shows before anyone builds it
+
+2026-09-10, by local time — **06:45 → 15:15 unbroken negative, six buckets past −0.5**:
+
+```
+06:45  -0.52 HIGH      12:15  -0.62 HIGH
+09:15  -0.51 HIGH      12:45  -0.69 HIGH
+11:15  -0.47           13:45  -0.74 HIGH
+                       15:15  -0.80 HIGH
+```
+
+Against 00:15–06:15 running **+0.30 to +0.81**. **The daily scalar for that day is −0.02**, because
+the night positives cancel the day negatives. **The chart is strictly more informative than the number
+it summarises.**
+
+### And it replicates TN-21 at eight times the sample
+
+| window | share of buckets | mean level | high | recovery |
+|---|---|---|---|---|
+| **night 22–06** | **57%** | **+0.266** | 16 | **98** |
+| day 07–21 | 43% | **−0.405** | **101** | 6 |
+
+TN-21 measured 55% / +0.266 / −0.413 on 230 buckets; this is 478 and lands in the same place. **A
+"daytime stress" average that is 57% night is mislabelled regardless of any correlation** — and it is
+why §4's daily numbers carry no signal. **⚠ It does not follow that a waking-only aggregate would**:
+§4's waking-restricted variant flips just as hard (−0.444 → +0.526).
+
+### Design constraints, each measured rather than assumed
+
+1. **Local-time axis, 30-minute resolution.** `components/body-battery/stress-strip.tsx` already
+   renders today's series — as a **sparkline with no time axis**, which shows the shape and cannot
+   answer *when*.
+2. **⛔ Gaps stay gaps.** Coverage averages **26.6 buckets/day — 13.3 of 24 hours** (range 23–32), and
+   2026-09-08 jumps **06:45 → 13:15**. A joined line invents stress that was never measured.
+3. **Shade the night band**, or its systematic positivity reads as a compliment about your sleep.
+4. **Mark zero and ±0.5** so "high" is legible from the shape.
+5. **Past days reachable**, back to 2026-08-24 (TN-3a's back-fill `Keep:` still stands).
+6. **⛔ No score, no verdict, no advice on this surface** — that is what makes it shippable while
+   Q-507 is open, and what keeps it distinct from **TN-16**, which stays parked.

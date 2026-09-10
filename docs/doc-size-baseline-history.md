@@ -10632,7 +10632,7 @@ Fixed by the shared predicate rather than by a third patch.
 **No journal entry** — `docs/overview/entries/` is still at its 361 ceiling; LA-100 remains the
 blocker and is Gate: owner.
 
-## 2026-09-10 — backlog → 20374, `tuning.md` → 541: the stress status (TN-33)
+## 2026-09-10 — backlog → 20422, `tuning.md` → 557: the stress status and the chart (TN-33, TN-3b)
 
 The owner asked for the state of the stress calculation. Two answers pointing opposite ways, and the
 second is why the entry cannot be short.
@@ -10657,3 +10657,19 @@ correlating against it.
 Hence the three-level test ladder, which is the part the owner actually asked for: consistency
 (shipped), response to a named stressor (one day, the first test that can fail, worth building), and
 prediction (blocked on an owner action rather than on code).
+
+The owner then asked for the series on a chart — *"so we can see when the stress occurs. I will be
+able to match it up based on time to what I was doing"* — which unparks TN-3b and adds 48 lines to it.
+
+The reason it earns them: TN-3b sat behind Q-507's sign since 2026-08-24, and **that parking is right
+for a score and wrong for a chart**. Since TN-33 established there is no independent target with
+variance, the owner's own recall is the only ground truth available, so the chart is the instrument
+rather than a nice-to-have. Recording that distinction — verdict versus instrument — is what stops a
+successor re-parking it beside TN-16.
+
+The measurements that shape the design do not compress either. 2026-09-10 runs unbroken negative from
+**06:45 to 15:15 with six buckets past −0.5**, while its daily scalar reads **−0.02**, because the
+night positives cancel the day negatives — the chart is strictly more informative than the number it
+summarises. And the night/day split now replicates on **478 buckets** at 57% night, mean +0.266
+against the day's −0.405, matching TN-21's 230-bucket read. Coverage of 26.6 buckets a day against 24
+hours, with a real 6.5-hour hole on 2026-09-08, is what forces the "gaps stay gaps" constraint.
