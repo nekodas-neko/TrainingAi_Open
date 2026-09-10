@@ -10266,3 +10266,10 @@ deletion, both confirm-first. The entry was printing as ordinary READY work whil
 the remaining half is confirm-first — the fifth field/prose mismatch this session.
 
 Entries ceiling untouched at 360.
+
+## 2026-09-10 — `docs/implementation-backlog.md` raised to 20237 for the Dependabot standing item
+
+The stored state was six weeks old and wrong in the direction that costs a session: it said the
+`sharp` advisory needed a major `next` bump, when the live path was a devDependency nobody invokes
+and the fix was one override line. The replacement records the pattern (version-keyed overrides, not
+bare) and that correction, because the next pass reads this before it reads `pnpm audit`.
