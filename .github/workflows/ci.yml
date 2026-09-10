@@ -77,7 +77,14 @@ jobs:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: trainingai_ci
         options: >-
-          --health-cmd pg_isready
+          # LB-54: `-U postgres` is load-bearing, not tidiness. Without it `pg_isready` connects as
+          # the container's OS user — root — and Postgres logs `FATAL: role "root" does not exist`
+          # for every probe, every 10 s, for the life of the job. The runner prints that service
+          # dump AFTER all steps, so it is the tail of the log, and it is the only thing
+          # `get_job_logs` can reach: a failed `Tests` job returned 2,797 characters, none of them
+          # vitest's. A red job could announce that it was red and nothing else.
+          # `android-emulator.yml` has always had the `-U`, which is where the correct form came from.
+          --health-cmd "pg_isready -U postgres"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -508,7 +515,14 @@ jobs:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: trainingai_ci
         options: >-
-          --health-cmd pg_isready
+          # LB-54: `-U postgres` is load-bearing, not tidiness. Without it `pg_isready` connects as
+          # the container's OS user — root — and Postgres logs `FATAL: role "root" does not exist`
+          # for every probe, every 10 s, for the life of the job. The runner prints that service
+          # dump AFTER all steps, so it is the tail of the log, and it is the only thing
+          # `get_job_logs` can reach: a failed `Tests` job returned 2,797 characters, none of them
+          # vitest's. A red job could announce that it was red and nothing else.
+          # `android-emulator.yml` has always had the `-U`, which is where the correct form came from.
+          --health-cmd "pg_isready -U postgres"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -566,7 +580,14 @@ jobs:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: trainingai_ci
         options: >-
-          --health-cmd pg_isready
+          # LB-54: `-U postgres` is load-bearing, not tidiness. Without it `pg_isready` connects as
+          # the container's OS user — root — and Postgres logs `FATAL: role "root" does not exist`
+          # for every probe, every 10 s, for the life of the job. The runner prints that service
+          # dump AFTER all steps, so it is the tail of the log, and it is the only thing
+          # `get_job_logs` can reach: a failed `Tests` job returned 2,797 characters, none of them
+          # vitest's. A red job could announce that it was red and nothing else.
+          # `android-emulator.yml` has always had the `-U`, which is where the correct form came from.
+          --health-cmd "pg_isready -U postgres"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5

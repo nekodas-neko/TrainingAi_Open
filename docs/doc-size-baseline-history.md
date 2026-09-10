@@ -10755,3 +10755,15 @@ one they can check in a second, or refute.
 OR-105 also grew a paragraph on what was **not** done: no `Branch:` was written for the nine entries
 that had shipped, because the commit the scan finds is often an incidental mention rather than the
 work. That paragraph exists to stop the next pass "finishing the job" by writing false provenance.
+
+## 2026-09-10 — `docs/implementation-backlog.md` → 20478 (LB-54, half fixed)
+
+Twenty lines. LB-54 gains the root cause of its unreadable-logs half (a `pg_isready` with no
+`-U postgres`, so every healthcheck logged `role "root" does not exist` into the tail of the log) and
+loses nothing, because the historical bullet stays: the next reader needs to know what the symptom
+looked like to recognise it if it returns.
+
+The other ten lines are a `Needs: LB-56` and the paragraph justifying it. Enabling E2E on the nightly
+is a one-line change that *looks* free and is not — LB-31 chose "one job rather than six" on purpose,
+and LB-56 records that `main` would not pass the suite, so it would buy a nightly red from its first
+run. Writing down why an obvious change was NOT made is what stops the next session making it.
