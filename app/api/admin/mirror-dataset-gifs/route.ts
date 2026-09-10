@@ -90,12 +90,17 @@ export async function POST(req: Request) {
   // Upload to S3 (or fall back to data URL if storage isn't configured)
   const storageReady = isStorageConfigured();
 
+  // LA-87 — the same `store()` shape as `generate-exercise-media`, fixed the same way: report the
+  // path taken, not the path configured. Swept together because a fix applied to one surface and
+  // not its sibling is only half done.
+  let usedFallback = false;
   async function store(gender: string): Promise<string> {
     const key = mediaKey(exerciseName, gender, 'gif');
     if (storageReady) {
       const url = await uploadExerciseMedia(key, gifBuffer, 'image/gif');
       if (url) return url;
     }
+    usedFallback = true;
     return `data:image/gif;base64,${gifBuffer.toString('base64')}`;
   }
 
@@ -111,7 +116,7 @@ export async function POST(req: Request) {
   return NextResponse.json({
     status: 'mirrored',
     exerciseName,
-    storageMode: storageReady ? 's3' : 'db-fallback',
+    storageMode: storageReady && !usedFallback ? 's3' : 'db-fallback',
     gifUrl: gifUrl.startsWith('data:') ? '[data-url]' : gifUrl,
   });
 }
