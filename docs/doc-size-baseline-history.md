@@ -10246,3 +10246,23 @@ reader working the queue top-down hits the instruction, not the annotation. The 
 deliberate — the wrong sentence stays visible as a record while ceasing to read as an instruction.
 
 Entries ceiling untouched at 360.
+
+---
+
+## 2026-09-10 — backlog 20,194 → 20,224 (+30), no ceiling raise (Q-30 re-measurement)
+
+Thirty lines because a projection expired and the entry was still running on it. Q-30's 2026-08-08
+note said the database returns to the ~924 MB alarm level in roughly six weeks and that only D4 or a
+retention policy changes the direction; four and a half weeks later it is 227 MB, down 46%, with the
+table it blamed having lost 78% of its rows.
+
+Most of the +30 is the table of three measurements and the paragraph saying what the new number does
+*not* settle. The urgency is gone; the decision is not, because the owner's reason for D4 was the
+multi-user ratio and a shrinking single-user database says nothing about a ratio. Without that
+paragraph the measurement reads as "the database is fine" — the easy conclusion and the wrong one.
+
+The rest is a `Gate: owner`: everything still open in Q-30 is D4 or a retention policy, both data
+deletion, both confirm-first. The entry was printing as ordinary READY work while its own body said
+the remaining half is confirm-first — the fifth field/prose mismatch this session.
+
+Entries ceiling untouched at 360.

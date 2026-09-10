@@ -18748,6 +18748,36 @@ database.
 **Also blocks Q-31/Q-32 below** — the owner's 2026-07-30 sequencing decision put the DB volume fix
 before the public-repo release, alongside Phase 3.
 
+**🆕 RE-MEASURED 2026-09-10 — the projection above is REFUTED, and the direction reversed without D4.**
+
+| when | `pg_database_size` | `oura_raw_samples` |
+|---|---|---|
+| 2026-07-21, post-REINDEX | 205 MB | — |
+| 2026-08-08 | 421 MB | 306 MB / 881,603 rows |
+| **2026-09-10** | **227 MB** | **75 MB / 195,769 rows** |
+
+The 2026-08-08 note said the database *"returns to the ~924 MB alarm level in roughly six weeks
+whether or not [the console actions] run"*, and that **"only D4 or a retention policy changes the
+direction."* Four and a half weeks later it is **227 MB — down 46%, not up**, and the table it
+blamed for 73% of the total has lost **78% of its rows**. The packing work (Q-541) plus the retention
+window did what D4 was projected to be needed for.
+
+**What this does and does not change.** It removes the *urgency* argument, not the decision: the
+owner's stated reason for D4 was the multi-user ratio (~36 GB/year for ten users on a server-primary
+design vs ~160 MB/year device-primary), and a shrinking single-user database says nothing about that
+ratio. **Do not read this as "D4 is unnecessary."** Read it as: the six-week clock the entry was
+running against does not exist, so D4 can be sequenced on its merits rather than under pressure.
+
+**One number worth watching instead:** `oura_raw_samples` now carries **44 MB of index against
+30 MB of heap** — the index is larger than the data it indexes. CLAUDE.md's standing advice applies
+(read `total` *and* `idx`; a size figure is as likely bloat as data), and an index-heavy table is
+where the 2026-08-17 outage started.
+
+- **Gate: owner** — everything still open here is D4 (a destructive server-raw drop, its own
+  confirm-first gate by CLAUDE.md's rule) or a retention policy, which is also data deletion. The
+  entry printed as ordinary READY work while its own body said the remaining half is confirm-first;
+  that is the field/prose mismatch this queue keeps producing.
+
 ### [devices][platform] ➡️ Q-31 — own resilience weights & own workout-energy MET table — RE-SCOPED by #999, gates released
 
 - **Lane:** A
