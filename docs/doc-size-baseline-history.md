@@ -10425,3 +10425,9 @@ merged file each time rather than adding deltas: this set was not pure additions
 queue while LA-97, BF-136 and TN-29's row entered), so arithmetic on the deltas would have been
 wrong in a way nothing downstream would catch. Checked the two-deletions trap on each merge — LA-90
 stayed deleted, and LA-97, BF-136 and TN-29 all survived.
+
+**And +11 more (20349) for LA-97's root cause, found before the PR merged.** `getSupplementLogs`
+does `SELECT *` and its row→object mapper drops all four OR-102a fields, so `enrichPayload` could
+not forward them even if it asked. That turns the entry's fix from three steps into four and
+reorders them — wiring the push path to fields the mapper does not surface ships a silent no-op that
+passes every test. Eleven lines to stop the next session building the wrong three-step version.

@@ -42,6 +42,13 @@ it server-side at push time would record whatever vial is current when sync happ
 retroactive rewrite the freeze exists to prevent."* It happens one layer up, because the push path
 was never extended past BF-3's three fields when OR-102a added four more.
 
+**A third piece of the same gap, found before this PR merged and folded into LA-97.**
+`getSupplementLogs` does `SELECT *` and its row→object mapper lists ten fields, none of them the
+four OR-102a added — so `enrichPayload` could not forward `takenAt` or the vial triple even if it
+asked. That is the root cause, and it is CLAUDE.md's own mapper rule (*"When adding a DB column,
+update every row→object mapper"*, sessions 29 and 64) missed once more. It reorders LA-97's fix:
+surface the fields in the reader FIRST, or the push wiring is a silent no-op that passes every test.
+
 It is deliberately not fixed in this PR: **CLAUDE.md says a sync-push change never ships batched**,
 because its revert is a corrective migration rather than a git revert. Bundling a live data bug into
 a trap-fix would also have made both unreviewable, which is the same reason OR-104 left LA-90 out of

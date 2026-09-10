@@ -19600,10 +19600,21 @@ The chain, verified against `main` on 2026-09-10:
    purpose, and its comment says so: *"Stamping it server-side at push time would record whatever
    vial is current when sync happens, which is the retroactive rewrite the freeze exists to
    prevent."*
-2. `enrichPayload` reads the local row back and forwards **`amount`, `unit`, `doseText` only**.
-3. The server's `supplement_logs` push branch accepts **those same three**.
-4. `logSupplement` therefore stamps `takenAt: new Date()` — **push time** — and re-reads the
+2. **`getSupplementLogs` cannot read them back.** It does `SELECT *`, but its row→object mapper
+   lists ten fields and **none of the four** is among them — `takenAt`, `vialStrengthMg`,
+   `vialWaterMl`, `vialUnitsPerMl` are dropped on the way out of SQLite. This is the root cause and
+   the reason the other steps look innocent: OR-102a updated the writer and not this reader.
+   Straight from CLAUDE.md — *"When adding a DB column, update **every** row→object mapper
+   (`rowToX`, SELECT lists) — a missed field fails silently"* (sessions 29, 64).
+3. `enrichPayload` reads the local row through that mapper, so it forwards **`amount`, `unit`,
+   `doseText` only** — it could not forward the rest even if it asked.
+4. The server's `supplement_logs` push branch accepts **those same three**.
+5. `logSupplement` therefore stamps `takenAt: new Date()` — **push time** — and re-reads the
    **current** vial.
+
+**So the fix is four steps, not three, and step 2 comes first.** Wiring `enrichPayload` to fields
+the mapper does not surface ships a silent no-op that every test would pass — which is the exact
+failure mode the mapper rule exists to name.
 
 So the rewrite the local comment warns about happens one layer up, because the push path was never
 extended past BF-3's three fields when OR-102a added four more (`takenAt`, `vialStrengthMg`,
