@@ -1789,11 +1789,66 @@ sheet is open over the bottom half of it.
 - **Worth a device look when it ships**, since the failure is vertical space on the S25 with the log
   sheet open, which is not reproducible from the dimensions alone.
 
-### [body][nutrition] BF-136 — a vial's open date is hardcoded to today, so the weight-response window starts on the day you happen to record it 🔴 LIVE
+### [body][nutrition] LB-99 — the Weight response card reports "not enough weigh-ins" with the weigh-ins in hand 🔴 LIVE
+
+- **Lane:** B — `components/nutrition/reta/weight-response-card.tsx`.
+- **Added:** 2026-09-10 · measured while shipping BF-136, whose reported symptom this turns out to be
+  the second half of.
+- **Needs:** — nothing.
+
+**BF-136 fixed the cause it names and the symptom did not clear.** Reproduced locally: 14 daily
+weigh-ins, one vial, its `opened_on` corrected to five days back. `/api/body-metadata` answered 200
+with `recent` = `["2026-09-10","2026-09-09","2026-09-08","2026-09-07","2026-09-06","2026-09-05",
+"2026-09-04"]` — six of them inside the window and each carrying a `weightKg`. The sibling note in
+the same sheet had already re-rendered as *"Measured from 5 Sept"*, so `sinceDate` was correct and
+the props were right. **The card still read "Not enough weigh-ins yet" after six settled seconds.**
+
+**Where to look, and what is already ruled out.**
+- **Not a shape mismatch.** `toRow` (`app/api/body-metadata/route.ts:82`) emits `{ date, weightKg }`
+  and `WeightPoint` (`packages/shared/src/health/long-term-goal-progress.ts:15`) wants exactly that.
+- **Not the arithmetic.** `weightResponse()` is unit-tested against the production shape and returns
+  a rate for six points; the gate it fails is the three-point one, which means `windowed` was empty.
+- **The live suspect is the branch above it.** The effect takes `getLocalStore(userId)` first and
+  only falls through to `cachedFetch('body-metadata', …)` when that is null. If the web build returns
+  a store object rather than null, `store.getBodyMetrics(sinceDate)` resolves `[]` and the fetch
+  never runs — points become `[]`, not `null`, and the card reports a true-sounding "not enough".
+  That is **LB-98**'s class exactly, and this would be its first live instance.
+- **Check the fall-through before rewriting anything**: log which branch the effect takes on web.
+
+- **⚠ Do not "fix" it by widening the three-point gate.** The gate is correct and OR-102b ④ argues
+  for it at length — two points cannot separate 0.4 kg/week from 1.2. A card that draws a rate from
+  an empty window would be worse than one that says it has nothing.
+- **Reversal cost:** low — one effect in one component.
+
+### [body][nutrition] BF-136 — a vial's open date is hardcoded to today (fixed; the card's own render is a separate defect)
 
 - **Lane:** B — `components/nutrition/reta/vial-sheet.tsx`. The routes already take the field; nothing server-side needs changing.
 - **Added:** 2026-09-10 · owner: *"its saying no weights taken; but i weigh my self every day. so its been over 5 days since first dose"*.
 - **Needs:** — nothing.
+- **Verify:** device — the reported symptom. On the S25, correct the vial's date and check the
+  Weight response card actually renders a rate. **The sandbox could not observe that** — see the
+  ⚠ below — so what shipped is the cause, not a confirmed clearing of the symptom.
+- **✅ SHIPPED 2026-09-10** (`fix/vial-opened-date`).
+  [Journal](overview/entries/2026-09-10-fix-vial-opened-date.md). An `Opened on` date on the sheet
+  defaulting to **today**, bounded to `[today − 180d, today]`, with the POST now sending it instead
+  of the constant; and the stored vial's date shown and correctable in place.
+- **⚠ Correcting in place is REQUIRED, not a convenience — "save a new vial" is not a workaround.**
+  `listSupplementVials` orders by `openedOn DESC` and the sheet reads `vials[0]`, so a second vial
+  dated *earlier* than the wrong one sorts BELOW it and the card keeps windowing on the wrong date.
+  A vial stamped today when it was opened five days ago can only be fixed where it stands.
+- **The new-vial field defaults to today and must keep doing so.** Prefilling it from the current
+  vial — the way the reconstitution numbers above it are prefilled, because those are stable — would
+  make the next vial silently inherit this one's date, which is this entry's own defect one vial
+  along. Pinned by a source test.
+- **⚠ MEASURED, AND IT DOES NOT CLEAR THE OWNER'S SYMPTOM ON WEB — filed as LB-99.** With the bug
+  state reproduced locally (14 daily weigh-ins, vial stamped today), the date corrected to 5 days
+  back and `/api/body-metadata` returning exactly the six in-window rows
+  (`2026-09-05 … 2026-09-10`), `WeightResponseCard` **still read "Not enough weigh-ins yet"** after
+  six settled seconds. The note beside it had already updated to *"Measured from 5 Sept"*, so
+  `sinceDate` was correct and the card's own read is what did not complete. Pre-existing and
+  independent of this change — it reproduces identically before it — but it means **the fix here is
+  the cause, not the observed symptom**, and nobody should read this entry as closing the report
+  until LB-99 or the device check says so.
 
 **The message is correct about the data, and the data is wrong.** The owner's only
 `supplement_vials` row reads **`opened_on = 2026-09-10`**, created 03:18 that morning — while he had

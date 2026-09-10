@@ -14,6 +14,8 @@ import { todayInTz } from "@trainingai/shared/date-utils";
 import type { SupplementVial } from "@trainingai/shared/types/supplement";
 import { concentrationWorking, doseWorking, planDose, DEFAULT_BARREL_UNITS } from "./vial-plan";
 import { WeightResponseCard } from "./weight-response-card";
+import { VialOpenedNote } from "./vial-opened-note";
+import { openedOnBounds, openedOnProblem } from "./vial-date";
 
 /**
  * The vial's key is `supplements-vials:<id>` on purpose, and it depends on prefix semantics:
@@ -39,6 +41,7 @@ interface Props {
 
 export function VialSheet({ open, onOpenChange, supplementId, supplementName, defaultDoseMg, userId }: Props) {
   const tz = useUserTimezone()
+  const today = todayInTz(tz)
   const [failed, setFailed] = useState(false)
   // Not gated on `open`, and that is deliberate twice over. An empty key would subscribe to every
   // invalidation — `prefix.startsWith('')` is true for all of them — and refetch nothing on each
@@ -56,6 +59,7 @@ export function VialSheet({ open, onOpenChange, supplementId, supplementName, de
   const [waterMl, setWaterMl] = useState('')
   const [unitsPerMl, setUnitsPerMl] = useState(String(DEFAULT_BARREL_UNITS))
   const [doseMg, setDoseMg] = useState('')
+  const [openedOn, setOpenedOn] = useState('')
   const [saving, setSaving] = useState(false)
 
   // Prefilled from the last vial, because reconstitution is stable in practice — one vial lasts
@@ -66,7 +70,11 @@ export function VialSheet({ open, onOpenChange, supplementId, supplementName, de
     setWaterMl(current ? String(current.waterMl) : '')
     setUnitsPerMl(String(current?.syringeUnitsPerMl ?? DEFAULT_BARREL_UNITS))
     setDoseMg(defaultDoseMg == null ? '' : String(defaultDoseMg))
-  }, [open, current, defaultDoseMg])
+    // BF-136. Today, and NOT `current.openedOn` — the reconstitution numbers above are prefilled
+    // from the last vial because they are stable, but a date is not: inheriting the previous vial's
+    // would recreate this entry's defect one vial along, silently.
+    setOpenedOn(today)
+  }, [open, current, defaultDoseMg, today])
 
   const draft = {
     strengthMg: Number(strengthMg),
@@ -77,15 +85,17 @@ export function VialSheet({ open, onOpenChange, supplementId, supplementName, de
   const dose = Number(doseMg)
   const plan = planDose(dose, draft, draft.syringeUnitsPerMl)
   const working = doseMg.trim() === '' ? null : doseWorking(dose, draft)
+  const openedProblem = openedOnProblem(openedOn, today)
+  const openedBounds = openedOnBounds(today)
 
   async function save() {
-    if (saving || concentration == null) return
+    if (saving || concentration == null || openedProblem) return
     setSaving(true)
     try {
       const res = await fetch(`/api/supplements/${supplementId}/vials`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...draft, openedOn: todayInTz(tz) }),
+        body: JSON.stringify({ ...draft, openedOn }),
       })
       if (!res.ok) throw new Error(String(res.status))
       await invalidateSupplements()
@@ -119,6 +129,22 @@ export function VialSheet({ open, onOpenChange, supplementId, supplementName, de
               <NumField id="vial-water" label="Bac water" unit="mL" value={waterMl} onChange={setWaterMl} />
             </div>
             <NumField id="vial-units" label="Marks on the barrel" unit="per mL" value={unitsPerMl} onChange={setUnitsPerMl} />
+            {/* BF-136. This used to be `todayInTz(tz)` with no control, so the response window
+                started on whichever day the vial happened to be entered. It anchors every figure on
+                the card below and it is the one field that cannot be corrected once wrong. */}
+            <div className="space-y-1">
+              <Label htmlFor="vial-opened" className="text-xs text-muted-foreground">Opened on</Label>
+              <Input
+                id="vial-opened"
+                type="date"
+                value={openedOn}
+                min={openedBounds.min}
+                max={openedBounds.max}
+                onChange={e => setOpenedOn(e.target.value)}
+                className="h-11 tabular-nums"
+              />
+              {openedProblem && <p className="text-xs text-destructive">{openedProblem}</p>}
+            </div>
             {/* The division, not only the result: a concentration cannot be checked from its answer. */}
             <p className="text-sm tabular-nums text-muted-foreground">
               {concentration ?? 'Enter the peptide and water to get a concentration.'}
@@ -150,6 +176,19 @@ export function VialSheet({ open, onOpenChange, supplementId, supplementName, de
 
           {/* ④. Under the calculator rather than on a screen of its own: the owner asked for the
               four parts in one place, and this is the one that answers "is it working". */}
+          {/* BF-136. The window's start, said out loud and correctable in place. Saving a new vial
+              is not a way round a wrong date: `listSupplementVials` orders by `openedOn DESC` and
+              this sheet reads `vials[0]`, so an earlier-dated vial sorts BELOW the wrong one and
+              the card keeps using it. */}
+          {current && (
+            <VialOpenedNote
+              supplementId={supplementId}
+              vialId={current.id}
+              openedOn={current.openedOn}
+              today={today}
+            />
+          )}
+
           <WeightResponseCard userId={userId} sinceDate={current?.openedOn ?? null} />
         </div>
 
@@ -157,7 +196,7 @@ export function VialSheet({ open, onOpenChange, supplementId, supplementName, de
           <Button
             className="w-full h-12 bg-brand hover:opacity-90 text-brand-foreground font-semibold"
             onClick={save}
-            disabled={saving || concentration == null}
+            disabled={saving || concentration == null || openedProblem != null}
           >
             {saving ? 'Saving…' : current ? 'Save as a new vial' : 'Save vial'}
           </Button>

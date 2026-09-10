@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.446.1",
+    date: "2026-09-10",
+    changes: [
+      "A vial now records the day you actually mixed it, instead of the day you happened to enter it. There is an Opened on date on the vial sheet, and the date on a vial you already saved can be corrected in place \u2014 saving a second vial would not have helped, since the newest date wins. Everything the vial card measures runs from that day, so it being a few days late is what made the weight response say it had no weigh-ins.",
+    ],
+  },
+  {
     version: "1.446.0",
     date: "2026-09-09",
     changes: [

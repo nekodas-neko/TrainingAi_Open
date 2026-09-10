@@ -10376,3 +10376,18 @@ Forty-five lines because the one-line cause needs three things around it to be a
 
 The null `taken_at` is noted as OR-102a's, not a second defect, so an empty dose timeline is not
 re-filed by whoever picks this up.
+
+## 2026-09-10 — `docs/implementation-backlog.md` raised to 20341 for BF-136's result and LB-99
+
+BF-136's entry gained what shipped, the reason correcting a vial in place is required rather than
+optional (vials sort `openedOn DESC`, so a re-dated new vial sorts below the wrong one), and the
+measurement showing its fix does not clear the reported symptom. That last part is a new entry,
+LB-99, with the branches already ruled out — the payload shape matches and the arithmetic is tested,
+so the suspect is the local-store fall-through. Filing it costs lines and not filing it would have
+left BF-136 reading as closed.
+
+## 2026-09-10 — `projectOverview.md` raised to 10561 for BF-136's row
+
+A live owner report whose cause shipped and whose symptom was measured NOT to clear. That gap is
+exactly what a Known-Issues row is for: without it the entry reads as closed, and the next session
+would take the owner's next mention of it as a new bug rather than the open half of this one.
