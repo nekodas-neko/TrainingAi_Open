@@ -19763,6 +19763,12 @@ still cite. Whatever the sweep does, it must repoint citations rather than break
 - **Lane:** A — `app/api/oura/hr-sync/route.ts`.
 - **Added:** 2026-09-09, Lane A — found while writing the route's first tests (PS-39). Tested and
   pinned as it stands; **not deleted**, because removing an HTTP surface is the owner's call.
+- **Gate:** owner — added 2026-09-10, and the reason is a live demonstration of why fields beat
+  prose. This entry said the decision was the owner's in three separate sentences and carried **no
+  `Gate:` field**, so `next-item.js` printed it as READY. A session picked it up on that basis and
+  wrote itself an instruction that *"the rename half is startable"* — which this entry explicitly
+  refutes below (renaming is the WORSE option, because it keeps a second way to reach the pipeline).
+  Prose does not block. The field does.
 
 Two separate things, and only the second is a decision:
 
