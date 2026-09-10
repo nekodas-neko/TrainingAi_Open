@@ -10484,3 +10484,9 @@ two hours on this one file. Recomputed with `wc -l` rather than adjusted, as eve
 resurrection check was done by comparing entry BLOCKS against `git show origin/main:…` rather than
 reading diff markers: LA-97 removed here and still present on main (this PR is what removes it),
 LA-98 added here, LA-96 and BF-136 untouched on both sides.
+
+**Sixth recomputation, after #1076: 20301.** Recorded because the recipe itself needed correcting.
+`wc -l` is NOT the number — the file has no trailing newline, so `check-doc-index-size` counts one
+more, and setting `wc -l` produced an off-by-one twice today (20246 vs 20247, 20330 vs 20331). The
+reliable move is to take **the count the check reports** and write that. This resolution used it and
+landed first try.
