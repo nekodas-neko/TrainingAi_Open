@@ -10744,3 +10744,14 @@ measurement. Removing both is one shipped item and one that should never have ex
 The lesson is cheaper to write than to repeat: an entry filed *out of* a conversation about a
 blocking gate is exactly the kind most likely to already exist, because whatever blocked you blocked
 someone else first. Grep the queue for the symptom before filing.
+
+## 2026-09-10 — `docs/implementation-backlog.md` → 20458 (OR-105 worked)
+
+Twenty-one lines net: five entries gain a three-line note saying what proves they are unbuilt, and
+OR-105 is rewritten from a to-do into a result. The proof lines are the point — "RV-44 is not built"
+is a claim the next session has to re-derive, while "the longhand is still in `scan-totals.ts:41`" is
+one they can check in a second, or refute.
+
+OR-105 also grew a paragraph on what was **not** done: no `Branch:` was written for the nine entries
+that had shipped, because the commit the scan finds is often an incidental mention rather than the
+work. That paragraph exists to stop the next pass "finishing the job" by writing false provenance.

@@ -1632,38 +1632,49 @@ that is *wrong* — is already covered by `laneDrift` and the batch-mixing check
 
 - **Reversal cost:** nil. Nothing here changes a queue field.
 
-### [platform] OR-105 — 17 more entries may be filed as shipped without having been built
+### [platform] OR-105 — five premature `Verify:` fields fixed; four entries still unresolved
 
-- **Lane:** O — reading the queue against the code, then editing entries. Neither implementer's paths.
-- **Added:** 2026-09-08 by Orchestrator, from the OR-102b find. **Branch:** unassigned.
-- **Two were proven and are fixed in this same PR.** OR-102b carried a forward-looking `Verify:`
-  while none of its four parts existed — grep for `vial` across `components/**` and `app/**` returns
-  no `.tsx` at all — so `next-item.js` filed the reta tracker's whole surface under *"shipped; a look
-  is owed"* and the owner reasonably believed it had shipped. OR-104 was the same, plus a `Gate:`
-  that parked the very code fix its own next line said must not wait.
+- **Lane:** O — reading the queue against the code, then editing entries.
+- **Added:** 2026-09-08 by Orchestrator, from the OR-102b find. **Worked 2026-09-10.**
 
-**The scan that found them, and its honest limit.** 19 entries carry a `Verify:` with **no `Branch:`
-field and no ship evidence** (no PR number, no "shipped"/"merged" in the body):
+**The method that worked, because the first two guesses did not.** "Carries a `Verify:` with no
+`Branch:`" over-caught badly — it flags every shipped entry that simply never recorded a branch. What
+discriminates is **whether any commit mentioning the id also touched a non-docs file**: a filing
+commit only touches `docs/`. Nine of the eighteen had zero code-touching commits.
 
-> OR-102b · PS-24 · RV-44 · RV-42 · RV-41 · RV-40 · RV-38 · RV-39 · RV-35 · RV-36 · BF-119 · BF-98 ·
-> BF-96 · BF-95 · BF-72 · BF-74 · BF-76 · BF-53 · LA-57
+**That signal over-catches too, and checking is what settled it.** RV-38 has no code-touching commit
+yet `components/body-battery-card.tsx` carries a real `battery.hasData` branch — it shipped. So each
+candidate needed one targeted grep for the thing it claims.
 
-**That list over-catches and must not be treated as 19 defects.** BF-72, BF-95 and BF-98 were checked
-on the S25 on 2026-09-06 and are genuinely shipped — they simply never recorded a branch. The signal
-that separated OR-102b was **a full unwritten build spec still in the body** (64 lines of "build it
-as…"), which a shipped entry does not carry. The long ones are therefore the suspects: PS-24 (56),
-LA-57 (57), BF-119 (58), BF-98 (51), RV-40 (46).
+**Five proven unbuilt and converted to prose (now READY):**
 
-**What to do:** for each of the 17 remaining, grep for the thing it claims to have shipped. Built →
-add the `Branch:`/PR it merged in, so the next scan stops flagging it. Not built → strip the
-`Verify:` to prose per the field rule above, and it returns to READY.
+| entry | what proves it |
+|---|---|
+| **RV-40** | neither named route contains `invalidUuidResponse` |
+| **RV-44** | the longhand `proteinG * 4 + carbsG * 4 + fatG * 9` is still in `scan-totals.ts:41` and `meal-split.ts:189` — `atwater.ts` appears only in comments |
+| **RV-41** | `lib/coach/patch.ts` imports nothing from the targets or goals routes and declares no bounds |
+| **RV-36** | `app/nutrition/nutrition-content.tsx` has no scroll-restoration reference at all |
+| **RV-42** | `replaceMealPlanStructure` checks `ownedPlan` for the plan, then inserts `mealTypeId` and `savedMealId` from input unchecked |
 
-**Why this is worth a pass rather than waiting for each to surface.** A wrong `Gate:` is discoverable
-— PARKED prints the reason and invites the question. A wrong `Verify:` prints *"nothing is blocked"*,
-so neither the implementer nor the owner has any reason to look. OR-102b was invisible for two days
-in the one lane whose READY list was nearly empty, which is exactly when a hidden entry costs most.
+**Cleared — leave alone:** RV-38 (the `hasData` branch exists), and the nine with code-touching
+commits (PS-24, RV-35, BF-98, BF-96, BF-95, BF-72, BF-74, BF-76, BF-53).
 
-- **Reversal cost:** nil. Editing queue fields; no code, no data.
+**⚠ No `Branch:` was added to those nine, deliberately.** The obvious next step — write in the commit
+the scan found — produces **false provenance**: PS-24's top hit is OR-102a's commit, BF-53's is
+PS-39's, BF-96's is BF-116's. Each merely *mentions* the id. A wrong `Branch:` is worse than an
+absent one, because the next scan trusts it. Add one only from a commit that actually did the work.
+
+**Still unresolved (3), each needing a judgement a grep cannot make:**
+- **RV-39** — a warm-visit skeleton on the ring card. Its own `Verify:` says the real state is BLE,
+  which the web build cannot reach, so neither the code nor the sandbox can settle it.
+- **BF-119** — a resumed guided walk. `guided-walk-store.ts:76` says *"never auto-resume a stale
+  active"* and `walk-active.tsx:102` says *"no pause/resume in this screen"*, which neither confirms
+  nor refutes the reported loss of samples across a process kill.
+- **LA-57** — carries **⛔ REFUTED** in its own heading and a `Verify: device`. A refuted finding
+  owing a device check is a contradiction; decide whether it is a live question or should leave the
+  queue.
+
+- **Reversal cost:** nil. Queue fields only.
 
 ### [app-shell] BF-126 — the cat collection's drawn art, once the mechanic has been lived with
 
@@ -2807,7 +2818,9 @@ those two surfaces this is the fallback path, not the primary.
   file it or fix it as though a value were incorrect.
 - Import `KCAL_PER_G` at the nine sites. Worth doing when someone is next in those files rather than
   as a standalone PR.
-- **Verify:** owner — not needed beyond a green gate; nothing user-visible changes.
+- **On completion, the check is:** not needed beyond a green gate; nothing user-visible changes.
+  **Not a `Verify:` field — this is unbuilt.** Confirmed 2026-09-10 (OR-105): the longhand `proteinG * 4 + carbsG * 4 + fatG * 9` is still in `scan-totals.ts:41` and `meal-split.ts:189,265-267`; `atwater.ts` is named only in comments.
+  A `Verify:` files unbuilt work under "shipped; nothing is blocked", where nobody looks for it.
 
 ### [nutrition][platform] RV-42 — a meal plan can point at another account's saved meal and meal type
 
@@ -2837,7 +2850,9 @@ those two surfaces this is the fallback path, not the primary.
   migration on a table two routes write, where a four-line pre-check matches the sibling code.
 - **How to test locally:** two accounts, create a plan as B naming A's `savedMealId`/`mealTypeId`, and
   read `meal_plan_meals` back — the response body echoes the ids either way and proves nothing.
-- **Verify:** owner — nothing user-visible changes; a green local gate plus the two-account probe is
+- **On completion, the check is:** nothing user-visible changes; a green local gate plus the two-account probe is
+  **Not a `Verify:` field — this is unbuilt.** Confirmed 2026-09-10 (OR-105): `replaceMealPlanStructure` checks `ownedPlan` for the PLAN, then inserts `mealTypeId` and `savedMealId` straight from input with no ownership check on either.
+  A `Verify:` files unbuilt work under "shipped; nothing is blocked", where nobody looks for it.
   the bar.
 ### [devices] PS-22 — a fifth of the ring's heart-rate log is discarded as future-dated, every sync
 
@@ -2907,7 +2922,9 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
   user's bounds; these are the numbers the owner's own screens have enforced all along.
 - **How to test locally:** two accounts, one curl per field to each surface, and read the row back out
   of Postgres — the response body echoes the input and proves nothing about what was stored.
-- **Verify:** owner — whether any Coach bound should legitimately differ from the form's.
+- **On completion, the check is:** whether any Coach bound should legitimately differ from the form's.
+  **Not a `Verify:` field — this is unbuilt.** Confirmed 2026-09-10 (OR-105): `lib/coach/patch.ts` imports nothing from the targets or goals routes and declares no bounds constants.
+  A `Verify:` files unbuilt work under "shipped; nothing is blocked", where nobody looks for it.
 
 ### [workouts][platform] RV-40 — the malformed-id guard was only ever pointed at path params, and two body-id routes 500
 
@@ -2952,7 +2969,9 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
   the only outbox domains, so program and style saves never take that path.
 - **How to test locally:** two signed-in accounts and one curl each; assert `Content-Length` as well
   as the status, and query `error_events` afterwards — the fault row is invisible from the response.
-- **Verify:** owner — nothing user-visible changes, so this needs no device pass; a green local gate
+- **On completion, the check is:** nothing user-visible changes, so this needs no device pass; a green local gate
+  **Not a `Verify:` field — this is unbuilt.** Confirmed 2026-09-10 (OR-105): neither `app/api/progression-styles/route.ts` nor `app/api/workout-templates/route.ts` contains `invalidUuidResponse`.
+  A `Verify:` files unbuilt work under "shipped; nothing is blocked", where nobody looks for it.
   plus the probe table above is the bar.
 
 ### [readiness][app-shell] RV-38 — Body Battery prints 50 and calls it "Good" for an account that has never worn anything
@@ -3064,7 +3083,9 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
   back case. Keep its precondition assertions — BF-100 records four spec traps that all report
   `expected 840, received 0`, and a fifth this sweep paid for: `page.goto()` is a hard navigation, so
   React cleanup never runs and **no** screen saves an offset.
-- **Verify:** device — the system back gesture on the S25, which is the gesture BF-100 was reported
+- **On completion, the check is:** the system back gesture on the S25, which is the gesture BF-100 was reported
+  **Not a `Verify:` field — this is unbuilt.** Confirmed 2026-09-10 (OR-105): `app/nutrition/nutrition-content.tsx` contains no scroll-restoration reference at all.
+  A `Verify:` files unbuilt work under "shipped; nothing is blocked", where nobody looks for it.
   against and the one the harness cannot send.
 
 ### [app-shell][platform] RV-37 — `/health/day` scrolls with no bottom padding (structural; NOT observed)
