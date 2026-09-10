@@ -10768,9 +10768,14 @@ is a one-line change that *looks* free and is not — LB-31 chose "one job rathe
 and LB-56 records that `main` would not pass the suite, so it would buy a nightly red from its first
 run. Writing down why an obvious change was NOT made is what stops the next session making it.
 
+## 2026-09-10 — `docs/implementation-backlog.md`
+
+Raised for BF-139 and BF-140, two owner-reported entries from one Home screenshot, plus in-place
+amendments to BF-96 and Q-111 so their standing instructions do not contradict the new entries.
+
 ## 2026-09-11 — both indexes raised for PS-35b's result
 
-`docs/implementation-backlog.md` to 20508 and `projectOverview.md` to 10548. PS-35b's entry gained
+`docs/implementation-backlog.md` to 20614 and `projectOverview.md` to 10548. PS-35b's entry gained
 what shipped for each of its four items, the two measurements (34 → 29 boot requests; the chip's
 rendered failure state), and a correction the next reader would otherwise trip on: the checkpoint
 report's "two unreachable palette keys" are reachable, because the report compared line 26 of one

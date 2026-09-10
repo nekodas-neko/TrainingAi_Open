@@ -421,6 +421,99 @@ below threshold and left in place for next time.
 
 
 
+### [devices] BF-140 — the strap battery chip cannot go stale, so a reading from any point in the past renders as current
+
+- **Lane:** A (the fix starts in `android/**`; the JS half follows)
+- **Verify:** device — the whole mechanism is a native service field, and `getPolarBle()` returns
+  null off-device, so nothing below can be reproduced in the sandbox or in CI.
+
+- **Added:** 2026-09-10 · owner, with a Home screenshot showing the strap chip at **100%**:
+  *"the strap battery guage; i dont know if thats right - its 100% and I have had it for months now
+  and used it. I imagine we dont have the correct metric"*.
+
+- **The metric is the right one. The TIMESTAMP attached to it is invented, and that is the bug.**
+  The number is a real read of the standard Battery Service characteristic `0x2A19`
+  (`PolarGattClient.kt:192-194`, service/characteristic UUIDs at `PolarProtocol.kt:19-20`), issued
+  once per connection off the HR CCCD write (`PolarGattClient.kt:157`). So the app is not showing a
+  hardcoded 100 — it is showing whatever the H10 last reported, whenever that was.
+- **`PolarStrapService.battery` is written once and never cleared.** Set at
+  `PolarStrapService.kt:232` in `onBattery`; grep the file and there is no other assignment — no
+  reset on disconnect, none on stop. It holds its last value for the life of the service process.
+  `status()` publishes that field unconditionally (`PolarStrapService.kt:392`).
+- **So the JS re-stamps an old reading as new on every Home mount.**
+  `use-strap-battery.ts:41` calls `record((await native.plugin.getStatus()).battery)`, and `record`
+  calls `writeStrapBattery(percent)` (`:31`), which stamps `at: Date.now()`
+  (`lib/stores/strap-battery.ts:60`). The stored `at` is therefore **when JS last looked**, not when
+  the strap last reported. `ageMinutes` derives from it (`use-strap-battery.ts:55`).
+- **The consequence is that the staleness affordance can never fire.** `DeviceBatteryChip` dims at
+  `ageMinutes > STALE_AFTER_MINUTES` (180, `components/device-battery-chip.tsx:21`, `:49`) and only
+  then says *"last seen Nh ago"* in the accessible name (`:52-54`). With `at` continuously refreshed,
+  `stale` is permanently false: the chip never dims, never reports an age, and a months-old reading
+  is pixel-identical to a live one. **The screenshot corroborates this** — that chip is at full
+  opacity with a green icon, i.e. the code believes the reading is under three hours old.
+- **Fix shape:** carry the reading's own time from native. Add a `batteryAt` epoch-ms alongside
+  `battery` in `status()`, stamped in `onBattery`, and have `writeStrapBattery` take that instead of
+  defaulting to `Date.now()` (the parameter already exists — `strap-battery.ts:59` takes
+  `now: number = Date.now()`, and every caller currently omits it). Clearing `battery` on disconnect
+  is the wrong fix on its own: it would blank a chip whose entire purpose is
+  last-seen-when-disconnected (Q-111).
+- **Second, smaller half: the strap keeps no history at all, so "has it moved in months?" is
+  unanswerable by anything.** One overwritten `localStorage` key (`ta_strap_battery_v1`,
+  `strap-battery.ts:21`) and nothing server-side — there is no polar battery table and no
+  `app/api/polar*` route. Contrast the ring, which has `oura_ble_battery_poll` (migration 133):
+  measured 2026-09-10, **9,578 polls spanning 9%–100%** between 2026-07-19 and 2026-09-10. The ring
+  can answer this question about itself and the strap cannot.
+- **Do not assume the underlying 100% is wrong.** The H10 runs a CR2025 coin cell, ~400 h
+  (`polar-h10-ble` skill §7), and a coin cell's discharge curve is flat for most of its life, so a
+  long plateau at 100% is what a truthful gauge looks like. **This entry does not claim the reading
+  is false** — it claims nothing in the app can currently tell the owner either way, which is the
+  same complaint from the other side.
+- **Needs:** nothing.
+
+### [app-shell] BF-139 — three header chips no longer fit beside the date, and BF-96's prescribed remedy is already spent
+
+- **Lane:** B
+- **Verify:** device — the sandbox seeds no weather snapshot, so `WeatherChip` renders a skeleton
+  and the real three-chip width can be neither reproduced nor disproved off the S25 (BF-96 records
+  the same limitation).
+
+- **Added:** 2026-09-10 · owner, with a Home screenshot: *"the pills in the top are a little cutoff.
+  can we make them smaller to fit?"*
+
+- **This is Q-111's own device question coming back red.** That entry shipped the two battery chips
+  and flagged the risk in writing: *"Two chips join the weather chip in a header row that already
+  compresses badly — BF-96's whole finding was that this row is where a long date runs out of width
+  at 412 dp ... whether three pills plus `EEEE d MMMM` fits is a hardware question."* It is answered
+  now, on the device, and the answer is no.
+- **The clipping is deliberate and is the mechanism.** `components/home/header-meta-row.tsx:39` is
+  `flex items-center gap-2 min-w-0 overflow-hidden`; that `overflow-hidden` was added as a floor so
+  that once the date has truncated away, extra chips are clipped at the right rather than spilling
+  onto the action buttons. Every chip is `shrink-0 whitespace-nowrap`
+  (`components/weather-chip.tsx:42`, `components/device-battery-chip.tsx:50`), so the date is the
+  only item that can give.
+- **Width, at 412 dp:** 412 − 32 (`px-4`) = 380. The right-hand cluster is 44 + 44 + 36 + two 8 px
+  gaps = 140, plus the header's own `gap-2` → the `flex-1 min-w-0` left column gets **~232 px**.
+  Three chips are ~55 + ~68 + ~62 plus two gaps ≈ **201 px**, leaving ~31 px for the date. The
+  daytime `· UV n` segment (`weather-chip.tsx:45-49`) adds ~45 px and puts the row past 232.
+- **In the owner's screenshot the date is already rendering empty** and the chips end flush against
+  the clip boundary — i.e. the row has consumed the whole left column and there is nothing left to
+  truncate.
+- **Which is why BF-96's standing instruction cannot be followed here.** It says: *"if a long date
+  still overflows on device, shorten the DATE, not the chip ... Making the chip smaller is the wrong
+  lever: this is `white-space`, not width."* That reasoning was sound for one chip beside a date;
+  with three chips the date has already gone to zero, so the lever is used up and the complaint is
+  now genuinely about width. **The owner's requested lever — smaller pills — is the remaining one.**
+  Whoever implements this amends BF-96 rather than silently contradicting it.
+- **`components/home/__tests__/header-meta-row-overflow.test.ts` locks the current classes** on the
+  row and on both chip components, so any sizing change breaks it by design. Update the guard in the
+  same PR; do not delete it.
+- **Establish which edge before building.** The screenshot is consistent with the right-edge clip
+  described above, but "a little cutoff" was not pinned to an edge and the header also carries
+  `pt-safe` (`components/shell/screen-header.tsx:14`) — bare safe-area utilities are a known
+  near-zero-clearance trap on this device. One look on the S25 settles it, and the two causes have
+  nothing in common.
+- **Needs:** nothing.
+
 ### [platform] LB-94 — the journal's recent window is 332 entries, and 297 of them are pinned by a citation
 
 - **The ceiling is not a size problem, it is a linking problem.** `docs/overview/entries/` is meant
@@ -4664,6 +4757,13 @@ two screens, and a user who sets one has no way to know the other exists.
 - **Keep — if a long date still overflows on device, shorten the DATE, not the chip.** `EEE d MMMM`
   saves four characters; the date is partly recoverable from the phone's own UI, the temperature and
   UV are not. Making the chip smaller is the wrong lever: this is `white-space`, not width.
+- **⚑ 2026-09-10 — that instruction is now SPENT, and BF-139 is where it goes.** It was written when
+  this row held one chip beside a date. Q-111 then added two battery chips, and on the owner's S25
+  screenshot the date is **already rendering empty** with the chips flush against the
+  `overflow-hidden` clip at `header-meta-row.tsx:39` — so there is no date left to shorten. The
+  complaint is genuinely about width now, and the owner asked for the chips to shrink. Follow
+  **BF-139**, not the line above, for the three-chip case; this entry's own single-chip reasoning
+  stands unchanged and is not being retracted.
 - **Added:** 2026-09-01 · owner: *"I dont like how the temperature/uV pill sits. can we go back to
   the old way when it was side by side. you can make it smaller if needed."*
 
@@ -18047,6 +18147,12 @@ per-field merge where an AI write has no honest source rank to claim.
      412 dp. `whitespace-nowrap shrink-0` is on all three, but whether three pills plus
      `EEEE d MMMM` fits is a hardware question. **And the strap's live path has never executed**: it
      needs the APK and a Polar H10, because `getPolarBle()` returns null off-device.
+     **⚑ 2026-09-10 — the device pass HAPPENED, via an owner screenshot, and both halves came back
+     red.** The width question is answered no and is now **BF-139** (the date renders empty and the
+     chips sit against the clip). The strap's live path executed and exposed **BF-140**: the native
+     service never clears its cached `battery`, so the JS re-stamps an old reading as current on
+     every Home mount and the chip's staleness affordance can never fire. Neither is a re-opening of
+     this entry — both are traced separately — but this sub-item's device check is discharged.
   2. **The scale, and the refresh-button question — the owner's.** The scale has **no battery
      capability anywhere**, not even a one-shot native read: it is new BLE work in Kotlin, so **not
      Lane B's**, and the owner flagged it a stretch. Separately he asked whether the header refresh
