@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { shiftDateStr } from '@trainingai/shared/date-utils'
-import { weightResponse, formatRange, DEFAULT_BAND_PCT_PER_WEEK } from '../weight-response'
+import type { WeightPoint } from '@trainingai/shared/health/long-term-goal-progress'
+import { weightResponse, formatRange, responseState, DEFAULT_BAND_PCT_PER_WEEK } from '../weight-response'
 
 /**
  * OR-102b ④. The property under test is not the arithmetic — that is LB-67's `computeWeightRateFit`
@@ -150,5 +153,59 @@ describe('formatRange — signed as weight change, which is how it is read', () 
     const [, hiChange, loChange] = text.match(/CI ([−+][\d.]+) to ([−+][\d.]+)/)!
     const num = (s: string) => Number(s.replace('−', '-').replace('+', ''))
     expect(num(hiChange)).toBeLessThan(num(loChange))
+  })
+})
+
+/**
+ * LB-99 — the two grey states are not the same, and the card said they were.
+ *
+ * This is the open half of BF-136: the vial date was corrected, the window then held six weigh-ins,
+ * and the chip still read *"Not enough weigh-ins yet"* — above its own line reading *"6 weigh-ins
+ * over 5 days"*. `weightResponse` was returning a full result the whole time; only its `verdict` was
+ * null, because the interval straddled the band.
+ */
+describe('responseState — enough weigh-ins is not the same as a verdict', () => {
+  /** `n` daily readings from `2026-09-05`, weight walking by `stepKg` a day. */
+  const daily = (n: number, stepKg: number, start = 81): WeightPoint[] =>
+    Array.from({ length: n }, (_, i) => ({
+      date: shiftDateStr('2026-09-05', i),
+      weightKg: start - stepKg * i,
+    }))
+
+  it('is `insufficient` below three readings, which is the only real shortage', () => {
+    expect(responseState(weightResponse({ points: daily(0, 0) }))).toBe('insufficient')
+    expect(responseState(weightResponse({ points: daily(2, 0.1) }))).toBe('insufficient')
+  })
+
+  it('is `undecided` with plenty of readings whose interval straddles the band', () => {
+    // Six weigh-ins over five days is BF-136's reproduced state: enough to fit, far too few to
+    // narrow the interval onto one side of a 0.4–0.8 kg/wk band.
+    const result = weightResponse({ points: daily(6, 0.02) })
+    expect(result).not.toBeNull()
+    expect(result!.weighIns).toBe(6)
+    expect(result!.verdict).toBeNull()
+    expect(responseState(result)).toBe('undecided')
+  })
+
+  it('is `verdict` once the whole range commits', () => {
+    // A month of steady loss well past the band's top.
+    const result = weightResponse({ points: daily(30, 0.35) })
+    expect(result!.verdict).not.toBeNull()
+    expect(responseState(result)).toBe('verdict')
+  })
+})
+
+/** The label itself, read off the card, because the defect was one string. */
+describe('the chip does not claim a shortage it does not have', () => {
+  const raw = readFileSync(
+    path.resolve(__dirname, '../weight-response-card.tsx'), 'utf8',
+  )
+  const code = raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+
+  it('picks the label from the state rather than falling through to one string', () => {
+    expect(code).toMatch(/responseState\(result\) === 'undecided'/)
+    expect(code).toMatch(/'Not called yet'/)
+    // The regression: the bare fallback that conflated them.
+    expect(code).not.toMatch(/tone\?\.label \?\? 'Not enough weigh-ins yet'/)
   })
 })

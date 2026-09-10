@@ -10455,6 +10455,19 @@ half shipped and the surface half stays as Lane B with `Verify: device` — and 
 byte-identical to `main` for that entry. **A `-###` line in a backlog diff is not evidence of a
 deletion**; compare the resulting blocks, not the diff markers.
 
+## 2026-09-10 — `docs/implementation-backlog.md` raised to 20363 for LB-99's result
+
+LB-99 was filed and fixed the same day, so its entry replaced a diagnosis with a cause — and kept the
+wrong first diagnosis on the record with why it was wrong, because "a card reporting no data is not
+evidence that no data reached it" is the reusable part. BF-136 gained a line saying both halves of
+the report have now shipped. Recomputed on the merged file — another lane moved the same
+baseline in parallel.
+
+## 2026-09-10 — `projectOverview.md` set to 10564 for the merged BF-136 + LB-99 row
+
+The row filed hours earlier said the report's symptom was open; it is now fixed, so the two entries
+became one row describing both defects rather than two rows describing one report twice.
+
 ## 2026-09-10 — `docs/implementation-backlog.md` 20404 → 20372 (−32), LA-97 shipped, LA-98 filed
 
 A shrink, so the ratchet asked for this one rather than the reverse. LA-97's 48 lines left the queue
@@ -10465,3 +10478,9 @@ every step looks correct in isolation — the writer freezes, the reader drops, 
 what it was given, the server fills what it was not sent — and only the sequence is wrong. That
 entry is what made the fix take an hour instead of a day. LA-98 inherits the same shape at a
 quarter the length, because it is one field and the chain is already documented.
+
+**Re-merged against #1074 (the weigh-in shortage claim): 20331.** Fifth baseline recomputation in
+two hours on this one file. Recomputed with `wc -l` rather than adjusted, as every time — and the
+resurrection check was done by comparing entry BLOCKS against `git show origin/main:…` rather than
+reading diff markers: LA-97 removed here and still present on main (this PR is what removes it),
+LA-98 added here, LA-96 and BF-136 untouched on both sides.

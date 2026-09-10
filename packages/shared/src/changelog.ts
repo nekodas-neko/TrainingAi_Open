@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.446.2",
+    date: "2026-09-10",
+    changes: [
+      "The vial's weight-response chip no longer says \"not enough weigh-ins yet\" when it has them. There are two grey states and they were sharing a label: too few readings to work with, and enough readings whose range still crosses your band. The second now reads \"Not called yet\" \u2014 it was contradicting the line underneath it counting your weigh-ins.",
+    ],
+  },
+  {
     version: "1.446.1",
     date: "2026-09-10",
     changes: [
