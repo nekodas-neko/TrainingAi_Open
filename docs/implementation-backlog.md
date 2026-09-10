@@ -18971,29 +18971,6 @@ Owner direction (2026-07-27): these stay device-owned; do not move them to the s
 that returns nothing but `non_wear_time_sec` no longer writes a false-positive
 "synced" row.
 
-### [sleep] 🟡 Q-10 — degenerate sleep rows are stored; no session `type`
-
-- **Lane:** A
-**Downgraded** — originally filed as a prerequisite for classifying naps vs nights,
-but `lib/health/sleep-night.ts` already classifies by circadian position, no stored
-`type` needed. Persisting Oura's `type` / the ring's bedtime-period tag is now a
-nice-to-have, not queued in detail.
-
-✅ **The live symptom — DONE 2026-08-02 (v1.250.8).** `groupSleepPeriods`
-(`packages/shared/src/health/sleep-night.ts`) now drops windows with no duration
-before classifying, so a degenerate row can no longer become the most recent night
-and null out `previousNight`.
-
-The entry's suggested fix — *"skip/floor sub-20-minute sessions"* — was **not** what
-shipped, and deliberately so. Of the nine sub-20-minute sessions only the one with
-`duration_hours = 0.00` can produce the null: `computeSleepScore` returns null for
-`duration == null || duration <= 0` and nothing else, so a 15-minute session scores
-fine (badly, which is correct). A 20-minute floor would also have discarded genuine
-short windows that `groupSleepPeriods` merges into fragmented nights on purpose.
-
-What is left of Q-10 is only the nice-to-have above: persisting Oura's session
-`type` / the ring's bedtime-period tag.
-
 ### [sleep] 🟢 Q-34 — sleep-staging Phase 1b: items 2 and 4 remain
 
 - **Lane:** A

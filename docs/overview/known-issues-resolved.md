@@ -1914,3 +1914,31 @@ restart the same account signs in normally.
 limiter's in-memory L1 is not cleared by deleting `rate_limits` rows, so counts survive a `psql`
 reset and poison the next run; only restarting `pnpm dev` clears them. Anything measuring this
 limiter locally has to restart between runs.
+
+## [sleep] Q-10 — degenerate sleep rows are stored; no session `type` (closed 2026-09-10)
+
+**The live symptom shipped 2026-08-02 (v1.250.8).** `groupSleepPeriods`
+(`packages/shared/src/health/sleep-night.ts`) drops zero-duration windows before classifying, so a
+degenerate row can no longer become the most recent night and null out `previousNight`. The entry's
+own suggested fix — *"skip/floor sub-20-minute sessions"* — was deliberately **not** what shipped: of
+nine sub-20-minute sessions only the `duration_hours = 0.00` one can produce the null, and a
+20-minute floor would have discarded genuine short windows that `groupSleepPeriods` merges into
+fragmented nights on purpose.
+
+**Closed 2026-09-10 because both halves of the residue are now dead, and the second is worth
+recording.** What was left was described as a nice-to-have: *"persisting Oura's session `type` / the
+ring's bedtime-period tag."*
+
+1. **Oura's session `type` has no source.** The Oura Cloud integration was removed on 2026-08-13 and
+   must never be re-added — the ring is on our own key, so nothing supplies that field.
+
+2. **The ring's `bedtime_period` (0x76) is not what the entry assumed, and persisting it would
+   reintroduce the exact bug Q-10 exists to fix.** Measured on-device 2026-07-09 and recorded in
+   `lib/oura-ble/rollup/run.ts`: on this Ring 5 the captured events are **~0.5 h sub-period
+   fragments** (e.g. 01:23–01:53), not the full night. Treating them as sleep windows *"produced tiny
+   or duplicate sleep rows and blew displayed end times into the afternoon"* — which is degenerate
+   sleep rows, the title of this entry. The rollup now ignores any bedtime window shorter than three
+   hours for that reason.
+
+So the residue is not merely low-value; the first half is unbuildable and the second is a proposal to
+persist the defect. Nothing is owed.

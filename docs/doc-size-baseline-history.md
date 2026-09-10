@@ -10266,3 +10266,17 @@ deletion, both confirm-first. The entry was printing as ordinary READY work whil
 the remaining half is confirm-first — the fifth field/prose mismatch this session.
 
 Entries ceiling untouched at 360.
+
+---
+
+## 2026-09-10 — backlog 20,224 → 20,201 (−23) (Q-10 closed)
+
+Q-10 leaves the queue whole, into the resolved archive. Its live symptom shipped 2026-08-02; what
+remained was a nice-to-have that turned out to be unbuildable in one half (the Oura Cloud integration
+that would supply a session `type` was removed on 2026-08-13) and actively harmful in the other.
+
+The second half is worth the archive entry rather than a one-line strike: `bedtime_period` (0x76) was
+measured on-device on 2026-07-09 as ~0.5 h sub-period fragments, and the rollup already refuses any
+bedtime window under three hours because treating them as sleep windows produced *"tiny or duplicate
+sleep rows"* — which is the title of Q-10. The residue proposed persisting the defect the entry
+exists to fix, and the measurement that says so predates the note that left the residue by a month.
