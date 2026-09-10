@@ -183,8 +183,16 @@ async function openPlanMeals(page: Page): Promise<void> {
   // pointer and swallows the click, so a forced click leaves `aria-expanded` at `false` (Q-354).
   // Measured while building Q-187, and it is the single thing most likely to cost the next author
   // an hour on this screen.
+  //
+  // And `scrollIntoViewIfNeeded()` is the wrong scroll, for two reasons this repo has now paid for
+  // three times, both of which land the tap on the Workout tab. It stops as soon as the box is
+  // technically on screen, which for a control this far down leaves it **under the fixed bottom
+  // nav** (`plan-meal-to-saved-meal.spec.ts`), and it scrolls every ancestor — one of which is the
+  // shell's *horizontal* tab carousel, so it slides the shell off Nutrition
+  // (`plan-meal-log-decline.spec.ts`). `block: 'center'` answers the first, `inline: 'nearest'` the
+  // second.
   const toggle = page.getByRole('button', { name: /Show 3 meals/ })
-  await toggle.scrollIntoViewIfNeeded()
+  await toggle.evaluate(el => el.scrollIntoView({ block: 'center', inline: 'nearest' }))
   await tapCentre(page, toggle)
   await expect(page.getByRole('button', { name: /Hide meals/ })).toBeVisible({ timeout: 30_000 })
 }

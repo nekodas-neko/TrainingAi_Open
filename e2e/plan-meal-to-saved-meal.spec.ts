@@ -127,12 +127,14 @@ const stampOf = (mealId: string) => withDb(async db => {
  * (Q-354). And `scrollIntoViewIfNeeded()` is not enough on its own here: it stops as soon as the box
  * is technically on screen, which for a control near the end of a long page leaves it **under the
  * fixed bottom nav** — the first run of this spec tapped "Show 2 meals" and landed on the Workout
- * tab. `block: 'center'` puts it where a thumb would actually reach it.
+ * tab. `block: 'center'` puts it where a thumb would actually reach it, and `inline: 'nearest'`
+ * keeps the scroll off the shell's horizontal tab carousel, which is the *other* way this call
+ * lands on Workout (`plan-meal-log-decline.spec.ts`).
  */
 async function tap(page: Page, name: RegExp | string) {
   const target = page.getByRole('button', { name })
   await expect(target).toBeVisible({ timeout: 30_000 })
-  await target.evaluate(el => el.scrollIntoView({ block: 'center' }))
+  await target.evaluate(el => el.scrollIntoView({ block: 'center', inline: 'nearest' }))
   await tapCentre(page, target)
 }
 

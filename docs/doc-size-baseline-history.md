@@ -10796,6 +10796,14 @@ successor acts from and the durable gotchas stayed. The rewrite is the point of 
 overwritten in full at every handoff — so the baseline tracking it downward is the mechanism working,
 not a concession.
 
+## 2026-09-11 — both indexes raised for RV-36 + RV-37
+
+Both entries shipped and both owe a device look, so each converted from work-to-do into a
+`Verify: device` record rather than being deleted — RV-36's note explaining why it was deliberately
+NOT a `Verify:` while unbuilt is kept, because that reasoning is exactly right and would otherwise be
+re-litigated. RV-37 additionally keeps the fifth-CI-rule question, which is the half that genuinely
+needs evidence: no safe-area rule fires on an absent utility, only on a wrong one.
+
 ## 2026-09-10 — `docs/implementation-backlog.md` and `projectOverview.md` (BF-141)
 
 BF-141 files the owner's lb/kg dial toggle, with the Session 119 unit-corruption history and the
@@ -10813,3 +10821,10 @@ work queue as a permanently unstartable item.
 Recomputed by `pnpm fix:baselines` after merging `main` (which had moved to #1094 and folded the
 journal directory in the meantime). Resurrection check done the block way against
 `git show origin/main:docs/implementation-backlog.md`: exactly one heading removed, LA-101's own.
+
+## 2026-09-11 — `docs/implementation-backlog.md` 20719 → 20725 (LB-56 fifth sighting)
+
+Six lines for a *recovered* renderer-`SIGSEGV` flake on `macro-calorie-warning.spec.ts:77`, at the
+same address as the third and fourth sightings. A sighting that recovers on retry is the one that
+otherwise goes uncounted, and LB-56's argument is a rate — so the entry grows by the observation
+rather than being left to be re-derived from a log nobody will re-open.

@@ -1754,6 +1754,21 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [app-shell][nutrition] ⚠️ Nutrition keeps its scroll position now, and neither fix has been seen on the phone (RV-36 + RV-37, 2026-09-11, v1.446.4)
+
+**RV-36:** BF-100's scroll restoration reached three tabs, not five — it lives in `PullToSync`, and
+the Nutrition tab owns its own scroller. Measured: `/more` → Profile details → back restored **840**;
+`/nutrition` → `/coach` → back saved **no** key and returned **0**. One hook call fixes it, and the
+wrong *"every screen using the shell inherits it"* phrasing is gone from `pull-to-sync.tsx`'s own
+comment as well as from the entry. **RV-37:** `/health/day`'s scroller had no bottom padding at all,
+so its last card ended flush with the S25's gesture bar; it now carries `pb-nav-safe`.
+[Journal](docs/overview/entries/2026-09-11-fix-nutrition-scroll-and-day-padding.md).
+**Owed: one device pass covering both.** RV-36's check is the **system back gesture**, the one gesture
+the harness cannot send. RV-37 **was never observed and still has not been** — the seeded fixture
+renders "Nothing logged on this day", so the container never scrolls; the missing padding was read
+from source. Still open on RV-37: whether a fifth safe-area CI rule should fire on an **absent**
+utility, which needs an allow-list for the sheets and navless screens that legitimately have none.
+
 ### [app-shell] ⚠️ Four boot/chip fixes shipped, and only the failure half could be rendered (PS-35b, 2026-09-11, v1.446.3)
 
 The PWA `start_url` pointed at a bare `redirect()`; the boot warm used a bare `fetch` that

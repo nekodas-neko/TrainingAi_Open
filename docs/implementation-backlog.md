@@ -2238,11 +2238,17 @@ sheet is open over the bottom half of it.
     `page.goto: net::ERR_ABORTED at http://localhost:3100/`. So `ERR_ABORTED` is what a later test
     sees after the renderer is already gone, not a second failure mode: attempt and retry of one test
     produced one of each. 177 passed.
-  - **Four sightings, four different specs** — `preferences-survive-reinstall` (×3, twice as the hard
+  - **⚠ FIFTH SIGHTING 2026-09-10 (#1095).** `macro-calorie-warning.spec.ts:77` went flaky with
+    `browser.newContext: Target page, context or browser has been closed`, preceded in the log by
+    `Received signal 11 SEGV_MAPERR 0000000001b0` — the same address for the third time. It
+    recovered on retry, so the run's two hard failures were both real assertion faults and neither
+    was this. Recorded because a *recovered* sighting is the one that would otherwise go unwritten,
+    and the rate is the argument this entry rests on.
+  - **Five sightings, six different specs** — `preferences-survive-reinstall` (×3, twice as the hard
     failure), `touch-target-size`, `one-calorie-budget`, `back-dismiss-sweep`, `card-429-error-state`,
-    `home-device-battery-chips`. Which spec is reported is a scheduling accident, as this entry said
-    at the second sighting; the constant is a renderer crash inside a 21–26 minute run. **It has now
-    cost four log reads in one session.**
+    `home-device-battery-chips`, `macro-calorie-warning`. Which spec is reported is a scheduling
+    accident, as this entry said at the second sighting; the constant is a renderer crash inside a
+    21–26 minute run. **It has now cost five log reads across two sessions.**
   - Recorded because a 26-minute job that eats its own browser roughly one run in three is an
     argument about the job, which is what this entry is for. It also means **a red E2E cannot be
     read as a signal without opening the log**, which is the cost LB-54 is about.
@@ -3294,10 +3300,17 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
   back case. Keep its precondition assertions — BF-100 records four spec traps that all report
   `expected 840, received 0`, and a fifth this sweep paid for: `page.goto()` is a hard navigation, so
   React cleanup never runs and **no** screen saves an offset.
-- **On completion, the check is:** the system back gesture on the S25, which is the gesture BF-100 was reported
-  **Not a `Verify:` field — this is unbuilt.** Confirmed 2026-09-10 (OR-105): `app/nutrition/nutrition-content.tsx` contains no scroll-restoration reference at all.
-  A `Verify:` files unbuilt work under "shipped; nothing is blocked", where nobody looks for it.
-  against and the one the harness cannot send.
+- **Verify:** device — the **system back gesture** on the S25, which is what BF-100 was reported
+  against and the one gesture the harness cannot send. It is a `Verify:` now rather than the note
+  below, because the work is built: that note was correct while it was unbuilt (OR-105, 2026-09-10),
+  since a `Verify:` files unbuilt work under "shipped; nothing is blocked" where nobody looks for it.
+- **✅ SHIPPED 2026-09-11** (`fix/rv-36-nutrition-scroll-restoration`).
+  [Journal](overview/entries/2026-09-11-fix-nutrition-scroll-and-day-padding.md). One hook call on
+  the tab's own scroller, the `/nutrition` → `/coach` → back case added to
+  `e2e/scroll-restoration.spec.ts` — **confirmed red with the fix stashed**, failing on the
+  precondition (`Received string: "{}"`, nothing saved) rather than the ambiguous
+  `expected 840, received 0` that file's header warns about — and BF-100's wrong phrasing removed
+  from `pull-to-sync.tsx`'s own comment, not only from its entry.
 
 ### [app-shell][platform] RV-37 — `/health/day` scrolls with no bottom padding (structural; NOT observed)
 
@@ -3323,6 +3336,16 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
   with the gesture bar is a defect by CLAUDE.md's own rule, which treats even bare `pb-safe` as too
   little. The control on `/more` measures `padding-bottom: 68px` (`pb-nav-safe`) and is the shape to
   match. Fix it, then look — a device check belongs after this one, not in front of it.
+- **Verify:** device — **and it is still NOT observed.** The container now carries `pb-nav-safe`;
+  whether the symptom was ever visible needs a day with enough logged to make it scroll, which the
+  seeded fixture cannot produce (it renders *"Nothing logged on this day"*).
+- **✅ SHIPPED 2026-09-11** (`fix/rv-36-nutrition-scroll-restoration`, same PR as RV-36 — one device
+  pass covers both). [Journal](overview/entries/2026-09-11-fix-nutrition-scroll-and-day-padding.md).
+- **Keep: the fifth-CI-rule question, which is the part that genuinely needed evidence.** No existing
+  safe-area rule fires on an **absent** utility, only on a wrong one. A check for "full-height
+  scroller with no bottom pad" still wants an allow-list for the sheets and navless full-screens that
+  legitimately carry none, and that list should be drawn after the device says whether this class is
+  worth a rule at all.
 - **On completion, the device check is:** open `/health/day` on the S25 on a day with enough logged to
   make the container scroll, and confirm the last card clears the gesture bar.
 - **Still open, and still needing evidence first:** whether to add a fifth Custom Rules check for

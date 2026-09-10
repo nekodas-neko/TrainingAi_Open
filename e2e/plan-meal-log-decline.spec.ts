@@ -186,8 +186,11 @@ async function openPlanMeals(page: Page): Promise<void> {
   await expect(page.getByText('LB-51 answer fixture')).toBeVisible({ timeout: 60_000 })
   // A real touch, never `.click()`: the Nutrition screen's date-swipe `useDrag` binds mouse and
   // pointer and swallows the click, so a forced click leaves `aria-expanded` at `false` (Q-354).
+  // Not `scrollIntoViewIfNeeded()` — see `tapRowButton` below for the carousel half, and
+  // `plan-meal-to-saved-meal.spec.ts` for the bottom-nav half. The same two hazards apply to this
+  // toggle; it is only luck that this file's fixture leaves it higher up the page.
   const toggle = page.getByRole('button', { name: /Show 2 meals/ })
-  await toggle.scrollIntoViewIfNeeded()
+  await toggle.evaluate(el => el.scrollIntoView({ block: 'center', inline: 'nearest' }))
   await tapCentre(page, toggle)
   await expect(page.getByRole('button', { name: /Hide meals/ })).toBeVisible({ timeout: 30_000 })
 }
