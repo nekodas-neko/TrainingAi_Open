@@ -602,6 +602,7 @@ below threshold and left in place for next time.
   already read does not get rewritten silently.
 
 ### [heart-rate][cardio] TN-30 — one zone model, four max-HR anchors: the walk, the zone bar and the Body Battery grade the same heartbeat against three different ceilings
+- **Lane:** A — engine only: packages/shared, lib/health.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · owner: *"we should only have one calculation for our heart rate zones so try make them consistent."*
 - **Lane: A** — `packages/shared/src/health/observed-hr.ts:110` (`resolveMaxHr`), `health/hr-profile.ts:86` (`targetAnchorMax`), `health/body-battery-inputs.ts:51` (`resolveBatteryHrMax`), `health/hr-zones.ts:9` (`hrMaxFromAge`), plus `lib/health/readiness-payload.ts:397`.
@@ -709,6 +710,7 @@ from it; and a test asserts the walk's fast target equals the Zone-2 floor **bec
 anchor, not by arithmetic coincidence.
 
 ### [cardio] TN-31 — split the interval JOG out of Guided Walk into a Run type; a walk and a jog are two sessions, not two speeds
+- **Lane:** A — both (2 engine, 3 surface) → A, engine half first.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · owner: *"these should be 2 different options then… if we are doing jogging it should fall under the Run category in cardio… Run could consist of that interval Jog as a style; whereas the walk is more a walk."*
 - **Lane: B** — `components/cardio/modality-picker.tsx` (the three-way picker), `components/guided-walk/**`, `app/running/**`. **Lane A** for `packages/shared/src/running/hr-targets.ts` if a new run type is added.
@@ -766,6 +768,7 @@ phase the owner reaches; and TN-25's three options no longer need answering, bec
 is claiming to be both.
 
 ### [cardio][heart-rate] TN-32 — three user-facing surfaces describe zones in a model the engine does not use
+- **Lane:** A — both (2 engine, 1 surface) → A, engine half first.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · found in the zone audit TN-30 came out of.
 - **Lane: B** — `packages/shared/src/running/frameworks/zone2-base.ts:6`, `frameworks/norwegian-4x4.ts:6`, `app/health/heart-rate/page.tsx:69-72`, `packages/shared/src/health/session-picker.ts:85`.
@@ -848,6 +851,7 @@ moving, which is the failure mode BF-134 was filed about on the same screen.
 - **Reversal cost:** low — a window filter plus a status string. No stored value changes.
 
 ### [nutrition] TN-29 — the app measures this owner's activity factor at 1.41 and then accepts a maintenance implying 1.67, because nothing cross-checks the two estimates it already computes
+- **Lane:** A — engine only: packages/shared, lib/health.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · owner: *"I wonder if we could estimate the activity level value or tune how we do ours."*
 - **Lane: A** — `packages/shared/src/nutrition/adaptive-tdee.ts` (`estimateMaintenance`, the `minMaintenanceKcal` floor), fed from `lib/health/energy-balance-service.ts:236-260` where both estimates already sit in scope.
@@ -947,6 +951,7 @@ back near 1,895, and no accepted estimate implies an activity factor above ~1.55
 movement stays near 280 kcal/day.
 
 ### [nutrition] TN-27 — the maintenance estimator rejects its reliable window and falls back to its noisiest one, and the owner is shown 2,245 kcal instead of ~1,700
+- **Lane:** A — engine only: packages/shared, lib/health.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · owner: *"this is the maint calories derived from the app — i don't think it's right. with RMR at 1350 and calories well under that and barely maintaining weight."*
 - **Lane: A** — `packages/shared/src/nutrition/adaptive-tdee.ts` (`MIN_LOGGED_FRACTION`, `resolveMaintenance`), consumed by `lib/health/energy-balance-service.ts:260`.
@@ -1015,6 +1020,7 @@ this card offers to overwrite with 2,045.
 1,850, and lengthening the window by a fortnight moves it by less than 100 kcal.
 
 ### [nutrition] TN-28 — the one card that can act on the maintenance estimate is the one that hides how good it is
+- **Lane:** B — surface only: components/nutrition.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · found while answering TN-27.
 - **Lane: B** — `components/nutrition/tdee-adaptation-card.tsx:118-124`.
@@ -1038,6 +1044,7 @@ qualifier the siblings show, on the surface where it costs something to be wrong
 maintenance figure, matching the wording already on the energy card.
 
 ### [cardio][heart-rate] TN-26 — the walk prescribes a control that means something different on every surface; prescribe heart rate and record the rest
+- **Lane:** A — both (1 engine, 2 surface) → A, engine half first.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-08 · owner: *"let's not tune to the treadmill — like you said it changes based on location, what do you suggest we do?"*
 - **Lane: A** — `lib/walk/walk-pacer.ts:66` (cadence targets), `components/guided-walk/walk-active.tsx:67-68` (HR targets), `components/guided-walk/walk-summary.tsx:141-146` (what is stored).
@@ -1086,6 +1093,7 @@ reports fast-block compliance and interval contrast for the session, and both nu
 between a treadmill walk and an outdoor walk without any surface-specific adjustment.
 
 ### [cardio][heart-rate] TN-25 — the guided walk's fast target has never been met in 44 attempts, and the live pacer says "push" every time
+- **Lane:** A — both (1 engine, 1 surface) → A, engine half first.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-08 · owner: *"what makes it effective is the 2 speeds — should I be walking faster or slower during any phases?"*
 - **Lane: A** — `components/guided-walk/walk-active.tsx:67-68` sets the targets; `classifyZone` in `hr-zones.ts` renders the verdict.
@@ -1532,6 +1540,36 @@ why `nutrition-sheet-surface.spec.ts` passes. Whatever the cause, it is specific
   overlay difference against the `My Foods` trigger is the obvious first place, and the fact that
   `el.click()` works rules out most of the alternatives.
 - **Reversal cost:** nil. A test helper and a note.
+
+### [platform] OR-106 — the `Lane:` field is at 95% and the gap is all shipped residue
+
+- **Lane:** O — reading the queue and editing entries. Neither implementer's paths.
+- **Added:** 2026-09-10 by Orchestrator. **Branch:** unassigned.
+- **⚠ This entry replaces a WRONG one filed hours earlier in the same PR, which claimed 90 entries
+  had no lane. The real number is 16 of 340.** The 90 came from a throwaway regex, `/\*\*Lane:?\*\*/`,
+  which requires the colon *outside* the bold. Many entries write `- **Lane: A**` with it inside, and
+  `scripts/lib/lane.js` — whose whole job is reading both forms — handles that correctly. The scratch
+  script disagreed with the shipped parser and the scratch script was wrong. **Measure with
+  `laneFromLines()`, never with a fresh regex.**
+
+**None of the 16 is startable work.** Nine are `Verify:` (shipped, a device look owed), one is a
+`Keep:`, one is `Reference:`, and five are parked:
+
+> VERIFY — BF-104 · BF-103 · BF-101 · BF-99 · BF-100 · LA-45 · BF-64 · BF-53 · Q-187
+> KEEP — BF-83 · REFERENCE — Q-253 · PARKED — Q-297 · Q-254 · Q-147 · Q-48 · Q-551
+
+So the lane field is doing its job and **there is no lane backlog to work.** Coverage by month added
+is **96% (August) and 94% (September)** — flat, not degrading, so nothing is leaking either.
+
+**What is genuinely worth doing, and it is small:** a lane on a `Verify:` entry costs nothing to add
+and settles who owns the follow-up if the device check fails. Do it when each entry is next touched,
+not as a sweep — a sweep here would be nine edits to buy nothing.
+
+**What NOT to do.** Do not add a CI rule requiring a `Lane:` on every entry. At 95% the rule would
+fire almost only on shipped residue, where the field is least useful, and the one real risk — a lane
+that is *wrong* — is already covered by `laneDrift` and the batch-mixing check.
+
+- **Reversal cost:** nil. Nothing here changes a queue field.
 
 ### [platform] OR-105 — 17 more entries may be filed as shipped without having been built
 
@@ -2466,22 +2504,54 @@ present.
 - **Not urgent, and small.** Nothing is broken; the Lint job passes on warnings today and would keep
   passing. This is about whether the output can be read at all.
 
-### [app-shell] PS-35 — five zero-content pages, a wrong PWA start_url, and boot-time paper cuts
+### [app-shell] PS-35a — five zero-content redirect/duplicate pages, to delete or keep
 
-- **Lane:** B — `app/{workout-select,session-select,stats,config,profile}/page.tsx`,
-  `app/manifest.ts:8`, `lib/background/pathname-routing.ts:44-45`, `components/sync-provider.tsx:99`,
-  `lib/stores/workout-store.ts:438`, `components/weather-chip.tsx:26`, `lib/weather/use-weather.ts:9,52`.
-  **Gate:** owner for the page deletions.
+- **Lane:** B — `app/{workout-select,session-select,stats,config,profile}/page.tsx`, ~10 call-site edits.
+- **Gate:** owner — deleting a page the owner may still navigate to is theirs to approve, and that is
+  the ONLY part of the original PS-35 that was ever gated.
 - **Added:** 2026-09-06, app checkpoint — [report](reviews/2026-09-05-app-checkpoint.md) §4/§P2.
+  **Split from PS-35 on 2026-09-10 (OR-106).**
+- Five pages with no content of their own: each redirects or duplicates a tab. ≤4 in-repo callers
+  each; full table in the report.
+- **What the owner decides:** delete them, or keep them as bookmarkable aliases. Deleting is the
+  recommendation — an alias nobody links to is a route that can rot — but a PWA shortcut or a browser
+  bookmark pointing at one would break, which only the owner can know.
+- **Reversal cost:** low. Restoring a deleted redirect page is a few lines.
 
-Delete the five redirect/duplicate pages (≤4 in-repo callers each; ~10 call-site edits; full table
-in the report); point `manifest.ts` `start_url` somewhere real (`/session-select` redirects a PWA
-launch to the Workout tab); drop the two unreachable palette keys. Boot: the Phase-3 warm re-fetches
-home's three heaviest requests because `warmCache` uses bare `fetch` and cannot see `cachedFetch`'s
-in-flight map (measured ×2 on Fast-3G); `applyRehydrateFixups(state, null, …)` makes the
-"abandon a previous-day workout" branch dead against its own E1-4 comment; the weather chip pulses
-forever with no failure state, and the weather cache is one unkeyed entry returned before
-coordinates are read (a moved device shows the old location for 30 min).
+### [app-shell] PS-35b — a wrong PWA start_url, a doubled boot fetch, a dead branch and a stuck weather chip
+
+- **Lane:** B — `app/manifest.ts:8`, `components/sync-provider.tsx:99`, `lib/stores/workout-store.ts:438`,
+  `components/weather-chip.tsx:26`, `lib/weather/use-weather.ts:9,52`.
+- **Added:** 2026-09-06, app checkpoint — [report](reviews/2026-09-05-app-checkpoint.md) §4/§P2.
+  **Split from PS-35 on 2026-09-10 (OR-106).**
+- **⚠ Split out because a `Gate: owner` covering only the page deletions was parking all four of
+  these.** `next-item.js` reads `Gate:` as a property of the whole entry — it cannot see a gate that
+  prose scopes to one paragraph — so four ungated fixes sat in PARKED behind a decision none of them
+  needs. That is the same "a label that lives only in prose" defect the `Lane:` field exists for.
+  **None of the four below is gated on anything.**
+
+**① `start_url` points at a redirect.** `manifest.ts` sends a PWA launch to `/session-select`, which
+redirects to the Workout tab — so every install-icon launch pays a redirect. Point it somewhere real.
+
+**② The Phase-3 warm re-fetches home's three heaviest requests.** `warmCache` uses bare `fetch` and
+so cannot see `cachedFetch`'s in-flight map; **measured ×2 on Fast-3G**. The fix is to warm through
+`cachedFetch` so the in-flight map dedupes — per CLAUDE.md, client GETs of `/api/*` go through
+`cachedFetch`, never bare `fetch`, and this is that rule with a measurement attached.
+
+**③ A dead rehydrate branch.** `applyRehydrateFixups(state, null, …)` makes the "abandon a
+previous-day workout" branch unreachable, against its own E1-4 comment. Either pass what the comment
+says it passes, or delete the branch — but the two must stop disagreeing.
+
+**④ The weather chip pulses forever, and its cache is unkeyed.** No failure state, so a failed fetch
+is an eternal skeleton — the Q-499 shape, where `cachedFetch` swallows `!res.ok` unless the caller
+passes `onError`. Separately the weather cache is **one unkeyed entry returned before coordinates are
+read**, so a moved device shows the old location for 30 minutes. Key it by rounded coordinates.
+
+- **Also here:** drop the two unreachable palette keys named in the report.
+- **Reversal cost:** low throughout. No data, no migration.
+
+- **On completion, the device check is:** launch from the installed icon and confirm it lands without
+  a redirect flash; and confirm the weather chip resolves or shows a failure state rather than pulsing.
 
 ### [cardio] PS-36 — sex='other' silently halves VO2max, best pace has no distance floor, and WHO minutes have three mappings
 
@@ -2939,7 +3009,6 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
 ### [app-shell][platform] RV-37 — `/health/day` scrolls with no bottom padding (structural; NOT observed)
 
 - **Lane:** B — `app/health/day/day-detail-content.tsx:226`
-- **Gate:** device
 - **Added:** 2026-09-03, Review sweep 41 —
   [`write-up §4`](reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md)
 - The container is `flex-1 space-y-4 overflow-y-auto scrollbar-hide px-4 pt-4` — no `pb-*` at all. It
@@ -2953,9 +3022,18 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
   element). None fires on an **absent** one. Worth considering a fifth rule, but only after the device
   confirms the symptom — a check for "full-height scroller with no bottom pad" would need an
   allow-list for the sheets and navless full-screens that legitimately have none.
-- **How to confirm the symptom:** open `/health/day` on the S25 on a day with enough logged to make
-  the container scroll, and check whether the last card clears the gesture bar. The `Gate: device`
-  above is exactly that — nothing here can start until the device says the symptom is real.
+- **The `Gate: device` was removed 2026-09-10 (OR-106), and the fifth-CI-rule question is what it
+  really guarded.** Two questions were being answered as one. *"Should a fifth safe-area rule exist?"*
+  genuinely needs evidence — it would need an allow-list for the sheets and navless full-screens that
+  legitimately carry no bottom pad, and that stays gated below. *"Should this one container have
+  bottom padding?"* does not: the absence is read from source, and a full-height scroller ending flush
+  with the gesture bar is a defect by CLAUDE.md's own rule, which treats even bare `pb-safe` as too
+  little. The control on `/more` measures `padding-bottom: 68px` (`pb-nav-safe`) and is the shape to
+  match. Fix it, then look — a device check belongs after this one, not in front of it.
+- **On completion, the device check is:** open `/health/day` on the S25 on a day with enough logged to
+  make the container scroll, and confirm the last card clears the gesture bar.
+- **Still open, and still needing evidence first:** whether to add a fifth Custom Rules check for
+  "full-height scroller with no bottom pad". Do not add it off the back of this one fix.
 
 ### [nutrition] BF-109 — the Review sheet's macro/calorie cross-check (shipped; a real scan and the device owed)
 
@@ -8353,6 +8431,7 @@ signed off by the owner in that conversation. Review:
   filed independently for the same red; folded here rather than kept as a fourth duplicate.*
 
 ### [readiness][devices] TN-8 — the chronic-stress fever mask is a FOURTH consumer of the broken temperature baseline
+- **Lane:** A — engine only: packages/shared.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-25 · found by the threshold sweep the owner asked for
@@ -8417,6 +8496,7 @@ Review: [`docs/reviews/2026-08-25-threshold-sweep.md`](reviews/2026-08-25-thresh
   ~half the nights negative; `temp_dev_c > 1.0` on 0 nights (TN-8); biomarker table re-measured,
   since every z moves ~19× and the radar may then fire too often (Q-506).
 ### [readiness] TN-9 — readiness moves when the check-in is logged; the owner wants it final on first open
+- **Lane:** A — engine only: packages/shared.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-26 · owner instruction: *"we shouldn't have readiness move the number — the numbers should be fully set on first open/load."*
@@ -8502,6 +8582,7 @@ apart with no new overnight data — which the check-in half alone does not achi
   redundant. It is worth keeping and using elsewhere.
 
 ### [sleep] TN-23 — `hrv` and `hr` are the same autonomic event scored twice, for 25% of the sleep score
+- **Lane:** A — engine only: packages/shared.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-03 · owner: *"why would sleep score be so low for this? I'd imagine 80s if not 90s"*
 - **Lane: A** — `packages/shared/src/health/sleep-score.ts`, `SLEEP_WEIGHTS`.
@@ -8540,6 +8621,7 @@ the 63 is the double count.
 combined weight above ~18 of 110; and the 2026-09-02 night's blend rises by 5–8 points, not 8.
 
 ### [sleep] TN-10 — `TOTAL_SLEEP`'s comment and its curve disagree by ~15 points, on the heaviest contributor
+- **Lane:** A — engine only: packages/shared.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-26 · found while explaining a 57 on a 7.75 h night
@@ -8580,6 +8662,7 @@ make a good night *"land in the 80s"*, which the curve does and the comment does
 test asserts the sub-score at 7.6 / 8.0 / 9.0 h so they cannot drift apart again.
 
 ### [activity][heart-rate] TN-11 — "moved this hour" is really "the ring recorded something this hour": 99.8% of waking hours qualify
+- **Lane:** A — engine only: packages/shared, lib/health.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-26 · owner asked how move hours are tracked and whether sleep is counted
@@ -8659,6 +8742,7 @@ spread with a median in the 50–85 band and at least 20% of days below 70; and 
 called with the night's real wake/sleep hours, asserted by a test.
 
 ### [activity] TN-12 — there is no way to see hourly movement, and the one surface that exists is pinned at full
+- **Lane:** B — surface only: app/health, components/body-battery.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-26 · owner request: *"id like to see something for it to make sure there is moment every hour"*
@@ -8691,6 +8775,7 @@ like the feature works and would quietly teach the owner to ignore it.
 the day's move-hours total is below the goal.
 
 ### [heart-rate] TN-13 — the HR tile shows a 7-day average of the one signal that best predicts how the owner feels
+- **Lane:** A — engine only: packages/shared.
 
 - **Verify:** device
 > **✅ SHIPPED 2026-08-30, both halves together — which the entry required.** The tile reads **last
@@ -8747,6 +8832,7 @@ night — 2.5× the nightly resting HR — which makes it the better **stress** 
 intuited, but nothing in the app computes it and it does not belong on a tile labelled "Heart Rate".
 
 ### [activity] TN-17 — Activity as a pace-to-goal score: the mechanic works, the goals make it punishing
+- **Lane:** A — engine only: packages/shared.
 
 - **Branch:** _unassigned_ · **Added:** 2026-08-26 · owner design: *"from wakeup you start close to 100; then as time goes on it lowers unless you do all parts of what's needed"*
 - **Lane: A** — the score is computed server-side in `packages/shared/src/health/activity-score.ts`
@@ -8953,6 +9039,7 @@ its consumers re-checked), and after that `stress_high_minutes` no longer correl
 count at |r| > 0.4.
 
 ### [readiness][body][app-shell] TN-19 — the Body Battery explainer promises five mechanisms; four are inert or backwards
+- **Lane:** B — surface only: components/body-battery-card.tsx.
 
 - **Branch:** _unassigned_ · **Added:** 2026-08-31 · owner, second report on this pillar in six days: *"any work being done for this? still not very usable"*
 - **Lane: A** — the defect is in the model, not the card. `components/body-battery-card.tsx` is Lane B and **should not be touched for this**.
@@ -9051,6 +9138,7 @@ data density — was **tested and refuted** (r = −0.128 vs HR sample count). N
 established. Until one is, this stays parked.
 
 ### [readiness] TN-18 — TN-6a's suspension covers the readiness ladder but NOT the deload banner, which is the one the owner sees
+- **Lane:** A — engine only: packages/shared.
 
 - **Keep — FIXED 2026-08-31; what is owed is the owner seeing a quiet morning.** `computeDeloadStrength`
   now takes a `temperatureTrusted` flag and the adapter computes it with `isTemperatureBaselineCentred`
@@ -9109,6 +9197,7 @@ same object and cannot fire at all while the sd is 12× too wide.
 count night for night.
 
 ### [readiness] TN-6a — suspend the temperature penalty until its baseline is centred
+- **Lane:** A — engine only: lib/health.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner decision, asked and answered plainly
@@ -9146,6 +9235,7 @@ behaviour, and TN-6's own pass test (deviation mean within ±0.05 °C of zero) i
 - **Keep:** a **suppression, not a fix** — TN-6 retires it (its ±0.05 °C pass test is what does), and
   nothing was observed in production.
 ### [readiness][devices] TN-6 — the temperature baseline is 0.36 °C too low, so readiness carries a −16 pt penalty on 89% of days
+- **Lane:** A — engine only: lib/health.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner report with screenshot — *"its often triggering deload days. its not trustable yet."*
@@ -9249,6 +9339,7 @@ permanently-positive deviation cannot tell illness from baseline error.
 Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/2026-08-24-readiness-temperature-penalty.md).
 
 ### [readiness][heart-rate] TN-2 — the Body Battery charge window has closed, so the tank only drains
+- **Lane:** A — engine only: packages/shared, app/api.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner report + production measurement
@@ -9367,6 +9458,7 @@ one — the "treadmill" the activity-goal volume lane already removed (Q-190).
     returns the four pass-test numbers per offset. **That is new work and is not scoped here.**
 
 ### [readiness] TN-3a — the per-bucket daytime-stress series is computed and thrown away
+- **Lane:** A — engine only: lib/oura-ble.
 
 > **✅ THE PERSISTENCE HALF SHIPPED — verified in production 2026-08-26.**
 > `oura_daytime_stress_buckets` exists (migrations **212** and **213**) and is writing: **69 rows
@@ -9448,6 +9540,7 @@ record explicitly why not.
   3. **TN-3b is still blocked on a back-fill existing**, not merely on the table existing.
 
 ### [readiness] TN-3b — surface stress by hour, and on the HR charts
+- **Lane:** B — surface only: components/body-battery.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner request
@@ -9469,6 +9562,7 @@ today", inside the Body Battery card. The owner did not know it was there, so **
 part of this entry**, not only new surfaces.
 
 ### [sleep] TN-5 — the sleep calibration's gain varies 8-fold, so the same real improvement is worth 4 points or 0.5
+- **Lane:** A — engine only: packages/shared.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner report *"the scores have been very varied lately"*
@@ -9528,6 +9622,7 @@ same 41 nights within ±2 of 87.0 and **not above it**; `LOW_SLEEP_SCORE` firing
 Review: [`docs/reviews/2026-08-24-sleep-score-volatility.md`](reviews/2026-08-24-sleep-score-volatility.md).
 
 ### [readiness][platform] TN-4 — /api/body-battery threw 31 × 500 for ten hours, then stopped on its own
+- **Lane:** A — engine only: app/api, lib/data.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · found on the session-start `error_events` read
