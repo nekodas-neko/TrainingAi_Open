@@ -47,9 +47,15 @@ D5 regression against Oura's original. Removing it is a D7 decision, not a sweep
 `computeDaytimeStress` (the ONNX path) is called only by
 `buildDaytimeStressSeries`, and **`buildDaytimeStressSeries` has no caller** — both production sites
 (`adapter.ts`, `app/api/body-battery/route.ts`) use `buildDaytimeStressSeriesFromModel`, D5's own
-fitted regression. Deleting the import, the ONNX file and the dead functions removes one Oura
+fitted regression. ~~Deleting the import, the ONNX file and the dead functions removes one Oura
 dependency at zero product cost. It is the cheapest row here and should ship first, because it also
-*proves the audit method* on a low-risk module.
+*proves the audit method* on a low-risk module.~~
+
+**Struck 2026-09-09** — it contradicted the correction directly above it, and left in place it was
+the half a reader acts on: a ⚠️ note saying "do not do this" followed by a paragraph saying "do this
+first" resolves in favour of whichever the reader reaches. The call-graph finding stands; the
+conclusion drawn from it does not. Production-unreachable is what the retention *is*, not evidence
+against it, and the golden test is the thing being retained. **D7 decides this.**
 
 ---
 

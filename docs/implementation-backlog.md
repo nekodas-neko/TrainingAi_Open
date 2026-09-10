@@ -18186,8 +18186,14 @@ that path with our own regression they are reached from **tests alone**. But tha
 `docs/oura-ondevice-hybrid-implementer-progress.md` both record that the ONNX path *"stays
 golden-tested but unreachable from production **until D7**"*, and that golden test is what pins our
 D5 replacement against Oura's original. Deleting it now discards the validation while the replacement
-is still young. **Decide as part of D7, not as a sweep.** The "deletable today" wording has been
-corrected in the three docs that carried it.
+is still young. **Decide as part of D7, not as a sweep.** ~~The "deletable today" wording has been
+corrected in the three docs that carried it.~~ **Amended 2026-09-09: it had not been.** Three live
+copies survived until today — Q-31's own headline bullet, `docs/domains/platform/README.md`, and the
+triage plan itself, where the correction was appended as a note *above* the paragraph it corrected
+and the paragraph still said the row "should ship first". All three are struck now.
+**The lesson is about the shape of the fix, not the count:** a correction placed beside the text it
+corrects leaves both readings live, and a reader following the queue top-down acts on whichever they
+reach first. Strike the wrong sentence; do not annotate it.
 
 **2. Two BDI weight files have no loader.** `onnx/sleepnet_bdi_0_3_0_core.onnx` and
 `sleepnet_bdi_0_4_0_core.onnx` (plus their constants) are never named by a `MODEL_FILE` — BDI is
@@ -18770,8 +18776,15 @@ Plan: [`docs/superpowers/plans/2026-07-30-d8-own-resilience-and-energy-constants
 > task order. Headlines:
 >
 > - **`inference/dhrv` is dead code** — `buildDaytimeStressSeries` has no caller (both production
->   sites use D5's own `buildDaytimeStressSeriesFromModel`). One Oura dependency deletable today at
->   zero product cost.
+>   sites use D5's own `buildDaytimeStressSeriesFromModel`). ~~One Oura dependency deletable today at
+>   zero product cost.~~ **✅ STRUCK 2026-09-09 — do not delete it, and this bullet was the last live
+>   copy of a claim corrected on 2026-08-02.** Production-unreachable is what the retention *is*, not
+>   evidence against it: `module-map.md` and the on-device progress doc both record that the ONNX path
+>   *"stays golden-tested but unreachable from production **until D7**"*, and that golden test is what
+>   pins D5's own regression against Oura's original. Deleting it discards the validation while the
+>   replacement is still young. Same conclusion as **Q-50 item 1**, which reached it independently and
+>   also defers to D7. The triage plan carried the correction as a note *above* the paragraph it
+>   corrected, leaving both readings live; the paragraph is struck there now too.
 > - **The MET table leads the replacements** and is nearly free: `daily-energy.ts` already
 >   documents its source as the public Compendium of Physical Activities, so this is re-sourcing
 >   the same numbers, not deriving new ones.
