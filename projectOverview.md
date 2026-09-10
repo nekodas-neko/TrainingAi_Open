@@ -5052,37 +5052,6 @@ The review's own architecture lens (Lens F) is shallower than the rest, and **"w
   `needsRegenerate: true`) and a sweep for how many other users/sessions are currently serving an
   expired prescription. See Q-229.
 
-### [workouts] 🔴 A stray pre-Q-115 deload log is still poisoning one exercise's prescribed weight (Q-228, 2026-08-14)
-
-- **Live, currently affecting the owner's in-progress workout.** Today's Incline Bench Press
-  prescription (Intensification phase) showed **72.5 kg** (83% of an 86.25 kg "1RM"), against a
-  genuine recent working weight of 62.5 kg × 6-7 reps at 80% (2026-07-30) — an unearned ~11 kg
-  overload the owner caught before loading the bar and reported live.
-- **Root cause: Q-115's own corrective migration (`168_q115_whole_session_deload_pr_correction.sql`,
-  2026-08-07) fixed 4 of the 5 exercises corrupted by the 2026-08-06 whole-session-deload bug, and
-  missed the 5th.** All 5 exercises logged in that one corrupted session still show
-  `exercise_deloaded = true`; the migration zeroed `estimated_1rm` on 4 of them (Overhead Press,
-  Skull Crusher, Preacher Curl, Pulldown) but Incline Bench Press — exercise 1 of that same session,
-  logged 21:41 UTC, just before the migration's audited 21:47-22:09 window — was never touched, and
-  still carries the original inflated `estimated_1rm: 85.75`. Confirmed directly against production
-  via the read-only admin endpoint, not inferred.
-- **Deeper structural gap this exposed: `getLastRealOneRmBatch` (`lib/data/postgres/adapter.ts`)
-  never filters on `exercise_deloaded`.** It picks the most recent log with `estimated_1rm > 0`,
-  relying entirely on the write-time invariant that a deloaded set always stores `estimated_1rm = 0`
-  — an invariant this exact row already disproves. The sibling query `reconcilePersonalRecord` in
-  the same file explicitly filters `eq(exerciseLogs.exerciseDeloaded, false)` "mirrors
-  shouldCountTowardPr's per-exercise deload gate" — `getLastRealOneRmBatch` is the one query in this
-  family missing that same defensive filter, so any future write-time regression (or any other
-  straggler like this one) silently poisons the very next prescription for that exercise, for every
-  user, with no read-time backstop.
-- **Scope, confirmed for the owner's account**: exactly one row (`exercise_logs` id
-  `c4e3d87d-b357-4f08-8910-dfe3462611ca`) currently has `exercise_deloaded = true AND
-  estimated_1rm > 0` — this is not an ongoing leak, just one missed straggler plus a real gap in the
-  defense that let it leak into today's prescription. See Q-228 for the fix (read-time filter + a
-  Q-115-style corrective migration for this one row).
-- **Not yet done**: the code fix and the corrective migration — this is the live-investigation
-  finding, queued for an implementer session.
-
 ### [devices][platform] ⚠️ The step-decoder table now loads over the network — NOT device-verified (Q-221, 2026-08-13) · needs: browser
 
 `steps_motion_decoder_2_0_0`'s dequantisation table used to be bundled, so it was always present.

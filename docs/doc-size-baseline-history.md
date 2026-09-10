@@ -10655,11 +10655,57 @@ been typed by hand since LA-99 shipped, which is four merges now. Resurrection c
 comparing entry BLOCKS against `git show origin/main:…` — LA-87 and LA-88 stayed removed, BF-137
 survived, and LA-89 kept the `Gate: owner` this branch adds.
 
-## 2026-09-10 — `docs/implementation-backlog.md` 20321 → 20281 (LA-96, #TBD)
+## 2026-09-10 — `docs/implementation-backlog.md` → 20410 (OR-106, the queue sweep)
+
+Eighty-nine lines, and most of them are one entry becoming two. PS-35 carried `Gate: owner for the
+page deletions` — a gate prose scoped to one paragraph of five, which `next-item.js` can only read as
+a property of the whole entry, so four ungated fixes sat in PARKED behind a decision none of them
+needed. Splitting into PS-35a (the gated deletions) and PS-35b (the four) duplicates the header and
+provenance, which is the cost of making the gate mean what it says. The rest is 25 one-line `Lane:`
+tags and the OR-106 entry recording the 90 still untagged. Re-measured after merging `main`,
+which raised the same baseline in parallel — a raise computed before the rebase is a guess.
+
+Six more lines than the first attempt, because OR-106 was **rewritten after its own number turned out
+to be wrong**: it claimed 90 entries had no lane, from a scratch regex that missed the `**Lane: A**`
+form; the real figure is 16 and none of them is startable work. The replacement is longer than the
+claim it retracts, because a retraction that does not say how the measurement failed invites the same
+measurement again.
+
+## 2026-09-10 — `docs/implementation-backlog.md` → 20458 (OR-107, the journal ceiling)
+
+Forty-two lines for one entry, and the length is almost all citation of work already done. OR-107
+proposes a fold that rewrites citations — the thing the entries README currently forbids doing
+carelessly, because a previous attempt broke 48 links across five distinct failure modes. The entry
+would be irresponsible at half the length: it has to point at those five traps by name, or the next
+session rediscovers them one `check-doc-links` run at a time, which is exactly how they were found.
+
+The numbers are in it because they decide the approach: 305 of 342 entries cited, 467 links across 30
+files, 194 of them in one regular form. Regular enough to script is the whole argument for scripting.
+
+## 2026-09-10 — `docs/implementation-backlog.md` 20458 → 20418 (LA-96)
 
 LA-96 shipped, so its 40-line entry left the queue. No other document moved.
 
-Written by `pnpm fix:baselines`. Resurrection check done the block way — compared the resulting
-entry blocks against `git show origin/main:docs/implementation-backlog.md` rather than reading
-diff markers: this branch's only backlog change is LA-96's removal, and nothing that earlier
-sessions removed came back.
+The first number this branch wrote was 20281, against a baseline of 20321, and both are now wrong:
+OR-106 and OR-107 landed on `main` while this was in flight and took the same baseline to 20458.
+Recomputed by `pnpm fix:baselines` **after** merging `main`, which is the only way the subtraction
+means anything — a baseline computed before the merge is arithmetic on a number that no longer
+exists.
+
+Resurrection check done the block way — compared the resulting entry blocks against
+`git show origin/main:docs/implementation-backlog.md` rather than reading diff markers. The merge
+of the backlog itself was clean; this branch's only change to it is LA-96's removal, and OR-106's
+PS-35a/PS-35b split and the 25 new `Lane:` tags all survived it.
+
+## 2026-09-10 — `projectOverview.md` 10564 → 10533 (LA-96, Q-228 struck)
+
+Thirty-one lines, all one Known Issue leaving. Q-228 is resolved on both halves — migration
+`186_q228_deloaded_log_1rm_straggler.sql` zeroed the straggler (verified in production today: the row
+is still there, un-deleted, reading 0) and LA-96 finished the read-time backstop across every
+remaining 1RM reader. Moved whole to `known-issues-resolved.md` rather than ticked in place, so the
+orientation read stays a list of what is open.
+
+Worth recording *why* it lingered: the entry's own text had gone stale in both directions. It said
+`getLastRealOneRmBatch` never filters on `exercise_deloaded` long after that filter shipped, and
+called it the one query in the family missing the filter when four others were. Nobody re-read it
+because it read as accurate.
