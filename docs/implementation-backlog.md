@@ -1354,42 +1354,6 @@ bigger setting.
 reports fast-block compliance and interval contrast for the session, and both numbers are comparable
 between a treadmill walk and an outdoor walk without any surface-specific adjustment.
 
-### [platform] LA-101 — a full test run fails with zero failing tests, twice in one session
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-10 · found twice while gating LA-87 and LA-96, not from a report.
-- **Lane: A** — test infrastructure (`vitest.config.ts`), no product code.
-
-`pnpm test` exits **1** while reporting `881 passed | 5 skipped` and `8287 passed, 0 failed`. The
-whole failure is one line:
-
-```
-EnvironmentTeardownError: [vitest-worker]: Closing rpc while "onUserConsoleLog" was pending
-This error originated in "lib/__tests__/hr-read-routes.test.ts"
-```
-
-A worker was torn down with a console-log RPC still in flight. Both sightings re-ran clean
-immediately after, on identical code.
-
-**Why this is worth an entry rather than a shrug.** CLAUDE.md already names the signature — *"1 test
-file failed with 0 failing tests — the tell that it is a hook, not an assertion"* — for the
-`migration-test-lock` case, and this is a second, different cause wearing the same clothes. It has
-now cost two investigations in one session, and the second only resolved quickly because the first
-had happened. A red gate that is not a red gate is the most expensive kind of flake: the honest
-response to it is to investigate, every time, until someone writes down which reds are real.
-
-**What to look at.** The originating file is incidental — it is whichever worker happened to be
-logging at teardown, and the run that fails is the one running alongside `check-comment-blindness`,
-which writes an unusually large amount of console output while injecting fixtures into real source
-files. Suspect the interaction rather than `hr-read-routes.test.ts` itself. Vitest's own issue
-tracker has this under worker teardown races; check whether the pinned version has a fix before
-reaching for `dangerouslyIgnoreUnhandledErrors`, which would hide real unhandled rejections too.
-
-**Do not fix this by quieting the console output** — that output is `check-comment-blindness` doing
-its job, and silencing it to make a race less likely is treating the symptom that is legible rather
-than the one that is broken.
-
----
-
 ### [cardio][heart-rate] TN-25 — the guided walk's fast target has never been met in 44 attempts, and the live pacer says "push" every time
 - **Lane:** A — both (1 engine, 1 surface) → A, engine half first.
 
