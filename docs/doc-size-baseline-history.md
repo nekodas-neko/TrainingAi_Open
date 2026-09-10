@@ -10670,3 +10670,14 @@ to be wrong**: it claimed 90 entries had no lane, from a scratch regex that miss
 form; the real figure is 16 and none of them is startable work. The replacement is longer than the
 claim it retracts, because a retraction that does not say how the measurement failed invites the same
 measurement again.
+
+## 2026-09-10 — `docs/implementation-backlog.md` → 20458 (OR-107, the journal ceiling)
+
+Forty-two lines for one entry, and the length is almost all citation of work already done. OR-107
+proposes a fold that rewrites citations — the thing the entries README currently forbids doing
+carelessly, because a previous attempt broke 48 links across five distinct failure modes. The entry
+would be irresponsible at half the length: it has to point at those five traps by name, or the next
+session rediscovers them one `check-doc-links` run at a time, which is exactly how they were found.
+
+The numbers are in it because they decide the approach: 305 of 342 entries cited, 467 links across 30
+files, 194 of them in one regular form. Regular enough to script is the whole argument for scripting.
