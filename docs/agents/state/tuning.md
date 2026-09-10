@@ -529,6 +529,24 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
 - **⚠ Coverage is 26.6 buckets/day — 13.3 of 24 hours** (range 23–32), with real holes: 2026-09-08
   jumps 06:45 → 13:15. **Any stress chart must render gaps as gaps**; a joined line invents stress
   that was never measured.
+- **✅ THE STRESS SERIES IS REAL SIGNAL; ITS DAILY SUMMARY IS NOT (TN-33 §8, 2026-09-10).** With no
+  external target available, the test that worked was **internal structure**: lag-1 autocorrelation
+  over 331 truly-adjacent 30-min pairs is **+0.637**, against a null shuffled *within each day's night
+  and day blocks* that maxes at **+0.454** over 2000 permutations, and the residual after removing
+  each day's night-mean and day-mean is still **+0.372**. **p < 0.0005.** The series contains episodes
+  lasting hours. **⚠ That proves there is something to look at, NOT that it is stress** — a persistent
+  artefact autocorrelates too.
+- **⚑ When there is no target to validate against, test the signal against ITSELF.** Autocorrelation
+  versus a permutation null needs no ground truth and took one query. **And shuffle within the
+  structure you already know about** — the naive within-day shuffle gave max +0.181 and would have
+  overstated the result, because the night/day split alone carries a lot of it.
+- **⛔⛔ THE STRESS-DELOAD OVERRIDE FIRES ON 83% OF DAYS (TN-34).** `ai-dynamic.ts:219` gates a deload
+  recommendation on `stressHighMinutes >= 120`: **15 of 18 days recomputed, 7 of 10 on stored values
+  since the fix.** A flag firing four days in five carries no information, and its input is the number
+  measured to carry no signal. **⛔ Do not raise the threshold** — the same file warns eleven lines
+  above about exactly that mistake on `TEMP_ALERT_THRESHOLD_C`, calling it the fourth in this pillar.
+  **This is the fifth.** Unwire it instead; the condition already falls through when derived stress is
+  null.
 - **The threshold is usually right and the input usually wrong** — Q-506, Q-512, Q-514, now TN-6.
   Check the input's distribution before touching any constant.
 - **Do NOT lift the sleep scale toward its old mean** — sleep/readiness agreeing is load-bearing for

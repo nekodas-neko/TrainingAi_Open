@@ -199,3 +199,56 @@ why §4's daily numbers carry no signal. **⚠ It does not follow that a waking-
 5. **Past days reachable**, back to 2026-08-24 (TN-3a's back-fill `Keep:` still stands).
 6. **⛔ No score, no verdict, no advice on this surface** — that is what makes it shippable while
    Q-507 is open, and what keeps it distinct from **TN-16**, which stays parked.
+
+---
+
+## 8. The verdict — the series is real, the daily number is not, and the daily number is what drives decisions
+
+**Owner, 2026-09-10:** *"so what was the verdict — is stress a real usable value?"*
+
+### The 30-minute series measures something real
+
+The one test available without an external target: **does the series have structure, or is it noise?**
+Across **494 buckets over 19 days**, using only pairs exactly 30 minutes apart (331 of them):
+
+| | lag-1 autocorrelation |
+|---|---|
+| **observed** | **+0.637** |
+| null, shuffled within each day (2000 permutations) | mean −0.022, **max +0.181** |
+| **null, shuffled within each day's night and day blocks separately** | mean +0.336, **max +0.454** |
+| **residual, after removing each day's night-mean and day-mean** | **+0.372** |
+
+**p < 0.0005 against both nulls.** The second null is the important one: it preserves the night/day
+pattern and destroys only the ordering *within* each block, so it rules out the possibility that all
+the structure is just "nights are calm, days are not". **Even after subtracting each day's own night
+and day means, consecutive half-hours still correlate at +0.372.**
+
+**So the series contains episodes — stress rises and falls in blocks lasting hours, well beyond
+chance.** That is a real, time-varying signal. **⚠ It does not establish that the signal is *stress*;
+a persistent artefact would autocorrelate too. It establishes that there is something to look at.**
+
+### The daily numbers do not
+
+**57% night, night systematically positive, `r = +0.072` with readiness over 18 days and the two
+halves pointing opposite ways** (§4, §7). A sleep-weighted average wearing a daytime label.
+
+### And the daily number is the half that is wired into decisions — see TN-34
+
+`ai-dynamic.ts:219` gates a **deload recommendation** on `stressHighMinutes >= 120`. Measured on the
+owner's data that fires on **15 of 18 days (83%)** recomputed, and **7 of 10 (70%)** on the stored
+values since the fix. **A flag that fires four days in five is the Q-504 failure class, live, on the
+surface that tells the owner whether to train.**
+
+### So: the verdict, in one line each
+
+- **The chart (30-min series): usable now, as an observation.** Build it — TN-3b. It has earned the
+  surface, and it is the only route to validating what the episodes mean.
+- **The daily scalar and `stress_high_minutes`: not usable.** Do not display them as a judgement, do
+  not trend them, and do not let them gate anything.
+- **The deload override: unwire it** until level 2 passes — TN-34, one line, reversible.
+- **Still unknown, and only the owner can close it:** whether the episodes match what he would call
+  stress. **That is what the chart is for.**
+
+**⛔ Do not read "the series is real" as "the metric works".** The honest position is that there is a
+genuine signal, its daily summary destroys it, and nobody has yet checked whether the signal means
+what the label says.

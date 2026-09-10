@@ -10632,7 +10632,7 @@ Fixed by the shared predicate rather than by a third patch.
 **No journal entry** — `docs/overview/entries/` is still at its 361 ceiling; LA-100 remains the
 blocker and is Gate: owner.
 
-## 2026-09-10 — backlog → 20422, `tuning.md` → 557: the stress status and the chart (TN-33, TN-3b)
+## 2026-09-10 — backlog → 20469, `tuning.md` → 575: the stress verdict (TN-33, TN-3b, TN-34)
 
 The owner asked for the state of the stress calculation. Two answers pointing opposite ways, and the
 second is why the entry cannot be short.
@@ -10673,3 +10673,22 @@ night positives cancel the day negatives — the chart is strictly more informat
 summarises. And the night/day split now replicates on **478 buckets** at 57% night, mean +0.266
 against the day's −0.405, matching TN-21's 230-bucket read. Coverage of 26.6 buckets a day against 24
 hours, with a real 6.5-hour hole on 2026-09-08, is what forces the "gaps stay gaps" constraint.
+
+The owner then asked for a verdict — *"is stress a real usable value?"* — and answering it needed one
+more measurement and produced one more entry.
+
+**The test that worked needed no external target: the signal against itself.** Lag-1 autocorrelation
+over 331 truly-adjacent 30-minute pairs is **+0.637**, against a null shuffled within each day's night
+and day blocks that maxes at **+0.454** over 2000 permutations, with a residual of **+0.372** after
+removing each day's night-mean and day-mean. The two-null structure is what earns the lines: the naive
+within-day shuffle maxes at +0.181 and would have overstated the result, because the night/day split
+alone carries much of it. **The series contains episodes lasting hours — real signal, though not proof
+it is stress.**
+
+**TN-34 is the finding that came out of asking what the unusable half drives.** `ai-dynamic.ts:219`
+gates a deload recommendation on `stressHighMinutes >= 120`, which fires on **15 of 18 days
+recomputed and 7 of 10 on stored values since the fix**. A flag firing four days in five carries no
+information, and its input is the number measured to carry none. The ⛔ line is the load-bearing part:
+the same file warns eleven lines above against raising `TEMP_ALERT_THRESHOLD_C` for the same reason
+and calls it the fourth instance in this pillar — **this is the fifth**, so the entry names it rather
+than repeating it.

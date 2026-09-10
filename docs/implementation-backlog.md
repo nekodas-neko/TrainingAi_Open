@@ -421,6 +421,53 @@ below threshold and left in place for next time.
 
 
 
+### [readiness] TN-34 — the stress-deload override fires on 83% of days, off the one number measured to carry no signal
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-10 · found answering the owner's *"is stress a real usable value?"*
+- **Lane: A** — `packages/shared/src/ai-periodization/ai-dynamic.ts:219-225`.
+- **Needs: TN-33** — the decision about what to do depends on whether the daily scalar gets restricted to waking hours or unwired; both are on that entry.
+- **Reference:** [`review`](reviews/2026-09-10-stress-status.md) §8.
+
+`ai-dynamic.ts:219` gates a **deload recommendation** on `stressHighMinutes >= 120`
+(`STRESS_HIGH_DAY_THRESHOLD_MIN`), returning `{ recommended: true, strength: 'recommended' }`.
+
+**Measured against the owner's actual data:**
+
+| basis | days over 120 min | share |
+|---|---|---|
+| recomputed from buckets, all hours | 15 of 18 | **83%** |
+| recomputed, waking only | 14 of 18 | 78% |
+| **stored values since the 2026-08-31 fix** | **7 of 10** | **70%** |
+
+**A deload flag that fires on four days in five carries no information** — it is the Q-504 failure
+class, live, in the surface that tells the owner whether to train.
+
+**And the input is the number TN-33 measured as carrying no signal**: the daily scalar is **57%
+night** buckets with night systematically positive (+0.266 against the day's −0.405), and its
+correlation with readiness is **+0.072 over 18 days**, with the two halves pointing opposite ways.
+
+**⛔ Do NOT fix this by raising the 120-minute threshold.** That is the mistake the file's own comment
+warns about eleven lines above this condition, about `TEMP_ALERT_THRESHOLD_C` — *"the fourth 'the
+threshold is right, the input is wrong' in this pillar"*. **This is the fifth.** The threshold is a
+documented judgement call at ~2 h; the input is a sleep-weighted average wearing a daytime label.
+
+**⚠ Two things this entry deliberately does not claim.** It does not say the *series* is worthless —
+TN-33 §8 measures strong episode structure in it (lag-1 **+0.637**, residual **+0.372** after removing
+day/night means). And it does not say a waking-only aggregate would be better: at 78% it barely moves,
+and its correlation flips just as hard.
+
+**The options, cheapest first:**
+1. **Unwire `stressOverride` until TN-33's level-2 test passes.** The condition already falls through
+   to `daySummary === 'very_stressful'` when derived stress is null, and the other two overrides
+   (temperature, illness) still fire. One line, reversible.
+2. **Restrict the input to waking hours** — correct in itself (a "daytime" number should not be 57%
+   night) but it only moves 83% → 78%, so it does not fix the firing rate.
+3. **Re-anchor the threshold to this user's own distribution** once the series is validated — a
+   percentile rather than a constant, which is what makes a flag informative.
+
+**Pass test:** the stress-deload override fires on a minority of days, and a day it fires on is one
+the owner recognises as unusually stressful.
+
 ### [readiness] TN-33 — the stress storage defect is fixed and the SIGN is not; TN-22's reversal was an eight-day artefact
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-10 · owner: *"give me the update on our stress reading/calculation… how can we test it works?"*
