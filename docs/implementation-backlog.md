@@ -1789,6 +1789,51 @@ sheet is open over the bottom half of it.
 - **Worth a device look when it ships**, since the failure is vertical space on the S25 with the log
   sheet open, which is not reproducible from the dimensions alone.
 
+### [body][nutrition] BF-136 — a vial's open date is hardcoded to today, so the weight-response window starts on the day you happen to record it 🔴 LIVE
+
+- **Lane:** B — `components/nutrition/reta/vial-sheet.tsx`. The routes already take the field; nothing server-side needs changing.
+- **Added:** 2026-09-10 · owner: *"its saying no weights taken; but i weigh my self every day. so its been over 5 days since first dose"*.
+- **Needs:** — nothing.
+
+**The message is correct about the data, and the data is wrong.** The owner's only
+`supplement_vials` row reads **`opened_on = 2026-09-10`**, created 03:18 that morning — while he had
+been dosing for five days. `WeightResponseCard` windows on
+`p.date >= sinceDate` (`weight-response-card.tsx:62`) with `sinceDate = current?.openedOn`
+(`vial-sheet.tsx:153`), so exactly one weigh-in falls inside it and the three-point gate says *"Not
+enough weigh-ins yet"*.
+
+**He has 14 weigh-ins in the last 14 days**, arriving automatically from the BLE scale — nothing
+about his logging is at fault. Dated 2026-09-05 the same vial would have had **6** points and the
+card would have rendered on the spot.
+
+**Cause, and it is one line.** `vial-sheet.tsx:88` sends `openedOn: todayInTz(tz)` — a constant — and
+the sheet renders **no date control**: peptide, bac water, marks, dose, and nothing else. The
+capability exists everywhere else: `app/api/supplements/[id]/vials/route.ts:18` requires `openedOn`
+in the POST body, and the PATCH route at `[vialId]/route.ts:16` accepts an optional one. **The
+backend was built to be told; the form never asks.**
+
+**Why this is worse than a missing convenience.** A reconstitution date is not cosmetic — it anchors
+*every* derived figure on the card, and it is exactly the field a user cannot correct afterwards from
+the UI. The card then reports a true statement (*"needs three weigh-ins"*) that reads as a bug,
+because the user knows he has weighed daily for a fortnight. That is the shape that produces a false
+report, and it did.
+
+**Fix: add the date to the sheet, defaulting to today.** Today is the right default — most vials are
+recorded when opened — so this costs nothing in the common case and unblocks the one where it
+matters. Editable afterwards too, since the PATCH route already takes it.
+
+- **⚠ Do NOT infer the open date from the first dose log.** It is tempting and wrong twice over:
+  the owner has **one** Retatrutide `supplement_logs` row and its `taken_at` is **null**, so there is
+  nothing to infer from; and a vial can legitimately be opened before its first dose. Ask.
+- **Bound it.** A free date field on a clinical record wants a sane range — not in the future, and not
+  implausibly far back — because a mistyped year silently rewrites the window rather than erroring.
+- **Adjacent, and not this entry's to fix:** that single dose row with a null `taken_at` is the gap
+  **OR-102a** exists to close. It is recorded here only so the next reader does not treat an empty
+  dose timeline as a second defect.
+- **The owner's immediate workaround:** none from the UI — the field cannot be reached. Until this
+  ships the window will keep starting on whichever day the vial was entered.
+- **Reversal cost:** low — one input on one sheet, against routes that already validate the field.
+
 ### [platform] LB-56 — E2E costs 26 minutes a UI PR and currently gates nothing; decide which of those to change
 
 - **Lane:** O — the Orchestrator's, not an implementer's. `.github/workflows/ci.yml`, `playwright.config.ts` and the required-checks
