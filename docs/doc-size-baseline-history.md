@@ -10631,3 +10631,26 @@ Fixed by the shared predicate rather than by a third patch.
 
 **No journal entry** — `docs/overview/entries/` is still at its 361 ceiling; LA-100 remains the
 blocker and is Gate: owner.
+
+## 2026-09-10 — `docs/implementation-backlog.md` +8, LA-89 given the `Gate: owner` its prose already implied
+
+Eight lines, and they exist because the gap they close caught me in the act.
+
+LA-89 says the decision is the owner's in **three separate sentences** — "removing an HTTP surface
+is the owner's call", "the decision, and why it is not mine to take", and an explicit "renaming
+instead is the worse option". It carried **no `Gate:` field**, so `next-item.js` printed it READY.
+
+I read the queue, saw it listed as startable, and wrote myself an instruction that "LA-89's rename
+half is startable" — the one action the entry rules out, because a rename keeps a second way to
+reach the pipeline, which is what Q-122 was removing. The entry was right and the tooling said
+otherwise, and I believed the tooling.
+
+This is the same lesson the queue has been teaching all evening (`⛔` on LA-97, an inline `Gate:` on
+LA-100, prose-only markers on four entries in #1047): **prose does not block; the field does.** The
+difference here is that the reader it fooled was the one who had spent the session writing that
+lesson down.
+
+**Re-merged against #1080 (BF-137): 20321.** Written by `pnpm fix:baselines`; the number has not
+been typed by hand since LA-99 shipped, which is four merges now. Resurrection check done by
+comparing entry BLOCKS against `git show origin/main:…` — LA-87 and LA-88 stayed removed, BF-137
+survived, and LA-89 kept the `Gate: owner` this branch adds.
