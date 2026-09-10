@@ -19503,40 +19503,6 @@ UI?") means most PRs skip the job in ~35 seconds, so nobody has a feel for the r
 
 - **Reversal cost:** trivial. One line per job.
 
-### [workouts][platform] LB-93 — the baseline-hop test waits on a fixed 300 ms sleep, and loses that race under the full suite
-
-- **Lane: A** — `lib/data/postgres/__tests__/baseline-anchor-hop.test.ts`, BF-131's own engine test.
-- **Added:** 2026-09-09, found while shipping LA-92 (the surface half of the same bug).
-- **Needs:** — nothing.
-
-**The mechanism is in the file.** *"a second session finishes what the first started"* calls
-`completeWorkoutFromPayload` and then `await new Promise(r => setTimeout(r, 300))` — twice — before
-asserting `baselineComplete`. A fixed sleep is not a wait for the work; it is a bet on how long the
-work takes, and the bet is placed against a shared local Postgres that ~865 other test files are
-also using.
-
-**Measured, because "flaky" is not a diagnosis and one red run is not evidence:**
-
-| run | tree | scope | result |
-|---|---|---|---|
-| 1 | LA-92 branch | full suite | **FAIL** — `expected false to be true` at `:137` |
-| 2 | clean `main` | that file alone | pass |
-| 3 | LA-92 branch | that file alone | pass |
-| 4 | clean `main` | full suite | pass (864 files) |
-| 5 | LA-92 branch | full suite | pass (865 files) |
-
-So it fails only under full-suite contention, and only sometimes — 1 of 2 on the same tree. **It is
-not caused by the branch it appeared on:** LA-92's diff is components, docs and one new component
-test, and none of that can change what a Postgres adapter writes.
-
-- **The fix is to wait for the condition, not for a duration** — poll `stateOf(sessionId)` until
-  `baselineComplete` flips or a generous timeout expires. Raising 300 ms to 1000 ms buys time and
-  keeps the bet.
-- **Why it matters more than one red run:** it fails on branches that did not cause it, which is the
-  expensive kind of flake — the author's first hypothesis is their own diff, and here that cost five
-  runs to rule out.
-- **Reversal cost:** nil. One test file, no product code.
-
 ### [platform][nutrition] LA-90 — the two supplement write paths merge a caller-supplied dose differently
 
 - **Lane:** A — `lib/data/postgres/adapter.ts` (`logSupplement`) and `lib/local-store/sqlite-backend.ts`
