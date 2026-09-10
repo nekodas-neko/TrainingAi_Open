@@ -10782,3 +10782,11 @@ report's "two unreachable palette keys" are reachable, because the report compar
 function with line 45 of another. Deleting them on the entry's word would have removed the palette
 from two live routes, so the refutation is worth more lines than the instruction was. Backlog number recomputed on the
 merged file — another lane moved the same baseline in parallel.
+
+## 2026-09-10 — `docs/agents/state/implementation-lane-b.md` LOWERED to 113
+
+A baton rewrite, so the ratchet correctly demanded the number come down with it rather than leaving
+43 lines of slack to regrow into. 155 → 112 lines: the accreted run narrative went, the state a
+successor acts from and the durable gotchas stayed. The rewrite is the point of the file — it is
+overwritten in full at every handoff — so the baseline tracking it downward is the mechanism working,
+not a concession.
