@@ -10570,6 +10570,32 @@ and it needs the owner's naming decision before the next entry can land. Recomme
 dated monthly batches (`history-2026-08.md`, `history-2026-09.md`) beside the frozen session-era
 files.
 
+## 2026-09-10 — `docs/implementation-backlog.md` 20,321 → 20,376 (+55), BF-137
+
+The owner pushed back on the raised budget — *"I thought discussed 1650 was like the maint?"* —
+and checking him is what found this. He was right, and the previous day's answer (mine) was wrong in
+the same direction as the app's.
+
+Fitting 29 weigh-ins rather than reading two endpoints splits the picture cleanly: **+0.10 kg/week
+pre-drug over 23 days, −0.95 kg/week over the six days since his first retatrutide dose, −0.12
+overall**. Against logged intake of 1,340–1,530 that puts maintenance near **1,600–1,700** — where his
+stored 1,660 came from — while the estimator reached **2,245** by fitting the drug window, which
+back-calculates to about 2,545 on its own.
+
+Filed separately from TN-29 rather than folded into it, because the mechanism is different and will
+recur on every vial: TN-29 is a cross-check on the *implied activity factor* and would catch this
+instance while attributing it to activity. The entry says so explicitly, and states the two reasons
+the inference is invalid — early GLP-1 loss is largely water and gut content, so the 7,700 kcal/kg
+conversion does not apply at all; and a six-day slope is noise-dominated regardless, which the
+pre/post split demonstrates on one person's own data.
+
+The dependency on **BF-136** is the part most likely to be missed: `supplement_vials.opened_on` is the
+obvious intervention marker and is currently hardcoded to the day the vial is *recorded*, so an
+exclusion keyed on it would exclude the wrong window. Recorded as a prerequisite in fact if not in
+form.
+
+Also records a correction to TN-29's own figure: its "honest" 1,895 is inflated by the same six days,
+just less so. **1,660 stands as the best-supported number**, which is what the owner said.
 ## 2026-09-10 — `docs/implementation-backlog.md` −40, LA-88 shipped (number written by `pnpm fix:baselines`)
 
 LA-88's entry left the queue. Second use of the tool LA-99 shipped an hour earlier, and the second
@@ -10606,3 +10632,23 @@ Two guards. The entry must **not** become a calculation change while three entri
 that are in flight — it should state today's model and move with them. And it should state confidence,
 not just numbers: *"weight flat across 29 days at 1,340–1,530 logged intake"* is stronger evidence
 than any estimate on the card, and presenting four estimates as equally solid is how this started.
+## 2026-09-10 — `docs/implementation-backlog.md` −24, LA-87 shipped
+
+LA-87's entry left the queue. Third use of `pnpm fix:baselines`; the number has not been typed by
+hand since LA-99 shipped.
+
+**LA-87's claims all survived, and working it found the cause underneath them.** The entry described
+`storageMode` reporting `'s3'` over a base64 row and proposed reporting the path taken. Correct, and
+the reachability came from somewhere the entry did not look: `getS3()` resolved its env vars with
+`??` while `isStorageConfigured()` used `||`, which differ on the **empty string** — so a blank
+`AWS_ENDPOINT_URL` beside a real `STORAGE_ENDPOINT` had one helper saying ready and the other
+returning null. Two implementations of one predicate, which **One Formula, One Place** calls a bug
+by definition.
+
+That also widened the blast radius past the two routes the entry named. `admin/reference-figure`
+gates a POST on the same predicate and then returns `{ url }` unguarded — so the same blank variable
+answered **200 `{ url: null }`** and dropped the uploaded file, with no base64 fallback to soften it.
+Fixed by the shared predicate rather than by a third patch.
+
+**No journal entry** — `docs/overview/entries/` is still at its 361 ceiling; LA-100 remains the
+blocker and is Gate: owner.
