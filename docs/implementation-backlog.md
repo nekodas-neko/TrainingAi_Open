@@ -221,13 +221,26 @@ below threshold and left in place for next time.
 - **Branch:** `chore/dependabot-remediation` (fresh from `main` each pass)
 - **Trigger:** ≥ 5 outstanding high/critical alerts, OR any single critical alert
   older than ~1 week. **Currently below threshold — skip.**
-- **State as of 2026-07-27:** `pnpm audit` reports **2 high**, both the same advisory
-  (`sharp`'s inherited libvips vulnerabilities, GHSA-f88m-g3jw-g9cj) reached
-  transitively via `next > sharp`. Fixing it means a major `next` bump or a
-  force-override under Next's own dependency — either gets its own PR per this
-  project's major-bump rule, not a drive-by fix. No Dependabot grouped security PR
-  was open at last check. Re-check `pnpm audit` and the GitHub Dependabot dashboard
-  before taking this — the count may have moved since.
+- **State as of 2026-09-10:** `pnpm audit` reports **1 moderate and nothing else** —
+  `adm-zip` GHSA-vwc7-r8mq-g2x9 via `onnxruntime-node`, which has **no published fix**
+  (`patched_versions: <0.0.0`), so there is nothing to bump. Down from **36 findings,
+  23 high and 2 critical**, cleared 2026-09-10 in `chore/dependabot-remediation`
+  ([journal](overview/entries/2026-09-10-chore-dependabot-remediation.md)).
+- **What that pass did, so the next one starts from the pattern rather than rediscovering it:**
+  two direct patch bumps within the same major (`next` ^15.5.22 → ^15.5.24, which resolved
+  15.5.25 and cleared the **critical**; `sharp` ^0.35.3 → ^0.35.4) plus six `pnpm.overrides`
+  for packages reached only transitively. **Version-keyed overrides, not bare ones** — a bare
+  `"nanoid": ">=3.3.18"` resolves nanoid 5, which is ESM, under a `postcss` that wants CJS ^3.
+  Each new override carries its `<` bound and an upper bound inside the same major.
+- **⚠ The 2026-07-27 note said the `sharp` advisory needed a major `next` bump and could not be
+  fixed by an override. That was wrong on both counts**, and it is why this sat six weeks. The
+  live path was `@capacitor/assets > sharp@0.32.6`, not `next > sharp`; `@capacitor/assets` is
+  a devDependency **invoked by no script and no CI job** (it generates icons by hand), so
+  `"sharp@<0.35.4": ">=0.35.4"` is a one-line, obviously-reversible fix whose only failure mode
+  is a tool nobody runs automatically. Verify the consumer before concluding an override is
+  unsafe.
+- **Re-check `pnpm audit` before taking this** — the count moves on CVE disclosure, not on this
+  repo's commits, so the number above ages on its own.
 
 ---
 

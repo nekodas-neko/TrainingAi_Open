@@ -10289,7 +10289,16 @@ incidents it was proposed to prevent — which is the fact that justifies buildi
 rather than the cheap one. An entry that had only said "build a check" would have got a check with no
 argument behind it.
 
-## 2026-09-10 — `docs/implementation-backlog.md` 20171 → 20234 (+63), Q-52 re-measurement and LA-96
+## 2026-09-10 — `docs/implementation-backlog.md` raised to 20184 for the Dependabot standing item
+
+The stored state was six weeks old and wrong in the direction that costs a session: it said the
+`sharp` advisory needed a major `next` bump, when the live path was a devDependency nobody invokes
+and the fix was one override line. The replacement records the pattern (version-keyed overrides, not
+bare) and that correction, because the next pass reads this before it reads `pnpm audit`.
+Recomputed on the merged file: the Orchestrator moved the same baseline in parallel, which is the
+case the per-document `.size` split is meant to conflict on.
+
+## 2026-09-10 — `docs/implementation-backlog.md` → 20247 (+63 over 20184), Q-52 re-measurement and LA-96
 
 Q-52's outstanding *"re-run once blocks cycle"* note was run and produced a result that has to be
 visible **at queue-read time**, not filed away: the precondition cleared, the program was rebuilt
@@ -10311,3 +10320,9 @@ deliberately front-loaded with the reason NOT to open it in a hurry (0 of 444 ro
 offending shape, so today's exposure is nil, and the adapter comment's cited production violation
 no longer exists). An entry that reads as a live bug and turns out to be robustness work costs a
 session; six lines that say so up front are cheaper than the six-line table beneath them.
+
+**Merged against the Dependabot raise directly above, which landed first.** Both entries moved this
+one number in parallel — the case the per-document `.size` split is designed to conflict on rather
+than silently pick a winner. Resolved by recomputing the count on the merged file (20247), not by
+taking either side's number: 20184 + 63 is only right by coincidence when both changes are pure
+additions, and relying on that is how a baseline drifts.
