@@ -110,6 +110,7 @@ const fs = require('fs');
 const path = require('path');
 const { resolveBaseRef, countAtBase, verdict } = require('./lib/base-ref');
 const { stripComments } = require('./lib/strip-comments');
+const { countInertStrict } = require('./lib/inert-strict');
 
 const ROOTS = ['app/api', 'packages/shared/src/validation'];
 
@@ -171,18 +172,43 @@ function countNonStrict(src) {
   return n;
 }
 
+// LA-88 — `.strict()` that has nothing to act on, reported as a THIRD STATE beside pass and fail.
+//
+// This checker asks whether a schema carries `.strict()`. It cannot see whether the strictness has
+// anything to reject: **a route that hands its schema an object it built itself, key by key, has
+// already discarded every unknown key before validation runs.** `admin/ai-usage` is the reference —
+// `?unknown=1` answers 200, confirmed by test, and the checker still reports the file clean.
+//
+// The exemption is documented at length in this file's header and that is exactly the problem: the
+// REPORT does not say it. A clean run reads as full coverage, so the next person to add a second
+// param will believe the typo guard is already in place. That is the shape #1019 fixed for
+// `check-admin-guard-catch.js`, whose regex matched 0 of 2 real defects while 12 live sites carried
+// them — a check blind to its own class is worse than no check, because it is believed.
+//
+// **Not a failure, and deliberately so.** For a GET whose only input is one named param, dropping
+// the rest is arguably right and 400-ing on a cache-buster would be worse. These are five routes,
+// not five bugs. The same posture as `check-cache-ttl-divergence.js`, which prints how many
+// helper-built keys it could not resolve so a clean run is never mistaken for full coverage.
+//
+// The tell is structural: a spread (`{ ...body, id }`) means real request keys reach the schema, so
+// strictness fires — `running-plan/runs/[id]` is the one site here that does. An all-literal object
+// means it cannot.
 function walk(dir, hit) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
     const p = path.join(dir, e.name);
     if (e.isDirectory()) walk(p, hit);
     else if (p.endsWith('.ts') && !p.includes('__tests__')) {
-      const n = countNonStrict(stripComments(fs.readFileSync(p, 'utf8')));
+      const src = stripComments(fs.readFileSync(p, 'utf8'));
+      const n = countNonStrict(src);
       if (n > 0) hit[p] = n;
+      const inert = countInertStrict(src);
+      if (inert > 0) INERT[p] = inert;
     }
   }
 }
 
 const found = {};
+const INERT = {};
 for (const r of ROOTS) if (fs.existsSync(r)) walk(r, found);
 
 if (process.argv.includes('--print')) {
@@ -234,3 +260,14 @@ if (failures.length) {
 }
 const total = Object.values(found).reduce((a, b) => a + b, 0);
 console.log(`check-strict-request-schemas: OK \u2014 ${total} non-strict across ${Object.keys(found).length} files (baseline held)`);
+
+// LA-88 — printed on a PASSING run, because the point is that a pass is not full coverage.
+const inertTotal = Object.values(INERT).reduce((a, b) => a + b, 0);
+if (inertTotal > 0) {
+  console.log(
+    `check-strict-request-schemas: note \u2014 ${inertTotal} \`.strict()\` schema(s) across ` +
+    `${Object.keys(INERT).length} file(s) are parsed against an object the route BUILDS, so the ` +
+    `strictness cannot fire. Not a failure; see this file's header. The guard becomes real the day ` +
+    `the literal is replaced by a spread of the request.`);
+  for (const f of Object.keys(INERT).sort()) console.log(`    ${f}${INERT[f] > 1 ? ` (${INERT[f]})` : ''}`);
+}
