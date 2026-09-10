@@ -10288,3 +10288,12 @@ in place — `typecheck:tests` entered `pnpm ci:local` on 2026-09-02, five days 
 incidents it was proposed to prevent — which is the fact that justifies building the bespoke check
 rather than the cheap one. An entry that had only said "build a check" would have got a check with no
 argument behind it.
+
+## 2026-09-10 — `docs/implementation-backlog.md` raised to 20184 for the Dependabot standing item
+
+The stored state was six weeks old and wrong in the direction that costs a session: it said the
+`sharp` advisory needed a major `next` bump, when the live path was a devDependency nobody invokes
+and the fix was one override line. The replacement records the pattern (version-keyed overrides, not
+bare) and that correction, because the next pass reads this before it reads `pnpm audit`.
+Recomputed on the merged file: the Orchestrator moved the same baseline in parallel, which is the
+case the per-document `.size` split is meant to conflict on.
