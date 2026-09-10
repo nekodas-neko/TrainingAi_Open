@@ -219,13 +219,21 @@ export function applyRehydrateFixups(
   const FOUR_HOURS_MS = 4 * 60 * 60 * 1000
   const isStale = (ms: number | null) => ms !== null && now - ms > FOUR_HOURS_MS
 
-  // E1-4: a workout whose start anchor is >4h old or from a previous day is
-  // abandoned. The old guard only reset `mode` + the timer anchors and ran ONLY for
-  // `mode === 'active'`, leaving `workoutStartMs`/`sessionLog`/`exerciseBuffers`
-  // intact — so "Continue Workout" resumed a days-old session, its duration
-  // (`end − start`) spanned multiple days, and an app killed in `warmup` reopened
-  // straight into a warm-up clock anchored days ago. Fully drop the workout identity
-  // for ANY mode; the partially-logged server session is already safe in the DB.
+  // E1-4: a workout whose start anchor is >4h old is abandoned. The old guard only reset
+  // `mode` + the timer anchors and ran ONLY for `mode === 'active'`, leaving
+  // `workoutStartMs`/`sessionLog`/`exerciseBuffers` intact — so "Continue Workout" resumed a
+  // days-old session, its duration (`end − start`) spanned multiple days, and an app killed in
+  // `warmup` reopened straight into a warm-up clock anchored days ago. Fully drop the workout
+  // identity for ANY mode; the partially-logged server session is already safe in the DB.
+  //
+  // **PS-35b ③ — this comment used to say "or from a previous day", and production never did
+  // that.** `dateRolledOver` is false at the only production call site, because
+  // `onRehydrateStorage` passes `today: null` on purpose (Q-477, see above). The clause survives
+  // for a caller that DOES supply a date, and the tests exercise it — but nothing in the app is
+  // such a caller, so the >4h rule is the whole of the production guard. The day's ticks are
+  // rolled over separately and correctly by `WorkoutDayRollover` → `rolloverDay(today)`, from the
+  // user's real zone. A workout started at 23:50 and resumed at 00:10 therefore SURVIVES, which is
+  // the right answer for someone training across midnight and is pinned by a test.
   const sessionStale = state.workoutStartMs !== null && (isStale(state.workoutStartMs) || dateRolledOver)
   if (sessionStale) {
     state.mode = 'pre'

@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.446.3",
+    date: "2026-09-11",
+    changes: [
+      "Launching from the home-screen icon no longer bounces through a redirect first, and the app makes five fewer requests on start-up \u2014 the warm-up was fetching things a screen was already asking for.",
+      "The weather chip says something when it cannot load, instead of pulsing forever. Its cache is also per-location now: after travelling it showed the old city's weather for up to half an hour and skipped the fetch that would have corrected it.",
+    ],
+  },
+  {
     version: "1.446.2",
     date: "2026-09-10",
     changes: [

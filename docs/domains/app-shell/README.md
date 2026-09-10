@@ -32,6 +32,15 @@ split is "does it feel slow" vs "is it actually slow at the source".
   [`docs/reviews/2026-07-20-wiring-caching-perf-audit.md`](../../reviews/2026-07-20-wiring-caching-perf-audit.md)
 - [`docs/reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md`](../../reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md)
 - [`docs/reviews/2026-09-06-deload-confirm-eviction-gap.md`](../../reviews/2026-09-06-deload-confirm-eviction-gap.md) — **the owner's stale-screen report traced to cause, 2026-09-06** (RV-49 — the Home deload confirm calls `invalidatePrescriptionChanged()` id-less, which the group's own conditional turns into a no-op for every `workout-card:<id>`, and `next-session` is not in the group; RV-50 — three raw seed-only `readCacheSync('workout-card:<id>')` reads that can never revalidate). The nutrition add surface swept in the same pass is **clean at source** — all nine writers close the `onLogged` loop.
+- [`docs/overview/entries/2026-09-11-fix-ps35b-boot-and-weather.md`](../../overview/entries/2026-09-11-fix-ps35b-boot-and-weather.md)
+  — **four boot/chip fixes from the checkpoint (PS-35b), 2026-09-11.** PWA `start_url` pointed at a
+  bare `redirect()`; the boot warm used a bare `fetch` the in-flight map cannot see (**A/B 34 → 29
+  requests**); the E1-4 rehydrate comment claimed a previous-day abandonment production never did —
+  `onRehydrateStorage` passes `today: null` on purpose (Q-477) and `WorkoutDayRollover` owns the
+  rollover; the weather cache was one **unkeyed** entry read before coordinates were known, with no
+  failure state. **⚠ The checkpoint report's "two unreachable palette keys" are REACHABLE** — it
+  compared line 26 of `pathnameToSection` with line 45 of `pathnameToPaletteKey`. Check both lines
+  are in the same function before trusting a shadowing claim.
 - [`docs/reviews/2026-09-05-app-checkpoint.md`](../../reviews/2026-09-05-app-checkpoint.md) — **the whole-app checkpoint, 2026-09-05/06** (twenty-six lanes collated; PS-24…PS-39. For this pillar: see the report's pattern sections and per-lane table).
   — **the persistent shell's two coverage gaps, 2026-09-03** (sweep 41). Both are hooks built once,
   wired into one place, and recorded as global. **RV-35** — `useLocalDay()` (BF-86) has three

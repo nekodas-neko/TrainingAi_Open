@@ -1751,6 +1751,21 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [app-shell] ⚠️ Four boot/chip fixes shipped, and only the failure half could be rendered (PS-35b, 2026-09-11, v1.446.3)
+
+The PWA `start_url` pointed at a bare `redirect()`; the boot warm used a bare `fetch` that
+`cachedFetch`'s in-flight map cannot see (**A/B: 34 → 29 requests on boot**); the E1-4 rehydrate
+comment claimed a previous-day-workout abandonment production never did; and the weather chip had no
+failure state over a cache that was one unkeyed entry read before any coordinates were known.
+[Journal](docs/overview/entries/2026-09-11-fix-ps35b-boot-and-weather.md).
+**Owed: the device check, and one path the sandbox cannot reach.** There is no outbound route to
+`api.open-meteo.com` here, so only the weather **failure** branch was rendered — the keyed cache and
+the instant-paint seed are unit-tested, not observed end to end. On the S25: launch from the
+installed icon and check it lands without a redirect flash, and check the chip resolves or shows `—`.
+**Also recorded:** the checkpoint report's "two unreachable palette keys" claim is **wrong** — it
+compared line 26 of one function with line 45 of another, and both keys are live. Dropping them
+would have removed the palette from two real routes.
+
 ### [body][nutrition] ⚠️ The vial report is fixed in both halves, and neither has been seen on the phone (BF-136 + LB-99, 2026-09-10, v1.446.2)
 
 Owner: *"its saying no weights taken; but i weigh my self every day."* **Two defects, one report.**

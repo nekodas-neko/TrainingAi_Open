@@ -10755,3 +10755,12 @@ one they can check in a second, or refute.
 OR-105 also grew a paragraph on what was **not** done: no `Branch:` was written for the nine entries
 that had shipped, because the commit the scan finds is often an incidental mention rather than the
 work. That paragraph exists to stop the next pass "finishing the job" by writing false provenance.
+
+## 2026-09-11 — both indexes raised for PS-35b's result
+
+`docs/implementation-backlog.md` to 20488 and `projectOverview.md` to 10548. PS-35b's entry gained
+what shipped for each of its four items, the two measurements (34 → 29 boot requests; the chip's
+rendered failure state), and a correction the next reader would otherwise trip on: the checkpoint
+report's "two unreachable palette keys" are reachable, because the report compared line 26 of one
+function with line 45 of another. Deleting them on the entry's word would have removed the palette
+from two live routes, so the refutation is worth more lines than the instruction was.
