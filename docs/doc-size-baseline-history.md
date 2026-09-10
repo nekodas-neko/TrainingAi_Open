@@ -10267,9 +10267,33 @@ the remaining half is confirm-first — the fifth field/prose mismatch this sess
 
 Entries ceiling untouched at 360.
 
-## 2026-09-10 — `docs/implementation-backlog.md` raised to 20237 for the Dependabot standing item
+---
+
+## 2026-09-10 — backlog 20,224 → 20,201 (−23) (Q-10 closed)
+
+Q-10 leaves the queue whole, into the resolved archive. Its live symptom shipped 2026-08-02; what
+remained was a nice-to-have that turned out to be unbuildable in one half (the Oura Cloud integration
+that would supply a session `type` was removed on 2026-08-13) and actively harmful in the other.
+
+The second half is worth the archive entry rather than a one-line strike: `bedtime_period` (0x76) was
+measured on-device on 2026-07-09 as ~0.5 h sub-period fragments, and the rollup already refuses any
+bedtime window under three hours because treating them as sleep windows produced *"tiny or duplicate
+sleep rows"* — which is the title of Q-10. The residue proposed persisting the defect the entry
+exists to fix, and the measurement that says so predates the note that left the residue by a month.
+## 2026-09-10 — backlog 20,224 → 20,194 (−30) (LB-62 shipped)
+
+LB-62 left the queue whole. Worth noting what its 30 lines bought: the entry named a cheaper
+alternative and told the implementer to price it *first*. Doing so found the alternative was already
+in place — `typecheck:tests` entered `pnpm ci:local` on 2026-09-02, five days before the three
+incidents it was proposed to prevent — which is the fact that justifies building the bespoke check
+rather than the cheap one. An entry that had only said "build a check" would have got a check with no
+argument behind it.
+
+## 2026-09-10 — `docs/implementation-backlog.md` raised to 20184 for the Dependabot standing item
 
 The stored state was six weeks old and wrong in the direction that costs a session: it said the
 `sharp` advisory needed a major `next` bump, when the live path was a devDependency nobody invokes
 and the fix was one override line. The replacement records the pattern (version-keyed overrides, not
 bare) and that correction, because the next pass reads this before it reads `pnpm audit`.
+Recomputed on the merged file: the Orchestrator moved the same baseline in parallel, which is the
+case the per-document `.size` split is meant to conflict on.

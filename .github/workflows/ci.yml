@@ -484,6 +484,12 @@ jobs:
       - name: A dead WebView renderer is handled, not fatal
         run: node scripts/check-render-process-recovery.js
 
+      # LB-62. Caught today only by `check-test-typecheck` in the Build job, which needs an install
+      # and a full tsc. This one is a regex over spec files, so it belongs in the dependency-free
+      # job that answers in ~25 seconds instead of four minutes.
+      - name: A zero-argument mock does not have its calls indexed (shrink-only)
+        run: node scripts/check-zero-arg-mock-indexed.js
+
       - name: CI, engines.node and production agree on a Node major
         run: node scripts/check-node-version-agreement.js
 

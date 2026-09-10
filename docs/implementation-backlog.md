@@ -18984,29 +18984,6 @@ Owner direction (2026-07-27): these stay device-owned; do not move them to the s
 that returns nothing but `non_wear_time_sec` no longer writes a false-positive
 "synced" row.
 
-### [sleep] 🟡 Q-10 — degenerate sleep rows are stored; no session `type`
-
-- **Lane:** A
-**Downgraded** — originally filed as a prerequisite for classifying naps vs nights,
-but `lib/health/sleep-night.ts` already classifies by circadian position, no stored
-`type` needed. Persisting Oura's `type` / the ring's bedtime-period tag is now a
-nice-to-have, not queued in detail.
-
-✅ **The live symptom — DONE 2026-08-02 (v1.250.8).** `groupSleepPeriods`
-(`packages/shared/src/health/sleep-night.ts`) now drops windows with no duration
-before classifying, so a degenerate row can no longer become the most recent night
-and null out `previousNight`.
-
-The entry's suggested fix — *"skip/floor sub-20-minute sessions"* — was **not** what
-shipped, and deliberately so. Of the nine sub-20-minute sessions only the one with
-`duration_hours = 0.00` can produce the null: `computeSleepScore` returns null for
-`duration == null || duration <= 0` and nothing else, so a 15-minute session scores
-fine (badly, which is correct). A 20-minute floor would also have discarded genuine
-short windows that `groupSleepPeriods` merges into fragmented nights on purpose.
-
-What is left of Q-10 is only the nice-to-have above: persisting Oura's session
-`type` / the ring's bedtime-period tag.
-
 ### [sleep] 🟢 Q-34 — sleep-staging Phase 1b: items 2 and 4 remain
 
 - **Lane:** A
@@ -19405,36 +19382,6 @@ reads.
   verified is the compiled CSS: `.bg-brand{background-color:var(--color-brand)}` and the dark
   `[data-state=checked]` thumb rule resolving to `--brand-foreground: oklch(100% 0 0)`.
 - **Reversal cost:** one line, visual only — no state, no storage, no API.
-### [platform] LB-62 — a zero-argument `vi.fn` whose recorded calls are then indexed; red `main` three times in one day
-
-- **Lane:** A — `scripts/` (a new Custom Rules check).
-- **Added:** 2026-09-07 · Lane B, after fixing the third instance.
-- **Needs:** — nothing.
-- **The shape.** `const f = vi.fn(async () => undefined)` takes no parameters, so TypeScript gives
-  `f.mock.calls[0]` the tuple type `[]`. A spec that then reads `[0]` off it gets **TS2493** (*"Tuple
-  type '[]' of length '0' has no element at index '0'"*), and any `as {…}` on the result gets
-  **TS2352** on top. The mock still *works* at runtime — vitest records the arguments regardless —
-  so the spec passes and only the type checker objects.
-- **Three instances on 2026-09-07, each of which turned `main` red:**
-  - `lib/auth/__tests__/login-rate-limit-key.test.ts` — `vi.fn(() => true)` (fixed in #912)
-  - `lib/__tests__/ingest-routes-fail-closed.test.ts` — `vi.fn(async () => undefined)`, 4 errors (PS-39, #935; fixed in #934)
-  - `lib/__tests__/home-aggregate-routes.test.ts` — `vi.fn(async () => [] as unknown[])` (PS-39, #936; fixed in #934)
-- **Why it keeps reaching `main` rather than being caught in the branch.** `tsconfig.json` excludes
-  `**/__tests__/**`, so `npx tsc --noEmit` — what an implementer runs — cannot see it. The only gate
-  that can is `check-test-typecheck.js`, which runs **inside the Build job after `pnpm build`**. An
-  author who runs lint and the suite locally gets a clean board and finds out post-merge.
-- **The fix is always the same and it is one line:** type the parameters the assertion expects
-  (`vi.fn(async (_userId: string, _from: Date) => …)`), which usually makes the cast unnecessary
-  too. So the check has an unambiguous suggested edit, which is what makes it worth automating.
-- **What to check.** A `vi.fn(` whose argument list is empty, in a file where the same identifier is
-  later read as `.mock.calls[<n>][<m>]` or destructured from `.mock.calls[<n>]`. Both halves are
-  needed — a zero-argument mock nobody indexes is fine and there are many.
-- **Cheaper alternative worth pricing first:** make `check-test-typecheck` runnable without a build,
-  or add it to `pnpm ci:local`, so the existing gate fires before the push instead of after the
-  merge. That fixes the *class* of "only CI sees test type errors" rather than this one shape, and it
-  may make the bespoke check unnecessary.
-- **Reversal cost:** low — a script and a CI step, deletable.
-
 ### [platform] LA-86 — a Postgres DEADLOCK between parallel DB test files, seen once
 
 - **Lane:** A — the DB-backed files under `lib/data/postgres/__tests__/` and their cleanup shape.
