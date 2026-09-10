@@ -64,10 +64,19 @@ non-barbell equipment, which is 2.76 lb — a grid with no pound dumbbell on it.
 9.07 kg and the dial offers 8.75 or 10.00. The logged Lateral Raise history sits at 5.5–11.25 kg
 across 54 sets: kilogram-grid values standing in for pound hardware.
 
-Most of the plumbing exists — `WeightDial` already takes a `unit` prop, and `quantity-editor.tsx`
-already pairs a vertical `SegmentedTabs` units toggle with a numeric control. The conversion
-constant exists too, but in the Postgres adapter, so the engine half is moving it to
-`packages/shared` rather than writing a second copy.
+Most of the plumbing exists — `WeightDial` already takes a `unit` prop. The conversion constant
+exists too, but in the Postgres adapter, so the engine half is moving it to `packages/shared`
+rather than writing a second copy.
+
+The control was re-specified the same day. The first answer was a vertical `SegmentedTabs`, copying
+the units toggle in `quantity-editor.tsx`; the owner corrected that to *"a very small button ...
+something you wouldnt see or hidden in away"*, and that component is 96 px tall. The toggle is now
+the `kg` suffix the dial already prints: tapping it swaps to `lb`, adding no chrome at all. It needs
+the suffix split out of its bare text node, `stopPropagation` so it does not also drive the row's
+select handler, and the repo's existing `.tap-dense` + `.tap-target-44` pair — otherwise the global
+48 px tap-target floor inflates it into a slab, which is the failure already documented on
+`switch.tsx`. `e2e/touch-target-size.spec.ts` keeps an empty allowlist, so any other approach fails
+the spec.
 
 The entry flags one hazard that would silently ruin the feature: `mround125` clamps to [5, 250], so
 a 5 lb dumbbell at 2.27 kg would be floored to 5 kg. Converted values must not pass through it.

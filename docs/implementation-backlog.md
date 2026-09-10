@@ -565,12 +565,37 @@ below threshold and left in place for next time.
     `const LBS_TO_KG = 0.45359237` at `lib/data/postgres/adapter.ts:135`. Per **One Formula, One
     Place**, move it to `packages/shared/src/` and have the adapter import it — do **not** write a
     second copy for the UI. This is the engine half and the reason the entry is Lane A's first.
-  - **The toggle should be `SegmentedTabs`, not a new control.**
-    `components/nutrition/quantity-editor.tsx:117-124` is already a units toggle beside a numeric
-    control (`size="xs" orientation="vertical" className="h-full w-14 flex-none"`) and is the repo's
-    only `orientation="vertical"` use. Copy that shape. `segmented-tabs.tsx:9-15` warns a two-option
-    vertical toggle is 96 px tall and its neighbour must be built to match — the pill dial in
-    `set-card.tsx:185-194` is ~96–144 px, so it does.
+  - **⚑ THE CONTROL IS THE `kg` LABEL ITSELF. Owner, 2026-09-10, correcting this entry's first
+    answer:** *"like I said I want it to be a very small button to swap to lb - something you
+    wouldnt see or hidden in away"*. **`SegmentedTabs` is therefore ruled out** — it was this
+    entry's original recommendation, on the precedent of the vertical units toggle at
+    `components/nutrition/quantity-editor.tsx:117-124`, but `segmented-tabs.tsx:9-15` puts a
+    two-option vertical toggle at **96 px tall**, which is a prominent control and the opposite of
+    what was asked for. Do not reach for it.
+  - **What to build instead: make the unit suffix the button.** The dial already prints it —
+    `{v}{unit ? ` ${unit}` : ""}` at `components/ui/weight-dial.tsx:169-170` — so tapping `kg` to
+    get `lb` adds no chrome whatsoever, which is exactly the ask. Two mechanical changes it needs:
+    - **Split the suffix into its own element.** It is a bare text node today, so it cannot carry a
+      handler until it is a `<span>`/`<button>`.
+    - **`stopPropagation` is mandatory.** The whole row is already a click target that selects that
+      value (`weight-dial.tsx:172-175`), so without it a tap on the unit also drives the dial.
+      Make only the **selected** row's suffix interactive; the unit renders on every visible row and
+      three live toggles in a scrolling column is not what "hidden" means.
+  - **The tap-target floor is the real constraint, and the repo already solved it.** `globals.css`
+    forces `min-height/min-width: 48px` on every `button`/`[role="button"]`, which would blow a
+    small inline control up into a 48 px slab — the exact failure documented on
+    `components/ui/switch.tsx`. The pattern is `.tap-dense` to opt out of the floor plus
+    **`.tap-target-44`** (`app/globals.css:587-600`) to put an invisible 44 px touch box back. Note
+    its stated rule — *never give a control a hit area larger than its clearance* — which is fine
+    here: dial rows are 48 px tall, so a 44 px box stays inside its own row.
+  - **`e2e/touch-target-size.spec.ts` will fail this if it is done any other way.** Its `ALLOWED`
+    map is deliberately **empty** (`:50`), so a new undersized control is a failing spec rather than
+    an allowlist row. That is the check, and it is not to be widened for this.
+  - **One honest cost of "hidden", accepted:** a control with no visual affordance is undiscoverable,
+    and normally that is an argument against it. It does not apply here — this app has one user, he
+    asked for it explicitly, and he is the person who would have to find it. Worth a faint styling
+    cue (a dotted underline or slightly dimmed weight on the suffix) so it reads as tappable once
+    looked at, without becoming furniture.
 
 - **⚠ THE ROUNDING HAZARD, which is the one thing that will silently ruin this.** `mround125`
   (`components/workout/utils.ts:47-49`) is
