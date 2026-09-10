@@ -2720,8 +2720,38 @@ is an eternal skeleton — the Q-499 shape, where `cachedFetch` swallows `!res.o
 passes `onError`. Separately the weather cache is **one unkeyed entry returned before coordinates are
 read**, so a moved device shows the old location for 30 minutes. Key it by rounded coordinates.
 
-- **Also here:** drop the two unreachable palette keys named in the report.
+- **⚠ THE TWO "UNREACHABLE" PALETTE KEYS ARE REACHABLE — do not drop them.** The report says
+  *"`pathname-routing.ts:26` (`/workout`) precedes `:45` (`/workout-select`), so the `workoutSelect`
+  palette branch is unreachable"*. Those two lines are in **different functions**: `:26` is in
+  `pathnameToSection`, `:45` in `pathnameToPaletteKey`, and nothing in the latter matches
+  `/workout-select` before it. Evaluated 2026-09-11: `/workout-select` → `workoutSelect`,
+  `/stats` → `stats`, `/workout` → `null`. Deleting them would have removed the palette from two
+  live routes. Whether those ROUTES should exist is PS-35's owner-gated question and untouched.
 - **Reversal cost:** low throughout. No data, no migration.
+- **Verify:** device — launch from the installed icon and confirm it lands without a redirect
+  flash; and confirm the weather chip resolves or shows its `—` state rather than pulsing. **The
+  sandbox has no outbound route to `api.open-meteo.com`, so only the FAILURE path could be
+  rendered here** — the success path and the keyed cache are unit-tested, not observed.
+- **✅ SHIPPED 2026-09-11** (`fix/ps35b-boot-and-weather`).
+  [Journal](overview/entries/2026-09-11-fix-ps35b-boot-and-weather.md). All four, plus the palette
+  correction above.
+  - **① measured:** `start_url` `/session-select` → `/workout`, the same destination without the
+    `redirect()` hop. Where a launch *should* land is PS-35's question, not this one's.
+  - **② measured, A/B on identical runs:** boot went **34 → 29 requests** (32 → 27 distinct),
+    stable across two runs of the fixed build. The `today: true` keys now warm through
+    `cachedFetchToday`, which also closes a mismatch this rewrite surfaced — the hand-rolled
+    envelope stamped `todayInTz(tz)` while every reader unwraps with `todayInTz()`, so outside
+    Brisbane the warm write was unreadable the moment it landed.
+  - **③ was stale PROSE, not a missing feature.** `dateRolledOver` is false at the only production
+    call site because `onRehydrateStorage` passes `today: null` on purpose (Q-477), and the day's
+    ticks roll over correctly in `WorkoutDayRollover` → `rolloverDay(today)`. The comment claimed
+    a previous-day workout is abandoned; the >4h anchor is the whole guard. Comment corrected and
+    the surviving behaviour pinned: a workout started 23:50 and resumed 00:10 is kept, which is
+    right for training across midnight.
+  - **④** cache keyed by coordinates rounded to 2 dp — the same rounding the in-flight dedup
+    already used — read **after** `getDeviceLocation()` resolves, which is the half that makes the
+    key work. A `ta_weather_cache:last` seed seeds the instant paint the keying would otherwise
+    cost, in a `useEffect` rather than the `useState` initializer the old code used.
 
 - **On completion, the device check is:** launch from the installed icon and confirm it lands without
   a redirect flash; and confirm the weather chip resolves or shows a failure state rather than pulsing.

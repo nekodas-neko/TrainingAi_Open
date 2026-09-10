@@ -10777,3 +10777,21 @@ amendments to BF-96 and Q-111 so their standing instructions do not contradict t
 
 Owner confirmed the header chips clip on the right, closing BF-139's one open question and ruling
 out the `pt-safe` alternative. Net a few lines over the entry's original open-question bullet.
+
+## 2026-09-11 — both indexes raised for PS-35b's result
+
+`docs/implementation-backlog.md` to 20622 and `projectOverview.md` to 10548. PS-35b's entry gained
+what shipped for each of its four items, the two measurements (34 → 29 boot requests; the chip's
+rendered failure state), and a correction the next reader would otherwise trip on: the checkpoint
+report's "two unreachable palette keys" are reachable, because the report compared line 26 of one
+function with line 45 of another. Deleting them on the entry's word would have removed the palette
+from two live routes, so the refutation is worth more lines than the instruction was. Backlog number recomputed on the
+merged file — another lane moved the same baseline in parallel.
+
+## 2026-09-10 — `docs/agents/state/implementation-lane-b.md` LOWERED to 113
+
+A baton rewrite, so the ratchet correctly demanded the number come down with it rather than leaving
+43 lines of slack to regrow into. 155 → 112 lines: the accreted run narrative went, the state a
+successor acts from and the durable gotchas stayed. The rewrite is the point of the file — it is
+overwritten in full at every handoff — so the baseline tracking it downward is the mechanism working,
+not a concession.
