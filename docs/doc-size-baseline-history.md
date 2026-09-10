@@ -10414,3 +10414,43 @@ same baseline in parallel, which is the case the per-document `.size` split shou
 A live owner report whose cause shipped and whose symptom was measured NOT to clear. That gap is
 exactly what a Known-Issues row is for: without it the entry reads as closed, and the next session
 would take the owner's next mention of it as a new bug rather than the open half of this one.
+
+## 2026-09-10 — `docs/implementation-backlog.md` → 20307 (+21 of it here), LA-90 out, LA-97 in
+
+Net of a 27-line removal and a 48-line addition. LA-90 shipped and left the queue; **LA-97** took
+its place — the live half of the same finding, which LA-90's entry did not mention: the sync push
+drops `takenAt` and the frozen vial, so every offline supplement tick is re-stamped at push time
+with whatever vial is current then.
+
+The new entry is longer than the one it replaces and earns it. It carries the four-step chain
+(local freeze → `enrichPayload` → push branch → `logSupplement`) because each step looks correct in
+isolation and only the sequence is wrong, so an entry that merely named the symptom would send the
+next session to re-derive it. It also states up front that this ships alone — a sync-push change's
+revert is a corrective migration — which is the constraint most likely to be missed by someone
+batching a tidy-up.
+
+**Merged against BF-136's raise directly above, which landed first (#1070).** Both entries moved
+this number in parallel — the case the per-document `.size` split exists to conflict on rather than
+silently pick a winner. Resolved by recomputing on the merged file (20307), never by adding the two
+deltas: that is right only when both sides are pure additions, and this pair was not (LA-90 left the
+queue while LA-97 and BF-136 entered it).
+
+**Re-merged against #1071 (TN-29) as well, so the number above moved again — 20338, not the 20307
+this PR first recorded.** Three PRs raised this one baseline within the hour. Recomputed on the
+merged file each time rather than adding deltas: this set was not pure additions (LA-90 left the
+queue while LA-97, BF-136 and TN-29's row entered), so arithmetic on the deltas would have been
+wrong in a way nothing downstream would catch. Checked the two-deletions trap on each merge — LA-90
+stayed deleted, and LA-97, BF-136 and TN-29 all survived.
+
+**And +11 more (20349) for LA-97's root cause, found before the PR merged.** `getSupplementLogs`
+does `SELECT *` and its row→object mapper drops all four OR-102a fields, so `enrichPayload` could
+not forward them even if it asked. That turns the entry's fix from three steps into four and
+reorders them — wiring the push path to fields the mapper does not surface ships a silent no-op that
+passes every test. Eleven lines to stop the next session building the wrong three-step version.
+
+**Fourth re-merge, #1073 (BF-136's engine half): 20404.** Recomputed again rather than adjusted.
+Worth recording the near-miss: #1073's diff shows `-### … BF-136 … 🔴 LIVE`, which reads as an entry
+being DELETED and triggered a two-deletions check here. It was a heading **rewrite** — the engine
+half shipped and the surface half stays as Lane B with `Verify: device` — and the merged file is
+byte-identical to `main` for that entry. **A `-###` line in a backlog diff is not evidence of a
+deletion**; compare the resulting blocks, not the diff markers.

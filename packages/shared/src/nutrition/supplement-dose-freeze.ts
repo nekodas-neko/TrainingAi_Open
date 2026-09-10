@@ -43,3 +43,51 @@ export function freezableDoseText(
   const text = definitionDoseText?.trim()
   return text ? text : null
 }
+
+/** The definition's side of the merge — the three columns a log can fall back to. */
+export interface SupplementDoseDefinition {
+  defaultAmount: number | null | undefined
+  unit: string | null | undefined
+  /** The definition's free-text `dose`. */
+  dose: string | null | undefined
+}
+
+/** What a log freezes: the structured pair plus the free text, all resolved. */
+export interface ResolvedLoggedDose {
+  amount: number | null
+  unit: string | null
+  doseText: string | null
+}
+
+/**
+ * Merge a caller's dose against the definition (LA-90).
+ *
+ * **The two write paths did this differently, and the offline one wins when they disagree** —
+ * a pushed mutation carries what the device recorded. The server merged PER FIELD
+ * (`amount ?? defaultAmount`, and the same for `unit`); the local store was ALL-OR-NOTHING, reading
+ * the definition only when `amount`, `unit` and `doseText` were all null and otherwise taking the
+ * caller's triple as given. So a caller supplying only `amount` got the definition's `unit` online
+ * and a null one offline: same tick, same supplement, two different rows depending on connectivity.
+ *
+ * **No caller reaches that today**, which is why it never bit — the log route and the sync engine
+ * both normalise to a complete triple before the server sees one, and the supplements page sends
+ * `{amount, unit}` to both paths or neither. It is a trap laid for the next caller, and the kind
+ * that surfaces as "the unit vanished on one of my logs" months later.
+ *
+ * Per field is the behaviour kept, because it is the one the server already had: sharing the merge
+ * must not quietly re-decide what a log stores. `??` treats an explicit null as absent, which is
+ * also the server's existing behaviour and is deliberately unchanged here — see LA-97 for the
+ * separate question of whether a REPLAYED log's null amount should stay null rather than pick up
+ * the definition's current one. That question changes sync-push semantics and cannot ride along.
+ */
+export function resolveLoggedDose(
+  caller: Partial<ResolvedLoggedDose> | null | undefined,
+  definition: SupplementDoseDefinition | null | undefined,
+): ResolvedLoggedDose {
+  const amount = caller?.amount ?? definition?.defaultAmount ?? null
+  return {
+    amount,
+    unit: caller?.unit ?? definition?.unit ?? null,
+    doseText: caller?.doseText ?? freezableDoseText(amount, definition?.dose),
+  }
+}
