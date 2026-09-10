@@ -19593,30 +19593,62 @@ UI?") means most PRs skip the job in ~35 seconds, so nobody has a feel for the r
 
 - **Reversal cost:** trivial. One line per job.
 
-### [platform][nutrition] LA-90 — the two supplement write paths merge a caller-supplied dose differently
+### [platform][nutrition] LA-97 — the sync push drops `takenAt` and the frozen vial, so an offline tick is re-stamped at push time
 
-- **Lane:** A — `lib/data/postgres/adapter.ts` (`logSupplement`) and `lib/local-store/sqlite-backend.ts`
-  (`upsertSupplementLog`).
-- **Added:** 2026-09-09, Lane A — found while shipping OR-104's engine half, and deliberately left
-  out of it: bundling a second divergence into a dose-text fix would have made both unreviewable.
+- **Lane:** A — `lib/local-store/sync-engine.ts` (`enrichPayload`), `lib/data/postgres/adapter.ts`
+  (the `supplement_logs` push branch, and `logSupplement`'s vial read).
+- **Added:** 2026-09-10, found while shipping LA-90 — same two functions, and NOT the same bug.
+- **Ships alone, and is otherwise startable.** CLAUDE.md: never batch a sync-push change, because
+  its revert is a corrective migration rather than a git revert. That is why it was not folded into
+  LA-90 — it is a batching constraint, not a blocker, so it carries no `Gate:` and no `⛔`. (The
+  first draft of this entry used `⛔` and `next-item.js` parked it as "not implementable", which is
+  the trap that file's own header describes: the marker means *cannot be built*, not *build it by
+  itself*.)
 
-The server merges the caller's dose against the definition **per field**:
-`amount: dose?.amount ?? owns.defaultAmount`, and the same for `unit`. The local store is
-**all-or-nothing** — it reads the definition only when `amount`, `unit` and `doseText` are *all*
-null, and otherwise takes the caller's triple as given.
+**This one is live, unlike LA-90.** Every supplement tick made offline gets its `taken_at` and its
+frozen reconstitution rewritten when it syncs.
 
-So a caller supplying only `amount` gets the definition's `unit` on the server and a **null** unit
-offline. The same tick, the same supplement, two different rows depending on connectivity — and the
-offline one syncs up and wins, because a pushed mutation carries what the device recorded.
+The chain, verified against `main` on 2026-09-10:
 
-**No caller does this today**, which is why it has not bitten: the supplements page passes no dose
-at all and the sync engine replays a complete triple. It is a trap laid for the next caller, and the
-kind that surfaces as "the unit vanished on one of my logs" months later.
+1. `upsertSupplementLog` freezes `takenAt` and the vial triple at log time — OR-102a's entire
+   purpose, and its comment says so: *"Stamping it server-side at push time would record whatever
+   vial is current when sync happens, which is the retroactive rewrite the freeze exists to
+   prevent."*
+2. **`getSupplementLogs` cannot read them back.** It does `SELECT *`, but its row→object mapper
+   lists ten fields and **none of the four** is among them — `takenAt`, `vialStrengthMg`,
+   `vialWaterMl`, `vialUnitsPerMl` are dropped on the way out of SQLite. This is the root cause and
+   the reason the other steps look innocent: OR-102a updated the writer and not this reader.
+   Straight from CLAUDE.md — *"When adding a DB column, update **every** row→object mapper
+   (`rowToX`, SELECT lists) — a missed field fails silently"* (sessions 29, 64).
+3. `enrichPayload` reads the local row through that mapper, so it forwards **`amount`, `unit`,
+   `doseText` only** — it could not forward the rest even if it asked.
+4. The server's `supplement_logs` push branch accepts **those same three**.
+5. `logSupplement` therefore stamps `takenAt: new Date()` — **push time** — and re-reads the
+   **current** vial.
 
-**The fix is to share the merge, as OR-104 shared the free-text decision** — one function taking the
-caller's partial and the definition, returning the triple, called by both. Cheap while
-`freezableDoseText` is fresh and its shared module already exists. No migration; existing rows keep
-what they were stamped with.
+**So the fix is four steps, not three, and step 2 comes first.** Wiring `enrichPayload` to fields
+the mapper does not surface ships a silent no-op that every test would pass — which is the exact
+failure mode the mapper rule exists to name.
+
+So the rewrite the local comment warns about happens one layer up, because the push path was never
+extended past BF-3's three fields when OR-102a added four more (`takenAt`, `vialStrengthMg`,
+`vialWaterMl`, `vialUnitsPerMl`).
+
+**Why it has stayed invisible:** `frozenReconstitution()` returns null unless all three vial numbers
+are present, so a re-stamp produces a *plausible* number rather than an obviously broken one — and
+`taken_at` has no screen that would contradict it. A supplement with no vials is unaffected; the
+damage is scoped to vialled supplements ticked while offline.
+
+**Not a migration**, and no back-fill is possible: the frozen values only ever existed on the device,
+and the rows that were re-stamped cannot be recovered from the server. Fixing it stops the bleeding
+going forward.
+
+**Second question to settle in the same PR, because the fix decides it either way.** `logSupplement`
+merges with `??`, which treats an explicit `null` as absent — so a replayed log whose amount was
+genuinely null picks up the definition's *current* `default_amount`. That is the same class of
+rewrite BF-3 exists to prevent, for supplements that had no structured amount at tick time. The
+`undefined`-vs-`null` distinction is what separates "not specified, fill it in" from "explicitly
+none, keep it", and `resolveLoggedDose` (LA-90) is where it would live.
 
 ### [platform] LA-89 — `oura/hr-sync` has no callers, and its name says something that is not true
 
