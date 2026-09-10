@@ -1586,6 +1586,48 @@ why `nutrition-sheet-surface.spec.ts` passes. Whatever the cause, it is specific
   `el.click()` works rules out most of the alternatives.
 - **Reversal cost:** nil. A test helper and a note.
 
+### [platform] OR-107 — a fold that rewrites citations, so the journal's recent window can actually shed
+
+- **Lane:** O — `scripts/`, `docs/overview/`. Neither implementer's paths.
+- **Added:** 2026-09-10 by Orchestrator. **Branch:** unassigned.
+- **The ceiling was raised 361 → 600 in the same PR as a stopgap.** That buys time and fixes nothing;
+  this entry is the fix. Do not lower the ceiling again without shipping this first.
+
+**The bind, stated once.** `docs/overview/entries/` is meant to be a readable *recent* window. Two
+rules make that impossible together:
+- the entries README says **do not fold an entry another doc links to** — adopted after a sweep broke
+  48 links, and right, because a broken citation in another lane's baton is worse than a long list;
+- **305 of 342 entries are cited** by a durable doc (`projectOverview.md` pins 198,
+  `docs/implementation-backlog.md` 98, the domain READMEs most of the rest — 30 files, 467 links).
+
+So the only entries a sweep may fold are the newest, and obeying a total ceiling means **deleting the
+recent window to preserve the archive.** At ~13.5 new entries a day it re-blocks within days.
+
+**The fix: make folding rewrite the citation instead of refusing to fold.** An entry moved into
+`history-*.md` keeps a stable anchor, and every `](docs/overview/entries/<name>.md)` becomes
+`](docs/overview/history-<file>.md#<anchor>)`. Then "linked" stops meaning "unfoldable" and the window
+sheds oldest-first, which is the direction it was always supposed to go.
+
+**The citation form is regular enough to automate:** 194 of projectOverview's are literally
+`[journal](docs/overview/entries/<name>.md)`, 79 more in the backlog.
+
+**⚠ Five measured traps, all already written down in
+[`entries/README.md`](overview/entries/README.md) §1-5 — read them before writing a line of this.**
+Each was found by `check-doc-links` on a separate pass, and each looked like the last thing that
+could be wrong: relative links losing a level (three cases, not one); entries linking to each other
+by bare filename (folded→folded and folded→loose need *different* fixes); a loose entry linking to
+one you folded, which surfaces nowhere near the file you touched; and a concurrent PR citing an entry
+mid-sweep, landing as a modify/delete conflict where git shows you only one of the three.
+
+**Do not reason about which links moved — run `node scripts/check-doc-links.js` and fix what it
+names.** That is how all five were found.
+
+- **Build it as a script, not a manual sweep.** A hand sweep is what produced the five traps; this
+  runs on 300+ links and must be repeatable.
+- **Reversal cost:** moderate. Folding is reversible (the content moves, it is not lost), but a
+  rewritten citation across 30 files is a wide diff to unpick — so the script writes, then
+  `check-doc-links` verifies, before anything is deleted.
+
 ### [platform] OR-106 — the `Lane:` field is at 95% and the gap is all shipped residue
 
 - **Lane:** O — reading the queue and editing entries. Neither implementer's paths.
