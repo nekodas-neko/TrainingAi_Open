@@ -57,6 +57,27 @@ const config = JSON.parse(fs.readFileSync(path.join(root, 'docs/doc-size-baselin
 //
 // The entries ceiling is deliberately NOT fixed: it is owner-set (#1052) and raising it is a
 // decision, not arithmetic. See LA-100.
+//
+// **Raised 361 → 600 on 2026-09-10 (OR-107), and reframed as a BACKSTOP rather than a working gate.**
+// The two numbers measure different things and only one of them names an action:
+//
+//   • `limit` (60) counts FOLDABLE entries — those no durable doc cites. That is the working gate:
+//     when it trips, someone folds unlinked entries and the number goes down. It is at 37.
+//   • `totalCeiling` counts EVERY entry, including the ones policy forbids folding. The entries
+//     README is explicit — *"Do not fold an entry that another doc links to... Fold the unlinked
+//     ones and leave the rest"* — a rule adopted after a sweep broke 48 links across five distinct
+//     failure modes. 305 of 342 entries are cited by a durable doc, so they are unfoldable by that
+//     rule.
+//
+// Which makes the total ceiling unsatisfiable by any sanctioned action: the only entries a sweep may
+// fold are the newest ones, so obeying it means destroying the recent window to preserve the archive
+// — backwards from what the window is for. Measured 2026-09-10 it had blocked two unrelated PRs in
+// two days, and at ~13.5 new entries a day no fixed total survives a week anyway.
+//
+// 600 is a backstop against pathological growth, not a compaction trigger. **The real fix is a fold
+// that REWRITES the citations** so linked entries become foldable — filed as OR-107, with the five
+// measured link-breaking traps the README already documents. Do not lower this number again without
+// that fix; lowering it only re-imposes a tax on whichever PR happens to be open.
 const FIX = process.argv.includes('--fix');
 const fixed = [];
 
