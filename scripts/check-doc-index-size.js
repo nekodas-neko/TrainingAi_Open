@@ -38,6 +38,28 @@ const { BASELINE_DIR, loadBaselines, baselinePathFor } = require('./lib/doc-size
 const root = path.join(__dirname, '..');
 const config = JSON.parse(fs.readFileSync(path.join(root, 'docs/doc-size-baseline.json'), 'utf8'));
 
+// `--fix` (LA-99): rewrite each tracked doc's `.size` to the count this check actually computes.
+//
+// Six PRs raised `docs/implementation-backlog.md.size` in two hours on 2026-09-10 and EVERY merge
+// conflicted on it and was hand-resolved identically. The conflict itself is correct — see this
+// file's header: two PRs raising the same doc genuinely disagree about one number, and suppressing
+// that would silently pick a wrong one. What was wasteful is doing the arithmetic by hand.
+//
+// **A `.gitattributes` merge driver was the obvious idea and does not work.** Git merges paths in
+// index (byte) order, and `docs/doc-size/docs/implementation-backlog.md.size` sorts BEFORE
+// `docs/implementation-backlog.md` — so a driver would compute from a document git has not merged
+// yet. Running after the merge is the only correct time, which is what this flag does.
+//
+// **And the count is not `wc -l`.** These docs have no trailing newline, so `split('\n').length`
+// is one more than `wc -l` reports — an off-by-one that cost two retries in one session before the
+// recipe was written down. Reusing the check's own arithmetic is the point: there is one definition
+// of the number and `--fix` cannot disagree with the gate.
+//
+// The entries ceiling is deliberately NOT fixed: it is owner-set (#1052) and raising it is a
+// decision, not arithmetic. See LA-100.
+const FIX = process.argv.includes('--fix');
+const fixed = [];
+
 const BASELINE = loadBaselines(path.join(root, BASELINE_DIR));
 const { dir: ENTRIES_DIR, chore: ENTRIES_CHORE, limit: ENTRIES_LIMIT, totalCeiling: ENTRIES_TOTAL_CEILING } =
   config.entries;
@@ -96,6 +118,15 @@ for (const [rel, limit] of Object.entries(BASELINE)) {
   // the ceiling wrong. That is the opposite of the growth side, where the inherited case is a real
   // one (Q-424) because the fix there is moving prose, not editing a number.
   const call = verdict({ count: lines, limit, atBase: null });
+  if (FIX) {
+    // Both directions: over the number and under it. The slack case is a failure too, so a `--fix`
+    // that only ever raised would leave the gate red and look broken.
+    if (call !== 'ok') {
+      fs.writeFileSync(path.join(root, baselinePathFor(rel)), `${lines}\n`);
+      fixed.push(`${baselinePathFor(rel)}: ${limit} → ${lines}`);
+    }
+    continue;
+  }
   if (call === 'ok') continue;
   if (call === 'slack') {
     slack.push(
@@ -160,6 +191,18 @@ if (fs.existsSync(entriesAbs)) {
 if (inherited.length) {
   console.log('check-doc-index-size: inherited from the base branch, not caused here:');
   inherited.forEach((f) => console.log('  • ' + f));
+}
+
+if (FIX) {
+  if (fixed.length) {
+    console.log('check-doc-index-size --fix: rewrote');
+    fixed.forEach((f) => console.log('  • ' + f));
+    console.log('  Add a note to docs/doc-size-baseline-history.md saying WHY the document moved —');
+    console.log('  the number is arithmetic, the reason is not, and the reason is the point.');
+  } else {
+    console.log('check-doc-index-size --fix: every baseline already matches its document.');
+  }
+  process.exit(0);
 }
 
 if (failures.length) {

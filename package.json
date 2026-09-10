@@ -1,7 +1,9 @@
 {
   "name": "trainingai",
   "version": "1.446.2",
-  "engines": { "node": "22.x" },
+  "engines": {
+    "node": "22.x"
+  },
   "private": true,
   "packageManager": "pnpm@10.33.0",
   "pnpm": {
@@ -48,6 +50,7 @@
     "typecheck:tests": "node scripts/check-test-typecheck.js",
     "ci:local": "pnpm lint && pnpm check:rules && pnpm typecheck && pnpm typecheck:tests && pnpm test",
     "check:rules": "node scripts/run-custom-rules.js",
+    "fix:baselines": "node scripts/check-doc-index-size.js --fix",
     "db:local": "bash scripts/local-db/setup.sh",
     "db:snapshot": "node scripts/local-db/snapshot.js"
   },

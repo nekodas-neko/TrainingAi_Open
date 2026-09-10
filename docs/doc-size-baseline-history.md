@@ -10537,3 +10537,35 @@ it back to 360 and take LA-100 first; nothing else depends on this line.
 **Backlog 20306 → 20348 (+42) in the same PR: LA-99 and LA-100.** Both filed from friction rather
 than from a report — the repeated `.size` hand-merges, and the ceiling that fired with no target
 file to sweep into. Set from the count the check reports, as LA-99 exists to encode.
+
+## 2026-09-10 — `docs/implementation-backlog.md` 20348 → 20318 (−30), LA-99 shipped
+
+LA-99's 29-line entry left the queue. **This number was written by `pnpm fix:baselines` rather than
+by hand — the first time, and the reason the entry existed.**
+
+LA-99 shipped differently from how it specified itself. It proposed a `.gitattributes` merge driver;
+git merges paths in index order and `docs/doc-size/…​.size` sorts BEFORE the document it measures, so
+a driver would compute from an unmerged file. `--fix` on the check runs after the merge, which is
+the only correct time, and reuses the check's own arithmetic — so it cannot disagree with the gate
+the way `wc -l` does on these no-trailing-newline documents.
+
+The entries ceiling stays 361 and is deliberately outside `--fix`: owner-set, and raising it is a
+decision rather than arithmetic (LA-100).
+
+**⚠ And this PR ships with NO journal entry, deliberately — the directory is full.**
+
+Adding LA-99's entry took `docs/overview/entries/` to **362 against the 361 ceiling this session
+had already raised from 360 an hour earlier**. Raising a second time, in the same session, is
+precisely the "+1-per-PR treadmill" #1052 ended — so it was not done. The ceiling stays **361**.
+
+**The record is not lost**, it is just not in that directory: the reasoning is in this note, the
+queue entry was removed in this PR's diff, and the PR body carries the full account including the
+rejected merge-driver design. What the convention protects — that nothing lives only in a chat log —
+still holds.
+
+**What this proves, which the earlier note could only argue:** the directory is now at a hard stop.
+Every feature PR from any of the six agents carries a journal entry by standing rule, so **every
+one now fails CI or raises the ceiling again**. LA-100 is no longer a tidy-up; it is the blocker,
+and it needs the owner's naming decision before the next entry can land. Recommendation stands:
+dated monthly batches (`history-2026-08.md`, `history-2026-09.md`) beside the frozen session-era
+files.
