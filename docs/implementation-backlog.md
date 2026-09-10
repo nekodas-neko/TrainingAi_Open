@@ -19692,42 +19692,6 @@ to reach the pipeline, which is what Q-122 was removing.
 Cheap either way — the route is 50 lines and tested, so it costs nothing to leave until someone
 answers.
 
-### [platform] LA-88 — five routes satisfy the `.strict()` check while the strictness cannot fire
-
-- **Lane:** A — `scripts/check-strict-request-schemas.js`. The routes themselves may well be fine;
-  the checker is the thing reporting a guard that is not there.
-- **Added:** 2026-09-09, Lane A — found while writing PS-39 tests for `admin/app-load-report`, and
-  measured across `app/api` rather than assumed from the one case.
-
-Q-464's checker asks whether a request schema carries `.strict()`, because a permissive one silently
-drops a mistyped key and answers 200. It cannot see whether the strictness has anything to act on.
-**A route that hands its schema an object it built itself has already discarded every unknown key
-before validation runs**, so `.strict()` there guards nothing and the check still reports it clean.
-
-Measured, all `Schema.safeParse({ ... })` with a hand-built object and a `.strict()` schema:
-
-- `admin/app-load-report` — `{ days: searchParams.get('days') ?? undefined }`
-- `admin/ai-usage` — three named params, confirmed by test: `?unknown=1` answers 200
-- `coach/options` — `{ source, sourceId }`
-- `exercise-gif` — `{ name }`
-- `nutrition/barcode` — `{ code }`
-
-`running-plan/runs/[id]` spreads the real body before adding `id`, so its `.strict()` **does** fire —
-which is what makes the difference structural rather than stylistic, and detectable.
-
-**This is not five bugs.** For a GET whose only input is one named param, dropping the rest is
-arguably right, and 400-ing on a cache-buster would be worse. The cost is the report: the checker
-says these routes are protected, and the next person to add a second param will believe the typo
-guard is already in place. That is the shape [#1019](https://github.com/nekodas-neko/TrainingAi_Open/pull/1019)
-fixed for `check-admin-guard-catch.js`, whose one-line regex matched 0 of 2 real defects while 12
-live sites carried them — a check blind to its own class is worse than no check, because it is
-believed.
-
-**The fix is in the checker, not the routes:** when a `.strict()` schema's only `safeParse` call site
-passes an object literal whose keys are all written out, report it as inert — a third state beside
-pass and fail, the way the TTL-divergence check prints how many helper-built keys it had to skip. A
-clean run should never be mistaken for full coverage.
-
 ### [platform] LA-87 — a configured upload that returns nothing is reported as if it succeeded
 
 - **Lane:** A — `app/api/admin/generate-exercise-media/route.ts`, and check the sibling

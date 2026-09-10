@@ -10596,3 +10596,17 @@ form.
 
 Also records a correction to TN-29's own figure: its "honest" 1,895 is inflated by the same six days,
 just less so. **1,660 stands as the best-supported number**, which is what the owner said.
+## 2026-09-10 — `docs/implementation-backlog.md` −40, LA-88 shipped (number written by `pnpm fix:baselines`)
+
+LA-88's entry left the queue. Second use of the tool LA-99 shipped an hour earlier, and the second
+time the number was not typed by hand.
+
+**LA-88 is the first entry today whose every claim survived verification** — all five inert routes
+and the one counter-example (`running-plan/runs/[id]`, whose spread makes strictness real) were
+exactly as written. Thirteen entries in a row before it had at least one claim that did not, four of
+them mine. Worth recording which way this one went, so "re-verify first" does not curdle into
+"assume the entry is wrong".
+
+**No journal entry again** — `docs/overview/entries/` is still at its 361 ceiling and LA-100 is still
+the blocker. Same posture as #1078: the record is here, in the PR body, and in the queue-entry
+removal.
