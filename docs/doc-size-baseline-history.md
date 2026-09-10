@@ -10611,6 +10611,27 @@ them mine. Worth recording which way this one went, so "re-verify first" does no
 the blocker. Same posture as #1078: the record is here, in the PR body, and in the queue-entry
 removal.
 
+## 2026-09-10 — `docs/implementation-backlog.md` 20,285 → 20,331 (+46), BF-138
+
+*"im getting confused - can we have a central idea of everything"*. The owner had four numbers from
+four screens inside a week and could not tell which to eat to. He was also right about the model —
+*"eat to 1350 + exercise"* describes the dynamic path accurately — and could not confirm it anywhere.
+
+Filed as its own entry rather than folded into BF-134 because it is the reason one owner hit **three**
+separate defects in seven days: BF-134 (macros and calories on different anchors), BF-137 (the drug
+window inflating maintenance) and TN-29 (no activity cross-check) all present to a user as *"the
+number is wrong"*, and nothing on any screen lets him tell a defect from a design.
+
+What the entry adds beyond "write an explainer" is the measurement that turns a documentation request
+into a design question: median **2,438 steps/day** and **22 workouts in 30 days** put typical earned
+movement near **215 kcal**, so a normal day computes to **~1,470** against a stored goal of **1,660**.
+That ~190 kcal gap is nobody's bug — it is two models disagreeing quietly, and reconciling them is the
+question the explainer will force. BF-134 made the gap visible; it did not close it.
+
+Two guards. The entry must **not** become a calculation change while three entries proposing exactly
+that are in flight — it should state today's model and move with them. And it should state confidence,
+not just numbers: *"weight flat across 29 days at 1,340–1,530 logged intake"* is stronger evidence
+than any estimate on the card, and presenting four estimates as equally solid is how this started.
 ## 2026-09-10 — `docs/implementation-backlog.md` −24, LA-87 shipped
 
 LA-87's entry left the queue. Third use of `pnpm fix:baselines`; the number has not been typed by
@@ -10682,15 +10703,18 @@ session rediscovers them one `check-doc-links` run at a time, which is exactly h
 The numbers are in it because they decide the approach: 305 of 342 entries cited, 467 links across 30
 files, 194 of them in one regular form. Regular enough to script is the whole argument for scripting.
 
-## 2026-09-10 — `docs/implementation-backlog.md` 20458 → 20418 (LA-96)
+## 2026-09-10 — `docs/implementation-backlog.md` 20503 → 20499 (LA-96 out, LA-101 in)
 
-LA-96 shipped, so its 40-line entry left the queue. No other document moved.
+Net four lines. LA-96's 40-line entry left the queue as it shipped, and a 36-line LA-101 went in
+behind it — a full test run that exits 1 while reporting zero failing tests, seen twice tonight. The
+near-cancellation is a coincidence of length, not a swap.
 
-The first number this branch wrote was 20281, against a baseline of 20321, and both are now wrong:
-OR-106 and OR-107 landed on `main` while this was in flight and took the same baseline to 20458.
-Recomputed by `pnpm fix:baselines` **after** merging `main`, which is the only way the subtraction
-means anything — a baseline computed before the merge is arithmetic on a number that no longer
-exists.
+This number has now been wrong twice for the same reason, which is the point of writing it down.
+The branch first wrote 20281 (against 20321), then 20418 (against 20458) after OR-106 and OR-107
+landed; BF-138 landed during CI and took it to 20503. Each figure was correct when computed and
+stale by the time it was pushed. Recomputed by `pnpm fix:baselines` **after** each merge of `main`,
+which is the only way the subtraction means anything — under six concurrent lanes, a baseline is a
+reading of a moving number, not a fact about the branch.
 
 Resurrection check done the block way — compared the resulting entry blocks against
 `git show origin/main:docs/implementation-backlog.md` rather than reading diff markers. The merge

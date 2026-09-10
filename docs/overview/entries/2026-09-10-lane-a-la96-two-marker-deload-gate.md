@@ -57,6 +57,14 @@ Also worth carrying: a backtick inside a `sql` template literal **terminates the
 these comments were written with `` `> 0` `` in them and the queries failed at runtime with
 `TypeError: 0 is not a function`. Neither lint nor `tsc` says anything — it is valid JavaScript.
 
+## Filed on the way past: LA-101
+
+Two full runs this session exited **1** while reporting 0 failing tests — an
+`EnvironmentTeardownError` from a worker closed with a console-log RPC in flight, both times clean on
+an immediate re-run of identical code. CLAUDE.md already names that signature for the
+`migration-test-lock` case; this is a second cause wearing the same clothes, and a red gate that is
+not a red gate is the expensive kind. Filed rather than shrugged off.
+
 ## Not exercised
 
 No device path (server reads only) and no APK. The dev-server pass covered all three routes

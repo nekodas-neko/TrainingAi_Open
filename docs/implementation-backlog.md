@@ -795,6 +795,51 @@ prose is what is wrong. Same principle as TN-25's — the target is right and th
 **Pass test:** every user-visible sentence describing a zone states the same basis the engine uses,
 and no heart rate is coloured as an alarm at a value inside the user's own Zone 1.
 
+### [nutrition] BF-138 — the app runs two energy models at once and never states either, so the owner cannot tell which number to eat to
+
+- **Lane:** B — a single explainer surface; the numbers it states already exist. **Do not change any calculation under this entry.**
+- **Added:** 2026-09-10 · owner, after four screens showed four different figures: *"I thought it was eat to 1350 + excercise amount right? im getting confused- can we have a central idea of everything"*.
+- **Needs:** — nothing. **Read BF-134, BF-137 and TN-29 first**: they are three separate defects that all present as *"the number is wrong"*, and this entry is why one owner hit all three inside a week.
+
+**He was right, and that is the point.** *"Eat to 1,350 + exercise"* describes the app's own dynamic
+model accurately — 1,325 measured RMR, plus movement as it happens. He could not confirm it from any
+screen.
+
+**The two models, both live, both defensible, never named:**
+
+| | anchor | where it shows | assumes |
+|---|---|---|---|
+| **Static** | `nutrition_targets.calories` = **1,660**, written once 2026-08-31 | the macro row | a typical day's movement, already included |
+| **Dynamic** | `restingBase + goalDelta + earned` | the calorie ring and the zone bar | nothing; it climbs as you move |
+
+**They are the same model seen two ways and should agree on an average day — for this owner they do
+not.** Measured over 30 days: median **2,438 steps/day**, **22 workouts (5.3/week)**, so typical
+earned movement is roughly **215 kcal**. That puts a normal day at `1,453 − 200 + 215 ≈ **1,470**`
+against a stored goal of **1,660** — a standing **~190 kcal** disagreement that is nobody's bug and
+everybody's confusion. **Reconciling those two is the real question this entry raises**; BF-134 only
+made the gap *visible* by explaining it on the card.
+
+**The chain that produces "base", and why it reads as arbitrary:** measured RMR **1,325** → ×1.2 for
+sedentary living → minus the walking already inside "sedentary" (BF-88 made steps earn from the first
+one, so the credit is removed from the base to stop double-counting) → **≈1,453**. Every step is
+sound and *none of it is stated anywhere*, which is why a user who knows his own RMR sees 1,453 and
+reasonably suspects an error — as he did on 2026-09-08.
+
+**Recommendation: one explainer, reachable from every number it explains, stating the chain above
+with the user's own figures substituted.** Not a tooltip per surface — that is how three surfaces
+came to describe the same model in three vocabularies. The `WHY TWO NUMBERS` block BF-134 added is
+the right shape and the wrong scope: it explains the macro-vs-calorie gap only.
+
+- **⚠ This entry must not become a calculation change.** Three entries already propose changes to
+  these numbers (BF-134 labelling, BF-137 the drug window, TN-29 the activity cross-check). An
+  explainer written while those are in flight should state *today's* model and be updated with them,
+  not pre-empt them. Writing it is also a good forcing function: a model that cannot be stated in six
+  lines is not yet a model.
+- **⚠ State the units of confidence, not just the numbers.** The most useful sentence available to
+  this owner is not any estimate — it is *"your weight was flat across 29 days at 1,340–1,530 logged
+  intake"*. Measured stability beats every derived figure on the screen, and the explainer should say
+  so rather than presenting four estimates as equally solid.
+- **Reversal cost:** none — one read-only surface over values that already exist.
 ### [nutrition][body] BF-137 — the maintenance estimator is fitting a GLP-1 weight drop and calling it metabolic rate 🔴 LIVE
 
 - **Lane:** A — `packages/shared/src/nutrition/adaptive-tdee.ts`, alongside **TN-29** and best built with it.
@@ -1091,6 +1136,42 @@ bigger setting.
 **Pass test:** a guided walk states its fast and slow blocks as heart-rate targets, the summary
 reports fast-block compliance and interval contrast for the session, and both numbers are comparable
 between a treadmill walk and an outdoor walk without any surface-specific adjustment.
+
+### [platform] LA-101 — a full test run fails with zero failing tests, twice in one session
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-10 · found twice while gating LA-87 and LA-96, not from a report.
+- **Lane: A** — test infrastructure (`vitest.config.ts`), no product code.
+
+`pnpm test` exits **1** while reporting `881 passed | 5 skipped` and `8287 passed, 0 failed`. The
+whole failure is one line:
+
+```
+EnvironmentTeardownError: [vitest-worker]: Closing rpc while "onUserConsoleLog" was pending
+This error originated in "lib/__tests__/hr-read-routes.test.ts"
+```
+
+A worker was torn down with a console-log RPC still in flight. Both sightings re-ran clean
+immediately after, on identical code.
+
+**Why this is worth an entry rather than a shrug.** CLAUDE.md already names the signature — *"1 test
+file failed with 0 failing tests — the tell that it is a hook, not an assertion"* — for the
+`migration-test-lock` case, and this is a second, different cause wearing the same clothes. It has
+now cost two investigations in one session, and the second only resolved quickly because the first
+had happened. A red gate that is not a red gate is the most expensive kind of flake: the honest
+response to it is to investigate, every time, until someone writes down which reds are real.
+
+**What to look at.** The originating file is incidental — it is whichever worker happened to be
+logging at teardown, and the run that fails is the one running alongside `check-comment-blindness`,
+which writes an unusually large amount of console output while injecting fixtures into real source
+files. Suspect the interaction rather than `hr-read-routes.test.ts` itself. Vitest's own issue
+tracker has this under worker teardown races; check whether the pinned version has a fix before
+reaching for `dangerouslyIgnoreUnhandledErrors`, which would hide real unhandled rejections too.
+
+**Do not fix this by quieting the console output** — that output is `check-comment-blindness` doing
+its job, and silencing it to make a race less likely is treating the symptom that is legible rather
+than the one that is broken.
+
+---
 
 ### [cardio][heart-rate] TN-25 — the guided walk's fast target has never been met in 44 attempts, and the live pacer says "push" every time
 - **Lane:** A — both (1 engine, 1 surface) → A, engine half first.
