@@ -1751,21 +1751,24 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
-### [body][nutrition] ⚠️ The vial date is fixed and the report it came from is not closed (BF-136 → LB-99, 2026-09-10, v1.446.1)
+### [body][nutrition] ⚠️ The vial report is fixed in both halves, and neither has been seen on the phone (BF-136 + LB-99, 2026-09-10, v1.446.2)
 
-`openedOn` was hardcoded to `todayInTz(tz)` with no control on the sheet, so the weight-response
-window started on whichever day the vial was entered — the owner's vial read five days late and the
-card said *"not enough weigh-ins"* to someone weighing daily. There is an `Opened on` date now,
-bounded to 180 days back, and an existing vial's date is correctable **in place** — which is
-required, not optional, because `listSupplementVials` orders by `openedOn DESC` and a re-dated new
-vial sorts below the wrong one.
-[Journal](docs/overview/entries/2026-09-10-fix-vial-opened-date.md).
-**Owed: the symptom itself.** With the bug state reproduced, the date corrected and
-`/api/body-metadata` returning the six in-window weigh-ins, `WeightResponseCard` **still** read "Not
-enough weigh-ins yet" — the sibling note had already updated, so `sinceDate` was right and the card's
-own read is what failed. Pre-existing and independent, filed as **LB-99**; the live suspect is the
-`getLocalStore` fall-through, which would make it **LB-98**'s first live instance. Also not seen on
-the S25, where the date picker is the device's own.
+Owner: *"its saying no weights taken; but i weigh my self every day."* **Two defects, one report.**
+(1) `openedOn` was hardcoded to `todayInTz(tz)` with no control, so the weight-response window
+started on whichever day the vial was entered — there is an `Opened on` date now, bounded to 180 days
+back, and an existing vial's date is correctable **in place**, which is required rather than optional
+because `listSupplementVials` orders by `openedOn DESC` and a re-dated new vial sorts below the wrong
+one. (2) Correcting the date did **not** clear the symptom: the chip read *"Not enough weigh-ins
+yet"* above its own *"6 weigh-ins over 5 days"*, because `weightResponse()` returns a full result
+whose `verdict` is null when the range straddles the band and the card rendered that as the no-data
+state. It now reads *"Not called yet"*.
+[Journal](docs/overview/entries/2026-09-10-fix-vial-opened-date.md) ·
+[Journal](docs/overview/entries/2026-09-10-fix-weight-response-undecided-label.md).
+**Owed: the S25.** The date control is a native `<input type="date">`, so the picker is the device's
+own and has not been opened on one; and the owner's account is the only one with a real dosing period
+to render against. **Worth reading before the next "no data" report:** LB-99's entry keeps its wrong
+first diagnosis, which blamed the `getLocalStore` fall-through — a card reporting "no data" is not
+evidence that no data reached it.
 
 ### [workouts][app-shell] ⚠️ The injured-exercise header was rebuilt, and the case that prompted it was never rendered (BF-135, 2026-09-09, v1.446.0)
 

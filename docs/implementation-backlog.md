@@ -1820,45 +1820,46 @@ sheet is open over the bottom half of it.
 - **Worth a device look when it ships**, since the failure is vertical space on the S25 with the log
   sheet open, which is not reproducible from the dimensions alone.
 
-### [body][nutrition] LB-99 — the Weight response card reports "not enough weigh-ins" with the weigh-ins in hand 🔴 LIVE
+### [body][nutrition] LB-99 — the Weight response chip said "not enough weigh-ins" above its own line counting six (fixed)
 
-- **Lane:** B — `components/nutrition/reta/weight-response-card.tsx`.
-- **Added:** 2026-09-10 · measured while shipping BF-136, whose reported symptom this turns out to be
-  the second half of.
+- **Lane:** B — `components/nutrition/reta/weight-response-card.tsx`, `weight-response.ts`.
+- **Added:** 2026-09-10 · measured while shipping BF-136, whose reported symptom this was the second
+  half of.
 - **Needs:** — nothing.
+- **✅ SHIPPED 2026-09-10** (`fix/weight-response-undecided-label`).
+  [Journal](overview/entries/2026-09-10-fix-weight-response-undecided-label.md).
 
-**BF-136 fixed the cause it names and the symptom did not clear.** Reproduced locally: 14 daily
-weigh-ins, one vial, its `opened_on` corrected to five days back. `/api/body-metadata` answered 200
-with `recent` = `["2026-09-10","2026-09-09","2026-09-08","2026-09-07","2026-09-06","2026-09-05",
-"2026-09-04"]` — six of them inside the window and each carrying a `weightKg`. The sibling note in
-the same sheet had already re-rendered as *"Measured from 5 Sept"*, so `sinceDate` was correct and
-the props were right. **The card still read "Not enough weigh-ins yet" after six settled seconds.**
+**Two opposite states shared one label.** `weightResponse()` returns null only when there is no
+interval to compute — under three readings, or no spread of days. It returns a **full result with
+`verdict: null`** when there are plenty of readings and the confidence interval straddles the band,
+which the card's own module doc calls the designed normal state. The chip was
+`tone?.label ?? 'Not enough weigh-ins yet'`, so the second state rendered as the first — directly
+above the card's own *"6 weigh-ins over 5 days"*. `responseState()` now separates them and the
+undecided chip reads **"Not called yet"**.
 
-**Where to look, and what is already ruled out.**
-- **Not a shape mismatch.** `toRow` (`app/api/body-metadata/route.ts:82`) emits `{ date, weightKg }`
-  and `WeightPoint` (`packages/shared/src/health/long-term-goal-progress.ts:15`) wants exactly that.
-- **Not the arithmetic.** `weightResponse()` is unit-tested against the production shape and returns
-  a rate for six points; the gate it fails is the three-point one, which means `windowed` was empty.
-- **The live suspect is the branch above it.** The effect takes `getLocalStore(userId)` first and
-  only falls through to `cachedFetch('body-metadata', …)` when that is null. If the web build returns
-  a store object rather than null, `store.getBodyMetrics(sinceDate)` resolves `[]` and the fetch
-  never runs — points become `[]`, not `null`, and the card reports a true-sounding "not enough".
-  That is **LB-98**'s class exactly, and this would be its first live instance.
-- **Check the fall-through before rewriting anything**: log which branch the effect takes on web.
+**⚠ MY FIRST DIAGNOSIS IN THIS ENTRY WAS WRONG, and it is left here on purpose.** It named the
+`getLocalStore` fall-through and called this LB-98's first live instance. **It is not.**
+`getLocalStore` returns null on web at `lib/local-store/index.ts:199` (`isSQLiteAvailable()`), so the
+`cachedFetch` branch does run and the points did arrive — which the ruled-out list should have
+implied, since the payload shape matched and the arithmetic was tested. The lesson is the one this
+repo keeps relearning: *a card that reports "no data" is not evidence that no data reached it*. Read
+what the component does with the data before suspecting the fetch.
 
-- **⚠ Do not "fix" it by widening the three-point gate.** The gate is correct and OR-102b ④ argues
-  for it at length — two points cannot separate 0.4 kg/week from 1.2. A card that draws a rate from
-  an empty window would be worse than one that says it has nothing.
-- **Reversal cost:** low — one effect in one component.
+**Verified in the harness**, six weigh-ins over five days in the window:
+`Not called yet · +0.54 kg/wk (95% CI −5.05 to +6.13, 5 days) · … 6 weigh-ins over 5 days.`
+
+- **⚠ Do not "fix" this class by widening the three-point gate.** OR-102b ④ argues it at length: two
+  points cannot separate 0.4 kg/week from 1.2. Nothing here changes when a verdict is given — only
+  what the card says while it is withholding one.
 
 ### [body][nutrition] BF-136 — a vial's open date is hardcoded to today (fixed; the card's own render is a separate defect)
 
 - **Lane:** B — `components/nutrition/reta/vial-sheet.tsx`. The routes already take the field; nothing server-side needs changing.
 - **Added:** 2026-09-10 · owner: *"its saying no weights taken; but i weigh my self every day. so its been over 5 days since first dose"*.
 - **Needs:** — nothing.
-- **Verify:** device — the reported symptom. On the S25, correct the vial's date and check the
-  Weight response card actually renders a rate. **The sandbox could not observe that** — see the
-  ⚠ below — so what shipped is the cause, not a confirmed clearing of the symptom.
+- **Verify:** device — on the S25, correct the vial's date and check the Weight response card reads
+  sensibly. **Both halves of the report have now shipped**: the date (here) and the chip that said
+  "not enough weigh-ins" while holding six (**LB-99**, fixed the same day).
 - **✅ SHIPPED 2026-09-10** (`fix/vial-opened-date`).
   [Journal](overview/entries/2026-09-10-fix-vial-opened-date.md). An `Opened on` date on the sheet
   defaulting to **today**, bounded to `[today − 180d, today]`, with the POST now sending it instead
@@ -1871,54 +1872,12 @@ the props were right. **The card still read "Not enough weigh-ins yet" after six
   vial — the way the reconstitution numbers above it are prefilled, because those are stable — would
   make the next vial silently inherit this one's date, which is this entry's own defect one vial
   along. Pinned by a source test.
-- **⚠ MEASURED, AND IT DOES NOT CLEAR THE OWNER'S SYMPTOM ON WEB — filed as LB-99.** With the bug
-  state reproduced locally (14 daily weigh-ins, vial stamped today), the date corrected to 5 days
-  back and `/api/body-metadata` returning exactly the six in-window rows
-  (`2026-09-05 … 2026-09-10`), `WeightResponseCard` **still read "Not enough weigh-ins yet"** after
-  six settled seconds. The note beside it had already updated to *"Measured from 5 Sept"*, so
-  `sinceDate` was correct and the card's own read is what did not complete. Pre-existing and
-  independent of this change — it reproduces identically before it — but it means **the fix here is
-  the cause, not the observed symptom**, and nobody should read this entry as closing the report
-  until LB-99 or the device check says so.
-
-**The message is correct about the data, and the data is wrong.** The owner's only
-`supplement_vials` row reads **`opened_on = 2026-09-10`**, created 03:18 that morning — while he had
-been dosing for five days. `WeightResponseCard` windows on
-`p.date >= sinceDate` (`weight-response-card.tsx:62`) with `sinceDate = current?.openedOn`
-(`vial-sheet.tsx:153`), so exactly one weigh-in falls inside it and the three-point gate says *"Not
-enough weigh-ins yet"*.
-
-**He has 14 weigh-ins in the last 14 days**, arriving automatically from the BLE scale — nothing
-about his logging is at fault. Dated 2026-09-05 the same vial would have had **6** points and the
-card would have rendered on the spot.
-
-**Cause, and it is one line.** `vial-sheet.tsx:88` sends `openedOn: todayInTz(tz)` — a constant — and
-the sheet renders **no date control**: peptide, bac water, marks, dose, and nothing else. The
-capability exists everywhere else: `app/api/supplements/[id]/vials/route.ts:18` requires `openedOn`
-in the POST body, and the PATCH route at `[vialId]/route.ts:16` accepts an optional one. **The
-backend was built to be told; the form never asks.**
-
-**Why this is worse than a missing convenience.** A reconstitution date is not cosmetic — it anchors
-*every* derived figure on the card, and it is exactly the field a user cannot correct afterwards from
-the UI. The card then reports a true statement (*"needs three weigh-ins"*) that reads as a bug,
-because the user knows he has weighed daily for a fortnight. That is the shape that produces a false
-report, and it did.
-
-**Fix: add the date to the sheet, defaulting to today.** Today is the right default — most vials are
-recorded when opened — so this costs nothing in the common case and unblocks the one where it
-matters. Editable afterwards too, since the PATCH route already takes it.
-
-- **⚠ Do NOT infer the open date from the first dose log.** It is tempting and wrong twice over:
-  the owner has **one** Retatrutide `supplement_logs` row and its `taken_at` is **null**, so there is
-  nothing to infer from; and a vial can legitimately be opened before its first dose. Ask.
-- **Bound it.** A free date field on a clinical record wants a sane range — not in the future, and not
-  implausibly far back — because a mistyped year silently rewrites the window rather than erroring.
-- **Adjacent, and not this entry's to fix:** that single dose row with a null `taken_at` is the gap
-  **OR-102a** exists to close. It is recorded here only so the next reader does not treat an empty
-  dose timeline as a second defect.
-- **The owner's immediate workaround:** none from the UI — the field cannot be reached. Until this
-  ships the window will keep starting on whichever day the vial was entered.
-- **Reversal cost:** low — one input on one sheet, against routes that already validate the field.
+- **✅ THE SECOND HALF IS LB-99, AND IT IS FIXED.** Correcting the date here was measured NOT to
+  clear the owner's symptom: with six in-window weigh-ins the card still read *"Not enough weigh-ins
+  yet"*. That was a second defect in the chip's label — `weightResponse()` was returning a full
+  result whose `verdict` was null, and the card rendered that as the no-data state. Fixed
+  2026-09-10; the chip now reads *"Not called yet"*. **The two together are the report**, and
+  neither alone closes it.
 
 ### [platform] LB-56 — E2E costs 26 minutes a UI PR and currently gates nothing; decide which of those to change
 

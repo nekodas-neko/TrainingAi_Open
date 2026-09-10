@@ -10414,3 +10414,15 @@ same baseline in parallel, which is the case the per-document `.size` split shou
 A live owner report whose cause shipped and whose symptom was measured NOT to clear. That gap is
 exactly what a Known-Issues row is for: without it the entry reads as closed, and the next session
 would take the owner's next mention of it as a new bug rather than the open half of this one.
+
+## 2026-09-10 — `docs/implementation-backlog.md` raised to 20331 for LB-99's result
+
+LB-99 was filed and fixed the same day, so its entry replaced a diagnosis with a cause — and kept the
+wrong first diagnosis on the record with why it was wrong, because "a card reporting no data is not
+evidence that no data reached it" is the reusable part. BF-136 gained a line saying both halves of
+the report have now shipped.
+
+## 2026-09-10 — `projectOverview.md` set to 10564 for the merged BF-136 + LB-99 row
+
+The row filed hours earlier said the report's symptom was open; it is now fixed, so the two entries
+became one row describing both defects rather than two rows describing one report twice.

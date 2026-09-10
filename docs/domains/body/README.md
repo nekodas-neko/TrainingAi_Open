@@ -22,6 +22,14 @@ others (energy balance, bodyweight 1RM, readiness) and shouldn't be buried insid
 
 - [`docs/superpowers/plans/2026-08-31-dexa-filter.md`](../../superpowers/plans/2026-08-31-dexa-filter.md) — **BF-2's implementation plan.** Read-time correction, derived pairs, offset at n=1, and the sweep of every `bodyFatPct` read site — including `personalRmr`, where feeding the uncorrected scale number re-scales a measured RMR onto +45 kcal/day of fat-free mass the owner does not have.
 - [`docs/superpowers/plans/2026-09-01-blood-panel-import.md`](../../superpowers/plans/2026-09-01-blood-panel-import.md) — **BF-1's implementation plan (engine half).** The schema is written from the real 41-analyte panel, so the shapes it has to survive are facts rather than guesses: `<0.2` is a result that is **not a number** (`value_num` + `value_operator`), reference ranges arrive two-sided, one-sided in **both** directions and absent (both bounds nullable), the collection date is a **month** (a precision column, or every panel lands on the 1st and lies), and flags are commentary — *"Normal (athletic)"* sits on a creatinine **inside** its range, which is why **out-of-range is derived from the bounds and never read off the flag**. Names the three markers that would change a recommendation (urea 9.2 vs the protein target; LDL/non-HDL high with triglycerides optimal — a fat-*quality* signal; fasting insulin 4 and glucose 4.8, whose value is *negative*, removing a hedge), because a table of 40 analytes nothing reads is this feature's failure mode.
+- [`docs/overview/entries/2026-09-10-fix-weight-response-undecided-label.md`](../../overview/entries/2026-09-10-fix-weight-response-undecided-label.md)
+  — **"not enough weigh-ins", printed above six of them (LB-99), 2026-09-10.** BF-136's second half.
+  `weightResponse()` returns null only when there is no interval to compute; it returns a **full
+  result with `verdict: null`** when the readings are plentiful and the range straddles the band —
+  the designed normal state. The chip was `tone?.label ?? 'Not enough weigh-ins yet'`, so the second
+  rendered as the first. `responseState()` separates them; undecided now reads "Not called yet".
+  **The entry keeps a wrong first diagnosis on the record**: a card reporting "no data" is not
+  evidence that no data reached it.
 - [`docs/overview/entries/2026-09-10-fix-vial-opened-date.md`](../../overview/entries/2026-09-10-fix-vial-opened-date.md)
   — **a vial records when it was mixed, not when it was entered (BF-136), 2026-09-10.** `openedOn`
   was `todayInTz(tz)` with no control, and it anchors every figure on the vial card — a vial entered

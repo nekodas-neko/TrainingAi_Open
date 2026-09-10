@@ -27,6 +27,14 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   be excluded from aggregates rather than counted as zero. **Stage 1 shipped 2026-09-01**, so the
   unique constraint it says has to go is already gone.
 
+- [`docs/overview/entries/2026-09-10-fix-weight-response-undecided-label.md`](../../overview/entries/2026-09-10-fix-weight-response-undecided-label.md)
+  — **"not enough weigh-ins", printed above six of them (LB-99), 2026-09-10.** BF-136's second half.
+  `weightResponse()` returns null only when there is no interval to compute; it returns a **full
+  result with `verdict: null`** when the readings are plentiful and the range straddles the band —
+  the designed normal state. The chip was `tone?.label ?? 'Not enough weigh-ins yet'`, so the second
+  rendered as the first. `responseState()` separates them; undecided now reads "Not called yet".
+  **The entry keeps a wrong first diagnosis on the record**: a card reporting "no data" is not
+  evidence that no data reached it.
 - [`docs/overview/entries/2026-09-10-fix-vial-opened-date.md`](../../overview/entries/2026-09-10-fix-vial-opened-date.md)
   — **a vial records when it was mixed, not when it was entered (BF-136), 2026-09-10.** `openedOn`
   was `todayInTz(tz)` with no control, and it anchors every figure on the vial card — a vial entered

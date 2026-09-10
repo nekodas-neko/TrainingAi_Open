@@ -5,7 +5,7 @@ import { getLocalStore } from "@/lib/local-store";
 import { cachedFetch } from "@/lib/sqlite/cache";
 import { TTL_MEDIUM } from "@trainingai/shared/cache-ttl";
 import type { WeightPoint } from "@trainingai/shared/health/long-term-goal-progress";
-import { weightResponse, formatRange, type ResponseVerdict } from "./weight-response";
+import { weightResponse, formatRange, responseState, type ResponseVerdict } from "./weight-response";
 
 /**
  * Weight response over the current vial (OR-102b ④).
@@ -62,6 +62,12 @@ export function WeightResponseCard({ userId, sinceDate }: { userId?: string; sin
   const windowed = (points ?? []).filter(p => p.date >= sinceDate);
   const result = weightResponse({ points: windowed });
   const tone = result?.verdict ? TONE[result.verdict] : null;
+  // LB-99. These were one label, and the two states are opposites: `undecided` means there ARE
+  // enough weigh-ins and the interval straddles the band. Saying "not enough" there contradicts the
+  // "6 weigh-ins over 5 days" line printed two rows below it, and is what the owner reported.
+  const chipLabel = tone?.label ?? (responseState(result) === 'undecided'
+    ? 'Not called yet'
+    : 'Not enough weigh-ins yet');
 
   return (
     <section className="space-y-2">
@@ -71,7 +77,7 @@ export function WeightResponseCard({ userId, sinceDate }: { userId?: string; sin
       </div>
 
       <div className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${tone?.chip ?? UNDECIDED}`}>
-        {tone?.label ?? 'Not enough weigh-ins yet'}
+        {chipLabel}
       </div>
 
       {result ? (
