@@ -1137,6 +1137,42 @@ bigger setting.
 reports fast-block compliance and interval contrast for the session, and both numbers are comparable
 between a treadmill walk and an outdoor walk without any surface-specific adjustment.
 
+### [platform] LA-101 — a full test run fails with zero failing tests, twice in one session
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-10 · found twice while gating LA-87 and LA-96, not from a report.
+- **Lane: A** — test infrastructure (`vitest.config.ts`), no product code.
+
+`pnpm test` exits **1** while reporting `881 passed | 5 skipped` and `8287 passed, 0 failed`. The
+whole failure is one line:
+
+```
+EnvironmentTeardownError: [vitest-worker]: Closing rpc while "onUserConsoleLog" was pending
+This error originated in "lib/__tests__/hr-read-routes.test.ts"
+```
+
+A worker was torn down with a console-log RPC still in flight. Both sightings re-ran clean
+immediately after, on identical code.
+
+**Why this is worth an entry rather than a shrug.** CLAUDE.md already names the signature — *"1 test
+file failed with 0 failing tests — the tell that it is a hook, not an assertion"* — for the
+`migration-test-lock` case, and this is a second, different cause wearing the same clothes. It has
+now cost two investigations in one session, and the second only resolved quickly because the first
+had happened. A red gate that is not a red gate is the most expensive kind of flake: the honest
+response to it is to investigate, every time, until someone writes down which reds are real.
+
+**What to look at.** The originating file is incidental — it is whichever worker happened to be
+logging at teardown, and the run that fails is the one running alongside `check-comment-blindness`,
+which writes an unusually large amount of console output while injecting fixtures into real source
+files. Suspect the interaction rather than `hr-read-routes.test.ts` itself. Vitest's own issue
+tracker has this under worker teardown races; check whether the pinned version has a fix before
+reaching for `dangerouslyIgnoreUnhandledErrors`, which would hide real unhandled rejections too.
+
+**Do not fix this by quieting the console output** — that output is `check-comment-blindness` doing
+its job, and silencing it to make a race less likely is treating the symptom that is legible rather
+than the one that is broken.
+
+---
+
 ### [cardio][heart-rate] TN-25 — the guided walk's fast target has never been met in 44 attempts, and the live pacer says "push" every time
 - **Lane:** A — both (1 engine, 1 surface) → A, engine half first.
 
@@ -20332,46 +20368,6 @@ which metrics are valid and which camera angle to ask for.
 carry no `equipment` tag** (15%), and 16 carry more than one. The `unknown` profile is a live path
 serving about one exercise in seven, not a defensive branch.
 
-
-### [workouts] LA-96 — the two-marker deload gate is applied at 2 of 6 1RM read sites
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-10 · found while re-measuring Q-52, not from a report.
-- **Lane: A** — `lib/data/postgres/**` and one `app/api` route.
-- **Reference for the measurement:** [`2026-09-10-q52-phase-hold-remeasure.md`](reviews/2026-09-10-q52-phase-hold-remeasure.md) §5.
-- **Low priority on purpose: there is nothing to catch today.** File it so the reasoning is not
-  re-derived a third time, not because a user can see it.
-
-`getLastRealOneRmBatch` filters `estimated_1rm > 0` **AND** `exercise_deloaded = false`, and its own
-comment gives the reason: the `> 0` predicate alone *"trusts the write-time invariant that a deload
-set always stores 0 — and that invariant has been violated in production"*. `reconcilePersonalRecord`
-mirrors it. **Four sibling readers guard on `> 0` alone:**
-
-| site | `> 0` | `deloaded = false` |
-|---|---|---|
-| `getLastRealOneRmBatch` (`adapter.ts:1483`) | ✓ | ✓ |
-| `reconcilePersonalRecord` (`adapter.ts:3402`) | ✓ | ✓ |
-| `getYearReviewTopExercises` (`adapter.ts:1426`) | ✓ | ✗ |
-| `listRecent1rm` (`adapter.ts:1683`) | ✓ | ✗ |
-| `getStrengthTrend` (`slices/periodization.ts:469`) | ✓ | ✗ |
-| `/api/strength-trend` (`route.ts:69`) | ✓ | ✗ |
-
-**⚠ Do not open this expecting to find a bug — measured 2026-09-10, the exposure is zero.** The
-2026-08-06 log the adapter comment cites (`estimated_1rm = 85.75` with `exercise_deloaded = true`)
-**no longer exists**: `0 of 444` logs hold that shape, deleted rows included. The comment's evidence
-is stale; its *argument* is not, which is why the filter stays and why this entry is about the four
-sites that lack it rather than about a wrong number on a screen.
-
-**The other half of the same measurement is genuinely inert and needs nothing:** ten pre-Q-298 logs
-store `estimated_1rm = 0` with `exercise_deloaded = false` (two whole Pull sessions, 2026-08-09 and
-2026-08-16, on real working sets), and every one of the six sites above excludes them via `> 0`.
-
-**Also visible in that table, and probably the better fix:** the last two rows are the *same query*
-duplicated across `slices/periodization.ts` and `app/api/strength-trend/route.ts` — 90-day window,
-same `MAX(estimated_1rm)` grouping, same `to_char` day bucketing. Per **One Formula, One Place** that
-is a bug by definition, and de-duplicating it makes this a three-site change rather than four.
-Confirm the two are really equivalent before merging them; they may have drifted.
-
----
 
 ## [cardio] ▶ Cardio training system — remaining
 

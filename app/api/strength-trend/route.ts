@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
-import { sql } from 'drizzle-orm'
-import { getDb, ensureSchema } from '@/lib/data/postgres/client'
+import { ensureSchema } from '@/lib/data/postgres/client'
 import { getRepository } from '@/lib/data'
 import { formatInTimeZone } from 'date-fns-tz'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
@@ -52,38 +51,13 @@ export async function GET() {
     return NextResponse.json({ exercises: [] } satisfies StrengthTrendResponse, { headers: { "Cache-Control": "private, no-store" } })
   }
 
-  const db = getDb()
-  const nameList = sql.join(programExercises.map(n => sql`${n}`), sql`, `)
-
-  type RawRow = { exercise_name: string; session_date: string; rm: number }
-  const result = await db.execute<RawRow>(sql`
-    SELECT
-      el.exercise_name,
-      to_char((ws.started_at AT TIME ZONE ${tz}), 'YYYY-MM-DD') AS session_date,
-      MAX(el.estimated_1rm)::double precision AS rm
-    FROM exercise_logs el
-    JOIN workout_sessions ws ON ws.id = el.workout_session_id
-    WHERE ws.user_id = ${userId}::uuid
-      AND el.exercise_name IN (${nameList})
-      AND el.estimated_1rm IS NOT NULL
-      AND el.estimated_1rm > 0
-      AND ws.started_at >= NOW() - INTERVAL '90 days'
-      AND el.deleted_at IS NULL AND ws.deleted_at IS NULL
-    GROUP BY el.exercise_name, session_date
-    ORDER BY el.exercise_name, session_date
-  `)
-
-  // Group by exercise, preserving program order
-  const byExercise = new Map<string, { date: string; rm: number }[]>()
-  for (const row of result.rows) {
-    const arr = byExercise.get(row.exercise_name) ?? []
-    arr.push({ date: row.session_date, rm: Number(row.rm) })
-    byExercise.set(row.exercise_name, arr)
-  }
+  // One Formula, One Place: this route used to carry a byte-identical copy of the repository's
+  // 90-day 1RM-history query, which is how it missed the deload gate the repository has (LA-96).
+  const byExercise = await repo.getExercise1rmHistory(userId, programExercises, tz)
 
   const exercises: StrengthTrendEntry[] = []
   for (const name of programExercises) {
-    const history = byExercise.get(name)
+    const history = byExercise[name]
     if (!history || history.length === 0) continue
     const rms = history.map(h => h.rm)
     const currentRm = rms[rms.length - 1]

@@ -10702,3 +10702,34 @@ session rediscovers them one `check-doc-links` run at a time, which is exactly h
 
 The numbers are in it because they decide the approach: 305 of 342 entries cited, 467 links across 30
 files, 194 of them in one regular form. Regular enough to script is the whole argument for scripting.
+
+## 2026-09-10 — `docs/implementation-backlog.md` 20503 → 20499 (LA-96 out, LA-101 in)
+
+Net four lines. LA-96's 40-line entry left the queue as it shipped, and a 36-line LA-101 went in
+behind it — a full test run that exits 1 while reporting zero failing tests, seen twice tonight. The
+near-cancellation is a coincidence of length, not a swap.
+
+This number has now been wrong twice for the same reason, which is the point of writing it down.
+The branch first wrote 20281 (against 20321), then 20418 (against 20458) after OR-106 and OR-107
+landed; BF-138 landed during CI and took it to 20503. Each figure was correct when computed and
+stale by the time it was pushed. Recomputed by `pnpm fix:baselines` **after** each merge of `main`,
+which is the only way the subtraction means anything — under six concurrent lanes, a baseline is a
+reading of a moving number, not a fact about the branch.
+
+Resurrection check done the block way — compared the resulting entry blocks against
+`git show origin/main:docs/implementation-backlog.md` rather than reading diff markers. The merge
+of the backlog itself was clean; this branch's only change to it is LA-96's removal, and OR-106's
+PS-35a/PS-35b split and the 25 new `Lane:` tags all survived it.
+
+## 2026-09-10 — `projectOverview.md` 10564 → 10533 (LA-96, Q-228 struck)
+
+Thirty-one lines, all one Known Issue leaving. Q-228 is resolved on both halves — migration
+`186_q228_deloaded_log_1rm_straggler.sql` zeroed the straggler (verified in production today: the row
+is still there, un-deleted, reading 0) and LA-96 finished the read-time backstop across every
+remaining 1RM reader. Moved whole to `known-issues-resolved.md` rather than ticked in place, so the
+orientation read stays a list of what is open.
+
+Worth recording *why* it lingered: the entry's own text had gone stale in both directions. It said
+`getLastRealOneRmBatch` never filters on `exercise_deloaded` long after that filter shipped, and
+called it the one query in the family missing the filter when four others were. Nobody re-read it
+because it read as accurate.

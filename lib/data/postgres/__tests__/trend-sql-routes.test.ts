@@ -1,11 +1,15 @@
 // PS-39 — `strength-trend` and `muscle-tonnage-trend`, the two trend reads whose logic IS their SQL.
 //
-// **These two are tested against real rows because a mock would pin nothing they own.** Both build a
-// query by hand rather than going through the repository, and everything that matters lives inside
-// it: the `ws.user_id` scope, `deleted_at IS NULL` across three tables, bucketing by the LOCAL
-// calendar date rather than the UTC timestamp, and — for tonnage — the main/secondary role
-// weighting and the split between library and free-text muscles. A stub answering `db.execute`
-// would assert that a string was passed somewhere.
+// **These two are tested against real rows because a mock would pin nothing they own.** Everything
+// that matters lives inside the SQL: the `ws.user_id` scope, `deleted_at IS NULL` across three
+// tables, bucketing by the LOCAL calendar date rather than the UTC timestamp, and — for tonnage —
+// the main/secondary role weighting and the split between library and free-text muscles. A stub
+// answering `db.execute` would assert that a string was passed somewhere.
+//
+// LA-96 moved strength-trend's half of that SQL into the repository (`getExercise1rmHistory`),
+// which the route had been carrying a byte-identical copy of. These cases did not change and were
+// not touched — they are what established the delegation preserved the route's behaviour.
+// `muscle-tonnage-trend` still builds its query in the route.
 //
 // So the cases below are the ones a mock is structurally blind to:
 //
@@ -18,7 +22,8 @@
 // One guard is deliberately NOT covered and it is worth saying why: `startRm > 0` in the gain
 // calculation is unreachable, because the query already filters `estimated_1rm > 0`, so nothing a
 // zero could ride in on ever reaches the JS. A test for it would assert a state the route cannot
-// produce.
+// produce. LA-96's second marker (`exercise_deloaded = false`) makes it doubly so; that gate is
+// covered in `deload-gate-1rm-readers.test.ts`, at the repository, where it now lives.
 //
 // Runs only against a real local dev Postgres — skips in CI, like its siblings here.
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest'
