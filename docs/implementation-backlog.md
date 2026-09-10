@@ -19325,6 +19325,34 @@ numbers:
 > other high-cardinality timeseries) to the delta and this item becomes urgent in the same PR.**
 > Q-29 D2 (the on-device rollup) is the most likely source of such a change.
 
+> **⚠ RE-MEASURED 2026-09-10 — the verdict holds, four of its supporting numbers do not, and the
+> tripwire below is now ENFORCED rather than written down.**
+>
+> - **The restore is 3,544 rows across 31 domains**, not "≈1,800 across twenty". Counted per domain
+>   against production: `set_logs` 1,189 (was 887), `exercise_logs` 444, `food_logs` 438,
+>   `food_items` 293, `body_metrics` 133, `oura_daily_derived` 115, `session_exercises` 111,
+>   `sleep_sessions` 109, `workout_sessions` 107, `mood_logs` 96, `day_checkins` 82, and twenty
+>   smaller. **+92% in five weeks**, from eleven domains added since 2026-08-02.
+> - **The verdict is unchanged.** 3,544 is still the low end of this entry's own criterion, not the
+>   five-figure case, and it is still a one-time path on the code with the worst data-loss history
+>   in the repo. **Do not build the batching on this number.**
+> - **But the tripwire's stakes tripled.** `oura_heartrate` is **111,246 rows**, not the 37,950 this
+>   entry recorded — so adding the HR series to the delta now means ~115,000 sequential bridge
+>   crossings against today's 3,544, a factor of **32**, not the factor of 22 the old figures implied.
+> - **`scripts/check-apply-delta-domains.js` (Custom Rules) freezes the domain list.** Adding a
+>   domain to `applyDeltaBody` now fails CI with the question to answer first — how many rows, at
+>   what cardinality — rather than passing silently. **That is the change this entry needed:** the
+>   tripwire was prose, nothing made a PR notice it, and eleven domains were added without anyone
+>   re-running the number. The extraction lives in `scripts/lib/apply-delta-domains.js` with a test
+>   pinning the brace-walk scoping, because `delta.*` is touched outside the method too.
+> - **Two stale line numbers, corrected:** `runSQL` is `lib/sqlite/sqlite-service.ts:198` (was 134),
+>   `applyDeltaBody` is `lib/local-store/sqlite-backend.ts:1252` (was 1186). Both are unchanged in
+>   shape — one `_db.run()` per statement, one `await runSQL` per row.
+> - **Still true, re-verified:** `executeSet` has zero call sites in the repo; `oura_heartrate` is
+>   mirrored in the local schema but is not a delta domain; and
+>   `lib/local-store/__tests__/sqlite-backend.test.ts` mocks `runSQL` and asserts on issued SQL
+>   across 28 `applyDelta` cases, so a batching refactor really is checkable statement-for-statement.
+
 Native SQLite still does not run in the sandbox, so the *bridge-crossing* cost itself remains
 device-only — but the row count is what decides priority, and that is now known.
 
