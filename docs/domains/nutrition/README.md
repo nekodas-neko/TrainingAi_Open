@@ -52,8 +52,8 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   `components/nutrition/__tests__/macro-budget-gap.test.ts` pins it. Q-401's "one budget, three
   views" guarantee on `energy-card.tsx` covers the calorie half only — the macro row was never in
   it. **Whether the two should share an anchor is the owner's and Lane A's**, and untouched.
-- [`docs/overview/entries/2026-09-02-q517-tdee-bmr-floor.md`](../../overview/entries/2026-09-02-q517-tdee-bmr-floor.md) — **the calibrated maintenance is floored at BMR, 2026-09-02 (Q-517).** `adaptive-tdee.ts` clamped at a universal **1000** against its own header's prediction that the failure would land at 1200; the owner's worst window computed **1052**. The floor is now the user's own BMR — the **measured** resting rate where one exists, because `energy-balance-service.ts` already resolves `personalRmr(measured) ?? comp.bmrKcal ?? mifflinStJeorBmr` two dozen lines above the call, which also disposes of the addendum's fallback ladder. Below it the window is **rejected, not clamped**, so the resolver falls back to the formula baseline. **The right floor already existed one line below on `restingBaseKcal`** — protecting what the balance *displays*, not the maintenance that becomes the recommendation and then `users.calorie_goal`. **SAFE, not CORRECT:** survivors still sit under the formula's 2,397, and within-day incompleteness detection stays on the `Keep:`.
-- [`docs/overview/entries/2026-09-06-bf-112-dose-entry.md`](../../overview/entries/2026-09-06-bf-112-dose-entry.md)
+- [`2026-09-02-q517-tdee-bmr-floor`](../../overview/history-2026-09-10-folded-5.md#2026-09-02-q517-tdee-bmr-floor) — **the calibrated maintenance is floored at BMR, 2026-09-02 (Q-517).** `adaptive-tdee.ts` clamped at a universal **1000** against its own header's prediction that the failure would land at 1200; the owner's worst window computed **1052**. The floor is now the user's own BMR — the **measured** resting rate where one exists, because `energy-balance-service.ts` already resolves `personalRmr(measured) ?? comp.bmrKcal ?? mifflinStJeorBmr` two dozen lines above the call, which also disposes of the addendum's fallback ladder. Below it the window is **rejected, not clamped**, so the resolver falls back to the formula baseline. **The right floor already existed one line below on `restingBaseKcal`** — protecting what the balance *displays*, not the maintenance that becomes the recommendation and then `users.calorie_goal`. **SAFE, not CORRECT:** survivors still sit under the formula's 2,397, and within-day incompleteness detection stays on the `Keep:`.
+- [`2026-09-06-bf-112-dose-entry`](../../overview/history-2026-09-10-folded-6.md#2026-09-06-bf-112-dose-entry)
   — **the dose can be typed in (BF-112, BF-69 stage 2), 2026-09-06.** The manage sheet writes
   amount, unit, `dose_prompt` and the started/stopped window; a prompted supplement asks for the
   number when ticked; the row renders **what the log recorded**, not the definition's current
@@ -62,7 +62,7 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   working in the browser, and the tick left the previous log's number on screen until the next pull.
   **Not device-verified.** The read path now lives in `lib/hooks/use-supplements.ts`; the day's
   exposure is derived once per lane, which is filed as **LB-57**.
-- [`docs/overview/entries/2026-09-01-supplement-contributions.md`](../../overview/entries/2026-09-01-supplement-contributions.md)
+- [`2026-09-01-supplement-contributions`](../../overview/history-2026-09-10-folded-5.md#2026-09-01-supplement-contributions)
   — **a day's dose is a sum of contributions (BF-69 stage 1), 2026-09-01.** Migrations 254/255 and
   local SQLite v34. `supplement_logs` is contribution rows now, with a *partial* unique over
   `source = 'manual'` in place of the whole-day one — meal contributions add, the page's tick stays
@@ -70,7 +70,7 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   `started_on`/`stopped_on`/`dose_prompt`. **v34 rebuilds a table rather than adding a column and
   no device has opened it**; nothing can write an amount until Lane B's stage 2.
 
-- [`docs/overview/entries/2026-09-01-blood-panel-storage.md`](../../overview/entries/2026-09-01-blood-panel-storage.md) — **blood panels are stored, de-identified (BF-1, engine half), 2026-09-01.** `blood_panels` + `blood_analytes` (migrations 250/251) with a schema written from the owner's real 63-row report: `<0.2` is a result that is not a number, ranges arrive one-sided in both directions and absent, the date is a month, and **out-of-range is derived from the bounds rather than read off the provider's flag**. The extraction route, the recommendation consumers and the whole UI are still owed.
+- [`2026-09-01-blood-panel-storage`](../../overview/history-2026-09-10-folded-4.md#2026-09-01-blood-panel-storage) — **blood panels are stored, de-identified (BF-1, engine half), 2026-09-01.** `blood_panels` + `blood_analytes` (migrations 250/251) with a schema written from the owner's real 63-row report: `<0.2` is a result that is not a number, ranges arrive one-sided in both directions and absent, the date is a month, and **out-of-range is derived from the bounds rather than read off the provider's flag**. The extraction route, the recommendation consumers and the whole UI are still owed.
 - [`docs/superpowers/plans/2026-08-25-unified-day-review.md`](../../superpowers/plans/2026-08-25-unified-day-review.md)
   — **Q-112, the unified day review** (Q-112a–e). Read it instead of Task 27 of the 2026-08-05 batch,
   whose central premise — that no per-day read-through screen exists — stopped being true when Q-110
@@ -133,19 +133,19 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   v1.292.0 ([`docs/overview/history-2026-08-12.md`](../../overview/history-2026-08-12.md)).
 - [`docs/superpowers/plans/2026-08-17-saved-meal-printable-label.md`](../../superpowers/plans/2026-08-17-saved-meal-printable-label.md)
   — **Q-389, printable saved-meal labels with a scannable code. ✅ BUILT 2026-08-18 (v1.320.0)** —
-  see [the journal entry](../../overview/entries/2026-08-18-saved-meal-printable-label.md); two owed
+  see [the journal entry](../../overview/history-2026-09-10-folded-1.md#2026-08-18-saved-meal-printable-label); two owed
   checks remain and both are physical (a test print, and the camera scan path). Carries three
   corrections to the intake entry: a 21×21 QR **cannot** hold a meal id (v2 25×25 minimum, so the
   module pitch is 0.49–0.64 mm, ~16% finer than recorded); the "log one serving" requirement is
   already met by `oneServingItems`/`logMealItems`; and consequently **`SavedMeal.totals` is the whole
   recipe**, so a label must render `totals / servings` or it prints double what scanning it logs.
-- [`docs/overview/entries/2026-08-18-meal-label-ingredient-breakdown.md`](../../overview/entries/2026-08-18-meal-label-ingredient-breakdown.md)
+- [`2026-08-18-meal-label-ingredient-breakdown`](../../overview/history-2026-09-10-folded-1.md#2026-08-18-meal-label-ingredient-breakdown)
   — **Q-393, the ingredient breakdown on the label (v1.323.0).** A square-only style, because a round
   50 mm label has **7 units of slack — zero lines** — once the default's content is on it. **Carries a
   correction worth reading before any print test: every module-pitch figure in Q-389/Q-393 is ~24%
   optimistic**, since the quiet zone is drawn *inside* the code box (band is 0.369 mm, not 0.487).
   The round trimmed variant was measured at 0.353 mm and deliberately **not** built.
-- [`docs/overview/entries/2026-08-19-label-line-budget.md`](../../overview/entries/2026-08-19-label-line-budget.md)
+- [`2026-08-19-label-line-budget`](../../overview/history-2026-09-10-folded-1.md#2026-08-19-label-line-budget)
   — **Q-399: the default label promised the ingredient breakdown and printed zero lines of it for a
   release (v1.324.0–v1.324.6), and three separate gates stayed quiet.** The sheet's "Printing N
   ingredients" copy was gated on `> 0`, so the one reading worth having removed itself; the picker
@@ -153,7 +153,7 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   **size**, which a bigger code scored better on. Read it before changing any label geometry: the
   four vertical gaps are spec data now, `centredStackLineBudget` derives the line count from them,
   and a test asserts the promise rather than a constant.
-- [`docs/overview/entries/2026-08-18-meal-label-inline-centred.md`](../../overview/entries/2026-08-18-meal-label-inline-centred.md)
+- [`2026-08-18-meal-label-inline-centred`](../../overview/history-2026-09-10-folded-1.md#2026-08-18-meal-label-inline-centred)
   — **Q-397, the label that actually shipped to the agreed design (v1.324.0), and the reasoning
   worth keeping.** Q-393's "the list does not fit a round label" was true only for a **stacked**
   list; running the ingredients as one **wrapping** run spends width instead of height, so the
@@ -166,16 +166,16 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   the code size. **Superseded again 2026-08-19 by Q-411**, which retired the round constraint
   entirely — every style draws square, the default is **0.561 with four lines**, and both test
   thresholds were raised because the square canvas made the old ones unable to fail
-  ([`journal`](../../overview/entries/2026-08-19-square-label-canvas.md)). ⚠ That gain holds only if
+  ([`journal`](../../overview/history-2026-09-10-folded-2.md#2026-08-19-square-label-canvas)). ⚠ That gain holds only if
   the owner's circle template **crops**; if it **scales**, the default lands at 0.397 — worse than
-  what it replaced. Unresolved until one test print — [`journal`](../../overview/entries/2026-08-19-label-line-budget.md).
-- [`docs/overview/entries/2026-08-30-feat-self-contained-meal-label.md`](../../overview/entries/2026-08-30-feat-self-contained-meal-label.md)
+  what it replaced. Unresolved until one test print — [`journal`](../../overview/history-2026-09-10-folded-1.md#2026-08-19-label-line-budget).
+- [`2026-08-30-feat-self-contained-meal-label`](../../overview/history-2026-09-10-folded-3.md#2026-08-30-feat-self-contained-meal-label)
   — **BF-57 engine half: the meal travels IN the code, not as a pointer to it.** Positional JSON, so
   a label scans offline for a user with no account, as a copy. Ids were deliberately **not** made
   globally resolvable — a photo of a label would become read access to someone's meal. **The totals
   are sacred:** the tail rolls into one remainder entry carrying its combined macros rather than
   anything being dropped.
-- [`docs/overview/entries/2026-08-31-shared-meal-labels.md`](../../overview/entries/2026-08-31-shared-meal-labels.md)
+- [`2026-08-31-shared-meal-labels`](../../overview/history-2026-09-10-folded-4.md#2026-08-31-shared-meal-labels)
   — **BF-57 surface half, and the measurement that reversed its plan.** The entry asked for the code
   to be given ~30 mm so version 11 fits every style; the five print styles are each **already** at
   the largest code that clears their content by 6 units, and four of the six cannot hold 62 bytes —
@@ -184,7 +184,7 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   before changing any `codeUnits`: `mealLabelShareBudget` derives the payload budget from the
   geometry, so shrinking a code silently shrinks what its label can carry. ⚠ **0.49 mm per module is
   a convention, not a measurement** — no label of any style has been through a printer.
-- [`docs/overview/entries/2026-08-31-nutrition-sheet-surface.md`](../../overview/entries/2026-08-31-nutrition-sheet-surface.md)
+- [`2026-08-31-nutrition-sheet-surface`](../../overview/history-2026-09-10-folded-4.md#2026-08-31-nutrition-sheet-surface)
   — **BF-75: the sheets carry the tab's palette.** Read before making any sheet translucent: the
   wallpaper is `z-[-1]` while `SheetOverlay` and `SheetContent` are both `z-50`, so transparency
   reveals the overlay's `bg-black/50`, not the tab. The palette is painted *inside* the sheet behind
@@ -200,7 +200,7 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   (`image`+`mimeType`, `url`, `text`) in one handler, so the fix is an entry point and not an engine.
   The plan **declines** BF-52's instruction to absorb BF-63's barcode into the new row, and says why:
   photo and URL produce a whole ingredient list, the barcode and the estimate produce one ingredient.
-- [`docs/overview/entries/2026-08-31-meal-builder-entry-point.md`](../../overview/entries/2026-08-31-meal-builder-entry-point.md)
+- [`2026-08-31-meal-builder-entry-point`](../../overview/history-2026-09-10-folded-4.md#2026-08-31-meal-builder-entry-point)
   — **BF-52 shipped: the builder's source row.** Two findings bind future work here. The URL branch in
   `ingredient-search.tsx` is a **guard**, not just an affordance — delete it and a pasted link falls to
   the AI estimate, which produces a food called "https" with invented macros. And `runRecipeImport`
@@ -212,9 +212,9 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
 
 - Reviews: [`docs/reviews/2026-08-07-full-app-review.md`](../../reviews/2026-08-07-full-app-review.md) — **full-app deep review, 2026-08-07** (saving/caching/performance/logic across all 201 routes and 40 pages; 53 findings queued as Q-117…Q-138, plus root cause for Q-73 and mechanisms for Q-72/Q-107)
 
-- [`docs/reviews/2026-08-18-memo-stability-audit.md`](../../reviews/2026-08-18-memo-stability-audit.md) — **are the memos actually memoising? 2026-08-18**. All 66 `memo(...)` declarations collected and every call site scanned: Q-490 — `MealMacroBars`/`DayMacroTotals` are called with an inline `target={{…}}` inside `variant.meals.map(...)`, so every keystroke in the meal-plan edit sheet re-renders every meal row. Also notes the rule's *"both long-standing memos"* count is stale (66, not 2). **Q-490 SHIPPED 2026-08-18** (v1.324.9): both take scalars now, and `scripts/check-memo-prop-stability.js` enforces the class — [`journal`](../../overview/entries/2026-08-18-memo-scalar-props.md). **Two of this audit's claims did not survive that check:** `actual` is a fresh object at three of the four sites too, not just `target`, so fixing `target` alone would have left three still defeated; and *"64 hold, no inline arrows anywhere"* is wrong — there are **four** inline-arrow sites on four other memoised components, now baselined and filed as Q-357.
-- [`docs/overview/entries/2026-08-24-recipe-spec-structural-attribution.md`](../../overview/entries/2026-08-24-recipe-spec-structural-attribution.md) — **LB-7, the recipe spec's attribution guard, 2026-08-24** (`getByText('example.com').last()` matched the row's NAME, which is the host while the scrape resolves — measured passing with the attribution deleted and the mock delayed 8 s. It asserts on a `data-testid` row now.)
-- [`docs/overview/entries/2026-08-24-memo-call-site-stability.md`](../../overview/entries/2026-08-24-memo-call-site-stability.md) — **Q-357, the memo baseline emptied, 2026-08-24** (four defeated call sites cleared; the `SavedMealCard` one was inside a `.map()`, so its callbacks now take the meal and hand it back rather than being closed over per row). **Render saving not measured.**
+- [`docs/reviews/2026-08-18-memo-stability-audit.md`](../../reviews/2026-08-18-memo-stability-audit.md) — **are the memos actually memoising? 2026-08-18**. All 66 `memo(...)` declarations collected and every call site scanned: Q-490 — `MealMacroBars`/`DayMacroTotals` are called with an inline `target={{…}}` inside `variant.meals.map(...)`, so every keystroke in the meal-plan edit sheet re-renders every meal row. Also notes the rule's *"both long-standing memos"* count is stale (66, not 2). **Q-490 SHIPPED 2026-08-18** (v1.324.9): both take scalars now, and `scripts/check-memo-prop-stability.js` enforces the class — [`journal`](../../overview/history-2026-09-10-folded-1.md#2026-08-18-memo-scalar-props). **Two of this audit's claims did not survive that check:** `actual` is a fresh object at three of the four sites too, not just `target`, so fixing `target` alone would have left three still defeated; and *"64 hold, no inline arrows anywhere"* is wrong — there are **four** inline-arrow sites on four other memoised components, now baselined and filed as Q-357.
+- [`2026-08-24-recipe-spec-structural-attribution`](../../overview/history-2026-09-10-folded-2.md#2026-08-24-recipe-spec-structural-attribution) — **LB-7, the recipe spec's attribution guard, 2026-08-24** (`getByText('example.com').last()` matched the row's NAME, which is the host while the scrape resolves — measured passing with the attribution deleted and the mock delayed 8 s. It asserts on a `data-testid` row now.)
+- [`2026-08-24-memo-call-site-stability`](../../overview/history-2026-09-10-folded-2.md#2026-08-24-memo-call-site-stability) — **Q-357, the memo baseline emptied, 2026-08-24** (four defeated call sites cleared; the `SavedMealCard` one was inside a `.map()`, so its callbacks now take the meal and hand it back rather than being closed over per row). **Render saving not measured.**
 - [`docs/reviews/2026-08-18-malformed-route-ids.md`](../../reviews/2026-08-18-malformed-route-ids.md) — **every dynamic route called with an id that is not a UUID, 2026-08-18** (Q-483 — three routes reply with the raw driver error including the full `SELECT` and every column name of `workout_sessions`, from their own catch, unredacted in production; Q-482 — 21 route/method pairs across 14 routes 500 on a malformed id while answering a valid-but-missing one correctly, and only 2 of 30 dynamic routes validate the id at all).
 - [`docs/reviews/2026-08-18-outbox-replay-idempotency.md`](../../reviews/2026-08-18-outbox-replay-idempotency.md) — **the same mutation pushed twice, 2026-08-18** (Q-481 — a water quick-add replayed by the outbox stores 750 ml for 250 logged; `waterMlDelta` is the only non-idempotent branch of nineteen, and the server keeps no record of processed mutation ids). The additive write is deliberate (SYNC-P7) and must stay — the fix is mutation-id dedupe, not a change of semantics.
 - [`docs/reviews/2026-08-18-write-surface-not-found.md`](../../reviews/2026-08-18-write-surface-not-found.md) — **nutrition/cardio/activity writes probed cross-user, and the whole write surface measured for the not-found answer, 2026-08-18** (Q-463 — `PUT /api/nutrition/meal-types/[id]` and both supplement write routes answer a missing row with a bodiless 500). Finding Q-463; **cross-user protection holds across all four write pillars**, and the idempotent `DELETE` pattern is recorded as clean rather than filed.
@@ -248,17 +248,17 @@ Live at the time of writing (2026-07-30):
 - ⚠️ **The finished-logging control was never reached** (BF-6, 2026-08-24, v1.344.0) — last on the
   page, **zero presses in seven weeks**, while the calibration it feeds excludes an unmarked day
   rather than treating it as light. Now directly under the meals, End of Day last. **Not
-  device-verified** — [`journal`](../../overview/entries/2026-08-24-finish-logging-above-end-of-day.md).
+  device-verified** — [`journal`](../../overview/history-2026-09-10-folded-2.md#2026-08-24-finish-logging-above-end-of-day).
 - ⚠️ **A recipe link becomes a meal** (Q-409's Lane B half, 2026-08-24, v1.342.0) — the plan
   wizard's "meals you usually eat" step takes a URL. **A page that states no yield hands back the
   WHOLE recipe**, so the row asks how many it serves and refuses to be kept until answered;
   `perServing` is shared with the route so the two divides cannot drift —
-  [`journal`](../../overview/entries/2026-08-24-recipe-url-to-meal-ui.md).
+  [`journal`](../../overview/history-2026-09-10-folded-2.md#2026-08-24-recipe-url-to-meal-ui).
 - ⚠️ **Saved meals can carry a photo at last** (Q-327, 2026-08-24, v1.341.0) — a 64 px tile in
   Edit Meal, downscaling to 128 px WebP so the picture fits `SAVED_MEAL_IMAGE_MAX_BYTES`. The
   storage half had shipped with Q-396 and nothing could reach it. **Not device-verified**: the
   native camera branch never runs in a browser —
-  [`journal`](../../overview/entries/2026-08-24-saved-meal-photo-picker.md).
+  [`journal`](../../overview/history-2026-09-10-folded-2.md#2026-08-24-saved-meal-photo-picker).
 - 🔴 **The whole meal-plan write surface was dead, and is fixed** (Q-398, 2026-08-24, v1.340.0).
   Five routes guarded the request body and then validated a variable nothing assigned, so creating a
   plan, renaming/activating/deleting one, restructuring it, editing a meal and saving dietary
@@ -268,20 +268,20 @@ Live at the time of writing (2026-07-30):
   plus `Save all`, idempotent on `meal_plan_meals.saved_meal_id`, with a derived `From plan` tag.
   `savePlanMealToLibrary` is now the one copy path; the setup sheet's own used to duplicate against
   it. **Not device-verified**, and the entry's step 3 (deleting the plan surface) still needs the
-  owner — [`journal`](../../overview/entries/2026-08-24-meal-plan-to-saved-meals.md).
+  owner — [`journal`](../../overview/history-2026-09-10-folded-2.md#2026-08-24-meal-plan-to-saved-meals).
 - ⚠️ **The maintenance calibration can engage at last** (Q-387, 2026-08-23, v1.337.0) — the
   "I've finished logging" button + counter shipped, so days can be flagged complete. **Not
   device-verified, and the write has no outbox domain** —
-  [`journal`](../../overview/entries/2026-08-23-food-logging-complete.md).
+  [`journal`](../../overview/history-2026-09-10-folded-2.md#2026-08-23-food-logging-complete).
 - ⚠️ **Q-323 turned the calorie bar into a progress bar and Home's donut into a progress ring**
   (2026-08-23, v1.336.0). `barPosition`/`barBands` are gone; `barProgress()` replaces them. **Not
-  device-verified** — [`journal`](../../overview/entries/2026-08-23-calorie-progress-bar.md).
+  device-verified** — [`journal`](../../overview/history-2026-09-10-folded-2.md#2026-08-23-calorie-progress-bar).
 - ⚠️ **Three calorie budgets were live on one screen; there is now one** (Q-415/Q-417, fixed
   2026-08-23, v1.335.0). Home's nutrition card and the Nutrition ring both read
   `budgetProvenance(...).total` rather than composing `nutrition_targets.calories` — the **rest-day
   floor** — plus a separately-sourced burn. Follow-up **LB-4** (food logs invalidate before their
   push) and **not device-verified** —
-  [`journal`](../../overview/entries/2026-08-23-one-calorie-budget.md).
+  [`journal`](../../overview/history-2026-09-10-folded-2.md#2026-08-23-one-calorie-budget).
 
 - **Offline saved-meal create/edit/delete** is a new sync domain and is **not device-verified**.
 - **Offline food search** is APK-only and unverified on device.
@@ -298,39 +298,39 @@ Live at the time of writing (2026-07-30):
   taking a nutrition entry:** six of the eight entries examined were wrong about something
   load-bearing — including LB-18, which insisted on a migration that `listSavedMeals` had already
   made unnecessary by deriving `lastUsedAt` from `max(food_logs.logged_at)`.
-- **[`docs/overview/entries/2026-09-02-la-47-coach-plan-card.md`](../../overview/entries/2026-09-02-la-47-coach-plan-card.md)**
+- **[`2026-09-02-la-47-coach-plan-card`](../../overview/history-2026-09-10-folded-5.md#2026-09-02-la-47-coach-plan-card)**
   — 🆕 **LA-47's plan card (2026-09-02).** `showMealPlan` takes a title and nothing else; the card
   reads the meals from the plan the app holds, and Save-all copies every one into My Foods through
   Q-398's idempotent write path. Its two buttons are ordinary `chose` results, not a new result
   type. **Q-407's `Needs:` is cleared by it** — the conversation itself is what is left, and the
   plan card is not to be rebuilt.
-- **[`docs/overview/entries/2026-09-02-lb-38-root-caused.md`](../../overview/entries/2026-09-02-lb-38-root-caused.md)**
+- **[`2026-09-02-lb-38-root-caused`](../../overview/history-2026-09-10-folded-5.md#2026-09-02-lb-38-root-caused)**
   — **LB-38, root cause (2026-09-02).** `@zxing/library` cannot read certain **valid** QR symbols
   upright: 115 of 3,000 meal tokens (3.83%) fail, 4 (0.13%) still fail after four rotations, and no app
   code is involved in the reproduction. **Read this before treating any label-decode failure as a
   rendering bug** — seven earlier theories on that entry blamed the canvas and all were wrong. The
   app's own scanner shares the decoder, which is flagged for the owner and untested on a camera.
-- **[`docs/overview/entries/2026-09-02-q-407-nutrition-coach-entry.md`](../../overview/entries/2026-09-02-q-407-nutrition-coach-entry.md)**
+- **[`2026-09-02-q-407-nutrition-coach-entry`](../../overview/history-2026-09-10-folded-5.md#2026-09-02-q-407-nutrition-coach-entry)**
   — **Q-407, entry point + scope (2026-09-02).** `Build a meal plan` opens `/coach?scope=nutrition`;
   `CoachContent` forwards the scope in the request body. **The scope decides the coach's tool subset,
   not its prompt** — read that before treating the param as cosmetic routing. The seven-step stepper is
   deliberately kept as a visible second control in the same empty state, because Rebuild does not exist
   until a plan does. The conversation's own opening shape is still owed and is Lane A's.
-- **[`docs/overview/entries/2026-09-02-fix-bf-109-macro-calorie-warning.md`](../../overview/entries/2026-09-02-fix-bf-109-macro-calorie-warning.md)**
+- **[`2026-09-02-fix-bf-109-macro-calorie-warning`](../../overview/history-2026-09-10-folded-5.md#2026-09-02-fix-bf-109-macro-calorie-warning)**
   — **BF-109 (2026-09-02).** `MacroCalorieWarning` under the Calories field in `ReviewStep`, so the
   barcode, photo-scan and manual roads all cross-check macros against stated calories. **Read this
   before "fixing" a wrong calorie count in an OFF row**: the mapper is correct, and that row's
   `energy-kcal_100g` is derived from the same bad number, so preferring `_100g` fixes nothing and
   breaks the products where the per-serving figure is the accurate one. Warns and offers; never
   rewrites. Applying `sanitiseNutrition` at save time is deliberately still open.
-- **[`docs/overview/entries/2026-09-02-recent-food-items-unscoped.md`](../../overview/entries/2026-09-02-recent-food-items-unscoped.md)**
+- **[`2026-09-02-recent-food-items-unscoped`](../../overview/history-2026-09-10-folded-6.md#2026-09-02-recent-food-items-unscoped)**
   — **LB-18's source (2026-09-02).** `listRecentFoodItems` / `getRecentFoodItems`, and `mealTypeId`
   is now optional on `GET /api/nutrition/recent-for-meal`. Lane B's half is dropping the query param.
-- **[`docs/overview/entries/2026-09-02-meal-log-scale.md`](../../overview/entries/2026-09-02-meal-log-scale.md)**
+- **[`2026-09-02-meal-log-scale`](../../overview/history-2026-09-10-folded-5.md#2026-09-02-meal-log-scale)**
   — **LB-49 (2026-09-02).** `logMealItems` takes an optional `scale`, applied at write time across
   **five** sites (the entry named three — it missed both optimistic pushes). The factor is not
   stored, so *"I ate 1.5×"* is not recoverable afterwards; only the scaled per-item amounts are.
-- **[`docs/overview/entries/2026-09-01-scan-meal-group.md`](../../overview/entries/2026-09-01-scan-meal-group.md)**
+- **[`2026-09-01-scan-meal-group`](../../overview/history-2026-09-10-folded-5.md#2026-09-01-scan-meal-group)**
   — 🆕 **BF-97, engine half**: a scanned meal gets a `meal_group_id` **and** its own
   `meal_group_name`, because BF-39's grouping names a group from its saved meal and a scan has none.
   Read it before touching the diary rule: the group is minted **only past one entry** and **only
@@ -342,19 +342,19 @@ Live at the time of writing (2026-07-30):
   writing an e2e that taps a coordinate**: `Input.dispatchTouchEvent` performs none of
   `locator.tap()`'s actionability checks, and the three gestures that do *not* reproduce BF-61 are
   written down there.
-- **[`docs/overview/entries/2026-08-31-nutrition-uplift.md`](../../overview/entries/2026-08-31-nutrition-uplift.md)**
+- **[`2026-08-31-nutrition-uplift`](../../overview/history-2026-09-10-folded-4.md#2026-08-31-nutrition-uplift)**
   — 🆕 **BF-72/73/74/76**. Read it before touching a nutrition sheet's padding or a button's height:
   **`min-h-[Npx]` does nothing on a `<button>`** here (a bare `button { min-height: 48px }` in
   `globals.css` beats the utility — measured), and **BF-76's safe-area sweep found the opposite of
   what it expected** — nothing under-padded, three sheets over-padded, and the `vh`→`dvh` fix is not
   the mechanism because a bottom sheet is `fixed bottom-0`. Also the one-line BF-72 cause: an
   `applyDelta` payload that omits a column writes NULL over it.
-- **[`docs/overview/entries/2026-08-31-bf-71-clinical-entry.md`](../../overview/entries/2026-08-31-bf-71-clinical-entry.md)**
+- **[`2026-08-31-bf-71-clinical-entry`](../../overview/history-2026-09-10-folded-4.md#2026-08-31-bf-71-clinical-entry)**
   — 🆕 **BF-71**: a measured RMR can now be stored, and it replaces the predicted one in the calorie
   target — **BMR 1328 / TDEE 1594 against 1485 / 1782 predicted, a 188 kcal/day difference** on the
   owner's own test. Relevant here because `nutrition-goals/recommend` was already reading
   `getLatestMeasuredRmr` and getting null every time.
-- **[`docs/overview/entries/2026-08-31-diary-nested-meal-rows.md`](../../overview/entries/2026-08-31-diary-nested-meal-rows.md)**
+- **[`2026-08-31-diary-nested-meal-rows`](../../overview/history-2026-09-10-folded-4.md#2026-08-31-diary-nested-meal-rows)**
   — 🆕 **BF-39**: a logged meal draws as **one** diary row, headed by the meal's name and photo, and
   opens to its ingredients. Grouped on `meal_group_id`, never `saved_meal_id`; the name and photo
   come from [`use-saved-meal-summaries.ts`](../../../lib/hooks/use-saved-meal-summaries.ts), a
@@ -362,7 +362,7 @@ Live at the time of writing (2026-07-30):
   measurement made against a swipe spec**: the week-long hold, recorded as a `useDrag` being dropped
   by a sibling re-render, was the spec measuring a row the sheet had not finished animating — the
   drag handler was never invoked at all.
-- **[`docs/overview/entries/2026-08-30-nutrition-ui-uplift.md`](../../overview/entries/2026-08-30-nutrition-ui-uplift.md)**
+- **[`2026-08-30-nutrition-ui-uplift`](../../overview/history-2026-09-10-folded-4.md#2026-08-30-nutrition-ui-uplift)**
   — 🆕 **BF-45 / BF-50 / BF-51**: eight surface fixes from two device passes — the macro ring starting
   at 9 o'clock (`from -90deg` is the SVG idiom; CSS conic gradients already start at the top, and
   Home's ring had it too), a collapsed meal losing its macros, 4 px bottom-sheet gutters against
@@ -370,7 +370,7 @@ Live at the time of writing (2026-07-30):
   deliberately held** — the meal-photo rework and the builder's back surface. Read BF-46 and BF-51
   before rebuilding either: the photo picker acquires the image correctly and it reaches nothing,
   which is probably BF-46 ①(b) itself.
-- **[`docs/overview/entries/2026-08-30-log-food-database-search.md`](../../overview/entries/2026-08-30-log-food-database-search.md)**
+- **[`2026-08-30-log-food-database-search`](../../overview/history-2026-09-10-folded-4.md#2026-08-30-log-food-database-search)**
   — 🆕 **BF-48**: Log Food → Single foods searches the **food database**, not only foods you have
   already logged. The query and its results section are shared with the meal builder
   ([`use-food-database-search.ts`](../../../lib/hooks/use-food-database-search.ts),
@@ -379,7 +379,7 @@ Live at the time of writing (2026-07-30):
   hook** — Open Food Facts rate-limits to roughly ten searches a minute, so the own-foods search's
   250 ms clock gets 503ed. The foods tab's search box is now unconditional: it had been hidden while
   the list was empty, which is the state the report was made from.
-- **[`docs/overview/entries/2026-08-26-saved-meal-duplicate-detection.md`](../../overview/entries/2026-08-26-saved-meal-duplicate-detection.md)**
+- **[`2026-08-26-saved-meal-duplicate-detection`](../../overview/history-2026-09-10-folded-3.md#2026-08-26-saved-meal-duplicate-detection)**
   — 🆕 **BF-11d**: saving a meal you already have **asks** instead of adding it again
   ([`meal-duplicate.ts`](../../../components/nutrition/meal-duplicate.ts)). *Close* is two
   independent tests and both must pass — `fitDistance` on the macros, and **equality of the
@@ -388,14 +388,14 @@ Live at the time of writing (2026-07-30):
   because a printed QR label points at it. The write moved to
   [`save-meal.ts`](../../../components/nutrition/save-meal.ts) and Q-216's source-text guard followed
   it there.
-- **[`docs/overview/entries/2026-08-26-build-a-meal-add-methods.md`](../../overview/entries/2026-08-26-build-a-meal-add-methods.md)**
+- **[`2026-08-26-build-a-meal-add-methods`](../../overview/history-2026-09-10-folded-3.md#2026-08-26-build-a-meal-add-methods)**
   — 🆕 **BF-11c**: Build a Meal takes a pasted **recipe link**, and a page holding several dishes
   asks which to keep (each becomes its own saved meal). **⚠ Read this before touching any recipe
   import**: `/api/nutrition/scan` **divides before it answers**, so a page stating *makes 12* arrives
   as one slice — a caller that then sets `servings: 12` logs a twelfth of a slice. The decision is
   [`recipe-import.ts`](../../../components/nutrition/recipe-import.ts) → `recipeBuilderPatch`, with
   tests. Also: the picker's default list was never missing, only unlabelled.
-- **[`docs/overview/entries/2026-08-26-log-food-one-screen.md`](../../overview/entries/2026-08-26-log-food-one-screen.md)**
+- **[`2026-08-26-log-food-one-screen`](../../overview/history-2026-09-10-folded-3.md#2026-08-26-log-food-one-screen)**
   — 🆕 **LB-16 + BF-37**: Log Food is **one screen** — no tile grid, a
   `Recent · Meals · Single foods` tab strip and a `Photo · Barcode · Describe or enter` action row
   ([`capture-actions.tsx`](../../../components/nutrition/capture-actions.tsx),
@@ -405,7 +405,7 @@ Live at the time of writing (2026-07-30):
   the entry below's merged list is **un-merged**, because the owner reported it the same morning
   (*"they are 2 seperate things"*). `FoodList` takes a `show` prop; nothing else about it moved.
   `Recent` is scoped to a meal bucket, which is **LB-18**'s open question rather than a defect.
-- **[`docs/overview/entries/2026-08-26-one-food-list.md`](../../overview/entries/2026-08-26-one-food-list.md)**
+- **[`2026-08-26-one-food-list`](../../overview/history-2026-09-10-folded-3.md#2026-08-26-one-food-list)**
   — **Q-395c** *(the merge above reversed the list half of this the same day)*: *My Meals* and the
   food library were **one list called My Foods**
   ([`components/nutrition/food-list.tsx`](../../../components/nutrition/food-list.tsx));
@@ -416,14 +416,14 @@ Live at the time of writing (2026-07-30):
   unavailable**, because `food_logs` carries no `saved_meal_id` and a saved meal therefore has no
   last-used timestamp at all. It sorts `createdAt DESC` until a Lane A column exists.
 
-- **[`docs/overview/entries/2026-08-25-saved-meal-meal-type-tags.md`](../../overview/entries/2026-08-25-saved-meal-meal-type-tags.md)**
+- **[`2026-08-25-saved-meal-meal-type-tags`](../../overview/history-2026-09-10-folded-3.md#2026-08-25-saved-meal-meal-type-tags)**
   — BF-11e: saved meals carry meal-type tags (migration 217, local SQLite v29). **Storage and
   transport only — no picker yet (BF-11f), so nothing is user-visible.** Read it before touching the
   saved-meal write path: `undefined` leaves stored tags alone and `[]` clears them, soft-deleted meal
   types are filtered on read rather than by deleting join rows, and the sheet's outbox payload
   deliberately does **not** carry tags yet — BF-11f must add it there and to `upsertSavedMeal` in the
   same PR or tags will save on the web and strand offline.
-- **[`docs/overview/entries/2026-08-25-scan-multi-candidate.md`](../../overview/entries/2026-08-25-scan-multi-candidate.md)**
+- **[`2026-08-25-scan-multi-candidate`](../../overview/history-2026-09-10-folded-3.md#2026-08-25-scan-multi-candidate)**
   — BF-11b: `/api/nutrition/scan` returns one candidate per meal instead of merging several into one
   estimate. The top level stays the first dish because five call sites read it and two gate on it.
   Its measurement is worth knowing before touching that prompt: the first split rule was a **coin
@@ -437,7 +437,7 @@ Live at the time of writing (2026-07-30):
   a one-tap **"Log the N meals so far"** on the plan card, **bounded by the clock** so pressing it at
   9am cannot log a dinner that has not happened. Selector:
   [`components/nutrition/plan-day-fill.ts`](../../../components/nutrition/plan-day-fill.ts); outcome:
-  [`journal`](../../overview/entries/2026-08-31-meal-plan-day-fill.md). The design that made it cheap
+  [`journal`](../../overview/history-2026-09-10-folded-4.md#2026-08-31-meal-plan-day-fill). The design that made it cheap
   is in the plan
   ([`plans/2026-08-13-meal-plan-prefill-and-confirmation.md`](../../superpowers/plans/2026-08-13-meal-plan-prefill-and-confirmation.md))
   — keep unconfirmed prefills out of `food_logs` rather than filtering a column across its 24 readers.

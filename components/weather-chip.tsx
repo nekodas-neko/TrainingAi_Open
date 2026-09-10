@@ -22,8 +22,24 @@ function uvColor(uvIndex: number): string {
 }
 
 export function WeatherChip() {
-  const { snapshot, loading } = useWeather()
+  const { snapshot, loading, failed } = useWeather()
   if (!snapshot) {
+    // PS-35b ④. `failed` is checked BEFORE `loading`, because the bug was the other order by
+    // omission: with no failure state at all, a fetch that never resolves left the skeleton
+    // pulsing forever and the user could not tell "loading" from "this broke" (the Q-499 shape).
+    // A dash is the whole treatment — this is a chip in a header row, and an error card here would
+    // be louder than the information it replaces.
+    if (failed) {
+      return (
+        <div
+          role="status"
+          aria-label="Weather unavailable"
+          className="flex items-center whitespace-nowrap shrink-0 rounded-full bg-muted/60 px-2.5 py-1 text-xs font-semibold text-muted-foreground"
+        >
+          —
+        </div>
+      )
+    }
     if (!loading) return null
     return <div className="h-[26px] w-14 rounded-full bg-muted/60 animate-pulse" />
   }

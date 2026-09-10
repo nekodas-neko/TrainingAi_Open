@@ -106,7 +106,7 @@ Live at the time of writing (2026-07-30, plus the 2026-08-07 entry below):
   v1.334.0). Q-110 moved the calendar day-tap to `/health/day` and left the four controls on a sheet
   nothing opens. They now live on the day screen, driven by `lib/hooks/use-day-entry-mutations.ts`,
   which `health-content.tsx` shares. **Not device-verified** —
-  [`journal`](../../overview/entries/2026-08-23-day-screen-edit-delete.md).
+  [`journal`](../../overview/history-2026-09-10-folded-2.md#2026-08-23-day-screen-edit-delete).
 
 - ⛔ **Q-488 — the activity delete never updates the local store, and the obvious fix is a no-op.**
   **⚠ Stale as written (2026-08-23): `deleteActivityLog` exists now and the delete path calls it.**
@@ -116,7 +116,7 @@ Live at the time of writing (2026-07-30, plus the 2026-08-07 entry below):
   SET`, so stamping `deletedAt` on a read-merged record type-checks and changes nothing. The fix
   needs a local-store method first, then four lines in `app/health/health-content.tsx`. Evidence and
   the reverted dead end:
-  [`the journal entry`](../../overview/entries/2026-08-18-local-first-write-rule-and-journal-sweep.md).
+  [`the journal entry`](../../overview/history-2026-09-10-folded-1.md#2026-08-18-local-first-write-rule-and-journal-sweep).
   The rule it broke is now in `CLAUDE.md`'s Offline-First section.
 
 - ✅ **The activity detail sheet's HR chart, zone breakdown and HR-coloured route line had never
@@ -159,20 +159,20 @@ cause of one class was a posted step window coming from a *different stream* tha
 
 ## History
 
-- **[`docs/overview/entries/2026-09-02-bf-108-activity-store-stale.md`](../../overview/entries/2026-09-02-bf-108-activity-store-stale.md)**
+- **[`2026-09-02-bf-108-activity-store-stale`](../../overview/history-2026-09-10-folded-5.md#2026-09-02-bf-108-activity-store-stale)**
   — **BF-108 (2026-09-02).** `reconcileRehydratedActivity` clears the setup when a session is demoted
   to `pre`. **Read this before touching the activity store's rehydrate path:** the completion path
   already calls `resetSession()` and is not the gap — an *abandoned* session is; and a live `active`
   session inside the 12-hour bound must keep its type (Q-450), with the bound `>` not `>=`, or a
   recording is silently discarded.
-- **[`docs/overview/entries/2026-09-02-bf-107-walk-calories.md`](../../overview/entries/2026-09-02-bf-107-walk-calories.md)**
+- **[`2026-09-02-bf-107-walk-calories`](../../overview/history-2026-09-10-folded-5.md#2026-09-02-bf-107-walk-calories)**
   — **BF-107 (2026-09-02).** The walk summary's calories tile. **Read this before adding any tile that
   shows a server-derived value:** `saveActivityLog` computes the figure (the MET table is read through
   `node:path` and cannot enter a client bundle), and on device `pushMutations` only flips the row to
   `synced` — the value arrives on a **pull**, so a forced `pullDelta` plus a read-back is what makes it
   appear at all. Also records that `done-activity-screen.tsx` does **not** share the gap: it navigates
   away on save, so its grid is a pre-save draft.
-- **[`docs/overview/entries/2026-08-24-activity-log-delete-outbox.md`](../../overview/entries/2026-08-24-activity-log-delete-outbox.md)**
+- **[`2026-08-24-activity-log-delete-outbox`](../../overview/history-2026-09-10-folded-2.md#2026-08-24-activity-log-delete-outbox)**
   — Q-328: deleting an activity was the one activity-log write with no outbox domain, so offline it
   simply failed while creating one already queued. The client writes a local tombstone and queues
   `{ deleted: true }` now. **`softDeleteActivityLogPending`, not `deleteActivityLog`** — a queued
@@ -180,7 +180,7 @@ cause of one class was a posted step window coming from a *different stream* tha
   later lets `applyDelta` reap the tombstone, so both values are correct at different moments.
   **The offline path itself is not exercised here** (`getLocalStore` is null in the sandbox) —
   `Gate: device`. Unblocks Q-556's 404 half.
-- **[`docs/overview/entries/2026-08-17-activity-untyped-entry.md`](../../overview/entries/2026-08-17-activity-untyped-entry.md)**
+- **[`2026-08-17-activity-untyped-entry`](../../overview/history-2026-09-10-folded-1.md#2026-08-17-activity-untyped-entry)**
   — 🆕 Q-450: `/activity` with no `activityType` recorded a full activity and discarded it on Save.
   The typeless store is the **normal** between-activities state (`resetSession()` clears the type
   after every save), so the guard belongs at the destination, not on the call sites — `/activity`

@@ -23,7 +23,7 @@ prescription coach, the cardio hub/trends/picker surfaces, and guided walk.
 
 ## Reference docs
 
-- [`docs/overview/entries/2026-08-18-running-explain-cache.md`](../../overview/entries/2026-08-18-running-explain-cache.md)
+- [`2026-08-18-running-explain-cache`](../../overview/history-2026-09-10-folded-1.md#2026-08-18-running-explain-cache)
   — **Q-469 (v1.324.3): the prescribed-run card re-asked the model for the same sentence on every
   mount** — 31 redundant calls across 9 distinct runs, each worded differently. Now cached on the
   local date plus the prescription fingerprint. The reason to fix it was **content consistency**, not
@@ -42,7 +42,7 @@ prescription coach, the cardio hub/trends/picker surfaces, and guided walk.
   (Q-301). **Closed:** the code went 2026-08-24 (Q-301) and the table itself was dropped
   2026-08-25 in migrations 220/221 (Q-301b) — `n_tup_ins` was 0 for the table's entire life, and
   `resolveSnapshot()` recomputes from `fitness_tests` + `body_metrics` on every request instead.
-  See [`docs/overview/entries/2026-08-25-drop-running-baselines.md`](../../overview/entries/2026-08-25-drop-running-baselines.md).
+  See [`2026-08-25-drop-running-baselines`](../../overview/history-2026-09-10-folded-3.md#2026-08-25-drop-running-baselines).
   The pace/HR model across 47 activity logs is **still unreviewed**.
 - [`docs/gait-movement-domain.md`](../../gait-movement-domain.md) — **start here** for cadence and
   gait: the domain map and what each signal can and cannot tell us.
@@ -73,7 +73,7 @@ Live at the time of writing (2026-07-30):
   v1.339.0) — it rendered distance, pace and cadence only, while the same strap streamed beats.
   **No device has seen it**: the sandbox has no strap, so the live reading and the staleness guard
   are both unverified. The Android pill stays static and is Lane A —
-  [`journal`](../../overview/entries/2026-08-23-free-activity-metrics.md).
+  [`journal`](../../overview/history-2026-09-10-folded-2.md#2026-08-23-free-activity-metrics).
 
 - 🟡 **Ring cadence is octave-ambiguous, not flat** — still gated off; the strap path is
   validated end to end (64 → 150 spm) but the ring path is not.
@@ -94,7 +94,7 @@ Live at the time of writing (2026-07-30):
   signal is a ladder (cadence → speed → heart rate) and the screen names the rung it is on; the speed
   pair is derived from the walker's own past segments rather than configured. Formula:
   [`lib/walk/walk-pacer.ts`](../../../lib/walk/walk-pacer.ts). Outcome:
-  [`journal`](../../overview/entries/2026-08-31-walk-cadence-pacer.md). **Only the speed rung has ever
+  [`journal`](../../overview/history-2026-09-10-folded-4.md#2026-08-31-walk-cadence-pacer). **Only the speed rung has ever
   executed** — the other two need a Polar H10 (LB-36); per-segment adherence storage is LA-48.
 - Guided walk GPS/pace, per-segment stats, the elevation profile, the run execution screen, the
   cardio hub/trends/picker and the baseline fitness tests are all shipped but **not

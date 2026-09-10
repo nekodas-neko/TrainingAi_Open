@@ -62,7 +62,7 @@ handler swallowing it. Establishing that needs the router's internals, not anoth
 > does fail is *before hydration*, where `handleNavClick` cannot run and the anchor makes a native
 > navigation to the browser's error page; that is visible rather than silent, and inherent, since
 > neither our JavaScript nor the worker exists yet. Q-555 is closed unfixed —
-> [`journal`](../overview/entries/2026-08-25-q555-offline-tap-not-reproducible.md).
+> [`journal`](../overview/history-2026-09-10-folded-3.md#2026-08-25-q555-offline-tap-not-reproducible).
 
 ## Method — three retractions, and the second is the useful one
 
