@@ -44,6 +44,5 @@ between 2026-07-19 and 2026-09-10.
 Neither report was reproduced in the sandbox. The seeded DB has no weather snapshot, so `WeatherChip`
 renders a skeleton and the three-chip width cannot be measured off-device; `getPolarBle()` returns
 null off-device, so the strap path does not execute at all. Both entries carry `Verify: device`.
-BF-139 also records that the owner's *"a little cutoff"* was not pinned to an edge — the right-edge
-clip above is the likely cause, but the header carries `pt-safe`, and the two causes need different
-fixes.
+BF-139's one open question — which edge — was closed the same day: the owner confirmed the right
+side, so the `overflow-hidden` clip is the cause and the `pt-safe` hypothesis is ruled out.

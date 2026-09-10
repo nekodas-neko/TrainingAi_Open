@@ -507,11 +507,19 @@ below threshold and left in place for next time.
 - **`components/home/__tests__/header-meta-row-overflow.test.ts` locks the current classes** on the
   row and on both chip components, so any sizing change breaks it by design. Update the guard in the
   same PR; do not delete it.
-- **Establish which edge before building.** The screenshot is consistent with the right-edge clip
-  described above, but "a little cutoff" was not pinned to an edge and the header also carries
-  `pt-safe` (`components/shell/screen-header.tsx:14`) — bare safe-area utilities are a known
-  near-zero-clearance trap on this device. One look on the S25 settles it, and the two causes have
-  nothing in common.
+- **✅ THE EDGE IS CONFIRMED: right. Asked and answered the same day** — owner, 2026-09-10:
+  *"can see in the screenshot it was clipped on the right on the right side"*. So this is the
+  `overflow-hidden` clip at `header-meta-row.tsx:39` and nothing else. **The `pt-safe` /
+  safe-area hypothesis is ruled out and must not be re-investigated** — it was the other candidate
+  only while the edge was unknown, and chasing it now would be work against a cause the owner has
+  excluded.
+- **What "a little" means, and why it points at the fix.** The three chips measure ~201 px against a
+  ~232 px column, so the strap chip is shaved by only a few pixels — its `rounded-full` right cap,
+  not its digits. Recovering that needs very little: trimming `px-2.5` to `px-2` on
+  `DeviceBatteryChip` (`components/device-battery-chip.tsx:50`) returns ~4 px per battery chip, ~8 px
+  across the two, which clears the current overflow on its own. **Check it against the daytime case
+  before calling it done** — `· UV n` (`components/weather-chip.tsx:45-49`) adds ~45 px and that
+  screenshot was taken at 07:20, so the worst case is not the one reported.
 - **Needs:** nothing.
 
 ### [platform] LB-94 — the journal's recent window is 332 entries, and 297 of them are pinned by a citation

@@ -10772,3 +10772,8 @@ run. Writing down why an obvious change was NOT made is what stops the next sess
 
 Raised for BF-139 and BF-140, two owner-reported entries from one Home screenshot, plus in-place
 amendments to BF-96 and Q-111 so their standing instructions do not contradict the new entries.
+
+## 2026-09-10 — `docs/implementation-backlog.md` (BF-139 edge confirmation)
+
+Owner confirmed the header chips clip on the right, closing BF-139's one open question and ruling
+out the `pt-safe` alternative. Net a few lines over the entry's original open-question bullet.
