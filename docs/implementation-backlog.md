@@ -1541,29 +1541,35 @@ why `nutrition-sheet-surface.spec.ts` passes. Whatever the cause, it is specific
   `el.click()` works rules out most of the alternatives.
 - **Reversal cost:** nil. A test helper and a note.
 
-### [platform] OR-106 — 90 entries still state no lane, and 7 of them cannot be derived from paths
+### [platform] OR-106 — the `Lane:` field is at 95% and the gap is all shipped residue
 
 - **Lane:** O — reading the queue and editing entries. Neither implementer's paths.
-- **Added:** 2026-09-10 by Orchestrator, from the sweep that produced this PR. **Branch:** unassigned.
-- **This PR tagged 25 of 115.** Every TN- entry that names a path now carries a `Lane:` derived from
-  §3 rather than left to each reader — 21 engine, 4 surface. **The 4 surface ones matter out of
-  proportion to their count:** TN-12, TN-19 and TN-3b were invisible to Lane B entirely, and are now
-  visible with their real blocker (a `Needs:` on a Lane A engine half) printed next to them.
+- **Added:** 2026-09-10 by Orchestrator. **Branch:** unassigned.
+- **⚠ This entry replaces a WRONG one filed hours earlier in the same PR, which claimed 90 entries
+  had no lane. The real number is 16 of 340.** The 90 came from a throwaway regex, `/\*\*Lane:?\*\*/`,
+  which requires the colon *outside* the bold. Many entries write `- **Lane: A**` with it inside, and
+  `scripts/lib/lane.js` — whose whole job is reading both forms — handles that correctly. The scratch
+  script disagreed with the shipped parser and the scratch script was wrong. **Measure with
+  `laneFromLines()`, never with a fresh regex.**
 
-**90 entries still state no lane.** `next-item.js` shows an unstated lane to *both* lanes with
-`⟨lane unstated⟩`, so nothing is hidden — but every reader re-derives the same answer, and a
-derivation repeated by six agents is a rule that lives nowhere.
+**None of the 16 is startable work.** Nine are `Verify:` (shipped, a device look owed), one is a
+`Keep:`, one is `Reference:`, and five are parked:
 
-**7 cannot be derived and need a human read** — they name no path at all:
-> TN-24 · TN-14 · TN-20 · TN-22 · TN-21 · TN-15 · TN-16
+> VERIFY — BF-104 · BF-103 · BF-101 · BF-99 · BF-100 · LA-45 · BF-64 · BF-53 · Q-187
+> KEEP — BF-83 · REFERENCE — Q-253 · PARKED — Q-297 · Q-254 · Q-147 · Q-48 · Q-551
 
-**Do not bulk-assign by filing agent.** The obvious shortcut — *"TN- is Tuning, Tuning is scoring,
-scoring is Lane A"* — was tried in this sweep and is **wrong**: 4 of the 32 are pure surface
-(`components/body-battery-card.tsx`, `components/nutrition`). A blanket tag would have sent them to
-the wrong agent silently, which is the exact failure `scripts/lib/lane.js` exists to prevent. Derive
-each from the paths it names; where it names none, read it.
+So the lane field is doing its job and **there is no lane backlog to work.** Coverage by month added
+is **96% (August) and 94% (September)** — flat, not degrading, so nothing is leaking either.
 
-- **Reversal cost:** nil. Queue fields only.
+**What is genuinely worth doing, and it is small:** a lane on a `Verify:` entry costs nothing to add
+and settles who owns the follow-up if the device check fails. Do it when each entry is next touched,
+not as a sweep — a sweep here would be nine edits to buy nothing.
+
+**What NOT to do.** Do not add a CI rule requiring a `Lane:` on every entry. At 95% the rule would
+fire almost only on shipped residue, where the field is least useful, and the one real risk — a lane
+that is *wrong* — is already covered by `laneDrift` and the batch-mixing check.
+
+- **Reversal cost:** nil. Nothing here changes a queue field.
 
 ### [platform] OR-105 — 17 more entries may be filed as shipped without having been built
 

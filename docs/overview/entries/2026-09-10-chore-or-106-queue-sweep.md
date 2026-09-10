@@ -64,11 +64,28 @@ right and the proposal was wrong — BF-68 had already shipped, and my throwaway
 because that entry writes `**Keep —**` rather than `**Keep:**`. `next-item.js` handles both correctly
 via `lib/keep.js`; only my scratch script did not, so there is no repo defect here.
 
+## The lane count in the first draft of this entry was wrong
+
+An earlier version of this write-up, and of OR-106, said **90 entries state no lane** and that
+coverage had gone 68% → 82%. Both numbers came from a throwaway regex in a scratch script,
+`/\*\*Lane:?\*\*/`, which requires the colon *outside* the bold. Many entries write `- **Lane: A**`
+with it inside. `scripts/lib/lane.js` reads both — that is the whole reason the module exists — so
+the scratch script disagreed with the shipped parser and the scratch script lost.
+
+**The real figure is 16 of 340, and coverage is 96% (August) / 94% (September) — flat.** Cross-checked
+against `next-item.js`'s own `⟨lane unstated⟩` marker, which independently names 16.
+
+**None of the 16 is startable work**: nine `Verify:`, one `Keep:`, one `Reference:`, five parked. So
+the 25 tags this PR does add are worth having, but they close a gap that was never 115 wide, and the
+follow-up OR-106 asks for is now *small and conditional* rather than a sweep.
+
+**The lesson, written into OR-106:** measure lane coverage with `laneFromLines()`, never a fresh
+regex. A parser exists precisely because the field has more than one written form.
+
 ## Not done
 
-- **90 entries still state no lane** (down from 115). Filed as **OR-106**, including the 7 that name
-  no path at all and cannot be derived without a human read: TN-24, TN-14, TN-20, TN-22, TN-21,
-  TN-15, TN-16.
+- **16 entries state no lane**, none of them startable work — see the correction above. Filed as
+  **OR-106**, which now says to add a lane when each is next touched rather than sweeping for it.
 - **Q-395 is 300 lines of shipped spec sitting in the queue file** — every phase has landed and what
   remains is a completion checkpoint. It belongs in `docs/` with a short entry pointing at it. Not
   done here because moving it is a judgement about where the spec should live, and this PR was
