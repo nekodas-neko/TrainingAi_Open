@@ -10773,9 +10773,14 @@ run. Writing down why an obvious change was NOT made is what stops the next sess
 Raised for BF-139 and BF-140, two owner-reported entries from one Home screenshot, plus in-place
 amendments to BF-96 and Q-111 so their standing instructions do not contradict the new entries.
 
+## 2026-09-10 — `docs/implementation-backlog.md` (BF-139 edge confirmation)
+
+Owner confirmed the header chips clip on the right, closing BF-139's one open question and ruling
+out the `pt-safe` alternative. Net a few lines over the entry's original open-question bullet.
+
 ## 2026-09-11 — both indexes raised for PS-35b's result
 
-`docs/implementation-backlog.md` to 20614 and `projectOverview.md` to 10548. PS-35b's entry gained
+`docs/implementation-backlog.md` to 20622 and `projectOverview.md` to 10548. PS-35b's entry gained
 what shipped for each of its four items, the two measurements (34 → 29 boot requests; the chip's
 rendered failure state), and a correction the next reader would otherwise trip on: the checkpoint
 report's "two unreachable palette keys" are reachable, because the report compared line 26 of one
