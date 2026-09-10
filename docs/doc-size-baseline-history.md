@@ -10467,3 +10467,26 @@ baseline in parallel.
 
 The row filed hours earlier said the report's symptom was open; it is now fixed, so the two entries
 became one row describing both defects rather than two rows describing one report twice.
+
+## 2026-09-10 — `docs/implementation-backlog.md` 20404 → 20372 (−32), LA-97 shipped, LA-98 filed
+
+A shrink, so the ratchet asked for this one rather than the reverse. LA-97's 48 lines left the queue
+and LA-98's 24 replaced them.
+
+The trade is worth naming. LA-97's entry was long because it carried a four-step chain in which
+every step looks correct in isolation — the writer freezes, the reader drops, the payload forwards
+what it was given, the server fills what it was not sent — and only the sequence is wrong. That
+entry is what made the fix take an hour instead of a day. LA-98 inherits the same shape at a
+quarter the length, because it is one field and the chain is already documented.
+
+**Re-merged against #1074 (the weigh-in shortage claim): 20331.** Fifth baseline recomputation in
+two hours on this one file. Recomputed with `wc -l` rather than adjusted, as every time — and the
+resurrection check was done by comparing entry BLOCKS against `git show origin/main:…` rather than
+reading diff markers: LA-97 removed here and still present on main (this PR is what removes it),
+LA-98 added here, LA-96 and BF-136 untouched on both sides.
+
+**Sixth recomputation, after #1076: 20301.** Recorded because the recipe itself needed correcting.
+`wc -l` is NOT the number — the file has no trailing newline, so `check-doc-index-size` counts one
+more, and setting `wc -l` produced an off-by-one twice today (20246 vs 20247, 20330 vs 20331). The
+reliable move is to take **the count the check reports** and write that. This resolution used it and
+landed first try.

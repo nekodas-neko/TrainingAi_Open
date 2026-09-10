@@ -138,6 +138,63 @@ describe.skipIf(!canRun)('a log freezes the reconstitution it was dosed from (OR
     })
   })
 
+  // ── LA-97: the freeze had no way to REACH the server ────────────────────────────────────────
+  //
+  // Every case above writes through the web route, where the tick and the stamp are the same
+  // instant, so the current vial IS the right one. The offline path is the one that breaks: a
+  // mutation queued on the device drains later, and until LA-97 the payload could not carry what
+  // the device had frozen — so this function re-read whatever vial was current at PUSH time.
+  describe('a caller that supplies the reconstitution (LA-97)', () => {
+    it('keeps the vial the dose was actually mixed from, ignoring the current one', async () => {
+      // The vial current at push time — a re-mix at a different water volume.
+      await repo.createSupplementVial(USER, {
+        supplementId, strengthMg: 10, waterMl: 1, syringeUnitsPerMl: 100, openedOn: '2026-09-20',
+      })
+      // What the device froze when the dose was actually taken, days earlier.
+      await repo.logSupplement(supplementId, USER, '2026-09-02', {
+        amount: 2.5, unit: 'mg',
+        vialStrengthMg: 10, vialWaterMl: 2, vialUnitsPerMl: 100,
+        takenAt: '2026-09-02T08:15:00.000Z',
+      })
+
+      const [row] = await logRow()
+      expect(row.vial_water_ml).toBe(2)          // the mix it was dosed from…
+      expect(row.vial_strength_mg).toBe(10)
+      expect(row.vial_units_per_ml).toBe(100)
+      expect(row.taken_at?.toISOString()).toBe('2026-09-02T08:15:00.000Z')
+      // …and the units it means are the frozen ones, not the re-mix's.
+      expect(frozenReconstitution({
+        vialStrengthMg: row.vial_strength_mg, vialWaterMl: row.vial_water_ml,
+        vialUnitsPerMl: row.vial_units_per_ml,
+      })).not.toBeNull()
+      expect(unitsForMg(2.5, { strengthMg: 10, waterMl: 2, syringeUnitsPerMl: 100 }))
+        .not.toBe(unitsForMg(2.5, { strengthMg: 10, waterMl: 1, syringeUnitsPerMl: 100 }))
+    })
+
+    it('still falls back to the current vial when the caller supplies none', async () => {
+      // The web route and any older client send no reconstitution, and must keep working.
+      await repo.createSupplementVial(USER, {
+        supplementId, strengthMg: 10, waterMl: 2, syringeUnitsPerMl: 100, openedOn: '2026-09-01',
+      })
+      await repo.logSupplement(supplementId, USER, '2026-09-02', { amount: 2.5, unit: 'mg' })
+
+      const [row] = await logRow()
+      expect(row.vial_water_ml).toBe(2)
+    })
+
+    it('honours a caller triple even when the supplement has no vial at all', async () => {
+      // The device froze a mix that was later deleted server-side. Re-reading would stamp nulls and
+      // lose it; the caller's numbers are the only surviving record.
+      await repo.logSupplement(supplementId, USER, '2026-09-02', {
+        amount: 2.5, unit: 'mg', vialStrengthMg: 5, vialWaterMl: 1, vialUnitsPerMl: 100,
+      })
+
+      const [row] = await logRow()
+      expect(row.vial_strength_mg).toBe(5)
+      expect(row.vial_water_ml).toBe(1)
+    })
+  })
+
   it('refuses a vial against a supplement that is not yours', async () => {
     const OTHER = '00000000-0000-4000-8000-000000102a02'
     await pool.query(

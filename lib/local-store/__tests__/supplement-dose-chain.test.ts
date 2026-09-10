@@ -113,6 +113,11 @@ describe('the push sends what was recorded, not what the definition says now', (
     expect(enrich).toContain("m.domain !== 'supplement_logs'")
     expect(enrich).toContain('getSupplementLogs')
     expect(enrich).toContain('row.doseText ?? null')
+    // LA-97 — the four OR-102a fields travel too, or the server re-stamps them at push time.
+    expect(enrich).toContain('row.takenAt ?? null')
+    expect(enrich).toContain('row.vialStrengthMg ?? null')
+    expect(enrich).toContain('row.vialWaterMl ?? null')
+    expect(enrich).toContain('row.vialUnitsPerMl ?? null')
   })
 
   // The enrichment is worthless unless the sender calls it — this is the wiring, and it is the part
@@ -124,5 +129,31 @@ describe('the push sends what was recorded, not what the definition says now', (
   // A deletion carries no dose and must not be given one.
   it('leaves a delete alone', () => {
     expect(fnBody(engine, 'async function enrichPayload(')).toContain('m.payload.deleted')
+  })
+})
+
+// LA-97 — the step that made the other three unreachable, and the reason it hid.
+//
+// `getSupplementLogs` does `SELECT *`, so the rows carried OR-102a's four columns from the day the
+// migration ran. Its row→object mapper listed ten fields and stopped, so the freeze was WRITE-ONLY:
+// `enrichPayload` reads a log through this mapper to build its push payload, and could not forward
+// what it could not see. Every test in the repo passed throughout.
+//
+// Greps source because native SQLite does not run in node — the same reason this whole suite does.
+// The behavioural half is `supplement-vial-freeze.test.ts`, which drives the server for real.
+describe('the local read surfaces what the local write froze (LA-97)', () => {
+  const getter = fnBody(backend, 'async getSupplementLogs(')
+
+  it('maps every OR-102a column back out of the row', () => {
+    expect(getter).toContain('takenAt:')
+    expect(getter).toContain('vialStrengthMg:')
+    expect(getter).toContain('vialWaterMl:')
+    expect(getter).toContain('vialUnitsPerMl:')
+  })
+
+  it('reads the vial numbers as numbers, not truthily — 0 is a real strength', () => {
+    // `r.unit ? String(r.unit) : null` is right for text and wrong here: a 0 would become null.
+    expect(getter).toContain('r.vial_strength_mg == null ? null : Number(r.vial_strength_mg)')
+    expect(getter).not.toContain('r.vial_strength_mg ? Number(')
   })
 })

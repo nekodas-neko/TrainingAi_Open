@@ -2749,6 +2749,19 @@ export class SQLiteLocalStore implements LocalStore {
       doseText:     r.dose_text ? String(r.dose_text) : null,
       source:       r.source === 'meal' ? 'meal' : 'manual',
       sourceRef:    r.source_ref ? String(r.source_ref) : null,
+      // LA-97 — OR-102a's four columns were written and never read back. The SELECT is `*`, so the
+      // rows carried them the whole time; this mapper listed ten fields and stopped. That made the
+      // freeze write-only: `enrichPayload` reads a log through here to build its push payload, so
+      // the server got `amount`/`unit`/`doseText` and nothing else, and `logSupplement` then
+      // stamped `taken_at` at PUSH time and re-read whatever vial was current then — the
+      // retroactive rewrite `upsertSupplementLog`'s own comment says the freeze exists to prevent.
+      //
+      // CLAUDE.md, sessions 29 and 64: when adding a DB column, update EVERY row→object mapper. A
+      // missed one fails silently, and this one failed silently for the whole of OR-102a's life.
+      takenAt:        r.taken_at ? String(r.taken_at) : null,
+      vialStrengthMg: r.vial_strength_mg == null ? null : Number(r.vial_strength_mg),
+      vialWaterMl:    r.vial_water_ml == null ? null : Number(r.vial_water_ml),
+      vialUnitsPerMl: r.vial_units_per_ml == null ? null : Number(r.vial_units_per_ml),
       updatedAt:    String(r.updated_at),
       deletedAt:    r.deleted_at ? String(r.deleted_at) : null,
       syncStatus:   String(r.sync_status) as 'pending' | 'synced',

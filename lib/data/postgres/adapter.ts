@@ -4690,10 +4690,20 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             // A mutation queued offline can drain days later, by which time the definition may have
             // been titrated; stamping from the definition here would write the new dose onto an old
             // act. Absent (an older client), `logSupplement` falls back to the definition.
+            //
+            // LA-97 — the vial and the timestamp travel too. `logSupplement` re-reads the CURRENT
+            // vial and stamps `new Date()` when these are absent, which is right for the web route
+            // (the tick and the stamp are the same instant) and wrong here for the same reason the
+            // dose is: a mutation queued offline drains later, and by then the current vial may be
+            // a different mix. An older client that sends none still gets the old fallback.
             await this.logSupplement(String(p.supplementId), userId, String(p.logDate), {
               amount: typeof p.amount === 'number' ? p.amount : null,
               unit: typeof p.unit === 'string' ? p.unit : null,
               doseText: typeof p.doseText === 'string' ? p.doseText : null,
+              takenAt: typeof p.takenAt === 'string' ? p.takenAt : null,
+              vialStrengthMg: typeof p.vialStrengthMg === 'number' ? p.vialStrengthMg : null,
+              vialWaterMl: typeof p.vialWaterMl === 'number' ? p.vialWaterMl : null,
+              vialUnitsPerMl: typeof p.vialUnitsPerMl === 'number' ? p.vialUnitsPerMl : null,
             })
           }
           processed++
@@ -6549,7 +6559,21 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // sticky default the log screen offers. A supplement with no vial stamps nulls, and
     // `frozenReconstitution()` then reports "cannot be expressed in units" rather than reaching
     // for whatever vial is current later, which is the rewrite this exists to prevent.
-    const [vial] = await this.db.select({
+    // LA-97 — a caller that supplies the reconstitution WINS, and the read below is skipped
+    // entirely. Without this the sync push had no way to say "this dose was mixed from that vial":
+    // it could only send the dose, and the current vial was re-read here at PUSH time, silently
+    // replacing an offline tick's frozen numbers with whatever mix happened to be current when the
+    // device next reached the network. #1073 widened that window further by making `openedOn` a
+    // user-entered mix date, so "the newest vial" can now change without a new vial being entered.
+    //
+    // All-or-nothing on the triple, mirroring `upsertSupplementLog`'s identical guard and
+    // `frozenReconstitution()`'s "all three or none" rule — a partial triple cannot be rendered, so
+    // there is no reading under which two of the caller's numbers should be mixed with one of the
+    // definition's.
+    const callerVial = dose?.vialStrengthMg != null || dose?.vialWaterMl != null || dose?.vialUnitsPerMl != null
+      ? { strengthMg: dose.vialStrengthMg ?? null, waterMl: dose.vialWaterMl ?? null, unitsPerMl: dose.vialUnitsPerMl ?? null }
+      : null
+    const [currentVial] = callerVial ? [undefined] : await this.db.select({
       strengthMg: s.supplementVials.strengthMg,
       waterMl: s.supplementVials.waterMl,
       unitsPerMl: s.supplementVials.syringeUnitsPerMl,
@@ -6561,6 +6585,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       ))
       .orderBy(desc(s.supplementVials.openedOn), desc(s.supplementVials.createdAt))
       .limit(1)
+    const vial = callerVial ?? currentVial
 
     // OR-104 / LA-90 — the whole merge of the caller's dose against the definition is
     // `resolveLoggedDose`, shared with the offline store so the two write paths cannot drift. It
@@ -6570,6 +6595,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       ...resolveLoggedDose(dose, { defaultAmount: owns.defaultAmount, unit: owns.unit, dose: owns.dose }),
       // An explicit `takenAt` wins; otherwise the moment of the tick, which is what the owner
       // means by ticking it now. Never back-filled onto rows that predate the column.
+      //
+      // LA-97 — this branch was already correct and still produced push-time timestamps, because
+      // nothing ever SUPPLIED a `takenAt`: the payload did not carry one and the local mapper did
+      // not read one back. A correct fallback behind a caller that never calls is indistinguishable
+      // from no fallback at all, which is why the fix is in the three steps before this line.
       takenAt: dose?.takenAt != null ? new Date(dose.takenAt) : new Date(),
       vialStrengthMg: vial?.strengthMg ?? null,
       vialWaterMl: vial?.waterMl ?? null,
