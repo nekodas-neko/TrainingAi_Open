@@ -10803,3 +10803,21 @@ Both entries shipped and both owe a device look, so each converted from work-to-
 NOT a `Verify:` while unbuilt is kept, because that reasoning is exactly right and would otherwise be
 re-litigated. RV-37 additionally keeps the fifth-CI-rule question, which is the half that genuinely
 needs evidence: no safe-area rule fires on an absent utility, only on a wrong one.
+
+## 2026-09-10 — `docs/implementation-backlog.md` and `projectOverview.md` (BF-141)
+
+BF-141 files the owner's lb/kg dial toggle, with the Session 119 unit-corruption history and the
+`mround125` clamp hazard that would silently ruin it. `projectOverview.md` moves because the
+LB-41 line claimed a follow-up had been filed that never was; it now points at BF-141.
+
+## 2026-09-10 — `docs/implementation-backlog.md` 20738 → 20702 (LA-101 closed unfixed)
+
+LA-101's 36-line entry leaves the queue one investigation after it was filed. It was filed as a fix
+and turned out not to be one: 24 controlled full runs could not reproduce the fault, so there is
+nothing to verify a fix against, and the durable output — a recognition rule — belongs in
+`local-dev-database.md` beside the two sibling causes of the same zero-failing-test shape, not in a
+work queue as a permanently unstartable item.
+
+Recomputed by `pnpm fix:baselines` after merging `main` (which had moved to #1094 and folded the
+journal directory in the meantime). Resurrection check done the block way against
+`git show origin/main:docs/implementation-backlog.md`: exactly one heading removed, LA-101's own.
