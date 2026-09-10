@@ -1820,38 +1820,6 @@ sheet is open over the bottom half of it.
 - **Worth a device look when it ships**, since the failure is vertical space on the S25 with the log
   sheet open, which is not reproducible from the dimensions alone.
 
-### [body][nutrition] LB-99 — the Weight response chip said "not enough weigh-ins" above its own line counting six (fixed)
-
-- **Lane:** B — `components/nutrition/reta/weight-response-card.tsx`, `weight-response.ts`.
-- **Added:** 2026-09-10 · measured while shipping BF-136, whose reported symptom this was the second
-  half of.
-- **Needs:** — nothing.
-- **✅ SHIPPED 2026-09-10** (`fix/weight-response-undecided-label`).
-  [Journal](overview/entries/2026-09-10-fix-weight-response-undecided-label.md).
-
-**Two opposite states shared one label.** `weightResponse()` returns null only when there is no
-interval to compute — under three readings, or no spread of days. It returns a **full result with
-`verdict: null`** when there are plenty of readings and the confidence interval straddles the band,
-which the card's own module doc calls the designed normal state. The chip was
-`tone?.label ?? 'Not enough weigh-ins yet'`, so the second state rendered as the first — directly
-above the card's own *"6 weigh-ins over 5 days"*. `responseState()` now separates them and the
-undecided chip reads **"Not called yet"**.
-
-**⚠ MY FIRST DIAGNOSIS IN THIS ENTRY WAS WRONG, and it is left here on purpose.** It named the
-`getLocalStore` fall-through and called this LB-98's first live instance. **It is not.**
-`getLocalStore` returns null on web at `lib/local-store/index.ts:199` (`isSQLiteAvailable()`), so the
-`cachedFetch` branch does run and the points did arrive — which the ruled-out list should have
-implied, since the payload shape matched and the arithmetic was tested. The lesson is the one this
-repo keeps relearning: *a card that reports "no data" is not evidence that no data reached it*. Read
-what the component does with the data before suspecting the fetch.
-
-**Verified in the harness**, six weigh-ins over five days in the window:
-`Not called yet · +0.54 kg/wk (95% CI −5.05 to +6.13, 5 days) · … 6 weigh-ins over 5 days.`
-
-- **⚠ Do not "fix" this class by widening the three-point gate.** OR-102b ④ argues it at length: two
-  points cannot separate 0.4 kg/week from 1.2. Nothing here changes when a verdict is given — only
-  what the card says while it is withholding one.
-
 ### [body][nutrition] BF-136 — a vial's open date is hardcoded to today (fixed; the card's own render is a separate defect)
 
 - **Lane:** B — `components/nutrition/reta/vial-sheet.tsx`. The routes already take the field; nothing server-side needs changing.
@@ -1859,7 +1827,9 @@ what the component does with the data before suspecting the fetch.
 - **Needs:** — nothing.
 - **Verify:** device — on the S25, correct the vial's date and check the Weight response card reads
   sensibly. **Both halves of the report have now shipped**: the date (here) and the chip that said
-  "not enough weigh-ins" while holding six (**LB-99**, fixed the same day).
+  "not enough weigh-ins" while holding six (**LB-99**, fixed the same day and removed from the queue
+  — [its journal entry](overview/entries/2026-09-10-fix-weight-response-undecided-label.md) keeps the
+  wrong first diagnosis and why it was wrong).
 - **✅ SHIPPED 2026-09-10** (`fix/vial-opened-date`).
   [Journal](overview/entries/2026-09-10-fix-vial-opened-date.md). An `Opened on` date on the sheet
   defaulting to **today**, bounded to `[today − 180d, today]`, with the POST now sending it instead
