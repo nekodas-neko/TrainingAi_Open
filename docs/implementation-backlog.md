@@ -856,6 +856,37 @@ is `nutrition_targets.calories` (**1,660**, set 2026-08-31) — which this gate 
 changes: at a `recomp` delta of −200 the honest band is **1,450–1,700**, and 1,660 already sits
 inside it.
 
+**🔴 NOW LIVE ON THE OWNER'S SCREEN — 2026-09-10, and the entry's own number is what appeared.**
+Reported as *"the budget went up again"*, with a jump nothing in his behaviour explains:
+
+| | 2026-09-08 | 2026-09-10 |
+|---|---|---|
+| resting base | **1,453** | **2,104** |
+| budget | 1,253 | **2,114** |
+
+`restingBaseKcal` is `maintenanceKcal − avgActiveKcal` on the calibrated branch
+(`energy-balance-service.ts:293`), and **2,245 − ~141 = 2,104** — the 2,245 this entry already names
+as the estimate that should be rejected. The 8 Sep figure was the *formula* branch
+(`bmr × 1.2 − step credit`); between the two screenshots the long window filled,
+`resolveMaintenance` took the calibrated value **the moment it became available**
+(`adaptive-tdee.ts:194-199` — the acceptance is unconditional, which is precisely the gap), and the
+base rose 651 kcal overnight.
+
+**So the cost is now quantified rather than projected:** against the ~1,895 this entry argues is
+honest, today's budget of 2,114 is **roughly 350 kcal/day too generous** on a `recomp` goal — a
+surplus large enough to cancel the deficit it is supposed to carry.
+
+**Two things this changes about the entry, neither of them the recommendation:**
+1. **It is no longer hypothetical, so it should not sit behind cosmetic work.** The gate is
+   owner-approved and unassigned; every day it waits is a day of over-budget.
+2. **It confirms the mechanism, not just the number.** The transition is what proves the acceptance
+   is unconditional — a cross-check that ran and passed would not produce a 651 kcal step change
+   between two consecutive mornings.
+
+**⚠ Do not "fix" this by reverting to the formula branch.** The calibrated path is the better model
+when it is right; the defect is that nothing tests whether it is. Reverting throws away the
+measurement this entry exists to make trustworthy.
+
 **Pass test:** with the owner's current data the calibrated maintenance is rejected, the card falls
 back near 1,895, and no accepted estimate implies an activity factor above ~1.55 while measured
 movement stays near 280 kcal/day.
