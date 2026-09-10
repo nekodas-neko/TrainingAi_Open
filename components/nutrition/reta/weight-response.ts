@@ -170,3 +170,24 @@ export function formatRange(r: WeightResponse): string {
   // it, so the low end of the loss is the high end of the change.
   return `${signed(-r.lossKgPerWeek)} kg/wk (95% CI ${signed(-r.hiKgPerWeek)} to ${signed(-r.loKgPerWeek)}, ${Math.round(r.spanDays)} days)`
 }
+
+/**
+ * Which of three things the card is looking at (LB-99).
+ *
+ * **`insufficient` and `undecided` are not the same state and were rendered as one.** `weightResponse`
+ * returns null only when there is no interval to compute — under three readings, or no spread of
+ * days. It returns a full result with `verdict: null` when there are plenty of readings and the
+ * confidence interval simply straddles the band, which is the *designed* normal state and the reason
+ * the chip is grey far more often than it is coloured.
+ *
+ * The card collapsed both onto *"Not enough weigh-ins yet"*, so an account with six weigh-ins in the
+ * window read that it had none — directly above its own line saying *"6 weigh-ins over 5 days"*. That
+ * is what BF-136's reporter saw after his vial date was corrected, and why fixing the date did not
+ * clear his symptom.
+ */
+export type ResponseState = 'verdict' | 'undecided' | 'insufficient'
+
+export function responseState(result: WeightResponse | null): ResponseState {
+  if (!result) return 'insufficient'
+  return result.verdict ? 'verdict' : 'undecided'
+}

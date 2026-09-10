@@ -10454,3 +10454,16 @@ being DELETED and triggered a two-deletions check here. It was a heading **rewri
 half shipped and the surface half stays as Lane B with `Verify: device` — and the merged file is
 byte-identical to `main` for that entry. **A `-###` line in a backlog diff is not evidence of a
 deletion**; compare the resulting blocks, not the diff markers.
+
+## 2026-09-10 — `docs/implementation-backlog.md` raised to 20363 for LB-99's result
+
+LB-99 was filed and fixed the same day, so its entry replaced a diagnosis with a cause — and kept the
+wrong first diagnosis on the record with why it was wrong, because "a card reporting no data is not
+evidence that no data reached it" is the reusable part. BF-136 gained a line saying both halves of
+the report have now shipped. Recomputed on the merged file — another lane moved the same
+baseline in parallel.
+
+## 2026-09-10 — `projectOverview.md` set to 10564 for the merged BF-136 + LB-99 row
+
+The row filed hours earlier said the report's symptom was open; it is now fixed, so the two entries
+became one row describing both defects rather than two rows describing one report twice.
