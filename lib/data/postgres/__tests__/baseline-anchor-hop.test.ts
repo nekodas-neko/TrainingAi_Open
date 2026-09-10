@@ -67,6 +67,69 @@ describe.skipIf(!canRun)('the baseline hop (BF-131)', () => {
 
   const stateOf = (sessionId: string) => repo.getSessionPeriodization(USER, sessionId)
 
+  /** LB-93 — poll for the condition instead of betting on a duration.
+   *
+   * `completeWorkoutFromPayload` fires `recordBaselineAnchorsFrom` and drops the promise on purpose
+   * (a completion must never fail on a periodization write), so a test has nothing to await. The
+   * fixed 300 ms sleep this replaces was a bet on how long that write takes, placed against a local
+   * Postgres ~870 other test files are also using — it lost under full-suite contention, on
+   * branches whose diffs could not have caused it, which is the expensive kind of flake.
+   *
+   * The timeout is generous because it is only ever paid when the assertion is about to fail
+   * anyway; the happy path returns as soon as the write lands, which is why this is FASTER than the
+   * sleep it replaces rather than a slower safety margin. */
+  async function waitForState(
+    sessionId: string,
+    predicate: (s: Awaited<ReturnType<typeof stateOf>>) => boolean,
+    what: string,
+    timeoutMs = 10_000,
+  ) {
+    const deadline = Date.now() + timeoutMs
+    let state = await stateOf(sessionId)
+    while (!predicate(state)) {
+      if (Date.now() > deadline) {
+        throw new Error(`waitForState: timed out after ${timeoutMs}ms waiting for ${what}. Last state: ${JSON.stringify(state)}`)
+      }
+      await new Promise(r => setTimeout(r, 10))
+      state = await stateOf(sessionId)
+    }
+    return state
+  }
+
+  /** The inverse of `waitForState`, for the two cases that assert the write did NOT happen.
+   *
+   * **You cannot remove the bet from a negative assertion — you can only choose which way it
+   * fails.** There is no signal for "the fire-and-forget write decided not to fire", so any such
+   * test is really "nothing happened within some window". `waitForState` fails when its window
+   * expires; this one PASSES, so contention on a loaded runner produces a false pass rather than a
+   * false failure. That direction is the whole point of LB-93: the old fixed sleep failed on
+   * branches whose diffs could not have caused it, and cost five runs to rule out.
+   *
+   * Measured, because "it still has teeth" is a claim and not an assumption: with the call-site
+   * guard replaced by `if (true)`, the first of these two goes red and the second does not — which
+   * matches that test's own comment saying the completed-check is not what it catches. Deleting the
+   * wait outright (the first version of this change) let BOTH survive that mutant. */
+  async function expectNoWrite(
+    sessionId: string,
+    predicate: (s: Awaited<ReturnType<typeof stateOf>>) => boolean,
+    what: string,
+    windowMs = 500,
+  ) {
+    const deadline = Date.now() + windowMs
+    while (Date.now() < deadline) {
+      const state = await stateOf(sessionId)
+      if (predicate(state)) {
+        throw new Error(`expectNoWrite: ${what} — but it did. State: ${JSON.stringify(state)}`)
+      }
+      await new Promise(r => setTimeout(r, 10))
+    }
+  }
+
+  /** The number of anchors recorded so far — the positive signal the "assert it did NOT complete"
+   *  cases wait on. You cannot poll for an absence, but each of those tests also asserts how many
+   *  anchors the partial write produced, and that IS a thing that happens. */
+  const anchorCount = (s: Awaited<ReturnType<typeof stateOf>>) => Object.keys(s?.baseline1rm ?? {}).length
+
   it('completes the baseline from the session that was just run', async () => {
     // The entry's definition of done. Before this, both flags stayed false however many baseline
     // sessions were completed.
@@ -75,9 +138,8 @@ describe.skipIf(!canRun)('the baseline hop (BF-131)', () => {
 
     const { completeWorkoutFromPayload } = await import('@trainingai/shared/workout/complete-workout')
     await completeWorkoutFromPayload(USER, { workoutSessionId: wsId })
-    await new Promise(r => setTimeout(r, 300)) // the write is fire-and-forget, by design
 
-    const state = await stateOf(sessionId)
+    const state = await waitForState(sessionId, s => s?.baselineComplete === true, 'the baseline to complete')
     expect(state?.baselineComplete).toBe(true)
     expect(state?.phase).toBe('accumulation')
     // Keyed by SESSION-EXERCISE id, which is how the periodization signals look a baseline up —
@@ -95,8 +157,8 @@ describe.skipIf(!canRun)('the baseline hop (BF-131)', () => {
     const wsId = await completedWorkout(sessionId, { 'Bench Press': 100 })
     const { completeWorkoutFromPayload } = await import('@trainingai/shared/workout/complete-workout')
     await completeWorkoutFromPayload(USER, { workoutSessionId: wsId })
-    await new Promise(r => setTimeout(r, 300))
-    expect((await stateOf(sessionId))?.baseline1rm[exercises[0].id].source).toBe('amrap')
+    const state = await waitForState(sessionId, s => anchorCount(s) === 1, 'the anchor to be written')
+    expect(state?.baseline1rm[exercises[0].id].source).toBe('amrap')
   })
 
   it('keeps a PARTIAL baseline in the phase, and keeps what it measured', async () => {
@@ -108,9 +170,10 @@ describe.skipIf(!canRun)('the baseline hop (BF-131)', () => {
     const wsId = await completedWorkout(sessionId, { A: 100, B: 90, C: 80 })
     const { completeWorkoutFromPayload } = await import('@trainingai/shared/workout/complete-workout')
     await completeWorkoutFromPayload(USER, { workoutSessionId: wsId })
-    await new Promise(r => setTimeout(r, 300))
 
-    const state = await stateOf(sessionId)
+    // The partial write IS the positive signal; the negative assertion below is only meaningful
+    // once it has landed.
+    const state = await waitForState(sessionId, s => anchorCount(s) === 3, 'the three measured anchors')
     expect(state?.baselineComplete).toBe(false)
     expect(state?.phase).toBe('baseline')
     expect(Object.keys(state?.baseline1rm ?? {})).toHaveLength(3)
@@ -126,14 +189,14 @@ describe.skipIf(!canRun)('the baseline hop (BF-131)', () => {
 
     const first = await completedWorkout(sessionId, { A: 100, B: 90 })
     await completeWorkoutFromPayload(USER, { workoutSessionId: first })
-    await new Promise(r => setTimeout(r, 300))
-    expect((await stateOf(sessionId))?.baselineComplete).toBe(false)
+    // Wait for the FIRST write to land before starting the second — otherwise the merge this test
+    // exists to prove is racing, and a pass would not mean what it says.
+    expect((await waitForState(sessionId, s => anchorCount(s) === 2, "the first session's two anchors"))?.baselineComplete).toBe(false)
 
     const second = await completedWorkout(sessionId, { C: 80 })
     await completeWorkoutFromPayload(USER, { workoutSessionId: second })
-    await new Promise(r => setTimeout(r, 300))
 
-    const state = await stateOf(sessionId)
+    const state = await waitForState(sessionId, s => s?.baselineComplete === true, 'the merged baseline to complete')
     expect(state?.baselineComplete).toBe(true)
     // Annotated because `?? {}` widens the record away and `Object.values` then yields `unknown[]`.
     const anchors: Record<string, { kg: number }> = state?.baseline1rm ?? {}
@@ -152,9 +215,8 @@ describe.skipIf(!canRun)('the baseline hop (BF-131)', () => {
        VALUES ($1, 'B', NULL, now())`, [wsId])
     const { completeWorkoutFromPayload } = await import('@trainingai/shared/workout/complete-workout')
     await completeWorkoutFromPayload(USER, { workoutSessionId: wsId })
-    await new Promise(r => setTimeout(r, 300))
 
-    const state = await stateOf(sessionId)
+    const state = await waitForState(sessionId, s => anchorCount(s) === 1, 'the one usable anchor')
     expect(state?.baselineComplete).toBe(false)
     expect(Object.keys(state?.baseline1rm ?? {})).toHaveLength(1)
   })
@@ -165,8 +227,12 @@ describe.skipIf(!canRun)('the baseline hop (BF-131)', () => {
     const wsId = await completedWorkout(sessionId, { A: 100 })
     const { completeWorkoutFromPayload } = await import('@trainingai/shared/workout/complete-workout')
     await completeWorkoutFromPayload(USER, { workoutSessionId: wsId })
-    await new Promise(r => setTimeout(r, 300))
 
+    // `completeWorkoutFromPayload` fires the anchor write only when
+    // `phase === 'baseline' && !baselineComplete`, so nothing should happen here — and this test is
+    // the one that proves the phase half of that guard, so it has to watch for a window rather than
+    // assert once. See `expectNoWrite` for why the window fails open.
+    await expectNoWrite(sessionId, s => anchorCount(s) > 0, 'no anchor should be written outside baseline')
     const state = await stateOf(sessionId)
     expect(state?.phase).toBe('accumulation')
     expect(state?.baseline1rm).toEqual({})
@@ -187,8 +253,16 @@ describe.skipIf(!canRun)('the baseline hop (BF-131)', () => {
     const wsId = await completedWorkout(sessionId, { A: 100 })
     const { completeWorkoutFromPayload } = await import('@trainingai/shared/workout/complete-workout')
     await completeWorkoutFromPayload(USER, { workoutSessionId: wsId })
-    await new Promise(r => setTimeout(r, 300))
 
+    // Watched rather than asserted once, for the same reason as the test above — though by this
+    // file's own measurement the completed-check is NOT what this case catches (deleting both
+    // guards together still passed it). What it does catch is the anchor being overwritten, so
+    // that is what the window watches for.
+    await expectNoWrite(
+      sessionId,
+      s => s?.baseline1rm[exercises[0].id]?.kg !== 55,
+      'the seeded anchor should not be overwritten',
+    )
     expect((await stateOf(sessionId))?.baseline1rm[exercises[0].id]).toEqual({ kg: 55, source: 'existing' })
   })
 

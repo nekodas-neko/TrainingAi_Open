@@ -10340,3 +10340,16 @@ The +28 is also the ceiling on this one: the enforcement it describes went to
 `scripts/check-apply-delta-domains.js` and its header carries the reasoning, so the entry names the
 check rather than re-explaining it. Nothing here went to a review doc, because a re-measurement that
 *confirms* a verdict has no evidence worth a separate document — the table is six rows.
+
+## 2026-09-10 — `docs/implementation-backlog.md` 20275 → 20241 (−34), LB-93 shipped
+
+LB-93 left the queue whole. The ratchet asked for this one rather than the reverse — it is a
+shrink, and leaving the old number would have let the file regrow 34 lines silently.
+
+Worth noting what those 34 lines bought, because it is the opposite of the usual case. LB-93's
+five-row measurement table (which tree, which scope, pass or fail) is what made the entry
+actionable: it had already ruled out "the branch it appeared on" before anyone opened the file. What
+the entry got wrong was the *fix* — it prescribed polling for a flag, which suits three of the eight
+sleeps in that file and not the five that assert a non-event. An entry can carry a correct,
+expensively-obtained diagnosis and a wrong prescription, and the diagnosis is still the part worth
+paying for.
