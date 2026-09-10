@@ -10675,3 +10675,19 @@ lesson down.
 been typed by hand since LA-99 shipped, which is four merges now. Resurrection check done by
 comparing entry BLOCKS against `git show origin/main:…` — LA-87 and LA-88 stayed removed, BF-137
 survived, and LA-89 kept the `Gate: owner` this branch adds.
+
+## 2026-09-10 — `docs/implementation-backlog.md` → 20410 (OR-106, the queue sweep)
+
+Eighty-nine lines, and most of them are one entry becoming two. PS-35 carried `Gate: owner for the
+page deletions` — a gate prose scoped to one paragraph of five, which `next-item.js` can only read as
+a property of the whole entry, so four ungated fixes sat in PARKED behind a decision none of them
+needed. Splitting into PS-35a (the gated deletions) and PS-35b (the four) duplicates the header and
+provenance, which is the cost of making the gate mean what it says. The rest is 25 one-line `Lane:`
+tags and the OR-106 entry recording the 90 still untagged. Re-measured after merging `main`,
+which raised the same baseline in parallel — a raise computed before the rebase is a guess.
+
+Six more lines than the first attempt, because OR-106 was **rewritten after its own number turned out
+to be wrong**: it claimed 90 entries had no lane, from a scratch regex that missed the `**Lane: A**`
+form; the real figure is 16 and none of them is startable work. The replacement is longer than the
+claim it retracts, because a retraction that does not say how the measurement failed invites the same
+measurement again.
