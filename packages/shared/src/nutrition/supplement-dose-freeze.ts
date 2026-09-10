@@ -75,19 +75,34 @@ export interface ResolvedLoggedDose {
  * that surfaces as "the unit vanished on one of my logs" months later.
  *
  * Per field is the behaviour kept, because it is the one the server already had: sharing the merge
- * must not quietly re-decide what a log stores. `??` treats an explicit null as absent, which is
- * also the server's existing behaviour and is deliberately unchanged here — see LA-97 for the
- * separate question of whether a REPLAYED log's null amount should stay null rather than pick up
- * the definition's current one. That question changes sync-push semantics and cannot ride along.
+ * must not quietly re-decide what a log stores.
+ *
+ * **LA-98 — absent and null are now different, and that is the whole point.** This used to merge
+ * with `??`, which treats an explicit `null` as absent. A replayed log whose amount was *genuinely*
+ * null at the moment it was taken therefore picked up whatever `default_amount` the definition
+ * carried at PUSH time — the same class of retroactive rewrite BF-3 exists to prevent, and the
+ * sibling of the one LA-97 fixed for the reconstitution.
+ *
+ * So the test is `=== undefined`, not `??`:
+ *
+ *   · key absent    → "not specified" → fill from the definition.
+ *   · key present, null → "none was recorded" → KEEP the null.
+ *
+ * Every caller has to preserve that distinction to get the benefit, which is why the log route now
+ * builds a partial (omitting what the body omitted) instead of coercing with `?? null`, and the
+ * sync push branch passes `undefined` for a key its payload does not carry.
  */
 export function resolveLoggedDose(
   caller: Partial<ResolvedLoggedDose> | null | undefined,
   definition: SupplementDoseDefinition | null | undefined,
 ): ResolvedLoggedDose {
-  const amount = caller?.amount ?? definition?.defaultAmount ?? null
+  const amount = caller?.amount !== undefined ? caller.amount : (definition?.defaultAmount ?? null)
   return {
     amount,
-    unit: caller?.unit ?? definition?.unit ?? null,
-    doseText: caller?.doseText ?? freezableDoseText(amount, definition?.dose),
+    unit: caller?.unit !== undefined ? caller.unit : (definition?.unit ?? null),
+    // The free text is decided against the RESOLVED amount either way — a log carrying both a
+    // number and contradicting prose is the OR-104 hazard, and it does not care where the number
+    // came from.
+    doseText: caller?.doseText !== undefined ? caller.doseText : freezableDoseText(amount, definition?.dose),
   }
 }

@@ -32,14 +32,24 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!read.ok && read.reason !== 'no_body' && read.reason !== 'empty') {
     return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
   }
-  let dose: import('@trainingai/shared/types/supplement').SupplementDose | undefined
+  // LA-98 — a PARTIAL, and the omissions are load-bearing.
+  //
+  // `SupplementLogSchema` declares all three fields optional under `.strict()`, so an omitted field
+  // arrives as `undefined` and a field sent as null arrives as null — the parser already keeps them
+  // apart. This used to flatten both to null with `?? null`, one line after the schema had taken
+  // care to distinguish them, and `resolveLoggedDose` then could not tell "fill this from the
+  // definition" from "this dose genuinely had none".
+  //
+  // Spreading conditionally rather than assigning `undefined` keeps the key ABSENT, which is what
+  // `resolveLoggedDose` tests for.
+  let dose: Partial<import('@trainingai/shared/types/supplement').SupplementDose> | undefined
   if (read.ok && read.body != null) {
     const parsed = SupplementLogSchema.safeParse(read.body)
     if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
     dose = {
-      amount: parsed.data.amount ?? null,
-      unit: parsed.data.unit ?? null,
-      doseText: parsed.data.doseText ?? null,
+      ...(parsed.data.amount !== undefined ? { amount: parsed.data.amount } : {}),
+      ...(parsed.data.unit !== undefined ? { unit: parsed.data.unit } : {}),
+      ...(parsed.data.doseText !== undefined ? { doseText: parsed.data.doseText } : {}),
     }
   }
 

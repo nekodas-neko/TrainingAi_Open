@@ -203,6 +203,39 @@ describe.skipIf(!canRun)('the dose is stamped on the log (BF-3)', () => {
     })
   })
 
+  // ── LA-98: a replayed log keeps the null it was taken with ──────────────────────────────────
+  //
+  // The sibling of LA-97, one field over. `logSupplement` merged with `??`, which cannot tell an
+  // omitted amount from one that is genuinely null — so a mutation queued while the definition had
+  // no structured amount, and drained after someone added one, acquired a number that was never
+  // true when the dose was taken.
+  describe('a pushed mutation keeps what the device recorded (LA-98)', () => {
+    it('keeps an explicit null amount rather than adopting the definition’s current one', async () => {
+      const sup = await create({ dose: '10mg', defaultAmount: null, unit: null })
+      // The titration that happens between the tick and the drain.
+      await repo.updateSupplement(sup.id, USER, { defaultAmount: 8, unit: 'mg' })
+
+      const res = await repo.pushMutations(USER, [{
+        id: 'la98-1', domain: 'supplement_logs', date: '2026-08-24',
+        // What the device froze: no structured amount existed when this was taken.
+        payload: { supplementId: sup.id, logDate: '2026-08-24', amount: null, unit: null, doseText: '10mg' },
+      }])
+      expect(res.errors).toEqual([])
+      expect(await logRow(sup.id, '2026-08-24')).toMatchObject({ amount: null, dose_text: '10mg' })
+    })
+
+    it('still fills from the definition when the payload omits the dose entirely', async () => {
+      // An older client sends no dose fields at all, and must keep getting the definition.
+      const sup = await create({ dose: '2 mg', defaultAmount: 2, unit: 'mg' })
+      const res = await repo.pushMutations(USER, [{
+        id: 'la98-2', domain: 'supplement_logs', date: '2026-08-25',
+        payload: { supplementId: sup.id, logDate: '2026-08-25' },
+      }])
+      expect(res.errors).toEqual([])
+      expect(await logRow(sup.id, '2026-08-25')).toMatchObject({ amount: 2, unit: 'mg' })
+    })
+  })
+
   it("never stamps another user's definition", async () => {
     const mine = await create({ dose: '2 mg', defaultAmount: 2, unit: 'mg' })
     await create({ dose: '99 mg', defaultAmount: 99, unit: 'mg' }, OTHER)
