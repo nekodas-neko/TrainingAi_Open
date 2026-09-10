@@ -20151,46 +20151,6 @@ carry no `equipment` tag** (15%), and 16 carry more than one. The `unknown` prof
 serving about one exercise in seven, not a defensive branch.
 
 
-### [workouts] LA-96 — the two-marker deload gate is applied at 2 of 6 1RM read sites
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-10 · found while re-measuring Q-52, not from a report.
-- **Lane: A** — `lib/data/postgres/**` and one `app/api` route.
-- **Reference for the measurement:** [`2026-09-10-q52-phase-hold-remeasure.md`](reviews/2026-09-10-q52-phase-hold-remeasure.md) §5.
-- **Low priority on purpose: there is nothing to catch today.** File it so the reasoning is not
-  re-derived a third time, not because a user can see it.
-
-`getLastRealOneRmBatch` filters `estimated_1rm > 0` **AND** `exercise_deloaded = false`, and its own
-comment gives the reason: the `> 0` predicate alone *"trusts the write-time invariant that a deload
-set always stores 0 — and that invariant has been violated in production"*. `reconcilePersonalRecord`
-mirrors it. **Four sibling readers guard on `> 0` alone:**
-
-| site | `> 0` | `deloaded = false` |
-|---|---|---|
-| `getLastRealOneRmBatch` (`adapter.ts:1483`) | ✓ | ✓ |
-| `reconcilePersonalRecord` (`adapter.ts:3402`) | ✓ | ✓ |
-| `getYearReviewTopExercises` (`adapter.ts:1426`) | ✓ | ✗ |
-| `listRecent1rm` (`adapter.ts:1683`) | ✓ | ✗ |
-| `getStrengthTrend` (`slices/periodization.ts:469`) | ✓ | ✗ |
-| `/api/strength-trend` (`route.ts:69`) | ✓ | ✗ |
-
-**⚠ Do not open this expecting to find a bug — measured 2026-09-10, the exposure is zero.** The
-2026-08-06 log the adapter comment cites (`estimated_1rm = 85.75` with `exercise_deloaded = true`)
-**no longer exists**: `0 of 444` logs hold that shape, deleted rows included. The comment's evidence
-is stale; its *argument* is not, which is why the filter stays and why this entry is about the four
-sites that lack it rather than about a wrong number on a screen.
-
-**The other half of the same measurement is genuinely inert and needs nothing:** ten pre-Q-298 logs
-store `estimated_1rm = 0` with `exercise_deloaded = false` (two whole Pull sessions, 2026-08-09 and
-2026-08-16, on real working sets), and every one of the six sites above excludes them via `> 0`.
-
-**Also visible in that table, and probably the better fix:** the last two rows are the *same query*
-duplicated across `slices/periodization.ts` and `app/api/strength-trend/route.ts` — 90-day window,
-same `MAX(estimated_1rm)` grouping, same `to_char` day bucketing. Per **One Formula, One Place** that
-is a bug by definition, and de-duplicating it makes this a three-site change rather than four.
-Confirm the two are really equivalent before merging them; they may have drifted.
-
----
-
 ## [cardio] ▶ Cardio training system — remaining
 
 - **Plateau handling + block-end review (D-7, D-8)** — deferred deliberately, needs

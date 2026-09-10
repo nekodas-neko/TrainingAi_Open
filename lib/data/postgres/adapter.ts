@@ -1421,10 +1421,13 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         // `> 0`, not `IS NOT NULL`: a deloaded exercise stores estimated_1rm = 0 on purpose
         // (`estimateOneRm` returns 0 when `deloaded`), and 0 passes an IS NOT NULL filter — so a
         // deload landing on the last logged session rendered the year's headline lift as
-        // "92.75 → 0 kg". Every sibling reader already guards this way (`getExercise1rmHistory`,
-        // `reconcilePersonalRecord`); this was the one that did not.
-        first1rm: sql<number | null>`(array_agg(${s.exerciseLogs.estimated1rm} ORDER BY ${s.exerciseLogs.loggedAt} ASC) FILTER (WHERE ${s.exerciseLogs.estimated1rm} > 0))[1]`,
-        last1rm: sql<number | null>`(array_agg(${s.exerciseLogs.estimated1rm} ORDER BY ${s.exerciseLogs.loggedAt} DESC) FILTER (WHERE ${s.exerciseLogs.estimated1rm} > 0))[1]`,
+        // "92.75 → 0 kg". The `exercise_deloaded = false` half is the read-time backstop for the
+        // *other* direction — a deload that stored a non-zero estimate anyway, which has happened
+        // in production (see getLastRealOneRmBatch below for the incident). LA-96 brought both
+        // markers here; the filters are on the aggregates, not the WHERE clause, because setCount
+        // must still count the deload's sets.
+        first1rm: sql<number | null>`(array_agg(${s.exerciseLogs.estimated1rm} ORDER BY ${s.exerciseLogs.loggedAt} ASC) FILTER (WHERE ${s.exerciseLogs.estimated1rm} > 0 AND ${s.exerciseLogs.exerciseDeloaded} = false))[1]`,
+        last1rm: sql<number | null>`(array_agg(${s.exerciseLogs.estimated1rm} ORDER BY ${s.exerciseLogs.loggedAt} DESC) FILTER (WHERE ${s.exerciseLogs.estimated1rm} > 0 AND ${s.exerciseLogs.exerciseDeloaded} = false))[1]`,
         // Grouped by name, and a name maps to one library row, so max() just picks that row's value.
         exerciseType: sql<string | null>`max(${s.exerciseLibrary.exerciseType})`,
       })
@@ -1687,6 +1690,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         FROM exercise_logs el
         JOIN workout_sessions ws ON ws.id = el.workout_session_id
         WHERE ws.user_id = ${userId} AND el.estimated_1rm > 0
+          -- Second marker, mirroring getLastRealOneRmBatch (LA-96): the estimated_1rm > 0
+          -- predicate alone trusts the write-time invariant that a deload stores 0, which
+          -- production has broken.
+          AND el.exercise_deloaded = false
           AND el.deleted_at IS NULL AND ws.deleted_at IS NULL
       ) ranked
       WHERE rn <= 2

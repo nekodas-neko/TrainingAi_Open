@@ -451,8 +451,9 @@ export async function getSetTimingRows(db: Db, userId: string, exerciseNames: st
     .where(and(...conditions))
 }
 
-// 90-day estimated-1RM history per exercise, one point per session-day (mirrors
-// app/api/strength-trend/route.ts's query) — feeds the strength-projection plateau detector.
+// 90-day estimated-1RM history per exercise, one point per session-day — feeds the
+// strength-projection plateau detector and, since LA-96, /api/strength-trend, which used to
+// carry a byte-identical copy of this query.
 export async function getExercise1rmHistory(db: Db, userId: string, exerciseNames: string[], tz: string): Promise<Record<string, { date: string; rm: number }[]>> {
   if (exerciseNames.length === 0) return {}
   type RawRow = { exercise_name: string; session_date: string; rm: number }
@@ -467,6 +468,10 @@ export async function getExercise1rmHistory(db: Db, userId: string, exerciseName
       AND el.exercise_name IN (${sql.join(exerciseNames.map(n => sql`${n}`), sql`, `)})
       AND el.estimated_1rm IS NOT NULL
       AND el.estimated_1rm > 0
+      -- Mirrors getLastRealOneRmBatch's two-marker gate (LA-96). The estimated_1rm > 0
+      -- predicate alone trusts the write-time invariant that a deload always stores 0, and
+      -- that invariant has been violated in production in both directions.
+      AND el.exercise_deloaded = false
       AND ws.started_at >= NOW() - INTERVAL '90 days'
       AND el.deleted_at IS NULL AND ws.deleted_at IS NULL
     GROUP BY el.exercise_name, session_date

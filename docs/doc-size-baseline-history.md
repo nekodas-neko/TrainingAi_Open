@@ -10654,3 +10654,12 @@ lesson down.
 been typed by hand since LA-99 shipped, which is four merges now. Resurrection check done by
 comparing entry BLOCKS against `git show origin/main:…` — LA-87 and LA-88 stayed removed, BF-137
 survived, and LA-89 kept the `Gate: owner` this branch adds.
+
+## 2026-09-10 — `docs/implementation-backlog.md` 20321 → 20281 (LA-96, #TBD)
+
+LA-96 shipped, so its 40-line entry left the queue. No other document moved.
+
+Written by `pnpm fix:baselines`. Resurrection check done the block way — compared the resulting
+entry blocks against `git show origin/main:docs/implementation-backlog.md` rather than reading
+diff markers: this branch's only backlog change is LA-96's removal, and nothing that earlier
+sessions removed came back.
