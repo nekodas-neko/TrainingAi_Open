@@ -19573,8 +19573,11 @@ UI?") means most PRs skip the job in ~35 seconds, so nobody has a feel for the r
   Lane bullet first; `check-backlog-pointers` caught it, because an inline field is ignored and the
   entry would have printed READY. Second field-shaped filing mistake this session — the first was
   `⛔` on LA-97.)
-- **Blocking-ish:** `main` sits at the ceiling, so the next entry from any of the six agents fails
-  CI. #1077 raised it 360 → 361 to unblock and recorded that this contradicts #1052's intent.
+- **⚑ BLOCKING, not "blocking-ish" — upgraded 2026-09-10 after it fired twice in one hour.** #1077
+  raised the ceiling 360 → 361 to unblock and recorded that this contradicts #1052's intent. The
+  very next PR (LA-99) hit **362**, so it shipped with **no journal entry at all** rather than raise
+  a second time — which is the "+1-per-PR treadmill" #1052 ended. Every feature PR carries an entry
+  by standing rule, so **every agent's next PR now fails CI or treadmills the ceiling again.**
 
 **The sweep is overdue on the repo's own numbers** — 56 foldable against a chore threshold of 20 and
 a runaway limit of 60, oldest dating to 2026-08-16 — and
@@ -19604,36 +19607,6 @@ directory being compacted.
 is "linked" if `projectOverview.md` or `CLAUDE.md` names it, not only `docs/`. A `docs/`-only measure
 reports 235 foldable where the real number is 56; sweeping on that would delete entries durable docs
 still cite. Whatever the sweep does, it must repoint citations rather than break them.
-
-### [platform] LA-99 — the doc-size baselines are hand-merged, six times in one evening, always identically
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-10, from the friction rather than from a report.
-- **Lane: A** — `.gitattributes`, a driver script under `scripts/`, and a note in
-  `docs/doc-size-baseline-history.md`.
-- **Small, and the payoff is other agents' time as much as this lane's.**
-
-Every PR that touches `docs/implementation-backlog.md` raises
-`docs/doc-size/docs/implementation-backlog.md.size`. On 2026-09-10 six PRs did so within two hours
-(#1070, #1071, #1072, #1073, #1074, #1076), and **every single merge conflicted on that one file and
-was resolved the same way**: recompute the count on the merged document, write it, commit.
-
-**The conflict is CORRECT and should not be suppressed.** LA-33 split a shared map into one file per
-tracked doc precisely so two PRs raising two different documents no longer collide; what is left is
-two PRs raising the *same* document, which genuinely disagree about one number. A union merge or an
-"ours" strategy would silently pick a wrong number. **The waste is the hand-resolution, not the
-conflict** — so the fix is a merge driver that computes the right answer, not one that hides the
-question.
-
-- `.gitattributes`: `docs/doc-size/*.size merge=docsize`
-- the driver recomputes from the merged working tree and writes the result.
-
-**⚠ The driver must NOT use `wc -l`.** The tracked documents have no trailing newline, so
-`check-doc-index-size` counts one more line than `wc -l` reports — an off-by-one that cost two
-retries in this session alone (20246 vs 20247, 20330 vs 20331). **Take the count the check itself
-reports** (`docs/… is N lines`) and write that; it is the only number the gate agrees with.
-
-**Reversal cost: nil.** A merge driver is local config plus one script; delete both and conflicts
-come back exactly as they are today.
 
 ### [platform] LA-89 — `oura/hr-sync` has no callers, and its name says something that is not true
 
