@@ -9789,12 +9789,24 @@ because none of them is the change that review was for, and per **No orphaned fi
 without a queue entry is a dropped finding.*
 
 
-### [platform] LB-54 — a red CI job cannot be read, and E2E has no green baseline to compare against
+### [platform] LB-54 — E2E still has no green baseline on `main` to compare a red PR against
 
 - **Lane:** O — the Orchestrator's. `.github/workflows/ci.yml` and the CI tooling are the Orchestrator's.
 - **Added:** 2026-09-03 · from BF-111 (#840), where diagnosing one red check consumed most of a
   session and still did not reach the failing assertion.
-- **⚠️ `get_job_logs` cannot reach a step's output on this repo's jobs.** Every retrieval — by
+- **Needs:** LB-56 — the baseline half below is a cost decision that LB-56 owns, not an independent
+  change. See the ⚠ under it.
+
+- **✅ FIXED 2026-09-10 — the logs half is root-caused and repaired.** All three `ci.yml` Postgres
+  services ran `--health-cmd pg_isready` with **no `-U postgres`**, so every probe connected as the
+  container's OS user, root, and Postgres logged `FATAL: role "root" does not exist` every 10 s for
+  the life of the job. That dump is printed by the runner AFTER all steps, making it the tail of the
+  log and the only thing `get_job_logs` could reach. `android-emulator.yml` had the `-U` all along,
+  which is where the correct form came from. **Not yet confirmed end-to-end:** whether a step's real
+  output is now retrievable needs the next genuinely red job to prove — the fix removes the
+  documented cause of the noise, which is not the same as observing the cure.
+
+- **⚠️ (HISTORICAL — what the above fixes) `get_job_logs` could not reach a step's output.** Every retrieval — by
   `job_id`, by `run_id` with `failed_only`, at `tail_lines` from 60 to 400 — returns only the
   **post-job Postgres service-container dump**, which the runner prints last and which is thousands
   of lines of `role "root" does not exist` healthcheck noise. Measured: the whole retrievable content
@@ -9810,7 +9822,15 @@ without a queue entry is a dropped finding.*
   - Worth trying: uploading vitest's and Playwright's own output as a run artifact, or printing a
     failure summary to a file the workflow `cat`s in a final step — anything that puts the failure
     *before* the container dump rather than behind it.
-- **⚠️ E2E is a required check with no green baseline on `main`.** The job is gated
+- **⚠️ THE REMAINING HALF, and it is blocked on LB-56 rather than free.** Removing the skip would
+  give `main` an E2E baseline — but LB-31 chose "one job rather than six" on the nightly deliberately,
+  and E2E is 26 minutes. More to the point, **LB-56 records that `main` would not pass the suite
+  today**, so enabling it now buys a nightly that is red from its first run: the "advisory check
+  decays unwatched" failure LB-56 itself warns about, bought at 26 CI-minutes a night. The baseline is
+  worth having *once someone intends to act on it*, and LB-56's decision is what settles whether a
+  nightly is even the right instrument. Do not enable this before that decision.
+
+- **E2E is a required check with no green baseline on `main`.** The job is gated
   `if: github.event_name != 'schedule'`, so the nightly run on `main` **skips it** (confirmed: run
   33797376255 shows E2E `skipped`). It therefore only ever runs on a PR. **CI history cannot answer
   "is this red on `main` too?"** — the first question the CI rules tell you to ask.

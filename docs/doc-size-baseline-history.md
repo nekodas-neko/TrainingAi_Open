@@ -10756,11 +10756,24 @@ OR-105 also grew a paragraph on what was **not** done: no `Branch:` was written 
 that had shipped, because the commit the scan finds is often an incidental mention rather than the
 work. That paragraph exists to stop the next pass "finishing the job" by writing false provenance.
 
+## 2026-09-10 — `docs/implementation-backlog.md` → 20478 (LB-54, half fixed)
+
+Twenty lines. LB-54 gains the root cause of its unreadable-logs half (a `pg_isready` with no
+`-U postgres`, so every healthcheck logged `role "root" does not exist` into the tail of the log) and
+loses nothing, because the historical bullet stays: the next reader needs to know what the symptom
+looked like to recognise it if it returns.
+
+The other ten lines are a `Needs: LB-56` and the paragraph justifying it. Enabling E2E on the nightly
+is a one-line change that *looks* free and is not — LB-31 chose "one job rather than six" on purpose,
+and LB-56 records that `main` would not pass the suite, so it would buy a nightly red from its first
+run. Writing down why an obvious change was NOT made is what stops the next session making it.
+
 ## 2026-09-11 — both indexes raised for PS-35b's result
 
-`docs/implementation-backlog.md` to 20488 and `projectOverview.md` to 10548. PS-35b's entry gained
+`docs/implementation-backlog.md` to 20508 and `projectOverview.md` to 10548. PS-35b's entry gained
 what shipped for each of its four items, the two measurements (34 → 29 boot requests; the chip's
 rendered failure state), and a correction the next reader would otherwise trip on: the checkpoint
 report's "two unreachable palette keys" are reachable, because the report compared line 26 of one
 function with line 45 of another. Deleting them on the entry's word would have removed the palette
-from two live routes, so the refutation is worth more lines than the instruction was.
+from two live routes, so the refutation is worth more lines than the instruction was. Backlog number recomputed on the
+merged file — another lane moved the same baseline in parallel.
