@@ -24,6 +24,23 @@ log and therefore the only part `get_job_logs` can reach.
 **`android-emulator.yml` has always had the `-U`.** The corrected form was already in the repo; three
 jobs simply never got it.
 
+## The first attempt turned CI red, and the reason is worth more than the fix
+
+The comment explaining the `-U` went **inside** the `options: >-` block. That is a **folded block
+scalar**: every indented line under it is folded into the value, so eight `#` lines became part of
+the docker argument string. All three Postgres-backed jobs — `Tests`, `Migration Check`, `E2E` — died
+in **10 to 14 seconds**, while `Lint` and `Build`, which have no Postgres service, passed.
+
+**The file parsed as valid YAML the whole time.** My pre-push check was
+`yaml.safe_load(...)`, which proves the syntax and says nothing about the value. The second attempt
+checks the resolved value instead — that `services.postgres.options` starts with `--health-cmd` and
+contains no `#` — and compares it byte-for-byte against `android-emulator.yml`, which has always
+worked.
+
+The tell was in the timing before it was in the logs: *only* the jobs with a Postgres service failed,
+and all of them failed in seconds rather than at a test. The comment now sits above the key and warns
+the next reader, because the failure looks nothing like its cause.
+
 ## What is not claimed
 
 **Whether a step's output is now retrievable needs the next genuinely red job to prove.** This
