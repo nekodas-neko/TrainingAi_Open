@@ -10611,6 +10611,27 @@ them mine. Worth recording which way this one went, so "re-verify first" does no
 the blocker. Same posture as #1078: the record is here, in the PR body, and in the queue-entry
 removal.
 
+## 2026-09-10 — `docs/implementation-backlog.md` 20,285 → 20,331 (+46), BF-138
+
+*"im getting confused - can we have a central idea of everything"*. The owner had four numbers from
+four screens inside a week and could not tell which to eat to. He was also right about the model —
+*"eat to 1350 + exercise"* describes the dynamic path accurately — and could not confirm it anywhere.
+
+Filed as its own entry rather than folded into BF-134 because it is the reason one owner hit **three**
+separate defects in seven days: BF-134 (macros and calories on different anchors), BF-137 (the drug
+window inflating maintenance) and TN-29 (no activity cross-check) all present to a user as *"the
+number is wrong"*, and nothing on any screen lets him tell a defect from a design.
+
+What the entry adds beyond "write an explainer" is the measurement that turns a documentation request
+into a design question: median **2,438 steps/day** and **22 workouts in 30 days** put typical earned
+movement near **215 kcal**, so a normal day computes to **~1,470** against a stored goal of **1,660**.
+That ~190 kcal gap is nobody's bug — it is two models disagreeing quietly, and reconciling them is the
+question the explainer will force. BF-134 made the gap visible; it did not close it.
+
+Two guards. The entry must **not** become a calculation change while three entries proposing exactly
+that are in flight — it should state today's model and move with them. And it should state confidence,
+not just numbers: *"weight flat across 29 days at 1,340–1,530 logged intake"* is stronger evidence
+than any estimate on the card, and presenting four estimates as equally solid is how this started.
 ## 2026-09-10 — `docs/implementation-backlog.md` −24, LA-87 shipped
 
 LA-87's entry left the queue. Third use of `pnpm fix:baselines`; the number has not been typed by
