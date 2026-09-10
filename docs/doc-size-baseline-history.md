@@ -10821,3 +10821,10 @@ work queue as a permanently unstartable item.
 Recomputed by `pnpm fix:baselines` after merging `main` (which had moved to #1094 and folded the
 journal directory in the meantime). Resurrection check done the block way against
 `git show origin/main:docs/implementation-backlog.md`: exactly one heading removed, LA-101's own.
+
+## 2026-09-11 — `docs/implementation-backlog.md` 20719 → 20725 (LB-56 fifth sighting)
+
+Six lines for a *recovered* renderer-`SIGSEGV` flake on `macro-calorie-warning.spec.ts:77`, at the
+same address as the third and fourth sightings. A sighting that recovers on retry is the one that
+otherwise goes uncounted, and LB-56's argument is a rate — so the entry grows by the observation
+rather than being left to be re-derived from a log nobody will re-open.

@@ -58,3 +58,36 @@ difference between a guard and a coin flip.
 **Not exercised:** the S25. RV-36's check is the **system back gesture**, which is the one gesture the
 harness cannot send — `page.goBack()` is not it. RV-37's is a day with enough logged to scroll. Both
 are `Verify: device` on their entries and in one row on `projectOverview.md`.
+
+## Two E2E reds cleared on the way past, neither of them this branch's
+
+The advisory job came back with two hard failures. Both were already on `main`, and both are fixed
+here rather than left, because a red E2E that has to be opened and read is the cost LB-54 and LB-56
+are both about.
+
+**`reta-weight-response.spec.ts:142` is LB-99's missed sibling surface, and it is mine.** That PR
+split the placeholder chip in two — three weigh-ins can fit a rate, so a withheld verdict reads
+*"Not called yet"*, and *"Not enough weigh-ins yet"* is reserved for genuinely too little data. The
+unit test pinned the new string; the e2e spec asserting the same chip on the real screen did not get
+updated. Its own comment already described the new behaviour, which is the tell that only the string
+was stale. The sibling verdict test's negative assertion is widened to both labels: asserting the
+absence of a string that can no longer render in any state checks nothing.
+
+**`plan-rescale.spec.ts:230` is not mine, and that was established rather than assumed** — the same
+failure reproduces locally against `origin/main`'s `nutrition-content.tsx`, with this branch's hook
+absent. The tap that expands the meal list was landing on the Workout tab, so the list never opened
+and the assertion below it never ran.
+
+Both causes were already written down in `e2e/`, each in the file that paid for it, and neither had
+reached this one. `scrollIntoViewIfNeeded()` stops as soon as the box is technically on screen, which
+for a control this far down a long page leaves it **under the fixed bottom nav**
+(`plan-meal-to-saved-meal.spec.ts`); and it scrolls *every* ancestor scroll container, one of which
+is the shell's **horizontal tab carousel**, so it slides the shell off Nutrition
+(`plan-meal-log-decline.spec.ts`). Both land on Workout — which is exactly why fixing one reads as
+sufficient until the other fires. `block: 'center', inline: 'nearest'` answers both, and all three
+specs that tap this control now carry it; the two that were not red differ only in fixture height.
+
+A fifth `LB-56` sighting is recorded on its entry: `macro-calorie-warning.spec.ts:77` went flaky with
+the renderer `SIGSEGV` at the same address as the third and fourth. It recovered on retry, which is
+why it is worth writing down — a recovered sighting is the one that otherwise goes uncounted, and the
+rate is the whole argument of that entry.

@@ -2238,11 +2238,17 @@ sheet is open over the bottom half of it.
     `page.goto: net::ERR_ABORTED at http://localhost:3100/`. So `ERR_ABORTED` is what a later test
     sees after the renderer is already gone, not a second failure mode: attempt and retry of one test
     produced one of each. 177 passed.
-  - **Four sightings, four different specs** — `preferences-survive-reinstall` (×3, twice as the hard
+  - **⚠ FIFTH SIGHTING 2026-09-10 (#1095).** `macro-calorie-warning.spec.ts:77` went flaky with
+    `browser.newContext: Target page, context or browser has been closed`, preceded in the log by
+    `Received signal 11 SEGV_MAPERR 0000000001b0` — the same address for the third time. It
+    recovered on retry, so the run's two hard failures were both real assertion faults and neither
+    was this. Recorded because a *recovered* sighting is the one that would otherwise go unwritten,
+    and the rate is the argument this entry rests on.
+  - **Five sightings, six different specs** — `preferences-survive-reinstall` (×3, twice as the hard
     failure), `touch-target-size`, `one-calorie-budget`, `back-dismiss-sweep`, `card-429-error-state`,
-    `home-device-battery-chips`. Which spec is reported is a scheduling accident, as this entry said
-    at the second sighting; the constant is a renderer crash inside a 21–26 minute run. **It has now
-    cost four log reads in one session.**
+    `home-device-battery-chips`, `macro-calorie-warning`. Which spec is reported is a scheduling
+    accident, as this entry said at the second sighting; the constant is a renderer crash inside a
+    21–26 minute run. **It has now cost five log reads across two sessions.**
   - Recorded because a 26-minute job that eats its own browser roughly one run in three is an
     argument about the job, which is what this entry is for. It also means **a red E2E cannot be
     read as a signal without opening the log**, which is the cost LB-54 is about.
