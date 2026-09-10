@@ -6,7 +6,7 @@
 // SQLite does not run in this sandbox), so a behavioural change there passes those tests untouched.
 // Putting the decision in a shared function is what makes both paths genuinely covered.
 import { describe, it, expect } from 'vitest'
-import { freezableDoseText } from '../supplement-dose-freeze'
+import { freezableDoseText, resolveLoggedDose } from '../supplement-dose-freeze'
 
 describe('freezableDoseText', () => {
   it('drops a free text that would contradict the structured amount', () => {
@@ -53,5 +53,39 @@ describe('freezableDoseText', () => {
 
   it('trims what it does freeze', () => {
     expect(freezableDoseText(null, '  1 scoop  ')).toBe('1 scoop')
+  })
+})
+
+describe('resolveLoggedDose (LA-90)', () => {
+  const def = { defaultAmount: 5, unit: 'mg', dose: '5mg once daily' }
+
+  it('resolves entirely from the definition when the caller supplies nothing', () => {
+    expect(resolveLoggedDose(undefined, def)).toEqual({ amount: 5, unit: 'mg', doseText: null })
+  })
+
+  it('fills a MISSING field from the definition rather than dropping it — the divergence LA-90 names', () => {
+    // The server did this; the local store took the caller's triple as given and left `unit` null.
+    // Same tick, same supplement, two different rows depending on connectivity — and the offline
+    // one wins, because a pushed mutation carries what the device recorded.
+    expect(resolveLoggedDose({ amount: 7.5 }, def)).toEqual({ amount: 7.5, unit: 'mg', doseText: null })
+    expect(resolveLoggedDose({ unit: 'mcg' }, def)).toEqual({ amount: 5, unit: 'mcg', doseText: null })
+  })
+
+  it("keeps the caller's complete triple untouched — a replayed log at the dose it was taken at", () => {
+    expect(resolveLoggedDose({ amount: 2, unit: 'ml', doseText: 'half a vial' }, def))
+      .toEqual({ amount: 2, unit: 'ml', doseText: 'half a vial' })
+  })
+
+  it('freezes the free text against the RESOLVED amount, not the caller-supplied one', () => {
+    // The amount came from the definition here, and it still suppresses the prose — otherwise a
+    // log would carry both `5 mg` and contradicting free text, which is the OR-104 hazard.
+    expect(resolveLoggedDose({ unit: 'mg' }, def).doseText).toBeNull()
+    // With no structured amount anywhere, the prose is the only record and is kept (BF-3).
+    expect(resolveLoggedDose({ unit: 'mg' }, { defaultAmount: null, unit: null, dose: '10mg' }).doseText).toBe('10mg')
+  })
+
+  it('survives a missing definition without inventing anything', () => {
+    expect(resolveLoggedDose({ amount: 3 }, null)).toEqual({ amount: 3, unit: null, doseText: null })
+    expect(resolveLoggedDose(null, null)).toEqual({ amount: null, unit: null, doseText: null })
   })
 })

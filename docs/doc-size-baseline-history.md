@@ -10353,3 +10353,17 @@ the entry got wrong was the *fix* — it prescribed polling for a flag, which su
 sleeps in that file and not the five that assert a non-event. An entry can carry a correct,
 expensively-obtained diagnosis and a wrong prescription, and the diagnosis is still the part worth
 paying for.
+
+## 2026-09-10 — `docs/implementation-backlog.md` 20241 → 20262 (+21), LA-90 out, LA-97 in
+
+Net of a 27-line removal and a 48-line addition. LA-90 shipped and left the queue; **LA-97** took
+its place — the live half of the same finding, which LA-90's entry did not mention: the sync push
+drops `takenAt` and the frozen vial, so every offline supplement tick is re-stamped at push time
+with whatever vial is current then.
+
+The new entry is longer than the one it replaces and earns it. It carries the four-step chain
+(local freeze → `enrichPayload` → push branch → `logSupplement`) because each step looks correct in
+isolation and only the sequence is wrong, so an entry that merely named the symptom would send the
+next session to re-derive it. It also states up front that this ships alone — a sync-push change's
+revert is a corrective migration — which is the constraint most likely to be missed by someone
+batching a tidy-up.

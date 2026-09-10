@@ -48,11 +48,26 @@ describe('the local write freezes the dose (BF-3)', () => {
   // change back to the old expression passes every behavioural test in the repo. The rule itself is
   // executed in `packages/shared/src/nutrition/__tests__/supplement-dose-freeze.test.ts`; this is
   // the half that catches the wiring being undone.
+  //
+  // LA-90 widened what is shared: the whole caller-vs-definition merge is now `resolveLoggedDose`,
+  // which calls `freezableDoseText` itself. Asserting the outer call is the stronger check — the
+  // free-text rule cannot be re-implemented locally without also un-sharing the merge around it.
   it('delegates the free-text decision to the shared rule', () => {
-    expect(upsert).toContain('freezableDoseText(amount,')
+    expect(upsert).toContain('resolveLoggedDose(caller,')
     expect(backend).toContain("from '@trainingai/shared/nutrition/supplement-dose-freeze'")
-    // The shape it replaced, which stamped the prose whatever the amount said.
+    // The two shapes it replaced: stamping the prose whatever the amount said (OR-104), and
+    // re-deriving the free text locally instead of through the shared rule (LA-90).
     expect(upsert).not.toContain('doseText: def.dose ? String(def.dose) : null')
+    expect(upsert).not.toContain('freezableDoseText(')
+  })
+
+  // LA-90 — the local store used to read the definition only when the caller supplied NOTHING, so a
+  // partial dose kept its nulls offline while the server filled them per field. The guard is now
+  // "any field still missing", which is what the shared per-field merge needs to have something to
+  // merge against.
+  it('reads the definition whenever a field is still missing, not only when all are', () => {
+    expect(upsert).toContain('caller.amount == null || caller.unit == null || caller.doseText == null')
+    expect(upsert).not.toContain('dose.amount == null && dose.unit == null && dose.doseText == null')
   })
 
   // …and a caller that DOES supply one wins, which is how a replayed offline log keeps the dose it

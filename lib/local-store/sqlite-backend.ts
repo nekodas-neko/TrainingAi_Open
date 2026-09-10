@@ -11,7 +11,7 @@ import type {
   LocalExerciseLibraryEntry, LocalMealType, LocalPlanMealAnswer,
 } from './types';
 import type { LogExercisePayload } from '@trainingai/shared/workout/log-exercise';
-import { freezableDoseText } from '@trainingai/shared/nutrition/supplement-dose-freeze';
+import { resolveLoggedDose } from '@trainingai/shared/nutrition/supplement-dose-freeze';
 import { defaultUseFor1rm } from '@trainingai/shared/workout/default-use-for-1rm';
 import { assembleLocalActiveProgram, type LocalActiveProgram } from './program-assembler';
 
@@ -2762,21 +2762,28 @@ export class SQLiteLocalStore implements LocalStore {
     // with no change to the UI: `supplements-section.tsx` passes no dose and does not need to.
     // A caller that DOES pass one wins, which is how the sync engine replays a log at the dose it
     // was actually taken at rather than at whatever the definition says now.
-    let dose = { amount: record.amount ?? null, unit: record.unit ?? null, doseText: record.doseText ?? null };
-    if (dose.amount == null && dose.unit == null && dose.doseText == null) {
+    //
+    // LA-90 — the merge itself is `resolveLoggedDose`, shared with the server. This block used to
+    // apply a DIFFERENT rule: it read the definition only when all three were null and otherwise
+    // took the caller's triple as given, so a caller supplying only `amount` got the definition's
+    // `unit` online and a null one offline — and the offline row wins, because a pushed mutation
+    // carries what the device recorded.
+    //
+    // The definition is read whenever any field is still missing, which is what per-field needs. A
+    // caller with a complete triple — the sync engine replaying a log at the dose it was taken at —
+    // skips the query entirely, as it did before.
+    const caller = { amount: record.amount ?? null, unit: record.unit ?? null, doseText: record.doseText ?? null };
+    let dose = caller;
+    if (caller.amount == null || caller.unit == null || caller.doseText == null) {
       const [def] = await querySQL<Record<string, unknown>>(
         `SELECT dose, default_amount, unit FROM supplements WHERE id = ?`, [record.supplementId]);
-      if (def) {
-        // OR-104 — whether the definition's free text is frozen beside a structured amount is
-        // decided by `freezableDoseText`, shared with the server so the two write paths cannot
-        // drift. A log written offline must not disagree with one written online.
-        const amount = def.default_amount == null ? null : Number(def.default_amount);
-        dose = {
-          amount,
-          unit: def.unit ? String(def.unit) : null,
-          doseText: freezableDoseText(amount, def.dose == null ? null : String(def.dose)),
-        };
-      }
+      dose = resolveLoggedDose(caller, {
+        defaultAmount: def?.default_amount == null ? null : Number(def.default_amount),
+        // Truthiness, not `?? null`: a blank unit is absent, and `freezableDoseText` documents the
+        // same reading for the free text.
+        unit: def?.unit ? String(def.unit) : null,
+        dose: def?.dose == null ? null : String(def.dose),
+      });
     }
     // BF-69 — the conflict target is the PARTIAL index over manual contributions
     // (`idx_supplement_logs_manual_day`), not the table's old whole-day UNIQUE. A meal contribution
