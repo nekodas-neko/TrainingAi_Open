@@ -10377,14 +10377,37 @@ Forty-five lines because the one-line cause needs three things around it to be a
 The null `taken_at` is noted as OR-102a's, not a second defect, so an empty dose timeline is not
 re-filed by whoever picks this up.
 
-## 2026-09-10 — `docs/implementation-backlog.md` raised to 20341 for BF-136's result and LB-99
+## 2026-09-10 — `docs/implementation-backlog.md` 20,286 → 20,317 (+31), TN-29 amended
+
+The owner reported *"the budget went up again"* — resting base 1,453 → 2,104 and budget 1,253 → 2,114
+across two mornings. **Amended TN-29 rather than filing a new entry**, per the dedup rule: this is
+that entry's predicted failure arriving, not a second one.
+
+What makes it worth 31 lines is that the entry had already named the number. `restingBaseKcal` is
+`maintenanceKcal − avgActiveKcal` on the calibrated branch, and TN-29 already identified **2,245** as
+the maintenance that should be rejected; 2,245 − ~141 lands on the 2,104 now on screen. The 8 Sep
+figure came from the formula branch, so the two screenshots bracket the moment `resolveMaintenance`
+took the calibrated value — and that transition is the evidence that the acceptance is
+**unconditional**, which no amount of reading the function proves as sharply as a 651 kcal step
+between consecutive mornings.
+
+The amendment also converts a projected cost into a measured one: ~350 kcal/day of extra budget on a
+recomp goal, enough to cancel the deficit it carries. That reframes an owner-approved but unassigned
+entry from tuning to something with a running cost.
+
+One explicit do-not added: don't revert to the formula branch. The calibrated path is the better
+model when it is right, and the defect is that nothing tests whether it is — reverting discards the
+measurement the entry exists to make trustworthy.
+
+## 2026-09-10 — `docs/implementation-backlog.md` raised to 20372 for BF-136's result and LB-99
 
 BF-136's entry gained what shipped, the reason correcting a vial in place is required rather than
 optional (vials sort `openedOn DESC`, so a re-dated new vial sorts below the wrong one), and the
 measurement showing its fix does not clear the reported symptom. That last part is a new entry,
 LB-99, with the branches already ruled out — the payload shape matches and the arithmetic is tested,
 so the suspect is the local-store fall-through. Filing it costs lines and not filing it would have
-left BF-136 reading as closed.
+left BF-136 reading as closed. Recomputed on the merged file — another lane raised the
+same baseline in parallel, which is the case the per-document `.size` split should conflict on.
 
 ## 2026-09-10 — `projectOverview.md` raised to 10561 for BF-136's row
 
