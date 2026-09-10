@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.446.4",
+    date: "2026-09-11",
+    changes: [
+      "Leaving the Nutrition tab for the coach and coming back returns you to where you were scrolled, instead of the top. The other tabs already did this; Nutrition scrolls its own container and was never wired up.",
+      "The single-day health screen no longer ends flush with the bottom of the phone \u2014 the last card had nothing below it, so on gesture navigation it sat against the gesture bar.",
+    ],
+  },
+  {
     version: "1.446.3",
     date: "2026-09-11",
     changes: [

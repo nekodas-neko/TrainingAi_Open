@@ -30,6 +30,13 @@ split is "does it feel slow" vs "is it actually slow at the source".
 - Reviews: [`docs/reviews/2026-07-21-ui-responsiveness-audit.md`](../../reviews/2026-07-21-ui-responsiveness-audit.md) ·
   [`docs/reviews/2026-07-11-offline-feel-performance-review.md`](../../reviews/2026-07-11-offline-feel-performance-review.md) ·
   [`docs/reviews/2026-07-20-wiring-caching-perf-audit.md`](../../reviews/2026-07-20-wiring-caching-perf-audit.md)
+- [`docs/overview/entries/2026-09-11-fix-nutrition-scroll-and-day-padding.md`](../../overview/entries/2026-09-11-fix-nutrition-scroll-and-day-padding.md)
+  — **Nutrition keeps its scroll position; `/health/day` clears the gesture bar (RV-36, RV-37),
+  2026-09-11.** BF-100's restoration lives in `PullToSync` and therefore reached **three** screens,
+  not five — *"every screen using the shell inherits it"* was wrong at the call site as well as in
+  the entry, and is now gone from both. **A screen that scrolls its own container gets no restoration
+  from being inside the shell — check the call, not the layout.** `/health/day`'s scroller had no
+  bottom padding at all. Both owe **one** device pass; RV-37 has still never been observed.
 - [`docs/reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md`](../../reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md)
 - [`docs/reviews/2026-09-06-deload-confirm-eviction-gap.md`](../../reviews/2026-09-06-deload-confirm-eviction-gap.md) — **the owner's stale-screen report traced to cause, 2026-09-06** (RV-49 — the Home deload confirm calls `invalidatePrescriptionChanged()` id-less, which the group's own conditional turns into a no-op for every `workout-card:<id>`, and `next-session` is not in the group; RV-50 — three raw seed-only `readCacheSync('workout-card:<id>')` reads that can never revalidate). The nutrition add surface swept in the same pass is **clean at source** — all nine writers close the `onLogged` loop.
 - [`docs/overview/entries/2026-09-11-fix-ps35b-boot-and-weather.md`](../../overview/entries/2026-09-11-fix-ps35b-boot-and-weather.md)

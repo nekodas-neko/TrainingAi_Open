@@ -10795,3 +10795,11 @@ A baton rewrite, so the ratchet correctly demanded the number come down with it 
 successor acts from and the durable gotchas stayed. The rewrite is the point of the file — it is
 overwritten in full at every handoff — so the baseline tracking it downward is the mechanism working,
 not a concession.
+
+## 2026-09-11 — both indexes raised for RV-36 + RV-37
+
+Both entries shipped and both owe a device look, so each converted from work-to-do into a
+`Verify: device` record rather than being deleted — RV-36's note explaining why it was deliberately
+NOT a `Verify:` while unbuilt is kept, because that reasoning is exactly right and would otherwise be
+re-litigated. RV-37 additionally keeps the fifth-CI-rule question, which is the half that genuinely
+needs evidence: no safe-area rule fires on an absent utility, only on a wrong one.

@@ -64,6 +64,7 @@ import { mealTypeForHour } from "@trainingai/shared/nutrition/log-plan-meal";
 import { NutritionActionRow } from "@/components/nutrition/nutrition-action-row";
 import { useFoodLogsLoader } from "./use-food-logs-loader";
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
+import { useScrollRestoration } from "@/lib/hooks/use-scroll-restoration";
 
 const MEAL_PLAN_REVIEW_DAYS = 28;
 
@@ -88,6 +89,11 @@ function formatDateLabel(dateStr: string, todayStr: string): string {
 
 export default function NutritionContent({ userId }: { userId?: string }) {
   const tz = useUserTimezone();
+  // RV-36. The only deeper push from this tab is `/coach?scope=nutrition`; every other routable
+  // screen that scrolls at this viewport is a leaf, so re-entering one is a fresh arrival that
+  // correctly starts at the top.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useScrollRestoration(scrollRef);
   const todayStr = todayInTz(tz);
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -521,7 +527,14 @@ export default function NutritionContent({ userId }: { userId?: string }) {
         </div>
       </ScreenHeader>
 
+      {/* RV-36. This tab owns its own scroller and inherits nothing from `PullToSync`, which is
+          where `useScrollRestoration` is called for the three screens that DO use it
+          (`health-content`, `more-content`, `session-select-content`). Measured: `/more` → Profile
+          details → back restored 840; `/nutrition` → `/coach` → back saved no key and returned 0.
+          The hook takes a ref and nothing about it is tab-specific — wrapping this in `PullToSync`
+          instead would also add a pull-to-refresh gesture nobody asked for. */}
       <div
+        ref={scrollRef}
         {...bindDateSwipe()}
         data-swipe-carousel
         style={{ touchAction: "pan-y" }}
