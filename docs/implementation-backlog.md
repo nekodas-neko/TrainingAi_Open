@@ -421,6 +421,64 @@ below threshold and left in place for next time.
 
 
 
+### [readiness] TN-33 — the stress storage defect is fixed and the SIGN is not; TN-22's reversal was an eight-day artefact
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-10 · owner: *"give me the update on our stress reading/calculation… how can we test it works?"*
+- **Lane: A** for the level-2 test harness; the level-3 blocker is an owner action, not code.
+- **Amends TN-22** — whose defect was real and shipped, and whose sign claim does not survive ten more days.
+- **Reference:** [`review`](reviews/2026-09-10-stress-status.md).
+
+**✅ The storage half is CLOSED, verified 2026-09-10.** Commit `7c428a7f` (2026-08-31) gave the strip
+and the scalars one producer — the rollup had written the buckets while `/api/body-battery` wrote the
+three daily numbers, each from a series built off a different heart-rate baseline. Recomputing
+`stress_high_minutes` from `oura_daytime_stress_buckets`:
+
+| window | days | verdict |
+|---|---|---|
+| **2026-09-01 → 09-10** | 10 | **10 of 10 match exactly** |
+| 2026-08-24 → 08-31 | 8 | **8 of 8 disagree**, four storing **0** against 210–270 real bucket-minutes |
+
+**⛔ Q-507 IS NOT EXPLAINED, AND THE POOLED ANSWER IS WORSE THAN A WRONG SIGN.** Recomputed from
+buckets — one quantity, immune to the storage defect — against readiness:
+
+| window | n | corr(high-stress min, readiness) |
+|---|---|---|
+| pre-fix | 8 | **−0.395** (right way) |
+| post-fix | 10 | **+0.427** (wrong way) |
+| **pooled** | **18** | **+0.072** |
+
+The waking-only variant does the same (−0.444 → +0.526, pooled +0.049) and the mean level flips too
+(+0.287 → −0.462, pooled −0.001). **Two halves pointing opposite ways with nothing pooled is what no
+signal looks like** — and that is harder than a backwards sign, which would at least be a bug to find.
+**This is the THIRD mechanism proposed for Q-507 and the third to fail; all three were fitted on
+fewer than ten days.**
+
+**⛔ AND IT CANNOT BE VALIDATED TODAY — this is the real blocker, not the sample size.** Readiness
+shares its overnight autonomic input with the stress model's baseline, so it is partly circular. The
+independent target has no variance: **`perceived_recovery` is `3` on all 17 days**, and across 29
+check-ins since 2026-08-24 **`perceived_recovery_touched` is 0** — never touched, every value the
+default. `mental_drain` and `physical_tiredness` are **NULL on all 29**. A constant correlates with
+nothing.
+
+**The test ladder, in order of what each can prove:**
+1. **Consistency — shipped.** `scripts/check-stress-scalars-one-writer.js` in CI, plus the one-query
+   bucket-vs-scalar comparison above. Proves the pipeline agrees with itself, nothing about truth.
+2. **Response to a known stressor — the cheapest real test, and the first that can FAIL.** One day:
+   the owner names a stressful window in advance, and the buckets in it are checked against that day's
+   own mean. Needs a day, not a month. **Build this.**
+3. **Prediction — blocked on an owner action.** `perceived_recovery` filled honestly for ~3 weeks,
+   then re-run the table above.
+
+**⛔ Do not re-run the correlation before level 3 has data.** Another ten days of readiness gives
+another number between −0.4 and +0.4 and settles nothing.
+
+**⛔ Do not build TN-16** (prolonged-stress warning, calm-down prompt) **until level 2 passes.** A
+warning fired off a metric never shown to track anything converts a silent uncertainty into a
+demonstrated one — the TN-19 lesson.
+
+**Pass test:** level 2 runs and the owner's named stressful window reads materially more negative than
+the rest of that day; and `perceived_recovery` carries at least three distinct values over 21 days.
+
 ### [platform] LB-94 — the journal's recent window is 332 entries, and 297 of them are pinned by a citation
 
 - **The ceiling is not a size problem, it is a linking problem.** `docs/overview/entries/` is meant
@@ -8871,7 +8929,8 @@ samples, and no day whose raw HR count is non-zero stores `hr_sample_count = 0`.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-01 · owner: *"does this mean stress will work properly soon?"*
 - **Lane: A** — the writer of the daily scalar, not the stress model.
-- **Reference:** [`review`](reviews/2026-09-01-stress-sign-explained.md). **This explains Q-507 and reverses its conclusion.**
+- **⚠ AMENDED 2026-09-10 — the DEFECT half shipped and the SIGN half did not survive.** The fix landed in `7c428a7f` on **2026-08-31**, the day *before* this entry was filed, and 10 of 10 days since 2026-09-01 now match exactly. **But the claim below that recomputing from buckets *"flips the sign to correct"* rested on eight days; the next ten gave +0.427 and the pooled 18 give +0.072.** See **TN-33**. Keep this entry for its measurement of the defect; do not quote its correlations.
+- **Reference:** [`review`](reviews/2026-09-01-stress-sign-explained.md), amended by [`review`](reviews/2026-09-10-stress-status.md).
 - **Likely the same defect as TN-20** — a later pass recomputing a completed day from an impoverished input. Stated as *likely*: the mechanism is identified in neither.
 
 `stress_high_minutes` is bucket-minutes below `STRESS_HIGH_LEVEL = -0.5`, so with TN-3a's buckets

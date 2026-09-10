@@ -10631,3 +10631,29 @@ Fixed by the shared predicate rather than by a third patch.
 
 **No journal entry** — `docs/overview/entries/` is still at its 361 ceiling; LA-100 remains the
 blocker and is Gate: owner.
+
+## 2026-09-10 — backlog → 20374, `tuning.md` → 541: the stress status (TN-33)
+
+The owner asked for the state of the stress calculation. Two answers pointing opposite ways, and the
+second is why the entry cannot be short.
+
+**The storage defect is closed** — `7c428a7f` shipped on 2026-08-31, and 10 of 10 days match since
+2026-09-01 against 8 of 8 disagreeing before it. Worth recording that the fix landed the day *before*
+TN-22 was filed, so the entry sat open for ten days against a defect already corrected.
+
+**The sign is not.** The three-row table is the finding and does not compress: recomputed from
+buckets, the correlation with readiness runs **−0.395** over the pre-fix eight days, **+0.427** over
+the post-fix ten, and **+0.072** pooled over all eighteen. TN-22 claimed the recomputation *"flips the
+sign to correct"*; that was an eight-day artefact, and two halves pointing opposite ways with nothing
+pooled reads as **no signal** rather than a backwards one — the harder of the two problems.
+
+The lines that earn the most room are the ones about why more data will not help. Readiness shares its
+overnight autonomic input with the stress baseline, so it is partly circular; and the independent
+target has no variance at all — `perceived_recovery` is **3 on all 17 days**, never touched across 29
+check-ins, with `mental_drain` and `physical_tiredness` NULL on every one. A constant returns NaN,
+which is easy to misread as a null result, so the baton now says to check a target for variance before
+correlating against it.
+
+Hence the three-level test ladder, which is the part the owner actually asked for: consistency
+(shipped), response to a named stressor (one day, the first test that can fail, worth building), and
+prediction (blocked on an owner action rather than on code).

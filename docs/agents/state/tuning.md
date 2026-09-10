@@ -496,6 +496,23 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
   and the observed-max anchor (wrong about what 168 means). Two numbers were corrected in place besides.
   **The findings that survived every round were measured, not modelled** — 0 of 44, Zone 1 at 60% of
   the range, four resolvers, +19 bpm in one session. **Model output is a hypothesis; state it as one.**
+- **✅ THE STRESS STORAGE DEFECT IS FIXED (TN-22 → shipped `7c428a7f`, 2026-08-31) AND THE SIGN IS
+  NOT (TN-33, 2026-09-10).** The rollup wrote the buckets while `/api/body-battery` wrote the three
+  scalars off a different HR baseline — two producers, two answers. Verified: **10 of 10 days match
+  since 2026-09-01, 8 of 8 disagree before it.** `check-stress-scalars-one-writer.js` holds it.
+  **⛔ But TN-22's *"recomputing flips the sign to correct"* was an EIGHT-DAY artefact**: pre-fix
+  −0.395, post-fix **+0.427**, pooled 18 days **+0.072**. Q-507 is unexplained, and *no signal* is a
+  harder problem than a backwards sign. **Third mechanism proposed for Q-507, third to fail, all
+  three fitted on fewer than ten days.**
+- **⛔⛔ THE STRESS METRIC CANNOT BE VALIDATED TODAY AND MORE DAYS WILL NOT HELP.** Readiness shares
+  its overnight autonomic input with the stress baseline, so it is partly circular; the independent
+  target has **no variance** — `perceived_recovery` reads **3 on all 17 days**, and
+  `perceived_recovery_touched` is **0 across 29 check-ins**, so every value is the default.
+  `mental_drain`/`physical_tiredness` are NULL on all 29. **Check a candidate target for variance
+  BEFORE correlating against it** — a constant returns NaN, which is easy to misread as a null result.
+- **⚠ A queue entry can be filed the day AFTER its fix ships.** TN-22 was filed 2026-09-01 against a
+  defect corrected on 2026-08-31, and sat open for ten days. **Check `git log` for the entry's own
+  file paths before re-measuring a filed defect** — the queue lags `main` as well as the database.
 - **The threshold is usually right and the input usually wrong** — Q-506, Q-512, Q-514, now TN-6.
   Check the input's distribution before touching any constant.
 - **Do NOT lift the sleep scale toward its old mean** — sleep/readiness agreeing is load-bearing for
