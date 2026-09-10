@@ -19692,31 +19692,6 @@ to reach the pipeline, which is what Q-122 was removing.
 Cheap either way — the route is 50 lines and tested, so it costs nothing to leave until someone
 answers.
 
-### [platform] LA-87 — a configured upload that returns nothing is reported as if it succeeded
-
-- **Lane:** A — `app/api/admin/generate-exercise-media/route.ts`, and check the sibling
-  `mirror-dataset-gifs`, which builds the same `store()` helper.
-- **Added:** 2026-09-09, Lane A — found while writing the route's first tests (PS-39) and pinned
-  there as current behaviour, because the fix is a small decision rather than an obvious line.
-
-`store()` falls back to a base64 data URL when object storage is unconfigured **and** when a
-configured `uploadExerciseMedia` resolves null. The response reports `storageMode` from
-`isStorageConfigured()` alone, so the second case answers **`'s3'` while the row holds base64** — a
-report saying the upload path ran, on the one occasion it silently did not.
-
-Nothing breaks: the picture renders either way, which is why this has never been noticed. What it
-costs is the next person's diagnosis. A `data:` gif is roughly 200 kB of base64 in a Postgres column
-that is expected to hold a URL, and the admin screen's own status line is the thing that would
-otherwise say so. Silent per-row growth in a table nobody watches is the shape of the 2026-08-17
-`disk_full` outage, arriving from the other direction.
-
-**The fix is one line and the decision is which line.** Either report the path actually taken
-(`storageMode` from whether every `store()` call returned a real URL), or treat a null from a
-*configured* uploader as a failure and answer 502 — object storage being up and refusing a write is
-a different condition from it not being configured, and the current code cannot tell the reader
-which one happened. The first is a better report; the second refuses to record a row whose bytes are
-in the wrong place. Prefer the first unless the sweep finds the null branch actually firing.
-
 ### [platform] LA-85 — the calendar route's scope check may not match what Google actually throws
 
 - **Lane:** A — `app/api/log-calendar-event/route.ts`.
