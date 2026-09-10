@@ -10354,7 +10354,30 @@ sleeps in that file and not the five that assert a non-event. An entry can carry
 expensively-obtained diagnosis and a wrong prescription, and the diagnosis is still the part worth
 paying for.
 
-## 2026-09-10 — `docs/implementation-backlog.md` 20241 → 20262 (+21), LA-90 out, LA-97 in
+## 2026-09-10 — `docs/implementation-backlog.md` 20,241 → 20,286 (+45), BF-136
+
+The owner reported "no weights taken" on the retatrutide card while weighing daily. The card was
+right and the data was wrong: his only `supplement_vials` row reads `opened_on = 2026-09-10`, created
+that morning, after five days of dosing — so the window `p.date >= sinceDate` admits one weigh-in of
+the fourteen he has.
+
+Forty-five lines because the one-line cause needs three things around it to be actionable:
+
+- **The measurement that separates "user error" from "defect".** 14 weigh-ins in 14 days, arriving
+  automatically from the scale. Without it the report reads as someone who forgot to log, which is
+  what the on-screen message implies.
+- **That the backend was already built for this.** The POST route *requires* `openedOn` and the PATCH
+  route accepts an optional one; `vial-sheet.tsx:88` sends `todayInTz(tz)` as a constant and renders
+  no control. That turns an open-ended "add a date picker" into a one-input change against validated
+  routes.
+- **An explicit do-not with two reasons.** Inferring the open date from the first dose log is the
+  obvious shortcut: there is exactly one dose row and its `taken_at` is null, so there is nothing to
+  infer from — and a vial can legitimately be opened before its first dose.
+
+The null `taken_at` is noted as OR-102a's, not a second defect, so an empty dose timeline is not
+re-filed by whoever picks this up.
+
+## 2026-09-10 — `docs/implementation-backlog.md` → 20307 (+21 of it here), LA-90 out, LA-97 in
 
 Net of a 27-line removal and a 48-line addition. LA-90 shipped and left the queue; **LA-97** took
 its place — the live half of the same finding, which LA-90's entry did not mention: the sync push
@@ -10367,3 +10390,9 @@ isolation and only the sequence is wrong, so an entry that merely named the symp
 next session to re-derive it. It also states up front that this ships alone — a sync-push change's
 revert is a corrective migration — which is the constraint most likely to be missed by someone
 batching a tidy-up.
+
+**Merged against BF-136's raise directly above, which landed first (#1070).** Both entries moved
+this number in parallel — the case the per-document `.size` split exists to conflict on rather than
+silently pick a winner. Resolved by recomputing on the merged file (20307), never by adding the two
+deltas: that is right only when both sides are pure additions, and this pair was not (LA-90 left the
+queue while LA-97 and BF-136 entered it).
