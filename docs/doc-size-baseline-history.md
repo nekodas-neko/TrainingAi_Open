@@ -10767,3 +10767,8 @@ The other ten lines are a `Needs: LB-56` and the paragraph justifying it. Enabli
 is a one-line change that *looks* free and is not — LB-31 chose "one job rather than six" on purpose,
 and LB-56 records that `main` would not pass the suite, so it would buy a nightly red from its first
 run. Writing down why an obvious change was NOT made is what stops the next session making it.
+
+## 2026-09-10 — `docs/implementation-backlog.md`
+
+Raised for BF-139 and BF-140, two owner-reported entries from one Home screenshot, plus in-place
+amendments to BF-96 and Q-111 so their standing instructions do not contradict the new entries.
