@@ -19252,6 +19252,23 @@ where the 2026-08-17 outage started.
 ### [devices][platform] ➡️ Q-31 — own resilience weights & own workout-energy MET table — RE-SCOPED by #999, gates released
 
 - **Lane:** A
+- **Gate:** owner
+- **⚠ Gated 2026-09-11 because this entry and the plan it tells you to read disagree about whether
+  it is startable, and `next-item.js` was printing it READY.** The header says *"the Q-1 + Q-30 gates
+  are released"*; the triage plan's own closing section — the document this entry says to read
+  *instead of* its narrative — says *"Q-31's **implementation** stays blocked behind Q-1 and Q-30 …
+  Only the thinking is unblocked."* **Both gates are still open**: Q-30 is in this queue and Q-305
+  carries `Needs: Q-30`; Q-1a is in this queue.
+  The two claims may be reconcilable — the header argues Q-31 no longer *gates the repo cut*, which
+  is not the same as its implementation being unblocked — but that is the owner's sequencing to
+  confirm, not a reader's to infer. **The decision needed is one line: is Q-31's implementation
+  startable now, or does it still follow Q-1 and Q-30?** Remove this field once answered.
+  Two further things a starter would otherwise trip on, recorded here so the answer is cheap:
+  **Task 0 is partly invalidated** — it says to delete `inference/dhrv`, and the header struck that
+  on 2026-09-09 (*"do not delete it"*, the golden test pins D5's regression until D7).
+  **Task 2 (the MET table) is the one piece that is unambiguously safe** whatever the answer:
+  `daily-energy.ts` already documents its source as the public Compendium of Physical Activities, so
+  it re-sources numbers rather than deriving new ones.
 > **🆕 2026-08-02 — no longer blocked, and no longer the public-repo blocker.** Two changes: (1)
 > #999 re-scoped this against the real seven-module import graph — read
 > [`2026-08-02-oura-ip-triage.md`](superpowers/plans/2026-08-02-oura-ip-triage.md), not the narrative
