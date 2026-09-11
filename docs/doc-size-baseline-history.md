@@ -10857,13 +10857,22 @@ RV-41's 42-line entry leaves the queue. The goal bounds now live once, in
 build from — they had each declared their own, and the model's were up to 50× looser.
 
 Written by `pnpm fix:baselines`.
-## 2026-09-11 — `docs/implementation-backlog.md` 20672 → 20647 (RV-42 shipped)
+
+## 2026-09-11 — `docs/implementation-backlog.md` 20672 → 20624 (RV-40 shipped)
+
+RV-40's 48-line entry leaves the queue. Both routes that 500'd on a malformed body id now run
+`invalidUuidResponse`, the same guard the dynamic `[id]` routes have had since Q-482.
+
+Written by `pnpm fix:baselines`.
+
+## 2026-09-11 — `docs/implementation-backlog.md` 20624 → 20599 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 
-**This figure has been rewritten three times and the churn is the note worth leaving.** The branch
-computed 20732 → 20707, then 20714 → 20689, and now 20672 → 20647; RV-44 and RV-41 both landed on
-`main` while this PR waited on an owner decision, and each landing moved the base out from under it.
+**This figure has been rewritten four times and the churn is the note worth leaving.** The branch
+computed 20732 → 20707, then 20714 → 20689, then 20672 → 20647, and now 20624 → 20599; RV-44, RV-41
+and RV-40 all landed on `main` while this PR waited on an owner decision, and each landing moved the
+base out from under it.
 Nothing was wrong with any of the three — each was correct against the `main` of its hour. Under six
 concurrent lanes plus an owner gate, a baseline is a reading of a moving number, and a PR that waits
 will re-read it once per merge that overtakes it. Recomputed by `pnpm fix:baselines` after each

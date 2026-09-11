@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { refusalResponse, isRefusal } from '@/lib/api/route-errors'
+import { refusalResponse, isRefusal, invalidUuidResponse } from '@/lib/api/route-errors'
 import { auth } from "@/auth";
 import { getRepository } from "@/lib/data";
 import { computeDefaultVolumeTargets } from "@trainingai/shared/ai-periodization/volume-targets";
@@ -40,6 +40,11 @@ export async function POST(req: NextRequest) {
   // Recalibration-only request — recomputes the block-cycle anchor from training
   // history without touching the program's sessions/exercises.
   if (body.recalibrateCycleAnchor && body.programId) {
+    // RV-40, same as the sibling in `progression-styles`: a body id never went through the guard the
+    // dynamic `[id]` routes all run, so a malformed one 500'd with a zero-byte body and filed its
+    // raw SQL into `error_events`.
+    const badId = invalidUuidResponse(body.programId);
+    if (badId) return badId;
     await repo.autoRecalibrateCycleAnchor(userId, body.programId);
     return NextResponse.json({ ok: true });
   }
