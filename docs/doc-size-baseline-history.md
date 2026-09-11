@@ -10942,3 +10942,11 @@ third time. The lines that earn their place are the third mask — `touch-target
 *"no interactive elements found"*, which unlike `ERR_ABORTED` and `newContext` reads as a genuine
 product failure — and the running spec list, because LB-56's argument is a rate and a sighting that
 is not written down is not counted.
+## 2026-09-11 — `docs/implementation-backlog.md` 20703 → 20710 (BF-141, Lane A half)
+
+Seven lines, and the entry deliberately STAYS in the queue: BF-141 is both-halves work, and only the
+engine half shipped. The `Lane:` field flips A → B and records what is now available to it — the
+shared `LBS_TO_KG` with `lbsToKg`/`kgToLbs`, neither of which rounds, and why that matters
+(`mround125` clamps to [5, 250], so a 5 lb dumbbell would floor to 5 kg).
+
+Written by `pnpm fix:baselines`.
