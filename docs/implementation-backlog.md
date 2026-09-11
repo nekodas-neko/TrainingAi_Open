@@ -424,8 +424,10 @@ below threshold and left in place for next time.
 ### [devices] BF-140 — the strap battery chip cannot go stale, so a reading from any point in the past renders as current
 
 - **Lane:** A (the fix starts in `android/**`; the JS half follows)
-- **Verify:** device — the whole mechanism is a native service field, and `getPolarBle()` returns
-  null off-device, so nothing below can be reproduced in the sandbox or in CI.
+- **Verification:** on the S25 with the strap left off — the chip dims and names an age once the
+  reading passes 180 minutes, instead of staying bright indefinitely. The whole mechanism is a
+  native service field and `getPolarBle()` returns null off-device, so nothing below reproduces in
+  the sandbox or in CI.
 
 - **Added:** 2026-09-10 · owner, with a Home screenshot showing the strap chip at **100%**:
   *"the strap battery guage; i dont know if thats right - its 100% and I have had it for months now
@@ -473,9 +475,10 @@ below threshold and left in place for next time.
 ### [app-shell] BF-139 — three header chips no longer fit beside the date, and BF-96's prescribed remedy is already spent
 
 - **Lane:** B
-- **Verify:** device — the sandbox seeds no weather snapshot, so `WeatherChip` renders a skeleton
-  and the real three-chip width can be neither reproduced nor disproved off the S25 (BF-96 records
-  the same limitation).
+- **Verification:** on the S25 — all three chips are whole at the right edge, **and again during
+  the day with `· UV n` present**, which is ~45 px wider than the 07:20 screenshot that reported it.
+  The sandbox seeds no weather snapshot, so `WeatherChip` renders a skeleton and the real three-chip
+  width can be neither reproduced nor disproved off the device (BF-96 records the same limitation).
 
 - **Added:** 2026-09-10 · owner, with a Home screenshot: *"the pills in the top are a little cutoff.
   can we make them smaller to fit?"*
@@ -526,8 +529,10 @@ below threshold and left in place for next time.
 
 - **Lane:** A — the shared constant and its de-duplication are engine work; the dial and toggle are
   Lane B's and hand over after. Both halves, so Lane A first per the lane rule.
-- **Verify:** device — a scroll-snap dial with haptics beside a new control is a touch-target and
-  gesture question, not a rendering one.
+- **Verification:** on the S25 — tapping the unit suffix swaps kg↔lb without the dial also
+  scrolling or re-selecting, the 44 px touch box is reachable at the drawn size, and
+  `e2e/touch-target-size.spec.ts` stays green with an empty allowlist. A scroll-snap dial with
+  haptics beside a new control is a touch-target and gesture question, not a rendering one.
 
 - **Added:** 2026-09-10 · owner, from the live logging screen for **Dumbbell Lateral Raise**:
   *"can there be a 'small' toggle for the weight dial to switch between lb/kg? my Dumbells are
@@ -642,8 +647,9 @@ below threshold and left in place for next time.
 
 - **Lane:** B for the sentence. The base drift underneath it is BF-137's and Lane A's; the two are
   independent and this one does not wait on it.
-- **Verify:** owner — he is the person the sentence is for, and whether it now reads as true is his
-  call, not a test's.
+- **Verification:** the replacement sentence names both numbers — the goal he set and the computed
+  allowance — and a reader who follows it does not expect the gap to close as he moves. The owner is
+  the person the sentence is for, so he is the one who says whether it now reads as true.
 
 - **Added:** 2026-09-11 · owner, on the Nutrition card, third report in this family:
   *"calories still not right"*.
@@ -666,10 +672,15 @@ below threshold and left in place for next time.
   checks out exactly:** `1,660 − (2,150 − 200) = −290` against the card's printed **−295** (gram
   rounding accounts for the 5). **So the arithmetic is right and only the words are wrong** — which
   is why this is a Lane B sentence and not a recalculation.
-- **⚠ The docstring's own constant is already stale.** It pins the gap at *"**406 kcal** on the
-  owner's account, at every hour of every day"*. It reads **295** today. `restingBase + goalDelta`
-  has risen ~111 kcal since BF-134 shipped, so the quantity described as constant is drifting — and
-  any fix that hardcodes or re-states 406 inherits that.
+- **⚠ The docstring's own constant is not just stale — INVERTING IT RECOVERS THE REAL NUMBER, AND IT
+  IS ALARMING.** It pins the gap at *"**406 kcal** on the owner's account, at every hour of every
+  day"*, grams **above** budget. Today the card prints **295 below**. **The sign flipped**, so the
+  two do not differ by 111 — read the docstring's own formula backwards for the base:
+  `base = storedGoal + 200 − gap`, giving **1,454 then** and **2,155 now** (the card shows 2,150;
+  gram rounding covers the 5). **The resting base has risen ~700 kcal.**
+  - **1,454 was a SANE resting figure** — just under the 1,527 Mifflin BMR, which is what a resting
+    base with the step credit taken out should look like. So this did not start wrong; it inflated.
+  - Any fix that hardcodes or re-states 406 inherits a number that has already moved 700.
 
 - **⚠ INDEPENDENT CORROBORATION THAT BF-137 IS LIVE AND UNDERSTATED, from a direction that entry did
   not use.** BF-137 argues the calibrated maintenance is fitting a drug-driven weight drop. That
@@ -1162,8 +1173,13 @@ BMR; that ratio is a fully active TDEE. Since `restingBase = maintenanceKcal −
 calibrated path, the inflated maintenance surfaces in a field **labelled resting**, and the day's
 measured movement is then added on top of a number that already contains a day of it. **The height
 is what makes it conclusive** — at 158 cm his BMR is ~130 kcal below a 178 cm man of the same mass,
-so reasoning from weight alone understates the overshoot. Related: the base was ~2,039 when BF-134
-shipped and is 2,150 now, so this is still climbing. Filed as evidence under **BF-142**, which found
+so reasoning from weight alone understates the overshoot. **And it is climbing fast.** Reading
+`macro-budget-gap.ts`'s own formula backwards (`base = storedGoal + 200 − gap`) against the gap it
+recorded then (+406, grams *above* budget) and the one the card prints now (−295, grams *below* —
+**the sign flipped**) gives **1,454 then** and **2,155 now**: a rise of **~700 kcal**. 1,454 sits
+just under the 1,527 BMR, which is what a resting base with the step credit removed should look
+like — so the estimator did not start wrong, it inflated, and the drift is the defect rather than a
+bad initial constant. Filed as evidence under **BF-142**, which found
 it while tracing a separate defect in the card's explainer copy.
 
 **The app already knows when the drug started.** `supplement_vials.opened_on` exists and the reta

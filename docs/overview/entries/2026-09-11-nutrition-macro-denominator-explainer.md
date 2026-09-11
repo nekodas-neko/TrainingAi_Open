@@ -23,7 +23,11 @@ The arithmetic underneath is right: `storedGoal − (restingBase + goalDelta)` g
 Only the words are wrong, which keeps the fix in Lane B.
 
 One thing the fix must not inherit: the docstring pins the gap at "406 kcal, at every hour of every
-day". It reads 295 now. The quantity called constant has moved 111 kcal.
+day", grams *above* budget. The card prints 295 *below* — the sign flipped, so the two do not differ
+by 111. Reading the docstring's own formula backwards for the base gives 1,454 then and 2,155 now
+against the card's 2,150: **the resting base has risen ~700 kcal**. 1,454 sits just under the 1,527
+BMR, which is what a resting base with the step credit removed should look like, so the estimator
+did not start wrong — it inflated.
 
 ## A cleaner proof that BF-137 is live
 
@@ -50,3 +54,18 @@ Three reports of "the calories are wrong" are that, rather than three separate a
 No code changed and nothing was run against the app. Every figure above is from the read-only
 production query endpoint or direct source read. BF-142 carries `Verify: owner` — whether the
 replacement sentence reads as true is his judgement, not a test's.
+
+## A field error of my own, caught by the owner
+
+BF-139, BF-140, BF-141 and BF-142 were all filed with a `Verify:` line. That field means *shipped,
+awaiting a look* — `next-item.js` prints it under VERIFY and the entry never reaches READY. Four
+unbuilt entries were therefore filed as finished work, and the owner found it the way you would
+expect: both lanes reported nothing to start.
+
+The backlog protocol says this outright — *"A device requirement on unbuilt work is a **Verification**
+line, not a gate"* — and records the same class hiding the whole `nutrition-ui-uplift` batch, then
+recurring in LB-26 the same day, by a session that had read the warning. This is that mistake again
+in the `Verify:` field rather than `Gate:`.
+
+All four are converted to prose `Verification:` lines stating what the check actually is. Lane B now
+reads READY (2) with BF-139 and BF-142; Lane A reads READY (14) with BF-140 and BF-141 at the top.
