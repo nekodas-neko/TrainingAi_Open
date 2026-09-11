@@ -10965,3 +10965,8 @@ thumb has tried, with both of those findings on it so neither reads as pedantry 
 
 BF-143 files the baseline auto-heal firing on a recreated session, with the three defects in that
 block measured against the owner's live Lower row.
+
+## 2026-09-11 — `docs/implementation-backlog.md` (BF-143 shipped)
+
+BF-143 gains its shipped record: the three changes, the one owner action still owed, and an explicit
+note that the bodyweight-index half is NOT fixed and stays with BF-127.

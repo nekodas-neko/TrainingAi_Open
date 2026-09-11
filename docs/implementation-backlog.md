@@ -613,13 +613,35 @@ below threshold and left in place for next time.
     the gap moves both numbers). Keep it; it is the assertion the wrong sentence contradicts.
 - **Needs:** nothing.
 
-### [workouts] BF-143 — a crash-recovery path fires on a recreated session, so a never-trained Lower is marked baseline-complete on borrowed PRs — one of them a bodyweight index labelled kg 🔴 LIVE
+### [workouts] BF-143 — a crash-recovery path fires on a recreated session, so a never-trained Lower is marked baseline-complete on borrowed PRs (FIXED; the owner's own Lower row self-repairs on next open)
 
 - **Lane:** A — `app/api/ai-periodization/**` and the `session_periodization` write.
-- **Verification:** a session created fresh inside an existing program enters `baseline` and STAYS
-  there until its own AMRAP is logged; an exercise with no personal record never leaves the session
-  marked complete; and no `baseline_1rm` entry carries a `kg` figure for an exercise whose logged
-  sets are all weight 0. Reproducible from the owner's live data below — no device needed.
+- **✅ SHIPPED** (`bugfix/baseline-autoheal-recreated-session`, 2026-09-11) — the owner asked for it
+  in-session, mid-training. Three changes, one per defect below:
+  1. The auto-heal now requires a log **newer than `phaseStartedAt`** — the only honest test of the
+     interruption it exists to repair. A recreated session's logs predate its phase clock.
+  2. It completes only on **full coverage**, matching the invariant `recordBaselineAnchors` already
+     holds for the measured path.
+  3. `revertAutoAdoptedBaseline` (`lib/data/postgres/slices/periodization.ts`) undoes a baseline
+     already stored from borrowed PRs, so the owner's Lower row repairs itself the next time that
+     session's card is opened — no manual DB write, which was not available anyway.
+- **Keep — ONE owner action, and it is the whole residue:** open Lower's card once. The revert runs
+  on that GET; until then the stored row still reads `accumulation` / complete. After it, Lower is in
+  `baseline` and the next Lower workout is its AMRAP.
+- **⚠ Defect 3 of the original finding — the bodyweight index — is NOT fixed here, and must not be
+  read as fixed.** The revert removes the bad anchors, and full coverage plus the interruption gate
+  stop new ones being adopted on a fresh session; but the adoption path still writes `{ kg: pr }`
+  with no bodyweight branch, so a genuinely interrupted session whose exercises include a bodyweight
+  movement would still store an index under a key named `kg`. That is **BF-127**'s resolver work and
+  stays open there.
+- **Verification:** unit — `lib/__tests__/ai-periodization-session-routes.test.ts` (31 cases; the
+  two new guards mutation-checked, each fails alone when removed). DB —
+  `lib/data/postgres/__tests__/revert-auto-adopted-baseline.test.ts` (5 cases against local
+  Postgres, mutation-checked): the narrowing is the safety property, since four other sessions on
+  the owner's account carry `amrap` or `existing` anchors that a wider revert would destroy.
+  **NOT exercised:** the authenticated body of the route was never run by a browser — `pnpm dev`
+  confirmed the module loads and returns 401 without a session cookie, and no device or real
+  session was available. The owner opening Lower is the first real execution.
 
 - **Added:** 2026-09-11 · owner, after rebuilding the Lower session that BF-124's
   no-confirmation delete removed: *"I deleted and added lower as you know - its the first session

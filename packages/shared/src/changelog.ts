@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.448.1",
+    date: "2026-09-11",
+    changes: [
+      "A session you add to an existing program now starts with its calibration workout again. If its exercises had been logged before, the app was quietly taking those old numbers as the starting point and skipping the AMRAP \u2014 so a rebuilt session began prescribing from weights it had never measured.",
+      "It also waits until every exercise has a starting number before calling the calibration done. One session had three of its four exercises anchored and was marked complete, which left the fourth with nothing and no way to ask for it.",
+      "Any session already carrying borrowed numbers puts itself back into calibration the next time you open it. Sessions you calibrated properly, or set up from prior data on purpose, are left alone.",
+    ],
+  },
+  {
     version: "1.448.0",
     date: "2026-09-12",
     changes: [
