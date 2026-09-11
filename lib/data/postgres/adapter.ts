@@ -129,10 +129,10 @@ import {
   deriveBodyFatCalibration, pairScansWithReadings, DEFAULT_CALIBRATED_SOURCE,
   type BodyFatCalibration,
 } from '@trainingai/shared/health/body-fat-calibration'
+// 1 lb = 0.45359237 kg exactly. Shared since BF-141, because the lb/kg toggle needs the same
+// number on the client and a second copy is how two implementations of one metric begin.
+import { LBS_TO_KG } from '@trainingai/shared/workout/units'
 
-// 1 lb = 0.45359237 kg exactly. Used to correct dumbbell weights that were
-// logged in lbs but recorded in the weight_kg column as if they were kg.
-const LBS_TO_KG = 0.45359237
 
 interface LbsToKgLogRow {
   id: string
