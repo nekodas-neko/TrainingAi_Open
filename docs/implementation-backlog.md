@@ -18872,6 +18872,34 @@ describing a safety net that no longer exists.
 - **What is left is hygiene, not the owner request.** Phase 2 is 182 identifiers and Phase 3 is the
   schema tables (~2,813 repo-wide references). Both carry real regression risk — Phase 2's trap is
   cache keys. Neither is urgent now that Phase 1 has landed.
+- **⚠ MEASURED 2026-09-11 (Orchestrator) — renaming alone produces a generically-named
+  single-vendor table, which is worse than the honest vendor name.** The owner's follow-up was
+  *"make sure we know which sensor somewhere, so we can use the same tables for other recording
+  devices"*. That is a **second requirement**, and the plan does not carry it.
+
+  **`oura_heartrate` is already multi-device and already misnamed.** Its `source` column, in production:
+
+  | `source` | rows | period | what it is |
+  |---|---|---|---|
+  | `chest_strap` | **84,246** | 2026-07-17 → now | Polar H10 |
+  | `ble` | 19,376 | 2026-07-06 → now | Oura ring, direct BLE |
+  | `workout` / `awake` / `rest` / `live` | 12,494 | 06-22 → **07-06 only** | Oura **Cloud**, dead era |
+
+  **73% of the rows in a table called `oura_heartrate` come from a Polar chest strap.** The
+  discriminator works for everything current — `chest_strap` and `ble` both name a device — and only
+  the frozen Cloud era uses series names instead, an era whose last row is 2026-07-06.
+
+  **The gap is coverage, not design: 5 of 22 vendor tables carry a `source` at all** —
+  `oura_heartrate`, `rr_intervals`, `oura_workouts`, `oura_tags`, `oura_daily_derived`. The other 17
+  do not, and **`oura_bucket` is among them** — the intraday rollup that a second device would most
+  need to share. Renaming it to `sensor_bucket` with no way to say which sensor wrote a row buys a
+  honest-looking name and no portability.
+
+  **So Phase 3 wants a column audit beside the rename**, deciding per table: does a second source
+  ever write here (→ needs `source`), or is it structurally single-device (→ keep the vendor name,
+  like `oura_raw_samples` already does and for the same reason)? Do it in the same PR as each
+  table's rename — a generically-named table with no discriminator is the state that invites a
+  later writer to assume portability the schema cannot deliver.
 - ✅ **Phase 3 now HAS its plan (2026-08-04):**
   [`docs/superpowers/plans/2026-08-04-vendor-table-rename-phase-3.md`](superpowers/plans/2026-08-04-vendor-table-rename-phase-3.md).
   Three PRs, not one: rename behind compatibility **views** (an `ALTER TABLE … RENAME` is

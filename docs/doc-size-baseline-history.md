@@ -10970,3 +10970,14 @@ block measured against the owner's live Lower row.
 
 BF-143 gains its shipped record: the three changes, the one owner action still owed, and an explicit
 note that the bodyweight-index half is NOT fixed and stays with BF-127.
+
+## 2026-09-11 — `docs/implementation-backlog.md` → 20796 (Q-44's second requirement)
+
+Twenty-eight lines, and the table is most of them. Q-44 has had a written Phase-3 plan since
+2026-08-04 for renaming the vendor tables; what it never carried is the owner's second requirement —
+knowing *which* sensor wrote a row. The measurement is what makes the case: 73% of `oura_heartrate`
+is a Polar chest strap, and only 5 of 22 vendor tables carry a `source` at all.
+
+The numbers are in the entry rather than summarised because the whole argument is that the table is
+already multi-device. "Rename it and add a source column" is a sentence anyone could have written;
+"84,246 of these rows are not from an Oura" is what makes it urgent.
