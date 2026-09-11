@@ -1835,7 +1835,14 @@ candidate needed one targeted grep for the thing it claims.
 | **RV-44** | the longhand `proteinG * 4 + carbsG * 4 + fatG * 9` is still in `scan-totals.ts:41` and `meal-split.ts:189` — `atwater.ts` appears only in comments |
 | **RV-41** | `lib/coach/patch.ts` imports nothing from the targets or goals routes and declares no bounds |
 | **RV-36** | `app/nutrition/nutrition-content.tsx` has no scroll-restoration reference at all |
-| **RV-42** | `replaceMealPlanStructure` checks `ownedPlan` for the plan, then inserts `mealTypeId` and `savedMealId` from input unchecked |
+| **RV-42** | `replaceMealPlanStructure` checks `ownedPlan` for the plan, then inserts `mealTypeId` and `savedMealId` from input unchecked — *since built; the audit row stands as written, but see the note below* |
+
+**RV-42 has since been built, and the audit row above is half right.** The unchecked inserts were
+real, but there are **three** such write paths (`createMealPlan`, `updateMealPlanMeal`,
+`replaceMealPlanStructure`), not one, and `replaceMealPlanStructure` is the one that was *not*
+reachable with client-supplied child ids: its route's `.strict()` schema accepts no meal fields at
+all and carries the ids forward from the plan's existing rows. The live doors were the create POST
+and the meal PATCH. All three now go through `assertOwnedMealRefs`.
 
 **Cleared — leave alone:** RV-38 (the `hasData` branch exists), and the nine with code-touching
 commits (PS-24, RV-35, BF-98, BF-96, BF-95, BF-72, BF-74, BF-76, BF-53).
@@ -3039,38 +3046,6 @@ those two surfaces this is the fallback path, not the primary.
   **Not a `Verify:` field — this is unbuilt.** Confirmed 2026-09-10 (OR-105): the longhand `proteinG * 4 + carbsG * 4 + fatG * 9` is still in `scan-totals.ts:41` and `meal-split.ts:189,265-267`; `atwater.ts` is named only in comments.
   A `Verify:` files unbuilt work under "shipped; nothing is blocked", where nobody looks for it.
 
-### [nutrition][platform] RV-42 — a meal plan can point at another account's saved meal and meal type
-
-- **Lane:** A — `lib/data/postgres/slices/meal-plans.ts` (`replaceMealPlanStructure` and the create
-  path). Both routes go through it; the fix is one pre-check, not two.
-- **Added:** 2026-09-03, Review sweep 45 —
-  [`write-up §4`](reviews/2026-09-03-fk-edges-meal-plan-cross-user-refs.md)
-- **The plan is ownership-checked; its child ids are not.** `ownedPlan(db, id, userId)` guards the
-  plan, then `meal_plan_meals` rows are inserted with `mealTypeId: m.mealTypeId ?? null` and
-  `savedMealId: m.savedMealId ?? null` straight from the request. Both are `z.string().uuid()` at the
-  boundary, which proves the shape and nothing about the owner. `meal_plan_meals` has no `user_id`, so
-  the FK is the only ownership link — and it only proves the row exists. **This is rule (c).**
-- **Two doors, both driven as a second account against the seeded user's rows:**
-  `POST /api/nutrition/meal-plans` → 201 stored; `PATCH /api/nutrition/meal-plans/meals/[mealId]` →
-  200 stored. Read back from Postgres, B's plan meal points at A's `saved_meal_id` *and* A's
-  `meal_type_id`.
-- **No data leaks — check this before raising the severity.** The meal-plan read joins neither
-  `saved_meals` nor `meal_types`; the API returns raw ids and `savedMealName`/`mealTypeName` came back
-  `null`. That is the half RV-32 had and this does not.
-- **What it does cost: one account silently mutates another's.** Both columns are `ON DELETE SET
-  NULL`. Driven end to end — B's plan meal held A's `saved_meal_id`, A deleted their own saved meal
-  through A's own API (`200 {"success":true}`), and B's row read `<NULLED>`. Neither account can see
-  why. Same second-order consequence RV-32 recorded on the progression-style edges.
-- **The fix already exists in a sibling.** `writeSavedMeal` verifies both of its equivalent ids in the
-  same transaction and cites rule (c) while doing it — copy that shape and refuse with a 400 naming
-  the field. **Do not reach for a composite FK carrying `user_id`**: it would work, but it is a
-  migration on a table two routes write, where a four-line pre-check matches the sibling code.
-- **How to test locally:** two accounts, create a plan as B naming A's `savedMealId`/`mealTypeId`, and
-  read `meal_plan_meals` back — the response body echoes the ids either way and proves nothing.
-- **On completion, the check is:** nothing user-visible changes; a green local gate plus the two-account probe is
-  **Not a `Verify:` field — this is unbuilt.** Confirmed 2026-09-10 (OR-105): `replaceMealPlanStructure` checks `ownedPlan` for the PLAN, then inserts `mealTypeId` and `savedMealId` straight from input with no ownership check on either.
-  A `Verify:` files unbuilt work under "shipped; nothing is blocked", where nobody looks for it.
-  the bar.
 ### [devices] PS-22 — a fifth of the ring's heart-rate log is discarded as future-dated, every sync
 
 - **Lane:** A — `lib/colmi-ble/frames-to-payload.ts`, decode only; no schema change

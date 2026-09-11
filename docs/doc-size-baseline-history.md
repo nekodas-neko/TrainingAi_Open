@@ -10836,3 +10836,12 @@ from Lane B; that half shipped in #1011, and what is left is one field in an `ap
 which the rule puts in Lane A. The note stays rather than being trimmed to `Lane: A` because the
 stale heading is what hid a classified, ready item from `next-item.js` for weeks — the next reader
 should see the correction, not just the corrected value.
+
+## 2026-09-11 — `docs/implementation-backlog.md` 20732 → 20707 (RV-42 shipped)
+
+Net 25 lines: RV-42's 32-line entry left the queue, and a 7-line note went in above the OR-105 audit
+table correcting the row that had filed it. The row stands as written — it is a dated record of what
+that audit saw — but it named one write path where there are three, and the one it named is the only
+one that was never reachable with client-supplied ids.
+
+Written by `pnpm fix:baselines`.
