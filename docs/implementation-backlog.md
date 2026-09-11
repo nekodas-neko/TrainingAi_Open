@@ -3772,6 +3772,26 @@ stronger reason the measured one wins.
   ships instead: **a `dom-lost` sample always** — that is the observation that would disprove this
   entry and must never be dropped — and **a `dom-intact` sample once per launch**, which is all the
   positive case needs. The repaint itself runs on every resume; only the row is capped.
+- **⚠ NEW EVIDENCE 2026-09-11 (Orchestrator), from the telemetry this entry already ships — and it
+  is a perfect separation, not a tendency.** The `bf110 resume dom-intact` breadcrumbs in
+  `error_events` carry the viewport and the DOM child count. Sixteen samples, **zero overlap**:
+
+  | viewport height | DOM children | samples |
+  |---|---|---|
+  | **667** | **1–2** (blank) | 8 |
+  | **826** | **7–8** (rendered) | 8 |
+
+  The S25's real CSS viewport is **826**. Every blank resume reports **667** — and 384×667 is the
+  classic *default* viewport a WebView falls back to before it has been told the real size. So the
+  shape is not "the renderer died and painted nothing"; it is **"the WebView resumed at a fallback
+  viewport and the app rendered almost nothing into it"**. That is a different hypothesis and a
+  cheaper one to test.
+- **⚠ The competing reading, which the data cannot yet separate:** the breadcrumb may simply fire
+  *before* the WebView has resized, making 667 a timing artefact rather than a stuck state. **What
+  settles it:** log the viewport a second time ~500 ms later in the same resume. If it reads 826 by
+  then, this is a measurement-too-early bug and the fix is in when the app decides to render; if it
+  is still 667, the viewport is genuinely stuck and the fix is in the native layer. **Do that before
+  writing any fix** — the two answers point at different files.
 - **Gate:** device — and here it is the whole verdict, not a formality. This is a Samsung WebView
   compositor failure: Chrome and `pnpm dev` cannot show it, so the suite proves the effect RUNS and
   nothing about whether it FIXES anything. Reproduce as the entry says (background the app on low

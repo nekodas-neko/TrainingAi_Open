@@ -10879,7 +10879,18 @@ Four entries converted from the `Verify:` field to prose `Verification:` lines �
 shipped, so it had hidden them from `next-item.js`. BF-142 and BF-137 also correct a base-drift
 figure: the gap's sign flipped, so the base rose ~700 kcal rather than the ~111 first recorded.
 
-## 2026-09-11 — `docs/implementation-backlog.md` 20717 → 20734 (Q-31 gated)
+## 2026-09-11 — `docs/implementation-backlog.md` → 20644 (BF-110's viewport lead)
+
+Twenty lines, and half of them are the table. BF-110 has cost four log reads and several sessions,
+and the telemetry it already ships turned out to hold a perfect separation — every blank resume
+reports viewport height 667, every good one 826, sixteen samples, no overlap. A finding like that is
+worth the space because the entry's whole problem has been that nobody could reproduce it.
+
+The other half is the competing reading: 667 may be a measurement taken before the WebView resized.
+Written down beside the finding on purpose — a lead that omits its own alternative is how a session
+spends a day in the native layer for a timing bug.
+
+## 2026-09-11 — `docs/implementation-backlog.md` 20737 → 20754 (Q-31 gated)
 
 Eighteen lines, and they exist because the entry and the plan it points at disagree. Q-31's header
 says its gates are released; the triage plan's own closing section says the implementation stays
