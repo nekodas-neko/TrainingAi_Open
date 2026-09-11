@@ -10960,3 +10960,8 @@ what shipped. What replaced its build notes is the part that outlives it — the
 
 `projectOverview.md` takes the Known-Issues row for a fix whose fit is measured and whose control no
 thumb has tried, with both of those findings on it so neither reads as pedantry later.
+
+## 2026-09-11 — `docs/implementation-backlog.md` (BF-143)
+
+BF-143 files the baseline auto-heal firing on a recreated session, with the three defects in that
+block measured against the owner's live Lower row.

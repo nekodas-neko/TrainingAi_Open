@@ -613,6 +613,78 @@ below threshold and left in place for next time.
     the gap moves both numbers). Keep it; it is the assertion the wrong sentence contradicts.
 - **Needs:** nothing.
 
+### [workouts] BF-143 — a crash-recovery path fires on a recreated session, so a never-trained Lower is marked baseline-complete on borrowed PRs — one of them a bodyweight index labelled kg 🔴 LIVE
+
+- **Lane:** A — `app/api/ai-periodization/**` and the `session_periodization` write.
+- **Verification:** a session created fresh inside an existing program enters `baseline` and STAYS
+  there until its own AMRAP is logged; an exercise with no personal record never leaves the session
+  marked complete; and no `baseline_1rm` entry carries a `kg` figure for an exercise whose logged
+  sets are all weight 0. Reproducible from the owner's live data below — no device needed.
+
+- **Added:** 2026-09-11 · owner, after rebuilding the Lower session that BF-124's
+  no-confirmation delete removed: *"I deleted and added lower as you know - its the first session
+  and it didnt get an amrap/base session"*.
+
+- **He is right, and the state is measurable.** `session_periodization` for the active program's
+  **Lower** (`48e9f365-…`), read 2026-09-11: `phase = accumulation`, `baseline_complete = true`,
+  `sessions_in_phase = 0` — against **0 rows in `workout_sessions`** for that session. The Health
+  card's own *"Never trained"* is the truth; the phase beside it is not.
+
+- **THE MECHANISM IS A CRASH-RECOVERY PATH FIRING ON A CASE THAT IS NOT A CRASH.**
+  `app/api/ai-periodization/session/[sessionId]/route.ts:30-51`, entered on a plain GET of the
+  session. Its own comment says what it is for: *"if DB says baseline is incomplete but exercises
+  already have prior logs, the completion endpoint was never reached (app crash / navigation
+  away)"*. A session the owner **recreated yesterday** is neither. It qualifies only because its
+  exercise **names** match rows logged earlier in the same program.
+  - **The scope guard anticipated the wrong half.** `:37-38` scopes the lookup to `program.id` so
+    *"a shared exercise name logged under a **different** program mustn't let this fresh
+    ai_dynamic cycle skip its own AMRAP baseline week"* — the exact harm, guarded across programs
+    and unguarded **within** one. Recreating a session inside the same program walks straight
+    through it. This is the fix's natural home: the condition needs to be about *this session
+    having logs*, not *these names having logs*.
+
+- **⚠ THREE SEPARATE DEFECTS SIT IN THOSE TWENTY LINES. Fixing only the first leaves two live.**
+  1. **`.some` decides for all.** `:41` — `if (exerciseNames.some(name => lastLogs.has(name)))`.
+     One matching name completes the baseline for **every** exercise in the session.
+  2. **Partial coverage, completion claimed.** `:44-47` writes an entry only `if (pr != null)`, then
+     `:49` calls `setBaselineComplete` regardless. Measured on Lower: **four exercises, three
+     baselines.** `Dumbbell Calf Raise` (position 2) has no personal record, so it got none — and
+     because the session is now marked complete, nothing will ever ask for one.
+  3. **A bodyweight index is written under a key named `kg`.** `:46` is `{ kg: pr, … }` with `pr`
+     taken straight from `listPersonalRecords`, with no bodyweight branch. Lower's stored baseline
+     holds `Hanging Leg Raise: {"kg": 128, "source": "personal_record"}`. That exercise is
+     `equipment: ["bodyweight"]`, and across **26 logged sets its maximum `weight_kg` is 0** — the
+     128 is the `BW_REF = 100` relative index, exactly the quantity **BF-127** identified. The owner
+     weighs ~70 kg. Nothing here is a 128 kg hanging leg raise.
+
+- **This is BF-127 reaching further than BF-127 describes, and that entry should not be closed
+  believing it is display-only.** BF-127 is about a *suggested weight* printed on screen
+  (`pre-workout-screen.tsx` × 0.7). This is the same index entering `session_periodization` as a
+  stored baseline, where the phase engine multiplies it by prescription percentages. A wrong number
+  on a banner is read once; a wrong number here is the denominator for a whole cycle.
+  **Do not fix this one by special-casing Hanging Leg Raise** — the defect is that the adoption path
+  has no bodyweight branch at all, and `packages/shared/src/1rm.ts` already owns the resolver
+  (`displayOneRm`/`oneRmUnit`) that knows the difference.
+
+- **Why the owner saw no "Use prior data" choice.** That affordance exists and he has used it — it
+  is what he was told to tap on Push and Pull. Here the same adoption happened **silently, on a
+  GET**, with no prompt and no record that a choice was made. Whatever the fix does about the
+  baseline, adopting prior numbers into a new session should be something he is asked about, not
+  something a read request does to his data.
+- **⚠ A GET that writes.** `:49` persists on a read path, so merely opening the session's card
+  commits the state. That is why this is already durable in production rather than something that
+  would have been undone by not starting the workout.
+
+- **Recommendation:** gate `:33-51` on evidence that **this session** was interrupted — a
+  `workout_sessions` row for this `program_session_id` — rather than on exercise-name matches.
+  A session with zero workout rows is new, not crashed, and belongs in `baseline`. Then, separately:
+  require every exercise to resolve a baseline before `setBaselineComplete`, and route each value
+  through the bodyweight resolver rather than assuming kilograms.
+- **Owner-side, once it is fixed:** Lower's row needs correcting back to `baseline` — its current
+  `baseline_complete = true` and three adopted values are already written and a code fix will not
+  retroactively clear them.
+- **Needs:** nothing. **Read BF-127 first** — defect 3 is its mechanism in a second location.
+
 ### [platform] LB-94 — the journal's recent window is 332 entries, and 297 of them are pinned by a citation
 
 - **The ceiling is not a size problem, it is a linking problem.** `docs/overview/entries/` is meant
