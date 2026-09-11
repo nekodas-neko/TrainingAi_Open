@@ -707,6 +707,190 @@ below threshold and left in place for next time.
   retroactively clear them.
 - **Needs:** nothing. **Read BF-127 first** — defect 3 is its mechanism in a second location.
 
+### [workouts] BF-146 — a baseline session is TOLD to establish a baseline and then shown a red "couldn't generate, tap refresh" for refusing to prescribe before it has one 🔴 LIVE
+
+- **Lane:** B — the backend refusal is correct and must not change; the screen's handling of it is the defect.
+- **Verification:** open a session in `baseline` with `baselineComplete = false`. No failure banner
+  appears, the "First session — establish baseline" panel is the only explanation on screen, and
+  nothing invites a retry that cannot succeed. Reproducible without a device: the state is a
+  `session_periodization` row.
+
+- **Added:** 2026-09-11 · owner, minutes before training, on the Lower card: *"Not sure if this is
+  temporary issue; but its not able to generate an ai workout for the new one"* — with the amber
+  banner *"Couldn't generate your AI prescription just now — showing your base program. Tap refresh
+  to try again."*
+
+- **Nothing is broken and nothing is temporary. The refusal is deliberate and correct.**
+  `packages/shared/src/ai-periodization/generate-prescription.ts:201-202` returns
+  `{ ok: false, error: 'Baseline not complete', status: 400 }` when
+  `state.phase === 'baseline' && !state.baselineComplete`. Prescriptions are percentages of a 1RM;
+  before the AMRAP there is no 1RM to take a percentage of. **Do not "fix" this by letting
+  generation proceed** — that is precisely the borrowed-anchor prescribing BF-143 just removed.
+- **The client has no case for it.** `components/workout/pre-workout-screen.tsx:301-305` renders
+  that banner under `prescriptionGenTimedOut` — a *timeout/failure* flag. A deliberate 400 is
+  funnelled into the same state as a 502 or a network drop, so a settled, expected condition is
+  drawn in amber with a warning triangle and an instruction to retry. **The retry can never
+  succeed** until an AMRAP is logged.
+- **And the screen contradicts itself.** Directly above the banner it already says *"First session —
+  establish baseline … The AI will calculate your 1RM and start prescribing from the next
+  session."* That panel is the correct explanation; the banner underneath calls the same state an
+  error.
+
+- **⚠ HONESTLY: BF-143's fix is what made this reachable, and that is worth stating rather than
+  filing this as an unrelated find.** Before it, the owner's sessions were either AMRAP-calibrated
+  or silently auto-completed from prior PRs, so `baseline && !baselineComplete` never survived
+  a card open on his account. Putting Lower correctly back into baseline exposed a path with no UI
+  treatment. **This is a latent gap made visible, not a regression** — the 400 predates BF-143 and
+  any genuinely new session would always have hit it.
+
+- **Recommendation:** distinguish "refused because of state" from "failed". Have the generation
+  hook treat a 400 `Baseline not complete` as a normal outcome — no banner, no retry prompt — and
+  let the baseline panel be the whole explanation. If anything is shown at all, it belongs in that
+  panel's voice (*"the AI starts prescribing after this session"*), not in an error's.
+  - **Do not widen the suppression to all 400s.** `Invalid body` is a real fault and should still
+    surface. Match the specific error string, or give the result a typed reason.
+  - **Nothing about this blocks training** — the base program renders, the suggested starting
+    points are on screen and Start Workout is live, which is why this is a clarity defect rather
+    than an outage.
+- **Needs:** nothing.
+
+### [platform][app-shell] BF-147 — the admin exercise list squeezes the exercise NAME to zero px, force-overwrites a GIF on one tap with no confirm, and there is no way to say a GIF is wrong
+
+- **Lane:** A — the flag needs a column and a route; the list re-layout hands to Lane B after.
+- **Verification:** at 412 dp every row shows its name in full; a destructive action asks first;
+  the coverage figure matches a `count(*)` of live exercises with media; and a GIF judged wrong can
+  be marked as such and found again later.
+
+- **Added:** 2026-09-11 · owner, on the Admin Console → Exercises tab: *"ui is bad and I also want a
+  better way to make sure everything has the right gif. Maybe a way for me to flag if its wrong so
+  you we can decide how to proceed."*
+
+- **THE NAME IS RENDERED AND THEN CRUSHED TO NOTHING — that is why the rows are unreadable.**
+  `components/admin/exercise-manager.tsx:545` draws `{ex.name}` with `truncate`, which sets
+  `overflow:hidden` and lets its min-width resolve to **0**. Its flex sibling `SourceBadge` (`:202`)
+  has neither `shrink-0` nor `overflow:hidden`, so it cannot collapse below its content. Everything
+  else in the row — thumbnail (`:533`), status glyph (`:555`), the four-button group (`:565`) — is
+  `flex-none`. At phone width the badge and the buttons keep their width and the name is the only
+  thing that can give, so it gives everything. **The `bod…` visible in the screenshot is line TWO**
+  (`:548-551`, equipment), which sits alone in the flexible column and so keeps a fragment. A row
+  showing a truncated equipment string and no name at all is this, exactly.
+
+- **⚠ TWO DESTRUCTIVE ACTIONS WITH NO CONFIRMATION, one of them silent.**
+  1. **Delete** (`:593-599`) fires `DELETE /api/admin/exercises?name=…` on a single tap. **This is
+     BF-124's defect in a second place** — the owner lost his Lower session to an unconfirmed trash
+     icon four days ago and had to rebuild it, which is what produced BF-143 and BF-146. The same
+     icon, the same absence, on a 156-row list.
+  2. **The per-row Mirror and AI buttons OVERWRITE.** `:570` and `:579` pass `force = hasS3Gif`, so
+     tapping either on a row that already has a GIF re-mirrors or regenerates and the routes
+     `onConflictDoUpdate` the row in place. A correct GIF is replaced by a new generation with no
+     prompt and no undo. The *bulk* buttons are safe by contrast — they send no force and skip rows
+     that already have one — so the dangerous control is the one that looks incidental.
+
+- **The coverage figure counts the wrong things in both halves.** `:415-416` divides
+  `exercises.filter(ex => !!media[name]?.gifUrl).length` by `exercises.length`.
+  - The **denominator** is every library row, including the 4 with `merged_into` set. Measured
+    2026-09-11: **156 rows, 152 live**.
+  - The **numerator** counts only `exercise_media`, so a Custom URL in `exercise_gif_cache` renders
+    a thumbnail on the row and still reads as uncovered.
+  - Truth, measured the same day: **15 live exercises have no media of any kind**, against the 19
+    the card's "137 / 156" implies. The list is: Barbell Chest Supported Row, Cable Hip Adduction,
+    Cable Seated Leg Curl, Copenhagen Plank, Dumbbell Forearm Curl, Fire Hydrant, Hip Flexor Raise,
+    Machine Curl, Machine Lateral Raise, Machine Rear Delt Fly, Rope Pushdown, Slider Leg Curl,
+    Stability Ball Leg Curl, Toe Touch Crunch, Wrist Extension.
+
+- **The broken reference thumbnail is a storage failure, and it is NOT cosmetic — it is the style
+  anchor every future generation uses.** `reference-figure/route.ts` serves
+  `exercise-media/reference-figure.png` through the private-bucket proxy, which returns 404 when
+  `downloadMedia` fails; the sandbox boot banner reports the shared S3 client rejecting with
+  **`SignatureDoesNotMatch (403)`**. `exercise-manager.tsx:481` passes `unoptimized` only for a
+  `.gif`, so a `.png` goes through `/_next/image`, which surfaces the failure as a broken-image
+  glyph rather than a blank.
+  **Why the exercise rows still look fine while this one does not — measured, not assumed:** of 139
+  media rows, **133 are absolute external URLs** (~99 chars, the dataset mirrors) and only **6 are
+  proxy paths** that depend on the bucket — Ab Wheel, Barbell Shrug, Cable Crunch Abs, Donkey Kick,
+  Face Pull, Nordic Hamstring Curl. Those six and the reference figure share one fate.
+  **Check the production credentials before writing any code here**: if the bucket is rejecting in
+  prod too, "AI all" writes into a store it cannot read back.
+
+- **THE FLAG IS NEW SURFACE — nothing like it exists.** Searched `needs_review`, `gif_status`,
+  `verified`, `approved`, `flagged`, `mismatch`, `reviewStatus` across the repo: zero hits on any
+  exercise or media table. `exercise_media` carries only `model_used`/`generated_at`;
+  `exercise_gif_cache` only urls and `fetched_at`; `exercise_library` nothing. The admin **Feedback**
+  tab is an append-and-delete inbox over `feedback_submissions` with **no entity linkage and no
+  status field**, so it can carry "this GIF is wrong" as free text and nothing on the Exercises tab
+  would ever read it.
+- **Recommendation — a status column on `exercise_media`, and a sweep screen rather than a list.**
+  The table already has the `(exercise_name, gender)` unique key and provenance, so a
+  `review_status` (`unreviewed` / `ok` / `wrong`) plus `reviewed_at` is the smallest honest
+  addition, and it survives regeneration decisions because it sits beside `model_used`.
+  **The bigger half is the workflow, not the column.** Verifying 152 GIFs by scrolling a cramped
+  admin list is the wrong instrument — one GIF at a time, large, with the exercise name and target
+  muscles beside it and two buttons, sweeps the whole catalogue in a sitting and yields a queryable
+  set of wrong ones to decide about. That is what the owner asked for: *"so we can decide how to
+  proceed"* is a set, not a toast.
+  - **Keep the flag separate from regeneration.** Marking one wrong should not silently trigger an
+    AI call — deciding what to do about the wrong ones is the point of collecting them.
+- **⚠ There is NO test of any kind for this screen** — `exercise-manager.tsx` is referenced only by
+  itself and `admin-content.tsx`, and `e2e/` has no admin spec at all. The API routes underneath
+  are covered (`lib/__tests__/admin-media-tool-routes.test.ts`,
+  `admin-exercise-catalogue-routes.test.ts`), so the untested part is exactly the part being
+  reported.
+- **Needs:** nothing.
+
+### [app-shell] BF-145 — every surface token is chroma ZERO, so the app is grey by construction and each of 49 sheets paints over the background art
+
+- **Lane:** B
+- **Verification:** on the S25 — an open sheet shows the dynamic background's colour rather than a
+  flat slab, body text still clears 4.5:1 against the tinted surface, and the owner's chosen brand
+  hue visibly moves the surfaces rather than only the accents. Dark only, per the dark-only rule.
+
+- **Added:** 2026-09-11 · owner, on the Edit Program sheet: *"Needs a major uplift + addung in a
+  color scheme instead of the plain black"*.
+
+- **"Plain black" is literal, and it is measurable rather than a matter of taste.** Every dark
+  surface token in `app/globals.css` carries **chroma 0**: `--background: oklch(0.05 0 0)` (:140),
+  `--card: oklch(0.09 0 0)` (:145), `--popover: oklch(0.09 0 0)`, `--secondary: oklch(0.13 0 0)`,
+  `--muted: oklch(0.13 0 0)` (:153), `--muted-foreground: oklch(0.75 0 0)`. Not one of them has a
+  hue. So every panel, input, card and sheet in the app is pure greyscale **by construction**, and
+  the only colour that can ever appear is `--brand` on top of it — which is exactly what the
+  screenshots show: black with cyan.
+- **The owner can already choose a hue and it cannot reach the surfaces.** `brandHue` (0–360) and
+  `brandTheme` are stored preferences (`packages/shared/src/user/preferences.ts:45-46`), and they
+  drive `--brand` alone. Changing it recolours the accents and leaves every surface the same grey.
+  **That is the gap to close**, and it is why this is one change in the palette rather than a
+  restyle of the screen he happened to be looking at.
+- **`--card-tint-pct` is NOT the hook it looks like.** It mixes `--muted` with `transparent`
+  (`packages/shared/src/utils.ts:52,62`), and `--muted` is itself chroma 0 — so it controls the
+  *opacity* of a grey, never its hue. Reaching for it to add colour produces a slightly different
+  grey.
+
+- **⚠ AND THE SHEETS PAINT OVER THE BACKGROUND SYSTEM — this is a standing-rule violation in a
+  SHARED PRIMITIVE, which is why it is everywhere at once.** `components/ui/sheet.tsx:133` puts
+  **`bg-background`** on every `SheetContent`. `docs/mobile-ui-and-performance.md:97` says screen
+  backgrounds go through `bg-page` + the dynamic-background system, *"never opaque per-screen paint:
+  a `bg-background` root silently hides any wallpaper layer"*. The rule was written about screens;
+  the sheet primitive does the same thing and **49 files render `SheetContent`**. The owner's own
+  screenshots are the proof — the Program screen behind the sheet shows its blue gradient at the top
+  edge, and everything below the sheet's edge is flat near-black.
+  `components/ui/dialog.tsx:35` does the same.
+  **Fix the primitive, not the 49 call sites**, and check `bg-page` adoption while there: 28 files
+  use it against 63 still using `bg-background`.
+
+- **Recommendation — give the dark ramp a small chroma anchored to the user's hue, in the palette,
+  once.** Surfaces become `oklch(L C h)` with a low C (roughly 0.01–0.03, rising slightly with
+  lightness) and `h` from the brand hue, so the app reads as a tinted dark theme that follows the
+  colour the owner already picked, and every one of the 49 sheets changes with it. Then replace the
+  sheet's opaque `bg-background` with a translucent tinted surface so the dynamic background shows
+  through, per rule 97.
+  - **Do not fix this by restyling the Edit Program sheet.** One screen diverging from 48 others is
+    the outcome that rule exists to prevent, and the complaint is about the palette, not that sheet.
+  - **Do not reach for hex literals.** `check-hex-literals.js` ratchets them shrink-only per file,
+    and a literal bypasses the hue the owner chose — which is the whole point here.
+  - **Contrast is the real constraint, not taste.** Body text must stay ≥4.5:1 against the tinted
+    surface, and the tint must not close the gap between `--card` and `--background` that currently
+    separates a card from the page.
+- **Needs:** nothing.
+
 ### [platform] LB-94 — the journal's recent window is 332 entries, and 297 of them are pinned by a citation
 
 - **The ceiling is not a size problem, it is a linking problem.** `docs/overview/entries/` is meant

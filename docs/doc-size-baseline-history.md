@@ -10981,3 +10981,8 @@ is a Polar chest strap, and only 5 of 22 vendor tables carry a `source` at all.
 The numbers are in the entry rather than summarised because the whole argument is that the table is
 already multi-device. "Rename it and add a source column" is a sentence anyone could have written;
 "84,246 of these rows are not from an Oura" is what makes it urgent.
+
+## 2026-09-12 — `docs/implementation-backlog.md` (BF-145, BF-146, BF-147)
+
+Three owner reports in one sitting: the baseline refusal drawn as a failure, the admin GIF console
+and its missing flag, and the zero-chroma surface palette.
