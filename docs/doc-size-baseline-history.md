@@ -10837,7 +10837,20 @@ which the rule puts in Lane A. The note stays rather than being trimmed to `Lane
 stale heading is what hid a classified, ready item from `next-item.js` for weeks — the next reader
 should see the correction, not just the corrected value.
 
-## 2026-09-11 — `docs/implementation-backlog.md` 20732 → 20707 (RV-42 shipped)
+## 2026-09-11 — `docs/agents/state/implementation-lane-b.md` 113 → 112 (Lane B baton refresh)
+
+Rewritten in full, as a baton always is, after #1092/#1095/#1097 merged: the file still named #1092
+as open and RV-36/RV-37 as next, all four of which had shipped. One line down rather than up because
+the shrink-only ratchet forced the trim, and the trim was the right edit anyway — five paragraphs
+carried narrative that the journal entries already hold. What replaced it is state: READY is 0 and
+the lane is device-blocked, which is the one thing a successor cannot re-derive quickly.
+
+## 2026-09-11 — `docs/implementation-backlog.md` 20732 → 20714 (RV-44 shipped)
+
+RV-44's 18-line entry leaves the queue. The nine longhand Atwater sites in `scan-totals.ts` and
+`meal-split.ts` now import `KCAL_PER_G`, which is what `atwater.ts` was created for.
+
+## 2026-09-11 — `docs/implementation-backlog.md` 20714 → 20689 (RV-42 shipped)
 
 Net 25 lines: RV-42's 32-line entry left the queue, and a 7-line note went in above the OR-105 audit
 table correcting the row that had filed it. The row stands as written — it is a dated record of what
