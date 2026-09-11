@@ -10828,3 +10828,11 @@ Six lines for a *recovered* renderer-`SIGSEGV` flake on `macro-calorie-warning.s
 same address as the third and fourth sightings. A sighting that recovers on retry is the one that
 otherwise goes uncounted, and LB-56's argument is a rate — so the entry grows by the observation
 rather than being left to be re-derived from a log nobody will re-open.
+
+## 2026-09-10 — `docs/implementation-backlog.md` 20725 → 20732 (Q-519 classified)
+
+Seven lines to give Q-519 a lane and to say why it had none. The heading claimed a UI half was owed
+from Lane B; that half shipped in #1011, and what is left is one field in an `app/api/**` route,
+which the rule puts in Lane A. The note stays rather than being trimmed to `Lane: A` because the
+stale heading is what hid a classified, ready item from `next-item.js` for weeks — the next reader
+should see the correction, not just the corrected value.

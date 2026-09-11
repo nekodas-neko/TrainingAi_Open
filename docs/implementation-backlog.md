@@ -15055,8 +15055,14 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   its tests and by a comment in `TdeeAdaptationCard` explaining it was replaced. Same trap as
   `amrapScaleFactor` (Q-514); do not calibrate it.
 
-### [sleep] Q-519 — manual bedtime: the ENGINE half shipped; the UI half is Lane B's
+### [sleep] Q-519 — manual bedtime: both halves shipped; one route field is all that is left
 
+- **Lane:** A — **and the heading above used to say the UI half was Lane B's, which is why this
+  needed classifying at all.** That was true when it was written and stopped being true when the UI
+  shipped in #1011. What remains is one line in `app/api/sleep-sessions/route.ts`, and `app/api/**`
+  is Lane A's by the rule. Verified 2026-09-10 against `main`: the route's field list runs
+  `date` → `sleepTimeRecommendation` with no `manualSleepStart` in it, while `adapter.ts:2738`
+  maps the column — so the mapping is there and the route drops it.
 - **Branch:** `feat/manual-bedtime-entry`
 - **Plan:** none needed — contained, and it reuses the existing per-field merge.
 - **Added:** 2026-08-19 · Tuning agent, from an **owner report** ·
@@ -15117,8 +15123,9 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   where there is no local store. The measured start is shown beside it as the contrast that makes the
   control make sense, and nothing else on the screen changed.
 - **Keep: `/api/sleep-sessions` does not return `manualSleepStart`, so the card reads it from the
-  local store.** The repository maps the column (`adapter.ts:2716`) and the route's field list omits
-  it — one line, in an `app/api/**` path, so **Lane A's**. Until it lands, the saved value is
+  local store.** The repository maps the column (`adapter.ts:2738` — it was 2716 when this was
+  written) and the route's field list omits it — one line, in an `app/api/**` path, so **Lane A's**,
+  which is what sets this entry's lane. Until it lands, the saved value is
   invisible on the **web** build (`getLocalStore` returns null there) while the write works; on the
   APK it reads correctly. Worth doing because the screen's own local rows are overwritten by the
   network reply, so nothing else on that screen can see the column either.
