@@ -62,6 +62,20 @@ describe('the header meta row can absorb a shortfall', () => {
       expect(battery).toMatch(/battery \$\{percent\}%/);
     });
 
+    /**
+     * The merge nearly took the per-device accessible name with it, and
+     * `e2e/home-device-battery-chips.spec.ts` is what caught it: with one joined label on the pill,
+     * `getByLabel('Strap battery 72%')` stops matching the moment a ring reading appears beside it,
+     * and a screen reader gets one run-on sentence for two independent facts. `role="img"` is what
+     * makes a name on a composite span count at all — an `aria-label` on a generic element is
+     * ignored, so the fix would have read correctly and announced nothing.
+     */
+    it('names each device separately, on a role that carries the name', () => {
+      expect(battery).toMatch(/role="img"/);
+      expect(battery).toMatch(/aria-label=\{describe\(device\)\}/);
+      expect(battery, 'one joined label loses per-device addressability').not.toMatch(/\.join\(/);
+    });
+
     it('dims a stale device rather than the whole pill', () => {
       // With two devices sharing a pill, dimming the container misreports the fresh one.
       expect(battery).toMatch(/stale \? 'opacity-50' : ''/);

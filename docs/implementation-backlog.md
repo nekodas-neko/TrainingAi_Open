@@ -2289,11 +2289,23 @@ sheet is open over the bottom half of it.
     recovered on retry, so the run's two hard failures were both real assertion faults and neither
     was this. Recorded because a *recovered* sighting is the one that would otherwise go unwritten,
     and the rate is the argument this entry rests on.
-  - **Five sightings, six different specs** — `preferences-survive-reinstall` (×3, twice as the hard
-    failure), `touch-target-size`, `one-calorie-budget`, `back-dismiss-sweep`, `card-429-error-state`,
-    `home-device-battery-chips`, `macro-calorie-warning`. Which spec is reported is a scheduling
-    accident, as this entry said at the second sighting; the constant is a renderer crash inside a
-    21–26 minute run. **It has now cost five log reads across two sessions.**
+  - **⚑ SIXTH SIGHTING 2026-09-11 (#1110), and it is the worst run yet: TWO `SIGSEGV`s and FOUR
+    flaky in one 26.1-minute job.** `preferences-survive-reinstall:36` is the hard failure for the
+    **third** time, beside `baseline-progress-label:19`, `health-tabs-instant-paint:27`,
+    `meal-label:286` and `touch-target-size:53` — all four recovered on retry, two of them reporting
+    `browser.newContext: Target page, context or browser has been closed` straight after
+    `Received signal 11 SEGV_MAPERR 0000000001b0`, the same address for the fourth time. 174 passed.
+  - **`touch-target-size:53` failed with `/: no interactive elements found`**, which is the same
+    dead-renderer downstream wearing a third mask: the page never rendered, so the measurement had
+    nothing to measure and the assertion read as a layout defect. Worth naming, because unlike
+    `ERR_ABORTED` and `newContext` it looks like a genuine product failure on its own.
+  - **Six sightings, seven different specs** — `preferences-survive-reinstall` (×4, three times as
+    the hard failure), `touch-target-size` (×2), `one-calorie-budget`, `back-dismiss-sweep`,
+    `card-429-error-state`, `home-device-battery-chips`, `macro-calorie-warning`,
+    `baseline-progress-label`, `health-tabs-instant-paint`, `meal-label`. Which spec is reported is a
+    scheduling accident, as this entry said at the second sighting; the constant is a renderer crash
+    inside a 21–26 minute run. **It has now cost six log reads across two sessions**, and this run
+    cost a seventh read to separate one real failure from four crash artefacts.
   - Recorded because a 26-minute job that eats its own browser roughly one run in three is an
     argument about the job, which is what this entry is for. It also means **a red E2E cannot be
     read as a signal without opening the log**, which is the cost LB-54 is about.

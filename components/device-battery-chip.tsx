@@ -31,6 +31,14 @@ import { BatteryChargingIcon, BatteryFullIcon, BatteryLowIcon, BatteryMediumIcon
  * already read as a percentage, and the header row has room for a number and not for a sentence.
  * Colour still never carries the state alone: the digits are beside the icon and the accessible
  * name spells the level out.
+ *
+ * **Each device carries its OWN accessible name, not one joined string on the pill.** Merging the
+ * pills nearly took the per-device name with it, and `home-device-battery-chips.spec.ts` is what
+ * caught it: with a joined label, `getByLabel('Strap battery 72%')` stops matching the moment a ring
+ * reading appears beside it. A screen reader would have got one run-on sentence for what are two
+ * independent facts. `role="img"` is what makes the name on a composite span count — without a role
+ * an `aria-label` on a generic element is ignored, so the fix would have looked right and announced
+ * nothing.
  */
 
 /** Past this, a reading is last-seen rather than current. Matches the ring section's own 3h rule. */
@@ -60,10 +68,7 @@ export function DeviceBatteryChip({ devices }: { devices: DeviceBattery[] }) {
   if (devices.length === 0) return null
 
   return (
-    <div
-      className="flex items-center gap-1.5 whitespace-nowrap shrink-0 rounded-full bg-muted/60 px-2 py-1 text-xs font-semibold"
-      aria-label={devices.map(describe).join('. ')}
-    >
+    <div className="flex items-center gap-1.5 whitespace-nowrap shrink-0 rounded-full bg-muted/60 px-2 py-1 text-xs font-semibold">
       {devices.map(device => {
         const { label, percent, charging = false, ageMinutes } = device
         const stale = ageMinutes > STALE_AFTER_MINUTES
@@ -73,7 +78,12 @@ export function DeviceBatteryChip({ devices }: { devices: DeviceBattery[] }) {
         const tone = charging || percent >= 60 ? 'text-green-400' : percent >= 25 ? 'text-amber-400' : 'text-red-400'
 
         return (
-          <span key={label} className={`flex items-center gap-1 ${stale ? 'opacity-50' : ''}`}>
+          <span
+            key={label}
+            role="img"
+            aria-label={describe(device)}
+            className={`flex items-center gap-1 ${stale ? 'opacity-50' : ''}`}
+          >
             <Icon className={`h-3.5 w-3.5 ${stale ? 'text-muted-foreground' : tone}`} aria-hidden="true" />
             <span className="tabular-nums">{percent}</span>
           </span>

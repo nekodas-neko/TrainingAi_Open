@@ -10933,3 +10933,12 @@ PR touching `android/**`.
 
 The correction matters because it changes the owner's next step: the row implied a rebuild was
 owed, when the APK carrying the fix already exists and only needs installing.
+
+## 2026-09-12 — `docs/implementation-backlog.md` 20714 → 20726 (LB-56 sixth sighting)
+
+Twelve lines for the worst run of this flake so far: two renderer `SIGSEGV`s at the same address and
+four flaky in one 26.1-minute job, with `preferences-survive-reinstall:36` the hard failure for the
+third time. The lines that earn their place are the third mask — `touch-target-size:53` reporting
+*"no interactive elements found"*, which unlike `ERR_ABORTED` and `newContext` reads as a genuine
+product failure — and the running spec list, because LB-56's argument is a rate and a sighting that
+is not written down is not counted.
