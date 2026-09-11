@@ -10909,6 +10909,20 @@ naming the check (post-BF-140 APK, strap off three hours, chip should dim).
 
 Written by `pnpm fix:baselines`.
 
+## 2026-09-12 — `docs/implementation-backlog.md` 20703 → 20714 and `projectOverview.md` 10594 → 10613 (BF-139)
+
+Both grow for the same reason: BF-139 was argued from estimates and the measurements contradict
+them, so the numbers are written down where the next person to touch this row will hit them. The
+entry gains a before/after table (224 px column; 227 px of chips at night, 279 with the daytime
+`· UV n`) and a note that its own prescribed `px-2.5` → `px-2` covers 12 px of a 55 px gap. Its
+prose shrank — what replaced it is arithmetic.
+
+`projectOverview.md` takes the Known-Issues row for a fix that is measured but not yet seen on the
+phone, and BF-96 gains four lines retiring its "shorten the date, not the chip" instruction with
+numbers rather than by assertion: at three chips there was no date length that would have fitted.
+
+The baton stayed at its 112 baseline across a full rewrite, which is the ratchet doing its job — a
+run that ships has more to say and the file is the wrong place for most of it.
 ## 2026-09-11 — `projectOverview.md` 10594 → 10601 (BF-140 row corrected)
 
 Seven lines, correcting a claim I made in that row hours earlier: it said the Kotlin *"cannot be
@@ -10920,6 +10934,14 @@ PR touching `android/**`.
 The correction matters because it changes the owner's next step: the row implied a rebuild was
 owed, when the APK carrying the fix already exists and only needs installing.
 
+## 2026-09-12 — `docs/implementation-backlog.md` 20714 → 20726 (LB-56 sixth sighting)
+
+Twelve lines for the worst run of this flake so far: two renderer `SIGSEGV`s at the same address and
+four flaky in one 26.1-minute job, with `preferences-survive-reinstall:36` the hard failure for the
+third time. The lines that earn their place are the third mask — `touch-target-size:53` reporting
+*"no interactive elements found"*, which unlike `ERR_ABORTED` and `newContext` reads as a genuine
+product failure — and the running spec list, because LB-56's argument is a rate and a sighting that
+is not written down is not counted.
 ## 2026-09-11 — `docs/implementation-backlog.md` 20703 → 20710 (BF-141, Lane A half)
 
 Seven lines, and the entry deliberately STAYS in the queue: BF-141 is both-halves work, and only the

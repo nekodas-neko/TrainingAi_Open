@@ -421,57 +421,60 @@ below threshold and left in place for next time.
 
 
 
-### [app-shell] BF-139 — three header chips no longer fit beside the date, and BF-96's prescribed remedy is already spent
+### [app-shell] BF-139 — three header chips no longer fit beside the date (fixed; the device look is what is left)
 
 - **Lane:** B
-- **Verification:** on the S25 — all three chips are whole at the right edge, **and again during
-  the day with `· UV n` present**, which is ~45 px wider than the 07:20 screenshot that reported it.
-  The sandbox seeds no weather snapshot, so `WeatherChip` renders a skeleton and the real three-chip
-  width can be neither reproduced nor disproved off the device (BF-96 records the same limitation).
+- **Verify:** device — on the S25, all three chips whole at the right edge, **and again during the
+  day with `· UV n` present**, which is the case the 07:20 screenshot could not show. The sandbox
+  seeds no weather snapshot, so `WeatherChip` renders a skeleton and the real row can be neither
+  reproduced nor disproved off the device (BF-96 records the same limitation).
+- **✅ SHIPPED 2026-09-12** (`fix/bf139-header-chip-width`).
+  [Journal](overview/entries/2026-09-12-fix-bf139-header-chip-width.md).
 
 - **Added:** 2026-09-10 · owner, with a Home screenshot: *"the pills in the top are a little cutoff.
   can we make them smaller to fit?"*
 
-- **This is Q-111's own device question coming back red.** That entry shipped the two battery chips
-  and flagged the risk in writing: *"Two chips join the weather chip in a header row that already
-  compresses badly — BF-96's whole finding was that this row is where a long date runs out of width
-  at 412 dp ... whether three pills plus `EEEE d MMMM` fits is a hardware question."* It is answered
-  now, on the device, and the answer is no.
+- **⚑ THE ARITHMETIC WAS MEASURED, AND THIS ENTRY'S OWN ESTIMATES WERE LOW — read this before
+  changing the row again.** Every figure below is from the running app at 412 dp, taken by injecting
+  the exact pill markup into the live header row and reading `getBoundingClientRect()`, not from
+  counting characters:
+
+  | | before | after |
+  |---|---|---|
+  | left column | **224 px** | 224 px |
+  | night (no UV) | 226.9 — **2.9 over** | 156.1 — 67.9 spare |
+  | daytime, `UV 5` | 271.0 — **47 over** | 200.2 — 23.8 spare |
+  | daytime, `UV 11` | 279.4 — **55.4 over** | 208.6 — 15.4 spare |
+
+  The entry had estimated the column at ~232 px and three chips at ~201 px, which would have left
+  31 px spare and no bug at all. The real three-chip width was **227 px**, which is why the owner's
+  screenshot shows the date already rendering empty.
+- **⚑ AND ITS PRESCRIBED FIX WAS INSUFFICIENT, WHICH THE ENTRY ITSELF SAID TO CHECK.** It proposed
+  trimming `px-2.5` → `px-2` on the battery chips for *"~8 px across the two"*. Measured, that lever
+  is worth 4 px a pill — 12 px across all three, since the weather chip carries the same padding.
+  It clears the night case and leaves the daytime case **43 px over**. The trim is kept, because it
+  is free and it is the lever the owner actually asked for, but it is not what makes the row fit.
+- **What makes it fit: the two battery pills became ONE pill, and the drawn `%` moved into the
+  accessible name.** Two separate pills cost **150 px** of a 224 px column — 67% of it — for two
+  readings; merged they cost **91 px**. A pill boundary is two paddings and a gap, and paying that
+  twice for two numbers is what the row could not afford. The `%` is 12 px a reading and a number
+  beside a battery icon already reads as a percentage.
+- **Per-device staleness is why the merge is not free.** `opacity-50` used to dim a whole pill; with
+  two devices sharing one, dimming the container would misreport a fresh reading as stale. It is on
+  each device's own span now, and the guard pins that there is exactly one `opacity-50` in the file.
 - **The clipping is deliberate and is the mechanism.** `components/home/header-meta-row.tsx:39` is
   `flex items-center gap-2 min-w-0 overflow-hidden`; that `overflow-hidden` was added as a floor so
   that once the date has truncated away, extra chips are clipped at the right rather than spilling
-  onto the action buttons. Every chip is `shrink-0 whitespace-nowrap`
-  (`components/weather-chip.tsx:42`, `components/device-battery-chip.tsx:50`), so the date is the
-  only item that can give.
-- **Width, at 412 dp:** 412 − 32 (`px-4`) = 380. The right-hand cluster is 44 + 44 + 36 + two 8 px
-  gaps = 140, plus the header's own `gap-2` → the `flex-1 min-w-0` left column gets **~232 px**.
-  Three chips are ~55 + ~68 + ~62 plus two gaps ≈ **201 px**, leaving ~31 px for the date. The
-  daytime `· UV n` segment (`weather-chip.tsx:45-49`) adds ~45 px and puts the row past 232.
-- **In the owner's screenshot the date is already rendering empty** and the chips end flush against
-  the clip boundary — i.e. the row has consumed the whole left column and there is nothing left to
-  truncate.
-- **Which is why BF-96's standing instruction cannot be followed here.** It says: *"if a long date
-  still overflows on device, shorten the DATE, not the chip ... Making the chip smaller is the wrong
-  lever: this is `white-space`, not width."* That reasoning was sound for one chip beside a date;
-  with three chips the date has already gone to zero, so the lever is used up and the complaint is
-  now genuinely about width. **The owner's requested lever — smaller pills — is the remaining one.**
-  Whoever implements this amends BF-96 rather than silently contradicting it.
-- **`components/home/__tests__/header-meta-row-overflow.test.ts` locks the current classes** on the
-  row and on both chip components, so any sizing change breaks it by design. Update the guard in the
-  same PR; do not delete it.
+  onto the action buttons. Every chip is `shrink-0 whitespace-nowrap`, so the date is the only item
+  that can give — and in the owner's screenshot it had already given everything.
 - **✅ THE EDGE IS CONFIRMED: right. Asked and answered the same day** — owner, 2026-09-10:
   *"can see in the screenshot it was clipped on the right on the right side"*. So this is the
-  `overflow-hidden` clip at `header-meta-row.tsx:39` and nothing else. **The `pt-safe` /
-  safe-area hypothesis is ruled out and must not be re-investigated** — it was the other candidate
-  only while the edge was unknown, and chasing it now would be work against a cause the owner has
-  excluded.
-- **What "a little" means, and why it points at the fix.** The three chips measure ~201 px against a
-  ~232 px column, so the strap chip is shaved by only a few pixels — its `rounded-full` right cap,
-  not its digits. Recovering that needs very little: trimming `px-2.5` to `px-2` on
-  `DeviceBatteryChip` (`components/device-battery-chip.tsx:50`) returns ~4 px per battery chip, ~8 px
-  across the two, which clears the current overflow on its own. **Check it against the daytime case
-  before calling it done** — `· UV n` (`components/weather-chip.tsx:45-49`) adds ~45 px and that
-  screenshot was taken at 07:20, so the worst case is not the one reported.
+  `overflow-hidden` clip and nothing else. **The `pt-safe` / safe-area hypothesis is ruled out and
+  must not be re-investigated.**
+- **`components/home/__tests__/header-meta-row-overflow.test.ts` is the guard**, and it now pins the
+  arithmetic rather than only the wrap fix: one `rounded-full` in the battery chip, no drawn `%`,
+  one `opacity-50`, `px-2` on both weather pills. Three mutations were run against it and each was
+  caught. Update it with any sizing change; do not delete it.
 - **Needs:** nothing.
 
 ### [workouts] BF-141 — a lb/kg toggle on the weight dial, for the equipment that has already corrupted this owner's data once
@@ -2293,11 +2296,23 @@ sheet is open over the bottom half of it.
     recovered on retry, so the run's two hard failures were both real assertion faults and neither
     was this. Recorded because a *recovered* sighting is the one that would otherwise go unwritten,
     and the rate is the argument this entry rests on.
-  - **Five sightings, six different specs** — `preferences-survive-reinstall` (×3, twice as the hard
-    failure), `touch-target-size`, `one-calorie-budget`, `back-dismiss-sweep`, `card-429-error-state`,
-    `home-device-battery-chips`, `macro-calorie-warning`. Which spec is reported is a scheduling
-    accident, as this entry said at the second sighting; the constant is a renderer crash inside a
-    21–26 minute run. **It has now cost five log reads across two sessions.**
+  - **⚑ SIXTH SIGHTING 2026-09-11 (#1110), and it is the worst run yet: TWO `SIGSEGV`s and FOUR
+    flaky in one 26.1-minute job.** `preferences-survive-reinstall:36` is the hard failure for the
+    **third** time, beside `baseline-progress-label:19`, `health-tabs-instant-paint:27`,
+    `meal-label:286` and `touch-target-size:53` — all four recovered on retry, two of them reporting
+    `browser.newContext: Target page, context or browser has been closed` straight after
+    `Received signal 11 SEGV_MAPERR 0000000001b0`, the same address for the fourth time. 174 passed.
+  - **`touch-target-size:53` failed with `/: no interactive elements found`**, which is the same
+    dead-renderer downstream wearing a third mask: the page never rendered, so the measurement had
+    nothing to measure and the assertion read as a layout defect. Worth naming, because unlike
+    `ERR_ABORTED` and `newContext` it looks like a genuine product failure on its own.
+  - **Six sightings, seven different specs** — `preferences-survive-reinstall` (×4, three times as
+    the hard failure), `touch-target-size` (×2), `one-calorie-budget`, `back-dismiss-sweep`,
+    `card-429-error-state`, `home-device-battery-chips`, `macro-calorie-warning`,
+    `baseline-progress-label`, `health-tabs-instant-paint`, `meal-label`. Which spec is reported is a
+    scheduling accident, as this entry said at the second sighting; the constant is a renderer crash
+    inside a 21–26 minute run. **It has now cost six log reads across two sessions**, and this run
+    cost a seventh read to separate one real failure from four crash artefacts.
   - Recorded because a 26-minute job that eats its own browser roughly one run in three is an
     argument about the job, which is what this entry is for. It also means **a red E2E cannot be
     read as a signal without opening the log**, which is the cost LB-54 is about.
@@ -4836,6 +4851,14 @@ two screens, and a user who sets one has no way to know the other exists.
   complaint is genuinely about width now, and the owner asked for the chips to shrink. Follow
   **BF-139**, not the line above, for the three-chip case; this entry's own single-chip reasoning
   stands unchanged and is not being retracted.
+- **⚑ 2026-09-12 — BF-139 shipped, and it settles the "shorten the date, not the chip" question with
+  numbers.** Measured at 412 dp: the row's left column is **224 px** and the three chips were
+  **227 px** at night and **279 px** with the daytime `· UV n`. There was never a date length that
+  would have fitted that — at `EEE d MMMM` or even at zero characters the chips alone still overflow
+  — so on three chips the lever was not merely spent, it could not have worked. **The chip DID get
+  smaller**, by merging the two battery pills into one and moving `%` into the accessible name, and
+  this entry's `px-2.5` also went to `px-2`. The single-chip reasoning above is still right for one
+  chip beside a date, which is the case it was written about.
 - **Added:** 2026-09-01 · owner: *"I dont like how the temperature/uV pill sits. can we go back to
   the old way when it was side by side. you can make it smaller if needed."*
 
