@@ -620,6 +620,11 @@ below threshold and left in place for next time.
   in-session, mid-training. Three changes, one per defect below:
   1. The auto-heal now requires a log **newer than `phaseStartedAt`** — the only honest test of the
      interruption it exists to repair. A recreated session's logs predate its phase clock.
+     **⚠ The reason recorded here for looking those logs up BY NAME was false** — it cited
+     `program_session_id` being NULL everywhere, which is the DEAD column of the pair
+     `schema.ts:183-191` warns about. The live `session_id` is populated (62 of 108 rows) and would
+     have answered directly. The guard's behaviour is right; its justification is corrected in
+     **BF-144**, which moves it onto the id link.
   2. It completes only on **full coverage**, matching the invariant `recordBaselineAnchors` already
      holds for the measured path.
   3. `revertAutoAdoptedBaseline` (`lib/data/postgres/slices/periodization.ts`) undoes a baseline
@@ -890,6 +895,48 @@ below threshold and left in place for next time.
     surface, and the tint must not close the gap between `--card` and `--background` that currently
     separates a card from the page.
 - **Needs:** nothing.
+### [workouts] BF-144 — BF-143's guard asks about exercise NAMES when the id link was there all along, and the dead column that hid it
+
+- **Lane:** A — `app/api/ai-periodization/**`, and the schema question is Lane A's alone.
+- **Verification:** the interruption test resolves through `workout_sessions.session_id`; a session
+  renamed between cycles, or sharing a name with another session, still answers correctly. The
+  existing BF-143 cases must keep passing unchanged — the behaviour is not meant to move for the
+  recreated-session case, only to stop depending on names.
+
+- **Added:** 2026-09-11 · found while closing out BF-143, by re-measuring a claim that entry's own
+  fix had written into the codebase as a comment.
+
+- **⚠ THE CLAIM IN BF-143 WAS FALSE, AND THE SHIPPED COMMENT SAYING IT IS CORRECTED IN THIS PR.**
+  BF-143 justified a name-keyed lookup with *"`workout_sessions.program_session_id` is NULL on every
+  recent row … an id join would answer 'never trained' for everyone"*. That measured the **dead**
+  column of the pair `lib/data/postgres/schema.ts:183-191` warns about. The live link is the column
+  literally named **`session_id`** (Drizzle property `programSessionId`), and it is populated:
+  **62 of 108 rows**, measured 2026-09-11. Per active session that day — Push 1, Pull 1, Legs 1,
+  Upper 1, **Lower 0** — which is precisely the question BF-143 needed answered, available directly
+  and ignored.
+- **The shipped fix is not wrong, and this is not a revert.** The date comparison against
+  `phaseStartedAt` is what carries the guard, and it is correct for the recreated-session case —
+  Lower's name-matched logs predate its phase clock, so it stayed in baseline as intended. What is
+  wrong is the *reason*, and a reason left in a comment is what the next reader builds on.
+- **Why the id link is the better signal anyway:** a name lookup is right only while names stay
+  unique and unchanged. Rename Lower, or add a second session sharing a name, and the interruption
+  test answers about the wrong workouts. `session_id` cannot be confused that way. The 46 rows with
+  no live id are older history predating the link, which is why the date comparison stays as the
+  companion test rather than being replaced by the id alone.
+
+- **⚠ THE DEAD COLUMN IS A TRAP THAT HAS NOW COST THREE SESSIONS, AND THAT IS THE ARGUMENT FOR
+  REMOVING IT.** `schema.ts:183-191` already records that it *"has already cost a session: a repro
+  fixture populated `program_session_id`, the periodization block took its `null` branch, and the
+  honest reading of that run was 'the race does not exist'."* It then cost BF-143 a false premise,
+  and cost this session a wrong measurement — the raw-SQL name `program_session_id` reads the dead
+  one, so **every ad-hoc query through the admin endpoint hits the trap by default**, which is
+  exactly where a session goes to check a claim. Renaming the Drizzle property fixed the ORM path
+  and left the SQL path as sharp as it was.
+- **Gate:** owner — dropping the column is a data-losing migration and needs confirmation, per the
+  standing rule and `schema.ts`'s own note. **Ask it as its own question, not folded into the guard
+  fix:** the column holds nothing (0 of 108 rows) and has never been read, so the loss is nominal,
+  but "nominal" is still the owner's call. The guard change above is not blocked by it.
+- **Needs:** nothing. **Read BF-143 first** — this corrects that entry's reasoning, not its outcome.
 
 ### [platform] LB-94 — the journal's recent window is 332 entries, and 297 of them are pinned by a citation
 
