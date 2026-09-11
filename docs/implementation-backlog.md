@@ -476,8 +476,15 @@ below threshold and left in place for next time.
 
 ### [workouts] BF-141 — a lb/kg toggle on the weight dial, for the equipment that has already corrupted this owner's data once
 
-- **Lane:** A — the shared constant and its de-duplication are engine work; the dial and toggle are
-  Lane B's and hand over after. Both halves, so Lane A first per the lane rule.
+- **Lane:** B — **the Lane A half is DONE (2026-09-11); what is left is the dial and the toggle.**
+  `LBS_TO_KG` now lives in `packages/shared/src/workout/units.ts` with `lbsToKg`/`kgToLbs` beside it,
+  and `lib/data/postgres/adapter.ts` imports it rather than declaring its own. **Neither helper
+  rounds, deliberately** — the entry's rounding hazard is that `mround125` clamps to [5, 250], so a
+  5 lb dumbbell (2.268 kg) would floor to 5 kg; a conversion that rounded itself would bury that
+  decision inside the helper. Round at the call site, for storage only.
+  A test pins the constant, the no-rounding property, and that no second *declaration* exists
+  (`packages/shared/src/workout/__tests__/units.test.ts`). The `projectOverview.md` LB-41 correction
+  this entry promised was already made when the entry was filed — nothing owed there.
 - **Verification:** on the S25 — tapping the unit suffix swaps kg↔lb without the dial also
   scrolling or re-selecting, the 44 px touch box is reachable at the drawn size, and
   `e2e/touch-target-size.spec.ts` stays green with an empty allowlist. A scroll-snap dial with

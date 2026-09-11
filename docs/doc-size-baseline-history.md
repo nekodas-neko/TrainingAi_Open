@@ -10918,17 +10918,26 @@ PR touching `android/**`.
 The correction matters because it changes the owner's next step: the row implied a rebuild was
 owed, when the APK carrying the fix already exists and only needs installing.
 
-## 2026-09-11 — `docs/implementation-backlog.md` 20703 → 20678 (RV-42 shipped)
+## 2026-09-11 — `docs/implementation-backlog.md` 20703 → 20710 (BF-141, Lane A half)
+
+Seven lines, and the entry deliberately STAYS in the queue: BF-141 is both-halves work, and only the
+engine half shipped. The `Lane:` field flips A → B and records what is now available to it — the
+shared `LBS_TO_KG` with `lbsToKg`/`kgToLbs`, neither of which rounds, and why that matters
+(`mround125` clamps to [5, 250], so a 5 lb dumbbell would floor to 5 kg).
+
+Written by `pnpm fix:baselines`.
+
+## 2026-09-11 — `docs/implementation-backlog.md` 20710 → 20685 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 
-**This figure has been rewritten six times and the churn is the note worth leaving.** The branch
-computed 20732 → 20707, then 20714 → 20689, 20672 → 20647, 20624 → 20599, 20754 → 20729, and now
-20703 → 20678; RV-44, RV-41, RV-40, the LA-101 amendment, the Q-31 gating, BF-140 and its row
-correction all landed on `main` while this PR waited on an owner decision, and each landing moved
-the base out from under it. **Six rewrites of one number is the cost of a green PR waiting**, and it
-is recorded rather than smoothed because the alternative reading — that someone kept getting the
-arithmetic wrong — is the wrong lesson.
+**This figure has been rewritten seven times and the churn is the note worth leaving.** The branch
+computed 20732 → 20707, then 20714 → 20689, 20672 → 20647, 20624 → 20599, 20754 → 20729,
+20703 → 20678, and now 20710 → 20685; RV-44, RV-41, RV-40, the LA-101 amendment, the Q-31 gating,
+BF-140, its row correction and BF-141's engine half all landed on `main` while this PR waited on an
+owner decision, and each landing moved the base out from under it. **Seven rewrites of one number is
+the cost of a green PR waiting**, and it is recorded rather than smoothed because the alternative
+reading — that someone kept getting the arithmetic wrong — is the wrong lesson.
 Nothing was wrong with any of the three — each was correct against the `main` of its hour. Under six
 concurrent lanes plus an owner gate, a baseline is a reading of a moving number, and a PR that waits
 will re-read it once per merge that overtakes it. Recomputed by `pnpm fix:baselines` after each
