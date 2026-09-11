@@ -1,3 +1,4 @@
+import { KCAL_PER_G } from './atwater'
 import type { NutritionIngredient } from '@trainingai/shared/types/nutrition'
 
 // Deterministic totals from the per-ingredient breakdown. The model no longer
@@ -38,7 +39,7 @@ export function sumIngredients(ingredients: NutritionIngredient[]): {
     fatG         += Math.max(0, Number(ing.fatPer100g)      || 0) * w / 100
     calFromPer100 += Math.max(0, Number(ing.caloriesPer100g) || 0) * w / 100
   }
-  const atwater = proteinG * 4 + carbsG * 4 + fatG * 9
+  const atwater = proteinG * KCAL_PER_G.protein + carbsG * KCAL_PER_G.carbs + fatG * KCAL_PER_G.fat
   const calories = calFromPer100 > 0 && Math.abs(calFromPer100 - atwater) / Math.max(atwater, 1) <= 0.4
     ? calFromPer100
     : atwater
@@ -110,7 +111,7 @@ export function macroCalorieDisagreement(
 ): number | null {
   const calories = pos(r.calories)
   if (!(calories > 0)) return null
-  const fromMacros = pos(r.proteinG) * 4 + pos(r.carbsG) * 4 + pos(r.fatG) * 9
+  const fromMacros = pos(r.proteinG) * KCAL_PER_G.protein + pos(r.carbsG) * KCAL_PER_G.carbs + pos(r.fatG) * KCAL_PER_G.fat
   if (!(fromMacros > 0)) return null
   return Math.abs(calories - fromMacros) / calories
 }
@@ -142,7 +143,7 @@ export function sanitiseNutrition(r: RawNutrition): RawNutrition {
   satFat = clamp(satFat, 0, fat)
 
   // Expected calories from macros (Atwater factors)
-  const calFromMacros = protein * 4 + carbs * 4 + fat * 9
+  const calFromMacros = protein * KCAL_PER_G.protein + carbs * KCAL_PER_G.carbs + fat * KCAL_PER_G.fat
 
   // If calories is wildly off from macro math (>40% deviation), recalculate
   const deviation = calories > 0 ? Math.abs(calories - calFromMacros) / calories : 1
@@ -152,8 +153,8 @@ export function sanitiseNutrition(r: RawNutrition): RawNutrition {
   }
 
   // If fat alone (×9) exceeds total calories by >20%, fat was hallucinated — recalculate
-  if (fat * 9 > calories * 1.2 && protein * 4 + carbs * 4 < calories) {
-    fat = Math.max(0, Math.round((calories - protein * 4 - carbs * 4) / 9))
+  if (fat * KCAL_PER_G.fat > calories * 1.2 && protein * KCAL_PER_G.protein + carbs * KCAL_PER_G.carbs < calories) {
+    fat = Math.max(0, Math.round((calories - protein * KCAL_PER_G.protein - carbs * KCAL_PER_G.carbs) / KCAL_PER_G.fat))
     satFat = clamp(satFat, 0, fat)
   }
 
