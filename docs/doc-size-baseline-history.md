@@ -10851,3 +10851,11 @@ RV-44's 18-line entry leaves the queue. The nine longhand Atwater sites in `scan
 `meal-split.ts` now import `KCAL_PER_G`, which is what `atwater.ts` was created for.
 
 Written by `pnpm fix:baselines`.
+
+## 2026-09-11 — `docs/implementation-backlog.md` 20714 → 20672 (RV-41 shipped)
+
+RV-41's 42-line entry leaves the queue. The goal bounds now live once, in
+`packages/shared/src/validation/goal-bounds.ts`, which both user routes and the Coach's patch schema
+build from — they had each declared their own, and the model's were up to 50× looser.
+
+Written by `pnpm fix:baselines`.
