@@ -10889,3 +10889,13 @@ worth the space because the entry's whole problem has been that nobody could rep
 The other half is the competing reading: 667 may be a measurement taken before the WebView resized.
 Written down beside the finding on purpose — a lead that omits its own alternative is how a session
 spends a day in the native layer for a timing bug.
+
+## 2026-09-11 — `docs/implementation-backlog.md` 20737 → 20754 (Q-31 gated)
+
+Eighteen lines, and they exist because the entry and the plan it points at disagree. Q-31's header
+says its gates are released; the triage plan's own closing section says the implementation stays
+blocked behind Q-1 and Q-30, both of which are still in this queue. Prose does not block, so
+`next-item.js` was printing it READY — the LA-89 shape, third time this class has surfaced.
+
+The note carries the two things a starter would trip on regardless of the answer (Task 0's `dhrv`
+deletion is struck; Task 2's MET table is safe either way), so the owner's reply can be one line.
