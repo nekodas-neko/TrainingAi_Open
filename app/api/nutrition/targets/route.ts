@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { goalBoundSchema } from '@trainingai/shared/validation/goal-bounds'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { dailyKcalToGoal } from '@trainingai/shared/nutrition/calorie-balance'
@@ -10,11 +11,11 @@ import { invalidBodyResponse } from '@/lib/api/route-errors'
 const MAX_BODY_BYTES = 8 * 1024
 
 const TargetsSchema = z.object({
-  calories: z.number().min(0).max(20000).optional().nullable(),
-  proteinG: z.number().min(0).max(2000).optional().nullable(),
-  carbsG:   z.number().min(0).max(2000).optional().nullable(),
-  fatG:     z.number().min(0).max(2000).optional().nullable(),
-  fiberG:   z.number().min(0).max(500).optional().nullable(),
+  calories: goalBoundSchema('calories').optional().nullable(),
+  proteinG: goalBoundSchema('proteinG').optional().nullable(),
+  carbsG:   goalBoundSchema('carbsG').optional().nullable(),
+  fatG:     goalBoundSchema('fatG').optional().nullable(),
+  fiberG:   goalBoundSchema('fiberG').optional().nullable(),
 }).strict()
 
 export async function GET() {

@@ -10850,11 +10850,22 @@ the lane is device-blocked, which is the one thing a successor cannot re-derive 
 RV-44's 18-line entry leaves the queue. The nine longhand Atwater sites in `scan-totals.ts` and
 `meal-split.ts` now import `KCAL_PER_G`, which is what `atwater.ts` was created for.
 
-## 2026-09-11 — `docs/implementation-backlog.md` 20714 → 20689 (RV-42 shipped)
+## 2026-09-11 — `docs/implementation-backlog.md` 20714 → 20672 (RV-41 shipped)
 
-Net 25 lines: RV-42's 32-line entry left the queue, and a 7-line note went in above the OR-105 audit
-table correcting the row that had filed it. The row stands as written — it is a dated record of what
-that audit saw — but it named one write path where there are three, and the one it named is the only
-one that was never reachable with client-supplied ids.
+RV-41's 42-line entry leaves the queue. The goal bounds now live once, in
+`packages/shared/src/validation/goal-bounds.ts`, which both user routes and the Coach's patch schema
+build from — they had each declared their own, and the model's were up to 50× looser.
 
 Written by `pnpm fix:baselines`.
+## 2026-09-11 — `docs/implementation-backlog.md` 20672 → 20647 (RV-42 shipped)
+
+RV-42's 31-line entry leaves the queue with the write-path ownership fix.
+
+**This figure has been rewritten three times and the churn is the note worth leaving.** The branch
+computed 20732 → 20707, then 20714 → 20689, and now 20672 → 20647; RV-44 and RV-41 both landed on
+`main` while this PR waited on an owner decision, and each landing moved the base out from under it.
+Nothing was wrong with any of the three — each was correct against the `main` of its hour. Under six
+concurrent lanes plus an owner gate, a baseline is a reading of a moving number, and a PR that waits
+will re-read it once per merge that overtakes it. Recomputed by `pnpm fix:baselines` after each
+merge, which is the only thing that makes the subtraction mean anything.
+

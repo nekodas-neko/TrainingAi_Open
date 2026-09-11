@@ -1833,7 +1833,7 @@ candidate needed one targeted grep for the thing it claims.
 |---|---|
 | **RV-40** | neither named route contains `invalidUuidResponse` |
 | **RV-44** | the longhand `proteinG * 4 + carbsG * 4 + fatG * 9` is still in `scan-totals.ts:41` and `meal-split.ts:189` — `atwater.ts` appears only in comments |
-| **RV-41** | `lib/coach/patch.ts` imports nothing from the targets or goals routes and declares no bounds |
+| **RV-41** | `lib/coach/patch.ts` imports nothing from the targets or goals routes and declares no bounds — *since built; it now imports `goalBoundSchema` per field* |
 | **RV-36** | `app/nutrition/nutrition-content.tsx` has no scroll-restoration reference at all |
 | **RV-42** | `replaceMealPlanStructure` checks `ownedPlan` for the plan, then inserts `mealTypeId` and `savedMealId` from input unchecked — *since built; the audit row stands as written, but see the note below* |
 
@@ -3057,48 +3057,6 @@ thrown away rather than shifted back, and the ring's daytime coverage is meaning
 the 288/day currently stored. If it does not hold, the future-dated rejection is doing exactly its
 job and this closes as understood. Either way the rejection stays — a sample ahead of now is a bad
 clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
-
-### [nutrition][workouts] RV-41 — the Coach can write goal numbers the user's own screens refuse
-
-- **Lane:** A — `lib/coach/patch.ts` (the bounds), with `app/api/nutrition/targets/route.ts` and
-  `app/api/user/goals/route.ts` as the source of truth to import from.
-- **Added:** 2026-09-03, Review sweep 44 —
-  [`write-up §3`](reviews/2026-09-03-coach-write-bounds-vs-user-routes.md)
-- **The schema's own comment names a value it does not refuse.** Directly above the bound:
-  *"'set my calories to 26000' should be refused by the schema rather than survive to a confirmation
-  card that looks legitimate."* The bound is `max(100_000)`. Driven as the seeded user: 26,000 → 200,
-  stored; 100,000 → 200, stored; only 100,001 refused. The rendered summary reads *"Calories 0 kcal →
-  26,000 kcal"*, which is the confirmation card the comment warns about.
-- **One column, two validators, and the looser one is the LLM's.** Measured by sending the same value
-  to both surfaces in the same session:
-
-  | Field | user route | its bound | Coach bound | |
-  |---|---|---|---|---|
-  | `calories` | `PUT /api/nutrition/targets` | 20,000 | 100,000 | 5× |
-  | `proteinG` / `carbsG` / `fatG` | same | 2,000 | 100,000 | **50×** |
-  | `calorieGoal` | `PATCH /api/user/goals` | 30,000 | 100,000 | 3.3× |
-  | `waterGoalMl` | same | 20,000 | 100,000 | 5× |
-  | `stepsGoal` | same | 200,000 | 100,000 | *tighter* |
-
-  `PUT /api/nutrition/targets {"calories":26000}` → `400 "Too big: expected number to be <=20000"`;
-  the same value through `/api/coach/apply` → 200, read back from Postgres as 26000. Same for
-  `proteinG` 5000 and `waterGoalMl` 50000.
-- **The type diverges too, and it costs a 500.** `stepsGoal` is `z.number().int()` on the user route
-  and a plain `z.number()` in the patch schema, so `8000.5` is a clean 400 on one path and
-  `500 {"error":"Apply failed"}` on the other — the RV-40 class through a different door. It writes
-  **no** `error_events` row (measured: zero in a 10-minute window) because the catch calls `errorLog`
-  rather than `reportServerError`, so it neither pollutes the fault channel nor appears in it.
-- **Fix the divergence, not the numbers.** Import the bounds the user routes already declare rather
-  than restating them in `patch.ts` — restating is what let them drift, and picking new constants by
-  hand re-creates the same hazard. If a bound genuinely should differ for the Coach, that is an owner
-  decision with a written reason, not a default.
-- **Do not widen the user routes to match.** The direction of the fix is the Coach path down to the
-  user's bounds; these are the numbers the owner's own screens have enforced all along.
-- **How to test locally:** two accounts, one curl per field to each surface, and read the row back out
-  of Postgres — the response body echoes the input and proves nothing about what was stored.
-- **On completion, the check is:** whether any Coach bound should legitimately differ from the form's.
-  **Not a `Verify:` field — this is unbuilt.** Confirmed 2026-09-10 (OR-105): `lib/coach/patch.ts` imports nothing from the targets or goals routes and declares no bounds constants.
-  A `Verify:` files unbuilt work under "shipped; nothing is blocked", where nobody looks for it.
 
 ### [workouts][platform] RV-40 — the malformed-id guard was only ever pointed at path params, and two body-id routes 500
 
