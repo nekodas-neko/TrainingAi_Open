@@ -10950,3 +10950,13 @@ shared `LBS_TO_KG` with `lbsToKg`/`kgToLbs`, neither of which rounds, and why th
 (`mround125` clamps to [5, 250], so a 5 lb dumbbell would floor to 5 kg).
 
 Written by `pnpm fix:baselines`.
+
+## 2026-09-12 — `docs/implementation-backlog.md` 20733 → 20674, `projectOverview.md` 10620 → 10640 (BF-141)
+
+The backlog comes **down** 59 lines: BF-141 was a long specification and is now a short record of
+what shipped. What replaced its build notes is the part that outlives it — the entry named
+`touch-target-size.spec.ts` as its gate and that spec cannot reach the control, and the
+`stopPropagation` guard protects a lossy round-trip the new spec provably cannot demonstrate.
+
+`projectOverview.md` takes the Known-Issues row for a fix whose fit is measured and whose control no
+thumb has tried, with both of those findings on it so neither reads as pedantry later.

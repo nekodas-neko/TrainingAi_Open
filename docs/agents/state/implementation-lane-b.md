@@ -13,13 +13,13 @@
 
 ## Now
 
-**BF-139 shipped** (`fix/bf139-header-chip-width`, v1.447.0) — Home's three header chips fit the
-224 px column again. Merged before it: #1092, #1095, #1097, #1099. `check:rules` reads **73 of 73**.
+**BF-141 shipped** (`fix/bf141-weight-dial-unit-toggle`, v1.448.0) — the weight dial takes pounds,
+stored as kg, remembered per exercise. **BF-139** before it (#1110, v1.447.0). `check:rules` **73/73**.
 
-**BF-139's own numbers were estimates and were low** — it put three chips at ~201 px in a ~232 px
-column, which is no bug. Measured: **227 px** in **224**, and **279** with the daytime `· UV n`. Its
-prescribed `px-2.5` → `px-2` is worth 12 px and left daytime 43 px over. The fit came from merging
-the two battery pills into one (150 px → 91) and moving `%` into the accessible name.
+**Both entries were wrong about something load-bearing, the same way.** BF-139 estimated three chips
+at ~201 px in a ~232 px column; measured **227** in **224**. BF-141 named
+`touch-target-size.spec.ts` as its gate — that spec scans the five tab roots and the dial is inside
+an active workout, so its empty allowlist would have stayed green over a 20 px suffix.
 
 **A 4-hourly silent Routine polls this lane** (`trig_01WcuYTidPtngLFZFD7yKnoL`, session-bound,
 `53 */4 * * *`): syncs `main`, clears any open PR, runs `next-item.js`, **says nothing when READY is 0**.
@@ -66,30 +66,31 @@ None held.
 
 ## The lessons that cost real time
 
-1. **An entry's pixel estimates are prose until something measures them.** BF-139 reasoned from
-   character counts and was wrong in the direction that hides the bug, and its prescribed fix
-   covered a third of the gap. **Injecting the real markup into the live row and reading
-   `getBoundingClientRect()` costs one Playwright run** and is the only way this row has ever been
-   argued about with numbers. Do it before choosing a lever.
-2. **This file already held the fix for the failure that cost a run its longest detour** — the
-   `scrollIntoViewIfNeeded` gotcha below, rediscovered from scratch. **Read the Gotchas first.**
-3. **A card reporting "no data" is not evidence that no data reached it.** LB-99's cause was not
-   the `getLocalStore` fall-through — the fetch ran — but one label conflating "too few readings"
-   with "no verdict yet". **Read what a component does with data before suspecting how it got
-   there.**
-4. **A shadowing claim is about ONE function's branch order.** PS-35b's two "unreachable" palette
+1. **An entry's numbers and its named test gate are both prose until something checks them.**
+   BF-139's estimates hid the bug; BF-141 named a spec that cannot reach its own control. One
+   Playwright run settles either. **Check the gate before trusting it to catch you.**
+2. **A mutation that does NOT fail is a finding.** BF-141's `stopPropagation` guards a real lossy
+   round-trip (61.0 kg returns 61.25) the spec cannot show, because the seeded workout starts at
+   60 kg and round-trips exactly. Recorded in the code and on the entry; the test was renamed to
+   what it proves rather than left claiming more.
+3. **This file already held the fix for a run's longest detour** — the `scrollIntoViewIfNeeded`
+   gotcha below, rediscovered from scratch. **Read the Gotchas first.**
+4. **A card reporting "no data" is not evidence that no data reached it.** LB-99's cause was one
+   label conflating "too few readings" with "no verdict yet", not the `getLocalStore` fall-through.
+5. **A shadowing claim is about ONE function's branch order.** PS-35b's two "unreachable" palette
    keys cited lines in *different* functions; both were live.
-5. **Never run `pnpm build` and `npx vitest run` against the one local Postgres at once.** A
+6. **Never run `pnpm build` and `npx vitest run` against the one local Postgres at once.** A
    "failure" that will not reproduce serially is contention, not a defect.
-6. **A stored "state as of" line ages into a wrong answer.** The Dependabot item read *"2 high,
-   below threshold"* from 2026-07-27; `pnpm audit` read **36 findings, 23 high, 2 critical**. Same
-   shape as BF-139's stale estimates and Q-254's stale premise: a written number is not a measured one.
+7. **A stored "state as of" line ages into a wrong answer.** The Dependabot item read *"2 high,
+   below threshold"* (2026-07-27); `pnpm audit` read **36 findings, 23 high, 2 critical**.
 
 ## Gotchas worth carrying
 
 - **`npx tsc --noEmit` TYPECHECKS NOTHING UNDER `__tests__`; CI's `Build` does**, via
-  `scripts/check-test-typecheck.js`. `e2e/` **is** covered by plain `tsc`. Both vitest projects run
-  `environment: 'node'`, so **vitest cannot parse JSX** — a unit-tested helper lives in a `.ts`.
+  `scripts/check-test-typecheck.js`. It also misses `react-hooks/rules-of-hooks` — a hook below an
+  early return passes `tsc` and fails Build. `e2e/` **is** covered by plain `tsc`. Both vitest
+  projects run `environment: 'node'`, so **vitest cannot parse JSX** (a unit-tested helper lives in a
+  `.ts`) and there is **no `localStorage`** — stub it.
 - **`get_check_runs` returning `total_count: 0` minutes after opening a PR is a STALE BASE**, not
   slow CI: fetch, merge `origin/main`, push. It also reads 0 for ~a minute after a good push, so
   check `actions_list` for the run before acting.
@@ -101,11 +102,10 @@ None held.
 - **Rebuild `package.json` / `changelog.ts` from `git show origin/main:…`; never splice a hunk.**
   Never `open(p,'w').write(open(p).read()…)` in one expression — it truncates before it reads.
 - **Playwright needs `DATABASE_URL` prefixed in** (TCP, not the hook's socket form), and
-  **`locator.click()` does nothing on Nutrition** — use `tapCentre`, or `el.evaluate(e => e.click())`
-  in the supplements section, where synthetic input never reaches the handlers.
+  **`locator.click()` does nothing on Nutrition** — use `tapCentre`, or `el.evaluate(e => e.click())`.
 - **`scrollIntoViewIfNeeded()` lands a tap on the Workout tab, two ways:** it scrolls EVERY ancestor
   including the horizontal tab carousel, *and* it stops once the box is technically on screen,
   leaving a low control under the nav. Always `scrollIntoView({ block: 'center', inline: 'nearest' })`.
-- **A seeded probe must restore the database.** Delete exactly what you inserted; `body_metrics`
-  has a `(user_id, date)` unique and an upsert would overwrite a real weigh-in.
+- **A seeded probe must restore the database** — `body_metrics` has a `(user_id, date)` unique and
+  an upsert would overwrite a real weigh-in. A spec that starts a workout must delete it too.
 - **The check:rules count is `Ran N of N` and moves** — never hardcode it, never quote "pass".
