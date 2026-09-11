@@ -10907,6 +10907,20 @@ naming the check (post-BF-140 APK, strap off three hours, chip should dim).
 
 Written by `pnpm fix:baselines`.
 
+## 2026-09-12 — `docs/implementation-backlog.md` 20703 → 20714 and `projectOverview.md` 10594 → 10613 (BF-139)
+
+Both grow for the same reason: BF-139 was argued from estimates and the measurements contradict
+them, so the numbers are written down where the next person to touch this row will hit them. The
+entry gains a before/after table (224 px column; 227 px of chips at night, 279 with the daytime
+`· UV n`) and a note that its own prescribed `px-2.5` → `px-2` covers 12 px of a 55 px gap. Its
+prose shrank — what replaced it is arithmetic.
+
+`projectOverview.md` takes the Known-Issues row for a fix that is measured but not yet seen on the
+phone, and BF-96 gains four lines retiring its "shorten the date, not the chip" instruction with
+numbers rather than by assertion: at three chips there was no date length that would have fitted.
+
+The baton stayed at its 112 baseline across a full rewrite, which is the ratchet doing its job — a
+run that ships has more to say and the file is the wrong place for most of it.
 ## 2026-09-11 — `projectOverview.md` 10594 → 10601 (BF-140 row corrected)
 
 Seven lines, correcting a claim I made in that row hours earlier: it said the Kotlin *"cannot be
@@ -10918,6 +10932,14 @@ PR touching `android/**`.
 The correction matters because it changes the owner's next step: the row implied a rebuild was
 owed, when the APK carrying the fix already exists and only needs installing.
 
+## 2026-09-12 — `docs/implementation-backlog.md` 20714 → 20726 (LB-56 sixth sighting)
+
+Twelve lines for the worst run of this flake so far: two renderer `SIGSEGV`s at the same address and
+four flaky in one 26.1-minute job, with `preferences-survive-reinstall:36` the hard failure for the
+third time. The lines that earn their place are the third mask — `touch-target-size:53` reporting
+*"no interactive elements found"*, which unlike `ERR_ABORTED` and `newContext` reads as a genuine
+product failure — and the running spec list, because LB-56's argument is a rate and a sighting that
+is not written down is not counted.
 ## 2026-09-11 — `docs/implementation-backlog.md` 20703 → 20710 (BF-141, Lane A half)
 
 Seven lines, and the entry deliberately STAYS in the queue: BF-141 is both-halves work, and only the
@@ -10927,17 +10949,18 @@ shared `LBS_TO_KG` with `lbsToKg`/`kgToLbs`, neither of which rounds, and why th
 
 Written by `pnpm fix:baselines`.
 
-## 2026-09-11 — `docs/implementation-backlog.md` 20710 → 20685 (RV-42 shipped)
+## 2026-09-11 — `docs/implementation-backlog.md` 20733 → 20708 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 
-**This figure has been rewritten seven times and the churn is the note worth leaving.** The branch
+**This figure has been rewritten eight times and the churn is the note worth leaving.** The branch
 computed 20732 → 20707, then 20714 → 20689, 20672 → 20647, 20624 → 20599, 20754 → 20729,
-20703 → 20678, and now 20710 → 20685; RV-44, RV-41, RV-40, the LA-101 amendment, the Q-31 gating,
-BF-140, its row correction and BF-141's engine half all landed on `main` while this PR waited on an
-owner decision, and each landing moved the base out from under it. **Seven rewrites of one number is
-the cost of a green PR waiting**, and it is recorded rather than smoothed because the alternative
-reading — that someone kept getting the arithmetic wrong — is the wrong lesson.
+20703 → 20678, 20710 → 20685, and now 20733 → 20708; nine other merges landed on `main` while this
+PR waited on an owner decision, and each one moved the base out from under it. **Eight rewrites of
+one number is the cost of a green PR waiting**, recorded rather than smoothed because the
+alternative reading — that someone kept getting the arithmetic wrong — is the wrong lesson. The
+per-file `.size` split (LA-33) is what keeps this to one number instead of a whole map: no other
+document's baseline has conflicted once across all eight.
 Nothing was wrong with any of the three — each was correct against the `main` of its hour. Under six
 concurrent lanes plus an owner gate, a baseline is a reading of a moving number, and a PR that waits
 will re-read it once per merge that overtakes it. Recomputed by `pnpm fix:baselines` after each

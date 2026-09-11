@@ -34,7 +34,7 @@ export function WeatherChip() {
         <div
           role="status"
           aria-label="Weather unavailable"
-          className="flex items-center whitespace-nowrap shrink-0 rounded-full bg-muted/60 px-2.5 py-1 text-xs font-semibold text-muted-foreground"
+          className="flex items-center whitespace-nowrap shrink-0 rounded-full bg-muted/60 px-2 py-1 text-xs font-semibold text-muted-foreground"
         >
           —
         </div>
@@ -55,7 +55,7 @@ export function WeatherChip() {
   // `EEEE d MMMM` runs 12–20 characters across the year, and a long date is what runs the row out
   // of width, which is why it looked fine on shorter ones.
   return (
-    <div className="flex items-center gap-1 whitespace-nowrap shrink-0 rounded-full bg-muted/60 px-2.5 py-1 text-xs font-semibold">
+    <div className="flex items-center gap-1 whitespace-nowrap shrink-0 rounded-full bg-muted/60 px-2 py-1 text-xs font-semibold">
       <Icon className="h-3.5 w-3.5" style={{ color: 'var(--color-brand)' }} />
       <span>{Math.round(snapshot.temperatureC)}°</span>
       {showUv && (
