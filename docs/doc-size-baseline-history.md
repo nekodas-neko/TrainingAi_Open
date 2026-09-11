@@ -10981,3 +10981,8 @@ is a Polar chest strap, and only 5 of 22 vendor tables carry a `source` at all.
 The numbers are in the entry rather than summarised because the whole argument is that the table is
 already multi-device. "Rename it and add a source column" is a sentence anyone could have written;
 "84,246 of these rows are not from an Oura" is what makes it urgent.
+
+## 2026-09-11 — `docs/implementation-backlog.md` (BF-144)
+
+BF-144 files the id-link correction to BF-143's reasoning, plus the owner-gated question of dropping
+the dead `program_session_id` column that produced the false premise.

@@ -32,10 +32,15 @@ export async function GET(
   // It asked whether these exercise NAMES had ever been logged, which is true of every recreated
   // session, so rebuilding a session inside an existing program silently skipped its calibration.
   //
-  // Name-keyed rather than id-keyed on purpose: `workout_sessions.program_session_id` is NULL on
-  // every recent row (measured 2026-09-11 — all five of the owner's sessions read 0 by id while
-  // four had been trained that week), so an id join would answer "never trained" for everyone and
-  // park every session in baseline forever. The date comparison is what distinguishes them.
+  // ⚠ Name-keyed, and that is a WEAKNESS rather than a design choice — see BF-144.
+  // The justification originally written here was false: it claimed `program_session_id` is NULL on
+  // every row. That measured the DEAD column of the pair `schema.ts` warns about. The live link is
+  // the column named `session_id` (Drizzle property `programSessionId`), and it IS populated —
+  // 62 of 108 rows, and on 2026-09-11 each of the owner's four trained sessions had one while the
+  // recreated Lower had none. An id test would have answered this question directly.
+  // The date comparison is what carries the guard today, and it is correct for the recreated-session
+  // case; BF-144 replaces the name lookup with the id link, which does not depend on names staying
+  // unique or unchanged.
   let interrupted: boolean | null = null
   const sessionWasInterrupted = async (): Promise<boolean> => {
     if (interrupted !== null) return interrupted
