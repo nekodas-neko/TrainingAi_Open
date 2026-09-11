@@ -543,74 +543,65 @@ below threshold and left in place for next time.
   the set card's non-editable branch, the last-session chips and the 1RM trend are unchanged.
 - **Needs:** nothing.
 
-### [nutrition] BF-142 — the gap explainer that shipped gives a reason its own module says is false, and the "constant" it cites has already moved 🔴 LIVE
+### [nutrition] BF-142 — the gap explainer gave a reason its own module rules out (fixed; the owner says whether it reads true)
 
-- **Lane:** B for the sentence. The base drift underneath it is BF-137's and Lane A's; the two are
-  independent and this one does not wait on it.
-- **Verification:** the replacement sentence names both numbers — the goal he set and the computed
-  allowance — and a reader who follows it does not expect the gap to close as he moves. The owner is
-  the person the sentence is for, so he is the one who says whether it now reads as true.
+- **Lane:** B. The base drift underneath it is BF-137's and Lane A's; the two are independent and
+  this one did not wait on it.
+- **Verify:** owner — the replacement sentence names both numbers, and a reader who follows it does
+  not expect the gap to close as he moves. He is the person the sentence is for.
+- **✅ SHIPPED 2026-09-12** (`fix/bf142-gap-explainer-sentence`).
+  [Journal](overview/entries/2026-09-12-fix-bf142-gap-explainer-sentence.md).
 
 - **Added:** 2026-09-11 · owner, on the Nutrition card, third report in this family:
   *"calories still not right"*.
 
-- **The card says the grams are his stored goal. They are not.** Measured 2026-09-11 —
-  `nutrition_targets` holds **1,660 kcal · 150 P / 141 C / 55 F** (last written 2026-08-31). The
-  card renders **150 P / 185 C / 72 F = 1,988 kcal**: carbs and fat are **1.31×** their stored
-  values, protein alone is untouched. The file knows this — `components/nutrition/energy-card.tsx:27-29`
-  documents the prop as *"the **effective** targets: the caller has already substituted the
-  burn-aware calorie budget and Q-323's earned-scaled macro grams"*. The sentence at `:181-183`
-  then tells the owner *"The grams come from your stored daily goal"*, four lines below the comment
-  saying they do not.
-- **And the REASON it gives is the one its own module rules out.**
-  `components/nutrition/macro-budget-gap.ts:8-9`: *"Both addends carry the same `earned`, so it
-  cancels."* Movement is in both numbers, so movement cannot be what separates them — yet the card
-  explains the gap as grams-from-goal versus budget-with-*"the movement recorded today"*. A reader
-  who believes the sentence concludes the gap will close as he moves. It will not, which is the one
+- **The card said the grams were his stored goal. They were not.** Measured 2026-09-11 —
+  `nutrition_targets` holds **1,660 kcal · 150 P / 141 C / 55 F**; the card rendered
+  **150 P / 185 C / 72 F = 1,988 kcal**, carbs and fat at **1.31×** their stored values. The file
+  knew: `energy-card.tsx` documents the prop as *"the **effective** targets ... Q-323's
+  earned-scaled macro grams"*, four lines above a sentence saying they come from the stored goal.
+- **And the REASON it gave was the one its own module rules out.** `macro-budget-gap.ts`: *"Both
+  addends carry the same `earned`, so it cancels."* Movement is in both numbers, so movement cannot
+  be what separates them — yet the card explained the gap as goal-versus-budget-with-*"the movement
+  recorded today"*. A reader who believed it waits for a gap that never closes, which is the one
   thing the paragraph exists to say.
-- **The true separator, from the same docstring, is `storedGoal − (restingBase + goalDelta)`, and it
-  checks out exactly:** `1,660 − (2,150 − 200) = −290` against the card's printed **−295** (gram
-  rounding accounts for the 5). **So the arithmetic is right and only the words are wrong** — which
-  is why this is a Lane B sentence and not a recalculation.
-- **⚠ The docstring's own constant is not just stale — INVERTING IT RECOVERS THE REAL NUMBER, AND IT
-  IS ALARMING.** It pins the gap at *"**406 kcal** on the owner's account, at every hour of every
-  day"*, grams **above** budget. Today the card prints **295 below**. **The sign flipped**, so the
-  two do not differ by 111 — read the docstring's own formula backwards for the base:
-  `base = storedGoal + 200 − gap`, giving **1,454 then** and **2,155 now** (the card shows 2,150;
-  gram rounding covers the 5). **The resting base has risen ~700 kcal.**
-  - **1,454 was a SANE resting figure** — just under the 1,527 Mifflin BMR, which is what a resting
-    base with the step credit taken out should look like. So this did not start wrong; it inflated.
-  - Any fix that hardcodes or re-states 406 inherits a number that has already moved 700.
+- **The arithmetic was right and only the words were wrong**, which is why this was a sentence and
+  not a recalculation: `1,660 − (2,150 − 200) = −290` against the card's printed **−295** (gram
+  rounding covers the 5).
+- **What shipped: the sentence now names every number and says which one is his.** Rendered against
+  the seeded account — *"Macro targets add up to 1,900 kcal — 463 below the calorie budget. Your
+  stored goal is 1,900. Today's budget is 2,363 — 2,063 resting burn, +300 for your goal, +0 moved.
+  The grams are that goal scaled up by the same movement, so moving more raises both numbers and the
+  gap stays."* The card gained one prop, `storedGoalCalories`, which is printed and never computed
+  with; resting burn, goal delta and earned come from the balance it already had.
+- **⚠ THE DOCSTRING'S OWN CONSTANT WAS STALE, AND INVERTING IT RECOVERED THE REAL NUMBER.** It
+  pinned the gap at *"**406 kcal** on the owner's account, at every hour of every day"*. On
+  2026-09-11 the card printed **295 the other way** — **the sign flipped**, so the two do not differ
+  by 111. Reading the formula backwards for the base gives **1,454 then** and **~2,155 now**: the
+  resting base has risen **~700 kcal**. 1,454 was sane — just under the 1,527 Mifflin BMR, which is
+  what a resting base with the step credit removed should look like. So this did not start wrong; it
+  inflated. The number is no longer restated in the module, and a test fails any attempt to re-pin
+  it as current fact.
 
-- **⚠ INDEPENDENT CORROBORATION THAT BF-137 IS LIVE AND UNDERSTATED, from a direction that entry did
-  not use.** BF-137 argues the calibrated maintenance is fitting a drug-driven weight drop. That
-  argument rests on a weight trend, which is exactly the confounded signal. **This does not.** The
-  owner is **158 cm**, 69.95 kg, 33, male (`users`, measured 2026-09-11). Mifflin-St Jeor BMR is
-  **1,527 kcal**. The card calls **2,150** his *resting* burn — **1.41 × BMR, 623 kcal above it**.
-  No resting figure is 1.41 × BMR; that ratio is a fully active TDEE. Because
+- **⚠ INDEPENDENT CORROBORATION THAT BF-137 IS LIVE AND UNDERSTATED, from a direction that entry
+  does not use.** BF-137 rests on a weight trend, which is the confounded signal. This does not.
+  The owner is **158 cm**, 69.95 kg, 33, male (`users`, 2026-09-11); Mifflin-St Jeor BMR is
+  **1,527**. The card calls **2,150** his *resting* burn — **1.41 × BMR, 623 above it**. No resting
+  figure is 1.41 × BMR; that is a fully active TDEE. Because
   `restingBase = maintenanceKcal − avgActiveKcal` on the calibrated path
   (`lib/health/energy-balance-service.ts`), an inflated maintenance lands in a field *labelled*
   resting, and today's movement is then added on top of a number that already contains a day of it.
-  **The height is what makes this conclusive** and it is easy to get wrong from the weight alone:
-  at 158 cm his BMR is ~130 kcal lower than a 178 cm man of the same mass, so the overshoot is
-  larger than a taller frame would suggest.
-- **What the owner is actually reacting to, stated plainly:** he set his goal to **1,660** on
-  2026-08-31. The card offers him **2,283**, prints **1,988** of macros beside it, and marks 1,331
-  eaten as *"Well under so far"* in red. **Not one of the three numbers on that card is the number
-  he chose.** Three sessions of "the calories are wrong" are that, not three separate arithmetic
-  faults.
-
-- **Recommendation — say the true sentence, which is shorter than the false one.** Name both
-  numbers and which is his: *"Your goal is 1,660. Today's computed allowance is 2,283 — your resting
-  burn is estimated at 2,150, minus 200 for your goal, plus 333 moved."* That is honest about the
-  disagreement instead of explaining it away, and it puts the estimate next to the goal where the
-  owner can see which one he is being judged against.
-  - **Do not "fix" this by re-labelling the grams as earned-scaled and leaving it there.** That
-    makes the sentence true and still leaves the reader with two numbers and no guidance.
-  - **Do not close the gap by scaling the stored goal to the budget.** That would silently raise
-    what he eats to a maintenance figure this entry has just shown is ~600 kcal too high.
-  - **`components/nutrition/__tests__/macro-budget-gap.test.ts` pins the non-convergence** (earning
-    the gap moves both numbers). Keep it; it is the assertion the wrong sentence contradicts.
+  **The height is what makes this conclusive**: at 158 cm his BMR is ~130 kcal below a 178 cm man of
+  the same mass, so the overshoot is larger than the weight alone suggests. **Left with BF-137 and
+  Lane A** — this entry fixed the sentence, not the base.
+- **What the owner was reacting to, stated plainly:** he set his goal to **1,660** on 2026-08-31.
+  The card offered **2,283**, printed **1,988** of macros beside it, and marked 1,331 eaten as
+  *"Well under so far"* in red. **Not one of the three numbers was the one he chose.** Three reports
+  of "the calories are wrong" are that, not three arithmetic faults.
+- **Two things deliberately NOT done**, both named on the entry before it was built: re-labelling
+  the grams as earned-scaled and stopping there (true, and still leaves two numbers with no
+  guidance), and closing the gap by scaling the stored goal to the budget (which would raise what he
+  eats to a maintenance figure this entry shows is ~600 kcal too high).
 - **Needs:** nothing.
 
 ### [workouts] BF-143 — a crash-recovery path fires on a recreated session, so a never-trained Lower is marked baseline-complete on borrowed PRs (FIXED; the owner's own Lower row self-repairs on next open)

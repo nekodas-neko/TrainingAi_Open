@@ -10970,3 +10970,12 @@ block measured against the owner's live Lower row.
 
 BF-143 gains its shipped record: the three changes, the one owner action still owed, and an explicit
 note that the bodyweight-index half is NOT fixed and stays with BF-127.
+## 2026-09-12 — `docs/implementation-backlog.md` 20768 → 20759, `projectOverview.md` 10640 → 10660 (BF-142)
+
+The backlog comes down again: BF-142 was a long diagnosis and is now a record of a one-sentence fix
+plus the finding it uncovered. What is kept is the part that is not about the sentence at all — the
+module's constant had flipped sign, and inverting it recovers a resting base risen ~700 kcal, which
+corroborates BF-137 from a direction that entry does not use.
+
+`projectOverview.md` takes the Known-Issues row, and it carries that corroboration rather than only
+the copy change, because the sentence is now true over a base that is not.
