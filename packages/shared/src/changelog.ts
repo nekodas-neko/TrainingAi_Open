@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.448.0",
+    date: "2026-09-12",
+    changes: [
+      "The weight dial takes pounds. Tap the little \u0022kg\u0022 under the number to swap it to \u0022lb\u0022 \u2014 the dial then steps in 2.5 lb, which is what dumbbells actually come in, and what gets logged is still the kilogram equivalent. It remembers the choice per exercise, so the couple of lb dumbbells stay lb and everything else stays kg.",
+      "This is the thing that went wrong in June: three dumbbell exercises were logged in pounds into the kilogram field, which inflated their 1RMs, volume and personal records until a repair tool put them back.",
+    ],
+  },
+  {
     version: "1.447.0",
     date: "2026-09-12",
     changes: [

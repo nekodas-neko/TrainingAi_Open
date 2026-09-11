@@ -1754,6 +1754,26 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [workouts] ⚠️ The weight dial takes pounds now, and no thumb has tried the control (BF-141, 2026-09-12, v1.448.0) · needs: hardware
+
+Owner: *"my Dumbells are pounds and I need to convert it ... then just have it convert to the kg
+equivalent"*. Prevention for a failure that already happened on that exercise — Session 119 logged
+three dumbbell exercises in pounds into the kg field, and the repair needed an admin tool that
+rescaled every set and **backdated the all-time PR**. Tapping the dial's own `kg` suffix swaps it to
+`lb`; the stored value stays kilograms, and the unit is remembered per exercise in `localStorage`.
+
+**Two findings worth more than the feature.** BF-141 claimed `e2e/touch-target-size.spec.ts` would
+catch an undersized control here; it cannot — that spec scans the five tab roots and this dial is
+inside an active workout, so its empty allowlist would have stayed green over a 20 px suffix. And
+the `stopPropagation` on the suffix guards a **real** case that the new spec cannot demonstrate: in
+lb mode a row tap round-trips kg → lb → kg, which is lossy for some weights (61.0 kg returns 61.25),
+but the seeded workout starts at 60 kg, which round-trips exactly. Both are written on the entry so
+neither reads as dead weight later.
+
+**What is owed is the S25.** A scroll-snap dial with haptics beside a new inline control is a
+touch-target and gesture question; the harness drives a mouse, so it can prove the box measures
+44 px and cannot prove a thumb reaches it without also moving the dial.
+
 ### [app-shell] ⚠️ Home's three header chips fit now, and the fit has only been measured, not seen (BF-139, 2026-09-12, v1.447.0) · needs: browser
 
 Owner, with a screenshot: *"the pills in the top are a little cutoff. can we make them smaller to
