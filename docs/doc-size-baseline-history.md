@@ -10867,6 +10867,18 @@ RV-40's 48-line entry leaves the queue. Both routes that 500'd on a malformed bo
 
 Written by `pnpm fix:baselines`.
 
+## 2026-09-11 — `docs/implementation-backlog.md` (BF-142)
+
+BF-142 files the false gap-explainer sentence, with the stored-versus-rendered macro measurement and
+the exact gap formula. BF-137 gains the BMR-ratio corroboration, which is independent of the weight
+trend its original argument rests on.
+
+## 2026-09-11 — `docs/implementation-backlog.md` (BF-142 corrections)
+
+Four entries converted from the `Verify:` field to prose `Verification:` lines — `Verify:` means
+shipped, so it had hidden them from `next-item.js`. BF-142 and BF-137 also correct a base-drift
+figure: the gap's sign flipped, so the base rose ~700 kcal rather than the ~111 first recorded.
+
 ## 2026-09-11 — `docs/implementation-backlog.md` → 20644 (BF-110's viewport lead)
 
 Twenty lines, and half of them are the table. BF-110 has cost four log reads and several sessions,
