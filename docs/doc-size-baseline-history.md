@@ -10865,14 +10865,47 @@ RV-40's 48-line entry leaves the queue. Both routes that 500'd on a malformed bo
 
 Written by `pnpm fix:baselines`.
 
-## 2026-09-11 — `docs/implementation-backlog.md` 20624 → 20599 (RV-42 shipped)
+## 2026-09-11 — `docs/implementation-backlog.md` (BF-142)
+
+BF-142 files the false gap-explainer sentence, with the stored-versus-rendered macro measurement and
+the exact gap formula. BF-137 gains the BMR-ratio corroboration, which is independent of the weight
+trend its original argument rests on.
+
+## 2026-09-11 — `docs/implementation-backlog.md` (BF-142 corrections)
+
+Four entries converted from the `Verify:` field to prose `Verification:` lines — `Verify:` means
+shipped, so it had hidden them from `next-item.js`. BF-142 and BF-137 also correct a base-drift
+figure: the gap's sign flipped, so the base rose ~700 kcal rather than the ~111 first recorded.
+
+## 2026-09-11 — `docs/implementation-backlog.md` → 20644 (BF-110's viewport lead)
+
+Twenty lines, and half of them are the table. BF-110 has cost four log reads and several sessions,
+and the telemetry it already ships turned out to hold a perfect separation — every blank resume
+reports viewport height 667, every good one 826, sixteen samples, no overlap. A finding like that is
+worth the space because the entry's whole problem has been that nobody could reproduce it.
+
+The other half is the competing reading: 667 may be a measurement taken before the WebView resized.
+Written down beside the finding on purpose — a lead that omits its own alternative is how a session
+spends a day in the native layer for a timing bug.
+
+## 2026-09-11 — `docs/implementation-backlog.md` 20737 → 20754 (Q-31 gated)
+
+Eighteen lines, and they exist because the entry and the plan it points at disagree. Q-31's header
+says its gates are released; the triage plan's own closing section says the implementation stays
+blocked behind Q-1 and Q-30, both of which are still in this queue. Prose does not block, so
+`next-item.js` was printing it READY — the LA-89 shape, third time this class has surfaced.
+
+The note carries the two things a starter would trip on regardless of the answer (Task 0's `dhrv`
+deletion is struck; Task 2's MET table is safe either way), so the owner's reply can be one line.
+
+## 2026-09-11 — `docs/implementation-backlog.md` 20754 → 20729 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 
-**This figure has been rewritten four times and the churn is the note worth leaving.** The branch
-computed 20732 → 20707, then 20714 → 20689, then 20672 → 20647, and now 20624 → 20599; RV-44, RV-41
-and RV-40 all landed on `main` while this PR waited on an owner decision, and each landing moved the
-base out from under it.
+**This figure has been rewritten five times and the churn is the note worth leaving.** The branch
+computed 20732 → 20707, then 20714 → 20689, 20672 → 20647, 20624 → 20599, and now 20754 → 20729;
+RV-44, RV-41, RV-40, the LA-101 amendment and the Q-31 gating all landed on `main` while this PR
+waited on an owner decision, and each landing moved the base out from under it.
 Nothing was wrong with any of the three — each was correct against the `main` of its hour. Under six
 concurrent lanes plus an owner gate, a baseline is a reading of a moving number, and a PR that waits
 will re-read it once per merge that overtakes it. Recomputed by `pnpm fix:baselines` after each
