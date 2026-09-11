@@ -10859,3 +10859,10 @@ RV-41's 42-line entry leaves the queue. The goal bounds now live once, in
 build from — they had each declared their own, and the model's were up to 50× looser.
 
 Written by `pnpm fix:baselines`.
+
+## 2026-09-11 — `docs/implementation-backlog.md` 20672 → 20624 (RV-40 shipped)
+
+RV-40's 48-line entry leaves the queue. Both routes that 500'd on a malformed body id now run
+`invalidUuidResponse`, the same guard the dynamic `[id]` routes have had since Q-482.
+
+Written by `pnpm fix:baselines`.

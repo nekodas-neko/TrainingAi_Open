@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { getRepository } from "@/lib/data";
 import type { ProgressionStyle } from "@trainingai/shared/types";
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
-import { withRouteErrors } from '@/lib/api/route-errors'
+import { withRouteErrors, invalidUuidResponse } from '@/lib/api/route-errors'
 import { ProgressionStyleSaveSchema } from "@trainingai/shared/validation/progression-style";
 
 // A progression style with its per-set rows.
@@ -72,6 +72,14 @@ export async function DELETE(req: NextRequest) {
   }
   const body = (read.body ?? {}) as { id?: string; name?: string };
   if (!body.id && !body.name) return NextResponse.json({ error: "Missing id or name" }, { status: 400 });
+
+  // RV-40. `invalidUuidResponse` was swept across the dynamic `[id]` routes and never pointed at an
+  // id taken from a BODY, which is the same hazard: a malformed one reached the driver as a 22P02
+  // and answered 500 with a ZERO-BYTE body, so a client calling `res.json()` got a parse exception
+  // on top of the real fault — and the failing UPDATE, raw SQL and all, was filed into
+  // `error_events` as a server fault for what is a client input error.
+  const badId = invalidUuidResponse(body.id);
+  if (body.id && badId) return badId;
 
   const repo = await getRepository();
   if (body.id) {
