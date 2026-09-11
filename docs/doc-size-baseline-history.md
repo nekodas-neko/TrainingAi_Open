@@ -10923,3 +10923,13 @@ numbers rather than by assertion: at three chips there was no date length that w
 
 The baton stayed at its 112 baseline across a full rewrite, which is the ratchet doing its job — a
 run that ships has more to say and the file is the wrong place for most of it.
+## 2026-09-11 — `projectOverview.md` 10594 → 10601 (BF-140 row corrected)
+
+Seven lines, correcting a claim I made in that row hours earlier: it said the Kotlin *"cannot be
+compiled"*, which is true of the sandbox and false of the project. The `Android (Kotlin tests +
+debug APK)` job compiles it, runs `:app:testDebugUnitTest`, and on `main` publishes the APK to the
+rolling `apk-latest` release — it passed on #1107, which is a seventh check that only appears on a
+PR touching `android/**`.
+
+The correction matters because it changes the owner's next step: the row implied a rebuild was
+owed, when the APK carrying the fix already exists and only needs installing.
