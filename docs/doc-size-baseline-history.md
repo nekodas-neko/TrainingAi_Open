@@ -10866,3 +10866,9 @@ RV-40's 48-line entry leaves the queue. Both routes that 500'd on a malformed bo
 `invalidUuidResponse`, the same guard the dynamic `[id]` routes have had since Q-482.
 
 Written by `pnpm fix:baselines`.
+
+## 2026-09-11 — `docs/implementation-backlog.md` (BF-142)
+
+BF-142 files the false gap-explainer sentence, with the stored-versus-rendered macro measurement and
+the exact gap formula. BF-137 gains the BMR-ratio corroboration, which is independent of the weight
+trend its original argument rests on.
