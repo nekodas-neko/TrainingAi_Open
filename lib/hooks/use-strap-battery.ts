@@ -25,10 +25,17 @@ export function useStrapBattery(): { percent: number; ageMinutes: number } | nul
     let cancelled = false
     let handle: { remove: () => Promise<void> } | null = null
 
-    const record = (percent: number | null | undefined) => {
+    const record = (percent: number | null | undefined, at?: number | null) => {
       // Written before it is rendered, so a value seen once survives the strap disconnecting — and
       // so both writers land in one place rather than two numbers in two screens.
-      writeStrapBattery(percent)
+      //
+      // BF-140: `at` is the strap's OWN report time. It used to be omitted, so every Home mount
+      // re-stamped an old reading with `Date.now()` and `stale` could never become true — the chip
+      // never dimmed and never named an age, making a months-old reading pixel-identical to a live
+      // one. `undefined` still falls through to the default, which is what an APK predating the
+      // native half sends; there the old behaviour persists, because the timestamp does not exist
+      // to be carried.
+      writeStrapBattery(percent, at ?? undefined)
       const stored = readStrapBattery()
       if (!cancelled && stored) setReading(stored)
     }
@@ -37,9 +44,10 @@ export function useStrapBattery(): { percent: number; ageMinutes: number } | nul
       const native = await getPolarBle()
       if (!native || cancelled) return
       try {
-        handle = await native.plugin.addListener('polarStatus', s => record(s.battery))
+        handle = await native.plugin.addListener('polarStatus', s => record(s.battery, s.batteryAt))
         if (cancelled) return
-        record((await native.plugin.getStatus()).battery)
+        const status = await native.plugin.getStatus()
+        record(status.battery, status.batteryAt)
       } catch {
         // A plugin that is present but not started is not an error state for a chip.
       }

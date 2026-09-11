@@ -10899,3 +10899,12 @@ blocked behind Q-1 and Q-30, both of which are still in this queue. Prose does n
 
 The note carries the two things a starter would trip on regardless of the answer (Task 0's `dhrv`
 deletion is struck; Task 2's MET table is safe either way), so the owner's reply can be one line.
+
+## 2026-09-11 — `docs/implementation-backlog.md` 20754 → 20703, `projectOverview.md` 10566 → 10594 (BF-140)
+
+BF-140's 51-line entry leaves the queue and a 28-line Known-Issues row replaces part of it. The row
+is required rather than optional: the fix starts in `android/**`, which the sandbox can neither
+compile nor exercise, so the device-verification gate is satisfied by an explicit NOT-verified row
+naming the check (post-BF-140 APK, strap off three hours, chip should dim).
+
+Written by `pnpm fix:baselines`.
