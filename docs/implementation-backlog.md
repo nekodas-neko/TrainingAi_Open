@@ -421,57 +421,6 @@ below threshold and left in place for next time.
 
 
 
-### [devices] BF-140 — the strap battery chip cannot go stale, so a reading from any point in the past renders as current
-
-- **Lane:** A (the fix starts in `android/**`; the JS half follows)
-- **Verification:** on the S25 with the strap left off — the chip dims and names an age once the
-  reading passes 180 minutes, instead of staying bright indefinitely. The whole mechanism is a
-  native service field and `getPolarBle()` returns null off-device, so nothing below reproduces in
-  the sandbox or in CI.
-
-- **Added:** 2026-09-10 · owner, with a Home screenshot showing the strap chip at **100%**:
-  *"the strap battery guage; i dont know if thats right - its 100% and I have had it for months now
-  and used it. I imagine we dont have the correct metric"*.
-
-- **The metric is the right one. The TIMESTAMP attached to it is invented, and that is the bug.**
-  The number is a real read of the standard Battery Service characteristic `0x2A19`
-  (`PolarGattClient.kt:192-194`, service/characteristic UUIDs at `PolarProtocol.kt:19-20`), issued
-  once per connection off the HR CCCD write (`PolarGattClient.kt:157`). So the app is not showing a
-  hardcoded 100 — it is showing whatever the H10 last reported, whenever that was.
-- **`PolarStrapService.battery` is written once and never cleared.** Set at
-  `PolarStrapService.kt:232` in `onBattery`; grep the file and there is no other assignment — no
-  reset on disconnect, none on stop. It holds its last value for the life of the service process.
-  `status()` publishes that field unconditionally (`PolarStrapService.kt:392`).
-- **So the JS re-stamps an old reading as new on every Home mount.**
-  `use-strap-battery.ts:41` calls `record((await native.plugin.getStatus()).battery)`, and `record`
-  calls `writeStrapBattery(percent)` (`:31`), which stamps `at: Date.now()`
-  (`lib/stores/strap-battery.ts:60`). The stored `at` is therefore **when JS last looked**, not when
-  the strap last reported. `ageMinutes` derives from it (`use-strap-battery.ts:55`).
-- **The consequence is that the staleness affordance can never fire.** `DeviceBatteryChip` dims at
-  `ageMinutes > STALE_AFTER_MINUTES` (180, `components/device-battery-chip.tsx:21`, `:49`) and only
-  then says *"last seen Nh ago"* in the accessible name (`:52-54`). With `at` continuously refreshed,
-  `stale` is permanently false: the chip never dims, never reports an age, and a months-old reading
-  is pixel-identical to a live one. **The screenshot corroborates this** — that chip is at full
-  opacity with a green icon, i.e. the code believes the reading is under three hours old.
-- **Fix shape:** carry the reading's own time from native. Add a `batteryAt` epoch-ms alongside
-  `battery` in `status()`, stamped in `onBattery`, and have `writeStrapBattery` take that instead of
-  defaulting to `Date.now()` (the parameter already exists — `strap-battery.ts:59` takes
-  `now: number = Date.now()`, and every caller currently omits it). Clearing `battery` on disconnect
-  is the wrong fix on its own: it would blank a chip whose entire purpose is
-  last-seen-when-disconnected (Q-111).
-- **Second, smaller half: the strap keeps no history at all, so "has it moved in months?" is
-  unanswerable by anything.** One overwritten `localStorage` key (`ta_strap_battery_v1`,
-  `strap-battery.ts:21`) and nothing server-side — there is no polar battery table and no
-  `app/api/polar*` route. Contrast the ring, which has `oura_ble_battery_poll` (migration 133):
-  measured 2026-09-10, **9,578 polls spanning 9%–100%** between 2026-07-19 and 2026-09-10. The ring
-  can answer this question about itself and the strap cannot.
-- **Do not assume the underlying 100% is wrong.** The H10 runs a CR2025 coin cell, ~400 h
-  (`polar-h10-ble` skill §7), and a coin cell's discharge curve is flat for most of its life, so a
-  long plateau at 100% is what a truthful gauge looks like. **This entry does not claim the reading
-  is false** — it claims nothing in the app can currently tell the owner either way, which is the
-  same complaint from the other side.
-- **Needs:** nothing.
-
 ### [app-shell] BF-139 — three header chips no longer fit beside the date, and BF-96's prescribed remedy is already spent
 
 - **Lane:** B

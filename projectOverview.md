@@ -5085,6 +5085,41 @@ The review's own architecture lens (Lens F) is shallower than the rest, and **"w
   `needsRegenerate: true`) and a sweep for how many other users/sessions are currently serving an
   expired prescription. See Q-229.
 
+### [devices][workouts] ⚠️ The strap battery chip now carries its own report time — NOT device-verified (BF-140, 2026-09-11) · needs: APK
+
+`PolarStrapService.battery` is written once per connection and never cleared, and the JS stamped
+`at: Date.now()` each time it read it — so the stored time was *when JS last looked*, not when the
+strap last reported. `ageMinutes` reset on every Home mount, `stale` was permanently false, and
+`DeviceBatteryChip` never dimmed and never named an age. The owner's screenshot of a months-old
+100% at full opacity is exactly what that code believed.
+
+**Fixed in source. Compiled and unit-tested by CI; only the on-device behaviour is unverified.**
+Native stamps `batteryAt` in `onBattery` and publishes it from `status()`; the hook threads it to
+`writeStrapBattery`.
+
+**This row originally claimed the Kotlin "cannot be compiled", which is true of the sandbox and false
+of the project.** The `Android (Kotlin tests + debug APK)` job runs `:app:testDebugUnitTest` and
+`:app:assembleDebug` on every PR touching `android/**` — it passed on #1107 — and on `main` it
+publishes the result to the rolling `apk-latest` release. So the Kotlin compiles, its unit tests
+pass, **and the APK carrying this fix already exists**; what nobody has done is install it and watch
+the chip. `getPolarBle()` returns null off-device, so that last step cannot be automated at all.
+
+**The two halves still ship on different clocks.** The JS reaches the device through a Railway
+deploy immediately; the Kotlin reaches it only when the owner installs a new APK. In that window `batteryAt` is
+undefined and `writeStrapBattery` falls back to `Date.now()` — i.e. today's behaviour persists,
+deliberately, because the timestamp does not exist to be carried. **Nothing is worse in the
+meantime; nothing is better either until the APK lands.**
+
+**To verify:** download `apk-latest` (see [`canonical-runtime-android.md`](docs/canonical-runtime-android.md)
+"Getting a new APK"), install it, leave the strap off for three hours, open Home. The chip should dim
+and its accessible name should read *"last seen Nh ago"* instead of staying bright. No rebuild is
+needed — CI already published it.
+
+**Second half deliberately not built:** the strap still keeps no battery history (one overwritten
+`localStorage` key, nothing server-side), so *"has it moved in months?"* stays unanswerable. The
+ring can answer it about itself — `oura_ble_battery_poll`, 9,578 polls spanning 9%–100%. That is a
+schema change and belongs in its own entry, not batched behind an unverifiable native fix.
+
 ### [devices][platform] ⚠️ The step-decoder table now loads over the network — NOT device-verified (Q-221, 2026-08-13) · needs: browser
 
 `steps_motion_decoder_2_0_0`'s dequantisation table used to be bundled, so it was always present.

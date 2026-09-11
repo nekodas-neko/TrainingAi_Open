@@ -10898,14 +10898,37 @@ blocked behind Q-1 and Q-30, both of which are still in this queue. Prose does n
 The note carries the two things a starter would trip on regardless of the answer (Task 0's `dhrv`
 deletion is struck; Task 2's MET table is safe either way), so the owner's reply can be one line.
 
-## 2026-09-11 — `docs/implementation-backlog.md` 20754 → 20729 (RV-42 shipped)
+## 2026-09-11 — `docs/implementation-backlog.md` 20754 → 20703, `projectOverview.md` 10566 → 10594 (BF-140)
+
+BF-140's 51-line entry leaves the queue and a 28-line Known-Issues row replaces part of it. The row
+is required rather than optional: the fix starts in `android/**`, which the sandbox can neither
+compile nor exercise, so the device-verification gate is satisfied by an explicit NOT-verified row
+naming the check (post-BF-140 APK, strap off three hours, chip should dim).
+
+Written by `pnpm fix:baselines`.
+
+## 2026-09-11 — `projectOverview.md` 10594 → 10601 (BF-140 row corrected)
+
+Seven lines, correcting a claim I made in that row hours earlier: it said the Kotlin *"cannot be
+compiled"*, which is true of the sandbox and false of the project. The `Android (Kotlin tests +
+debug APK)` job compiles it, runs `:app:testDebugUnitTest`, and on `main` publishes the APK to the
+rolling `apk-latest` release — it passed on #1107, which is a seventh check that only appears on a
+PR touching `android/**`.
+
+The correction matters because it changes the owner's next step: the row implied a rebuild was
+owed, when the APK carrying the fix already exists and only needs installing.
+
+## 2026-09-11 — `docs/implementation-backlog.md` 20703 → 20678 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 
-**This figure has been rewritten five times and the churn is the note worth leaving.** The branch
-computed 20732 → 20707, then 20714 → 20689, 20672 → 20647, 20624 → 20599, and now 20754 → 20729;
-RV-44, RV-41, RV-40, the LA-101 amendment and the Q-31 gating all landed on `main` while this PR
-waited on an owner decision, and each landing moved the base out from under it.
+**This figure has been rewritten six times and the churn is the note worth leaving.** The branch
+computed 20732 → 20707, then 20714 → 20689, 20672 → 20647, 20624 → 20599, 20754 → 20729, and now
+20703 → 20678; RV-44, RV-41, RV-40, the LA-101 amendment, the Q-31 gating, BF-140 and its row
+correction all landed on `main` while this PR waited on an owner decision, and each landing moved
+the base out from under it. **Six rewrites of one number is the cost of a green PR waiting**, and it
+is recorded rather than smoothed because the alternative reading — that someone kept getting the
+arithmetic wrong — is the wrong lesson.
 Nothing was wrong with any of the three — each was correct against the `main` of its hour. Under six
 concurrent lanes plus an owner gate, a baseline is a reading of a moving number, and a PR that waits
 will re-read it once per merge that overtakes it. Recomputed by `pnpm fix:baselines` after each
