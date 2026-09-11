@@ -3021,24 +3021,6 @@ those two surfaces this is the fallback path, not the primary.
 - The `Gate: owner` above **is** the decision: which of the two definitions of the estimate they want.
   Nothing here can start until that is answered, so there is no separate verify.
 
-### [nutrition] RV-44 — nine longhand Atwater sites in the two files `atwater.ts` never reached
-
-- **Lane:** A — `packages/shared/src/nutrition/scan-totals.ts`, `.../meal-split.ts`.
-- **Added:** 2026-09-03, Review sweep 46 —
-  [`write-up §3`](reviews/2026-09-03-progression-exact-adherence-ratchet.md)
-- `atwater.ts` exists because of LB-9 and says so in its header: *"Six lines with no dependencies can
-  be imported from anywhere, which is the property that stops a fifth copy appearing."* Neither file
-  below imports it: `scan-totals.ts` lines 41, 113, 145, 155, 156 and `meal-split.ts` lines 173, 249,
-  250, 251 all write `* 4` / `* 4` / `* 9` longhand.
-- **No number is wrong today.** All nine agree at 4/4/9, and the Atwater factors are physiological
-  constants that will not change. **This is a consistency finding, not a correctness one** — do not
-  file it or fix it as though a value were incorrect.
-- Import `KCAL_PER_G` at the nine sites. Worth doing when someone is next in those files rather than
-  as a standalone PR.
-- **On completion, the check is:** not needed beyond a green gate; nothing user-visible changes.
-  **Not a `Verify:` field — this is unbuilt.** Confirmed 2026-09-10 (OR-105): the longhand `proteinG * 4 + carbsG * 4 + fatG * 9` is still in `scan-totals.ts:41` and `meal-split.ts:189,265-267`; `atwater.ts` is named only in comments.
-  A `Verify:` files unbuilt work under "shipped; nothing is blocked", where nobody looks for it.
-
 ### [nutrition][platform] RV-42 — a meal plan can point at another account's saved meal and meal type
 
 - **Lane:** A — `lib/data/postgres/slices/meal-plans.ts` (`replaceMealPlanStructure` and the create

@@ -10844,3 +10844,10 @@ as open and RV-36/RV-37 as next, all four of which had shipped. One line down ra
 the shrink-only ratchet forced the trim, and the trim was the right edit anyway — five paragraphs
 carried narrative that the journal entries already hold. What replaced it is state: READY is 0 and
 the lane is device-blocked, which is the one thing a successor cannot re-derive quickly.
+
+## 2026-09-11 — `docs/implementation-backlog.md` 20732 → 20714 (RV-44 shipped)
+
+RV-44's 18-line entry leaves the queue. The nine longhand Atwater sites in `scan-totals.ts` and
+`meal-split.ts` now import `KCAL_PER_G`, which is what `atwater.ts` was created for.
+
+Written by `pnpm fix:baselines`.
