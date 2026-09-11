@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.447.0",
+    date: "2026-09-12",
+    changes: [
+      "The chips at the top of Home no longer get cut off on the right. The two battery readings now share a single pill instead of taking one each \u2014 two pills were using two thirds of the space the row has, just to show two numbers \u2014 and the percent sign moved into the spoken label, since a number next to a battery icon already reads as a percentage.",
+      "All the pills are slightly narrower too, which is what you asked for. On its own that was not enough: measured on the phone's width, the row needed 279 px in the afternoon and only had 224.",
+    ],
+  },
+  {
     version: "1.446.4",
     date: "2026-09-11",
     changes: [

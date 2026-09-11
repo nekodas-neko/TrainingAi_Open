@@ -10908,3 +10908,18 @@ compile nor exercise, so the device-verification gate is satisfied by an explici
 naming the check (post-BF-140 APK, strap off three hours, chip should dim).
 
 Written by `pnpm fix:baselines`.
+
+## 2026-09-12 — `docs/implementation-backlog.md` 20703 → 20714 and `projectOverview.md` 10594 → 10613 (BF-139)
+
+Both grow for the same reason: BF-139 was argued from estimates and the measurements contradict
+them, so the numbers are written down where the next person to touch this row will hit them. The
+entry gains a before/after table (224 px column; 227 px of chips at night, 279 with the daytime
+`· UV n`) and a note that its own prescribed `px-2.5` → `px-2` covers 12 px of a 55 px gap. Its
+prose shrank — what replaced it is arithmetic.
+
+`projectOverview.md` takes the Known-Issues row for a fix that is measured but not yet seen on the
+phone, and BF-96 gains four lines retiring its "shorten the date, not the chip" instruction with
+numbers rather than by assertion: at three chips there was no date length that would have fitted.
+
+The baton stayed at its 112 baseline across a full rewrite, which is the ratchet doing its job — a
+run that ships has more to say and the file is the wrong place for most of it.

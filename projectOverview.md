@@ -1754,6 +1754,25 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [app-shell] ⚠️ Home's three header chips fit now, and the fit has only been measured, not seen (BF-139, 2026-09-12, v1.447.0) · needs: browser
+
+Owner, with a screenshot: *"the pills in the top are a little cutoff. can we make them smaller to
+fit?"* Measured at 412 dp rather than estimated — the pill markup injected into the live row and
+read with `getBoundingClientRect()`: the header's left column is **224 px**, the three chips were
+**226.9 px** at night and **279.4 px** with the daytime `· UV n`. The entry's own estimate had been
+~201 px in a ~232 px column, which would have been no bug at all.
+
+That also made the entry's prescribed fix insufficient, which it had said to check: `px-2.5` → `px-2`
+is worth 12 px across three pills, clearing the night case and leaving the daytime case **43 px
+over**. What closes it is the two battery pills becoming **one** pill (150 px → 91 px — a pill
+boundary is two paddings and a gap, paid twice for two numbers) and the drawn `%` moving into the
+accessible name. Worst case is now **208.6 px** with 15.4 px left for the date.
+
+**What is owed is the look on the S25**, and specifically the daytime case with `· UV n` present —
+the seeded database has no weather snapshot, so `WeatherChip` renders only a skeleton and the
+three-chip row cannot be assembled from real data off the device. BF-96 records the same limitation;
+a mutation-checked source guard holds the classes meanwhile, and three mutations were run against it.
+
 ### [app-shell][nutrition] ⚠️ Nutrition keeps its scroll position now, and neither fix has been seen on the phone (RV-36 + RV-37, 2026-09-11, v1.446.4)
 
 **RV-36:** BF-100's scroll restoration reached three tabs, not five — it lives in `PullToSync`, and
