@@ -542,3 +542,52 @@ export async function getWeeklySetsByMuscleGroup(db: Db, userId: string, program
   }
   return result
 }
+
+/**
+ * Undo a baseline the auto-adopt path completed on borrowed personal records (BF-143).
+ *
+ * `source: 'personal_record'` is written in exactly one place — the auto-heal block in
+ * `app/api/ai-periodization/session/[sessionId]/route.ts` — so a row whose every anchor carries it
+ * was completed by that path and by nothing else. An AMRAP writes `'amrap'` and the prior-data
+ * choice writes `'existing'`; neither is touched here.
+ *
+ * **Why this is a revert and not a repair-in-place.** The adopted numbers cannot be salvaged: one
+ * of them was a bodyweight 1RM index stored under a key named `kg`, and a baseline is the
+ * denominator every prescription percentage multiplies. Clearing it puts the session back where
+ * the owner's rule says a never-trained session belongs — measuring, not prescribing.
+ *
+ * Returns null when nothing matched, so the caller can tell a revert from a no-op.
+ */
+export async function revertAutoAdoptedBaseline(
+  db: Db,
+  userId: string,
+  programSessionId: string,
+): Promise<SessionPeriodization | null> {
+  const [current] = await db.select().from(s.sessionPeriodization).where(and(
+    eq(s.sessionPeriodization.userId, userId),
+    eq(s.sessionPeriodization.programSessionId, programSessionId),
+  )).limit(1)
+  if (!current || !current.baselineComplete) return null
+
+  const anchors = Object.values((current.baseline1rm ?? {}) as Record<string, Baseline1rmEntry>)
+  // An empty map is not evidence of the auto-adopt path, so it is left alone rather than reverted.
+  if (anchors.length === 0 || !anchors.every(a => a.source === 'personal_record')) return null
+
+  const [row] = await db
+    .update(s.sessionPeriodization)
+    .set({
+      phase: 'baseline', phaseStartedAt: new Date(), baselineComplete: false,
+      baseline1rm: {}, sessionsInPhase: 0,
+      // A prescription generated off the adopted anchors is derived from them and outlives them by
+      // up to 7 days, so it goes with them.
+      prescription: null, prescriptionStatus: 'none',
+      prescriptionGeneratedAt: null, prescriptionExpiresAt: null, pendingTransition: null,
+      updatedAt: new Date(),
+    })
+    .where(and(
+      eq(s.sessionPeriodization.userId, userId),
+      eq(s.sessionPeriodization.programSessionId, programSessionId),
+    ))
+    .returning()
+  return row ? mapPeriodization(row) : null
+}
