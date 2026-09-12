@@ -92,12 +92,39 @@ if (darkAt === -1) {
 const lightSrc = css.slice(0, darkAt);
 const darkSrc = css.slice(darkAt);
 
+// A token is `[L, C, H]`, plus a fourth element flagging that H is not fixed: BF-145 builds the
+// dark surface ramp from `oklch(L C var(--brand-hue, 149))`, where the hue is whichever the user
+// picked — one of eight presets or any angle off the custom slider.
+//
+// **Reading only the `var()` fallback would measure one hue out of 360 and call it the palette.**
+// Chroma here is small, so the spread is small, but "small" is a claim this script exists to check
+// rather than assume — so a variable-hue token is scored at its WORST hue over the whole circle.
+// Before this, such a token simply did not match the literal-triple regex, the dark palette came
+// back empty, and the identity guard below stopped the run — which is the correct failure and the
+// reason this was noticed rather than silently unmeasured.
 function tokens(src) {
   const out = {};
-  for (const m of src.matchAll(/--([a-z0-9-]+):\s*oklch\(\s*([0-9.]+)\s+([0-9.]+)\s+([0-9.]+)/g)) {
-    out[m[1]] = [parseFloat(m[2]), parseFloat(m[3]), parseFloat(m[4])];
+  const RE = /--([a-z0-9-]+):\s*oklch\(\s*([0-9.]+)\s+([0-9.]+)\s+(?:([0-9.]+)|var\(\s*--brand-hue\s*,\s*([0-9.]+)\s*\))/g;
+  for (const m of src.matchAll(RE)) {
+    const fixed = m[4] !== undefined;
+    out[m[1]] = [parseFloat(m[2]), parseFloat(m[3]), parseFloat(fixed ? m[4] : m[5])];
+    if (!fixed) out[m[1]].hueVaries = true;
   }
   return out;
+}
+
+// The worst ratio across every hue either side can take. Identical to `ratio` when both are fixed.
+const HUE_STEP = 3;
+function worstRatio(fg, bg) {
+  if (!fg.hueVaries && !bg.hueVaries) return { r: ratio(fg, bg), hue: null };
+  let worst = Infinity, at = null;
+  for (let h = 0; h < 360; h += HUE_STEP) {
+    const f = fg.hueVaries ? [fg[0], fg[1], h] : fg;
+    const b = bg.hueVaries ? [bg[0], bg[1], h] : bg;
+    const r = ratio(f, b);
+    if (r < worst) { worst = r; at = h; }
+  }
+  return { r: worst, hue: at };
 }
 const light = tokens(lightSrc);
 const dark = { ...light, ...tokens(darkSrc) };
@@ -144,8 +171,8 @@ const results = [];
 for (const [themeName, T] of [['light', light], ['dark', dark]]) {
   for (const [fg, bg, need] of PAIRS) {
     if (!T[fg] || !T[bg]) continue; // token not defined as a literal oklch triple
-    const r = ratio(T[fg], T[bg]);
-    const key = `${themeName}:${fg} on ${bg}`;
+    const { r, hue } = worstRatio(T[fg], T[bg]);
+    const key = `${themeName}:${fg} on ${bg}` + (hue === null ? '' : ` (worst hue ${hue}°)`);
     results.push({ key, r, need });
     if (r + 1e-9 < need && !GRANDFATHERED.has(key)) failures.push({ key, r, need });
   }

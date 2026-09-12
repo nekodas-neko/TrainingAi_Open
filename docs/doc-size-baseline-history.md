@@ -11059,18 +11059,31 @@ the rate, so a sighting that is not written down weakens it — but the note was
 to four and the running tally rewritten in place rather than extended, so the growth is the sighting
 itself and nothing around it.
 
+## 2026-09-12 — `docs/implementation-backlog.md` 21080 → 21069 (BF-145 rewritten to its residue)
 
-## 2026-09-11 — `docs/implementation-backlog.md` → 21055 (RV-42 shipped)
+Down eleven: the palette half shipped, so the entry no longer carries the token inventory or the
+recommendation, and what is left is the sheet question plus the two measurements a later session
+would otherwise redo — that chroma alone is invisible below L 0.13, and that BF-75 already refuted
+the translucent-sheet fix.
+
+## 2026-09-12 — `projectOverview.md` 10660 → 10683 (BF-145 Known-Issues row)
+
+Twenty-three for a palette change that touches every screen and has not been seen on the phone. The
+row carries the two things a later session would otherwise redo: the measurement that chroma alone
+is invisible below L 0.13, and that BF-145's sheet half is refuted rather than outstanding.
+
+
+## 2026-09-11 — `docs/implementation-backlog.md` → 21044 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 
-**This figure has been rewritten THIRTEEN times and the churn is the note worth leaving.** Fourteen
+**This figure has been rewritten FOURTEEN times and the churn is the note worth leaving.** Sixteen
 other merges landed on `main` while this PR waited on an owner decision, and each one moved the base
 out from under it — so the starting figure is no longer even quoted here, because it changed again
-between the last two rewrites. **Thirteen rewrites of one number is the cost of a green PR waiting**,
+between the last two rewrites. **Fourteen rewrites of one number is the cost of a green PR waiting**,
 recorded rather than smoothed because the alternative reading — that someone kept getting the
 arithmetic wrong — is the wrong lesson. The per-file `.size` split (LA-33) is what keeps this to one
-number instead of a whole map: no other document's baseline has conflicted once across all thirteen.
+number instead of a whole map: no other document's baseline has conflicted once across all fourteen.
 Nothing was wrong with any of the three — each was correct against the `main` of its hour. Under six
 concurrent lanes plus an owner gate, a baseline is a reading of a moving number, and a PR that waits
 will re-read it once per merge that overtakes it. Recomputed by `pnpm fix:baselines` after each
