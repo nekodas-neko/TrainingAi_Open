@@ -65,3 +65,38 @@ above the sheet edge and dies below it.
 
 No code changed and nothing was run against a browser. Figures come from the read-only production
 query endpoint and direct source reads.
+
+## BF-148 — fixed the same night, and my filed diagnosis was wrong
+
+The owner opened his recalibrated Lower session and got a normal workout: header reading
+"Baseline · S1 · Ex 1/5" above a set card prescribing 3 × 92.5 kg × 8.
+
+I filed this blaming the program-phase engine and the `leader.phaseStatus` collapse. That collapse is
+real, but it is not what he hit. The operative term was a third condition on `isAiDynamicBaseline` in
+the same route:
+
+```ts
+const hasAnyPriorLog = priorLogsThisProgram != null && exerciseNames.some(name => priorLogsThisProgram.has(name))
+```
+
+`exerciseNames.some(...)` — the identical name-keyed shape BF-143 and BF-144 already corrected in two
+other places, here for a third time. Lower's exercise names were logged in this program before the
+rebuild, so the flag was true and the baseline was vetoed.
+
+It is removed rather than repaired, in both paths, taking the now-unused `priorLogsThisProgram` fetch
+with it. It was a proxy for stale periodization state, and BF-143 made that state trustworthy: the
+auto-heal only completes a baseline on evidence that this session was interrupted. `generate-prescription`
+already trusts the same pair to refuse a prescription, and the header and pre-workout panel already
+render from it — so the set card now agrees with the rest of the screen rather than holding a second
+opinion.
+
+A date-keyed repair was considered and rejected. A log newer than `phaseStartedAt` appears the moment
+the first set is logged, which would drop the AMRAP display half way through the workout it exists
+for. BF-143's auto-heal can use that test because flipping true mid-session is correct there.
+
+The test asserting the old behaviour was replaced deliberately, and both surviving terms are
+mutation-checked. The first attempt pinned only one of them and the mutation survived, which is why
+there are three cases rather than one.
+
+**Not exercised:** the authenticated body of the route was never run by a browser. `pnpm dev` confirms
+both paths load and return 401 without a session cookie; no real session was available.

@@ -10996,3 +10996,8 @@ and its missing flag, and the zero-chroma surface palette.
 BF-148 files the two-baseline-models disagreement: the header reads session_periodization while the
 set card reads the program phase engine's leader session, so a baseline session prescribes normally
 and stores an anchor from the wrong estimator.
+
+## 2026-09-12 — `docs/implementation-backlog.md` (BF-148 shipped)
+
+BF-148 gains its shipped record and a correction: the filed diagnosis blamed the program-phase
+engine, and the operative term was a name-keyed `hasAnyPriorLog` guard in the same route.

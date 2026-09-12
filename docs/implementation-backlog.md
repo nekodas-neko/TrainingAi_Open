@@ -712,7 +712,7 @@ below threshold and left in place for next time.
   retroactively clear them.
 - **Needs:** nothing. **Read BF-127 first** — defect 3 is its mechanism in a second location.
 
-### [workouts] BF-148 — the header says Baseline and the set card prescribes 3×8, because two different phase models are on the same screen 🔴 LIVE
+### [workouts] BF-148 — the header says Baseline and the set card prescribes 3×8, because a name-keyed guard vetoes the periodization state (FIXED)
 
 - **Lane:** A — the disagreement is in what `/api/workout-data` puts in `phaseStatus`.
 - **Verification:** a session whose `session_periodization.phase` is `baseline` renders AMRAP set
@@ -723,7 +723,37 @@ below threshold and left in place for next time.
   it didnt open up to amrap; was just the normal session."* Screenshot header reads
   **"Baseline · S1 · Ex 1/5"** above a set card showing **3 sets of 92.5 kg × 8**, no AMRAP.
 
-- **TWO INDEPENDENT BASELINE NOTIONS, and the screen shows one of each.**
+- **⚠ THE DIAGNOSIS BELOW WAS WRONG AND IS CORRECTED HERE. Read this first.** This entry was filed
+  blaming the program-phase engine and the `leader.phaseStatus` collapse. That collapse is real and
+  is described below, but it is **not** what produced the symptom. The operative term was a third
+  condition on `isAiDynamicBaseline` in the *same* route:
+  `hasAnyPriorLog = priorLogsThisProgram != null && exerciseNames.some(name => priorLogsThisProgram.has(name))`
+  — **the identical name-keyed shape BF-143 and BF-144 already corrected in two other places, here
+  for a third time.** Lower's exercise names were logged in this program before the rebuild, so the
+  flag was true, so `isAiDynamicBaseline` was false, and the set card prescribed normally while the
+  header — reading the same `aiPeriodizationState` — said Baseline.
+- **✅ SHIPPED** (2026-09-12, owner asked for it in-session). The `!hasAnyPriorLog` term is
+  **removed** rather than repaired, in both the batch and single-session paths, and the now-unused
+  `priorLogsThisProgram` fetch goes with it — one fewer query per single-session read. Two reasons
+  it is a deletion:
+  - It was a **proxy for stale periodization state**, and BF-143 made that state trustworthy: the
+    auto-heal now completes a baseline only on evidence that THIS session was interrupted, so a row
+    reading `baseline && !baselineComplete` means what it says.
+  - `generate-prescription.ts:201` already trusts exactly that pair to refuse a prescription, and
+    the header and pre-workout panel already render from it. The set card now agrees with the rest
+    of the screen instead of holding a second opinion.
+  **A date-keyed repair was considered and rejected:** a log newer than `phaseStartedAt` appears the
+  moment the first set of the baseline session is logged, which would drop the AMRAP display half
+  way through the workout it exists for. BF-143's auto-heal can use that test because flipping true
+  mid-session is correct *there*; here it is not.
+- **Keep — one owner check:** open Lower and confirm the set cards read AMRAP rather than 3×8.
+- **⚠ The `leader.phaseStatus` collapse below is NOT fixed and is not this entry's bug.** The route
+  still gives the program-wide `phaseStatus` (the *meta* path) the phase of the session furthest
+  through the program. That is defensible for a program-wide view and was never in the
+  single-session path the owner hit. Kept so the next reader does not re-derive it, and explicitly
+  not claimed as fixed.
+
+- **The original filing's reasoning, kept for the record — its second half is still accurate:**
   1. **`session_periodization.phase`** — per session, what BF-143 set and what the header and the
      pre-workout *"First session — establish baseline"* panel read. Correct: Lower is in `baseline`.
   2. **`ProgramPhase.phaseType`** — the program-level cycle engine.
@@ -747,15 +777,15 @@ below threshold and left in place for next time.
   branch, and `recordBaselineAnchorsFrom` (`complete-workout.ts:159`) then copies whatever was
   written into the baseline anchors. **A session completed in this state calibrates the whole cycle
   from the wrong estimator**, and because it also marks the baseline complete, nothing asks again.
-- **Recommendation: feed the set card the per-session periodization phase, not the program engine's
-  leader.** The route already computes `perSessionPhaseStatus`; the single-session path should use
-  *its own* entry, and `isBaseline` should be OR-ed with
-  `session_periodization.phase === 'baseline' && !baselineComplete` — the same condition
-  `generate-prescription.ts:201` already trusts to refuse a prescription. Two models answering one
-  question is the defect; making the session's own state authoritative for a session-scoped screen
-  is the fix.
-  - **Do not "fix" it by deleting the leader line** without checking what else reads `phaseStatus` —
-    it also drives deload (`isDeloadActive`) and cycle counts on the select screen.
+- **Verification:** `lib/__tests__/workout-data-route.test.ts` — 31 cases. The test asserting the
+  removed behaviour (*"ends a stale baseline only on a log from THIS program"*) is **replaced,
+  deliberately and visibly**, by one asserting the opposite, plus two that isolate each surviving
+  term. Both terms are mutation-checked: deleting either fails a case the other does not cover. The
+  first attempt pinned only one of them and the mutation survived, which is why there are three
+  cases rather than one.
+  **NOT exercised:** the authenticated body was never run by a browser — `pnpm dev` confirms both
+  the meta and single-session paths load and return 401 without a session cookie, and no real
+  session was available in the sandbox.
 - **Related, not the same:** BF-146 is the *pre-workout* screen mishandling the prescription
   refusal; this is the *active* screen prescribing as though there were no baseline at all. Both
   surfaced from BF-143 making the baseline state reachable, and they need separate fixes.
