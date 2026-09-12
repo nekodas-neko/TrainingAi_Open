@@ -525,6 +525,7 @@ export function ActiveWorkoutScreen({
                   lastSetMode={exercise?.lastSetMode}
                   exerciseType={exercise?.exerciseType}
                   equipment={exercise?.equipment}
+                  exerciseId={exercise?.sessionExerciseId}
                   isBodyweight={isBodyweight}
                   onRpeChange={handleRpeChange}
                 />

@@ -1135,6 +1135,8 @@ export interface WorkoutRepository {
   getSessionExercise1rms(userId: string, workoutSessionId: string): Promise<{ exerciseName: string; estimated1rm: number }[]>
   /** BF-131 — merge measured anchors in, completing the phase only when every exercise has one. */
   recordBaselineAnchors(userId: string, programSessionId: string, anchors: Record<string, Baseline1rmEntry>, complete: boolean): Promise<SessionPeriodization | null>
+  /** BF-143: undo a baseline auto-completed from personal records. Null when nothing matched. */
+  revertAutoAdoptedBaseline(userId: string, programSessionId: string): Promise<SessionPeriodization | null>
   advancePhase(userId: string, programSessionId: string, newPhase: PeriodizationPhase): Promise<SessionPeriodization>
   /** `status` is written atomically with the prescription — see the slice for why (Q-54). */
   storePrescription(userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date, status?: PrescriptionStatus): Promise<void>

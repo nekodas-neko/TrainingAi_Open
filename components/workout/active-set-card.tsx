@@ -13,6 +13,8 @@ interface ActiveSetCardProps {
   lastSetMode?: string;
   exerciseType?: ExerciseType;
   equipment?: string[];
+  /** `sessionExerciseId` — the dial remembers its unit against this (BF-141). */
+  exerciseId?: string;
   isBodyweight: boolean;
   onRepChange: (index: number, value: number) => void;
   onWeightChange?: (index: number, value: number) => void;
@@ -32,6 +34,7 @@ export const ActiveSetCard = memo(function ActiveSetCard({
   lastSetMode,
   exerciseType,
   equipment,
+  exerciseId,
   isBodyweight,
   onRepChange,
   onWeightChange,
@@ -60,6 +63,7 @@ export const ActiveSetCard = memo(function ActiveSetCard({
       isAmrap={isAmrap}
       exerciseType={exerciseType}
       equipment={equipment}
+      exerciseId={exerciseId}
       rpeValue={rpeValue}
       onRpeChange={onRpeChange}
     />

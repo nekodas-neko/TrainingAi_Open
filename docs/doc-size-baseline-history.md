@@ -10949,18 +10949,56 @@ shared `LBS_TO_KG` with `lbsToKg`/`kgToLbs`, neither of which rounds, and why th
 
 Written by `pnpm fix:baselines`.
 
-## 2026-09-11 — `docs/implementation-backlog.md` 20733 → 20708 (RV-42 shipped)
+## 2026-09-12 — `docs/implementation-backlog.md` 20733 → 20674, `projectOverview.md` 10620 → 10640 (BF-141)
+
+The backlog comes **down** 59 lines: BF-141 was a long specification and is now a short record of
+what shipped. What replaced its build notes is the part that outlives it — the entry named
+`touch-target-size.spec.ts` as its gate and that spec cannot reach the control, and the
+`stopPropagation` guard protects a lossy round-trip the new spec provably cannot demonstrate.
+
+`projectOverview.md` takes the Known-Issues row for a fix whose fit is measured and whose control no
+thumb has tried, with both of those findings on it so neither reads as pedantry later.
+
+## 2026-09-11 — `docs/implementation-backlog.md` (BF-143)
+
+BF-143 files the baseline auto-heal firing on a recreated session, with the three defects in that
+block measured against the owner's live Lower row.
+
+## 2026-09-11 — `docs/implementation-backlog.md` (BF-143 shipped)
+
+BF-143 gains its shipped record: the three changes, the one owner action still owed, and an explicit
+note that the bodyweight-index half is NOT fixed and stays with BF-127.
+
+## 2026-09-11 — `docs/implementation-backlog.md` → 20796 (Q-44's second requirement)
+
+Twenty-eight lines, and the table is most of them. Q-44 has had a written Phase-3 plan since
+2026-08-04 for renaming the vendor tables; what it never carried is the owner's second requirement —
+knowing *which* sensor wrote a row. The measurement is what makes the case: 73% of `oura_heartrate`
+is a Polar chest strap, and only 5 of 22 vendor tables carry a `source` at all.
+
+The numbers are in the entry rather than summarised because the whole argument is that the table is
+already multi-device. "Rename it and add a source column" is a sentence anyone could have written;
+"84,246 of these rows are not from an Oura" is what makes it urgent.
+
+## 2026-09-11 — `docs/implementation-backlog.md` (BF-144)
+
+BF-144 files the id-link correction to BF-143's reasoning, plus the owner-gated question of dropping
+the dead `program_session_id` column that produced the false premise.
+## 2026-09-12 — `docs/implementation-backlog.md` (BF-145, BF-146, BF-147)
+
+Three owner reports in one sitting: the baseline refusal drawn as a failure, the admin GIF console
+and its missing flag, and the zero-chroma surface palette.
+
+## 2026-09-11 — `docs/implementation-backlog.md` 21027 → 21002 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 
-**This figure has been rewritten eight times and the churn is the note worth leaving.** The branch
-computed 20732 → 20707, then 20714 → 20689, 20672 → 20647, 20624 → 20599, 20754 → 20729,
-20703 → 20678, 20710 → 20685, and now 20733 → 20708; nine other merges landed on `main` while this
-PR waited on an owner decision, and each one moved the base out from under it. **Eight rewrites of
-one number is the cost of a green PR waiting**, recorded rather than smoothed because the
-alternative reading — that someone kept getting the arithmetic wrong — is the wrong lesson. The
-per-file `.size` split (LA-33) is what keeps this to one number instead of a whole map: no other
-document's baseline has conflicted once across all eight.
+**This figure has been rewritten nine times and the churn is the note worth leaving.** Ten other
+merges landed on `main` while this PR waited on an owner decision, and each one moved the base out
+from under it. **Nine rewrites of one number is the cost of a green PR waiting**, recorded rather
+than smoothed because the alternative reading — that someone kept getting the arithmetic wrong — is
+the wrong lesson. The per-file `.size` split (LA-33) is what keeps this to one number instead of a
+whole map: no other document's baseline has conflicted once across all nine.
 Nothing was wrong with any of the three — each was correct against the `main` of its hour. Under six
 concurrent lanes plus an owner gate, a baseline is a reading of a moving number, and a PR that waits
 will re-read it once per merge that overtakes it. Recomputed by `pnpm fix:baselines` after each

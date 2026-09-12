@@ -30,6 +30,7 @@ const advancePhase = vi.fn(async (_u: string, _s: string, _p: string) => state({
 const storePrescription = vi.fn(async (_u: string, _s: string, _p: Row, _e: Date) => undefined)
 const updatePrescriptionStatus = vi.fn(async (_u: string, _s: string, _st: string) => undefined)
 const getLastExerciseLogsBatch = vi.fn(async (_u: string, _n: string[], _p?: string) => new Map<string, Row>())
+const revertAutoAdoptedBaseline = vi.fn(async (_u: string, _s: string) => null as Row | null)
 const listPersonalRecords = vi.fn(async (_u: string) => new Map<string, number>())
 const listPrevious1rm = vi.fn(async (_u: string) => new Map<string, number>())
 const generatePrescriptionForSession = vi.fn(async (..._a: unknown[]) => generated() as Row)
@@ -41,6 +42,7 @@ vi.mock('@/lib/data', () => {
   const repo = async () => ({
     getActiveProgram, ensureSessionPeriodization, getSessionPeriodization, setBaselineComplete,
     advancePhase, storePrescription, updatePrescriptionStatus, getLastExerciseLogsBatch,
+    revertAutoAdoptedBaseline,
     listPersonalRecords, listPrevious1rm,
   })
   return { getRepository: repo, getRepositoryAsync: repo }
@@ -113,11 +115,13 @@ const freshUser = (over: { timezone?: string } = {}) => {
 beforeEach(() => {
   for (const m of [getActiveProgram, ensureSessionPeriodization, getSessionPeriodization,
     setBaselineComplete, advancePhase, storePrescription, updatePrescriptionStatus,
-    getLastExerciseLogsBatch, listPersonalRecords, listPrevious1rm, generatePrescriptionForSession]) m.mockClear()
+    getLastExerciseLogsBatch, listPersonalRecords, listPrevious1rm, generatePrescriptionForSession,
+    revertAutoAdoptedBaseline]) m.mockClear()
   getActiveProgram.mockResolvedValue(program())
   ensureSessionPeriodization.mockResolvedValue(state())
   getSessionPeriodization.mockResolvedValue(state())
   getLastExerciseLogsBatch.mockResolvedValue(new Map())
+  revertAutoAdoptedBaseline.mockResolvedValue(null)
   listPersonalRecords.mockResolvedValue(new Map())
   listPrevious1rm.mockResolvedValue(new Map())
   generatePrescriptionForSession.mockResolvedValue(generated())
@@ -349,12 +353,60 @@ describe('GET …/session/[sessionId] — the stale-baseline auto-heal', () => {
     expect(setBaselineComplete).not.toHaveBeenCalled()
   })
 
+  /** A log at least as new as the phase clock — the shape that means "this cycle was interrupted". */
+  const loggedSincePhaseStart = () =>
+    getLastExerciseLogsBatch.mockResolvedValue(
+      new Map([['Squat', { id: 'log-1', loggedAt: new Date(Date.now() + 60_000) }]]),
+    )
+
   it('completes a baseline the completion endpoint never reached, from the personal records', async () => {
     baselineRunning()
-    getLastExerciseLogsBatch.mockResolvedValue(new Map([['Squat', { id: 'log-1' }]]))
+    loggedSincePhaseStart()
+    // BOTH exercises, because a subset no longer completes — see the partial-coverage case below.
+    listPersonalRecords.mockResolvedValue(new Map([['Squat', 120], ['Curl', 30]]))
+    await getSession()
+    expect(setBaselineComplete.mock.calls[0][2]).toEqual({
+      [SQUAT]: { kg: 120, source: 'personal_record' },
+      [CURL]: { kg: 30, source: 'personal_record' },
+    })
+  })
+
+  // BF-143 ①. The owner rebuilt a session inside an existing program and it never asked for an
+  // AMRAP: the old condition asked whether these exercise NAMES had ever been logged, which is true
+  // of every recreated session. The logs must be newer than the phase clock to mean "interrupted".
+  it('does not complete when the only logs predate the baseline phase — a recreated session', async () => {
+    baselineRunning()
+    getLastExerciseLogsBatch.mockResolvedValue(
+      new Map([['Squat', { id: 'log-1', loggedAt: new Date(Date.now() - 6 * 86_400_000) }]]),
+    )
+    listPersonalRecords.mockResolvedValue(new Map([['Squat', 120], ['Curl', 30]]))
+    await getSession()
+    expect(setBaselineComplete).not.toHaveBeenCalled()
+  })
+
+  // BF-143 ②. Lower held three baselines for four exercises and was still marked complete, so the
+  // exercise without a personal record could never acquire one. `recordBaselineAnchors` already
+  // holds this invariant for the measured path; this is the same rule on the adopted path.
+  it('does not complete on partial coverage — an exercise with no personal record', async () => {
+    baselineRunning()
+    loggedSincePhaseStart()
     listPersonalRecords.mockResolvedValue(new Map([['Squat', 120]]))
     await getSession()
-    expect(setBaselineComplete.mock.calls[0][2]).toEqual({ [SQUAT]: { kg: 120, source: 'personal_record' } })
+    expect(setBaselineComplete).not.toHaveBeenCalled()
+  })
+
+  // BF-143 ③. The already-stored bad state: complete, but never trained since the phase began.
+  it('reverts a baseline that was completed without the session being trained', async () => {
+    ensureSessionPeriodization.mockResolvedValue(state({ phase: 'accumulation', baselineComplete: true }))
+    await getSession()
+    expect(revertAutoAdoptedBaseline.mock.calls[0][1]).toBe(SESSION_ID)
+  })
+
+  it('leaves a completed baseline alone once the session has been trained in this phase', async () => {
+    ensureSessionPeriodization.mockResolvedValue(state({ phase: 'accumulation', baselineComplete: true }))
+    loggedSincePhaseStart()
+    await getSession()
+    expect(revertAutoAdoptedBaseline).not.toHaveBeenCalled()
   })
 
   // A shared exercise name logged under a DIFFERENT program must not let a fresh cycle skip its

@@ -1,9 +1,10 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useEffect, useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { formatTime, formatSetLoadParts, weightStepFor, clampVoiceLogResult, mroundStep } from "./utils";
 import { WeightDial } from "@/components/ui/weight-dial";
+import { dialRange, fromDisplay, readUnit, toDisplay, writeUnit, type WeightUnit } from "./weight-unit";
 import { AddedWeightToggle } from "./added-weight-toggle";
 import { RpeSlider, RPE_COLORS } from "./rpe-strip";
 import type { ExerciseType } from "@trainingai/shared/types/program";
@@ -23,6 +24,8 @@ interface SetCardProps {
   isAmrap?: boolean;
   exerciseType?: ExerciseType;
   equipment?: string[];
+  /** `sessionExerciseId` — what the dial's unit choice is remembered against (BF-141). */
+  exerciseId?: string;
   rpeValue?: number;
   onRpeChange?: (value: number) => void;
   loggedRpe?: number;
@@ -42,6 +45,7 @@ function SetCardComponent({
   isAmrap,
   exerciseType,
   equipment,
+  exerciseId,
   rpeValue,
   onRpeChange,
   loggedRpe,
@@ -49,6 +53,20 @@ function SetCardComponent({
   const isDone = index < currentSet;
   const isActive = index === currentSet;
   const isBodyweight = exerciseType === "bodyweight";
+
+  // BF-141. The stored weight is always kilograms; the unit belongs to the dial, not the value.
+  //
+  // **Above the early returns, because this component has three of them** and a hook inside the
+  // `isActive` branch is called conditionally — `react-hooks/rules-of-hooks`, which `tsc` does not
+  // see and CI's Build job does. Seeded in an effect rather than a `useState` initializer so the
+  // server render and the first client render agree: `localStorage` does not exist during SSR.
+  const [unit, setUnit] = useState<WeightUnit>("kg");
+  useEffect(() => { setUnit(readUnit(exerciseId)); }, [exerciseId]);
+  const toggleUnit = () => {
+    const next: WeightUnit = unit === "kg" ? "lb" : "kg";
+    setUnit(next);
+    writeUnit(exerciseId, next);
+  };
 
   if (isDone) {
     const { weightLabel, repsLabel } = formatSetLoadParts(weight, repValue, exerciseType);
@@ -90,6 +108,7 @@ function SetCardComponent({
 
   if (isActive) {
     const handleWeightChange = (v: number) => onWeightChange?.(index, v)
+    const range = dialRange(unit, weightStepFor(equipment))
     const handleVoiceResult = (weight?: number, reps?: number) => {
       const clamped = clampVoiceLogResult(weight, reps)
       if (clamped.reps !== undefined) onRepChange(index, clamped.reps)
@@ -183,12 +202,13 @@ function SetCardComponent({
                 <div className="flex items-center justify-center px-3 flex-1">
                   {onWeightChange ? (
                     <WeightDial
-                      value={weight}
-                      onChange={handleWeightChange}
-                      min={0}
-                      max={250}
-                      step={weightStepFor(equipment)}
-                      unit="kg"
+                      value={toDisplay(weight, unit)}
+                      onChange={(v) => handleWeightChange(fromDisplay(v, unit))}
+                      min={range.min}
+                      max={range.max}
+                      step={range.step}
+                      unit={unit}
+                      onUnitToggle={toggleUnit}
                       visible={3}
                       pill
                     />
