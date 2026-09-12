@@ -10989,18 +10989,42 @@ the dead `program_session_id` column that produced the false premise.
 Three owner reports in one sitting: the baseline refusal drawn as a failure, the admin GIF console
 and its missing flag, and the zero-chroma surface palette.
 
-## 2026-09-11 — `docs/implementation-backlog.md` 21027 → 21002 (RV-42 shipped)
+## 2026-09-12 — `docs/implementation-backlog.md` (BF-148)
+
+BF-148 files the two-baseline-models disagreement: the header reads session_periodization while the
+set card reads the program phase engine's leader session, so a baseline session prescribes normally
+and stores an anchor from the wrong estimator.
+
+## 2026-09-12 — `docs/implementation-backlog.md` (BF-148 shipped)
+
+BF-148 gains its shipped record and a correction: the filed diagnosis blamed the program-phase
+engine, and the operative term was a name-keyed `hasAnyPriorLog` guard in the same route.
+## 2026-09-12 — `docs/implementation-backlog.md` (BF-144 unparked)
+
+BF-144 was hidden from the queue twice over: a `Gate: owner` covering only the column-drop question,
+and a cross-reference to BF-143 written inside the `Needs:` bullet, which the parser read as a real
+dependency. Both corrected, with the reason recorded in the entry.
+
+## 2026-09-12 — `docs/implementation-backlog.md` (BF-147 re-laned)
+
++18. BF-147's Lane A half shipped, so the entry gains a record of the column and route that now
+exist, a `Keep:` naming the four UI defects and the sweep screen left for Lane B, and an explicit
+note that the production S3 credentials the entry asks about were *not* checked — the verdict column
+touches neither storage nor generation, but that judgement belongs on the record rather than in a
+gap. Nothing was deleted: the entry stays queued, re-laned rather than removed.
+
+## 2026-09-11 — `docs/implementation-backlog.md` → 21108 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 
-**This figure has been rewritten nine times and the churn is the note worth leaving.** Ten other
-merges landed on `main` while this PR waited on an owner decision, and each one moved the base out
-from under it. **Nine rewrites of one number is the cost of a green PR waiting**, recorded rather
-than smoothed because the alternative reading — that someone kept getting the arithmetic wrong — is
-the wrong lesson. The per-file `.size` split (LA-33) is what keeps this to one number instead of a
-whole map: no other document's baseline has conflicted once across all nine.
+**This figure has been rewritten ELEVEN times and the churn is the note worth leaving.** Twelve
+other merges landed on `main` while this PR waited on an owner decision, and each one moved the base
+out from under it — so the starting figure is no longer even quoted here, because it changed again
+between the last two rewrites. **Eleven rewrites of one number is the cost of a green PR waiting**,
+recorded rather than smoothed because the alternative reading — that someone kept getting the
+arithmetic wrong — is the wrong lesson. The per-file `.size` split (LA-33) is what keeps this to one
+number instead of a whole map: no other document's baseline has conflicted once across all eleven.
 Nothing was wrong with any of the three — each was correct against the `main` of its hour. Under six
 concurrent lanes plus an owner gate, a baseline is a reading of a moving number, and a PR that waits
 will re-read it once per merge that overtakes it. Recomputed by `pnpm fix:baselines` after each
 merge, which is the only thing that makes the subtraction mean anything.
-
