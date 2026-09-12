@@ -48,6 +48,7 @@ jobs:
     # LB-31: the nightly verifies `main`'s test suite only — see the `schedule` trigger.
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v5
@@ -68,6 +69,7 @@ jobs:
   test:
     name: Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     # A real Postgres lets the DB integration tests run — without DATABASE_URL they
     # skipIf-skip (~20 files), leaving the rollup/repo DB behaviour with no CI coverage.
     services:
@@ -114,6 +116,7 @@ jobs:
     # LB-31: the nightly verifies `main`'s test suite only — see the `schedule` trigger.
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       NODE_OPTIONS: --max-old-space-size=4096
       # Q-311. Everything below is a throwaway literal for this ephemeral job, not a redacted
@@ -154,6 +157,7 @@ jobs:
     # LB-31: the nightly verifies `main`'s test suite only — see the `schedule` trigger.
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
 
@@ -506,11 +510,15 @@ jobs:
       - name: CI, engines.node and production agree on a Node major
         run: node scripts/check-node-version-agreement.js
 
+      - name: Every workflow job declares a timeout
+        run: node scripts/check-workflow-job-timeouts.js
+
   migrations:
     # LB-31: the nightly verifies `main`'s test suite only — see the `schedule` trigger.
     if: github.event_name != 'schedule'
     name: Migration Check
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     services:
       postgres:
         image: postgres:16
@@ -579,6 +587,7 @@ jobs:
     # LB-31: the nightly verifies `main`'s test suite only — see the `schedule` trigger.
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:16

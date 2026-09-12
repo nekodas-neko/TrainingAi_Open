@@ -20425,41 +20425,6 @@ adopted.
 - **Keep:** do not close this on "it has not happened again" — an intermittent lock-ordering bug is
   precisely the thing that looks fixed for weeks.
 
-### [platform] LA-91 — no CI job has a `timeout-minutes`, so a hung run burns six hours
-
-- **Lane:** A — `.github/workflows/ci.yml`.
-- **Added:** 2026-09-09, Lane A — found while waiting on #1029's E2E, and measured from that run
-  rather than guessed.
-
-`grep -n timeout-minutes .github/workflows/ci.yml` returns nothing, so every job inherits GitHub's
-**360-minute** default. A genuinely hung step — a Playwright run that never exits, a webServer that
-never binds — holds a runner for six hours, and the PR sits unmergeable the whole time with
-`mergeable_state: unstable` and nothing to distinguish it from a slow job.
-
-**Measured, so the limits are sized rather than invented** (run 34326591694, the first UI-touching
-PR in a long while, which is what made E2E run its real path at all):
-
-| job | duration |
-|---|---|
-| Custom Rules | 0:19 |
-| Migration Check | 1:06 |
-| Lint | 0:50 |
-| Build | 5:27 |
-| Tests | 6:01 |
-| **E2E** | **24:36** (the `pnpm e2e` step alone, 23:06) |
-
-E2E is the one that matters: `playwright.config.ts` runs **77 spec files at `workers: 1`**, so it is
-serial by design, with `retries: 1` in CI. A limit has to clear a bad-luck run where several specs
-retry — 45 minutes leaves real headroom while still cutting a hang at an eighth of the current cost.
-
-**The near-miss that produced this entry is the useful part.** A check-in of mine had guessed that
-"25 minutes is beyond plausible for this suite" with no evidence. The real run took 24:36. Acting on
-that guess would have re-triggered a healthy run about two minutes before it went green. **The
-config was the answer and reading it took a minute** — the E2E gate ("Does this change touch the
-UI?") means most PRs skip the job in ~35 seconds, so nobody has a feel for the real duration.
-
-- **Reversal cost:** trivial. One line per job.
-
 ### [platform] LA-100 — the entries compaction sweep has no target file, and the ceiling now blocks every lane
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-10, when the ceiling fired and the sweep turned out

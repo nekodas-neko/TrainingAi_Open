@@ -40,6 +40,7 @@ jobs:
   android:
     name: Android (Kotlin tests + debug APK)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     # Needed by the "Publish APK" step below to create/replace the rolling release.
     permissions:
       contents: write
