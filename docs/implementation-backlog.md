@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **273** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **274** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v38** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -759,12 +759,24 @@ below threshold and left in place for next time.
     than an outage.
 - **Needs:** nothing.
 
-### [platform][app-shell] BF-147 — the admin exercise list squeezes the exercise NAME to zero px, force-overwrites a GIF on one tap with no confirm, and there is no way to say a GIF is wrong
+### [platform][app-shell] BF-147 — the admin exercise list squeezes the exercise NAME to zero px, force-overwrites a GIF on one tap with no confirm, and the wrong-GIF flag it now has no way to reach
 
-- **Lane:** A — the flag needs a column and a route; the list re-layout hands to Lane B after.
+- **Lane:** B — the storage half landed (see below); everything left is `components/admin/exercise-manager.tsx`.
 - **Verification:** at 412 dp every row shows its name in full; a destructive action asks first;
   the coverage figure matches a `count(*)` of live exercises with media; and a GIF judged wrong can
   be marked as such and found again later.
+
+- **The Lane A half landed 2026-09-12 — the column and the route exist, nothing reads them yet.**
+  Migration `273_exercise_media_review_status.sql` adds `review_status` (`unreviewed`/`ok`/`wrong`,
+  CHECK-constrained, defaulting to `unreviewed`) and `reviewed_at` to `exercise_media`, with a
+  partial index on the non-`unreviewed` rows. `app/api/admin/exercise-media-review` serves `GET`
+  (the flagged set) and `PATCH`
+  (`{ exerciseName, gender?, status }`, keyed on the table's own `(exercise_name, gender)` unique
+  key). Per the recommendation below it is deliberately inert: it imports no generation surface, so
+  marking one wrong fires no AI call, and it 404s rather than upserting — a verdict about a GIF that
+  does not exist would invent provenance for a generation that never happened. Covered by
+  `lib/__tests__/admin-exercise-media-review-route.test.ts` (13 tests).
+  **No UI calls either verb**, which is the whole of what is left here.
 
 - **Added:** 2026-09-11 · owner, on the Admin Console → Exercises tab: *"ui is bad and I also want a
   better way to make sure everything has the right gif. Maybe a way for me to flag if its wrong so
@@ -840,6 +852,12 @@ below threshold and left in place for next time.
   are covered (`lib/__tests__/admin-media-tool-routes.test.ts`,
   `admin-exercise-catalogue-routes.test.ts`), so the untested part is exactly the part being
   reported.
+- **Keep:** the four UI defects above (name crushed to 0 px, the two unconfirmed destructive
+  actions, the coverage arithmetic) plus the sweep screen that reads the new route — one GIF at a
+  time with two buttons, per the recommendation. **Also still open and NOT checked by the Lane A
+  half:** the production S3 credentials. The entry asks for that before writing code, and it was
+  judged orthogonal to the verdict column (which touches neither storage nor generation) — but it
+  still gates the "AI all" / Mirror paths and the six proxy-path rows, and nobody has looked.
 - **Needs:** nothing.
 
 ### [app-shell] BF-145 — every surface token is chroma ZERO, so the app is grey by construction and each of 49 sheets paints over the background art
