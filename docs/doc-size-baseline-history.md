@@ -11001,3 +11001,8 @@ and stores an anchor from the wrong estimator.
 
 BF-148 gains its shipped record and a correction: the filed diagnosis blamed the program-phase
 engine, and the operative term was a name-keyed `hasAnyPriorLog` guard in the same route.
+## 2026-09-12 — `docs/implementation-backlog.md` (BF-144 unparked)
+
+BF-144 was hidden from the queue twice over: a `Gate: owner` covering only the column-drop question,
+and a cross-reference to BF-143 written inside the `Needs:` bullet, which the parser read as a real
+dependency. Both corrected, with the reason recorded in the entry.
