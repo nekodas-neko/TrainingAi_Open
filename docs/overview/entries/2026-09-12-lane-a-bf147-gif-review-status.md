@@ -15,6 +15,8 @@ screen that uses it is `components/admin/exercise-manager.tsx` (Lane B).
   `NOT NULL DEFAULT 'unreviewed'` with a CHECK constraint on the three values, and a **partial**
   index covers only the rows that are not `unreviewed` — the flagged set is the small one and the
   only one anything queries.
+- **Migration 274** regenerates the `claude_ro` views so those two columns are readable through
+  `/api/admin/db-query`. See the gotcha below — this was not foreseen, it was caught by CI.
 - **`app/api/admin/exercise-media-review`** — `GET` returns the flagged set, `PATCH` writes one
   verdict. Keyed on `(exercise_name, gender)`, which is `exercise_media`'s own unique key, so a
   caller names the thing it is judging rather than a row id it had to look up first.
@@ -33,6 +35,18 @@ screen that uses it is `components/admin/exercise-manager.tsx` (Lane B).
   this judged" never outlives the judgement.
 - **Rate-limited 60/60 s** to match the sibling media routes. It is cheap by comparison (no
   generation), but a runaway client loop is the same mis-click exposure and uniformity is free.
+
+## The gotcha: a green local suite is structurally blind to the `claude_ro` drift check
+
+Adding a column to a table the `claude_ro` views already cover leaves it invisible to
+`/api/admin/db-query` until the views are rebuilt. `db-snapshot-integration.test.ts` fails the Tests
+job on exactly that — and it did here, after a fully green local run.
+
+**It skips locally even with a `DATABASE_URL` set**, because it needs the `claude_readonly` role and
+the local dev setup does not create one. So this is not a case of having run the suite wrong; a local
+suite cannot see it at all. Migration 272's header says this in as many words and it was still walked
+into, which is the argument for the rule being mechanical rather than remembered: **any migration
+adding a column to a viewed table needs its `claude_ro` twin in the same PR.**
 
 ## Verification
 
