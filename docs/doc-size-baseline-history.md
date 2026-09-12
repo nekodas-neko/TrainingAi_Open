@@ -10970,7 +10970,7 @@ block measured against the owner's live Lower row.
 
 BF-143 gains its shipped record: the three changes, the one owner action still owed, and an explicit
 note that the bodyweight-index half is NOT fixed and stays with BF-127.
-## 2026-09-12 — `docs/implementation-backlog.md` 20844 → 20835, `projectOverview.md` 10640 → 10660 (BF-142)
+## 2026-09-12 — `docs/implementation-backlog.md` → 21097, `projectOverview.md` 10640 → 10660 (BF-142)
 
 The backlog comes down again: BF-142 was a long diagnosis and is now a record of a one-sentence fix
 plus the finding it uncovered. What is kept is the part that is not about the sentence at all — the
@@ -10995,3 +10995,18 @@ already multi-device. "Rename it and add a source column" is a sentence anyone c
 
 BF-144 files the id-link correction to BF-143's reasoning, plus the owner-gated question of dropping
 the dead `program_session_id` column that produced the false premise.
+## 2026-09-12 — `docs/implementation-backlog.md` (BF-145, BF-146, BF-147)
+
+Three owner reports in one sitting: the baseline refusal drawn as a failure, the admin GIF console
+and its missing flag, and the zero-chroma surface palette.
+
+## 2026-09-12 — `docs/implementation-backlog.md` (BF-148)
+
+BF-148 files the two-baseline-models disagreement: the header reads session_periodization while the
+set card reads the program phase engine's leader session, so a baseline session prescribes normally
+and stores an anchor from the wrong estimator.
+
+## 2026-09-12 — `docs/implementation-backlog.md` (BF-148 shipped)
+
+BF-148 gains its shipped record and a correction: the filed diagnosis blamed the program-phase
+engine, and the operative term was a name-keyed `hasAnyPriorLog` guard in the same route.

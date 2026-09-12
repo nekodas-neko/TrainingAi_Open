@@ -6,10 +6,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.448.2",
+    version: "1.448.3",
     date: "2026-09-12",
     changes: [
       "The note under the Nutrition ring explaining why the macro grams and the calorie budget disagree was wrong twice over. It said the grams were your stored goal (they are your goal scaled up by what you have moved) and it blamed the difference on today's movement \u2014 which is in both numbers, so it cancels and the gap never closes. It now prints your stored goal beside the computed budget, breaks the budget into resting burn, goal adjustment and movement, and says plainly that moving more raises both.",
+    ],
+  },
+  {
+    version: "1.448.2",
+    date: "2026-09-12",
+    changes: [
+      "A first session now actually opens in AMRAP mode. It was correctly labelled \u201cBaseline\u201d at the top while the set cards below prescribed a normal three sets \u2014 because a check asked whether those exercise names had ever been logged in the program, which is true of any session you rebuild.",
+      "That mattered for more than the labels: the same flag decides which formula estimates your 1RM, and finishing the session copies that estimate into the anchors the whole cycle is then prescribed from.",
     ],
   },
   {
