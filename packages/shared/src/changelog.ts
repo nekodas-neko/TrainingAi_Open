@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.450.0",
+    date: "2026-09-12",
+    changes: [
+      "Your daily calorie budget is now your own goal plus what you earn by moving, instead of a number the app worked out for you. It used to start from a calibrated estimate of your maintenance, and that estimate had climbed to 2,196 kcal \u2014 about 600 above what you expect, rising day by day, and 1.44\u00d7 your BMR in a field labelled resting. Your stored goal took no part in it and there was no way to opt out. The estimate is still shown so you can see what it believes; it just no longer decides what you eat to. The line under the ring now names your goal rather than a resting base and a deduction, and the macro grams finally share a denominator with the calorie figure above them.",
+    ],
+  },
+  {
     version: "1.449.0",
     date: "2026-09-12",
     changes: [

@@ -17,13 +17,16 @@ import { movementSummary } from '@/components/nutrition/movement-breakdown'
  * switch where an object literal would defeat it silently.
  */
 export const CalorieZoneBar = memo(function CalorieZoneBar({
-  intakeKcal, restingBaseKcal, activeKcal, targetNetKcal,
+  intakeKcal, restingBaseKcal, activeKcal, targetNetKcal, goalKcal,
   workoutKcal, activityKcal, stepsKcal, compact,
 }: {
   intakeKcal: number
   restingBaseKcal: number
   activeKcal: number
   targetNetKcal: number
+  /** BF-150. The stored calorie target, which anchors the budget when it exists. Null/absent falls
+   *  back to the old resting-base-plus-goal-delta budget — see `budgetProvenance`. */
+  goalKcal?: number | null
   /** The three addends of `activeKcal`, from the service's `activeBreakdown` (BF-87). Scalars, not
    *  the object — `memo` compares shallowly and an object literal at a call site defeats it. */
   workoutKcal: number
@@ -32,14 +35,21 @@ export const CalorieZoneBar = memo(function CalorieZoneBar({
   /** Home's card is dense — tighten the bar. */
   compact?: boolean
 }) {
-  const { earned, total } = budgetProvenance({ restingBaseKcal, activeKcal, targetNetKcal })
+  const { base, earned, total, anchoredToGoal } =
+    budgetProvenance({ restingBaseKcal, activeKcal, targetNetKcal, goalKcal })
   const parts = movementSummary({ workoutKcal, activityKcal, stepsKcal })
-  // BF-99. `budgetProvenance().base` is `restingBaseKcal + targetNetKcal` — the resting base with
-  // the GOAL DELTA already folded in — and this line called it "base". On a recomp that prints a
-  // number ~200 below the owner's measured RMR, so he went looking for a broken calculation:
-  // *"why is my base rate under the 1350 RMR value."* Every figure on the screen reconciled; the
-  // word did not. The two are separated here rather than in `budgetProvenance`, which is shared and
-  // whose `base` is the right thing for a caller that wants one number. They still sum to `total`.
+  // BF-99. On the UNANCHORED path `budgetProvenance().base` is `restingBaseKcal + targetNetKcal` —
+  // the resting base with the GOAL DELTA already folded in — and this line called it "base". On a
+  // recomp that prints a number ~200 below the owner's measured RMR, so he went looking for a broken
+  // calculation: *"why is my base rate under the 1350 RMR value."* Every figure on the screen
+  // reconciled; the word did not. The two are separated here rather than in `budgetProvenance`,
+  // which is shared and whose `base` is the right thing for a caller that wants one number.
+  //
+  // BF-150. When the budget is ANCHORED to the stored goal the split does not exist: the goal is the
+  // whole zero-movement budget and no delta is applied to it. Printing "resting base − goal" there
+  // would name two numbers that are no longer addends of what is on screen — the same class of
+  // defect BF-99 was filed for, so the wording follows the arithmetic rather than the other way
+  // round. `base` is used directly, so the line always sums to `total` on both paths.
   const restingBase = Math.round(restingBaseKcal)
   const goalDelta = Math.round(targetNetKcal)
 
@@ -55,14 +65,18 @@ export const CalorieZoneBar = memo(function CalorieZoneBar({
           sentence explained cannot arise while any steps exist. What is left is the honest
           remaining case — a day with no movement recorded at all. */}
       <p className={`${compact ? 'mt-1' : 'mt-2'} text-[10px] leading-snug text-muted-foreground tabular-nums`}>
-        {restingBase.toLocaleString()} base
-        {/* Only when there IS one: on `maintain` the delta is 0, and printing "+ 0 for your goal"
-            would be noise. That also satisfies BF-99's check that a maintain user sees the same
-            number under both wordings. */}
-        {goalDelta !== 0 && (
-          <> <span className="text-muted-foreground/70">{goalDelta < 0 ? '−' : '+'}</span>{' '}
-            {Math.abs(goalDelta).toLocaleString()} for your goal</>
-        )}
+        {anchoredToGoal
+          ? <>{base.toLocaleString()} your goal</>
+          : <>
+              {restingBase.toLocaleString()} base
+              {/* Only when there IS one: on `maintain` the delta is 0, and printing "+ 0 for your
+                  goal" would be noise. That also satisfies BF-99's check that a maintain user sees
+                  the same number under both wordings. */}
+              {goalDelta !== 0 && (
+                <> <span className="text-muted-foreground/70">{goalDelta < 0 ? '−' : '+'}</span>{' '}
+                  {Math.abs(goalDelta).toLocaleString()} for your goal</>
+              )}
+            </>}
         {earned > 0
           ? <>
               {' '}<span className="text-muted-foreground/70">+</span> {earned.toLocaleString()} earned from movement

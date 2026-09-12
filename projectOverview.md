@@ -1754,6 +1754,25 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [nutrition] ⚠️ The budget follows your goal now, and which goal is still unanswered (BF-150, 2026-09-12, v1.450.0) · needs: owner
+
+Owner: *"When is this going to be back to the expected number? The 1350+ excercsise?"* The daily
+budget was `estimated maintenance − goal adjustment + earned`, so the 1,660 he stored took no part in
+it and the estimate — climbing, and ~600 kcal high (BF-137) — decided what he ate to. It is now
+**stored goal + earned**, and the estimate is shown as information rather than driving the number.
+
+**What is owed is a number, not code.** BF-150 prescribed "stored goal + earned" but verified against
+~1,481, and those disagree by 310 kcal/day. Measured in production 2026-09-12: `nutrition_targets`
+and `users.calorie_goal` both hold **1,660**, while his measured RMR is **1,325** — and BF-99's record
+has him calling 1,350 *"the 1350 RMR value"*, so the figure he is asking for is his resting rate, not
+a goal he ever stored. The rule is identical either way and the stored number is now load-bearing, so
+**the app will show 1,791 today until he sets his goal to whatever he actually wants**; setting 1,350
+makes it 1,481. Not resolved in code on purpose: which number he eats to is his.
+
+**Also not verified on device.** Server-computed, so it reaches the APK through Railway with no
+rebuild, but no S25 has rendered the new provenance line — *"1,660 your goal + 131 earned from
+movement"* — and the wording is the part a screenshot would catch.
+
 ### [app-shell] ⚠️ The app is tinted now, and no OLED panel has judged it (BF-145, 2026-09-12, v1.449.0) · needs: hardware
 
 Owner, on the Edit Program sheet: *"adding in a color scheme instead of the plain black"*. Every dark
