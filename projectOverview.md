@@ -1754,6 +1754,21 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [nutrition] 🔴 `one-calorie-budget.spec.ts` is red on `main` since BF-150, and it merged that way (LB-100, 2026-09-12)
+
+`e2e/one-calorie-budget.spec.ts:165` — *"Home's nutrition card counts against that same budget"* —
+was green on #1127 at 10:26 and has failed on every run since BF-150, including BF-150's own
+pre-merge run. E2E is advisory, so it merged red and nothing recorded it.
+
+**The cause is not established and the entry deliberately does not pick one.** Either the
+one-budget invariant is broken again — the Nutrition ring still passes against the pre-BF-150
+expression while Home's donut does not, which is the Q-415/Q-417 defect returning on the number the
+owner eats to — or the spec is stale, since its own guard asserts the budget must *not* equal
+`stored goal + earned`, which is exactly what BF-150 made it. A `dialog "Morning Check-in"` sits
+over Home in the failure snapshot and has to be ruled out before either reading holds.
+
+Lane A's, filed from Lane B. Discriminator and reproduction in the backlog entry.
+
 ### [nutrition][app-shell] ⚠️ The weekly recap shows its numbers now, unseen on the phone (Q-112e, 2026-09-12, v1.451.0) · needs: hardware
 
 The recap said its piece in prose and showed none of the figures behind it. It now carries the day

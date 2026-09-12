@@ -421,6 +421,40 @@ below threshold and left in place for next time.
 
 
 
+### [nutrition] LB-100 — BF-150 turned `one-calorie-budget.spec.ts` red on `main`, and it merged that way 🔴 LIVE
+
+- **Lane:** A — `lib/health/energy-balance-service.ts` / `budgetProvenance`, and the spec that pins
+  them. Filed by Lane B, which is why the ID carries `LB-`; the letter records who found it.
+- **Found:** 2026-09-12, on #1129's CI. Not that PR's — its diff is the weekly recap's trend rows and
+  touches no budget code.
+
+- **The timing is the evidence, and it is clean.** `e2e/one-calorie-budget.spec.ts:165` —
+  *"Home's nutrition card counts against that same budget"* — was **green on #1127 at 10:26** (181
+  passed), whose base predates BF-150. It has failed on **every** run since: BF-150's own pre-merge
+  run (#1128, job 103541484504) and #1129's (job 103543889216), with the identical locator.
+  **BF-150 merged with it red**, which E2E being advisory permits and nothing recorded.
+- Reproduced locally on a tree containing BF-150: `1 failed, 4 passed`.
+
+- **⚠ TWO CANDIDATE CAUSES, AND THIS ENTRY DOES NOT PICK ONE.** Both fit the evidence and they want
+  different fixes, so the next session should discriminate before writing code.
+  1. **The one-budget invariant is broken again.** `budgetFromRoute` derives
+     `round(restingBaseKcal + targetNetKcal) + earned` — the pre-BF-150 expression — and the
+     **Nutrition ring test still passes against it** while Home's donut does not. Two surfaces
+     disagreeing about the day's budget is exactly the defect Q-415/Q-417 fixed in v1.335.0 and this
+     spec exists to catch. If so it is a live product regression on the number the owner eats to.
+  2. **The spec is simply stale.** Its line 54 asserts the budget must **not** equal
+     `BASE.calories + earned` — *"if it ever equals the real budget the fixture has stopped
+     discriminating"* — and anchoring on the stored goal is precisely what BF-150 made it. On this
+     reading the card is right, the fixture's guard has inverted, and the fix is the spec.
+  - **A third thing is in the way and must be ruled out first:** the failure's accessibility
+    snapshot shows a **`dialog "Morning Check-in"` open over Home**, so the donut may be rendering
+    the correct figure while occluded. `toBeVisible` fails either way. Dismiss the check-in in the
+    fixture before concluding anything about the number.
+- **Discriminator:** read what Home's donut actually prints with the check-in dismissed. Equal to
+  `storedGoal + earned` → the spec is stale (②). Equal to neither that nor the route's
+  `restingBase + targetNet + earned` → the surfaces disagree (①).
+- **Needs:** nothing.
+
 ### [app-shell] BF-139 — three header chips no longer fit beside the date (fixed; the device look is what is left)
 
 - **Lane:** B

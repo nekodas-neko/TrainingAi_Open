@@ -3,7 +3,7 @@
 > **Successor sessions are titled `🚧 Implementation Agent (B) 🟢`** — exactly. A renamed successor
 > is a lost thread.
 
-**Updated:** 2026-09-12 · **By:** the twenty-seventh Lane B run · **Next ID:** `LB-100`
+**Updated:** 2026-09-12 · **By:** the twenty-seventh Lane B run · **Next ID:** `LB-101`
 
 > **A mistyped ID here silently advances the lane's numbering.** Allocate with
 > `grep -rhoE '\bLB-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`; check the max is real in the
@@ -41,8 +41,9 @@ moves without warning** — re-run `next-item.js` rather than trusting this line
 - **Owner:** the macro/budget anchor (BF-134's residue, TN-29 protects the stored 1,660); LB-61's
   switch colour; whether the PWA lands on Home rather than Workout (PS-35).
 - **⚠ BF-84 reads startable and is not** — BF-94 supersedes it and is `Gate: device`.
-- **⚠ `actions_list` on ci.yml WITH a `branch` filter is STALE** — it showed one run across four
-  pushes and I wrongly told the owner CI was dead. Query it UNFILTERED.
+- **⚠ `actions_list` is STALE for RUN EXISTENCE, filtered OR not** — `total_count` sat unchanged and
+  showed no run for ~6 min after one existed, and I told the owner CI was broken. **`get_check_runs`
+  on the PR is the read; 0 means WAIT, never escalate.**
 - **⚠ When `main` lands a PR every ~5 min, a 26-minute E2E never finishes on a current base** (BF-142 took six pushes). Merge on the required five once E2E passed on that exact app code; expect `main` to take your version — rebuild `changelog.ts` from `origin/main`, never splice.
 - **⚠ Q-254 is device-free Lane B work parked behind `Needs: Q-297`, itself `Gate: owner`**; premise
   stale too (says one spec exists, there are **84**). With the owner since 2026-09-11. Do not unpark.
