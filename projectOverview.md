@@ -1754,7 +1754,7 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
-### [nutrition] ⚠️ The gap explainer is true now, and the base underneath it is still wrong (BF-142, 2026-09-12, v1.448.3) · needs: owner
+### [nutrition] ⚠️ The gap explainer is true now, and the base underneath it is still wrong (BF-142, 2026-09-12, v1.448.4) · needs: owner
 
 Owner, third report in this family: *"calories still not right"*. The card explained the macro/budget
 gap with *"the movement recorded today"* — the one reason `macro-budget-gap.ts` rules out in its own

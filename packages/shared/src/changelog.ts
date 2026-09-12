@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.448.3",
+    version: "1.448.4",
     date: "2026-09-12",
     changes: [
       "The note under the Nutrition ring explaining why the macro grams and the calorie budget disagree was wrong twice over. It said the grams were your stored goal (they are your goal scaled up by what you have moved) and it blamed the difference on today's movement \u2014 which is in both numbers, so it cancels and the gap never closes. It now prints your stored goal beside the computed budget, breaks the budget into resting burn, goal adjustment and movement, and says plainly that moving more raises both.",
+    ],
+  },
+  {
+    version: "1.448.3",
+    date: "2026-09-12",
+    changes: [
+      "Your rep max on a bodyweight exercise now matches the reps you actually did. An 11-rep set was showing as 8 RM \u2014 the estimate is discounted when it is taken to failure, and the summary card was undoing that discount with the wrong formula, so every bodyweight rep max read low.",
     ],
   },
   {

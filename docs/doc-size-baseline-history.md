@@ -10970,7 +10970,7 @@ block measured against the owner's live Lower row.
 
 BF-143 gains its shipped record: the three changes, the one owner action still owed, and an explicit
 note that the bodyweight-index half is NOT fixed and stays with BF-127.
-## 2026-09-12 — `docs/implementation-backlog.md` → 21106, `projectOverview.md` 10640 → 10660 (BF-142)
+## 2026-09-12 — `docs/implementation-backlog.md` → 21124, `projectOverview.md` 10640 → 10660 (BF-142)
 
 The backlog comes down again: BF-142 was a long diagnosis and is now a record of a one-sentence fix
 plus the finding it uncovered. What is kept is the part that is not about the sentence at all — the
@@ -11015,3 +11015,15 @@ engine, and the operative term was a name-keyed `hasAnyPriorLog` guard in the sa
 BF-144 was hidden from the queue twice over: a `Gate: owner` covering only the column-drop question,
 and a cross-reference to BF-143 written inside the `Needs:` bullet, which the parser read as a real
 dependency. Both corrected, with the reason recorded in the entry.
+
+## 2026-09-12 — `docs/implementation-backlog.md` (BF-147 re-laned)
+
++18. BF-147's Lane A half shipped, so the entry gains a record of the column and route that now
+exist, a `Keep:` naming the four UI defects and the sweep screen left for Lane B, and an explicit
+note that the production S3 credentials the entry asks about were *not* checked — the verdict column
+touches neither storage nor generation, but that judgement belongs on the record rather than in a
+gap. Nothing was deleted: the entry stays queued, re-laned rather than removed.
+## 2026-09-12 — `docs/implementation-backlog.md` (BF-149)
+
+Net zero: BF-149 was written and then removed in the same change, because it shipped with nothing
+owed and `check-backlog-pointers` rejects a finished entry in the queue. The journal carries it.
