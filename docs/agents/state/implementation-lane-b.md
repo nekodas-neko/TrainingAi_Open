@@ -27,8 +27,9 @@ answers the entry.**
 
 ## Next
 
-1. **Re-run `next-item.js --lane B`.** BF-145 keeps a `Verify: device` and an owner question (widen
-   `surface="page"` past its five of 46 files?), so it stays in the queue without being work.
+1. **READY was 0 at 2026-09-12 04:35** — 48 parked, almost all `Gate: device`/`Gate: owner`, none
+   unparkable without him. BF-145 stays queued on a device check plus an owner question (widen
+   `surface="page"` past its five of 46 files?), which is not work.
 
 BF-142 left a live finding with Lane A: the resting base is ~1.41 × the owner's Mifflin BMR,
 corroborating BF-137 from a direction that entry does not use (height, not weight trend). **READY
@@ -44,16 +45,18 @@ moves without warning** — re-run `next-item.js` rather than trusting this line
 - **⚠ `actions_list` on ci.yml WITH a `branch` filter is STALE** — it showed one run across four
   pushes and I wrongly told the owner CI was dead. Query it UNFILTERED.
 - **⚠ When `main` lands a PR every ~5 min, a 26-minute E2E never finishes on a current base** (BF-142
-  took six pushes). Merge on the required five once E2E has passed on that exact app code, and expect
-  `main` to take your version number — rebuild `changelog.ts` from `origin/main`, never splice.
-- **⚠ Q-254 is device-free Lane B work parked on a gate that cannot open** — `Needs: Q-297`, which is
-  `Gate: owner`; its premise is stale too (says one spec exists, there are **84**). With the owner
-  since 2026-09-11. **Do not unpark it unilaterally.**
+  took six pushes). Merge on the required five once E2E passed on that exact app code; expect `main`
+  to take your version — rebuild `changelog.ts` from `origin/main`, never splice.
+- **⚠ Q-254 is device-free Lane B work parked on a gate that cannot open** — `Needs: Q-297`, itself
+  `Gate: owner`; premise stale too (says one spec exists, there are **84**). With the owner since
+  2026-09-11. **Do not unpark it unilaterally.**
 - **PS-4 is UNCLASSIFIED by design; LB-94 the owner deferred 2026-09-09.** Do not classify either.
 
 ## Claimed paths
 
-None held.
+None held. **Two abandoned Lane B PRs are open whose work is already on `main`** — #265
+(Q-323/Q-415/Q-417) and #608 (LB-19): all four entries are out of the queue and the code is in the
+tree, under other filenames. Closing a PR needs the owner.
 
 ## Do not re-litigate
 
@@ -73,14 +76,11 @@ None held.
 2. **A mutation that does NOT fail is a finding.** BF-141's `stopPropagation` guards a lossy
    round-trip (61.0 kg → 61.25) the spec cannot show — the seeded workout starts at 60 kg and
    round-trips exactly. The test was renamed to what it proves.
-3. **This file already held the fix for a run's longest detour** — the `scrollIntoViewIfNeeded`
-   gotcha, rediscovered from scratch. **Read the Gotchas first.**
+3. **This file already held the fix for a run's longest detour** (`scrollIntoViewIfNeeded`), rediscovered from scratch. **Read the Gotchas first.**
 4. **A card reporting "no data" is not evidence that no data reached it** — LB-99's cause was one
-   label, not the `getLocalStore` fall-through. And a shadowing claim is about ONE function's branch
-   order: PS-35b's two "unreachable" palette keys cited lines in *different* functions, both live.
+   label, not the `getLocalStore` fall-through. A shadowing claim is about ONE function's branch order: PS-35b's two "unreachable" palette keys cited *different* functions, both live.
 5. **Never run `pnpm build` and `npx vitest run` against the one local Postgres at once** — a "failure" that will not reproduce serially is contention, not a defect.
-6. **A stored "state as of" line ages into a wrong answer** — Dependabot read *"2 high"* (2026-07-27);
-   `pnpm audit` read **36, 23 high, 2 critical**.
+6. **A stored "state as of" line ages into a wrong answer** — Dependabot read *"2 high"* (2026-07-27); `pnpm audit` read **36, 23 high, 2 critical**.
 
 ## Gotchas worth carrying
 
