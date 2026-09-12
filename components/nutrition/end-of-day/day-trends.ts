@@ -1,4 +1,4 @@
-import type { WeekWindowDay, WeekWindowResponse } from '@/app/api/day-review/week-window/route'
+import type { WeekWindowResponse } from '@/app/api/day-review/week-window/route'
 
 /** The four stats the week-window route serves, and the only four the plan says earn a trend. */
 export type TrendKey = 'restingHeartRate' | 'steps' | 'sessionVolumeKg' | 'weightKg'
@@ -67,24 +67,37 @@ export function trendDelta(today: number | null, average: number | null): TrendD
   return { direction: diff > 0 ? 'up' : 'down', magnitude: Math.abs(diff) }
 }
 
-export function deltaSentence(spec: TrendSpec, delta: TrendDelta): string {
-  if (delta.direction === 'level') return 'Level with the last 7 days'
+/**
+ * `comparison` names what the delta is measured against, because the same row now serves two
+ * windows: the day review compares today with the last 7 days, the weekly recap compares the week
+ * with the last 4 weeks. Defaulted to the daily phrasing so the original call site reads unchanged.
+ */
+export function deltaSentence(spec: TrendSpec, delta: TrendDelta, comparison = 'the last 7 days'): string {
+  if (delta.direction === 'level') return `Level with ${comparison}`
   const word = delta.direction === 'up' ? 'above' : 'below'
-  return `${spec.formatDelta(delta.magnitude)} ${word} the last 7 days`
+  return `${spec.formatDelta(delta.magnitude)} ${word} ${comparison}`
 }
 
 export interface TrendSeries {
   values: number[]
-  /** Day index within the window, 0…7. Paired with `values` so a stat recorded on three of eight
-   *  days draws at the three positions it was recorded, rather than stretched across the width. */
+  /** Index of the point within the window. Paired with `values` so a stat recorded on three of
+   *  eight days draws at the three positions it was recorded, rather than stretched across the
+   *  width — and the same for three of five weeks. */
   times: number[]
 }
 
+/**
+ * One period of the window: a day for the day review, a week for the recap. Structural rather than
+ * `WeekWindowDay`, which also carries a `date` the maths never reads — the two routes name their
+ * period differently (`date` / `weekStart`) and that is the only thing that differs.
+ */
+export type TrendPoint = { [K in TrendKey]?: number | null }
+
 /** `null` when there are fewer than two points, which is what `Sparkline` refuses to draw. */
-export function trendSeries(days: WeekWindowDay[], key: TrendKey): TrendSeries | null {
+export function trendSeries(points: TrendPoint[], key: TrendKey): TrendSeries | null {
   const values: number[] = []
   const times: number[] = []
-  days.forEach((d, i) => {
+  points.forEach((d, i) => {
     const v = d[key]
     if (v == null) return
     values.push(v)
@@ -101,26 +114,46 @@ export interface TrendRow {
 }
 
 /**
- * The rows to draw, in order. A stat with **no** reading anywhere in the eight days is omitted
- * rather than shown empty — that is a stat this user does not record, and a permanently blank row
- * is worse than an absent one. A stat with some history but nothing today keeps its row, because
- * the week is still an answer and the gap is itself worth seeing.
+ * A window of periods and the average to judge its last one against. Both routes serve this shape
+ * under different names — `days`/`sevenDayAverages` and `weeks`/`priorAverages` — and the maths is
+ * identical, so it is written once here and adapted at each call site (Q-112e).
  */
-export function trendRows(data: WeekWindowResponse): TrendRow[] {
-  const today = data.days[data.days.length - 1]
+export interface TrendWindow {
+  /** Oldest first. The LAST point is the period being reported on. */
+  points: TrendPoint[]
+  /** Mean over the points before the last one. */
+  priorAverages: TrendPoint
+}
+
+/**
+ * The rows to draw, in order. A stat with **no** reading anywhere in the window is omitted rather
+ * than shown empty — that is a stat this user does not record, and a permanently blank row is worse
+ * than an absent one. A stat with some history but nothing in the current period keeps its row,
+ * because the window is still an answer and the gap is itself worth seeing.
+ */
+export function trendRowsFor(window: TrendWindow): TrendRow[] {
+  const current = window.points[window.points.length - 1]
   return TREND_SPECS.flatMap(spec => {
-    const series = trendSeries(data.days, spec.key)
-    const value = today?.[spec.key] ?? null
+    const series = trendSeries(window.points, spec.key)
+    const value = current?.[spec.key] ?? null
     if (series === null && value == null) return []
     return [{
       spec,
       today: value,
-      delta: trendDelta(value, data.sevenDayAverages[spec.key]),
+      delta: trendDelta(value, window.priorAverages[spec.key] ?? null),
       series,
     }]
   })
 }
 
+/** The day review's window: eight days against the seven before today. */
+export function trendRows(data: WeekWindowResponse): TrendRow[] {
+  return trendRowsFor({ points: data.days, priorAverages: data.sevenDayAverages })
+}
+
 /** The domain every row's sparkline projects into, so four charts of different coverage still line
  *  up day-for-day with each other. */
 export const TREND_TIME_DOMAIN: [number, number] = [0, 7]
+
+/** The same, for the recap's five weekly points — four prior weeks plus the week being reported. */
+export const TREND_WEEK_TIME_DOMAIN: [number, number] = [0, 4]
