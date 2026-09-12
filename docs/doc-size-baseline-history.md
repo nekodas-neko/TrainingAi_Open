@@ -11060,3 +11060,16 @@ Four lines for the seventh E2E renderer `SIGSEGV`, on the run for #1122. The ent
 the rate, so a sighting that is not written down weakens it — but the note was cut from five lines
 to four and the running tally rewritten in place rather than extended, so the growth is the sighting
 itself and nothing around it.
+
+## 2026-09-12 — `docs/implementation-backlog.md` 21080 → 21069 (BF-145 rewritten to its residue)
+
+Down eleven: the palette half shipped, so the entry no longer carries the token inventory or the
+recommendation, and what is left is the sheet question plus the two measurements a later session
+would otherwise redo — that chroma alone is invisible below L 0.13, and that BF-75 already refuted
+the translucent-sheet fix.
+
+## 2026-09-12 — `projectOverview.md` 10660 → 10683 (BF-145 Known-Issues row)
+
+Twenty-three for a palette change that touches every screen and has not been seen on the phone. The
+row carries the two things a later session would otherwise redo: the measurement that chroma alone
+is invisible below L 0.13, and that BF-145's sheet half is refuted rather than outstanding.
