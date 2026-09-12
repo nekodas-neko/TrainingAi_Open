@@ -153,14 +153,13 @@ async function handleWorkoutData(req: NextRequest) {
     // per-session calls the single-tab path makes — no partitioning needed (buildWorkoutExercises
     // only ever looks up its own session's exercise names).
     const unionNames = [...new Set(program.sessions.flatMap(s => s.exercises.map(ex => ex.exerciseName)))]
-    const [allPhases, prMap, todayExercises, sessionCounts, lastLogs, lastRealOneRm, priorLogsThisProgram, estimates] = await Promise.all([
+    const [allPhases, prMap, todayExercises, sessionCounts, lastLogs, lastRealOneRm, estimates] = await Promise.all([
       isAutomatic ? repo.listProgramPhases(userId, program.id) : Promise.resolve([] as ProgramPhase[]),
       repo.listPersonalRecords(userId),
       repo.getDayExerciseNames(userId, todayStr.replace(/-/g, '/'), tz),
       isAutomatic ? repo.countAllSessionsSinceStart(userId, program.id) : Promise.resolve(new Map<string, number>()),
       repo.getLastExerciseLogsBatch(userId, unionNames),
       repo.getLastRealOneRmBatch(userId, unionNames),
-      isAiDynamic ? repo.getLastExerciseLogsBatch(userId, unionNames, program.id) : Promise.resolve(null),
       repo.getExerciseEstimates(userId).catch(() => []),
       // Heals the stored sessions_in_phase before the periodization read below turns it into
       // completedCycles / phaseSessionNumber (SYNC-T2). Batched here rather than awaited
@@ -213,11 +212,11 @@ async function handleWorkoutData(req: NextRequest) {
         currentPhase = sessionPhaseStatus.phase
       }
 
-      const hasAnyPriorLog = priorLogsThisProgram != null && exerciseNames.some(name => priorLogsThisProgram.has(name))
+      // BF-148 — same two-term condition as the single-session path below; see the comment there
+      // for why the name-keyed `hasAnyPriorLog` term was removed rather than repaired.
       const isAiDynamicBaseline = isAiDynamic
         && aiPeriodizationState?.phase === 'baseline'
         && !aiPeriodizationState?.baselineComplete
-        && !hasAnyPriorLog
 
       const isBaselinePhase = currentPhase?.phaseType === 'baseline' || isAiDynamicBaseline
 
@@ -372,19 +371,25 @@ async function handleWorkoutData(req: NextRequest) {
   }
 
   // AI Dynamic baseline: first session before baseline is marked complete = 1 AMRAP set per exercise.
-  // Guard against stale DB state: if any exercise already has prior logs, baseline was already done
-  // (the completion call was missed, e.g. due to app crash). Don't force AMRAP mode in that case.
-  // Program-scoped (not the general cross-program `lastLogs` used for display below) — a
-  // shared exercise name logged under a *different* program mustn't let this fresh
-  // ai_dynamic cycle skip its own AMRAP baseline week.
-  const priorLogsThisProgram = isAiDynamic
-    ? await repo.getLastExerciseLogsBatch(userId, exerciseNames, program.id)
-    : null
-  const hasAnyPriorLog = priorLogsThisProgram != null && exerciseNames.some(name => priorLogsThisProgram.has(name))
+  //
+  // BF-148. This used to carry a third term, `!hasAnyPriorLog`, standing for "these exercise names
+  // have been logged in this program before, so the baseline must already be done and the
+  // completion call was merely missed". It was a proxy for stale periodization state, and it was
+  // both WRONG and no longer needed:
+  //  - Wrong, because it is keyed on exercise NAMES. Rebuilding a session inside an existing
+  //    program reuses the names, so a genuinely uncalibrated session read as already-calibrated:
+  //    the header said "Baseline · S1" from this same `aiPeriodizationState` while the set card
+  //    prescribed a normal 3x8. That is the owner's report, and the same name-keyed shape BF-143
+  //    and BF-144 already corrected in two other places.
+  //  - Not needed, because BF-143 made the stale state it guarded against unreachable: the
+  //    auto-heal now completes a baseline only on evidence that THIS session was interrupted, so a
+  //    row still reading `baseline && !baselineComplete` means what it says.
+  // `generate-prescription.ts` already trusts exactly this pair to refuse a prescription, and the
+  // header and pre-workout panel already render from it — so the set card now agrees with what the
+  // rest of the screen was saying rather than holding a second opinion.
   const isAiDynamicBaseline = isAiDynamic
     && aiPeriodizationState?.phase === 'baseline'
     && !aiPeriodizationState?.baselineComplete
-    && !hasAnyPriorLog
 
   const isBaselinePhase = currentPhase?.phaseType === 'baseline' || isAiDynamicBaseline
 
