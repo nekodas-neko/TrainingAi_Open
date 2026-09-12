@@ -782,105 +782,44 @@ below threshold and left in place for next time.
   surfaced from BF-143 making the baseline state reachable, and they need separate fixes.
 - **Needs:** nothing.
 
-### [platform][app-shell] BF-147 — the admin exercise list squeezes the exercise NAME to zero px, force-overwrites a GIF on one tap with no confirm, and the wrong-GIF flag it now has no way to reach
+### [platform][app-shell] BF-147 — the admin Exercises tab: the four UI defects shipped; the S3 credentials are still unchecked
 
-- **Lane:** B — the storage half landed (see below); everything left is `components/admin/exercise-manager.tsx`.
-- **Verification:** at 412 dp every row shows its name in full; a destructive action asks first;
-  the coverage figure matches a `count(*)` of live exercises with media; and a GIF judged wrong can
-  be marked as such and found again later.
-
-- **The Lane A half landed 2026-09-12 — the column and the route exist, nothing reads them yet.**
-  Migration `273_exercise_media_review_status.sql` adds `review_status` (`unreviewed`/`ok`/`wrong`,
-  CHECK-constrained, defaulting to `unreviewed`) and `reviewed_at` to `exercise_media`, with a
-  partial index on the non-`unreviewed` rows. `app/api/admin/exercise-media-review` serves `GET`
-  (the flagged set) and `PATCH`
-  (`{ exerciseName, gender?, status }`, keyed on the table's own `(exercise_name, gender)` unique
-  key). Per the recommendation below it is deliberately inert: it imports no generation surface, so
-  marking one wrong fires no AI call, and it 404s rather than upserting — a verdict about a GIF that
-  does not exist would invent provenance for a generation that never happened. Covered by
-  `lib/__tests__/admin-exercise-media-review-route.test.ts` (13 tests).
-  **No UI calls either verb**, which is the whole of what is left here.
-
+- **Lane:** B
+- **Keep:** ONE thing, and it is not UI. **Nobody has checked the production S3 credentials.** The
+  sandbox boot banner reports the shared S3 client rejecting with `SignatureDoesNotMatch (403)`, and
+  if the bucket rejects in prod too then "AI all" writes into a store it cannot read back and the
+  six proxy-path rows (Ab Wheel, Barbell Shrug, Cable Crunch Abs, Donkey Kick, Face Pull, Nordic
+  Hamstring Curl) plus the reference figure stay broken. Orthogonal to everything shipped below —
+  none of it touches storage or generation — but it gates the Mirror/AI paths and it is still owed.
+- **Verify:** device — the two-line row and the sweep sheet on the S25. Measured at 412 dp in the
+  harness, not seen on glass.
 - **Added:** 2026-09-11 · owner, on the Admin Console → Exercises tab: *"ui is bad and I also want a
   better way to make sure everything has the right gif. Maybe a way for me to flag if its wrong so
   you we can decide how to proceed."*
 
-- **THE NAME IS RENDERED AND THEN CRUSHED TO NOTHING — that is why the rows are unreadable.**
-  `components/admin/exercise-manager.tsx:545` draws `{ex.name}` with `truncate`, which sets
-  `overflow:hidden` and lets its min-width resolve to **0**. Its flex sibling `SourceBadge` (`:202`)
-  has neither `shrink-0` nor `overflow:hidden`, so it cannot collapse below its content. Everything
-  else in the row — thumbnail (`:533`), status glyph (`:555`), the four-button group (`:565`) — is
-  `flex-none`. At phone width the badge and the buttons keep their width and the name is the only
-  thing that can give, so it gives everything. **The `bod…` visible in the screenshot is line TWO**
-  (`:548-551`, equipment), which sits alone in the flexible column and so keeps a fragment. A row
-  showing a truncated equipment string and no name at all is this, exactly.
+- **✅ SHIPPED 2026-09-12** — `components/admin/exercise-manager.tsx` and the new
+  `components/admin/gif-review-sweep.tsx`. Journal:
+  `docs/overview/entries/2026-09-12-bf147-admin-exercise-manager.md`.
+  - **The name fix is the action row, and THIS ENTRY'S DIAGNOSIS WAS WRONG.** It blamed the
+    `SourceBadge` for not collapsing. Measured at 412 dp: the badge is **25 px**; the four action
+    buttons are **204 px of a 340 px row**, because the global 48 dp tap-target floor inflates each
+    12 px icon to 51 px. The flexible column got **50 px** and the name **19**. Shrinking the
+    targets is a P0 violation, so the row went to two lines — names now render in full (Arnold
+    Press 19 px → 87 px, nothing clipped) and the delete button is still 48×48.
+  - Delete, per-row Mirror and per-row AI now go through one `ConfirmDialog`. The two overwrite
+    actions confirm **only when they would replace** an existing GIF; a first generation destroys
+    nothing and still fires on one tap. Delete also had no accessible name at all.
+  - Coverage arithmetic: denominator drops `mergedInto` rows, numerator counts the Custom-URL
+    fallback `getThumbnail` already draws from. Local read went `40 / 146` → `42 / 145`, matching
+    `count(*)` exactly on both halves.
+  - The sweep sheet reads Lane A's `/api/admin/exercise-media-review`: one GIF at a time, large,
+    with name and target muscles, two buttons, and it advances only on a successful PATCH. It never
+    regenerates — collecting the wrong ones is the point of collecting them.
 
-- **⚠ TWO DESTRUCTIVE ACTIONS WITH NO CONFIRMATION, one of them silent.**
-  1. **Delete** (`:593-599`) fires `DELETE /api/admin/exercises?name=…` on a single tap. **This is
-     BF-124's defect in a second place** — the owner lost his Lower session to an unconfirmed trash
-     icon four days ago and had to rebuild it, which is what produced BF-143 and BF-146. The same
-     icon, the same absence, on a 156-row list.
-  2. **The per-row Mirror and AI buttons OVERWRITE.** `:570` and `:579` pass `force = hasS3Gif`, so
-     tapping either on a row that already has a GIF re-mirrors or regenerates and the routes
-     `onConflictDoUpdate` the row in place. A correct GIF is replaced by a new generation with no
-     prompt and no undo. The *bulk* buttons are safe by contrast — they send no force and skip rows
-     that already have one — so the dangerous control is the one that looks incidental.
-
-- **The coverage figure counts the wrong things in both halves.** `:415-416` divides
-  `exercises.filter(ex => !!media[name]?.gifUrl).length` by `exercises.length`.
-  - The **denominator** is every library row, including the 4 with `merged_into` set. Measured
-    2026-09-11: **156 rows, 152 live**.
-  - The **numerator** counts only `exercise_media`, so a Custom URL in `exercise_gif_cache` renders
-    a thumbnail on the row and still reads as uncovered.
-  - Truth, measured the same day: **15 live exercises have no media of any kind**, against the 19
-    the card's "137 / 156" implies. The list is: Barbell Chest Supported Row, Cable Hip Adduction,
-    Cable Seated Leg Curl, Copenhagen Plank, Dumbbell Forearm Curl, Fire Hydrant, Hip Flexor Raise,
-    Machine Curl, Machine Lateral Raise, Machine Rear Delt Fly, Rope Pushdown, Slider Leg Curl,
-    Stability Ball Leg Curl, Toe Touch Crunch, Wrist Extension.
-
-- **The broken reference thumbnail is a storage failure, and it is NOT cosmetic — it is the style
-  anchor every future generation uses.** `reference-figure/route.ts` serves
-  `exercise-media/reference-figure.png` through the private-bucket proxy, which returns 404 when
-  `downloadMedia` fails; the sandbox boot banner reports the shared S3 client rejecting with
-  **`SignatureDoesNotMatch (403)`**. `exercise-manager.tsx:481` passes `unoptimized` only for a
-  `.gif`, so a `.png` goes through `/_next/image`, which surfaces the failure as a broken-image
-  glyph rather than a blank.
-  **Why the exercise rows still look fine while this one does not — measured, not assumed:** of 139
-  media rows, **133 are absolute external URLs** (~99 chars, the dataset mirrors) and only **6 are
-  proxy paths** that depend on the bucket — Ab Wheel, Barbell Shrug, Cable Crunch Abs, Donkey Kick,
-  Face Pull, Nordic Hamstring Curl. Those six and the reference figure share one fate.
-  **Check the production credentials before writing any code here**: if the bucket is rejecting in
-  prod too, "AI all" writes into a store it cannot read back.
-
-- **THE FLAG IS NEW SURFACE — nothing like it exists.** Searched `needs_review`, `gif_status`,
-  `verified`, `approved`, `flagged`, `mismatch`, `reviewStatus` across the repo: zero hits on any
-  exercise or media table. `exercise_media` carries only `model_used`/`generated_at`;
-  `exercise_gif_cache` only urls and `fetched_at`; `exercise_library` nothing. The admin **Feedback**
-  tab is an append-and-delete inbox over `feedback_submissions` with **no entity linkage and no
-  status field**, so it can carry "this GIF is wrong" as free text and nothing on the Exercises tab
-  would ever read it.
-- **Recommendation — a status column on `exercise_media`, and a sweep screen rather than a list.**
-  The table already has the `(exercise_name, gender)` unique key and provenance, so a
-  `review_status` (`unreviewed` / `ok` / `wrong`) plus `reviewed_at` is the smallest honest
-  addition, and it survives regeneration decisions because it sits beside `model_used`.
-  **The bigger half is the workflow, not the column.** Verifying 152 GIFs by scrolling a cramped
-  admin list is the wrong instrument — one GIF at a time, large, with the exercise name and target
-  muscles beside it and two buttons, sweeps the whole catalogue in a sitting and yields a queryable
-  set of wrong ones to decide about. That is what the owner asked for: *"so we can decide how to
-  proceed"* is a set, not a toast.
-  - **Keep the flag separate from regeneration.** Marking one wrong should not silently trigger an
-    AI call — deciding what to do about the wrong ones is the point of collecting them.
-- **⚠ There is NO test of any kind for this screen** — `exercise-manager.tsx` is referenced only by
-  itself and `admin-content.tsx`, and `e2e/` has no admin spec at all. The API routes underneath
-  are covered (`lib/__tests__/admin-media-tool-routes.test.ts`,
-  `admin-exercise-catalogue-routes.test.ts`), so the untested part is exactly the part being
-  reported.
-- **Keep:** the four UI defects above (name crushed to 0 px, the two unconfirmed destructive
-  actions, the coverage arithmetic) plus the sweep screen that reads the new route — one GIF at a
-  time with two buttons, per the recommendation. **Also still open and NOT checked by the Lane A
-  half:** the production S3 credentials. The entry asks for that before writing code, and it was
-  judged orthogonal to the verdict column (which touches neither storage nor generation) — but it
-  still gates the "AI all" / Mirror paths and the six proxy-path rows, and nobody has looked.
+- **⚠ The sweep can only judge `exercise_media` rows, by construction.** The review route refuses to
+  upsert (a verdict about a GIF that does not exist would invent provenance), so a Custom-URL row
+  has nothing to record against and offering it would 404 per tap. If those ever need judging, that
+  is a Lane A change to the route, not a UI one.
 - **Needs:** nothing.
 
 ### [app-shell] BF-145 — the palette half shipped; the sheet half is refuted as specified and needs a decision

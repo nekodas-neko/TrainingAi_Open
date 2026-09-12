@@ -7,9 +7,11 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import {
   Plus, Pencil, Trash2, X, Check, Loader2, Search, Download, Play,
-  RefreshCw, Square, Upload, ImageIcon, Sparkles, CheckCircle2, XCircle,
+  RefreshCw, Square, Upload, ImageIcon, Sparkles, CheckCircle2, XCircle, ClipboardCheck,
 } from "lucide-react";
 import { AddExerciseSheet } from "@/components/exercises/add-exercise-sheet";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { GifReviewSweep, type ReviewCandidate } from "@/components/admin/gif-review-sweep";
 import { invalidateExerciseLibrary } from "@/lib/cache-groups";
 import type { MuscleAssignment, ExerciseType } from "@trainingai/shared/types/program";
 
@@ -22,6 +24,8 @@ interface ExerciseRow {
   exerciseType: ExerciseType;
   gifUrl: string | null;
   imageUrl: string | null;
+  /** Set when this row was merged into another; it stays in the shared catalogue but is not live. */
+  mergedInto?: string;
 }
 
 interface MediaRow {
@@ -31,6 +35,32 @@ interface MediaRow {
 }
 
 type GifSource = "ai" | "dataset" | "custom" | null;
+
+/**
+ * BF-147 — what each destructive action actually does, said before it happens.
+ *
+ * The two overwrite actions are the ones the entry called *"the dangerous control that looks
+ * incidental"*: the BULK buttons skip rows that already have a GIF, so only the per-row ones can
+ * replace a correct GIF, and they are the small icons. The copy names the replacement rather than
+ * asking "are you sure".
+ */
+const CONFIRM_COPY: Record<"delete" | "mirror" | "generate", { title: string; message: string; confirmLabel: string }> = {
+  delete: {
+    title: "Delete exercise?",
+    message: "this removes it from the shared library. Programs and history that reference it are not deleted, but it will no longer be pickable.",
+    confirmLabel: "Delete",
+  },
+  mirror: {
+    title: "Replace this GIF?",
+    message: "it already has a GIF. Re-mirroring overwrites it with the dataset's version, and the current one is not kept.",
+    confirmLabel: "Replace",
+  },
+  generate: {
+    title: "Replace this GIF?",
+    message: "it already has a GIF. Regenerating spends an AI call and overwrites it, and the current one is not kept.",
+    confirmLabel: "Regenerate",
+  },
+};
 
 const EQUIPMENT_OPTIONS = ["barbell", "dumbbell", "cable", "kettlebell", "machine", "bodyweight"];
 const MUSCLE_OPTIONS = [
@@ -213,6 +243,17 @@ export default function ExerciseManager() {
   const [search, setSearch] = useState("");
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // BF-147 — every destructive action on this screen goes through one confirm. Modelled as a
+  // pending action rather than a boolean per button: three of them are destructive and a boolean
+  // each is how the fourth gets added without one.
+  const [pendingAction, setPendingAction] = useState<
+    { kind: "delete" | "mirror" | "generate"; name: string } | null
+  >(null);
+  const [sweepOpen, setSweepOpen] = useState(false);
+  // Verdicts already recorded. The GET returns only the judged rows (the partial index the
+  // migration adds matches that), so absence from this map IS "unreviewed" — there is no third
+  // state to carry and no need to fetch the ~150 unreviewed ones to find that out.
+  const [reviewed, setReviewed] = useState<Record<string, "ok" | "wrong">>({});
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [generating, setGenerating] = useState<Set<string>>(new Set());
@@ -245,6 +286,26 @@ export default function ExerciseManager() {
       setLoading(false);
     }
   }
+
+  async function loadReviewed() {
+    try {
+      const res = await fetch("/api/admin/exercise-media-review");
+      if (!res.ok) return;
+      const json = await res.json();
+      const map: Record<string, "ok" | "wrong"> = {};
+      for (const r of (json.reviewed ?? [])) {
+        if (r.gender === "male" && r.reviewStatus !== "unreviewed") map[r.exerciseName.toLowerCase()] = r.reviewStatus;
+      }
+      setReviewed(map);
+    } catch {
+      // Silent: a failed read costs the sweep its "already judged" filter, which re-shows a GIF
+      // that was already judged. Wrong to shout about, and wrong to block the whole tab over.
+    }
+  }
+
+  useEffect(() => {
+    loadReviewed();
+  }, []);
 
   useEffect(() => {
     load();
@@ -412,8 +473,32 @@ export default function ExerciseManager() {
 
   const busy = generating.size > 0 || !!progress;
   const filtered = exercises.filter(e => e.name.toLowerCase().includes(search.toLowerCase()));
-  const withGif = exercises.filter(ex => !!media[ex.name.toLowerCase()]?.gifUrl).length;
-  const pct = exercises.length > 0 ? Math.round((withGif / exercises.length) * 100) : 0;
+  // BF-147 — both halves of this fraction counted the wrong thing.
+  // Denominator: `exercises.length` includes rows merged into another exercise. They are kept in the
+  // shared catalogue on purpose (another user may still have logged them) but they are not live, so
+  // counting them made full coverage unreachable by construction.
+  // Numerator: only `exercise_media` was counted, so a Custom URL from `exercise_gif_cache` drew a
+  // thumbnail on the row and still read as uncovered — the same source `getThumbnail` falls back to.
+  const live = exercises.filter(ex => !ex.mergedInto);
+  const hasAnyMedia = (ex: ExerciseRow) =>
+    !!media[ex.name.toLowerCase()]?.gifUrl || !!ex.gifUrl || !!ex.imageUrl;
+  const withGif = live.filter(hasAnyMedia).length;
+  const pct = live.length > 0 ? Math.round((withGif / live.length) * 100) : 0;
+
+  // The sweep queue: live exercises whose GIF exists in `exercise_media` and has no verdict yet.
+  // Restricted to media rows because that is the only table the review route can write a verdict
+  // against — it refuses to upsert, so a Custom-URL row has nothing to record against and offering
+  // it would produce a 404 per tap.
+  const reviewCandidates: ReviewCandidate[] = live
+    .filter(ex => !!media[ex.name.toLowerCase()]?.gifUrl && !reviewed[ex.name.toLowerCase()])
+    .map(ex => ({
+      name: ex.name,
+      gifUrl: gifProxyUrl(ex.name),
+      muscles: ex.muscles.filter(m => m.role === "main").map(m => m.muscle),
+      equipment: ex.equipment,
+    }));
+  const flaggedWrong = Object.values(reviewed).filter(v => v === "wrong").length;
+  const mergedCount = exercises.length - live.length;
 
   if (loading) {
     return (
@@ -438,7 +523,7 @@ export default function ExerciseManager() {
         <div className="flex items-center justify-between gap-2">
           <div>
             <p className="font-semibold text-sm">Exercise GIFs</p>
-            <p className="text-xs text-muted-foreground">{withGif} / {exercises.length} covered</p>
+            <p className="text-xs text-muted-foreground">{withGif} / {live.length} covered</p>
           </div>
           <div className="flex gap-1.5 shrink-0">
             <Button size="sm" variant="outline" className="h-8 text-xs gap-1" disabled={busy} onClick={mirrorAll}>
@@ -448,6 +533,21 @@ export default function ExerciseManager() {
               <Play className="w-3 h-3" /> AI all
             </Button>
           </div>
+        </div>
+        {/* BF-147 — the owner's *"a way to flag if its wrong"*. Disabled rather than hidden when the
+            queue is empty, so "nothing left to review" is a state you can read rather than a
+            missing button. */}
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs text-muted-foreground">
+            {reviewCandidates.length > 0
+              ? `${reviewCandidates.length} GIF${reviewCandidates.length === 1 ? "" : "s"} unreviewed`
+              : "All GIFs reviewed"}
+            {flaggedWrong > 0 && ` · ${flaggedWrong} flagged wrong`}
+          </p>
+          <Button size="sm" variant="outline" className="h-8 shrink-0 gap-1 text-xs"
+            disabled={reviewCandidates.length === 0} onClick={() => setSweepOpen(true)}>
+            <ClipboardCheck className="w-3 h-3" /> Review GIFs
+          </Button>
         </div>
         <div className="w-full bg-muted rounded-full h-1">
           <div className="bg-primary rounded-full h-1 transition-all" style={{ width: `${pct}%` }} />
@@ -516,7 +616,13 @@ export default function ExerciseManager() {
 
       {/* Exercise list */}
       <div className="space-y-1.5">
-        <p className="text-xs text-muted-foreground">{filtered.length} exercises</p>
+        {/* The list deliberately shows merged rows — an admin editing the shared catalogue needs to
+            see them — so it counts more than the coverage denominator does. Said out loud, because
+            two counts that disagree and do not explain themselves read as a bug (BF-147). */}
+        <p className="text-xs text-muted-foreground">
+          {filtered.length} exercises
+          {mergedCount > 0 && ` · ${mergedCount} merged, not counted in coverage`}
+        </p>
         {filtered.map(ex => {
           const source = getSource(ex.name, ex.gifUrl);
           const isGenerating = generating.has(ex.name);
@@ -528,55 +634,67 @@ export default function ExerciseManager() {
               {editingId === ex.id ? (
                 <ExerciseForm initial={ex} onSave={data => handleSave(data, ex.id)} onCancel={() => setEditingId(null)} saving={saving} />
               ) : (
-                <div className="flex items-center gap-2.5 rounded-2xl border border-border bg-muted/30 px-3 py-2.5">
-                  {/* Thumbnail */}
-                  <div className="relative h-10 w-10 flex-none rounded-lg overflow-hidden bg-white flex items-center justify-center">
-                    {thumb ? (
-                      <Image src={thumb} alt="" fill sizes="40px"
-                        unoptimized={thumb.endsWith('.gif')} className="object-cover" />
-                    ) : (
-                      <XCircle className="w-4 h-4 text-muted-foreground/30" />
-                    )}
-                  </div>
-
-                  {/* Name + info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <p className="text-sm font-medium truncate">{ex.name}</p>
-                      <SourceBadge source={source} />
+                <div className="rounded-2xl border border-border bg-muted/30 px-3 py-2.5">
+                  {/* BF-147 — the actions sit on their OWN line, and that is the fix for the
+                      unreadable name rather than anything about the name itself. Measured at 412 dp
+                      with all four on the same row: the button group is 204 px of a 340 px row (the
+                      global 48 dp tap-target floor inflates each 12 px icon to 51 px), the
+                      thumbnail and status take another 54, and the flexible column is left with
+                      50 px — of which the name got 19. The entry blamed the source badge; the badge
+                      is 25 px. Shrinking the targets is not available (48 dp is a P0 rule) and an
+                      overflow menu would cost a tap on every action, so the row goes to two lines. */}
+                  <div className="flex items-center gap-2.5">
+                    {/* Thumbnail */}
+                    <div className="relative h-10 w-10 flex-none rounded-lg overflow-hidden bg-white flex items-center justify-center">
+                      {thumb ? (
+                        <Image src={thumb} alt="" fill sizes="40px"
+                          unoptimized={thumb.endsWith('.gif')} className="object-cover" />
+                      ) : (
+                        <XCircle className="w-4 h-4 text-muted-foreground/30" />
+                      )}
                     </div>
-                    <p className="text-[10px] text-muted-foreground truncate">
-                      {ex.equipment.join(", ") || "No equipment"}
-                      {ex.muscles.length > 0 && ` · ${ex.muscles.filter(m => m.role === "main").map(m => m.muscle).join(", ")}`}
-                    </p>
-                  </div>
 
-                  {/* GIF status icon */}
-                  <div className="flex-none">
-                    {isGenerating
-                      ? <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500" />
-                      : hasS3Gif
-                        ? <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
-                        : <XCircle className="w-3.5 h-3.5 text-muted-foreground/30" />
-                    }
+                    {/* Name + info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <p className="text-sm font-medium truncate">{ex.name}</p>
+                        <SourceBadge source={source} />
+                      </div>
+                      <p className="text-[10px] text-muted-foreground truncate">
+                        {ex.equipment.join(", ") || "No equipment"}
+                        {ex.muscles.length > 0 && ` · ${ex.muscles.filter(m => m.role === "main").map(m => m.muscle).join(", ")}`}
+                      </p>
+                    </div>
+
+                    {/* GIF status icon */}
+                    <div className="flex-none">
+                      {isGenerating
+                        ? <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500" />
+                        : hasS3Gif
+                          ? <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+                          : <XCircle className="w-3.5 h-3.5 text-muted-foreground/30" />
+                      }
+                    </div>
                   </div>
 
                   {/* Actions */}
-                  <div className="flex gap-1 flex-none">
-                    {/* Mirror from dataset */}
+                  <div className="mt-1 flex justify-end gap-1">
+                    {/* Mirror from dataset — confirms only when it would OVERWRITE (BF-147) */}
                     <button
+                      aria-label={hasS3Gif ? `Re-mirror ${ex.name} from dataset` : `Mirror ${ex.name} from dataset`}
                       title={hasS3Gif ? "Re-mirror from dataset" : "Mirror from dataset"}
                       disabled={isGenerating || busy}
-                      onClick={() => mirrorOne(ex.name, hasS3Gif)}
+                      onClick={() => hasS3Gif ? setPendingAction({ kind: "mirror", name: ex.name }) : mirrorOne(ex.name, false)}
                       className="text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors p-1.5 rounded-lg hover:bg-muted"
                     >
                       {isGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
                     </button>
-                    {/* AI generate */}
+                    {/* AI generate — same: a first generation is free, a regeneration replaces */}
                     <button
+                      aria-label={hasS3Gif ? `Regenerate ${ex.name} with AI` : `Generate ${ex.name} with AI`}
                       title={hasS3Gif ? "Regenerate (AI)" : "Generate (AI)"}
                       disabled={isGenerating || busy}
-                      onClick={() => generateOne(ex.name, hasS3Gif)}
+                      onClick={() => hasS3Gif ? setPendingAction({ kind: "generate", name: ex.name }) : generateOne(ex.name, false)}
                       className="text-muted-foreground hover:text-violet-400 disabled:opacity-30 transition-colors p-1.5 rounded-lg hover:bg-muted"
                     >
                       {hasS3Gif ? <RefreshCw className="w-3 h-3" /> : <Sparkles className="w-3 h-3" />}
@@ -589,10 +707,12 @@ export default function ExerciseManager() {
                     >
                       <Pencil className="w-3 h-3" />
                     </button>
-                    {/* Delete */}
+                    {/* Delete — BF-124's defect in a second place; the owner lost a session to an
+                        unconfirmed trash icon. It also shipped with no accessible name at all. */}
                     <button
+                      aria-label={`Delete ${ex.name}`}
                       disabled={deleting === ex.name}
-                      onClick={() => handleDelete(ex.name)}
+                      onClick={() => setPendingAction({ kind: "delete", name: ex.name })}
                       className="text-muted-foreground hover:text-destructive disabled:opacity-30 transition-colors p-1.5 rounded-lg hover:bg-muted"
                     >
                       {deleting === ex.name ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
@@ -609,6 +729,34 @@ export default function ExerciseManager() {
         open={addSheetOpen}
         onOpenChange={setAddSheetOpen}
         onAdded={() => { setAddSheetOpen(false); load(); }}
+      />
+
+      <GifReviewSweep
+        open={sweepOpen}
+        onOpenChange={setSweepOpen}
+        candidates={reviewCandidates}
+        onDone={loadReviewed}
+      />
+
+      <ConfirmDialog
+        open={!!pendingAction}
+        onOpenChange={o => { if (!o) setPendingAction(null); }}
+        title={CONFIRM_COPY[pendingAction?.kind ?? "delete"].title}
+        message={
+          pendingAction
+            ? `${pendingAction.name} — ${CONFIRM_COPY[pendingAction.kind].message}`
+            : ""
+        }
+        confirmLabel={CONFIRM_COPY[pendingAction?.kind ?? "delete"].confirmLabel}
+        onConfirm={() => {
+          const a = pendingAction;
+          setPendingAction(null);
+          if (!a) return;
+          if (a.kind === "delete") handleDelete(a.name);
+          // `force` is what makes these two destructive, so it is what the confirm is for.
+          else if (a.kind === "mirror") mirrorOne(a.name, true);
+          else generateOne(a.name, true);
+        }}
       />
     </div>
   );

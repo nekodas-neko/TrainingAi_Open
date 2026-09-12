@@ -12,24 +12,23 @@
 
 ## Now
 
-**BF-145 palette half SHIPPED** (v1.449.0): `--brand-hue` carries the hue angle alone, set in all four
-places `--brand` is, and the dark ramp is built from it. **BF-146** closed not built (#1122).
-**BF-142** (#1114), **BF-141** (#1111), **BF-139** (#1110) shipped. `check:rules` **73/73**.
+**BF-147 SHIPPED** (v1.450.0): admin Exercises tab — two-line rows, three confirms, fixed coverage
+arithmetic, and a one-at-a-time GIF sweep on Lane A's review route. **BF-145** palette half shipped
+(v1.449.0). **BF-146** closed not built (#1122). `check:rules` **73/73**.
 
-**FIVE running entries were wrong about something load-bearing** — BF-139's px estimates, BF-141's
-gate spec, BF-142's **406** constant, BF-146's cause, and **BF-145's fix twice over**: chroma
-0.01–0.03 paints `--card` as sRGB `1,3,1` (invisible — the ramp had to be LIFTED), and its sheet half
-is refuted in `sheet.tsx:70-87`. **Grep the file you are about to change for a comment that already
-answers the entry.**
+**SIX running entries were wrong about something load-bearing** — BF-139's px estimates, BF-141's
+gate spec, BF-142's **406** constant, BF-146's cause, BF-145's fix twice over, and **BF-147's**: it
+blamed the source badge for crushing the exercise name; the badge is **25 px** and the four action
+buttons are **204 of a 340 px row**. **Measure the thing before you fix what the entry blames.**
 
 **A 4-hourly silent Routine polls this lane** (`trig_01WcuYTidPtngLFZFD7yKnoL`, session-bound,
 `53 */4 * * *`): syncs `main`, clears any open PR, runs `next-item.js`, **says nothing when READY is 0**.
 
 ## Next
 
-1. **READY was 0 at 2026-09-12 04:35** — 48 parked, almost all `Gate: device`/`Gate: owner`, none
-   unparkable without him. BF-145 stays queued on a device check plus an owner question (widen
-   `surface="page"` past its five of 46 files?), which is not work.
+1. **Re-run `next-item.js --lane B`. When READY reads 0, READ THE `KEEP` SECTION** — that is where
+   BF-147 was, and it was 300 lines of real unbuilt UI. `Keep:` means "only the stated residue is
+   owed", and the residue is sometimes the whole job. **BF-150 is top of queue and is Lane A's.**
 
 BF-142 left a live finding with Lane A: the resting base is ~1.41 × the owner's Mifflin BMR,
 corroborating BF-137 from a direction that entry does not use (height, not weight trend). **READY
@@ -37,19 +36,15 @@ moves without warning** — re-run `next-item.js` rather than trusting this line
 
 ## Blocked
 
-- **~50 VERIFY entries owe a look.** BF-136 and LB-99 are sharpest (only the owner's account has a
-  real dosing period); BF-139 owes the **daytime** case, unrenderable here (no route to open-meteo).
+- **~50 VERIFY entries owe a look.** BF-136 and LB-99 are sharpest (only the owner's account has a real dosing period); BF-139 owes the **daytime** case (no route to open-meteo).
 - **Owner:** the macro/budget anchor (BF-134's residue, TN-29 protects the stored 1,660); LB-61's
   switch colour; whether the PWA lands on Home rather than Workout (PS-35).
 - **⚠ BF-84 reads startable and is not** — BF-94 supersedes it and is `Gate: device`.
 - **⚠ `actions_list` on ci.yml WITH a `branch` filter is STALE** — it showed one run across four
   pushes and I wrongly told the owner CI was dead. Query it UNFILTERED.
-- **⚠ When `main` lands a PR every ~5 min, a 26-minute E2E never finishes on a current base** (BF-142
-  took six pushes). Merge on the required five once E2E passed on that exact app code; expect `main`
-  to take your version — rebuild `changelog.ts` from `origin/main`, never splice.
-- **⚠ Q-254 is device-free Lane B work parked on a gate that cannot open** — `Needs: Q-297`, itself
-  `Gate: owner`; premise stale too (says one spec exists, there are **84**). With the owner since
-  2026-09-11. **Do not unpark it unilaterally.**
+- **⚠ When `main` lands a PR every ~5 min, a 26-minute E2E never finishes on a current base** (BF-142 took six pushes). Merge on the required five once E2E passed on that exact app code; expect `main` to take your version — rebuild `changelog.ts` from `origin/main`, never splice.
+- **⚠ Q-254 is device-free Lane B work parked behind `Needs: Q-297`, itself `Gate: owner`**; premise
+  stale too (says one spec exists, there are **84**). With the owner since 2026-09-11. Do not unpark.
 - **PS-4 is UNCLASSIFIED by design; LB-94 the owner deferred 2026-09-09.** Do not classify either.
 
 ## Claimed paths
@@ -66,16 +61,14 @@ tree, under other filenames. Closing a PR needs the owner.
 - **A Lane B half needing a Lane A argument is TWO entries.** `workout-screen.tsx` is shrink-only at
   1833 lines — derive further down, never thread a prop through it.
 - **E2E is ADVISORY** — wait on it for app-code or new-spec PRs, else the required five are the gate.
-- **Batons are shrink-only too.** This file is ratcheted; a rewrite that grows it fails CI.
+- **Batons are shrink-only.** Ratcheted; a rewrite that grows it fails CI.
 
 ## The lessons that cost real time
 
 1. **An entry's numbers, gate and CAUSE are prose until something checks them** — five in a row were
    wrong (see Now). The tell each time was a test: BF-146's spec passed with the fix reverted, and
    BF-145's screenshot showed nothing had changed. **Write the failing check before the fix.**
-2. **A mutation that does NOT fail is a finding.** BF-141's `stopPropagation` guards a lossy
-   round-trip (61.0 kg → 61.25) the spec cannot show — the seeded workout starts at 60 kg and
-   round-trips exactly. The test was renamed to what it proves.
+2. **A mutation that does NOT fail is a finding.** BF-141's `stopPropagation` guards a lossy round-trip (61.0 kg → 61.25) the spec cannot show — the seeded workout round-trips exactly. The test was renamed to what it proves.
 3. **This file already held the fix for a run's longest detour** (`scrollIntoViewIfNeeded`), rediscovered from scratch. **Read the Gotchas first.**
 4. **A card reporting "no data" is not evidence that no data reached it** — LB-99's cause was one
    label, not the `getLocalStore` fall-through. A shadowing claim is about ONE function's branch order: PS-35b's two "unreachable" palette keys cited *different* functions, both live.
@@ -108,3 +101,10 @@ tree, under other filenames. Closing a PR needs the owner.
   `body_metrics` has a `(user_id, date)` unique. check:rules is `Ran N of N` — never quote "pass".
 - **Judge a colour change by sampling pixels**, not token values: `OffscreenCanvas` + `getImageData`
   in `page.evaluate` gives sRGB and WCAG ratios, and channel spread (max−min) says if a hue is visible.
+  For a LAYOUT complaint, measure `getBoundingClientRect()` on every child of the row — that is what
+  showed the 48 dp tap floor, not the badge, eating BF-147's name column.
+- **The admin screens need `is_admin` AND a re-minted JWT** — the claim is in the token, so flipping
+  the column leaves a stored `e2e/.auth` state non-admin. Re-run `--project=setup`. Restore both.
+- **Prove a destructive path from the DATABASE, not from `page.route` interception** — a matcher that
+  silently fails reads exactly like "no request fired", and on BF-147 that nearly got reported as a
+  broken confirm while `count(*)` showed the delete had gone through.

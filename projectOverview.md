@@ -1754,7 +1754,24 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
-### [nutrition] ⚠️ The budget follows your goal now, and which goal is still unanswered (BF-150, 2026-09-12, v1.450.0) · needs: owner
+### [platform][app-shell] ⚠️ The admin Exercises tab is usable now, and the S3 credentials nobody checked still gate it (BF-147, 2026-09-12, v1.450.0) · needs: owner
+
+Owner: *"ui is bad and I also want a better way to make sure everything has the right gif."* Names
+render in full, the three destructive taps ask first, the coverage fraction counts the right things,
+and a sweep screen judges one GIF at a time against Lane A's review route.
+
+**The entry's stated cause was wrong and measurement caught it — the fifth in a row.** It blamed the
+source badge for crushing the name; the badge is 25 px. The four action buttons are **204 px of a
+340 px row** (the 48 dp tap-target floor inflating 12 px icons to 51), leaving the name column 50 px
+and the name 19. The row went to two lines instead.
+
+**What is owed is the owner, and it is not UI.** Nobody has checked the **production S3
+credentials** — the sandbox reports `SignatureDoesNotMatch (403)` from the shared client. If the
+bucket rejects in prod too, "AI all" writes into a store it cannot read back, and the six
+proxy-path rows plus the AI style reference stay broken. BF-147 asked for that check before any
+code was written here; the code was orthogonal to it and shipped, the check was not done.
+
+### [nutrition] ⚠️ The budget follows your goal now, and which goal is still unanswered (BF-150, 2026-09-12, v1.451.0) · needs: owner
 
 Owner: *"When is this going to be back to the expected number? The 1350+ excercsise?"* The daily
 budget was `estimated maintenance − goal adjustment + earned`, so the 1,660 he stored took no part in
@@ -1772,6 +1789,7 @@ makes it 1,481. Not resolved in code on purpose: which number he eats to is his.
 **Also not verified on device.** Server-computed, so it reaches the APK through Railway with no
 rebuild, but no S25 has rendered the new provenance line — *"1,660 your goal + 131 earned from
 movement"* — and the wording is the part a screenshot would catch.
+
 
 ### [app-shell] ⚠️ The app is tinted now, and no OLED panel has judged it (BF-145, 2026-09-12, v1.449.0) · needs: hardware
 

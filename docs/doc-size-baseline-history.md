@@ -11085,6 +11085,20 @@ decided rather than awaiting triage.
 LA-91's 35-line entry leaves the queue with the CI job timeouts. `docs/module-map.md` gains a row for
 the guard script in the same PR and stays within its own baseline.
 
+## 2026-09-12 — `docs/implementation-backlog.md` 21088 → 21027 (BF-147 rewritten to its residue)
+
+Down sixty-one. The entry carried a full diagnosis of four UI defects; three of the four are now in
+the diff, so what stays is the measurement that overturned its stated cause (the badge is 25 px, the
+action row is 204), the one thing still owed (nobody has checked the production S3 credentials) and
+the structural limit on the sweep. The rest is in the journal.
+
+## 2026-09-12 — `projectOverview.md` 10683 → 10700 (BF-147 Known-Issues row)
+
+Seventeen for a shipped admin screen whose one outstanding item is an owner action rather than code:
+the production S3 credentials, which the entry asked to check first and which nobody has. The row
+also carries the measurement that overturned the entry's stated cause, so a later reader does not
+re-adopt it.
+
 ## 2026-09-12 — `docs/implementation-backlog.md` + `projectOverview.md` (BF-150 shipped)
 
 BF-150's 54-line entry leaves the queue with the goal-anchored budget. `projectOverview.md` gains a
