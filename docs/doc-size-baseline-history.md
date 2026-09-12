@@ -11105,3 +11105,11 @@ BF-150's 54-line entry leaves the queue with the goal-anchored budget. `projectO
 Known-Issues row, because what the entry left unresolved is a number rather than code: it prescribed
 "stored goal + earned" and verified against a figure 310 kcal/day lower, and only the owner can say
 which he meant.
+
+## 2026-09-12 — `docs/implementation-backlog.md` (BF-151 filed)
+
+Thirty-five lines for BF-151, the orphaned finding out of the BF-149 fix: the bodyweight rep max is
+reconstructed by inverting a stored estimate when `exercise_logs.avg_reps` holds the real figure. It
+was written only into the journal entry and the PR body, which the **No orphaned findings** rule does
+not accept — the entry carries the 5/6 collision at 114.5 that no inverse can separate, which is the
+argument for doing it at all.
