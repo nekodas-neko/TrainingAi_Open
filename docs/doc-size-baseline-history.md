@@ -11079,3 +11079,8 @@ is invisible below L 0.13, and that BF-145's sheet half is refuted rather than o
 BF-150 leads the queue on the owner's instruction: anchor the daily budget to the goal he set rather
 than to an estimator measured 600 kcal high and drifting +46 kcal/day, with the approach already
 decided rather than awaiting triage.
+
+## 2026-09-12 — `docs/implementation-backlog.md` (LA-91 shipped)
+
+LA-91's 35-line entry leaves the queue with the CI job timeouts. `docs/module-map.md` gains a row for
+the guard script in the same PR and stays within its own baseline.
