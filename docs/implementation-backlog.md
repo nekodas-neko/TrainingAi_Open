@@ -20528,6 +20528,41 @@ patch.
 - **Keep:** whether the app's scanner needs the same rotation tolerance, and whether the residual
   0.13% is worth pursuing upstream. Both are decisions, not work.
 
+### [workouts] BF-151 — the bodyweight rep max is reconstructed from an estimate when the database stores the real reps
+
+- **Lane:** A — `app/api/workout-data/route.ts` has to carry the previous session's reps before the
+  card can stop inverting; `components/workout/exercise-summary-screen.tsx` and
+  `packages/shared/src/1rm.ts` are the follow-on half.
+- **Added:** 2026-09-12 (BugFix intake). Filed from the BF-149 fix, which was a correct inverse and
+  is shipped — this is the reason the inverse should eventually not be needed. Per **No orphaned
+  findings** it was written into
+  [`docs/overview/entries/2026-09-12-bodyweight-rep-max-inverse.md`](overview/entries/2026-09-12-bodyweight-rep-max-inverse.md)
+  and needs a queue entry of its own.
+- **The exercise summary derives a bodyweight rep max by inverting a stored 1RM estimate.** For a
+  bodyweight exercise the rep max *is* the reps performed, and `exercise_logs.avg_reps` already holds
+  that figure exactly — 11 for the set the owner reported. The card reconstructs, lossily, a number
+  the database stores.
+- **One collision is unfixable by any inverse, which is what makes this worth doing.** 5 reps and 6
+  reps both store **114.5**: the rep-factor gain from the extra rep is exactly cancelled by
+  `amrapScaleFactor`'s 1.0 → 0.97 step at 6. `repMaxFromAmrapOneRm` returns the lower of a tie, which
+  is the most the stored number supports, and no better inverse can separate them. Reading the reps
+  removes the question.
+- **The current session needs no new data.** `summaryData.reps` is already on the client
+  (`components/workout/types.ts`), so `newRepMax` can come straight from the logged reps today. It is
+  the *previous* session that is the engine half: `prevEst1rm` is `ex.estimated1rm` from the
+  `workout-data` payload, which carries no reps, so the route has to return `avgReps` alongside it.
+  That split is why this is Lane A first rather than a display change.
+- **`repMaxFromOneRm` and the exercise stats sheet stay as they are.** That pair inverts the same
+  unscaled `calc1RM` the sheet's own comparison table is built from, so it is self-consistent; the
+  defect BF-149 fixed was only ever feeding an AMRAP-scaled estimate to the unscaled inverse. Nothing
+  here asks for that caller to change.
+- **Scope note:** a historical series with no per-set reps to hand still needs an inverse, so
+  `repMaxFromAmrapOneRm` is not being deleted — it stops being the source for the two values on this
+  card.
+- **Verification:** the two rep-max values render only under `isBodyweight`, so a bodyweight set on
+  device (a Hanging Leg Raise at a rep count other than 5 or 6) is the check — the previous-session
+  value is the one that exercises the new payload field.
+
 ### [platform][workouts] 🔵 BF-9 — a trainer role: build a program for someone else and assign it to them
 
 - **Lane:** A — classified 2026-08-30 by CLAUDE.md's path rule (*touches storage or `app/api/**` → A; both halves → A, engine first*). New tables, authorization and routes are the engine; the trainer UI follows as **B**. The planning session still splits the work — it does not re-decide the lane.
