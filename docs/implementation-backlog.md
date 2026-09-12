@@ -932,11 +932,20 @@ below threshold and left in place for next time.
   one, so **every ad-hoc query through the admin endpoint hits the trap by default**, which is
   exactly where a session goes to check a claim. Renaming the Drizzle property fixed the ORM path
   and left the SQL path as sharp as it was.
-- **Gate:** owner — dropping the column is a data-losing migration and needs confirmation, per the
-  standing rule and `schema.ts`'s own note. **Ask it as its own question, not folded into the guard
-  fix:** the column holds nothing (0 of 108 rows) and has never been read, so the loss is nominal,
-  but "nominal" is still the owner's call. The guard change above is not blocked by it.
-- **Needs:** nothing. **Read BF-143 first** — this corrects that entry's reasoning, not its outcome.
+- **⚠ NO `Gate:` ON THIS ENTRY, deliberately, and the reason is the rule itself.** The guard change
+  above needs nothing from the owner and is startable today. A `Gate:` parks the whole entry, so
+  putting one here to mark the column question would hide the startable work behind it — the exact
+  failure the protocol header describes, and one this session had already made once (BF-139 through
+  BF-142 were filed with a `Verify:` field and vanished from both lanes until the owner noticed).
+- **The column drop is the owner's, and it is a SEPARATE decision that does not block the guard.**
+  Dropping `program_session_id` is a data-losing migration and needs confirmation per the standing
+  rule and `schema.ts`'s own note. The loss is nominal — 0 of 108 rows, never read — but nominal is
+  still his call. **Ask it on its own**, and do not let the answer hold up moving the interruption
+  test onto the id link.
+- **Read BF-143 first** — this corrects that entry's reasoning, not its outcome. Kept out of the
+  `Needs:` bullet on purpose: `Needs:` is a FIELD, so a bare id inside it is parsed as a dependency,
+  and that is exactly what parked this entry behind a BF-143 that had already shipped.
+- **Needs:** nothing.
 
 ### [platform] LB-94 — the journal's recent window is 332 entries, and 297 of them are pinned by a citation
 

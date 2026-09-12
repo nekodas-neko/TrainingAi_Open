@@ -10990,3 +10990,9 @@ the dead `program_session_id` column that produced the false premise.
 
 Three owner reports in one sitting: the baseline refusal drawn as a failure, the admin GIF console
 and its missing flag, and the zero-chroma surface palette.
+
+## 2026-09-12 — `docs/implementation-backlog.md` (BF-144 unparked)
+
+BF-144 was hidden from the queue twice over: a `Gate: owner` covering only the column-drop question,
+and a cross-reference to BF-143 written inside the `Needs:` bullet, which the parser read as a real
+dependency. Both corrected, with the reason recorded in the entry.
