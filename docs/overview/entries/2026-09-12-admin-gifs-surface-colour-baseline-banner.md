@@ -100,3 +100,30 @@ there are three cases rather than one.
 
 **Not exercised:** the authenticated body of the route was never run by a browser. `pnpm dev` confirms
 both paths load and return 401 without a session cookie; no real session was available.
+
+## BF-150 — the owner's call on which number he eats to
+
+He asked when the budget would return to the figure he expects, "the 1350+ exercise". The honest
+answer was: not on its own, and not soon. Measured from his screenshots, the base went 2,150 on the
+11th to 2,196 on the 12th — **+46 kcal in a day** — because the calibrated maintenance is fitting a
+retatrutide weight drop and reading it as metabolism. At 2,196 it is 1.44 × his 1,527 BMR in a field
+the card labels *resting*, and the gap against what he expects is ~646 kcal.
+
+He also cannot opt out. `resolveMaintenance` returns `source: 'calibrated'` the moment either window
+fills, unconditionally — no override anywhere in the app. So every day that passes re-anchors him
+higher and nothing he can touch changes it.
+
+Two routes were put to him: fix the estimator (BF-137's drug-window exclusion), or anchor the daily
+budget to the goal he already set and leave the estimator as information. He chose the second and
+asked for it at the top of the queue, so BF-150 leads Lane A.
+
+The reasoning for that recommendation, recorded because it is a product decision rather than a bug
+fix: excluding the drug window is the principled repair, but it needs a judgement about when the
+data is trustworthy again, and until then he would still be eating to a number he did not choose.
+Anchoring to the stored goal is one line of intent, reversible, and correct regardless of where the
+estimator eventually settles. It also closes BF-142's gap from the other side — with the budget and
+the grams sharing a denominator, the paragraph explaining why they differ stops being needed.
+
+What it gives up, stated so it is not re-opened as a defect later: the app stops auto-adjusting his
+intake as his metabolism changes. That is the trade, it is deliberate, and it is revisitable once he
+is off the drug — which is the point at which BF-137 becomes the right tool.

@@ -11073,3 +11073,9 @@ the translucent-sheet fix.
 Twenty-three for a palette change that touches every screen and has not been seen on the phone. The
 row carries the two things a later session would otherwise redo: the measurement that chroma alone
 is invisible below L 0.13, and that BF-145's sheet half is refuted rather than outstanding.
+
+## 2026-09-12 — `docs/implementation-backlog.md` (BF-150)
+
+BF-150 leads the queue on the owner's instruction: anchor the daily budget to the goal he set rather
+than to an estimator measured 600 kcal high and drifting +46 kcal/day, with the approach already
+decided rather than awaiting triage.

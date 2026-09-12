@@ -421,6 +421,60 @@ below threshold and left in place for next time.
 
 
 
+### [nutrition] BF-150 — anchor the daily budget to the goal the owner SET, not to an estimator that is 600 kcal high and still climbing 🔴 LIVE · TOP OF QUEUE
+
+- **Lane:** A — `lib/health/energy-balance-service.ts` and the energy model.
+- **Owner decision, 2026-09-12: DO THIS ONE, ahead of fixing the estimator.** Presented as a
+  recommendation against the alternative of BF-137's drug-window exclusion; he chose it and said
+  *"Move it to the top of th3 queue"*. **This is not a finding awaiting triage — the approach is
+  already decided and the entry exists to be built.**
+
+- **Added:** 2026-09-12 · owner: *"When is this going to be back to the expected number? The 1350+
+  excercsise?"*
+
+- **What he wants, in his own words, is a rule the app does not currently follow:** eat to a chosen
+  daily number, plus whatever movement earns. Today the number he eats to is **computed** — base
+  2,196 − 200 goal + 131 earned = **2,127** — while the goal he actually set, **1,660** in
+  `nutrition_targets` on 2026-08-31, takes no part in it at all.
+- **⚠ THE ESTIMATOR IS WRONG AND GETTING WORSE, WHICH IS WHY THIS CANNOT WAIT FOR A CAREFUL FIX.**
+  Measured from his own screenshots: base **2,150 on 2026-09-11**, **2,196 on 2026-09-12** —
+  **+46 kcal in one day**, and 2,196 is **1.44 × his 1,527 Mifflin BMR** (158 cm, 70 kg, 33, male)
+  in a field the card labels *resting*. BF-137 has the mechanism: the calibrated maintenance is
+  fitting a retatrutide-driven weight drop and reading it as metabolism, so it climbs for as long as
+  the weight falls. **The gap against what he expects is ~646 kcal**, in the direction that has him
+  eating at maintenance while trying to recomp.
+- **And there is no way for him to opt out.** `resolveMaintenance`
+  (`packages/shared/src/nutrition/adaptive-tdee.ts:194-201`) returns `source: 'calibrated'` the
+  moment either window fills, unconditionally — no override, no setting, nothing in Profile or
+  Nutrition settings. Checked 2026-09-12. So the owner cannot route around this himself and every
+  day that passes re-anchors him higher.
+
+- **The change:** the daily budget becomes **stored goal + earned movement**. The estimator stays
+  computed and stays visible as information — it must not vanish, because BF-137 and TN-29 are about
+  making it true and they still need somewhere to show it — but it stops setting the number he eats
+  to.
+  - **The goal adjustment (−200) folds into the goal itself.** He set 1,660 *as* his target;
+    subtracting another 200 from it would re-introduce the double-deduction the ⓘ text already has
+    to explain away.
+  - **The macro grams stop being earned-scaled against a different denominator.** This is the other
+    half of BF-142's gap: with the budget anchored to the same stored goal the grams come from, the
+    two numbers finally share a denominator instead of needing a paragraph explaining why they
+    cannot.
+  - **Keep the earned-movement addend exactly as it is.** It is the half of the model he has never
+    disputed, and `restingBase` already has habitual activity removed so it is not double-counted.
+- **What this deliberately gives up, stated so nobody re-opens it as a bug:** the app stops
+  auto-adjusting his intake as his real metabolism changes. That is the point — the estimator is
+  ~600 kcal wrong today — and it is revisitable once he is off the drug, which is when BF-137's
+  exclusion window becomes the right tool.
+- **Related, and none of them are replaced by this:** BF-137 (the estimator fits the drug window),
+  TN-29 (nothing cross-checks the two activity factors the app already computes), BF-142 (the card
+  explains the gap with a reason its own module rules out). This entry changes *which number the
+  owner eats to*; those three are about making the estimate itself honest.
+- **Verification:** the Nutrition card's budget equals `stored goal + earned`, so today's would read
+  ~1,481 rather than 2,127; the macro grams and the calorie budget agree on their denominator; and
+  the estimator is still shown somewhere the owner can see what it currently believes.
+- **Needs:** nothing.
+
 ### [app-shell] BF-139 — three header chips no longer fit beside the date (fixed; the device look is what is left)
 
 - **Lane:** B
