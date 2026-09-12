@@ -225,7 +225,7 @@ below threshold and left in place for next time.
   `adm-zip` GHSA-vwc7-r8mq-g2x9 via `onnxruntime-node`, which has **no published fix**
   (`patched_versions: <0.0.0`), so there is nothing to bump. Down from **36 findings,
   23 high and 2 critical**, cleared 2026-09-10 in `chore/dependabot-remediation`
-  ([journal](overview/entries/2026-09-10-chore-dependabot-remediation.md)).
+  ([journal](overview/history-2026-09-12-folded-1.md#2026-09-10-chore-dependabot-remediation)).
 - **What that pass did, so the next one starts from the pattern rather than rediscovering it:**
   two direct patch bumps within the same major (`next` ^15.5.22 → ^15.5.24, which resolved
   15.5.25 and cleared the **critical**; `sharp` ^0.35.3 → ^0.35.4) plus six `pnpm.overrides`
@@ -2327,7 +2327,7 @@ sounds like:**
 - **Keep:** the anchor decision, and only that. **The labelling shipped 2026-09-09** —
   `macro-budget-gap.ts` + `energy-card.tsx` name what the grams add up to, how far that sits from the
   budget, and that the ⓘ's resting burn already has habitual movement removed (the invisible
-  subtraction read as a second one). See [`docs/overview/entries/2026-09-09-fix-macro-budget-anchor-label.md`](overview/entries/2026-09-09-fix-macro-budget-anchor-label.md).
+  subtraction read as a second one). See [`2026-09-09-fix-macro-budget-anchor-label`](overview/history-2026-09-12-folded-1.md#2026-09-09-fix-macro-budget-anchor-label).
 
 **⚠ Two corrections to this entry, measured while implementing it.** (1) **The gap does NOT
 converge.** `scaleMacrosForEarnedKcal` grows the grams by `earned` at the same moment
@@ -2402,7 +2402,7 @@ short all day.
   and **(b)** the same screen with the logging sheet actually over the bottom half. Check set 1 is
   reachable and the `⚠ Injury: …  Swap` chip is tappable with a thumb.
 - **✅ SHIPPED 2026-09-09** (`fix/injury-header-crowding`) — the whole recommendation.
-  [Journal](overview/entries/2026-09-09-fix-injury-header-crowding.md). The full banner moved to the
+  [Journal](overview/history-2026-09-12-folded-1.md#2026-09-09-fix-injury-header-crowding). The full banner moved to the
   ready screen (which **had no injury warning at all** before this, so the warning used to arrive
   after the weight was chosen); during the set it is a chip with Swap; the header gained
   `max-h-[45%] overflow-y-auto` so the next thing added to it scrolls rather than pushing set 1 off.
@@ -14701,7 +14701,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Keep:** the unexplained residue, and nothing buildable. **There is no next action** — every
   mechanical candidate is closed (smoothing 0.487 h, bin occupancy 0.000, window geometry ~0.06,
   candidate 3 closed 2026-09-04), the one buildable half shipped 2026-09-09
-  ([#1040](overview/entries/2026-09-09-q509-fragmented-night-recovery-index.md)), and **both knobs
+  ([#1040](overview/history-2026-09-12-folded-1.md#2026-09-09-q509-fragmented-night-recovery-index)), and **both knobs
   that remain are under standing do-not-move orders**: do not widen `MEDIAN_WINDOW`, do not move
   `RECOVERY_INDEX_OPTIMAL_HOURS`. What is owed is an explanation for the **~0.39 h in ordinary
   full-length nights**, which needs a new idea rather than a new implementation. This entry printed
@@ -14806,7 +14806,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Do NOT move `RECOVERY_INDEX_OPTIMAL_HOURS`.** A second anchor change inside two days, same
   direction, fitted to an input that moved for measurement reasons, is how a scoring constant gets
   quietly re-purposed into a bias correction.
-- **✅ `last.recoveryIndexHours` SHIPPED 2026-09-09** — `nightRecoveryIndexHours` takes the minimum across every window, the wake from the last ([journal](overview/entries/2026-09-09-q509-fragmented-night-recovery-index.md)).
+- **✅ `last.recoveryIndexHours` SHIPPED 2026-09-09** — `nightRecoveryIndexHours` takes the minimum across every window, the wake from the last ([journal](overview/history-2026-09-12-folded-1.md#2026-09-09-q509-fragmented-night-recovery-index)).
   **⚠ Its quoted measurement was unsound: "fragmented nights average 2.719 h against 2.639 h" cannot
   be of this path — under `groupSleepPeriods`' rules NOT ONE of the 61 BLE-era nights is fragmented,
   so the branch has never run and the fix is latent.** Rows-per-date gives 13; every second row is a
@@ -16216,7 +16216,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   otherwise heard only "Readiness: —".
   The two sentences differ because only one is fixed by waiting — "Nothing recorded for today" versus
   "Not enough history to score this yet" — which is the whole distinction the engine half preserved.
-  [journal](overview/entries/2026-09-08-feat-q278-availability-surfaces.md)
+  [journal](overview/history-2026-09-12-folded-1.md#2026-09-08-feat-q278-availability-surfaces)
 - **Keep:** the route emits `availability` for **readiness, sleep and activity only**. Daytime stress
   and resilience — the two lowest-coverage pillars in the table below, at 55% and 33% — still render
   without one, so their dashes cannot be explained by any surface. `metricAvailability` is keyed on
