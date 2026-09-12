@@ -11014,6 +11014,11 @@ exist, a `Keep:` naming the four UI defects and the sweep screen left for Lane B
 note that the production S3 credentials the entry asks about were *not* checked — the verdict column
 touches neither storage nor generation, but that judgement belongs on the record rather than in a
 gap. Nothing was deleted: the entry stays queued, re-laned rather than removed.
+## 2026-09-12 — `docs/implementation-backlog.md` (BF-149)
+
+Net zero: BF-149 was written and then removed in the same change, because it shipped with nothing
+owed and `check-backlog-pointers` rejects a finished entry in the queue. The journal carries it.
+
 
 ## 2026-09-12 — `docs/implementation-backlog.md` (BF-144 guard half)
 

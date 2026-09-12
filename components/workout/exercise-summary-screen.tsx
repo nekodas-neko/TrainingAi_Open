@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@trainingai/shared/utils";
 import type { ExerciseSummaryData } from "./types";
 import { formatTime, formatSetLoad } from "./utils";
-import { repMaxFromOneRm, displayOneRmSeries, isBodyweightType, oneRmLabel, oneRmUnit } from "@trainingai/shared/1rm";
+import { repMaxFromAmrapOneRm, displayOneRmSeries, isBodyweightType, oneRmLabel, oneRmUnit } from "@trainingai/shared/1rm";
 import { cachedFetch } from "@/lib/sqlite/cache";
 import { EXERCISE_HISTORY_TTL } from '@trainingai/shared/cache-ttl';
 import { SessionClock } from "./session-clock";
@@ -102,8 +102,11 @@ export function ExerciseSummaryScreen({ summaryData, workoutStartMs, onNext, use
           : "text-muted-foreground";
 
   const isBodyweight = isBodyweightType(exerciseType);
-  const prevRepMax = prevEst1rm != null ? repMaxFromOneRm(prevEst1rm) : null;
-  const newRepMax = repMaxFromOneRm(newEst1rm);
+  // BF-149 — these render only under `isBodyweight` below, and a bodyweight estimate is always
+  // written by `amrapAverage1Rm`, so it must be inverted through the AMRAP-scaled formula it came
+  // from. `repMaxFromOneRm` inverts the unscaled `calc1RM` and under-reported by the discount.
+  const prevRepMax = prevEst1rm != null ? repMaxFromAmrapOneRm(prevEst1rm) : null;
+  const newRepMax = repMaxFromAmrapOneRm(newEst1rm);
   const repDiff = prevRepMax != null ? newRepMax - prevRepMax : null;
 
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calc1RM, calcAmrap1RM, calculate1RM, runningEstimate1RM, oneRmTrendStatus, BW_REF, repMaxFromOneRm, rescaleBodyweightReps, resolveBodyweightStyle, estimateOneRm, repFactor, amrapScaleFactor, REP_CEILING, bestSetOneRm, mround, displayOneRm, displayOneRmDelta, displayOneRmSeries, oneRmLabel, oneRmUnit, describePersonalRecord, pickHeadlinePersonalRecord } from '../1rm'
+import { calc1RM, calcAmrap1RM, calculate1RM, runningEstimate1RM, oneRmTrendStatus, BW_REF, repMaxFromOneRm, repMaxFromAmrapOneRm, rescaleBodyweightReps, resolveBodyweightStyle, estimateOneRm, repFactor, amrapScaleFactor, REP_CEILING, bestSetOneRm, mround, displayOneRm, displayOneRmDelta, displayOneRmSeries, oneRmLabel, oneRmUnit, describePersonalRecord, pickHeadlinePersonalRecord } from '../1rm'
 
 describe('calcAmrap1RM', () => {
   it('matches calc1RM for ≤5 reps (scale factor 1.0)', () => {
@@ -176,6 +176,45 @@ describe('oneRmTrendStatus', () => {
   it('is "even" within ±0.5 kg', () => {
     expect(oneRmTrendStatus(66.75, 66.5)).toBe('even')
     expect(oneRmTrendStatus(66.25, 66.75)).toBe('even')
+  })
+})
+
+describe('repMaxFromAmrapOneRm (BF-149)', () => {
+  // The owner's own numbers: 11 logged reps stored 128 and the summary card read 8 RM, because
+  // the inverse used `calc1RM` while `estimateOneRm` writes `amrapAverage1Rm` values.
+  it('recovers the reps a stored bodyweight estimate came from', () => {
+    const stored = estimateOneRm([{ weightKg: 0, reps: 11 }], { exerciseType: 'bodyweight' }).estimated1rm
+    expect(stored).toBe(128)
+    expect(repMaxFromAmrapOneRm(stored)).toBe(11)
+    // What it used to report, kept so the regression is legible rather than just "not 8".
+    expect(repMaxFromOneRm(stored)).toBe(8)
+  })
+
+  // `amrapScaleFactor` steps at 5/8/12/20, so the forward map dips across each boundary and a
+  // "largest r that does not exceed" search overshoots — 20 reps used to read back as 28.
+  it('does not overshoot at the scale-factor step boundaries', () => {
+    for (const reps of [5, 8, 12, 19, 20]) {
+      expect(repMaxFromAmrapOneRm(calcAmrap1RM(BW_REF, reps))).toBe(reps)
+    }
+  })
+
+  it('round-trips every rep count except the one genuine collision', () => {
+    const mismatched: number[] = []
+    for (let r = 1; r <= REP_CEILING; r++) {
+      if (repMaxFromAmrapOneRm(calcAmrap1RM(BW_REF, r)) !== r) mismatched.push(r)
+    }
+    // 5 and 6 both store 114.5 — the rep-factor gain is exactly cancelled by the 1.0 -> 0.97 step,
+    // so no inverse can separate them and the lower reading is the one the number supports.
+    expect(mismatched).toEqual([6])
+    expect(calcAmrap1RM(BW_REF, 5)).toBe(calcAmrap1RM(BW_REF, 6))
+  })
+
+  it('inverts at the load the estimate was earned on', () => {
+    expect(repMaxFromAmrapOneRm(calcAmrap1RM(BW_REF + 20, 8), 20)).toBe(8)
+  })
+
+  it('returns 0 with no estimate', () => {
+    expect(repMaxFromAmrapOneRm(0)).toBe(0)
   })
 })
 
