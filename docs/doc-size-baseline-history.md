@@ -11098,3 +11098,10 @@ Seventeen for a shipped admin screen whose one outstanding item is an owner acti
 the production S3 credentials, which the entry asked to check first and which nobody has. The row
 also carries the measurement that overturned the entry's stated cause, so a later reader does not
 re-adopt it.
+
+## 2026-09-12 — `docs/implementation-backlog.md` + `projectOverview.md` (BF-150 shipped)
+
+BF-150's 54-line entry leaves the queue with the goal-anchored budget. `projectOverview.md` gains a
+Known-Issues row, because what the entry left unresolved is a number rather than code: it prescribed
+"stored goal + earned" and verified against a figure 310 kcal/day lower, and only the owner can say
+which he meant.

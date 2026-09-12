@@ -18,14 +18,26 @@ const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/
  */
 describe('the line labelled "base" shows the resting base', () => {
   it('does not print budgetProvenance().base as "base"', () => {
-    // The specific regression: destructuring `base` and printing it beside the word.
-    expect(code).not.toMatch(/const\s*\{[^}]*\bbase\b[^}]*\}\s*=\s*budgetProvenance/)
+    // The specific regression. BF-150 narrowed this: it used to ban DESTRUCTURING `base` at all,
+    // which was a proxy for the defect rather than the defect. The anchored path prints `base`
+    // legitimately — there it is the user's stored goal and nothing is folded into it — so the ban
+    // is now on the only thing that was ever wrong: that value printed beside the word "base".
+    expect(code).not.toMatch(/\{base\.toLocaleString\(\)\}\s*base/)
     expect(code).toMatch(/restingBase\.toLocaleString\(\)\}\s*base/)
   })
 
   it('names the goal delta rather than folding it into the base silently', () => {
     expect(code).toMatch(/goalDelta\s*!==\s*0/)
     expect(code).toMatch(/for your goal/)
+  })
+
+  // BF-150. The wording has to follow which branch of `budgetProvenance` ran. On the anchored path
+  // there is no resting-base-plus-delta split to name — the goal IS the whole zero-movement budget —
+  // so printing "base − goal" there would name two numbers that are not addends of what is on
+  // screen, which is BF-99's defect wearing the opposite hat.
+  it('switches the wording on whether the budget is anchored to the goal', () => {
+    expect(code).toMatch(/anchoredToGoal/)
+    expect(code).toMatch(/\{base\.toLocaleString\(\)\}\s*your goal/)
   })
 })
 
@@ -35,6 +47,10 @@ describe('the printed figures still reconcile to the budget', () => {
   const printed = (b: { restingBaseKcal: number; activeKcal: number; targetNetKcal: number }) =>
     Math.round(b.restingBaseKcal) + Math.round(b.targetNetKcal) + Math.round(b.activeKcal)
 
+  // BF-150's path: the goal replaces both addends, so what is printed is the goal plus movement.
+  const printedAnchored = (b: { activeKcal: number; goalKcal: number }) =>
+    Math.round(b.goalKcal) + Math.round(b.activeKcal)
+
   it.each([
     // The owner's reconstructed day: base 1,464, recomp −200, 150 earned → 1,414 budget.
     { restingBaseKcal: 1464, activeKcal: 150, targetNetKcal: -200 },
@@ -43,6 +59,14 @@ describe('the printed figures still reconcile to the budget', () => {
     { restingBaseKcal: 1500, activeKcal: 320, targetNetKcal: 0 },    // maintain
   ])('sums to budgetProvenance().total for %j', (b) => {
     expect(printed(b)).toBe(budgetProvenance(b).total)
+  })
+
+  it.each([
+    { restingBaseKcal: 2196, activeKcal: 131, targetNetKcal: -200, goalKcal: 1660 },  // the owner, 2026-09-12
+    { restingBaseKcal: 2196, activeKcal: 0, targetNetKcal: -200, goalKcal: 1660 },    // no movement yet
+    { restingBaseKcal: 1464, activeKcal: 320, targetNetKcal: 0, goalKcal: 1350 },     // maintain, anchored
+  ])('sums to budgetProvenance().total on the anchored path for %j', (b) => {
+    expect(printedAnchored(b)).toBe(budgetProvenance(b).total)
   })
 
   it('a maintain user sees the resting base and nothing else added', () => {
