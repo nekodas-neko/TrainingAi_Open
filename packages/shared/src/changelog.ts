@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.448.3",
+    date: "2026-09-12",
+    changes: [
+      "Your rep max on a bodyweight exercise now matches the reps you actually did. An 11-rep set was showing as 8 RM \u2014 the estimate is discounted when it is taken to failure, and the summary card was undoing that discount with the wrong formula, so every bodyweight rep max read low.",
+    ],
+  },
+  {
     version: "1.448.2",
     date: "2026-09-12",
     changes: [
