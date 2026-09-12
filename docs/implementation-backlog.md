@@ -712,6 +712,85 @@ below threshold and left in place for next time.
   retroactively clear them.
 - **Needs:** nothing. **Read BF-127 first** — defect 3 is its mechanism in a second location.
 
+### [workouts] BF-148 — the header says Baseline and the set card prescribes 3×8, because a name-keyed guard vetoes the periodization state (FIXED)
+
+- **Lane:** A — the disagreement is in what `/api/workout-data` puts in `phaseStatus`.
+- **Verification:** a session whose `session_periodization.phase` is `baseline` renders AMRAP set
+  cards, and `estimateOneRm` receives `isBaseline: true` so the anchor it persists comes from the
+  baseline estimator. Reproducible from a `session_periodization` row; no device needed.
+
+- **Added:** 2026-09-12 · owner, opening his recalibrated Lower session: *"I tried the session; but
+  it didnt open up to amrap; was just the normal session."* Screenshot header reads
+  **"Baseline · S1 · Ex 1/5"** above a set card showing **3 sets of 92.5 kg × 8**, no AMRAP.
+
+- **⚠ THE DIAGNOSIS BELOW WAS WRONG AND IS CORRECTED HERE. Read this first.** This entry was filed
+  blaming the program-phase engine and the `leader.phaseStatus` collapse. That collapse is real and
+  is described below, but it is **not** what produced the symptom. The operative term was a third
+  condition on `isAiDynamicBaseline` in the *same* route:
+  `hasAnyPriorLog = priorLogsThisProgram != null && exerciseNames.some(name => priorLogsThisProgram.has(name))`
+  — **the identical name-keyed shape BF-143 and BF-144 already corrected in two other places, here
+  for a third time.** Lower's exercise names were logged in this program before the rebuild, so the
+  flag was true, so `isAiDynamicBaseline` was false, and the set card prescribed normally while the
+  header — reading the same `aiPeriodizationState` — said Baseline.
+- **✅ SHIPPED** (2026-09-12, owner asked for it in-session). The `!hasAnyPriorLog` term is
+  **removed** rather than repaired, in both the batch and single-session paths, and the now-unused
+  `priorLogsThisProgram` fetch goes with it — one fewer query per single-session read. Two reasons
+  it is a deletion:
+  - It was a **proxy for stale periodization state**, and BF-143 made that state trustworthy: the
+    auto-heal now completes a baseline only on evidence that THIS session was interrupted, so a row
+    reading `baseline && !baselineComplete` means what it says.
+  - `generate-prescription.ts:201` already trusts exactly that pair to refuse a prescription, and
+    the header and pre-workout panel already render from it. The set card now agrees with the rest
+    of the screen instead of holding a second opinion.
+  **A date-keyed repair was considered and rejected:** a log newer than `phaseStartedAt` appears the
+  moment the first set of the baseline session is logged, which would drop the AMRAP display half
+  way through the workout it exists for. BF-143's auto-heal can use that test because flipping true
+  mid-session is correct *there*; here it is not.
+- **Keep — one owner check:** open Lower and confirm the set cards read AMRAP rather than 3×8.
+- **⚠ The `leader.phaseStatus` collapse below is NOT fixed and is not this entry's bug.** The route
+  still gives the program-wide `phaseStatus` (the *meta* path) the phase of the session furthest
+  through the program. That is defensible for a program-wide view and was never in the
+  single-session path the owner hit. Kept so the next reader does not re-derive it, and explicitly
+  not claimed as fixed.
+
+- **The original filing's reasoning, kept for the record — its second half is still accurate:**
+  1. **`session_periodization.phase`** — per session, what BF-143 set and what the header and the
+     pre-workout *"First session — establish baseline"* panel read. Correct: Lower is in `baseline`.
+  2. **`ProgramPhase.phaseType`** — the program-level cycle engine.
+     `packages/shared/src/phase-engine.ts:105` derives `isBaseline: result.phase.phaseType === 'baseline'`,
+     and that is what reaches the set card. `components/workout-screen.tsx:1212` reads
+     `phaseStatus?.isBaseline ?? false`, passes it at `:1221` and `:1812`, and
+     `components/workout/active-set-card.tsx:49` turns it into `isAmrap`.
+  The AMRAP rendering exists and works. It is simply asking the wrong model.
+- **⚠ AND THE PER-SESSION ANSWER IS DISCARDED BEFORE IT ARRIVES.**
+  `app/api/workout-data/route.ts:126-131` computes `perSessionPhaseStatus` and then sets
+  `phaseStatus = leader.phaseStatus`, the **session furthest through the program** by
+  `completedCycles`. So a brand-new session inherits the phase of the most-advanced one. Lower —
+  zero cycles — is handed Push/Legs/Upper's accumulation. Even a correct program-level baseline for
+  Lower could not survive this line.
+
+- **⚠ THE CONSEQUENCE IS NOT COSMETIC — IT DECIDES WHAT GETS STORED AS THE ANCHOR.**
+  `lib/data/postgres/slices/periodization.ts:83-89` states it plainly: *"The AMRAP baseline
+  estimator is NOT re-run here. `estimateOneRm` takes an `isBaseline` flag, **the workout screen
+  passes it**, and the result is already persisted to `exercise_logs.estimated_1rm`."* So the client
+  flag — false here — chooses the formula, `packages/shared/src/1rm.ts:171` takes the non-AMRAP
+  branch, and `recordBaselineAnchorsFrom` (`complete-workout.ts:159`) then copies whatever was
+  written into the baseline anchors. **A session completed in this state calibrates the whole cycle
+  from the wrong estimator**, and because it also marks the baseline complete, nothing asks again.
+- **Verification:** `lib/__tests__/workout-data-route.test.ts` — 31 cases. The test asserting the
+  removed behaviour (*"ends a stale baseline only on a log from THIS program"*) is **replaced,
+  deliberately and visibly**, by one asserting the opposite, plus two that isolate each surviving
+  term. Both terms are mutation-checked: deleting either fails a case the other does not cover. The
+  first attempt pinned only one of them and the mutation survived, which is why there are three
+  cases rather than one.
+  **NOT exercised:** the authenticated body was never run by a browser — `pnpm dev` confirms both
+  the meta and single-session paths load and return 401 without a session cookie, and no real
+  session was available in the sandbox.
+- **Related, not the same:** BF-146 is the *pre-workout* screen mishandling the prescription
+  refusal; this is the *active* screen prescribing as though there were no baseline at all. Both
+  surfaced from BF-143 making the baseline state reachable, and they need separate fixes.
+- **Needs:** nothing.
+
 ### [workouts] BF-146 — a baseline session is TOLD to establish a baseline and then shown a red "couldn't generate, tap refresh" for refusing to prescribe before it has one 🔴 LIVE
 
 - **Lane:** B — the backend refusal is correct and must not change; the screen's handling of it is the defect.
@@ -950,11 +1029,20 @@ below threshold and left in place for next time.
   one, so **every ad-hoc query through the admin endpoint hits the trap by default**, which is
   exactly where a session goes to check a claim. Renaming the Drizzle property fixed the ORM path
   and left the SQL path as sharp as it was.
-- **Gate:** owner — dropping the column is a data-losing migration and needs confirmation, per the
-  standing rule and `schema.ts`'s own note. **Ask it as its own question, not folded into the guard
-  fix:** the column holds nothing (0 of 108 rows) and has never been read, so the loss is nominal,
-  but "nominal" is still the owner's call. The guard change above is not blocked by it.
-- **Needs:** nothing. **Read BF-143 first** — this corrects that entry's reasoning, not its outcome.
+- **⚠ NO `Gate:` ON THIS ENTRY, deliberately, and the reason is the rule itself.** The guard change
+  above needs nothing from the owner and is startable today. A `Gate:` parks the whole entry, so
+  putting one here to mark the column question would hide the startable work behind it — the exact
+  failure the protocol header describes, and one this session had already made once (BF-139 through
+  BF-142 were filed with a `Verify:` field and vanished from both lanes until the owner noticed).
+- **The column drop is the owner's, and it is a SEPARATE decision that does not block the guard.**
+  Dropping `program_session_id` is a data-losing migration and needs confirmation per the standing
+  rule and `schema.ts`'s own note. The loss is nominal — 0 of 108 rows, never read — but nominal is
+  still his call. **Ask it on its own**, and do not let the answer hold up moving the interruption
+  test onto the id link.
+- **Read BF-143 first** — this corrects that entry's reasoning, not its outcome. Kept out of the
+  `Needs:` bullet on purpose: `Needs:` is a FIELD, so a bare id inside it is parsed as a dependency,
+  and that is exactly what parked this entry behind a BF-143 that had already shipped.
+- **Needs:** nothing.
 
 ### [platform] LB-94 — the journal's recent window is 332 entries, and 297 of them are pinned by a citation
 

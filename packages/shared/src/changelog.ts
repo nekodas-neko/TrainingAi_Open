@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.448.2",
+    date: "2026-09-12",
+    changes: [
+      "A first session now actually opens in AMRAP mode. It was correctly labelled \u201cBaseline\u201d at the top while the set cards below prescribed a normal three sets \u2014 because a check asked whether those exercise names had ever been logged in the program, which is true of any session you rebuild.",
+      "That mattered for more than the labels: the same flag decides which formula estimates your 1RM, and finishing the session copies that estimate into the anchors the whole cycle is then prescribed from.",
+    ],
+  },
+  {
     version: "1.448.1",
     date: "2026-09-11",
     changes: [
