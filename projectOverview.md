@@ -1802,6 +1802,14 @@ code was written here; the code was orthogonal to it and shipped, the check was 
 
 ### [nutrition] ⚠️ The budget follows your goal now, and which goal is still unanswered (BF-150, 2026-09-12, v1.451.0) · needs: owner
 
+**Amended 2026-09-12 (LB-100):** BF-150 anchored the budget in `budgetProvenance` and left
+`computeCalorieBalance`'s deviation on the old expression, so the Nutrition ring's *"N kcal left"*
+counted against the estimator while Home's donut counted against the goal — 469 kcal apart in the
+e2e fixture, ~336 for the owner. `one-calorie-budget.spec.ts` caught it on BF-150's own pre-merge run
+and it merged anyway, because E2E is advisory rather than required. Fixed: the deviation, and so
+`remainingKcal`, the zone band and its label, now measure against `budgetProvenance`. The lesson is
+recorded rather than the fix alone — **a red advisory check is a signal, not a formality.**
+
 Owner: *"When is this going to be back to the expected number? The 1350+ excercsise?"* The daily
 budget was `estimated maintenance − goal adjustment + earned`, so the 1,660 he stored took no part in
 it and the estimate — climbing, and ~600 kcal high (BF-137) — decided what he ate to. It is now

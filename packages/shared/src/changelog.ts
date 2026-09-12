@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.452.1",
+    date: "2026-09-12",
+    changes: [
+      "The \u201ckcal left\u201d figure on the Nutrition ring was counting against a different budget from the one Home\u2019s donut shows \u2014 the estimator rather than your goal, about 336 kcal apart for you. Anchoring the budget to your goal this morning changed what the donut counts against and left the ring behind. Both now count against the same number, and so do the colour band and its label.",
+    ],
+  },
+  {
     version: "1.452.0",
     date: "2026-09-12",
     changes: [
