@@ -11053,3 +11053,10 @@ regression net for BF-148's guard; the suppression was reverted.
 Down one across a full rewrite that added two CI gotchas and a new first lesson. The room came from
 compressing four "four entries were wrong" clauses into one and dropping the narrative around the
 `actions_list` branch-filter finding to the two lines a successor actually needs.
+
+## 2026-09-12 — `docs/implementation-backlog.md` 21076 → 21080 (LB-56 seventh sighting)
+
+Four lines for the seventh E2E renderer `SIGSEGV`, on the run for #1122. The entry's argument *is*
+the rate, so a sighting that is not written down weakens it — but the note was cut from five lines
+to four and the running tally rewritten in place rather than extended, so the growth is the sighting
+itself and nothing around it.
