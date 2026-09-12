@@ -1754,6 +1754,20 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [nutrition][app-shell] ⚠️ The weekly recap shows its numbers now, unseen on the phone (Q-112e, 2026-09-12, v1.451.0) · needs: hardware
+
+The recap said its piece in prose and showed none of the figures behind it. It now carries the day
+review's four trend rows over five weekly points, each judged against the four completed weeks
+before it, reading LB-64's `month-window` route.
+
+**Widened, not copied.** `trendRowsFor`/`TrendRowCard` take a window (`points` + `priorAverages`)
+instead of a day-shaped response, so both surfaces share one implementation — proven by mutation:
+reading the first point instead of the last fails 6 of 19 tests across both windows.
+
+**What is owed is the phone.** Verified at 412 dp in the harness against the real route and real
+data (weight `↓ 0.3 kg below the last 4 weeks` checks by hand), but the recap is a Home banner whose
+expanded body now grows by four cards, and nobody has opened it on the S25.
+
 ### [platform][app-shell] ⚠️ The admin Exercises tab is usable now, and the S3 credentials nobody checked still gate it (BF-147, 2026-09-12, v1.450.0) · needs: owner
 
 Owner: *"ui is bad and I also want a better way to make sure everything has the right gif."* Names

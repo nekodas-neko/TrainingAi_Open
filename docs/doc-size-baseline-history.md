@@ -11098,3 +11098,10 @@ Seventeen for a shipped admin screen whose one outstanding item is an owner acti
 the production S3 credentials, which the entry asked to check first and which nobody has. The row
 also carries the measurement that overturned the entry's stated cause, so a later reader does not
 re-adopt it.
+
+## 2026-09-12 — `docs/implementation-backlog.md` 21027 → 21033, `projectOverview.md` 10700 → 10714 (Q-112e)
+
+Six and fourteen. Q-112e's entry shrank its own prose but gained the two facts a later reader needs
+— that the day review's trend module is now shared rather than daily, and that its cache key wants a
+named TTL in Lane A's file the day a second site reads it. The Known-Issues row carries the device
+check and the mutation evidence that the sharing is real.
