@@ -11137,3 +11137,10 @@ check and the mutation evidence that the sharing is real.
 BF-150 merged with `one-calorie-budget.spec.ts` failing and E2E being advisory meant nothing caught
 it. The entry costs more lines than usual because it carries two competing causes and the test that
 tells them apart — cheaper than the next session re-deriving which surface is wrong.
+
+## 2026-09-12 — `docs/implementation-backlog.md` + `projectOverview.md` (LB-100 shipped)
+
+LB-100's entry leaves the queue with the one-budget fix. `projectOverview.md` grows rather than
+shrinks: BF-150's Known-Issues row stays (its goal question is still owed) and gains an amendment
+recording the regression it caused and why it reached `main` — a red advisory check that nothing
+blocked on.

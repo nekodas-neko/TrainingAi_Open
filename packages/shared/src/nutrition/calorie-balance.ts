@@ -73,8 +73,8 @@ export interface CalorieBalanceInput {
   /**
    * BF-150. The calorie target the user STORED (`nutrition_targets.calories`, else
    * `users.calorie_goal`), null when they have never set one. It anchors the budget — see
-   * `budgetProvenance` — and takes no part in the balance arithmetic below, which still measures
-   * intake against expenditure.
+   * `budgetProvenance` — and through it the deviation, the zone and `remainingKcal`, so every
+   * surface counts against one number (LB-100).
    */
   goalKcal?: number | null
 }
@@ -106,7 +106,25 @@ export function computeCalorieBalance(input: CalorieBalanceInput): CalorieBalanc
   const expenditureKcal = Math.round(input.restingBaseKcal + input.activeKcal)
   const netKcal = Math.round(input.intakeKcal - expenditureKcal)
   const targetNetKcal = Math.round(input.goalDeltaKcal)
-  const deviationKcal = netKcal - targetNetKcal
+
+  // LB-100. `deviationKcal` is how far today sits from where the goal wants it, and everything the
+  // user reads about "left" / "over" comes off it: `remainingKcal`, the zone band, the label and the
+  // colour. It used to be `net − targetNet`, which is `intake − (restingBase + active + goalDelta)`
+  // — intake measured against the OLD budget expression.
+  //
+  // BF-150 anchored the budget to the stored goal in `budgetProvenance`, and this was left behind.
+  // The result was the exact defect `one-calorie-budget.spec.ts` exists to catch and did catch:
+  // Home's donut counted against `goal + earned` while the Nutrition ring's "N kcal left" counted
+  // against `restingBase + goalDelta + earned` — 469 kcal apart in that fixture, ~336 for the owner.
+  // Q-415/Q-417 fixed this same class once; the fix is one budget, so the deviation is measured
+  // against the budget rather than re-derived from a second expression.
+  const budgetKcal = budgetProvenance({
+    restingBaseKcal: input.restingBaseKcal,
+    activeKcal: input.activeKcal,
+    targetNetKcal,
+    goalKcal: input.goalKcal,
+  }).total
+  const deviationKcal = Math.round(input.intakeKcal) - budgetKcal
   const { zone, label, color } = balanceZone(deviationKcal)
   return {
     expenditureKcal,
