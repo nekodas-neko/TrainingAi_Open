@@ -712,6 +712,55 @@ below threshold and left in place for next time.
   retroactively clear them.
 - **Needs:** nothing. **Read BF-127 first** — defect 3 is its mechanism in a second location.
 
+### [workouts] BF-148 — the header says Baseline and the set card prescribes 3×8, because two different phase models are on the same screen 🔴 LIVE
+
+- **Lane:** A — the disagreement is in what `/api/workout-data` puts in `phaseStatus`.
+- **Verification:** a session whose `session_periodization.phase` is `baseline` renders AMRAP set
+  cards, and `estimateOneRm` receives `isBaseline: true` so the anchor it persists comes from the
+  baseline estimator. Reproducible from a `session_periodization` row; no device needed.
+
+- **Added:** 2026-09-12 · owner, opening his recalibrated Lower session: *"I tried the session; but
+  it didnt open up to amrap; was just the normal session."* Screenshot header reads
+  **"Baseline · S1 · Ex 1/5"** above a set card showing **3 sets of 92.5 kg × 8**, no AMRAP.
+
+- **TWO INDEPENDENT BASELINE NOTIONS, and the screen shows one of each.**
+  1. **`session_periodization.phase`** — per session, what BF-143 set and what the header and the
+     pre-workout *"First session — establish baseline"* panel read. Correct: Lower is in `baseline`.
+  2. **`ProgramPhase.phaseType`** — the program-level cycle engine.
+     `packages/shared/src/phase-engine.ts:105` derives `isBaseline: result.phase.phaseType === 'baseline'`,
+     and that is what reaches the set card. `components/workout-screen.tsx:1212` reads
+     `phaseStatus?.isBaseline ?? false`, passes it at `:1221` and `:1812`, and
+     `components/workout/active-set-card.tsx:49` turns it into `isAmrap`.
+  The AMRAP rendering exists and works. It is simply asking the wrong model.
+- **⚠ AND THE PER-SESSION ANSWER IS DISCARDED BEFORE IT ARRIVES.**
+  `app/api/workout-data/route.ts:126-131` computes `perSessionPhaseStatus` and then sets
+  `phaseStatus = leader.phaseStatus`, the **session furthest through the program** by
+  `completedCycles`. So a brand-new session inherits the phase of the most-advanced one. Lower —
+  zero cycles — is handed Push/Legs/Upper's accumulation. Even a correct program-level baseline for
+  Lower could not survive this line.
+
+- **⚠ THE CONSEQUENCE IS NOT COSMETIC — IT DECIDES WHAT GETS STORED AS THE ANCHOR.**
+  `lib/data/postgres/slices/periodization.ts:83-89` states it plainly: *"The AMRAP baseline
+  estimator is NOT re-run here. `estimateOneRm` takes an `isBaseline` flag, **the workout screen
+  passes it**, and the result is already persisted to `exercise_logs.estimated_1rm`."* So the client
+  flag — false here — chooses the formula, `packages/shared/src/1rm.ts:171` takes the non-AMRAP
+  branch, and `recordBaselineAnchorsFrom` (`complete-workout.ts:159`) then copies whatever was
+  written into the baseline anchors. **A session completed in this state calibrates the whole cycle
+  from the wrong estimator**, and because it also marks the baseline complete, nothing asks again.
+- **Recommendation: feed the set card the per-session periodization phase, not the program engine's
+  leader.** The route already computes `perSessionPhaseStatus`; the single-session path should use
+  *its own* entry, and `isBaseline` should be OR-ed with
+  `session_periodization.phase === 'baseline' && !baselineComplete` — the same condition
+  `generate-prescription.ts:201` already trusts to refuse a prescription. Two models answering one
+  question is the defect; making the session's own state authoritative for a session-scoped screen
+  is the fix.
+  - **Do not "fix" it by deleting the leader line** without checking what else reads `phaseStatus` —
+    it also drives deload (`isDeloadActive`) and cycle counts on the select screen.
+- **Related, not the same:** BF-146 is the *pre-workout* screen mishandling the prescription
+  refusal; this is the *active* screen prescribing as though there were no baseline at all. Both
+  surfaced from BF-143 making the baseline state reachable, and they need separate fixes.
+- **Needs:** nothing.
+
 ### [workouts] BF-146 — a baseline session is TOLD to establish a baseline and then shown a red "couldn't generate, tap refresh" for refusing to prescribe before it has one 🔴 LIVE
 
 - **Lane:** B — the backend refusal is correct and must not change; the screen's handling of it is the defect.
