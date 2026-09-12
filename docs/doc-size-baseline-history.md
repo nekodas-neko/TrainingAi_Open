@@ -11035,3 +11035,28 @@ owed and `check-backlog-pointers` rejects a finished entry in the queue. The jou
 (that half shipped) and gains the owner decision about the dead `program_session_id` column, written
 out as a recommendation with its alternatives. Noted rather than left silent because a baseline that
 drops for no recorded reason reads as an error later.
+
+## 2026-09-12 — `docs/implementation-backlog.md` → 21076 (BF-146 closed not built)
+
+BF-146 leaves the queue with no code change. BF-148 (#1117, `ad8938d328`) removed the name-keyed
+`hasAnyPriorLog` veto in `isAiDynamicBaseline` hours after this was filed — that veto is what made
+`isBaselinePhase` false, let the poll run, and drew the banner. `isAiPrescriptionPending` requires
+`!isBaselinePhase`, so the path is unreachable now and the entry's own recommended fix would be dead
+code.
+
+Established by measurement rather than reading: the client-side suppression was written first, and
+`e2e/baseline-not-a-failure.spec.ts` passed identically with and without it. The spec ships as the
+regression net for BF-148's guard; the suppression was reverted.
+
+## 2026-09-12 — `docs/agents/state/implementation-lane-b.md` 112 → 111 (BF-146 rewrite)
+
+Down one across a full rewrite that added two CI gotchas and a new first lesson. The room came from
+compressing four "four entries were wrong" clauses into one and dropping the narrative around the
+`actions_list` branch-filter finding to the two lines a successor actually needs.
+
+## 2026-09-12 — `docs/implementation-backlog.md` 21076 → 21080 (LB-56 seventh sighting)
+
+Four lines for the seventh E2E renderer `SIGSEGV`, on the run for #1122. The entry's argument *is*
+the rate, so a sighting that is not written down weakens it — but the note was cut from five lines
+to four and the running tally rewritten in place rather than extended, so the growth is the sighting
+itself and nothing around it.
