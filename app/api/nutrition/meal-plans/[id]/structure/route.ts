@@ -10,7 +10,7 @@ import {
 } from '@trainingai/shared/nutrition/meal-split'
 import type { MealPlanDayType } from '@trainingai/shared/types/nutrition'
 import type { MealPlanVariantInput } from '@/lib/data/postgres/slices/meal-plans'
-import { invalidBodyResponse, invalidUuidResponse } from '@/lib/api/route-errors'
+import { invalidBodyResponse, invalidUuidResponse, routeErrorResponse } from '@/lib/api/route-errors'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 
 // Meal counts and a reorder.
@@ -164,15 +164,22 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     }
   })
 
-  const updated = await repo.replaceMealPlanStructure(id, userId, {
-    mealsPerDay,
-    trainingTime,
-    targetCalories: daily.calories,
-    targetProteinG: daily.proteinG,
-    targetCarbsG: daily.carbsG,
-    targetFatG: daily.fatG,
-    variants,
-  })
+  // RV-42's ownership refusal is a UserFacingError, which without this mapper reaches Next's
+  // default handler as a 500 and lands in error_events.
+  let updated
+  try {
+    updated = await repo.replaceMealPlanStructure(id, userId, {
+      mealsPerDay,
+      trainingTime,
+      targetCalories: daily.calories,
+      targetProteinG: daily.proteinG,
+      targetCarbsG: daily.carbsG,
+      targetFatG: daily.fatG,
+      variants,
+    })
+  } catch (err) {
+    return routeErrorResponse(err)
+  }
   if (!updated) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   return NextResponse.json({

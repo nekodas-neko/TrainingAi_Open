@@ -10850,8 +10850,6 @@ the lane is device-blocked, which is the one thing a successor cannot re-derive 
 RV-44's 18-line entry leaves the queue. The nine longhand Atwater sites in `scan-totals.ts` and
 `meal-split.ts` now import `KCAL_PER_G`, which is what `atwater.ts` was created for.
 
-Written by `pnpm fix:baselines`.
-
 ## 2026-09-11 — `docs/implementation-backlog.md` 20714 → 20672 (RV-41 shipped)
 
 RV-41's 42-line entry leaves the queue. The goal bounds now live once, in
@@ -11144,3 +11142,20 @@ LB-100's entry leaves the queue with the one-budget fix. `projectOverview.md` gr
 shrinks: BF-150's Known-Issues row stays (its goal question is still owed) and gains an amendment
 recording the regression it caused and why it reached `main` — a red advisory check that nothing
 blocked on.
+
+
+## 2026-09-11 — `docs/implementation-backlog.md` → 20989 (RV-42 shipped)
+
+RV-42's 31-line entry leaves the queue with the write-path ownership fix.
+
+**This figure has been rewritten FOURTEEN times and the churn is the note worth leaving.** Sixteen
+other merges landed on `main` while this PR waited on an owner decision, and each one moved the base
+out from under it — so the starting figure is no longer even quoted here, because it changed again
+between the last two rewrites. **Fourteen rewrites of one number is the cost of a green PR waiting**,
+recorded rather than smoothed because the alternative reading — that someone kept getting the
+arithmetic wrong — is the wrong lesson. The per-file `.size` split (LA-33) is what keeps this to one
+number instead of a whole map: no other document's baseline has conflicted once across all fourteen.
+Nothing was wrong with any of the three — each was correct against the `main` of its hour. Under six
+concurrent lanes plus an owner gate, a baseline is a reading of a moving number, and a PR that waits
+will re-read it once per merge that overtakes it. Recomputed by `pnpm fix:baselines` after each
+merge, which is the only thing that makes the subtraction mean anything.
