@@ -1153,6 +1153,8 @@ export interface WorkoutRepository {
   replaceVolumeTargets(userId: string, programId: string, targets: { muscleGroup: string; targetSetsPerWeek: number }[]): Promise<void>
 
   getWorkoutSessionProgramSessionId(userId: string, workoutSessionId: string): Promise<string | null>
+  /** BF-144: has this program session been trained since `since`? Keyed on the id link, not names. */
+  wasProgramSessionTrainedSince(userId: string, programSessionId: string, since: Date): Promise<boolean>
   getRecentSessionsOfType(userId: string, programSessionId: string, limit: number): Promise<Array<{
     id: string; startedAt: Date; completedAt: Date | null; sessionName: string
   }>>

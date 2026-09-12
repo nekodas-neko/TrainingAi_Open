@@ -11006,3 +11006,10 @@ engine, and the operative term was a name-keyed `hasAnyPriorLog` guard in the sa
 BF-144 was hidden from the queue twice over: a `Gate: owner` covering only the column-drop question,
 and a cross-reference to BF-143 written inside the `Needs:` bullet, which the parser read as a real
 dependency. Both corrected, with the reason recorded in the entry.
+
+## 2026-09-12 — `docs/implementation-backlog.md` (BF-144 guard half)
+
+−1, so the ratchet tightens by one line. BF-144's entry loses the diagnosis of the name-keyed guard
+(that half shipped) and gains the owner decision about the dead `program_session_id` column, written
+out as a recommendation with its alternatives. Noted rather than left silent because a baseline that
+drops for no recorded reason reads as an error later.

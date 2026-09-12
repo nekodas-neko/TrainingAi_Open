@@ -386,6 +386,35 @@ export async function getWorkoutSessionProgramSessionId(db: Db, userId: string, 
   return row?.programSessionId ?? null
 }
 
+/**
+ * BF-144: has THIS program session been trained since `since`?
+ *
+ * Resolved through `workout_sessions.session_id` — the live FK to `program_sessions` — rather than
+ * by matching exercise names, which is what BF-143's guard did. A name lookup is right only while
+ * names stay unique and unchanged: rename a session, or add a second one sharing a name, and the
+ * question gets answered about the wrong workouts. An id cannot be confused that way.
+ *
+ * The caller keeps its own date comparison as the companion test, because rows predating the link
+ * carry no `session_id` and so cannot answer for themselves.
+ */
+export async function wasProgramSessionTrainedSince(
+  db: Db, userId: string, programSessionId: string, since: Date,
+): Promise<boolean> {
+  const [row] = await db
+    .select({ id: s.exerciseLogs.id })
+    .from(s.exerciseLogs)
+    .innerJoin(s.workoutSessions, eq(s.workoutSessions.id, s.exerciseLogs.workoutSessionId))
+    .where(and(
+      eq(s.workoutSessions.userId, userId),
+      eq(s.workoutSessions.programSessionId, programSessionId),
+      isNull(s.workoutSessions.deletedAt),
+      isNull(s.exerciseLogs.deletedAt),
+      gte(s.exerciseLogs.loggedAt, since),
+    ))
+    .limit(1)
+  return row != null
+}
+
 export async function getRecentSessionsOfType(db: Db, userId: string, programSessionId: string, limit: number): Promise<Array<{
   id: string; startedAt: Date; completedAt: Date | null; sessionName: string
 }>> {
