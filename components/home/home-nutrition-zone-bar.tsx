@@ -34,6 +34,7 @@ export function HomeNutritionZoneBar() {
         restingBaseKcal={b.restingBaseKcal}
         activeKcal={b.activeKcal}
         targetNetKcal={b.targetNetKcal}
+        goalKcal={b.goalKcal}
         workoutKcal={data.activeBreakdown.workoutKcal}
         activityKcal={data.activeBreakdown.activityKcal}
         stepsKcal={data.activeBreakdown.stepsKcal}

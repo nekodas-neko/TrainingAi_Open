@@ -225,7 +225,7 @@ below threshold and left in place for next time.
   `adm-zip` GHSA-vwc7-r8mq-g2x9 via `onnxruntime-node`, which has **no published fix**
   (`patched_versions: <0.0.0`), so there is nothing to bump. Down from **36 findings,
   23 high and 2 critical**, cleared 2026-09-10 in `chore/dependabot-remediation`
-  ([journal](overview/entries/2026-09-10-chore-dependabot-remediation.md)).
+  ([journal](overview/history-2026-09-12-folded-1.md#2026-09-10-chore-dependabot-remediation)).
 - **What that pass did, so the next one starts from the pattern rather than rediscovering it:**
   two direct patch bumps within the same major (`next` ^15.5.22 → ^15.5.24, which resolved
   15.5.25 and cleared the **critical**; `sharp` ^0.35.3 → ^0.35.4) plus six `pnpm.overrides`
@@ -782,105 +782,44 @@ below threshold and left in place for next time.
   surfaced from BF-143 making the baseline state reachable, and they need separate fixes.
 - **Needs:** nothing.
 
-### [platform][app-shell] BF-147 — the admin exercise list squeezes the exercise NAME to zero px, force-overwrites a GIF on one tap with no confirm, and the wrong-GIF flag it now has no way to reach
+### [platform][app-shell] BF-147 — the admin Exercises tab: the four UI defects shipped; the S3 credentials are still unchecked
 
-- **Lane:** B — the storage half landed (see below); everything left is `components/admin/exercise-manager.tsx`.
-- **Verification:** at 412 dp every row shows its name in full; a destructive action asks first;
-  the coverage figure matches a `count(*)` of live exercises with media; and a GIF judged wrong can
-  be marked as such and found again later.
-
-- **The Lane A half landed 2026-09-12 — the column and the route exist, nothing reads them yet.**
-  Migration `273_exercise_media_review_status.sql` adds `review_status` (`unreviewed`/`ok`/`wrong`,
-  CHECK-constrained, defaulting to `unreviewed`) and `reviewed_at` to `exercise_media`, with a
-  partial index on the non-`unreviewed` rows. `app/api/admin/exercise-media-review` serves `GET`
-  (the flagged set) and `PATCH`
-  (`{ exerciseName, gender?, status }`, keyed on the table's own `(exercise_name, gender)` unique
-  key). Per the recommendation below it is deliberately inert: it imports no generation surface, so
-  marking one wrong fires no AI call, and it 404s rather than upserting — a verdict about a GIF that
-  does not exist would invent provenance for a generation that never happened. Covered by
-  `lib/__tests__/admin-exercise-media-review-route.test.ts` (13 tests).
-  **No UI calls either verb**, which is the whole of what is left here.
-
+- **Lane:** B
+- **Keep:** ONE thing, and it is not UI. **Nobody has checked the production S3 credentials.** The
+  sandbox boot banner reports the shared S3 client rejecting with `SignatureDoesNotMatch (403)`, and
+  if the bucket rejects in prod too then "AI all" writes into a store it cannot read back and the
+  six proxy-path rows (Ab Wheel, Barbell Shrug, Cable Crunch Abs, Donkey Kick, Face Pull, Nordic
+  Hamstring Curl) plus the reference figure stay broken. Orthogonal to everything shipped below —
+  none of it touches storage or generation — but it gates the Mirror/AI paths and it is still owed.
+- **Verify:** device — the two-line row and the sweep sheet on the S25. Measured at 412 dp in the
+  harness, not seen on glass.
 - **Added:** 2026-09-11 · owner, on the Admin Console → Exercises tab: *"ui is bad and I also want a
   better way to make sure everything has the right gif. Maybe a way for me to flag if its wrong so
   you we can decide how to proceed."*
 
-- **THE NAME IS RENDERED AND THEN CRUSHED TO NOTHING — that is why the rows are unreadable.**
-  `components/admin/exercise-manager.tsx:545` draws `{ex.name}` with `truncate`, which sets
-  `overflow:hidden` and lets its min-width resolve to **0**. Its flex sibling `SourceBadge` (`:202`)
-  has neither `shrink-0` nor `overflow:hidden`, so it cannot collapse below its content. Everything
-  else in the row — thumbnail (`:533`), status glyph (`:555`), the four-button group (`:565`) — is
-  `flex-none`. At phone width the badge and the buttons keep their width and the name is the only
-  thing that can give, so it gives everything. **The `bod…` visible in the screenshot is line TWO**
-  (`:548-551`, equipment), which sits alone in the flexible column and so keeps a fragment. A row
-  showing a truncated equipment string and no name at all is this, exactly.
+- **✅ SHIPPED 2026-09-12** — `components/admin/exercise-manager.tsx` and the new
+  `components/admin/gif-review-sweep.tsx`. Journal:
+  `docs/overview/entries/2026-09-12-bf147-admin-exercise-manager.md`.
+  - **The name fix is the action row, and THIS ENTRY'S DIAGNOSIS WAS WRONG.** It blamed the
+    `SourceBadge` for not collapsing. Measured at 412 dp: the badge is **25 px**; the four action
+    buttons are **204 px of a 340 px row**, because the global 48 dp tap-target floor inflates each
+    12 px icon to 51 px. The flexible column got **50 px** and the name **19**. Shrinking the
+    targets is a P0 violation, so the row went to two lines — names now render in full (Arnold
+    Press 19 px → 87 px, nothing clipped) and the delete button is still 48×48.
+  - Delete, per-row Mirror and per-row AI now go through one `ConfirmDialog`. The two overwrite
+    actions confirm **only when they would replace** an existing GIF; a first generation destroys
+    nothing and still fires on one tap. Delete also had no accessible name at all.
+  - Coverage arithmetic: denominator drops `mergedInto` rows, numerator counts the Custom-URL
+    fallback `getThumbnail` already draws from. Local read went `40 / 146` → `42 / 145`, matching
+    `count(*)` exactly on both halves.
+  - The sweep sheet reads Lane A's `/api/admin/exercise-media-review`: one GIF at a time, large,
+    with name and target muscles, two buttons, and it advances only on a successful PATCH. It never
+    regenerates — collecting the wrong ones is the point of collecting them.
 
-- **⚠ TWO DESTRUCTIVE ACTIONS WITH NO CONFIRMATION, one of them silent.**
-  1. **Delete** (`:593-599`) fires `DELETE /api/admin/exercises?name=…` on a single tap. **This is
-     BF-124's defect in a second place** — the owner lost his Lower session to an unconfirmed trash
-     icon four days ago and had to rebuild it, which is what produced BF-143 and BF-146. The same
-     icon, the same absence, on a 156-row list.
-  2. **The per-row Mirror and AI buttons OVERWRITE.** `:570` and `:579` pass `force = hasS3Gif`, so
-     tapping either on a row that already has a GIF re-mirrors or regenerates and the routes
-     `onConflictDoUpdate` the row in place. A correct GIF is replaced by a new generation with no
-     prompt and no undo. The *bulk* buttons are safe by contrast — they send no force and skip rows
-     that already have one — so the dangerous control is the one that looks incidental.
-
-- **The coverage figure counts the wrong things in both halves.** `:415-416` divides
-  `exercises.filter(ex => !!media[name]?.gifUrl).length` by `exercises.length`.
-  - The **denominator** is every library row, including the 4 with `merged_into` set. Measured
-    2026-09-11: **156 rows, 152 live**.
-  - The **numerator** counts only `exercise_media`, so a Custom URL in `exercise_gif_cache` renders
-    a thumbnail on the row and still reads as uncovered.
-  - Truth, measured the same day: **15 live exercises have no media of any kind**, against the 19
-    the card's "137 / 156" implies. The list is: Barbell Chest Supported Row, Cable Hip Adduction,
-    Cable Seated Leg Curl, Copenhagen Plank, Dumbbell Forearm Curl, Fire Hydrant, Hip Flexor Raise,
-    Machine Curl, Machine Lateral Raise, Machine Rear Delt Fly, Rope Pushdown, Slider Leg Curl,
-    Stability Ball Leg Curl, Toe Touch Crunch, Wrist Extension.
-
-- **The broken reference thumbnail is a storage failure, and it is NOT cosmetic — it is the style
-  anchor every future generation uses.** `reference-figure/route.ts` serves
-  `exercise-media/reference-figure.png` through the private-bucket proxy, which returns 404 when
-  `downloadMedia` fails; the sandbox boot banner reports the shared S3 client rejecting with
-  **`SignatureDoesNotMatch (403)`**. `exercise-manager.tsx:481` passes `unoptimized` only for a
-  `.gif`, so a `.png` goes through `/_next/image`, which surfaces the failure as a broken-image
-  glyph rather than a blank.
-  **Why the exercise rows still look fine while this one does not — measured, not assumed:** of 139
-  media rows, **133 are absolute external URLs** (~99 chars, the dataset mirrors) and only **6 are
-  proxy paths** that depend on the bucket — Ab Wheel, Barbell Shrug, Cable Crunch Abs, Donkey Kick,
-  Face Pull, Nordic Hamstring Curl. Those six and the reference figure share one fate.
-  **Check the production credentials before writing any code here**: if the bucket is rejecting in
-  prod too, "AI all" writes into a store it cannot read back.
-
-- **THE FLAG IS NEW SURFACE — nothing like it exists.** Searched `needs_review`, `gif_status`,
-  `verified`, `approved`, `flagged`, `mismatch`, `reviewStatus` across the repo: zero hits on any
-  exercise or media table. `exercise_media` carries only `model_used`/`generated_at`;
-  `exercise_gif_cache` only urls and `fetched_at`; `exercise_library` nothing. The admin **Feedback**
-  tab is an append-and-delete inbox over `feedback_submissions` with **no entity linkage and no
-  status field**, so it can carry "this GIF is wrong" as free text and nothing on the Exercises tab
-  would ever read it.
-- **Recommendation — a status column on `exercise_media`, and a sweep screen rather than a list.**
-  The table already has the `(exercise_name, gender)` unique key and provenance, so a
-  `review_status` (`unreviewed` / `ok` / `wrong`) plus `reviewed_at` is the smallest honest
-  addition, and it survives regeneration decisions because it sits beside `model_used`.
-  **The bigger half is the workflow, not the column.** Verifying 152 GIFs by scrolling a cramped
-  admin list is the wrong instrument — one GIF at a time, large, with the exercise name and target
-  muscles beside it and two buttons, sweeps the whole catalogue in a sitting and yields a queryable
-  set of wrong ones to decide about. That is what the owner asked for: *"so we can decide how to
-  proceed"* is a set, not a toast.
-  - **Keep the flag separate from regeneration.** Marking one wrong should not silently trigger an
-    AI call — deciding what to do about the wrong ones is the point of collecting them.
-- **⚠ There is NO test of any kind for this screen** — `exercise-manager.tsx` is referenced only by
-  itself and `admin-content.tsx`, and `e2e/` has no admin spec at all. The API routes underneath
-  are covered (`lib/__tests__/admin-media-tool-routes.test.ts`,
-  `admin-exercise-catalogue-routes.test.ts`), so the untested part is exactly the part being
-  reported.
-- **Keep:** the four UI defects above (name crushed to 0 px, the two unconfirmed destructive
-  actions, the coverage arithmetic) plus the sweep screen that reads the new route — one GIF at a
-  time with two buttons, per the recommendation. **Also still open and NOT checked by the Lane A
-  half:** the production S3 credentials. The entry asks for that before writing code, and it was
-  judged orthogonal to the verdict column (which touches neither storage nor generation) — but it
-  still gates the "AI all" / Mirror paths and the six proxy-path rows, and nobody has looked.
+- **⚠ The sweep can only judge `exercise_media` rows, by construction.** The review route refuses to
+  upsert (a verdict about a GIF that does not exist would invent provenance), so a Custom-URL row
+  has nothing to record against and offering it would 404 per tap. If those ever need judging, that
+  is a Lane A change to the route, not a UI one.
 - **Needs:** nothing.
 
 ### [app-shell] BF-145 — the palette half shipped; the sheet half is refuted as specified and needs a decision
@@ -2395,7 +2334,7 @@ sounds like:**
 - **Keep:** the anchor decision, and only that. **The labelling shipped 2026-09-09** —
   `macro-budget-gap.ts` + `energy-card.tsx` name what the grams add up to, how far that sits from the
   budget, and that the ⓘ's resting burn already has habitual movement removed (the invisible
-  subtraction read as a second one). See [`docs/overview/entries/2026-09-09-fix-macro-budget-anchor-label.md`](overview/entries/2026-09-09-fix-macro-budget-anchor-label.md).
+  subtraction read as a second one). See [`2026-09-09-fix-macro-budget-anchor-label`](overview/history-2026-09-12-folded-1.md#2026-09-09-fix-macro-budget-anchor-label).
 
 **⚠ Two corrections to this entry, measured while implementing it.** (1) **The gap does NOT
 converge.** `scaleMacrosForEarnedKcal` grows the grams by `earned` at the same moment
@@ -2470,7 +2409,7 @@ short all day.
   and **(b)** the same screen with the logging sheet actually over the bottom half. Check set 1 is
   reachable and the `⚠ Injury: …  Swap` chip is tappable with a thumb.
 - **✅ SHIPPED 2026-09-09** (`fix/injury-header-crowding`) — the whole recommendation.
-  [Journal](overview/entries/2026-09-09-fix-injury-header-crowding.md). The full banner moved to the
+  [Journal](overview/history-2026-09-12-folded-1.md#2026-09-09-fix-injury-header-crowding). The full banner moved to the
   ready screen (which **had no injury warning at all** before this, so the warning used to arrive
   after the weight was chosen); during the set it is a chip with Swap; the header gained
   `max-h-[45%] overflow-y-auto` so the next thing added to it scrolls rather than pushing set 1 off.
@@ -14737,7 +14676,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Keep:** the unexplained residue, and nothing buildable. **There is no next action** — every
   mechanical candidate is closed (smoothing 0.487 h, bin occupancy 0.000, window geometry ~0.06,
   candidate 3 closed 2026-09-04), the one buildable half shipped 2026-09-09
-  ([#1040](overview/entries/2026-09-09-q509-fragmented-night-recovery-index.md)), and **both knobs
+  ([#1040](overview/history-2026-09-12-folded-1.md#2026-09-09-q509-fragmented-night-recovery-index)), and **both knobs
   that remain are under standing do-not-move orders**: do not widen `MEDIAN_WINDOW`, do not move
   `RECOVERY_INDEX_OPTIMAL_HOURS`. What is owed is an explanation for the **~0.39 h in ordinary
   full-length nights**, which needs a new idea rather than a new implementation. This entry printed
@@ -14842,7 +14781,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Do NOT move `RECOVERY_INDEX_OPTIMAL_HOURS`.** A second anchor change inside two days, same
   direction, fitted to an input that moved for measurement reasons, is how a scoring constant gets
   quietly re-purposed into a bias correction.
-- **✅ `last.recoveryIndexHours` SHIPPED 2026-09-09** — `nightRecoveryIndexHours` takes the minimum across every window, the wake from the last ([journal](overview/entries/2026-09-09-q509-fragmented-night-recovery-index.md)).
+- **✅ `last.recoveryIndexHours` SHIPPED 2026-09-09** — `nightRecoveryIndexHours` takes the minimum across every window, the wake from the last ([journal](overview/history-2026-09-12-folded-1.md#2026-09-09-q509-fragmented-night-recovery-index)).
   **⚠ Its quoted measurement was unsound: "fragmented nights average 2.719 h against 2.639 h" cannot
   be of this path — under `groupSleepPeriods`' rules NOT ONE of the 61 BLE-era nights is fragmented,
   so the branch has never run and the fix is latent.** Rows-per-date gives 13; every second row is a
@@ -16252,7 +16191,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   otherwise heard only "Readiness: —".
   The two sentences differ because only one is fixed by waiting — "Nothing recorded for today" versus
   "Not enough history to score this yet" — which is the whole distinction the engine half preserved.
-  [journal](overview/entries/2026-09-08-feat-q278-availability-surfaces.md)
+  [journal](overview/history-2026-09-12-folded-1.md#2026-09-08-feat-q278-availability-surfaces)
 - **Keep:** the route emits `availability` for **readiness, sleep and activity only**. Daytime stress
   and resilience — the two lowest-coverage pillars in the table below, at 55% and 33% — still render
   without one, so their dashes cannot be explained by any surface. `metricAvailability` is keyed on
@@ -20346,41 +20285,6 @@ adopted.
 - **Keep:** do not close this on "it has not happened again" — an intermittent lock-ordering bug is
   precisely the thing that looks fixed for weeks.
 
-### [platform] LA-91 — no CI job has a `timeout-minutes`, so a hung run burns six hours
-
-- **Lane:** A — `.github/workflows/ci.yml`.
-- **Added:** 2026-09-09, Lane A — found while waiting on #1029's E2E, and measured from that run
-  rather than guessed.
-
-`grep -n timeout-minutes .github/workflows/ci.yml` returns nothing, so every job inherits GitHub's
-**360-minute** default. A genuinely hung step — a Playwright run that never exits, a webServer that
-never binds — holds a runner for six hours, and the PR sits unmergeable the whole time with
-`mergeable_state: unstable` and nothing to distinguish it from a slow job.
-
-**Measured, so the limits are sized rather than invented** (run 34326591694, the first UI-touching
-PR in a long while, which is what made E2E run its real path at all):
-
-| job | duration |
-|---|---|
-| Custom Rules | 0:19 |
-| Migration Check | 1:06 |
-| Lint | 0:50 |
-| Build | 5:27 |
-| Tests | 6:01 |
-| **E2E** | **24:36** (the `pnpm e2e` step alone, 23:06) |
-
-E2E is the one that matters: `playwright.config.ts` runs **77 spec files at `workers: 1`**, so it is
-serial by design, with `retries: 1` in CI. A limit has to clear a bad-luck run where several specs
-retry — 45 minutes leaves real headroom while still cutting a hang at an eighth of the current cost.
-
-**The near-miss that produced this entry is the useful part.** A check-in of mine had guessed that
-"25 minutes is beyond plausible for this suite" with no evidence. The real run took 24:36. Acting on
-that guess would have re-triggered a healthy run about two minutes before it went green. **The
-config was the answer and reading it took a minute** — the E2E gate ("Does this change touch the
-UI?") means most PRs skip the job in ~35 seconds, so nobody has a feel for the real duration.
-
-- **Reversal cost:** trivial. One line per job.
-
 ### [platform] LA-100 — the entries compaction sweep has no target file, and the ceiling now blocks every lane
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-10, when the ceiling fired and the sweep turned out
@@ -20598,6 +20502,41 @@ patch.
   0.13%. **Not measured on a real camera**, so this is a flag rather than a finding.
 - **Keep:** whether the app's scanner needs the same rotation tolerance, and whether the residual
   0.13% is worth pursuing upstream. Both are decisions, not work.
+
+### [workouts] BF-151 — the bodyweight rep max is reconstructed from an estimate when the database stores the real reps
+
+- **Lane:** A — `app/api/workout-data/route.ts` has to carry the previous session's reps before the
+  card can stop inverting; `components/workout/exercise-summary-screen.tsx` and
+  `packages/shared/src/1rm.ts` are the follow-on half.
+- **Added:** 2026-09-12 (BugFix intake). Filed from the BF-149 fix, which was a correct inverse and
+  is shipped — this is the reason the inverse should eventually not be needed. Per **No orphaned
+  findings** it was written into
+  [`docs/overview/entries/2026-09-12-bodyweight-rep-max-inverse.md`](overview/entries/2026-09-12-bodyweight-rep-max-inverse.md)
+  and needs a queue entry of its own.
+- **The exercise summary derives a bodyweight rep max by inverting a stored 1RM estimate.** For a
+  bodyweight exercise the rep max *is* the reps performed, and `exercise_logs.avg_reps` already holds
+  that figure exactly — 11 for the set the owner reported. The card reconstructs, lossily, a number
+  the database stores.
+- **One collision is unfixable by any inverse, which is what makes this worth doing.** 5 reps and 6
+  reps both store **114.5**: the rep-factor gain from the extra rep is exactly cancelled by
+  `amrapScaleFactor`'s 1.0 → 0.97 step at 6. `repMaxFromAmrapOneRm` returns the lower of a tie, which
+  is the most the stored number supports, and no better inverse can separate them. Reading the reps
+  removes the question.
+- **The current session needs no new data.** `summaryData.reps` is already on the client
+  (`components/workout/types.ts`), so `newRepMax` can come straight from the logged reps today. It is
+  the *previous* session that is the engine half: `prevEst1rm` is `ex.estimated1rm` from the
+  `workout-data` payload, which carries no reps, so the route has to return `avgReps` alongside it.
+  That split is why this is Lane A first rather than a display change.
+- **`repMaxFromOneRm` and the exercise stats sheet stay as they are.** That pair inverts the same
+  unscaled `calc1RM` the sheet's own comparison table is built from, so it is self-consistent; the
+  defect BF-149 fixed was only ever feeding an AMRAP-scaled estimate to the unscaled inverse. Nothing
+  here asks for that caller to change.
+- **Scope note:** a historical series with no per-set reps to hand still needs an inverse, so
+  `repMaxFromAmrapOneRm` is not being deleted — it stops being the source for the two values on this
+  card.
+- **Verification:** the two rep-max values render only under `isBodyweight`, so a bodyweight set on
+  device (a Hanging Leg Raise at a rep count other than 5 or 6) is the check — the previous-session
+  value is the one that exercises the new payload field.
 
 ### [platform][workouts] 🔵 BF-9 — a trainer role: build a program for someone else and assign it to them
 

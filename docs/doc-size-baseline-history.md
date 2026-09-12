@@ -11072,8 +11072,58 @@ Twenty-three for a palette change that touches every screen and has not been see
 row carries the two things a later session would otherwise redo: the measurement that chroma alone
 is invisible below L 0.13, and that BF-145's sheet half is refuted rather than outstanding.
 
+## 2026-09-12 — `docs/implementation-backlog.md` (BF-150)
 
-## 2026-09-11 — `docs/implementation-backlog.md` → 21044 (RV-42 shipped)
+BF-150 leads the queue on the owner's instruction: anchor the daily budget to the goal he set rather
+than to an estimator measured 600 kcal high and drifting +46 kcal/day, with the approach already
+decided rather than awaiting triage.
+
+## 2026-09-12 — `docs/implementation-backlog.md` (LA-91 shipped)
+
+LA-91's 35-line entry leaves the queue with the CI job timeouts. `docs/module-map.md` gains a row for
+the guard script in the same PR and stays within its own baseline.
+
+## 2026-09-12 — `docs/implementation-backlog.md` 21088 → 21027 (BF-147 rewritten to its residue)
+
+Down sixty-one. The entry carried a full diagnosis of four UI defects; three of the four are now in
+the diff, so what stays is the measurement that overturned its stated cause (the badge is 25 px, the
+action row is 204), the one thing still owed (nobody has checked the production S3 credentials) and
+the structural limit on the sweep. The rest is in the journal.
+
+## 2026-09-12 — `projectOverview.md` 10683 → 10700 (BF-147 Known-Issues row)
+
+Seventeen for a shipped admin screen whose one outstanding item is an owner action rather than code:
+the production S3 credentials, which the entry asked to check first and which nobody has. The row
+also carries the measurement that overturned the entry's stated cause, so a later reader does not
+re-adopt it.
+
+## 2026-09-12 — `docs/implementation-backlog.md` + `projectOverview.md` (BF-150 shipped)
+
+BF-150's 54-line entry leaves the queue with the goal-anchored budget. `projectOverview.md` gains a
+Known-Issues row, because what the entry left unresolved is a number rather than code: it prescribed
+"stored goal + earned" and verified against a figure 310 kcal/day lower, and only the owner can say
+which he meant.
+
+## 2026-09-12 — `docs/implementation-backlog.md` (BF-151 filed)
+
+Thirty-five lines for BF-151, the orphaned finding out of the BF-149 fix: the bodyweight rep max is
+reconstructed by inverting a stored estimate when `exercise_logs.avg_reps` holds the real figure. It
+was written only into the journal entry and the PR body, which the **No orphaned findings** rule does
+not accept — the entry carries the 5/6 collision at 114.5 that no inverse can separate, which is the
+argument for doing it at all.
+
+## 2026-09-12 — journal compaction sweep (entries 88 → 48)
+
+`docs/overview/entries/` crossed the 60-entry runaway limit, which fails the Orientation-docs check
+on every branch rather than on whoever caused it — RV-42's rebase is where it surfaced, and folding a
+shared chore into an owner-gated security PR would have widened a diff that has to stay reviewable.
+Done as its own PR instead: `node scripts/fold-journal-entries.js` folded 40 entries into
+`history-2026-09-12-folded-1.md` and repointed their citations in five files. Five entries are held
+back because an agent baton cites them; rewriting those would mean one lane writing into another's
+live state file.
+
+
+## 2026-09-11 — `docs/implementation-backlog.md` → 20983 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 

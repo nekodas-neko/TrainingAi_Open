@@ -16,12 +16,12 @@ describe('budgetProvenance', () => {
   it('splits the budget into the rest-day floor and what movement earned', () => {
     // The owner's own numbers: 1,826 resting, recomp goal of −200, so 1,626 before moving.
     expect(budgetProvenance({ restingBaseKcal: 1826, activeKcal: 312, targetNetKcal: -200 }))
-      .toEqual({ base: 1626, earned: 312, total: 1938 })
+      .toEqual({ base: 1626, earned: 312, total: 1938, anchoredToGoal: false })
   })
 
   it('is the rest-day floor exactly when nothing has been earned', () => {
     const p = budgetProvenance({ restingBaseKcal: 1826, activeKcal: 0, targetNetKcal: -200 })
-    expect(p).toEqual({ base: 1626, earned: 0, total: 1626 })
+    expect(p).toEqual({ base: 1626, earned: 0, total: 1626, anchoredToGoal: false })
   })
 
   /**
