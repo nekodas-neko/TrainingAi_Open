@@ -10968,6 +10968,15 @@ block measured against the owner's live Lower row.
 
 BF-143 gains its shipped record: the three changes, the one owner action still owed, and an explicit
 note that the bodyweight-index half is NOT fixed and stays with BF-127.
+## 2026-09-12 — `docs/implementation-backlog.md` → 21124, `projectOverview.md` 10640 → 10660 (BF-142)
+
+The backlog comes down again: BF-142 was a long diagnosis and is now a record of a one-sentence fix
+plus the finding it uncovered. What is kept is the part that is not about the sentence at all — the
+module's constant had flipped sign, and inverting it recovers a resting base risen ~700 kcal, which
+corroborates BF-137 from a direction that entry does not use.
+
+`projectOverview.md` takes the Known-Issues row, and it carries that corroboration rather than only
+the copy change, because the sentence is now true over a base that is not.
 
 ## 2026-09-11 — `docs/implementation-backlog.md` → 20796 (Q-44's second requirement)
 
@@ -11012,18 +11021,31 @@ exist, a `Keep:` naming the four UI defects and the sweep screen left for Lane B
 note that the production S3 credentials the entry asks about were *not* checked — the verdict column
 touches neither storage nor generation, but that judgement belongs on the record rather than in a
 gap. Nothing was deleted: the entry stays queued, re-laned rather than removed.
+## 2026-09-12 — `docs/implementation-backlog.md` (BF-149)
 
-## 2026-09-11 — `docs/implementation-backlog.md` → 21108 (RV-42 shipped)
+Net zero: BF-149 was written and then removed in the same change, because it shipped with nothing
+owed and `check-backlog-pointers` rejects a finished entry in the queue. The journal carries it.
+
+
+## 2026-09-12 — `docs/implementation-backlog.md` (BF-144 guard half)
+
+−1, so the ratchet tightens by one line. BF-144's entry loses the diagnosis of the name-keyed guard
+(that half shipped) and gains the owner decision about the dead `program_session_id` column, written
+out as a recommendation with its alternatives. Noted rather than left silent because a baseline that
+drops for no recorded reason reads as an error later.
+
+
+## 2026-09-11 — `docs/implementation-backlog.md` → 21098 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 
-**This figure has been rewritten ELEVEN times and the churn is the note worth leaving.** Twelve
+**This figure has been rewritten TWELVE times and the churn is the note worth leaving.** Thirteen
 other merges landed on `main` while this PR waited on an owner decision, and each one moved the base
 out from under it — so the starting figure is no longer even quoted here, because it changed again
-between the last two rewrites. **Eleven rewrites of one number is the cost of a green PR waiting**,
+between the last two rewrites. **Twelve rewrites of one number is the cost of a green PR waiting**,
 recorded rather than smoothed because the alternative reading — that someone kept getting the
 arithmetic wrong — is the wrong lesson. The per-file `.size` split (LA-33) is what keeps this to one
-number instead of a whole map: no other document's baseline has conflicted once across all eleven.
+number instead of a whole map: no other document's baseline has conflicted once across all twelve.
 Nothing was wrong with any of the three — each was correct against the `main` of its hour. Under six
 concurrent lanes plus an owner gate, a baseline is a reading of a moving number, and a PR that waits
 will re-read it once per merge that overtakes it. Recomputed by `pnpm fix:baselines` after each

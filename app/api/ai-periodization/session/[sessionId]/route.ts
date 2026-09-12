@@ -32,27 +32,22 @@ export async function GET(
   // It asked whether these exercise NAMES had ever been logged, which is true of every recreated
   // session, so rebuilding a session inside an existing program silently skipped its calibration.
   //
-  // ⚠ Name-keyed, and that is a WEAKNESS rather than a design choice — see BF-144.
-  // The justification originally written here was false: it claimed `program_session_id` is NULL on
-  // every row. That measured the DEAD column of the pair `schema.ts` warns about. The live link is
-  // the column named `session_id` (Drizzle property `programSessionId`), and it IS populated —
-  // 62 of 108 rows, and on 2026-09-11 each of the owner's four trained sessions had one while the
-  // recreated Lower had none. An id test would have answered this question directly.
-  // The date comparison is what carries the guard today, and it is correct for the recreated-session
-  // case; BF-144 replaces the name lookup with the id link, which does not depend on names staying
-  // unique or unchanged.
+  // BF-144 moved it off names and onto `workout_sessions.session_id`, the live FK to
+  // `program_sessions`. The reason BF-143 gave for keying on names was false — it claimed the id is
+  // NULL on every row, having measured the DEAD column of the pair `schema.ts` warns about. The live
+  // one was populated the whole time (62 of 108 rows, 2026-09-11), and on that date each of the
+  // owner's four trained sessions carried one while the recreated Lower carried none: exactly the
+  // question this guard needed answered, available directly.
+  //
+  // The date comparison stays, and is not redundant. Rows predating the link carry no `session_id`
+  // (46 of the 108), so the id alone cannot speak for older history; and the question is about
+  // training since THIS phase clock started, not ever.
   let interrupted: boolean | null = null
   const sessionWasInterrupted = async (): Promise<boolean> => {
     if (interrupted !== null) return interrupted
-    const lastLogs = await repo.getLastExerciseLogsBatch(
-      userId,
-      validSession.exercises.map(e => e.exerciseName),
-      // Program-scoped: a shared exercise name logged under a *different* program mustn't
-      // let this fresh ai_dynamic cycle skip its own AMRAP baseline week.
-      program!.id,
+    interrupted = await repo.wasProgramSessionTrainedSince(
+      userId, sessionId, state!.phaseStartedAt,
     )
-    const since = state!.phaseStartedAt.getTime()
-    interrupted = [...lastLogs.values()].some(log => log.loggedAt.getTime() >= since)
     return interrupted
   }
 

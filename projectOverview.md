@@ -1754,6 +1754,26 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [nutrition] ⚠️ The gap explainer is true now, and the base underneath it is still wrong (BF-142, 2026-09-12, v1.448.4) · needs: owner
+
+Owner, third report in this family: *"calories still not right"*. The card explained the macro/budget
+gap with *"the movement recorded today"* — the one reason `macro-budget-gap.ts` rules out in its own
+docstring, because movement is in **both** addends and cancels. It also called the grams his stored
+goal four lines below the prop comment saying they are earned-scaled. The arithmetic was right to the
+kcal; only the words were wrong. The sentence now names every number and says outright that moving
+will not close the gap.
+
+**The finding underneath it is not fixed and is Lane A's.** The module's docstring pinned the gap at
+*"406 kcal, at every hour of every day"*; the card printed **295 the other way**, so the sign had
+flipped. Reading the formula backwards for the base gives **1,454 then** against **~2,155 now** — the
+resting base has risen **~700 kcal**. That corroborates **BF-137** from a direction it does not use:
+the owner is 158 cm, so Mifflin BMR is **1,527** and the card calls **2,150** his *resting* burn,
+**1.41 × BMR**, which is a fully active TDEE sitting in a field labelled resting.
+
+**What is owed is the owner.** Every figure above was measured from his account; the seeded account's
+numbers differ, so the harness proves the sentence renders and its parts add up, not that it reads
+true to the person it is for.
+
 ### [workouts] ⚠️ The weight dial takes pounds now, and no thumb has tried the control (BF-141, 2026-09-12, v1.448.0) · needs: hardware
 
 Owner: *"my Dumbells are pounds and I need to convert it ... then just have it convert to the kg

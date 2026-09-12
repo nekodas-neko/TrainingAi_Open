@@ -543,74 +543,65 @@ below threshold and left in place for next time.
   the set card's non-editable branch, the last-session chips and the 1RM trend are unchanged.
 - **Needs:** nothing.
 
-### [nutrition] BF-142 — the gap explainer that shipped gives a reason its own module says is false, and the "constant" it cites has already moved 🔴 LIVE
+### [nutrition] BF-142 — the gap explainer gave a reason its own module rules out (fixed; the owner says whether it reads true)
 
-- **Lane:** B for the sentence. The base drift underneath it is BF-137's and Lane A's; the two are
-  independent and this one does not wait on it.
-- **Verification:** the replacement sentence names both numbers — the goal he set and the computed
-  allowance — and a reader who follows it does not expect the gap to close as he moves. The owner is
-  the person the sentence is for, so he is the one who says whether it now reads as true.
+- **Lane:** B. The base drift underneath it is BF-137's and Lane A's; the two are independent and
+  this one did not wait on it.
+- **Verify:** owner — the replacement sentence names both numbers, and a reader who follows it does
+  not expect the gap to close as he moves. He is the person the sentence is for.
+- **✅ SHIPPED 2026-09-12** (`fix/bf142-gap-explainer-sentence`).
+  [Journal](overview/entries/2026-09-12-fix-bf142-gap-explainer-sentence.md).
 
 - **Added:** 2026-09-11 · owner, on the Nutrition card, third report in this family:
   *"calories still not right"*.
 
-- **The card says the grams are his stored goal. They are not.** Measured 2026-09-11 —
-  `nutrition_targets` holds **1,660 kcal · 150 P / 141 C / 55 F** (last written 2026-08-31). The
-  card renders **150 P / 185 C / 72 F = 1,988 kcal**: carbs and fat are **1.31×** their stored
-  values, protein alone is untouched. The file knows this — `components/nutrition/energy-card.tsx:27-29`
-  documents the prop as *"the **effective** targets: the caller has already substituted the
-  burn-aware calorie budget and Q-323's earned-scaled macro grams"*. The sentence at `:181-183`
-  then tells the owner *"The grams come from your stored daily goal"*, four lines below the comment
-  saying they do not.
-- **And the REASON it gives is the one its own module rules out.**
-  `components/nutrition/macro-budget-gap.ts:8-9`: *"Both addends carry the same `earned`, so it
-  cancels."* Movement is in both numbers, so movement cannot be what separates them — yet the card
-  explains the gap as grams-from-goal versus budget-with-*"the movement recorded today"*. A reader
-  who believes the sentence concludes the gap will close as he moves. It will not, which is the one
+- **The card said the grams were his stored goal. They were not.** Measured 2026-09-11 —
+  `nutrition_targets` holds **1,660 kcal · 150 P / 141 C / 55 F**; the card rendered
+  **150 P / 185 C / 72 F = 1,988 kcal**, carbs and fat at **1.31×** their stored values. The file
+  knew: `energy-card.tsx` documents the prop as *"the **effective** targets ... Q-323's
+  earned-scaled macro grams"*, four lines above a sentence saying they come from the stored goal.
+- **And the REASON it gave was the one its own module rules out.** `macro-budget-gap.ts`: *"Both
+  addends carry the same `earned`, so it cancels."* Movement is in both numbers, so movement cannot
+  be what separates them — yet the card explained the gap as goal-versus-budget-with-*"the movement
+  recorded today"*. A reader who believed it waits for a gap that never closes, which is the one
   thing the paragraph exists to say.
-- **The true separator, from the same docstring, is `storedGoal − (restingBase + goalDelta)`, and it
-  checks out exactly:** `1,660 − (2,150 − 200) = −290` against the card's printed **−295** (gram
-  rounding accounts for the 5). **So the arithmetic is right and only the words are wrong** — which
-  is why this is a Lane B sentence and not a recalculation.
-- **⚠ The docstring's own constant is not just stale — INVERTING IT RECOVERS THE REAL NUMBER, AND IT
-  IS ALARMING.** It pins the gap at *"**406 kcal** on the owner's account, at every hour of every
-  day"*, grams **above** budget. Today the card prints **295 below**. **The sign flipped**, so the
-  two do not differ by 111 — read the docstring's own formula backwards for the base:
-  `base = storedGoal + 200 − gap`, giving **1,454 then** and **2,155 now** (the card shows 2,150;
-  gram rounding covers the 5). **The resting base has risen ~700 kcal.**
-  - **1,454 was a SANE resting figure** — just under the 1,527 Mifflin BMR, which is what a resting
-    base with the step credit taken out should look like. So this did not start wrong; it inflated.
-  - Any fix that hardcodes or re-states 406 inherits a number that has already moved 700.
+- **The arithmetic was right and only the words were wrong**, which is why this was a sentence and
+  not a recalculation: `1,660 − (2,150 − 200) = −290` against the card's printed **−295** (gram
+  rounding covers the 5).
+- **What shipped: the sentence now names every number and says which one is his.** Rendered against
+  the seeded account — *"Macro targets add up to 1,900 kcal — 463 below the calorie budget. Your
+  stored goal is 1,900. Today's budget is 2,363 — 2,063 resting burn, +300 for your goal, +0 moved.
+  The grams are that goal scaled up by the same movement, so moving more raises both numbers and the
+  gap stays."* The card gained one prop, `storedGoalCalories`, which is printed and never computed
+  with; resting burn, goal delta and earned come from the balance it already had.
+- **⚠ THE DOCSTRING'S OWN CONSTANT WAS STALE, AND INVERTING IT RECOVERED THE REAL NUMBER.** It
+  pinned the gap at *"**406 kcal** on the owner's account, at every hour of every day"*. On
+  2026-09-11 the card printed **295 the other way** — **the sign flipped**, so the two do not differ
+  by 111. Reading the formula backwards for the base gives **1,454 then** and **~2,155 now**: the
+  resting base has risen **~700 kcal**. 1,454 was sane — just under the 1,527 Mifflin BMR, which is
+  what a resting base with the step credit removed should look like. So this did not start wrong; it
+  inflated. The number is no longer restated in the module, and a test fails any attempt to re-pin
+  it as current fact.
 
-- **⚠ INDEPENDENT CORROBORATION THAT BF-137 IS LIVE AND UNDERSTATED, from a direction that entry did
-  not use.** BF-137 argues the calibrated maintenance is fitting a drug-driven weight drop. That
-  argument rests on a weight trend, which is exactly the confounded signal. **This does not.** The
-  owner is **158 cm**, 69.95 kg, 33, male (`users`, measured 2026-09-11). Mifflin-St Jeor BMR is
-  **1,527 kcal**. The card calls **2,150** his *resting* burn — **1.41 × BMR, 623 kcal above it**.
-  No resting figure is 1.41 × BMR; that ratio is a fully active TDEE. Because
+- **⚠ INDEPENDENT CORROBORATION THAT BF-137 IS LIVE AND UNDERSTATED, from a direction that entry
+  does not use.** BF-137 rests on a weight trend, which is the confounded signal. This does not.
+  The owner is **158 cm**, 69.95 kg, 33, male (`users`, 2026-09-11); Mifflin-St Jeor BMR is
+  **1,527**. The card calls **2,150** his *resting* burn — **1.41 × BMR, 623 above it**. No resting
+  figure is 1.41 × BMR; that is a fully active TDEE. Because
   `restingBase = maintenanceKcal − avgActiveKcal` on the calibrated path
   (`lib/health/energy-balance-service.ts`), an inflated maintenance lands in a field *labelled*
   resting, and today's movement is then added on top of a number that already contains a day of it.
-  **The height is what makes this conclusive** and it is easy to get wrong from the weight alone:
-  at 158 cm his BMR is ~130 kcal lower than a 178 cm man of the same mass, so the overshoot is
-  larger than a taller frame would suggest.
-- **What the owner is actually reacting to, stated plainly:** he set his goal to **1,660** on
-  2026-08-31. The card offers him **2,283**, prints **1,988** of macros beside it, and marks 1,331
-  eaten as *"Well under so far"* in red. **Not one of the three numbers on that card is the number
-  he chose.** Three sessions of "the calories are wrong" are that, not three separate arithmetic
-  faults.
-
-- **Recommendation — say the true sentence, which is shorter than the false one.** Name both
-  numbers and which is his: *"Your goal is 1,660. Today's computed allowance is 2,283 — your resting
-  burn is estimated at 2,150, minus 200 for your goal, plus 333 moved."* That is honest about the
-  disagreement instead of explaining it away, and it puts the estimate next to the goal where the
-  owner can see which one he is being judged against.
-  - **Do not "fix" this by re-labelling the grams as earned-scaled and leaving it there.** That
-    makes the sentence true and still leaves the reader with two numbers and no guidance.
-  - **Do not close the gap by scaling the stored goal to the budget.** That would silently raise
-    what he eats to a maintenance figure this entry has just shown is ~600 kcal too high.
-  - **`components/nutrition/__tests__/macro-budget-gap.test.ts` pins the non-convergence** (earning
-    the gap moves both numbers). Keep it; it is the assertion the wrong sentence contradicts.
+  **The height is what makes this conclusive**: at 158 cm his BMR is ~130 kcal below a 178 cm man of
+  the same mass, so the overshoot is larger than the weight alone suggests. **Left with BF-137 and
+  Lane A** — this entry fixed the sentence, not the base.
+- **What the owner was reacting to, stated plainly:** he set his goal to **1,660** on 2026-08-31.
+  The card offered **2,283**, printed **1,988** of macros beside it, and marked 1,331 eaten as
+  *"Well under so far"* in red. **Not one of the three numbers was the one he chose.** Three reports
+  of "the calories are wrong" are that, not three arithmetic faults.
+- **Two things deliberately NOT done**, both named on the entry before it was built: re-labelling
+  the grams as earned-scaled and stopping there (true, and still leaves two numbers with no
+  guidance), and closing the gap by scaling the stored goal to the budget (which would raise what he
+  eats to a maintenance figure this entry shows is ~600 kcal too high).
 - **Needs:** nothing.
 
 ### [workouts] BF-143 — a crash-recovery path fires on a recreated session, so a never-trained Lower is marked baseline-complete on borrowed PRs (FIXED; the owner's own Lower row self-repairs on next open)
@@ -992,56 +983,55 @@ below threshold and left in place for next time.
     surface, and the tint must not close the gap between `--card` and `--background` that currently
     separates a card from the page.
 - **Needs:** nothing.
-### [workouts] BF-144 — BF-143's guard asks about exercise NAMES when the id link was there all along, and the dead column that hid it
+### [workouts] BF-144 — the dead `program_session_id` column that misled BF-143, and whether to drop it
 
-- **Lane:** A — `app/api/ai-periodization/**`, and the schema question is Lane A's alone.
-- **Verification:** the interruption test resolves through `workout_sessions.session_id`; a session
-  renamed between cycles, or sharing a name with another session, still answers correctly. The
-  existing BF-143 cases must keep passing unchanged — the behaviour is not meant to move for the
-  recreated-session case, only to stop depending on names.
+- **Lane:** A — a column drop is a migration, and migrations are Lane A's alone.
+- **Gate:** owner — the drop is data-losing and needs confirmation. Deliberately added ONLY now that
+  the startable half is out: a `Gate:` parks the whole entry, and putting one here while the guard
+  was still owed would have hidden real work behind a question, which is the failure this entry's
+  own filing warned about.
+- **Verification:** nothing in the repo reaches `unusedProgramSessionId`, and a raw-SQL
+  `program_session_id` no longer resolves to a column that silently reads NULL.
 
 - **Added:** 2026-09-11 · found while closing out BF-143, by re-measuring a claim that entry's own
   fix had written into the codebase as a comment.
 
-- **⚠ THE CLAIM IN BF-143 WAS FALSE, AND THE SHIPPED COMMENT SAYING IT IS CORRECTED IN THIS PR.**
-  BF-143 justified a name-keyed lookup with *"`workout_sessions.program_session_id` is NULL on every
-  recent row … an id join would answer 'never trained' for everyone"*. That measured the **dead**
-  column of the pair `lib/data/postgres/schema.ts:183-191` warns about. The live link is the column
-  literally named **`session_id`** (Drizzle property `programSessionId`), and it is populated:
-  **62 of 108 rows**, measured 2026-09-11. Per active session that day — Push 1, Pull 1, Legs 1,
-  Upper 1, **Lower 0** — which is precisely the question BF-143 needed answered, available directly
-  and ignored.
-- **The shipped fix is not wrong, and this is not a revert.** The date comparison against
-  `phaseStartedAt` is what carries the guard, and it is correct for the recreated-session case —
-  Lower's name-matched logs predate its phase clock, so it stayed in baseline as intended. What is
-  wrong is the *reason*, and a reason left in a comment is what the next reader builds on.
-- **Why the id link is the better signal anyway:** a name lookup is right only while names stay
-  unique and unchanged. Rename Lower, or add a second session sharing a name, and the interruption
-  test answers about the wrong workouts. `session_id` cannot be confused that way. The 46 rows with
-  no live id are older history predating the link, which is why the date comparison stays as the
-  companion test rather than being replaced by the id alone.
+- **The guard half shipped 2026-09-12.** The interruption test now resolves through
+  `workout_sessions.session_id` (Drizzle `programSessionId`) rather than by matching exercise names:
+  `wasProgramSessionTrainedSince` in `lib/data/postgres/slices/periodization.ts`, called from
+  `app/api/ai-periodization/session/[sessionId]/route.ts`. The false justification BF-143 left in a
+  comment is corrected in the same place it was written. The date comparison stays as the companion
+  test, because the 46 rows predating the link carry no id and cannot answer for themselves. Covered
+  by `lib/data/postgres/__tests__/was-program-session-trained-since.test.ts` against a real database.
 
-- **⚠ THE DEAD COLUMN IS A TRAP THAT HAS NOW COST THREE SESSIONS, AND THAT IS THE ARGUMENT FOR
-  REMOVING IT.** `schema.ts:183-191` already records that it *"has already cost a session: a repro
-  fixture populated `program_session_id`, the periodization block took its `null` branch, and the
-  honest reading of that run was 'the race does not exist'."* It then cost BF-143 a false premise,
-  and cost this session a wrong measurement — the raw-SQL name `program_session_id` reads the dead
-  one, so **every ad-hoc query through the admin endpoint hits the trap by default**, which is
-  exactly where a session goes to check a claim. Renaming the Drizzle property fixed the ORM path
-  and left the SQL path as sharp as it was.
-- **⚠ NO `Gate:` ON THIS ENTRY, deliberately, and the reason is the rule itself.** The guard change
-  above needs nothing from the owner and is startable today. A `Gate:` parks the whole entry, so
-  putting one here to mark the column question would hide the startable work behind it — the exact
-  failure the protocol header describes, and one this session had already made once (BF-139 through
-  BF-142 were filed with a `Verify:` field and vanished from both lanes until the owner noticed).
-- **The column drop is the owner's, and it is a SEPARATE decision that does not block the guard.**
-  Dropping `program_session_id` is a data-losing migration and needs confirmation per the standing
-  rule and `schema.ts`'s own note. The loss is nominal — 0 of 108 rows, never read — but nominal is
-  still his call. **Ask it on its own**, and do not let the answer hold up moving the interruption
-  test onto the id link.
-- **Read BF-143 first** — this corrects that entry's reasoning, not its outcome. Kept out of the
-  `Needs:` bullet on purpose: `Needs:` is a FIELD, so a bare id inside it is parsed as a dependency,
-  and that is exactly what parked this entry behind a BF-143 that had already shipped.
+- **⚠ WHAT IS LEFT IS THE TRAP, AND IT HAS NOW COST THREE SESSIONS.** `schema.ts` already records
+  that the dead column *"has already cost a session: a repro fixture populated `program_session_id`,
+  the periodization block took its `null` branch, and the honest reading of that run was 'the race
+  does not exist'."* It then cost BF-143 a false premise, and cost the session that filed this entry
+  a wrong measurement. Renaming the Drizzle property to `unusedProgramSessionId` fixed the ORM path
+  and left the SQL path exactly as sharp: **a raw `program_session_id` in an ad-hoc query through the
+  admin endpoint still hits the dead column by default**, which is precisely where a session goes to
+  check a claim.
+
+- **The decision, for the owner — recommendation: drop it.**
+  - **Why:** the column has never been written or read by any code since it was created in
+    `079_ai_dynamic_periodization.sql`, and 0 of 108 rows carry a value. What it costs is not
+    storage, it is that two columns point at `program_sessions` and only one is real — and the wrong
+    one owns the name a person would type. Three sessions have now measured the wrong column and
+    drawn a confident, false conclusion from it. Dropping it makes `program_session_id` an error
+    rather than a NULL: the difference between a question that fails loudly and one that answers
+    wrongly.
+  - **Alternative — keep it and rely on the rename.** Genuinely better at one thing: it is free and
+    reversible, and the ORM path is already safe. It loses because the failure mode is raw SQL, which
+    the rename does not touch at all.
+  - **Alternative — keep it and document it harder.** Better at preserving the record of what was
+    once intended. It loses because two of the three sessions that fell in had already read a comment
+    saying exactly this.
+  - **Reversal cost:** low but not zero. Re-adding the column is one migration and restores exactly
+    what is there now — nothing. It is data-losing by category rather than by consequence, which is
+    why it is being asked rather than assumed.
+
+- **Keep:** the owner's answer above, and the migration if it is yes.
 - **Needs:** nothing.
 
 ### [platform] LB-94 — the journal's recent window is 332 entries, and 297 of them are pinned by a citation

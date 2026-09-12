@@ -24,6 +24,10 @@ interface Props {
   goalCalories: number | null
   /** The `earned` term inside that same budget — the movement addend, from the same call. */
   earnedKcal: number | null
+  /** The goal as STORED in `nutrition_targets`, before any burn-aware substitution (BF-142).
+   *  The card prints it beside the computed budget, because the owner's complaint was that not one
+   *  number on this card was the number he chose. Never used to compute anything. */
+  storedGoalCalories: number | null
   /** The **effective** targets: the caller has already substituted the burn-aware calorie budget and
    *  Q-323's earned-scaled macro grams. Passing the raw stored targets would report fat over on a
    *  day with 551 kcal earned when it was well under. */
@@ -58,7 +62,8 @@ const RING_MASK = 'radial-gradient(farthest-side, transparent 69%, black 70% 89%
  * confident number built from a default.
  */
 export const EnergyCard = memo(function EnergyCard({
-  data, isToday, loading, calories, proteinG, carbsG, fatG, goalCalories, earnedKcal, targets,
+  data, isToday, loading, calories, proteinG, carbsG, fatG, goalCalories, earnedKcal,
+  storedGoalCalories, targets,
 }: Props) {
   const [showInfo, setShowInfo] = useState(false)
 
@@ -179,9 +184,24 @@ export const EnergyCard = memo(function EnergyCard({
           Macro targets add up to{' '}
           <span className="font-semibold tabular-nums text-foreground">{macroGap.targetKcal.toLocaleString()} kcal</span>
           {' '}&mdash; {Math.abs(macroGap.gapKcal).toLocaleString()} {macroGap.gapKcal > 0 ? 'above' : 'below'} the
-          calorie budget. The grams come from your stored daily goal; the budget is built from your
-          resting burn, your goal adjustment, and the movement recorded today. Two different
-          denominators, not a miscalculation.
+          calorie budget.{' '}
+          {storedGoalCalories != null && (
+            <>
+              Your stored goal is{' '}
+              <span className="font-semibold tabular-nums text-foreground">{storedGoalCalories.toLocaleString()}</span>.{' '}
+            </>
+          )}
+          {b != null && goal != null && (
+            <>
+              Today&rsquo;s budget is{' '}
+              <span className="font-semibold tabular-nums text-foreground">{goal.toLocaleString()}</span>
+              {' '}&mdash; {Math.round(b.restingBaseKcal).toLocaleString()} resting burn,
+              {' '}{b.targetNetKcal >= 0 ? '+' : '\u2212'}{Math.abs(Math.round(b.targetNetKcal)).toLocaleString()} for your goal,
+              {' '}+{Math.round(b.activeKcal).toLocaleString()} moved.{' '}
+            </>
+          )}
+          The grams are that goal scaled up by the same movement, so moving more raises both numbers
+          and the gap stays.
         </p>
       )}
 
