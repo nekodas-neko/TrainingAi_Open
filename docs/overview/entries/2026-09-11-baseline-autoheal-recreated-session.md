@@ -49,11 +49,16 @@ He was training and asked for it directly, so this stopped being intake. Three c
 
 The auto-heal now requires a log **newer than `phaseStartedAt`** rather than a name that has ever
 been logged. That is the only honest test of the interruption it exists to repair, and a recreated
-session's logs predate its own phase clock. It is name-keyed rather than id-keyed on purpose:
-`workout_sessions.program_session_id` is NULL on every recent row — measured 2026-09-11, all five of
-the owner's sessions read zero by id while four had been trained that week — so an id join would
-answer "never trained" for everyone and park every session in baseline forever. The date comparison
-is what separates them.
+session's logs predate its own phase clock.
+
+**A correction to that, found while closing the session out.** The lookup is name-keyed, and the
+reason written into the code for that was wrong: it claimed `program_session_id` is NULL on every
+row. That measured the dead column of the pair `schema.ts` warns about. The live link is the column
+named `session_id`, it is populated on 62 of 108 rows, and on 2026-09-11 each of the four trained
+sessions had one while the recreated Lower had none — the exact question, available directly. The
+date comparison is what actually carries the guard and the behaviour is correct, but the reasoning
+is not, and a reason left in a comment is what the next reader builds on. Corrected in the code and
+filed as BF-144, which moves the test onto the id link.
 
 It also completes only on full coverage, which is the invariant `recordBaselineAnchors` already
 holds for the measured path and states in its own docstring.

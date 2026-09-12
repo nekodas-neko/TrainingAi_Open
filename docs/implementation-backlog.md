@@ -611,6 +611,11 @@ below threshold and left in place for next time.
   in-session, mid-training. Three changes, one per defect below:
   1. The auto-heal now requires a log **newer than `phaseStartedAt`** — the only honest test of the
      interruption it exists to repair. A recreated session's logs predate its phase clock.
+     **⚠ The reason recorded here for looking those logs up BY NAME was false** — it cited
+     `program_session_id` being NULL everywhere, which is the DEAD column of the pair
+     `schema.ts:183-191` warns about. The live `session_id` is populated (62 of 108 rows) and would
+     have answered directly. The guard's behaviour is right; its justification is corrected in
+     **BF-144**, which moves it onto the id link.
   2. It completes only on **full coverage**, matching the invariant `recordBaselineAnchors` already
      holds for the measured path.
   3. `revertAutoAdoptedBaseline` (`lib/data/postgres/slices/periodization.ts`) undoes a baseline
@@ -697,6 +702,49 @@ below threshold and left in place for next time.
   `baseline_complete = true` and three adopted values are already written and a code fix will not
   retroactively clear them.
 - **Needs:** nothing. **Read BF-127 first** — defect 3 is its mechanism in a second location.
+
+### [workouts] BF-144 — BF-143's guard asks about exercise NAMES when the id link was there all along, and the dead column that hid it
+
+- **Lane:** A — `app/api/ai-periodization/**`, and the schema question is Lane A's alone.
+- **Verification:** the interruption test resolves through `workout_sessions.session_id`; a session
+  renamed between cycles, or sharing a name with another session, still answers correctly. The
+  existing BF-143 cases must keep passing unchanged — the behaviour is not meant to move for the
+  recreated-session case, only to stop depending on names.
+
+- **Added:** 2026-09-11 · found while closing out BF-143, by re-measuring a claim that entry's own
+  fix had written into the codebase as a comment.
+
+- **⚠ THE CLAIM IN BF-143 WAS FALSE, AND THE SHIPPED COMMENT SAYING IT IS CORRECTED IN THIS PR.**
+  BF-143 justified a name-keyed lookup with *"`workout_sessions.program_session_id` is NULL on every
+  recent row … an id join would answer 'never trained' for everyone"*. That measured the **dead**
+  column of the pair `lib/data/postgres/schema.ts:183-191` warns about. The live link is the column
+  literally named **`session_id`** (Drizzle property `programSessionId`), and it is populated:
+  **62 of 108 rows**, measured 2026-09-11. Per active session that day — Push 1, Pull 1, Legs 1,
+  Upper 1, **Lower 0** — which is precisely the question BF-143 needed answered, available directly
+  and ignored.
+- **The shipped fix is not wrong, and this is not a revert.** The date comparison against
+  `phaseStartedAt` is what carries the guard, and it is correct for the recreated-session case —
+  Lower's name-matched logs predate its phase clock, so it stayed in baseline as intended. What is
+  wrong is the *reason*, and a reason left in a comment is what the next reader builds on.
+- **Why the id link is the better signal anyway:** a name lookup is right only while names stay
+  unique and unchanged. Rename Lower, or add a second session sharing a name, and the interruption
+  test answers about the wrong workouts. `session_id` cannot be confused that way. The 46 rows with
+  no live id are older history predating the link, which is why the date comparison stays as the
+  companion test rather than being replaced by the id alone.
+
+- **⚠ THE DEAD COLUMN IS A TRAP THAT HAS NOW COST THREE SESSIONS, AND THAT IS THE ARGUMENT FOR
+  REMOVING IT.** `schema.ts:183-191` already records that it *"has already cost a session: a repro
+  fixture populated `program_session_id`, the periodization block took its `null` branch, and the
+  honest reading of that run was 'the race does not exist'."* It then cost BF-143 a false premise,
+  and cost this session a wrong measurement — the raw-SQL name `program_session_id` reads the dead
+  one, so **every ad-hoc query through the admin endpoint hits the trap by default**, which is
+  exactly where a session goes to check a claim. Renaming the Drizzle property fixed the ORM path
+  and left the SQL path as sharp as it was.
+- **Gate:** owner — dropping the column is a data-losing migration and needs confirmation, per the
+  standing rule and `schema.ts`'s own note. **Ask it as its own question, not folded into the guard
+  fix:** the column holds nothing (0 of 108 rows) and has never been read, so the loss is nominal,
+  but "nominal" is still the owner's call. The guard change above is not blocked by it.
+- **Needs:** nothing. **Read BF-143 first** — this corrects that entry's reasoning, not its outcome.
 
 ### [platform] LB-94 — the journal's recent window is 332 entries, and 297 of them are pinned by a citation
 
@@ -18863,6 +18911,34 @@ describing a safety net that no longer exists.
 - **What is left is hygiene, not the owner request.** Phase 2 is 182 identifiers and Phase 3 is the
   schema tables (~2,813 repo-wide references). Both carry real regression risk — Phase 2's trap is
   cache keys. Neither is urgent now that Phase 1 has landed.
+- **⚠ MEASURED 2026-09-11 (Orchestrator) — renaming alone produces a generically-named
+  single-vendor table, which is worse than the honest vendor name.** The owner's follow-up was
+  *"make sure we know which sensor somewhere, so we can use the same tables for other recording
+  devices"*. That is a **second requirement**, and the plan does not carry it.
+
+  **`oura_heartrate` is already multi-device and already misnamed.** Its `source` column, in production:
+
+  | `source` | rows | period | what it is |
+  |---|---|---|---|
+  | `chest_strap` | **84,246** | 2026-07-17 → now | Polar H10 |
+  | `ble` | 19,376 | 2026-07-06 → now | Oura ring, direct BLE |
+  | `workout` / `awake` / `rest` / `live` | 12,494 | 06-22 → **07-06 only** | Oura **Cloud**, dead era |
+
+  **73% of the rows in a table called `oura_heartrate` come from a Polar chest strap.** The
+  discriminator works for everything current — `chest_strap` and `ble` both name a device — and only
+  the frozen Cloud era uses series names instead, an era whose last row is 2026-07-06.
+
+  **The gap is coverage, not design: 5 of 22 vendor tables carry a `source` at all** —
+  `oura_heartrate`, `rr_intervals`, `oura_workouts`, `oura_tags`, `oura_daily_derived`. The other 17
+  do not, and **`oura_bucket` is among them** — the intraday rollup that a second device would most
+  need to share. Renaming it to `sensor_bucket` with no way to say which sensor wrote a row buys a
+  honest-looking name and no portability.
+
+  **So Phase 3 wants a column audit beside the rename**, deciding per table: does a second source
+  ever write here (→ needs `source`), or is it structurally single-device (→ keep the vendor name,
+  like `oura_raw_samples` already does and for the same reason)? Do it in the same PR as each
+  table's rename — a generically-named table with no discriminator is the state that invites a
+  later writer to assume portability the schema cannot deliver.
 - ✅ **Phase 3 now HAS its plan (2026-08-04):**
   [`docs/superpowers/plans/2026-08-04-vendor-table-rename-phase-3.md`](superpowers/plans/2026-08-04-vendor-table-rename-phase-3.md).
   Three PRs, not one: rename behind compatibility **views** (an `ALTER TABLE … RENAME` is
