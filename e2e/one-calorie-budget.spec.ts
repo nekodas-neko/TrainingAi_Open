@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { Client } from 'pg'
+import { budgetProvenance } from '@trainingai/shared/nutrition/calorie-balance'
 import { ensureEnergyBalanceProfile, enableHomeCards, settleRouteBoundary } from './fixtures'
 
 /**
@@ -46,13 +47,23 @@ async function budgetFromRoute(page: Page) {
   expect(body.balance, 'the seeded profile must be complete enough to produce a balance').toBeTruthy()
   const { restingBaseKcal, targetNetKcal, activeKcal, intakeKcal } = body.balance
   const earned = Math.round(activeKcal)
-  const total = Math.round(restingBaseKcal + targetNetKcal) + earned
+
+  // LB-100. This used to re-derive the budget as `restingBase + targetNet + earned`. That was a
+  // SECOND implementation of the one thing this spec exists to protect, and it drifted the moment
+  // BF-150 anchored the real budget to the stored goal: the spec went red against a card that was
+  // right, and the reflex reading was "the fixture is stale". It was not — the ring really had been
+  // left behind — but a second copy of the formula cannot tell you which. It now asks the shared
+  // one, so the spec pins that the surfaces agree with `budgetProvenance` rather than with a
+  // transcription of it that has to be maintained in step.
+  const total = budgetProvenance(body.balance).total
 
   expect(earned, 'the HR-based session must reach the active-energy figure').toBeGreaterThan(0)
-  // The mutation check, made explicit: `stored goal + earned` is what both surfaces used to print.
-  // If it ever equals the real budget the fixture has stopped discriminating and must be retuned.
-  expect(total, 'fixture must separate the real budget from the old expression')
-    .not.toBe(BASE.calories + earned)
+  // The discriminator, retuned for the same reason. The expression to separate from is the OLD one
+  // — what both surfaces printed before the budget was anchored — not the stored goal, which is now
+  // what the budget IS. Written the old way this asserted the fixture must differ from the correct
+  // answer, so it would have started failing for being right.
+  expect(total, 'fixture must separate the real budget from the pre-BF-150 expression')
+    .not.toBe(Math.round(restingBaseKcal + targetNetKcal) + earned)
 
   return { total, earned, intakeKcal: Math.round(intakeKcal), scaled: body.macroTargets.scaled }
 }
