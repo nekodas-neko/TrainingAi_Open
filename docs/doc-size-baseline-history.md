@@ -11034,18 +11034,43 @@ owed and `check-backlog-pointers` rejects a finished entry in the queue. The jou
 out as a recommendation with its alternatives. Noted rather than left silent because a baseline that
 drops for no recorded reason reads as an error later.
 
+## 2026-09-12 — `docs/implementation-backlog.md` → 21076 (BF-146 closed not built)
 
-## 2026-09-11 — `docs/implementation-backlog.md` → 21098 (RV-42 shipped)
+BF-146 leaves the queue with no code change. BF-148 (#1117, `ad8938d328`) removed the name-keyed
+`hasAnyPriorLog` veto in `isAiDynamicBaseline` hours after this was filed — that veto is what made
+`isBaselinePhase` false, let the poll run, and drew the banner. `isAiPrescriptionPending` requires
+`!isBaselinePhase`, so the path is unreachable now and the entry's own recommended fix would be dead
+code.
+
+Established by measurement rather than reading: the client-side suppression was written first, and
+`e2e/baseline-not-a-failure.spec.ts` passed identically with and without it. The spec ships as the
+regression net for BF-148's guard; the suppression was reverted.
+
+## 2026-09-12 — `docs/agents/state/implementation-lane-b.md` 112 → 111 (BF-146 rewrite)
+
+Down one across a full rewrite that added two CI gotchas and a new first lesson. The room came from
+compressing four "four entries were wrong" clauses into one and dropping the narrative around the
+`actions_list` branch-filter finding to the two lines a successor actually needs.
+
+## 2026-09-12 — `docs/implementation-backlog.md` 21076 → 21080 (LB-56 seventh sighting)
+
+Four lines for the seventh E2E renderer `SIGSEGV`, on the run for #1122. The entry's argument *is*
+the rate, so a sighting that is not written down weakens it — but the note was cut from five lines
+to four and the running tally rewritten in place rather than extended, so the growth is the sighting
+itself and nothing around it.
+
+
+## 2026-09-11 — `docs/implementation-backlog.md` → 21055 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 
-**This figure has been rewritten TWELVE times and the churn is the note worth leaving.** Thirteen
+**This figure has been rewritten THIRTEEN times and the churn is the note worth leaving.** Fourteen
 other merges landed on `main` while this PR waited on an owner decision, and each one moved the base
 out from under it — so the starting figure is no longer even quoted here, because it changed again
-between the last two rewrites. **Twelve rewrites of one number is the cost of a green PR waiting**,
+between the last two rewrites. **Thirteen rewrites of one number is the cost of a green PR waiting**,
 recorded rather than smoothed because the alternative reading — that someone kept getting the
 arithmetic wrong — is the wrong lesson. The per-file `.size` split (LA-33) is what keeps this to one
-number instead of a whole map: no other document's baseline has conflicted once across all twelve.
+number instead of a whole map: no other document's baseline has conflicted once across all thirteen.
 Nothing was wrong with any of the three — each was correct against the `main` of its hour. Under six
 concurrent lanes plus an owner gate, a baseline is a reading of a moving number, and a PR that waits
 will re-read it once per merge that overtakes it. Recomputed by `pnpm fix:baselines` after each

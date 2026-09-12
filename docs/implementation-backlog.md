@@ -782,53 +782,6 @@ below threshold and left in place for next time.
   surfaced from BF-143 making the baseline state reachable, and they need separate fixes.
 - **Needs:** nothing.
 
-### [workouts] BF-146 — a baseline session is TOLD to establish a baseline and then shown a red "couldn't generate, tap refresh" for refusing to prescribe before it has one 🔴 LIVE
-
-- **Lane:** B — the backend refusal is correct and must not change; the screen's handling of it is the defect.
-- **Verification:** open a session in `baseline` with `baselineComplete = false`. No failure banner
-  appears, the "First session — establish baseline" panel is the only explanation on screen, and
-  nothing invites a retry that cannot succeed. Reproducible without a device: the state is a
-  `session_periodization` row.
-
-- **Added:** 2026-09-11 · owner, minutes before training, on the Lower card: *"Not sure if this is
-  temporary issue; but its not able to generate an ai workout for the new one"* — with the amber
-  banner *"Couldn't generate your AI prescription just now — showing your base program. Tap refresh
-  to try again."*
-
-- **Nothing is broken and nothing is temporary. The refusal is deliberate and correct.**
-  `packages/shared/src/ai-periodization/generate-prescription.ts:201-202` returns
-  `{ ok: false, error: 'Baseline not complete', status: 400 }` when
-  `state.phase === 'baseline' && !state.baselineComplete`. Prescriptions are percentages of a 1RM;
-  before the AMRAP there is no 1RM to take a percentage of. **Do not "fix" this by letting
-  generation proceed** — that is precisely the borrowed-anchor prescribing BF-143 just removed.
-- **The client has no case for it.** `components/workout/pre-workout-screen.tsx:301-305` renders
-  that banner under `prescriptionGenTimedOut` — a *timeout/failure* flag. A deliberate 400 is
-  funnelled into the same state as a 502 or a network drop, so a settled, expected condition is
-  drawn in amber with a warning triangle and an instruction to retry. **The retry can never
-  succeed** until an AMRAP is logged.
-- **And the screen contradicts itself.** Directly above the banner it already says *"First session —
-  establish baseline … The AI will calculate your 1RM and start prescribing from the next
-  session."* That panel is the correct explanation; the banner underneath calls the same state an
-  error.
-
-- **⚠ HONESTLY: BF-143's fix is what made this reachable, and that is worth stating rather than
-  filing this as an unrelated find.** Before it, the owner's sessions were either AMRAP-calibrated
-  or silently auto-completed from prior PRs, so `baseline && !baselineComplete` never survived
-  a card open on his account. Putting Lower correctly back into baseline exposed a path with no UI
-  treatment. **This is a latent gap made visible, not a regression** — the 400 predates BF-143 and
-  any genuinely new session would always have hit it.
-
-- **Recommendation:** distinguish "refused because of state" from "failed". Have the generation
-  hook treat a 400 `Baseline not complete` as a normal outcome — no banner, no retry prompt — and
-  let the baseline panel be the whole explanation. If anything is shown at all, it belongs in that
-  panel's voice (*"the AI starts prescribing after this session"*), not in an error's.
-  - **Do not widen the suppression to all 400s.** `Invalid body` is a real fault and should still
-    surface. Match the specific error string, or give the result a typed reason.
-  - **Nothing about this blocks training** — the base program renders, the suggested starting
-    points are on screen and Start Workout is live, which is why this is a clarity defect rather
-    than an outage.
-- **Needs:** nothing.
-
 ### [platform][app-shell] BF-147 — the admin exercise list squeezes the exercise NAME to zero px, force-overwrites a GIF on one tap with no confirm, and the wrong-GIF flag it now has no way to reach
 
 - **Lane:** B — the storage half landed (see below); everything left is `components/admin/exercise-manager.tsx`.
@@ -2671,17 +2624,21 @@ sheet is open over the bottom half of it.
     `meal-label:286` and `touch-target-size:53` — all four recovered on retry, two of them reporting
     `browser.newContext: Target page, context or browser has been closed` straight after
     `Received signal 11 SEGV_MAPERR 0000000001b0`, the same address for the fourth time. 174 passed.
+  - **⚠ SEVENTH SIGHTING 2026-09-12 (#1122).** `macro-calorie-warning:77` (second time) and
+    `diary-nested-meal:163` both went flaky on `browser.newContext: Target page, context or browser
+    has been closed` after `Received signal 11 SEGV_MAPERR 0000000001b0` — same address, fifth time.
+    Both recovered; the run's one hard failure was a real fixture fault in a spec that PR added.
   - **`touch-target-size:53` failed with `/: no interactive elements found`**, which is the same
     dead-renderer downstream wearing a third mask: the page never rendered, so the measurement had
     nothing to measure and the assertion read as a layout defect. Worth naming, because unlike
     `ERR_ABORTED` and `newContext` it looks like a genuine product failure on its own.
-  - **Six sightings, seven different specs** — `preferences-survive-reinstall` (×4, three times as
-    the hard failure), `touch-target-size` (×2), `one-calorie-budget`, `back-dismiss-sweep`,
-    `card-429-error-state`, `home-device-battery-chips`, `macro-calorie-warning`,
-    `baseline-progress-label`, `health-tabs-instant-paint`, `meal-label`. Which spec is reported is a
-    scheduling accident, as this entry said at the second sighting; the constant is a renderer crash
-    inside a 21–26 minute run. **It has now cost six log reads across two sessions**, and this run
-    cost a seventh read to separate one real failure from four crash artefacts.
+  - **Seven sightings, eleven different specs** — `preferences-survive-reinstall` (×4, three times as
+    the hard failure), `touch-target-size` (×2), `macro-calorie-warning` (×2), `one-calorie-budget`,
+    `back-dismiss-sweep`, `card-429-error-state`, `home-device-battery-chips`,
+    `baseline-progress-label`, `health-tabs-instant-paint`, `meal-label`, `diary-nested-meal`. Which
+    spec is reported is a scheduling accident, as this entry said at the second sighting; the
+    constant is a renderer crash inside a 21–26 minute run. **It has now cost eight log reads across
+    three sessions**, one of them only to establish the hard failure was something else.
   - Recorded because a 26-minute job that eats its own browser roughly one run in three is an
     argument about the job, which is what this entry is for. It also means **a red E2E cannot be
     read as a signal without opening the log**, which is the cost LB-54 is about.
