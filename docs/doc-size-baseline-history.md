@@ -11007,6 +11007,13 @@ BF-144 was hidden from the queue twice over: a `Gate: owner` covering only the c
 and a cross-reference to BF-143 written inside the `Needs:` bullet, which the parser read as a real
 dependency. Both corrected, with the reason recorded in the entry.
 
+## 2026-09-12 — `docs/implementation-backlog.md` (BF-147 re-laned)
+
++18. BF-147's Lane A half shipped, so the entry gains a record of the column and route that now
+exist, a `Keep:` naming the four UI defects and the sweep screen left for Lane B, and an explicit
+note that the production S3 credentials the entry asks about were *not* checked — the verdict column
+touches neither storage nor generation, but that judgement belongs on the record rather than in a
+gap. Nothing was deleted: the entry stays queued, re-laned rather than removed.
 ## 2026-09-12 — `docs/implementation-backlog.md` (BF-149)
 
 Net zero: BF-149 was written and then removed in the same change, because it shipped with nothing
