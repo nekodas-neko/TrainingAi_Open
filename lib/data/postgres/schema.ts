@@ -328,6 +328,12 @@ export const exerciseMedia = pgTable('exercise_media', {
   gifUrl:       text('gif_url'),
   modelUsed:    text('model_used'),
   generatedAt:  timestamp('generated_at', { withTimezone: true }).defaultNow(),
+  // BF-147 (migration 273). The owner's verdict on whether this GIF actually shows the exercise.
+  // Beside `model_used` on purpose: a verdict about a generation belongs with its provenance, and
+  // it has to survive the regeneration decisions it exists to inform. Marking `wrong` deliberately
+  // does NOT trigger a regeneration — collecting the wrong ones is the point.
+  reviewStatus: text('review_status').notNull().default('unreviewed'),
+  reviewedAt:   timestamp('reviewed_at', { withTimezone: true }),
 }, (t) => [unique().on(t.exerciseName, t.gender)])
 
 export const exerciseGifCache = pgTable('exercise_gif_cache', {
