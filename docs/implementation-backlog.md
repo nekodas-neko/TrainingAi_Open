@@ -421,6 +421,40 @@ below threshold and left in place for next time.
 
 
 
+### [nutrition] LB-100 — BF-150 turned `one-calorie-budget.spec.ts` red on `main`, and it merged that way 🔴 LIVE
+
+- **Lane:** A — `lib/health/energy-balance-service.ts` / `budgetProvenance`, and the spec that pins
+  them. Filed by Lane B, which is why the ID carries `LB-`; the letter records who found it.
+- **Found:** 2026-09-12, on #1129's CI. Not that PR's — its diff is the weekly recap's trend rows and
+  touches no budget code.
+
+- **The timing is the evidence, and it is clean.** `e2e/one-calorie-budget.spec.ts:165` —
+  *"Home's nutrition card counts against that same budget"* — was **green on #1127 at 10:26** (181
+  passed), whose base predates BF-150. It has failed on **every** run since: BF-150's own pre-merge
+  run (#1128, job 103541484504) and #1129's (job 103543889216), with the identical locator.
+  **BF-150 merged with it red**, which E2E being advisory permits and nothing recorded.
+- Reproduced locally on a tree containing BF-150: `1 failed, 4 passed`.
+
+- **⚠ TWO CANDIDATE CAUSES, AND THIS ENTRY DOES NOT PICK ONE.** Both fit the evidence and they want
+  different fixes, so the next session should discriminate before writing code.
+  1. **The one-budget invariant is broken again.** `budgetFromRoute` derives
+     `round(restingBaseKcal + targetNetKcal) + earned` — the pre-BF-150 expression — and the
+     **Nutrition ring test still passes against it** while Home's donut does not. Two surfaces
+     disagreeing about the day's budget is exactly the defect Q-415/Q-417 fixed in v1.335.0 and this
+     spec exists to catch. If so it is a live product regression on the number the owner eats to.
+  2. **The spec is simply stale.** Its line 54 asserts the budget must **not** equal
+     `BASE.calories + earned` — *"if it ever equals the real budget the fixture has stopped
+     discriminating"* — and anchoring on the stored goal is precisely what BF-150 made it. On this
+     reading the card is right, the fixture's guard has inverted, and the fix is the spec.
+  - **A third thing is in the way and must be ruled out first:** the failure's accessibility
+    snapshot shows a **`dialog "Morning Check-in"` open over Home**, so the donut may be rendering
+    the correct figure while occluded. `toBeVisible` fails either way. Dismiss the check-in in the
+    fixture before concluding anything about the number.
+- **Discriminator:** read what Home's donut actually prints with the check-in dismissed. Equal to
+  `storedGoal + earned` → the spec is stale (②). Equal to neither that nor the route's
+  `restingBase + targetNet + earned` → the surfaces disagree (①).
+- **Needs:** nothing.
+
 ### [app-shell] BF-139 — three header chips no longer fit beside the date (fixed; the device look is what is left)
 
 - **Lane:** B
@@ -18445,23 +18479,29 @@ per-field merge where an AI write has no honest source rank to claim.
   reusable components. What is missing is one entry point instead of two, three stats, a 7-day
   comparison, and the wrap-up continuing from the read-through. Reasoning and alternatives: the plan.
 
-### [nutrition][app-shell] Q-112e — the weekly recap gets the same treatment
+### [nutrition][app-shell] Q-112e — the weekly recap gets the same treatment (SHIPPED; device check owed)
 
-- **Branch:** `feat/weekly-recap-uplift` · **Lane: B** · **Plan:** the above, §4
-- `weekly-recap-banner.tsx` + `/api/weekly-digest` at the owner's "monthly scale" lookback.
-  Deliberately last, so the daily version settles the layout first.
-- **⚑ PART SHIPPED 2026-09-08; the trends half is now UNBLOCKED — LB-64 shipped 2026-09-09.** The
-  banner's silent-vanish error state is fixed — a failed recap used to `return null`, so the user
-  could not tell a quiet week from a broken one, and the once-per-week `hasFetched` guard meant a
-  single failure cost the whole week's recap. It now says so and the tap retries. That is the half of
-  "the pattern Q-112a–d proves out" that needed nothing from the engine (the plan asks for exactly
-  this fix by name for the daily digest in Q-112a).
-- **Keep:** the trends themselves. `/api/weekly-digest` still returns prose only, and it is not the
-  route to draw from — LB-64 shipped `GET /api/weekly-review/month-window` instead, five weekly
-  buckets of the same four metrics `day-review/week-window` serves daily, with `priorAverages` over
-  the four completed weeks. Q-112d's `day-trends.ts` is the render to copy; its
-  `TREND_SPECS`/`trendRows` are shaped around a `WeekWindowResponse` and want widening to the
-  `MonthWindowResponse` shape, not rewriting.
+- **Branch:** `feat/weekly-recap-uplift` → shipped as `feat/q112e-weekly-recap-trends` · **Lane: B**
+- **Keep:** the device check, and only that. On the S25: open the weekly recap from the banner (or
+  the reminder's `/?review=week` deep link) and confirm the four trend rows read at 412 dp under the
+  prose, that a week with no reading says so rather than drawing a gap as zero, and that the
+  sparklines line up week-for-week with each other.
+- **✅ SHIPPED 2026-09-12 (v1.451.0)** — `components/week-trends-section.tsx`, rendered inside the
+  expanded banner. Journal: `docs/overview/entries/2026-09-12-q112e-weekly-recap-trends.md`.
+  - The banner's silent-vanish error state shipped 2026-09-08; the trends half was unblocked by
+    LB-64 on 2026-09-09 and is what this closes.
+  - **The maths is the day review's, widened rather than copied.** `trendRowsFor`/`TrendRowCard` now
+    take a window (`points` + `priorAverages`) instead of a `WeekWindowResponse`, so the daily and
+    weekly surfaces share one implementation — a second copy of a formula is a bug by definition
+    here. What varies is passed in: the sparkline domain (`TREND_WEEK_TIME_DOMAIN` `[0,4]` against
+    the daily `[0,7]`), the phrase a delta is measured against, and the absent-reading label.
+  - Reads `GET /api/weekly-review/month-window`, not `/api/weekly-digest` — the digest is a POST
+    that runs an LLM and caches prose, and a chart wants the numbers on a different clock.
+  - **One TTL note for whoever adds the second call site:** it uses the shared `TTL_MEDIUM` tier
+    rather than a named key constant, because a named one belongs in
+    `packages/shared/src/cache-ttl.ts` beside its siblings and that file is **Lane A's**. Worth
+    promoting the day a second site reads `weekly-review-month-window:`.
+- **Needs:** nothing.
 
 ### [devices][app-shell] Q-111 — device battery chips on the Home header (ring + strap shipped; scale is native, and one owner question)
 

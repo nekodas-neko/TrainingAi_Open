@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.452.0",
+    date: "2026-09-12",
+    changes: [
+      "Your week in review now shows the numbers behind the write-up. Under the paragraph you get the same four trends the daily review has \u2014 resting heart rate, steps, session volume and weight \u2014 but over the last five weeks, each compared with the four weeks before it. A week you recorded nothing for says so rather than being drawn as a zero.",
+    ],
+  },
+  {
     version: "1.451.0",
     date: "2026-09-12",
     changes: [

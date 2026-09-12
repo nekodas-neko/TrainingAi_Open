@@ -11122,8 +11122,22 @@ Done as its own PR instead: `node scripts/fold-journal-entries.js` folded 40 ent
 back because an agent baton cites them; rewriting those would mean one lane writing into another's
 live state file.
 
+## 2026-09-12 — `docs/implementation-backlog.md` → 20979, `projectOverview.md` → 10734 (Q-112e)
 
-## 2026-09-11 — `docs/implementation-backlog.md` → 20983 (RV-42 shipped)
+Both recomputed from the merged file after BF-150 and the journal-compaction sweep landed
+underneath this branch — never spliced. Q-112e's entry shrank its own prose but gained the two facts a later reader needs
+— that the day review's trend module is now shared rather than daily, and that its cache key wants a
+named TTL in Lane A's file the day a second site reads it. The Known-Issues row carries the device
+check and the mutation evidence that the sharing is real.
+
+## 2026-09-12 — both indexes up for LB-100 (a red spec on `main` that nobody filed)
+
+BF-150 merged with `one-calorie-budget.spec.ts` failing and E2E being advisory meant nothing caught
+it. The entry costs more lines than usual because it carries two competing causes and the test that
+tells them apart — cheaper than the next session re-deriving which surface is wrong.
+
+
+## 2026-09-11 — `docs/implementation-backlog.md` → 21023 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 

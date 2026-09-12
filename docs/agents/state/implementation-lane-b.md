@@ -3,7 +3,7 @@
 > **Successor sessions are titled `🚧 Implementation Agent (B) 🟢`** — exactly. A renamed successor
 > is a lost thread.
 
-**Updated:** 2026-09-12 · **By:** the twenty-seventh Lane B run · **Next ID:** `LB-100`
+**Updated:** 2026-09-12 · **By:** the twenty-seventh Lane B run · **Next ID:** `LB-101`
 
 > **A mistyped ID here silently advances the lane's numbering.** Allocate with
 > `grep -rhoE '\bLB-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`; check the max is real in the
@@ -12,9 +12,9 @@
 
 ## Now
 
-**BF-147 SHIPPED** (v1.450.0): admin Exercises tab — two-line rows, three confirms, fixed coverage
-arithmetic, and a one-at-a-time GIF sweep on Lane A's review route. **BF-145** palette half shipped
-(v1.449.0). **BF-146** closed not built (#1122). `check:rules` **73/73**.
+**Q-112e SHIPPED** (v1.451.0): the weekly recap draws the day review's four trends over five weeks —
+`trendRowsFor`/`TrendRowCard` widened to a window, not copied. **BF-147** (v1.450.0), **BF-145**
+(v1.449.0) shipped; **BF-146** closed not built. `check:rules` **74/74**.
 
 **SIX running entries were wrong about something load-bearing** — BF-139's px estimates, BF-141's
 gate spec, BF-142's **406** constant, BF-146's cause, BF-145's fix twice over, and **BF-147's**: it
@@ -26,9 +26,10 @@ buttons are **204 of a 340 px row**. **Measure the thing before you fix what the
 
 ## Next
 
-1. **Re-run `next-item.js --lane B`. When READY reads 0, READ THE `KEEP` SECTION** — that is where
-   BF-147 was, and it was 300 lines of real unbuilt UI. `Keep:` means "only the stated residue is
-   owed", and the residue is sometimes the whole job. **BF-150 is top of queue and is Lane A's.**
+1. **Re-run `next-item.js --lane B`. When READY reads 0, READ THE `KEEP` SECTION** — both of the
+   last two items came from there. `Keep:` means "only the stated residue is owed" and the residue is
+   sometimes the whole job (BF-147: 300 lines of UI; Q-112e: a blocker cleared three days earlier).
+   Read each `Keep:` and ask whether it is a device check or work. **BF-150 is top of queue, Lane A's.**
 
 BF-142 left a live finding with Lane A: the resting base is ~1.41 × the owner's Mifflin BMR,
 corroborating BF-137 from a direction that entry does not use (height, not weight trend). **READY
@@ -40,8 +41,9 @@ moves without warning** — re-run `next-item.js` rather than trusting this line
 - **Owner:** the macro/budget anchor (BF-134's residue, TN-29 protects the stored 1,660); LB-61's
   switch colour; whether the PWA lands on Home rather than Workout (PS-35).
 - **⚠ BF-84 reads startable and is not** — BF-94 supersedes it and is `Gate: device`.
-- **⚠ `actions_list` on ci.yml WITH a `branch` filter is STALE** — it showed one run across four
-  pushes and I wrongly told the owner CI was dead. Query it UNFILTERED.
+- **⚠ `actions_list` is STALE for RUN EXISTENCE, filtered OR not** — `total_count` sat unchanged and
+  showed no run for ~6 min after one existed, and I told the owner CI was broken. **`get_check_runs`
+  on the PR is the read; 0 means WAIT, never escalate.**
 - **⚠ When `main` lands a PR every ~5 min, a 26-minute E2E never finishes on a current base** (BF-142 took six pushes). Merge on the required five once E2E passed on that exact app code; expect `main` to take your version — rebuild `changelog.ts` from `origin/main`, never splice.
 - **⚠ Q-254 is device-free Lane B work parked behind `Needs: Q-297`, itself `Gate: owner`**; premise
   stale too (says one spec exists, there are **84**). With the owner since 2026-09-11. Do not unpark.
@@ -105,6 +107,4 @@ tree, under other filenames. Closing a PR needs the owner.
   showed the 48 dp tap floor, not the badge, eating BF-147's name column.
 - **The admin screens need `is_admin` AND a re-minted JWT** — the claim is in the token, so flipping
   the column leaves a stored `e2e/.auth` state non-admin. Re-run `--project=setup`. Restore both.
-- **Prove a destructive path from the DATABASE, not from `page.route` interception** — a matcher that
-  silently fails reads exactly like "no request fired", and on BF-147 that nearly got reported as a
-  broken confirm while `count(*)` showed the delete had gone through.
+- **Prove a destructive path from the DATABASE, not `page.route` interception** — a matcher that fails silently reads exactly like "no request fired"; on BF-147 `count(*)` showed the delete had gone through.
