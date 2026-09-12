@@ -883,58 +883,47 @@ below threshold and left in place for next time.
   still gates the "AI all" / Mirror paths and the six proxy-path rows, and nobody has looked.
 - **Needs:** nothing.
 
-### [app-shell] BF-145 — every surface token is chroma ZERO, so the app is grey by construction and each of 49 sheets paints over the background art
+### [app-shell] BF-145 — the palette half shipped; the sheet half is refuted as specified and needs a decision
 
 - **Lane:** B
-- **Verification:** on the S25 — an open sheet shows the dynamic background's colour rather than a
-  flat slab, body text still clears 4.5:1 against the tinted surface, and the owner's chosen brand
-  hue visibly moves the surfaces rather than only the accents. Dark only, per the dark-only rule.
-
+- **Keep:** two things, neither of them the palette. ① the device check on the shipped ramp, ② the
+  sheet question below, which is a decision rather than an implementation.
+- **Verify:** device — on the S25, the lifted ramp reads as a tinted dark rather than a colour cast,
+  and body text still clears 4.5:1 on the tinted surfaces. Dark only, per the dark-only rule.
 - **Added:** 2026-09-11 · owner, on the Edit Program sheet: *"Needs a major uplift + addung in a
   color scheme instead of the plain black"*.
 
-- **"Plain black" is literal, and it is measurable rather than a matter of taste.** Every dark
-  surface token in `app/globals.css` carries **chroma 0**: `--background: oklch(0.05 0 0)` (:140),
-  `--card: oklch(0.09 0 0)` (:145), `--popover: oklch(0.09 0 0)`, `--secondary: oklch(0.13 0 0)`,
-  `--muted: oklch(0.13 0 0)` (:153), `--muted-foreground: oklch(0.75 0 0)`. Not one of them has a
-  hue. So every panel, input, card and sheet in the app is pure greyscale **by construction**, and
-  the only colour that can ever appear is `--brand` on top of it — which is exactly what the
-  screenshots show: black with cyan.
-- **The owner can already choose a hue and it cannot reach the surfaces.** `brandHue` (0–360) and
-  `brandTheme` are stored preferences (`packages/shared/src/user/preferences.ts:45-46`), and they
-  drive `--brand` alone. Changing it recolours the accents and leaves every surface the same grey.
-  **That is the gap to close**, and it is why this is one change in the palette rather than a
-  restyle of the screen he happened to be looking at.
-- **`--card-tint-pct` is NOT the hook it looks like.** It mixes `--muted` with `transparent`
-  (`packages/shared/src/utils.ts:52,62`), and `--muted` is itself chroma 0 — so it controls the
-  *opacity* of a grey, never its hue. Reaching for it to add colour produces a slightly different
-  grey.
+- **✅ SHIPPED — the surface ramp now carries the user's brand hue.** `--brand-hue` is set in all
+  four places `--brand` is (`:root`, each `[data-brand]` block, `applyCustomHue`, and the pre-paint
+  script in `app/layout.tsx`), and the dark surface tokens are built from it. See
+  `docs/overview/entries/2026-09-12-bf145-tinted-dark-surfaces.md`.
+  - **The entry's own prescription — chroma 0.01–0.03, lightness untouched — does not work, and it
+    was measured rather than argued.** At the old lightnesses `--card` (L 0.09) with chroma 0.018
+    paints sRGB `1,3,1`: a channel spread of 2 out of 255. No chroma is visible at L 0.05–0.13, so
+    the ramp had to be LIFTED as well as tinted. Shipped at background L 0.145, card 0.185, panels
+    0.225 — `2,12,15` / `2,22,26` / `4,32,36` at hue 210. **If the owner wants more or less colour,
+    those three lightnesses are the only numbers to move**, and `check-contrast.js` now sweeps all
+    360 hues so it will say if a move breaks a pair.
 
-- **⚠ AND THE SHEETS PAINT OVER THE BACKGROUND SYSTEM — this is a standing-rule violation in a
-  SHARED PRIMITIVE, which is why it is everywhere at once.** `components/ui/sheet.tsx:133` puts
-  **`bg-background`** on every `SheetContent`. `docs/mobile-ui-and-performance.md:97` says screen
-  backgrounds go through `bg-page` + the dynamic-background system, *"never opaque per-screen paint:
-  a `bg-background` root silently hides any wallpaper layer"*. The rule was written about screens;
-  the sheet primitive does the same thing and **49 files render `SheetContent`**. The owner's own
-  screenshots are the proof — the Program screen behind the sheet shows its blue gradient at the top
-  edge, and everything below the sheet's edge is flat near-black.
-  `components/ui/dialog.tsx:35` does the same.
-  **Fix the primitive, not the 49 call sites**, and check `bg-page` adoption while there: 28 files
-  use it against 63 still using `bg-background`.
-
-- **Recommendation — give the dark ramp a small chroma anchored to the user's hue, in the palette,
-  once.** Surfaces become `oklch(L C h)` with a low C (roughly 0.01–0.03, rising slightly with
-  lightness) and `h` from the brand hue, so the app reads as a tinted dark theme that follows the
-  colour the owner already picked, and every one of the 49 sheets changes with it. Then replace the
-  sheet's opaque `bg-background` with a translucent tinted surface so the dynamic background shows
-  through, per rule 97.
-  - **Do not fix this by restyling the Edit Program sheet.** One screen diverging from 48 others is
-    the outcome that rule exists to prevent, and the complaint is about the palette, not that sheet.
-  - **Do not reach for hex literals.** `check-hex-literals.js` ratchets them shrink-only per file,
-    and a literal bypasses the hue the owner chose — which is the whole point here.
-  - **Contrast is the real constraint, not taste.** Body text must stay ≥4.5:1 against the tinted
-    surface, and the tint must not close the gap between `--card` and `--background` that currently
-    separates a card from the page.
+- **⚠ THE SHEET HALF WAS ALREADY TRIED AND REJECTED — do not implement it as written.** This entry
+  says to *"replace the sheet's opaque `bg-background` with a translucent tinted surface so the
+  dynamic background shows through"*. `components/ui/sheet.tsx:70-87` records BF-75 doing exactly
+  that and measuring why it cannot work: **the wallpaper sits at `z-[-1]` while `SheetOverlay` and
+  `SheetContent` are both `z-50`, so a transparent sheet reveals the overlay's `bg-black/50`, not
+  the tab behind it.** Dropping the overlay instead takes the dimming that keeps small grey
+  secondary text legible on a dense sheet. BF-75's answer was to PAINT the palette inside the sheet
+  (`SheetSurfaceLayer`, `-z-10`) rather than reveal it, and that shipped.
+  - **So the real question is adoption, not the primitive.** `surface="page"` exists and **five of
+    46** `SheetContent` files opt in, all of them nutrition.
+    `components/ui/__tests__/sheet-page-surface.test.ts:63` pins that list exactly and asserts the
+    default stays `"default"`, deliberately, on the no-global-element-styling rule.
+  - **And the wallpaper ships OFF** (`the store ships enabled: false`, per that test's own comment),
+    so for a user who never turned it on `SheetSurfaceLayer` is a no-op and there is nothing to
+    reveal. Establish whether the owner has it on before treating this as a live defect.
+  - **Owner decision:** widen `surface="page"` to every sheet (one line in the primitive plus that
+    pinned list, reversible), or leave it opt-in and consider the complaint answered by the tinted
+    ramp above. Recommendation: **leave it opt-in and re-ask the owner**, because the tint now
+    reaches all 46 sheets through `--background` and the wallpaper may not even be on for him.
 - **Needs:** nothing.
 ### [workouts] BF-144 — the dead `program_session_id` column that misled BF-143, and whether to drop it
 

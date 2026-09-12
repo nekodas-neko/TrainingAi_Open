@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.449.0",
+    date: "2026-09-12",
+    changes: [
+      "The app is no longer black. Every panel, card, sheet and input was built from a grey with no colour in it at all, so the accent colour you pick could only ever appear on top \u2014 the surfaces underneath stayed the same regardless. They are now built from the hue you chose, and lifted enough that you can see it: pick Blue and the whole app goes cool, pick Orange and it warms, and the custom hue slider moves the surfaces too, not just the highlights. Text contrast is unchanged or better, and cards now separate from the page on their own rather than relying on their outline.",
+    ],
+  },
+  {
     version: "1.448.4",
     date: "2026-09-12",
     changes: [

@@ -1754,6 +1754,29 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [app-shell] ⚠️ The app is tinted now, and no OLED panel has judged it (BF-145, 2026-09-12, v1.449.0) · needs: hardware
+
+Owner, on the Edit Program sheet: *"adding in a color scheme instead of the plain black"*. Every dark
+surface token read `oklch(L 0 0)`, so the app was greyscale by construction and the accent he picked
+could only ever sit on top of it. `--brand-hue` now carries the hue angle alone — set in all four
+places `--brand` is, including the pre-paint script — and the surfaces are built from it.
+
+**The entry's own recipe was measured and would have shipped nothing visible.** Chroma 0.01–0.03 at
+the old lightnesses paints `--card` as sRGB `1,3,1`; there is no hue to see at L 0.09. The ramp is
+lifted as well as tinted — background L 0.145, card 0.185, panels 0.225 — and contrast improved on
+every pair (foreground/card 17.8:1, muted-foreground/card 8.36:1, card-to-page separation 1.010 →
+1.066).
+
+**What is owed is the phone.** Whether `2,12,15` reads as a tinted dark or as washed-out grey depends
+on the S25's OLED and its calibration, and a desktop panel in a sandbox cannot answer that. Three
+lightnesses are the only numbers to move if it is wrong, and `check-contrast.js` — which now sweeps
+all 360 hues rather than one — will say if a move breaks a pair.
+
+**Not the same finding, still open:** BF-145's other half wanted the sheets translucent so the
+wallpaper shows through. That is refuted, not skipped — `sheet.tsx:70-87` records BF-75 measuring
+that the overlay sits between them at the same z-index. What remains is whether to widen
+`surface="page"` past its five of 46 files, which is an owner call and is in the backlog.
+
 ### [nutrition] ⚠️ The gap explainer is true now, and the base underneath it is still wrong (BF-142, 2026-09-12, v1.448.4) · needs: owner
 
 Owner, third report in this family: *"calories still not right"*. The card explained the macro/budget

@@ -63,6 +63,12 @@ html, body {
      the previous 0.55 was 4.16:1, still under the 4.5 floor. */
   --brand: oklch(0.52 0.22 149);
   --color-brand: oklch(0.52 0.22 149);
+  /* The brand's HUE ANGLE on its own, so the dark surface ramp can be built from it (BF-145).
+     `--brand` is a whole colour and cannot be sampled for one component in CSS, which is why the
+     surfaces could never follow the hue the owner picked. Set wherever `--brand` is: here, in each
+     `[data-brand]` block below, in `applyCustomHue`, and in the pre-paint script in `app/layout.tsx`
+     — miss that last one and the surfaces flash grey before they tint. */
+  --brand-hue: 149;
   --brand-foreground: oklch(1 0 0);
   --brand-card-bg: rgba(0, 255, 135, 0.04);
   --brand-card-border: rgba(0, 255, 135, 0.10);
@@ -137,22 +143,42 @@ html, body {
 }
 
 .dark {
-  --background: oklch(0.05 0 0);
+  /* BF-145 — the surface ramp carries the brand HUE at a low chroma, rather than chroma 0.
+     Owner, on the Edit Program sheet: *"adding in a color scheme instead of the plain black"*.
+     "Plain black" was literal: every token here read `oklch(L 0 0)`, so the app was greyscale by
+     construction and `--brand` was the only colour that could ever appear on top of it.
+
+     **Chroma alone could not do it, and that is worth stating because the obvious fix is to add
+     chroma and stop.** Measured in Chromium at the old lightnesses: `--card` at L 0.09 with chroma
+     0.018 paints sRGB `1,3,1` — a channel spread of 2 out of 255. There is no hue to see at that
+     lightness, whatever the chroma. So the ramp is LIFTED as well as tinted, and the lift is what
+     the owner will actually notice.
+
+     Measured on the lifted ramp (hue 210, Chromium canvas): background `2,12,15`, card `2,22,26`,
+     muted `4,32,36` — a channel spread of 13/24/32, which reads as a tinted dark rather than a
+     void, and still as black in a dark room. Contrast went the right way on every pair that
+     matters: foreground/background 18.9:1, foreground/card 17.8:1, muted-foreground/card 8.36:1 —
+     all far above the 4.5:1 floor — and the card-to-page separation the entry warned about WIDENS,
+     1.010:1 to 1.066:1, so a card stops relying on its border to read as a card.
+
+     Chroma still rises with lightness: a fixed one reads as a cast on the page and as nothing on
+     the panels. Foreground tokens keep chroma 0 — tinting text is how a dark theme goes muddy. */
+  --background: oklch(0.145 0.020 var(--brand-hue, 149));
   --foreground: oklch(0.985 0 0);
   /* Matches the original hardcoded 60% used by accentCardStyle() — dark
      --muted is near-black, so 60% already contrasts fine here. */
   --card-tint-pct: 60%;
-  --card: oklch(0.09 0 0);
+  --card: oklch(0.185 0.028 var(--brand-hue, 149));
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.09 0 0);
+  --popover: oklch(0.185 0.028 var(--brand-hue, 149));
   --popover-foreground: oklch(0.985 0 0);
   --primary: oklch(0.922 0 0);
   --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.13 0 0);
+  --secondary: oklch(0.225 0.034 var(--brand-hue, 149));
   --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.13 0 0);
+  --muted: oklch(0.225 0.034 var(--brand-hue, 149));
   --muted-foreground: oklch(0.75 0 0);
-  --accent: oklch(0.13 0 0);
+  --accent: oklch(0.225 0.034 var(--brand-hue, 149));
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 7%);
@@ -163,11 +189,11 @@ html, body {
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.09 0 0);
+  --sidebar: oklch(0.185 0.028 var(--brand-hue, 149));
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.13 0 0);
+  --sidebar-accent: oklch(0.225 0.034 var(--brand-hue, 149));
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 7%);
   --sidebar-ring: oklch(0.556 0 0);
@@ -236,6 +262,7 @@ html, body {
 
 /* Brand accent colour themes — set via data-brand on <html> */
 [data-brand="blue"] {
+  --brand-hue: 210;
   --brand: oklch(0.45 0.22 210);
   --color-brand: oklch(0.45 0.22 210);
   --brand-card-bg: rgba(0, 212, 255, 0.04);
@@ -251,6 +278,7 @@ html, body {
 }
 
 [data-brand="purple"] {
+  --brand-hue: 305;
   --brand: oklch(0.50 0.25 305);
   --color-brand: oklch(0.50 0.25 305);
   --brand-card-bg: rgba(191, 95, 255, 0.04);
@@ -266,6 +294,7 @@ html, body {
 }
 
 [data-brand="orange"] {
+  --brand-hue: 45;
   --brand: oklch(0.55 0.22 45);
   --color-brand: oklch(0.55 0.22 45);
   --brand-card-bg: rgba(255, 106, 26, 0.04);
@@ -281,6 +310,7 @@ html, body {
 }
 
 [data-brand="pink"] {
+  --brand-hue: 350;
   --brand: oklch(0.52 0.25 350);
   --color-brand: oklch(0.52 0.25 350);
   --brand-card-bg: rgba(255, 61, 154, 0.04);
@@ -296,6 +326,7 @@ html, body {
 }
 
 [data-brand="cyan"] {
+  --brand-hue: 215;
   --brand: oklch(0.45 0.18 215);
   --color-brand: oklch(0.45 0.18 215);
   --brand-card-bg: rgba(0, 229, 255, 0.04);
@@ -311,6 +342,7 @@ html, body {
 }
 
 [data-brand="red"] {
+  --brand-hue: 25;
   --brand: oklch(0.48 0.23 25);
   --color-brand: oklch(0.48 0.23 25);
   --brand-card-bg: rgba(255, 45, 85, 0.04);
@@ -328,6 +360,7 @@ html, body {
 }
 
 [data-brand="gold"] {
+  --brand-hue: 85;
   --brand: oklch(0.50 0.18 85);
   --color-brand: oklch(0.50 0.18 85);
   --brand-card-bg: rgba(255, 215, 0, 0.04);
