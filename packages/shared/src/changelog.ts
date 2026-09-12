@@ -6,6 +6,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.450.0",
+    date: "2026-09-12",
+    changes: [
+      "Admin \u2014 the Exercises tab is usable on a phone again. Exercise names were being squeezed to nothing by the row's four action buttons, so a row showed a truncated equipment line and no name at all; the actions now sit on their own line and every name reads in full.",
+      "Admin \u2014 deleting an exercise, re-mirroring a GIF and regenerating one all ask first. The delete fired on a single tap, and the two GIF buttons quietly replaced a correct GIF with a new one; they now say what will be replaced, and only when something would actually be overwritten.",
+      "Admin \u2014 a new one-at-a-time GIF review: each GIF large, with its exercise name and target muscles, and two buttons to mark it right or wrong. Flagging one records it and nothing else \u2014 no AI call fires \u2014 so the wrong ones collect into a set you can decide about.",
+      "Admin \u2014 the GIF coverage figure was wrong in both halves: it counted retired exercises in the total and ignored custom-URL GIFs that were already showing on the row. It now counts what is actually there.",
+    ],
+  },
+  {
     version: "1.449.0",
     date: "2026-09-12",
     changes: [
