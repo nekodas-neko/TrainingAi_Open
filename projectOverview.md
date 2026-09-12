@@ -40,7 +40,7 @@ baseline accumulates rather than completing on a gap. **Existing rows are untouc
 new completions, not the two already sitting at false; "Use prior data" remains valid and is now a
 choice rather than the only way through. The card still reads "Baseline needed" until LA-92 (Lane B)
 lands, and **none of this has been seen on the S25**
-([journal](docs/overview/entries/2026-09-09-bf131-baseline-anchor-hop.md)).
+([journal](docs/overview/history-2026-09-12-folded-1.md#2026-09-09-bf131-baseline-anchor-hop)).
 
 **The weekly weight trend was measuring change per weigh-in, not per day (LB-67).**
 `computeWeightRateKgPerWeek` fitted the array index, and rows exist only on days carrying a metric —
@@ -51,7 +51,7 @@ in `adaptive-tdee`, so the app held two weekly-rate figures disagreeing by ~1.5�
 both now call `computeWeightRateFit`, which also returns a standard error (OR-102b ④ needed the
 interval and would otherwise have invented a third). **Not seen on a screen** — the band is asserted
 in a unit test, not observed turning green on the S25
-([journal](docs/overview/entries/2026-09-09-lb67-weight-rate-day-index.md)).
+([journal](docs/overview/history-2026-09-12-folded-1.md#2026-09-09-lb67-weight-rate-day-index)).
 
 
 **The baseline banner told him to load 82.5 kg on a pull-up (BF-127).** Owner, mid-session: *"pull
@@ -1736,7 +1736,7 @@ Last swept **2026-09-03**.
 | **Body Battery's drain model** | The replacement is **already owner-confirmed and fitted** (goal-normalised `c`, BMR-proportional baseline). It is sequenced behind the anchor decision above, so that one release unblocks it. Today `0` means *"you wore the ring a long time"*, close to the opposite of what you asked for. | Q-521 |
 | **Whether to close Q-283** | Its "~11 MB of unused indexes" is now **800 kB** once primary keys and unique constraints are excluded, and its one real candidate was already dropped. Implementing it means a destructive migration for 0.4% of the database. | Q-283 |
 | ~~Approve the Sentry tunnel's widening~~ | ✅ **DECIDED 2026-09-03 — delegated, and reverted.** The tunnel ships behind the auth gate: a signed-in request falls through, so BF-92's reported defect (13 days of browser silence while signed in) is fixed without it. Exclusion would only have added sign-in-screen errors, at the cost of an unauthenticated relay to any Sentry project via this domain. **Still owed: the device check** — a deliberate throw from the APK appearing in the dashboard. | BF-92 |
-| **Whether the macro grams and the calorie budget should share an anchor** | The grams come from your stored daily goal, the budget from resting burn + goal + movement recorded — a **constant 406 kcal apart, all day, every day** (they do not converge; the earned addend is in both). The card now says so, which is the whole of what shipped. Scaling grams to the budget prints a morning protein target near 113 g that climbs — the reason it was not just done. TN-29 protects the stored 1,660. | BF-134 `Keep:`, [journal](docs/overview/entries/2026-09-09-fix-macro-budget-anchor-label.md) |
+| **Whether the macro grams and the calorie budget should share an anchor** | The grams come from your stored daily goal, the budget from resting burn + goal + movement recorded — a **constant 406 kcal apart, all day, every day** (they do not converge; the earned addend is in both). The card now says so, which is the whole of what shipped. Scaling grams to the budget prints a morning protein target near 113 g that climbs — the reason it was not just done. TN-29 protects the stored 1,660. | BF-134 `Keep:`, [journal](docs/overview/history-2026-09-12-folded-1.md#2026-09-09-fix-macro-budget-anchor-label) |
 | **Where "Exercise detected" gets its data** | Its only writer was the Oura Cloud sync. Either the BLE classifier feeds the existing review UI, or the card and its route retire. Either branch is a different feature. | Q-231 |
 
 ## ⚠️ Known Issues & Risks With Recently Shipped Features
@@ -1959,7 +1959,7 @@ recover it. The full injury banner moved to the ready screen — which carried *
 before this**, so it used to arrive after the weight was already chosen — and during the set it is a
 chip with Swap intact; the AMRAP banner is gone, since the ready screen already says the same thing
 at more length for every exercise; the header gained `max-h-[45%] overflow-y-auto`.
-[Journal](docs/overview/entries/2026-09-09-fix-injury-header-crowding.md).
+[Journal](docs/overview/history-2026-09-12-folded-1.md#2026-09-09-fix-injury-header-crowding).
 **Owed: the device check, and two gaps behind it.** The reported case is an injured exercise on a
 **baseline** session — the two-banner worst case — and the seeded account is mid-`Accumulation`, so
 that state was reasoned about and pinned by a source test but **never rendered**. Nor was any of it
@@ -1973,7 +1973,7 @@ Health → Trends → Rest discipline now shows what the plan prescribes for res
 actually taken, per prescription, with the signed difference and set count. No score and no nudge:
 39.8% of sets are "rushed" *uniformly* — every session rushes something, none is mostly rushed — so
 a discipline reading is meaningless, and the owner chose a plain fact card.
-[Journal](docs/overview/entries/2026-09-09-feat-rest-vs-prescription.md).
+[Journal](docs/overview/history-2026-09-12-folded-1.md#2026-09-09-feat-rest-vs-prescription).
 **Owed: the device check, which is the only place it renders at all.** It reads
 `set_logs.planned_rest_sec` (the snapshot at log time, so a later style edit cannot rewrite the past)
 from the local store, and no route publishes that field — so a browser shows nothing and CI can only
@@ -1983,7 +1983,7 @@ assert its absence. Second such card today; filed as a class in **LB-98**.
 
 The vial sheet now reports the weight-change rate since the vial was opened, its 95% interval and the
 target band, colouring the chip only when the whole interval clears a boundary.
-[Journal](docs/overview/entries/2026-09-09-feat-reta-weight-response.md).
+[Journal](docs/overview/history-2026-09-12-folded-1.md#2026-09-09-feat-reta-weight-response).
 **Owed: the device check, and it is the only place the realistic case exists.** The card reads
 `body_metrics` local-first; a browser has no local store, and `/api/body-metadata` — the only server
 read of that table — returns seven days with no range parameter, so on web the interval is about
@@ -1996,7 +1996,7 @@ rendering, not the behaviour over a real dosing period (LB-96 asks Lane A for th
 `fitness_tests`, `dexa_scans` and `measured_rmr` render as a "Tests and scans" section under the
 daily readings #1009 added, each row dated and each labelled apart from its same-named neighbour —
 the scan's body fat is not the scale's, and a measured resting rate is not the scale's estimate.
-[Journal](docs/overview/entries/2026-09-09-feat-details-tests-and-scans.md).
+[Journal](docs/overview/history-2026-09-12-folded-1.md#2026-09-09-feat-details-tests-and-scans).
 **Owed: the device check**, and it covers both halves of this screen — #1009's never had one either.
 `fitness_tests` is read local-first and the browser has no native SQLite, so only the `cachedFetch`
 fallback ran; the `getFitnessTests` branch is unexercised. And this is now a long dense list on a
@@ -2011,7 +2011,7 @@ while the card is on screen, so a read already in flight when you tap returns th
 Measured on two runs in three while covering the surface; fixed in
 `app/nutrition/use-plan-meal-logging.ts` by holding this device's own answers until a read agrees
 with them, and covered by `e2e/plan-meal-log-decline.spec.ts` (3 of 3 green after, 1 of 3 before).
-[Journal](docs/overview/entries/2026-09-09-feat-plan-meal-answer-e2e.md).
+[Journal](docs/overview/history-2026-09-12-folded-1.md#2026-09-09-feat-plan-meal-answer-e2e).
 **Owed: the device check.** `plan_meal_answers` is an offline-first domain and the browser has no
 native SQLite, so only the API fallback ran here — the `store.getPlanMealAnswers` branch of the same
 reconcile, the local-store write and the outbox mutation have not been exercised on hardware.
@@ -2023,7 +2023,7 @@ itself recoverable.** The session and its exercises are tombstoned, which also s
 `ON DELETE SET NULL` FKs severing already-logged workouts from it and `ON DELETE CASCADE` destroying
 its phase state; both unique constraints became partial indexes over live rows, or a non-last
 removal 23505s against its own tombstone.
-[Journal](docs/overview/entries/2026-09-09-lb66-program-session-tombstones.md).
+[Journal](docs/overview/history-2026-09-12-folded-1.md#2026-09-09-lb66-program-session-tombstones).
 **Owed: the device check** — server-side only, so a Railway deploy delivers it, but the half that
 matters on hardware is the sync and it has not been run there. **No recovery UI**: reading a
 tombstone back is a DB query.

@@ -50,7 +50,7 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   and the sheet reads `vials[0]`, so a re-dated new vial sorts *below* the wrong one. **The fix is
   the cause, not the symptom** — with the window corrected and the data present, the card still read
   "Not enough weigh-ins yet"; filed as **LB-99**.
-- [`docs/overview/entries/2026-09-09-fix-macro-budget-anchor-label.md`](../../overview/entries/2026-09-09-fix-macro-budget-anchor-label.md)
+- [`2026-09-09-fix-macro-budget-anchor-label`](../../overview/history-2026-09-12-folded-1.md#2026-09-09-fix-macro-budget-anchor-label)
   — **the macro grams and the calorie budget are two denominators, and the card says so (BF-134),
   2026-09-09.** The grams come from stored `nutrition_targets`; the budget from
   `restingBase + goalDelta + earned`. **The gap is a CONSTANT** — `scaleMacrosForEarnedKcal` grows

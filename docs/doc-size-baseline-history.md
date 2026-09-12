@@ -11114,6 +11114,16 @@ was written only into the journal entry and the PR body, which the **No orphaned
 not accept — the entry carries the 5/6 collision at 114.5 that no inverse can separate, which is the
 argument for doing it at all.
 
+## 2026-09-12 — journal compaction sweep (entries 88 → 48)
+
+`docs/overview/entries/` crossed the 60-entry runaway limit, which fails the Orientation-docs check
+on every branch rather than on whoever caused it — RV-42's rebase is where it surfaced, and folding a
+shared chore into an owner-gated security PR would have widened a diff that has to stay reviewable.
+Done as its own PR instead: `node scripts/fold-journal-entries.js` folded 40 entries into
+`history-2026-09-12-folded-1.md` and repointed their citations in five files. Five entries are held
+back because an agent baton cites them; rewriting those would mean one lane writing into another's
+live state file.
+
 ## 2026-09-12 — `docs/implementation-backlog.md` → 20979, `projectOverview.md` → 10734 (Q-112e)
 
 Both recomputed from the merged file after BF-150 and the journal-compaction sweep landed

@@ -53,7 +53,7 @@ Mode flow and the orchestrator pattern are documented in [`CLAUDE.md`](../../../
   entry's own acceptance criterion picks the wrong mapping — 92% of the ratings were never touched,
   so they *are* the prefill, and any statistic over all of them is the prefill agreeing with itself.
 - [`docs/reviews/2026-08-18-orientation-index-paths.md`](../../reviews/2026-08-18-orientation-index-paths.md) — **the orientation indexes named paths that do not exist, 2026-08-18** (Q-554 — `module-map.md:232` carried a row for `lib/oura-ble/steps-motion-decoder.ts` → `decodeStepsPacket`, **neither of which has ever existed**; the real port is the row below and is itself flagged "NOT yet wired", so the map presented planned work as existing infrastructure. Plus three stale domain rows — `app/history/`, `docs/oura-models/`, `app/overview/` — and 49 malformed history display labels (a stray `../` made them resolve to a non-existent root `overview/`).) Now enforced by `scripts/check-index-doc-paths.js`, step 42 of 42, over **748 paths**.
-- [`docs/overview/entries/2026-09-09-fix-injury-header-crowding.md`](../../overview/entries/2026-09-09-fix-injury-header-crowding.md)
+- [`2026-09-09-fix-injury-header-crowding`](../../overview/history-2026-09-12-folded-1.md#2026-09-09-fix-injury-header-crowding)
   — **the injury warning moved to where the swap is decided (BF-135), 2026-09-09.** The
   active-exercise header is `flex-none` above a `min-h-0` set list with **no scroll container in that
   branch**, so two stacked banners pushed set 1 under the logging sheet with nothing to recover it.
