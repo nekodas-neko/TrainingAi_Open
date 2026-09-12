@@ -11099,9 +11099,17 @@ the production S3 credentials, which the entry asked to check first and which no
 also carries the measurement that overturned the entry's stated cause, so a later reader does not
 re-adopt it.
 
-## 2026-09-12 — `docs/implementation-backlog.md` 21027 → 21033, `projectOverview.md` 10700 → 10714 (Q-112e)
+## 2026-09-12 — `docs/implementation-backlog.md` + `projectOverview.md` (BF-150 shipped)
 
-Six and fourteen. Q-112e's entry shrank its own prose but gained the two facts a later reader needs
+BF-150's 54-line entry leaves the queue with the goal-anchored budget. `projectOverview.md` gains a
+Known-Issues row, because what the entry left unresolved is a number rather than code: it prescribed
+"stored goal + earned" and verified against a figure 310 kcal/day lower, and only the owner can say
+which he meant.
+
+## 2026-09-12 — `docs/implementation-backlog.md` → 20979, `projectOverview.md` → 10734 (Q-112e)
+
+Both recomputed from the merged file after BF-150 and the journal-compaction sweep landed
+underneath this branch — never spliced. Q-112e's entry shrank its own prose but gained the two facts a later reader needs
 — that the day review's trend module is now shared rather than daily, and that its cache key wants a
 named TTL in Lane A's file the day a second site reads it. The Known-Issues row carries the device
 check and the mutation evidence that the sharing is real.

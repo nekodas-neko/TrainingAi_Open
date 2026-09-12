@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.451.0",
+    version: "1.452.0",
     date: "2026-09-12",
     changes: [
       "Your week in review now shows the numbers behind the write-up. Under the paragraph you get the same four trends the daily review has \u2014 resting heart rate, steps, session volume and weight \u2014 but over the last five weeks, each compared with the four weeks before it. A week you recorded nothing for says so rather than being drawn as a zero.",
+    ],
+  },
+  {
+    version: "1.451.0",
+    date: "2026-09-12",
+    changes: [
+      "Your daily calorie budget is now your own goal plus what you earn by moving, instead of a number the app worked out for you. It used to start from a calibrated estimate of your maintenance, and that estimate had climbed to 2,196 kcal \u2014 about 600 above what you expect, rising day by day, and 1.44\u00d7 your BMR in a field labelled resting. Your stored goal took no part in it and there was no way to opt out. The estimate is still shown so you can see what it believes; it just no longer decides what you eat to. The line under the ring now names your goal rather than a resting base and a deduction, and the macro grams finally share a denominator with the calorie figure above them.",
     ],
   },
   {
