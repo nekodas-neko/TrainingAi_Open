@@ -10986,3 +10986,7 @@ already multi-device. "Rename it and add a source column" is a sentence anyone c
 
 BF-144 files the id-link correction to BF-143's reasoning, plus the owner-gated question of dropping
 the dead `program_session_id` column that produced the false premise.
+## 2026-09-12 — `docs/implementation-backlog.md` (BF-145, BF-146, BF-147)
+
+Three owner reports in one sitting: the baseline refusal drawn as a failure, the admin GIF console
+and its missing flag, and the zero-chroma surface palette.

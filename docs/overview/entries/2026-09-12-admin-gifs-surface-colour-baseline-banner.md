@@ -1,0 +1,67 @@
+# 2026-09-12 — three owner reports: the baseline banner, the admin GIF console, and the grey
+
+Intake only; no code changed.
+
+## BF-146 — a correct refusal drawn as a failure
+
+Minutes before training, the Lower card showed *"Couldn't generate your AI prescription just now —
+showing your base program. Tap refresh to try again."* Nothing is broken. Generation returns
+`{ ok: false, error: 'Baseline not complete', status: 400 }` when a session is in `baseline` with no
+anchors, which is right: a prescription is a percentage of a 1RM and there is no 1RM yet.
+
+The client has no case for a deliberate refusal. `pre-workout-screen.tsx:301-305` renders that
+banner under `prescriptionGenTimedOut`, so a settled state is drawn in amber with a warning triangle
+and an instruction to retry that can never succeed. The panel directly above it already gives the
+correct explanation — "First session — establish baseline … the AI will start prescribing from the
+next session" — so the screen contradicts itself.
+
+BF-143's fix is what made this reachable, and the entry says so. Before it the owner's sessions were
+either AMRAP-calibrated or silently auto-completed, so the state never survived a card open. The 400
+predates it; the UI gap was latent.
+
+## BF-147 — the admin exercise list
+
+The name is rendered and then crushed to zero. `exercise-manager.tsx:545` gives it `truncate`, whose
+min-width resolves to 0; the `SourceBadge` beside it has neither `shrink-0` nor `overflow:hidden` so
+it cannot collapse, and the thumbnail, status glyph and four-button group are all `flex-none`. The
+name is the only thing that can give, so it gives everything — the `bod…` on screen is the second
+line, which sits alone in the flexible column.
+
+Two destructive actions have no confirmation. Delete fires on one tap, which is BF-124's defect in a
+second place — the same unconfirmed trash icon that cost the owner his Lower session four days ago.
+And the per-row Mirror and AI buttons pass `force = hasS3Gif`, so tapping one on a row that already
+has a good GIF overwrites it silently. The bulk buttons are the safe ones, which inverts the
+expectation.
+
+The coverage figure is wrong in both halves: the denominator counts 4 merged-away rows and the
+numerator ignores custom URLs. Measured: 152 live exercises, **15** with no media at all, against
+the 19 that "137 / 156" implies.
+
+The broken reference thumbnail is the style anchor for every future generation, and it is a storage
+failure — the shared S3 client reports `SignatureDoesNotMatch (403)`. Of 139 media rows, 133 are
+absolute external URLs and only 6 are proxy paths, which is why the rows render while this one does
+not. Those six share the reference figure's fate.
+
+Flagging is new surface: no review or status column exists anywhere on the exercise or media tables,
+and the Feedback tab has no entity linkage. The recommendation is a `review_status` on
+`exercise_media` plus a one-at-a-time sweep screen — verifying 152 GIFs by scrolling a cramped list
+is the wrong instrument, and "decide how to proceed" needs a queryable set, not a toast.
+
+## BF-145 — the grey is structural
+
+Every dark surface token in `globals.css` carries **chroma 0**: background, card, popover,
+secondary, muted, muted-foreground. The app is greyscale by construction and the only colour that
+can appear is `--brand` on top. The owner already has a `brandHue` preference; it drives the accents
+and cannot reach the surfaces. `--card-tint-pct` looks like the hook and is not — it mixes `--muted`
+with transparent, so it changes the opacity of a grey.
+
+Separately, `components/ui/sheet.tsx:133` paints `bg-background` on every `SheetContent`, and
+`docs/mobile-ui-and-performance.md:97` says screen backgrounds must go through `bg-page` rather than
+opaque paint because it "silently hides any wallpaper layer". The rule was written about screens;
+the sheet primitive does it to **49 files**. The owner's screenshots show it — the gradient survives
+above the sheet edge and dies below it.
+
+## Not exercised
+
+No code changed and nothing was run against a browser. Figures come from the read-only production
+query endpoint and direct source reads.
