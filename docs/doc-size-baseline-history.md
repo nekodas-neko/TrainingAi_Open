@@ -11080,7 +11080,12 @@ BF-150 leads the queue on the owner's instruction: anchor the daily budget to th
 than to an estimator measured 600 kcal high and drifting +46 kcal/day, with the approach already
 decided rather than awaiting triage.
 
-## 2026-09-12 — `docs/implementation-backlog.md` 21123 → 21062 (BF-147 rewritten to its residue)
+## 2026-09-12 — `docs/implementation-backlog.md` (LA-91 shipped)
+
+LA-91's 35-line entry leaves the queue with the CI job timeouts. `docs/module-map.md` gains a row for
+the guard script in the same PR and stays within its own baseline.
+
+## 2026-09-12 — `docs/implementation-backlog.md` 21088 → 21027 (BF-147 rewritten to its residue)
 
 Down sixty-one. The entry carried a full diagnosis of four UI defects; three of the four are now in
 the diff, so what stays is the measurement that overturned its stated cause (the badge is 25 px, the
