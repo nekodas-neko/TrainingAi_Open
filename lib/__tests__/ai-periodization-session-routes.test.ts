@@ -30,6 +30,7 @@ const advancePhase = vi.fn(async (_u: string, _s: string, _p: string) => state({
 const storePrescription = vi.fn(async (_u: string, _s: string, _p: Row, _e: Date) => undefined)
 const updatePrescriptionStatus = vi.fn(async (_u: string, _s: string, _st: string) => undefined)
 const getLastExerciseLogsBatch = vi.fn(async (_u: string, _n: string[], _p?: string) => new Map<string, Row>())
+const wasProgramSessionTrainedSince = vi.fn(async (_u: string, _s: string, _since: Date) => false)
 const revertAutoAdoptedBaseline = vi.fn(async (_u: string, _s: string) => null as Row | null)
 const listPersonalRecords = vi.fn(async (_u: string) => new Map<string, number>())
 const listPrevious1rm = vi.fn(async (_u: string) => new Map<string, number>())
@@ -42,6 +43,7 @@ vi.mock('@/lib/data', () => {
   const repo = async () => ({
     getActiveProgram, ensureSessionPeriodization, getSessionPeriodization, setBaselineComplete,
     advancePhase, storePrescription, updatePrescriptionStatus, getLastExerciseLogsBatch,
+    wasProgramSessionTrainedSince,
     revertAutoAdoptedBaseline,
     listPersonalRecords, listPrevious1rm,
   })
@@ -115,12 +117,14 @@ const freshUser = (over: { timezone?: string } = {}) => {
 beforeEach(() => {
   for (const m of [getActiveProgram, ensureSessionPeriodization, getSessionPeriodization,
     setBaselineComplete, advancePhase, storePrescription, updatePrescriptionStatus,
-    getLastExerciseLogsBatch, listPersonalRecords, listPrevious1rm, generatePrescriptionForSession,
+    getLastExerciseLogsBatch, wasProgramSessionTrainedSince,
+    listPersonalRecords, listPrevious1rm, generatePrescriptionForSession,
     revertAutoAdoptedBaseline]) m.mockClear()
   getActiveProgram.mockResolvedValue(program())
   ensureSessionPeriodization.mockResolvedValue(state())
   getSessionPeriodization.mockResolvedValue(state())
   getLastExerciseLogsBatch.mockResolvedValue(new Map())
+  wasProgramSessionTrainedSince.mockResolvedValue(false)
   revertAutoAdoptedBaseline.mockResolvedValue(null)
   listPersonalRecords.mockResolvedValue(new Map())
   listPrevious1rm.mockResolvedValue(new Map())
@@ -353,11 +357,13 @@ describe('GET …/session/[sessionId] — the stale-baseline auto-heal', () => {
     expect(setBaselineComplete).not.toHaveBeenCalled()
   })
 
-  /** A log at least as new as the phase clock — the shape that means "this cycle was interrupted". */
-  const loggedSincePhaseStart = () =>
-    getLastExerciseLogsBatch.mockResolvedValue(
-      new Map([['Squat', { id: 'log-1', loggedAt: new Date(Date.now() + 60_000) }]]),
-    )
+  /**
+   * The repository answered yes: this program session carries a log at least as new as the phase
+   * clock. BF-144 moved that date comparison down into the query, so the route-level shape is the
+   * answer rather than the logs — the comparison itself is covered against a real database in
+   * `lib/data/postgres/__tests__/was-program-session-trained-since.test.ts`.
+   */
+  const loggedSincePhaseStart = () => wasProgramSessionTrainedSince.mockResolvedValue(true)
 
   it('completes a baseline the completion endpoint never reached, from the personal records', async () => {
     baselineRunning()
@@ -376,9 +382,7 @@ describe('GET …/session/[sessionId] — the stale-baseline auto-heal', () => {
   // of every recreated session. The logs must be newer than the phase clock to mean "interrupted".
   it('does not complete when the only logs predate the baseline phase — a recreated session', async () => {
     baselineRunning()
-    getLastExerciseLogsBatch.mockResolvedValue(
-      new Map([['Squat', { id: 'log-1', loggedAt: new Date(Date.now() - 6 * 86_400_000) }]]),
-    )
+    wasProgramSessionTrainedSince.mockResolvedValue(false)
     listPersonalRecords.mockResolvedValue(new Map([['Squat', 120], ['Curl', 30]]))
     await getSession()
     expect(setBaselineComplete).not.toHaveBeenCalled()
@@ -409,12 +413,17 @@ describe('GET …/session/[sessionId] — the stale-baseline auto-heal', () => {
     expect(revertAutoAdoptedBaseline).not.toHaveBeenCalled()
   })
 
-  // A shared exercise name logged under a DIFFERENT program must not let a fresh cycle skip its
-  // own AMRAP baseline week — so the lookup is scoped to the active program.
-  it('asks for prior logs within the active program only', async () => {
-    baselineRunning()
+  // BF-144. The interruption question is asked about THIS program session's id and THIS phase
+  // clock — not about exercise names, which answer for the wrong workouts the moment a session is
+  // renamed or a second one shares a name. A program-scoping argument is no longer needed: a
+  // program-session id belongs to exactly one program by construction.
+  it('asks about this session id and this phase clock, not about exercise names', async () => {
+    const phaseStartedAt = new Date(Date.now() - 3 * 86_400_000)
+    ensureSessionPeriodization.mockResolvedValue(
+      state({ phase: 'baseline', baselineComplete: false, phaseStartedAt }))
     await getSession()
-    expect(getLastExerciseLogsBatch.mock.calls[0][1]).toEqual(['Squat', 'Curl'])
-    expect(getLastExerciseLogsBatch.mock.calls[0][2]).toBe('p-1')
+    expect(wasProgramSessionTrainedSince.mock.calls[0][1]).toBe(SESSION_ID)
+    expect(wasProgramSessionTrainedSince.mock.calls[0][2]).toEqual(phaseStartedAt)
+    expect(getLastExerciseLogsBatch).not.toHaveBeenCalled()
   })
 })

@@ -11027,3 +11027,11 @@ gap. Nothing was deleted: the entry stays queued, re-laned rather than removed.
 
 Net zero: BF-149 was written and then removed in the same change, because it shipped with nothing
 owed and `check-backlog-pointers` rejects a finished entry in the queue. The journal carries it.
+
+
+## 2026-09-12 — `docs/implementation-backlog.md` (BF-144 guard half)
+
+−1, so the ratchet tightens by one line. BF-144's entry loses the diagnosis of the name-keyed guard
+(that half shipped) and gains the owner decision about the dead `program_session_id` column, written
+out as a recommendation with its alternatives. Noted rather than left silent because a baseline that
+drops for no recorded reason reads as an error later.

@@ -6793,6 +6793,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async listVolumeTargets(userId: string, programId: string) { return period.listVolumeTargets(this.db, userId, programId) }
   async replaceVolumeTargets(userId: string, programId: string, targets: { muscleGroup: string; targetSetsPerWeek: number }[]) { return period.replaceVolumeTargets(this.db, userId, programId, targets) }
   async getWorkoutSessionProgramSessionId(userId: string, workoutSessionId: string) { return period.getWorkoutSessionProgramSessionId(this.db, userId, workoutSessionId) }
+  async wasProgramSessionTrainedSince(userId: string, programSessionId: string, since: Date) { return period.wasProgramSessionTrainedSince(this.db, userId, programSessionId, since) }
   async getRecentSessionsOfType(userId: string, programSessionId: string, limit: number) { return period.getRecentSessionsOfType(this.db, userId, programSessionId, limit) }
   async getSetLogsForSessions(workoutSessionIds: string[]) { return period.getSetLogsForSessions(this.db, workoutSessionIds) }
   async getSetTimingRows(userId: string, exerciseNames: string[]) { return period.getSetTimingRows(this.db, userId, exerciseNames) }
