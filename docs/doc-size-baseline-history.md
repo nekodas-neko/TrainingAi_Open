@@ -11301,11 +11301,11 @@ regex to a bullet start loses 7 legitimate inline mentions and silently un-parks
 work. So the choice is on the record as LA-103 with the population unmeasured and said to be
 unmeasured, rather than as a one-line parser change nobody could audit later. **A 36-line entry is the
 cost of not guessing.**
-## 2026-09-13 — `docs/implementation-backlog.md` → 21363 · `projectOverview.md` → 10764 (BF-152 shipped)
+## 2026-09-13 — `docs/implementation-backlog.md` → 21403 · `projectOverview.md` → 10764 (BF-152 shipped)
 
 BF-152's 54-line entry leaves the queue; **LA-102 arrives in its place, so the net is 28 lines rather
-than 54** (the figure is 21363 rather than 21327 because LA-103 landed on `main` in between — that one
-is the red-`main` note above, not this change). That is deliberate and is the thing to read here: BF-152 shipped with a residual it chose
+than 54** (the figure is 21403 rather than 21327 because LA-103 and then BF-153 landed on `main` while
+this PR waited on its E2E run — LA-103 is the red-`main` note above, BF-153 is not ours at all). That is deliberate and is the thing to read here: BF-152 shipped with a residual it chose
 not to model — the thermic effect of food and non-step NEAT — and the ⓘ copy explaining that is Lane
 B's. An entry that closes by opening a smaller one nets out small, and **the alternative was a
 54-line drop with the finding living only in a journal paragraph**, which is how a finding gets
@@ -11330,3 +11330,11 @@ cannot derive: the nine-entry all-exclusions READY list, #1098's owner gate and 
 conflicts, the four owner decisions (one of which BF-152 just dissolved rather than answered), the
 three owed device checks, and the four testing traps that have each cost a session.
 
+
+## 2026-09-13 — `docs/implementation-backlog.md` (BF-153 filed)
+
+Thirty-eight lines for BF-153: the vial sheet shows a create-form and the current vial's record
+together with nothing distinguishing them, and its `Dose (mg)` field is a calculator input that
+`save()` never posts. The entry is mostly the evidence — the save body, and the two dates reading
+13/09/2026 and 10 Sept on one screen — because the screen looks correct and the defect is only
+visible from the code.
