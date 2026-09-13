@@ -75,8 +75,16 @@ describe('Gate and Verify together', () => {
  *
  * These are the eleven BF-90 measured. If one of them ever regains a `Gate: device`, it silently
  * goes back to PARKED and the count the owner was given stops being true — so the file is read.
+ *
+ * **Amended 2026-09-13: an entry that has BEEN verified is the third state, and demanding `Verify:`
+ * of it turned a success into red `main`.** The owner's 2026-09-13 nutrition pass cleared nine of
+ * these on the S25 (#1136), which removes the `Verify:` bullet — correctly, there is nothing left to
+ * look at — and nine of the seventeen assertions here went red on every branch for a device check
+ * that had actually happened. The invariant BF-90 is about was never touched: **none of the
+ * seventeen has a `Gate:`, verified or not.** So the rule is "not parked", and `Verify: device` is
+ * one of the two ways to satisfy it rather than the only one.
  */
-describe('the seventeen shipped entries carry Verify, not Gate', () => {
+describe('the seventeen shipped entries are never parked', () => {
   const ROOT = join(__dirname, '..', '..')
   const backlog = readFileSync(join(ROOT, 'docs/implementation-backlog.md'), 'utf8')
   // Eleven BF-90 named from their own headings, and six more the existing `keepKind` rule found
@@ -95,10 +103,19 @@ describe('the seventeen shipped entries carry Verify, not Gate', () => {
     return lines.slice(start, rest === -1 ? undefined : start + 1 + rest)
   }
 
+  /** An entry the owner has signed off on the phone, which is why its `Verify:` is gone. */
+  const verifiedOnDevice = (lines: string[]) =>
+    lines.some(l => /\bVERIFIED ON THE S25\b/.test(l))
+
   for (const id of CONVERTED) {
-    it(`${id} is verification debt, not a block`, () => {
+    it(`${id} is verification debt or already verified, never a block`, () => {
       const lines = entry(id)
-      expect(verifyFromLines(lines)?.value).toBe('device')
+      // Exactly one of the two, so neither a silently-dropped `Verify:` nor a verified entry that
+      // kept the bullet slips through as "fine".
+      expect(
+        [verifyFromLines(lines)?.value === 'device', verifiedOnDevice(lines)].filter(Boolean).length,
+        `${id} must carry Verify: device OR record a device verification, not both and not neither`,
+      ).toBe(1)
       expect(lines.filter(l => /^\s*[-*]\s*\*{0,2}Gate:/i.test(l)), `${id} still has a Gate:`).toEqual([])
     })
   }
@@ -143,10 +160,29 @@ describe('next-item.js routes them out of PARKED', () => {
     'BF-76', 'BF-53', 'BF-26', 'BF-27', 'TN-13', 'Q-93',
   ]
 
-  it('prints a VERIFY section holding every converted entry', () => {
+  /**
+   * Split from the FILE, not from a second hardcoded list.
+   *
+   * The list above is a snapshot and drifted once already — #1136 verified nine of these on the S25
+   * and this block went red for nine device checks that had happened. Reading which group an id is in
+   * off its own entry is what stops the next sign-off doing it again; the snapshot's job is only to
+   * say which ids are in scope at all.
+   */
+  const backlog2 = readFileSync(join(ROOT2, 'docs/implementation-backlog.md'), 'utf8')
+  const stillOwed = CONVERTED2.filter(id => {
+    const lines = backlog2.split('\n')
+    const start = lines.findIndex(l => l.startsWith('### ') && new RegExp(`\\b${id}\\b`).test(l))
+    const rest = lines.slice(start + 1).findIndex(l => l.startsWith('### '))
+    const body = lines.slice(start, rest === -1 ? undefined : start + 1 + rest)
+    return !body.some(l => /\bVERIFIED ON THE S25\b/.test(l))
+  })
+
+  it('prints a VERIFY section holding every entry that still owes a look', () => {
     const verify = section('VERIFY')
     expect(verify).toContain('shipped; a look is owed, nothing is blocked')
-    for (const id of CONVERTED2) expect(verify, `${id} missing from VERIFY`).toContain(id)
+    expect(stillOwed.length, 'the snapshot cannot all be verified or this block asserts nothing')
+      .toBeGreaterThan(0)
+    for (const id of stillOwed) expect(verify, `${id} missing from VERIFY`).toContain(id)
   })
 
   /**
@@ -161,11 +197,22 @@ describe('next-item.js routes them out of PARKED', () => {
     sec.split('\n').some(l => new RegExp(`^\\s+(?:\\d+\\.\\s+)?${id}\\s`).test(l))
 
   it('and none of them is parked or listed as startable work any more', () => {
+    // True of all seventeen, verified or not — this is the BF-90 invariant itself. Shipped work must
+    // never sit in PARKED beside work that genuinely cannot start, and must never be offered as
+    // something to build.
     for (const id of CONVERTED2) {
       expect(listsEntry(section('PARKED'), id), `${id} is still parked`).toBe(false)
       expect(listsEntry(section('READY'), id), `${id} is offered as startable work`).toBe(false)
+    }
+    // VERIFY is the more specific claim than KEEP, so an entry that still owes a look belongs in one
+    // and not the other. A verified entry has no look left to print and falls back to KEEP for
+    // whatever residue it still has, which is the right place for it.
+    for (const id of stillOwed) {
       expect(listsEntry(section('KEEP'), id), `${id} is in KEEP, where VERIFY is the more specific claim`).toBe(false)
       expect(listsEntry(section('VERIFY'), id), `${id} is missing from VERIFY`).toBe(true)
+    }
+    for (const id of CONVERTED2.filter(id => !stillOwed.includes(id))) {
+      expect(listsEntry(section('VERIFY'), id), `${id} is verified and should owe no look`).toBe(false)
     }
   })
 

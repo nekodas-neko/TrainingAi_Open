@@ -11267,17 +11267,49 @@ budget anchors to the owner's measured resting rate rather than to the number ty
 `nutrition_targets`. The entry carries the measurement that makes it buildable — the Cunningham
 residual re-scaled onto today's fat-free mass reads **1,342**, which is the *"start at 1350"* he
 described, and `bmr × 1.2` reads **1,611**, which is his *"1600"*.
-## 2026-09-11 — `docs/implementation-backlog.md` → 21248 (RV-42 shipped)
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21355 (the owner's nutrition device pass)
+
+Eighty-odd lines from one sitting on the phone, and the shape of the spend is the point: fourteen
+entries got SHORTER (a `Verify: device` replaced by a one-line result), and five got substantially
+longer, because a failure costs more to record than a pass.
+
+BF-98 is the longest and is mostly a refusal to guess. The owner's report fits two readings that
+point at different components, so the entry carries both and says one screenshot settles it — a
+confident single reading would have sent the next session to `meal-card.tsx`, which the code says is
+probably already correct.
+
+BF-134 is the other long one: a requirement the owner has now given verbally **twice** with no entry
+of its own, so each session re-derived it. It also contradicts LB-50/BF-102's measured activity
+factor, and saying so is what stops the app shipping two calorie models.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21391 (red `main`: the BF-90 verify guard)
+
+Grows 36 lines and every one is LA-103 plus four words inside BF-46. **The growth is the fix being
+honest about what it did not fix.**
+
+`backlog-verify-field.test.ts` was 11-of-34 red on `main` from #1136. Nine of those were the guard not
+knowing that a VERIFIED entry legitimately has no `Verify:` bullet. The tenth was real: BF-46's `Keep:`
+block contains a sentence saying its gate *was withheld*, and `keep.js` reads a `Gate:` from anywhere
+in the block — so the sentence was the gate, cancelled until the owner's sign-off removed the
+`Verify:` that had been masking it.
+
+**The red was cleared at the entry (four words) and the parser was left alone**, because anchoring its
+regex to a bullet start loses 7 legitimate inline mentions and silently un-parks genuinely blocked
+work. So the choice is on the record as LA-103 with the population unmeasured and said to be
+unmeasured, rather than as a one-line parser change nobody could audit later. **A 36-line entry is the
+cost of not guessing.**
+## 2026-09-11 — `docs/implementation-backlog.md` → 21366 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 
-**This figure has been rewritten SIXTEEN times and the churn is the note worth leaving.** Eighteen
+**This figure has been rewritten SEVENTEEN times and the churn is the note worth leaving.** Nineteen
 other merges landed on `main` while this PR waited on an owner decision, and each one moved the base
 out from under it — so the starting figure is no longer even quoted here, because it changed again
-between the last two rewrites. **Sixteen rewrites of one number is the cost of a green PR waiting**,
+between the last two rewrites. **Seventeen rewrites of one number is the cost of a green PR waiting**,
 recorded rather than smoothed because the alternative reading — that someone kept getting the
 arithmetic wrong — is the wrong lesson. The per-file `.size` split (LA-33) is what keeps this to one
-number instead of a whole map: no other document's baseline has conflicted once across all sixteen.
+number instead of a whole map: no other document's baseline has conflicted once across all seventeen.
 Nothing was wrong with any of the three — each was correct against the `main` of its hour. Under six
 concurrent lanes plus an owner gate, a baseline is a reading of a moving number, and a PR that waits
 will re-read it once per merge that overtakes it. Recomputed by `pnpm fix:baselines` after each
