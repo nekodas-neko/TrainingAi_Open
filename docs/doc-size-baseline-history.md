@@ -11506,7 +11506,34 @@ breaks it into terms summing to 2,078. Most of the lines are the two consequence
 arithmetic — the 2,278 it prints as "resting burn" is the inflated estimator BF-152 escaped, and the
 macro grams stayed on the stored goal while the budget moved.
 
-## 2026-09-13 — `docs/implementation-backlog.md` → 21342 (BF-154 shipped)
+## 2026-09-13 — `docs/implementation-backlog.md` → 21323 (LA-105 shipped; a workaround's whole life in one day)
+
+−17 as LA-105 leaves. Worth a line because of the shape rather than the size: OR-108 hit a route cap
+this morning, filed it as LB-101 and worked around it in the client with a named constant and a
+quality ladder; LB-101 shipped hours later; LA-105 collected the debt the same day. The workaround
+carried its own expiry in both the entry and the code comment, and that is why it did not survive
+its cause.
+
+The e2e's wire assertion was **inverted rather than deleted** — it now fails if the stored thumbnail
+is *smaller* than the old 7 KB budget, which is what a returning ladder would look like.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21495 (the app-shell device pass)
+
+Sixty-four lines, and the largest single block is BF-96/BF-139's shared diagnosis. Two entries had
+each been declared fixed and each re-broke the same header row, because they own different elements
+in one width budget and neither owns the date. Writing that once, on both entries, with a `Batch:`
+tying them together, is what stops a third round of one-at-a-time fixes.
+
+The rest is failures recorded in the owner's words. `BF-95`'s *"Still requires a little pause"* is
+the one worth the space: it reads like a near-miss and is not — the entry's bar was the confirmation
+appearing on the FIRST press, so a shorter pause is the same defect, and saying so stops the next
+session tuning a constant down instead of fixing the sequencing.
+
+PS-35b gained a scope rule rather than an answer: no check that is only reproducible in a browser
+goes in front of the owner. That is `CLAUDE.md`'s Canonical Runtime policy with its checklist
+consequence spelled out.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21387 (BF-154 shipped)
 
 BF-154's 36-line entry leaves the queue the same day it was filed, which is the shape worth noting:
 it was opened against BF-152, shipped that morning, from the owner's screenshot of the result. The
