@@ -463,6 +463,7 @@ below threshold and left in place for next time.
   in the ⓘ copy instead of modelling it. Modelling TEF as an earned credit makes the budget grow as
   he eats, a feedback loop the card then has to explain, for a number inside food-logging error.
   **This is the one line the owner can overrule**, and the entry is buildable either way.
+- **Three Tuning entries move with this, and only one of them the way it looks.** TN-27 and TN-29 were downgraded to *informational* when PR #1128 stopped the budget following the maintenance estimate — **BF-152 does not change that**, because the base becomes the measured resting rate and the estimator still takes no part. **TN-28 is the one that reverses**: its 2026-09-13 amendment reads *"the stored target … is now the thing everything else follows"*, which this entry undoes. Amend it rather than discovering it.
 - **What BF-150 keeps.** One budget expression read by all three surfaces; the goal delta still not
   applied on top; `deviationKcal` still measured against the budget rather than re-derived. The
   stored target stops being the base and goes back to being what it is — a target.
@@ -1787,6 +1788,7 @@ this card offers to overwrite with 2,045.
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · found while answering TN-27.
 - **Lane: B** — `components/nutrition/tdee-adaptation-card.tsx:118-124`.
 - **⚠ Amended 2026-09-13:** PR #1128 made the budget follow the owner's **stored goal**, so this card's one-tap write no longer redirects the whole day's eating — it changes the stored target, which is now the thing everything else follows. **That makes the write MORE consequential, not less**, so the missing confidence qualifier still matters.
+- **⚠ Amended again the same day, and it reverses the line above: BF-152 takes the stored target back OUT of the budget.** The owner's spec is *"Rmr+body metabolism as base"* — a rule, not a number — so the base becomes his re-scaled measured resting rate and the stored target goes back to being a target. **The escalation this entry recorded lasted one day.** Whether the one-tap write is consequential is now the question BF-152 settles, so read that entry before acting on this reasoning; the missing confidence qualifier stands on its own merits either way.
 - **Sibling of TN-27** — TN-27 makes the number better; this makes its uncertainty visible. Fix either order.
 - **Reference:** [`review`](reviews/2026-09-09-maintenance-2245-is-too-high.md) §5.
 

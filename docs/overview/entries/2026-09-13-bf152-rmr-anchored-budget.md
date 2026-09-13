@@ -55,3 +55,16 @@ surfaces, the goal delta still not applied on top, `deviationKcal` still measure
 
 Docs only. The 1,342 and 1,611 figures are computed from production rows (`measured_rmr`,
 `body_metrics`) against the shipped `cunninghamBmr`, not read off a running app.
+
+## A correction made in the same PR
+
+The first pass through this said Lane A should re-read **TN-27 and TN-29** because BF-152 moves the
+ground under them again. It does not. Those two were downgraded to *informational* when PR #1128
+stopped the budget following the maintenance estimate, and BF-152 keeps them there — the base becomes
+the measured resting rate, and the estimator still takes no part in it either way.
+
+**TN-28 is the one that reverses.** Its own amendment, written the same day, reads *"the stored
+target … is now the thing everything else follows"* and concludes the card's one-tap write is
+therefore **more** consequential. BF-152 takes the stored target back out of the budget, so that
+escalation lasted a day. TN-28 now carries a second amendment saying so, rather than leaving the
+contradiction for whoever picks it up.
