@@ -24,6 +24,14 @@ interface Props {
   goalCalories: number | null
   /** The `earned` term inside that same budget — the movement addend, from the same call. */
   earnedKcal: number | null
+  /** The `base` term inside that same budget — the zero-movement half, from the same call.
+   *  BF-154: the breakdown sentence below used to print `balance.restingBaseKcal` instead, which
+   *  stopped being an addend of the budget when BF-152 re-anchored it. */
+  baseKcal: number | null
+  /** `budgetProvenance(...).anchoredToRestingRate`, from the same call. Decides the WORD printed
+   *  beside `baseKcal`, which is not cosmetic: on the anchored path that figure is the resting rate
+   *  and calling it anything else re-opens BF-99. */
+  baseIsRestingRate: boolean
   /** The goal as STORED in `nutrition_targets`, before any burn-aware substitution (BF-142).
    *  The card prints it beside the computed budget, because the owner's complaint was that not one
    *  number on this card was the number he chose. Never used to compute anything. */
@@ -63,7 +71,7 @@ const RING_MASK = 'radial-gradient(farthest-side, transparent 69%, black 70% 89%
  */
 export const EnergyCard = memo(function EnergyCard({
   data, isToday, loading, calories, proteinG, carbsG, fatG, goalCalories, earnedKcal,
-  storedGoalCalories, targets,
+  baseKcal, baseIsRestingRate, storedGoalCalories, targets,
 }: Props) {
   const [showInfo, setShowInfo] = useState(false)
 
@@ -191,13 +199,37 @@ export const EnergyCard = memo(function EnergyCard({
               <span className="font-semibold tabular-nums text-foreground">{storedGoalCalories.toLocaleString()}</span>.{' '}
             </>
           )}
-          {b != null && goal != null && (
+          {b != null && goal != null && baseKcal != null && (
             <>
               Today&rsquo;s budget is{' '}
               <span className="font-semibold tabular-nums text-foreground">{goal.toLocaleString()}</span>
-              {' '}&mdash; {Math.round(b.restingBaseKcal).toLocaleString()} resting burn,
-              {' '}{b.targetNetKcal >= 0 ? '+' : '\u2212'}{Math.abs(Math.round(b.targetNetKcal)).toLocaleString()} for your goal,
-              {' '}+{Math.round(b.activeKcal).toLocaleString()} moved.{' '}
+              {' '}&mdash;{' '}
+              {/* BF-154. These terms are the ones `budgetProvenance` actually summed, passed down
+                  from the same call that produced the budget beside them. They used to be
+                  `restingBaseKcal`, `targetNetKcal` and `activeKcal` — the addends of the formula
+                  BF-152 retired — so the sentence named 1,294 and broke it into terms summing to
+                  2,078. On the calibrated path `restingBaseKcal` is `maintenance − avgActive`,
+                  which is the inflated estimator BF-152 moved away from, so it also printed 2,278
+                  as "resting burn" ten lines above 1,294 as "resting rate". */}
+              {baseIsRestingRate
+                ? (earnedKcal != null && earnedKcal > 0
+                    ? <>{baseKcal.toLocaleString()} resting rate</>
+                    // With nothing earned the budget IS the base, and printing the figure again
+                    // three words later adds a number that says nothing — which is how the report
+                    // this came from opened: *"There is so many numbers here."*
+                    : <>your resting rate</>)
+                : <>
+                    {Math.round(b.restingBaseKcal).toLocaleString()} resting burn
+                    {/* The unanchored base folds the goal delta in, so naming it alone would be
+                        BF-99 again. Omitted at 0, where "+ 0 for your goal" is noise. */}
+                    {Math.round(b.targetNetKcal) !== 0 && (
+                      <>, {b.targetNetKcal >= 0 ? '+' : '\u2212'}
+                        {Math.abs(Math.round(b.targetNetKcal)).toLocaleString()} for your goal</>
+                    )}
+                  </>}
+              {earnedKcal != null && earnedKcal > 0
+                ? <>, +{Math.round(earnedKcal).toLocaleString()} moved.{' '}</>
+                : <>, nothing moved yet.{' '}</>}
             </>
           )}
           The grams are that goal scaled up by the same movement, so moving more raises both numbers

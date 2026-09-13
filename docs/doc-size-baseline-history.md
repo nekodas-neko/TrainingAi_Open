@@ -11504,17 +11504,86 @@ breaks it into terms summing to 2,078. Most of the lines are the two consequence
 arithmetic — the 2,278 it prints as "resting burn" is the inflated estimator BF-152 escaped, and the
 macro grams stayed on the stored goal while the budget moved.
 
-## 2026-09-11 — `docs/implementation-backlog.md` → 21361 (RV-42 shipped)
+## 2026-09-13 — `docs/implementation-backlog.md` → 21323 (LA-105 shipped; a workaround's whole life in one day)
+
+−17 as LA-105 leaves. Worth a line because of the shape rather than the size: OR-108 hit a route cap
+this morning, filed it as LB-101 and worked around it in the client with a named constant and a
+quality ladder; LB-101 shipped hours later; LA-105 collected the debt the same day. The workaround
+carried its own expiry in both the entry and the code comment, and that is why it did not survive
+its cause.
+
+The e2e's wire assertion was **inverted rather than deleted** — it now fails if the stored thumbnail
+is *smaller* than the old 7 KB budget, which is what a returning ladder would look like.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21495 (the app-shell device pass)
+
+Sixty-four lines, and the largest single block is BF-96/BF-139's shared diagnosis. Two entries had
+each been declared fixed and each re-broke the same header row, because they own different elements
+in one width budget and neither owns the date. Writing that once, on both entries, with a `Batch:`
+tying them together, is what stops a third round of one-at-a-time fixes.
+
+The rest is failures recorded in the owner's words. `BF-95`'s *"Still requires a little pause"* is
+the one worth the space: it reads like a near-miss and is not — the entry's bar was the confirmation
+appearing on the FIRST press, so a shorter pause is the same defect, and saying so stops the next
+session tuning a constant down instead of fixing the sequencing.
+
+PS-35b gained a scope rule rather than an answer: no check that is only reproducible in a browser
+goes in front of the owner. That is `CLAUDE.md`'s Canonical Runtime policy with its checklist
+consequence spelled out.
+
+## 2026-09-13 — `docs/implementation-backlog.md` (BF-155, BF-156, and BF-154's answer)
+
+Ninety-three lines across three edits. BF-155 carries a seven-row production table because the
+reported symptom ("my amrap week") and the real scope (every session since 6 September) differ, and
+the entry has to show that rather than assert it. BF-156 is short. BF-157 was added to the same PR: the
+bodyweight ready screen's countdown is gated on the warm-up weight ladder, so a `workingWeight` of 0
+removes both. BF-154 gains the owner's answer on
+the macro anchor plus the consequence he has not seen yet — protein is held constant while the base
+drops.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21547 (BF-154's arithmetic half shipped)
+
+**BF-154 does NOT leave the queue, and very nearly did.** The entry was filed against BF-152 the
+morning it shipped, from the owner's screenshot; this PR fixed the arithmetic half and the first
+draft deleted the entry as finished, which is what the protocol asks for. Between the branch being
+cut and the merge attempt, #1153 landed on `main` and **appended the owner's answer on the macro
+anchor to that same entry** — *"Can we have it dynamically sized for my calories?"* The backlog
+conflict that followed had an EMPTY head side and a main side holding three new entries plus the one
+being removed, so the obvious resolution — take main's additions, drop the entry I finished —
+would have deleted his decision along with it. It is re-queued with a `Keep:` line instead.
+
+**The rule this is a case of: a conflict on this file is normally two deletions, and this one was
+not.** It was one deletion against an addition INSIDE the entry being deleted, which no marker
+distinguishes. Reading the headings is what the standing rule asks for; reading what changed inside
+them is what it needed.
+
+The entry was right on every claim, including the one it made to stop itself being refiled — that
+the 1,294 base is correct and only the expectation behind it was built on an uncorrected body-fat
+figure. Re-derived rather than taken on trust: `cunninghamBmr` is `ffm * 21.6 + 370`, so the
+DEXA-corrected 28.7 % of 70.2 kg gives FFM 50.05 and `1452.2 − 157 = 1294.1`, while the scale's raw
+25.5 % gives FFM 52.30 and 1342.7 — which is exactly the 1,342 BF-152 quoted and the owner read as
+">1350". Both figures are right; they are answers to different questions.
+
+## 2026-09-13 — `projectOverview.md` → 10835 (BF-154's Known-Issues row)
+
++40 for a row that is mostly the part NOT fixed. The arithmetic half is two sentences; the rest is
+the macro-gram anchor, which moved from ~295 to ~365 kcal out. The row was written while that was
+still an open question for the owner and rewritten once his answer surfaced, so it now says the
+outstanding work is a BUILD rather than a decision — including the consequence he has not seen, that
+protein holds while carbs and fat drop. A row that recorded only the fix would read as closed, and
+the next session would find the gap and refile it.
+
+## 2026-09-11 — `docs/implementation-backlog.md` → 21522 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 
-**This figure has been rewritten TWENTY-TWO times and the churn is the note worth leaving.** Twenty-seven
+**This figure has been rewritten TWENTY-THREE times and the churn is the note worth leaving.** Twenty-nine
 other merges landed on `main` while this PR waited on an owner decision, and each one moved the base
 out from under it — so the starting figure is no longer even quoted here, because it changed again
-between the last two rewrites. **Twenty-two rewrites of one number is the cost of a green PR waiting**,
+between the last two rewrites. **Twenty-three rewrites of one number is the cost of a green PR waiting**,
 recorded rather than smoothed because the alternative reading — that someone kept getting the
 arithmetic wrong — is the wrong lesson. The per-file `.size` split (LA-33) is what keeps this to one
-number instead of a whole map: no other document's baseline has conflicted once across all twenty-two.
+number instead of a whole map: no other document's baseline has conflicted once across all twenty-three.
 Nothing was wrong with any of the three — each was correct against the `main` of its hour. Under six
 concurrent lanes plus an owner gate, a baseline is a reading of a moving number, and a PR that waits
 will re-read it once per merge that overtakes it. Recomputed by `pnpm fix:baselines` after each

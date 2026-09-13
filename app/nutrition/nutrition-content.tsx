@@ -566,6 +566,8 @@ export default function NutritionContent({ userId }: { userId?: string }) {
               fatG={totals.fatG}
               goalCalories={effectiveCalorieGoal}
               earnedKcal={earnedForSelectedDate}
+              baseKcal={budget?.base ?? null}
+              baseIsRestingRate={budget?.anchoredToRestingRate ?? false}
               storedGoalCalories={targets?.calories ?? null}
               targets={effectiveTargets}
             />

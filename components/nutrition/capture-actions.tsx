@@ -29,33 +29,22 @@ interface Props {
 }
 
 /**
- * What the thumbnail's base64 may weigh on the wire, in characters.
- *
- * **This is smaller than the image cap, and that is a defect being worked around rather than a
- * design.** `POST /api/nutrition/food-items` caps its whole body at 8 KB — a number written for
- * *"a name, a brand and a dozen macro numbers"*, before BF-35 gave the route a 16 KB image field.
- * Base64 costs a third more than the bytes it carries, so an image at its own permitted cap is
- * ~21 KB on the wire and the route answers **413 before `rejectMealImage` ever runs**: the whole
- * food save fails, rather than the picture being refused. Measured 2026-09-13 — a 128 px WebP of a
- * detailed photo at q0.8 came back 6,612 bytes, which is 8,816 characters, which is over.
- *
- * So the ladder below fits the picture to what the route will actually take. Raising the route's
- * body cap past `FOOD_ITEM_IMAGE_MAX_BYTES` is LB-101 (Lane A); this constant goes when it lands.
- */
-const THUMB_WIRE_BUDGET = 7 * 1024
-
-/**
  * The captured photo as a stored thumbnail, or `undefined` if it cannot be made into one.
  *
  * **Never throws and never blocks the scan.** A picture must not be able to fail a nutrition
  * lookup — the barcode route's own thumbnail fetch is written to the same rule, and dropping the
  * image is always the better failure than losing the food the user just photographed.
+ *
+ * **The wire budget and its quality ladder are gone (LA-105).** They existed only because
+ * `/api/nutrition/food-items` capped its whole body at 8 KB while permitting a 16 KB image, so a
+ * detailed photo 413'd the entire save; LB-101 derives that cap from `FOOD_ITEM_IMAGE_MAX_BYTES`
+ * now — 25,942 bytes — and the re-encode down to 7 KB is dead weight. The downscale itself stays:
+ * shrinking a capture before upload is right regardless of what the route accepts.
  */
 async function thumbFromPhoto(previewUrl: string): Promise<string | undefined> {
   try {
-    const thumb = await downscaleToThumbDataUrl(dataUrlToBlob(previewUrl), THUMB_WIRE_BUDGET)
-    const tooBigForTheBody = thumb.length - thumb.indexOf(',') - 1 > THUMB_WIRE_BUDGET
-    return tooBigForTheBody || rejectMealImage(thumb, FOOD_ITEM_IMAGE_MAX_BYTES) ? undefined : thumb
+    const thumb = await downscaleToThumbDataUrl(dataUrlToBlob(previewUrl))
+    return rejectMealImage(thumb, FOOD_ITEM_IMAGE_MAX_BYTES) ? undefined : thumb
   } catch {
     return undefined
   }

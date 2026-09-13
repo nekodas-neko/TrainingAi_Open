@@ -421,49 +421,165 @@ below threshold and left in place for next time.
 
 
 
-### [nutrition] BF-154 — the budget's own explanation prints three numbers that do not add up to it
+### [workouts] BF-157 — a bodyweight exercise gets no get-ready countdown, because the timer is gated on the warm-up weight ladder
 
-- **Lane:** A — `components/nutrition/energy-card.tsx:195-201` is the print site, but the value it
-  needs is `budgetProvenance`'s (`packages/shared/src/nutrition/calorie-balance.ts`) and
-  `components/nutrition/macro-budget-gap.ts`'s docstring states the retired formula as fact.
-- **Added:** 2026-09-13 (BugFix intake), from the owner's screenshot of the Nutrition tab the evening
-  BF-152 deployed: *"There is so many numbers here. I thought the base would be above 1350?"*
-- **On screen, verbatim: *"Today's budget is 1,294 — 2,278 resting burn, −200 for your goal, +0
-  moved."*** `2,278 − 200 + 0 = 2,078`. The sentence names **1,294** and then breaks it into terms
-  summing to **2,078**, a 784 kcal contradiction inside one sentence.
-- **The cause is a breakdown of the retired expression printed beside the new number.** BF-152 made
-  the budget `restingRate + earned`. The card still renders `restingBaseKcal`, `targetNetKcal` and
-  `activeKcal` — the addends of `restingBase + goalDelta + earned` — against a `goal` that no longer
-  comes from them. **This is precisely the defect BF-99 exists for, and BF-150's own journal entry
-  names it** — *"printing base − goal there would name two numbers that are not addends of what is on
-  screen — BF-99's defect wearing the opposite hat."* The guard BF-150 narrowed bans destructuring
-  `base` from `budgetProvenance`; it does not reach a call site that never asks `budgetProvenance`
-  anything and reads the balance fields directly.
-- **Worse than an arithmetic slip: the 2,278 is the number BF-152 was escaping.** On the calibrated
-  path `restingBaseKcal` is `maintenance − avgActive`, carrying the estimator inflation BF-137 is
-  about. So the card prints **2,278 labelled "resting burn"** ten lines above **1,294 labelled
-  "resting rate"** — two figures 984 kcal apart, both named resting, one of them the value the app
-  has stopped using.
-- **A second consequence, and it is not cosmetic.** The macro grams still key off the stored 1,660
-  goal while the budget is now 1,294, so the printed gap has gone from ~295 to **365** and no longer
-  closes. BF-150's journal recorded that the grams and the budget *"already share a denominator"*
-  (150p/141c/55f = 1,659 against a stored 1,660); BF-152 separated them and nothing re-derived the
-  grams. Whether the grams should follow the resting rate or stay on the stored goal is a decision —
-  `macro-budget-gap.ts` says outright that choosing the anchor is not its business — but they cannot
-  stay silently 365 apart while a paragraph explains the gap using a formula that is no longer run.
-- **Fix shape:** print the breakdown FROM `budgetProvenance` — it already returns `{ base, earned,
-  total, anchoredToRestingRate }`, so the sentence can name the two addends it actually used and say
-  *resting rate* for the base on the anchored path. Extend the source guard to the fields, not only
-  the destructure: what made this reachable is that a call site can print `restingBaseKcal` beside a
-  budget without touching `budgetProvenance` at all.
-- **Not a defect, and the entry should stop it being refiled as one: the base is correct at 1,294.**
-  The owner expected ">1350" from the 1,342 quoted in BF-152, which was computed from the scale's raw
-  25.5% body fat. The app uses the DEXA-corrected figure (BF-2) — ~28.7%, so FFM 50.1 kg rather than
-  52.3 — and `cunninghamBmr(50.1) − 157` is 1,294. The measurement, the residual and the correction
-  are all behaving; only the quoted expectation was built on the uncorrected input.
-- **Verification:** on device, with and without movement recorded, the budget and the terms beside it
-  must add up, and no number labelled *resting* may appear twice with different values.
-  `base-label-reconciles.test.ts` is the existing guard on that label and did not catch this.
+- **Lane:** B — `components/workout/active-workout-screen.tsx:181-189` is the gate; the durations it
+  needs already exist in `packages/shared/src/workout/duration-model.ts`
+  (`transitionSecForEquipment`, `warmupRampSectionSec`).
+- **Added:** 2026-09-13 (BugFix intake). Owner, on the Pull-Up ready screen with the session clock at
+  **8:42**: *"The body weight screens have no warmup timer or load time so its just infinite on this
+  screen."*
+- **One line explains it:**
+
+  ```js
+  const warmupSets = (() => {
+    const set1 = workingWeight
+    if (!set1 || set1 <= 0 || soloMode) return null      // ← bodyweight is 0
+    return [{ pct: 50, … }, { pct: 74, … }, { pct: 92, … }]
+  })()
+  ```
+
+  A bodyweight exercise has `workingWeight === 0`, so `warmupSets` is `null`. **Dropping the ladder
+  is correct** — 50% / 74% / 92% of nothing is not a warm-up. But the on-screen ramp timer is
+  rendered *from* that array, so removing the ladder removed the clock with it. The two are separate
+  ideas that share one gate.
+- **The notification chip keeps counting, which is how we know the intent.** `workout-screen.tsx:711`
+  still calls `startRestChip(rampStart + prepSec × 1000, …)` with
+  `prepSec = transitionSecForEquipment(equipment)`, and `Pull-Up` carries `equipment = ['bodyweight']`
+  (confirmed in `exercise_library`), so the chip runs a correct **60-second** countdown. The lifter
+  gets a notification counting down against a screen showing nothing — the two surfaces disagree
+  about whether this phase is timed.
+- **`WARMUP_SECTION_SEC` is computed and then unreachable.** Line 216 evaluates
+  `warmupRampSectionSec(equipment, warmupSets?.length ?? 0)`, which hits that helper's
+  `sectionCount <= 0 → 40` branch. Nothing consumes it once `warmupSets` is null, so the file already
+  computes a per-section duration for a case it does not render.
+- **Why it matters beyond the screen.** `handleStart` derives `prepSecRef` from
+  `readyElapsedBaselineSec`, and that value is submitted as `prepTimeSec` and feeds the duration
+  model's own transition estimate. An unbounded, untimed ready screen makes that measurement the
+  length of whatever distraction occurred, and it is an input to the time budget printed on the
+  session card (*"~56 min of work"*).
+- **Recommended shape:** separate the countdown from the ladder. Keep `warmupSets` gated on a real
+  working weight, and render the ready-screen timer from `transitionSecForEquipment(equipment)`
+  whenever the exercise is not started — 60 s for bodyweight, matching the chip that is already
+  correct. The bodyweight screen then shows a bounded get-ready bar with no weight ladder, which is
+  what the exercise actually needs.
+- **Not in scope:** inventing a bodyweight warm-up progression (band-assisted, negatives, rep
+  ramps). That is a programming feature and a separate decision; this entry only restores the clock.
+- **Verification:** on device, open a bodyweight exercise's ready screen and confirm a bounded
+  countdown appears and agrees with the notification chip, then a barbell exercise and confirm its
+  ladder and 240 s are unchanged.
+
+### [workouts] BF-155 — every session since 6 September reports 2–3 minutes because one fallback collapses five timestamps into one
+
+- **Lane:** A — `packages/shared/src/workout/log-exercise.ts:275-277` is the fallback,
+  `app/api/day-log/route.ts:177-200` is the consumer that turns it into the printed duration, and
+  `components/workout-screen.tsx:1120` (`appendSetEndMs`) is where the missing input should come from.
+- **Added:** 2026-09-13 (BugFix intake). Owner: *"my amrap week all has under 5mins workout time."*
+  He is right about the symptom and the cause is not AMRAP-specific — it is **every session since
+  6 September**.
+- **Measured in production, five broken sessions against seven good ones:**
+
+  | session | real (`completed_at − started_at`) | printed | set rows | with `set_end_ms` |
+  |---|---|---|---|---|
+  | 12 Sep | **12.0 min** | **3 min** | 5 | **0** |
+  | 10 Sep | **38.3 min** | **3 min** | 5 | **0** |
+  | 9 Sep | 33.3 min | 2 min | 5 | 0 |
+  | 7 Sep | 40.0 min | 2 min | 5 | 0 |
+  | 6 Sep | 22.8 min | 2 min | 4 | 0 |
+  | 5 Sep | 63.4 min | 61 min | 10 | 5 |
+  | 3 Sep | 53.7 min | 51 min | 10 | 5 |
+
+- **The mechanism, end to end.** `logExerciseFromPayload` stamps the row as
+  `lastSetEndMs ?? workoutStartedAt ?? now`. `lastSetEndMs` comes from `setEndTimes`, which comes
+  from the store's `setEndMsArray`, appended on **"Log Set"**. In these sessions **no set row carries
+  a `set_end_ms` at all**, so every exercise falls to the second rung — and `workoutStartedAt` is the
+  same value for all five. All five rows on 12 Sep read
+  **`logged_at = started_at = 00:38:37.167`, identical to the millisecond.**
+- **`day-log` then computes the duration from those timestamps and never looks at `completed_at`.**
+  `end = max(loggedAt + timeToComplete)` — with every `loggedAt` collapsed onto the start, that is
+  start plus the single **longest** exercise (202 s on 12 Sep), giving 3 min. `completed_at` is
+  correct on the session row the whole time, sitting unread beside it.
+- **Two candidate triggers and the data cannot separate them — say so rather than pick.** Every
+  broken session has **exactly one set per exercise** and every good one has two or more; every
+  broken session is also in the AMRAP/baseline shape. Whether the single set never reaches
+  `appendSetEndMs`, or the baseline path submits without it, needs the code path walked — the 5-of-10
+  ratio on the good sessions says `set_end_ms` is already sparse on the working path, so this is not
+  simply "the last set is missing one".
+- **The blast radius is larger than the card, which is why this is Lane A rather than a display
+  fix.** `logged_at` orders 1RM history and trend (`ORDER BY loggedAt`), breaks PR ties, and keys
+  per-set HR attribution. Five sessions now carry five rows that claim to have happened at the same
+  instant, so their internal order is whatever the table returns.
+- **Fix shape, in two parts.** (a) Make `day-log` prefer `completed_at` when the session has one —
+  it is the measured end and needs no reconstruction. (b) Find why the single set carries no
+  `set_end_ms` and restore it, because (a) repairs the card while leaving `logged_at` collapsed for
+  everything else that reads it. **(a) alone is not the fix**, and shipping only (a) would close this
+  entry on the visible half.
+- **Historical rows:** the five affected sessions cannot be reconstructed per-exercise — the
+  information was never written. Their session-level `completed_at` is intact, so (a) repairs what is
+  displayed without a backfill.
+- **Verification:** on device, log a single-set session and confirm the printed duration matches the
+  wall clock, and that the exercise rows carry distinct `logged_at` values.
+
+### [workouts] BF-156 — what "Accept" costs you depends on the recommendation, and the card never says which kind it is
+
+- **Lane:** B — `components/workout/ai-prescription-card.tsx`. The rule it must surface already
+  exists in `packages/shared/src/ai-periodization/apply-prescription.ts` (`prescriptionDrivesLoad`);
+  nothing about the decision changes.
+- **Added:** 2026-09-13 (BugFix intake). Owner: *"what happens if I dont select to apply the
+  session? Its pretty easy to miss that button."*
+- **There are two answers and the card looks identical for both.** `prescriptionDrivesLoad` splits
+  the five phase actions in half. A pending **`stay`** or **`transition_recommended`** *does* drive
+  today's loads — skipping Accept costs nothing but the phase decision. A pending **`deload`**,
+  **`session_swap_recommended`** or **rest** does *not* — skipping Accept silently reverts the
+  session to the program's base progression style, and the recommendation on screen is simply not
+  what you train.
+- **This is live for him right now, not hypothetical.** `session_periodization` holds a row at
+  **`prescription_status = 'pending'`, `phaseAction = 'session_swap_recommended'`** — the opt-in
+  half. Missing that button means training something the app was recommending against, with no
+  indication either way.
+- **The existing design is right and this entry does not reargue it.** `apply-prescription.ts`
+  explains the split at length: the generator runs its full chain regardless, so discarding the
+  numbers over an unresolved *phase* choice would silently revert to the base style, while recovery
+  decisions "represent a decision, not a default". The defect is that a rule with two opposite
+  consequences is presented through one unlabelled button.
+- **Recommended shape:** say the consequence on the card, from `prescriptionDrivesLoad` rather than a
+  second copy of the rule — *"These numbers are already loaded; Accept only confirms the phase
+  change"* on the driving half, against *"Start Workout without accepting and you'll train the
+  program's normal loads"* on the opt-in half. The opt-in half is also the one worth making harder to
+  scroll past, since it is the one where doing nothing discards the advice.
+- **Not in scope:** changing which actions drive load, and auto-applying the opt-in half. Both are
+  the owner's calls and neither is needed to make the button honest.
+- **Verification:** on device, open a session in each state and confirm the card says what Start
+  Workout will do without Accept. A `session_swap_recommended` is available on his account now.
+
+### [nutrition] BF-154 — the macro grams still key off the stored goal, and the owner has said they should not
+
+- **Lane:** A — `lib/health/energy-balance-service.ts` and `packages/shared/src/nutrition/`, where
+  the base that `scaleMacrosForEarnedKcal` scales FROM is chosen.
+- **Keep:** the macro re-anchor, and only that. **The arithmetic half shipped 2026-09-13 (#1155,
+  v1.455.1)** — the breakdown sentence now names `budgetProvenance`'s own `base` and `earned`, says
+  *resting rate* on the anchored path, and no longer prints two different figures both labelled
+  *resting*. Guarded by `components/nutrition/__tests__/bf154-budget-breakdown-addends.test.ts` and
+  `e2e/bf154-budget-breakdown-reconciles.spec.ts`, the latter proven against the defect before it was
+  run against the fix.
+- **✅ THE OWNER ANSWERED, 2026-09-13: the grams follow the budget.** His words — *"Can we have it
+  dynamically sized for my calories? I.e before excercise its 1 value and after its another if
+  calories increase?"* So the gram targets take the **budget** as their base, not the stored 1,660,
+  and the printed gap goes to zero by construction rather than being explained.
+  `scaleMacrosForEarnedKcal` already grows them with `earned` and holds protein fixed while splitting
+  the rest on the stored carb/fat ratio — that half is built and needs no change. What changes is the
+  base it scales FROM.
+- **⚠ Flag when building:** protein is held constant by that function, so re-basing from 1,660 to
+  ~1,294 drops carbs and fat while 150 g protein stands. That is the right shape for a cut and a
+  visible change to his targets — worth confirming on the first day it renders rather than after a
+  week of it.
+- **Two things #1155 left behind become dead when this lands, and go in the same change:** the
+  explanatory paragraph in `components/nutrition/energy-card.tsx` exists only because the two numbers
+  disagree, and `components/nutrition/macro-budget-gap.ts` exists only to measure that disagreement.
+  A gap that is zero by construction needs neither. Do not leave a card explaining a difference that
+  no longer exists.
+- **Added:** 2026-09-13 · re-queued from the shipped half, so the owner's answer is not lost with the
+  entry that carried it.
 
 ### [nutrition] LA-102 — the budget starts at the resting rate and says nothing about what it leaves out
 - **Lane:** B — surface only: `components/nutrition/calorie-zone-bar.tsx`, and the ⓘ copy on
@@ -491,25 +607,6 @@ below threshold and left in place for next time.
   the base, and nothing on the screen implies the base is a full day's burn.
 - **Reversal cost:** none. It is copy.
 
-### [nutrition] LA-105 — the capture workaround for LB-101 is now dead weight
-- **Lane:** B — `components/nutrition/capture-actions.tsx`, and two assertions in
-  `components/nutrition/__tests__/food-image-write-paths.test.ts`.
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-13 · found shipping LB-101, which this depends on.
-- **LB-101 SHIPPED 2026-09-13**: `/api/nutrition/food-items` derives its body cap from
-  `FOOD_ITEM_IMAGE_MAX_BYTES` instead of restating 8 KB, so an image at its own permitted size no
-  longer 413s. **The client-side workaround that existed only because of that is now redundant.**
-- **What to remove:** `THUMB_WIRE_BUDGET = 7 * 1024` and the quality-ladder re-encode that walks down
-  to fit it, the `tooBigForTheBody` guard beside it, and the two assertions that pin them. LB-101's
-  own entry named these and said to leave them until the cap moved. It has moved.
-- **Do NOT remove the downscale itself** — only the budget the ladder targets. Shrinking a capture
-  before upload is right regardless; what is dead is re-encoding down to **7 KB** to sneak under a cap
-  that was 8,192 bytes and is now 25,942.
-- **Verify by measurement, not by reading:** the case LB-101 measured was a 128 px WebP of a detailed
-  600 × 400 source at q0.8 coming back **6,612 bytes**. After removing the ladder that capture should
-  save at its natural quality rather than at whatever rung fitted 7 KB.
-- **Reversal cost:** low, and the route-side cap stands on its own either way.
-
 ### [readiness] LA-104 — today's stress chart and a past day's come from two different baselines
 - **Lane:** B — `components/body-battery/stress-day-chart.tsx` and whatever feeds it on the day screen.
   The engine half is done; this is which source the surface reads.
@@ -536,6 +633,14 @@ below threshold and left in place for next time.
 - **Reversal cost:** low — one fetch swapped on one surface.
 
 ### [app-shell] BF-139 — three header chips no longer fit beside the date (fixed; the device look is what is left)
+
+- **Batch:** `header-row-width` — ships with **BF-96**. Batched on the VERIFICATION, per this file's rule: both are settled by one look at the longest real date with `· UV n` present, and fixing either alone re-breaks the other.
+
+- **❌ FAILED ON THE S25, 2026-09-13.** Owner: *"Its now squished the day of the week. Might need to
+  make it smaller or move it."*
+- **⚠ Same defect as BF-96 — see that entry for the full diagnosis.** Two entries have now each been
+  fixed and each re-broken the header row, because they own different elements in one width budget
+  and neither owns the date. **Batch them.**
 
 - **Lane:** B
 - **Verify:** device — on the S25, all three chips whole at the right edge, **and again during the
@@ -941,7 +1046,7 @@ below threshold and left in place for next time.
 - **Lane:** B
 - **Keep:** two things, neither of them the palette. ① the device check on the shipped ramp, ② the
   sheet question below, which is a decision rather than an implementation.
-- **Verify:** device — on the S25, the lifted ramp reads as a tinted dark rather than a colour cast,
+- **✅ VERIFIED ON THE S25, 2026-09-13** (owner's app-shell pass): owner: *"Seems good so far"*.
   and body text still clears 4.5:1 on the tinted surfaces. Dark only, per the dark-only rule.
 - **Added:** 2026-09-11 · owner, on the Edit Program sheet: *"Needs a major uplift + addung in a
   color scheme instead of the plain black"*.
@@ -3395,6 +3500,21 @@ present.
 
 ### [app-shell] PS-35b — a wrong PWA start_url, a doubled boot fetch, a dead branch and a stuck weather chip
 
+- **⚠ OWNER DIRECTED 2026-09-13, and it is a scope rule rather than an answer to this entry.**
+  Verbatim: *"Let's not do any testing for the web ui app; only the apk."*
+- **What that removes from this entry:** ① the PWA `start_url`. A `manifest.json` launch is a
+  *browser-installed* PWA, which is not the canonical runtime — the APK is a WebView loading from
+  Railway and never reads the manifest to start. So ① is real but **unobservable on the only surface
+  the owner uses**, and asking them to install the PWA to check it is asking them to test the thing
+  they just said not to test.
+- **What stays, and is the bulk of it:** ② the doubled boot fetch (measured ×2 on Fast-3G), ③ the
+  dead rehydrate branch, ④ the weather chip's eternal skeleton and unkeyed cache. All three run
+  **inside the APK** and are checkable there.
+- **The general rule this states, worth carrying beyond this entry:** `CLAUDE.md`'s Canonical Runtime
+  section already says the web build is a dev/QA surface only. What the owner has added is the
+  checklist consequence — **a check only reproducible in a browser does not go in front of them.**
+  Fix it on the code and the tests, or do not file it as a device check.
+
 - **Lane:** B — `app/manifest.ts:8`, `components/sync-provider.tsx:99`, `lib/stores/workout-store.ts:438`,
   `components/weather-chip.tsx:26`, `lib/weather/use-weather.ts:9,52`.
 - **Added:** 2026-09-06, app checkpoint — [report](reviews/2026-09-05-app-checkpoint.md) §4/§P2.
@@ -3720,6 +3840,16 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
 
 ### [app-shell][nutrition] RV-36 — scroll restoration reaches 3 of 5 tabs; BF-100's entry says it reaches all of them
 
+- **❌ FAILED ON THE S25, 2026-09-13 — the second failure of this entry.** Owner: *"Checked on more -
+  and still doesnt work"*.
+- **RV-36 passed in the same sitting, which narrows it rather than contradicting it.** Owner there:
+  *"Mostly works. Just need to make sure when you press back on a tab and there is no where to go it
+  should go to the home screen."* So scroll restoration is largely working; what is failing is
+  **`/more` specifically**, and there is a second, separate requirement: **back from a tab with
+  nothing to pop should land on Home, not exit.**
+- **Do not re-fix this blind.** It has been declared fixed twice. The next attempt names which route
+  it reproduced on and how, before changing anything.
+
 - **Lane:** B — `app/nutrition/nutrition-content.tsx`, plus a correction to BF-100's entry above.
 - **Batch:** nutrition-tab-day-and-scroll
 - **Added:** 2026-09-03, Review sweep 41 —
@@ -3745,7 +3875,7 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
   back case. Keep its precondition assertions — BF-100 records four spec traps that all report
   `expected 840, received 0`, and a fifth this sweep paid for: `page.goto()` is a hard navigation, so
   React cleanup never runs and **no** screen saves an offset.
-- **Verify:** device — the **system back gesture** on the S25, which is what BF-100 was reported
+- **✅ VERIFIED ON THE S25, 2026-09-13** (owner's app-shell pass): scroll restoration works across the tabs — owner: *"Mostly works"*; the residue is recorded on BF-100.
   against and the one gesture the harness cannot send. It is a `Verify:` now rather than the note
   below, because the work is built: that note was correct while it was unbuilt (OR-105, 2026-09-10),
   since a `Verify:` files unbuilt work under "shipped; nothing is blocked" where nobody looks for it.
@@ -3781,7 +3911,7 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
   with the gesture bar is a defect by CLAUDE.md's own rule, which treats even bare `pb-safe` as too
   little. The control on `/more` measures `padding-bottom: 68px` (`pb-nav-safe`) and is the shape to
   match. Fix it, then look — a device check belongs after this one, not in front of it.
-- **Verify:** device — **and it is still NOT observed.** The container now carries `pb-nav-safe`;
+- **✅ VERIFIED ON THE S25, 2026-09-13** (owner's app-shell pass): `/health/day` clears the gesture bar.
   whether the symptom was ever visible needs a day with enough logged to make it scroll, which the
   seeded fixture cannot produce (it renders *"Nothing logged on this day"*).
 - **✅ SHIPPED 2026-09-11** (`fix/rv-36-nutrition-scroll-restoration`, same PR as RV-36 — one device
@@ -4317,6 +4447,11 @@ paint, only on Samsung's WebView, invisible in Chrome and in `pnpm dev`.
 
 
 ### [app-shell] BF-111 — "Up to date — v1.414.1 is the newest build" sits under a v1.436.2 badge, and both are right
+
+- **❌ FAILED ON THE S25, 2026-09-13** (owner, no note). The card returns early off-native, so this is
+  the first time any of its three states has been on a screen — and it did not survive that.
+  **Ask for the screenshot before starting:** the entry's whole difficulty is that the failure is
+  which-number-where, and a bare fail does not say which of the three states was wrong.
 
 - **✅ SHIPPED 2026-09-03** (`fix/bf-111-version-labels`, v1.436.4). Both numbers labelled, and every
   state now names the **installed** build rather than only the newest one — the update state used to
@@ -5222,6 +5357,12 @@ two screens, and a user who sets one has no way to know the other exists.
 
 ### [app-shell][platform] BF-86 — the morning check-in never re-prompts (fixed; the "close/reset" half is answered, not built)
 
+- **⚠ OWNER CANNOT TEST THIS, 2026-09-13.** Verbatim: *"this is something i wont be able to test -
+  assume it works or do your testing till we see otherwise"*. The re-prompt needs a morning that has
+  already been answered and then reset, which is not a state to ask for on demand.
+- **So it leaves the device queue on the same terms as RV-35:** it ships on code and a test, and a
+  fix landing here **needs a test that fails before and passes after**, because nothing else will.
+
 - **Lane:** B
 - **Verify:** device — leave the app open overnight on the S25 and resume it after midnight: the
   morning check-in prompts once, yesterday's ticks are gone, and no reload or spinner happens.
@@ -5339,6 +5480,20 @@ two screens, and a user who sets one has no way to know the other exists.
 
 ### [app-shell] BF-96 — the temperature/UV pill wrapped (fixed; the device check is the whole of what is left)
 
+- **Batch:** `header-row-width` — ships with **BF-139**. Batched on the VERIFICATION, per this file's rule: both are settled by one look at the longest real date with `· UV n` present, and fixing either alone re-breaks the other.
+
+- **❌ FAILED ON THE S25, 2026-09-13.** Owner: *"Day is cut off"*.
+- **⚠ THIS AND BF-139 ARE ONE DEFECT — batch them, and do not fix either alone.** BF-96 requires the
+  weather pill to stay on **one line**; BF-139 requires **three chips whole** at the right edge. Both
+  shipped, both were declared fixed, and both failed in the same sitting with the same symptom: the
+  header row is a **fixed width budget and nothing in it is defending the date.** Each entry bought
+  its own element room out of the only slack available, which was the date's.
+  Owner on BF-139 the same day: *"Its now squished the day of the week. Might need to make it smaller
+  or move it."* — which is the right instinct and the thing neither entry was allowed to decide.
+- **What the fix has to settle, once, for the whole row:** what happens at the longest real date
+  (`Wednesday 30 September`, 22 characters) **with `· UV n` present** — which element truncates,
+  wraps or moves. A fix that only makes today fit will fail again in the same way.
+
 - **Lane:** B
 - **Verify:** device — on the S25, the pill is one line on a **long** date. Today's is not the worst
   case: `EEEE d MMMM` runs 12–22 characters (measured 2026-09-01, correcting this entry's original
@@ -5372,6 +5527,12 @@ two screens, and a user who sets one has no way to know the other exists.
 
 ### [app-shell] BF-95 — the swipe marker the tab navigator ignored (fixed; device check owed)
 
+- **❌ FAILED ON THE S25, 2026-09-13.** Owner: *"Still requires a little pause."*
+- **The fix reduced the delay without removing it**, which is the same defect in a smaller size — the
+  entry's bar was that the confirmation appears on the **first** press. A pause the owner can still
+  feel means the press is still landing before the tray is ready, so this is a sequencing problem,
+  not a timing constant to tune down further.
+
 - **Lane:** B
 - **Verify:** device — a swipe-to-delete started at the far **left edge** of a meal row must open the
   tray and **not** change tab. The web sandbox does not reproduce the WebView's touch behaviour, and
@@ -5385,7 +5546,7 @@ two screens, and a user who sets one has no way to know the other exists.
 ### [app-shell] BF-82 — the More page is seven groups of one row each, with one of them behaving differently
 
 - **Keep:** one look on the S25. Nothing else is owed.
-- **Verify:** device.
+- **✅ VERIFIED ON THE S25, 2026-09-13** (owner's app-shell pass): the More page works — owner: *"Still not as organised/separated as I would like it to be"*, which is a **design complaint, not a defect**, and is left as one rather than converted into a fix nobody asked for.
 - **Lane:** B.
 - **✅ The grouping and interaction half SHIPPED** (`feat/bf-82-more-page-grouping`, PR #749,
   2026-09-01, v1.419.0) — nine single-row groups became two headings of three or four rows,
@@ -13242,7 +13403,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Keep:** the owner walking the drain → re-sync → verify flow on the S25 and saying whether the
   section order matches what they actually do. That was never a blocker and is not one now; it is the
   only part that cannot be answered from the sandbox.
-- **Verify:** device.
+- **✅ VERIFIED ON THE S25, 2026-09-13** (owner's app-shell pass): the device consoles are findable where they moved to — owner: *"Works but could be labeled better"*.
 - **✅ SHIPPED** (`fix/device-console-ia`, 2026-09-01, v1.421.0). `/admin` grew a **Devices** tab;
   `/admin/oura-ble` is six numbered sections in §4-of-the-runbook order rather than fourteen stacked
   consoles; Settings → Developer lost its device rows and kept Diagnostics.
@@ -18967,7 +19128,7 @@ per-field merge where an AI write has no honest source rank to claim.
 ### [app-shell] Q-93-followup — the timeline's workout and walk taps have not been pressed on the phone
 
 - **Branch:** `feat/timeline-workout-day-detail` (merged 2026-08-25, v1.371.0) · **Lane: B**
-- **Verify:** device
+- **✅ VERIFIED ON THE S25, 2026-09-13** (owner's app-shell pass): the timeline's workout and walk taps both open correctly.
 - Built and guarded: `workout` and `walk` cards navigate to `/health/day?date=`, proved by the
   mutation-checked `e2e/timeline-card-navigation.spec.ts`; `bedtime`/`tag` stay inert on purpose
   ([`journal`](overview/history-2026-09-10-folded-3.md#2026-08-25-timeline-workout-day-detail)).

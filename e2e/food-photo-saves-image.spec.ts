@@ -188,15 +188,17 @@ test('a photographed food is saved with its picture', async ({ page }) => {
   // sails past a cap that nothing checks loudly.
   expect(image.startsWith('data:image/webp;base64,'), `stored as ${image.slice(0, 24)}`).toBe(true)
 
-  // **Measured on the wire, because that is what refused it.** The route caps its whole body at
-  // 8 KB while permitting a 16 KB image, and base64 costs a third more than the bytes it carries —
-  // so this fixture's thumbnail 413'd the entire save at q0.8 until the quality ladder fitted it.
-  // That mismatch is the route's to fix (LB-101); the assertion here is that the client never sends
-  // a body the route will refuse.
+  // **This fixture is the case LB-101 was filed for, and it is why the number is asserted at all.**
+  // The route used to cap its whole body at 8 KB while permitting a 16 KB image, so this thumbnail —
+  // 6,612 bytes, 8,816 base64 characters at the documented quality — 413'd the entire save, and the
+  // client carried a quality ladder down to 7 KB to sneak under it. LB-101 derives the body cap from
+  // `FOOD_ITEM_IMAGE_MAX_BYTES` (25,942 bytes) and LA-105 removed the ladder, so the picture now
+  // stores at its natural quality. **Asserting ABOVE the old 7 KB budget is deliberate**: it would
+  // fail if the ladder came back, which is the regression worth catching.
   const encoded = image.length - image.indexOf(',') - 1
-  expect(encoded, 'over the route body cap — this save would 413').toBeLessThanOrEqual(7 * 1024)
+  expect(encoded, 'the quality ladder is back — this was re-encoded to fit a cap that no longer exists')
+    .toBeGreaterThan(7 * 1024)
   expect(Math.ceil(encoded * 0.75), 'over FOOD_ITEM_IMAGE_MAX_BYTES').toBeLessThan(16 * 1024)
-  expect(encoded, 'suspiciously small — did anything actually encode?').toBeGreaterThan(300)
 
   expect(posted).toMatchObject({ name: FOOD_NAME, imageDataUri: image })
 })
