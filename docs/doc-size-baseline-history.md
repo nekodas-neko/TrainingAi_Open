@@ -11433,3 +11433,14 @@ either side would have set a baseline for a document that does not exist.
 Same for `package.json` and `changelog.ts` in the same merge — rebuilt from `git show origin/main:…`
 and re-bumped on top, so BF-152's v1.454.3 entry survives under this branch's v1.455.0 rather than
 being spliced away.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21396 (LB-103: an unfiled blocker becomes an entry)
+
++27 for LB-103, and the lines buy a dependency that existed without existing. Q-305's `Keep:` has
+said since 2026-08-25 that its push:pull half *"belongs in `packages/shared` … which is Lane A's"* —
+and no Lane A entry was ever written, so `next-item.js --lane A` has never listed it and never would.
+The work was blocked on something nobody was holding.
+
+**That is the second instance today of the same failure**, after TN-3b sat startable in PARKED for
+three days because its unparking is prose and the tool reads fields. Both are cheap to write and
+invisible to read, which is precisely why they persist.
