@@ -421,46 +421,6 @@ below threshold and left in place for next time.
 
 
 
-### [nutrition] BF-153 — the vial sheet reads as a settings screen, and two of its fields are not settings
-
-- **Lane:** B — `components/nutrition/reta/vial-sheet.tsx` only. No API change: the route already
-  stores what it should, and `VialOpenedNote` already edits the saved date in place.
-- **Added:** 2026-09-13 (BugFix intake). The owner, looking at the sheet: *"Can you explain how this
-  works? Where am I meant to update the dose?"* He had the screen open with the right numbers on it
-  and could not tell which of them the app would keep.
-- **`Dose (mg)` looks like the dose and is a calculator input that is never saved.** `save()` posts
-  `{ ...draft, openedOn }` where `draft` is `strengthMg` / `waterMl` / `syringeUnitsPerMl`.
-  **`doseMg` is not in the body.** It is seeded from the supplement definition's `defaultAmount`,
-  drives the mg → units arithmetic, and is discarded on close. The real dose lives on the definition
-  and is edited in `manage-supplements-sheet.tsx` under **Amount** — a different sheet, reached a
-  different way, with a different word for the same quantity.
-- **Two dates are shown with nothing saying they belong to different objects.** The `Opened on` INPUT
-  defaults to **today** because the form creates a NEW vial (BF-136 made that deliberate and it must
-  stay). The `VialOpenedNote` below it reads `current.openedOn` — the vial he ALREADY has. On his
-  screen those read **13/09/2026** and **10 Sept** at the same moment, both correct, five lines apart.
-  BF-136's own docstring says the two are *"Separate … on purpose"*; the purpose is never stated on
-  screen.
-- **What this costs, and why it is not cosmetic.** The footer button says *Save as a new vial*, and a
-  stray press restarts the weight-response window — which BF-136 established can only be corrected in
-  place, because `listSupplementVials` orders by `openedOn DESC` and the sheet reads `vials[0]`, so an
-  earlier-dated vial sorts BELOW the wrong one. A screen that invites a press to "save my dose" sits
-  directly on top of that.
-- **Recommended shape, and it is presentational throughout.** Head the create-form *"Open a new
-  vial"* rather than *"This vial"*; move the current vial's line (`VialOpenedNote`) above it under a
-  heading that names it as the one in use; and label the Dose field for what it does — *"Work out the
-  units"* or equivalent — with the definition's saved amount stated beside it and a link to where it
-  is changed. **Do not make the Dose field write the definition.** That reverses BF-112's separation
-  of the definition from the day's log, and it would let a units calculation silently re-set every
-  future prompt.
-- **Related, not this entry:** the owner's `Retatrutide` definition holds `default_amount 0.5 mg` AND
-  free-text `dose '10mg'` (the vial strength in a field labelled Dose). `hasFreeTextBesideAmount`
-  (`components/nutrition/definition-dose.ts`) already surfaces that pair in the manage list; nothing
-  here changes it.
-- **Verification:** on device, open the sheet with a saved vial present and confirm the two dates can
-  be told apart without reading code, and that the Dose field no longer reads as a saved setting. The
-  destructive case to try deliberately: press the footer button with no new vial opened, and confirm
-  the screen said clearly that it would create one.
-
 ### [platform] LA-103 — a sentence saying a gate was withheld IS a gate, and it parked verified work
 - **Lane:** A — `scripts/lib/keep.js:47`, and the park ordering it feeds in `scripts/next-item.js:145`.
 
