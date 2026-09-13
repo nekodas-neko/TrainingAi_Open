@@ -11301,11 +11301,13 @@ regex to a bullet start loses 7 legitimate inline mentions and silently un-parks
 work. So the choice is on the record as LA-103 with the population unmeasured and said to be
 unmeasured, rather than as a one-line parser change nobody could audit later. **A 36-line entry is the
 cost of not guessing.**
-## 2026-09-13 — `docs/implementation-backlog.md` → 21403 · `projectOverview.md` → 10764 (BF-152 shipped)
+## 2026-09-13 — `docs/implementation-backlog.md` → 21403 · `projectOverview.md` → 10784 (BF-152 shipped)
 
 BF-152's 54-line entry leaves the queue; **LA-102 arrives in its place, so the net is 28 lines rather
-than 54** (the figure is 21403 rather than 21327 because LA-103 and then BF-153 landed on `main` while
-this PR waited on its E2E run — LA-103 is the red-`main` note above, BF-153 is not ours at all). That is deliberate and is the thing to read here: BF-152 shipped with a residual it chose
+than 54** (the figure is 21403 rather than 21327 because LA-103, BF-153, LB-101 and OR-108's own removal
+all landed on `main` while this PR waited through two E2E runs — LA-103 is the red-`main` note above,
+the rest are not ours at all). **`projectOverview.md` falls 6 net**, and the same caution applies: the
+BF-150 row was rewritten rather than struck, and LB-100's 🔴 row moved out to the archive. That is deliberate and is the thing to read here: BF-152 shipped with a residual it chose
 not to model — the thermic effect of food and non-step NEAT — and the ⓘ copy explaining that is Lane
 B's. An entry that closes by opening a smaller one nets out small, and **the alternative was a
 54-line drop with the finding living only in a journal paragraph**, which is how a finding gets
@@ -11338,3 +11340,17 @@ together with nothing distinguishing them, and its `Dose (mg)` field is a calcul
 `save()` never posts. The entry is mostly the evidence — the save body, and the two dates reading
 13/09/2026 and 10 Sept on one screen — because the screen looks correct and the defect is only
 visible from the code.
+
+## 2026-09-13 — `projectOverview.md` → 10790 (OR-108's write half shipped, two reads still owed)
+
++20 for one Known-Issues entry, and the length is the finding rather than the fix. Photographing or
+scanning a food now writes its picture, and **the S25 will still show none**: `LA-36` leaves all three
+local-store read paths omitting `image_data_uri`, so the canonical runtime reads null from a column
+that is finally being filled. Beside it, `POST /api/nutrition/food-items` caps its body at 8 KB while
+permitting a 16 KB image — base64 costs a third more, so a detailed photo 413s the whole save before
+the image check runs, and the client is carrying a quality ladder to dodge it until LB-101 lands.
+
+**A row that says "shipped" and nothing else would be false three ways over**, which is why the two
+open dependencies, the workaround and the constant that has to be deleted with it are all named. The
+entry leaves — to `known-issues-resolved.md` — when LA-36 and LB-101 are both in and the device pass
+has seen a picture on a row.
