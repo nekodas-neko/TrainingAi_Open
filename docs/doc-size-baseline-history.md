@@ -11358,3 +11358,14 @@ the entry leaves.
 **Re-verifying against `main` is what stopped this being wrong in either direction.** Read as stale,
 it deletes with the obligation unmet and nothing guarding the behaviour. Read as unbuilt, it
 re-implements a line that is already there. Both halves had to be checked.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21360 (LB-98 ① shipped, Q-300's reason corrected)
+
++8 across two entries, and both are corrections rather than additions. LB-98's Keep loses residue ①
+and gains the shipped note; **Q-300's Keep had to be rewritten because its stated reason stopped
+being true** — it said the card "is absent in a browser and cannot be verified in CI", which was
+exactly right until the fallback landed today. Leaving it would have told the next session the card
+is unverifiable when it now has a mutation-proven spec, and would have overstated what the S25 still
+owes: the local path only, which no harness can reach.
+
+A Keep that describes a world that has moved is worse than a missing one, because it is trusted.

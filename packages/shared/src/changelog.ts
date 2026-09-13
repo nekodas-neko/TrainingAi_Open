@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.454.2",
+    date: "2026-09-13",
+    changes: [
+      "The \u201cYour rest vs the plan\u201d table under Rest discipline can now fall back to the server when the phone\u2019s own copy of your set history has nothing to show \u2014 on a fresh install, for instance, before everything has synced down. Where your device does have the history it is still used, unchanged.",
+    ],
+  },
+  {
     version: "1.454.1",
     date: "2026-09-13",
     changes: [
