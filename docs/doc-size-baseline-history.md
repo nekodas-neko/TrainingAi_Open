@@ -11516,3 +11516,19 @@ its cause.
 
 The e2e's wire assertion was **inverted rather than deleted** — it now fails if the stored thumbnail
 is *smaller* than the old 7 KB budget, which is what a returning ladder would look like.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21495 (the app-shell device pass)
+
+Sixty-four lines, and the largest single block is BF-96/BF-139's shared diagnosis. Two entries had
+each been declared fixed and each re-broke the same header row, because they own different elements
+in one width budget and neither owns the date. Writing that once, on both entries, with a `Batch:`
+tying them together, is what stops a third round of one-at-a-time fixes.
+
+The rest is failures recorded in the owner's words. `BF-95`'s *"Still requires a little pause"* is
+the one worth the space: it reads like a near-miss and is not — the entry's bar was the confirmation
+appearing on the FIRST press, so a shorter pause is the same defect, and saying so stops the next
+session tuning a constant down instead of fixing the sequencing.
+
+PS-35b gained a scope rule rather than an answer: no check that is only reproducible in a browser
+goes in front of the owner. That is `CLAUDE.md`'s Canonical Runtime policy with its checklist
+consequence spelled out.
