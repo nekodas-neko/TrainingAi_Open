@@ -1754,6 +1754,17 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [nutrition] ⚠️ The vial sheet's rewrite is not device-verified (BF-153, 2026-09-13)
+
+Shipped in v1.454.1: the vial in use is named and moved above the create-form, the form is headed
+*Open a new vial*, the `Dose` field is *Try a dose* under *Work out the units* and says outright that
+it is not saved, and the footer warns before opening a second vial. **BF-153's own check is owed on
+the S25**: with a saved vial present, confirm the two dates can be told apart without reading code,
+and press the footer button deliberately to confirm the screen said it would create a vial. That
+press is the destructive case — a second vial restarts the weight-response window, and BF-136
+established it can only be corrected in place (`listSupplementVials` orders by `openedOn DESC` and
+the sheet reads `vials[0]`, so a corrective vial dated earlier sorts below).
+
 ### [nutrition] ⚠️ A captured food's picture is written but the device still reads it back as null (OR-108/LA-36, 2026-09-13)
 
 The write half shipped in v1.454.0: photographing a food and scanning a barcode both now put an

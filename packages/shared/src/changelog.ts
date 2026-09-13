@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.454.1",
+    version: "1.454.2",
     date: "2026-09-13",
     changes: [
       "Your calorie budget now starts at your own resting burn rather than the calorie target you typed in. It is your measured RMR re-scaled onto today's fat-free mass \u2014 1,342 kcal, against the 1,325 the test recorded \u2014 and it moves on its own as your weight does, which a typed number cannot. Walking and training add to it through the day exactly as before. Your stored target goes back to being a target: changing it no longer changes what the day's budget counts against. Note that resting burn leaves out the energy spent digesting food and everyday fidgeting, so the number you see before moving is the floor, not a full day.",
+    ],
+  },
+  {
+    version: "1.454.1",
+    date: "2026-09-13",
+    changes: [
+      "The vial sheet now says which vial each thing belongs to. The date you already saved sits at the top under \u201cThe vial you\u2019re using\u201d, and the form below it is headed \u201cOpen a new vial\u201d \u2014 the two dates on that screen were both correct and there was nothing saying they were different vials. The Dose field is now \u201cTry a dose\u201d under \u201cWork out the units\u201d, and says outright that it is not saved and where your real dose is changed. And the button that opens a second vial says so before you press it.",
     ],
   },
   {

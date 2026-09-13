@@ -11,15 +11,16 @@
 
 ## Now
 
-**OR-108 SHIPPED** (v1.454.0): photographing a food and scanning a barcode now write the picture, and
-a refine no longer discards it. Everything below the capture screens already carried `imageDataUri` —
-**three callers that rebuild a payload field by field dropped it**, while the one passing the object
-through never had the bug. Q-112e, BF-147, BF-145 shipped; BF-146 closed not built. `check:rules` **74/74**.
+**BF-153 SHIPPED** (v1.454.1): the vial sheet names which vial each thing belongs to, and its `Dose`
+field says it is a calculator, not a setting. **OR-108 SHIPPED** (v1.454.0): both capture paths write
+the picture now — three callers that rebuild a payload field by field had dropped it, while the one
+passing the object through never had the bug. `check:rules` **74/74**.
 
 **SEVEN running entries were wrong about something load-bearing** — BF-139's px, BF-141's gate,
 BF-142's **406**, BF-146's cause, BF-145's fix twice, BF-147's (the badge is **25 px**; the four action
-buttons are **204 of 340**), and OR-108's: two missing writers named, **three** real, plus a route
-defect nothing hinted at. **Measure the thing before you fix what the entry blames.**
+buttons are **204 of 340**), and OR-108's: two writers named, **three** real, plus a route defect
+nothing hinted at. BF-153 was the first that checked out whole, and verifying it still cost ten
+minutes well spent. **Measure before you fix what the entry blames.**
 
 **A 4-hourly silent Routine polls this lane** (`trig_01WcuYTidPtngLFZFD7yKnoL`, session-bound,
 `53 */4 * * *`): syncs `main`, clears any open PR, runs `next-item.js`, **says nothing when READY is 0**.
@@ -27,13 +28,12 @@ defect nothing hinted at. **Measure the thing before you fix what the entry blam
 ## Next
 
 1. **Re-run `next-item.js --lane B`. When READY reads 0, READ THE `KEEP` SECTION** — three of the last
-   four items came from there. `Keep:` means "only the stated residue is owed", and the residue is
+   five items came from there. `Keep:` means "only the stated residue is owed", and the residue is
    sometimes the whole job (BF-147: 300 lines of UI; Q-112e: a blocker cleared three days earlier). Ask
-   of each whether it is a device check or work. Batch `nutrition-tab-day-and-scroll` was next behind OR-108.
-2. **`LB-101` is filed for Lane A and OR-108's workaround dies with it** — `THUMB_WIRE_BUDGET`, the
-   `tooBigForTheBody` guard and two assertions in `food-image-write-paths.test.ts` exist only because
-   the route caps its body below the image it permits. **READY moves without warning** — re-run
-   `next-item.js` rather than trusting this list.
+   of each whether it is a device check or work. **Batch `nutrition-tab-day-and-scroll` (RV-35) was the
+   only READY B item left after BF-153**, and READY moves without warning — re-run rather than trust it.
+2. **`LB-101` is Lane A's and OR-108's workaround dies with it** — `THUMB_WIRE_BUDGET`, the
+   `tooBigForTheBody` guard and two assertions in `food-image-write-paths.test.ts` exist only because that route caps its body below the image it permits.
 
 ## Blocked
 
@@ -42,11 +42,11 @@ defect nothing hinted at. **Measure the thing before you fix what the entry blam
 - **Owner:** the macro/budget anchor (BF-134's residue, TN-29 protects the stored 1,660); LB-61's
   switch colour; whether the PWA lands on Home rather than Workout (PS-35).
 - **⚠ BF-84 reads startable and is not** — BF-94 supersedes it and is `Gate: device`.
+- **PS-4 is UNCLASSIFIED by design; LB-94 the owner deferred 2026-09-09.** Do not classify either.
 - **⚠ `actions_list` is STALE for RUN EXISTENCE, filtered OR not** — `total_count` showed no run for
   ~6 min after one existed and I told the owner CI was broken. **`get_check_runs` on the PR is the read; 0 means WAIT, never escalate.**
 - **⚠ When `main` lands a PR every ~5 min, a 26-minute E2E never finishes on a current base** (BF-142 took six pushes). Merge on the required five once E2E passed on that exact app code; expect `main` to take your version — rebuild `changelog.ts` from `origin/main`, never splice.
 - **⚠ Q-254 is device-free Lane B work parked behind `Needs: Q-297`, itself `Gate: owner`**; its premise is stale too (says one spec exists, there are **84**). With the owner since 2026-09-11. Do not unpark.
-- **PS-4 is UNCLASSIFIED by design; LB-94 the owner deferred 2026-09-09.** Do not classify either.
 
 ## Claimed paths
 

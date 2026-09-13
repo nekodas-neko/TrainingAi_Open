@@ -11301,13 +11301,18 @@ regex to a bullet start loses 7 legitimate inline mentions and silently un-parks
 work. So the choice is on the record as LA-103 with the population unmeasured and said to be
 unmeasured, rather than as a one-line parser change nobody could audit later. **A 36-line entry is the
 cost of not guessing.**
-## 2026-09-13 — `docs/implementation-backlog.md` → 21403 · `projectOverview.md` → 10784 (BF-152 shipped)
+## 2026-09-13 — `docs/implementation-backlog.md` → 21363 · `projectOverview.md` → 10795 (BF-152 shipped)
 
 BF-152's 54-line entry leaves the queue; **LA-102 arrives in its place, so the net is 28 lines rather
-than 54** (the figure is 21403 rather than 21327 because LA-103, BF-153, LB-101 and OR-108's own removal
-all landed on `main` while this PR waited through two E2E runs — LA-103 is the red-`main` note above,
-the rest are not ours at all). **`projectOverview.md` falls 6 net**, and the same caution applies: the
-BF-150 row was rewritten rather than struck, and LB-100's 🔴 row moved out to the archive. That is deliberate and is the thing to read here: BF-152 shipped with a residual it chose
+than 54** (the figure is 21363 rather than 21327 because LA-103, BF-153, LB-101, OR-108 and BF-153's
+second half all landed on `main` while this PR waited through three E2E runs — LA-103 is the
+red-`main` note above, the rest are not ours at all). **`projectOverview.md` moves too**, and the same
+caution applies: the BF-150 row was rewritten rather than struck, and LB-100's 🔴 row moved out to the
+archive.
+
+**Four base re-merges in ninety minutes is the number worth recording, not the baseline.** `main`
+moved every ~30 minutes while E2E took ~29, so a green was stale each time it arrived. The green was
+never the problem and neither was the queue — the two intervals simply do not fit. That is deliberate and is the thing to read here: BF-152 shipped with a residual it chose
 not to model — the thermic effect of food and non-step NEAT — and the ⓘ copy explaining that is Lane
 B's. An entry that closes by opening a smaller one nets out small, and **the alternative was a
 54-line drop with the finding living only in a journal paragraph**, which is how a finding gets
@@ -11354,3 +11359,25 @@ the image check runs, and the client is carrying a quality ladder to dodge it un
 open dependencies, the workaround and the constant that has to be deleted with it are all named. The
 entry leaves — to `known-issues-resolved.md` — when LA-36 and LB-101 are both in and the device pass
 has seen a picture on a row.
+
+## 2026-09-13 — `projectOverview.md` → 10801 (BF-153's device check, and the press that cannot be undone)
+
++11 for one Known-Issues entry. The vial sheet now names which vial each thing belongs to and says
+the Dose field is a calculator rather than a setting, but the check BF-153 asked for is on the S25 and
+has not happened. The length is the destructive case: pressing the footer button opens a **second**
+vial and restarts the weight-response window, and BF-136 established that a wrong date can only be
+corrected in place — `listSupplementVials` orders by `openedOn DESC` and the sheet reads `vials[0]`,
+so a corrective vial dated earlier sorts below the wrong one and the card keeps using it.
+
+A row reading "clearer copy shipped" would not tell the next session that the check owed is a
+deliberate press of a button whose effect is hard to reverse. It leaves for
+`known-issues-resolved.md` when that press has been made on the device and the screen was clear
+about it beforehand.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21391 (BF-153 shipped, 40 lines back)
+
+The ratchet reclaims what a completed entry frees, which is the half that makes it a ratchet rather
+than a ceiling. BF-153 was 38 lines and mostly evidence — the save body showing `doseMg` absent, and
+the two dates reading 13/09/2026 and 10 Sept on one screen — because the screen looks correct and the
+defect is only visible from the code. That evidence is why the entry was right in every particular,
+which is not the recent norm; it now lives in the journal entry rather than the queue.

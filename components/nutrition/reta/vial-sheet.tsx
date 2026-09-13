@@ -122,8 +122,31 @@ export function VialSheet({ open, onOpenChange, supplementId, supplementName, de
             </p>
           )}
 
-          <section className="space-y-3">
-            <h3 className="text-sm font-semibold">This vial</h3>
+          {/* BF-153. FIRST, and named. It used to sit five lines below the create-form's date
+              input, and the two read as one thing: on the owner's screen the input said 13/09/2026
+              and this said 10 Sept at the same moment, both correct, with nothing saying they
+              belong to different vials. He asked *"Can you explain how this works?"* looking at it.
+
+              BF-136's separation is unchanged and must stay — the form's date defaults to today
+              because it creates a NEW vial, and prefilling it from this one would hand the next
+              vial this one's date. What changes is that the screen now says which is which. */}
+          {current && (
+            <section className="space-y-2">
+              <h3 className="text-sm font-semibold">The vial you&apos;re using</h3>
+              <VialOpenedNote
+                supplementId={supplementId}
+                vialId={current.id}
+                openedOn={current.openedOn}
+                today={today}
+              />
+            </section>
+          )}
+
+          <section className={current ? "space-y-3 border-t border-border pt-5" : "space-y-3"}>
+            {/* Named for what the footer button does, not for what is on screen. `This vial` read
+                as the vial in use, so its fields read as that vial's settings — which is how a
+                dose typed into the calculator below looked like something being saved. */}
+            <h3 className="text-sm font-semibold">{current ? 'Open a new vial' : 'Your vial'}</h3>
             <div className="grid grid-cols-2 gap-3">
               <NumField id="vial-strength" label="Peptide" unit="mg" value={strengthMg} onChange={setStrengthMg} />
               <NumField id="vial-water" label="Bac water" unit="mL" value={waterMl} onChange={setWaterMl} />
@@ -152,8 +175,23 @@ export function VialSheet({ open, onOpenChange, supplementId, supplementName, de
           </section>
 
           <section className="space-y-3 border-t border-border pt-5">
-            <h3 className="text-sm font-semibold">Dose</h3>
-            <NumField id="dose-mg" label="Dose" unit="mg" value={doseMg} onChange={setDoseMg} />
+            {/* BF-153. `Dose` was the one word on this screen the owner was looking for, and the
+                field under it is a calculator input that `save()` never posts — the body is
+                `{ ...draft, openedOn }` and `doseMg` is not in `draft`. The real dose is the
+                definition's `defaultAmount`, edited in a different sheet under a different word.
+                So the heading says what the field is for and the note says where the dose lives.
+
+                Deliberately NOT wired to write the definition. That would reverse BF-112's
+                separation of the definition from the day's log, and let a units calculation
+                silently re-set every future prompt. */}
+            <h3 className="text-sm font-semibold">Work out the units</h3>
+            <NumField id="dose-mg" label="Try a dose" unit="mg" value={doseMg} onChange={setDoseMg} />
+            <p className="text-xs text-muted-foreground">
+              Not saved — this only works out what to draw.{' '}
+              {defaultDoseMg == null
+                ? 'You have no saved dose yet; set one in Manage supplements, under Amount.'
+                : `Your saved dose is ${round(defaultDoseMg)} mg, changed in Manage supplements, under Amount.`}
+            </p>
             {working && (
               <p className="text-sm tabular-nums text-muted-foreground">{working}</p>
             )}
@@ -174,25 +212,20 @@ export function VialSheet({ open, onOpenChange, supplementId, supplementName, de
             )}
           </section>
 
-          {/* ④. Under the calculator rather than on a screen of its own: the owner asked for the
-              four parts in one place, and this is the one that answers "is it working". */}
-          {/* BF-136. The window's start, said out loud and correctable in place. Saving a new vial
-              is not a way round a wrong date: `listSupplementVials` orders by `openedOn DESC` and
-              this sheet reads `vials[0]`, so an earlier-dated vial sorts BELOW the wrong one and
-              the card keeps using it. */}
-          {current && (
-            <VialOpenedNote
-              supplementId={supplementId}
-              vialId={current.id}
-              openedOn={current.openedOn}
-              today={today}
-            />
-          )}
-
           <WeightResponseCard userId={userId} sinceDate={current?.openedOn ?? null} />
         </div>
 
         <div className="flex-none px-4 pt-2 border-t">
+          {/* BF-153. The destructive case, said before the press rather than after. A new vial
+              restarts the weight-response window, and BF-136 established that a wrong date can only
+              be corrected in place — `listSupplementVials` orders by `openedOn DESC` and this sheet
+              reads `vials[0]`, so a corrective vial dated earlier sorts BELOW the wrong one. */}
+          {current && (
+            <p className="pb-2 text-xs text-muted-foreground">
+              This opens a second vial and restarts the response window. To fix the current one&apos;s
+              date, use Change above.
+            </p>
+          )}
           <Button
             className="w-full h-12 bg-brand hover:opacity-90 text-brand-foreground font-semibold"
             onClick={save}
