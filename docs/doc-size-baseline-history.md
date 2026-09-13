@@ -11324,3 +11324,25 @@ the image check runs, and the client is carrying a quality ladder to dodge it un
 open dependencies, the workaround and the constant that has to be deleted with it are all named. The
 entry leaves — to `known-issues-resolved.md` — when LA-36 and LB-101 are both in and the device pass
 has seen a picture on a row.
+
+## 2026-09-13 — `projectOverview.md` → 10801 (BF-153's device check, and the press that cannot be undone)
+
++11 for one Known-Issues entry. The vial sheet now names which vial each thing belongs to and says
+the Dose field is a calculator rather than a setting, but the check BF-153 asked for is on the S25 and
+has not happened. The length is the destructive case: pressing the footer button opens a **second**
+vial and restarts the weight-response window, and BF-136 established that a wrong date can only be
+corrected in place — `listSupplementVials` orders by `openedOn DESC` and the sheet reads `vials[0]`,
+so a corrective vial dated earlier sorts below the wrong one and the card keeps using it.
+
+A row reading "clearer copy shipped" would not tell the next session that the check owed is a
+deliberate press of a button whose effect is hard to reverse. It leaves for
+`known-issues-resolved.md` when that press has been made on the device and the screen was clear
+about it beforehand.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21391 (BF-153 shipped, 40 lines back)
+
+The ratchet reclaims what a completed entry frees, which is the half that makes it a ratchet rather
+than a ceiling. BF-153 was 38 lines and mostly evidence — the save body showing `doseMg` absent, and
+the two dates reading 13/09/2026 and 10 Sept on one screen — because the screen looks correct and the
+defect is only visible from the code. That evidence is why the entry was right in every particular,
+which is not the recent norm; it now lives in the journal entry rather than the queue.

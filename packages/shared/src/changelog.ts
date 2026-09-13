@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.454.1",
+    date: "2026-09-13",
+    changes: [
+      "The vial sheet now says which vial each thing belongs to. The date you already saved sits at the top under \u201cThe vial you\u2019re using\u201d, and the form below it is headed \u201cOpen a new vial\u201d \u2014 the two dates on that screen were both correct and there was nothing saying they were different vials. The Dose field is now \u201cTry a dose\u201d under \u201cWork out the units\u201d, and says outright that it is not saved and where your real dose is changed. And the button that opens a second vial says so before you press it.",
+    ],
+  },
+  {
     version: "1.454.0",
     date: "2026-09-13",
     changes: [
