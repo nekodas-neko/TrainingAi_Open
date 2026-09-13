@@ -11532,3 +11532,13 @@ session tuning a constant down instead of fixing the sequencing.
 PS-35b gained a scope rule rather than an answer: no check that is only reproducible in a browser
 goes in front of the owner. That is `CLAUDE.md`'s Canonical Runtime policy with its checklist
 consequence spelled out.
+
+## 2026-09-13 — `docs/implementation-backlog.md` (BF-155, BF-156, and BF-154's answer)
+
+Ninety-three lines across three edits. BF-155 carries a seven-row production table because the
+reported symptom ("my amrap week") and the real scope (every session since 6 September) differ, and
+the entry has to show that rather than assert it. BF-156 is short. BF-157 was added to the same PR: the
+bodyweight ready screen's countdown is gated on the warm-up weight ladder, so a `workingWeight` of 0
+removes both. BF-154 gains the owner's answer on
+the macro anchor plus the consequence he has not seen yet — protein is held constant while the base
+drops.
