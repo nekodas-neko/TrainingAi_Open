@@ -11505,3 +11505,21 @@ addends of the formula BF-152 retired beside the budget the new one produced, so
 breaks it into terms summing to 2,078. Most of the lines are the two consequences that are not
 arithmetic — the 2,278 it prints as "resting burn" is the inflated estimator BF-152 escaped, and the
 macro grams stayed on the stored goal while the budget moved.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21342 (BF-154 shipped)
+
+BF-154's 36-line entry leaves the queue the same day it was filed, which is the shape worth noting:
+it was opened against BF-152, shipped that morning, from the owner's screenshot of the result. The
+entry was right on every claim, including the one it made to stop itself being refiled — that the
+1,294 base is correct and only the expectation behind it was built on an uncorrected body-fat
+figure. Re-derived rather than taken on trust: `cunninghamBmr` is `ffm * 21.6 + 370`, so the
+DEXA-corrected 28.7 % of 70.2 kg gives FFM 50.05 and `1452.2 − 157 = 1294.1`, while the scale's raw
+25.5 % gives FFM 52.30 and 1342.7 — which is exactly the 1,342 BF-152 quoted and the owner read as
+">1350". Both figures are right; they are answers to different questions.
+
+## 2026-09-13 — `projectOverview.md` → 10829 (BF-154's Known-Issues row)
+
++34 for a row that is mostly the part NOT fixed. The arithmetic half is two sentences; the rest is
+the macro-gram anchor, which moved from ~295 to ~365 kcal out and was deliberately left alone because
+changing it changes what the owner is told to eat. A row that recorded only the fix would read as
+closed, and the next session would find the gap and refile it.

@@ -1829,6 +1829,40 @@ bodyweight set on the S25 at a rep count other than 5 or 6 — a Hanging Leg Rai
 previous-session value is the one that exercises the new payload field. Verified on the route
 (`?tab=all` and the single-session tab) and by unit and DB tests; not seen on a phone.
 
+### [nutrition] ⚠️ The budget's explanation adds up now; the macro grams still answer to a different anchor (BF-154, 2026-09-13, v1.455.1) · needs: owner
+
+Filed from the owner's screenshot hours after BF-152 deployed — *"There is so many numbers here. I
+thought the base would be above 1350?"* The sentence under the macro row read **"Today's budget is
+1,294 — 2,278 resting burn, −200 for your goal, +0 moved"**: it named the new budget and broke it into
+the addends of the formula BF-152 retired, so the terms summed to 2,078, contradicting the number in
+front of them by 784. Worse, the 2,278 it called *resting burn* is `maintenance − avgActive`, the
+inflated estimator BF-152 escaped — printed ten lines above the zone bar's 1,294 *resting rate*, two
+figures 984 apart both named resting.
+
+**Fixed and driven through the real page**, both branches, numbers parsed out of the rendered
+sentence: no movement reads *"1,815 — your resting rate, nothing moved yet"*, with movement
+*"2,529 — 1,815 resting rate, +714 moved"*. The e2e spec was run against the defect first and
+reproduced it on the fixture (`2,369` against a named `1,815`), which is what makes it evidence
+rather than a passing test.
+
+**What is still owed, and it is the owner's:** the macro gram targets key off the stored 1,660 goal
+while the budget now follows the resting rate, so the printed gap moved from ~295 to ~365 and does
+not close. Whether the grams should follow the anchor is a change to what he is told to eat, not a
+bug in the card that prints the difference — so it was deliberately not made here.
+`components/nutrition/macro-budget-gap.ts` carries the open question where the next reader meets it.
+
+**Also not device-verified.** JS-only, so it reaches the phone on the next Railway deploy with no
+APK, but nothing has read the sentence at 412 dp. The check is one look at Nutrition: the terms
+beside the budget must add up to it, and no figure labelled *resting* may appear twice with
+different values.
+
+**The guard that missed it is widened.** `base-label-reconciles.test.ts` reads `calorie-zone-bar.tsx`
+alone and bans one destructured value beside one word; this call site never asked `budgetProvenance`
+anything, so there was nothing to match on a file it was not watching.
+`bf154-budget-breakdown-addends.test.ts` now covers the second surface and the arithmetic on both
+paths.
+
+
 ### [nutrition] ⚠️ The budget starts at your resting rate; no S25 has seen it say so (BF-152, 2026-09-13, v1.454.1) · needs: device
 
 **Amended 2026-09-12 (LB-100):** BF-150 anchored the budget in `budgetProvenance` and left

@@ -421,50 +421,6 @@ below threshold and left in place for next time.
 
 
 
-### [nutrition] BF-154 — the budget's own explanation prints three numbers that do not add up to it
-
-- **Lane:** A — `components/nutrition/energy-card.tsx:195-201` is the print site, but the value it
-  needs is `budgetProvenance`'s (`packages/shared/src/nutrition/calorie-balance.ts`) and
-  `components/nutrition/macro-budget-gap.ts`'s docstring states the retired formula as fact.
-- **Added:** 2026-09-13 (BugFix intake), from the owner's screenshot of the Nutrition tab the evening
-  BF-152 deployed: *"There is so many numbers here. I thought the base would be above 1350?"*
-- **On screen, verbatim: *"Today's budget is 1,294 — 2,278 resting burn, −200 for your goal, +0
-  moved."*** `2,278 − 200 + 0 = 2,078`. The sentence names **1,294** and then breaks it into terms
-  summing to **2,078**, a 784 kcal contradiction inside one sentence.
-- **The cause is a breakdown of the retired expression printed beside the new number.** BF-152 made
-  the budget `restingRate + earned`. The card still renders `restingBaseKcal`, `targetNetKcal` and
-  `activeKcal` — the addends of `restingBase + goalDelta + earned` — against a `goal` that no longer
-  comes from them. **This is precisely the defect BF-99 exists for, and BF-150's own journal entry
-  names it** — *"printing base − goal there would name two numbers that are not addends of what is on
-  screen — BF-99's defect wearing the opposite hat."* The guard BF-150 narrowed bans destructuring
-  `base` from `budgetProvenance`; it does not reach a call site that never asks `budgetProvenance`
-  anything and reads the balance fields directly.
-- **Worse than an arithmetic slip: the 2,278 is the number BF-152 was escaping.** On the calibrated
-  path `restingBaseKcal` is `maintenance − avgActive`, carrying the estimator inflation BF-137 is
-  about. So the card prints **2,278 labelled "resting burn"** ten lines above **1,294 labelled
-  "resting rate"** — two figures 984 kcal apart, both named resting, one of them the value the app
-  has stopped using.
-- **A second consequence, and it is not cosmetic.** The macro grams still key off the stored 1,660
-  goal while the budget is now 1,294, so the printed gap has gone from ~295 to **365** and no longer
-  closes. BF-150's journal recorded that the grams and the budget *"already share a denominator"*
-  (150p/141c/55f = 1,659 against a stored 1,660); BF-152 separated them and nothing re-derived the
-  grams. Whether the grams should follow the resting rate or stay on the stored goal is a decision —
-  `macro-budget-gap.ts` says outright that choosing the anchor is not its business — but they cannot
-  stay silently 365 apart while a paragraph explains the gap using a formula that is no longer run.
-- **Fix shape:** print the breakdown FROM `budgetProvenance` — it already returns `{ base, earned,
-  total, anchoredToRestingRate }`, so the sentence can name the two addends it actually used and say
-  *resting rate* for the base on the anchored path. Extend the source guard to the fields, not only
-  the destructure: what made this reachable is that a call site can print `restingBaseKcal` beside a
-  budget without touching `budgetProvenance` at all.
-- **Not a defect, and the entry should stop it being refiled as one: the base is correct at 1,294.**
-  The owner expected ">1350" from the 1,342 quoted in BF-152, which was computed from the scale's raw
-  25.5% body fat. The app uses the DEXA-corrected figure (BF-2) — ~28.7%, so FFM 50.1 kg rather than
-  52.3 — and `cunninghamBmr(50.1) − 157` is 1,294. The measurement, the residual and the correction
-  are all behaving; only the quoted expectation was built on the uncorrected input.
-- **Verification:** on device, with and without movement recorded, the budget and the terms beside it
-  must add up, and no number labelled *resting* may appear twice with different values.
-  `base-label-reconciles.test.ts` is the existing guard on that label and did not catch this.
-
 ### [nutrition] LA-102 — the budget starts at the resting rate and says nothing about what it leaves out
 - **Lane:** B — surface only: `components/nutrition/calorie-zone-bar.tsx`, and the ⓘ copy on
   `components/nutrition/energy-card.tsx` / `components/nutrition/calorie-balance-bar.tsx`.
