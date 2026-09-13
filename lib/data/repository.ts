@@ -460,6 +460,10 @@ export interface BodyBatteryDailyRow {
 export interface LastRealOneRm {
   estimated1rm: number
   target80: number | null
+  /** BF-151: the reps actually performed on the log this 1RM came from. For a bodyweight exercise
+   *  the rep max IS this number, and the card had been reconstructing it by inverting the estimate
+   *  — lossily, and impossibly for the 5/6 collision where both store the same figure. */
+  avgReps: number | null
 }
 
 export interface MeasuredRmrInput {

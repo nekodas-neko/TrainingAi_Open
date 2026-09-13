@@ -11241,3 +11241,9 @@ informational. TN-28 moved the opposite way: the stored target is now what every
 the card that writes it on one tap matters more, not less. That asymmetry is the lesson worth its
 lines — an entry's correctness and its consequence age separately, and only the second was checked
 here by re-reading `main`.
+
+## 2026-09-13 — `docs/implementation-backlog.md` + `projectOverview.md` (BF-151 shipped)
+
+BF-151's entry leaves the queue with the bodyweight rep max reading its stored reps.
+`projectOverview.md` gains a Known-Issues row for the device check that is still owed: both figures
+render only under `isBodyweight`, so only a bodyweight set on the phone exercises them.
