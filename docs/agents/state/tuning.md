@@ -496,6 +496,81 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
   and the observed-max anchor (wrong about what 168 means). Two numbers were corrected in place besides.
   **The findings that survived every round were measured, not modelled** — 0 of 44, Zone 1 at 60% of
   the range, four resolvers, +19 bpm in one session. **Model output is a hypothesis; state it as one.**
+- **✅ THE STRESS STORAGE DEFECT IS FIXED (TN-22 → shipped `7c428a7f`, 2026-08-31) AND THE SIGN IS
+  NOT (TN-33, 2026-09-10).** The rollup wrote the buckets while `/api/body-battery` wrote the three
+  scalars off a different HR baseline — two producers, two answers. Verified: **10 of 10 days match
+  since 2026-09-01, 8 of 8 disagree before it.** `check-stress-scalars-one-writer.js` holds it.
+  **⛔ But TN-22's *"recomputing flips the sign to correct"* was an EIGHT-DAY artefact**: pre-fix
+  −0.395, post-fix **+0.427**, pooled 18 days **+0.072**. Q-507 is unexplained, and *no signal* is a
+  harder problem than a backwards sign. **Third mechanism proposed for Q-507, third to fail, all
+  three fitted on fewer than ten days.**
+- **⛔⛔ THE STRESS METRIC CANNOT BE VALIDATED TODAY AND MORE DAYS WILL NOT HELP.** Readiness shares
+  its overnight autonomic input with the stress baseline, so it is partly circular; the independent
+  target has **no variance** — `perceived_recovery` reads **3 on all 17 days**, and
+  `perceived_recovery_touched` is **0 across 29 check-ins**, so every value is the default.
+  `mental_drain`/`physical_tiredness` are NULL on all 29. **Check a candidate target for variance
+  BEFORE correlating against it** — a constant returns NaN, which is easy to misread as a null result.
+- **⚠ A queue entry can be filed the day AFTER its fix ships.** TN-22 was filed 2026-09-01 against a
+  defect corrected on 2026-08-31, and sat open for ten days. **Check `git log` for the entry's own
+  file paths before re-measuring a filed defect** — the queue lags `main` as well as the database.
+- **⚑ THE STRESS CHART (TN-3b) IS UNPARKED AND IS THE CRITICAL PATH TO Q-507 (2026-09-10).** It sat
+  behind Q-507's sign since 2026-08-24. **That parking is right for a SCORE and wrong for a CHART**:
+  the owner asked to see raw levels against a clock so he can match them to his own day, and raw data
+  with no interpretation makes no claim that can be wrong. Since TN-33 established there is **no
+  independent target with variance**, the owner's recall is the only ground truth available — so the
+  chart is not a nice-to-have, it is the instrument. **TN-16 stays parked; the distinction is verdict
+  vs instrument.**
+- **⚠ The "daytime" stress series is 57% NIGHT and night is systematically positive** (+0.266 against
+  the day's −0.405; 98 recovery buckets to 16 high). Replicated on **478 buckets over 18 days**,
+  matching TN-21's original 230-bucket read almost exactly. **So the daily scalar is dominated by
+  sleep — a mislabelling defect independent of any correlation.** ⚠ It does **not** follow that a
+  waking-only aggregate would carry signal: the waking-restricted variant flips just as hard
+  (−0.444 → +0.526).
+- **⚠ Coverage is 26.6 buckets/day — 13.3 of 24 hours** (range 23–32), with real holes: 2026-09-08
+  jumps 06:45 → 13:15. **Any stress chart must render gaps as gaps**; a joined line invents stress
+  that was never measured.
+- **✅ THE STRESS SERIES IS REAL SIGNAL; ITS DAILY SUMMARY IS NOT (TN-33 §8, 2026-09-10).** With no
+  external target available, the test that worked was **internal structure**: lag-1 autocorrelation
+  over 331 truly-adjacent 30-min pairs is **+0.637**, against a null shuffled *within each day's night
+  and day blocks* that maxes at **+0.454** over 2000 permutations, and the residual after removing
+  each day's night-mean and day-mean is still **+0.372**. **p < 0.0005.** The series contains episodes
+  lasting hours. **⚠ That proves there is something to look at, NOT that it is stress** — a persistent
+  artefact autocorrelates too.
+- **⚑ When there is no target to validate against, test the signal against ITSELF.** Autocorrelation
+  versus a permutation null needs no ground truth and took one query. **And shuffle within the
+  structure you already know about** — the naive within-day shuffle gave max +0.181 and would have
+  overstated the result, because the night/day split alone carries a lot of it.
+- **⛔⛔ THE STRESS-DELOAD OVERRIDE FIRES ON 83% OF DAYS (TN-34).** `ai-dynamic.ts:219` gates a deload
+  recommendation on `stressHighMinutes >= 120`: **15 of 18 days recomputed, 7 of 10 on stored values
+  since the fix.** A flag firing four days in five carries no information, and its input is the number
+  measured to carry no signal. **⛔ Do not raise the threshold** — the same file warns eleven lines
+  above about exactly that mistake on `TEMP_ALERT_THRESHOLD_C`, calling it the fourth in this pillar.
+  **This is the fifth.** Unwire it instead; the condition already falls through when derived stress is
+  null.
+- **✅ THE WHOLE STRESS PLAN IS OWNER-APPROVED (2026-09-10) — TN-34, TN-3b, TN-35, in that order.**
+  The goal in the owner's words is **attribution**, not display: *"a usable value to determine what
+  events stress me."* A chart answers *when*; *what* needs the series joined to the day's events.
+- **⚑ HALF THE ATTRIBUTION IS FREE: `day-timeline/route.ts:15` already emits typed, timestamped
+  `wakeup | sleep | workout | meal | walk | bedtime` events.** Overlaying the 30-min series on that
+  attributes stress to training, food, walks and sleep with no new input. **⛔ But the `tag` lane in
+  that same union is DEAD — `oura_tags` holds 0 rows** and was fed by the retired Oura Cloud. It looks
+  like an existing marker mechanism and is not one.
+- **❌ Nothing can mark a MOMENT, which is what the goal needs.** `day_checkins.journal` is whole-day,
+  untimestamped, and used on **2 of 83** check-ins. So TN-35's second half is a timestamped marker —
+  **and that marker IS TN-33's level-2 test**, since `perceived_recovery` is a constant and readiness
+  is circular. **The feature and the experiment are the same build.** ⛔ No "X stresses you" verdict
+  until many marked instances exist; that is TN-16's shape and stays parked.
+- **⚑⚑ BF-137 FOUND THE CAUSE TN-27/TN-29 MISSED: the maintenance estimator is fitting a GLP-1
+  (retatrutide) weight drop and calling it metabolic rate.** `maintenance = intake − Δweight × 7700`
+  assumes weight change reflects energy balance; under a GLP-1 it does not. **This session diagnosed
+  the WINDOW and the missing CROSS-CHECK — both real — and never questioned whether the input was
+  confounded.** BugFix filed it the next day and cross-referenced TN-29; the reciprocal reference is
+  now on TN-29. **Before calibrating anything against body weight, ask what else is moving it.**
+- **⚠ The nutrition batch's urgency dropped on 2026-09-12 and the entries did not say so.** PR #1128
+  anchored the daily budget to the owner's **stored goal** rather than to the estimate, so TN-27/TN-29
+  are no longer load-bearing — the estimate is informational now. **TN-28 went the other way**: the
+  stored target is now what everything follows, so that card's one-tap write matters MORE. **Re-read
+  an entry's consequence, not just its correctness, after main moves under it.**
 - **The threshold is usually right and the input usually wrong** — Q-506, Q-512, Q-514, now TN-6.
   Check the input's distribution before touching any constant.
 - **Do NOT lift the sleep scale toward its old mean** — sleep/readiness agreeing is load-bearing for
