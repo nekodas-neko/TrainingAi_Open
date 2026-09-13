@@ -13,6 +13,7 @@ inputs — a bug in an input belongs to that input's pillar.
 |---|---|
 | Composite & bands | `packages/shared/src/health/readiness-composite.ts`, `live-readiness.ts`, `recovery-band.ts`, `recovery-index.ts`, `score-band.ts` |
 | Stress | `lib/health/daytime-stress.ts`, `daytime-stress-thresholds.ts`, `stress-resilience.ts`, `chronic-stress-assembly.ts` |
+| Stress series — reading a DAY back | `GET /api/body-battery/stress-day?date=` (LB-102) over `oura_daytime_stress_buckets`, which the rollup writes and nothing published until now. **⚠ It is NOT the same series `/api/body-battery` computes live**: the rollup builds from `latest.rhrLowBpm` + `nightHrvMs`, the live route from `restingHr` + a 28-day HRV mean, and TN-3a stores only the rollup's because *"persisting both would put two numbers behind one metric"*. So this route serves EVERY day from storage, today included — one chart, one baseline. Today's stored series ends at the last rollup, which `throughMs` reports. Which source the chart reads for today is **LA-104**. |
 | Temperature | `packages/shared/src/health/temperature-baseline.ts`, `intraday-temp.ts` |
 | Illness & baselines | `packages/shared/src/health/illness-radar.ts`, `personal-baseline.ts`, `wear-confidence.ts` |
 | Source availability | `lib/health/score-availability.ts` — which readiness inputs a user has for a day, the confidence band that follows, and `trailingBaselineZ` for building a baseline from a generic series |

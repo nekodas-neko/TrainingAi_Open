@@ -11469,3 +11469,16 @@ existed, so `next-item.js --lane A` had never listed it and never would. Lane B 
 PARKED. That is the second time today a sentence has done a field's job: LA-103 was a sentence read
 AS a field, this was a field left as a sentence.
 
+## 2026-09-13 — `docs/implementation-backlog.md` → 21344 (LB-102 shipped)
+
+LB-102's entry leaves the queue and LA-104 arrives, so the net is **+3 lines** on a completed item.
+That is the shape to read, not the number: the entry asked for a read path and the code answered with
+a second question.
+
+`/api/body-battery`'s live stress series and the rollup's persisted buckets are built from **different
+baselines**, which TN-3a states outright and deliberately stores only one of. So "serve a past day
+from storage" turns out to imply "and decide which source today reads", because a chart mixing them
+puts two metrics on one axis — in exactly the across-days dimension the owner's approved pass test
+measures. LA-104 carries that decision to Lane B rather than letting it be settled by whichever fetch
+a component happens to call.
+
