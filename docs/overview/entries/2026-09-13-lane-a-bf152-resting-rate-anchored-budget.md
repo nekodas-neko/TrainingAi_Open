@@ -69,10 +69,26 @@ figures (1,342 from a real measurement) are asserted in tests against production
 not observed on his account; the seeded profile exercises the *predicted* branch, and the measured
 branch is covered by unit and service tests only.
 
-## One thing worth carrying
+## One thing worth carrying, and it cuts both ways
 
-**The E2E spec needed no edit, and that is the whole argument for LB-100's shape.** It asks
-`budgetProvenance` for the budget instead of transcribing it, so re-anchoring the budget twice in two
-days cost it nothing. The earlier version — `restingBase + targetNet + earned` — would have gone red
-against a correct card for the second time in two days, and the reflex reading of that is "stale
-fixture".
+**`one-calorie-budget.spec.ts` needed no edit, and that is the whole argument for LB-100's shape.** It
+asks `budgetProvenance` for the budget instead of transcribing it, so re-anchoring twice in two days
+cost it nothing.
+
+**Its sibling did need one, and CI is what found that.** `calorie-progress-bar.spec.ts` still carried
+the transcription — `restingBase + targetNet + earned` — so it went red on this PR's first E2E run:
+fill read **44.74%** against an expected **41.46%**, a correct bar measured against a stale formula.
+Fixed by asking the shared function, with the sibling's discriminator copied across so a reverted
+`budgetProvenance` cannot pass. Reverting that one line reproduces CI's failure locally — both tests,
+same assertion — which is what says the fix is the fix rather than a number that now agrees.
+
+**LB-100 did the right thing to one file and the sibling-surface sweep was not done.** The repo has a
+standing rule for exactly that and it did not fire, because nothing connects the two specs by name. Two
+copies of a formula is two places to re-anchor.
+
+**And the job that caught it is advisory.** That is the other half of BF-150's lesson: waiting for E2E
+is why this was found before it merged rather than after.
+
+**Not fixed here:** `preferences-survive-reinstall.spec.ts` failed in the same run with
+`net::ERR_ABORTED at page.goto('/')`. It is one of **LA-63's nine**, already recorded there as failing
+in the full run and flaky when run alone, and nothing this diff touches.

@@ -2016,7 +2016,11 @@ number the owner eats to. The `dialog "Morning Check-in"` in the failure snapsho
 
 Fixed in #1132 (LB-100): the deviation, and with it `remainingKcal`, the zone band and its label, all
 read `budgetProvenance`. The spec stopped transcribing the budget and asks the shared function instead
-— which is why BF-152 re-anchoring the budget a day later (#1137) needed no edit to it at all.
+— which is why BF-152 re-anchoring the budget a day later needed no edit to it at all.
+
+**One thing LB-100 did not do, recorded here because it cost a CI cycle:** the sibling-surface sweep.
+`calorie-progress-bar.spec.ts` kept the same transcription and went red on BF-152's first E2E run
+(fill 44.74% against an expected 41.46%). Fixed inside BF-152's own PR, discriminator copied across.
 
 **Nothing is owed.** Green on the full E2E run of #1133 and again on #1137's, and the arithmetic
 property is now asserted in a unit test (`lb100-one-budget.test.ts`) that runs on every commit rather
