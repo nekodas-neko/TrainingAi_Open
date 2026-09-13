@@ -11310,3 +11310,17 @@ together with nothing distinguishing them, and its `Dose (mg)` field is a calcul
 `save()` never posts. The entry is mostly the evidence — the save body, and the two dates reading
 13/09/2026 and 10 Sept on one screen — because the screen looks correct and the defect is only
 visible from the code.
+
+## 2026-09-13 — `projectOverview.md` → 10790 (OR-108's write half shipped, two reads still owed)
+
++20 for one Known-Issues entry, and the length is the finding rather than the fix. Photographing or
+scanning a food now writes its picture, and **the S25 will still show none**: `LA-36` leaves all three
+local-store read paths omitting `image_data_uri`, so the canonical runtime reads null from a column
+that is finally being filled. Beside it, `POST /api/nutrition/food-items` caps its body at 8 KB while
+permitting a 16 KB image — base64 costs a third more, so a detailed photo 413s the whole save before
+the image check runs, and the client is carrying a quality ladder to dodge it until LB-101 lands.
+
+**A row that says "shipped" and nothing else would be false three ways over**, which is why the two
+open dependencies, the workaround and the constant that has to be deleted with it are all named. The
+entry leaves — to `known-issues-resolved.md` — when LA-36 and LB-101 are both in and the device pass
+has seen a picture on a row.

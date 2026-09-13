@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.454.0",
+    date: "2026-09-13",
+    changes: [
+      "Photographing a food now saves the photo with it, and scanning a barcode saves the product picture the lookup already found. Neither used to \u2014 every food logged by camera or barcode was left without an image, on rows that are drawn around one. The photo is stored as a small thumbnail, and correcting a scan afterwards no longer throws it away.",
+    ],
+  },
+  {
     version: "1.453.0",
     date: "2026-09-13",
     changes: [

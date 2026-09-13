@@ -493,26 +493,26 @@ below threshold and left in place for next time.
   entries `backlog-verify-field.test.ts` covers.
 - **Reversal cost:** low, and the test above is the safety net — it reads the real file.
 
-### [nutrition] OR-108 — a scanned barcode saves no image, and neither does photographing the food
+### [nutrition] LB-101 — `/api/nutrition/food-items` refuses a body smaller than the image it permits
 
-- **Lane:** B — the capture paths in `components/nutrition/`; `food_items.image_data_uri` already
-  exists and is LA-36's subject.
-- **Added:** 2026-09-13 by Orchestrator, from the owner's nutrition device pass. **Branch:** unassigned.
-- **Owner, verbatim:** *"images are working fine on my end; but scanning barcodes still doesn't auto
-  save an image for the food; or does taking a photo of the food save the image either."*
-- **This was reported against LA-36 and is NOT LA-36.** That entry says
-  `food_items.image_data_uri` is *written and read by nothing* — a plumbing gap. This is the
-  opposite end: the column may well be read now, and **nothing is putting an image into it from
-  either capture route.** Two writers are missing, not one:
-  - **the barcode scan**, which has a product image available from the lookup and discards it;
-  - **the camera**, where the user has literally just taken a photograph of the food.
-- **Why it matters more than a missing thumbnail.** Every food the owner logs by camera or barcode
-  is imageless forever, and BF-73's bigger capture tiles and Q-406's shared food row are both drawn
-  around an image slot that the common paths never fill.
-- **Check LA-36 first** — if its read path shipped, this is purely the write half and small.
-- **On completion, the device check is:** scan a barcode, then photograph a food; both should leave
-  an image on the row. **Not a `Verify:` field — nothing is built yet.**
-- **Reversal cost:** low. A column that already exists gains writers.
+- **Lane:** A — `app/api/nutrition/food-items/route.ts`, one constant. **Added:** 2026-09-13 by
+  Implementation Lane B, measured while building OR-108. **Branch:** unassigned.
+- **The route caps its whole body at 8 KB and its image field at 16 KB.** `MAX_BODY_BYTES = 8 * 1024`
+  carries the comment *"One food item: a name, a brand and a dozen macro numbers"* — written before
+  BF-35 gave the route `imageDataUri`. Base64 costs a third more than the bytes it carries, so an image
+  at its own permitted cap is **~21.3 KB on the wire** and the request is refused with a **413 before
+  `rejectMealImage` ever runs**. The user does not lose the picture; they lose the food.
+- **Measured 2026-09-13** in Playwright, driving the real capture flow: a 128 px WebP of a detailed
+  600 × 400 source at q0.8 came back **6,612 bytes = 8,816 base64 characters** and the save 413'd; a
+  smooth photo-like source came back 1,410 and fits. It bites detailed photos, not every photo.
+- **The fix is one line:** derive the body cap from `FOOD_ITEM_IMAGE_MAX_BYTES` (`Math.ceil(x * 4 / 3)
+  + 4 * 1024`) rather than restating a number, so the two cannot drift again. Check the offline push
+  branch's own limit for the same mismatch too.
+- **A workaround is live and goes with this.** `capture-actions.tsx` carries `THUMB_WIRE_BUDGET =
+  7 * 1024` and re-encodes down a quality ladder to fit it; that constant, the `tooBigForTheBody`
+  guard beside it and two assertions in `components/nutrition/__tests__/food-image-write-paths.test.ts`
+  exist only because of this. Removing them is Lane B's follow-up — leave them until the cap moves.
+- **Reversal cost:** low — one constant, and a route that takes a larger body than it did.
 
 ### [nutrition] BF-152 — anchor the budget to the measured resting rate, not to a typed-in goal
 
