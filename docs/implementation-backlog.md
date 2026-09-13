@@ -3704,45 +3704,6 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
 - **Verify:** device — the ring card's real state is BLE, which the web build cannot reach at all, so
   a web-green paint says nothing about what the APK shows here.
 
-### [nutrition][app-shell] RV-35 — Nutrition never asks what day it is on resume, so it files breakfast against yesterday
-
-- **⚠ OWNER DIRECTED 2026-09-13: stop trying to verify this by hand.** Verbatim: *"This is a hard one
-  to check; lets just make the best guess and file it as a non issue till its reproduced — ideally
-  you can be confident in your fix."* The check needed the app left open across midnight, which is
-  not something to ask for repeatedly. **So this is no longer `Verify: device`** — it ships on the
-  strength of the code and a test, and returns only if the symptom is seen in the wild.
-  **What that buys is an obligation:** a fix landing without a device check needs a test that fails
-  before it and passes after, because nothing else will catch a regression here.
-
-
-- **Lane:** B — `app/nutrition/nutrition-content.tsx` only.
-- **Batch:** nutrition-tab-day-and-scroll
-- **Added:** 2026-09-03, Review sweep 41 —
-  [`write-up §2`](reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md)
-- **Measured, not inferred.** Five tabs loaded at 23:50 Brisbane under a fixed clock, clock advanced
-  30 minutes, `visibilitychange` dispatched. Dated requests before → after:
-  Home 4 → **2**, Health 3 → **3**, Nutrition **5 → 0**, Workout and More issue none either side.
-  Nutrition is the only tab that is day-scoped *and* fails to roll over.
-- **The part that is not cosmetic.** The header reads `Today` because
-  `formatDateLabel(selectedDate, todayStr)` prints it only when the two agree — and both are frozen at
-  the launch day, so there is no visible tell. `selectedDate` is also what a new log is written with
-  (`logDate` at `nutrition-content.tsx:716`, `selectedDateRef.current` on the delete path), so a
-  breakfast logged after midnight lands on the finished day and feeds its calorie budget and adherence.
-- **The existing guard is correct and unreachable.** `nutrition-content.tsx:311–326` already compares
-  `lastVisibleDayRef` against a fresh `todayInTz(tz)` and follows the day. Its deps are
-  `[tabEpoch, fetchData, tz]`, and the shell increments `tabEpoch` only when a tab is **re-shown** —
-  never on a resume-in-place. Switching tabs away and back does fix it, so this reads as intermittent.
-- **The fix is the hook that already exists.** `useLocalDay()` (`components/shell/local-day-provider.tsx`,
-  BF-86) re-evaluates on `visibilitychange` and is what `session-select-content.tsx` uses — the surface
-  that measured correct above. Add it to the dependency array; do not hand-roll a second listener, and
-  do not reach for an interval (BF-86's comment records why).
-- **Do not "fix" this by reloading on `visibilitychange`** — BF-80 rules that out; it costs the
-  instant-paint behaviour.
-- **How to test locally:** the clock recipe in §7 of the write-up — `page.clock.install` at 23:50
-  Brisbane, `fastForward`, dispatch `visibilitychange` — asserting a request dated the *new* day. The
-  mechanism is fully web-testable, so no `Gate:` is set.
-  breakfast; confirm the header follows the date and the log lands on the new day.
-
 ### [app-shell][nutrition] RV-36 — scroll restoration reaches 3 of 5 tabs; BF-100's entry says it reaches all of them
 
 - **Lane:** B — `app/nutrition/nutrition-content.tsx`, plus a correction to BF-100's entry above.

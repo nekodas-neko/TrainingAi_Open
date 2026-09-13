@@ -11301,7 +11301,7 @@ regex to a bullet start loses 7 legitimate inline mentions and silently un-parks
 work. So the choice is on the record as LA-103 with the population unmeasured and said to be
 unmeasured, rather than as a one-line parser change nobody could audit later. **A 36-line entry is the
 cost of not guessing.**
-## 2026-09-13 — `docs/implementation-backlog.md` → 21363 · `projectOverview.md` → 10795 (BF-152 shipped)
+## 2026-09-13 — `docs/implementation-backlog.md` → 21324 · `projectOverview.md` → 10795 (BF-152 shipped)
 
 BF-152's 54-line entry leaves the queue; **LA-102 arrives in its place, so the net is 28 lines rather
 than 54** (the figure is 21363 rather than 21327 because LA-103, BF-153, LB-101, OR-108 and BF-153's
@@ -11310,8 +11310,9 @@ red-`main` note above, the rest are not ours at all). **`projectOverview.md` mov
 caution applies: the BF-150 row was rewritten rather than struck, and LB-100's 🔴 row moved out to the
 archive.
 
-**Four base re-merges in ninety minutes is the number worth recording, not the baseline.** `main`
-moved every ~30 minutes while E2E took ~29, so a green was stale each time it arrived. The green was
+**Five base re-merges in two hours is the number worth recording, not the baseline.** `main`
+moved every ~20-30 minutes while E2E took ~29, so a green was stale each time it arrived. The fifth
+attempt was refused outright with a 405: by then the base was not merely stale but conflicting. The green was
 never the problem and neither was the queue — the two intervals simply do not fit. That is deliberate and is the thing to read here: BF-152 shipped with a residual it chose
 not to model — the thermic effect of food and non-step NEAT — and the ⓘ copy explaining that is Lane
 B's. An entry that closes by opening a smaller one nets out small, and **the alternative was a
@@ -11381,3 +11382,15 @@ than a ceiling. BF-153 was 38 lines and mostly evidence — the save body showin
 the two dates reading 13/09/2026 and 10 Sept on one screen — because the screen looks correct and the
 defect is only visible from the code. That evidence is why the entry was right in every particular,
 which is not the recent norm; it now lives in the journal entry rather than the queue.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21352 (RV-35 closed, 39 lines back)
+
+RV-35's fix was already in the tree — `nutrition-content.tsx:334` calls `useDayRolloverRefresh`,
+which is the hook the entry prescribed — so what the entry was really still owed was its own
+condition: the owner directed that it ship without a device check, and the entry converts that into
+a test that fails before the fix and passes after. That test now exists and is mutation-proven, so
+the entry leaves.
+
+**Re-verifying against `main` is what stopped this being wrong in either direction.** Read as stale,
+it deletes with the obligation unmet and nothing guarding the behaviour. Read as unbuilt, it
+re-implements a line that is already there. Both halves had to be checked.

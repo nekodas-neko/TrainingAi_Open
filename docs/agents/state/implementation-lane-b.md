@@ -11,10 +11,10 @@
 
 ## Now
 
-**BF-153 SHIPPED** (v1.454.1): the vial sheet names which vial each thing belongs to, and its `Dose`
-field says it is a calculator, not a setting. **OR-108 SHIPPED** (v1.454.0): both capture paths write
-the picture now — three callers that rebuild a payload field by field had dropped it, while the one
-passing the object through never had the bug. `check:rules` **74/74**.
+**RV-35 CLOSED** — its fix was already in the tree (`nutrition-content.tsx:334`); what it still owed
+was its own condition, a test failing before and passing after, now mutation-proven. **BF-153** (v1.454.1)
+named which vial the sheet means. **OR-108** (v1.454.0): both capture paths write the picture — three
+callers rebuilding a payload field by field dropped it. `check:rules` **74/74**.
 
 **SEVEN running entries were wrong about something load-bearing** — BF-139's px, BF-141's gate,
 BF-142's **406**, BF-146's cause, BF-145's fix twice, BF-147's (the badge is **25 px**; the four action
@@ -30,8 +30,8 @@ minutes well spent. **Measure before you fix what the entry blames.**
 1. **Re-run `next-item.js --lane B`. When READY reads 0, READ THE `KEEP` SECTION** — three of the last
    five items came from there. `Keep:` means "only the stated residue is owed", and the residue is
    sometimes the whole job (BF-147: 300 lines of UI; Q-112e: a blocker cleared three days earlier). Ask
-   of each whether it is a device check or work. **Batch `nutrition-tab-day-and-scroll` (RV-35) was the
-   only READY B item left after BF-153**, and READY moves without warning — re-run rather than trust it.
+   of each whether it is a device check or work. **READY was 0 after RV-35**, and it moves without
+   warning — re-run rather than trust this line.
 2. **`LB-101` is Lane A's and OR-108's workaround dies with it** — `THUMB_WIRE_BUDGET`, the
    `tooBigForTheBody` guard and two assertions in `food-image-write-paths.test.ts` exist only because that route caps its body below the image it permits.
 
@@ -67,9 +67,9 @@ under other filenames. Closing a PR needs the owner.
 ## The lessons that cost real time
 
 1. **An entry's numbers, gate and CAUSE are prose until something checks them** — seven in a row were
-   wrong (see Now). The tell was always a test: BF-146's spec passed with the fix reverted, BF-145's
-   screenshot showed no change, OR-108's first honest end-to-end run **413'd** — which is how the
-   route's body cap was found. **Write the failing check before the fix.**
+   wrong. The tell was always a test: BF-146's spec passed with the fix reverted, OR-108's first honest
+   run **413'd**. **RV-35 shows re-verifying cuts BOTH ways** — its fix was already in the tree, but
+   deleting it as stale would have dropped the test it owed. **Write the failing check before the fix.**
 2. **A mutation that does NOT fail is a finding.** BF-141's `stopPropagation` guards a lossy round-trip (61.0 kg → 61.25) the spec cannot show — the seeded workout round-trips exactly. The test was renamed to what it proves.
 3. **This file already held the fix for a run's longest detour** (`scrollIntoViewIfNeeded`), rediscovered from scratch. **Read the Gotchas first.**
 4. **A card reporting "no data" is not evidence that no data reached it** — LB-99's cause was one
