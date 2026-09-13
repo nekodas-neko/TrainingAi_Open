@@ -11458,3 +11458,14 @@ counting changed the answer from a one-line regex to a different rule entirely.
 
 Nothing else moved: the eighteen classify identically before and after, asserted by id.
 
+## 2026-09-13 — `docs/implementation-backlog.md` → 21341 (LB-103 shipped)
+
+LB-103's entry leaves the queue with the push/pull/legs grouping, and Q-305's `Keep:` grows by three
+lines because its blocker is gone and the next reader needs to know *which* half is now unblocked.
+
+**The entry existed because a dependency stated in prose is a dependency nobody is holding.** Q-305
+said the push:pull half belonged in `packages/shared`, which is Lane A's — and no Lane A entry
+existed, so `next-item.js --lane A` had never listed it and never would. Lane B found it scanning
+PARKED. That is the second time today a sentence has done a field's job: LA-103 was a sentence read
+AS a field, this was a field left as a sentence.
+
