@@ -11497,3 +11497,11 @@ The pattern across today: **LA-102, LA-104 and LA-105 were all filed by the entr
 possible.** A fix that unblocks a surface is not finished when the engine half lands; it is finished
 when somebody is holding the other half.
 
+
+## 2026-09-13 — `docs/implementation-backlog.md` (BF-154 filed at the top)
+
+Thirty-six lines for BF-154, filed hours after BF-152 shipped: the card's explanation prints the
+addends of the formula BF-152 retired beside the budget the new one produced, so it names 1,294 and
+breaks it into terms summing to 2,078. Most of the lines are the two consequences that are not
+arithmetic — the 2,278 it prints as "resting burn" is the inflated estimator BF-152 escaped, and the
+macro grams stayed on the stored goal while the budget moved.
