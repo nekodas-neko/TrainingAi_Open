@@ -11301,6 +11301,46 @@ regex to a bullet start loses 7 legitimate inline mentions and silently un-parks
 work. So the choice is on the record as LA-103 with the population unmeasured and said to be
 unmeasured, rather than as a one-line parser change nobody could audit later. **A 36-line entry is the
 cost of not guessing.**
+## 2026-09-13 — `docs/implementation-backlog.md` → 21332 · `projectOverview.md` → 10795 (BF-152 shipped)
+
+BF-152's 54-line entry leaves the queue; **LA-102 arrives in its place, so the net is 28 lines rather
+than 54** (the figure is 21363 rather than 21327 because LA-103, BF-153, LB-101, OR-108 and BF-153's
+second half all landed on `main` while this PR waited through three E2E runs — LA-103 is the
+red-`main` note above, the rest are not ours at all). **`projectOverview.md` moves too**, and the same
+caution applies: the BF-150 row was rewritten rather than struck, and LB-100's 🔴 row moved out to the
+archive.
+
+**Six base re-merges in two and a half hours is the number worth recording, not the baseline.** `main`
+moved every ~20-30 minutes while E2E took ~29, so a green was stale each time it arrived. Two merge
+attempts were refused outright with a 405. **And the conflicts are always the same three bookkeeping
+files** — this one, `docs/implementation-backlog.md` and `packages/shared/src/changelog.ts` — never
+code: measured on the sixth round, where `main` had brought two components and an e2e spec and
+nothing in them touched anything here. So the serialisation is imposed entirely by the ledgers every
+agent must write to, not by the work colliding. The green was
+never the problem and neither was the queue — the two intervals simply do not fit. That is deliberate and is the thing to read here: BF-152 shipped with a residual it chose
+not to model — the thermic effect of food and non-step NEAT — and the ⓘ copy explaining that is Lane
+B's. An entry that closes by opening a smaller one nets out small, and **the alternative was a
+54-line drop with the finding living only in a journal paragraph**, which is how a finding gets
+dropped.
+
+`projectOverview.md` falls by only 6 net across three edits, which also understates the churn. The
+BF-150 Known-Issues row was rewritten rather than struck — its owner question is now moot (the budget
+reads no typed number) but the device check is owed, so it stays, per the rule that an entry only
+moves when nothing is owed. What *did* move out is **LB-100's 🔴 row**: `one-calorie-budget.spec.ts` is
+green, the cause it refused to guess turned out to be the less likely of the two it named, and the
+archive records that rather than a tick.
+
+## 2026-09-13 — `docs/agents/state/implementation-lane-a.md` 116 → 100 (rewritten, BF-152)
+
+Ratchets DOWN 16 lines, and the reason is not concision. **The file was eleven days stale in the two
+fields a successor would act on first:** Next ID read `LA-55` against a real `LA-102`, and migrations
+read `255` against a directory head of `275`. A baton that is half last week's is worse than none,
+because it gets trusted — so this is a full rewrite, not an append, per the rule in CLAUDE.md.
+
+What came out was narrative about PRs that merged eleven days ago. What went in is state a successor
+cannot derive: the nine-entry all-exclusions READY list, #1098's owner gate and its two recurring
+conflicts, the four owner decisions (one of which BF-152 just dissolved rather than answered), the
+three owed device checks, and the four testing traps that have each cost a session.
 
 
 ## 2026-09-13 — `docs/implementation-backlog.md` (BF-153 filed)
@@ -11382,3 +11422,14 @@ the failure the standing rules already name, now with a cost attached. The secon
 the same shape as LB-98 a few hours earlier: data that persists with no read path is invisible to
 every surface and to CI both. Naming the pattern in both entries is what makes the third one
 recognisable.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21368 (recomputed after a parallel merge)
+
+BF-152 (#1138) and TN-3b's chart landed within minutes of each other and both moved this number —
+main to 21332 as its entry left the queue, this branch to 21396 as LB-102 arrived. **The conflict
+resolves to neither**: the correct value is `wc -l` + 1 of the merged file, which is 21368. Splicing
+either side would have set a baseline for a document that does not exist.
+
+Same for `package.json` and `changelog.ts` in the same merge — rebuilt from `git show origin/main:…`
+and re-bumped on top, so BF-152's v1.454.3 entry survives under this branch's v1.455.0 rather than
+being spliced away.

@@ -71,12 +71,12 @@ export interface CalorieBalanceInput {
   /** Intentional daily offset for the goal — negative to lose, positive to gain. */
   goalDeltaKcal: number
   /**
-   * BF-150. The calorie target the user STORED (`nutrition_targets.calories`, else
-   * `users.calorie_goal`), null when they have never set one. It anchors the budget — see
-   * `budgetProvenance` — and through it the deviation, the zone and `remainingKcal`, so every
-   * surface counts against one number (LB-100).
+   * BF-152. The user's RESTING RATE — the clinically measured RMR re-scaled onto today's fat-free
+   * mass when there is one, the predicted BMR otherwise (`energy-balance-service`'s `bmr`). It
+   * anchors the budget — see `budgetProvenance` — and through it the deviation, the zone and
+   * `remainingKcal`, so every surface counts against one number (LB-100).
    */
-  goalKcal?: number | null
+  restingRateKcal?: number | null
 }
 
 export interface CalorieBalanceResult {
@@ -92,9 +92,9 @@ export interface CalorieBalanceResult {
   remainingKcal: number
   /** Weekly weight change implied by sustaining today's net. */
   projectedWeeklyKg: number
-  /** BF-150. The stored calorie target, carried through so every budget consumer anchors to the
-   *  same number without re-reading it. Null when the user has never set one. */
-  goalKcal: number | null
+  /** BF-152. The resting rate the budget is anchored to, carried through so every budget consumer
+   *  anchors to the same number without re-deriving it. Null when the caller supplied none. */
+  restingRateKcal: number | null
   zone: BalanceZone
   zoneLabel: string
   zoneColor: string
@@ -118,11 +118,15 @@ export function computeCalorieBalance(input: CalorieBalanceInput): CalorieBalanc
   // against `restingBase + goalDelta + earned` — 469 kcal apart in that fixture, ~336 for the owner.
   // Q-415/Q-417 fixed this same class once; the fix is one budget, so the deviation is measured
   // against the budget rather than re-derived from a second expression.
+  //
+  // BF-152 moved the anchor again, to the measured resting rate. That changes the number the budget
+  // starts from and nothing about the rule above: the deviation still reads `budgetProvenance`
+  // rather than re-deriving a second expression, which is what keeps a re-anchoring cheap.
   const budgetKcal = budgetProvenance({
     restingBaseKcal: input.restingBaseKcal,
     activeKcal: input.activeKcal,
     targetNetKcal,
-    goalKcal: input.goalKcal,
+    restingRateKcal: input.restingRateKcal,
   }).total
   const deviationKcal = Math.round(input.intakeKcal) - budgetKcal
   const { zone, label, color } = balanceZone(deviationKcal)
@@ -131,7 +135,7 @@ export function computeCalorieBalance(input: CalorieBalanceInput): CalorieBalanc
     netKcal,
     targetNetKcal,
     deviationKcal,
-    goalKcal: input.goalKcal ?? null,
+    restingRateKcal: input.restingRateKcal ?? null,
     // `-0` is a legal result of negating 0 and leaks into equality checks; normalise it away.
     remainingKcal: deviationKcal === 0 ? 0 : -deviationKcal,
     projectedWeeklyKg: Math.round((netKcal * 7 / KCAL_PER_KG_LOCAL) * 100) / 100,
@@ -258,10 +262,10 @@ export function dailyKcalToGoal(dailyKcal: number, goalType: 'daily' | 'weekly' 
  * activity."* So `base` is the budget on a zero-movement day and `earned` is today's measured
  * movement. Their sum is the budget the zone bar judges you against.
  *
- * **BF-150 changed what `base` is.** It is the user's STORED calorie target when they have set one,
- * and only falls back to `restingBaseKcal + targetNetKcal` when they have not — see the comment in
- * the function body for why. `anchoredToGoal` says which branch ran, so a caller printing the
- * provenance line names the right thing instead of calling a goal a resting rate.
+ * **BF-152 changed what `base` is.** It is the user's RESTING RATE when one is known, and only falls
+ * back to `restingBaseKcal + targetNetKcal` when none is — see the comment in the function body for
+ * why. `anchoredToRestingRate` says which branch ran, so a caller printing the provenance line names
+ * the right thing instead of calling a resting rate a goal, or the reverse.
  *
  *
  * **Lives here, beside `computeCalorieBalance` whose output it reads.** It spent a day in
@@ -275,28 +279,38 @@ export function dailyKcalToGoal(dailyKcal: number, goalType: 'daily' | 'weekly' 
  * Q-401: two budgets on one screen, 274 kcal apart, both labelled "left".
  */
 export function budgetProvenance(
-  { restingBaseKcal, activeKcal, targetNetKcal, goalKcal }:
-  { restingBaseKcal: number; activeKcal: number; targetNetKcal: number; goalKcal?: number | null },
-): { base: number; earned: number; total: number; anchoredToGoal: boolean } {
-  // BF-150, owner decision 2026-09-12. When the user has SET a calorie target, that number is the
-  // zero-movement budget — full stop. It used to be `restingBaseKcal + targetNetKcal`, where the
-  // resting base comes from the calibrated maintenance estimator; that estimator is fitting a
-  // retatrutide-driven weight drop and reading it as metabolism (BF-137), so it climbed 2,150 →
-  // 2,196 in a single day and reached 1.44 × the owner's Mifflin BMR in a field labelled *resting*.
-  // The stored goal took no part in the number he ate to, and `resolveMaintenance` offers no way to
-  // opt out, so every day that passed re-anchored him higher.
+  { restingBaseKcal, activeKcal, targetNetKcal, restingRateKcal }:
+  { restingBaseKcal: number; activeKcal: number; targetNetKcal: number; restingRateKcal?: number | null },
+): { base: number; earned: number; total: number; anchoredToRestingRate: boolean } {
+  // BF-152, from the owner's own spec: *"Rmr+body metabolism as base — Calories burned per day based
+  // on HR/exercise … It should start at 1350 - and as I walk/workout - move throughout the day to
+  // 1600."* The zero-movement budget is his RESTING RATE, and the earned half grows it from there.
   //
-  // What this deliberately gives up: the budget no longer tracks a changing metabolism on its own.
-  // That is the point while the estimate is ~600 kcal wrong, and it is revisitable once BF-137's
-  // exclusion window makes the estimate honest again.
+  // BF-150 put the STORED calorie target here instead, which was the right escape from a resting
+  // base the maintenance estimator had inflated (it climbed 2,150 → 2,196 in a day and reached
+  // 1.44 × his Mifflin BMR in a field labelled *resting* — BF-137). It bought that at the cost of a
+  // budget anchored to a number a human typed once: a typed figure cannot track a body that is
+  // changing, and his is — 72.1 kg at the RMR test on 2026-08-27, 70.2 kg on 2026-09-13.
   //
-  // The goal DELTA is not applied on top. The user set this figure *as* the target they eat to;
-  // subtracting the deficit from it again would re-introduce the double-deduction the ⓘ copy
-  // already has to explain away.
-  const anchoredToGoal = typeof goalKcal === 'number' && Number.isFinite(goalKcal) && goalKcal > 0
-  const base = anchoredToGoal
-    ? Math.round(goalKcal as number)
+  // `restingRateKcal` is the measured RMR re-scaled onto today's fat-free mass when one exists, the
+  // predicted BMR otherwise — `personalRmr` then `bodyComposition`/Mifflin, resolved once as
+  // `energy-balance-service`'s `bmr`. That tracks the changing body without touching the estimator
+  // this moved away from, which is the whole point: on the calibrated path `restingBaseKcal` is
+  // `maintenance − avgActive`, so it carries the inflation BF-150 was escaping.
+  //
+  // The goal DELTA is not applied on top. `base` is what the body costs at rest, not a target; the
+  // deficit lives in the target the user is judged against, and subtracting it here too would
+  // re-introduce the double-deduction the ⓘ copy already has to explain away.
+  //
+  // What this still does not model: the thermic effect of food (~10% of intake) and non-step NEAT.
+  // `bmr × 1.2` would be 1,611 on the owner's figures — his own "1600" — but a multiplier asserts
+  // that overhead happened, while the step credit OBSERVES it, and modelling intake-linked TEF as an
+  // earned credit makes the budget grow as he eats. The residual is named in the copy instead.
+  const anchoredToRestingRate =
+    typeof restingRateKcal === 'number' && Number.isFinite(restingRateKcal) && restingRateKcal > 0
+  const base = anchoredToRestingRate
+    ? Math.round(restingRateKcal as number)
     : Math.round(restingBaseKcal + targetNetKcal)
   const earned = Math.round(activeKcal)
-  return { base, earned, total: base + earned, anchoredToGoal }
+  return { base, earned, total: base + earned, anchoredToRestingRate }
 }
