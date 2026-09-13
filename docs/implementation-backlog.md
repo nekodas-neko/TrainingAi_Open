@@ -552,59 +552,34 @@ below threshold and left in place for next time.
 - **Verification:** on device, open a session in each state and confirm the card says what Start
   Workout will do without Accept. A `session_swap_recommended` is available on his account now.
 
-### [nutrition] BF-154 — the budget's own explanation prints three numbers that do not add up to it
+### [nutrition] BF-154 — the macro grams still key off the stored goal, and the owner has said they should not
 
-- **Lane:** A — `components/nutrition/energy-card.tsx:195-201` is the print site, but the value it
-  needs is `budgetProvenance`'s (`packages/shared/src/nutrition/calorie-balance.ts`) and
-  `components/nutrition/macro-budget-gap.ts`'s docstring states the retired formula as fact.
-- **Added:** 2026-09-13 (BugFix intake), from the owner's screenshot of the Nutrition tab the evening
-  BF-152 deployed: *"There is so many numbers here. I thought the base would be above 1350?"*
-- **On screen, verbatim: *"Today's budget is 1,294 — 2,278 resting burn, −200 for your goal, +0
-  moved."*** `2,278 − 200 + 0 = 2,078`. The sentence names **1,294** and then breaks it into terms
-  summing to **2,078**, a 784 kcal contradiction inside one sentence.
-- **The cause is a breakdown of the retired expression printed beside the new number.** BF-152 made
-  the budget `restingRate + earned`. The card still renders `restingBaseKcal`, `targetNetKcal` and
-  `activeKcal` — the addends of `restingBase + goalDelta + earned` — against a `goal` that no longer
-  comes from them. **This is precisely the defect BF-99 exists for, and BF-150's own journal entry
-  names it** — *"printing base − goal there would name two numbers that are not addends of what is on
-  screen — BF-99's defect wearing the opposite hat."* The guard BF-150 narrowed bans destructuring
-  `base` from `budgetProvenance`; it does not reach a call site that never asks `budgetProvenance`
-  anything and reads the balance fields directly.
-- **Worse than an arithmetic slip: the 2,278 is the number BF-152 was escaping.** On the calibrated
-  path `restingBaseKcal` is `maintenance − avgActive`, carrying the estimator inflation BF-137 is
-  about. So the card prints **2,278 labelled "resting burn"** ten lines above **1,294 labelled
-  "resting rate"** — two figures 984 kcal apart, both named resting, one of them the value the app
-  has stopped using.
-- **A second consequence, and it is not cosmetic.** The macro grams still key off the stored 1,660
-  goal while the budget is now 1,294, so the printed gap has gone from ~295 to **365** and no longer
-  closes. BF-150's journal recorded that the grams and the budget *"already share a denominator"*
-  (150p/141c/55f = 1,659 against a stored 1,660); BF-152 separated them and nothing re-derived the
-  grams. Whether the grams should follow the resting rate or stay on the stored goal is a decision —
-  `macro-budget-gap.ts` says outright that choosing the anchor is not its business — but they cannot
-  stay silently 365 apart while a paragraph explains the gap using a formula that is no longer run.
-- **✅ THE OWNER ANSWERED THE MACRO QUESTION, 2026-09-13: the grams follow the budget.** His words —
-  *"Can we have it dynamically sized for my calories? I.e before excercise its 1 value and after its
-  another if calories increase?"* So the gram targets take the **budget** as their base, not the
-  stored 1,660, and the printed gap goes to zero by construction rather than being explained.
-  `scaleMacrosForEarnedKcal` already grows them with `earned` and keeps protein fixed while splitting
+- **Lane:** A — `lib/health/energy-balance-service.ts` and `packages/shared/src/nutrition/`, where
+  the base that `scaleMacrosForEarnedKcal` scales FROM is chosen.
+- **Keep:** the macro re-anchor, and only that. **The arithmetic half shipped 2026-09-13 (#1155,
+  v1.455.1)** — the breakdown sentence now names `budgetProvenance`'s own `base` and `earned`, says
+  *resting rate* on the anchored path, and no longer prints two different figures both labelled
+  *resting*. Guarded by `components/nutrition/__tests__/bf154-budget-breakdown-addends.test.ts` and
+  `e2e/bf154-budget-breakdown-reconciles.spec.ts`, the latter proven against the defect before it was
+  run against the fix.
+- **✅ THE OWNER ANSWERED, 2026-09-13: the grams follow the budget.** His words — *"Can we have it
+  dynamically sized for my calories? I.e before excercise its 1 value and after its another if
+  calories increase?"* So the gram targets take the **budget** as their base, not the stored 1,660,
+  and the printed gap goes to zero by construction rather than being explained.
+  `scaleMacrosForEarnedKcal` already grows them with `earned` and holds protein fixed while splitting
   the rest on the stored carb/fat ratio — that half is built and needs no change. What changes is the
-  base it scales FROM. **Flag when building:** protein is held constant by that function, so
-  re-basing from 1,660 to ~1,294 drops carbs and fat while 150 g protein stands, which is the right
-  shape for a cut but is a visible change to his targets — worth confirming on the first day it
-  renders rather than after a week of it.
-- **Fix shape:** print the breakdown FROM `budgetProvenance` — it already returns `{ base, earned,
-  total, anchoredToRestingRate }`, so the sentence can name the two addends it actually used and say
-  *resting rate* for the base on the anchored path. Extend the source guard to the fields, not only
-  the destructure: what made this reachable is that a call site can print `restingBaseKcal` beside a
-  budget without touching `budgetProvenance` at all.
-- **Not a defect, and the entry should stop it being refiled as one: the base is correct at 1,294.**
-  The owner expected ">1350" from the 1,342 quoted in BF-152, which was computed from the scale's raw
-  25.5% body fat. The app uses the DEXA-corrected figure (BF-2) — ~28.7%, so FFM 50.1 kg rather than
-  52.3 — and `cunninghamBmr(50.1) − 157` is 1,294. The measurement, the residual and the correction
-  are all behaving; only the quoted expectation was built on the uncorrected input.
-- **Verification:** on device, with and without movement recorded, the budget and the terms beside it
-  must add up, and no number labelled *resting* may appear twice with different values.
-  `base-label-reconciles.test.ts` is the existing guard on that label and did not catch this.
+  base it scales FROM.
+- **⚠ Flag when building:** protein is held constant by that function, so re-basing from 1,660 to
+  ~1,294 drops carbs and fat while 150 g protein stands. That is the right shape for a cut and a
+  visible change to his targets — worth confirming on the first day it renders rather than after a
+  week of it.
+- **Two things #1155 left behind become dead when this lands, and go in the same change:** the
+  explanatory paragraph in `components/nutrition/energy-card.tsx` exists only because the two numbers
+  disagree, and `components/nutrition/macro-budget-gap.ts` exists only to measure that disagreement.
+  A gap that is zero by construction needs neither. Do not leave a card explaining a difference that
+  no longer exists.
+- **Added:** 2026-09-13 · re-queued from the shipped half, so the owner's answer is not lost with the
+  entry that carried it.
 
 ### [nutrition] LA-102 — the budget starts at the resting rate and says nothing about what it leaves out
 - **Lane:** B — surface only: `components/nutrition/calorie-zone-bar.tsx`, and the ⓘ copy on

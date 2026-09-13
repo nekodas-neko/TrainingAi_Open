@@ -5,10 +5,19 @@ import { macroKcal, type MacroGrams } from './macro-energy'
  *
  * **The two are anchored to different baselines, and the gap NEVER closes.** The grams come from
  * stored `nutrition_targets` — a whole-day goal that already assumes a normal day's activity —
- * scaled up by what has been earned. The budget is `restingBase + goalDelta + earned`, and the
- * resting base has that habitual activity taken *out* of it so movement can be added back once as
- * it is recorded. Both addends carry the same `earned`, so it cancels: what is left is
- * `storedGoal − (restingBase + goalDelta)`, which is constant across the day.
+ * scaled up by what has been earned. The budget is `budgetProvenance().base + earned`, where the
+ * base excludes that habitual activity so movement can be added back once as it is recorded. Both
+ * carry the same `earned`, so it cancels: what is left is `storedGoal − base`, constant across the
+ * day.
+ *
+ * **⚠ BF-154: `base` is not one formula, and this comment used to state the retired one as fact.**
+ * It read *"the budget is `restingBase + goalDelta + earned`"*, which is the UNANCHORED branch only.
+ * Since BF-152 the base is the user's RESTING RATE wherever one is known, so on the owner's account
+ * the constant moved from `storedGoal − (restingBase + goalDelta)` to `storedGoal − restingRate` —
+ * a jump from ~295 to ~365 that nothing re-derived. Read `budgetProvenance`'s
+ * `anchoredToRestingRate` for which branch produced the number in front of you rather than
+ * reconstructing it from the balance fields; a call site doing that arithmetic itself is exactly
+ * what BF-154 was filed for.
  *
  * BF-134's own entry reads it as a gap that "converges once the earned kcal arrive". It does not,
  * and `__tests__/macro-budget-gap.test.ts` pins that: earning it moves *both* numbers. That is the
@@ -24,7 +33,11 @@ import { macroKcal, type MacroGrams } from './macro-energy'
  *
  * Deciding which anchor is *right* is not this module's business — it reaches
  * `lib/health/energy-balance-service.ts` and TN-29 protects the stored 1,660. This only says out
- * loud that they are two denominators.
+ * loud that they are two denominators. **The owner has now decided which one wins (BF-154,
+ * 2026-09-13): the grams follow the budget** — *"Can we have it dynamically sized for my calories?"*
+ * That is not built yet. When it is, the gap goes to zero by construction and **this module should
+ * be deleted rather than kept**: it exists only to measure a disagreement that will no longer
+ * exist, and so does the paragraph on `energy-card.tsx` that reports it.
  */
 
 /** Below this the two numbers read as the same one, and a paragraph explaining them is noise. */

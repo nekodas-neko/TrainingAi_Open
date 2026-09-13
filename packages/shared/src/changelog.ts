@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.455.1",
+    date: "2026-09-13",
+    changes: [
+      "The line under your macro targets that explains the day's calorie budget now adds up. It was breaking the budget into a resting figure, your goal adjustment and what you had moved \u2014 the three parts of the old calculation \u2014 while the budget beside them came from the new one, so it named 1,294 and then listed parts totalling 2,078. It also meant two different numbers on the same screen were both called your resting figure. It now names the parts the budget was actually built from, and on a day before you have moved it simply says the budget is your resting rate rather than printing the same number twice.",
+    ],
+  },
+  {
     version: "1.455.0",
     date: "2026-09-13",
     changes: [
