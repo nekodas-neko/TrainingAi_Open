@@ -11303,6 +11303,14 @@ unmeasured, rather than as a one-line parser change nobody could audit later. **
 cost of not guessing.**
 
 
+## 2026-09-13 — `docs/implementation-backlog.md` (BF-153 filed)
+
+Thirty-eight lines for BF-153: the vial sheet shows a create-form and the current vial's record
+together with nothing distinguishing them, and its `Dose (mg)` field is a calculator input that
+`save()` never posts. The entry is mostly the evidence — the save body, and the two dates reading
+13/09/2026 and 10 Sept on one screen — because the screen looks correct and the defect is only
+visible from the code.
+
 ## 2026-09-13 — `projectOverview.md` → 10790 (OR-108's write half shipped, two reads still owed)
 
 +20 for one Known-Issues entry, and the length is the finding rather than the fix. Photographing or
