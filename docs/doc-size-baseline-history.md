@@ -11144,3 +11144,9 @@ LB-100's entry leaves the queue with the one-budget fix. `projectOverview.md` gr
 shrinks: BF-150's Known-Issues row stays (its goal question is still owed) and gains an amendment
 recording the regression it caused and why it reached `main` — a red advisory check that nothing
 blocked on.
+
+## 2026-09-13 — `docs/implementation-backlog.md` + `projectOverview.md` (BF-151 shipped)
+
+BF-151's entry leaves the queue with the bodyweight rep max reading its stored reps.
+`projectOverview.md` gains a Known-Issues row for the device check that is still owed: both figures
+render only under `isBodyweight`, so only a bodyweight set on the phone exercises them.

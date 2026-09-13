@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.453.0",
+    date: "2026-09-13",
+    changes: [
+      "The rep max on a bodyweight exercise summary is now the reps you actually did, read from the set as logged, instead of a number worked back out of the strength estimate. Working it backwards loses information \u2014 and at 5 versus 6 reps it cannot be done at all, because both store the identical estimate, so a 6-rep set could only ever be shown as 5. The previous session's figure comes from that session's own logged set too, rather than from whichever set happened to be most recent.",
+    ],
+  },
+  {
     version: "1.452.1",
     date: "2026-09-12",
     changes: [

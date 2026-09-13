@@ -237,6 +237,33 @@ export function repMaxFromOneRm(oneRm: number, addedKg = 0): number {
  * the standing argument for eventually displaying the logged reps rather than inverting an index
  * the app already has `avg_reps` for.
  */
+/**
+ * The rep max to SHOW for a bodyweight exercise: the reps actually performed when they are known,
+ * and only otherwise the number recovered by inverting a stored 1RM estimate.
+ *
+ * BF-151. The card used to invert unconditionally. That is lossy, and for 5 vs 6 reps it is
+ * impossible — the rep-factor gain from the extra rep is exactly cancelled by `amrapScaleFactor`'s
+ * 1.0 → 0.97 step, so both store the identical 1RM and `repMaxFromAmrapOneRm` can only return the
+ * lower of the tie. `exercise_logs.avg_reps` holds the real figure.
+ *
+ * It lives here rather than in the card for the reason Q-401 records: both vitest projects run in a
+ * `node` environment and cannot parse JSX, so arithmetic inside a `.tsx` cannot be asserted at all —
+ * which is how two budgets ended up on one screen 274 kcal apart, both labelled "left".
+ *
+ * The inverse is kept, not deleted: a seed-derived basis and a historical series both reach here
+ * with no reps to hand.
+ */
+export function bodyweightRepMax(
+  { storedReps, oneRm, addedKg = 0 }:
+  { storedReps?: number | null; oneRm?: number | null; addedKg?: number },
+): number | null {
+  if (typeof storedReps === 'number' && Number.isFinite(storedReps) && storedReps > 0) {
+    return Math.round(storedReps)
+  }
+  if (typeof oneRm !== 'number' || !Number.isFinite(oneRm) || oneRm <= 0) return null
+  return repMaxFromAmrapOneRm(oneRm, addedKg)
+}
+
 export function repMaxFromAmrapOneRm(oneRm: number, addedKg = 0): number {
   if (oneRm <= 0) return 0
   const ref = Math.max(1, BW_REF + addedKg)
@@ -443,11 +470,36 @@ export function resolveWorkingBasis(input: {
    *  for an exercise that has a PR from an older program but no recent real log. */
   allTimePr1rm?: number | null
 }): number | null {
+  return resolveWorkingBasisWithSource(input).kg
+}
+
+/**
+ * The same resolution, plus WHICH input won.
+ *
+ * BF-151. A caller that wants the reps behind the basis needs to know the basis came from a logged
+ * set at all: a `seed` is a number the user typed in the builder and a `pr` is an older program's
+ * best, and neither has reps to report. Reporting the last log's reps beside a seed-derived 1RM
+ * would pair two numbers from different places and read as one measurement.
+ *
+ * `resolveWorkingBasis` delegates here so the usable-value predicate exists once — the whole point
+ * of that function being the single definition for every weight path.
+ */
+export function resolveWorkingBasisWithSource(input: {
+  lastNonDeload1rm?: number | null
+  seedEstimate?: number | null
+  allTimePr1rm?: number | null
+}): { kg: number | null; source: 'last_real' | 'seed' | 'pr' | null } {
   const usable = (v: number | null | undefined): v is number =>
     typeof v === 'number' && Number.isFinite(v) && v > 0
 
-  if (usable(input.lastNonDeload1rm)) return input.lastNonDeload1rm
+  if (usable(input.lastNonDeload1rm)) return { kg: input.lastNonDeload1rm, source: 'last_real' }
 
-  const fallbacks = [input.seedEstimate, input.allTimePr1rm].filter(usable)
-  return fallbacks.length ? Math.max(...fallbacks) : null
+  const seed = usable(input.seedEstimate) ? input.seedEstimate : null
+  const pr = usable(input.allTimePr1rm) ? input.allTimePr1rm : null
+  if (seed == null && pr == null) return { kg: null, source: null }
+
+  // Ties go to `seed`, matching `Math.max`'s result either way: the kg is identical, and naming the
+  // user's own number is the more honest provenance when both say the same thing.
+  const kg = Math.max(seed ?? -Infinity, pr ?? -Infinity)
+  return { kg, source: seed != null && seed >= (pr ?? -Infinity) ? 'seed' : 'pr' }
 }

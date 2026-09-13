@@ -10,6 +10,11 @@ export interface ExerciseSummaryData {
   lapTimes: number[];
   restSec: number;
   prevEst1rm: number | null;
+  /** BF-151: reps behind `prevEst1rm`, when that number came from a logged set. For a bodyweight
+   *  exercise this IS the previous rep max, so the card reads it instead of inverting the estimate
+   *  — an inverse that cannot separate 5 reps from 6, which store the identical 1RM. Null when the
+   *  basis was a seed or an all-time PR, which have no reps behind them. */
+  prevRepMaxReps?: number | null;
   // All-time PR 1RM the "New Personal Record!" badge must beat (E1-7) — distinct
   // from prevEst1rm (last session). null when the exercise has no PR yet.
   allTimePr1rm: number | null;
