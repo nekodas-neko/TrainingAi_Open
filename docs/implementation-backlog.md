@@ -453,6 +453,32 @@ below threshold and left in place for next time.
   entries `backlog-verify-field.test.ts` covers.
 - **Reversal cost:** low, and the test above is the safety net — it reads the real file.
 
+### [nutrition] LA-102 — the budget starts at the resting rate and says nothing about what it leaves out
+- **Lane:** B — surface only: `components/nutrition/calorie-zone-bar.tsx`, and the ⓘ copy on
+  `components/nutrition/energy-card.tsx` / `components/nutrition/calorie-balance-bar.tsx`.
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-13 · found shipping BF-152.
+- **Reference:** [`the BF-152 journal entry`](overview/entries/2026-09-13-lane-a-bf152-resting-rate-anchored-budget.md).
+- **The engine half is done and this is the half it deliberately left.** BF-152 made the
+  zero-movement budget the user's resting rate, and the line under the bar now reads
+  `1,815 resting rate — no movement recorded yet today` (verified on Home and the Nutrition tab,
+  2026-09-13). What it does not say is what a resting rate excludes.
+- **Two things are genuinely missing from that number**, and the owner named the first himself:
+  *"1350 doesnt count some basic metabolic needs".* He is right — RMR excludes the **thermic effect
+  of food** (~10% of intake, ~140 kcal at his volume) and **non-step NEAT**: standing, fidgeting,
+  housework.
+- **BF-152 chose not to model either, and that decision is the thing to explain rather than
+  revisit.** `bmr × 1.2` is 1,611 on his figures — his own *"move to 1600"* — but a multiplier
+  **asserts** the overhead happened while the step credit **observes** it, and modelling
+  intake-linked TEF as an earned credit makes the budget grow as he eats, a feedback loop the card
+  then has to explain for a number inside food-logging error.
+- **So the ask is copy, not arithmetic:** the ⓘ panel says the base is resting burn only, that
+  eating and everyday fidgeting add some on top, and that movement is credited as it is measured.
+  One or two sentences. Do not add a multiplier to make the sentence unnecessary.
+- **Pass test:** the ⓘ copy names the thermic effect of food and non-step movement as excluded from
+  the base, and nothing on the screen implies the base is a full day's burn.
+- **Reversal cost:** none. It is copy.
+
 ### [nutrition] LB-101 — `/api/nutrition/food-items` refuses a body smaller than the image it permits
 
 - **Lane:** A — `app/api/nutrition/food-items/route.ts`, one constant. **Added:** 2026-09-13 by
@@ -473,60 +499,6 @@ below threshold and left in place for next time.
   guard beside it and two assertions in `components/nutrition/__tests__/food-image-write-paths.test.ts`
   exist only because of this. Removing them is Lane B's follow-up — leave them until the cap moves.
 - **Reversal cost:** low — one constant, and a route that takes a larger body than it did.
-
-### [nutrition] BF-152 — anchor the budget to the measured resting rate, not to a typed-in goal
-
-- **Lane:** A — `packages/shared/src/nutrition/calorie-balance.ts` (`budgetProvenance`),
-  `lib/health/energy-balance-service.ts`. Read
-  [`docs/overview/entries/2026-09-12-lane-a-bf150-goal-anchored-budget.md`](overview/entries/2026-09-12-lane-a-bf150-goal-anchored-budget.md)
-  first — this changes one line of what shipped there and keeps the rest.
-- **Added:** 2026-09-13 (BugFix intake), from the owner's own spec: *"Rmr+body metabolism as base —
-  Calories burned per day based on HR/exercise … It should start at 1350 - and as I walk/workout -
-  move throughout the day to 1600."*
-- **BF-150 made the budget anchor to a stored NUMBER; the owner wants it to anchor to a RULE.** That
-  is the whole change. `budgetProvenance` currently takes `goalKcal` — the figure in
-  `nutrition_targets.calories`, **1,660** for the owner — as the zero-movement base. A typed-in
-  number cannot track a body that is changing, and his is: 72.1 kg at the RMR test on 2026-08-27,
-  **70.2 kg** on 2026-09-13.
-- **The number he asked for is already computed, one scope away.** `energy-balance-service.ts` derives
-  `bmr` as `personalRmr(measured, todaysFfm)` — the clinical measurement with its Cunningham residual
-  re-scaled onto today's fat-free mass (BF-42). Measured 2026-09-13:
-
-  | | value |
-  |---|---|
-  | measured RMR (2026-08-27, 51.5 kg FFM) | 1,325 |
-  | Cunningham residual | −157 |
-  | FFM today (70.2 kg at 25.5% corrected) | 52.3 kg |
-  | **re-scaled RMR today** | **1,342** |
-
-  His *"start at 1350"* is his own measured resting rate to within 8 kcal, and it moves on its own as
-  he loses weight. `restingBaseKcal` is **not** the value to use — on the calibrated path it is
-  `maintenance − avgActive`, and that maintenance is the estimator BF-137 is about, currently ~600
-  kcal high.
-- **The earned half needs no work at all.** Steps have counted from the first one since BF-88, and
-  `computeActiveEnergy` already sums workouts + activities + steps. On the owner's yesterday (2,923
-  steps, one strength session) that is roughly 100 + ~200 kcal, which puts the day near 1,650 —
-  *"move throughout the day to 1600"*, reached by the mechanism that is already live.
-- **The owner named the real gap himself: *"1350 doesnt count some basic metabolic needs".*** He is
-  right. RMR excludes the thermic effect of food (~10% of intake, ~140 kcal at his volume) and
-  non-step NEAT — standing, fidgeting, housework. Note that `bmr × 1.2`, the classic sedentary
-  multiplier, is **1,611** on today's figures: his *"1600"* is RMR plus exactly the overhead he is
-  describing. **Recommended treatment: credit it through movement rather than through a multiplier**
-  — the multiplier asserts the overhead happened, the step credit observes it — and name the residual
-  in the ⓘ copy instead of modelling it. Modelling TEF as an earned credit makes the budget grow as
-  he eats, a feedback loop the card then has to explain, for a number inside food-logging error.
-  **This is the one line the owner can overrule**, and the entry is buildable either way.
-- **Three Tuning entries move with this, and only one of them the way it looks.** TN-27 and TN-29 were downgraded to *informational* when PR #1128 stopped the budget following the maintenance estimate — **BF-152 does not change that**, because the base becomes the measured resting rate and the estimator still takes no part. **TN-28 is the one that reverses**: its 2026-09-13 amendment reads *"the stored target … is now the thing everything else follows"*, which this entry undoes. Amend it rather than discovering it.
-- **What BF-150 keeps.** One budget expression read by all three surfaces; the goal delta still not
-  applied on top; `deviationKcal` still measured against the budget rather than re-derived. The
-  stored target stops being the base and goes back to being what it is — a target.
-- **Fallback order when there is no measurement:** re-scaled measured RMR → predicted BMR → the
-  existing `restingBaseKcal + targetNetKcal`. A user with no RMR test must not land on a worse number
-  than they have today.
-- **Verification:** the owner's own account across a day — the budget should read ~1,342 with no
-  movement and climb as steps and a session land, on Home's nutrition card, Home's energy-balance
-  card and the Nutrition tab, all showing the same figure. `one-calorie-budget.spec.ts` is the
-  existing guard that the three agree.
 
 ### [app-shell] BF-139 — three header chips no longer fit beside the date (fixed; the device look is what is left)
 
@@ -1845,7 +1817,7 @@ this card offers to overwrite with 2,045.
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · found while answering TN-27.
 - **Lane: B** — `components/nutrition/tdee-adaptation-card.tsx:118-124`.
 - **⚠ Amended 2026-09-13:** PR #1128 made the budget follow the owner's **stored goal**, so this card's one-tap write no longer redirects the whole day's eating — it changes the stored target, which is now the thing everything else follows. **That makes the write MORE consequential, not less**, so the missing confidence qualifier still matters.
-- **⚠ Amended again the same day, and it reverses the line above: BF-152 takes the stored target back OUT of the budget.** The owner's spec is *"Rmr+body metabolism as base"* — a rule, not a number — so the base becomes his re-scaled measured resting rate and the stored target goes back to being a target. **The escalation this entry recorded lasted one day.** Whether the one-tap write is consequential is now the question BF-152 settles, so read that entry before acting on this reasoning; the missing confidence qualifier stands on its own merits either way.
+- **⚠ Amended again the same day, and it reverses the line above: BF-152 took the stored target back OUT of the budget, and SHIPPED 2026-09-13.** The owner's spec is *"Rmr+body metabolism as base"* — a rule, not a number — so the base is his re-scaled measured resting rate and the stored target is a target again. **The escalation this entry recorded lasted one day.** So the one-tap write is back to changing a target rather than the whole day's eating; the missing confidence qualifier stands on its own merits either way. Read [`the journal entry`](overview/entries/2026-09-13-lane-a-bf152-resting-rate-anchored-budget.md) before acting on this reasoning — the BF-152 queue entry is gone, as a shipped entry should be.
 - **Sibling of TN-27** — TN-27 makes the number better; this makes its uncertainty visible. Fix either order.
 - **Reference:** [`review`](reviews/2026-09-09-maintenance-2245-is-too-high.md) §5.
 

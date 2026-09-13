@@ -2,12 +2,16 @@
  * LB-100 — every surface counts against ONE budget.
  *
  * BF-150 anchored `budgetProvenance` to the stored goal and left `computeCalorieBalance`'s deviation
- * on the old expression, so Home's donut counted against `goal + earned` while the Nutrition ring's
+ * on the old expression, so Home's donut counted against `anchor + earned` while the Nutrition ring's
  * "N kcal left" counted against `restingBase + goalDelta + earned`. `one-calorie-budget.spec.ts`
  * caught it on BF-150's own pre-merge run; E2E is advisory, so it merged red.
  *
  * The property is arithmetic and belongs here, where it runs on every commit rather than only when
  * a browser job is green. Q-415/Q-417 fixed this class once before.
+ *
+ * **The property is anchor-agnostic on purpose, which is why BF-152 changed the anchor without
+ * changing a line of the assertions** — only what the cases are called. Whatever the base comes from,
+ * the deviation reads it. That is the guarantee, and it outlives each choice of anchor.
  */
 import { describe, it, expect } from 'vitest'
 import { computeCalorieBalance, budgetProvenance } from '../calorie-balance'
@@ -17,20 +21,20 @@ const FIXTURE = { restingBaseKcal: 2069, activeKcal: 714, intakeKcal: 1200, goal
 
 describe('remainingKcal counts against the same budget budgetProvenance reports', () => {
   it.each([
-    { name: 'anchored to a stored goal', goalKcal: 1900 },
-    { name: 'anchored to a goal below resting burn', goalKcal: 1350 },
-    { name: 'no stored goal — the old expression still governs', goalKcal: null },
-  ])('$name', ({ goalKcal }) => {
-    const b = computeCalorieBalance({ ...FIXTURE, goalKcal })
-    const budget = budgetProvenance({ ...FIXTURE, targetNetKcal: b.targetNetKcal, goalKcal }).total
+    { name: 'anchored to a resting rate', restingRateKcal: 1900 },
+    { name: 'anchored to a resting rate well below the estimator', restingRateKcal: 1350 },
+    { name: 'no resting rate — the old expression still governs', restingRateKcal: null },
+  ])('$name', ({ restingRateKcal }) => {
+    const b = computeCalorieBalance({ ...FIXTURE, restingRateKcal })
+    const budget = budgetProvenance({ ...FIXTURE, targetNetKcal: b.targetNetKcal, restingRateKcal }).total
     expect(b.remainingKcal).toBe(budget - Math.round(FIXTURE.intakeKcal))
   })
 
-  // The regression in one line: with a goal 469 kcal below the old expression, the two must not
+  // The regression in one line: with an anchor 469 kcal below the old expression, the two must not
   // drift apart. Before the fix `remainingKcal` was 469 higher than the donut's budget allowed.
   it('does not leave the ring 469 kcal adrift of the donut', () => {
-    const anchored = computeCalorieBalance({ ...FIXTURE, goalKcal: 1900 })
-    const unanchored = computeCalorieBalance({ ...FIXTURE, goalKcal: null })
+    const anchored = computeCalorieBalance({ ...FIXTURE, restingRateKcal: 1900 })
+    const unanchored = computeCalorieBalance({ ...FIXTURE, restingRateKcal: null })
     expect(unanchored.remainingKcal - anchored.remainingKcal).toBe(469)
   })
 
@@ -41,15 +45,15 @@ describe('remainingKcal counts against the same budget budgetProvenance reports'
     // are ±150 on target and ±400 outside it, so the same day reads "over" against the budget the
     // donut shows and "on target" against the expression the ring used — a card calling a 386 kcal
     // overshoot fine is the Q-417 shape, and this is the case that separates them.
-    const day = computeCalorieBalance({ ...FIXTURE, intakeKcal: 3000, goalKcal: 1900 })
+    const day = computeCalorieBalance({ ...FIXTURE, intakeKcal: 3000, restingRateKcal: 1900 })
     expect(day.deviationKcal).toBe(3000 - (1900 + 714))
     expect(day.zone).toBe('over')
-    expect(computeCalorieBalance({ ...FIXTURE, intakeKcal: 3000, goalKcal: null }).zone).toBe('on_target')
+    expect(computeCalorieBalance({ ...FIXTURE, intakeKcal: 3000, restingRateKcal: null }).zone).toBe('on_target')
   })
 
   it('leaves expenditure and net alone — they measure burn, not budget', () => {
-    const a = computeCalorieBalance({ ...FIXTURE, goalKcal: 1900 })
-    const b = computeCalorieBalance({ ...FIXTURE, goalKcal: null })
+    const a = computeCalorieBalance({ ...FIXTURE, restingRateKcal: 1900 })
+    const b = computeCalorieBalance({ ...FIXTURE, restingRateKcal: null })
     expect(a.expenditureKcal).toBe(b.expenditureKcal)
     expect(a.netKcal).toBe(b.netKcal)
   })

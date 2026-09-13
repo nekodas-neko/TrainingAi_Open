@@ -17,16 +17,16 @@ import { movementSummary } from '@/components/nutrition/movement-breakdown'
  * switch where an object literal would defeat it silently.
  */
 export const CalorieZoneBar = memo(function CalorieZoneBar({
-  intakeKcal, restingBaseKcal, activeKcal, targetNetKcal, goalKcal,
+  intakeKcal, restingBaseKcal, activeKcal, targetNetKcal, restingRateKcal,
   workoutKcal, activityKcal, stepsKcal, compact,
 }: {
   intakeKcal: number
   restingBaseKcal: number
   activeKcal: number
   targetNetKcal: number
-  /** BF-150. The stored calorie target, which anchors the budget when it exists. Null/absent falls
+  /** BF-152. The user's resting rate, which anchors the budget when it is known. Null/absent falls
    *  back to the old resting-base-plus-goal-delta budget — see `budgetProvenance`. */
-  goalKcal?: number | null
+  restingRateKcal?: number | null
   /** The three addends of `activeKcal`, from the service's `activeBreakdown` (BF-87). Scalars, not
    *  the object — `memo` compares shallowly and an object literal at a call site defeats it. */
   workoutKcal: number
@@ -35,8 +35,8 @@ export const CalorieZoneBar = memo(function CalorieZoneBar({
   /** Home's card is dense — tighten the bar. */
   compact?: boolean
 }) {
-  const { base, earned, total, anchoredToGoal } =
-    budgetProvenance({ restingBaseKcal, activeKcal, targetNetKcal, goalKcal })
+  const { base, earned, total, anchoredToRestingRate } =
+    budgetProvenance({ restingBaseKcal, activeKcal, targetNetKcal, restingRateKcal })
   const parts = movementSummary({ workoutKcal, activityKcal, stepsKcal })
   // BF-99. On the UNANCHORED path `budgetProvenance().base` is `restingBaseKcal + targetNetKcal` —
   // the resting base with the GOAL DELTA already folded in — and this line called it "base". On a
@@ -45,11 +45,15 @@ export const CalorieZoneBar = memo(function CalorieZoneBar({
   // reconciled; the word did not. The two are separated here rather than in `budgetProvenance`,
   // which is shared and whose `base` is the right thing for a caller that wants one number.
   //
-  // BF-150. When the budget is ANCHORED to the stored goal the split does not exist: the goal is the
+  // BF-150, then BF-152. When the budget is ANCHORED the split does not exist: the anchor is the
   // whole zero-movement budget and no delta is applied to it. Printing "resting base − goal" there
   // would name two numbers that are no longer addends of what is on screen — the same class of
   // defect BF-99 was filed for, so the wording follows the arithmetic rather than the other way
   // round. `base` is used directly, so the line always sums to `total` on both paths.
+  //
+  // The anchor is now the resting rate, so the word is "resting rate" — which is also the answer to
+  // the question BF-99 came from (*"why is my base rate under the 1350 RMR value"*): on this path it
+  // IS that number, to within the re-scaling onto today's fat-free mass.
   const restingBase = Math.round(restingBaseKcal)
   const goalDelta = Math.round(targetNetKcal)
 
@@ -65,8 +69,8 @@ export const CalorieZoneBar = memo(function CalorieZoneBar({
           sentence explained cannot arise while any steps exist. What is left is the honest
           remaining case — a day with no movement recorded at all. */}
       <p className={`${compact ? 'mt-1' : 'mt-2'} text-[10px] leading-snug text-muted-foreground tabular-nums`}>
-        {anchoredToGoal
-          ? <>{base.toLocaleString()} your goal</>
+        {anchoredToRestingRate
+          ? <>{base.toLocaleString()} resting rate</>
           : <>
               {restingBase.toLocaleString()} base
               {/* Only when there IS one: on `maintain` the delta is 0, and printing "+ 0 for your
