@@ -11299,17 +11299,125 @@ regex to a bullet start loses 7 legitimate inline mentions and silently un-parks
 work. So the choice is on the record as LA-103 with the population unmeasured and said to be
 unmeasured, rather than as a one-line parser change nobody could audit later. **A 36-line entry is the
 cost of not guessing.**
-## 2026-09-11 — `docs/implementation-backlog.md` → 21366 (RV-42 shipped)
+## 2026-09-13 — `docs/implementation-backlog.md` → 21332 · `projectOverview.md` → 10795 (BF-152 shipped)
+
+BF-152's 54-line entry leaves the queue; **LA-102 arrives in its place, so the net is 28 lines rather
+than 54** (the figure is 21363 rather than 21327 because LA-103, BF-153, LB-101, OR-108 and BF-153's
+second half all landed on `main` while this PR waited through three E2E runs — LA-103 is the
+red-`main` note above, the rest are not ours at all). **`projectOverview.md` moves too**, and the same
+caution applies: the BF-150 row was rewritten rather than struck, and LB-100's 🔴 row moved out to the
+archive.
+
+**Six base re-merges in two and a half hours is the number worth recording, not the baseline.** `main`
+moved every ~20-30 minutes while E2E took ~29, so a green was stale each time it arrived. Two merge
+attempts were refused outright with a 405. **And the conflicts are always the same three bookkeeping
+files** — this one, `docs/implementation-backlog.md` and `packages/shared/src/changelog.ts` — never
+code: measured on the sixth round, where `main` had brought two components and an e2e spec and
+nothing in them touched anything here. So the serialisation is imposed entirely by the ledgers every
+agent must write to, not by the work colliding. The green was
+never the problem and neither was the queue — the two intervals simply do not fit. That is deliberate and is the thing to read here: BF-152 shipped with a residual it chose
+not to model — the thermic effect of food and non-step NEAT — and the ⓘ copy explaining that is Lane
+B's. An entry that closes by opening a smaller one nets out small, and **the alternative was a
+54-line drop with the finding living only in a journal paragraph**, which is how a finding gets
+dropped.
+
+`projectOverview.md` falls by only 6 net across three edits, which also understates the churn. The
+BF-150 Known-Issues row was rewritten rather than struck — its owner question is now moot (the budget
+reads no typed number) but the device check is owed, so it stays, per the rule that an entry only
+moves when nothing is owed. What *did* move out is **LB-100's 🔴 row**: `one-calorie-budget.spec.ts` is
+green, the cause it refused to guess turned out to be the less likely of the two it named, and the
+archive records that rather than a tick.
+
+## 2026-09-13 — `docs/agents/state/implementation-lane-a.md` 116 → 100 (rewritten, BF-152)
+
+Ratchets DOWN 16 lines, and the reason is not concision. **The file was eleven days stale in the two
+fields a successor would act on first:** Next ID read `LA-55` against a real `LA-102`, and migrations
+read `255` against a directory head of `275`. A baton that is half last week's is worse than none,
+because it gets trusted — so this is a full rewrite, not an append, per the rule in CLAUDE.md.
+
+What came out was narrative about PRs that merged eleven days ago. What went in is state a successor
+cannot derive: the nine-entry all-exclusions READY list, #1098's owner gate and its two recurring
+conflicts, the four owner decisions (one of which BF-152 just dissolved rather than answered), the
+three owed device checks, and the four testing traps that have each cost a session.
+
+
+## 2026-09-13 — `docs/implementation-backlog.md` (BF-153 filed)
+
+Thirty-eight lines for BF-153: the vial sheet shows a create-form and the current vial's record
+together with nothing distinguishing them, and its `Dose (mg)` field is a calculator input that
+`save()` never posts. The entry is mostly the evidence — the save body, and the two dates reading
+13/09/2026 and 10 Sept on one screen — because the screen looks correct and the defect is only
+visible from the code.
+
+## 2026-09-13 — `projectOverview.md` → 10790 (OR-108's write half shipped, two reads still owed)
+
++20 for one Known-Issues entry, and the length is the finding rather than the fix. Photographing or
+scanning a food now writes its picture, and **the S25 will still show none**: `LA-36` leaves all three
+local-store read paths omitting `image_data_uri`, so the canonical runtime reads null from a column
+that is finally being filled. Beside it, `POST /api/nutrition/food-items` caps its body at 8 KB while
+permitting a 16 KB image — base64 costs a third more, so a detailed photo 413s the whole save before
+the image check runs, and the client is carrying a quality ladder to dodge it until LB-101 lands.
+
+**A row that says "shipped" and nothing else would be false three ways over**, which is why the two
+open dependencies, the workaround and the constant that has to be deleted with it are all named. The
+entry leaves — to `known-issues-resolved.md` — when LA-36 and LB-101 are both in and the device pass
+has seen a picture on a row.
+
+## 2026-09-13 — `projectOverview.md` → 10801 (BF-153's device check, and the press that cannot be undone)
+
++11 for one Known-Issues entry. The vial sheet now names which vial each thing belongs to and says
+the Dose field is a calculator rather than a setting, but the check BF-153 asked for is on the S25 and
+has not happened. The length is the destructive case: pressing the footer button opens a **second**
+vial and restarts the weight-response window, and BF-136 established that a wrong date can only be
+corrected in place — `listSupplementVials` orders by `openedOn DESC` and the sheet reads `vials[0]`,
+so a corrective vial dated earlier sorts below the wrong one and the card keeps using it.
+
+A row reading "clearer copy shipped" would not tell the next session that the check owed is a
+deliberate press of a button whose effect is hard to reverse. It leaves for
+`known-issues-resolved.md` when that press has been made on the device and the screen was clear
+about it beforehand.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21391 (BF-153 shipped, 40 lines back)
+
+The ratchet reclaims what a completed entry frees, which is the half that makes it a ratchet rather
+than a ceiling. BF-153 was 38 lines and mostly evidence — the save body showing `doseMg` absent, and
+the two dates reading 13/09/2026 and 10 Sept on one screen — because the screen looks correct and the
+defect is only visible from the code. That evidence is why the entry was right in every particular,
+which is not the recent norm; it now lives in the journal entry rather than the queue.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21352 (RV-35 closed, 39 lines back)
+
+RV-35's fix was already in the tree — `nutrition-content.tsx:334` calls `useDayRolloverRefresh`,
+which is the hook the entry prescribed — so what the entry was really still owed was its own
+condition: the owner directed that it ship without a device check, and the entry converts that into
+a test that fails before the fix and passes after. That test now exists and is mutation-proven, so
+the entry leaves.
+
+**Re-verifying against `main` is what stopped this being wrong in either direction.** Read as stale,
+it deletes with the obligation unmet and nothing guarding the behaviour. Read as unbuilt, it
+re-implements a line that is already there. Both halves had to be checked.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21360 (LB-98 ① shipped, Q-300's reason corrected)
+
++8 across two entries, and both are corrections rather than additions. LB-98's Keep loses residue ①
+and gains the shipped note; **Q-300's Keep had to be rewritten because its stated reason stopped
+being true** — it said the card "is absent in a browser and cannot be verified in CI", which was
+exactly right until the fallback landed today. Leaving it would have told the next session the card
+is unverifiable when it now has a mutation-proven spec, and would have overstated what the S25 still
+owes: the local path only, which no harness can reach.
+
+A Keep that describes a world that has moved is worse than a missing one, because it is trusted.
+## 2026-09-11 — `docs/implementation-backlog.md` → 21307 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 
-**This figure has been rewritten SEVENTEEN times and the churn is the note worth leaving.** Nineteen
+**This figure has been rewritten EIGHTEEN times and the churn is the note worth leaving.** Twenty-three
 other merges landed on `main` while this PR waited on an owner decision, and each one moved the base
 out from under it — so the starting figure is no longer even quoted here, because it changed again
-between the last two rewrites. **Seventeen rewrites of one number is the cost of a green PR waiting**,
+between the last two rewrites. **Eighteen rewrites of one number is the cost of a green PR waiting**,
 recorded rather than smoothed because the alternative reading — that someone kept getting the
 arithmetic wrong — is the wrong lesson. The per-file `.size` split (LA-33) is what keeps this to one
-number instead of a whole map: no other document's baseline has conflicted once across all seventeen.
+number instead of a whole map: no other document's baseline has conflicted once across all eighteen.
 Nothing was wrong with any of the three — each was correct against the `main` of its hour. Under six
 concurrent lanes plus an owner gate, a baseline is a reading of a moving number, and a PR that waits
 will re-read it once per merge that overtakes it. Recomputed by `pnpm fix:baselines` after each

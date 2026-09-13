@@ -136,7 +136,10 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
   function handleRefine(result: NutritionScanResult) {
     setScanResult(result)
     setIngredients(withClientIds(result.ingredients))
-    setForm(scanToEditable(result))
+    // OR-108. A refine is a text-only re-scan, so it never carries a picture — taking its absent
+    // image over the one already on the form would throw away the photo the user took two steps ago,
+    // which is the same "the payload is rebuilt and one field goes missing" shape as the barcode miss.
+    setForm(f => ({ ...scanToEditable(result), imageDataUri: result.imageDataUri ?? f.imageDataUri ?? null }))
   }
 
   function handleManual() {

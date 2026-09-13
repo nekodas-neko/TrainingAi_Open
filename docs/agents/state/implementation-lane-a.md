@@ -4,112 +4,96 @@
 > is how six concurrent sessions stay tellable apart; a renamed successor is a lost thread even with a
 > perfect baton.
 
-**Updated:** 2026-09-02 · **By:** the fourteenth session to run as Lane A · **Next ID:** `LA-55`
+**Updated:** 2026-09-13 · **Next ID:** `LA-103`
 (`grep -rhoE '\bLA-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1` is the authority, not this line.
-`LA-54` was allocated and **withdrawn** — see Gotchas — so it is used, not free.)
-**Migrations:** directory head **255**, next free **256** — claim against open PRs too, not just the
-directory. Local SQLite **v34**.
+`LA-54` was allocated and withdrawn, so it is used rather than free.)
+**Migrations:** directory head **275** — claim against open PRs too, not just the directory.
+Local SQLite **v38**.
 
 ## Now
 
-**Ten PRs merged:** #775 (red-`main` fix), #781 (BF-69 stage 1), #770 (LB-37), #777 (LB-31),
-#785 (queue hygiene), #786 (LB-48), #788 (LB-49 + journal ceiling), #791 (LB-50 prompt half),
-#792 (BF-77 gate), #794 (LB-18 source). Full handoff:
-[`docs/handoff-2026-09-02-nutrition-lane-a-session.md`](../../handoff-2026-09-02-nutrition-lane-a-session.md).
+Start with `node scripts/next-item.js --lane A --all`. **`--all` is not optional** — the display
+truncates READY at 10 and a startable item has sat unnoticed at position 12.
 
-Start with `node scripts/next-item.js --lane A` and read its real output. **LA-47 should head it.**
+**As of 2026-09-13 READY holds nine entries and all nine are standing exclusions**, so "nothing
+startable" is the normal answer until the owner releases something. Do not widen the exclusion list
+to find work; it has been widened three times without being asked.
+
+- Owner-gated or parked: Q-220 (Orchestrator's), Q-44 Phase 3 PR 1, Q-1a, LA-95, Q-30, Q-52, Q-28,
+  Q-29 Task 5, LA-100, LA-89.
+- **LA-91 sits inside the original do-not-take band LA-84..LA-92.**
+- Feature work (BF-9 trainer role, BF-7 session-length picker, BF-5 week-in-review page) is a
+  different kind of change from a small verifiable fix and is not begun unilaterally.
+
+## One PR is open and must NOT be merged
+
+**#1098 — RV-42, cross-account meal-plan write-path ownership, branch
+`lane-a/rv42-meal-plan-child-ownership`.** Green since 2026-09-11, waiting on the owner: it is a
+security change, and CLAUDE.md's confirm-first carve-out covers it. Merging auto-deploys to Railway.
+Keep it rebased and mergeable only — merge `origin/main` in, re-run the gate, push.
+
+Its two recurring conflicts, sixteen times now: `docs/doc-size/docs/implementation-backlog.md.size`
+(overwrite with a bare integer FIRST — `pnpm fix:baselines` **throws** on conflict markers — then run
+it) and `docs/doc-size-baseline-history.md` (append-only, so keep BOTH sides with main's first). The
+recompute churn is recorded deliberately in the history note; do not tidy it.
+
+## Four owner decisions on the record — do not re-ask them
+
+1. Merge #1098. 2. Drop the dead `program_session_id` column. 3. Release Q-52 and Q-28.
+4. ~~The calorie goal, 1350 vs 1660~~ — **answered 2026-09-13 and shipped as BF-152**: he answered
+with a rule, not a figure, so the budget anchors to his measured resting rate and reads no typed
+number at all. The question evaporated rather than being decided.
+
+## Three device checks owed
+
+- The strap battery chip dims after 3 h (BF-140).
+- A bodyweight set at a rep count other than 5 or 6 (BF-151) — both figures render only under
+  `isBodyweight`.
+- BF-152's provenance line (*"1,815 resting rate"*) — rendered in the dev browser at S25 width on
+  both surfaces, never on a phone.
 
 ## ⚠ Read this before building anything
 
-**Six of the eight entries examined on 2026-09-02 were wrong about something load-bearing.** Not
-stale — wrong at filing time. A function name that does not exist, a severity that does not
-reproduce, a migration that was already built four months ago.
+**Every entry examined since 2026-09-02 had at least one load-bearing claim that did not survive
+contact with the code** — not stale, wrong at filing time. The shape is consistent: **line numbers
+have been accurate every time; names, conclusions and "this needs a schema change" have not.** So
+grep the symbol, then its callers, then decide. It has removed a whole migration from one entry.
 
-**The shape is consistent: line numbers have been accurate every time; names, conclusions and
-"this needs a schema change" have not.** LB-49 cited three correct line numbers inside a function
-whose name does not exist.
+BF-152 (2026-09-13) is the exception worth knowing — every arithmetic claim in it held, including
+the production figures. An entry *can* be right; it still has to be checked.
 
-**So: grep the symbol, then grep its callers, then decide.** It costs two minutes and it removed a
-whole migration from LB-18. The four-line fixes in this session are four lines *because* of it.
+## Testing, and the four things that have cost a session each
 
-Another session hit the same class independently in #789 (a self-contradicting entry, two misfiled
-lanes, a corrected sample size). It is a pattern worth raising with Orchestrator, not six
-coincidences.
+- **Run the suite with `DATABASE_URL` set** (`postgresql://postgres:postgres@/trainingai_dev?host=/tmp&port=5433`).
+  Without it ~190 DB-backed files SKIP silently: 700 files pass instead of ~896. Capture the real
+  exit code (`pnpm test > log 2>&1; echo $?`) — piping to `tail` reports tail's.
+- **`db-snapshot-integration.test.ts` skips locally even with `DATABASE_URL`** (it needs the
+  `claude_readonly` role local dev does not create) and fails CI on any migration adding a column to
+  a table the `claude_ro` views cover. **Every such migration needs its regenerated twin in the SAME
+  PR** — a NEW number, then diff against the previous to confirm only the intended columns moved.
+- **`Build` is NOT enforced as a required check, whatever the documented list says.** #935–#937
+  merged with it `in_progress` and all three finished `failure`. Wait for a conclusion on all six,
+  and run Build's own steps locally: `pnpm build` **and** `node scripts/check-test-typecheck.js`, not
+  just `tsc --noEmit`. Test files typecheck under a separate config, where `vi.fn(async () => …)`
+  infers a zero-parameter signature and any cast off `mock.calls[0]` is a hard error invisible to
+  `tsc --noEmit`.
+- **E2E is advisory, and that is exactly how a regression reached `main`.** BF-150 merged with
+  `one-calorie-budget.spec.ts` red on its own pre-merge run; the defect was real and became LB-100.
+  Wait for E2E even though nothing forces you to.
 
-## What is startable, and what is not
+## Gotchas
 
-- **LA-47** — the Coach plan widget, and the entry is right that it is **one change across two
-  lanes**. `widget-registry.tsx` narrows by early return, so a new union member is a type error
-  until a branch handles it; a branch rendering `null` **wedges the whole thread**, because the
-  provider refuses a request containing an unanswered tool call. Design is settled in the entry.
-  Take it under "Both → Lane A, engine half first".
-- **Q-388, Q-289, Q-290, Q-275, Q-272** — the Tuning calibration block, owner-gated.
-- **BF-77** — now correctly parked (`Gate: owner`, added #792). Needs the A-or-B choice: finish
-  BF-57's QR path, or build a server-stored share code.
-
-## Keeps a successor must read before touching the area
-
-- **BF-69 stage 1 shipped; stages 2–4 are owed, and stage 2 gates the rest.** Nothing can write a
-  dose amount yet — production holds 2 supplements and 1 log ever — so the trends overlay (stage 4)
-  stays `Gate: data`. **`loggedToday` deliberately tracks the MANUAL contribution only**; a meal's
-  dose turning it on would leave a control that refuses to turn off.
-- **LB-18's source shipped; Lane B drops the query param.** Its claim that recency needs a schema
-  change is false and the entry now says so.
-- **LB-50's prompt half shipped; the exposed activity factor is owed**, and it needs the
-  not-enough-data state the maintenance figure already has.
-
-## Not device-verified (both have Known-Issues rows)
-
-- **Local SQLite v34 rebuilds `supplement_logs`** — the first local migration here that creates,
-  copies, drops and renames rather than adding a column. SQLite cannot drop an inline table
-  constraint. Written so any prefix re-runs to completion; **read the comment before touching it.**
-- **`getRecentFoodItems`** — `getLocalStore` returns null under vitest and in the web sandbox.
-
-## ⚠ 2026-09-07 — I merged three PRs with Build RED. Read this before merging anything.
-
-The rest of this baton is from 2026-09-02 and is stale (IDs, migration numbers); this section is not.
-
-**`Build` is NOT enforced as a required status check on this repo, whatever the documented list
-says.** #935, #936 and #937 all merged while `Build` was still `in_progress`, and all three had it
-finish `failure`. `main` carried a red Build for ~45 minutes. `merge_pull_request` succeeded every
-time, so **branch protection refusing a merge is not evidence that checks passed.**
-
-CLAUDE.md's "the reliable green check is attempting the merge" is written for a check that has
-already *finished* and is being reported stale by `get_check_runs`. It does not license merging a
-check that genuinely has not finished. **Wait for a conclusion on all six.**
-
-**And run the Build job's own steps locally — `tsc --noEmit` is not enough.** The test files are
-typechecked separately under `tsconfig.tests.json` by `node scripts/check-test-typecheck.js`, which
-runs *inside* Build and is what went red. Before pushing: `pnpm build` **and**
-`node scripts/check-test-typecheck.js`, not just `tsc --noEmit` + `check:rules` + vitest.
-
-The errors themselves are worth knowing: `vi.fn(async () => …)` infers a **zero-parameter**
-signature, so `mock.calls[0]` is typed `[]` and any cast off it (`as [string, Date]`,
-`mock.calls[0][0] as {…}`) is a hard error under the test config while being invisible to
-`tsc --noEmit`. Declare the mock's parameters (`vi.fn(async (_userId: string, _from: Date) => …)`)
-and delete the cast.
-
-## Gotchas that cost time this session
-
-- **`get_check_runs` returning `total_count: 0` was a STALE BASE every single time** — never slow
-  CI. Confirm with `git merge-base --is-ancestor origin/main origin/<branch>`, re-merge, push.
+- **`get_check_runs` returning `total_count: 0` has been a STALE BASE every single time** — never
+  slow CI. Confirm with `git merge-base --is-ancestor origin/main HEAD`, re-merge, push.
+- **Re-merge `origin/main` immediately before opening a PR *and* again before merging.** `main` moved
+  between green and merge on four PRs in one session. A stale green is not a green.
 - **A stale local `origin/main` looks exactly like a lost edit.** Fetch before believing anything
   vanished.
-- **Expect a 405 merge conflict on nearly every PR** — `projectOverview.md`,
-  `doc-size-baseline-history.md` and the two `.size` files. After resolving, verify
-  `grep -c '\*\*Version:\*\*' projectOverview.md` is **1**; keeping both sides leaves two headers
-  and only the first is true.
-- **Guards find their own documentation.** Twice more this session. Strip comments before scanning;
-  exempt by name with an assertion that the exemption is real.
-- **I filed LA-54 and withdrew it** — a checker-gap entry resting on LB-48's false severity. Filing
-  on an undemonstrated premise is the same failure as the entries above, and it is easy to do while
-  correcting someone else's.
-
-## The journal ceiling
-
-Raised **250 → 320** (#788), owner-approved after being surfaced as a blocker: `main` had reached
-250 and every agent's next PR would have failed CI. The check's *other* guard — **unlinked** entries,
-the ones a sweep can fold — read **3 of 60**. The real compaction (folding *linked* entries,
-repointing durable docs) is still owed and still Orchestrator's. **Reversal is one number in
-`docs/doc-size-baseline.json`; the signal to do the real work instead of raising it again is the
-floor rising from something other than journal citations.**
+- **Mutation-test every change, with at least one deliberately equivalent control.** The survivors
+  are where the real tests come from. The one to write a test for *before* the pass is the
+  service-wiring mutant — which number the service hands the shared formula — because every formula
+  test passes through it. It survived BF-150's first pass; BF-152 wrote that test up front and killed
+  it.
+- **Guards find their own documentation.** Strip comments before scanning source in a test; exempt by
+  name with an assertion that the exemption is real.
+- **Never `git add -A` before resolving a conflict** — it hides the conflict from `git status`.

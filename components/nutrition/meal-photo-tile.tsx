@@ -4,28 +4,8 @@ import { useRef, useState } from 'react'
 import { Camera, ImagePlus, Loader2, Trash2, Utensils } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@trainingai/shared/utils'
-import { dataUrlToBlob, downscaleToDataUrl } from '@/lib/media/downscale-image'
+import { dataUrlToBlob, downscaleToThumbDataUrl, THUMB_MAX_DIM } from '@/lib/media/downscale-image'
 import { mealImageBytes, rejectMealImage, mealImageRejectionMessage } from '@trainingai/shared/nutrition/meal-image'
-
-/**
- * The meal photo, picked and previewed in one 64 px tile (Q-327).
- *
- * The storage half shipped with Q-396 and nothing could reach it: `saved_meals.image_data_uri`
- * round-trips through both routes, the outbox replay and the local mirror, but no screen offered a
- * way to choose a picture. This is that screen — beside the meal-name field in Edit Meal, so the
- * photo rides the save that is already there rather than needing a write of its own.
- *
- * **The downscale is the feature, not a nicety.** The server rejects anything over
- * `SAVED_MEAL_IMAGE_MAX_BYTES`, and a phone photo is two orders of magnitude past that — without
- * this every pick would be a 400 and the feature would read as broken. 128 px WebP lands around
- * 6 KB, which is the number that cap was sized against.
- *
- * **The byte figure is deliberate.** Nothing fails loudly when the cap slips: an oversized image is
- * rejected by the server and the outbox simply carries a heavier row. A number on the tile is the
- * cheapest tripwire, and it is `mealImageBytes` — the same arithmetic the server rejects on.
- */
-const THUMB_MAX_DIM = 128
-const THUMB_QUALITY = 0.8
 
 /**
  * `@capacitor/camera` reports a cancelled picker by throwing, with no code to test — only a message.
@@ -57,6 +37,23 @@ interface Props {
   label?: string
 }
 
+/**
+ * The meal photo, picked and previewed in one 64 px tile (Q-327).
+ *
+ * The storage half shipped with Q-396 and nothing could reach it: `saved_meals.image_data_uri`
+ * round-trips through both routes, the outbox replay and the local mirror, but no screen offered a
+ * way to choose a picture. This is that screen — beside the meal-name field in Edit Meal, so the
+ * photo rides the save that is already there rather than needing a write of its own.
+ *
+ * **The downscale is the feature, not a nicety.** The server rejects anything over
+ * `SAVED_MEAL_IMAGE_MAX_BYTES`, and a phone photo is two orders of magnitude past that — without
+ * this every pick would be a 400 and the feature would read as broken. 128 px WebP lands around
+ * 6 KB, which is the number that cap was sized against.
+ *
+ * **The byte figure is deliberate.** Nothing fails loudly when the cap slips: an oversized image is
+ * rejected by the server and the outbox simply carries a heavier row. A number on the tile is the
+ * cheapest tripwire, and it is `mealImageBytes` — the same arithmetic the server rejects on.
+ */
 export function MealPhotoTile({ value, onChange, disabled, variant = 'tile', label }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
@@ -78,7 +75,7 @@ export function MealPhotoTile({ value, onChange, disabled, variant = 'tile', lab
     if (!file) return
     setBusy(true)
     try {
-      await accept(await downscaleToDataUrl(file, { maxDim: THUMB_MAX_DIM, quality: THUMB_QUALITY, mimeType: 'image/webp' }))
+      await accept(await downscaleToThumbDataUrl(file))
     } catch {
       toast.error('That image could not be read. Try another photo.')
     } finally {
@@ -116,7 +113,7 @@ export function MealPhotoTile({ value, onChange, disabled, variant = 'tile', lab
       })
       if (!photo.base64String) return
       const blob = dataUrlToBlob(`data:image/${photo.format || 'jpeg'};base64,${photo.base64String}`)
-      await accept(await downscaleToDataUrl(blob, { maxDim: THUMB_MAX_DIM, quality: THUMB_QUALITY, mimeType: 'image/webp' }))
+      await accept(await downscaleToThumbDataUrl(blob))
     } catch (err) {
       // A cancel is not an error worth a toast — but everything else is, and swallowing both is how
       // this stayed broken through three reports. The plugin's cancel messages are the only thing

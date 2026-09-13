@@ -127,8 +127,9 @@ export const TrendsSection = memo(function TrendsSection({ userId }: { userId?: 
             )}
             {/* Q-300. The bars answer "does resting to plan go with lifting better?"; this answers
                 what the plan asks against what is actually taken, which the measurement found to be
-                the useful half. Renders nothing off-device — see the card. */}
-            {view === 'rest-adherence' && <RestPrescriptionCard userId={userId} />}
+                the useful half. LB-98: `restSets` rides on the response this component already
+                fetched, so the off-device fallback costs no second request and no cache key. */}
+            {view === 'rest-adherence' && <RestPrescriptionCard userId={userId} serverSets={data.restSets} />}
           </>
         )}
       </div>

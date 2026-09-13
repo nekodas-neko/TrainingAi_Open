@@ -132,3 +132,51 @@ export function dataUrlToBlob(dataUrl: string): Blob {
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
   return new Blob([bytes], { type })
 }
+
+/**
+ * Longest edge of a stored thumbnail, in pixels — the size every capped `image_data_uri` is
+ * produced at.
+ *
+ * **It is sized against the cap, not against the screen.** `SAVED_MEAL_IMAGE_MAX_BYTES` /
+ * `FOOD_ITEM_IMAGE_MAX_BYTES` are both 16 KB and both ride the outbox push, the pull delta and the
+ * on-device SQLite mirror; 128 px WebP lands around 6 KB, which is the number those caps were sized
+ * against. Raising this raises the bytes on every synced row.
+ *
+ * Exported separately from `downscaleToThumbDataUrl` because `@capacitor/camera`'s `width`/`height`
+ * hints want a multiple of it rather than the final size — a first pass in the plugin, with the
+ * canvas re-encode below doing the work that actually reaches the cap.
+ */
+export const THUMB_MAX_DIM = 128
+
+/** Encoder quality for a stored thumbnail. */
+export const THUMB_QUALITY = 0.8
+
+/**
+ * Quality rungs tried in order when a caller gives a byte budget, best first.
+ *
+ * Below the last rung WebP starts to smear at 128 px, so a caller that still does not fit is better
+ * served dropping the picture than storing a smudge.
+ */
+const THUMB_QUALITY_LADDER = [THUMB_QUALITY, 0.6, 0.45]
+
+/**
+ * A stored thumbnail: 128 px WebP, the one shape every `image_data_uri` in this app is written in.
+ *
+ * Extracted when the food-capture routes needed the third copy (OR-108). The spec is three
+ * arguments and getting any of them wrong is silent — a JPEG at the same box is roughly twice the
+ * bytes, which is how a thumbnail sails past a cap that nothing checks loudly.
+ *
+ * `maxEncodedChars` re-encodes at a lower quality until the base64 payload fits, and is measured in
+ * **characters of the data URI's payload — what a request body counts — not decoded bytes**, which
+ * is a third fewer. A caller with a request-size ceiling wants this; one storing the result
+ * directly does not, and omitting it keeps the single-pass behaviour. Returns the smallest rung
+ * even when none of them fit, so the caller decides what to do about it.
+ */
+export async function downscaleToThumbDataUrl(source: Blob, maxEncodedChars?: number): Promise<string> {
+  let out = ''
+  for (const quality of THUMB_QUALITY_LADDER) {
+    out = await downscaleToDataUrl(source, { maxDim: THUMB_MAX_DIM, quality, mimeType: 'image/webp' })
+    if (maxEncodedChars === undefined || out.length - out.indexOf(',') - 1 <= maxEncodedChars) break
+  }
+  return out
+}

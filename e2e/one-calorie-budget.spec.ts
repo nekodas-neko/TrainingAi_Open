@@ -55,14 +55,17 @@ async function budgetFromRoute(page: Page) {
   // left behind — but a second copy of the formula cannot tell you which. It now asks the shared
   // one, so the spec pins that the surfaces agree with `budgetProvenance` rather than with a
   // transcription of it that has to be maintained in step.
+  //
+  // BF-152 re-anchored the budget again, to the resting rate, and this line needed no edit — which is
+  // the argument for asking the shared function rather than transcribing it.
   const total = budgetProvenance(body.balance).total
 
   expect(earned, 'the HR-based session must reach the active-energy figure').toBeGreaterThan(0)
   // The discriminator, retuned for the same reason. The expression to separate from is the OLD one
-  // — what both surfaces printed before the budget was anchored — not the stored goal, which is now
+  // — what both surfaces printed before the budget was anchored — not the anchor itself, which is now
   // what the budget IS. Written the old way this asserted the fixture must differ from the correct
   // answer, so it would have started failing for being right.
-  expect(total, 'fixture must separate the real budget from the pre-BF-150 expression')
+  expect(total, 'fixture must separate the real budget from the pre-anchor expression')
     .not.toBe(Math.round(restingBaseKcal + targetNetKcal) + earned)
 
   return { total, earned, intakeKcal: Math.round(intakeKcal), scaled: body.macroTargets.scaled }

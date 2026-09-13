@@ -453,80 +453,52 @@ below threshold and left in place for next time.
   entries `backlog-verify-field.test.ts` covers.
 - **Reversal cost:** low, and the test above is the safety net — it reads the real file.
 
-### [nutrition] OR-108 — a scanned barcode saves no image, and neither does photographing the food
+### [nutrition] LA-102 — the budget starts at the resting rate and says nothing about what it leaves out
+- **Lane:** B — surface only: `components/nutrition/calorie-zone-bar.tsx`, and the ⓘ copy on
+  `components/nutrition/energy-card.tsx` / `components/nutrition/calorie-balance-bar.tsx`.
 
-- **Lane:** B — the capture paths in `components/nutrition/`; `food_items.image_data_uri` already
-  exists and is LA-36's subject.
-- **Added:** 2026-09-13 by Orchestrator, from the owner's nutrition device pass. **Branch:** unassigned.
-- **Owner, verbatim:** *"images are working fine on my end; but scanning barcodes still doesn't auto
-  save an image for the food; or does taking a photo of the food save the image either."*
-- **This was reported against LA-36 and is NOT LA-36.** That entry says
-  `food_items.image_data_uri` is *written and read by nothing* — a plumbing gap. This is the
-  opposite end: the column may well be read now, and **nothing is putting an image into it from
-  either capture route.** Two writers are missing, not one:
-  - **the barcode scan**, which has a product image available from the lookup and discards it;
-  - **the camera**, where the user has literally just taken a photograph of the food.
-- **Why it matters more than a missing thumbnail.** Every food the owner logs by camera or barcode
-  is imageless forever, and BF-73's bigger capture tiles and Q-406's shared food row are both drawn
-  around an image slot that the common paths never fill.
-- **Check LA-36 first** — if its read path shipped, this is purely the write half and small.
-- **On completion, the device check is:** scan a barcode, then photograph a food; both should leave
-  an image on the row. **Not a `Verify:` field — nothing is built yet.**
-- **Reversal cost:** low. A column that already exists gains writers.
+- **Branch:** _unassigned_ · **Added:** 2026-09-13 · found shipping BF-152.
+- **Reference:** [`the BF-152 journal entry`](overview/entries/2026-09-13-lane-a-bf152-resting-rate-anchored-budget.md).
+- **The engine half is done and this is the half it deliberately left.** BF-152 made the
+  zero-movement budget the user's resting rate, and the line under the bar now reads
+  `1,815 resting rate — no movement recorded yet today` (verified on Home and the Nutrition tab,
+  2026-09-13). What it does not say is what a resting rate excludes.
+- **Two things are genuinely missing from that number**, and the owner named the first himself:
+  *"1350 doesnt count some basic metabolic needs".* He is right — RMR excludes the **thermic effect
+  of food** (~10% of intake, ~140 kcal at his volume) and **non-step NEAT**: standing, fidgeting,
+  housework.
+- **BF-152 chose not to model either, and that decision is the thing to explain rather than
+  revisit.** `bmr × 1.2` is 1,611 on his figures — his own *"move to 1600"* — but a multiplier
+  **asserts** the overhead happened while the step credit **observes** it, and modelling
+  intake-linked TEF as an earned credit makes the budget grow as he eats, a feedback loop the card
+  then has to explain for a number inside food-logging error.
+- **So the ask is copy, not arithmetic:** the ⓘ panel says the base is resting burn only, that
+  eating and everyday fidgeting add some on top, and that movement is credited as it is measured.
+  One or two sentences. Do not add a multiplier to make the sentence unnecessary.
+- **Pass test:** the ⓘ copy names the thermic effect of food and non-step movement as excluded from
+  the base, and nothing on the screen implies the base is a full day's burn.
+- **Reversal cost:** none. It is copy.
 
-### [nutrition] BF-152 — anchor the budget to the measured resting rate, not to a typed-in goal
+### [nutrition] LB-101 — `/api/nutrition/food-items` refuses a body smaller than the image it permits
 
-- **Lane:** A — `packages/shared/src/nutrition/calorie-balance.ts` (`budgetProvenance`),
-  `lib/health/energy-balance-service.ts`. Read
-  [`docs/overview/entries/2026-09-12-lane-a-bf150-goal-anchored-budget.md`](overview/entries/2026-09-12-lane-a-bf150-goal-anchored-budget.md)
-  first — this changes one line of what shipped there and keeps the rest.
-- **Added:** 2026-09-13 (BugFix intake), from the owner's own spec: *"Rmr+body metabolism as base —
-  Calories burned per day based on HR/exercise … It should start at 1350 - and as I walk/workout -
-  move throughout the day to 1600."*
-- **BF-150 made the budget anchor to a stored NUMBER; the owner wants it to anchor to a RULE.** That
-  is the whole change. `budgetProvenance` currently takes `goalKcal` — the figure in
-  `nutrition_targets.calories`, **1,660** for the owner — as the zero-movement base. A typed-in
-  number cannot track a body that is changing, and his is: 72.1 kg at the RMR test on 2026-08-27,
-  **70.2 kg** on 2026-09-13.
-- **The number he asked for is already computed, one scope away.** `energy-balance-service.ts` derives
-  `bmr` as `personalRmr(measured, todaysFfm)` — the clinical measurement with its Cunningham residual
-  re-scaled onto today's fat-free mass (BF-42). Measured 2026-09-13:
-
-  | | value |
-  |---|---|
-  | measured RMR (2026-08-27, 51.5 kg FFM) | 1,325 |
-  | Cunningham residual | −157 |
-  | FFM today (70.2 kg at 25.5% corrected) | 52.3 kg |
-  | **re-scaled RMR today** | **1,342** |
-
-  His *"start at 1350"* is his own measured resting rate to within 8 kcal, and it moves on its own as
-  he loses weight. `restingBaseKcal` is **not** the value to use — on the calibrated path it is
-  `maintenance − avgActive`, and that maintenance is the estimator BF-137 is about, currently ~600
-  kcal high.
-- **The earned half needs no work at all.** Steps have counted from the first one since BF-88, and
-  `computeActiveEnergy` already sums workouts + activities + steps. On the owner's yesterday (2,923
-  steps, one strength session) that is roughly 100 + ~200 kcal, which puts the day near 1,650 —
-  *"move throughout the day to 1600"*, reached by the mechanism that is already live.
-- **The owner named the real gap himself: *"1350 doesnt count some basic metabolic needs".*** He is
-  right. RMR excludes the thermic effect of food (~10% of intake, ~140 kcal at his volume) and
-  non-step NEAT — standing, fidgeting, housework. Note that `bmr × 1.2`, the classic sedentary
-  multiplier, is **1,611** on today's figures: his *"1600"* is RMR plus exactly the overhead he is
-  describing. **Recommended treatment: credit it through movement rather than through a multiplier**
-  — the multiplier asserts the overhead happened, the step credit observes it — and name the residual
-  in the ⓘ copy instead of modelling it. Modelling TEF as an earned credit makes the budget grow as
-  he eats, a feedback loop the card then has to explain, for a number inside food-logging error.
-  **This is the one line the owner can overrule**, and the entry is buildable either way.
-- **Three Tuning entries move with this, and only one of them the way it looks.** TN-27 and TN-29 were downgraded to *informational* when PR #1128 stopped the budget following the maintenance estimate — **BF-152 does not change that**, because the base becomes the measured resting rate and the estimator still takes no part. **TN-28 is the one that reverses**: its 2026-09-13 amendment reads *"the stored target … is now the thing everything else follows"*, which this entry undoes. Amend it rather than discovering it.
-- **What BF-150 keeps.** One budget expression read by all three surfaces; the goal delta still not
-  applied on top; `deviationKcal` still measured against the budget rather than re-derived. The
-  stored target stops being the base and goes back to being what it is — a target.
-- **Fallback order when there is no measurement:** re-scaled measured RMR → predicted BMR → the
-  existing `restingBaseKcal + targetNetKcal`. A user with no RMR test must not land on a worse number
-  than they have today.
-- **Verification:** the owner's own account across a day — the budget should read ~1,342 with no
-  movement and climb as steps and a session land, on Home's nutrition card, Home's energy-balance
-  card and the Nutrition tab, all showing the same figure. `one-calorie-budget.spec.ts` is the
-  existing guard that the three agree.
+- **Lane:** A — `app/api/nutrition/food-items/route.ts`, one constant. **Added:** 2026-09-13 by
+  Implementation Lane B, measured while building OR-108. **Branch:** unassigned.
+- **The route caps its whole body at 8 KB and its image field at 16 KB.** `MAX_BODY_BYTES = 8 * 1024`
+  carries the comment *"One food item: a name, a brand and a dozen macro numbers"* — written before
+  BF-35 gave the route `imageDataUri`. Base64 costs a third more than the bytes it carries, so an image
+  at its own permitted cap is **~21.3 KB on the wire** and the request is refused with a **413 before
+  `rejectMealImage` ever runs**. The user does not lose the picture; they lose the food.
+- **Measured 2026-09-13** in Playwright, driving the real capture flow: a 128 px WebP of a detailed
+  600 × 400 source at q0.8 came back **6,612 bytes = 8,816 base64 characters** and the save 413'd; a
+  smooth photo-like source came back 1,410 and fits. It bites detailed photos, not every photo.
+- **The fix is one line:** derive the body cap from `FOOD_ITEM_IMAGE_MAX_BYTES` (`Math.ceil(x * 4 / 3)
+  + 4 * 1024`) rather than restating a number, so the two cannot drift again. Check the offline push
+  branch's own limit for the same mismatch too.
+- **A workaround is live and goes with this.** `capture-actions.tsx` carries `THUMB_WIRE_BUDGET =
+  7 * 1024` and re-encodes down a quality ladder to fit it; that constant, the `tooBigForTheBody`
+  guard beside it and two assertions in `components/nutrition/__tests__/food-image-write-paths.test.ts`
+  exist only because of this. Removing them is Lane B's follow-up — leave them until the cap moves.
+- **Reversal cost:** low — one constant, and a route that takes a larger body than it did.
 
 ### [app-shell] BF-139 — three header chips no longer fit beside the date (fixed; the device look is what is left)
 
@@ -1297,11 +1269,15 @@ the rest of that day; and `perceived_recovery` carries at least three distinct v
   sets carrying both are emitted; a prescription of `0` is dropped ("none planned", not a target)
   while a rest **taken** of `0` is kept (a real measurement — discarding it biases the mean upward).
   Five mutants, all caught, including one that swaps the logged snapshot for the live style.
-- **Keep: TWO things, and neither is the route.**
-  1. **The card's fallback wiring is Lane B's** — `components/health/rest-prescription-card.tsx`
-     still returns `null` when `getLocalStore` is null. The read now exists; nothing consumes it yet,
-     so the verification gap is not closed until that lands.
-  2. **The `body_metadata` half is LB-96**, still parked on `Needs: OR-102b`.
+- **✅ THE CARD'S FALLBACK SHIPPED 2026-09-13** (`fix/lb98-rest-card-server-fallback`).
+  `rest-prescription-card.tsx` takes `serverSets` and prefers the local store, falling back only when
+  it is absent or holds nothing summarisable — a swap into the same `restByPrescription`, not a second
+  aggregate. `restSets` rides on the response `trends-section.tsx` already fetched, so it costs no
+  request and no cache key. `e2e/rest-vs-plan-card.spec.ts` is the first run of that rendering path
+  anywhere but the S25; mutation-proven, and it stubs the response deliberately because the parent
+  gates everything behind the CORRELATION's `hasSufficientData` — a condition about the bars, not the
+  card. [Journal](overview/entries/2026-09-13-lb98-rest-card-server-fallback.md).
+- **Keep: the `body_metadata` half, which is LB-96**, still parked on `Needs: OR-102b`.
 - **Measured in production while building this, and worth keeping:** of 1,189 set logs, **462** carry
   `planned_rest_sec` and **838** carry `rest_time_sec`; **442** carry both, all inside the route's
   90-day window (841 sets). So the column started being written recently and covers ~53% of the
@@ -1841,7 +1817,7 @@ this card offers to overwrite with 2,045.
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · found while answering TN-27.
 - **Lane: B** — `components/nutrition/tdee-adaptation-card.tsx:118-124`.
 - **⚠ Amended 2026-09-13:** PR #1128 made the budget follow the owner's **stored goal**, so this card's one-tap write no longer redirects the whole day's eating — it changes the stored target, which is now the thing everything else follows. **That makes the write MORE consequential, not less**, so the missing confidence qualifier still matters.
-- **⚠ Amended again the same day, and it reverses the line above: BF-152 takes the stored target back OUT of the budget.** The owner's spec is *"Rmr+body metabolism as base"* — a rule, not a number — so the base becomes his re-scaled measured resting rate and the stored target goes back to being a target. **The escalation this entry recorded lasted one day.** Whether the one-tap write is consequential is now the question BF-152 settles, so read that entry before acting on this reasoning; the missing confidence qualifier stands on its own merits either way.
+- **⚠ Amended again the same day, and it reverses the line above: BF-152 took the stored target back OUT of the budget, and SHIPPED 2026-09-13.** The owner's spec is *"Rmr+body metabolism as base"* — a rule, not a number — so the base is his re-scaled measured resting rate and the stored target is a target again. **The escalation this entry recorded lasted one day.** So the one-tap write is back to changing a target rather than the whole day's eating; the missing confidence qualifier stands on its own merits either way. Read [`the journal entry`](overview/entries/2026-09-13-lane-a-bf152-resting-rate-anchored-budget.md) before acting on this reasoning — the BF-152 queue entry is gone, as a shipped entry should be.
 - **Sibling of TN-27** — TN-27 makes the number better; this makes its uncertainty visible. Fix either order.
 - **Reference:** [`review`](reviews/2026-09-09-maintenance-2245-is-too-high.md) §5.
 
@@ -3706,45 +3682,6 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
   both; if this is guarded, guard it that way.
 - **Verify:** device — the ring card's real state is BLE, which the web build cannot reach at all, so
   a web-green paint says nothing about what the APK shows here.
-
-### [nutrition][app-shell] RV-35 — Nutrition never asks what day it is on resume, so it files breakfast against yesterday
-
-- **⚠ OWNER DIRECTED 2026-09-13: stop trying to verify this by hand.** Verbatim: *"This is a hard one
-  to check; lets just make the best guess and file it as a non issue till its reproduced — ideally
-  you can be confident in your fix."* The check needed the app left open across midnight, which is
-  not something to ask for repeatedly. **So this is no longer `Verify: device`** — it ships on the
-  strength of the code and a test, and returns only if the symptom is seen in the wild.
-  **What that buys is an obligation:** a fix landing without a device check needs a test that fails
-  before it and passes after, because nothing else will catch a regression here.
-
-
-- **Lane:** B — `app/nutrition/nutrition-content.tsx` only.
-- **Batch:** nutrition-tab-day-and-scroll
-- **Added:** 2026-09-03, Review sweep 41 —
-  [`write-up §2`](reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md)
-- **Measured, not inferred.** Five tabs loaded at 23:50 Brisbane under a fixed clock, clock advanced
-  30 minutes, `visibilitychange` dispatched. Dated requests before → after:
-  Home 4 → **2**, Health 3 → **3**, Nutrition **5 → 0**, Workout and More issue none either side.
-  Nutrition is the only tab that is day-scoped *and* fails to roll over.
-- **The part that is not cosmetic.** The header reads `Today` because
-  `formatDateLabel(selectedDate, todayStr)` prints it only when the two agree — and both are frozen at
-  the launch day, so there is no visible tell. `selectedDate` is also what a new log is written with
-  (`logDate` at `nutrition-content.tsx:716`, `selectedDateRef.current` on the delete path), so a
-  breakfast logged after midnight lands on the finished day and feeds its calorie budget and adherence.
-- **The existing guard is correct and unreachable.** `nutrition-content.tsx:311–326` already compares
-  `lastVisibleDayRef` against a fresh `todayInTz(tz)` and follows the day. Its deps are
-  `[tabEpoch, fetchData, tz]`, and the shell increments `tabEpoch` only when a tab is **re-shown** —
-  never on a resume-in-place. Switching tabs away and back does fix it, so this reads as intermittent.
-- **The fix is the hook that already exists.** `useLocalDay()` (`components/shell/local-day-provider.tsx`,
-  BF-86) re-evaluates on `visibilitychange` and is what `session-select-content.tsx` uses — the surface
-  that measured correct above. Add it to the dependency array; do not hand-roll a second listener, and
-  do not reach for an interval (BF-86's comment records why).
-- **Do not "fix" this by reloading on `visibilitychange`** — BF-80 rules that out; it costs the
-  instant-paint behaviour.
-- **How to test locally:** the clock recipe in §7 of the write-up — `page.clock.install` at 23:50
-  Brisbane, `fastForward`, dispatch `visibilitychange` — asserting a request dated the *new* day. The
-  mechanism is fully web-testable, so no `Gate:` is set.
-  breakfast; confirm the header follows the date and the log lands on the new day.
 
 ### [app-shell][nutrition] RV-36 — scroll restoration reaches 3 of 5 tabs; BF-100's entry says it reaches all of them
 
@@ -13801,9 +13738,13 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   prescribed *at log time*; deriving it from the live style would let a later style edit silently
   rewrite what "prescribed" meant for a past set. The `rest-adherence` trend above it does derive
   from the style, which is right for its own question and would be wrong for this one.
-- **Keep:** the device check, and only that. `planned_rest_sec` is in the local store and no route
-  publishes it, so the card is **absent in a browser** and cannot be verified in CI — see LB-98.
-  Nothing here licenses a rest term in `expectedRpe`.
+- **Keep:** the device check, and only that — **but its stated reason no longer holds, and the check
+  it leaves is narrower.** LB-98 published the logged pairs on `/api/health-trends?view=rest-adherence`
+  and the card now falls back to them, so it is **no longer absent in a browser**:
+  `e2e/rest-vs-plan-card.spec.ts` exercises the rows, the deltas and the compression sentence, all
+  mutation-proven. What the S25 still owes is the LOCAL path — `getLocalStore` reading
+  `planned_rest_sec` from the device's own set logs, which no harness can reach. Nothing here
+  licenses a rest term in `expectedRpe`.
 
 ### [workouts] Q-289 — `expectedRpe` misses by more than the autoregulation dead band at both ends of its own range
 
