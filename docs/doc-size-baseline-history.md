@@ -11346,3 +11346,15 @@ than a ceiling. BF-153 was 38 lines and mostly evidence — the save body showin
 the two dates reading 13/09/2026 and 10 Sept on one screen — because the screen looks correct and the
 defect is only visible from the code. That evidence is why the entry was right in every particular,
 which is not the recent norm; it now lives in the journal entry rather than the queue.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21352 (RV-35 closed, 39 lines back)
+
+RV-35's fix was already in the tree — `nutrition-content.tsx:334` calls `useDayRolloverRefresh`,
+which is the hook the entry prescribed — so what the entry was really still owed was its own
+condition: the owner directed that it ship without a device check, and the entry converts that into
+a test that fails before the fix and passes after. That test now exists and is mutation-proven, so
+the entry leaves.
+
+**Re-verifying against `main` is what stopped this being wrong in either direction.** Read as stale,
+it deletes with the obligation unmet and nothing guarding the behaviour. Read as unbuilt, it
+re-implements a line that is already there. Both halves had to be checked.
