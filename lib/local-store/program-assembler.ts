@@ -97,6 +97,9 @@ function buildWorkoutExercise(
     defaultSets:          progressionStyle?.length ?? 3,
     lastSets:             null,
     lastReps:             [],
+    // Null for the same reason `estimated1rm` is: these reps describe the log that number came
+    // from, and the local mirror has neither until the network fetch fills them (BF-151).
+    prevRepMaxReps:       null,
     progressionStyle,
     styleName:            ex.styleId ? styleNameById.get(ex.styleId) ?? null : null,
     styleId:              ex.styleId ?? undefined,

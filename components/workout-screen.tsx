@@ -1352,6 +1352,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
       lapTimes: snapLapTimes,
       restSec: snapAccRestMs > 0 ? Math.round(snapAccRestMs / 1000) : 0,
       prevEst1rm: ex.estimated1rm ?? null,
+      prevRepMaxReps: ex.prevRepMaxReps ?? null,
       allTimePr1rm: ex.allTimePr1rm ?? null,
       newEst1rm: newEst1rm,
       target80: target80,
