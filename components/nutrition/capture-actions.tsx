@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button'
 import { BarcodeScanner } from './barcode-scanner'
 import type { NutritionScanResult } from '@trainingai/shared/types/nutrition'
 import { decodeMealLabelScan, type SharedMeal } from '@trainingai/shared/nutrition/label-payload'
-import { downscaleToJpegDataUrl, base64FromDataUrl, SCAN_IMAGE_MAX_DIM } from '@/lib/media/downscale-image'
+import { downscaleToJpegDataUrl, downscaleToThumbDataUrl, dataUrlToBlob, base64FromDataUrl, SCAN_IMAGE_MAX_DIM } from '@/lib/media/downscale-image'
+import { rejectMealImage, FOOD_ITEM_IMAGE_MAX_BYTES } from '@trainingai/shared/nutrition/meal-image'
 
 interface Props {
   onScanResult: (result: NutritionScanResult) => void
@@ -25,6 +26,39 @@ interface Props {
    * half-open camera.
    */
   children: React.ReactNode
+}
+
+/**
+ * What the thumbnail's base64 may weigh on the wire, in characters.
+ *
+ * **This is smaller than the image cap, and that is a defect being worked around rather than a
+ * design.** `POST /api/nutrition/food-items` caps its whole body at 8 KB — a number written for
+ * *"a name, a brand and a dozen macro numbers"*, before BF-35 gave the route a 16 KB image field.
+ * Base64 costs a third more than the bytes it carries, so an image at its own permitted cap is
+ * ~21 KB on the wire and the route answers **413 before `rejectMealImage` ever runs**: the whole
+ * food save fails, rather than the picture being refused. Measured 2026-09-13 — a 128 px WebP of a
+ * detailed photo at q0.8 came back 6,612 bytes, which is 8,816 characters, which is over.
+ *
+ * So the ladder below fits the picture to what the route will actually take. Raising the route's
+ * body cap past `FOOD_ITEM_IMAGE_MAX_BYTES` is LB-101 (Lane A); this constant goes when it lands.
+ */
+const THUMB_WIRE_BUDGET = 7 * 1024
+
+/**
+ * The captured photo as a stored thumbnail, or `undefined` if it cannot be made into one.
+ *
+ * **Never throws and never blocks the scan.** A picture must not be able to fail a nutrition
+ * lookup — the barcode route's own thumbnail fetch is written to the same rule, and dropping the
+ * image is always the better failure than losing the food the user just photographed.
+ */
+async function thumbFromPhoto(previewUrl: string): Promise<string | undefined> {
+  try {
+    const thumb = await downscaleToThumbDataUrl(dataUrlToBlob(previewUrl), THUMB_WIRE_BUDGET)
+    const tooBigForTheBody = thumb.length - thumb.indexOf(',') - 1 > THUMB_WIRE_BUDGET
+    return tooBigForTheBody || rejectMealImage(thumb, FOOD_ITEM_IMAGE_MAX_BYTES) ? undefined : thumb
+  } catch {
+    return undefined
+  }
 }
 
 /**
@@ -54,7 +88,15 @@ export function CaptureActions({ onScanResult, onManual, onScannedSavedMeal, onS
   const [pendingPhoto, setPendingPhoto] = useState<{ base64: string; mimeType: string; previewUrl: string } | null>(null)
   const [photoNote, setPhotoNote] = useState('')
 
-  async function callScan(body: object) {
+  /**
+   * `imageDataUri` is the photo the user just took, downscaled to a stored thumbnail (OR-108).
+   *
+   * The scan route answers with macros and no picture, so without this the one route where a
+   * photograph of the food certainly exists was the one that saved none. It rides the result rather
+   * than being written here because the caller — `food-logger-sheet` — owns the food creation and
+   * already threads `imageDataUri` through to it; the describe/text path simply passes nothing.
+   */
+  async function callScan(body: object, imageDataUri?: string) {
     setLoading(true)
     setError(null)
     try {
@@ -68,13 +110,15 @@ export function CaptureActions({ onScanResult, onManual, onScannedSavedMeal, onS
         setError(data.error ?? 'Could not identify food. Try describing it manually.')
         return
       }
-      onScanResult(data as NutritionScanResult)
+      const result = data as NutritionScanResult
+      onScanResult(imageDataUri ? { ...result, imageDataUri: result.imageDataUri ?? imageDataUri } : result)
     } catch {
       setError('Network error. Check your connection.')
     } finally {
       setLoading(false)
     }
   }
+
 
   async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -168,7 +212,7 @@ export function CaptureActions({ onScanResult, onManual, onScannedSavedMeal, onS
     const region = localStorage.getItem('ta_food_region') ?? 'AU'
     const body: Record<string, unknown> = { image: pendingPhoto.base64, mimeType: pendingPhoto.mimeType, region }
     if (photoNote.trim()) body.text = photoNote.trim()
-    await callScan(body)
+    await callScan(body, await thumbFromPhoto(pendingPhoto.previewUrl))
   }
 
   async function handleDescribe() {
@@ -215,12 +259,14 @@ export function CaptureActions({ onScanResult, onManual, onScannedSavedMeal, onS
     }
   }
 
+  // Named, for the reason `meal-photo-tile.tsx` records: this sheet carries other file inputs, and a
+  // selector as broad as `input[type="file"]` reaches whichever comes first in the DOM.
   const photoInput = (
     <>
-      <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhoto} />
+      <input ref={fileInputRef} name="food-photo" type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhoto} />
       {/* No `capture`: that attribute is what makes the browser open the camera, so the gallery
           route needs an input without it. */}
-      <input ref={galleryInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
+      <input ref={galleryInputRef} name="food-gallery" type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
     </>
   )
 

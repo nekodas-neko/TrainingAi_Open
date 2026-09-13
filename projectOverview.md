@@ -1754,6 +1754,26 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [nutrition] ⚠️ A captured food's picture is written but the device still reads it back as null (OR-108/LA-36, 2026-09-13)
+
+The write half shipped in v1.454.0: photographing a food and scanning a barcode both now put an
+image on the food item, and correcting a scan no longer discards it. **The picture will still not
+appear on a food row on the S25**, because `LA-36` is open — all three local-store read paths
+(`searchFoodItems`, `getRecentFoodItemsForMeal`, the item embedded in `getFoodLogs`) omit
+`image_data_uri`, so the canonical runtime reads null even now that the column is filled. Web
+returns it correctly, which is the device-versus-web divergence pointing the wrong way. **Not device
+verified either** — the harness drives the web `<input>`, which feeds the same handler and the same
+canvas re-encode, but not the Capacitor camera's own capture.
+
+**And the route will refuse a detailed photo outright until LB-101 lands.** `POST
+/api/nutrition/food-items` caps its body at 8 KB while permitting a 16 KB image; base64 costs a
+third more, so an image at its own cap is ~21 KB on the wire and the request 413s **before**
+`rejectMealImage` runs — the food is lost, not the picture. Measured: a 128 px WebP of a detailed
+source is 8,816 base64 characters. `capture-actions.tsx` works around it with a quality ladder down
+to a 7 KB wire budget and drops the image rather than send a body that would fail; that workaround,
+its `THUMB_WIRE_BUDGET` constant and two assertions in `food-image-write-paths.test.ts` come out
+when the route's cap is fixed.
+
 ### [nutrition] 🔴 `one-calorie-budget.spec.ts` is red on `main` since BF-150, and it merged that way (LB-100, 2026-09-12)
 
 `e2e/one-calorie-budget.spec.ts:165` — *"Home's nutrition card counts against that same budget"* —

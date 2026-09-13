@@ -174,6 +174,11 @@ export function IngredientPicker({ active, userId, onAdd, onImportRecipe, onReci
         sodiumMg: scan.sodiumMg,
         satFatG: scan.satFatG,
         source: 'barcode',
+        // OR-108. The lookup already fetched Open Food Facts' thumbnail and capped it — dropping it
+        // here is why every barcode-scanned food was imageless. `capture-actions.tsx` hands the whole
+        // response to `onScanResult`, so its copy of this path was never missing it; this one rebuilds
+        // the payload field by field, which is how one field goes missing without anything failing.
+        imageDataUri: scan.imageDataUri ?? null,
       }, userId))
     } catch {
       toast.error(offlineHint() ?? 'Network error looking up barcode.')
