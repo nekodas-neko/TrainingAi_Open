@@ -11324,3 +11324,19 @@ the image check runs, and the client is carrying a quality ladder to dodge it un
 open dependencies, the workaround and the constant that has to be deleted with it are all named. The
 entry leaves — to `known-issues-resolved.md` — when LA-36 and LB-101 are both in and the device pass
 has seen a picture on a row.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21495 (the app-shell device pass)
+
+Sixty-four lines, and the largest single block is BF-96/BF-139's shared diagnosis. Two entries had
+each been declared fixed and each re-broke the same header row, because they own different elements
+in one width budget and neither owns the date. Writing that once, on both entries, with a `Batch:`
+tying them together, is what stops a third round of one-at-a-time fixes.
+
+The rest is failures recorded in the owner's words. `BF-95`'s *"Still requires a little pause"* is
+the one worth the space: it reads like a near-miss and is not — the entry's bar was the confirmation
+appearing on the FIRST press, so a shorter pause is the same defect, and saying so stops the next
+session tuning a constant down instead of fixing the sequencing.
+
+PS-35b gained a scope rule rather than an answer: no check that is only reproducible in a browser
+goes in front of the owner. That is `CLAUDE.md`'s Canonical Runtime policy with its checklist
+consequence spelled out.
