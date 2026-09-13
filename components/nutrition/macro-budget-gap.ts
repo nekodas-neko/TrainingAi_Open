@@ -33,10 +33,11 @@ import { macroKcal, type MacroGrams } from './macro-energy'
  *
  * Deciding which anchor is *right* is not this module's business — it reaches
  * `lib/health/energy-balance-service.ts` and TN-29 protects the stored 1,660. This only says out
- * loud that they are two denominators. **Whether the grams should follow the resting rate or stay
- * on the stored goal is still open after BF-154**, which fixed the sentence explaining the gap and
- * deliberately did not move the grams: that is a change to what the user is told to eat, and it
- * belongs to whoever owns the target, not to the card that prints the difference.
+ * loud that they are two denominators. **The owner has now decided which one wins (BF-154,
+ * 2026-09-13): the grams follow the budget** — *"Can we have it dynamically sized for my calories?"*
+ * That is not built yet. When it is, the gap goes to zero by construction and **this module should
+ * be deleted rather than kept**: it exists only to measure a disagreement that will no longer
+ * exist, and so does the paragraph on `energy-card.tsx` that reports it.
  */
 
 /** Below this the two numbers read as the same one, and a paragraph explaining them is noise. */

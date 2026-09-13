@@ -43,12 +43,20 @@ first cut printed *"1,815 — 1,815 resting rate"* — the same figure twice, th
 sentence whose report opened *"There is so many numbers here."* That case now reads *"your resting
 rate"* without repeating the number. Cheap to reverse; it is one ternary.
 
-**Not done, deliberately:** the macro grams still key off the stored goal while the budget follows
-the resting rate, so the printed gap moved from ~295 to ~365 and does not close. Whether the grams
-should follow the anchor is a change to what the user is told to eat, and it belongs to whoever owns
-the target rather than to the card that prints the difference. `macro-budget-gap.ts` — whose
-docstring stated the retired formula as fact and now does not — says so where the next reader will
-find it.
+**Not done, deliberately — and the owner answered it while this was being gated.** The macro grams
+still key off the stored goal while the budget follows the resting rate, so the printed gap moved
+from ~295 to ~365 and does not close. That was left open here as his call, on the reasoning that
+moving the grams changes what he is told to eat. **He decided the same day** (#1153, landing on
+`main` mid-gate): *"Can we have it dynamically sized for my calories? I.e before excercise its 1
+value and after its another if calories increase?"* The grams follow the budget.
+
+The answer arrived attached to BF-154's backlog entry — the entry this PR was deleting. Resolving
+that conflict by removing the entry would have removed the decision with it, which is the failure
+this repo's backlog rule exists to prevent. **BF-154 stays queued with a `Keep:` line** naming the
+re-anchor as what is owed and carrying his words verbatim. `macro-budget-gap.ts` now records that
+the question is settled and that **the module itself should be deleted** when the re-anchor lands:
+it exists only to measure a disagreement that will then be zero by construction, and so does the
+paragraph this PR just fixed.
 
 ## Verification
 

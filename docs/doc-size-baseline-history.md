@@ -11533,20 +11533,44 @@ PS-35b gained a scope rule rather than an answer: no check that is only reproduc
 goes in front of the owner. That is `CLAUDE.md`'s Canonical Runtime policy with its checklist
 consequence spelled out.
 
-## 2026-09-13 — `docs/implementation-backlog.md` → 21387 (BF-154 shipped)
+## 2026-09-13 — `docs/implementation-backlog.md` (BF-155, BF-156, and BF-154's answer)
 
-BF-154's 36-line entry leaves the queue the same day it was filed, which is the shape worth noting:
-it was opened against BF-152, shipped that morning, from the owner's screenshot of the result. The
-entry was right on every claim, including the one it made to stop itself being refiled — that the
-1,294 base is correct and only the expectation behind it was built on an uncorrected body-fat
+Ninety-three lines across three edits. BF-155 carries a seven-row production table because the
+reported symptom ("my amrap week") and the real scope (every session since 6 September) differ, and
+the entry has to show that rather than assert it. BF-156 is short. BF-157 was added to the same PR: the
+bodyweight ready screen's countdown is gated on the warm-up weight ladder, so a `workingWeight` of 0
+removes both. BF-154 gains the owner's answer on
+the macro anchor plus the consequence he has not seen yet — protein is held constant while the base
+drops.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21547 (BF-154's arithmetic half shipped)
+
+**BF-154 does NOT leave the queue, and very nearly did.** The entry was filed against BF-152 the
+morning it shipped, from the owner's screenshot; this PR fixed the arithmetic half and the first
+draft deleted the entry as finished, which is what the protocol asks for. Between the branch being
+cut and the merge attempt, #1153 landed on `main` and **appended the owner's answer on the macro
+anchor to that same entry** — *"Can we have it dynamically sized for my calories?"* The backlog
+conflict that followed had an EMPTY head side and a main side holding three new entries plus the one
+being removed, so the obvious resolution — take main's additions, drop the entry I finished —
+would have deleted his decision along with it. It is re-queued with a `Keep:` line instead.
+
+**The rule this is a case of: a conflict on this file is normally two deletions, and this one was
+not.** It was one deletion against an addition INSIDE the entry being deleted, which no marker
+distinguishes. Reading the headings is what the standing rule asks for; reading what changed inside
+them is what it needed.
+
+The entry was right on every claim, including the one it made to stop itself being refiled — that
+the 1,294 base is correct and only the expectation behind it was built on an uncorrected body-fat
 figure. Re-derived rather than taken on trust: `cunninghamBmr` is `ffm * 21.6 + 370`, so the
 DEXA-corrected 28.7 % of 70.2 kg gives FFM 50.05 and `1452.2 − 157 = 1294.1`, while the scale's raw
 25.5 % gives FFM 52.30 and 1342.7 — which is exactly the 1,342 BF-152 quoted and the owner read as
 ">1350". Both figures are right; they are answers to different questions.
 
-## 2026-09-13 — `projectOverview.md` → 10829 (BF-154's Known-Issues row)
+## 2026-09-13 — `projectOverview.md` → 10835 (BF-154's Known-Issues row)
 
-+34 for a row that is mostly the part NOT fixed. The arithmetic half is two sentences; the rest is
-the macro-gram anchor, which moved from ~295 to ~365 kcal out and was deliberately left alone because
-changing it changes what the owner is told to eat. A row that recorded only the fix would read as
-closed, and the next session would find the gap and refile it.
++40 for a row that is mostly the part NOT fixed. The arithmetic half is two sentences; the rest is
+the macro-gram anchor, which moved from ~295 to ~365 kcal out. The row was written while that was
+still an open question for the owner and rewritten once his answer surfaced, so it now says the
+outstanding work is a BUILD rather than a decision — including the consequence he has not seen, that
+protein holds while carbs and fat drop. A row that recorded only the fix would read as closed, and
+the next session would find the gap and refile it.

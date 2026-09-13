@@ -1845,11 +1845,17 @@ sentence: no movement reads *"1,815 — your resting rate, nothing moved yet"*, 
 reproduced it on the fixture (`2,369` against a named `1,815`), which is what makes it evidence
 rather than a passing test.
 
-**What is still owed, and it is the owner's:** the macro gram targets key off the stored 1,660 goal
-while the budget now follows the resting rate, so the printed gap moved from ~295 to ~365 and does
-not close. Whether the grams should follow the anchor is a change to what he is told to eat, not a
-bug in the card that prints the difference — so it was deliberately not made here.
-`components/nutrition/macro-budget-gap.ts` carries the open question where the next reader meets it.
+**What is still owed is now BUILD work, not a decision.** The macro gram targets key off the stored
+1,660 goal while the budget follows the resting rate, so the printed gap moved from ~295 to ~365 and
+does not close. This was left open here as the owner's call — and **he answered it the same day**
+(BF-154, via #1153): *"Can we have it dynamically sized for my calories? I.e before excercise its 1
+value and after its another if calories increase?"* The grams follow the budget. That answer landed
+on `main` while this PR was being gated, so the fix shipped without it; BF-154 stays queued with a
+`Keep:` line carrying the answer rather than being struck, because deleting the entry would have
+deleted the decision with it. **Flag for whoever builds it:** `scaleMacrosForEarnedKcal` holds
+protein constant, so re-basing from 1,660 to ~1,294 drops carbs and fat while 150 g protein stands —
+right for a cut, and a visible change to his targets. When it lands, `macro-budget-gap.ts` and the
+paragraph reported here both become dead and should go with it.
 
 **Also not device-verified.** JS-only, so it reaches the phone on the next Railway deploy with no
 APK, but nothing has read the sentence at 412 dp. The check is one look at Nutrition: the terms
