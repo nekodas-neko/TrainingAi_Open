@@ -11144,3 +11144,11 @@ LB-100's entry leaves the queue with the one-budget fix. `projectOverview.md` gr
 shrinks: BF-150's Known-Issues row stays (its goal question is still owed) and gains an amendment
 recording the regression it caused and why it reached `main` — a red advisory check that nothing
 blocked on.
+
+## 2026-09-13 — `docs/implementation-backlog.md` (BF-152 filed at the top)
+
+Fifty-eight lines for BF-152, which changes one line of what BF-150 shipped the day before: the
+budget anchors to the owner's measured resting rate rather than to the number typed into
+`nutrition_targets`. The entry carries the measurement that makes it buildable — the Cunningham
+residual re-scaled onto today's fat-free mass reads **1,342**, which is the *"start at 1350"* he
+described, and `bmr × 1.2` reads **1,611**, which is his *"1600"*.
