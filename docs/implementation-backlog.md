@@ -421,6 +421,73 @@ below threshold and left in place for next time.
 
 
 
+### [workouts][readiness] TN-36 — the deload engine has ONE way to say "train normally", and a bug fix switched on its loudest trigger 🔴 LIVE
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-14 · owner: *"workouts are constantly being recommended for deload… I'm sure it's just bad tuning."*
+- **Lane: A** — `packages/shared/src/ai-periodization/ai-dynamic.ts:182-236`.
+- **Gate: owner** — step 1 changes what the app tells the owner to do with their training. Steps 2 and 3 are not gated.
+- **Sibling of TN-34**, which covers the stress override alone. **This entry is the cause; TN-34 is what made it visible.**
+- **Reference:** [`review`](reviews/2026-09-14-what-triggers-a-deload.md).
+
+**It is not tuning. Nine conditions can recommend a deload and exactly ONE can decline it.**
+
+```ts
+if (consecutiveTrainingDays < 3) {
+  return { recommended: false, strength: 'soft' }   // the only false in the function
+}
+const r = readinessScore ?? 70
+if (r >= 70) return { recommended: true, strength: 'soft' }
+if (r >= 50) return { recommended: true, strength: 'recommended' }
+return       { recommended: true, strength: 'strong' }
+```
+
+**Past three consecutive training days every branch returns `recommended: true`** — readiness picks
+the *strength*, never the *verdict*. **A readiness of 100 recommends a deload**, and `?? 70` means a
+day with no readiness does too.
+
+**Measured over 45 days: 28 days were not recommended and all 28 were cleared by
+`consecutiveTrainingDays < 3`. Not one on merit.** The engine has never said *"you are recovered"* —
+only *"you have not trained enough days in a row yet"*. **⚠ Which makes the rule perverse:** a rest
+day buys three clear days regardless of recovery, while four good days in a row guarantees a deload.
+
+**⚑ AND THE SECOND DEFECT HAS A DATE — this is the step change the owner is describing:**
+
+| | August (31 d) | September (14 d) |
+|---|---|---|
+| **deload recommended** | **6 — 19%** | **11 — 79%** |
+| fired by the stress override | **0** | **9** |
+| stored `stress_high_minutes` max | **90** | **330** |
+| days ≥ the 120 threshold | **0 of 27** | **9 of 14** |
+
+**The threshold did not move.** Commit `7c428a7f` (2026-08-31) fixed TN-22's storage defect; before
+it the stored scalar was written by a second producer off a different HR baseline and came out near
+zero, **so it never reached 120 and the override never fired.** Fixing the bug switched on a trigger
+nobody had seen fire. **⚠ And it is the number TN-33 measured as carrying no signal** — 57% night
+buckets, r = +0.072 with readiness over 18 days.
+
+**The readiness ladder is the smaller half but is also mistuned:** it fired on
+**65, 73, 69, 66, 52, 33, 50, 38**. A readiness of **73** produced a deload recommendation.
+
+**Fix in this order:**
+1. **Give readiness a way to CLEAR a day** — `r >= 70` returns `{ recommended: false }` instead of
+   "soft". One line, and it is the cause. **`Gate: owner`.**
+2. **Unwire the stress override** — TN-34, one line, reversible, and it is what changed on 09-01.
+3. **Re-measure before touching the bands.** With 1 and 2 done the rate falls to the ladder's own
+   contribution — **19% in August** — which may need no tuning at all.
+
+**⛔ Do not raise the 120-minute threshold and do not raise the streak from 3.** Both are the
+"threshold is right, the input is wrong" mistake, which this pillar has now made five times — the
+same file names four of them eleven lines above the stress condition. **The streak is not a recovery
+signal; it is a proxy standing in for one.**
+
+**⚠ Stated rather than implied:** `consecutiveTrainingDays` counts `hasExercises`, this
+reconstruction used `completed_at IS NOT NULL`, so real streaks are **the same or longer** and the
+real rate is at or above these figures. `energyLevel` and `selfReportedSick` were not reconstructed
+and can only escalate. Temperature and illness never fired in this window.
+
+**Pass test:** a day with readiness ≥ 70 and four training days behind it is **not** recommended for
+deload; and over a month the recommendation rate sits nearer 20% than 80%.
+
 ### [nutrition] BF-154 — the budget's own explanation prints three numbers that do not add up to it
 
 - **Lane:** A — `components/nutrition/energy-card.tsx:195-201` is the print site, but the value it
@@ -1078,6 +1145,7 @@ metric.
 - **Lane: A** — `packages/shared/src/ai-periodization/ai-dynamic.ts:219-225`.
 - **✅ OWNER-APPROVED 2026-09-10** — *"yes lets do all that."* **Option 1: unwire `stressOverride`.** Not gated; one line, reversible.
 - **Needs: TN-33** — only for the later question of what replaces it; the unwiring does not wait.
+- **⚑ TN-36 is the wider finding and dates this one.** The override fired **0 times in August and 9 times in 14 September days**, because `7c428a7f` fixed the storage defect that had been holding the stored value under the threshold. Unwiring here is step 2 of TN-36's three.
 - **Reference:** [`review`](reviews/2026-09-10-stress-status.md) §8.
 
 `ai-dynamic.ts:219` gates a **deload recommendation** on `stressHighMinutes >= 120`

@@ -11505,3 +11505,24 @@ addends of the formula BF-152 retired beside the budget the new one produced, so
 breaks it into terms summing to 2,078. Most of the lines are the two consequences that are not
 arithmetic — the 2,278 it prints as "resting burn" is the inflated estimator BF-152 escaped, and the
 macro grams stayed on the stored goal while the budget moved.
+
+## 2026-09-14 — backlog → 21454, `tuning.md` → 614: every deload trigger measured (TN-36)
+
+The owner reported constant deload recommendations and guessed at bad tuning. It is not tuning, and
+the entry needs its length because there are two defects rather than one.
+
+**The structural half is a code shape, so the entry quotes it.** Nine conditions can recommend a
+deload and exactly one — `consecutiveTrainingDays < 3` — can decline it; past three training days
+every branch returns `recommended: true` and readiness only picks the strength. **Measured: 28 of 45
+days cleared, every one by the streak counter and none on merit.** A five-line quotation makes that
+undeniable where a sentence would invite a reader to assume the ladder must clear somewhere.
+
+**The dated half is the finding the owner actually felt, and the table is the proof.** Deload went
+**19% in August to 79% in September** while the threshold never moved: `7c428a7f` fixed TN-22's
+storage defect, and before it the stored stress scalar came out near zero and **could not reach 120**,
+so the override had never once fired. Repairing an input switched on a trigger nobody had seen — which
+is a behaviour change that needed measuring as one, and is why the baton now says to date a reported
+step change against `git log` before calling it tuning.
+
+The ⛔ line closing the entry is the fifth instance of the same mistake in this pillar, and the file
+being edited names four of them eleven lines above the condition in question.

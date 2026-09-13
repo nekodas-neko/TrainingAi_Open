@@ -571,6 +571,21 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
   are no longer load-bearing — the estimate is informational now. **TN-28 went the other way**: the
   stored target is now what everything follows, so that card's one-tap write matters MORE. **Re-read
   an entry's consequence, not just its correctness, after main moves under it.**
+- **⛔⛔ THE DELOAD ENGINE HAS ONE WAY TO SAY "TRAIN NORMALLY" (TN-36).** Nine conditions can
+  recommend a deload; exactly one — `consecutiveTrainingDays < 3` — can decline it. Past three
+  training days **every branch returns `recommended: true`** and readiness only picks the strength, so
+  **a readiness of 100 still recommends a deload** (and `?? 70` means a missing readiness does too).
+  **Measured: 28 of 45 days cleared, all 28 by the streak counter, none on merit.** ⚠ Perverse by
+  construction — a rest day buys three clear days regardless of recovery.
+- **⚑⚑ FIXING A BUG SWITCHED ON A TRIGGER NOBODY HAD SEEN FIRE, AND THE OWNER FELT IT.** Deload went
+  **19% in August to 79% in September**; the stress override fired **0 times then 9 times**. The
+  threshold never moved — `7c428a7f` fixed TN-22's storage defect, and before it the stored scalar
+  came out near zero and **could not reach 120**. **A threshold that never fires is not calibrated,
+  it is disabled** — and repairing its input is a behaviour change that needs measuring as one.
+  **When an owner reports a step change, date it against `git log` before calling it tuning.**
+- **⚠ The readiness ladder fired on 65, 73, 69, 66, 52, 33, 50, 38** — a readiness of **73** produced
+  a deload recommendation. Mistuned, but the smaller half: the bands are choosing a strength when
+  §2 says they should first be choosing whether.
 - **The threshold is usually right and the input usually wrong** — Q-506, Q-512, Q-514, now TN-6.
   Check the input's distribution before touching any constant.
 - **Do NOT lift the sleep scale toward its old mean** — sleep/readiness agreeing is load-bearing for
