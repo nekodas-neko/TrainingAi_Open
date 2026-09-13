@@ -421,6 +421,33 @@ below threshold and left in place for next time.
 
 
 
+### [workouts] LB-103 — the push:pull half of Q-305 is blocked on a taxonomy nobody has filed
+
+- **Lane:** A — `packages/shared/src/ai-periodization/volume-targets.ts` or beside it, next to
+  `normalizeMuscle` / `MUSCLE_LANDMARKS`.
+- **Added:** 2026-09-13 by Implementation Lane B, found scanning PARKED after READY hit 0.
+  **Branch:** unassigned.
+- **The blocker is real and it is unfiled, which is the point of this entry.** Q-305's `Keep:` says
+  the push:pull half *"belongs in `packages/shared` … which is Lane A's"* — and there is **no Lane A
+  entry for it**. It exists only as a sentence inside a Lane B entry, so `next-item.js --lane A` has
+  never listed it and never will. Same shape as the prose parking that hid TN-3b for three days:
+  a dependency stated in prose is a dependency nobody is holding.
+- **What to build:** a muscle → movement-pattern grouping (push / pull / legs / other) in shared,
+  under One Formula One Place. Q-305 rejected doing it inside the component **for the right reason**
+  — a private second copy in `components/` is exactly the divergence that rule exists to stop — so
+  this is not a re-litigation of that call, it is the entry that call implies.
+- **Measured twice and it replicates**, which is why the surface is worth having: legs 481 (33%),
+  push 433 (30%), pull 333 (23%), other 168 (11%) over 60 days — ratio **1.30**; and legs 458 (34%),
+  push 382 (29%), pull 286 (22%), other 202 (15%) over 56 days — ratio **1.34**. Mildly
+  push-dominant, worth correcting toward 1.0, and well short of pathological. **Nothing computes it.**
+- **Once this lands, Q-305's remaining Lane B work is one card section** on
+  `weekly-muscle-sets-card.tsx`, which already carries the landmark bands.
+- **Do NOT let this quietly grow into the shared-treatment question.** Whether Q-278 / Q-302 / Q-305
+  want one common "computed and discarded" surface is an open design question for the owner or the
+  Orchestrator, deliberately untouched since 2026-08-25 — answering it inside this taxonomy would
+  prejudge it exactly as answering it inside one card would have.
+- **Reversal cost:** low. One shared module and its tests; nothing renders it until Q-305's half does.
+
 ### [readiness] LB-102 — `/api/body-battery` serves today only, so a persisted stress day cannot be read back
 
 - **Lane:** A — `app/api/body-battery/route.ts` (or a sibling read), over `oura_daytime_stress_buckets`.
@@ -13717,9 +13744,10 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   `DEFAULT_LANDMARKS`. It is not — `muscles.ts:17` maps `core: 'abs'` and `volume-targets.ts:58`
   applies `normalizeMuscle` before the lookup. Working correctly. **Now pinned by a unit case** so it
   stays that way.
-- **Keep:** the push:pull half (blocked above, Lane A), the shared-treatment design question, and the
-  S25 check — the band word sits beside the set count on a narrow row and has only been seen in a
-  desktop browser. `Gate: device`
+- **Keep:** the push:pull half — now filed as **`LB-103`** (Lane A) rather than left as prose in this
+  bullet, because a dependency only a Lane B entry mentions is one no Lane A queue shows. Also the
+  shared-treatment design question, and the S25 check — the band word sits beside the set count on a
+  narrow row and has only been seen in a desktop browser. `Gate: device`
 
 
 ### [workouts] Q-300 — 37% of sets are taken with materially less rest than prescribed, and the RPE model has no rest term
