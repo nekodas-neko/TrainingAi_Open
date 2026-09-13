@@ -11269,3 +11269,18 @@ budget anchors to the owner's measured resting rate rather than to the number ty
 `nutrition_targets`. The entry carries the measurement that makes it buildable — the Cunningham
 residual re-scaled onto today's fat-free mass reads **1,342**, which is the *"start at 1350"* he
 described, and `bmr × 1.2` reads **1,611**, which is his *"1600"*.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21355 (the owner's nutrition device pass)
+
+Eighty-odd lines from one sitting on the phone, and the shape of the spend is the point: fourteen
+entries got SHORTER (a `Verify: device` replaced by a one-line result), and five got substantially
+longer, because a failure costs more to record than a pass.
+
+BF-98 is the longest and is mostly a refusal to guess. The owner's report fits two readings that
+point at different components, so the entry carries both and says one screenshot settles it — a
+confident single reading would have sent the next session to `meal-card.tsx`, which the code says is
+probably already correct.
+
+BF-134 is the other long one: a requirement the owner has now given verbally **twice** with no entry
+of its own, so each session re-derived it. It also contradicts LB-50/BF-102's measured activity
+factor, and saying so is what stops the app shipping two calorie models.
