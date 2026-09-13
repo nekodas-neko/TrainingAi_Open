@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.455.0",
+    date: "2026-09-13",
+    changes: [
+      "Body Battery now shows when today ran stressed, on a clock. Open the card and under the daytime-stress strip there is a 24-hour chart: the hours you were stressed sit high, overnight is shaded because it runs positive for everyone, and hours the ring did not record are left blank rather than joined up \u2014 on an average day it records about 13 of 24, so the blanks are most of it. It says how many hours were measured, and it makes no judgement about the day. Past days are not reachable yet.",
+    ],
+  },
+  {
     version: "1.454.2",
     date: "2026-09-13",
     changes: [

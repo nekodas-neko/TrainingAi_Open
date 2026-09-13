@@ -421,6 +421,28 @@ below threshold and left in place for next time.
 
 
 
+### [readiness] LB-102 — `/api/body-battery` serves today only, so a persisted stress day cannot be read back
+
+- **Lane:** A — `app/api/body-battery/route.ts` (or a sibling read), over `oura_daytime_stress_buckets`.
+- **Added:** 2026-09-13 by Implementation Lane B, found shipping TN-3b's chart. **Branch:** unassigned.
+- **The route takes no parameters at all** — `export async function GET()` — and computes the stress
+  series live from today's ring dHRV. TN-3a's table has persisted 30-minute buckets since
+  **2026-08-24** (478 rows over 18 days when last measured) and **nothing publishes them**, so a
+  past day is unreachable from any surface.
+- **This blocks an owner-approved pass test, which is why it is filed at the top.** TN-3b's test is
+  *"the owner opens a past day, reads a stressed window off the axis, and can say whether it matches
+  what they were doing"* — the whole point being that his own recall is the ground truth, since
+  TN-33 established there is no independent target with variance (`perceived_recovery` reads 3 on
+  all 17 days). Today-only answers half the question he approved.
+- **The surface is already built and needs no change.** `StressDayChart` takes a plain
+  `{ t, level }[]` and `toSegments` sorts before segmenting precisely because a day assembled from
+  stored rows carries no ordering guarantee. A `?date=` on the existing route, returning the stored
+  buckets for that day, is all it wants.
+- **Same shape as LB-98**, and worth naming as a pattern: data that persists with no read path is
+  invisible to every surface and to CI both. That entry cost a card its verifiability; this one costs
+  an approved feature its pass test.
+- **Reversal cost:** low — one read, and a route that answers for a date as well as for today.
+
 ### [platform] LA-103 — a sentence saying a gate was withheld IS a gate, and it parked verified work
 - **Lane:** A — `scripts/lib/keep.js:47`, and the park ordering it feeds in `scripts/next-item.js:145`.
 
@@ -10393,6 +10415,20 @@ record explicitly why not.
 
 ### [readiness] TN-3b — surface stress by hour, and on the HR charts
 - **Lane:** B — surface only: components/body-battery.
+- **✅ THE TODAY CHART SHIPPED 2026-09-13** (`feat/tn-3b-stress-by-hour`).
+  `stress-day-chart.tsx` draws the day on a 24-hour local-time axis inside the Body Battery card,
+  beside the strip rather than replacing it: gaps left blank at a 75-minute threshold, the night band
+  shaded, zero and ±0.5 ruled, coverage stated in hours, and no score or verdict anywhere on it.
+  Geometry is in `stress-day.ts` with 9 node tests (timezone, the measured 06:45 → 13:15 hole, the
+  one-dropped-reading tolerance, coverage excluding gaps); `e2e/stress-by-hour.spec.ts` proves it
+  draws as **two** polylines rather than one joined line.
+  [Journal](overview/entries/2026-09-13-tn-3b-stress-by-hour.md).
+- **Keep: the PAST-DAY half, which is blocked on `LB-102` (Lane A).** The pass test — *"the owner
+  opens a past day, reads a stressed window off the axis"* — cannot be met yet: `/api/body-battery`
+  is `export async function GET()` with **no parameters**, so only today is reachable. The buckets are
+  persisted (TN-3a, `oura_daytime_stress_buckets`, from 2026-08-24), and the chart takes a plain
+  `buckets` array, so the surface work is done — what is missing is the read. Also still owed:
+  overlaying stress on the HR charts, and the **stress-by-hour aggregate across days**.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner request
