@@ -1850,9 +1850,12 @@ rather than a passing test.
 does not close. This was left open here as the owner's call — and **he answered it the same day**
 (BF-154, via #1153): *"Can we have it dynamically sized for my calories? I.e before excercise its 1
 value and after its another if calories increase?"* The grams follow the budget. That answer landed
-on `main` while this PR was being gated, so the fix shipped without it; BF-154 stays queued with a
-`Keep:` line carrying the answer rather than being struck, because deleting the entry would have
-deleted the decision with it. **Flag for whoever builds it:** `scaleMacrosForEarnedKcal` holds
+on `main` while this PR was being gated, so the fix shipped without it; BF-154 stays queued carrying
+the answer rather than being struck, because deleting the entry would have deleted the decision with
+it. It was re-queued with a `Keep:` line first and corrected immediately: `Keep:` marks an owner or
+device *check*, so it filed answered, buildable work under the KEEP bucket headed *"Not new work"* —
+OR-100's exact failure, reproduced within the hour. As a plain entry it sits at #2 of Lane A's READY.
+**Flag for whoever builds it:** `scaleMacrosForEarnedKcal` holds
 protein constant, so re-basing from 1,660 to ~1,294 drops carbs and fat while 150 g protein stands —
 right for a cut, and a visible change to his targets. When it lands, `macro-budget-gap.ts` and the
 paragraph reported here both become dead and should go with it.
