@@ -421,28 +421,6 @@ below threshold and left in place for next time.
 
 
 
-### [readiness] LB-102 — `/api/body-battery` serves today only, so a persisted stress day cannot be read back
-
-- **Lane:** A — `app/api/body-battery/route.ts` (or a sibling read), over `oura_daytime_stress_buckets`.
-- **Added:** 2026-09-13 by Implementation Lane B, found shipping TN-3b's chart. **Branch:** unassigned.
-- **The route takes no parameters at all** — `export async function GET()` — and computes the stress
-  series live from today's ring dHRV. TN-3a's table has persisted 30-minute buckets since
-  **2026-08-24** (478 rows over 18 days when last measured) and **nothing publishes them**, so a
-  past day is unreachable from any surface.
-- **This blocks an owner-approved pass test, which is why it is filed at the top.** TN-3b's test is
-  *"the owner opens a past day, reads a stressed window off the axis, and can say whether it matches
-  what they were doing"* — the whole point being that his own recall is the ground truth, since
-  TN-33 established there is no independent target with variance (`perceived_recovery` reads 3 on
-  all 17 days). Today-only answers half the question he approved.
-- **The surface is already built and needs no change.** `StressDayChart` takes a plain
-  `{ t, level }[]` and `toSegments` sorts before segmenting precisely because a day assembled from
-  stored rows carries no ordering guarantee. A `?date=` on the existing route, returning the stored
-  buckets for that day, is all it wants.
-- **Same shape as LB-98**, and worth naming as a pattern: data that persists with no read path is
-  invisible to every surface and to CI both. That entry cost a card its verifiability; this one costs
-  an approved feature its pass test.
-- **Reversal cost:** low — one read, and a route that answers for a date as well as for today.
-
 ### [nutrition] LA-102 — the budget starts at the resting rate and says nothing about what it leaves out
 - **Lane:** B — surface only: `components/nutrition/calorie-zone-bar.tsx`, and the ⓘ copy on
   `components/nutrition/energy-card.tsx` / `components/nutrition/calorie-balance-bar.tsx`.
@@ -468,6 +446,31 @@ below threshold and left in place for next time.
 - **Pass test:** the ⓘ copy names the thermic effect of food and non-step movement as excluded from
   the base, and nothing on the screen implies the base is a full day's burn.
 - **Reversal cost:** none. It is copy.
+
+### [readiness] LA-104 — today's stress chart and a past day's come from two different baselines
+- **Lane:** B — `components/body-battery/stress-day-chart.tsx` and whatever feeds it on the day screen.
+  The engine half is done; this is which source the surface reads.
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-13 · found shipping LB-102's read path.
+- **Reference:** [`the LB-102 journal entry`](overview/entries/2026-09-13-lb102-stress-day-read-path.md).
+- **The two series are not the same number and TN-3a says so out loud.** `lib/oura-ble/rollup/run.ts`
+  builds the persisted buckets from `latest.rhrLowBpm` + `nightHrvMs`; `/api/body-battery` builds its
+  live series from `restingHr` + a 28-day HRV mean. Its own comment: *"persisting both would put two
+  numbers behind one metric"* — which is why only the rollup's are stored.
+- **So a chart that reads TODAY live and a PAST day from storage is showing two metrics on one axis**,
+  and the owner's approved pass test is precisely a comparison across days: *"open a past day, read a
+  stressed window off the axis, and say whether it matches what you were doing."* Two baselines make
+  today and yesterday incomparable in exactly the dimension the test asks about.
+- **`GET /api/body-battery/stress-day?date=` already serves EVERY day from storage, today included**,
+  for this reason. The decision left open is whether TN-3b's chart should read today from it too.
+- **The cost of switching, stated so it is not discovered later:** today's stored series ends at the
+  last rollup rather than at this minute. The route returns `throughMs` so the surface can say where
+  the day's data stops instead of implying the day stopped.
+- **Do NOT answer this by persisting the live series as well.** That is the thing TN-3a rejected, and
+  re-adding it would put the second number back behind the metric.
+- **Pass test:** opening today and opening yesterday show series built the same way, and the chart
+  says where today's data currently reaches.
+- **Reversal cost:** low — one fetch swapped on one surface.
 
 ### [nutrition] LB-101 — `/api/nutrition/food-items` refuses a body smaller than the image it permits
 
