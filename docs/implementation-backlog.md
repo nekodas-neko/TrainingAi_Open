@@ -491,25 +491,6 @@ below threshold and left in place for next time.
   the base, and nothing on the screen implies the base is a full day's burn.
 - **Reversal cost:** none. It is copy.
 
-### [nutrition] LA-105 — the capture workaround for LB-101 is now dead weight
-- **Lane:** B — `components/nutrition/capture-actions.tsx`, and two assertions in
-  `components/nutrition/__tests__/food-image-write-paths.test.ts`.
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-13 · found shipping LB-101, which this depends on.
-- **LB-101 SHIPPED 2026-09-13**: `/api/nutrition/food-items` derives its body cap from
-  `FOOD_ITEM_IMAGE_MAX_BYTES` instead of restating 8 KB, so an image at its own permitted size no
-  longer 413s. **The client-side workaround that existed only because of that is now redundant.**
-- **What to remove:** `THUMB_WIRE_BUDGET = 7 * 1024` and the quality-ladder re-encode that walks down
-  to fit it, the `tooBigForTheBody` guard beside it, and the two assertions that pin them. LB-101's
-  own entry named these and said to leave them until the cap moved. It has moved.
-- **Do NOT remove the downscale itself** — only the budget the ladder targets. Shrinking a capture
-  before upload is right regardless; what is dead is re-encoding down to **7 KB** to sneak under a cap
-  that was 8,192 bytes and is now 25,942.
-- **Verify by measurement, not by reading:** the case LB-101 measured was a 128 px WebP of a detailed
-  600 × 400 source at q0.8 coming back **6,612 bytes**. After removing the ladder that capture should
-  save at its natural quality rather than at whatever rung fitted 7 KB.
-- **Reversal cost:** low, and the route-side cap stands on its own either way.
-
 ### [readiness] LA-104 — today's stress chart and a past day's come from two different baselines
 - **Lane:** B — `components/body-battery/stress-day-chart.tsx` and whatever feeds it on the day screen.
   The engine half is done; this is which source the surface reads.
