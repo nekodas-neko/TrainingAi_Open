@@ -11505,3 +11505,11 @@ addends of the formula BF-152 retired beside the budget the new one produced, so
 breaks it into terms summing to 2,078. Most of the lines are the two consequences that are not
 arithmetic — the 2,278 it prints as "resting burn" is the inflated estimator BF-152 escaped, and the
 macro grams stayed on the stored goal while the budget moved.
+
+## 2026-09-13 — `docs/implementation-backlog.md` (BF-155, BF-156, and BF-154's answer)
+
+Ninety-three lines across three edits. BF-155 carries a seven-row production table because the
+reported symptom ("my amrap week") and the real scope (every session since 6 September) differ, and
+the entry has to show that rather than assert it. BF-156 is short. BF-154 gains the owner's answer on
+the macro anchor plus the consequence he has not seen yet — protein is held constant while the base
+drops.
