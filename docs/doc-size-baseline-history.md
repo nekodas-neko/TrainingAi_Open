@@ -11506,6 +11506,17 @@ breaks it into terms summing to 2,078. Most of the lines are the two consequence
 arithmetic — the 2,278 it prints as "resting burn" is the inflated estimator BF-152 escaped, and the
 macro grams stayed on the stored goal while the budget moved.
 
+## 2026-09-13 — `docs/implementation-backlog.md` → 21323 (LA-105 shipped; a workaround's whole life in one day)
+
+−17 as LA-105 leaves. Worth a line because of the shape rather than the size: OR-108 hit a route cap
+this morning, filed it as LB-101 and worked around it in the client with a named constant and a
+quality ladder; LB-101 shipped hours later; LA-105 collected the debt the same day. The workaround
+carried its own expiry in both the entry and the code comment, and that is why it did not survive
+its cause.
+
+The e2e's wire assertion was **inverted rather than deleted** — it now fails if the stored thumbnail
+is *smaller* than the old 7 KB budget, which is what a returning ladder would look like.
+
 ## 2026-09-13 — `docs/implementation-backlog.md` → 21495 (the app-shell device pass)
 
 Sixty-four lines, and the largest single block is BF-96/BF-139's shared diagnosis. Two entries had

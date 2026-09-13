@@ -42,12 +42,14 @@ describe('a captured food keeps its picture', () => {
     // side — and from the SUBMIT path, which is the only place the captured image exists.
     expect(capture).toMatch(/await callScan\(body, await thumbFromPhoto\(pendingPhoto\.previewUrl\)\)/);
     // Through the shared thumbnail spec, not a fourth hand-rolled downscale.
-    expect(capture).toMatch(/downscaleToThumbDataUrl\(dataUrlToBlob\(previewUrl\), THUMB_WIRE_BUDGET\)/);
-    // And capped before it is sent, on BOTH numbers. The image cap is the contract; the wire budget
-    // is what the route's 8 KB body limit actually admits, and exceeding that is a 413 that fails
-    // the whole save rather than merely arriving without a picture (LB-101).
+    expect(capture).toMatch(/downscaleToThumbDataUrl\(dataUrlToBlob\(previewUrl\)\)/);
+    // Capped against the contract before it is sent. **The second cap is gone (LA-105)** — a wire
+    // budget and a quality ladder existed only while the route's body limit sat BELOW the image it
+    // permitted; LB-101 derives it from `FOOD_ITEM_IMAGE_MAX_BYTES`, so one check is the whole rule
+    // again. Asserted as an absence too, because a workaround that outlives its cause reads as
+    // deliberate to the next reader.
     expect(capture).toMatch(/rejectMealImage\(thumb, FOOD_ITEM_IMAGE_MAX_BYTES\)/);
-    expect(capture).toMatch(/tooBigForTheBody \|\| rejectMealImage/);
+    expect(capture, 'the LB-101 workaround is back').not.toMatch(/THUMB_WIRE_BUDGET|tooBigForTheBody/);
   });
 
   it('refining a scan keeps the picture the capture step produced', () => {
@@ -66,7 +68,7 @@ describe('a captured food keeps its picture', () => {
     // the same box is roughly twice the bytes against a cap nothing checks loudly.
     const shared = src('lib/media/downscale-image.ts');
     expect(shared).toMatch(/export const THUMB_MAX_DIM = 128/);
-    expect(shared).toMatch(/export async function downscaleToThumbDataUrl/);
+    expect(shared).toMatch(/export function downscaleToThumbDataUrl/);
     for (const rel of ['components/nutrition/meal-photo-tile.tsx', 'components/nutrition/capture-actions.tsx']) {
       expect(src(rel), `${rel} re-declares the thumbnail spec`).not.toMatch(/const THUMB_(MAX_DIM|QUALITY) =/);
     }
