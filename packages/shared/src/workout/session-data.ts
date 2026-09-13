@@ -7,7 +7,7 @@ import { prescriptionStyleForExercise } from "@trainingai/shared/ai-periodizatio
 import { deloadOverrideForGoal, deloadStyleForGoal } from "@trainingai/shared/ai-periodization/deload-constants";
 import { accessoryTargetRpe } from "@trainingai/shared/ai-periodization/goal-ranges";
 import { pctForExpectedRpe } from "@trainingai/shared/ai-periodization/expected-rpe";
-import { resolveBodyweightStyle, resolveWorkingBasis } from "@trainingai/shared/1rm";
+import { resolveBodyweightStyle, resolveWorkingBasis, resolveWorkingBasisWithSource } from "@trainingai/shared/1rm";
 import { toAestDateStr } from "@trainingai/shared/date-utils";
 
 export interface PerSessionPhaseStatus {
@@ -90,6 +90,9 @@ export interface WorkoutExercise {
   defaultSets: number;
   lastSets: number | null;
   lastReps: (number | null)[];
+  /** BF-151: reps performed on the log `estimated1rm` came from, null when that number is a seed
+   *  or an all-time PR rather than a logged set. For a bodyweight exercise this IS the rep max. */
+  prevRepMaxReps: number | null;
   progressionStyle: StyleSet[] | null;
   styleName: string | null;
   styleId?: string;
@@ -124,6 +127,7 @@ export interface WorkoutExercise {
 export interface LastRealOneRmLike {
   estimated1rm: number
   target80: number | null
+  avgReps?: number | null
 }
 
 // All resolved inputs the per-exercise mapping reads. Identical whether the single-tab
@@ -199,6 +203,13 @@ export function buildWorkoutExercises(
 
       const lastSetWeights = lastLog?.sets.map(s => s.weightKg) ?? [];
       const lastReps = lastLog?.sets.map(s => s.reps) ?? [];
+
+      // One resolution, read twice below (`basis` and `estimated1rm`) and once for its provenance.
+      const workingBasis = resolveWorkingBasisWithSource({
+        lastNonDeload1rm: lastRealOneRm?.get(ex.exerciseName)?.estimated1rm,
+        seedEstimate: estimateMap?.get(ex.exerciseName),
+        allTimePr1rm: prMap.get(ex.exerciseName),
+      });
 
       // Static-style progression by default
       let defaultSets = isBaselinePhase ? 1 : (resolvedStyle?.length ?? 3)
@@ -351,11 +362,16 @@ export function buildWorkoutExercises(
         // One resolver for every weight path (Q-5). This used to read the last log alone,
         // so a user-entered starting 1RM never reached the bar and the workout screen fell
         // through to a hardcoded 60 kg.
-        estimated1rm: resolveWorkingBasis({
-          lastNonDeload1rm: lastRealOneRm?.get(ex.exerciseName)?.estimated1rm,
-          seedEstimate: estimateMap?.get(ex.exerciseName),
-          allTimePr1rm: prMap.get(ex.exerciseName),
-        }),
+        estimated1rm: workingBasis.kg,
+        // BF-151. The reps behind `estimated1rm`, and ONLY when that number came from a logged set
+        // — a seed the user typed or an older program's PR has no reps to report, and attaching the
+        // last log's would pair two numbers from different places. For a bodyweight exercise the
+        // rep max IS this figure, so the card can read it instead of inverting the estimate: that
+        // inverse is lossy, and at 5 vs 6 reps it is impossible, since the rep-factor gain is
+        // exactly cancelled by `amrapScaleFactor`'s step and both store the same 1RM.
+        prevRepMaxReps: workingBasis.source === 'last_real'
+          ? (lastRealOneRm?.get(ex.exerciseName)?.avgReps ?? null)
+          : null,
         allTimePr1rm: prMap.get(ex.exerciseName) ?? null,
         // From the last NON-DELOAD session, not the last log (Q-202). A deload row stores
         // target_80 = 0, and this field is both the displayed target and the value the weight

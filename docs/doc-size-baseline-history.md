@@ -10653,6 +10653,84 @@ Fixed by the shared predicate rather than by a third patch.
 **No journal entry** — `docs/overview/entries/` is still at its 361 ceiling; LA-100 remains the
 blocker and is Gate: owner.
 
+## 2026-09-10 — backlog → 20514, `tuning.md` → 588: the stress verdict and plan (TN-33, TN-3b, TN-34, TN-35)
+
+The owner asked for the state of the stress calculation. Two answers pointing opposite ways, and the
+second is why the entry cannot be short.
+
+**The storage defect is closed** — `7c428a7f` shipped on 2026-08-31, and 10 of 10 days match since
+2026-09-01 against 8 of 8 disagreeing before it. Worth recording that the fix landed the day *before*
+TN-22 was filed, so the entry sat open for ten days against a defect already corrected.
+
+**The sign is not.** The three-row table is the finding and does not compress: recomputed from
+buckets, the correlation with readiness runs **−0.395** over the pre-fix eight days, **+0.427** over
+the post-fix ten, and **+0.072** pooled over all eighteen. TN-22 claimed the recomputation *"flips the
+sign to correct"*; that was an eight-day artefact, and two halves pointing opposite ways with nothing
+pooled reads as **no signal** rather than a backwards one — the harder of the two problems.
+
+The lines that earn the most room are the ones about why more data will not help. Readiness shares its
+overnight autonomic input with the stress baseline, so it is partly circular; and the independent
+target has no variance at all — `perceived_recovery` is **3 on all 17 days**, never touched across 29
+check-ins, with `mental_drain` and `physical_tiredness` NULL on every one. A constant returns NaN,
+which is easy to misread as a null result, so the baton now says to check a target for variance before
+correlating against it.
+
+Hence the three-level test ladder, which is the part the owner actually asked for: consistency
+(shipped), response to a named stressor (one day, the first test that can fail, worth building), and
+prediction (blocked on an owner action rather than on code).
+
+The owner then asked for the series on a chart — *"so we can see when the stress occurs. I will be
+able to match it up based on time to what I was doing"* — which unparks TN-3b and adds 48 lines to it.
+
+The reason it earns them: TN-3b sat behind Q-507's sign since 2026-08-24, and **that parking is right
+for a score and wrong for a chart**. Since TN-33 established there is no independent target with
+variance, the owner's own recall is the only ground truth available, so the chart is the instrument
+rather than a nice-to-have. Recording that distinction — verdict versus instrument — is what stops a
+successor re-parking it beside TN-16.
+
+The measurements that shape the design do not compress either. 2026-09-10 runs unbroken negative from
+**06:45 to 15:15 with six buckets past −0.5**, while its daily scalar reads **−0.02**, because the
+night positives cancel the day negatives — the chart is strictly more informative than the number it
+summarises. And the night/day split now replicates on **478 buckets** at 57% night, mean +0.266
+against the day's −0.405, matching TN-21's 230-bucket read. Coverage of 26.6 buckets a day against 24
+hours, with a real 6.5-hour hole on 2026-09-08, is what forces the "gaps stay gaps" constraint.
+
+The owner then asked for a verdict — *"is stress a real usable value?"* — and answering it needed one
+more measurement and produced one more entry.
+
+**The test that worked needed no external target: the signal against itself.** Lag-1 autocorrelation
+over 331 truly-adjacent 30-minute pairs is **+0.637**, against a null shuffled within each day's night
+and day blocks that maxes at **+0.454** over 2000 permutations, with a residual of **+0.372** after
+removing each day's night-mean and day-mean. The two-null structure is what earns the lines: the naive
+within-day shuffle maxes at +0.181 and would have overstated the result, because the night/day split
+alone carries much of it. **The series contains episodes lasting hours — real signal, though not proof
+it is stress.**
+
+**TN-34 is the finding that came out of asking what the unusable half drives.** `ai-dynamic.ts:219`
+gates a deload recommendation on `stressHighMinutes >= 120`, which fires on **15 of 18 days
+recomputed and 7 of 10 on stored values since the fix**. A flag firing four days in five carries no
+information, and its input is the number measured to carry none. The ⛔ line is the load-bearing part:
+the same file warns eleven lines above against raising `TEMP_ALERT_THRESHOLD_C` for the same reason
+and calls it the fourth instance in this pillar — **this is the fifth**, so the entry names it rather
+than repeating it.
+
+The owner approved the plan and stated the goal in their own words — *"a usable value to determine
+what events stress me"* — which is attribution rather than display, and that produced TN-35.
+
+The entry earns its 45 lines by drawing a line through the middle of the work. **Half the attribution
+is free**: `day-timeline/route.ts:15` already emits typed, timestamped `wakeup | sleep | workout |
+meal | walk | bedtime` events, so overlaying the 30-minute series on them attributes stress to
+training, food, walks and sleep with no new input at all. **⛔ The other lane in that same type union
+is a trap** — `oura_tags` holds 0 rows and was fed by the Oura Cloud retired on 2026-08-13, so it
+reads like an existing marker mechanism and is not one. Recording that stops the next session building
+the feature on a dead table.
+
+**And half does not exist:** nothing can mark a *moment*. `day_checkins.journal` is whole-day,
+untimestamped and used on 2 of 83 check-ins. So the second half is a timestamped marker — and the line
+that makes it worth doing first is that **the marker IS TN-33's level-2 test**, since
+`perceived_recovery` is a constant and the readiness target is circular. The feature that makes stress
+useful and the experiment that validates it are the same build.
+
 ## 2026-09-10 — `docs/implementation-backlog.md` +8, LA-89 given the `Gate: owner` its prose already implied
 
 Eight lines, and they exist because the gap they close caught me in the act.
@@ -11144,6 +11222,31 @@ LB-100's entry leaves the queue with the one-budget fix. `projectOverview.md` gr
 shrinks: BF-150's Known-Issues row stays (its goal question is still owed) and gains an amendment
 recording the regression it caused and why it reached `main` — a red advisory check that nothing
 blocked on.
+
+## 2026-09-13 — backlog → 21217, `tuning.md` → 599: reconciling the nutrition batch with three days of `main`
+
+A status check found two things the entries did not know, and both change how they should be read.
+
+**BF-137 named the cause TN-27 and TN-29 missed.** The maintenance estimator is fitting a GLP-1
+(retatrutide) weight drop and reading it as metabolic rate — `maintenance = intake − Δweight × 7700`
+assumes weight change reflects energy balance, and under a GLP-1 it does not. This agent diagnosed the
+window and the missing cross-check, both real, and never asked whether the input itself was
+confounded. BugFix filed it the next day and cross-referenced TN-29; the reciprocal reference is now
+on TN-29, since whoever builds that gate needs to know the cause survives it and recurs on every new
+vial.
+
+**And PR #1128 moved the ground under all three entries.** The daily budget now follows the owner's
+stored goal rather than the estimate, so TN-27 and TN-29 stopped being load-bearing — the number is
+informational. TN-28 moved the opposite way: the stored target is now what every surface follows, so
+the card that writes it on one tap matters more, not less. That asymmetry is the lesson worth its
+lines — an entry's correctness and its consequence age separately, and only the second was checked
+here by re-reading `main`.
+
+## 2026-09-13 — `docs/implementation-backlog.md` + `projectOverview.md` (BF-151 shipped)
+
+BF-151's entry leaves the queue with the bodyweight rep max reading its stored reps.
+`projectOverview.md` gains a Known-Issues row for the device check that is still owed: both figures
+render only under `isBodyweight`, so only a bodyweight set on the phone exercises them.
 
 ## 2026-09-13 — `docs/implementation-backlog.md` (BF-152 filed at the top)
 

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@trainingai/shared/utils";
 import type { ExerciseSummaryData } from "./types";
 import { formatTime, formatSetLoad } from "./utils";
-import { repMaxFromAmrapOneRm, displayOneRmSeries, isBodyweightType, oneRmLabel, oneRmUnit } from "@trainingai/shared/1rm";
+import { bodyweightRepMax, displayOneRmSeries, isBodyweightType, oneRmLabel, oneRmUnit } from "@trainingai/shared/1rm";
 import { cachedFetch } from "@/lib/sqlite/cache";
 import { EXERCISE_HISTORY_TTL } from '@trainingai/shared/cache-ttl';
 import { SessionClock } from "./session-clock";
@@ -40,6 +40,7 @@ export function ExerciseSummaryScreen({ summaryData, workoutStartMs, onNext, use
     lapTimes: slt,
     restSec,
     prevEst1rm,
+    prevRepMaxReps,
     allTimePr1rm,
     newEst1rm,
     exerciseType,
@@ -105,8 +106,16 @@ export function ExerciseSummaryScreen({ summaryData, workoutStartMs, onNext, use
   // BF-149 — these render only under `isBodyweight` below, and a bodyweight estimate is always
   // written by `amrapAverage1Rm`, so it must be inverted through the AMRAP-scaled formula it came
   // from. `repMaxFromOneRm` inverts the unscaled `calc1RM` and under-reported by the discount.
-  const prevRepMax = prevEst1rm != null ? repMaxFromAmrapOneRm(prevEst1rm) : null;
-  const newRepMax = repMaxFromAmrapOneRm(newEst1rm);
+  // BF-151. Read the reps the database stores rather than reconstructing them from the estimate.
+  // The inverse is lossy, and for 5 vs 6 reps it is impossible: the rep-factor gain from the extra
+  // rep is exactly cancelled by `amrapScaleFactor`'s 1.0 → 0.97 step, so both store the same 1RM and
+  // `repMaxFromAmrapOneRm` can only return the lower of the tie.
+  //
+  // It stays as the FALLBACK, not deleted: `prevRepMaxReps` is null when the previous basis was a
+  // seed or an all-time PR, and a historical series has no per-set reps to hand either.
+  const prevRepMax = bodyweightRepMax({ storedReps: prevRepMaxReps, oneRm: prevEst1rm });
+  // This session's rep max is the best set just logged — already on the client, never inverted.
+  const newRepMax = bodyweightRepMax({ storedReps: sr.length ? Math.max(...sr) : null, oneRm: newEst1rm }) ?? 0;
   const repDiff = prevRepMax != null ? newRepMax - prevRepMax : null;
 
 

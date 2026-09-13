@@ -1476,8 +1476,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const programFilter = programId
       ? sql`AND ws.session_id IN (SELECT id FROM program_sessions WHERE program_id = ${programId})`
       : sql``
-    const result = await this.db.execute<{ exercise_name: string; estimated_1rm: number; target_80: number | null }>(sql`
-      SELECT DISTINCT ON (el.exercise_name) el.exercise_name, el.estimated_1rm, el.target_80
+    const result = await this.db.execute<{ exercise_name: string; estimated_1rm: number; target_80: number | null; avg_reps: number | null }>(sql`
+      SELECT DISTINCT ON (el.exercise_name) el.exercise_name, el.estimated_1rm, el.target_80, el.avg_reps
       FROM exercise_logs el
       JOIN workout_sessions ws ON ws.id = el.workout_session_id
       WHERE ws.user_id = ${userId}
@@ -1513,6 +1513,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         map.set(r.exercise_name, {
           estimated1rm: Number(r.estimated_1rm),
           target80: r.target_80 != null && r.target_80 > 0 ? Number(r.target_80) : null,
+          // BF-151. Travels WITH the 1RM rather than from `lastLogs`, which is the genuinely most
+          // recent log and can be a different session — a deload one — so pairing that log's reps
+          // with this 1RM would describe two sessions as though they were one.
+          avgReps: r.avg_reps != null ? Number(r.avg_reps) : null,
         })
       }
     }

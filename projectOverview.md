@@ -1800,6 +1800,19 @@ bucket rejects in prod too, "AI all" writes into a store it cannot read back, an
 proxy-path rows plus the AI style reference stay broken. BF-147 asked for that check before any
 code was written here; the code was orthogonal to it and shipped, the check was not done.
 
+### [workouts] ⚠️ The bodyweight rep max is read now, and no thumb has seen it (BF-151, 2026-09-13, v1.453.0) · needs: hardware
+
+The exercise summary reconstructed a bodyweight rep max by inverting the stored 1RM estimate. That is
+lossy, and at 5 vs 6 reps impossible — both store the identical figure (verified: `calcAmrap1RM`
+returns 80.25 for each at bodyweight 70), so a 6-rep set could only ever render as 5. The reps are
+now read from `exercise_logs.avg_reps`, carried with the 1RM they belong to rather than from the most
+recent log, which can be a different deloaded session.
+
+**Owed: the device check.** Both values render only under `isBodyweight`, so the check is a
+bodyweight set on the S25 at a rep count other than 5 or 6 — a Hanging Leg Raise. The
+previous-session value is the one that exercises the new payload field. Verified on the route
+(`?tab=all` and the single-session tab) and by unit and DB tests; not seen on a phone.
+
 ### [nutrition] ⚠️ The budget follows your goal now, and which goal is still unanswered (BF-150, 2026-09-12, v1.451.0) · needs: owner
 
 **Amended 2026-09-12 (LB-100):** BF-150 anchored the budget in `budgetProvenance` and left
