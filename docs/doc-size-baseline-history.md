@@ -11284,3 +11284,21 @@ probably already correct.
 BF-134 is the other long one: a requirement the owner has now given verbally **twice** with no entry
 of its own, so each session re-derived it. It also contradicts LB-50/BF-102's measured activity
 factor, and saying so is what stops the app shipping two calorie models.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21391 (red `main`: the BF-90 verify guard)
+
+Grows 36 lines and every one is LA-103 plus four words inside BF-46. **The growth is the fix being
+honest about what it did not fix.**
+
+`backlog-verify-field.test.ts` was 11-of-34 red on `main` from #1136. Nine of those were the guard not
+knowing that a VERIFIED entry legitimately has no `Verify:` bullet. The tenth was real: BF-46's `Keep:`
+block contains a sentence saying its gate *was withheld*, and `keep.js` reads a `Gate:` from anywhere
+in the block — so the sentence was the gate, cancelled until the owner's sign-off removed the
+`Verify:` that had been masking it.
+
+**The red was cleared at the entry (four words) and the parser was left alone**, because anchoring its
+regex to a bullet start loses 7 legitimate inline mentions and silently un-parks genuinely blocked
+work. So the choice is on the record as LA-103 with the population unmeasured and said to be
+unmeasured, rather than as a one-line parser change nobody could audit later. **A 36-line entry is the
+cost of not guessing.**
+
