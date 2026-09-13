@@ -915,6 +915,155 @@ below threshold and left in place for next time.
 - **Keep:** the owner's answer above, and the migration if it is yes.
 - **Needs:** nothing.
 
+### [readiness] TN-35 — make stress answer "what stressed me", by joining the series to the day's events and letting the owner mark a moment
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-10 · owner: *"I'd like to get stress metric to be a usable value to determine what events stress me."*
+- **Lane: B** for the overlay (`app/api/day-timeline/route.ts` already assembles the events; `components/health/day-detail/**` renders them). **Lane A** for the marker's storage — a timestamped row is a migration.
+- **Needs: TN-3b** — the chart is this entry's first half; do not build the join before the axis exists.
+- **Reference:** [`review`](reviews/2026-09-10-stress-status.md) §9.
+
+**The owner's goal is attribution, not display.** A chart answers *when*; *what* needs the series
+lined up against what he was doing. **Half of that is free and half does not exist.**
+
+**✅ Free — the day timeline already carries typed, timestamped events.**
+`app/api/day-timeline/route.ts:15` emits `wakeup | sleep | workout | meal | walk | bedtime | tag`,
+each with a `timeMs`. Overlaying the 30-minute stress series on that timeline attributes stress to
+**training, food, walks and sleep with no new input from the owner** — and those are exactly the
+things with a plausible mechanism for moving HRV.
+
+**⛔ The `tag` lane is DEAD and will not fill.** `oura_tags` holds **0 rows**; it was fed by the Oura
+Cloud, which was removed 2026-08-13 and must never be re-added. **Do not build the attribution feature
+on top of it**, and do not read its presence in the timeline as an existing marker mechanism.
+
+**❌ Missing — there is no way to mark a moment.** Meetings, commutes, arguments, deadlines, caffeine
+and screens are invisible to the app, and they are most of what the owner means by "events".
+`day_checkins.journal` is the only free-text field, it is **whole-day with no timestamp**, and it has
+been used on **2 of 83** check-ins — so it cannot attribute a moment and is not being used anyway.
+
+**So the second half is a timestamped moment marker:** one tap, `now` by default, an optional short
+label, stored with its own time. **⚠ This is also TN-33's level-2 test.** Marking *"stressful, now"*
+IS the ground-truth collection, so the feature that makes stress useful and the experiment that
+validates it are the same build. That is the argument for doing it rather than the survey first.
+
+**⛔ Do not compute an "X stresses you" verdict from this yet.** Ranking causes needs many marked
+instances per event type, and one month of a single user will not support it. **Ship the join and the
+marker; let the owner read the pattern.** An automatic verdict is the TN-16 shape and stays parked.
+
+**⚠ What the join can and cannot see, stated so the UI does not overclaim:** coverage averages **26.6
+buckets a day — 13.3 of 24 hours** (TN-3b), with real multi-hour holes, so some events will have no
+stress reading beside them at all. Render that as absent, never as calm.
+
+**Pass test:** the owner opens a past day, sees the stress series against that day's workouts, meals
+and walks plus anything they marked, and can name the cause of a stressed window — or can say the
+window does not match anything, which is an equally valid result and the one that would retire the
+metric.
+
+### [readiness] TN-34 — the stress-deload override fires on 83% of days, off the one number measured to carry no signal
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-10 · found answering the owner's *"is stress a real usable value?"*
+- **Lane: A** — `packages/shared/src/ai-periodization/ai-dynamic.ts:219-225`.
+- **✅ OWNER-APPROVED 2026-09-10** — *"yes lets do all that."* **Option 1: unwire `stressOverride`.** Not gated; one line, reversible.
+- **Needs: TN-33** — only for the later question of what replaces it; the unwiring does not wait.
+- **Reference:** [`review`](reviews/2026-09-10-stress-status.md) §8.
+
+`ai-dynamic.ts:219` gates a **deload recommendation** on `stressHighMinutes >= 120`
+(`STRESS_HIGH_DAY_THRESHOLD_MIN`), returning `{ recommended: true, strength: 'recommended' }`.
+
+**Measured against the owner's actual data:**
+
+| basis | days over 120 min | share |
+|---|---|---|
+| recomputed from buckets, all hours | 15 of 18 | **83%** |
+| recomputed, waking only | 14 of 18 | 78% |
+| **stored values since the 2026-08-31 fix** | **7 of 10** | **70%** |
+
+**A deload flag that fires on four days in five carries no information** — it is the Q-504 failure
+class, live, in the surface that tells the owner whether to train.
+
+**And the input is the number TN-33 measured as carrying no signal**: the daily scalar is **57%
+night** buckets with night systematically positive (+0.266 against the day's −0.405), and its
+correlation with readiness is **+0.072 over 18 days**, with the two halves pointing opposite ways.
+
+**⛔ Do NOT fix this by raising the 120-minute threshold.** That is the mistake the file's own comment
+warns about eleven lines above this condition, about `TEMP_ALERT_THRESHOLD_C` — *"the fourth 'the
+threshold is right, the input is wrong' in this pillar"*. **This is the fifth.** The threshold is a
+documented judgement call at ~2 h; the input is a sleep-weighted average wearing a daytime label.
+
+**⚠ Two things this entry deliberately does not claim.** It does not say the *series* is worthless —
+TN-33 §8 measures strong episode structure in it (lag-1 **+0.637**, residual **+0.372** after removing
+day/night means). And it does not say a waking-only aggregate would be better: at 78% it barely moves,
+and its correlation flips just as hard.
+
+**The options, cheapest first:**
+1. **Unwire `stressOverride` until TN-33's level-2 test passes.** The condition already falls through
+   to `daySummary === 'very_stressful'` when derived stress is null, and the other two overrides
+   (temperature, illness) still fire. One line, reversible.
+2. **Restrict the input to waking hours** — correct in itself (a "daytime" number should not be 57%
+   night) but it only moves 83% → 78%, so it does not fix the firing rate.
+3. **Re-anchor the threshold to this user's own distribution** once the series is validated — a
+   percentile rather than a constant, which is what makes a flag informative.
+
+**Pass test:** the stress-deload override fires on a minority of days, and a day it fires on is one
+the owner recognises as unusually stressful.
+
+### [readiness] TN-33 — the stress storage defect is fixed and the SIGN is not; TN-22's reversal was an eight-day artefact
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-10 · owner: *"give me the update on our stress reading/calculation… how can we test it works?"*
+- **Lane: A** for the level-2 test harness; the level-3 blocker is an owner action, not code.
+- **Amends TN-22** — whose defect was real and shipped, and whose sign claim does not survive ten more days.
+- **Reference:** [`review`](reviews/2026-09-10-stress-status.md).
+
+**✅ The storage half is CLOSED, verified 2026-09-10.** Commit `7c428a7f` (2026-08-31) gave the strip
+and the scalars one producer — the rollup had written the buckets while `/api/body-battery` wrote the
+three daily numbers, each from a series built off a different heart-rate baseline. Recomputing
+`stress_high_minutes` from `oura_daytime_stress_buckets`:
+
+| window | days | verdict |
+|---|---|---|
+| **2026-09-01 → 09-10** | 10 | **10 of 10 match exactly** |
+| 2026-08-24 → 08-31 | 8 | **8 of 8 disagree**, four storing **0** against 210–270 real bucket-minutes |
+
+**⛔ Q-507 IS NOT EXPLAINED, AND THE POOLED ANSWER IS WORSE THAN A WRONG SIGN.** Recomputed from
+buckets — one quantity, immune to the storage defect — against readiness:
+
+| window | n | corr(high-stress min, readiness) |
+|---|---|---|
+| pre-fix | 8 | **−0.395** (right way) |
+| post-fix | 10 | **+0.427** (wrong way) |
+| **pooled** | **18** | **+0.072** |
+
+The waking-only variant does the same (−0.444 → +0.526, pooled +0.049) and the mean level flips too
+(+0.287 → −0.462, pooled −0.001). **Two halves pointing opposite ways with nothing pooled is what no
+signal looks like** — and that is harder than a backwards sign, which would at least be a bug to find.
+**This is the THIRD mechanism proposed for Q-507 and the third to fail; all three were fitted on
+fewer than ten days.**
+
+**⛔ AND IT CANNOT BE VALIDATED TODAY — this is the real blocker, not the sample size.** Readiness
+shares its overnight autonomic input with the stress model's baseline, so it is partly circular. The
+independent target has no variance: **`perceived_recovery` is `3` on all 17 days**, and across 29
+check-ins since 2026-08-24 **`perceived_recovery_touched` is 0** — never touched, every value the
+default. `mental_drain` and `physical_tiredness` are **NULL on all 29**. A constant correlates with
+nothing.
+
+**The test ladder, in order of what each can prove:**
+1. **Consistency — shipped.** `scripts/check-stress-scalars-one-writer.js` in CI, plus the one-query
+   bucket-vs-scalar comparison above. Proves the pipeline agrees with itself, nothing about truth.
+2. **Response to a known stressor — the cheapest real test, and the first that can FAIL.** One day:
+   the owner names a stressful window in advance, and the buckets in it are checked against that day's
+   own mean. Needs a day, not a month. **Build this.**
+3. **Prediction — blocked on an owner action.** `perceived_recovery` filled honestly for ~3 weeks,
+   then re-run the table above.
+
+**⛔ Do not re-run the correlation before level 3 has data.** Another ten days of readiness gives
+another number between −0.4 and +0.4 and settles nothing.
+
+**⛔ Do not build TN-16** (prolonged-stress warning, calm-down prompt) **until level 2 passes.** A
+warning fired off a metric never shown to track anything converts a silent uncertainty into a
+demonstrated one — the TN-19 lesson.
+
+**Pass test:** level 2 runs and the owner's named stressful window reads materially more negative than
+the rest of that day; and `perceived_recovery` carries at least three distinct values over 21 days.
+
 ### [platform] LB-94 — the journal's recent window is 332 entries, and 297 of them are pinned by a citation
 
 - **The ceiling is not a size problem, it is a linking problem.** `docs/overview/entries/` is meant
@@ -1413,6 +1562,8 @@ moving, which is the failure mode BF-134 was filed about on the same screen.
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · owner: *"I wonder if we could estimate the activity level value or tune how we do ours."*
 - **Lane: A** — `packages/shared/src/nutrition/adaptive-tdee.ts` (`estimateMaintenance`, the `minMaintenanceKcal` floor), fed from `lib/health/energy-balance-service.ts:236-260` where both estimates already sit in scope.
 - **Owner-approved 2026-09-09** — *"make all the changes you recommend."* Not gated; start here.
+- **⚑ Cross-reference BF-137 (filed 2026-09-10, the day after this entry) — and read it FIRST.** It names a cause this entry does not: **the estimator is fitting a GLP-1 (retatrutide) weight drop and reading it as metabolic rate.** `maintenance = intake − Δweight × 7700` assumes weight change reflects energy balance; under a GLP-1 it does not, so the drug's loss is booked as a higher metabolism. **This gate catches the instance through a different mechanism and does not remove the cause** — BF-137 says it will recur on every new vial. Build the two together.
+- **⚠ The urgency dropped on 2026-09-12 and the entry did not.** PR #1128 anchored the daily budget to the owner's **stored goal** rather than to this estimate, so the number is now informational rather than what he eats to. Still worth fixing — BF-137's commit says outright that TN-29 is *"about making it true"* and the estimate "still needs somewhere to show it" — but it is no longer load-bearing.
 - **Recommended over TN-27's three options, and independent of them** — this gate holds whichever window wins. Build this before TN-27.
 - **Reference:** [`review`](reviews/2026-09-09-maintenance-2245-is-too-high.md) §7.
 
@@ -1512,6 +1663,7 @@ movement stays near 280 kcal/day.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · owner: *"this is the maint calories derived from the app — i don't think it's right. with RMR at 1350 and calories well under that and barely maintaining weight."*
 - **Lane: A** — `packages/shared/src/nutrition/adaptive-tdee.ts` (`MIN_LOGGED_FRACTION`, `resolveMaintenance`), consumed by `lib/health/energy-balance-service.ts:260`.
+- **⚠ Amended 2026-09-13 — still valid, no longer urgent.** PR #1128 anchored the daily budget to the owner's stored goal, so this estimate no longer decides what he eats to. And **BF-137 names a deeper cause than the window**: the estimator is fitting a GLP-1 weight drop as metabolism, which no window choice fixes.
 - **Owner decision, 2026-09-09: option 3, after TN-29** — *"make all the changes you recommend."*
   The gate is cleared; this is Lane A's to build. Options 1 and 2 stay recorded below as the
   better-but-later versions, not as an open question.
@@ -1581,6 +1733,7 @@ this card offers to overwrite with 2,045.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · found while answering TN-27.
 - **Lane: B** — `components/nutrition/tdee-adaptation-card.tsx:118-124`.
+- **⚠ Amended 2026-09-13:** PR #1128 made the budget follow the owner's **stored goal**, so this card's one-tap write no longer redirects the whole day's eating — it changes the stored target, which is now the thing everything else follows. **That makes the write MORE consequential, not less**, so the missing confidence qualifier still matters.
 - **Sibling of TN-27** — TN-27 makes the number better; this makes its uncertainty visible. Fix either order.
 - **Reference:** [`review`](reviews/2026-09-09-maintenance-2245-is-too-high.md) §5.
 
@@ -9511,7 +9664,8 @@ samples, and no day whose raw HR count is non-zero stores `hr_sample_count = 0`.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-01 · owner: *"does this mean stress will work properly soon?"*
 - **Lane: A** — the writer of the daily scalar, not the stress model.
-- **Reference:** [`review`](reviews/2026-09-01-stress-sign-explained.md). **This explains Q-507 and reverses its conclusion.**
+- **⚠ AMENDED 2026-09-10 — the DEFECT half shipped and the SIGN half did not survive.** The fix landed in `7c428a7f` on **2026-08-31**, the day *before* this entry was filed, and 10 of 10 days since 2026-09-01 now match exactly. **But the claim below that recomputing from buckets *"flips the sign to correct"* rested on eight days; the next ten gave +0.427 and the pooled 18 give +0.072.** See **TN-33**. Keep this entry for its measurement of the defect; do not quote its correlations.
+- **Reference:** [`review`](reviews/2026-09-01-stress-sign-explained.md), amended by [`review`](reviews/2026-09-10-stress-status.md).
 - **Likely the same defect as TN-20** — a later pass recomputing a completed day from an impoverished input. Stated as *likely*: the mechanism is identified in neither.
 
 `stress_high_minutes` is bucket-minutes below `STRESS_HIGH_LEVEL = -0.5`, so with TN-3a's buckets
@@ -10099,14 +10253,63 @@ record explicitly why not.
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner request
 - **Lane: B**
-- **Needs: TN-3a**
+- **✅ OWNER-APPROVED 2026-09-10** — *"yes lets do all that. I'd like to get stress metric to be a usable value to determine what events stress me."* **That goal reshapes the entry: the chart is the first half, not the deliverable. See TN-35 for the second.**
+- **⚑ UNPARKED 2026-09-10 — build the chart FIRST, and the owner's request is why.** *"Can we have this displayed on a widget or chart so we can see when the stress occurs. I will be able to match it up based on time to what I was doing around then."*
+- **⚠ TN-3a's persistence SHIPPED** (verified: 478 buckets over 18 days), so this entry's stated blocker is gone. **And the Q-507 parking no longer applies to the chart half** — see below.
+- **Reference:** [`review`](reviews/2026-09-10-stress-status.md) §6, level 2.
 
-Two surfaces the owner asked for, both blocked until the buckets are persisted:
+**⛔ THE PARKING RATIONALE WAS RIGHT FOR A SCORE AND IS WRONG FOR A CHART.** TN-3b was parked because
+surfacing a metric whose sign cannot be explained converts a silent doubt into a demonstrated one
+(TN-19's lesson). **But the owner is not asking for a score, a verdict or a warning — he is asking to
+see the raw series against a clock so he can check it against his own memory of the day.** A chart of
+measured levels with no interpretation makes no claim that can be wrong, and **it is the only route
+left to answering Q-507**: TN-33 established there is no independent target with variance
+(`perceived_recovery` is `3` on all 17 days, never touched across 29 check-ins), so the owner's own
+recall *is* the ground truth. **This is level 2 of TN-33's test ladder and the first test that can
+actually fail.**
+
+**What the chart already reveals, before anyone builds it.** 2026-09-10, buckets by local time:
+**06:45 → 15:15 runs unbroken negative with six buckets past −0.5** (−0.52, −0.51, −0.62, −0.69,
+−0.74, −0.80), while 00:15 → 06:15 is almost entirely positive (+0.30 to +0.81). **That is a readable
+answer to "when was I stressed" and the daily scalar for the same day is −0.02** — because the night
+positives cancel the day negatives.
+
+**⚑ Which replicates TN-21 at scale and is the strongest Q-507 candidate standing.** Over all 478
+buckets:
+
+| window | share | mean level | high buckets | recovery buckets |
+|---|---|---|---|---|
+| **night 22–06** | **57%** | **+0.266** | 16 | **98** |
+| day 07–21 | 43% | **−0.405** | **101** | 6 |
+
+**The "daytime stress" daily average is 57% night, and night is systematically positive.** The daily
+number is dominated by sleep, which is a mislabelling defect independent of any correlation.
+**⚠ Restricting to waking hours does NOT rescue the correlation** (TN-33: −0.444 → +0.526 across the
+two halves), so this explains why the daily scalar is uninformative without establishing that a
+waking-only one would be informative.
+
+**Design constraints, each from the measured data:**
+1. **Local-time axis at 30-minute resolution.** The existing `stress-strip.tsx` is a **sparkline with
+   no time axis** — it shows the shape and cannot answer "when", which is the whole request.
+2. **⛔ Render gaps as gaps, never interpolate.** Coverage averages **26.6 buckets/day = 13.3 of 24
+   hours** (range 23–32), and 2026-09-08 jumps **06:45 → 13:15**, a 6.5-hour hole. A joined line there
+   would invent stress that was never measured.
+3. **Shade the night band.** Night is structurally positive; without the band a reader takes it as a
+   judgement about their sleep rather than a property of the series.
+4. **Mark zero and ±0.5.** "High" should be visible from the shape, not only from a label.
+5. **Past days reachable** — buckets exist from 2026-08-24 forward.
+6. **⛔ No score, no verdict, no advice on this surface.** That is exactly what keeps it shippable
+   while Q-507 is open, and what separates it from **TN-16**, which stays parked.
+
+**Pass test:** the owner opens a past day, reads a stressed window off the axis, and can say whether
+it matches what they were doing. A day with a 6-hour coverage gap shows the gap.
+
+Two surfaces the owner asked for:
 
 1. **Stress overlaid on the HR charts.** Today's chart can already do this from the
-   `/api/body-battery` response without any new storage (`stress.series` is in the payload) — but
-   **any past day cannot**, which is why this sits behind TN-3a rather than shipping alone. Doing
-   today-only first would ship a control that silently does nothing on every other day.
+   `/api/body-battery` response (`stress.series` is in the payload); past days now work too, since
+   TN-3a's table is live. **The 2026-08-24 start date is the remaining limit** — TN-3a's back-fill
+   `Keep:` still stands, so anything earlier renders empty.
 2. **A stress-by-hour view** — which hours and which days run hottest, aggregated across the
    back-filled history.
 
