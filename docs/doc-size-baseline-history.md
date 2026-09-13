@@ -11284,3 +11284,32 @@ probably already correct.
 BF-134 is the other long one: a requirement the owner has now given verbally **twice** with no entry
 of its own, so each session re-derived it. It also contradicts LB-50/BF-102's measured activity
 factor, and saying so is what stops the app shipping two calorie models.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21327 · `projectOverview.md` → 10764 (BF-152 shipped)
+
+BF-152's 54-line entry leaves the queue; **LA-102 arrives in its place, so the net is 28 lines rather
+than 54.** That is deliberate and is the thing to read here: BF-152 shipped with a residual it chose
+not to model — the thermic effect of food and non-step NEAT — and the ⓘ copy explaining that is Lane
+B's. An entry that closes by opening a smaller one nets out small, and **the alternative was a
+54-line drop with the finding living only in a journal paragraph**, which is how a finding gets
+dropped.
+
+`projectOverview.md` falls by only 6 net across three edits, which also understates the churn. The
+BF-150 Known-Issues row was rewritten rather than struck — its owner question is now moot (the budget
+reads no typed number) but the device check is owed, so it stays, per the rule that an entry only
+moves when nothing is owed. What *did* move out is **LB-100's 🔴 row**: `one-calorie-budget.spec.ts` is
+green, the cause it refused to guess turned out to be the less likely of the two it named, and the
+archive records that rather than a tick.
+
+## 2026-09-13 — `docs/agents/state/implementation-lane-a.md` 116 → 100 (rewritten, BF-152)
+
+Ratchets DOWN 16 lines, and the reason is not concision. **The file was eleven days stale in the two
+fields a successor would act on first:** Next ID read `LA-55` against a real `LA-102`, and migrations
+read `255` against a directory head of `275`. A baton that is half last week's is worse than none,
+because it gets trusted — so this is a full rewrite, not an append, per the rule in CLAUDE.md.
+
+What came out was narrative about PRs that merged eleven days ago. What went in is state a successor
+cannot derive: the nine-entry all-exclusions READY list, #1098's owner gate and its two recurring
+conflicts, the four owner decisions (one of which BF-152 just dissolved rather than answered), the
+three owed device checks, and the four testing traps that have each cost a session.
+

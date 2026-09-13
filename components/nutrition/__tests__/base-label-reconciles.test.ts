@@ -20,8 +20,8 @@ describe('the line labelled "base" shows the resting base', () => {
   it('does not print budgetProvenance().base as "base"', () => {
     // The specific regression. BF-150 narrowed this: it used to ban DESTRUCTURING `base` at all,
     // which was a proxy for the defect rather than the defect. The anchored path prints `base`
-    // legitimately — there it is the user's stored goal and nothing is folded into it — so the ban
-    // is now on the only thing that was ever wrong: that value printed beside the word "base".
+    // legitimately — there it is the anchor itself and nothing is folded into it — so the ban is
+    // now on the only thing that was ever wrong: that value printed beside the word "base".
     expect(code).not.toMatch(/\{base\.toLocaleString\(\)\}\s*base/)
     expect(code).toMatch(/restingBase\.toLocaleString\(\)\}\s*base/)
   })
@@ -31,13 +31,18 @@ describe('the line labelled "base" shows the resting base', () => {
     expect(code).toMatch(/for your goal/)
   })
 
-  // BF-150. The wording has to follow which branch of `budgetProvenance` ran. On the anchored path
-  // there is no resting-base-plus-delta split to name — the goal IS the whole zero-movement budget —
-  // so printing "base − goal" there would name two numbers that are not addends of what is on
-  // screen, which is BF-99's defect wearing the opposite hat.
-  it('switches the wording on whether the budget is anchored to the goal', () => {
-    expect(code).toMatch(/anchoredToGoal/)
-    expect(code).toMatch(/\{base\.toLocaleString\(\)\}\s*your goal/)
+  // BF-150, re-pointed by BF-152. The wording has to follow which branch of `budgetProvenance` ran.
+  // On the anchored path there is no resting-base-plus-delta split to name — the anchor IS the whole
+  // zero-movement budget — so printing "base − goal" there would name two numbers that are not
+  // addends of what is on screen, which is BF-99's defect wearing the opposite hat.
+  //
+  // BF-152 made the anchor the resting rate, so the word it must print is "resting rate". That is
+  // also the direct answer to the question BF-99 came from — *"why is my base rate under the 1350
+  // RMR value"* — so a regression here re-opens the original report, not just a label.
+  it('switches the wording on whether the budget is anchored to the resting rate', () => {
+    expect(code).toMatch(/anchoredToRestingRate/)
+    expect(code).toMatch(/\{base\.toLocaleString\(\)\}\s*resting rate/)
+    expect(code).not.toMatch(/\{base\.toLocaleString\(\)\}\s*your goal/)
   })
 })
 
@@ -47,9 +52,9 @@ describe('the printed figures still reconcile to the budget', () => {
   const printed = (b: { restingBaseKcal: number; activeKcal: number; targetNetKcal: number }) =>
     Math.round(b.restingBaseKcal) + Math.round(b.targetNetKcal) + Math.round(b.activeKcal)
 
-  // BF-150's path: the goal replaces both addends, so what is printed is the goal plus movement.
-  const printedAnchored = (b: { activeKcal: number; goalKcal: number }) =>
-    Math.round(b.goalKcal) + Math.round(b.activeKcal)
+  // The anchored path: the anchor replaces both addends, so what is printed is it plus movement.
+  const printedAnchored = (b: { activeKcal: number; restingRateKcal: number }) =>
+    Math.round(b.restingRateKcal) + Math.round(b.activeKcal)
 
   it.each([
     // The owner's reconstructed day: base 1,464, recomp −200, 150 earned → 1,414 budget.
@@ -62,9 +67,9 @@ describe('the printed figures still reconcile to the budget', () => {
   })
 
   it.each([
-    { restingBaseKcal: 2196, activeKcal: 131, targetNetKcal: -200, goalKcal: 1660 },  // the owner, 2026-09-12
-    { restingBaseKcal: 2196, activeKcal: 0, targetNetKcal: -200, goalKcal: 1660 },    // no movement yet
-    { restingBaseKcal: 1464, activeKcal: 320, targetNetKcal: 0, goalKcal: 1350 },     // maintain, anchored
+    { restingBaseKcal: 2196, activeKcal: 131, targetNetKcal: -200, restingRateKcal: 1342 }, // the owner, 2026-09-13
+    { restingBaseKcal: 2196, activeKcal: 0, targetNetKcal: -200, restingRateKcal: 1342 },   // no movement yet
+    { restingBaseKcal: 1464, activeKcal: 320, targetNetKcal: 0, restingRateKcal: 1325 },    // maintain, anchored
   ])('sums to budgetProvenance().total on the anchored path for %j', (b) => {
     expect(printedAnchored(b)).toBe(budgetProvenance(b).total)
   })

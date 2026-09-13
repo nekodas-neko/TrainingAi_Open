@@ -42,6 +42,16 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   rendered as the first. `responseState()` separates them; undecided now reads "Not called yet".
   **The entry keeps a wrong first diagnosis on the record**: a card reporting "no data" is not
   evidence that no data reached it.
+- [`docs/overview/entries/2026-09-13-lane-a-bf152-resting-rate-anchored-budget.md`](../../overview/entries/2026-09-13-lane-a-bf152-resting-rate-anchored-budget.md)
+  — **the calorie budget anchors to a rule, not a number (BF-152), 2026-09-13.** `budgetProvenance`'s
+  zero-movement base was the user's stored calorie target for one day (BF-150); it is now their
+  resting rate — the measured RMR re-scaled onto today's fat-free mass (1,342), the predicted BMR
+  otherwise. **`restingBaseKcal` is NOT that number and is the mutant to watch for**: on the
+  calibrated path it is `maintenance − avgActive`, so it carries the estimator inflation BF-150 was
+  escaping. Read with [`the BF-150 entry`](../../overview/entries/2026-09-12-lane-a-bf150-goal-anchored-budget.md),
+  which it changes one line of. The residual it deliberately does not model — the thermic effect of
+  food and non-step NEAT, together about the `bmr × 1.2` the owner's *"1600"* implies — is copy owed
+  under **LA-102**, not arithmetic.
 - [`docs/overview/entries/2026-09-10-fix-vial-opened-date.md`](../../overview/entries/2026-09-10-fix-vial-opened-date.md)
   — **a vial records when it was mixed, not when it was entered (BF-136), 2026-09-10.** `openedOn`
   was `todayInTz(tz)` with no control, and it anchors every figure on the vial card — a vial entered

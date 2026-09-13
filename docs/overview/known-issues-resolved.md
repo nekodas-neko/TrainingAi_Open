@@ -1997,3 +1997,29 @@ went stale first.**
 
 Nothing is owed: no device path (these are server reads), and the change moves no current output —
 all three affected routes return byte-identical JSON before and after.
+
+---
+
+## [nutrition] `one-calorie-budget.spec.ts` was red on `main` since BF-150, and it merged that way (LB-100) — resolved 2026-09-13
+
+`e2e/one-calorie-budget.spec.ts:165` — *"Home's nutrition card counts against that same budget"* —
+was green on #1127 and failed on every run from BF-150 onward, including BF-150's own pre-merge run.
+E2E is advisory, so it merged red and nothing recorded it.
+
+**The row deliberately refused to pick a cause, and running it picked the one that looked less
+likely.** Of the two readings it offered — the one-budget invariant genuinely broken, or the spec
+stale against a budget BF-150 had legitimately changed — it was the first. `budgetProvenance` anchored
+to the stored goal while `computeCalorieBalance`'s deviation still read the old expression, so the
+Nutrition ring's *"N kcal left"* counted against the estimator while Home's donut counted against the
+goal: 469 kcal apart in the e2e fixture, ~336 for the owner. The Q-415/Q-417 defect, returned on the
+number the owner eats to. The `dialog "Morning Check-in"` in the failure snapshot was a red herring.
+
+Fixed in #1132 (LB-100): the deviation, and with it `remainingKcal`, the zone band and its label, all
+read `budgetProvenance`. The spec stopped transcribing the budget and asks the shared function instead
+— which is why BF-152 re-anchoring the budget a day later (#1137) needed no edit to it at all.
+
+**Nothing is owed.** Green on the full E2E run of #1133 and again on #1137's, and the arithmetic
+property is now asserted in a unit test (`lb100-one-budget.test.ts`) that runs on every commit rather
+than only when a browser job is green. The lesson is recorded beside the fix rather than the fix
+alone: **a red advisory check is a signal, not a formality.**
+
