@@ -3,7 +3,7 @@
 > **Successor sessions are titled `🚧 Implementation Agent (B) 🟢`** — exactly. A renamed successor
 > is a lost thread.
 
-**Updated:** 2026-09-13 · **By:** the twenty-seventh Lane B run · **Next ID:** `LB-102`
+**Updated:** 2026-09-13 · **By:** the twenty-seventh Lane B run · **Next ID:** `LB-103`
 
 > **A mistyped ID here silently advances the lane's numbering.** Allocate with `grep -rhoE
 > '\bLB-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`, and check the max in the **journal** too — a
@@ -11,10 +11,10 @@
 
 ## Now
 
-**LB-98 ① SHIPPED** (v1.454.2): the Rest-vs-plan card falls back to the route's `restSets`, so a
-device-only rendering path now runs in CI. **RV-35 CLOSED** — its fix was already in the tree; what it
-owed was its own condition, a test failing before and passing after. **BF-153** (v1.454.1), **OR-108**
-(v1.454.0) shipped. `check:rules` **74/74**.
+**TN-3b's CHART SHIPPED** (v1.455.0): stress on a 24-hour axis, gaps left blank. **LB-98 ①**
+(v1.454.2) gave the Rest-vs-plan card a server fallback so a device-only render runs in CI.
+**RV-35** closed — already fixed; what it owed was its own test. **BF-153**, **OR-108** shipped.
+`check:rules` **74/74**.
 
 **SEVEN running entries were wrong about something load-bearing** — BF-139's px, BF-141's gate,
 BF-142's **406**, BF-146's cause, BF-145's fix twice, BF-147's (the badge is **25 px**; the four action
@@ -27,11 +27,11 @@ minutes well spent. **Measure before you fix what the entry blames.**
 
 ## Next
 
-1. **READY has been 0 for Lane B; the work is in `KEEP`, and the console TRUNCATES it.** Four of the
-   last six items came from there. Print each Keep whole and judge it: a device check is not yours, a
-   residue often is. LB-98's read as a check and was one line of wiring. **BF-51 ① is the one trap** —
-   built, measured, deliberately unshipped, and it must be reproduced on the S25 first; do not resolve
-   its `ERR_ABORTED` by loosening the spec.
+1. **READY reads 0 and that is not the same as no work.** KEEP holds it and the console TRUNCATES
+   each Keep — print them whole. **And read PARKED too: TN-3b sat there three days while READY was 0,
+   because its unparking is PROSE and the tool reads fields.** Its remaining halves are the HR overlay
+   and the across-days aggregate, both behind `LB-102`. **BF-51 ① is the trap** — built, deliberately
+   unshipped; reproduce on the S25 first, never loosen `meal-photo-picker.spec.ts`.
 2. **`LB-101` is Lane A's and OR-108's workaround dies with it** — `THUMB_WIRE_BUDGET`, the
    `tooBigForTheBody` guard and two assertions in `food-image-write-paths.test.ts` exist only because that route caps its body below the image it permits.
 

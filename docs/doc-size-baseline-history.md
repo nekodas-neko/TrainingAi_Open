@@ -11407,17 +11407,41 @@ is unverifiable when it now has a mutation-proven spec, and would have overstate
 owes: the local path only, which no harness can reach.
 
 A Keep that describes a world that has moved is worse than a missing one, because it is trusted.
-## 2026-09-11 — `docs/implementation-backlog.md` → 21307 (RV-42 shipped)
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21396 (TN-3b's chart shipped, LB-102 filed)
+
++36: TN-3b gains a shipped note and a reduced Keep, and **LB-102 is new** — `/api/body-battery` takes
+no parameters, so the persisted stress buckets (from 2026-08-24) cannot be read back and TN-3b's own
+pass test, *"the owner opens a past day"*, is unreachable.
+
+**Two things here are worth the lines.** The first is that TN-3b sat unstarted for three days while
+Lane B's READY was 0, because its unparking is written as **prose** and `next-item.js` reads fields —
+the failure the standing rules already name, now with a cost attached. The second is that LB-102 is
+the same shape as LB-98 a few hours earlier: data that persists with no read path is invisible to
+every surface and to CI both. Naming the pattern in both entries is what makes the third one
+recognisable.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21368 (recomputed after a parallel merge)
+
+BF-152 (#1138) and TN-3b's chart landed within minutes of each other and both moved this number —
+main to 21332 as its entry left the queue, this branch to 21396 as LB-102 arrived. **The conflict
+resolves to neither**: the correct value is `wc -l` + 1 of the merged file, which is 21368. Splicing
+either side would have set a baseline for a document that does not exist.
+
+Same for `package.json` and `changelog.ts` in the same merge — rebuilt from `git show origin/main:…`
+and re-bumped on top, so BF-152's v1.454.3 entry survives under this branch's v1.455.0 rather than
+being spliced away.
+## 2026-09-11 — `docs/implementation-backlog.md` → 21343 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 
-**This figure has been rewritten EIGHTEEN times and the churn is the note worth leaving.** Twenty-three
+**This figure has been rewritten NINETEEN times and the churn is the note worth leaving.** Twenty-four
 other merges landed on `main` while this PR waited on an owner decision, and each one moved the base
 out from under it — so the starting figure is no longer even quoted here, because it changed again
-between the last two rewrites. **Eighteen rewrites of one number is the cost of a green PR waiting**,
+between the last two rewrites. **Nineteen rewrites of one number is the cost of a green PR waiting**,
 recorded rather than smoothed because the alternative reading — that someone kept getting the
 arithmetic wrong — is the wrong lesson. The per-file `.size` split (LA-33) is what keeps this to one
-number instead of a whole map: no other document's baseline has conflicted once across all eighteen.
+number instead of a whole map: no other document's baseline has conflicted once across all nineteen.
 Nothing was wrong with any of the three — each was correct against the `main` of its hour. Under six
 concurrent lanes plus an owner gate, a baseline is a reading of a moving number, and a PR that waits
 will re-read it once per merge that overtakes it. Recomputed by `pnpm fix:baselines` after each
