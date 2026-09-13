@@ -76,7 +76,11 @@ describe('both writers reach the one store', () => {
   it('the native status listener records it', () => {
     const src = source('lib/hooks/use-strap-battery.ts')
     expect(src).toMatch(/addListener\('polarStatus'/)
-    expect(src).toMatch(/getStatus\(\)\)\.battery/)
+    // Was `/getStatus\(\)\)\.battery/` — one expression. BF-140 split it so the reported time can be
+    // read off the same status object, so this now pins the pair: the call, and the battery reaching
+    // `record`. The assertion's intent is unchanged; only the shape it matches is.
+    expect(src).toMatch(/getStatus\(\)/)
+    expect(src).toMatch(/record\(status\.battery/)
     expect(src).toContain('writeStrapBattery')
   })
 

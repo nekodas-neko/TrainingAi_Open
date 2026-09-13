@@ -56,6 +56,17 @@ non-conflicting removal above. Only the shared *pointer/tick* lines defer.)
 
 Loose entries are a **holding area, not permanent storage.** Fold them in on this trigger:
 
+**Since 2026-09-10 the sweep is a script: `node scripts/fold-journal-entries.js [--limit=N]`
+(`--dry-run` first).** It folds oldest-first, rolls a new history file at ~250 KB, and — the part
+that changes the rule above — **it folds CITED entries too, repointing every citation** at
+`history-<date>-folded-N.md#<entry-name>`. "Do not fold a linked entry" was a workaround for having
+no way to move the link; it is no longer the constraint. First run: 345 → 60 entries, `check-doc-links`
+and `check-index-doc-paths` both clean.
+
+**The one thing it still refuses to fold is an entry an agent baton cites.** Rewriting would work,
+but it means one lane writing into another's live state file, which races whatever that lane is doing.
+Batons are rewritten wholesale at handover anyway, so those few entries wait.
+
 > **When `docs/overview/entries/` holds ≥ ~20 note files (excluding this README) OR ~100 KB of
 > notes**, a session compacts them: append every entry (oldest-first) into the newest
 > `docs/overview/history-*.md` — starting a **new** `history-*.md` when it nears ~250 KB, per the
@@ -98,8 +109,17 @@ different ways. Both are mechanical; neither is obvious until it happens.
    set, not just over the loose one**, and un-fold anything that has gained a citation. Folding is
    the reversible half; a broken citation in someone else's handoff is not.
 
+6. **A citation's link TEXT is often the path too, and only the target gets rewritten** (measured
+   2026-09-10). Domain indexes cite an entry with the path as BOTH halves — backticked link text
+   reading `docs/overview/entries/x.md`, and the relative target beside it.
+   Repointing the target leaves the backticked text naming a file that no longer exists —
+   **`check-doc-links` cannot see it**, because it reads targets, so this one passes that gate and
+   fails `check-index-doc-paths` instead. Eighteen survived the first full run. The fold rewrites the
+   text to the bare entry name.
+
 **Run `node scripts/check-doc-links.js` after the fold and fix what it names — do not reason about
-which links moved.** All five traps above were found that way, in five separate passes, and each one
+which links moved.** Run **`node scripts/check-index-doc-paths.js` as well**: trap 6 is invisible to
+the first one, and the two together are what a clean fold means. All five traps above were found that way, in five separate passes, and each one
 looked like the last thing that could be wrong.
 
 ### The limit now counts foldable entries, not all of them (changed 2026-08-18)

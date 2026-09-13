@@ -386,6 +386,35 @@ export async function getWorkoutSessionProgramSessionId(db: Db, userId: string, 
   return row?.programSessionId ?? null
 }
 
+/**
+ * BF-144: has THIS program session been trained since `since`?
+ *
+ * Resolved through `workout_sessions.session_id` — the live FK to `program_sessions` — rather than
+ * by matching exercise names, which is what BF-143's guard did. A name lookup is right only while
+ * names stay unique and unchanged: rename a session, or add a second one sharing a name, and the
+ * question gets answered about the wrong workouts. An id cannot be confused that way.
+ *
+ * The caller keeps its own date comparison as the companion test, because rows predating the link
+ * carry no `session_id` and so cannot answer for themselves.
+ */
+export async function wasProgramSessionTrainedSince(
+  db: Db, userId: string, programSessionId: string, since: Date,
+): Promise<boolean> {
+  const [row] = await db
+    .select({ id: s.exerciseLogs.id })
+    .from(s.exerciseLogs)
+    .innerJoin(s.workoutSessions, eq(s.workoutSessions.id, s.exerciseLogs.workoutSessionId))
+    .where(and(
+      eq(s.workoutSessions.userId, userId),
+      eq(s.workoutSessions.programSessionId, programSessionId),
+      isNull(s.workoutSessions.deletedAt),
+      isNull(s.exerciseLogs.deletedAt),
+      gte(s.exerciseLogs.loggedAt, since),
+    ))
+    .limit(1)
+  return row != null
+}
+
 export async function getRecentSessionsOfType(db: Db, userId: string, programSessionId: string, limit: number): Promise<Array<{
   id: string; startedAt: Date; completedAt: Date | null; sessionName: string
 }>> {
@@ -451,8 +480,9 @@ export async function getSetTimingRows(db: Db, userId: string, exerciseNames: st
     .where(and(...conditions))
 }
 
-// 90-day estimated-1RM history per exercise, one point per session-day (mirrors
-// app/api/strength-trend/route.ts's query) — feeds the strength-projection plateau detector.
+// 90-day estimated-1RM history per exercise, one point per session-day — feeds the
+// strength-projection plateau detector and, since LA-96, /api/strength-trend, which used to
+// carry a byte-identical copy of this query.
 export async function getExercise1rmHistory(db: Db, userId: string, exerciseNames: string[], tz: string): Promise<Record<string, { date: string; rm: number }[]>> {
   if (exerciseNames.length === 0) return {}
   type RawRow = { exercise_name: string; session_date: string; rm: number }
@@ -467,6 +497,10 @@ export async function getExercise1rmHistory(db: Db, userId: string, exerciseName
       AND el.exercise_name IN (${sql.join(exerciseNames.map(n => sql`${n}`), sql`, `)})
       AND el.estimated_1rm IS NOT NULL
       AND el.estimated_1rm > 0
+      -- Mirrors getLastRealOneRmBatch's two-marker gate (LA-96). The estimated_1rm > 0
+      -- predicate alone trusts the write-time invariant that a deload always stores 0, and
+      -- that invariant has been violated in production in both directions.
+      AND el.exercise_deloaded = false
       AND ws.started_at >= NOW() - INTERVAL '90 days'
       AND el.deleted_at IS NULL AND ws.deleted_at IS NULL
     GROUP BY el.exercise_name, session_date
@@ -536,4 +570,53 @@ export async function getWeeklySetsByMuscleGroup(db: Db, userId: string, program
     result[mg] = (result[mg] ?? 0) + Number(row.weighted_sets)
   }
   return result
+}
+
+/**
+ * Undo a baseline the auto-adopt path completed on borrowed personal records (BF-143).
+ *
+ * `source: 'personal_record'` is written in exactly one place — the auto-heal block in
+ * `app/api/ai-periodization/session/[sessionId]/route.ts` — so a row whose every anchor carries it
+ * was completed by that path and by nothing else. An AMRAP writes `'amrap'` and the prior-data
+ * choice writes `'existing'`; neither is touched here.
+ *
+ * **Why this is a revert and not a repair-in-place.** The adopted numbers cannot be salvaged: one
+ * of them was a bodyweight 1RM index stored under a key named `kg`, and a baseline is the
+ * denominator every prescription percentage multiplies. Clearing it puts the session back where
+ * the owner's rule says a never-trained session belongs — measuring, not prescribing.
+ *
+ * Returns null when nothing matched, so the caller can tell a revert from a no-op.
+ */
+export async function revertAutoAdoptedBaseline(
+  db: Db,
+  userId: string,
+  programSessionId: string,
+): Promise<SessionPeriodization | null> {
+  const [current] = await db.select().from(s.sessionPeriodization).where(and(
+    eq(s.sessionPeriodization.userId, userId),
+    eq(s.sessionPeriodization.programSessionId, programSessionId),
+  )).limit(1)
+  if (!current || !current.baselineComplete) return null
+
+  const anchors = Object.values((current.baseline1rm ?? {}) as Record<string, Baseline1rmEntry>)
+  // An empty map is not evidence of the auto-adopt path, so it is left alone rather than reverted.
+  if (anchors.length === 0 || !anchors.every(a => a.source === 'personal_record')) return null
+
+  const [row] = await db
+    .update(s.sessionPeriodization)
+    .set({
+      phase: 'baseline', phaseStartedAt: new Date(), baselineComplete: false,
+      baseline1rm: {}, sessionsInPhase: 0,
+      // A prescription generated off the adopted anchors is derived from them and outlives them by
+      // up to 7 days, so it goes with them.
+      prescription: null, prescriptionStatus: 'none',
+      prescriptionGeneratedAt: null, prescriptionExpiresAt: null, pendingTransition: null,
+      updatedAt: new Date(),
+    })
+    .where(and(
+      eq(s.sessionPeriodization.userId, userId),
+      eq(s.sessionPeriodization.programSessionId, programSessionId),
+    ))
+    .returning()
+  return row ? mapPeriodization(row) : null
 }

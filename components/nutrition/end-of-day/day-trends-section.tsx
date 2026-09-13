@@ -15,7 +15,22 @@ interface Props {
 
 const ARROW: Record<'up' | 'down' | 'level', string> = { up: '↑', down: '↓', level: '→' }
 
-function TrendRowCard({ row }: { row: TrendRow }) {
+/**
+ * One stat's row. Exported because the weekly recap draws the identical card over a five-week
+ * window (Q-112e) — the only things that vary are the sparkline's domain, the phrase the delta is
+ * measured against, and what to call a missing reading.
+ */
+export function TrendRowCard({
+  row,
+  timeDomain = TREND_TIME_DOMAIN,
+  comparison,
+  absentLabel = 'No reading today',
+}: {
+  row: TrendRow
+  timeDomain?: [number, number]
+  comparison?: string
+  absentLabel?: string
+}) {
   const { spec, today, delta, series } = row
   return (
     <div className="rounded-xl border border-border bg-muted/40 px-3 py-2.5">
@@ -26,14 +41,14 @@ function TrendRowCard({ row }: { row: TrendRow }) {
             // An absence is not a value, and must not be dressed as one: muted and regular weight,
             // where a reading is coloured and semibold. Styled alike, "No reading today" read as
             // the loudest thing on the card.
-            ? <p className="text-xs text-muted-foreground">No reading today</p>
+            ? <p className="text-xs text-muted-foreground">{absentLabel}</p>
             : <p className="text-sm font-semibold" style={{ color: spec.color }}>{spec.format(today)}</p>}
         </div>
         {series && (
           <Sparkline
             values={series.values}
             times={series.times}
-            timeDomain={TREND_TIME_DOMAIN}
+            timeDomain={timeDomain}
             width={110}
             height={30}
             color={spec.color}
@@ -49,7 +64,7 @@ function TrendRowCard({ row }: { row: TrendRow }) {
       {delta && (
         <p className="mt-1.5 text-[11px] text-muted-foreground">
           <span aria-hidden="true">{ARROW[delta.direction]}</span>{' '}
-          {deltaSentence(spec, delta)}
+          {deltaSentence(spec, delta, comparison)}
         </p>
       )}
     </div>

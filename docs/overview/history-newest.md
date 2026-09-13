@@ -1806,3 +1806,131 @@ flag now fails. Verified by dropping each:
 Every other test that writes files already uses `mkdtempSync` under `os.tmpdir()` —
 `doc-size-baselines`, `repository-user-scoping-check`, `required-models`, `sw/manifest`. Grepped
 rather than assumed: this was the last `writeFileSync` into the working tree, and there are now none.
+
+## 2026-09-08 → 2026-09-09 — PS-39, the untested-route campaign (20 entries folded)
+
+**Folded 2026-09-10 (OR-106).** Twenty journal entries, one campaign: PS-39 drove the count of API
+routes with no test that imports their handler from **57 down to 7**. Each entry recorded one batch
+and the countdown in its title. They are folded together because the narrative is the campaign, not
+any single batch — but the *reasoning* in each is kept below, because what a route's cases decide is
+the part that does not regenerate.
+
+### 2026-09-08 — the exercise catalogue gets tests, and a guard turns out to be unreachable (PS-39)
+
+**Branch:** `test/exercise-catalogue-routes`
+
+- `lib/__tests__/exercise-catalogue-routes.test.ts` — 10 cases over `exercise-library`, `activity-types` and `exercises/generate`, with the repository and the model mocked. - `lib/data/postgres/__tests__/exercise-gif-route.test.ts` — 11 cases over `exercise-gif` against real rows, because its logic is entirely SQL: which table it prefers, what it skips, what it writes back.
+
+### 2026-09-08 — the leaderboard's scoping gets tested, closing an omission this sweep recorded (PS-39)
+
+**Branch:** `test/friends-leaderboard-route`
+
+`friends/leaderboard` was **deliberately left uncovered earlier in this same PS-39 sweep**, and the reasoning was written down at the time: its scoping lives inside `inArray(allIds)` across five queries, where a mock cannot see it, and a stub would pin canned rows and read as coverage without being any.
+
+### 2026-09-08 — the three routes that decide what a nutrition day means (PS-39, 58 → 55)
+
+**Branch:** `test/nutrition-day-completion-routes`
+
+25 cases over `food-logging-complete`, `nutrition/plan-meal-answers` and `nutrition/dietary-restrictions`, batched because each answers a different half of the same question — *is this day's food record finished, and what was deliberately not eaten*.
+
+### 2026-09-08 — how the app reports and delivers itself (PS-39, 54 → 50)
+
+**Branch:** `test/platform-meta-routes`
+
+16 cases over `version`, `status`, `download-apk` and `export` — the four routes an owner reaches for when something is already wrong, which is the worst possible moment for one of them to be subtly untrue.
+
+### 2026-09-08 — the two writes that reshape a running program (PS-39, 47 → 45)
+
+**Branch:** `test/program-phase-write-routes`
+
+14 cases over `confirm-early-deload` and `phase-sets/clone`. Batched because both take a client-supplied id and decide, from the user's own data, whether it may be acted on — and they answer that question in two different and both-correct ways.
+
+### 2026-09-08 — the year you had and the name you wear for it (PS-39, 57 → 54)
+
+**Branch:** `test/year-review-and-identity-routes`
+
+17 cases over `year-review`, `seasons` and `user/equipped-title` — the three reads and writes behind a retrospective and the identity attached to it.
+
+### 2026-09-09 — the snapshot's two doors, and two guards that were never asked (PS-39, 16 → 13)
+
+**Branch:** `test/admin-db-maintenance-routes`
+
+35 cases over `admin/db-snapshot`, `admin/vacuum` and `admin/program-export`.
+
+### 2026-09-09 — the exercise catalogue's four verbs, and what the ratchet cannot see (PS-39, stays at 22)
+
+**Branch:** `test/admin-exercise-tool-routes`
+
+15 cases over `admin/exercises` — the last route [#1019](https://github.com/nekodas-neko/TrainingAi_Open/pull/1019) changed without a test of its own.
+
+### 2026-09-09 — covering the routes #1019 changed blind (PS-39, 24 → 22)
+
+**Branch:** `test/admin-media-tool-routes`
+
+17 cases over `admin/reference-figure` and `admin/mirror-dataset-gifs`.
+
+### 2026-09-09 — three admin reports, and a `.strict()` that cannot fire (PS-39, 19 → 16)
+
+**Branch:** `test/admin-report-calibration-routes`
+
+33 cases over `admin/app-load-report`, `admin/timing-baseline` and `admin/sleep-feel-calibration`. They share the admin gate and parse their window three different ways, which is most of what a route-level test can hold a read-only report to.
+
+### 2026-09-09 — the admin reports, and a Q-548 defect two of them were carrying (PS-39, 34 → 30)
+
+**Branch:** `test/admin-report-routes`
+
+13 cases over `admin/errors`, `admin/ai-usage`, `admin/pending-count` and `admin/time-audit`.
+
+### 2026-09-09 — three admin tools, and a report naming a source that was deleted (PS-39, 22 → 19)
+
+**Branch:** `test/admin-tool-routes`
+
+27 cases over `admin/generate-exercise-media`, `admin/model-assets` and `admin/fix-exercise-units`. They share the admin gate and nothing else, which is the batch: the gate is the part that has regressed before, and three routes exercise it three ways in one file.
+
+### 2026-09-09 — the two reads that draw a conclusion (PS-39, 45 → 43)
+
+**Branch:** `test/cardio-sleep-analysis-routes`
+
+13 cases over `guided-walk/segment-stats` and `sleep-performance-correlation` — the routes that take months of rows and reduce them to something the app then *states* to the owner. That is the class where a quiet aggregation bug is least visible, because the answer is always a plausible-looking number.
+
+### 2026-09-09 — the three routes that hand something out of the app (PS-39, 43 → 40)
+
+**Branch:** `test/feedback-calendar-scale-routes`
+
+17 cases over `feedback`, `log-calendar-event` and `scale-ble/pending` — the last of the user-facing routes on the PS-39 list.
+
+### 2026-09-09 — the three backfill levers, and a jobId that polled the wrong job (PS-39, 13 → 10)
+
+**Branch:** `test/oura-ble-backfill-routes`
+
+35 cases over `oura-ble/samples/redecode`, `oura-ble/samples/step-backfill-preview` and `oura-ble/backfill-hr-stats`. All three re-derive stored data rather than draining the ring again, which is only possible because `oura_raw_samples.body_hex` is the archival source of truth on the server — the ring's history buffer is finite and its cursor only moves forward, so a decoder fixed later back-fills by re-reading stored hex and no other way. None of these routes may mutate that hex, and none does.
+
+### 2026-09-09 — the three ring-device probes (PS-39, 30 → 27)
+
+**Branch:** `test/oura-ble-device-routes`
+
+12 cases over `oura-ble/battery-latest`, `oura-ble/battery-analytics` and `oura-ble/daytime-coverage` — the same ring read from three angles.
+
+### 2026-09-09 — the two levers that remove data (PS-39, 36 → 34)
+
+**Branch:** `test/oura-ble-maintenance-routes`
+
+16 cases over `oura-ble/samples/pack` and `oura-ble/samples/backfill-null-decoded` — the destructive pair, and the ones where the app's hardest standing rule sits directly behind the route. `oura_raw_samples.body_hex` is the archival source of truth on the server, the ring's history buffer is finite and its sync cursor only moves forward, so a decoder fixed later can only back-fill by re-decoding stored hex. Anything that could remove it is a one-way door.
+
+### 2026-09-09 — the Oura-BLE reads and the gate in front of them (PS-39, 40 → 36)
+
+**Branch:** `test/oura-ble-sample-routes`
+
+15 cases over `oura-ble/samples/summary`, `oura-ble/samples/raw`, `oura-ble/db-stats` and `oura-ble/freshness`. They share one gate and differ in exactly the ways that gate matters, which is what makes them a batch rather than four thin files.
+
+### 2026-09-09 — the last Oura-BLE reads, and a two-line route worth two lines (PS-39, 7 → 3)
+
+**Branch:** `test/oura-ble-sensor-export-routes`
+
+25 cases over `oura-ble/step-counter-export`, `oura-ble/workout-sensors`, `oura-ble/comparison-harness` and `auth/[...nextauth]`.
+
+### 2026-09-09 — the ring-device three, and a NaN that emptied a panel (PS-39, 10 → 7)
+
+**Branch:** `test/ring-device-routes`
+
+29 cases over `oura-ble/rekey`, `oura-ble/device-metrics` and `colmi/status`.

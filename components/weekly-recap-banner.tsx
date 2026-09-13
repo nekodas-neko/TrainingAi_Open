@@ -5,6 +5,7 @@ import { SparklesIcon } from "lucide-react";
 import dynamic from "next/dynamic";
 import { startOfWeekInTz, shiftDateStr } from "@trainingai/shared/date-utils";
 import { DismissibleBanner } from "@/components/ui/dismissible-banner";
+import { WeekTrendsSection } from "@/components/week-trends-section";
 
 const Response = dynamic(() => import("@/components/ai/response").then(m => m.Response), { ssr: false });
 
@@ -120,6 +121,10 @@ export function WeeklyRecapBanner({ forceOpen = false }: Props) {
       onDismiss={handleDismiss}
     >
       {content && <Response className="text-sm leading-relaxed">{content}</Response>}
+      {/* Q-112e — the recap gets the daily review's treatment: the prose, then the numbers it is
+          talking about. Rendered inside the expanded body so the request only fires when the banner
+          is actually opened, and after the prose because the paragraph is what the owner came for. */}
+      {content && <WeekTrendsSection weekStart={weekStart} />}
     </DismissibleBanner>
   );
 }

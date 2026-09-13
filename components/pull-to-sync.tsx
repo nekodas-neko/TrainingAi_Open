@@ -43,7 +43,13 @@ export function PullToSync({
   const scrollRef = useRef<HTMLDivElement>(null);
   // BF-100. The app scrolls this container, not the document, so Next's own restoration cannot see
   // it — measured: on a push-and-back the container reads 0 while the document reads 0 throughout.
-  // Here rather than in 62 screens, because every screen using the shell inherits it.
+  //
+  // **RV-36: this used to say "every screen using the shell inherits it", and that was wrong.**
+  // Every screen using **`PullToSync`** inherits it, and three do — `health-content`,
+  // `more-content`, `session-select-content`. The Nutrition tab owns its own scroller and inherited
+  // nothing; it now calls the hook directly, which is all the hook needs (it takes a ref and nothing
+  // about it is shell-specific). A screen that scrolls its own container gets no restoration from
+  // being inside the shell — check the call, not the layout.
   useScrollRestoration(scrollRef, scrollKey);
   // BF-110. Same container and the same reason: the blank resume is in the shell, not a screen.
   // A scroll fixes it by hand, so the DOM was never lost — this measures that once and forces the

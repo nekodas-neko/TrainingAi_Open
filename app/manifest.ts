@@ -5,7 +5,11 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "TrainingAi",
     short_name: "TrainingAi",
     description: "AI-powered gym session tracker connected to Google Sheets",
-    start_url: "/session-select",
+    // PS-35b ①. Was "/session-select", which is a bare `redirect("/workout")` — so every launch
+    // from the installed icon paid a redirect before showing anything. Points at the real route now.
+    // Whether the Workout tab is the right place for a launch to LAND is PS-35's page-consolidation
+    // question and the owner's; this only removes the hop to the same destination.
+    start_url: "/workout",
     display: "standalone",
     orientation: "portrait",
     background_color: "#09090b",

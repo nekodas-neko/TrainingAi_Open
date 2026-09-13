@@ -48,6 +48,7 @@ const brandThemeScript = `(function(){
     var rgb = oklchToRgb(0.7, 0.2, h);
     html.style.setProperty('--brand', 'oklch(0.7 0.2 ' + h + ')');
     html.style.setProperty('--color-brand', 'oklch(0.7 0.2 ' + h + ')');
+    html.style.setProperty('--brand-hue', String(h));
     html.style.setProperty('--brand-foreground', 'oklch(0 0 0)');
     html.style.setProperty('--brand-card-bg', 'rgba(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ',0.07)');
     html.style.setProperty('--brand-card-border', 'rgba(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ',0.18)');

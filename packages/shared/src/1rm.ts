@@ -215,6 +215,42 @@ export function repMaxFromOneRm(oneRm: number, addedKg = 0): number {
   return best
 }
 
+/**
+ * The rep count a STORED bodyweight estimate came from (BF-149).
+ *
+ * `repMaxFromOneRm` above inverts `calc1RM`, which is correct for the stats sheet — that screen
+ * builds its comparison table with `calc1RM` too, so the pair is self-consistent. It is the wrong
+ * inverse for a stored estimate: `estimateOneRm` routes every bodyweight set through
+ * `amrapAverage1Rm`, which applies `amrapScaleFactor` on top of `calc1RM`. Inverting the unscaled
+ * formula therefore reports fewer reps than were performed, by exactly the discount — measured on
+ * the owner's account, 11 logged reps stored 128 and displayed as **8 RM**.
+ *
+ * **Nearest match, and a full scan, because the forward map is neither monotone nor injective.**
+ * `amrapScaleFactor` steps down at 5/8/12/20 reps, so `calcAmrap1RM` DIPS across each boundary —
+ * 8 reps gives 121.75 and 9 gives 120.25. A "largest r that does not exceed" search (what
+ * `repMaxFromOneRm` can safely do against a monotone `calc1RM`) overshoots badly here: 20 reps
+ * would read back as 28. Scanning for the closest value instead round-trips 29 of the 30 rep
+ * counts exactly.
+ *
+ * **The 30th is a genuine collision, not a bug to fix later:** 5 reps and 6 reps both store 114.5,
+ * because the 1.0 → 0.97 step cancels the rep-factor gain. No inverse can separate them, which is
+ * the standing argument for eventually displaying the logged reps rather than inverting an index
+ * the app already has `avg_reps` for.
+ */
+export function repMaxFromAmrapOneRm(oneRm: number, addedKg = 0): number {
+  if (oneRm <= 0) return 0
+  const ref = Math.max(1, BW_REF + addedKg)
+  let best = 0
+  let bestDistance = Infinity
+  for (let r = 1; r <= REP_CEILING; r++) {
+    const distance = Math.abs(calcAmrap1RM(ref, r) - oneRm)
+    // Strictly-less keeps the LOWEST rep count of a tie, which is the honest reading of a
+    // collision: it is the claim the stored number actually supports.
+    if (distance < bestDistance) { bestDistance = distance; best = r }
+  }
+  return best
+}
+
 // ── Display basis: bodyweight strength is measured in REPS, never kilograms ──
 //
 // A bodyweight `estimated1rm` is BW_REF-relative, so it is a pure monotone function of reps and

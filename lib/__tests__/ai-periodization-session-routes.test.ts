@@ -30,6 +30,8 @@ const advancePhase = vi.fn(async (_u: string, _s: string, _p: string) => state({
 const storePrescription = vi.fn(async (_u: string, _s: string, _p: Row, _e: Date) => undefined)
 const updatePrescriptionStatus = vi.fn(async (_u: string, _s: string, _st: string) => undefined)
 const getLastExerciseLogsBatch = vi.fn(async (_u: string, _n: string[], _p?: string) => new Map<string, Row>())
+const wasProgramSessionTrainedSince = vi.fn(async (_u: string, _s: string, _since: Date) => false)
+const revertAutoAdoptedBaseline = vi.fn(async (_u: string, _s: string) => null as Row | null)
 const listPersonalRecords = vi.fn(async (_u: string) => new Map<string, number>())
 const listPrevious1rm = vi.fn(async (_u: string) => new Map<string, number>())
 const generatePrescriptionForSession = vi.fn(async (..._a: unknown[]) => generated() as Row)
@@ -41,6 +43,8 @@ vi.mock('@/lib/data', () => {
   const repo = async () => ({
     getActiveProgram, ensureSessionPeriodization, getSessionPeriodization, setBaselineComplete,
     advancePhase, storePrescription, updatePrescriptionStatus, getLastExerciseLogsBatch,
+    wasProgramSessionTrainedSince,
+    revertAutoAdoptedBaseline,
     listPersonalRecords, listPrevious1rm,
   })
   return { getRepository: repo, getRepositoryAsync: repo }
@@ -113,11 +117,15 @@ const freshUser = (over: { timezone?: string } = {}) => {
 beforeEach(() => {
   for (const m of [getActiveProgram, ensureSessionPeriodization, getSessionPeriodization,
     setBaselineComplete, advancePhase, storePrescription, updatePrescriptionStatus,
-    getLastExerciseLogsBatch, listPersonalRecords, listPrevious1rm, generatePrescriptionForSession]) m.mockClear()
+    getLastExerciseLogsBatch, wasProgramSessionTrainedSince,
+    listPersonalRecords, listPrevious1rm, generatePrescriptionForSession,
+    revertAutoAdoptedBaseline]) m.mockClear()
   getActiveProgram.mockResolvedValue(program())
   ensureSessionPeriodization.mockResolvedValue(state())
   getSessionPeriodization.mockResolvedValue(state())
   getLastExerciseLogsBatch.mockResolvedValue(new Map())
+  wasProgramSessionTrainedSince.mockResolvedValue(false)
+  revertAutoAdoptedBaseline.mockResolvedValue(null)
   listPersonalRecords.mockResolvedValue(new Map())
   listPrevious1rm.mockResolvedValue(new Map())
   generatePrescriptionForSession.mockResolvedValue(generated())
@@ -349,20 +357,73 @@ describe('GET …/session/[sessionId] — the stale-baseline auto-heal', () => {
     expect(setBaselineComplete).not.toHaveBeenCalled()
   })
 
+  /**
+   * The repository answered yes: this program session carries a log at least as new as the phase
+   * clock. BF-144 moved that date comparison down into the query, so the route-level shape is the
+   * answer rather than the logs — the comparison itself is covered against a real database in
+   * `lib/data/postgres/__tests__/was-program-session-trained-since.test.ts`.
+   */
+  const loggedSincePhaseStart = () => wasProgramSessionTrainedSince.mockResolvedValue(true)
+
   it('completes a baseline the completion endpoint never reached, from the personal records', async () => {
     baselineRunning()
-    getLastExerciseLogsBatch.mockResolvedValue(new Map([['Squat', { id: 'log-1' }]]))
-    listPersonalRecords.mockResolvedValue(new Map([['Squat', 120]]))
+    loggedSincePhaseStart()
+    // BOTH exercises, because a subset no longer completes — see the partial-coverage case below.
+    listPersonalRecords.mockResolvedValue(new Map([['Squat', 120], ['Curl', 30]]))
     await getSession()
-    expect(setBaselineComplete.mock.calls[0][2]).toEqual({ [SQUAT]: { kg: 120, source: 'personal_record' } })
+    expect(setBaselineComplete.mock.calls[0][2]).toEqual({
+      [SQUAT]: { kg: 120, source: 'personal_record' },
+      [CURL]: { kg: 30, source: 'personal_record' },
+    })
   })
 
-  // A shared exercise name logged under a DIFFERENT program must not let a fresh cycle skip its
-  // own AMRAP baseline week — so the lookup is scoped to the active program.
-  it('asks for prior logs within the active program only', async () => {
+  // BF-143 ①. The owner rebuilt a session inside an existing program and it never asked for an
+  // AMRAP: the old condition asked whether these exercise NAMES had ever been logged, which is true
+  // of every recreated session. The logs must be newer than the phase clock to mean "interrupted".
+  it('does not complete when the only logs predate the baseline phase — a recreated session', async () => {
     baselineRunning()
+    wasProgramSessionTrainedSince.mockResolvedValue(false)
+    listPersonalRecords.mockResolvedValue(new Map([['Squat', 120], ['Curl', 30]]))
     await getSession()
-    expect(getLastExerciseLogsBatch.mock.calls[0][1]).toEqual(['Squat', 'Curl'])
-    expect(getLastExerciseLogsBatch.mock.calls[0][2]).toBe('p-1')
+    expect(setBaselineComplete).not.toHaveBeenCalled()
+  })
+
+  // BF-143 ②. Lower held three baselines for four exercises and was still marked complete, so the
+  // exercise without a personal record could never acquire one. `recordBaselineAnchors` already
+  // holds this invariant for the measured path; this is the same rule on the adopted path.
+  it('does not complete on partial coverage — an exercise with no personal record', async () => {
+    baselineRunning()
+    loggedSincePhaseStart()
+    listPersonalRecords.mockResolvedValue(new Map([['Squat', 120]]))
+    await getSession()
+    expect(setBaselineComplete).not.toHaveBeenCalled()
+  })
+
+  // BF-143 ③. The already-stored bad state: complete, but never trained since the phase began.
+  it('reverts a baseline that was completed without the session being trained', async () => {
+    ensureSessionPeriodization.mockResolvedValue(state({ phase: 'accumulation', baselineComplete: true }))
+    await getSession()
+    expect(revertAutoAdoptedBaseline.mock.calls[0][1]).toBe(SESSION_ID)
+  })
+
+  it('leaves a completed baseline alone once the session has been trained in this phase', async () => {
+    ensureSessionPeriodization.mockResolvedValue(state({ phase: 'accumulation', baselineComplete: true }))
+    loggedSincePhaseStart()
+    await getSession()
+    expect(revertAutoAdoptedBaseline).not.toHaveBeenCalled()
+  })
+
+  // BF-144. The interruption question is asked about THIS program session's id and THIS phase
+  // clock — not about exercise names, which answer for the wrong workouts the moment a session is
+  // renamed or a second one shares a name. A program-scoping argument is no longer needed: a
+  // program-session id belongs to exactly one program by construction.
+  it('asks about this session id and this phase clock, not about exercise names', async () => {
+    const phaseStartedAt = new Date(Date.now() - 3 * 86_400_000)
+    ensureSessionPeriodization.mockResolvedValue(
+      state({ phase: 'baseline', baselineComplete: false, phaseStartedAt }))
+    await getSession()
+    expect(wasProgramSessionTrainedSince.mock.calls[0][1]).toBe(SESSION_ID)
+    expect(wasProgramSessionTrainedSince.mock.calls[0][2]).toEqual(phaseStartedAt)
+    expect(getLastExerciseLogsBatch).not.toHaveBeenCalled()
   })
 })

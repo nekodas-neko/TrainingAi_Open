@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { goalBoundSchema } from '@trainingai/shared/validation/goal-bounds'
 
 /**
  * Domains AI Coach may write.
@@ -122,12 +123,18 @@ export const PatchChangeSchema = z.discriminatedUnion('field', [
   // Numeric, and bounded. The upper bounds are not decoration: this is the one place a model's
   // number reaches a stored goal, and "set my calories to 26000" should be refused by the schema
   // rather than survive to a confirmation card that looks legitimate.
+  //
+  // RV-41: that comment named a value this schema did not refuse. One shared `max(100_000)` stood
+  // here for all seven fields while the user's own routes enforced 20,000 / 2,000 / 30,000 / 20,000
+  // — up to 50× tighter — so the model could write a number the form refuses. The bounds are now
+  // imported per field from `GOAL_BOUNDS`, which is also where the user routes read them, so the
+  // two cannot drift again.
   ...(['calories', 'proteinG', 'carbsG', 'fatG', 'stepsGoal', 'calorieGoal', 'waterGoalMl'] as const).map(
     f => z.object({
       id: z.string().min(1),
       field: z.literal(f),
-      from: z.number().min(0).max(100_000).nullable(),
-      to: z.number().min(0).max(100_000),
+      from: goalBoundSchema(f).nullable(),
+      to: goalBoundSchema(f),
     }),
   ),
 

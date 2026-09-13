@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { budgetProvenance, scaleMacrosForEarnedKcal } from '@trainingai/shared/nutrition/calorie-balance'
 import { macroBudgetGap, MACRO_BUDGET_GAP_KCAL } from '../macro-budget-gap'
 
@@ -68,5 +70,50 @@ describe('what it refuses to report', () => {
   it('is signed, so a goal set below the budget reads as below', () => {
     const gap = macroBudgetGap(STORED, 2000)!
     expect(gap.gapKcal).toBe(-341)
+  })
+})
+
+/**
+ * BF-142 — the sentence the card prints beside that gap, which was false in two ways.
+ *
+ * Owner, third report in this family: *"calories still not right"*. The card said *"The grams come
+ * from your stored daily goal"* four lines below its own prop comment saying they are the
+ * **effective** targets — already earned-scaled. And it explained the gap as goal-versus-budget
+ * **"with the movement recorded today"**, which is the one reason this module rules out: movement
+ * is in both addends and cancels, so a reader who believes that sentence waits for a gap that never
+ * closes.
+ *
+ * This is a source guard rather than a render assertion because the defect was **the words**, not
+ * the arithmetic — the printed numbers checked out to the kcal. The harness covers that the
+ * replacement renders; these three assertions cover that the retracted claims cannot come back.
+ */
+describe('the sentence on the card (BF-142)', () => {
+  const card = readFileSync(path.join(__dirname, '../energy-card.tsx'), 'utf8')
+
+  it('no longer claims the grams are the stored goal', () => {
+    expect(card).not.toMatch(/grams come from your stored daily goal/i)
+    // What they actually are: the stored goal scaled by what has been earned.
+    expect(card).toMatch(/scaled up by the same movement/i)
+  })
+
+  it('no longer offers movement as what separates the two numbers', () => {
+    expect(card, 'movement is in both addends and cancels').not.toMatch(/the movement recorded today/i)
+    expect(card).toMatch(/moving more raises both numbers/i)
+  })
+
+  it('names the stored goal beside the computed budget', () => {
+    // The owner's complaint was that not one number on the card was the number he chose.
+    expect(card).toMatch(/storedGoalCalories/)
+    expect(card).toMatch(/Your stored goal is/)
+    expect(card).toMatch(/resting burn/)
+  })
+
+  it('does not hardcode a gap figure anywhere', () => {
+    // The docstring above used to pin 406 "at every hour of every day". Measured 2026-09-11 it was
+    // 295 the other way — the sign flipped and the resting base had risen ~700 kcal. A restated
+    // constant inherits a number that has already moved.
+    const gapModule = readFileSync(path.join(__dirname, '../macro-budget-gap.ts'), 'utf8')
+    const asCurrentFact = /\b406 kcal\b(?![^\n]*(?:earlier version|BF-142|used to))/
+    expect(gapModule).not.toMatch(asCurrentFact)
   })
 })

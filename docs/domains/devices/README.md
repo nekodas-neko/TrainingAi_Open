@@ -23,8 +23,8 @@ documentation cluster in the repo (~45 known issues, ~38 plans, 300+ model files
 
 ## Reference docs — read in this order
 
-- [`docs/overview/entries/2026-09-02-tn1-chronic-stress-count.md`](../../overview/entries/2026-09-02-tn1-chronic-stress-count.md) — **the chronic-stress refusal now leaves a number behind, 2026-09-02 (TN-1).** `chronic_stress_score` has been NULL on every row since the model shipped, and both gates countable from stored data pass (43 summary rows against a threshold of 21; 27 of 31 nights complete at the summary level), so the refusal is in the **granular** layer — which recomputes its intermediates in memory by design and records no reason. `chronic_stress_granular_nights` counts the nights in the model's own 31-night window carrying a non-empty hypnogram, rMSSD series **and** skin-temp run (migrations **258 + 259**, local SQLite **v36**). **The gate is untouched** — `CHRONIC_STRESS_MIN_DAYS` does not move and nothing consults the count. **⚠ Only a hand-triggered `fullHistory` pass reaches the model**, so the column stays NULL until the owner runs one; ≥ 21 with a null score then puts the fault inside the vendored model, < 21 names the granular stash.
-- [`docs/overview/entries/2026-09-01-fix-device-console-ia.md`](../../overview/entries/2026-09-01-fix-device-console-ia.md)
+- [`2026-09-02-tn1-chronic-stress-count`](../../overview/history-2026-09-10-folded-6.md#2026-09-02-tn1-chronic-stress-count) — **the chronic-stress refusal now leaves a number behind, 2026-09-02 (TN-1).** `chronic_stress_score` has been NULL on every row since the model shipped, and both gates countable from stored data pass (43 summary rows against a threshold of 21; 27 of 31 nights complete at the summary level), so the refusal is in the **granular** layer — which recomputes its intermediates in memory by design and records no reason. `chronic_stress_granular_nights` counts the nights in the model's own 31-night window carrying a non-empty hypnogram, rMSSD series **and** skin-temp run (migrations **258 + 259**, local SQLite **v36**). **The gate is untouched** — `CHRONIC_STRESS_MIN_DAYS` does not move and nothing consults the count. **⚠ Only a hand-triggered `fullHistory` pass reaches the model**, so the column stays NULL until the owner runs one; ≥ 21 with a null score then puts the fault inside the vendored model, < 21 names the granular stash.
+- [`2026-09-01-fix-device-console-ia`](../../overview/history-2026-09-10-folded-5.md#2026-09-01-fix-device-console-ia)
   — **where the device consoles live, and why they are ordered the way they are (Q-531, 2026-09-01).**
   All three (`/admin/oura-ble`, `/admin/cadence`, `/admin/data-capture`) are routed under `/admin`
   and `isAdminUser`-gated, and always were; they are listed from the `/admin` **Devices** tab and
@@ -120,7 +120,7 @@ Genuinely superseded, kept for the trail only: `docs/oura-on-device-handover.md`
 - [`docs/reviews/2026-09-05-app-checkpoint.md`](../../reviews/2026-09-05-app-checkpoint.md) — **the whole-app checkpoint, 2026-09-05/06** (twenty-six lanes collated; PS-24…PS-39. For this pillar: see the report's pattern sections and per-lane table).
 - Reviews: [`docs/reviews/2026-08-07-full-app-review.md`](../../reviews/2026-08-07-full-app-review.md) — **full-app deep review, 2026-08-07** (saving/caching/performance/logic across all 201 routes and 40 pages; 53 findings queued as Q-117…Q-138, plus root cause for Q-73 and mechanisms for Q-72/Q-107)
 
-- [`docs/overview/entries/2026-08-18-ble-rekey-declared-not-inferred.md`](../../overview/entries/2026-08-18-ble-rekey-declared-not-inferred.md)
+- [`2026-08-18-ble-rekey-declared-not-inferred`](../../overview/history-2026-09-10-folded-1.md#2026-08-18-ble-rekey-declared-not-inferred)
   — **Q-314, shipped 2026-08-18.** A ring re-key is now **declared** (`POST /api/oura-ble/rekey`),
   not inferred from a ds regression — a history re-drain produces the same shape, and reading it as a
   reset re-timed the whole sleep history twice (+12.17 h, +14.16 h). `EPOCH_RESTART_RATIO = 0.05`
@@ -132,7 +132,7 @@ Genuinely superseded, kept for the trail only: `docs/oura-on-device-handover.md`
   cursors correctly and then **nothing consumes it** — a repo-wide grep finds no caller for
   `getUnrolledRaw` or `markRolledUp`. The device rollup is a port behind a `RollupIO` interface, not a
   rewrite — **Task 2 shipped 2026-08-23**, see
-  [the journal entry](../../overview/entries/2026-08-23-oura-rollup-io-port.md). Note the plan's "17
+  [the journal entry](../../overview/history-2026-09-10-folded-2.md#2026-08-23-oura-rollup-io-port). Note the plan's "17
   DB-coupled lines" is a **line** count: the port is **22 store operations**, and `run.ts` still
   reaches `onnxruntime-node`, so the rollup's I/O is portable and its models are not.
   Two blockers were verified when it was written and **both have since been answered**: the missing
@@ -155,7 +155,7 @@ Genuinely superseded, kept for the trail only: `docs/oura-on-device-handover.md`
   blobs hold 941,233 frames in 13 MB, contiguous with the hot tier — and the packer now runs
   automatically from the ingest path rather than on an admin button, throttled per user, with the
   delete scoped to the row ids it verified.
-  ([`journal`](../../overview/entries/2026-08-23-feat-oura-autopack.md), ops-doc **I28**.) The
+  ([`journal`](../../overview/history-2026-09-10-folded-2.md#2026-08-23-feat-oura-autopack), ops-doc **I28**.) The
   92 MB high-water mark does not come back without a `VACUUM FULL` — that is Q-315, still owner-gated.
 
 - [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](../../superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md)
@@ -180,7 +180,7 @@ Genuinely superseded, kept for the trail only: `docs/oura-on-device-handover.md`
 - [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](../../reviews/2026-08-18-ingest-and-input-validation.md) — **the ingest surface and input validation, 2026-08-18** (the scale/ring ingest routes reject malformed frames and take no `userId` from the body; two sit behind `requireAdmin`). Findings Q-464/Q-465; **no ingest route accepts a `userId` from the body, and value validation rejects physiologically impossible input on every route reachable in the harness.**
 
 - [`docs/reviews/2026-08-18-tier-a-enqueue-silence.md`](../../reviews/2026-08-18-tier-a-enqueue-silence.md) — **swallowed failures on write paths, 2026-08-18** (Q-486 — the four `queueMutation` calls in `workout-screen.tsx` are the only ones in the app that swallow, and all four are Tier-A; the surrounding layering is good and the last layer is silent). **Not reproduced** — needs a broken local SQLite on a device.
-- [`docs/overview/entries/2026-08-24-tier-a-enqueue-visibility.md`](../../overview/entries/2026-08-24-tier-a-enqueue-visibility.md) — **Q-486, the four swallowed `queueMutation` calls, 2026-08-24** (they warn and toast now via `reportEnqueueFailure`; the badge deliberately stays out of it, because a thrown enqueue leaves no row for the Data & Sync card to retry). **Still not reproduced** — `Gate: device`.
+- [`2026-08-24-tier-a-enqueue-visibility`](../../overview/history-2026-09-10-folded-2.md#2026-08-24-tier-a-enqueue-visibility) — **Q-486, the four swallowed `queueMutation` calls, 2026-08-24** (they warn and toast now via `reportEnqueueFailure`; the badge deliberately stays out of it, because a thrown enqueue leaves no row for the Data & Sync card to retry). **Still not reproduced** — `Gate: device`.
 - [`docs/reviews/2026-08-18-implausible-value-silent-drop.md`](../../reviews/2026-08-18-implausible-value-silent-drop.md) — **the same out-of-range value sent down both write paths, 2026-08-18** (Q-485 — web refuses it with a message, sync-push writes the row, drops the field and reports `errors: []`, with no log and no `error_events` row; 12 of 14 value checks in `pushMutations` coerce silently while 2 throw). **The bounds themselves mirror correctly** — both paths share one validation module.
 - [`docs/reviews/2026-08-18-outbox-under-failure.md`](../../reviews/2026-08-18-outbox-under-failure.md) — **the outbox pushed for real, including with the database stopped, 2026-08-18** (Q-475 — a DB outage returns HTTP 200 with per-item errors, so the client resets its 5xx backoff and dead-letters every queued mutation after ~43 minutes of downtime, leaving a per-item-only retry UI; Q-476 — a schema-rejected mutation is deleted with no badge, toast or retry). **The poison-pill rule itself holds** — poison isolated by outbox id, all four siblings written.
 

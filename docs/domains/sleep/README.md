@@ -227,7 +227,7 @@ curve). **Before writing anything that treats one row as one night, call the hel
   governs *all* history — and a history re-drain after a re-pair opens a spurious epoch whose offset
   is estimated from backlog-laden anchors. On 2026-08-17 that shifted 43 nights by **+14.16 h** into
   midday bedtimes, and the full redecode is what applied it. Diagnosis, with the measurements:
-  [`entries/2026-08-17-q536-clock-epoch-diagnosis.md`](../../overview/entries/2026-08-17-q536-clock-epoch-diagnosis.md)
+  [`entries/2026-08-17-q536-clock-epoch-diagnosis.md`](../../overview/history-2026-09-10-folded-1.md#2026-08-17-q536-clock-epoch-diagnosis)
   (Q-536 to repair, Q-314 for the detection defect). Two things to carry: a bimodal bedtime
   histogram means **one constant offset**, so measure the shift before theorising about timezones;
   and `oura_raw_samples.epoch` existing does **not** mean resolving per-row is safe, because the

@@ -30,6 +30,8 @@ export interface EnergyBalanceResult {
     deviationKcal: number
     remainingKcal: number
     projectedWeeklyKg: number
+    /** BF-150. The stored calorie target that anchors the budget; null when none is set. */
+    goalKcal: number | null
     zone: string
     zoneLabel: string
     zoneColor: string
@@ -294,12 +296,18 @@ export async function computeEnergyBalance(
     ? Math.max(Math.round(bmr), Math.round(maintenanceKcal - avgActiveKcal))
     : Math.max(Math.round(bmr), formulaBaseline - stepBaseCreditKcal)
 
+  // BF-150. The stored target is read BEFORE the balance now, because the balance carries it: it is
+  // what anchors the budget (`budgetProvenance`), so every surface reads one number instead of
+  // re-deriving it. `nutrition_targets` first, the legacy `users.calorie_goal` second — the same
+  // precedence `target.currentKcal` has always used.
+  const currentKcal = targets?.calories ?? userGoals?.calorieGoal ?? null
+
   const balance = computeCalorieBalance({
     restingBaseKcal, activeKcal: activeEnergy.total, intakeKcal, goalDeltaKcal,
+    goalKcal: currentKcal,
   })
 
   const recommendedKcal = targetFromMaintenance(maintenanceKcal, goalDeltaKcal)
-  const currentKcal = targets?.calories ?? userGoals?.calorieGoal ?? null
 
   return {
     date,

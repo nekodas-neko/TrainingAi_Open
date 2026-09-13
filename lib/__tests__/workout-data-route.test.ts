@@ -399,15 +399,38 @@ describe('GET /api/workout-data — what drives the bar', () => {
     expect(opts.aiDrivesLoad).toBe(false)
   })
 
-  // A shared exercise name logged under a DIFFERENT program must not let a fresh ai_dynamic cycle
-  // skip its own AMRAP baseline week — so the guard's lookup is program-scoped.
-  it('ends a stale baseline only on a log from THIS program', async () => {
+  // BF-148 — REPLACES a test that asserted the opposite ("ends a stale baseline only on a log from
+  // THIS program"). That guard was keyed on exercise NAMES, so rebuilding a session inside an
+  // existing program reused the names and read as already-calibrated: the header rendered
+  // "Baseline" from this same periodization state while the set card prescribed a normal 3x8.
+  // The periodization row is now the only authority, which is what the header, the pre-workout
+  // panel and generate-prescription's refusal already trusted.
+  it('keeps the baseline when the same exercise names were logged before in this program', async () => {
     getSessionPeriodization.mockResolvedValue(periodization({ phase: 'baseline', baselineComplete: false }))
     getLastExerciseLogsBatch.mockImplementation(async (_u: string, _n: string[], programId?: string) =>
       programId === 'p-1' ? new Map([['Squat', { id: 'log-1' }]]) : new Map())
     await get('?tab=' + SESSION_ID)
+    expect(buildOptsFor()!.isBaselinePhase).toBe(true)
+  })
+
+  // The other half of the same rule: a completed baseline ends it, and nothing else has to.
+  // `phase` stays 'baseline' on purpose so `baselineComplete` is the ONLY term under test —
+  // flipping the phase as well would let the condition pass for the wrong reason.
+  it('ends the baseline when the periodization row says it is complete', async () => {
+    getSessionPeriodization.mockResolvedValue(periodization({ phase: 'baseline', baselineComplete: true }))
+    getLastExerciseLogsBatch.mockResolvedValue(new Map())
+    await get('?tab=' + SESSION_ID)
     expect(buildOptsFor()!.isBaselinePhase).toBe(false)
-    expect(getLastExerciseLogsBatch.mock.calls.some(c => c[2] === 'p-1')).toBe(true)
+  })
+
+  // And the phase term carries its own weight: a session past baseline does not re-enter it just
+  // because the completion flag was never set. Without this, `phase === 'baseline'` could be
+  // deleted from the condition and every test would still pass.
+  it('does not re-enter the baseline for a later phase with the flag unset', async () => {
+    getSessionPeriodization.mockResolvedValue(periodization({ phase: 'accumulation', baselineComplete: false }))
+    getLastExerciseLogsBatch.mockResolvedValue(new Map())
+    await get('?tab=' + SESSION_ID)
+    expect(buildOptsFor()!.isBaselinePhase).toBe(false)
   })
 })
 

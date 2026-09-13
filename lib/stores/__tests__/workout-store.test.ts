@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from 'vitest'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { useWorkoutStore, applyRehydrateFixups, effectiveRestSec, type WorkoutStore } from '../workout-store'
 
 describe('ExerciseBuffer carries restStartMs through stash/restore (superset alternation)', () => {
@@ -193,6 +195,53 @@ describe('applyRehydrateFixups with an unknown timezone (Q-477)', () => {
     useWorkoutStore.getState().rolloverDay('2026-07-12')
     useWorkoutStore.getState().startWorkout('session-a')
     expect(useWorkoutStore.getState().storedDate).toBe('2026-07-12')
+  })
+})
+
+/**
+ * PS-35b ③ — the E1-4 comment claimed production abandoned a previous-day workout. It does not, and
+ * the comment now says so.
+ *
+ * `onRehydrateStorage` is the only production caller and passes `today: null` on purpose (Q-477:
+ * the store runs before any provider mounts and guessing Brisbane would clear a Kiritimati user's
+ * morning). So `dateRolledOver` is always false there and the >4h anchor is the whole guard. The
+ * day's ticks roll over separately, in `WorkoutDayRollover` → `rolloverDay(today)`, from the user's
+ * real zone.
+ */
+describe('a workout across local midnight survives rehydrate (PS-35b)', () => {
+  it('keeps a recent session even though the calendar day changed', () => {
+    // Started 23:50, app reopened 00:10. Twenty minutes old, previous local day.
+    const now = Date.now()
+    const state = {
+      ...useWorkoutStore.getState(),
+      mode: 'active' as const,
+      storedDate: '2026-07-12',
+      workoutSessionId: 'sess-1',
+      workoutStartMs: now - 20 * 60 * 1000,
+    }
+    applyRehydrateFixups(state, null, now)
+    expect(state.workoutSessionId).toBe('sess-1')
+    expect(state.workoutStartMs).not.toBeNull()
+  })
+
+  it('still drops one whose anchor is older than four hours', () => {
+    const now = Date.now()
+    const state = {
+      ...useWorkoutStore.getState(),
+      mode: 'active' as const,
+      workoutSessionId: 'sess-2',
+      workoutStartMs: now - 5 * 60 * 60 * 1000,
+    }
+    applyRehydrateFixups(state, null, now)
+    expect(state.workoutSessionId).toBe('')
+    expect(state.workoutStartMs).toBeNull()
+  })
+
+  it('and the comment no longer claims the unreachable half', () => {
+    const src = readFileSync(path.resolve(__dirname, '../workout-store.ts'), 'utf8')
+    const e14 = src.slice(src.indexOf('// E1-4:'), src.indexOf('const sessionStale'))
+    expect(e14).not.toMatch(/>4h old or from a previous day is\n\s*\/\/ abandoned/)
+    expect(e14).toMatch(/WorkoutDayRollover/)
   })
 })
 

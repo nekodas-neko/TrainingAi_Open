@@ -14,6 +14,18 @@ interface WeightDialProps {
   max?: number;
   step?: number;
   unit?: string;
+  /**
+   * Makes the unit suffix on the SELECTED row a button (BF-141).
+   *
+   * **The control is the `kg` label itself**, because the owner asked for *"a very small button to
+   * swap to lb - something you wouldnt see or hidden in away"*. A `SegmentedTabs` toggle was this
+   * entry's first answer and is ruled out: it draws at 96 px tall, which is the opposite of hidden.
+   * Tapping the suffix the dial already prints adds no chrome at all.
+   *
+   * Only the selected row's suffix is interactive — the unit renders on every visible row, and three
+   * live toggles in a scrolling column is not what "hidden" means.
+   */
+  onUnitToggle?: () => void;
   recommendedValue?: number;
   visible?: number;
   pill?: boolean; // contained pill highlight — use inside overflow-hidden cards
@@ -26,6 +38,7 @@ export const WeightDial = ({
   max = 250,
   step = 1.25,
   unit = "kg",
+  onUnitToggle,
   recommendedValue,
   visible = 5,
   pill = false,
@@ -176,7 +189,30 @@ export const WeightDial = ({
               }}
             >
               {v}
-              {unit ? ` ${unit}` : ""}
+              {unit && (isSelected && onUnitToggle ? (
+                <button
+                  type="button"
+                  // **`stopPropagation`, and it guards a real case that is easy to think is
+                  // hypothetical.** The whole row is a click target calling `onChange` with the
+                  // row's own value — which in lb mode round-trips kg → lb (2.5 lb detent) → kg and
+                  // is lossy for some weights: 61.0 kg comes back 61.25. So a unit tap that also
+                  // reached the row would quietly rewrite the logged weight, which is this entry's
+                  // whole subject. `e2e/weight-dial-unit-toggle.spec.ts` passes without this line
+                  // because the seeded 60 kg round-trips exactly; that is a property of the fixture,
+                  // not of the code.
+                  onClick={(e) => { e.stopPropagation(); onUnitToggle(); }}
+                  // `tap-dense` opts out of the 48 px floor `globals.css` forces on every button —
+                  // which would blow this inline suffix up into a slab — and `tap-target-44` puts an
+                  // invisible 44 px box back. Dial rows are 48 px tall, so the box stays inside its
+                  // own row, which is that utility's stated rule.
+                  className="tap-dense tap-target-44 ml-1 underline decoration-dotted decoration-muted-foreground/60 underline-offset-4"
+                  aria-label={`Weight unit: ${unit}. Tap to change.`}
+                >
+                  {unit}
+                </button>
+              ) : (
+                <span className="ml-1">{unit}</span>
+              ))}
               {isRecommended && !isSelected && (
                 <CircleIcon className="ml-1 inline h-2 w-2 fill-brand text-brand" />
               )}

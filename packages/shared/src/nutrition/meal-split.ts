@@ -16,6 +16,8 @@
 // shift is a redistribution only — daily totals are set by the calorie-balance service and are
 // never changed here.
 
+import { KCAL_PER_G } from './atwater'
+
 export interface MacroTargets {
   calories: number
   proteinG: number
@@ -186,7 +188,8 @@ export function splitMacrosAcrossMeals(
   const fat = distribute(targets.fatG, fatWeights, 1)
   // Calories are distributed against the same shape the macros produced, so a meal's calorie share
   // tracks its actual food rather than being a flat 1/n that contradicts its macros.
-  const energyWeights = protein.map((p, i) => Math.max(0.0001, p * 4 + carbs[i] * 4 + fat[i] * 9))
+  const energyWeights = protein.map((p, i) => Math.max(0.0001,
+    p * KCAL_PER_G.protein + carbs[i] * KCAL_PER_G.carbs + fat[i] * KCAL_PER_G.fat))
   const calories = distribute(targets.calories, energyWeights, 0)
 
   return Array.from({ length: n }, (_, i) => ({
@@ -262,9 +265,9 @@ export const PROTEIN_SHARE_THRESHOLD = 0.3
  * rescaled: doubling the parsley does nothing for the target and reads as nonsense.
  */
 export function dominantMacro(ing: ScalableIngredient): MacroKey | null {
-  const p = Math.max(0, ing.proteinPer100g) * 4
-  const c = Math.max(0, ing.carbsPer100g) * 4
-  const f = Math.max(0, ing.fatPer100g) * 9
+  const p = Math.max(0, ing.proteinPer100g) * KCAL_PER_G.protein
+  const c = Math.max(0, ing.carbsPer100g) * KCAL_PER_G.carbs
+  const f = Math.max(0, ing.fatPer100g) * KCAL_PER_G.fat
   const total = p + c + f
   if (total <= 0) return null
   if (p / total >= PROTEIN_SHARE_THRESHOLD) return 'protein'

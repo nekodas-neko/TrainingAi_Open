@@ -68,11 +68,11 @@ All docs-only, all merged to `main`:
   deliberately not built** rather than left in the queue.
 
 Journal entries, one per sweep/decision cluster:
-[`2026-08-20-orchestrator-sweep-completed-work.md`](overview/entries/2026-08-20-orchestrator-sweep-completed-work.md) ·
-[`2026-08-23-orchestrator-sweep-aggregation.md`](overview/entries/2026-08-23-orchestrator-sweep-aggregation.md) ·
-[`2026-08-23-orchestrator-q395-phase-split.md`](overview/entries/2026-08-23-orchestrator-q395-phase-split.md) ·
-[`2026-08-23-orchestrator-owner-decisions.md`](overview/entries/2026-08-23-orchestrator-owner-decisions.md) ·
-[`2026-08-23-orchestrator-q287-decisions.md`](overview/entries/2026-08-23-orchestrator-q287-decisions.md).
+[`2026-08-20-orchestrator-sweep-completed-work.md`](overview/history-2026-09-10-folded-2.md#2026-08-20-orchestrator-sweep-completed-work) ·
+[`2026-08-23-orchestrator-sweep-aggregation.md`](overview/history-2026-09-10-folded-2.md#2026-08-23-orchestrator-sweep-aggregation) ·
+[`2026-08-23-orchestrator-q395-phase-split.md`](overview/history-2026-09-10-folded-2.md#2026-08-23-orchestrator-q395-phase-split) ·
+[`2026-08-23-orchestrator-owner-decisions.md`](overview/history-2026-09-10-folded-2.md#2026-08-23-orchestrator-owner-decisions) ·
+[`2026-08-23-orchestrator-q287-decisions.md`](overview/history-2026-09-10-folded-2.md#2026-08-23-orchestrator-q287-decisions).
 
 ## Deliberately NOT done
 

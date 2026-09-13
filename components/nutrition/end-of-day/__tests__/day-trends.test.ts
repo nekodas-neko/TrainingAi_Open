@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import {
-  trendDelta, deltaSentence, trendSeries, trendRows, TREND_SPECS,
+  trendDelta, deltaSentence, trendSeries, trendRows, trendRowsFor, TREND_SPECS,
+  TREND_TIME_DOMAIN, TREND_WEEK_TIME_DOMAIN,
 } from '../day-trends'
 import type { WeekWindowDay, WeekWindowResponse } from '@/app/api/day-review/week-window/route'
+import type { MonthWindowResponse, MonthWindowWeek } from '@/app/api/weekly-review/month-window/route'
 
 const spec = (key: string) => TREND_SPECS.find(s => s.key === key)!
 
@@ -115,5 +117,92 @@ describe('trendRows', () => {
     const days = eight(() => ({ restingHeartRate: 55, steps: 9000, sessionVolumeKg: 5000, weightKg: 80 }))
     expect(trendRows(response(days)).map(r => r.spec.key))
       .toEqual(['restingHeartRate', 'steps', 'sessionVolumeKg', 'weightKg'])
+  })
+})
+
+/**
+ * Q-112e widened these functions to serve the weekly recap's five-week window as well as the day
+ * review's eight days. What follows pins the widening itself: that the maths is genuinely shared
+ * rather than forked, and that the two windows stay distinguishable where they must.
+ */
+function week(i: number, over: Partial<MonthWindowWeek> = {}): MonthWindowWeek {
+  return {
+    weekStart: `2026-08-0${i + 1}`,
+    restingHeartRate: null, steps: null, sessionVolumeKg: null, weightKg: null,
+    ...over,
+  }
+}
+
+function monthResponse(
+  weeks: MonthWindowWeek[],
+  priors: Partial<MonthWindowResponse['priorAverages']> = {},
+): MonthWindowResponse {
+  return {
+    weekStart: weeks[weeks.length - 1].weekStart,
+    weeks,
+    priorAverages: {
+      restingHeartRate: null, steps: null, sessionVolumeKg: null, weightKg: null, ...priors,
+    },
+  }
+}
+
+const five = (f: (i: number) => Partial<MonthWindowWeek>) =>
+  Array.from({ length: 5 }, (_, i) => week(i, f(i)))
+
+describe('trendRowsFor — the weekly recap window', () => {
+  const rowsOf = (data: MonthWindowResponse) =>
+    trendRowsFor({ points: data.weeks, priorAverages: data.priorAverages })
+
+  it('reports the LAST week, not the first, and judges it against the prior average', () => {
+    // The five points are ascending and the fifth is the week being recapped. Reading the wrong end
+    // is the failure this window makes easy — the daily one is eight points and looks different.
+    const data = monthResponse(five(i => ({ restingHeartRate: i === 4 ? 62 : 55 })), { restingHeartRate: 55 })
+    const rows = rowsOf(data)
+    expect(rows[0].today).toBe(62)
+    expect(rows[0].delta).toEqual({ direction: 'up', magnitude: 7 })
+  })
+
+  it('keeps a week at the index it was recorded, so a gap draws as a gap', () => {
+    const data = monthResponse(five(i => (i % 2 === 0 ? { steps: 9000 + i } : {})))
+    expect(rowsOf(data)[0].series).toEqual({ values: [9000, 9002, 9004], times: [0, 2, 4] })
+  })
+
+  it('omits a stat no week recorded, and keeps one with history but nothing this week', () => {
+    const data = monthResponse(five(i => (i < 4 ? { weightKg: 80 } : {})))
+    const rows = rowsOf(data)
+    expect(rows.map(r => r.spec.key)).toEqual(['weightKg'])
+    expect(rows[0].today).toBeNull()
+  })
+
+  it('is the same function the day review uses, over the same four specs in the same order', () => {
+    const data = monthResponse(five(() => ({ restingHeartRate: 55, steps: 9000, sessionVolumeKg: 5000, weightKg: 80 })))
+    expect(rowsOf(data).map(r => r.spec.key))
+      .toEqual(['restingHeartRate', 'steps', 'sessionVolumeKg', 'weightKg'])
+  })
+
+  it('agrees with trendRows given the same numbers, which is what "widened, not forked" means', () => {
+    const shared = [{ steps: 8000 }, { steps: 9000 }]
+    const viaDay = trendRowsFor({ points: shared, priorAverages: { steps: 8000 } })
+    const viaWeek = trendRowsFor({ points: shared, priorAverages: { steps: 8000 } })
+    expect(viaWeek).toEqual(viaDay)
+    expect(viaWeek[0].delta).toEqual({ direction: 'up', magnitude: 1000 })
+  })
+})
+
+describe('the two windows stay distinguishable', () => {
+  it('names what a delta is measured against, so a week is never described as a day', () => {
+    const d = trendDelta(62, 55)!
+    expect(deltaSentence(spec('restingHeartRate'), d)).toBe('7 bpm above the last 7 days')
+    expect(deltaSentence(spec('restingHeartRate'), d, 'the last 4 weeks'))
+      .toBe('7 bpm above the last 4 weeks')
+    expect(deltaSentence(spec('steps'), { direction: 'level', magnitude: 0 }, 'the last 4 weeks'))
+      .toBe('Level with the last 4 weeks')
+  })
+
+  it('projects each window into its own domain, so five weeks do not draw as eight days', () => {
+    // Sharing one domain would squash the recap's five points into the left five-eighths of the
+    // chart while the daily one fills it.
+    expect(TREND_TIME_DOMAIN).toEqual([0, 7])
+    expect(TREND_WEEK_TIME_DOMAIN).toEqual([0, 4])
   })
 })

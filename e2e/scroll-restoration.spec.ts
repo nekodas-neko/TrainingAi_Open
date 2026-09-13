@@ -55,6 +55,39 @@ test.describe('scroll position survives a push to a sub-route and back', () => {
     }).toPass({ timeout: 30_000 })
   })
 
+  /**
+   * RV-36. The Nutrition tab owns its own scroller and inherits nothing from `PullToSync`, so it was
+   * the one live gap: measured before the fix, this push saved **no** `ta_scroll:` key and returned
+   * **0** where `/more` restored 840.
+   *
+   * `/coach?scope=nutrition` is the tab's only deeper push. Every other routable screen that scrolls
+   * at this viewport is a leaf with no `router.push` or `<Link>` out of it, so re-entering one is a
+   * fresh arrival that correctly starts at the top — that was counted, not assumed.
+   */
+  test('/nutrition returns to the same offset after a push to the coach', async ({ page }) => {
+    await page.goto('/nutrition')
+    await page.waitForTimeout(5000)
+    await scrollDown(page)
+    const before = await page.evaluate(SCROLL_TOP)
+    expect(before, 'nothing scrolled — the fixture is too short to test restoration').toBeGreaterThan(200)
+
+    // A `router.push` button, not a link — `a[href^=…]` matched nothing on these screens, which is
+    // one of the three traps this file's header records.
+    await page.getByRole('button', { name: /Build a meal plan/ }).first()
+      .evaluate(el => (el as HTMLElement).click())
+    await page.waitForURL('**/coach**', { timeout: 30_000 })
+
+    const saved = await page.evaluate(() => JSON.stringify(Object.fromEntries(
+      Object.keys(sessionStorage).filter(k => k.startsWith('ta_scroll:')).map(k => [k, sessionStorage.getItem(k)]))))
+    expect(saved, 'nothing was saved when the screen unmounted').toContain('ta_scroll:/nutrition')
+
+    await page.goBack()
+    await expect(page).toHaveURL(/\/nutrition$/, { timeout: 30_000 })
+    await expect(async () => {
+      expect(await page.evaluate(SCROLL_TOP)).toBe(before)
+    }).toPass({ timeout: 30_000 })
+  })
+
   test('a fresh forward arrival still starts at the top', async ({ page }) => {
     // The saved offset is consumed by the restore, so arriving with nothing stored starts at 0 by
     // construction. Asserted because the obvious alternative — gating on a `popstate` flag — is what

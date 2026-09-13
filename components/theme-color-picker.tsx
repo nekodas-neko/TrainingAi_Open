@@ -38,6 +38,9 @@ export function applyCustomHue(hue: number) {
   delete html.dataset.brand;
   html.style.setProperty("--brand", `oklch(0.7 0.2 ${hue})`);
   html.style.setProperty("--color-brand", `oklch(0.7 0.2 ${hue})`);
+  // The hue angle alone, which the dark surface ramp builds from (BF-145). Without it a custom hue
+  // recolours the accents and leaves every panel, card and sheet on the previous hue's tint.
+  html.style.setProperty("--brand-hue", String(hue));
   // Lightness is pinned at 0.7 for every hue, so black is always the higher-contrast
   // foreground here (measured 7.04:1 worst case across the hue circle, vs 2.23:1 for white).
   html.style.setProperty("--brand-foreground", "oklch(0 0 0)");
@@ -53,6 +56,9 @@ export function applyBrandTheme(key: BrandThemeKey) {
   const html = document.documentElement;
   html.style.removeProperty("--brand");
   html.style.removeProperty("--color-brand");
+  // Cleared with the rest: an inline value outranks the `[data-brand]` block this is switching to,
+  // so a leftover hue would tint every surface for the colour the user just moved away from.
+  html.style.removeProperty("--brand-hue");
   html.style.removeProperty("--brand-foreground");
   html.style.removeProperty("--brand-card-bg");
   html.style.removeProperty("--brand-card-border");

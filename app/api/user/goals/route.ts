@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { goalBoundSchema } from '@trainingai/shared/validation/goal-bounds'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { goalToDailyKcal } from '@trainingai/shared/nutrition/calorie-balance'
@@ -11,12 +12,12 @@ import { invalidBodyResponse } from '@/lib/api/route-errors'
 const MAX_BODY_BYTES = 8 * 1024
 
 const GoalsSchema = z.object({
-  stepsGoal:       z.number().int().min(0).max(200000).optional().nullable(),
+  stepsGoal:       goalBoundSchema('stepsGoal').optional().nullable(),
   stepsGoalType:   z.enum(['daily', 'weekly']).optional().nullable(),
   sleepGoalHours:  z.number().min(0).max(24).optional().nullable(),
-  calorieGoal:     z.number().min(0).max(30000).optional().nullable(),
+  calorieGoal:     goalBoundSchema('calorieGoal').optional().nullable(),
   calorieGoalType: z.enum(['daily', 'weekly']).optional().nullable(),
-  waterGoalMl:     z.number().min(0).max(20000).optional().nullable(),
+  waterGoalMl:     goalBoundSchema('waterGoalMl').optional().nullable(),
   waterGoalType:   z.enum(['daily', 'weekly']).optional().nullable(),
   targetWeightKg:  z.number().min(20).max(500).optional().nullable(),
   targetBfPct:     z.number().min(0).max(70).optional().nullable(),

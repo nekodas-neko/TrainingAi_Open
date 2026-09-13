@@ -560,6 +560,17 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
   **and that marker IS TN-33's level-2 test**, since `perceived_recovery` is a constant and readiness
   is circular. **The feature and the experiment are the same build.** ⛔ No "X stresses you" verdict
   until many marked instances exist; that is TN-16's shape and stays parked.
+- **⚑⚑ BF-137 FOUND THE CAUSE TN-27/TN-29 MISSED: the maintenance estimator is fitting a GLP-1
+  (retatrutide) weight drop and calling it metabolic rate.** `maintenance = intake − Δweight × 7700`
+  assumes weight change reflects energy balance; under a GLP-1 it does not. **This session diagnosed
+  the WINDOW and the missing CROSS-CHECK — both real — and never questioned whether the input was
+  confounded.** BugFix filed it the next day and cross-referenced TN-29; the reciprocal reference is
+  now on TN-29. **Before calibrating anything against body weight, ask what else is moving it.**
+- **⚠ The nutrition batch's urgency dropped on 2026-09-12 and the entries did not say so.** PR #1128
+  anchored the daily budget to the owner's **stored goal** rather than to the estimate, so TN-27/TN-29
+  are no longer load-bearing — the estimate is informational now. **TN-28 went the other way**: the
+  stored target is now what everything follows, so that card's one-tap write matters MORE. **Re-read
+  an entry's consequence, not just its correctness, after main moves under it.**
 - **The threshold is usually right and the input usually wrong** — Q-506, Q-512, Q-514, now TN-6.
   Check the input's distribution before touching any constant.
 - **Do NOT lift the sleep scale toward its old mean** — sleep/readiness agreeing is load-bearing for

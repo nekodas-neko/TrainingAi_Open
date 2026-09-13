@@ -57,6 +57,10 @@ export function readStrapBattery(): StrapBatteryReading | null {
 export function writeStrapBattery(percent: number | null | undefined, now: number = Date.now()): void {
   if (typeof window === 'undefined') return
   if (percent == null || !Number.isFinite(percent) || percent <= 0 || percent > 100) return
+  // BF-140: `now` is the strap's own report time when native supplies one. A non-finite value
+  // would make `ageMinutes` NaN and the chip neither fresh nor stale, so it falls back rather than
+  // storing it — the same posture as the percentage guard above.
+  if (!Number.isFinite(now)) now = Date.now()
   try {
     window.localStorage.setItem(STRAP_BATTERY_KEY, JSON.stringify({ percent, at: now }))
   } catch {

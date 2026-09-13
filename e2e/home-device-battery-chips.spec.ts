@@ -54,9 +54,14 @@ test('a stored strap reading renders as a chip, and a stale one says when it was
   await page.goto('/')
   await settleRouteBoundary(page)
 
+  // BF-139 moved the `%` off the glass and into the accessible name: two battery pills were using
+  // two thirds of a 224 px header column, and a drawn `%` is 12 px a reading. The name below still
+  // carries it, which is the half that has to stay true — and it is per-device rather than one
+  // joined string on the merged pill, or this locator would stop matching the moment a ring reading
+  // appeared beside the strap.
   const fresh = page.getByLabel('Strap battery 72%')
   await expect(fresh).toBeVisible({ timeout: 60_000 })
-  await expect(fresh).toHaveText('72%')
+  await expect(fresh).toHaveText('72')
 
   // Older than the 3h staleness rule: the same chip, still on screen, now saying it is a last-seen
   // value. A chip that vanished would read as "no strap" rather than "not connected right now",

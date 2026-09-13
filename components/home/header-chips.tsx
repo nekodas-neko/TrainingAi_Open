@@ -1,7 +1,7 @@
 'use client'
 
 import { WeatherChip } from '@/components/weather-chip'
-import { DeviceBatteryChip } from '@/components/device-battery-chip'
+import { DeviceBatteryChip, type DeviceBattery } from '@/components/device-battery-chip'
 import { useStrapBattery } from '@/lib/hooks/use-strap-battery'
 import { useCachedValue } from '@/lib/hooks/use-cached-value'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
@@ -39,15 +39,19 @@ export function HeaderChips() {
   )?.latest ?? null
   const strap = useStrapBattery()
 
+  // BF-139: one pill for however many devices report, not one each. Two separate pills took 150 px
+  // of a 224 px column and the daytime weather chip needs 113 of it, which is the clipping the owner
+  // reported. The chip itself renders nothing when the list is empty, so the conditionals that used
+  // to wrap each pill live in the filter.
+  const devices: DeviceBattery[] = [
+    ring != null && { label: 'Ring', percent: ring.percent, charging: ring.charging ?? false, ageMinutes: ring.ageMinutes },
+    strap != null && { label: 'Strap', percent: strap.percent, ageMinutes: strap.ageMinutes },
+  ].filter((d): d is DeviceBattery => d !== false)
+
   return (
     <>
       <WeatherChip />
-      {ring != null && (
-        <DeviceBatteryChip label="Ring" percent={ring.percent} charging={ring.charging ?? false} ageMinutes={ring.ageMinutes} />
-      )}
-      {strap != null && (
-        <DeviceBatteryChip label="Strap" percent={strap.percent} ageMinutes={strap.ageMinutes} />
-      )}
+      <DeviceBatteryChip devices={devices} />
     </>
   )
 }

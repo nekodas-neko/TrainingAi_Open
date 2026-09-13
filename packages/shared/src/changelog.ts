@@ -6,6 +6,107 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.452.1",
+    date: "2026-09-12",
+    changes: [
+      "The \u201ckcal left\u201d figure on the Nutrition ring was counting against a different budget from the one Home\u2019s donut shows \u2014 the estimator rather than your goal, about 336 kcal apart for you. Anchoring the budget to your goal this morning changed what the donut counts against and left the ring behind. Both now count against the same number, and so do the colour band and its label.",
+    ],
+  },
+  {
+    version: "1.452.0",
+    date: "2026-09-12",
+    changes: [
+      "Your week in review now shows the numbers behind the write-up. Under the paragraph you get the same four trends the daily review has \u2014 resting heart rate, steps, session volume and weight \u2014 but over the last five weeks, each compared with the four weeks before it. A week you recorded nothing for says so rather than being drawn as a zero.",
+    ],
+  },
+  {
+    version: "1.451.0",
+    date: "2026-09-12",
+    changes: [
+      "Your daily calorie budget is now your own goal plus what you earn by moving, instead of a number the app worked out for you. It used to start from a calibrated estimate of your maintenance, and that estimate had climbed to 2,196 kcal \u2014 about 600 above what you expect, rising day by day, and 1.44\u00d7 your BMR in a field labelled resting. Your stored goal took no part in it and there was no way to opt out. The estimate is still shown so you can see what it believes; it just no longer decides what you eat to. The line under the ring now names your goal rather than a resting base and a deduction, and the macro grams finally share a denominator with the calorie figure above them.",
+    ],
+  },
+  {
+    version: "1.450.0",
+    date: "2026-09-12",
+    changes: [
+      "Admin \u2014 the Exercises tab is usable on a phone again. Exercise names were being squeezed to nothing by the row's four action buttons, so a row showed a truncated equipment line and no name at all; the actions now sit on their own line and every name reads in full.",
+      "Admin \u2014 deleting an exercise, re-mirroring a GIF and regenerating one all ask first. The delete fired on a single tap, and the two GIF buttons quietly replaced a correct GIF with a new one; they now say what will be replaced, and only when something would actually be overwritten.",
+      "Admin \u2014 a new one-at-a-time GIF review: each GIF large, with its exercise name and target muscles, and two buttons to mark it right or wrong. Flagging one records it and nothing else \u2014 no AI call fires \u2014 so the wrong ones collect into a set you can decide about.",
+      "Admin \u2014 the GIF coverage figure was wrong in both halves: it counted retired exercises in the total and ignored custom-URL GIFs that were already showing on the row. It now counts what is actually there.",
+    ],
+  },
+  {
+    version: "1.449.0",
+    date: "2026-09-12",
+    changes: [
+      "The app is no longer black. Every panel, card, sheet and input was built from a grey with no colour in it at all, so the accent colour you pick could only ever appear on top \u2014 the surfaces underneath stayed the same regardless. They are now built from the hue you chose, and lifted enough that you can see it: pick Blue and the whole app goes cool, pick Orange and it warms, and the custom hue slider moves the surfaces too, not just the highlights. Text contrast is unchanged or better, and cards now separate from the page on their own rather than relying on their outline.",
+    ],
+  },
+  {
+    version: "1.448.4",
+    date: "2026-09-12",
+    changes: [
+      "The note under the Nutrition ring explaining why the macro grams and the calorie budget disagree was wrong twice over. It said the grams were your stored goal (they are your goal scaled up by what you have moved) and it blamed the difference on today's movement \u2014 which is in both numbers, so it cancels and the gap never closes. It now prints your stored goal beside the computed budget, breaks the budget into resting burn, goal adjustment and movement, and says plainly that moving more raises both.",
+    ],
+  },
+  {
+    version: "1.448.3",
+    date: "2026-09-12",
+    changes: [
+      "Your rep max on a bodyweight exercise now matches the reps you actually did. An 11-rep set was showing as 8 RM \u2014 the estimate is discounted when it is taken to failure, and the summary card was undoing that discount with the wrong formula, so every bodyweight rep max read low.",
+    ],
+  },
+  {
+    version: "1.448.2",
+    date: "2026-09-12",
+    changes: [
+      "A first session now actually opens in AMRAP mode. It was correctly labelled \u201cBaseline\u201d at the top while the set cards below prescribed a normal three sets \u2014 because a check asked whether those exercise names had ever been logged in the program, which is true of any session you rebuild.",
+      "That mattered for more than the labels: the same flag decides which formula estimates your 1RM, and finishing the session copies that estimate into the anchors the whole cycle is then prescribed from.",
+    ],
+  },
+  {
+    version: "1.448.1",
+    date: "2026-09-11",
+    changes: [
+      "A session you add to an existing program now starts with its calibration workout again. If its exercises had been logged before, the app was quietly taking those old numbers as the starting point and skipping the AMRAP \u2014 so a rebuilt session began prescribing from weights it had never measured.",
+      "It also waits until every exercise has a starting number before calling the calibration done. One session had three of its four exercises anchored and was marked complete, which left the fourth with nothing and no way to ask for it.",
+      "Any session already carrying borrowed numbers puts itself back into calibration the next time you open it. Sessions you calibrated properly, or set up from prior data on purpose, are left alone.",
+    ],
+  },
+  {
+    version: "1.448.0",
+    date: "2026-09-12",
+    changes: [
+      "The weight dial takes pounds. Tap the little \u0022kg\u0022 under the number to swap it to \u0022lb\u0022 \u2014 the dial then steps in 2.5 lb, which is what dumbbells actually come in, and what gets logged is still the kilogram equivalent. It remembers the choice per exercise, so the couple of lb dumbbells stay lb and everything else stays kg.",
+      "This is the thing that went wrong in June: three dumbbell exercises were logged in pounds into the kilogram field, which inflated their 1RMs, volume and personal records until a repair tool put them back.",
+    ],
+  },
+  {
+    version: "1.447.0",
+    date: "2026-09-12",
+    changes: [
+      "The chips at the top of Home no longer get cut off on the right. The two battery readings now share a single pill instead of taking one each \u2014 two pills were using two thirds of the space the row has, just to show two numbers \u2014 and the percent sign moved into the spoken label, since a number next to a battery icon already reads as a percentage.",
+      "All the pills are slightly narrower too, which is what you asked for. On its own that was not enough: measured on the phone's width, the row needed 279 px in the afternoon and only had 224.",
+    ],
+  },
+  {
+    version: "1.446.4",
+    date: "2026-09-11",
+    changes: [
+      "Leaving the Nutrition tab for the coach and coming back returns you to where you were scrolled, instead of the top. The other tabs already did this; Nutrition scrolls its own container and was never wired up.",
+      "The single-day health screen no longer ends flush with the bottom of the phone \u2014 the last card had nothing below it, so on gesture navigation it sat against the gesture bar.",
+    ],
+  },
+  {
+    version: "1.446.3",
+    date: "2026-09-11",
+    changes: [
+      "Launching from the home-screen icon no longer bounces through a redirect first, and the app makes five fewer requests on start-up \u2014 the warm-up was fetching things a screen was already asking for.",
+      "The weather chip says something when it cannot load, instead of pulsing forever. Its cache is also per-location now: after travelling it showed the old city's weather for up to half an hour and skipped the fetch that would have corrected it.",
+    ],
+  },
+  {
     version: "1.446.2",
     date: "2026-09-10",
     changes: [

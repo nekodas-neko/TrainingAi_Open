@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { initSQLite } from '@/lib/sqlite/sqlite-service';
 import { MIGRATIONS } from '@/lib/sqlite/migrations';
-import { getCached, setCached, mirrorToSessionCache, cachedFetch, cachedFetchToday } from '@/lib/sqlite/cache';
+import { getCached, mirrorToSessionCache, cachedFetch, cachedFetchToday } from '@/lib/sqlite/cache';
 import { reconcileMealReminders, scheduleEndOfDayReminder } from '@/lib/meal-reminders';
 import { scheduleEveningReminder, scheduleWeeklyRecapReminder } from '@/lib/day-review-reminders';
 import { reconcileWorkoutReminder } from '@/lib/workout-reminders';
@@ -87,7 +87,7 @@ const CACHE_TASKS: CacheTask[] = [
   { key: 'more-seasons',            url: '/api/seasons',                    ttl: TTL_MEDIUM },
 ];
 
-async function warmCache(task: CacheTask, tz: string): Promise<void> {
+async function warmCache(task: CacheTask): Promise<void> {
   // Skip if still fresh, but ensure the sessionStorage mirror is populated for
   // this tab so readCacheSync(key) doesn't return null on a fresh session
   const cached = await getCached(task.key);
@@ -97,12 +97,23 @@ async function warmCache(task: CacheTask, tz: string): Promise<void> {
     return;
   }
 
+  // PS-35b ②. This was a bare `fetch`, which `cachedFetch`'s in-flight map cannot see — so the warm
+  // and a component mounting at the same moment issued TWO requests for the same URL, measured ×2
+  // on Fast-3G for home's three heaviest. Going through the shared helper puts both in one map
+  // entry. It is also CLAUDE.md's standing rule (client GETs of `/api/*` use `cachedFetch`, never
+  // bare `fetch`), here with a measurement attached.
+  //
+  // The skip-if-fresh return above is untouched, so this runs only when there is nothing cached —
+  // which is exactly when a revalidation is wanted, and why no `freshWithinTtl` is needed.
+  //
+  // **`cachedFetchToday` also fixes a mismatch this rewrite surfaced.** The hand-rolled envelope
+  // stamped `todayInTz(tz)` — the user's zone — while every reader unwraps it with
+  // `unwrapToday`, which compares against `todayInTz()` (the Brisbane default). For a user outside
+  // Brisbane the warm write was unreadable the moment it landed. Writer and reader now share one
+  // function and cannot disagree.
   try {
-    const res = await fetch(task.url);
-    if (!res.ok) return;
-    const data = await res.json();
-    await setCached(task.key, task.today ? { date: todayInTz(tz), data } : data, task.ttl);
-    task.afterData?.(data);
+    const warm = task.today ? cachedFetchToday : cachedFetch;
+    await warm(task.key, task.url, task.ttl, (data: unknown) => { task.afterData?.(data); });
   } catch {
     // Network unavailable — skip, will retry next mount
   }
@@ -188,7 +199,7 @@ export function SyncProvider({ userId }: SyncProviderProps) {
       const WARM_CHUNK = 5;
       for (let i = 0; i < CACHE_TASKS.length; i += WARM_CHUNK) {
         if (cancelled) break;
-        await Promise.all(CACHE_TASKS.slice(i, i + WARM_CHUNK).map(t => warmCache(t, tz)));
+        await Promise.all(CACHE_TASKS.slice(i, i + WARM_CHUNK).map(t => warmCache(t)));
       }
     })();
 

@@ -57,6 +57,22 @@ const config = JSON.parse(fs.readFileSync(path.join(root, 'docs/doc-size-baselin
 //
 // The entries ceiling is deliberately NOT fixed: it is owner-set (#1052) and raising it is a
 // decision, not arithmetic. See LA-100.
+//
+// **361 → 600 → 150 on 2026-09-10 (LA-80), and the middle number was the stopgap.**
+//
+// The ceiling used to be unsatisfiable. `entries/README.md` said *do not fold an entry another doc
+// links to* — right, because a broken citation in someone else's handoff is worse than a long list —
+// and 305 of 342 entries were cited, so the only entries a sweep could fold were the NEWEST. Obeying
+// a total ceiling therefore meant deleting the recent window to preserve the archive, and it had
+// blocked two unrelated PRs in two days. 600 bought room while that stood.
+//
+// `scripts/fold-journal-entries.js` removes the bind: it folds a cited entry and **repoints the
+// citation** at the history file, so "linked" no longer means "unfoldable". 345 → 60 on its first
+// run. 150 is a real gate again — roughly ten days of headroom at ~13.5 entries a day — because the
+// chore it demands (run the fold) is now something a session can actually do.
+//
+// `limit` (60, on FOLDABLE entries) remains the finer trigger; this one catches a window that has
+// stopped being recent regardless of what is cited.
 const FIX = process.argv.includes('--fix');
 const fixed = [];
 

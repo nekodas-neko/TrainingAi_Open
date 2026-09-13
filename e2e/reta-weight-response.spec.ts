@@ -144,8 +144,9 @@ test('three weigh-ins get a number and no colour', async ({ page }) => {
   const sheet = await openVialSheet(page)
 
   // The rate is far outside any sane band, and it is still not called — three readings over eight
-  // weeks cannot separate it from noise, and the chip says so instead of going red.
-  await expect(sheet.getByText('Not enough weigh-ins yet')).toBeVisible({ timeout: 30_000 })
+  // weeks cannot separate it from noise, and the chip says so instead of going red. Three readings
+  // IS enough to fit a rate, so the chip distinguishes "not called" from "not enough data".
+  await expect(sheet.getByText('Not called yet')).toBeVisible({ timeout: 30_000 })
   await expect(sheet.getByText(/The range crosses a boundary/)).toBeVisible()
   // The figure and its interval are printed regardless — withholding the verdict is not withholding
   // the data.
@@ -163,5 +164,6 @@ test('a series whose whole interval clears the band gets the colour, and says wh
   await expect(sheet.getByText(/The whole range falls on one side of it/)).toBeVisible()
   // The band is a percentage of the CURRENT bodyweight, so it is printed rather than assumed.
   await expect(sheet.getByText(/Your band is \d\.\d\d–\d\.\d\d kg\/wk/)).toBeVisible()
+  await expect(sheet.getByText('Not called yet')).toHaveCount(0)
   await expect(sheet.getByText('Not enough weigh-ins yet')).toHaveCount(0)
 })

@@ -129,10 +129,10 @@ import {
   deriveBodyFatCalibration, pairScansWithReadings, DEFAULT_CALIBRATED_SOURCE,
   type BodyFatCalibration,
 } from '@trainingai/shared/health/body-fat-calibration'
+// 1 lb = 0.45359237 kg exactly. Shared since BF-141, because the lb/kg toggle needs the same
+// number on the client and a second copy is how two implementations of one metric begin.
+import { LBS_TO_KG } from '@trainingai/shared/workout/units'
 
-// 1 lb = 0.45359237 kg exactly. Used to correct dumbbell weights that were
-// logged in lbs but recorded in the weight_kg column as if they were kg.
-const LBS_TO_KG = 0.45359237
 
 interface LbsToKgLogRow {
   id: string
@@ -1421,10 +1421,13 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         // `> 0`, not `IS NOT NULL`: a deloaded exercise stores estimated_1rm = 0 on purpose
         // (`estimateOneRm` returns 0 when `deloaded`), and 0 passes an IS NOT NULL filter — so a
         // deload landing on the last logged session rendered the year's headline lift as
-        // "92.75 → 0 kg". Every sibling reader already guards this way (`getExercise1rmHistory`,
-        // `reconcilePersonalRecord`); this was the one that did not.
-        first1rm: sql<number | null>`(array_agg(${s.exerciseLogs.estimated1rm} ORDER BY ${s.exerciseLogs.loggedAt} ASC) FILTER (WHERE ${s.exerciseLogs.estimated1rm} > 0))[1]`,
-        last1rm: sql<number | null>`(array_agg(${s.exerciseLogs.estimated1rm} ORDER BY ${s.exerciseLogs.loggedAt} DESC) FILTER (WHERE ${s.exerciseLogs.estimated1rm} > 0))[1]`,
+        // "92.75 → 0 kg". The `exercise_deloaded = false` half is the read-time backstop for the
+        // *other* direction — a deload that stored a non-zero estimate anyway, which has happened
+        // in production (see getLastRealOneRmBatch below for the incident). LA-96 brought both
+        // markers here; the filters are on the aggregates, not the WHERE clause, because setCount
+        // must still count the deload's sets.
+        first1rm: sql<number | null>`(array_agg(${s.exerciseLogs.estimated1rm} ORDER BY ${s.exerciseLogs.loggedAt} ASC) FILTER (WHERE ${s.exerciseLogs.estimated1rm} > 0 AND ${s.exerciseLogs.exerciseDeloaded} = false))[1]`,
+        last1rm: sql<number | null>`(array_agg(${s.exerciseLogs.estimated1rm} ORDER BY ${s.exerciseLogs.loggedAt} DESC) FILTER (WHERE ${s.exerciseLogs.estimated1rm} > 0 AND ${s.exerciseLogs.exerciseDeloaded} = false))[1]`,
         // Grouped by name, and a name maps to one library row, so max() just picks that row's value.
         exerciseType: sql<string | null>`max(${s.exerciseLibrary.exerciseType})`,
       })
@@ -1687,6 +1690,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         FROM exercise_logs el
         JOIN workout_sessions ws ON ws.id = el.workout_session_id
         WHERE ws.user_id = ${userId} AND el.estimated_1rm > 0
+          -- Second marker, mirroring getLastRealOneRmBatch (LA-96): the estimated_1rm > 0
+          -- predicate alone trusts the write-time invariant that a deload stores 0, which
+          -- production has broken.
+          AND el.exercise_deloaded = false
           AND el.deleted_at IS NULL AND ws.deleted_at IS NULL
       ) ranked
       WHERE rn <= 2
@@ -6771,6 +6778,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async setBaselineComplete(userId: string, programSessionId: string, baseline1rm: Record<string, Baseline1rmEntry>) { return period.setBaselineComplete(this.db, userId, programSessionId, baseline1rm) }
   async getSessionExercise1rms(userId: string, workoutSessionId: string) { return period.getSessionExercise1rms(this.db, userId, workoutSessionId) }
   async recordBaselineAnchors(userId: string, programSessionId: string, anchors: Record<string, Baseline1rmEntry>, complete: boolean) { return period.recordBaselineAnchors(this.db, userId, programSessionId, anchors, complete) }
+  async revertAutoAdoptedBaseline(userId: string, programSessionId: string) { return period.revertAutoAdoptedBaseline(this.db, userId, programSessionId) }
   async advancePhase(userId: string, programSessionId: string, newPhase: PeriodizationPhase) { return period.advancePhase(this.db, userId, programSessionId, newPhase) }
   async storePrescription(userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date, status?: PrescriptionStatus) { return period.storePrescription(this.db, userId, programSessionId, prescription, expiresAt, status) }
   async clearProgramPrescriptions(userId: string, programId: string) { return period.clearProgramPrescriptions(this.db, userId, programId) }
@@ -6785,6 +6793,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async listVolumeTargets(userId: string, programId: string) { return period.listVolumeTargets(this.db, userId, programId) }
   async replaceVolumeTargets(userId: string, programId: string, targets: { muscleGroup: string; targetSetsPerWeek: number }[]) { return period.replaceVolumeTargets(this.db, userId, programId, targets) }
   async getWorkoutSessionProgramSessionId(userId: string, workoutSessionId: string) { return period.getWorkoutSessionProgramSessionId(this.db, userId, workoutSessionId) }
+  async wasProgramSessionTrainedSince(userId: string, programSessionId: string, since: Date) { return period.wasProgramSessionTrainedSince(this.db, userId, programSessionId, since) }
   async getRecentSessionsOfType(userId: string, programSessionId: string, limit: number) { return period.getRecentSessionsOfType(this.db, userId, programSessionId, limit) }
   async getSetLogsForSessions(workoutSessionIds: string[]) { return period.getSetLogsForSessions(this.db, workoutSessionIds) }
   async getSetTimingRows(userId: string, exerciseNames: string[]) { return period.getSetTimingRows(this.db, userId, exerciseNames) }

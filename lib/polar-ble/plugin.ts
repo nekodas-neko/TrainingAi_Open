@@ -8,6 +8,15 @@ export interface PolarBleStatus {
   /** Strap battery %, from the standard Battery Service. Null until the first read
    *  completes after connecting; also shown in the persistent connection notification. */
   battery?: number | null
+  /**
+   * Epoch ms when the strap actually reported `battery` — BF-140.
+   *
+   * **Absent on an APK older than that fix**, and the JS half of it ships through Railway while the
+   * native half waits for a rebuild, so there is a window where this is undefined on a device that
+   * has the new web bundle. Callers must fall back rather than treat undefined as "now" by accident;
+   * `writeStrapBattery`'s default parameter does exactly that.
+   */
+  batteryAt?: number | null
   /** Whether the cadence accelerometer stream is running (opt-in, run/walk only). */
   accStreaming?: boolean
   /** PMD frame encoding the strap is actually emitting; -1 until a frame arrives. */

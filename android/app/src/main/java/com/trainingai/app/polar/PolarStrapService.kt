@@ -68,6 +68,10 @@ class PolarStrapService : Service(), PolarGattClient.Listener {
     private var consecutiveFailures = 0
     private var state = "idle"
     private var battery: Int? = null
+    // BF-140. The reading's OWN time, carried to JS so it is not re-stamped as new on every Home
+    // mount. `battery` is written once per connection and never cleared, so without this the chip's
+    // staleness affordance can never fire and a months-old reading is pixel-identical to a live one.
+    private var batteryAt: Long? = null
     private var lowBatteryFired = false
 
     // Worn-gating (contact bit): drop posts while off the chest so the ring covers.
@@ -230,6 +234,7 @@ class PolarStrapService : Service(), PolarGattClient.Listener {
 
     override fun onBattery(percent: Int) = runOnMain {
         battery = percent
+        batteryAt = System.currentTimeMillis()
         updateNotification("Connected · $percent% battery")
         // The H10 runs a CR2025 coin cell, and a dying cell presents as flaky connections long
         // before it presents as a dead strap — so this warning is worth more here than on the ring.
@@ -390,6 +395,7 @@ class PolarStrapService : Service(), PolarGattClient.Listener {
         .put("ambient", ambient)
         .put("failures", consecutiveFailures)
         .put("battery", battery ?: JSONObject.NULL)
+        .put("batteryAt", batteryAt ?: JSONObject.NULL)
         .put("accStreaming", accStreaming)
         // Surfaced for the calibration console: which frame encoding the H10 actually sends,
         // and whether frames are arriving at all, are the first two questions a failing

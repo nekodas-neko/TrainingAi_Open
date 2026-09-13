@@ -48,6 +48,7 @@ jobs:
     # LB-31: the nightly verifies `main`'s test suite only — see the `schedule` trigger.
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v5
@@ -68,6 +69,7 @@ jobs:
   test:
     name: Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     # A real Postgres lets the DB integration tests run — without DATABASE_URL they
     # skipIf-skip (~20 files), leaving the rollup/repo DB behaviour with no CI coverage.
     services:
@@ -76,8 +78,18 @@ jobs:
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: trainingai_ci
+        # LB-54: `-U postgres` is load-bearing, not tidiness. Without it `pg_isready` connects as the
+        # container's OS user — root — and Postgres logs `FATAL: role "root" does not exist` for every
+        # probe, every 10 s, for the life of the job. The runner prints that service dump AFTER all
+        # steps, so it is the tail of the log and the only thing `get_job_logs` can reach: a failed
+        # `Tests` job returned 2,797 characters, none of them vitest's.
+        #
+        # The comment lives ABOVE `options:` and must stay there. `options: >-` is a FOLDED SCALAR —
+        # a `#` line indented under it is part of the docker argument STRING, not a YAML comment. Put
+        # one there and every Postgres-backed job dies in ~10 s while the file still parses as valid
+        # YAML, which is exactly how it shipped red once (2026-09-10).
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -104,6 +116,7 @@ jobs:
     # LB-31: the nightly verifies `main`'s test suite only — see the `schedule` trigger.
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       NODE_OPTIONS: --max-old-space-size=4096
       # Q-311. Everything below is a throwaway literal for this ephemeral job, not a redacted
@@ -144,6 +157,7 @@ jobs:
     # LB-31: the nightly verifies `main`'s test suite only — see the `schedule` trigger.
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
 
@@ -496,19 +510,33 @@ jobs:
       - name: CI, engines.node and production agree on a Node major
         run: node scripts/check-node-version-agreement.js
 
+      - name: Every workflow job declares a timeout
+        run: node scripts/check-workflow-job-timeouts.js
+
   migrations:
     # LB-31: the nightly verifies `main`'s test suite only — see the `schedule` trigger.
     if: github.event_name != 'schedule'
     name: Migration Check
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     services:
       postgres:
         image: postgres:16
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: trainingai_ci
+        # LB-54: `-U postgres` is load-bearing, not tidiness. Without it `pg_isready` connects as the
+        # container's OS user — root — and Postgres logs `FATAL: role "root" does not exist` for every
+        # probe, every 10 s, for the life of the job. The runner prints that service dump AFTER all
+        # steps, so it is the tail of the log and the only thing `get_job_logs` can reach: a failed
+        # `Tests` job returned 2,797 characters, none of them vitest's.
+        #
+        # The comment lives ABOVE `options:` and must stay there. `options: >-` is a FOLDED SCALAR —
+        # a `#` line indented under it is part of the docker argument STRING, not a YAML comment. Put
+        # one there and every Postgres-backed job dies in ~10 s while the file still parses as valid
+        # YAML, which is exactly how it shipped red once (2026-09-10).
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -559,14 +587,25 @@ jobs:
     # LB-31: the nightly verifies `main`'s test suite only — see the `schedule` trigger.
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:16
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: trainingai_ci
+        # LB-54: `-U postgres` is load-bearing, not tidiness. Without it `pg_isready` connects as the
+        # container's OS user — root — and Postgres logs `FATAL: role "root" does not exist` for every
+        # probe, every 10 s, for the life of the job. The runner prints that service dump AFTER all
+        # steps, so it is the tail of the log and the only thing `get_job_logs` can reach: a failed
+        # `Tests` job returned 2,797 characters, none of them vitest's.
+        #
+        # The comment lives ABOVE `options:` and must stay there. `options: >-` is a FOLDED SCALAR —
+        # a `#` line indented under it is part of the docker argument STRING, not a YAML comment. Put
+        # one there and every Postgres-backed job dies in ~10 s while the file still parses as valid
+        # YAML, which is exactly how it shipped red once (2026-09-10).
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5

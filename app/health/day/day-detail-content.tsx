@@ -219,11 +219,17 @@ export function DayDetailContent({ initialDate, tz, userId }: { initialDate: str
 
       {/* touchAction pan-y so the vertical scroll still belongs to the browser while the horizontal
           axis is ours — the direction-lock rule, satisfied by the platform rather than by hand. */}
+      {/* RV-37. `pb-nav-safe` — matching the 68 px `/more` measures — even though this sub-route
+          carries no bottom nav: the utility is the floored safe-area clearance, and this container
+          had NO bottom padding at all, so its last card ended flush with the viewport and therefore
+          with the S25's gesture bar. CLAUDE.md treats even a bare `pb-safe` as too little here.
+          **Not observed** — the seeded fixture renders "Nothing logged on this day", so the
+          container never became scrollable and the symptom is read from source. */}
       <div
         {...bindDateSwipe()}
         data-swipe-carousel
         style={{ touchAction: "pan-y" }}
-        className="flex-1 space-y-4 overflow-y-auto scrollbar-hide px-4 pt-4"
+        className="flex-1 space-y-4 overflow-y-auto scrollbar-hide px-4 pt-4 pb-nav-safe"
       >
         <AnimatePresence mode="popLayout" initial={false}>
           <motion.div
