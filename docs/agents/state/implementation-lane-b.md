@@ -11,9 +11,9 @@
 
 ## Now
 
-**TN-3b's CHART SHIPPED** (v1.455.0): stress on a 24-hour axis, gaps left blank. **LB-98 ①**
-(v1.454.2) gave the Rest-vs-plan card a server fallback so a device-only render runs in CI.
-**RV-35** closed — already fixed; what it owed was its own test. **BF-153**, **OR-108** shipped.
+**Lane A shipped all three entries this lane filed today** — LB-101, LB-102, LB-103 — and **LA-105
+collected the first debt**: OR-108's `THUMB_WIRE_BUDGET` ladder is gone, the photo stores at natural
+quality. TN-3b's chart (v1.455.0), LB-98 ① (v1.454.2), RV-35, BF-153, OR-108 all shipped.
 `check:rules` **74/74**.
 
 **SEVEN running entries were wrong about something load-bearing** — BF-139's px, BF-141's gate,
@@ -32,10 +32,10 @@ minutes well spent. **Measure before you fix what the entry blames.**
    because its unparking is PROSE and the tool reads fields.** Its remaining halves are the HR overlay
    and the across-days aggregate, both behind `LB-102`. **BF-51 ① is the trap** — built, deliberately
    unshipped; reproduce on the S25 first, never loosen `meal-photo-picker.spec.ts`.
-2. **Three Lane A entries gate Lane B work, all found the same way — a surface that cannot finish
-   because data or math sits behind a path nobody filed.** `LB-101` (food-item body cap; kills
-   OR-108's `THUMB_WIRE_BUDGET` workaround), `LB-102` (past-day stress read; TN-3b's rest),
-   `LB-103` (push:pull taxonomy; Q-305's half).
+2. **`LA-104` is next and it is a REAL finding, not tidy-up** — today's stress chart reads the live
+   series and a past day reads the rollup's, and TN-3a says outright these are two different numbers
+   (`rhrLowBpm` + `nightHrvMs` vs `restingHr` + a 28-day HRV mean). TN-3b's approved pass test is a
+   comparison ACROSS days, so one axis showing two metrics defeats it. Q-305's half is unblocked too.
 
 ## Blocked
 
