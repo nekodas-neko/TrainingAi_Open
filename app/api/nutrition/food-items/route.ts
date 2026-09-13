@@ -8,8 +8,20 @@ import { getRepository } from '@/lib/data'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { invalidBodyResponse } from '@/lib/api/route-errors'
 
-// One food item: a name, a brand and a dozen macro numbers.
-const MAX_BODY_BYTES = 8 * 1024
+// One food item: a name, a brand, a dozen macro numbers — and, since BF-35, an image.
+//
+// **LB-101. Derived from the image cap rather than restated, because the two had already drifted.**
+// This was a flat `8 * 1024`, written when the route carried no image at all. Base64 costs a third
+// more than the bytes it encodes, so an image at its OWN permitted 16 KB is ~21.8 KB on the wire and
+// the request was refused with a 413 by `readJsonLimited` **before `rejectMealImage` ever ran** —
+// the user did not lose the picture, they lost the food. Measured 2026-09-13 driving the real capture
+// flow: a 128 px WebP of a detailed source came back 6,612 bytes = 8,816 base64 characters and the
+// save 413'd, while a smooth photo-like source came back 1,410 and fitted. It bit detailed photos,
+// not every photo, which is why it survived BF-35's own testing.
+//
+// The 4 KB on top is the rest of the item — a name, a brand and the macro numbers — with room to
+// spare; the point of the expression is that raising the image cap now raises this by construction.
+const MAX_BODY_BYTES = Math.ceil(FOOD_ITEM_IMAGE_MAX_BYTES * 4 / 3) + 4 * 1024
 
 // Shared with the offline push branch so the two cannot drift (Q-24 §5).
 const FoodItemSchema = FoodItemFieldsSchema

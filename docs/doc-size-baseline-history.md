@@ -11442,17 +11442,70 @@ The work was blocked on something nobody was holding.
 **That is the second instance today of the same failure**, after TN-3b sat startable in PARKED for
 three days because its unparking is prose and the tool reads fields. Both are cheap to write and
 invisible to read, which is precisely why they persist.
-## 2026-09-11 — `docs/implementation-backlog.md` → 21371 (RV-42 shipped)
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21365 (LA-103 shipped)
+
+LA-103's 24-line entry leaves the queue with the `keep.js` parser fix, and **the entry is worth more
+than the fix it asked for.** It recorded its own proposed discriminator as a HYPOTHESIS — "a mention
+preceded by a word character is prose" — said outright that it came from one case, and demanded the
+population be measured before anyone built on it.
+
+**The measurement refuted it.** Eighteen of 164 Keep blocks yield a gate, and LB-53 — *"running it is
+a **`Gate: owner`** action"* — is preceded by the word "a" and is a real gate. Ten minutes of
+counting changed the answer from a one-line regex to a different rule entirely.
+
+Nothing else moved: the eighteen classify identically before and after, asserted by id.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21341 (LB-103 shipped)
+
+LB-103's entry leaves the queue with the push/pull/legs grouping, and Q-305's `Keep:` grows by three
+lines because its blocker is gone and the next reader needs to know *which* half is now unblocked.
+
+**The entry existed because a dependency stated in prose is a dependency nobody is holding.** Q-305
+said the push:pull half belonged in `packages/shared`, which is Lane A's — and no Lane A entry
+existed, so `next-item.js --lane A` had never listed it and never would. Lane B found it scanning
+PARKED. That is the second time today a sentence has done a field's job: LA-103 was a sentence read
+AS a field, this was a field left as a sentence.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21344 (LB-102 shipped)
+
+LB-102's entry leaves the queue and LA-104 arrives, so the net is **+3 lines** on a completed item.
+That is the shape to read, not the number: the entry asked for a read path and the code answered with
+a second question.
+
+`/api/body-battery`'s live stress series and the rollup's persisted buckets are built from **different
+baselines**, which TN-3a states outright and deliberately stores only one of. So "serve a past day
+from storage" turns out to imply "and decide which source today reads", because a chart mixing them
+puts two metrics on one axis — in exactly the across-days dimension the owner's approved pass test
+measures. LA-104 carries that decision to Lane B rather than letting it be settled by whichever fetch
+a component happens to call.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21342 (LB-101 shipped)
+
+LB-101's entry out, LA-105 in, net **−2 lines** — the third completed item today that leaves a
+successor behind, and the third time that is the right outcome rather than scope creep.
+
+LB-101 raised a server cap that a client workaround was compensating for. Removing the workaround is
+Lane B's file and Lane B's call, and doing it here would have been a Lane A session editing
+`components/` on the strength of its own change. So the entry names the exact constants to delete,
+the one thing NOT to delete (the downscale itself), and the measurement to re-take afterwards —
+6,612 bytes, the capture that was failing.
+
+The pattern across today: **LA-102, LA-104 and LA-105 were all filed by the entry that made them
+possible.** A fix that unblocks a surface is not finished when the engine half lands; it is finished
+when somebody is holding the other half.
+
+## 2026-09-11 — `docs/implementation-backlog.md` → 21317 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 
-**This figure has been rewritten TWENTY times and the churn is the note worth leaving.** Twenty-five
+**This figure has been rewritten TWENTY-ONE times and the churn is the note worth leaving.** Twenty-six
 other merges landed on `main` while this PR waited on an owner decision, and each one moved the base
 out from under it — so the starting figure is no longer even quoted here, because it changed again
-between the last two rewrites. **Twenty rewrites of one number is the cost of a green PR waiting**,
+between the last two rewrites. **Twenty-one rewrites of one number is the cost of a green PR waiting**,
 recorded rather than smoothed because the alternative reading — that someone kept getting the
 arithmetic wrong — is the wrong lesson. The per-file `.size` split (LA-33) is what keeps this to one
-number instead of a whole map: no other document's baseline has conflicted once across all twenty.
+number instead of a whole map: no other document's baseline has conflicted once across all twenty-one.
 Nothing was wrong with any of the three — each was correct against the `main` of its hour. Under six
 concurrent lanes plus an owner gate, a baseline is a reading of a moving number, and a PR that waits
 will re-read it once per merge that overtakes it. Recomputed by `pnpm fix:baselines` after each

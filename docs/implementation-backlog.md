@@ -421,87 +421,6 @@ below threshold and left in place for next time.
 
 
 
-### [workouts] LB-103 — the push:pull half of Q-305 is blocked on a taxonomy nobody has filed
-
-- **Lane:** A — `packages/shared/src/ai-periodization/volume-targets.ts` or beside it, next to
-  `normalizeMuscle` / `MUSCLE_LANDMARKS`.
-- **Added:** 2026-09-13 by Implementation Lane B, found scanning PARKED after READY hit 0.
-  **Branch:** unassigned.
-- **The blocker is real and it is unfiled, which is the point of this entry.** Q-305's `Keep:` says
-  the push:pull half *"belongs in `packages/shared` … which is Lane A's"* — and there is **no Lane A
-  entry for it**. It exists only as a sentence inside a Lane B entry, so `next-item.js --lane A` has
-  never listed it and never will. Same shape as the prose parking that hid TN-3b for three days:
-  a dependency stated in prose is a dependency nobody is holding.
-- **What to build:** a muscle → movement-pattern grouping (push / pull / legs / other) in shared,
-  under One Formula One Place. Q-305 rejected doing it inside the component **for the right reason**
-  — a private second copy in `components/` is exactly the divergence that rule exists to stop — so
-  this is not a re-litigation of that call, it is the entry that call implies.
-- **Measured twice and it replicates**, which is why the surface is worth having: legs 481 (33%),
-  push 433 (30%), pull 333 (23%), other 168 (11%) over 60 days — ratio **1.30**; and legs 458 (34%),
-  push 382 (29%), pull 286 (22%), other 202 (15%) over 56 days — ratio **1.34**. Mildly
-  push-dominant, worth correcting toward 1.0, and well short of pathological. **Nothing computes it.**
-- **Once this lands, Q-305's remaining Lane B work is one card section** on
-  `weekly-muscle-sets-card.tsx`, which already carries the landmark bands.
-- **Do NOT let this quietly grow into the shared-treatment question.** Whether Q-278 / Q-302 / Q-305
-  want one common "computed and discarded" surface is an open design question for the owner or the
-  Orchestrator, deliberately untouched since 2026-08-25 — answering it inside this taxonomy would
-  prejudge it exactly as answering it inside one card would have.
-- **Reversal cost:** low. One shared module and its tests; nothing renders it until Q-305's half does.
-
-### [readiness] LB-102 — `/api/body-battery` serves today only, so a persisted stress day cannot be read back
-
-- **Lane:** A — `app/api/body-battery/route.ts` (or a sibling read), over `oura_daytime_stress_buckets`.
-- **Added:** 2026-09-13 by Implementation Lane B, found shipping TN-3b's chart. **Branch:** unassigned.
-- **The route takes no parameters at all** — `export async function GET()` — and computes the stress
-  series live from today's ring dHRV. TN-3a's table has persisted 30-minute buckets since
-  **2026-08-24** (478 rows over 18 days when last measured) and **nothing publishes them**, so a
-  past day is unreachable from any surface.
-- **This blocks an owner-approved pass test, which is why it is filed at the top.** TN-3b's test is
-  *"the owner opens a past day, reads a stressed window off the axis, and can say whether it matches
-  what they were doing"* — the whole point being that his own recall is the ground truth, since
-  TN-33 established there is no independent target with variance (`perceived_recovery` reads 3 on
-  all 17 days). Today-only answers half the question he approved.
-- **The surface is already built and needs no change.** `StressDayChart` takes a plain
-  `{ t, level }[]` and `toSegments` sorts before segmenting precisely because a day assembled from
-  stored rows carries no ordering guarantee. A `?date=` on the existing route, returning the stored
-  buckets for that day, is all it wants.
-- **Same shape as LB-98**, and worth naming as a pattern: data that persists with no read path is
-  invisible to every surface and to CI both. That entry cost a card its verifiability; this one costs
-  an approved feature its pass test.
-- **Reversal cost:** low — one read, and a route that answers for a date as well as for today.
-
-### [platform] LA-103 — a sentence saying a gate was withheld IS a gate, and it parked verified work
-- **Lane:** A — `scripts/lib/keep.js:47`, and the park ordering it feeds in `scripts/next-item.js:145`.
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-13 · found fixing red `main` after #1136.
-- **Measured, not theorised.** `keep.js` reads a `Gate:` from **anywhere** in a `Keep:` block —
-  deliberately, because 7 of 27 mentions in the file are written inline mid-sentence and the
-  bullet-anchored form would miss them. BF-46's Keep contained the sentence *"**The `Gate: device`
-  above was deliberately withheld while they were unbuilt**"*, which is a sentence denying a gate and
-  was parsed as asserting one.
-- **It was invisible for weeks because a second bug was cancelling it.** `next-item.js:145` skips a
-  Keep's gate when the entry carries `Verify:` for the same value, and BF-46 did. The owner's
-  2026-09-13 nutrition pass verified BF-46 on the S25, which correctly removes the `Verify:` — and
-  that un-cancelled the phantom gate, so a verified entry went back to PARKED and
-  `backlog-verify-field.test.ts` went red on `main` and on every branch cut from it.
-- **Patched at the entry, not the parser, and that is why this exists.** The red was cleared by
-  rewording BF-46's sentence so it no longer names the field. **The parser still reads a quoted or
-  negated mention as a field**, so the next entry that explains its own gate re-creates this.
-- **Do NOT simply anchor the regex to a bullet start** — that loses the 7 legitimate inline mentions
-  and silently un-parks genuinely blocked work, which is worse than the bug. Measure the population
-  first: `grep -nE 'Gate:' docs/implementation-backlog.md` and classify every hit as field, inline
-  field, or prose *about* a field. The discriminator that looks right from the one case is a mention
-  preceded by a word character (*"The `Gate: device` above"*) versus one opening a clause — but one
-  case is not a population, and this entry must not be built on it.
-- **This is the repo's own recurring class**, which is the argument for fixing the parser rather than
-  the entry: *"guards find their own documentation"* is in CLAUDE.md and in Lane A's baton, and it has
-  now cost red `main` once. Every fix so far has been to strip comments before scanning; a Keep block
-  has no comment syntax to strip, so this one needs a different answer.
-- **Pass test:** a fixture entry whose Keep *discusses* a gate is not parked; a fixture whose Keep
-  *states* one inline still is; and the real queue's PARKED/VERIFY/KEEP split is unchanged for all 17
-  entries `backlog-verify-field.test.ts` covers.
-- **Reversal cost:** low, and the test above is the safety net — it reads the real file.
-
 ### [nutrition] LA-102 — the budget starts at the resting rate and says nothing about what it leaves out
 - **Lane:** B — surface only: `components/nutrition/calorie-zone-bar.tsx`, and the ⓘ copy on
   `components/nutrition/energy-card.tsx` / `components/nutrition/calorie-balance-bar.tsx`.
@@ -528,26 +447,49 @@ below threshold and left in place for next time.
   the base, and nothing on the screen implies the base is a full day's burn.
 - **Reversal cost:** none. It is copy.
 
-### [nutrition] LB-101 — `/api/nutrition/food-items` refuses a body smaller than the image it permits
+### [nutrition] LA-105 — the capture workaround for LB-101 is now dead weight
+- **Lane:** B — `components/nutrition/capture-actions.tsx`, and two assertions in
+  `components/nutrition/__tests__/food-image-write-paths.test.ts`.
 
-- **Lane:** A — `app/api/nutrition/food-items/route.ts`, one constant. **Added:** 2026-09-13 by
-  Implementation Lane B, measured while building OR-108. **Branch:** unassigned.
-- **The route caps its whole body at 8 KB and its image field at 16 KB.** `MAX_BODY_BYTES = 8 * 1024`
-  carries the comment *"One food item: a name, a brand and a dozen macro numbers"* — written before
-  BF-35 gave the route `imageDataUri`. Base64 costs a third more than the bytes it carries, so an image
-  at its own permitted cap is **~21.3 KB on the wire** and the request is refused with a **413 before
-  `rejectMealImage` ever runs**. The user does not lose the picture; they lose the food.
-- **Measured 2026-09-13** in Playwright, driving the real capture flow: a 128 px WebP of a detailed
-  600 × 400 source at q0.8 came back **6,612 bytes = 8,816 base64 characters** and the save 413'd; a
-  smooth photo-like source came back 1,410 and fits. It bites detailed photos, not every photo.
-- **The fix is one line:** derive the body cap from `FOOD_ITEM_IMAGE_MAX_BYTES` (`Math.ceil(x * 4 / 3)
-  + 4 * 1024`) rather than restating a number, so the two cannot drift again. Check the offline push
-  branch's own limit for the same mismatch too.
-- **A workaround is live and goes with this.** `capture-actions.tsx` carries `THUMB_WIRE_BUDGET =
-  7 * 1024` and re-encodes down a quality ladder to fit it; that constant, the `tooBigForTheBody`
-  guard beside it and two assertions in `components/nutrition/__tests__/food-image-write-paths.test.ts`
-  exist only because of this. Removing them is Lane B's follow-up — leave them until the cap moves.
-- **Reversal cost:** low — one constant, and a route that takes a larger body than it did.
+- **Branch:** _unassigned_ · **Added:** 2026-09-13 · found shipping LB-101, which this depends on.
+- **LB-101 SHIPPED 2026-09-13**: `/api/nutrition/food-items` derives its body cap from
+  `FOOD_ITEM_IMAGE_MAX_BYTES` instead of restating 8 KB, so an image at its own permitted size no
+  longer 413s. **The client-side workaround that existed only because of that is now redundant.**
+- **What to remove:** `THUMB_WIRE_BUDGET = 7 * 1024` and the quality-ladder re-encode that walks down
+  to fit it, the `tooBigForTheBody` guard beside it, and the two assertions that pin them. LB-101's
+  own entry named these and said to leave them until the cap moved. It has moved.
+- **Do NOT remove the downscale itself** — only the budget the ladder targets. Shrinking a capture
+  before upload is right regardless; what is dead is re-encoding down to **7 KB** to sneak under a cap
+  that was 8,192 bytes and is now 25,942.
+- **Verify by measurement, not by reading:** the case LB-101 measured was a 128 px WebP of a detailed
+  600 × 400 source at q0.8 coming back **6,612 bytes**. After removing the ladder that capture should
+  save at its natural quality rather than at whatever rung fitted 7 KB.
+- **Reversal cost:** low, and the route-side cap stands on its own either way.
+
+### [readiness] LA-104 — today's stress chart and a past day's come from two different baselines
+- **Lane:** B — `components/body-battery/stress-day-chart.tsx` and whatever feeds it on the day screen.
+  The engine half is done; this is which source the surface reads.
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-13 · found shipping LB-102's read path.
+- **Reference:** [`the LB-102 journal entry`](overview/entries/2026-09-13-lb102-stress-day-read-path.md).
+- **The two series are not the same number and TN-3a says so out loud.** `lib/oura-ble/rollup/run.ts`
+  builds the persisted buckets from `latest.rhrLowBpm` + `nightHrvMs`; `/api/body-battery` builds its
+  live series from `restingHr` + a 28-day HRV mean. Its own comment: *"persisting both would put two
+  numbers behind one metric"* — which is why only the rollup's are stored.
+- **So a chart that reads TODAY live and a PAST day from storage is showing two metrics on one axis**,
+  and the owner's approved pass test is precisely a comparison across days: *"open a past day, read a
+  stressed window off the axis, and say whether it matches what you were doing."* Two baselines make
+  today and yesterday incomparable in exactly the dimension the test asks about.
+- **`GET /api/body-battery/stress-day?date=` already serves EVERY day from storage, today included**,
+  for this reason. The decision left open is whether TN-3b's chart should read today from it too.
+- **The cost of switching, stated so it is not discovered later:** today's stored series ends at the
+  last rollup rather than at this minute. The route returns `throughMs` so the surface can say where
+  the day's data stops instead of implying the day stopped.
+- **Do NOT answer this by persisting the live series as well.** That is the thing TN-3a rejected, and
+  re-adding it would put the second number back behind the metric.
+- **Pass test:** opening today and opening yesterday show series built the same way, and the chart
+  says where today's data currently reaches.
+- **Reversal cost:** low — one fetch swapped on one surface.
 
 ### [app-shell] BF-139 — three header chips no longer fit beside the date (fixed; the device look is what is left)
 
@@ -7391,7 +7333,8 @@ that handler defers, the way it already defers to a carousel.
   `Gate:` from anywhere in a Keep block — so a sentence saying the gate was withheld WAS the gate.
   It only showed once the owner's 2026-09-13 sign-off removed the `Verify:` that had been cancelling
   it, and it turned a verified entry back into a parked one on every branch. The parser half is filed
-  as LA-103.)* On the S25, per ① (b)'s own note: pick a photo in Edit Meal, save, reopen. If it
+  as LA-103, and FIXED there on 2026-09-13 — `keep.js` now requires a gate to be set off from the
+  prose, so this sentence could be written either way today.)* On the S25, per ① (b)'s own note: pick a photo in Edit Meal, save, reopen. If it
   still fails it now fails *loudly*, which is the smaller half of that fix.
 - **Added:** 2026-08-27 · owner, with screenshots. *"overall just a UI rework/uplift. almost there."*
 
@@ -13719,10 +13662,13 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   `DEFAULT_LANDMARKS`. It is not — `muscles.ts:17` maps `core: 'abs'` and `volume-targets.ts:58`
   applies `normalizeMuscle` before the lookup. Working correctly. **Now pinned by a unit case** so it
   stays that way.
-- **Keep:** the push:pull half — now filed as **`LB-103`** (Lane A) rather than left as prose in this
-  bullet, because a dependency only a Lane B entry mentions is one no Lane A queue shows. Also the
-  shared-treatment design question, and the S25 check — the band word sits beside the set count on a
-  narrow row and has only been seen in a desktop browser. `Gate: device`
+- **Keep:** the push:pull half's **card section**, which is Lane B's and is now unblocked — the
+  shared grouping it was waiting on **SHIPPED 2026-09-13 as LB-103**: `movementPattern(muscle)` in
+  `packages/shared/src/muscles.ts`, push / pull / legs / other, with the catalogue's whole vocabulary
+  asserted against the database. Read that entry's journal before rendering it; `shoulders` counts as
+  push and `lower back` as neither, both deliberately and both argued there. Also the shared-treatment
+  design question, and the S25 check — the band word sits beside the set count on a narrow row and has
+  only been seen in a desktop browser. `Gate: device`
 
 
 ### [workouts] Q-300 — 37% of sets are taken with materially less rest than prescribed, and the RPE model has no rest term
