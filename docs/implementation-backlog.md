@@ -421,6 +421,38 @@ below threshold and left in place for next time.
 
 
 
+### [platform] LA-103 — a sentence saying a gate was withheld IS a gate, and it parked verified work
+- **Lane:** A — `scripts/lib/keep.js:47`, and the park ordering it feeds in `scripts/next-item.js:145`.
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-13 · found fixing red `main` after #1136.
+- **Measured, not theorised.** `keep.js` reads a `Gate:` from **anywhere** in a `Keep:` block —
+  deliberately, because 7 of 27 mentions in the file are written inline mid-sentence and the
+  bullet-anchored form would miss them. BF-46's Keep contained the sentence *"**The `Gate: device`
+  above was deliberately withheld while they were unbuilt**"*, which is a sentence denying a gate and
+  was parsed as asserting one.
+- **It was invisible for weeks because a second bug was cancelling it.** `next-item.js:145` skips a
+  Keep's gate when the entry carries `Verify:` for the same value, and BF-46 did. The owner's
+  2026-09-13 nutrition pass verified BF-46 on the S25, which correctly removes the `Verify:` — and
+  that un-cancelled the phantom gate, so a verified entry went back to PARKED and
+  `backlog-verify-field.test.ts` went red on `main` and on every branch cut from it.
+- **Patched at the entry, not the parser, and that is why this exists.** The red was cleared by
+  rewording BF-46's sentence so it no longer names the field. **The parser still reads a quoted or
+  negated mention as a field**, so the next entry that explains its own gate re-creates this.
+- **Do NOT simply anchor the regex to a bullet start** — that loses the 7 legitimate inline mentions
+  and silently un-parks genuinely blocked work, which is worse than the bug. Measure the population
+  first: `grep -nE 'Gate:' docs/implementation-backlog.md` and classify every hit as field, inline
+  field, or prose *about* a field. The discriminator that looks right from the one case is a mention
+  preceded by a word character (*"The `Gate: device` above"*) versus one opening a clause — but one
+  case is not a population, and this entry must not be built on it.
+- **This is the repo's own recurring class**, which is the argument for fixing the parser rather than
+  the entry: *"guards find their own documentation"* is in CLAUDE.md and in Lane A's baton, and it has
+  now cost red `main` once. Every fix so far has been to strip comments before scanning; a Keep block
+  has no comment syntax to strip, so this one needs a different answer.
+- **Pass test:** a fixture entry whose Keep *discusses* a gate is not parked; a fixture whose Keep
+  *states* one inline still is; and the real queue's PARKED/VERIFY/KEEP split is unchanged for all 17
+  entries `backlog-verify-field.test.ts` covers.
+- **Reversal cost:** low, and the test above is the safety net — it reads the real file.
+
 ### [nutrition] OR-108 — a scanned barcode saves no image, and neither does photographing the food
 
 - **Lane:** B — the capture paths in `components/nutrition/`; `food_items.image_data_uri` already
@@ -7390,11 +7422,15 @@ that handler defers, the way it already defers to a carousel.
 - **✅ VERIFIED ON THE S25, 2026-09-13** (owner's nutrition pass): the photo picker and quantity sheet both work.
 - **Keep:** the **device check**, and only that. All four parts have shipped — ① (a) the single
   picker at the top (v1.402.0), ① (b) the CSP fix that was the save failure's real cause (v1.399.0),
-  ② grams-only ingredient rows and ③ Option A (both v1.401.0). **The `Gate: device` above was
+  ② grams-only ingredient rows and ③ Option A (both v1.401.0). **The device-gate field above was
   deliberately withheld while they were unbuilt** — that field parks an entry, and parking unbuilt
   work would have hidden it. Now that nothing here is unbuilt, its absence did the opposite: it left
   an entry with no work in it heading `next-item.js`'s READY list, which is the one thing that tool
-  exists to prevent. On the S25, per ① (b)'s own note: pick a photo in Edit Meal, save, reopen. If it
+  exists to prevent. *(That sentence used to name the field in backticks, and `keep.js` reads a
+  `Gate:` from anywhere in a Keep block — so a sentence saying the gate was withheld WAS the gate.
+  It only showed once the owner's 2026-09-13 sign-off removed the `Verify:` that had been cancelling
+  it, and it turned a verified entry back into a parked one on every branch. The parser half is filed
+  as LA-103.)* On the S25, per ① (b)'s own note: pick a photo in Edit Meal, save, reopen. If it
   still fails it now fails *loudly*, which is the smaller half of that fix.
 - **Added:** 2026-08-27 · owner, with screenshots. *"overall just a UI rework/uplift. almost there."*
 
