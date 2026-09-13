@@ -1754,6 +1754,17 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [nutrition] ⚠️ The vial sheet's rewrite is not device-verified (BF-153, 2026-09-13)
+
+Shipped in v1.454.1: the vial in use is named and moved above the create-form, the form is headed
+*Open a new vial*, the `Dose` field is *Try a dose* under *Work out the units* and says outright that
+it is not saved, and the footer warns before opening a second vial. **BF-153's own check is owed on
+the S25**: with a saved vial present, confirm the two dates can be told apart without reading code,
+and press the footer button deliberately to confirm the screen said it would create a vial. That
+press is the destructive case — a second vial restarts the weight-response window, and BF-136
+established it can only be corrected in place (`listSupplementVials` orders by `openedOn DESC` and
+the sheet reads `vials[0]`, so a corrective vial dated earlier sorts below).
+
 ### [nutrition] ⚠️ A captured food's picture is written but the device still reads it back as null (OR-108/LA-36, 2026-09-13)
 
 The write half shipped in v1.454.0: photographing a food and scanning a barcode both now put an
@@ -1773,21 +1784,6 @@ source is 8,816 base64 characters. `capture-actions.tsx` works around it with a 
 to a 7 KB wire budget and drops the image rather than send a body that would fail; that workaround,
 its `THUMB_WIRE_BUDGET` constant and two assertions in `food-image-write-paths.test.ts` come out
 when the route's cap is fixed.
-
-### [nutrition] 🔴 `one-calorie-budget.spec.ts` is red on `main` since BF-150, and it merged that way (LB-100, 2026-09-12)
-
-`e2e/one-calorie-budget.spec.ts:165` — *"Home's nutrition card counts against that same budget"* —
-was green on #1127 at 10:26 and has failed on every run since BF-150, including BF-150's own
-pre-merge run. E2E is advisory, so it merged red and nothing recorded it.
-
-**The cause is not established and the entry deliberately does not pick one.** Either the
-one-budget invariant is broken again — the Nutrition ring still passes against the pre-BF-150
-expression while Home's donut does not, which is the Q-415/Q-417 defect returning on the number the
-owner eats to — or the spec is stale, since its own guard asserts the budget must *not* equal
-`stored goal + earned`, which is exactly what BF-150 made it. A `dialog "Morning Check-in"` sits
-over Home in the failure snapshot and has to be ruled out before either reading holds.
-
-Lane A's, filed from Lane B. Discriminator and reproduction in the backlog entry.
 
 ### [nutrition][app-shell] ⚠️ The weekly recap shows its numbers now, unseen on the phone (Q-112e, 2026-09-12, v1.451.0) · needs: hardware
 
@@ -1833,7 +1829,7 @@ bodyweight set on the S25 at a rep count other than 5 or 6 — a Hanging Leg Rai
 previous-session value is the one that exercises the new payload field. Verified on the route
 (`?tab=all` and the single-session tab) and by unit and DB tests; not seen on a phone.
 
-### [nutrition] ⚠️ The budget follows your goal now, and which goal is still unanswered (BF-150, 2026-09-12, v1.451.0) · needs: owner
+### [nutrition] ⚠️ The budget starts at your resting rate; no S25 has seen it say so (BF-152, 2026-09-13, v1.454.1) · needs: device
 
 **Amended 2026-09-12 (LB-100):** BF-150 anchored the budget in `budgetProvenance` and left
 `computeCalorieBalance`'s deviation on the old expression, so the Nutrition ring's *"N kcal left"*
@@ -1845,20 +1841,29 @@ recorded rather than the fix alone — **a red advisory check is a signal, not a
 
 Owner: *"When is this going to be back to the expected number? The 1350+ excercsise?"* The daily
 budget was `estimated maintenance − goal adjustment + earned`, so the 1,660 he stored took no part in
-it and the estimate — climbing, and ~600 kcal high (BF-137) — decided what he ate to. It is now
-**stored goal + earned**, and the estimate is shown as information rather than driving the number.
+it and the estimate — climbing, and ~600 kcal high (BF-137) — decided what he ate to. BF-150 made it
+**stored goal + earned**; BF-152 made it **resting rate + earned** (below). Either way the estimate is
+shown as information rather than driving the number, which is the part that answers the question.
 
-**What is owed is a number, not code.** BF-150 prescribed "stored goal + earned" but verified against
-~1,481, and those disagree by 310 kcal/day. Measured in production 2026-09-12: `nutrition_targets`
-and `users.calorie_goal` both hold **1,660**, while his measured RMR is **1,325** — and BF-99's record
-has him calling 1,350 *"the 1350 RMR value"*, so the figure he is asking for is his resting rate, not
-a goal he ever stored. The rule is identical either way and the stored number is now load-bearing, so
-**the app will show 1,791 today until he sets his goal to whatever he actually wants**; setting 1,350
-makes it 1,481. Not resolved in code on purpose: which number he eats to is his.
+**Amended 2026-09-13 (BF-152) — the anchor moved again, and the owner question this row carried is
+now moot.** BF-150's open item was *which* number he eats to: `nutrition_targets` held **1,660** while
+his measured RMR was **1,325**, a 310 kcal/day disagreement, and the row said the app would show 1,791
+until he changed the stored figure. He answered with a rule rather than a figure — *"Rmr+body
+metabolism as base … It should start at 1350 - and as I walk/workout - move throughout the day to
+1600"* — so the base is now his **re-scaled measured resting rate (1,342 on 2026-09-13)** and the
+stored target is a target again. **Nothing is owed from him on this: the budget no longer reads any
+number he types.** A typed anchor could not track a body that is moving, and his is — 72.1 kg at the
+RMR test, 70.2 kg seventeen days later.
 
-**Also not verified on device.** Server-computed, so it reaches the APK through Railway with no
-rebuild, but no S25 has rendered the new provenance line — *"1,660 your goal + 131 earned from
-movement"* — and the wording is the part a screenshot would catch.
+**What the base still excludes is copy, not arithmetic, and it is filed as LA-102 (Lane B).** RMR
+leaves out the thermic effect of food (~10% of intake) and non-step NEAT. `bmr × 1.2` is **1,611** —
+his own *"1600"* — but a multiplier asserts that overhead happened while the step credit observes it,
+so it is credited through measured movement and named in the ⓘ copy instead.
+
+**What is owed is the device check.** Server-computed, so it reaches the APK through Railway with no
+rebuild, and both surfaces were rendered in the dev browser at S25 width — `1,815 resting rate — no
+movement recorded yet today`, with Home's donut and ring on the same figure. No S25 has rendered it,
+and the wording is the part a screenshot would catch.
 
 
 ### [app-shell] ⚠️ The app is tinted now, and no OLED panel has judged it (BF-145, 2026-09-12, v1.449.0) · needs: hardware

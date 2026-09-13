@@ -11301,6 +11301,46 @@ regex to a bullet start loses 7 legitimate inline mentions and silently un-parks
 work. So the choice is on the record as LA-103 with the population unmeasured and said to be
 unmeasured, rather than as a one-line parser change nobody could audit later. **A 36-line entry is the
 cost of not guessing.**
+## 2026-09-13 — `docs/implementation-backlog.md` → 21332 · `projectOverview.md` → 10795 (BF-152 shipped)
+
+BF-152's 54-line entry leaves the queue; **LA-102 arrives in its place, so the net is 28 lines rather
+than 54** (the figure is 21363 rather than 21327 because LA-103, BF-153, LB-101, OR-108 and BF-153's
+second half all landed on `main` while this PR waited through three E2E runs — LA-103 is the
+red-`main` note above, the rest are not ours at all). **`projectOverview.md` moves too**, and the same
+caution applies: the BF-150 row was rewritten rather than struck, and LB-100's 🔴 row moved out to the
+archive.
+
+**Six base re-merges in two and a half hours is the number worth recording, not the baseline.** `main`
+moved every ~20-30 minutes while E2E took ~29, so a green was stale each time it arrived. Two merge
+attempts were refused outright with a 405. **And the conflicts are always the same three bookkeeping
+files** — this one, `docs/implementation-backlog.md` and `packages/shared/src/changelog.ts` — never
+code: measured on the sixth round, where `main` had brought two components and an e2e spec and
+nothing in them touched anything here. So the serialisation is imposed entirely by the ledgers every
+agent must write to, not by the work colliding. The green was
+never the problem and neither was the queue — the two intervals simply do not fit. That is deliberate and is the thing to read here: BF-152 shipped with a residual it chose
+not to model — the thermic effect of food and non-step NEAT — and the ⓘ copy explaining that is Lane
+B's. An entry that closes by opening a smaller one nets out small, and **the alternative was a
+54-line drop with the finding living only in a journal paragraph**, which is how a finding gets
+dropped.
+
+`projectOverview.md` falls by only 6 net across three edits, which also understates the churn. The
+BF-150 Known-Issues row was rewritten rather than struck — its owner question is now moot (the budget
+reads no typed number) but the device check is owed, so it stays, per the rule that an entry only
+moves when nothing is owed. What *did* move out is **LB-100's 🔴 row**: `one-calorie-budget.spec.ts` is
+green, the cause it refused to guess turned out to be the less likely of the two it named, and the
+archive records that rather than a tick.
+
+## 2026-09-13 — `docs/agents/state/implementation-lane-a.md` 116 → 100 (rewritten, BF-152)
+
+Ratchets DOWN 16 lines, and the reason is not concision. **The file was eleven days stale in the two
+fields a successor would act on first:** Next ID read `LA-55` against a real `LA-102`, and migrations
+read `255` against a directory head of `275`. A baton that is half last week's is worse than none,
+because it gets trusted — so this is a full rewrite, not an append, per the rule in CLAUDE.md.
+
+What came out was narrative about PRs that merged eleven days ago. What went in is state a successor
+cannot derive: the nine-entry all-exclusions READY list, #1098's owner gate and its two recurring
+conflicts, the four owner decisions (one of which BF-152 just dissolved rather than answered), the
+three owed device checks, and the four testing traps that have each cost a session.
 
 
 ## 2026-09-13 — `docs/implementation-backlog.md` (BF-153 filed)
@@ -11324,6 +11364,147 @@ the image check runs, and the client is carrying a quality ladder to dodge it un
 open dependencies, the workaround and the constant that has to be deleted with it are all named. The
 entry leaves — to `known-issues-resolved.md` — when LA-36 and LB-101 are both in and the device pass
 has seen a picture on a row.
+
+## 2026-09-13 — `projectOverview.md` → 10801 (BF-153's device check, and the press that cannot be undone)
+
++11 for one Known-Issues entry. The vial sheet now names which vial each thing belongs to and says
+the Dose field is a calculator rather than a setting, but the check BF-153 asked for is on the S25 and
+has not happened. The length is the destructive case: pressing the footer button opens a **second**
+vial and restarts the weight-response window, and BF-136 established that a wrong date can only be
+corrected in place — `listSupplementVials` orders by `openedOn DESC` and the sheet reads `vials[0]`,
+so a corrective vial dated earlier sorts below the wrong one and the card keeps using it.
+
+A row reading "clearer copy shipped" would not tell the next session that the check owed is a
+deliberate press of a button whose effect is hard to reverse. It leaves for
+`known-issues-resolved.md` when that press has been made on the device and the screen was clear
+about it beforehand.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21391 (BF-153 shipped, 40 lines back)
+
+The ratchet reclaims what a completed entry frees, which is the half that makes it a ratchet rather
+than a ceiling. BF-153 was 38 lines and mostly evidence — the save body showing `doseMg` absent, and
+the two dates reading 13/09/2026 and 10 Sept on one screen — because the screen looks correct and the
+defect is only visible from the code. That evidence is why the entry was right in every particular,
+which is not the recent norm; it now lives in the journal entry rather than the queue.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21352 (RV-35 closed, 39 lines back)
+
+RV-35's fix was already in the tree — `nutrition-content.tsx:334` calls `useDayRolloverRefresh`,
+which is the hook the entry prescribed — so what the entry was really still owed was its own
+condition: the owner directed that it ship without a device check, and the entry converts that into
+a test that fails before the fix and passes after. That test now exists and is mutation-proven, so
+the entry leaves.
+
+**Re-verifying against `main` is what stopped this being wrong in either direction.** Read as stale,
+it deletes with the obligation unmet and nothing guarding the behaviour. Read as unbuilt, it
+re-implements a line that is already there. Both halves had to be checked.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21360 (LB-98 ① shipped, Q-300's reason corrected)
+
++8 across two entries, and both are corrections rather than additions. LB-98's Keep loses residue ①
+and gains the shipped note; **Q-300's Keep had to be rewritten because its stated reason stopped
+being true** — it said the card "is absent in a browser and cannot be verified in CI", which was
+exactly right until the fallback landed today. Leaving it would have told the next session the card
+is unverifiable when it now has a mutation-proven spec, and would have overstated what the S25 still
+owes: the local path only, which no harness can reach.
+
+A Keep that describes a world that has moved is worse than a missing one, because it is trusted.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21396 (TN-3b's chart shipped, LB-102 filed)
+
++36: TN-3b gains a shipped note and a reduced Keep, and **LB-102 is new** — `/api/body-battery` takes
+no parameters, so the persisted stress buckets (from 2026-08-24) cannot be read back and TN-3b's own
+pass test, *"the owner opens a past day"*, is unreachable.
+
+**Two things here are worth the lines.** The first is that TN-3b sat unstarted for three days while
+Lane B's READY was 0, because its unparking is written as **prose** and `next-item.js` reads fields —
+the failure the standing rules already name, now with a cost attached. The second is that LB-102 is
+the same shape as LB-98 a few hours earlier: data that persists with no read path is invisible to
+every surface and to CI both. Naming the pattern in both entries is what makes the third one
+recognisable.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21368 (recomputed after a parallel merge)
+
+BF-152 (#1138) and TN-3b's chart landed within minutes of each other and both moved this number —
+main to 21332 as its entry left the queue, this branch to 21396 as LB-102 arrived. **The conflict
+resolves to neither**: the correct value is `wc -l` + 1 of the merged file, which is 21368. Splicing
+either side would have set a baseline for a document that does not exist.
+
+Same for `package.json` and `changelog.ts` in the same merge — rebuilt from `git show origin/main:…`
+and re-bumped on top, so BF-152's v1.454.3 entry survives under this branch's v1.455.0 rather than
+being spliced away.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21396 (LB-103: an unfiled blocker becomes an entry)
+
++27 for LB-103, and the lines buy a dependency that existed without existing. Q-305's `Keep:` has
+said since 2026-08-25 that its push:pull half *"belongs in `packages/shared` … which is Lane A's"* —
+and no Lane A entry was ever written, so `next-item.js --lane A` has never listed it and never would.
+The work was blocked on something nobody was holding.
+
+**That is the second instance today of the same failure**, after TN-3b sat startable in PARKED for
+three days because its unparking is prose and the tool reads fields. Both are cheap to write and
+invisible to read, which is precisely why they persist.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21365 (LA-103 shipped)
+
+LA-103's 24-line entry leaves the queue with the `keep.js` parser fix, and **the entry is worth more
+than the fix it asked for.** It recorded its own proposed discriminator as a HYPOTHESIS — "a mention
+preceded by a word character is prose" — said outright that it came from one case, and demanded the
+population be measured before anyone built on it.
+
+**The measurement refuted it.** Eighteen of 164 Keep blocks yield a gate, and LB-53 — *"running it is
+a **`Gate: owner`** action"* — is preceded by the word "a" and is a real gate. Ten minutes of
+counting changed the answer from a one-line regex to a different rule entirely.
+
+Nothing else moved: the eighteen classify identically before and after, asserted by id.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21341 (LB-103 shipped)
+
+LB-103's entry leaves the queue with the push/pull/legs grouping, and Q-305's `Keep:` grows by three
+lines because its blocker is gone and the next reader needs to know *which* half is now unblocked.
+
+**The entry existed because a dependency stated in prose is a dependency nobody is holding.** Q-305
+said the push:pull half belonged in `packages/shared`, which is Lane A's — and no Lane A entry
+existed, so `next-item.js --lane A` had never listed it and never would. Lane B found it scanning
+PARKED. That is the second time today a sentence has done a field's job: LA-103 was a sentence read
+AS a field, this was a field left as a sentence.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21344 (LB-102 shipped)
+
+LB-102's entry leaves the queue and LA-104 arrives, so the net is **+3 lines** on a completed item.
+That is the shape to read, not the number: the entry asked for a read path and the code answered with
+a second question.
+
+`/api/body-battery`'s live stress series and the rollup's persisted buckets are built from **different
+baselines**, which TN-3a states outright and deliberately stores only one of. So "serve a past day
+from storage" turns out to imply "and decide which source today reads", because a chart mixing them
+puts two metrics on one axis — in exactly the across-days dimension the owner's approved pass test
+measures. LA-104 carries that decision to Lane B rather than letting it be settled by whichever fetch
+a component happens to call.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21342 (LB-101 shipped)
+
+LB-101's entry out, LA-105 in, net **−2 lines** — the third completed item today that leaves a
+successor behind, and the third time that is the right outcome rather than scope creep.
+
+LB-101 raised a server cap that a client workaround was compensating for. Removing the workaround is
+Lane B's file and Lane B's call, and doing it here would have been a Lane A session editing
+`components/` on the strength of its own change. So the entry names the exact constants to delete,
+the one thing NOT to delete (the downscale itself), and the measurement to re-take afterwards —
+6,612 bytes, the capture that was failing.
+
+The pattern across today: **LA-102, LA-104 and LA-105 were all filed by the entry that made them
+possible.** A fix that unblocks a surface is not finished when the engine half lands; it is finished
+when somebody is holding the other half.
+
+
+## 2026-09-13 — `docs/implementation-backlog.md` (BF-154 filed at the top)
+
+Thirty-six lines for BF-154, filed hours after BF-152 shipped: the card's explanation prints the
+addends of the formula BF-152 retired beside the budget the new one produced, so it names 1,294 and
+breaks it into terms summing to 2,078. Most of the lines are the two consequences that are not
+arithmetic — the 2,278 it prints as "resting burn" is the inflated estimator BF-152 escaped, and the
+macro grams stayed on the stored goal while the budget moved.
 
 ## 2026-09-13 — `docs/implementation-backlog.md` → 21495 (the app-shell device pass)
 

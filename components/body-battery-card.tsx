@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'motion/react'
 import { fmtAest } from '@trainingai/shared/date-utils'
 import { bodyBatteryColor, type BodyBatteryLabel } from '@trainingai/shared/health/body-battery-band'
 import { StressStrip } from '@/components/body-battery/stress-strip'
+import { StressDayChart } from '@/components/body-battery/stress-day-chart'
 import type { BodyBatteryResponse } from '@/app/api/body-battery/route'
 
 const BATTERY_ICON: Record<BodyBatteryLabel, LucideIcon> = {
@@ -187,7 +188,16 @@ export function BodyBatteryCard({ battery }: { battery: BodyBatteryResponse }) {
                       measured calm. Treat the number as a rough guide.
                     </p>
                   )}
-                  {battery.stress && <StressStrip stress={battery.stress} />}
+                  {battery.stress && (
+                    <>
+                      <StressStrip stress={battery.stress} />
+                      {/* TN-3b. Beside the strip rather than replacing it: the strip carries the
+                          current state and the "high ~N min" figure, this answers "when". The owner
+                          did not know the strip existed, so the entry counts discoverability as
+                          part of the work — a labelled axis is what makes it findable. */}
+                      <StressDayChart buckets={battery.stress.series.map(p => ({ t: p.t, level: p.level }))} />
+                    </>
+                  )}
                 </>
               ) : (
                 <div className="space-y-2 py-1">

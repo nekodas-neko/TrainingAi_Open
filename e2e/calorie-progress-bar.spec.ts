@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { Client } from 'pg'
+import { budgetProvenance } from '@trainingai/shared/nutrition/calorie-balance'
 import { ensureEnergyBalanceProfile, enableHomeCards, settleRouteBoundary } from './fixtures'
 
 /**
@@ -42,7 +43,24 @@ async function balanceFromRoute(page: Page) {
   expect(res.ok()).toBeTruthy()
   const b = (await res.json()).balance
   expect(b, 'the seeded profile must produce a balance').toBeTruthy()
-  const budget = Math.round(b.restingBaseKcal + b.targetNetKcal) + Math.round(b.activeKcal)
+  // This used to re-derive the budget as `restingBase + targetNet + earned`, which was a SECOND
+  // implementation of the number the bar's geometry is asserted against. LB-100 removed exactly that
+  // from `one-calorie-budget.spec.ts` and **this sibling was missed** — the sibling-surface sweep, not
+  // done. It then went red the moment BF-152 re-anchored the budget to the measured resting rate: fill
+  // read 44.74% against an expected 41.46%, which is a correct bar measured against a stale formula.
+  //
+  // Asking the shared function means the geometry is pinned to the budget the app actually shows, and
+  // a third re-anchoring costs this file nothing. The property under test never involved *where* the
+  // budget comes from — only that the fill reaches `intake / (budget + OUTER)` and the notch sits at
+  // `budget / (budget + OUTER)`.
+  const budget = budgetProvenance(b).total
+
+  // The discriminator, copied from the sibling for the same reason it exists there: asking the shared
+  // function is only worth something if the fixture can tell the answers apart. If the anchored budget
+  // ever equalled the old expression this file would pass against a reverted `budgetProvenance`.
+  expect(budget, 'fixture must separate the real budget from the pre-anchor expression')
+    .not.toBe(Math.round(b.restingBaseKcal + b.targetNetKcal) + Math.round(b.activeKcal))
+
   return { budget, intake: Math.round(b.intakeKcal) }
 }
 

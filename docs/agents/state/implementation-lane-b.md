@@ -3,7 +3,7 @@
 > **Successor sessions are titled `🚧 Implementation Agent (B) 🟢`** — exactly. A renamed successor
 > is a lost thread.
 
-**Updated:** 2026-09-13 · **By:** the twenty-seventh Lane B run · **Next ID:** `LB-102`
+**Updated:** 2026-09-13 · **By:** the twenty-seventh Lane B run · **Next ID:** `LB-104`
 
 > **A mistyped ID here silently advances the lane's numbering.** Allocate with `grep -rhoE
 > '\bLB-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`, and check the max in the **journal** too — a
@@ -11,29 +11,31 @@
 
 ## Now
 
-**OR-108 SHIPPED** (v1.454.0): photographing a food and scanning a barcode now write the picture, and
-a refine no longer discards it. Everything below the capture screens already carried `imageDataUri` —
-**three callers that rebuild a payload field by field dropped it**, while the one passing the object
-through never had the bug. Q-112e, BF-147, BF-145 shipped; BF-146 closed not built. `check:rules` **74/74**.
+**TN-3b's CHART SHIPPED** (v1.455.0): stress on a 24-hour axis, gaps left blank. **LB-98 ①**
+(v1.454.2) gave the Rest-vs-plan card a server fallback so a device-only render runs in CI.
+**RV-35** closed — already fixed; what it owed was its own test. **BF-153**, **OR-108** shipped.
+`check:rules` **74/74**.
 
 **SEVEN running entries were wrong about something load-bearing** — BF-139's px, BF-141's gate,
 BF-142's **406**, BF-146's cause, BF-145's fix twice, BF-147's (the badge is **25 px**; the four action
-buttons are **204 of 340**), and OR-108's: two missing writers named, **three** real, plus a route
-defect nothing hinted at. **Measure the thing before you fix what the entry blames.**
+buttons are **204 of 340**), and OR-108's: two writers named, **three** real, plus a route defect
+nothing hinted at. BF-153 was the first that checked out whole, and verifying it still cost ten
+minutes well spent. **Measure before you fix what the entry blames.**
 
 **A 4-hourly silent Routine polls this lane** (`trig_01WcuYTidPtngLFZFD7yKnoL`, session-bound,
 `53 */4 * * *`): syncs `main`, clears any open PR, runs `next-item.js`, **says nothing when READY is 0**.
 
 ## Next
 
-1. **Re-run `next-item.js --lane B`. When READY reads 0, READ THE `KEEP` SECTION** — three of the last
-   four items came from there. `Keep:` means "only the stated residue is owed", and the residue is
-   sometimes the whole job (BF-147: 300 lines of UI; Q-112e: a blocker cleared three days earlier). Ask
-   of each whether it is a device check or work. Batch `nutrition-tab-day-and-scroll` was next behind OR-108.
-2. **`LB-101` is filed for Lane A and OR-108's workaround dies with it** — `THUMB_WIRE_BUDGET`, the
-   `tooBigForTheBody` guard and two assertions in `food-image-write-paths.test.ts` exist only because
-   the route caps its body below the image it permits. **READY moves without warning** — re-run
-   `next-item.js` rather than trusting this list.
+1. **READY reads 0 and that is not the same as no work.** KEEP holds it and the console TRUNCATES
+   each Keep — print them whole. **And read PARKED too: TN-3b sat there three days while READY was 0,
+   because its unparking is PROSE and the tool reads fields.** Its remaining halves are the HR overlay
+   and the across-days aggregate, both behind `LB-102`. **BF-51 ① is the trap** — built, deliberately
+   unshipped; reproduce on the S25 first, never loosen `meal-photo-picker.spec.ts`.
+2. **Three Lane A entries gate Lane B work, all found the same way — a surface that cannot finish
+   because data or math sits behind a path nobody filed.** `LB-101` (food-item body cap; kills
+   OR-108's `THUMB_WIRE_BUDGET` workaround), `LB-102` (past-day stress read; TN-3b's rest),
+   `LB-103` (push:pull taxonomy; Q-305's half).
 
 ## Blocked
 
@@ -42,17 +44,16 @@ defect nothing hinted at. **Measure the thing before you fix what the entry blam
 - **Owner:** the macro/budget anchor (BF-134's residue, TN-29 protects the stored 1,660); LB-61's
   switch colour; whether the PWA lands on Home rather than Workout (PS-35).
 - **⚠ BF-84 reads startable and is not** — BF-94 supersedes it and is `Gate: device`.
+- **PS-4 is UNCLASSIFIED by design; LB-94 the owner deferred 2026-09-09.** Do not classify either.
 - **⚠ `actions_list` is STALE for RUN EXISTENCE, filtered OR not** — `total_count` showed no run for
   ~6 min after one existed and I told the owner CI was broken. **`get_check_runs` on the PR is the read; 0 means WAIT, never escalate.**
-- **⚠ When `main` lands a PR every ~5 min, a 26-minute E2E never finishes on a current base** (BF-142 took six pushes). Merge on the required five once E2E passed on that exact app code; expect `main` to take your version — rebuild `changelog.ts` from `origin/main`, never splice.
+- **⚠ When `main` lands a PR every ~5 min, a 26-min E2E never finishes on a current base** (BF-142: six pushes). Merge on the required five once E2E passed on that exact app code. Rebuild `package.json`/`changelog.ts` from `origin/main` and re-bump; **recompute a `.size` conflict from the merged file** — neither side describes it.
 - **⚠ Q-254 is device-free Lane B work parked behind `Needs: Q-297`, itself `Gate: owner`**; its premise is stale too (says one spec exists, there are **84**). With the owner since 2026-09-11. Do not unpark.
-- **PS-4 is UNCLASSIFIED by design; LB-94 the owner deferred 2026-09-09.** Do not classify either.
 
 ## Claimed paths
 
 None held. **Two abandoned Lane B PRs are open whose work is already on `main`** — #265
-(Q-323/Q-415/Q-417) and #608 (LB-19): all four entries are out of the queue and the code is in the tree
-under other filenames. Closing a PR needs the owner.
+(Q-323/Q-415/Q-417) and #608 (LB-19): all four entries are out of the queue, the code is in the tree under other filenames, and closing a PR needs the owner.
 
 ## Do not re-litigate
 
@@ -67,15 +68,14 @@ under other filenames. Closing a PR needs the owner.
 ## The lessons that cost real time
 
 1. **An entry's numbers, gate and CAUSE are prose until something checks them** — seven in a row were
-   wrong (see Now). The tell was always a test: BF-146's spec passed with the fix reverted, BF-145's
-   screenshot showed no change, OR-108's first honest end-to-end run **413'd** — which is how the
-   route's body cap was found. **Write the failing check before the fix.**
+   wrong. The tell was always a test: BF-146's spec passed with the fix reverted, OR-108's first honest
+   run **413'd**. **RV-35 shows re-verifying cuts BOTH ways** — its fix was already in the tree, but
+   deleting it as stale would have dropped the test it owed. **Write the failing check before the fix
+   — and read the Gotchas below first; this file already held the fix for one run's longest detour.**
 2. **A mutation that does NOT fail is a finding.** BF-141's `stopPropagation` guards a lossy round-trip (61.0 kg → 61.25) the spec cannot show — the seeded workout round-trips exactly. The test was renamed to what it proves.
-3. **This file already held the fix for a run's longest detour** (`scrollIntoViewIfNeeded`), rediscovered from scratch. **Read the Gotchas first.**
-4. **A card reporting "no data" is not evidence that no data reached it** — LB-99's cause was one
-   label, not the `getLocalStore` fall-through. A shadowing claim is about ONE function's branch order: PS-35b's two "unreachable" palette keys cited *different* functions, both live.
-5. **Never run `pnpm build` and `npx vitest run` against the one local Postgres at once** — a "failure" that will not reproduce serially is contention, not a defect.
-6. **A stored "state as of" line ages into a wrong answer** — Dependabot read *"2 high"*; `pnpm audit` read **36, 23 high, 2 critical**.
+3. **A card reporting "no data" is not evidence none reached it** — LB-99's cause was one label, not the `getLocalStore` fall-through; and a shadowing claim is about ONE function's branch order (PS-35b's two "unreachable" palette keys cited *different* functions, both live).
+4. **Never run `pnpm build` and `npx vitest run` against the one local Postgres at once** — a "failure" that will not reproduce serially is contention, not a defect.
+5. **A stored "state as of" line ages into a wrong answer** — Dependabot read *"2 high"*; `pnpm audit` read **36, 23 high, 2 critical**.
 
 ## Gotchas worth carrying
 

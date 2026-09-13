@@ -6,6 +6,34 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.455.0",
+    date: "2026-09-13",
+    changes: [
+      "Body Battery now shows when today ran stressed, on a clock. Open the card and under the daytime-stress strip there is a 24-hour chart: the hours you were stressed sit high, overnight is shaded because it runs positive for everyone, and hours the ring did not record are left blank rather than joined up \u2014 on an average day it records about 13 of 24, so the blanks are most of it. It says how many hours were measured, and it makes no judgement about the day. Past days are not reachable yet.",
+    ],
+  },
+  {
+    version: "1.454.3",
+    date: "2026-09-13",
+    changes: [
+      "Your calorie budget now starts at your own resting burn rather than the calorie target you typed in. It is your measured RMR re-scaled onto today's fat-free mass \u2014 1,342 kcal, against the 1,325 the test recorded \u2014 and it moves on its own as your weight does, which a typed number cannot. Walking and training add to it through the day exactly as before. Your stored target goes back to being a target: changing it no longer changes what the day's budget counts against. Note that resting burn leaves out the energy spent digesting food and everyday fidgeting, so the number you see before moving is the floor, not a full day.",
+    ],
+  },
+  {
+    version: "1.454.2",
+    date: "2026-09-13",
+    changes: [
+      "The \u201cYour rest vs the plan\u201d table under Rest discipline can now fall back to the server when the phone\u2019s own copy of your set history has nothing to show \u2014 on a fresh install, for instance, before everything has synced down. Where your device does have the history it is still used, unchanged.",
+    ],
+  },
+  {
+    version: "1.454.1",
+    date: "2026-09-13",
+    changes: [
+      "The vial sheet now says which vial each thing belongs to. The date you already saved sits at the top under \u201cThe vial you\u2019re using\u201d, and the form below it is headed \u201cOpen a new vial\u201d \u2014 the two dates on that screen were both correct and there was nothing saying they were different vials. The Dose field is now \u201cTry a dose\u201d under \u201cWork out the units\u201d, and says outright that it is not saved and where your real dose is changed. And the button that opens a second vial says so before you press it.",
+    ],
+  },
+  {
     version: "1.454.0",
     date: "2026-09-13",
     changes: [

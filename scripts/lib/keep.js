@@ -16,6 +16,40 @@
 // The `Gate:` field is read from anywhere on the Keep's lines, not only from a bullet that starts
 // with it: entries write `` … the sheet's action row carries Remove. `Gate: device`. `` inline, and
 // the leading-bullet form matched 20 of the 27 `Gate:` mentions in the file.
+//
+// **LA-103. Reading it from ANYWHERE meant a sentence ABOUT a gate was read as one.** BF-46's Keep
+// said *"**The `Gate: device` above was deliberately withheld while they were unbuilt**"* — a
+// sentence denying a gate — and it was parsed as asserting one. That was masked for weeks by
+// `next-item.js` skipping a Keep's gate when the entry also carried `Verify:` for the same value;
+// the owner's 2026-09-13 sign-off removed the `Verify:`, un-masked the phantom, put a VERIFIED entry
+// back into PARKED and turned `main` red. The repo's own recurring class: guards find their own
+// documentation.
+//
+// **The fix is `GATE_IS_SET_OFF`, and it is what the measurement supports rather than what the
+// entry guessed.** LA-103 hypothesised "a mention preceded by a word character is prose" from that
+// single case. Measured across all 164 Keep blocks, 18 yield a gate — and **LB-53 refutes it**:
+// *"running it is a **`Gate: owner`** action"* is preceded by the word "a" and is a real gate. What
+// separates them is that a field is SET OFF from the prose — it opens a clause (17 of the 18 follow
+// a full stop) or it is bolded (LB-53 and BF-80) — while a mention inside a sentence is not.
+//
+// Anchoring to a bullet start instead, the obvious fix, would have dropped all 18 and silently
+// un-parked genuinely blocked work, which is worse than the bug.
+
+/**
+ * A `Gate:` that is SET OFF from the prose rather than mentioned inside a sentence — see the note
+ * above. Everything before the token, after an optional backtick, decides it: bold (`**`), a clause
+ * boundary, or nothing at all means a field; a word character means the sentence is talking ABOUT a
+ * gate. Returns the matched value, or null when every mention in the text is prose.
+ */
+function matchSetOffGate(text) {
+  const re = /(.{0,4}?)`?\*{0,2}Gate:\s*`?\*{0,2}(owner|device)/gi;
+  for (let m = re.exec(text); m; m = re.exec(text)) {
+    // What sits immediately before the token, with a backtick of its own stripped off.
+    const before = text.slice(0, m.index + m[1].length).replace(/`$/, '').trimEnd();
+    if (before === '' || /(\*\*|[.;:—–-])$/.test(before)) return m[2].toLowerCase();
+  }
+  return null;
+}
 
 /** The Keep residue for one entry's lines, or null if it states none. */
 function keepFromLines(lines) {
@@ -44,10 +78,17 @@ function keepFromLines(lines) {
       block.push(lines[j]);
       text += ' ' + lines[j].trim();
     }
-    const gate = block.join(' ').match(/Gate:\s*`?\*{0,2}(owner|device)/i);
+    // Per LINE, not on the joined block: a bare `Gate: device` opening a continuation line is set off
+    // by the line break itself, and joining with a space would hide that behind the previous
+    // sentence's last word.
+    let gate = null;
+    for (const line of block) {
+      gate = matchSetOffGate(line);
+      if (gate) break;
+    }
     return {
       text: text.replace(/\s+/g, ' ').replace(/\*\*/g, '').trim(),
-      gate: gate ? gate[1].toLowerCase() : null,
+      gate,
     };
   }
   return null;

@@ -421,152 +421,119 @@ below threshold and left in place for next time.
 
 
 
-### [nutrition] BF-153 — the vial sheet reads as a settings screen, and two of its fields are not settings
+### [nutrition] BF-154 — the budget's own explanation prints three numbers that do not add up to it
 
-- **Lane:** B — `components/nutrition/reta/vial-sheet.tsx` only. No API change: the route already
-  stores what it should, and `VialOpenedNote` already edits the saved date in place.
-- **Added:** 2026-09-13 (BugFix intake). The owner, looking at the sheet: *"Can you explain how this
-  works? Where am I meant to update the dose?"* He had the screen open with the right numbers on it
-  and could not tell which of them the app would keep.
-- **`Dose (mg)` looks like the dose and is a calculator input that is never saved.** `save()` posts
-  `{ ...draft, openedOn }` where `draft` is `strengthMg` / `waterMl` / `syringeUnitsPerMl`.
-  **`doseMg` is not in the body.** It is seeded from the supplement definition's `defaultAmount`,
-  drives the mg → units arithmetic, and is discarded on close. The real dose lives on the definition
-  and is edited in `manage-supplements-sheet.tsx` under **Amount** — a different sheet, reached a
-  different way, with a different word for the same quantity.
-- **Two dates are shown with nothing saying they belong to different objects.** The `Opened on` INPUT
-  defaults to **today** because the form creates a NEW vial (BF-136 made that deliberate and it must
-  stay). The `VialOpenedNote` below it reads `current.openedOn` — the vial he ALREADY has. On his
-  screen those read **13/09/2026** and **10 Sept** at the same moment, both correct, five lines apart.
-  BF-136's own docstring says the two are *"Separate … on purpose"*; the purpose is never stated on
-  screen.
-- **What this costs, and why it is not cosmetic.** The footer button says *Save as a new vial*, and a
-  stray press restarts the weight-response window — which BF-136 established can only be corrected in
-  place, because `listSupplementVials` orders by `openedOn DESC` and the sheet reads `vials[0]`, so an
-  earlier-dated vial sorts BELOW the wrong one. A screen that invites a press to "save my dose" sits
-  directly on top of that.
-- **Recommended shape, and it is presentational throughout.** Head the create-form *"Open a new
-  vial"* rather than *"This vial"*; move the current vial's line (`VialOpenedNote`) above it under a
-  heading that names it as the one in use; and label the Dose field for what it does — *"Work out the
-  units"* or equivalent — with the definition's saved amount stated beside it and a link to where it
-  is changed. **Do not make the Dose field write the definition.** That reverses BF-112's separation
-  of the definition from the day's log, and it would let a units calculation silently re-set every
-  future prompt.
-- **Related, not this entry:** the owner's `Retatrutide` definition holds `default_amount 0.5 mg` AND
-  free-text `dose '10mg'` (the vial strength in a field labelled Dose). `hasFreeTextBesideAmount`
-  (`components/nutrition/definition-dose.ts`) already surfaces that pair in the manage list; nothing
-  here changes it.
-- **Verification:** on device, open the sheet with a saved vial present and confirm the two dates can
-  be told apart without reading code, and that the Dose field no longer reads as a saved setting. The
-  destructive case to try deliberately: press the footer button with no new vial opened, and confirm
-  the screen said clearly that it would create one.
+- **Lane:** A — `components/nutrition/energy-card.tsx:195-201` is the print site, but the value it
+  needs is `budgetProvenance`'s (`packages/shared/src/nutrition/calorie-balance.ts`) and
+  `components/nutrition/macro-budget-gap.ts`'s docstring states the retired formula as fact.
+- **Added:** 2026-09-13 (BugFix intake), from the owner's screenshot of the Nutrition tab the evening
+  BF-152 deployed: *"There is so many numbers here. I thought the base would be above 1350?"*
+- **On screen, verbatim: *"Today's budget is 1,294 — 2,278 resting burn, −200 for your goal, +0
+  moved."*** `2,278 − 200 + 0 = 2,078`. The sentence names **1,294** and then breaks it into terms
+  summing to **2,078**, a 784 kcal contradiction inside one sentence.
+- **The cause is a breakdown of the retired expression printed beside the new number.** BF-152 made
+  the budget `restingRate + earned`. The card still renders `restingBaseKcal`, `targetNetKcal` and
+  `activeKcal` — the addends of `restingBase + goalDelta + earned` — against a `goal` that no longer
+  comes from them. **This is precisely the defect BF-99 exists for, and BF-150's own journal entry
+  names it** — *"printing base − goal there would name two numbers that are not addends of what is on
+  screen — BF-99's defect wearing the opposite hat."* The guard BF-150 narrowed bans destructuring
+  `base` from `budgetProvenance`; it does not reach a call site that never asks `budgetProvenance`
+  anything and reads the balance fields directly.
+- **Worse than an arithmetic slip: the 2,278 is the number BF-152 was escaping.** On the calibrated
+  path `restingBaseKcal` is `maintenance − avgActive`, carrying the estimator inflation BF-137 is
+  about. So the card prints **2,278 labelled "resting burn"** ten lines above **1,294 labelled
+  "resting rate"** — two figures 984 kcal apart, both named resting, one of them the value the app
+  has stopped using.
+- **A second consequence, and it is not cosmetic.** The macro grams still key off the stored 1,660
+  goal while the budget is now 1,294, so the printed gap has gone from ~295 to **365** and no longer
+  closes. BF-150's journal recorded that the grams and the budget *"already share a denominator"*
+  (150p/141c/55f = 1,659 against a stored 1,660); BF-152 separated them and nothing re-derived the
+  grams. Whether the grams should follow the resting rate or stay on the stored goal is a decision —
+  `macro-budget-gap.ts` says outright that choosing the anchor is not its business — but they cannot
+  stay silently 365 apart while a paragraph explains the gap using a formula that is no longer run.
+- **Fix shape:** print the breakdown FROM `budgetProvenance` — it already returns `{ base, earned,
+  total, anchoredToRestingRate }`, so the sentence can name the two addends it actually used and say
+  *resting rate* for the base on the anchored path. Extend the source guard to the fields, not only
+  the destructure: what made this reachable is that a call site can print `restingBaseKcal` beside a
+  budget without touching `budgetProvenance` at all.
+- **Not a defect, and the entry should stop it being refiled as one: the base is correct at 1,294.**
+  The owner expected ">1350" from the 1,342 quoted in BF-152, which was computed from the scale's raw
+  25.5% body fat. The app uses the DEXA-corrected figure (BF-2) — ~28.7%, so FFM 50.1 kg rather than
+  52.3 — and `cunninghamBmr(50.1) − 157` is 1,294. The measurement, the residual and the correction
+  are all behaving; only the quoted expectation was built on the uncorrected input.
+- **Verification:** on device, with and without movement recorded, the budget and the terms beside it
+  must add up, and no number labelled *resting* may appear twice with different values.
+  `base-label-reconciles.test.ts` is the existing guard on that label and did not catch this.
 
-### [platform] LA-103 — a sentence saying a gate was withheld IS a gate, and it parked verified work
-- **Lane:** A — `scripts/lib/keep.js:47`, and the park ordering it feeds in `scripts/next-item.js:145`.
+### [nutrition] LA-102 — the budget starts at the resting rate and says nothing about what it leaves out
+- **Lane:** B — surface only: `components/nutrition/calorie-zone-bar.tsx`, and the ⓘ copy on
+  `components/nutrition/energy-card.tsx` / `components/nutrition/calorie-balance-bar.tsx`.
 
-- **Branch:** _unassigned_ · **Added:** 2026-09-13 · found fixing red `main` after #1136.
-- **Measured, not theorised.** `keep.js` reads a `Gate:` from **anywhere** in a `Keep:` block —
-  deliberately, because 7 of 27 mentions in the file are written inline mid-sentence and the
-  bullet-anchored form would miss them. BF-46's Keep contained the sentence *"**The `Gate: device`
-  above was deliberately withheld while they were unbuilt**"*, which is a sentence denying a gate and
-  was parsed as asserting one.
-- **It was invisible for weeks because a second bug was cancelling it.** `next-item.js:145` skips a
-  Keep's gate when the entry carries `Verify:` for the same value, and BF-46 did. The owner's
-  2026-09-13 nutrition pass verified BF-46 on the S25, which correctly removes the `Verify:` — and
-  that un-cancelled the phantom gate, so a verified entry went back to PARKED and
-  `backlog-verify-field.test.ts` went red on `main` and on every branch cut from it.
-- **Patched at the entry, not the parser, and that is why this exists.** The red was cleared by
-  rewording BF-46's sentence so it no longer names the field. **The parser still reads a quoted or
-  negated mention as a field**, so the next entry that explains its own gate re-creates this.
-- **Do NOT simply anchor the regex to a bullet start** — that loses the 7 legitimate inline mentions
-  and silently un-parks genuinely blocked work, which is worse than the bug. Measure the population
-  first: `grep -nE 'Gate:' docs/implementation-backlog.md` and classify every hit as field, inline
-  field, or prose *about* a field. The discriminator that looks right from the one case is a mention
-  preceded by a word character (*"The `Gate: device` above"*) versus one opening a clause — but one
-  case is not a population, and this entry must not be built on it.
-- **This is the repo's own recurring class**, which is the argument for fixing the parser rather than
-  the entry: *"guards find their own documentation"* is in CLAUDE.md and in Lane A's baton, and it has
-  now cost red `main` once. Every fix so far has been to strip comments before scanning; a Keep block
-  has no comment syntax to strip, so this one needs a different answer.
-- **Pass test:** a fixture entry whose Keep *discusses* a gate is not parked; a fixture whose Keep
-  *states* one inline still is; and the real queue's PARKED/VERIFY/KEEP split is unchanged for all 17
-  entries `backlog-verify-field.test.ts` covers.
-- **Reversal cost:** low, and the test above is the safety net — it reads the real file.
+- **Branch:** _unassigned_ · **Added:** 2026-09-13 · found shipping BF-152.
+- **Reference:** [`the BF-152 journal entry`](overview/entries/2026-09-13-lane-a-bf152-resting-rate-anchored-budget.md).
+- **The engine half is done and this is the half it deliberately left.** BF-152 made the
+  zero-movement budget the user's resting rate, and the line under the bar now reads
+  `1,815 resting rate — no movement recorded yet today` (verified on Home and the Nutrition tab,
+  2026-09-13). What it does not say is what a resting rate excludes.
+- **Two things are genuinely missing from that number**, and the owner named the first himself:
+  *"1350 doesnt count some basic metabolic needs".* He is right — RMR excludes the **thermic effect
+  of food** (~10% of intake, ~140 kcal at his volume) and **non-step NEAT**: standing, fidgeting,
+  housework.
+- **BF-152 chose not to model either, and that decision is the thing to explain rather than
+  revisit.** `bmr × 1.2` is 1,611 on his figures — his own *"move to 1600"* — but a multiplier
+  **asserts** the overhead happened while the step credit **observes** it, and modelling
+  intake-linked TEF as an earned credit makes the budget grow as he eats, a feedback loop the card
+  then has to explain for a number inside food-logging error.
+- **So the ask is copy, not arithmetic:** the ⓘ panel says the base is resting burn only, that
+  eating and everyday fidgeting add some on top, and that movement is credited as it is measured.
+  One or two sentences. Do not add a multiplier to make the sentence unnecessary.
+- **Pass test:** the ⓘ copy names the thermic effect of food and non-step movement as excluded from
+  the base, and nothing on the screen implies the base is a full day's burn.
+- **Reversal cost:** none. It is copy.
 
-### [nutrition] LB-101 — `/api/nutrition/food-items` refuses a body smaller than the image it permits
+### [nutrition] LA-105 — the capture workaround for LB-101 is now dead weight
+- **Lane:** B — `components/nutrition/capture-actions.tsx`, and two assertions in
+  `components/nutrition/__tests__/food-image-write-paths.test.ts`.
 
-- **Lane:** A — `app/api/nutrition/food-items/route.ts`, one constant. **Added:** 2026-09-13 by
-  Implementation Lane B, measured while building OR-108. **Branch:** unassigned.
-- **The route caps its whole body at 8 KB and its image field at 16 KB.** `MAX_BODY_BYTES = 8 * 1024`
-  carries the comment *"One food item: a name, a brand and a dozen macro numbers"* — written before
-  BF-35 gave the route `imageDataUri`. Base64 costs a third more than the bytes it carries, so an image
-  at its own permitted cap is **~21.3 KB on the wire** and the request is refused with a **413 before
-  `rejectMealImage` ever runs**. The user does not lose the picture; they lose the food.
-- **Measured 2026-09-13** in Playwright, driving the real capture flow: a 128 px WebP of a detailed
-  600 × 400 source at q0.8 came back **6,612 bytes = 8,816 base64 characters** and the save 413'd; a
-  smooth photo-like source came back 1,410 and fits. It bites detailed photos, not every photo.
-- **The fix is one line:** derive the body cap from `FOOD_ITEM_IMAGE_MAX_BYTES` (`Math.ceil(x * 4 / 3)
-  + 4 * 1024`) rather than restating a number, so the two cannot drift again. Check the offline push
-  branch's own limit for the same mismatch too.
-- **A workaround is live and goes with this.** `capture-actions.tsx` carries `THUMB_WIRE_BUDGET =
-  7 * 1024` and re-encodes down a quality ladder to fit it; that constant, the `tooBigForTheBody`
-  guard beside it and two assertions in `components/nutrition/__tests__/food-image-write-paths.test.ts`
-  exist only because of this. Removing them is Lane B's follow-up — leave them until the cap moves.
-- **Reversal cost:** low — one constant, and a route that takes a larger body than it did.
+- **Branch:** _unassigned_ · **Added:** 2026-09-13 · found shipping LB-101, which this depends on.
+- **LB-101 SHIPPED 2026-09-13**: `/api/nutrition/food-items` derives its body cap from
+  `FOOD_ITEM_IMAGE_MAX_BYTES` instead of restating 8 KB, so an image at its own permitted size no
+  longer 413s. **The client-side workaround that existed only because of that is now redundant.**
+- **What to remove:** `THUMB_WIRE_BUDGET = 7 * 1024` and the quality-ladder re-encode that walks down
+  to fit it, the `tooBigForTheBody` guard beside it, and the two assertions that pin them. LB-101's
+  own entry named these and said to leave them until the cap moved. It has moved.
+- **Do NOT remove the downscale itself** — only the budget the ladder targets. Shrinking a capture
+  before upload is right regardless; what is dead is re-encoding down to **7 KB** to sneak under a cap
+  that was 8,192 bytes and is now 25,942.
+- **Verify by measurement, not by reading:** the case LB-101 measured was a 128 px WebP of a detailed
+  600 × 400 source at q0.8 coming back **6,612 bytes**. After removing the ladder that capture should
+  save at its natural quality rather than at whatever rung fitted 7 KB.
+- **Reversal cost:** low, and the route-side cap stands on its own either way.
 
-### [nutrition] BF-152 — anchor the budget to the measured resting rate, not to a typed-in goal
+### [readiness] LA-104 — today's stress chart and a past day's come from two different baselines
+- **Lane:** B — `components/body-battery/stress-day-chart.tsx` and whatever feeds it on the day screen.
+  The engine half is done; this is which source the surface reads.
 
-- **Lane:** A — `packages/shared/src/nutrition/calorie-balance.ts` (`budgetProvenance`),
-  `lib/health/energy-balance-service.ts`. Read
-  [`docs/overview/entries/2026-09-12-lane-a-bf150-goal-anchored-budget.md`](overview/entries/2026-09-12-lane-a-bf150-goal-anchored-budget.md)
-  first — this changes one line of what shipped there and keeps the rest.
-- **Added:** 2026-09-13 (BugFix intake), from the owner's own spec: *"Rmr+body metabolism as base —
-  Calories burned per day based on HR/exercise … It should start at 1350 - and as I walk/workout -
-  move throughout the day to 1600."*
-- **BF-150 made the budget anchor to a stored NUMBER; the owner wants it to anchor to a RULE.** That
-  is the whole change. `budgetProvenance` currently takes `goalKcal` — the figure in
-  `nutrition_targets.calories`, **1,660** for the owner — as the zero-movement base. A typed-in
-  number cannot track a body that is changing, and his is: 72.1 kg at the RMR test on 2026-08-27,
-  **70.2 kg** on 2026-09-13.
-- **The number he asked for is already computed, one scope away.** `energy-balance-service.ts` derives
-  `bmr` as `personalRmr(measured, todaysFfm)` — the clinical measurement with its Cunningham residual
-  re-scaled onto today's fat-free mass (BF-42). Measured 2026-09-13:
-
-  | | value |
-  |---|---|
-  | measured RMR (2026-08-27, 51.5 kg FFM) | 1,325 |
-  | Cunningham residual | −157 |
-  | FFM today (70.2 kg at 25.5% corrected) | 52.3 kg |
-  | **re-scaled RMR today** | **1,342** |
-
-  His *"start at 1350"* is his own measured resting rate to within 8 kcal, and it moves on its own as
-  he loses weight. `restingBaseKcal` is **not** the value to use — on the calibrated path it is
-  `maintenance − avgActive`, and that maintenance is the estimator BF-137 is about, currently ~600
-  kcal high.
-- **The earned half needs no work at all.** Steps have counted from the first one since BF-88, and
-  `computeActiveEnergy` already sums workouts + activities + steps. On the owner's yesterday (2,923
-  steps, one strength session) that is roughly 100 + ~200 kcal, which puts the day near 1,650 —
-  *"move throughout the day to 1600"*, reached by the mechanism that is already live.
-- **The owner named the real gap himself: *"1350 doesnt count some basic metabolic needs".*** He is
-  right. RMR excludes the thermic effect of food (~10% of intake, ~140 kcal at his volume) and
-  non-step NEAT — standing, fidgeting, housework. Note that `bmr × 1.2`, the classic sedentary
-  multiplier, is **1,611** on today's figures: his *"1600"* is RMR plus exactly the overhead he is
-  describing. **Recommended treatment: credit it through movement rather than through a multiplier**
-  — the multiplier asserts the overhead happened, the step credit observes it — and name the residual
-  in the ⓘ copy instead of modelling it. Modelling TEF as an earned credit makes the budget grow as
-  he eats, a feedback loop the card then has to explain, for a number inside food-logging error.
-  **This is the one line the owner can overrule**, and the entry is buildable either way.
-- **Three Tuning entries move with this, and only one of them the way it looks.** TN-27 and TN-29 were downgraded to *informational* when PR #1128 stopped the budget following the maintenance estimate — **BF-152 does not change that**, because the base becomes the measured resting rate and the estimator still takes no part. **TN-28 is the one that reverses**: its 2026-09-13 amendment reads *"the stored target … is now the thing everything else follows"*, which this entry undoes. Amend it rather than discovering it.
-- **What BF-150 keeps.** One budget expression read by all three surfaces; the goal delta still not
-  applied on top; `deviationKcal` still measured against the budget rather than re-derived. The
-  stored target stops being the base and goes back to being what it is — a target.
-- **Fallback order when there is no measurement:** re-scaled measured RMR → predicted BMR → the
-  existing `restingBaseKcal + targetNetKcal`. A user with no RMR test must not land on a worse number
-  than they have today.
-- **Verification:** the owner's own account across a day — the budget should read ~1,342 with no
-  movement and climb as steps and a session land, on Home's nutrition card, Home's energy-balance
-  card and the Nutrition tab, all showing the same figure. `one-calorie-budget.spec.ts` is the
-  existing guard that the three agree.
+- **Branch:** _unassigned_ · **Added:** 2026-09-13 · found shipping LB-102's read path.
+- **Reference:** [`the LB-102 journal entry`](overview/entries/2026-09-13-lb102-stress-day-read-path.md).
+- **The two series are not the same number and TN-3a says so out loud.** `lib/oura-ble/rollup/run.ts`
+  builds the persisted buckets from `latest.rhrLowBpm` + `nightHrvMs`; `/api/body-battery` builds its
+  live series from `restingHr` + a 28-day HRV mean. Its own comment: *"persisting both would put two
+  numbers behind one metric"* — which is why only the rollup's are stored.
+- **So a chart that reads TODAY live and a PAST day from storage is showing two metrics on one axis**,
+  and the owner's approved pass test is precisely a comparison across days: *"open a past day, read a
+  stressed window off the axis, and say whether it matches what you were doing."* Two baselines make
+  today and yesterday incomparable in exactly the dimension the test asks about.
+- **`GET /api/body-battery/stress-day?date=` already serves EVERY day from storage, today included**,
+  for this reason. The decision left open is whether TN-3b's chart should read today from it too.
+- **The cost of switching, stated so it is not discovered later:** today's stored series ends at the
+  last rollup rather than at this minute. The route returns `throughMs` so the surface can say where
+  the day's data stops instead of implying the day stopped.
+- **Do NOT answer this by persisting the live series as well.** That is the thing TN-3a rejected, and
+  re-adding it would put the second number back behind the metric.
+- **Pass test:** opening today and opening yesterday show series built the same way, and the chart
+  says where today's data currently reaches.
+- **Reversal cost:** low — one fetch swapped on one surface.
 
 ### [app-shell] BF-139 — three header chips no longer fit beside the date (fixed; the device look is what is left)
 
@@ -1345,11 +1312,15 @@ the rest of that day; and `perceived_recovery` carries at least three distinct v
   sets carrying both are emitted; a prescription of `0` is dropped ("none planned", not a target)
   while a rest **taken** of `0` is kept (a real measurement — discarding it biases the mean upward).
   Five mutants, all caught, including one that swaps the logged snapshot for the live style.
-- **Keep: TWO things, and neither is the route.**
-  1. **The card's fallback wiring is Lane B's** — `components/health/rest-prescription-card.tsx`
-     still returns `null` when `getLocalStore` is null. The read now exists; nothing consumes it yet,
-     so the verification gap is not closed until that lands.
-  2. **The `body_metadata` half is LB-96**, still parked on `Needs: OR-102b`.
+- **✅ THE CARD'S FALLBACK SHIPPED 2026-09-13** (`fix/lb98-rest-card-server-fallback`).
+  `rest-prescription-card.tsx` takes `serverSets` and prefers the local store, falling back only when
+  it is absent or holds nothing summarisable — a swap into the same `restByPrescription`, not a second
+  aggregate. `restSets` rides on the response `trends-section.tsx` already fetched, so it costs no
+  request and no cache key. `e2e/rest-vs-plan-card.spec.ts` is the first run of that rendering path
+  anywhere but the S25; mutation-proven, and it stubs the response deliberately because the parent
+  gates everything behind the CORRELATION's `hasSufficientData` — a condition about the bars, not the
+  card. [Journal](overview/entries/2026-09-13-lb98-rest-card-server-fallback.md).
+- **Keep: the `body_metadata` half, which is LB-96**, still parked on `Needs: OR-102b`.
 - **Measured in production while building this, and worth keeping:** of 1,189 set logs, **462** carry
   `planned_rest_sec` and **838** carry `rest_time_sec`; **442** carry both, all inside the route's
   90-day window (841 sets). So the column started being written recently and covers ~53% of the
@@ -1889,7 +1860,7 @@ this card offers to overwrite with 2,045.
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · found while answering TN-27.
 - **Lane: B** — `components/nutrition/tdee-adaptation-card.tsx:118-124`.
 - **⚠ Amended 2026-09-13:** PR #1128 made the budget follow the owner's **stored goal**, so this card's one-tap write no longer redirects the whole day's eating — it changes the stored target, which is now the thing everything else follows. **That makes the write MORE consequential, not less**, so the missing confidence qualifier still matters.
-- **⚠ Amended again the same day, and it reverses the line above: BF-152 takes the stored target back OUT of the budget.** The owner's spec is *"Rmr+body metabolism as base"* — a rule, not a number — so the base becomes his re-scaled measured resting rate and the stored target goes back to being a target. **The escalation this entry recorded lasted one day.** Whether the one-tap write is consequential is now the question BF-152 settles, so read that entry before acting on this reasoning; the missing confidence qualifier stands on its own merits either way.
+- **⚠ Amended again the same day, and it reverses the line above: BF-152 took the stored target back OUT of the budget, and SHIPPED 2026-09-13.** The owner's spec is *"Rmr+body metabolism as base"* — a rule, not a number — so the base is his re-scaled measured resting rate and the stored target is a target again. **The escalation this entry recorded lasted one day.** So the one-tap write is back to changing a target rather than the whole day's eating; the missing confidence qualifier stands on its own merits either way. Read [`the journal entry`](overview/entries/2026-09-13-lane-a-bf152-resting-rate-anchored-budget.md) before acting on this reasoning — the BF-152 queue entry is gone, as a shipped entry should be.
 - **Sibling of TN-27** — TN-27 makes the number better; this makes its uncertainty visible. Fix either order.
 - **Reference:** [`review`](reviews/2026-09-09-maintenance-2245-is-too-high.md) §5.
 
@@ -3794,45 +3765,6 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
   both; if this is guarded, guard it that way.
 - **Verify:** device — the ring card's real state is BLE, which the web build cannot reach at all, so
   a web-green paint says nothing about what the APK shows here.
-
-### [nutrition][app-shell] RV-35 — Nutrition never asks what day it is on resume, so it files breakfast against yesterday
-
-- **⚠ OWNER DIRECTED 2026-09-13: stop trying to verify this by hand.** Verbatim: *"This is a hard one
-  to check; lets just make the best guess and file it as a non issue till its reproduced — ideally
-  you can be confident in your fix."* The check needed the app left open across midnight, which is
-  not something to ask for repeatedly. **So this is no longer `Verify: device`** — it ships on the
-  strength of the code and a test, and returns only if the symptom is seen in the wild.
-  **What that buys is an obligation:** a fix landing without a device check needs a test that fails
-  before it and passes after, because nothing else will catch a regression here.
-
-
-- **Lane:** B — `app/nutrition/nutrition-content.tsx` only.
-- **Batch:** nutrition-tab-day-and-scroll
-- **Added:** 2026-09-03, Review sweep 41 —
-  [`write-up §2`](reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md)
-- **Measured, not inferred.** Five tabs loaded at 23:50 Brisbane under a fixed clock, clock advanced
-  30 minutes, `visibilitychange` dispatched. Dated requests before → after:
-  Home 4 → **2**, Health 3 → **3**, Nutrition **5 → 0**, Workout and More issue none either side.
-  Nutrition is the only tab that is day-scoped *and* fails to roll over.
-- **The part that is not cosmetic.** The header reads `Today` because
-  `formatDateLabel(selectedDate, todayStr)` prints it only when the two agree — and both are frozen at
-  the launch day, so there is no visible tell. `selectedDate` is also what a new log is written with
-  (`logDate` at `nutrition-content.tsx:716`, `selectedDateRef.current` on the delete path), so a
-  breakfast logged after midnight lands on the finished day and feeds its calorie budget and adherence.
-- **The existing guard is correct and unreachable.** `nutrition-content.tsx:311–326` already compares
-  `lastVisibleDayRef` against a fresh `todayInTz(tz)` and follows the day. Its deps are
-  `[tabEpoch, fetchData, tz]`, and the shell increments `tabEpoch` only when a tab is **re-shown** —
-  never on a resume-in-place. Switching tabs away and back does fix it, so this reads as intermittent.
-- **The fix is the hook that already exists.** `useLocalDay()` (`components/shell/local-day-provider.tsx`,
-  BF-86) re-evaluates on `visibilitychange` and is what `session-select-content.tsx` uses — the surface
-  that measured correct above. Add it to the dependency array; do not hand-roll a second listener, and
-  do not reach for an interval (BF-86's comment records why).
-- **Do not "fix" this by reloading on `visibilitychange`** — BF-80 rules that out; it costs the
-  instant-paint behaviour.
-- **How to test locally:** the clock recipe in §7 of the write-up — `page.clock.install` at 23:50
-  Brisbane, `fastForward`, dispatch `visibilitychange` — asserting a request dated the *new* day. The
-  mechanism is fully web-testable, so no `Gate:` is set.
-  breakfast; confirm the header follows the date and the log lands on the new day.
 
 ### [app-shell][nutrition] RV-36 — scroll restoration reaches 3 of 5 tabs; BF-100's entry says it reaches all of them
 
@@ -7534,7 +7466,8 @@ that handler defers, the way it already defers to a carousel.
   `Gate:` from anywhere in a Keep block — so a sentence saying the gate was withheld WAS the gate.
   It only showed once the owner's 2026-09-13 sign-off removed the `Verify:` that had been cancelling
   it, and it turned a verified entry back into a parked one on every branch. The parser half is filed
-  as LA-103.)* On the S25, per ① (b)'s own note: pick a photo in Edit Meal, save, reopen. If it
+  as LA-103, and FIXED there on 2026-09-13 — `keep.js` now requires a gate to be set off from the
+  prose, so this sentence could be written either way today.)* On the S25, per ① (b)'s own note: pick a photo in Edit Meal, save, reopen. If it
   still fails it now fails *loudly*, which is the smaller half of that fix.
 - **Added:** 2026-08-27 · owner, with screenshots. *"overall just a UI rework/uplift. almost there."*
 
@@ -10532,6 +10465,20 @@ record explicitly why not.
 
 ### [readiness] TN-3b — surface stress by hour, and on the HR charts
 - **Lane:** B — surface only: components/body-battery.
+- **✅ THE TODAY CHART SHIPPED 2026-09-13** (`feat/tn-3b-stress-by-hour`).
+  `stress-day-chart.tsx` draws the day on a 24-hour local-time axis inside the Body Battery card,
+  beside the strip rather than replacing it: gaps left blank at a 75-minute threshold, the night band
+  shaded, zero and ±0.5 ruled, coverage stated in hours, and no score or verdict anywhere on it.
+  Geometry is in `stress-day.ts` with 9 node tests (timezone, the measured 06:45 → 13:15 hole, the
+  one-dropped-reading tolerance, coverage excluding gaps); `e2e/stress-by-hour.spec.ts` proves it
+  draws as **two** polylines rather than one joined line.
+  [Journal](overview/entries/2026-09-13-tn-3b-stress-by-hour.md).
+- **Keep: the PAST-DAY half, which is blocked on `LB-102` (Lane A).** The pass test — *"the owner
+  opens a past day, reads a stressed window off the axis"* — cannot be met yet: `/api/body-battery`
+  is `export async function GET()` with **no parameters**, so only today is reachable. The buckets are
+  persisted (TN-3a, `oura_daytime_stress_buckets`, from 2026-08-24), and the chart takes a plain
+  `buckets` array, so the surface work is done — what is missing is the read. Also still owed:
+  overlaying stress on the HR charts, and the **stress-by-hour aggregate across days**.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner request
@@ -13848,9 +13795,13 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   `DEFAULT_LANDMARKS`. It is not — `muscles.ts:17` maps `core: 'abs'` and `volume-targets.ts:58`
   applies `normalizeMuscle` before the lookup. Working correctly. **Now pinned by a unit case** so it
   stays that way.
-- **Keep:** the push:pull half (blocked above, Lane A), the shared-treatment design question, and the
-  S25 check — the band word sits beside the set count on a narrow row and has only been seen in a
-  desktop browser. `Gate: device`
+- **Keep:** the push:pull half's **card section**, which is Lane B's and is now unblocked — the
+  shared grouping it was waiting on **SHIPPED 2026-09-13 as LB-103**: `movementPattern(muscle)` in
+  `packages/shared/src/muscles.ts`, push / pull / legs / other, with the catalogue's whole vocabulary
+  asserted against the database. Read that entry's journal before rendering it; `shoulders` counts as
+  push and `lower back` as neither, both deliberately and both argued there. Also the shared-treatment
+  design question, and the S25 check — the band word sits beside the set count on a narrow row and has
+  only been seen in a desktop browser. `Gate: device`
 
 
 ### [workouts] Q-300 — 37% of sets are taken with materially less rest than prescribed, and the RPE model has no rest term
@@ -13930,9 +13881,13 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   prescribed *at log time*; deriving it from the live style would let a later style edit silently
   rewrite what "prescribed" meant for a past set. The `rest-adherence` trend above it does derive
   from the style, which is right for its own question and would be wrong for this one.
-- **Keep:** the device check, and only that. `planned_rest_sec` is in the local store and no route
-  publishes it, so the card is **absent in a browser** and cannot be verified in CI — see LB-98.
-  Nothing here licenses a rest term in `expectedRpe`.
+- **Keep:** the device check, and only that — **but its stated reason no longer holds, and the check
+  it leaves is narrower.** LB-98 published the logged pairs on `/api/health-trends?view=rest-adherence`
+  and the card now falls back to them, so it is **no longer absent in a browser**:
+  `e2e/rest-vs-plan-card.spec.ts` exercises the rows, the deltas and the compression sentence, all
+  mutation-proven. What the S25 still owes is the LOCAL path — `getLocalStore` reading
+  `planned_rest_sec` from the device's own set logs, which no harness can reach. Nothing here
+  licenses a rest term in `expectedRpe`.
 
 ### [workouts] Q-289 — `expectedRpe` misses by more than the autoregulation dead band at both ends of its own range
 

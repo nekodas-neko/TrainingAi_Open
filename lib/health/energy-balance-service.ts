@@ -30,8 +30,9 @@ export interface EnergyBalanceResult {
     deviationKcal: number
     remainingKcal: number
     projectedWeeklyKg: number
-    /** BF-150. The stored calorie target that anchors the budget; null when none is set. */
-    goalKcal: number | null
+    /** BF-152. The resting rate that anchors the budget — the measured RMR re-scaled onto today's
+     *  fat-free mass when there is one, a prediction otherwise. Null when no profile supports one. */
+    restingRateKcal: number | null
     zone: string
     zoneLabel: string
     zoneColor: string
@@ -296,15 +297,20 @@ export async function computeEnergyBalance(
     ? Math.max(Math.round(bmr), Math.round(maintenanceKcal - avgActiveKcal))
     : Math.max(Math.round(bmr), formulaBaseline - stepBaseCreditKcal)
 
-  // BF-150. The stored target is read BEFORE the balance now, because the balance carries it: it is
-  // what anchors the budget (`budgetProvenance`), so every surface reads one number instead of
-  // re-deriving it. `nutrition_targets` first, the legacy `users.calorie_goal` second — the same
-  // precedence `target.currentKcal` has always used.
   const currentKcal = targets?.calories ?? userGoals?.calorieGoal ?? null
 
+  // BF-152. `bmr` anchors the budget (`budgetProvenance`), and it is carried on the balance so every
+  // surface reads one number instead of re-deriving it. This is deliberately `bmr` and NOT
+  // `restingBaseKcal`: on the calibrated path the latter is `maintenance − avgActiveKcal`, which
+  // carries the maintenance estimator's inflation (BF-137) — the thing BF-150 was escaping when it
+  // anchored to the stored target instead. `bmr` is the measured RMR re-scaled onto today's fat-free
+  // mass when there is one and a prediction otherwise, so the anchor tracks the body without
+  // tracking the estimator. The stored target goes back to being a target (`target.currentKcal`).
   const balance = computeCalorieBalance({
     restingBaseKcal, activeKcal: activeEnergy.total, intakeKcal, goalDeltaKcal,
-    goalKcal: currentKcal,
+    // Rounded here rather than only inside `budgetProvenance`: this number goes on the wire, and a
+    // float labelled kcal invites a consumer to print 1815.2992 where the card says 1,815.
+    restingRateKcal: Math.round(bmr),
   })
 
   const recommendedKcal = targetFromMaintenance(maintenanceKcal, goalDeltaKcal)

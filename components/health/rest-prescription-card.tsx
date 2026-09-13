@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getLocalStore } from "@/lib/local-store";
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { shiftDateStr, todayInTz } from "@trainingai/shared/date-utils";
@@ -18,20 +18,42 @@ import { restByPrescription, deltaPct, type RestPrescriptionSummary, type RestSe
  * every session rushes something and none is mostly rushed. A discipline reading of that is
  * meaningless, and the owner asked for a fact rather than a nudge.
  *
- * **Local-first, and here that means device-only.** `planned_rest_sec` is the snapshot taken when
- * the set was logged — the honest number, because a later style edit would silently rewrite what
- * "prescribed" meant for a past set. It lives in the local store's set logs and no route publishes
- * it, so `getLocalStore` returning null in a browser leaves this card absent rather than wrong. See
- * LB-98.
+ * **Local-first, with a server fallback — and the fallback exists for VERIFICATION (LB-98).**
+ * `planned_rest_sec` is the snapshot taken when the set was logged, the honest number, because a
+ * later style edit would silently rewrite what "prescribed" meant for a past set. It lives in the
+ * local store, so this card used to return `null` in any browser: the canonical runtime was fine and
+ * **CI could only ever assert the empty state**, which meant the rendering path below shipped
+ * unexercised and the card arrived owing a device check it could never discharge.
+ *
+ * The fallback is a **swap, not a second aggregate.** `/api/health-trends?view=rest-adherence` now
+ * emits `restSets` in this module's own `RestSet` shape, read from the same **logged** columns, so
+ * both paths run the identical `restByPrescription`. That is what keeps the two from answering
+ * different questions — the failure LB-98 warns about, and the reason the computation stays here
+ * rather than moving server-side.
+ *
+ * **Local still wins when it has an answer.** The device's store is the source of truth and needs no
+ * network; the prop is consulted only when there is no store, or when the store holds nothing to
+ * summarise.
  */
-export function RestPrescriptionCard({ userId }: { userId?: string }) {
+export function RestPrescriptionCard({ userId, serverSets }: {
+  userId?: string
+  /** The route's `restSets`, used only when the local store has no answer. See the note above. */
+  serverSets?: RestSet[]
+}) {
   const tz = useUserTimezone();
-  const [summary, setSummary] = useState<RestPrescriptionSummary | null>(null);
+  const [local, setLocal] = useState<RestPrescriptionSummary | null>(null);
+
+  // Memoised on the array the parent hands down, so a re-render — or the cache seed being replaced
+  // by the network payload — does not re-run the summary for an unchanged list.
+  const fromServer = useMemo(
+    () => (serverSets?.length ? restByPrescription(serverSets) : null),
+    [serverSets],
+  );
 
   useEffect(() => {
     let alive = true;
     const store = userId ? getLocalStore(userId) : null;
-    if (!store) { setSummary(null); return () => { alive = false } }
+    if (!store) { setLocal(null); return () => { alive = false } }
     // Ninety days, matching the window the trend above is built over, so the two halves of the card
     // are describing the same stretch of training.
     const cutoff = shiftDateStr(todayInTz(tz), -90);
@@ -39,12 +61,15 @@ export function RestPrescriptionCard({ userId }: { userId?: string }) {
       .then(history => {
         if (!alive) return;
         const sets: RestSet[] = history.flatMap(h => h.exerciseLogs.flatMap(ex => ex.sets));
-        setSummary(restByPrescription(sets));
+        setLocal(restByPrescription(sets));
       })
-      .catch(() => { if (alive) setSummary(null) });
+      .catch(() => { if (alive) setLocal(null) });
     return () => { alive = false };
   }, [userId, tz]);
 
+  // Local first — it is the source of truth and needs no network. `null` from it means the store is
+  // absent or holds nothing summarisable, and both are cases the server read can answer.
+  const summary = local ?? fromServer;
   if (!summary) return null;
 
   const taken = summary.rows.map(r => r.actualSec);
