@@ -11248,6 +11248,20 @@ BF-151's entry leaves the queue with the bodyweight rep max reading its stored r
 `projectOverview.md` gains a Known-Issues row for the device check that is still owed: both figures
 render only under `isBodyweight`, so only a bodyweight set on the phone exercises them.
 
+## 2026-09-13 — `docs/implementation-backlog.md` → 21218 (three owner answers recorded)
+
+Thirty-six lines across two entries: LB-56 gets the E2E decision, Q-30 gets the retention rule.
+
+Q-30's is the longer one and the length is doing work. The owner's two notes read as deferrals in the
+checklist — both were tapped "Defer" — but together they state a principle: the phone holds the data,
+Railway holds the smallest thing that makes a lost phone survivable. Recording that as a settled
+answer rather than a deferral needs the verbatim quotes beside it, or the next reader sees "Defer"
+in the tool and "settled" in the entry and trusts the wrong one.
+
+The rest is the condition the answer depends on. **21 MB was priced, not exempted** — if the packed
+tier stops being that size the decision is re-opened, and an entry that records only "yes, keep a
+backstop" would let a later session grow it without noticing it had changed the deal.
+
 ## 2026-09-13 — `docs/implementation-backlog.md` (BF-152 filed at the top)
 
 Fifty-eight lines for BF-152, which changes one line of what BF-150 shipped the day before: the
