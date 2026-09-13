@@ -11495,17 +11495,26 @@ The pattern across today: **LA-102, LA-104 and LA-105 were all filed by the entr
 possible.** A fix that unblocks a surface is not finished when the engine half lands; it is finished
 when somebody is holding the other half.
 
-## 2026-09-11 — `docs/implementation-backlog.md` → 21317 (RV-42 shipped)
+
+## 2026-09-13 — `docs/implementation-backlog.md` (BF-154 filed at the top)
+
+Thirty-six lines for BF-154, filed hours after BF-152 shipped: the card's explanation prints the
+addends of the formula BF-152 retired beside the budget the new one produced, so it names 1,294 and
+breaks it into terms summing to 2,078. Most of the lines are the two consequences that are not
+arithmetic — the 2,278 it prints as "resting burn" is the inflated estimator BF-152 escaped, and the
+macro grams stayed on the stored goal while the budget moved.
+
+## 2026-09-11 — `docs/implementation-backlog.md` → 21361 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 
-**This figure has been rewritten TWENTY-ONE times and the churn is the note worth leaving.** Twenty-six
+**This figure has been rewritten TWENTY-TWO times and the churn is the note worth leaving.** Twenty-seven
 other merges landed on `main` while this PR waited on an owner decision, and each one moved the base
 out from under it — so the starting figure is no longer even quoted here, because it changed again
-between the last two rewrites. **Twenty-one rewrites of one number is the cost of a green PR waiting**,
+between the last two rewrites. **Twenty-two rewrites of one number is the cost of a green PR waiting**,
 recorded rather than smoothed because the alternative reading — that someone kept getting the
 arithmetic wrong — is the wrong lesson. The per-file `.size` split (LA-33) is what keeps this to one
-number instead of a whole map: no other document's baseline has conflicted once across all twenty-one.
+number instead of a whole map: no other document's baseline has conflicted once across all twenty-two.
 Nothing was wrong with any of the three — each was correct against the `main` of its hour. Under six
 concurrent lanes plus an owner gate, a baseline is a reading of a moving number, and a PR that waits
 will re-read it once per merge that overtakes it. Recomputed by `pnpm fix:baselines` after each
