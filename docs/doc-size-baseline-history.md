@@ -11261,3 +11261,11 @@ in the tool and "settled" in the entry and trusts the wrong one.
 The rest is the condition the answer depends on. **21 MB was priced, not exempted** — if the packed
 tier stops being that size the decision is re-opened, and an entry that records only "yes, keep a
 backstop" would let a later session grow it without noticing it had changed the deal.
+
+## 2026-09-13 — `docs/implementation-backlog.md` (BF-152 filed at the top)
+
+Fifty-eight lines for BF-152, which changes one line of what BF-150 shipped the day before: the
+budget anchors to the owner's measured resting rate rather than to the number typed into
+`nutrition_targets`. The entry carries the measurement that makes it buildable — the Cunningham
+residual re-scaled onto today's fat-free mass reads **1,342**, which is the *"start at 1350"* he
+described, and `bmr × 1.2` reads **1,611**, which is his *"1600"*.
