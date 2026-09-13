@@ -1269,11 +1269,15 @@ the rest of that day; and `perceived_recovery` carries at least three distinct v
   sets carrying both are emitted; a prescription of `0` is dropped ("none planned", not a target)
   while a rest **taken** of `0` is kept (a real measurement — discarding it biases the mean upward).
   Five mutants, all caught, including one that swaps the logged snapshot for the live style.
-- **Keep: TWO things, and neither is the route.**
-  1. **The card's fallback wiring is Lane B's** — `components/health/rest-prescription-card.tsx`
-     still returns `null` when `getLocalStore` is null. The read now exists; nothing consumes it yet,
-     so the verification gap is not closed until that lands.
-  2. **The `body_metadata` half is LB-96**, still parked on `Needs: OR-102b`.
+- **✅ THE CARD'S FALLBACK SHIPPED 2026-09-13** (`fix/lb98-rest-card-server-fallback`).
+  `rest-prescription-card.tsx` takes `serverSets` and prefers the local store, falling back only when
+  it is absent or holds nothing summarisable — a swap into the same `restByPrescription`, not a second
+  aggregate. `restSets` rides on the response `trends-section.tsx` already fetched, so it costs no
+  request and no cache key. `e2e/rest-vs-plan-card.spec.ts` is the first run of that rendering path
+  anywhere but the S25; mutation-proven, and it stubs the response deliberately because the parent
+  gates everything behind the CORRELATION's `hasSufficientData` — a condition about the bars, not the
+  card. [Journal](overview/entries/2026-09-13-lb98-rest-card-server-fallback.md).
+- **Keep: the `body_metadata` half, which is LB-96**, still parked on `Needs: OR-102b`.
 - **Measured in production while building this, and worth keeping:** of 1,189 set logs, **462** carry
   `planned_rest_sec` and **838** carry `rest_time_sec`; **442** carry both, all inside the route's
   90-day window (841 sets). So the column started being written recently and covers ~53% of the
@@ -13759,9 +13763,13 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   prescribed *at log time*; deriving it from the live style would let a later style edit silently
   rewrite what "prescribed" meant for a past set. The `rest-adherence` trend above it does derive
   from the style, which is right for its own question and would be wrong for this one.
-- **Keep:** the device check, and only that. `planned_rest_sec` is in the local store and no route
-  publishes it, so the card is **absent in a browser** and cannot be verified in CI — see LB-98.
-  Nothing here licenses a rest term in `expectedRpe`.
+- **Keep:** the device check, and only that — **but its stated reason no longer holds, and the check
+  it leaves is narrower.** LB-98 published the logged pairs on `/api/health-trends?view=rest-adherence`
+  and the card now falls back to them, so it is **no longer absent in a browser**:
+  `e2e/rest-vs-plan-card.spec.ts` exercises the rows, the deltas and the compression sentence, all
+  mutation-proven. What the S25 still owes is the LOCAL path — `getLocalStore` reading
+  `planned_rest_sec` from the device's own set logs, which no harness can reach. Nothing here
+  licenses a rest term in `expectedRpe`.
 
 ### [workouts] Q-289 — `expectedRpe` misses by more than the autoregulation dead band at both ends of its own range
 

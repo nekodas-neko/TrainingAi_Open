@@ -11,10 +11,10 @@
 
 ## Now
 
-**RV-35 CLOSED** — its fix was already in the tree (`nutrition-content.tsx:334`); what it still owed
-was its own condition, a test failing before and passing after, now mutation-proven. **BF-153** (v1.454.1)
-named which vial the sheet means. **OR-108** (v1.454.0): both capture paths write the picture — three
-callers rebuilding a payload field by field dropped it. `check:rules` **74/74**.
+**LB-98 ① SHIPPED** (v1.454.2): the Rest-vs-plan card falls back to the route's `restSets`, so a
+device-only rendering path now runs in CI. **RV-35 CLOSED** — its fix was already in the tree; what it
+owed was its own condition, a test failing before and passing after. **BF-153** (v1.454.1), **OR-108**
+(v1.454.0) shipped. `check:rules` **74/74**.
 
 **SEVEN running entries were wrong about something load-bearing** — BF-139's px, BF-141's gate,
 BF-142's **406**, BF-146's cause, BF-145's fix twice, BF-147's (the badge is **25 px**; the four action
@@ -27,11 +27,11 @@ minutes well spent. **Measure before you fix what the entry blames.**
 
 ## Next
 
-1. **Re-run `next-item.js --lane B`. When READY reads 0, READ THE `KEEP` SECTION** — three of the last
-   five items came from there. `Keep:` means "only the stated residue is owed", and the residue is
-   sometimes the whole job (BF-147: 300 lines of UI; Q-112e: a blocker cleared three days earlier). Ask
-   of each whether it is a device check or work. **READY was 0 after RV-35**, and it moves without
-   warning — re-run rather than trust this line.
+1. **READY has been 0 for Lane B; the work is in `KEEP`, and the console TRUNCATES it.** Four of the
+   last six items came from there. Print each Keep whole and judge it: a device check is not yours, a
+   residue often is. LB-98's read as a check and was one line of wiring. **BF-51 ① is the one trap** —
+   built, measured, deliberately unshipped, and it must be reproduced on the S25 first; do not resolve
+   its `ERR_ABORTED` by loosening the spec.
 2. **`LB-101` is Lane A's and OR-108's workaround dies with it** — `THUMB_WIRE_BUDGET`, the
    `tooBigForTheBody` guard and two assertions in `food-image-write-paths.test.ts` exist only because that route caps its body below the image it permits.
 

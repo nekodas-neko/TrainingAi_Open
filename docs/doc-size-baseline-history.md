@@ -11301,7 +11301,7 @@ regex to a bullet start loses 7 legitimate inline mentions and silently un-parks
 work. So the choice is on the record as LA-103 with the population unmeasured and said to be
 unmeasured, rather than as a one-line parser change nobody could audit later. **A 36-line entry is the
 cost of not guessing.**
-## 2026-09-13 — `docs/implementation-backlog.md` → 21324 · `projectOverview.md` → 10795 (BF-152 shipped)
+## 2026-09-13 — `docs/implementation-backlog.md` → 21332 · `projectOverview.md` → 10795 (BF-152 shipped)
 
 BF-152's 54-line entry leaves the queue; **LA-102 arrives in its place, so the net is 28 lines rather
 than 54** (the figure is 21363 rather than 21327 because LA-103, BF-153, LB-101, OR-108 and BF-153's
@@ -11310,9 +11310,13 @@ red-`main` note above, the rest are not ours at all). **`projectOverview.md` mov
 caution applies: the BF-150 row was rewritten rather than struck, and LB-100's 🔴 row moved out to the
 archive.
 
-**Five base re-merges in two hours is the number worth recording, not the baseline.** `main`
-moved every ~20-30 minutes while E2E took ~29, so a green was stale each time it arrived. The fifth
-attempt was refused outright with a 405: by then the base was not merely stale but conflicting. The green was
+**Six base re-merges in two and a half hours is the number worth recording, not the baseline.** `main`
+moved every ~20-30 minutes while E2E took ~29, so a green was stale each time it arrived. Two merge
+attempts were refused outright with a 405. **And the conflicts are always the same three bookkeeping
+files** — this one, `docs/implementation-backlog.md` and `packages/shared/src/changelog.ts` — never
+code: measured on the sixth round, where `main` had brought two components and an e2e spec and
+nothing in them touched anything here. So the serialisation is imposed entirely by the ledgers every
+agent must write to, not by the work colliding. The green was
 never the problem and neither was the queue — the two intervals simply do not fit. That is deliberate and is the thing to read here: BF-152 shipped with a residual it chose
 not to model — the thermic effect of food and non-step NEAT — and the ⓘ copy explaining that is Lane
 B's. An entry that closes by opening a smaller one nets out small, and **the alternative was a
@@ -11394,3 +11398,14 @@ the entry leaves.
 **Re-verifying against `main` is what stopped this being wrong in either direction.** Read as stale,
 it deletes with the obligation unmet and nothing guarding the behaviour. Read as unbuilt, it
 re-implements a line that is already there. Both halves had to be checked.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21360 (LB-98 ① shipped, Q-300's reason corrected)
+
++8 across two entries, and both are corrections rather than additions. LB-98's Keep loses residue ①
+and gains the shipped note; **Q-300's Keep had to be rewritten because its stated reason stopped
+being true** — it said the card "is absent in a browser and cannot be verified in CI", which was
+exactly right until the fallback landed today. Leaving it would have told the next session the card
+is unverifiable when it now has a mutation-proven spec, and would have overstated what the S25 still
+owes: the local path only, which no harness can reach.
+
+A Keep that describes a world that has moved is worse than a missing one, because it is trusted.
