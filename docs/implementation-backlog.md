@@ -421,6 +421,54 @@ below threshold and left in place for next time.
 
 
 
+### [workouts] BF-157 — a bodyweight exercise gets no get-ready countdown, because the timer is gated on the warm-up weight ladder
+
+- **Lane:** B — `components/workout/active-workout-screen.tsx:181-189` is the gate; the durations it
+  needs already exist in `packages/shared/src/workout/duration-model.ts`
+  (`transitionSecForEquipment`, `warmupRampSectionSec`).
+- **Added:** 2026-09-13 (BugFix intake). Owner, on the Pull-Up ready screen with the session clock at
+  **8:42**: *"The body weight screens have no warmup timer or load time so its just infinite on this
+  screen."*
+- **One line explains it:**
+
+  ```js
+  const warmupSets = (() => {
+    const set1 = workingWeight
+    if (!set1 || set1 <= 0 || soloMode) return null      // ← bodyweight is 0
+    return [{ pct: 50, … }, { pct: 74, … }, { pct: 92, … }]
+  })()
+  ```
+
+  A bodyweight exercise has `workingWeight === 0`, so `warmupSets` is `null`. **Dropping the ladder
+  is correct** — 50% / 74% / 92% of nothing is not a warm-up. But the on-screen ramp timer is
+  rendered *from* that array, so removing the ladder removed the clock with it. The two are separate
+  ideas that share one gate.
+- **The notification chip keeps counting, which is how we know the intent.** `workout-screen.tsx:711`
+  still calls `startRestChip(rampStart + prepSec × 1000, …)` with
+  `prepSec = transitionSecForEquipment(equipment)`, and `Pull-Up` carries `equipment = ['bodyweight']`
+  (confirmed in `exercise_library`), so the chip runs a correct **60-second** countdown. The lifter
+  gets a notification counting down against a screen showing nothing — the two surfaces disagree
+  about whether this phase is timed.
+- **`WARMUP_SECTION_SEC` is computed and then unreachable.** Line 216 evaluates
+  `warmupRampSectionSec(equipment, warmupSets?.length ?? 0)`, which hits that helper's
+  `sectionCount <= 0 → 40` branch. Nothing consumes it once `warmupSets` is null, so the file already
+  computes a per-section duration for a case it does not render.
+- **Why it matters beyond the screen.** `handleStart` derives `prepSecRef` from
+  `readyElapsedBaselineSec`, and that value is submitted as `prepTimeSec` and feeds the duration
+  model's own transition estimate. An unbounded, untimed ready screen makes that measurement the
+  length of whatever distraction occurred, and it is an input to the time budget printed on the
+  session card (*"~56 min of work"*).
+- **Recommended shape:** separate the countdown from the ladder. Keep `warmupSets` gated on a real
+  working weight, and render the ready-screen timer from `transitionSecForEquipment(equipment)`
+  whenever the exercise is not started — 60 s for bodyweight, matching the chip that is already
+  correct. The bodyweight screen then shows a bounded get-ready bar with no weight ladder, which is
+  what the exercise actually needs.
+- **Not in scope:** inventing a bodyweight warm-up progression (band-assisted, negatives, rep
+  ramps). That is a programming feature and a separate decision; this entry only restores the clock.
+- **Verification:** on device, open a bodyweight exercise's ready screen and confirm a bounded
+  countdown appears and agrees with the notification chip, then a barbell exercise and confirm its
+  ladder and 240 s are unchanged.
+
 ### [workouts] BF-155 — every session since 6 September reports 2–3 minutes because one fallback collapses five timestamps into one
 
 - **Lane:** A — `packages/shared/src/workout/log-exercise.ts:275-277` is the fallback,

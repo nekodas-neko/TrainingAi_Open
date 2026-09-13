@@ -58,3 +58,25 @@ re-basing from 1,660 to ~1,294 drops carbs and fat while 150 g protein stands.
 
 Docs only. Every figure above is from production rows; the mechanisms were read in the shipped
 source, not run.
+
+## BF-157 — the bodyweight ready screen has no clock, filed in the same PR
+
+*"The body weight screens have no warmup timer or load time so its just infinite on this screen"* —
+sent with the Pull-Up ready screen showing a session clock at 8:42.
+
+```js
+const set1 = workingWeight
+if (!set1 || set1 <= 0 || soloMode) return null   // bodyweight is 0
+```
+
+`warmupSets` is null for a bodyweight exercise, which is **right** — 50/74/92% of nothing is not a
+warm-up. But the on-screen ramp timer renders *from* that array, so dropping the ladder dropped the
+clock. Two separate ideas behind one gate.
+
+The intent is visible in what still works: the notification chip runs
+`transitionSecForEquipment(equipment)` and `Pull-Up` carries `['bodyweight']`, so it counts down a
+correct 60 seconds against a screen showing nothing. And `WARMUP_SECTION_SEC` is still computed one
+line later, hitting the helper's `sectionCount <= 0 → 40` branch, consumed by nothing.
+
+It reaches past the screen: `prepTimeSec` is measured from how long the lifter sat there and feeds
+the transition estimate behind the *"~56 min of work"* budget on the session card.

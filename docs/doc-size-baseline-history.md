@@ -11510,6 +11510,8 @@ macro grams stayed on the stored goal while the budget moved.
 
 Ninety-three lines across three edits. BF-155 carries a seven-row production table because the
 reported symptom ("my amrap week") and the real scope (every session since 6 September) differ, and
-the entry has to show that rather than assert it. BF-156 is short. BF-154 gains the owner's answer on
+the entry has to show that rather than assert it. BF-156 is short. BF-157 was added to the same PR: the
+bodyweight ready screen's countdown is gated on the warm-up weight ladder, so a `workingWeight` of 0
+removes both. BF-154 gains the owner's answer on
 the macro anchor plus the consequence he has not seen yet — protein is held constant while the base
 drops.
