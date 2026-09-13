@@ -11246,18 +11246,31 @@ BF-151's entry leaves the queue with the bodyweight rep max reading its stored r
 `projectOverview.md` gains a Known-Issues row for the device check that is still owed: both figures
 render only under `isBodyweight`, so only a bodyweight set on the phone exercises them.
 
+## 2026-09-13 — `docs/implementation-backlog.md` → 21218 (three owner answers recorded)
 
-## 2026-09-11 — `docs/implementation-backlog.md` → 21157 (RV-42 shipped)
+Thirty-six lines across two entries: LB-56 gets the E2E decision, Q-30 gets the retention rule.
+
+Q-30's is the longer one and the length is doing work. The owner's two notes read as deferrals in the
+checklist — both were tapped "Defer" — but together they state a principle: the phone holds the data,
+Railway holds the smallest thing that makes a lost phone survivable. Recording that as a settled
+answer rather than a deferral needs the verbatim quotes beside it, or the next reader sees "Defer"
+in the tool and "settled" in the entry and trusts the wrong one.
+
+The rest is the condition the answer depends on. **21 MB was priced, not exempted** — if the packed
+tier stops being that size the decision is re-opened, and an entry that records only "yes, keep a
+backstop" would let a later session grow it without noticing it had changed the deal.
+
+## 2026-09-11 — `docs/implementation-backlog.md` → 21193 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 
-**This figure has been rewritten FOURTEEN times and the churn is the note worth leaving.** Sixteen
+**This figure has been rewritten FIFTEEN times and the churn is the note worth leaving.** Seventeen
 other merges landed on `main` while this PR waited on an owner decision, and each one moved the base
 out from under it — so the starting figure is no longer even quoted here, because it changed again
-between the last two rewrites. **Fourteen rewrites of one number is the cost of a green PR waiting**,
+between the last two rewrites. **Fifteen rewrites of one number is the cost of a green PR waiting**,
 recorded rather than smoothed because the alternative reading — that someone kept getting the
 arithmetic wrong — is the wrong lesson. The per-file `.size` split (LA-33) is what keeps this to one
-number instead of a whole map: no other document's baseline has conflicted once across all fourteen.
+number instead of a whole map: no other document's baseline has conflicted once across all fifteen.
 Nothing was wrong with any of the three — each was correct against the `main` of its hour. Under six
 concurrent lanes plus an owner gate, a baseline is a reading of a moving number, and a PR that waits
 will re-read it once per merge that overtakes it. Recomputed by `pnpm fix:baselines` after each
