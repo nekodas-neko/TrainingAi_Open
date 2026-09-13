@@ -11444,3 +11444,17 @@ The work was blocked on something nobody was holding.
 **That is the second instance today of the same failure**, after TN-3b sat startable in PARKED for
 three days because its unparking is prose and the tool reads fields. Both are cheap to write and
 invisible to read, which is precisely why they persist.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21365 (LA-103 shipped)
+
+LA-103's 24-line entry leaves the queue with the `keep.js` parser fix, and **the entry is worth more
+than the fix it asked for.** It recorded its own proposed discriminator as a HYPOTHESIS — "a mention
+preceded by a word character is prose" — said outright that it came from one case, and demanded the
+population be measured before anyone built on it.
+
+**The measurement refuted it.** Eighteen of 164 Keep blocks yield a gate, and LB-53 — *"running it is
+a **`Gate: owner`** action"* — is preceded by the word "a" and is a real gate. Ten minutes of
+counting changed the answer from a one-line regex to a different rule entirely.
+
+Nothing else moved: the eighteen classify identically before and after, asserted by id.
+
