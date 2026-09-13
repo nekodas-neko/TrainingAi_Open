@@ -2736,6 +2736,12 @@ re-proved on 2026-09-04** — three specs pass in isolation and fail in the full
   still costing 26 minutes on every UI PR. **A red check that nobody can act on is worse than either
   alternative**, because it trains six concurrent agents to scroll past a failing gate, which is how a
   real regression gets waved through later. Whatever else is decided, this state should not persist.
+- **✅ OWNER ANSWERED 2026-09-13 — make it advisory now.** The recommendation below, chosen over both
+  alternatives. **The re-require step is the half that decays if nobody writes it down**, so it is the
+  closing condition rather than an aspiration: E2E returns to the required set once the suite is green
+  on `main`, and **LB-54's baseline half (`Needs: LB-56`) unblocks the moment this lands.**
+  **This entry does not close on the toggle** — dropping it from branch protection is a repository
+  setting, the owner's click; what stays queued here is fixing the four specs.
 - **Recommendation: make it advisory now, fix it next, re-require it when green.** Removing it from
   the required set costs nothing, matches what is already true, and unblocks the PRs waiting on it.
   The risk is that an advisory check decays unwatched — which is how it reached ten failures without
@@ -19730,6 +19736,36 @@ shape single-user-only** — and it is the strongest argument yet for D4 over an
 **✅ REINDEX DONE 2026-08-13 (owner ran it).** `oura_heartrate_user_updated` went **52 MB → 2.75 MB**
 (19×); database total **484 MB → 435 MB**, indexes **261 MB → 212 MB**. Predicted ~50 MB, actual 49 MB.
 See Q-219 for how it got that bloated and why Q-213 Stage 1 slows the re-accumulation ~14×.
+
+**✅ OWNER ANSWERED 2026-09-13 — the retention rule, verbatim.** Asked whether the server keeps a
+permanent compressed copy of raw frames, and whether the growth rate is acceptable:
+
+> *"Try use as much phone storage as possible. But if its only 21MB; we can keep it for now."*
+> *"As long as its ONLY on the [device] storage — I don't want to use railway as a permanent
+> solution; so we don't want to store too much on cloud."*
+
+**Read together that is a principle, not two answers: the phone holds the data; Railway holds the
+smallest thing that makes a lost phone survivable.** It settles three of the four questions below.
+
+- **The server keeps a packed backstop — YES, and the size is the test it has to keep passing.**
+  21 MB for 1.5 M frames passed; the 151 MB of *hot* raw tables does not. So the backstop is
+  `sensor_raw_packed` and nothing else: the hot tier, `oura_heartrate` and `rr_intervals` are the
+  tables D4 moves to the device. **If the packed tier ever stops being ~20 MB, the answer is
+  re-opened, not assumed** — the owner priced the decision, they did not grant an exemption.
+- **The 14-day device window has to change**, because the device is now the archive and the server
+  copy is a *backstop*, not a mirror. The window is what the owner is buying with "as much phone
+  storage as possible"; its new number is Q-545's to set from the measured device budget.
+- **A wiped or second device restores from the packed tier.** That is what the backstop is for, and
+  it is why the answer to the first question could not be "device-only, cheapest".
+- **Still open:** whether `error_events` counts as "too much on cloud". It is **52 MB — the second
+  largest object in the database** and larger than the entire packed archive, and it is currently
+  full of BF-110 telemetry rather than faults. Not covered by the answer above, because nobody asked.
+
+**⚠ And one thing the answer does NOT license.** It is about *where data lives*, not about the
+documented growth figure. `CLAUDE.md` still says to expect ~0.4 MB/day against a measured
+**1.8 MB/day** (215 MB on 2026-09-11 against a 171 MB baseline on 08-18). Until that line is
+corrected or the growth is explained, every session following the start-up ritual re-discovers an
+anomaly that is probably just a stale number.
 
 **What this decision does NOT settle**, and should not be assumed:
 - The retention rule for the device copy. `CLAUDE.md` records a **14-day rolling window** on-device
