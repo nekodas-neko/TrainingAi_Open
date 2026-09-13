@@ -447,6 +447,25 @@ below threshold and left in place for next time.
   the base, and nothing on the screen implies the base is a full day's burn.
 - **Reversal cost:** none. It is copy.
 
+### [nutrition] LA-105 — the capture workaround for LB-101 is now dead weight
+- **Lane:** B — `components/nutrition/capture-actions.tsx`, and two assertions in
+  `components/nutrition/__tests__/food-image-write-paths.test.ts`.
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-13 · found shipping LB-101, which this depends on.
+- **LB-101 SHIPPED 2026-09-13**: `/api/nutrition/food-items` derives its body cap from
+  `FOOD_ITEM_IMAGE_MAX_BYTES` instead of restating 8 KB, so an image at its own permitted size no
+  longer 413s. **The client-side workaround that existed only because of that is now redundant.**
+- **What to remove:** `THUMB_WIRE_BUDGET = 7 * 1024` and the quality-ladder re-encode that walks down
+  to fit it, the `tooBigForTheBody` guard beside it, and the two assertions that pin them. LB-101's
+  own entry named these and said to leave them until the cap moved. It has moved.
+- **Do NOT remove the downscale itself** — only the budget the ladder targets. Shrinking a capture
+  before upload is right regardless; what is dead is re-encoding down to **7 KB** to sneak under a cap
+  that was 8,192 bytes and is now 25,942.
+- **Verify by measurement, not by reading:** the case LB-101 measured was a 128 px WebP of a detailed
+  600 × 400 source at q0.8 coming back **6,612 bytes**. After removing the ladder that capture should
+  save at its natural quality rather than at whatever rung fitted 7 KB.
+- **Reversal cost:** low, and the route-side cap stands on its own either way.
+
 ### [readiness] LA-104 — today's stress chart and a past day's come from two different baselines
 - **Lane:** B — `components/body-battery/stress-day-chart.tsx` and whatever feeds it on the day screen.
   The engine half is done; this is which source the surface reads.
@@ -471,27 +490,6 @@ below threshold and left in place for next time.
 - **Pass test:** opening today and opening yesterday show series built the same way, and the chart
   says where today's data currently reaches.
 - **Reversal cost:** low — one fetch swapped on one surface.
-
-### [nutrition] LB-101 — `/api/nutrition/food-items` refuses a body smaller than the image it permits
-
-- **Lane:** A — `app/api/nutrition/food-items/route.ts`, one constant. **Added:** 2026-09-13 by
-  Implementation Lane B, measured while building OR-108. **Branch:** unassigned.
-- **The route caps its whole body at 8 KB and its image field at 16 KB.** `MAX_BODY_BYTES = 8 * 1024`
-  carries the comment *"One food item: a name, a brand and a dozen macro numbers"* — written before
-  BF-35 gave the route `imageDataUri`. Base64 costs a third more than the bytes it carries, so an image
-  at its own permitted cap is **~21.3 KB on the wire** and the request is refused with a **413 before
-  `rejectMealImage` ever runs**. The user does not lose the picture; they lose the food.
-- **Measured 2026-09-13** in Playwright, driving the real capture flow: a 128 px WebP of a detailed
-  600 × 400 source at q0.8 came back **6,612 bytes = 8,816 base64 characters** and the save 413'd; a
-  smooth photo-like source came back 1,410 and fits. It bites detailed photos, not every photo.
-- **The fix is one line:** derive the body cap from `FOOD_ITEM_IMAGE_MAX_BYTES` (`Math.ceil(x * 4 / 3)
-  + 4 * 1024`) rather than restating a number, so the two cannot drift again. Check the offline push
-  branch's own limit for the same mismatch too.
-- **A workaround is live and goes with this.** `capture-actions.tsx` carries `THUMB_WIRE_BUDGET =
-  7 * 1024` and re-encodes down a quality ladder to fit it; that constant, the `tooBigForTheBody`
-  guard beside it and two assertions in `components/nutrition/__tests__/food-image-write-paths.test.ts`
-  exist only because of this. Removing them is Lane B's follow-up — leave them until the cap moves.
-- **Reversal cost:** low — one constant, and a route that takes a larger body than it did.
 
 ### [app-shell] BF-139 — three header chips no longer fit beside the date (fixed; the device look is what is left)
 

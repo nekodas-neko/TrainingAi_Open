@@ -11482,3 +11482,18 @@ puts two metrics on one axis — in exactly the across-days dimension the owner'
 measures. LA-104 carries that decision to Lane B rather than letting it be settled by whichever fetch
 a component happens to call.
 
+## 2026-09-13 — `docs/implementation-backlog.md` → 21342 (LB-101 shipped)
+
+LB-101's entry out, LA-105 in, net **−2 lines** — the third completed item today that leaves a
+successor behind, and the third time that is the right outcome rather than scope creep.
+
+LB-101 raised a server cap that a client workaround was compensating for. Removing the workaround is
+Lane B's file and Lane B's call, and doing it here would have been a Lane A session editing
+`components/` on the strength of its own change. So the entry names the exact constants to delete,
+the one thing NOT to delete (the downscale itself), and the measurement to re-take afterwards —
+6,612 bytes, the capture that was failing.
+
+The pattern across today: **LA-102, LA-104 and LA-105 were all filed by the entry that made them
+possible.** A fix that unblocks a surface is not finished when the engine half lands; it is finished
+when somebody is holding the other half.
+
