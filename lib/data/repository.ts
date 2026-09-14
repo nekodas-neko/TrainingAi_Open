@@ -654,6 +654,16 @@ export interface WorkoutRepository {
   getMostRecentConfirmedWeightKg(userId: string): Promise<number | null>
   insertScaleRawSample(userId: string, sample: ScaleRawSampleInput): Promise<{ id: number }>
   listPendingScaleSamples(userId: string): Promise<ScalePendingSample[]>
+  /**
+   * The most recent readings this account declined, newest first (LA-108).
+   *
+   * A declined reading is un-attributed, not destroyed — `insertScaleRawSample` archives the frame
+   * in every branch — but until this there was no way to look at one, so a reading declined by
+   * mistake was gone for practical purposes. It matters because the weight band anchors on the last
+   * CONFIRMED reading: with nothing to re-anchor it, one wrong decline makes every later reading
+   * fall outside the band too.
+   */
+  listRecentDismissedScaleSamples(userId: string, limit: number): Promise<ScalePendingSample[]>
   /** The scale-set body_metrics weight for a date, or null if no scale reading has set one.
    *  The day's **lowest** confirmed reading wins the trend (Q-69) — clothes only ever add weight,
    *  so a later nude reading coming in lower should replace an earlier clothed one. Callers need
@@ -663,7 +673,9 @@ export interface WorkoutRepository {
    *  "morning / evening" list. The trend is whichever is lowest, NOT the first — match on value. */
   listConfirmedScaleSamplesForDate(userId: string, date: string, tz: string): Promise<ScalePendingSample[]>
   /** Ownership-checked; returns the row (for the caller to run composition + upsertBodyMetrics)
-   *  or null if no matching pending row exists for this user. */
+   *  or null if this user has no matching claimable row. **Pending OR dismissed** (LA-108) — a
+   *  declined reading has to be reclaimable or nothing re-anchors the weight band. An
+   *  already-confirmed row is not claimable, so claiming twice cannot double-apply it. */
   confirmScaleSample(userId: string, id: number): Promise<ScalePendingSample | null>
   /** Ownership-checked; returns whether a matching pending row was found and dismissed. */
   dismissScaleSample(userId: string, id: number): Promise<boolean>

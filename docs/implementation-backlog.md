@@ -8078,31 +8078,42 @@ revocation, a Play Store health-data implication — and D needs none of it.
   and the answer to (1) is recorded either way, because the design of any future work here depends
   on it.
 
-### [body][devices] LA-108 — a declined weigh-in is invisible, and a big genuine change locks the scale out
+### [body][devices] LA-108 — a declined weigh-in has no screen, so the recovery path built for it cannot be reached
 
-- **Lane:** A.
-- **Added:** 2026-09-14 · Lane A, found while shipping BF-58's band split — the hazard the option-D
-  design does not cover, recorded rather than fixed because fixing it is a UI surface and a new read
-  path, not a band width.
+- **Lane:** B — the list. `components/settings/scale-pairing.tsx`, beside the pending one it already
+  renders.
+- **Added:** 2026-09-14 · Lane A, found while shipping BF-58's band split.
+- **Keep:** the list, and only the list. **The engine half shipped 2026-09-14** and is the half that
+  was actually locked: `confirmScaleSample` matched `status='pending'` only, so no declined reading
+  could ever be filed. It now accepts `pending` **or** `dismissed` (never `confirmed`, so claiming
+  twice cannot double-apply a reading), `listRecentDismissedScaleSamples` exists, and
+  `GET /api/scale-ble/pending` returns a bounded `dismissed[]` shaped exactly like `pending[]`.
+  **`POST /api/scale-ble/pending/<id>/confirm` already accepts one of these ids and needed no
+  change** — it files the weight against the reading's own `measuredAt` and re-anchors the band.
 
-BF-58 turned the outer band from *ask* into *decline*. That is right for the partner, and it has a
-failure mode for the owner: **the band is anchored on his last confirmed weight, and only a
-confirmed reading re-anchors it.** So a genuine change of more than 15% between two weigh-ins — a
-long gap plus an illness, an injury, a trip — puts him outside his own band with no confirmed
-reading to move it, and **every** reading after that is outside too. Before BF-58 that case raised
-*"is this you"* and one tap fixed it. Now it is silent and self-sustaining.
+**Why it matters, which is more than "a lost reading".** The band anchors on the last CONFIRMED
+weight and only a confirmed reading moves it. So a genuine change of more than
+`SCALE_WEIGHT_ANOMALY_PCT` between two weigh-ins — a long gap plus an illness or an injury — puts
+the owner outside his own band with nothing to move it, and **every** reading after that is outside
+too. Silent and self-sustaining.
 
-- **Narrow, but silent, which is the bad half.** Drift is gradual and normally passes *through* the
-  8–15% prompt band first, where one confirmation re-anchors. It needs a discontinuity to bite.
-- **Nothing is lost** — `insertScaleRawSample` archives the frame with `status: 'dismissed'` in every
-  branch. The data is there; there is just no way to see it. `listPendingScaleSamples` is the only
-  read path and it filters to `pending`.
-- **The likely shape**, not yet designed: surface recent `dismissed` readings somewhere the owner can
-  reach them (the pairing screen already lists pending ones) so a wrongly-declined reading can be
-  claimed and re-anchor the band. A repository read for dismissed samples is Lane A; the list is
-  Lane B.
-- **Do not fix it by widening the band** — the 8% was measured against the two real clusters and
-  widening it is the thing BF-58 was filed to stop.
+**This predates BF-58 rather than being caused by it**, which is the correction worth carrying: an
+accidental *Not me* tap has always been irreversible and has always failed to re-anchor. BF-58 made
+the state reachable without a tap, and that is what made it worth finding.
+
+**What is left is one list.** `GET /api/scale-ble/pending` now returns `{ pending, dismissed }`, both
+arrays of `{ id, measuredAt, weightKg }`. Render `dismissed` under the pending section with a
+claim action that POSTs to the same confirm route the pending rows use. Notes for whoever builds it:
+- **Newest first is deliberate and should be preserved in the render.** In the lockout this exists
+  for, the readings at the top ARE the locked-out user's — the scale is mostly his, so the most
+  recent declines are the wrongly-declined ones.
+- **A declined row may have `weightKg: null`** (a frame that would not decode is archived too), same
+  as a pending row. It still lists; do not hide it.
+- **Do not add a dismiss action to this list.** These are already dismissed; the only move is to
+  claim one back.
+- **Do not fix the underlying hazard by widening the band** — the 8% was measured against the two
+  real clusters and widening it is the thing BF-58 was filed to stop.
+
 
 ### [nutrition] BF-47 — the deleted food comes back: the loader calls the server authoritative while the delete is still in the outbox
 
