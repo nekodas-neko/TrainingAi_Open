@@ -11588,6 +11588,20 @@ lane not to look"* — reproduced within an hour of the entry being written, by 
 OR-100 in the same session. The field is for an owner or device CHECK; this owes code. Re-filed as a
 plain entry, it moves from KEEP to #2 of Lane A's READY.
 
+## 2026-09-14 — `docs/implementation-backlog.md` (BF-158, BF-159)
+
+Fifty lines for two entries out of one pre-flight check. BF-158 spends most of its length arguing
+against the obvious fix — clamping turns a −11.3 VO₂max into a plausible 10.0 that nothing flags —
+because the entry has to survive an implementer who reaches for `Math.max` on sight. BF-159 is short
+and carries one measured fact: `/baselines` has exactly one entrance in the whole app.
+
+## 2026-09-14 — `docs/implementation-backlog.md` (BF-160)
+
+Thirty lines. Most of them are the credited/not-credited table and the 894-step measurement, because
+the entry's whole point is that the run IS partly credited — the zone minutes arrive from the strap
+without an activity row — and the missing half is therefore invisible. An implementer who assumes
+"nothing counted" would double-count the zone minutes fixing it.
+
 ## 2026-09-14 — `docs/implementation-backlog.md` → 21589 (`Reference:` documented; LA-104 out, LB-104/LB-105 in)
 
 +38 net. LA-104's 25 lines left with the entry it shipped; what replaced them is a field definition,
