@@ -437,6 +437,47 @@ below threshold and left in place for next time.
 
 
 
+### [workouts] BF-164 — BF-149 fixed ONE of eight surfaces; every other bodyweight rep max still reads 8 RM for an 11-rep set
+
+- **Lane:** A — `packages/shared/src/1rm.ts`. Four call sites inside that one file feed all eight
+  surfaces, so the fix is central; no component needs to change.
+- **Added:** 2026-09-15 (BugFix intake). The owner, on the Hanging Leg Raise ready screen showing
+  **"Last: 11 reps · 12 Sept"** directly above **"REP MAX 8 RM"**: *"How is this right?"*
+- **It is the defect BF-149 was filed for, on the surfaces BF-149 did not touch.** BF-149 swapped
+  `exercise-summary-screen.tsx` to the AMRAP-scaled inverse and BF-151 replaced that with
+  `bodyweightRepMax`. **Both changed that one file.** `repMaxFromOneRm` — the inverse of the
+  *unscaled* `calc1RM`, which BF-149 proved wrong for a bodyweight estimate — is still what four
+  helpers in `1rm.ts` call:
+
+  | site | what it feeds |
+  |---|---|
+  | `displayOneRm` (:323) | the ready screen, pre-workout list, stats sheet, strength-trend card, baseline hints, year review |
+  | `displayOneRmSeries` (:396) | every rep-max trend chart, including the one under his 8 RM |
+  | `displayOneRmDelta` (:344) | the rep-change arrow |
+  | `rescaleBodyweightReps` (:408) | **prescribed reps**, not display |
+
+- **The arithmetic is the same one BF-149 published.** His stored estimate is **128**;
+  `repMaxFromOneRm(128)` = **8**, `repMaxFromAmrapOneRm(128)` = **11**, and `avg_reps` for that log
+  is **11**. The screen prints the true figure and the wrong one four lines apart.
+- **`rescaleBodyweightReps` is the half that is not cosmetic.** It sets
+  `reps = floor(pct/100 × repMax)` for the static progression style. An understated rep max
+  understates every prescribed rep count by the same proportion — at his numbers ~8/11, so roughly a
+  **27% shortfall** on any bodyweight exercise the AI did not prescribe directly. That is training
+  volume, not a label.
+- **The fix is one decision applied in one file.** `bodyweightRepMax` already exists and already does
+  the right thing — prefer `storedReps`, else `repMaxFromAmrapOneRm`. Route the four sites through it
+  (passing stored reps where the caller has them, oneRm where it does not). **`repMaxFromOneRm` stays
+  exported**: BF-149 established it is correct for the exercise stats sheet, whose comparison table is
+  built from `calc1RM`, so that pair is self-consistent — and `exercise-stats-sheet.tsx` imports it
+  directly for exactly that.
+- **Why it was missed, recorded because the rule it broke is in CLAUDE.md.** BF-149's journal checked
+  the *direct* callers of `repMaxFromOneRm`, found the stats sheet, and declared the other caller
+  sound. It did not look for **wrappers**: `displayOneRm` is one call deeper and is what seven
+  surfaces actually import. The sibling-surface sweep has to follow the helper up, not only across.
+- **Verification:** on device, one bodyweight exercise's ready screen, pre-workout row, trend chart,
+  stats sheet and strength-trend card must all print the same rep max as the reps last logged. His
+  Hanging Leg Raise is the case: **11**, not 8.
+
 ### [workouts] BF-162 — the prescription card tells you to load 85 kg onto a Hanging Leg Raise
 
 - **Lane:** B — `components/workout/ai-prescription-card.tsx:283-310`. The data needed to fix it is
