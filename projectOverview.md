@@ -29,6 +29,27 @@
 **Version:** v1.456.4 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-14.
 
+**A generic data-source connector contract now exists, written from the code rather than intent (no
+version bump — docs only).** Owner request: a structure so a second user's own ring/strap/phone can
+feed the app, prompted by a friend testing on an iPhone with Apple Health rather than Android's
+Health Connect. [`docs/data-source-connector-guide.md`](docs/data-source-connector-guide.md) is the
+result — the canonical shape of every data type, which calculation reads what and degrades how
+without it, and a metric-by-metric classification of what Oura's ring computes for us versus what
+the app computes itself (this matters for portability: the stress/resilience/Body-Battery family
+runs on the ring's own per-epoch outputs, not raw sensor waveforms, which lowers the bar for a future
+device considerably).
+[`docs/sync-health-api-reference.md`](docs/sync-health-api-reference.md) is the actual JSON contract
+for `POST /api/sync-health`, and [`docs/superpowers/plans/2026-09-14-apple-healthkit-ios-connector.md`](docs/superpowers/plans/2026-09-14-apple-healthkit-ios-connector.md)
+is a buildable HealthKit plan mirroring the real Health Connect sync field-by-field. **Six backlog
+entries filed, none built yet:** PS-40 (typed connector registry), PS-41 (Health Connect's HR series
+never reaches the table Activity Score depends on), PS-42 (illness radar's own formula degrades
+gracefully but its caller skips it for non-Oura users), PS-43 (Health Connect's 30-day backfill cap
+is an undecided client heuristic), PS-44 (a working rMSSD-from-raw-beats calculator already exists,
+wired only to workout summaries — nightly HRV could use it too, pending validation), PS-45 (no
+per-user API key for external device integration), PS-46 (the HealthKit connector itself — needs a
+real Apple Developer account, hence owner-gated)
+([journal](docs/overview/entries/2026-09-14-generic-datasource-connector.md)).
+
 **BF-110's blank resume now gets a second look, and the next move is the owner's (no version bump —
 instrumentation only).** Sixteen `error_events` samples separate perfectly on viewport height: every
 blank resume reports **667**, every rendered one **826**, and 826 is the S25's real CSS viewport.
