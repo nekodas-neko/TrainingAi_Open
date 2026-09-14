@@ -11766,6 +11766,16 @@ The device-only clause is the half that earns its length. `/more` restores 840 i
 fails on the phone, so a green spec is evidence for the wrong proposition — and this entry has
 already been declared fixed twice.
 
+### `docs/implementation-backlog.md` → 21592 (BF-94's blocker becomes a field)
+
++6. BF-94 printed as READY while its own body said *"Do not ship this until BF-61's fast-tap check
+has been done on the device."* BF-61 is shipped and still owes that check, so it is still queued and
+`Needs: BF-61` clears exactly when the condition does.
+
+Fourth instance today of a field's job being done in prose, and the first one INVERTED: the previous
+three buried work the queue should have shown, this one showed work the queue should have parked. An
+implementer would have built the swipe and then discovered it unshippable.
+
 ## 2026-09-14 — `docs/implementation-backlog.md` → 21081 (OR-113, the shell pass and the settled-Keep sweep)
 
 **503 lines, the largest single drop this file has recorded, and almost none of it is the shell
@@ -11802,3 +11812,9 @@ owner's back-to-Home requirement into **LB-107** — so the counts above were st
 opened. Recomputed rather than spliced, which is the standing rule for a `.size` file: the number is
 a measurement of the merged result, and a conflict in one is two sessions each reporting a count that
 was true of a file neither of them now has.
+
+### Re-derived a second time after #1170 (same PR)
+
++6 from #1170 parking BF-94, merged in while this branch was open. Third recomputation of this one
+number in a morning — which is the argument for `.size` files being recomputed rather than merged:
+each side's number is a true measurement of a file that no longer exists by the time the merge lands.
