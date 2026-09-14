@@ -11765,3 +11765,13 @@ failing.
 The device-only clause is the half that earns its length. `/more` restores 840 in Playwright and
 fails on the phone, so a green spec is evidence for the wrong proposition — and this entry has
 already been declared fixed twice.
+
+### `docs/implementation-backlog.md` → 21592 (BF-94's blocker becomes a field)
+
++6. BF-94 printed as READY while its own body said *"Do not ship this until BF-61's fast-tap check
+has been done on the device."* BF-61 is shipped and still owes that check, so it is still queued and
+`Needs: BF-61` clears exactly when the condition does.
+
+Fourth instance today of a field's job being done in prose, and the first one INVERTED: the previous
+three buried work the queue should have shown, this one showed work the queue should have parked. An
+implementer would have built the swipe and then discovered it unshippable.

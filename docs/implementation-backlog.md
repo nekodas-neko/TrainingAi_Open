@@ -5074,6 +5074,12 @@ computes that as `entries` (`:35`, from `groupDiaryEntries`). One group is one r
 
 - **Lane:** B — `app/session-select/components/recommendation-card.tsx:252-296` and
   `components/ui/swipe-actions.tsx`.
+- **Needs:** BF-61 — **a field as of 2026-09-14, because this entry has been saying it in PROSE and
+  printing as READY the whole time.** The sentence is below and is unambiguous: *"Do not ship this
+  until BF-61's fast-tap check has been done on the device."* BF-61 is shipped but still owes that
+  check, so it is still in the queue, and `Needs:` clears the moment it leaves — which is exactly
+  the condition. An implementer who reached this entry would have built it and then found it
+  unshippable, which is the cost the field now prevents.
 - **⚠ The `Needs: BF-84` this entry carried is DISCHARGED and has been removed (2026-09-03).** Its
   stated reason was that BF-84 *"rewrites what `onRestDay` does"* and that rebuilding how it is
   invoked first would touch the same call site twice. **That rewrite shipped 2026-09-01** (migration
