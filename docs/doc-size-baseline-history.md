@@ -11646,3 +11646,11 @@ proven by building the duplicate deliberately, not just by reverting.
 That is the detail a shorter row would drop, and it is the one worth keeping: the Cardio assertion
 fails first, so a single negative run never reaches the Health half. It would have shipped unproven
 while appearing tested, guarding exactly the two-entrances failure the entry was written about.
+
+## 2026-09-14 — `docs/implementation-backlog.md` (BF-161)
+
+Thirty-three lines, and most of them are the decision rather than the defect. "Add saved meals to the
+builder" reads as a dropdown until you see `saved_meal_items.food_item_id NOT NULL` — a meal item IS
+a food item, so nesting needs a migration, recursive macro computation and cycle prevention. The entry
+carries both options with the production counts (15 meals, 1.9 items each, 304 foods) that make
+flattening the cheap right answer.
