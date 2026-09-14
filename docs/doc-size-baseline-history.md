@@ -12029,3 +12029,14 @@ rather than closing. Its measured harm was a mis-ordered queue — BF-160 above 
 Its unmeasured harm is a `Gate:` that parks nothing, handing an agent owner-gated work with no sign
 anything is wrong. One of those is an annoyance and the other crosses a line the owner drew, and the
 check costs the same either way.
+
+## 2026-09-14 — `docs/implementation-backlog.md` → 20897, `projectOverview.md` → 11020 (BF-154)
+
+−33 on the backlog for BF-154 leaving the queue; +35 on projectOverview, which is more than the fix
+is complicated and is spent on one warning.
+
+The change makes the owner's carb and fat targets visibly DROP — protein is held per kg of
+bodyweight, so re-basing from ~1,660 to ~1,294 takes the whole difference out of the other two. The
+seeded test account moves the **other way**, because its budget base sits above its stored goal, so
+the sandbox cannot show him what he will see. A row recording only "the grams follow the budget now"
+would be true and would leave him to discover the rest on a Tuesday morning.

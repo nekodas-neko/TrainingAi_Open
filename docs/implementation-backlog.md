@@ -500,39 +500,6 @@ below threshold and left in place for next time.
   sources. The harness reaches the tab and proves it is wired; it cannot judge the arithmetic on a
   real library.
 
-### [nutrition] BF-154 — the macro grams still key off the stored goal, and the owner has said they should not
-
-- **Lane:** A — `lib/health/energy-balance-service.ts` and `packages/shared/src/nutrition/`, where
-  the base that `scaleMacrosForEarnedKcal` scales FROM is chosen.
-- **This is BUILDABLE WORK, not residue, and it carried a `Keep:` line for one commit by mistake.**
-  `Keep:` is for an entry owing an owner or device *check*; this owes a change to the code, and the
-  owner has already approved it. The field put an answered, startable item under a KEEP heading that
-  tells the lane not to look — the exact shape OR-100 is filed about — so it is a plain queue entry.
-- **The arithmetic half shipped 2026-09-13 (#1155, v1.455.1)** and is not what this entry asks for:
-  the breakdown sentence now names `budgetProvenance`'s own `base` and `earned`, says *resting rate*
-  on the anchored path, and no longer prints two figures both labelled *resting*. Guarded by
-  `components/nutrition/__tests__/bf154-budget-breakdown-addends.test.ts` and
-  `e2e/bf154-budget-breakdown-reconciles.spec.ts`, the latter proven against the defect before it was
-  run against the fix.
-- **✅ THE OWNER ANSWERED, 2026-09-13: the grams follow the budget.** His words — *"Can we have it
-  dynamically sized for my calories? I.e before excercise its 1 value and after its another if
-  calories increase?"* So the gram targets take the **budget** as their base, not the stored 1,660,
-  and the printed gap goes to zero by construction rather than being explained.
-  `scaleMacrosForEarnedKcal` already grows them with `earned` and holds protein fixed while splitting
-  the rest on the stored carb/fat ratio — that half is built and needs no change. What changes is the
-  base it scales FROM.
-- **⚠ Flag when building:** protein is held constant by that function, so re-basing from 1,660 to
-  ~1,294 drops carbs and fat while 150 g protein stands. That is the right shape for a cut and a
-  visible change to his targets — worth confirming on the first day it renders rather than after a
-  week of it.
-- **Two things #1155 left behind become dead when this lands, and go in the same change:** the
-  explanatory paragraph in `components/nutrition/energy-card.tsx` exists only because the two numbers
-  disagree, and `components/nutrition/macro-budget-gap.ts` exists only to measure that disagreement.
-  A gap that is zero by construction needs neither. Do not leave a card explaining a difference that
-  no longer exists.
-- **Added:** 2026-09-13 · re-queued from the shipped half, so the owner's answer is not lost with the
-  entry that carried it.
-
 ### [app-shell] LB-107 — back on a tab with nothing to pop should land on Home, not leave the app
 - **Lane:** B — the tab shell's history handling; `app/**` and `components/shell/**`.
 
