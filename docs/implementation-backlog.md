@@ -4314,6 +4314,14 @@ stronger reason the measured one wins.
 
 ### [app-shell][platform] BF-110 — the blank resume survives a scroll, which means the renderer never died
 
+- **Keep:** the READING, and only that. The second viewport log **shipped 2026-09-14**
+  (`feat/bf110-second-viewport-log`), so nothing here is owed a build. What is owed is one blank
+  resume in the owner's normal use, then `error_events`:
+  `... WHERE message LIKE 'bf110 resume recheck%'`. **`stuck` → the viewport is genuinely held at
+  384×667 and the fix is native; `resized` → the measurement was early and the fix is when the app
+  decides to render.** Still do not write a fix before that row exists — the two answers point at
+  different files.
+
 - **⚠ RE-MEASURED 2026-09-14 (Orchestrator): the separation HOLDS with more samples, and it is now
   route-independent — which rules out a hypothesis.** Seven days of `bf110 resume dom-intact` rows,
   every one of them still on one side or the other, and now spread across **six different routes**:

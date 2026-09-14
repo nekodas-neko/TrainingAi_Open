@@ -4,6 +4,7 @@ import path from 'node:path'
 import {
   readShellSample, isDomIntact, shouldReportResume, resumeReportMessage,
   nudgeRepaint, handleResume, resetResumeReportingForTest,
+  resumeRecheckMessage, RESUME_RECHECK_MS,
 } from '@/lib/resume-repaint'
 
 vi.mock('@/lib/client-error', () => ({ reportClientError: vi.fn() }))
@@ -103,6 +104,64 @@ describe('the repaint', () => {
     handleResume(el(0, 0, 0), cb => frames.push(cb))
     expect(vi.mocked(reportClientError)).toHaveBeenCalledTimes(2)
     expect(vi.mocked(reportClientError).mock.calls[1][0].message).toContain('dom-lost')
+  })
+})
+
+/**
+ * The second reading (BF-110, 2026-09-14).
+ *
+ * Sixteen samples separate perfectly on viewport height — every blank resume reported **667**, every
+ * rendered one **826**, and 826 is the S25's real CSS viewport. But that cannot yet tell a WebView
+ * stuck at its 384\u00d7667 default from a measurement taken before it resized, and **the two answers
+ * point at different files**: a JS render-timing fix, or the native layer. Hence a second look.
+ */
+describe('the recheck', () => {
+  it('names the verdict rather than leaving two numbers to be diffed', () => {
+    const first = { width: 384, height: 667, childCount: 1 }
+    expect(resumeRecheckMessage(first, { width: 412, height: 826, childCount: 7 }))
+      .toBe('bf110 resume recheck resized h1=667 h2=826 w2=412 children2=7')
+    expect(resumeRecheckMessage(first, { width: 384, height: 667, childCount: 1 }))
+      .toBe('bf110 resume recheck stuck h1=667 h2=667 w2=384 children2=1')
+  })
+
+  it('reads the element AGAIN rather than reporting the first sample twice', () => {
+    // The whole value is in the second measurement. Closing over the first sample for both halves
+    // would produce a row that always says `stuck` and looks like an answer.
+    const node = el(384, 667, 1)
+    const deferred: Array<() => void> = []
+    handleResume(node, () => {}, cb => deferred.push(cb))
+
+    // The viewport resizes between the two readings, which is the case under test.
+    node.getBoundingClientRect = () => ({ width: 412, height: 826 })
+    node.childElementCount = 7
+    deferred.forEach(f => f())
+
+    expect(vi.mocked(reportClientError).mock.calls[1][0].message)
+      .toBe('bf110 resume recheck resized h1=667 h2=826 w2=412 children2=7')
+  })
+
+  it('rides the first row budget: no first row, no recheck', () => {
+    // `error_events` prunes at 30 days and is the second-largest object in the database. A recheck
+    // on every resume would double a cost the once-per-launch cap exists to avoid.
+    const node = el(412, 830, 7)
+    const deferred: Array<() => void> = []
+    handleResume(node, () => {}, cb => deferred.push(cb))   // files, so it schedules
+    expect(deferred).toHaveLength(1)
+    handleResume(node, () => {}, cb => deferred.push(cb))   // capped, so it does not
+    expect(deferred).toHaveLength(1)
+  })
+
+  it('waits long enough for a resize to have happened, and stays inside the same resume', () => {
+    const deferred: Array<{ ms: number }> = []
+    handleResume(el(384, 667, 1), () => {}, (_cb, ms) => deferred.push({ ms }))
+    expect(deferred[0].ms).toBe(RESUME_RECHECK_MS)
+    expect(RESUME_RECHECK_MS).toBe(500)
+  })
+
+  it('is wired with a real timer at the call site, not left unscheduled', () => {
+    // The parameter is optional so the first half's tests keep working; that makes it exactly the
+    // kind of thing that can be added and never passed.
+    expect(src('lib/hooks/use-resume-repaint.ts')).toMatch(/setTimeout\(cb, ms\)/)
   })
 })
 
