@@ -11654,3 +11654,9 @@ builder" reads as a dropdown until you see `saved_meal_items.food_item_id NOT NU
 a food item, so nesting needs a migration, recursive macro computation and cycle prevention. The entry
 carries both options with the production counts (15 meals, 1.9 items each, 304 foods) that make
 flattening the cheap right answer.
+
+## 2026-09-14 — `docs/implementation-backlog.md` (BF-161's gate lifted)
+
+Six lines net: the `Gate: owner` bullet becomes the decision plus the consequence the owner is
+accepting. The extra length is deliberate — *"for now"* invites a nullable `food_item_id` left in
+place for a future nobody has asked for, and flatten only wins because it needs no migration at all.
