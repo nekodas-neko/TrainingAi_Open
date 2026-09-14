@@ -82,10 +82,15 @@ provenance bug before it was made required).
   `activity_logs` (`enrichActivityLogs`, `lib/health-connect-sync.ts:186-230`). It is **never
   written into `oura_heartrate`**. §4 shows the concrete cost of this gap: Activity Score's
   zone-minutes/move-hours contributors go missing for a Health-Connect-only user even though the
-  data exists — it just never reaches the table those contributors read. §7 files this as a
-  backlog item (PS-41).
+  data exists — it just never reaches the table those contributors read.
+  `docs/implementation-backlog.md` files this as **PS-41**.
 - **Derived from HR, not stored separately:** `daily_zone_minutes` (per-day time-in-zone) is a
   server-computed cache over `oura_heartrate`.
+- **This bpm value is the one metric in §5.6's classification that's a trivial, universally
+  portable conversion** (`60000 / ibi_ms`) rather than a model — see §5.6. **HRV is a different
+  story and does NOT live in this table**: it's the ring's own computed `rmssd_ms`, quality-selected
+  (not recomputed) into `body_metrics.hrvMs` — see §5.6 before assuming HRV is "ours" the way steps
+  or sleep stages are.
 - **RR intervals (beat-to-beat), if the device exposes them:** separate list, separate table.
   ```ts
   { at: string /* ISO */, rrMs: number, source?: string /* defaults 'chest_strap' */ }[]
@@ -189,7 +194,7 @@ table it reads.
 beyond totals, daytime-HRV→stress→resilience, readiness's temperature term, illness detection,
 training-stress score, and Body Battery "do not survive" a device switch — is **confirmed accurate**
 for everything except illness radar and Activity Score's HR contributors, which are gaps a
-normalize-layer fix could close (§5.5, §7). Readiness and Sleep Score already have real,
+normalize-layer fix could close (§5.5, §5.6). Readiness and Sleep Score already have real,
 shipped degraded-input code paths — not aspirational, verified in `readiness-payload.ts` lines
 494–541 (`// Generic-source fallback (Q-43)`) and the conditional-weight blend in `sleep-score.ts`.
 
@@ -274,7 +279,42 @@ inline to enrich `activity_logs.avgHr`/`maxHr` for individual sessions
 (`enrichActivityLogs`), then discarded. The data needed to compute Activity Score's zone-minutes and
 move-hours contributors for a Health-Connect-only user already arrives in the sync payload; it's
 just never normalized into the table those contributors read. This is the concrete, fixable instance
-of the general rule this section states — filed as **PS-41** in §7.
+of the general rule this section states — filed as **PS-41** in `docs/implementation-backlog.md`.
+
+### 5.6 Ring-computed vs. our-own-model — the precise portability classification, per metric
+
+§5.2 says the rollup normalizes decoded values into the §3 shapes. It doesn't say who did the
+*computation* those values represent — and that distinction is the actual answer to "can we
+calculate stress from the decoded-data layer, and what's automatic versus what do we calculate
+ourselves." Verified against the decode/model code directly (`lib/oura-ble/decode.ts`,
+`lib/oura-models/`, `lib/health/night-vitals.ts`), not assumed:
+
+| Metric | Verdict | Evidence |
+|---|---|---|
+| **Steps** | **We compute it, entirely.** Not a ring-transmitted count at all. | `decodeRealSteps` (tags `0x7e`/`0x7f`) decodes per-window accelerometer feature vectors — the code comment states explicitly these are inputs to the ring's *own* internal model, not a count, and warns against reading them as one. The live pipeline runs a gait-autocorrelation heuristic over raw `0x33` accelerometer frames (`lib/oura-ble/gait-step-count.ts`) and a vendored ONNX model (`lib/oura-models/steps-motion-decoder.ts` → `lib/oura-models/inference/step-counter.ts`, `step_counter_1_3_0_core.onnx`) over the same raw motion — both ours, both running on raw signal |
+| **Sleep stages (hypnogram)** | **Mostly we compute it.** Decode support for a ring-transmitted array exists but the Ring 5 doesn't use it in practice. | `decodeSleepPhases` (tags `0x4b`/`0x4e`/`0x5a`) is a pure decode of a ring-transmitted stage array — but `lib/oura-ble/rollup/run.ts:494`'s own comment: "the Ring 5 emits no phase events." The live path is our own SleepNet ONNX inference (`lib/oura-models/inference/sleepnet.ts`) on raw motion/HR/temp epochs, or a heuristic stager when even that's unavailable |
+| **Instantaneous HR (bpm)** | **Trivial conversion, universally portable.** | The ring transmits inter-beat-interval (`ibi_ms`, its own PPG beat-detection firmware output); `hr_bpm = 60000/ibi_ms` is our arithmetic, not a model. Any device exposing beat intervals feeds this identically — this is the one case where "our computation" carries none of the Oura-specific porting risk the other rows do |
+| **HRV (rMSSD)** | **Ring-computed — we select, not recompute.** | `decodeHrv` (tag `0x5d`) decodes the ring's own paired `(bpm, rmssd_ms)` samples, one per 5 min, computed on-ring. `night-vitals.ts`'s own header rule: HRV is "a quality-gated MEDIAN of the ring's own `0x5d` rmssd_ms, never a recompute from IBI" — deliberately preserved as the ring's figure, not ours |
+| **Skin temperature** | **Ring-computed sample, we aggregate.** | `decodeTemperatures` (tags `0x46`/`0x69`/`0x75`) is a pure centi-°C decode of the ring's own sensor reading; nightly temperature is our median/windowing over those already-computed samples |
+| **Respiratory rate** | **We compute it**, from the ring's IBI. | `breathingFromIbi` per 5-min epoch, night figure = median of per-epoch breaths/min — our algorithm on the ring's beat-interval output |
+| **RHR** | **We compute it** — an aggregation over our own bpm-from-IBI values. | `nightlyHeartRate()`: lowest 5-min *bin average*, MET-gated, never the raw per-beat minimum. No RHR scalar is ever transmitted by the ring |
+| **SpO2** | **We compute it, and it's uncalibrated.** | The Ring 5 "never emits the firmware-calibrated `spo2_event` over BLE" (confirmed overnight, per code comment) — only raw R ratio-of-ratios + perfusion index (`0x8b`), run through a borrowed-coefficient quadratic explicitly flagged `calibrated: false`. Worth knowing this is already weak for Oura, not a regression a new device would introduce |
+| **Chronic/daytime stress, resilience, daytime-HRV** | **Our own models — but fed by ring-computed intermediates, not raw PPG/accelerometer.** | `cumulative-stress.ts`, `stress-resilience.ts`, `daytime-hrv-model.ts` all consume the ring's own per-epoch outputs: `0x5d` HRV samples, `0x46`/`0x69` temp samples, `0x50` MET bins — never raw waveform data directly. The daytime-HRV replacement is explicit about this: `HRV_TAG = 0x5d`, `TEMP_TAGS = [0x46, 0x69]`, fit by OLS against the ring's own paired samples |
+| **Body Battery** | **Entirely our own model.** No BLE tag carries a Body Battery figure — inputs are our own derived HR/RHR values (above) plus the stress model |
+| **Training Stress Score (OTS)** | **Our own algorithm, on a ring-computed input.** | `runTrainingStressScore` is our port of a vendored formula, run over the ring's own `0x50` MET series (`decodeActivityInfo` — ring firmware computes MET per bin) plus RHR/readiness/profile |
+
+**What this means for "if we ever moved to a new device, would it stay similar":** the practical
+porting bar for most of §4's "hard Oura-only" row is **not** "does the new device expose raw
+PPG/accelerometer waveforms" — it's **"does the new device expose the same per-epoch
+intermediates the Oura ring already reduces to for us"**: a 5-minute HRV/bpm pair, periodic
+skin-temp samples, per-bin MET/activity. Several consumer rings and straps already do this over
+their own BLE services or SDKs. Steps and sleep staging are the exception — those are genuinely
+"raw signal → our own model" today (accelerometer → gait/ONNX step model; motion+HR+temp →
+SleepNet), which is the **opposite** of most computed-tier sources (Health Connect gives finished
+steps and a finished stage array directly, no model needed on our side at all — see §2's tier
+split). That asymmetry is worth being explicit about rather than assuming "decoded from Oura" and
+"received from Health Connect" sit at the same level of abstraction — they don't, for those two
+metrics specifically, even though both ultimately land in the same §3 shape.
 
 ---
 
