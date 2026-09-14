@@ -352,6 +352,50 @@ split). That asymmetry is worth being explicit about rather than assuming "decod
 "received from Health Connect" sit at the same level of abstraction — they don't, for those two
 metrics specifically, even though both ultimately land in the same §3 shape.
 
+### 5.7 Could we compute a ring-computed value ourselves instead, for future consistency?
+
+Worth asking of every "ring-computed, we decode" row in §5.6: is there a lower-level raw signal we
+could run our own computation on instead of trusting the ring's figure — which would mean any
+device exposing that lower-level signal (not specifically Oura's exact per-epoch computation) could
+feed the same pipeline? Checked against the actual code rather than assumed:
+
+- **HRV (rMSSD) — yes, and the computation already exists, just isn't wired to the scoring
+  pipeline.** `packages/shared/src/health/rmssd.ts` → `rmssdFromRr(rrMs: number[])` is a standard
+  rMSSD implementation (successive-difference formula, Kubios-style artifact filtering, 30-beat
+  minimum) — its own header comment calls it "the ONLY RR→rMSSD implementation in the app," and
+  distinguishes itself from the ring's `0x5d` events explicitly. It's real, tested, and already
+  running on live device data — but only for a workout's rest-window HRV
+  (`packages/shared/src/workout/compute-workout-hr.ts`, fed by the Polar H10's raw beat intervals
+  via `rr_intervals`). Every other HRV consumer — nightly HRV (`night-vitals.ts`), Readiness,
+  chronic stress, resilience — reads the ring's own precomputed `0x5d rmssd_ms` exclusively;
+  `rr_intervals` (and `rmssdFromRr`) never reach any of them. **The practical consequence: the
+  Polar strap is already streaming the raw ingredient this would need into the app today.** If worn
+  overnight, nightly HRV could in principle be computed from it right now, with no new device
+  integration — only a pipeline change. Filed as **PS-44** in `docs/implementation-backlog.md`.
+- **MET/activity intensity — no independent computation exists; would be genuinely new work.**
+  The app's calorie/energy estimate is HR-regression-first (`estWorkoutKcalFromHr`, a published
+  formula) with a MET-based fallback — but that MET table is Oura's own vendored data
+  (`lib/oura-models/__fixtures__/constants/energy-expenditure-features.json`), not something the
+  app derives from raw accelerometer. Unlike HRV, there's no shelved implementation to wire up;
+  building a raw-accelerometer MET estimator would be new work shaped like the step-counter model
+  (§5.6) — its own model, its own calibration — not a rewiring of an existing one.
+- **Skin temperature — nothing to gain.** A temperature sample already *is* the rawest available
+  reading; there's no lower layer left to compute it from ourselves.
+- **SpO2 — already fully our own computation**, and already flagged in §5.6 as uncalibrated. The
+  open problem here is calibration quality (needs a real pulse-oximeter reference to fit against),
+  not "should we compute it ourselves" — we already do.
+- **Respiratory rate — already fully our own computation**, from the ring's raw IBI stream, and
+  already portable to any device exposing beat intervals — nothing further to change.
+
+**The one thing worth stating plainly before actually wiring `rmssdFromRr` into the live scoring
+path:** the app currently trusts the ring's own value on purpose, per `night-vitals.ts`'s own
+comment — not an oversight. Before replacing it, validate the recomputed figure against the ring's
+own `0x5d` values over real history, the same way the app already did once for a different metric
+(`daytime-hrv-model.ts`'s own header calls its approach "observe-never-feed" — built from scratch,
+checked against Oura's output, only then trusted). Swapping a live health-score input without that
+check is exactly the kind of change `CLAUDE.md`'s Standing Agents rules reserve for Tuning-style
+validation and owner sign-off, not a silent code change.
+
 ---
 
 ## 6. Provenance — the ranked per-field merge
@@ -583,7 +627,7 @@ ring-specific, but because no other source has been wired to fill this shape yet
 | # | Input | Shape | Feeds | Oura's route to it | Why nothing else supplies it today |
 |---|---|---|---|---|---|
 | 9 | Skin temperature samples (periodic) | time series | Readiness's temperature term, illness radar, chronic stress | ring-computed samples, we aggregate (§5.6) | Health Connect has no periodic-temperature record type in the app's current read list (`lib/health-connect-sync.ts`'s `HC_SYNC_READ_TYPES`) |
-| 10 | Fine-grained HRV (~5 min cadence) | time series | Chronic stress, resilience | the ring's own `0x5d` samples, decoded directly (§5.6) | Health Connect exposes only a daily/session HRV figure, not a 5-min series, in what this app currently reads |
+| 10 | Fine-grained HRV (~5 min cadence) | time series | Chronic stress, resilience | the ring's own `0x5d` samples, decoded directly (§5.6) | Health Connect exposes only a daily/session HRV figure, not a 5-min series. **The Polar strap could already supply this one** — its raw RR intervals are already flowing into the app, and a standard rMSSD calculator (`rmssdFromRr`) already exists and runs on that exact data, just not wired to this pipeline yet (§5.7, PS-44) |
 | 11 | MET / activity-intensity series (per-minute) | time series | OTS training-stress score, daytime stress | the ring's own `0x50` activity-info stream, decoded directly (§5.6) | no equivalent fine-grained record is read from Health Connect today |
 | 12 | SpO2 | number/night | Illness radar (optional) | our own uncalibrated formula from raw ring sensor data — the weakest link even for Oura (§5.6) | Health Connect can supply this; not yet normalized into the illness-radar path (same class of gap as #6, not separately filed) |
 | 13 | Respiratory rate | number/night | Sleep Score bonus, illness radar | our own median-of-epochs from ring IBI (§5.6) | not commonly exposed by other platforms either |

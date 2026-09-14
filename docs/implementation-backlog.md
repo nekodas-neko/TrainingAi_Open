@@ -548,6 +548,42 @@ below threshold and left in place for next time.
   is a product/UX decision about what "connect a data source" promises the user, not a technical
   blocker.
 
+### [devices][heart-rate] PS-44 — compute nightly/readiness HRV from raw beat intervals instead of trusting the ring's own figure
+
+- **Gate:** owner. This changes an input to a live health score, not a UI/infra change — same class
+  of decision `CLAUDE.md`'s Standing Agents rules reserve for Tuning-style validation and sign-off,
+  never a silent swap.
+- **Added:** 2026-09-14 (one-off session; owner asked directly whether any Oura-computed value could
+  be calculated by the app itself for future device-consistency — see
+  [`docs/data-source-connector-guide.md`](data-source-connector-guide.md) §5.7).
+- **What already exists, and isn't connected:** `packages/shared/src/health/rmssd.ts` →
+  `rmssdFromRr(rrMs)` is a standard, artifact-filtered rMSSD implementation, already running on real
+  device data — but scoped only to a workout's rest-window HRV
+  (`packages/shared/src/workout/compute-workout-hr.ts`, fed by the Polar H10's `rr_intervals`).
+  Every other HRV consumer (`night-vitals.ts`'s nightly HRV, Readiness's HRV-balance contributor,
+  chronic stress, resilience) reads the ring's own precomputed `0x5d rmssd_ms` exclusively and never
+  touches `rr_intervals`/`rmssdFromRr`.
+- **Why this one, and why now:** it's the one item in §13's "Oura-only, no fallback" list where the
+  raw ingredient (beat-to-beat intervals) is *already streaming into the app* from a second device
+  (the Polar strap) — unlike temperature or MET, which have no existing raw-signal supplier at all.
+  Wiring this up costs a pipeline change, not a new integration.
+- **What this buys:** any future device exposing raw beat intervals (a near-universal HR-hardware
+  capability) could feed nightly HRV/chronic-stress/resilience identically to the ring, closing part
+  of the "Oura-only" gap without needing that device to replicate Oura's own specific per-epoch
+  computation.
+- **The catch, stated so it isn't skipped:** `night-vitals.ts`'s own header comment says the ring's
+  `0x5d` figure is used deliberately, not by oversight. Before this becomes the live source, validate
+  `rmssdFromRr` over raw IBI against the ring's own `0x5d` values across real history — the same
+  "observe, never feed until checked" discipline `daytime-hrv-model.ts` already used once for a
+  different metric. Do not swap the live pipeline on the strength of the formula being textbook-correct
+  alone; artifact rejection and beat-quality gating are exactly where a naive recompute can diverge
+  from a vendor's tuned figure.
+- **Coverage caveat:** the Polar strap isn't worn continuously the way the ring is, so it only
+  supplies nightly coverage on nights it's actually worn to bed — this closes the portability gap in
+  principle, not a coverage gap for the current single-ring setup.
+- **What's needed to start:** owner sign-off on doing the validation pass at all (since it's
+  scoring-adjacent work), then the comparison itself, before any pipeline change ships.
+
 ### [nutrition] BF-161 — the meal builder can only reach foods, so a meal made of meals has to be rebuilt ingredient by ingredient
 
 - **Lane:** B for the recommended shape (`components/nutrition/ingredient-search.tsx`,
