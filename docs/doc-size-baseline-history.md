@@ -11936,3 +11936,9 @@ The added length is mostly the things now ruled out by reading — no `storage` 
 it. That shape is what made today's conclusion possible at all: the 2026-08-30 header wrote *"if the
 abort returns, the SW was not it"*, and a fortnight later the return of the abort settled it with no
 new run.
+
+## 2026-09-14 — `docs/implementation-backlog.md` (BF-161's gate lifted)
+
+Six lines net: the `Gate: owner` bullet becomes the decision plus the consequence the owner is
+accepting. The extra length is deliberate — *"for now"* invites a nullable `food_item_id` left in
+place for a future nobody has asked for, and flatten only wins because it needs no migration at all.

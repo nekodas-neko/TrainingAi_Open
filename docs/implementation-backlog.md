@@ -477,9 +477,15 @@ below threshold and left in place for next time.
   computation in every consumer of `saved_meal_items`**, and cycle prevention (meal A contains B
   contains A) — a class of bug with no cheap guard. Not worth it for 15 meals of 1.9 items unless the
   owner specifically wants edits to propagate.
-- **Gate: owner** — flatten vs nest is a product decision about whether a built meal tracks its
-  source, not something an implementer should settle. The recommendation is flatten; a one-line answer
-  unblocks it.
+- **✅ OWNER DECIDED 2026-09-14: FLATTEN.** *"Okay lets go with flatten for now"* — the gate is
+  lifted and this is startable. **Build the flatten path only; do not add a nesting column.** The
+  *"for now"* is noted and changes nothing about the build: if propagation is wanted later it is a
+  new entry with its own migration, not a half-measure designed in here. Leaving room for nesting
+  would mean a nullable `food_item_id` today for a feature nobody has asked to build, which is the
+  cost this decision avoids.
+- **What the owner is accepting, restated because it is the part that bites later:** a meal built
+  from saved meals is a snapshot. Editing the source meal afterwards does not change it. Nothing on
+  screen should imply otherwise — no "from <meal name>" provenance chip that reads as a live link.
 - **Verification:** on device, build a meal from two saved meals and confirm the ingredient rows,
   their quantities, and the resulting macro total match the sum of the sources.
 
