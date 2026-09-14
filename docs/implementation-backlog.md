@@ -623,6 +623,34 @@ below threshold and left in place for next time.
 - **Reversal cost:** low, but it changes what a hardware gesture does, so it wants the device before
   it is called done.
 
+### [platform] LB-108 — E2E reports green without running whenever a change lives in `lib/`, and `lib/hooks/**` is UI
+- **Lane:** O — `.github/workflows/ci.yml`, the *"Does this change touch the UI?"* step (~line 637).
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-14 · found shipping BF-110's recheck.
+- **Observed, not reasoned.** PR #1173's E2E check went **green in 40 seconds** on a suite that takes
+  ~28 minutes. The job log is Postgres starting and stopping and **nothing else** — no Playwright
+  invocation at all. The PR changes `lib/resume-repaint.ts` and `lib/hooks/use-resume-repaint.ts`.
+- **The detector matches four prefixes** and `lib/` is not among them:
+  `grep -vE '^app/api/' | grep -qE '^(app/|components/|e2e/|playwright\.config\.ts$)'`.
+- **`lib/hooks/**` is UI by the repo's own lane rule** — CLAUDE.md puts `lib/hooks/**` and
+  `lib/stores/**` in Lane B, the surface lane, beside `components/**`. **26 files under `lib/` carry
+  `'use client'`**, including `use-cached-value.ts`, `use-scroll-restoration.ts` and
+  `use-resume-repaint.ts` — the last two mounted on the shell container **every screen inherits**.
+  A change to any of them currently ships with E2E green having tested nothing.
+- **LA-22's design is right and this is not an argument against it.** The job deliberately always
+  runs and always reports, skipping its expensive half, so that a required check never leaves a PR
+  pending. LA-63 then dropped `app/api/**` because no browser reaches it. Both are sound. **The
+  prefix list simply never grew a `lib/` clause**, and `lib/` was not a browser-reached directory
+  when it was written.
+- **Recommended shape:** add the client-reachable `lib/` subtrees to the same positive match —
+  `lib/hooks/`, `lib/stores/`, and `lib/media/` — rather than matching all of `lib/`, which would
+  re-buy the full suite for every engine change and undo LA-63.
+- **⚠ Do not verify this by reading the diff of the workflow.** The failure mode is a check that
+  passes without running, so the evidence is the JOB DURATION and the absence of a Playwright line in
+  the log. A 40-second E2E is the tell; confirm the fix the same way, by a run that takes minutes.
+- **Pass test:** a PR touching only `lib/hooks/**` runs the browser suite.
+- **Reversal cost:** none, one line of shell in a workflow.
+
 ### [platform] LB-106 — `preferences-survive-reinstall` fails on CI and passes everywhere else, twice in one day
 - **Lane:** B — `e2e/preferences-survive-reinstall.spec.ts`, or the launch-time hydration it waits on.
 

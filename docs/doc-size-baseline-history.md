@@ -11893,3 +11893,15 @@ use — and the row it produces decides which of two files the eventual fix live
 viewport is genuinely held at the WebView's 384×667 default and the fix is native, `resized` means
 the measurement was early and the fix is render timing. A status line saying only "added a log" would
 leave the next reader without the thing that makes the log worth reading.
+
+## 2026-09-14 — `docs/implementation-backlog.md` → 20953 (LB-108, the E2E blind spot)
+
++28 for an entry found by noticing that a check passed too fast. PR #1173's E2E went green in **40
+seconds** on a suite that takes ~28 minutes; the job log is Postgres starting and stopping and no
+Playwright invocation at all.
+
+Most of the entry's length is the two things that stop it being "fixed" wrongly. First, LA-22's
+always-run-always-report design and LA-63's `app/api/**` exclusion are both sound and the entry says
+so — the prefix list simply never grew a `lib/` clause, because `lib/` was not browser-reached when
+it was written. Second, the warning not to verify by reading the workflow diff: the failure mode is a
+check that passes without running, so the evidence is the job DURATION, not the YAML.
