@@ -11601,3 +11601,38 @@ Thirty lines. Most of them are the credited/not-credited table and the 894-step 
 the entry's whole point is that the run IS partly credited — the zone minutes arrive from the strap
 without an activity row — and the missing half is therefore invisible. An implementer who assumes
 "nothing counted" would double-count the zone minutes fixing it.
+
+## 2026-09-14 — `docs/implementation-backlog.md` → 21702 (`Reference:` documented; LA-104 out, LB-104/LB-105 in)
+
++38 net. LA-104's 25 lines left with the entry it shipped; what replaced them is a field definition,
+the sweep it implies (LB-104), and one unrelated red test found while regression-testing (LB-105).
+
+**`Reference:` had never been documented.** It means *this entry is READ, not built* —
+`next-item.js` prints it under *"never next"* — but the only place that was written down was
+`check-backlog-pointers.js`, which enforces the opposite direction (a prose-only "not implementable"
+must carry the field). So three sessions read the name and used it for *"here is supporting
+reading"*. LA-104 itself was filed that way, which is how it was found: it sat under "never next"
+carrying an explicit `Lane: B`.
+
+**The tell is a printed reason that is a bare link**, where a real one reads as a sentence. Seven
+entries have it; three were opened and all three were work — LA-104 shipped, LA-102 (64 lines of
+unbuilt Lane B surface) and TN-28 moved to `Background:` and are now READY. The remaining four are
+Tuning's and are left to their lane rather than guessed at, tracked as LB-104.
+
+Same shape as `Gate: device` on unbuilt work and `Verify:` on unshipped work: a field whose name
+invites a second reading, and a queue that goes quiet rather than wrong.
+
+## 2026-09-14 — `projectOverview.md` → 10852 (LA-104: the stress chart's one baseline)
+
++14. Twelve are the Current Status entry for LA-104 and two amend a stale Tuning line that still said
+TN-3b was parked on Q-507's sign. The entry is long for a status row because the *number* is the
+finding — over the eight days that carried both series, the sign differed on six and high-stress
+minutes by 4–8× — and a row that said only "the chart now reads storage" would leave the next reader
+free to reintroduce the live one.
+
+The +3 on top of that is LB-105 answering its own first step. Its entry told the next session to read
+CI's E2E job; that job then passed green on this very PR, on the exact tree that fails locally, so the
+answer arrived before the entry shipped. Leaving the instruction in place would have sent someone to
+fetch information already in hand. What replaced it is the finding — the failure is the sandbox seed,
+and a spec that is red locally and green on CI is worse than either, because it trains a session to
+skip it.

@@ -10,6 +10,7 @@ import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache";
 import { DAY_LOG_TTL, ENERGY_BALANCE_TTL, HR_PROFILE_TTL, TTL_LONG } from "@trainingai/shared/cache-ttl";
 import { todayInTz, shiftDateStr } from "@trainingai/shared/date-utils";
 import { DayReadThrough } from "@/components/health/day-detail/day-read-through";
+import { StressDayChart } from "@/components/body-battery/stress-day-chart";
 import type { DayLogResult } from "@/app/api/day-log/route";
 import type { EnergyBalanceResponse } from "@/app/api/nutrition/energy-balance/route";
 import type { FoodLogWithItem } from "@trainingai/shared/types/nutrition";
@@ -248,6 +249,16 @@ export function DayDetailContent({ initialDate, tz, userId }: { initialDate: str
               restingHr={hrProfile?.restingHr ?? null}
               tz={tz}
               controls={readThroughControls}
+            />
+
+            {/* LA-104. The stress chart's whole claim is that days are comparable — it reads the
+                stored series so today and a past day come from one baseline — and until it was
+                mounted somewhere you can open a past day, that claim was untestable. This screen
+                already swipes between days, so it is where the comparison actually happens.
+                Renders nothing on a day the ring recorded no stress for. */}
+            <StressDayChart
+              date={selectedDate}
+              className="rounded-2xl border border-white/10 bg-white/[0.04] p-3.5"
             />
           </motion.div>
         </AnimatePresence>

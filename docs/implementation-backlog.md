@@ -129,6 +129,22 @@ silently misdirecting the next session. Update them in the same PR that consumes
 >   over. **If the residue is something to build, split it** per the two-entry rule below (`Needs:`
 >   pointing at the shipped half) rather than describing it in a `Keep:`. Tracked as `OR-100`.
 >
+> - **`Reference: <why>`** — **this entry exists to be READ, not built.** `next-item.js` prints it
+>   under REFERENCE, headed *"never next"*, and never as work. It was added for the two map entries
+>   that said so only in prose (BF-28, BF-11) and printed as READY #1 for three sessions running;
+>   `check-backlog-pointers.js` fails a prose-only "not implementable" without it.
+>   **⚠ It is NOT "further reading for whoever builds this", and that misreading buries real work.**
+>   The field name invites it — nothing here documented the field until now, so the only way to learn
+>   it was from the check that enforces it. **The tell is that the printed reason is a bare link**,
+>   where a real one reads as a sentence. Counted 2026-09-14 across all three lanes: **seven** entries
+>   have that shape — `LA-102`, `LA-104`, `TN-28`, `TN-22`, `TN-25`, `TN-29`, `TN-31`. Three were
+>   checked and all three were startable work, not reading: LA-104 was built the same day, and
+>   LA-102 and TN-28 are unbuilt Lane B surface work — LA-102's 64 lines of it — that sat under
+>   *"never next"* while Lane B's READY list held two items. Same shape as `Gate: device` on unbuilt
+>   work and `Verify:` on unshipped work, one section over. The four `TN-` entries are left to their
+>   lanes and tracked as **LB-104**. Put supporting reading under **`Background:`**, which no tool
+>   reads.
+>
 > - **`Batch: <slug>`** — these entries ship as **one PR**, because one verification pass covers all
 >   of them. `next-item.js` groups them and the batch takes its highest member's queue position.
 >   **Never batch a migration or a sync-push change**; batch native/Kotlin work hardest, since each
@@ -700,7 +716,9 @@ below threshold and left in place for next time.
   `components/nutrition/energy-card.tsx` / `components/nutrition/calorie-balance-bar.tsx`.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-13 · found shipping BF-152.
-- **Reference:** [`the BF-152 journal entry`](overview/entries/2026-09-13-lane-a-bf152-resting-rate-anchored-budget.md).
+- **Background:** [`the BF-152 journal entry`](overview/entries/2026-09-13-lane-a-bf152-resting-rate-anchored-budget.md).
+  (Was `Reference:` — see that field's note above. It is supporting reading, not a statement that this
+  entry is read-only, and the field filed 64 lines of unbuilt Lane B surface work under REFERENCE.)
 - **The engine half is done and this is the half it deliberately left.** BF-152 made the
   zero-movement budget the user's resting rate, and the line under the bar now reads
   `1,815 resting rate — no movement recorded yet today` (verified on Home and the Nutrition tab,
@@ -721,30 +739,53 @@ below threshold and left in place for next time.
   the base, and nothing on the screen implies the base is a full day's burn.
 - **Reversal cost:** none. It is copy.
 
-### [readiness] LA-104 — today's stress chart and a past day's come from two different baselines
-- **Lane:** B — `components/body-battery/stress-day-chart.tsx` and whatever feeds it on the day screen.
-  The engine half is done; this is which source the surface reads.
+### [platform][nutrition] LB-105 — `day-review-read-through`'s first test is red on `main`, and it may only be red here
+- **Lane:** B — `e2e/day-review-read-through.spec.ts`, or the seed it runs against.
 
-- **Branch:** _unassigned_ · **Added:** 2026-09-13 · found shipping LB-102's read path.
-- **Reference:** [`the LB-102 journal entry`](overview/entries/2026-09-13-lb102-stress-day-read-path.md).
-- **The two series are not the same number and TN-3a says so out loud.** `lib/oura-ble/rollup/run.ts`
-  builds the persisted buckets from `latest.rhrLowBpm` + `nightHrvMs`; `/api/body-battery` builds its
-  live series from `restingHr` + a 28-day HRV mean. Its own comment: *"persisting both would put two
-  numbers behind one metric"* — which is why only the rollup's are stored.
-- **So a chart that reads TODAY live and a PAST day from storage is showing two metrics on one axis**,
-  and the owner's approved pass test is precisely a comparison across days: *"open a past day, read a
-  stressed window off the axis, and say whether it matches what you were doing."* Two baselines make
-  today and yesterday incomparable in exactly the dimension the test asks about.
-- **`GET /api/body-battery/stress-day?date=` already serves EVERY day from storage, today included**,
-  for this reason. The decision left open is whether TN-3b's chart should read today from it too.
-- **The cost of switching, stated so it is not discovered later:** today's stored series ends at the
-  last rollup rather than at this minute. The route returns `throughMs` so the surface can say where
-  the day's data stops instead of implying the day stopped.
-- **Do NOT answer this by persisting the live series as well.** That is the thing TN-3a rejected, and
-  re-adding it would put the second number back behind the metric.
-- **Pass test:** opening today and opening yesterday show series built the same way, and the chart
-  says where today's data currently reaches.
-- **Reversal cost:** low — one fetch swapped on one surface.
+- **Branch:** _unassigned_ · **Added:** 2026-09-14 · found while regression-testing LA-104.
+- **Observed, not inferred.** *"the wrap-up shows the day it is wrapping up"* fails on a clean
+  checkout of `origin/main` with no local changes — confirmed by stashing, running, and unstashing.
+  `sections.first()` never becomes visible in the `/nutrition?review=day` dialog. The other four
+  tests in the file pass.
+- **The likely cause is the seed, not the app, and that is exactly why it is filed rather than
+  fixed.** Every section of `DayReadThrough` self-hides when its domain is empty, so a day with
+  nothing logged renders a dialog with no sections — which is what the sandbox's local Postgres
+  gives. If CI's seed logs something, this is green there and the finding is "the spec depends on
+  seed contents", not "the wrap-up is broken".
+- **✅ That look has been taken, and it is the seed.** CI's E2E job passed on PR #1160 — the exact
+  tree that fails locally — completing 2026-09-14 01:59 UTC with this spec green. So the wrap-up is
+  not broken; the spec asserts on content the sandbox's local Postgres does not have.
+- **What is left is to make the two agree**, and it is a real cost: a spec that is red locally and
+  green on CI trains a session to skip it, which is how a genuine failure gets waved through. Either
+  seed the day the spec needs (`deload-visible.spec.ts` is the pattern for a probe that creates its
+  own state and restores it) or assert the dialog's frame rather than its contents.
+- **Reversal cost:** none either way.
+
+### [platform] LB-104 — four more entries may be buried under `Reference:`, and the field now says what it means
+- **Lane:** O — this queue file only; no code.
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-14 · found while shipping LA-104.
+- **Background:** the `Reference:` bullet in **The fields that decide whether an entry can be
+  started**, at the top of this file, which LA-104's PR wrote.
+- **What was found.** `Reference:` means *this entry is READ, not built* — `next-item.js` prints it
+  under *"never next"*. Nothing documented that until 2026-09-14, so three sessions used it for
+  *"here is supporting reading"* instead. **The tell is a printed reason that is a bare link**, and
+  seven entries have it: `LA-102`, `LA-104`, `TN-28`, `TN-22`, `TN-25`, `TN-29`, `TN-31`.
+- **Three were checked and all three were work, not reading.** LA-104 shipped the same day; LA-102
+  (64 lines of unbuilt Lane B surface) and TN-28 were moved to `Background:` and are now READY.
+  A 3-for-3 hit rate is why the remaining four are worth opening rather than assuming.
+- **The four left:** `TN-22`, `TN-25`, `TN-29`, `TN-31`, all Lane A, all Tuning-filed. Left alone
+  deliberately — a Tuning entry can legitimately be read-only (it proposes; Lane A ships), and
+  guessing which from outside the lane is how the field got misused in the first place. Open each,
+  decide, and either keep `Reference:` with a **sentence** saying why it is read-only, or move the
+  link to `Background:`.
+- **Do NOT "fix" this by widening the check.** `check-backlog-pointers.js` enforces the opposite
+  direction — a prose-only "not implementable" must carry the field — and it is right. A check that
+  also rejected a link-shaped reason would be guessing at intent; the documented field plus this
+  sweep is the answer.
+- **Pass test:** every remaining `Reference:` in this file states, in a sentence, why the entry is
+  read rather than built.
+- **Reversal cost:** none. It is queue metadata.
 
 ### [app-shell] BF-139 — three header chips no longer fit beside the date (fixed; the device look is what is left)
 
@@ -2073,7 +2114,7 @@ this card offers to overwrite with 2,045.
 - **⚠ Amended 2026-09-13:** PR #1128 made the budget follow the owner's **stored goal**, so this card's one-tap write no longer redirects the whole day's eating — it changes the stored target, which is now the thing everything else follows. **That makes the write MORE consequential, not less**, so the missing confidence qualifier still matters.
 - **⚠ Amended again the same day, and it reverses the line above: BF-152 took the stored target back OUT of the budget, and SHIPPED 2026-09-13.** The owner's spec is *"Rmr+body metabolism as base"* — a rule, not a number — so the base is his re-scaled measured resting rate and the stored target is a target again. **The escalation this entry recorded lasted one day.** So the one-tap write is back to changing a target rather than the whole day's eating; the missing confidence qualifier stands on its own merits either way. Read [`the journal entry`](overview/entries/2026-09-13-lane-a-bf152-resting-rate-anchored-budget.md) before acting on this reasoning — the BF-152 queue entry is gone, as a shipped entry should be.
 - **Sibling of TN-27** — TN-27 makes the number better; this makes its uncertainty visible. Fix either order.
-- **Reference:** [`review`](reviews/2026-09-09-maintenance-2245-is-too-high.md) §5.
+- **Background:** [`review`](reviews/2026-09-09-maintenance-2245-is-too-high.md) §5. (Was `Reference:`; see that field's note at the top of this file.)
 
 `TdeeAdaptationCard` renders the maintenance figure and a one-tap **Use 2,045** that writes straight
 into the calorie goal through `PUT /api/nutrition/targets`. The estimate behind the owner's

@@ -26,8 +26,20 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.442.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-09-09.
+**Version:** v1.456.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-09-14.
+
+**The stress chart reads one baseline, and now reaches past days (LA-104).** TN-3b shipped the chart
+reading `/api/body-battery`'s **live** series while LB-102's route served every stored day — and the
+two are not the same number: measured in production over the eight days that had both, the sign
+differed on **6** and high-stress minutes by **4–8×**. So today drawn one way and yesterday drawn the
+other made the owner's own pass test — *"open a past day, read a stressed window off the axis"* —
+compare two metrics on one axis. Both halves now come from `/api/body-battery/stress-day`. The chart
+is also **mounted on `/health/day`**, which is what makes that test runnable at all; before this
+there was no past-day surface, so the claim was unobservable. The honest cost is printed on the
+chart: *"Measured through HH:MM — the last reading stored, not the end of your day."* ⚠️ **Not
+device-verified** — the Home card and the day screen were exercised on `pnpm dev` at 412 dp only
+([journal](docs/overview/entries/2026-09-14-la104-stress-chart-one-baseline.md)).
 
 **The AMRAP baseline session was never consumed (BF-131).** Owner: *"even though the session was
 done it's saying baseline needed"*. He ran both baseline sessions as instructed and
@@ -3209,7 +3221,9 @@ check it asked for has now been run. (Found while answering an unrelated Sentry 
 - **The +0.557 headline is reconciled**, not retracted: that was the baseline-relative *contributor score*, which measures **−0.553 (n = 35)** — same magnitude, sign carried by two scales running opposite ways. **Dropping the 4 `provisional: true` days (score pinned at 50) takes it from −0.395 to −0.553** — check that before any future correlation against `readiness_contributors`.
 - **A waking-rest HR is a real second-tile candidate** (10th pct of BLE samples 08–21; 70 days, 984 samples/day, moving **6.24 bpm/night** against the tile's 0.44) and the better **stress** proxy — but **nothing in the app computes it**, so it is not folded into TN-13.
 - **TN-17 — Activity as a pace-to-goal score.** Mechanically sound: `body_metrics.steps` is a running daily total. **⛔ `step_live_windows` is effectively empty (8 rows / 6 days)** and would read a flat zero. **The obstacle is goal calibration** — median day **4,649 steps**, 7,000 reached on **32%** of days and 10,000 on **15%**, so a paced score goes red from mid-morning where today's average reads 63–82. **Pacing does not create that; it stops the averaging from hiding it.** `Needs: Q-524`, `Gate: owner`.
-- **TN-3a's persistence half has SHIPPED** — `oura_daytime_stress_buckets` live via migrations 212/213, **69 rows / 3 days / ~26 buckets a day**. The **back-fill has not**, so the entry stays queued with a `Keep:`. **This does not unblock TN-3b** — it and TN-16 are parked on Q-507's sign, unchanged.
+- **TN-3a's persistence half has SHIPPED** — `oura_daytime_stress_buckets` live via migrations 212/213, **69 rows / 3 days / ~26 buckets a day**. The **back-fill has not**, so the entry stays queued with a `Keep:`. ~~**This does not unblock TN-3b**~~ — **superseded 2026-09-14:** TN-3b shipped 2026-09-13 (it makes
+  no claim about the sign, which is what kept it shippable while Q-507 is open) and LA-104 has since
+  pointed it at the stored buckets and mounted it on `/health/day`. TN-16 is still parked on Q-507.
 
 ### [readiness][sleep][activity][heart-rate][body] 🔴 The five Home pillars, answered one at a time — four new findings (TN-13…TN-16, 2026-08-26)
 

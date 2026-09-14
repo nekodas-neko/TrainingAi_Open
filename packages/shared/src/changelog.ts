@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.456.0",
+    date: "2026-09-14",
+    changes: [
+      "The stress-by-hour chart now reaches past days. Swipe to any day on the day screen and it is there under the read-through, drawn the same way as today's — which is the point of the change rather than a side effect: today's chart used to be built from a different calculation than a stored day's, so comparing one day against another was comparing two things. Both now come from the same stored readings. The cost is stated on the chart: it says the time the readings stop at, because a stored day ends at the last sync rather than at this minute.",
+    ],
+  },
+  {
     version: "1.455.1",
     date: "2026-09-13",
     changes: [
