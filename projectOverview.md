@@ -1858,6 +1858,28 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [cardio][devices] ⚠️ A walk's segments carry a step count that no strap has yet produced (LA-48, 2026-09-14)
+
+Shipped with no version bump — nothing renders it. `WalkSegmentStat.steps` now stores how many steps
+each fast/slow block of a guided walk contained, in the existing `segments` JSONB, so the owner's
+*"steps x distance x time"* analysis has its third number.
+
+**It is integrated from the cadence bins, never `avgCadenceSpm × duration`.** That multiplication
+counts pauses at the walking rate — 360 steps where the integration says 60, on a segment holding
+30 s of walking inside a 180 s window — and `estimateSteps` already owned this arithmetic for the
+walk's own total. Both now call `stepsFromCadenceSeries`. Do not re-derive it at a call site.
+
+**Unverified with real data, and it cannot be verified here.** Cadence needs a Polar H10 over BLE,
+which no sandbox has, so every segment written in testing has `steps: null` — correct for a GPS-only
+walk and silent about a strap-paired one. **Check on the next strap walk:** a saved interval walk's
+segments carry non-null step counts that sum to roughly the walk's own `steps`, and a segment where
+you stopped reads lower than its cadence would imply.
+
+**Two thirds of LA-48 remain and are now a design question, not a build.** Adherence per segment and
+which signal paced it cannot be reconstructed after the fact: the live bar bands the tracker's
+instantaneous reading while the saved series holds 10-second medians, so a reconstruction would store
+a number the walker was never shown. The entry carries both candidate shapes.
+
 ### [body][devices] ⚠️ The scale claims a narrower band now, and a big genuine change locks it out silently (BF-58 → LA-108, 2026-09-14)
 
 Shipped in v1.456.12. `/api/scale-ble/samples` now splits a weigh-in three ways instead of two —
@@ -3487,7 +3509,7 @@ why, and confirm an outdoor run is unchanged.
 - **Standing still no longer scores a perfect slow block.** "Under the ceiling" would make 0 spm the best possible slow segment; below `STOPPED_SPM` the pacer reads **Stopped** in neutral — it does not scold a pause at a crossing and it does not congratulate one.
 - **Keep: only the speed rung has ever executed.** `e2e/walk-pacer-speed-rung.spec.ts` drives a real geolocation series and is mutation-checked, and every guard in `lib/walk/walk-pacer.ts` is too — but **the cadence and heart-rate rungs both need a Polar H10 over BLE**, which does not exist in the sandbox or in `pnpm dev`. So the bands moving with the legs, the Stopped state, the strap-drop fallback and the band colours' contrast at arm's length are all verified by reading. **LB-36** holds the device pass; `BAND_TOLERANCE = 0.10` is a proposal, not a measurement, and is one named constant so a real walk can move it.
 - **The ring cannot pace this and must not be made to.** `RING_CADENCE_VALIDATED = false` still holds (`packages/shared/src/health/cadence.ts`) — the ring signal is octave-ambiguous, not broken, and shipping it uncorrected gives a number wrong by 2×, which is worse than showing none. That correction is Lane A's.
-- **The number the pacer creates is not stored yet.** Per-segment adherence, steps and which signal paced the segment are additions to `activity_logs.segments`, which is a schema edit — filed as **LA-48**.
+- **The number the pacer creates is still not stored.** Per-segment **steps** shipped 2026-09-14 (LA-48, integrated from the cadence bins). **Adherence and which signal paced the segment remain**, and they are not the schema edit this line used to call them — `segments` is JSONB, so they are a type change in five places plus the wire schema. What blocks them is that they cannot be reconstructed after the fact: the live bar bands the tracker's instantaneous reading while the saved series holds 10-second medians, so a reconstruction stores a number the walker was never shown. **LA-48** carries both candidate shapes.
 
 ### [cardio][devices] ⚠️ The free walk shows heart rate at last, but no device has seen it (Q-418, 2026-08-23)
 

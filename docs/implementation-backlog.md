@@ -11406,42 +11406,62 @@ screenshot is a **1:39** walk with the screen on, which exercises none of it.
 - **Verification.** HR live on-device with the strap paired, and the stale guard exercised by walking
   out of range. The notification half is **APK-only** and cannot be checked in `pnpm dev` at all.
 
-### [cardio][devices] LA-48 — a walk's pacer creates an adherence number and nothing stores it
+### [cardio][devices] LA-48 — the walk's pacer creates an adherence number and nothing stores it
 
-- **Branch:** none yet
+- **Lane:** A — the types and the roll-up; a producer on the live screen is Lane B (see below).
 - **Added:** 2026-08-31 · Lane B, splitting the storage half out of Q-410 when the surface half shipped
-- **Lane:** A
-- **Needs:** LA-52
-- **⚠ SCOPE CORRECTED 2026-09-01 by Lane A, from reading the code rather than the entry.** Two of the
-  three claims below moved:
-  - **There is NO migration and NO local schema version.** `activity_logs.segments` is `jsonb` on the
-    server (`$type<>` is a TypeScript annotation) and `TEXT` locally, so nothing is a column edit.
-    What must move together is the **type in four places** — `WalkSegmentStat`
-    (`lib/walk/segment-stats.ts`), the `$type<>` in `schema.ts`, `LocalActivityLog`
-    (`lib/local-store/types.ts`), and **`WalkSegmentStatSchema`
-    (`packages/shared/src/validation/activity-log.ts`)**. That last one is the trap: Zod **strips**
-    unknown keys by default, so a field added everywhere except the wire schema is silently dropped
-    on both write paths with no error — the same silent-loss shape that dead-lettered every guided
-    walk in 2026-08-02, in reverse.
-  - **The adherence roll-up needs no Lane B producer.** `readPacer` is pure and every input is
-    already reconstructible from what `computeWalkSegmentStats` receives — cadence from
-    `cadenceSeries`, hr from `hrSamples`, and speed from `rawPoints` via the *same* cumulative
-    formula the live store uses, so a post-hoc reconstruction matches what the walker saw exactly.
-  - **Which is precisely why this now `Needs: LA-52`.** It matches what the walker saw, and what the
-    walker saw on the speed rung is a whole-walk average. Storing adherence computed from that would
-    bake the defect into the archive as an analysis variable — the class BF-59 exists about. **Ship
-    `steps` first if this is split; it is a clean derivation from `cadenceSeries` and depends on
-    nothing.**
-- **Why this exists separately.** Q-410's surface half shipped 2026-08-31: `lib/walk/walk-pacer.ts`
-  now decides, once a second, which signal is pacing a segment and which band the walker is in. That
-  is a *new* measurement — it did not exist before, so nothing records it — and the owner's ask was
-  explicit: *"make sure all these values get stored so we can do data analysis on it later like steps
-  x distance x time."*
-- **Three additions to the existing `segments` JSONB, not new columns.** Measured against
-  `lib/walk/segment-stats.ts`, which already stores `index`, `setNumber`, `kind`, `startSec`,
-  `endSec`, `avgHr`, `maxHr`, `hrAtStart`, `avgPaceSecPerKm`, `distanceKm`, `avgCadenceSpm`:
-  1. **`steps` per segment** — derivable from `avgCadenceSpm × duration`, but derived-at-read-time
-     means every consumer re-derives it slightly differently. Store it.
+- **Keep:** adherence per segment and which signal paced it. **The `steps` third SHIPPED 2026-09-14**
+  — `WalkSegmentStat.steps`, integrated through the shared `stepsFromCadenceSeries`
+  (`packages/shared/src/health/cadence.ts`), carried through all five type declarations and the wire
+  schema. Nothing of that half is outstanding.
+
+**⚠ THREE THINGS THIS ENTRY SAID ARE WRONG, all found by building the easy third of it.** They are
+corrections rather than notes, because each one changes what the remaining work is.
+
+**1. There are FIVE type places, not four.** The entry named `WalkSegmentStat`, the `$type<>` in
+`schema.ts`, `LocalActivityLog` and `WalkSegmentStatSchema`. It missed
+**`packages/shared/src/types/body.ts`**, which carries its own structural copy of the segment shape
+and is what `ActivityLog` is assembled against — `tsc` found it, nothing else would have. Same shape
+as BF-70's fifth layer: a per-field type repeated in five places is the defect, and the count in a
+backlog entry is not the authority on it.
+
+**2. `steps` was NOT "a clean derivation from `cadenceSeries` that depends on nothing".** Mean spm ×
+duration is wrong, and measurably: `avgCadenceSpm` is cadence *while moving* by construction — a stop
+contributes no readings and so cannot pull it down — so multiplying it by the segment's wall duration
+counts every pause at the walking rate. A segment with 30 s of walking at 120 spm inside a 180 s
+window gives 60 steps by integration and **360** by multiplication. It was also a second answer to a
+question the app already answered: `estimateSteps` in `cadence.ts` (Q-230) integrates bins for the
+walk's own saved `steps`, and its own comment warns against a second integration. Both now call
+`stepsFromCadenceSeries`, so the segments and the walk total cannot drift.
+
+**3. ⚠ THE BIG ONE — a post-hoc reconstruction does NOT match what the walker saw, so the
+"no Lane B producer needed" correction was itself wrong.** The 2026-09-01 correction reasoned that
+every `readPacer` input is reconstructible after the fact. Two of the three are. **Cadence is not.**
+`walk-pacer-bar.tsx:34` bands `snap?.liveSpm` — the tracker's instantaneous reading, ~1 Hz — while
+the only cadence a saved walk carries is `summarizeCadence`'s series, **binned to 10 s and carrying
+the bin MEDIAN** (`CADENCE_SERIES_BIN_SEC`). A median over ten seconds and the instantaneous value
+band differently either side of a target, which is exactly where adherence is decided. So a
+reconstruction would store a plausible number that is **not** the number the walker was shown — the
+BF-59 class the entry already invokes against itself.
+
+**What that leaves, and it is a design step rather than a build step.** Two shapes, and this needs
+deciding before anything is written:
+- **Accumulate live (Lane B).** The walk screen counts ticks per band as they happen and hands the
+  totals to the save. It is the only thing that can record what was actually displayed. Cost: a
+  producer on the live screen, and a walk that crashes mid-way loses its counts.
+- **Reconstruct, and say so (Lane A only).** Store adherence computed from the binned series with the
+  binning recorded beside it, as an approximation that is honest about being one. Cheaper, and
+  permanently a different measurement from the prompts the walker responded to.
+
+**The targets are not at the save site either**, which the reconstruction shape has to solve:
+`walk-summary.tsx` holds `config` (so cadence targets resolve) but not the HR pair — it fetches
+`hr-profile` asynchronously and may not have it when the save effect runs — nor the speed pair, which
+`walk-active.tsx` reads from the `walk-segment-stats` cache. Both are Lane B state on the live screen,
+which is a further argument for the first shape.
+
+**Three additions to the existing `segments` JSONB, not new columns** — one shipped, two remain.
+Measured against `lib/walk/segment-stats.ts`:
+  1. ~~**`steps` per segment**~~ — **shipped 2026-09-14**, integrated rather than multiplied.
   2. **Adherence per segment** — the fraction of the segment spent in each band. This is the number
      the pacer creates and the most interesting thing to analyse later: *did I hit the target, or
      just see the prompt.*
@@ -11449,19 +11469,19 @@ screenshot is a **1:39** walk with the screen on, which exercises none of it.
      an adherence figure is **uninterpretable without it** — 60% in range against a cadence target
      and against a heart-rate target are not the same measurement, and the ladder can change rung
      mid-segment when a strap drops.
-- **The producer is already there and is pure.** `readPacer()` returns the band per tick; the
-  aggregation is "count ticks per band over the segment window", which is the same shape
-  `computeWalkSegmentStats` already runs for HR and pace. Lane B holds the live readings; what is
-  missing is somewhere to put the roll-up.
+- **Why this exists separately.** Q-410's surface half shipped 2026-08-31: `lib/walk/walk-pacer.ts`
+  decides, once a second, which signal is pacing a segment and which band the walker is in. That is a
+  *new* measurement — it did not exist before, so nothing records it — and the owner's ask was
+  explicit: *"make sure all these values get stored so we can do data analysis on it later like steps
+  x distance x time."*
+- **There is NO migration and NO local schema version.** `activity_logs.segments` is `jsonb` on the
+  server (`$type<>` is a TypeScript annotation) and `TEXT` locally, so nothing is a column edit. What
+  must move together is the type in the five places above **and `WalkSegmentStatSchema`** — Zod
+  **strips** unknown keys by default, so a field added everywhere except the wire schema is silently
+  dropped on both write paths with no error. A test that merely *accepts* the payload does not catch
+  it; assert the value survives the parse, as `segment-stats.test.ts` now does.
 - **Verification.** Needs a real walk with the H10 paired to produce a cadence-paced segment at all —
   a browser only ever reaches the speed rung.
-
-> **✅ LB-36 and LA-52 VERIFIED together and removed, 2026-09-14, on one walk.** The cadence pacer ran
-> for the first time on a device and behaved (*"Yes this works fine - no issues"*); the windowed speed
-> rung and the **Stopped** readout were exercised in the same walk, which is what LA-52 was waiting
-> for — the owner asked how to check it separately and the answer is that it could not be, which is
-> why the two were put on one walk. Neither the cadence rung nor the HR rung had ever executed before
-> this, because both need a Polar H10 over BLE and no harness here has one.
 
 ### [workouts][devices] Q-486 — the outbox enqueue for a workout is the only write in the app that fails silently, and it is the last line of defence
 
