@@ -3340,6 +3340,37 @@ check it asked for has now been run. (Found while answering an unrelated Sentry 
 - **Q-354 is a live trap for spec authors, not just a curiosity.** The new spec's `locator.click()` did nothing at all — no toast, no request, no error — because the Nutrition scroll container's date-swipe `useDrag` swallows mouse input, which is what Playwright sends. `tap()` works and is the faithful input anyway. Every future e2e assertion that presses something on this screen has to know this first, and the failure gives no clue.
 - **Q-187 is re-scoped, not struck.** What remains is the owner's second sentence — the day re-calculating remaining meals against what was actually eaten — which has no design and three open questions (what gets re-scaled, whether a floor exists, what to say when the remaining macros are unreachable).
 
+### [cardio] ⚠️ A fitness test with no distance now withholds its score; the indoor case is untested on device (BF-158, 2026-09-14, v1.456.8) · needs: device
+
+Found from the owner's pre-flight question before his first Cooper test — he nearly ran it on a
+treadmill. **Both distance protocols take distance from GPS and nothing else** (`test-active.tsx`
+has no treadmill toggle and no manual entry, unlike the guided walk), so run indoors they complete a
+full-length, correctly-timed capture with a distance near zero and then score it.
+
+| protocol | scored at 0 m | |
+|---|---|---|
+| Cooper | **−11.3** | unclamped — announces itself |
+| 6MWT (Ross) | **10.0** | clamped up from 4.9 |
+| 6MWT (Burr) | **34.8** | *the owner's own profile* — wholly plausible, entirely fake |
+
+**The entry named only Cooper; the 6MWT was the worse half and is fixed too.** A negative is
+obviously wrong. 34.8 is not, and it would have entered the fitness snapshot as a real reading.
+
+Fixed by guarding the **distance** before any equation runs, with thresholds **derived** from each
+protocol's distance-only equation reaching `clampVo2`'s existing floor of 10 — Cooper 952.2 m,
+6MWT 219.7 m. Both sit below the worst genuine effort: the owner's stored 6MWT (603 m) still scores
+18.8, matching his `ross_2010` record exactly. The score and the `method` are withheld together, and
+the screen says why.
+
+**Deliberately NOT done:** manual distance entry, so a treadmill readout could be typed in. The entry
+calls that the owner's call; the safety half stands alone, and the screen now says the test needs
+GPS rather than failing silently. **If you want indoor tests to work, that is the follow-up.**
+
+**Not device-verified.** A fitness test needs a real 6- or 12-minute GPS capture, which the sandbox
+cannot produce — the guard is verified by unit test and source assertion. **The check:** run a
+protocol to full duration with GPS unavailable, confirm no VO₂max is saved and the screen explains
+why, and confirm an outdoor run is unchanged.
+
 ### [cardio][devices] ⚠️ The guided walk paces you by cadence now; no strap has ever driven it (Q-410, v1.411.0)
 
 **Shipped.** The interval walk leads with **km/h** (the unit the owner asked for by name, with min/km beside it off the same pace series) and its verdict line became a **banded pacer**: a bar, a mark and a sentence against a **cadence pair** you set in the walk config — a floor for the fast blocks, a ceiling for the slow ones, because a slow block walked too hard is what stops the fast one being fast. The band is chosen by **signed** distance, so on a fast block faster than the floor stays green however far above; ±10% out is amber, beyond that red ([`journal`](docs/overview/history-2026-09-10-folded-4.md#2026-08-31-walk-cadence-pacer)).

@@ -9,7 +9,7 @@ import { getLocalStore } from '@/lib/local-store'
 import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { invalidateFitnessTests } from '@/lib/cache-groups'
 import { todayInTz } from '@trainingai/shared/date-utils'
-import { sixMwtVo2max, cooperVo2max, baselineHrr1, restingHrFrom, maxHrFrom } from '@trainingai/shared/health/fitness-tests'
+import { sixMwtVo2max, cooperVo2max, baselineHrr1, restingHrFrom, maxHrFrom, distanceCanBeScored, MIN_SCOREABLE_DISTANCE_M } from '@trainingai/shared/health/fitness-tests'
 import type { HrReading } from '@trainingai/shared/workout/hr-analysis'
 import type { FitnessTestProtocol } from '@trainingai/shared/fitness-tests/protocols'
 import type { LocalFitnessTest } from '@/lib/local-store/types'
@@ -45,9 +45,15 @@ export function TestResult({ protocol, capture, previous, profile, userId, onDon
     // score in that case (HR + distance stats are still saved), and flag it to the user.
     const elapsedSec = (capture.endMs - capture.startMs) / 1000
     const endedEarly = protocol.durationSec != null && elapsedSec < protocol.durationSec * 0.9
+    // BF-158. The same treatment as `endedEarly`, for the other input the equations depend on.
+    // Distance comes from GPS and nothing else, so an indoor run completes a full-length capture
+    // with a distance near zero — which scored −11.3 on Cooper and a plausible-looking 34.8 on the
+    // 6MWT's profile-weighted branch. `MIN_SCOREABLE_DISTANCE_M` carries the derivation.
+    const distanceTooShort = protocol.vo2Equation != null && protocol.captureDistance &&
+      !distanceCanBeScored(protocol.vo2Equation, capture.distanceM)
     let vo2maxEst: number | null = null
     let method: string | null = null
-    if (!endedEarly) {
+    if (!endedEarly && !distanceTooShort) {
       if (protocol.vo2Equation === '6mwt') {
         // Burr 2011 (healthy adults) when profile terms are present; Ross 2010 fallback otherwise.
         vo2maxEst = sixMwtVo2max({
@@ -68,7 +74,7 @@ export function TestResult({ protocol, capture, previous, profile, userId, onDon
       // post-peak samples it reads exist.
       hrr1Bpm = baselineHrr1(readings)
     }
-    return { avgHr, maxHr, vo2maxEst, method, restingHr, hrr1Bpm, endedEarly }
+    return { avgHr, maxHr, vo2maxEst, method, restingHr, hrr1Bpm, endedEarly, distanceTooShort }
   }, [protocol, capture, profile])
 
   const primary = protocol.vo2Equation != null
@@ -160,6 +166,16 @@ export function TestResult({ protocol, capture, previous, profile, userId, onDon
         {computed.endedEarly && protocol.vo2Equation != null && (
           <p className="mt-2 text-xs text-muted-foreground">
             Ended early — VO₂max needs the full {Math.round((protocol.durationSec ?? 0) / 60)} min, so it wasn&apos;t scored.
+          </p>
+        )}
+        {/* BF-158. `endedEarly` wins the wording when both are true: a truncated capture explains
+            the short distance, so naming the distance would send you looking for a GPS fault. */}
+        {!computed.endedEarly && computed.distanceTooShort && protocol.vo2Equation != null && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            No distance recorded — VO₂max needs at least{' '}
+            {(MIN_SCOREABLE_DISTANCE_M[protocol.vo2Equation] / 1000).toFixed(2)} km, so it wasn&apos;t
+            scored. Your heart rate and time are saved. Indoors the test needs GPS; a treadmill run
+            can&apos;t be scored yet.
           </p>
         )}
       </div>
