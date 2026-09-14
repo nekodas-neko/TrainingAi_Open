@@ -27,14 +27,14 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   be excluded from aggregates rather than counted as zero. **Stage 1 shipped 2026-09-01**, so the
   unique constraint it says has to go is already gone.
 
-- [`docs/overview/entries/2026-09-11-fix-nutrition-scroll-and-day-padding.md`](../../overview/entries/2026-09-11-fix-nutrition-scroll-and-day-padding.md)
+- [`2026-09-11-fix-nutrition-scroll-and-day-padding`](../../overview/history-2026-09-14-folded-1.md#2026-09-11-fix-nutrition-scroll-and-day-padding)
   — **Nutrition keeps its scroll position; `/health/day` clears the gesture bar (RV-36, RV-37),
   2026-09-11.** BF-100's restoration lives in `PullToSync` and therefore reached **three** screens,
   not five — *"every screen using the shell inherits it"* was wrong at the call site as well as in
   the entry, and is now gone from both. **A screen that scrolls its own container gets no restoration
   from being inside the shell — check the call, not the layout.** `/health/day`'s scroller had no
   bottom padding at all. Both owe **one** device pass; RV-37 has still never been observed.
-- [`docs/overview/entries/2026-09-10-fix-weight-response-undecided-label.md`](../../overview/entries/2026-09-10-fix-weight-response-undecided-label.md)
+- [`2026-09-10-fix-weight-response-undecided-label`](../../overview/history-2026-09-14-folded-1.md#2026-09-10-fix-weight-response-undecided-label)
   — **"not enough weigh-ins", printed above six of them (LB-99), 2026-09-10.** BF-136's second half.
   `weightResponse()` returns null only when there is no interval to compute; it returns a **full
   result with `verdict: null`** when the readings are plentiful and the range straddles the band —
@@ -52,7 +52,7 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   which it changes one line of. The residual it deliberately does not model — the thermic effect of
   food and non-step NEAT, together about the `bmr × 1.2` the owner's *"1600"* implies — is copy owed
   under **LA-102**, not arithmetic.
-- [`docs/overview/entries/2026-09-10-fix-vial-opened-date.md`](../../overview/entries/2026-09-10-fix-vial-opened-date.md)
+- [`2026-09-10-fix-vial-opened-date`](../../overview/history-2026-09-14-folded-1.md#2026-09-10-fix-vial-opened-date)
   — **a vial records when it was mixed, not when it was entered (BF-136), 2026-09-10.** `openedOn`
   was `todayInTz(tz)` with no control, and it anchors every figure on the vial card — a vial entered
   five days late dropped five days of weigh-ins and the card said it had one. Correcting an existing
