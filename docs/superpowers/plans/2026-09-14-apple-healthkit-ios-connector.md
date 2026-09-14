@@ -3,9 +3,9 @@
 _2026-09-14 (PS-46). Written so someone else — a contributor, or a future implementer session — can
 build this without re-deriving the architecture. Mirrors `lib/health-connect-sync.ts` deliberately:
 same shape, same target endpoint, same canonical data types. Companion reading:
-[`docs/data-source-connector-guide.md`](../data-source-connector-guide.md) (the general contract —
+[`docs/data-source-connector-guide.md`](../../data-source-connector-guide.md) (the general contract —
 §0's two-layer model, §3's canonical shapes) and
-[`docs/sync-health-api-reference.md`](../sync-health-api-reference.md) (the exact write-side
+[`docs/sync-health-api-reference.md`](../../sync-health-api-reference.md) (the exact write-side
 contract this plan targets, unchanged)._
 
 ## 0. What this is, in one paragraph

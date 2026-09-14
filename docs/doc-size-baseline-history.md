@@ -12115,3 +12115,24 @@ Hanging Leg Raise" reads as a glitch until you see it is exactly 66% of a stored
 has to stop the fix being "relabel it as added weight". BF-163 spends its length on the fact that the
 tag is CORRECT by its own definition — an implementer told only "hypertrophy is wrong" would change
 the band table and break every other row.
+
+## 2026-09-14 — `docs/implementation-backlog.md` (PS-40 … PS-46, generic data-source connector)
+
+21002 → 21202. Seven entries from one docs-only session designing a generic data-source connector
+(a friend connecting his own device, and what the app needs to keep working without the Oura ring):
+PS-40 (a typed connector registry), PS-41 (Health Connect's HR series isn't normalized into the
+table Activity Score reads), PS-42 (illness radar's own formula degrades gracefully but its caller
+never invokes it for non-Oura users), PS-43 (Health Connect's 30-day backfill cap is a client
+heuristic, not a decided policy), PS-44 (a working rMSSD-from-raw-beats calculator already exists
+and is only wired to workout summaries), PS-45 (no per-user API key exists for external ingestion),
+PS-46 (the Apple HealthKit connector plan). Each carries the file/function evidence for its claim
+rather than a bare assertion, because the whole point of the session was to stop the next person
+re-deriving what six existing integrations already established by reading each other's code — an
+entry that only asserted "wire X into Y" would recreate exactly that problem one level up.
+
+## 2026-09-14 — `projectOverview.md` (generic data-source connector session)
+
+11071 → 11092. One Current Status paragraph pointing at three new reference docs and six backlog
+entries from the same session as the row above. Kept to a pointer rather than restating the guide's
+content, because the guide itself is the record — this paragraph exists so a session reading
+`projectOverview.md` first (the standing session-start rule) knows the connector docs exist at all.

@@ -1,7 +1,7 @@
 # Plan: formal `DataSourceConnector` interface + registry
 
 _2026-09-14 (PS-40). Companion implementation to
-[`docs/data-source-connector-guide.md`](../data-source-connector-guide.md), which documents the
+[`docs/data-source-connector-guide.md`](../../data-source-connector-guide.md), which documents the
 convention this plan makes explicit and machine-checkable. Read that doc first — §7 is this plan's
 starting point, and §1–§6 are the contract every task below has to preserve, not redesign._
 
