@@ -11955,3 +11955,22 @@ are clean sweeps — heading says a device check is owed, body records it verifi
 that nothing has confirmed the fix works. Swept with the other two, that sentence disappears and a
 future report of the same symptom reads as a new bug instead of a regression against an unverified
 fix. The lines are there to stop the sweep being uniform.
+
+## 2026-09-14 — `docs/implementation-backlog.md` → 20983 (BF-158 shipped, LA-106 filed)
+
+−19 net: BF-158's 43 lines leave, LA-106's 24 arrive. The swap is the point. LA-106 was found while
+starting BF-158 and is the more general defect: BF-160 wrote its dependency as ``**`Needs:` BF-158**``
+and `next-item.js` parses `\*{0,2}Needs:\*{0,2}` — asterisks, not backticks — so **BF-160 printed as
+READY #1 while the entry it needs sat at #2.**
+
+The same regex governs `Gate:`, which is why this earned an entry rather than just a one-line fix. A
+backticked ``**`Gate: owner`**`` would park nothing and hand an agent owner-gated work as the top of
+its queue. `Needs:` mis-orders; `Gate:` crosses a line the owner drew. The `Needs:` count going 49 →
+50 is how the in-place correction was confirmed.
+
+## 2026-09-14 — `projectOverview.md` → 10940 (BF-158's Known-Issues row)
+
++31, and most of it is the half the entry did not find. BF-158 named Cooper's −11.3; the 6MWT scores
+**34.8 from zero distance on the owner's own profile**, which is plausible enough that nothing would
+ever have questioned it. A row recording only the negative would leave the reader thinking the
+obvious case was the whole case.
