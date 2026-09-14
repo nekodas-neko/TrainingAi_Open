@@ -37,6 +37,14 @@ split is "does it feel slow" vs "is it actually slow at the source".
   the entry, and is now gone from both. **A screen that scrolls its own container gets no restoration
   from being inside the shell — check the call, not the layout.** `/health/day`'s scroller had no
   bottom padding at all. Both owe **one** device pass; RV-37 has still never been observed.
+- [`docs/overview/entries/2026-09-14-lb107-back-on-tab-goes-home.md`](../../overview/entries/2026-09-14-lb107-back-on-tab-goes-home.md)
+  — **Back on a tab was a silent no-op, on all four non-home tabs (LB-107), 2026-09-14.** Registering
+  a Capacitor `backButton` listener **suppresses the Android default**, so the app was never going to
+  exit; the listener then called `history.back()`, and the shell flips tabs with `replaceState`, so
+  there was nothing to pop. **A `backButton` listener owns the whole gesture — any path it does not
+  handle is dead, not defaulted.** `tab-shell.tsx` carried a comment asserting the opposite
+  (*"Android back exits the app like a native tab app"*), which is how it survived; the fix corrects
+  it. `backActionForPath` (`components/shell/tabs.ts`) is the one place that decides. Device pass owed.
 - [`docs/reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md`](../../reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md)
 - [`docs/reviews/2026-09-06-deload-confirm-eviction-gap.md`](../../reviews/2026-09-06-deload-confirm-eviction-gap.md) — **the owner's stale-screen report traced to cause, 2026-09-06** (RV-49 — the Home deload confirm calls `invalidatePrescriptionChanged()` id-less, which the group's own conditional turns into a no-op for every `workout-card:<id>`, and `next-session` is not in the group; RV-50 — three raw seed-only `readCacheSync('workout-card:<id>')` reads that can never revalidate). The nutrition add surface swept in the same pass is **clean at source** — all nine writers close the `onLogged` loop.
 - [`docs/overview/entries/2026-09-11-fix-ps35b-boot-and-weather.md`](../../overview/entries/2026-09-11-fix-ps35b-boot-and-weather.md)

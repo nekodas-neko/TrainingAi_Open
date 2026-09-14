@@ -32,3 +32,17 @@ export function activeTabIndex(pathname: string): number {
   if (pathname.startsWith("/more") || pathname.startsWith("/profile/")) return 4;
   return -1; // non-tab route: edge-swipe disabled
 }
+
+export type BackAction = "minimize" | "home" | "pop";
+
+// What the Android back gesture should do from `pathname`.
+//
+// The shell flips tabs with history.replaceState (see tab-shell.tsx) because tabs are peers
+// rather than a trail — so a tab route has NOTHING to pop, and the `history.back()` the
+// native listener used to call there was a silent no-op. Back was dead on four of the five
+// tabs. Sub-routes (/nutrition/meal/x) are real pushes, which is why this keys off
+// tabKeyForHref's exact-path match rather than a prefix.
+export function backActionForPath(pathname: string): BackAction {
+  if (pathname === "/") return "minimize";
+  return tabKeyForHref(pathname) ? "home" : "pop";
+}
