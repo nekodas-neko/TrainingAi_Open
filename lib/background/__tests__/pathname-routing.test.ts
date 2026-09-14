@@ -31,13 +31,14 @@ describe('background pathname routing', () => {
   })
 
   it('keeps the toggle bucket coarser than the palette', () => {
-    // `stats` is its own scene gated off the HOME switch, and `workout-select` its own scene gated
-    // off the WORKOUT switch. Collapsing the two functions into one would take that away, and the
-    // owner would lose the ability to turn off a tab's wallpaper without losing the others.
-    expect(pathnameToSection('/stats')).toBe('home')
-    expect(pathnameToPaletteKey('/stats')).toBe('stats')
-    expect(pathnameToSection('/workout-select')).toBe('workout')
-    expect(pathnameToPaletteKey('/workout-select')).toBe('workoutSelect')
+    // `session-explain` is its own scene gated off the HOME switch. Collapsing the two functions
+    // into one would take that away, and the owner would lose the ability to turn off a tab's
+    // wallpaper without losing the others.
+    //
+    // PS-35a removed the two examples this comment used to give — `/stats` and `/workout-select`
+    // were alias pages for the Health and Workout tabs, deleted with their palettes.
+    expect(pathnameToSection('/session-explain')).toBe('home')
+    expect(pathnameToPaletteKey('/session-explain')).toBe('sessionExplain')
   })
 
   it('leaves the sky-scene routes without a flat palette', () => {

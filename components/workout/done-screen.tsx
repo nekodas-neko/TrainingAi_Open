@@ -86,7 +86,7 @@ export function DoneScreen({
   // ends on this screen and the only way forward is back to session select, so this is the most
   // predictable navigation in the app: a button push gets no automatic prefetch (#919), and the
   // user is reading their summary while it warms.
-  useEffect(() => { router.prefetch('/session-select'); }, [router]);
+  useEffect(() => { router.prefetch('/workout'); }, [router]);
   const [hrData, setHrData]     = useState<HrData | null>(null);
   const [hrProfile, setHrProfile] = useState<{ maxHr: number; restingHr: number } | null>(null);
   const [hrLoading, setHrLoading] = useState(false);
@@ -509,7 +509,7 @@ export function DoneScreen({
               <ShareIcon className="h-4 w-4 mr-1.5" />
               Share
             </Button>
-            <Button variant="outline" className="h-12 flex-1" onClick={() => router.push("/session-select")}>
+            <Button variant="outline" className="h-12 flex-1" onClick={() => router.push("/workout")}>
               Done
             </Button>
           </div>

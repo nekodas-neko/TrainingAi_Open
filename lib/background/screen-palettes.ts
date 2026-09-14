@@ -12,8 +12,6 @@ export type ScreenPaletteKey =
   | 'health'
   | 'nutrition'
   | 'more'
-  | 'stats'
-  | 'workoutSelect'
   | 'sessionExplain'
 
 /** camelCase key → the kebab-case CSS custom property defined in globals.css. */

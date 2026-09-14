@@ -26,7 +26,7 @@ test.describe('zero-data account', () => {
   test.setTimeout(180_000)
 
   test('Q-451 — the Workout tab offers a way forward, not a dead Start button', async ({ page }) => {
-    await page.goto('/workout-select')
+    await page.goto('/workout')
     await settleRouteBoundary(page)
 
     await expect(page.getByText('No program yet')).toBeVisible({ timeout: 60_000 })
@@ -65,7 +65,7 @@ test('seeded user still sees content on every screen the first-run guards touch'
   test.setTimeout(180_000)
 
   // Q-451's companion: an account WITH a program still gets the carousel and a live Start button.
-  await page.goto('/workout-select')
+  await page.goto('/workout')
   await settleRouteBoundary(page)
   await expect(page.getByText('No program yet')).toHaveCount(0)
   await expect(page.getByRole('button', { name: /Start (Workout|Again)/ })).toBeVisible({ timeout: 60_000 })

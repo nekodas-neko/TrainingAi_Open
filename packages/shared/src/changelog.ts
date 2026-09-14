@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.456.7",
+    date: "2026-09-14",
+    changes: [
+      "Finishing a workout or an activity now returns you to the Workout tab itself rather than a separate copy of the same screen. The copy was a leftover from before the app had tabs: it looked identical but sat outside the tab bar, so the other tabs had to reload when you moved on, and back from it did not take you Home. Four more leftover addresses that only forwarded somewhere else were removed at the same time. Nothing you tap has changed where it goes.",
+    ],
+  },
+  {
     version: "1.456.6",
     date: "2026-09-14",
     changes: [

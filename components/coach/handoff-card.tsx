@@ -12,7 +12,7 @@ import type { HandoffArgs } from "@/lib/coach/widgets";
  * off-site.
  */
 const DESTINATIONS: Record<HandoffArgs["destination"], { href: string; label: string }> = {
-  program_builder: { href: "/config", label: "Program builder" },
+  program_builder: { href: "/program", label: "Program builder" },
   log_activity: { href: "/activity", label: "Log an activity" },
   profile: { href: "/more", label: "Profile" },
   nutrition: { href: "/nutrition", label: "Nutrition" },

@@ -434,7 +434,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     router.prefetch(`/workout?session=${encodeURIComponent(recommendedSessionId)}`);
   }, [router, recommendedSessionId]);
 
-  const handleNavigateStats = useCallback(() => router.push("/stats"), [router]);
+  const handleNavigateStats = useCallback(() => router.push("/health?tab=training"), [router]);
   const handleNavigateHealthBody = useCallback(() => navigateToTab(router, "/health?tab=body"), [router]);
   const handleOpenWaterLog = useCallback(() => setWaterLogOpen(true), []);
   const hrData = useMemo(
