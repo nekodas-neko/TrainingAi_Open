@@ -11711,6 +11711,32 @@ The baton drops 109 → 106. It also **fixes an overage it did not cause**: `mai
 against a 109 baseline, so a previous merge tightened the number without tightening the file. Two
 paragraphs reflowed onto single lines paid for that and this session's two additions together.
 
+## 2026-09-14 — `projectOverview.md` → 10918, `docs/implementation-backlog.md` → 21564 (LB-105)
+
+The backlog shrank 22; its baseline is tightened rather than left as slack. projectOverview grew 13
+for a change that ships no product behaviour, which needs justifying.
+
+Seven of the thirteen are the half the entry never knew about. LB-105 was filed as "a spec is red
+locally and green on CI" — true, and the seed explains it. What reading the file turned up is that
+its SECOND test passed on that same empty day, because an unscoped `^Sleep$` matched the day
+screen's own score cell rather than a read-through section. The test guarding "both hosts render one
+implementation" would have passed with the component absent.
+
+A row that recorded only the seed-dependence would leave the next reader believing the other half
+was sound. The label list being wrong as well (`Body composition`, never matched by `^Body$`) is the
+detail that shows how long it had been matching nothing.
+
+### `docs/implementation-backlog.md` → 21586, baton → 105 (LB-106, filed during LB-105's merge)
+
++22 for one entry, filed rather than waved through. `preferences-survive-reinstall` failed on CI on a
+PR that does not touch it, having been flaky on a different PR's run four hours earlier, and passes
+locally. E2E is advisory and the required five were green, so #1166 merged — but merging past a red
+check without recording why is how a real failure gets waved through, which is the exact sentence
+LB-105's own entry is about.
+
+Most of the entry's length is the instruction NOT to lengthen the poll timeout first: that is the
+fix that makes a genuine hydration regression invisible, and it is what a reader reaches for.
+
 ## 2026-09-13 — `docs/implementation-backlog.md` → 21598 (the workout device pass)
 
 Twelve net lines. Three entries gained a one-line verification, two gained a conditional-close note,
