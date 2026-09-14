@@ -649,34 +649,6 @@ below threshold and left in place for next time.
 - **Added:** 2026-09-13 · re-queued from the shipped half, so the owner's answer is not lost with the
   entry that carried it.
 
-### [nutrition] LA-102 — the budget starts at the resting rate and says nothing about what it leaves out
-- **Lane:** B — surface only: `components/nutrition/calorie-zone-bar.tsx`, and the ⓘ copy on
-  `components/nutrition/energy-card.tsx` / `components/nutrition/calorie-balance-bar.tsx`.
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-13 · found shipping BF-152.
-- **Background:** [`the BF-152 journal entry`](overview/entries/2026-09-13-lane-a-bf152-resting-rate-anchored-budget.md).
-  (Was `Reference:` — see that field's note above. It is supporting reading, not a statement that this
-  entry is read-only, and the field filed 64 lines of unbuilt Lane B surface work under REFERENCE.)
-- **The engine half is done and this is the half it deliberately left.** BF-152 made the
-  zero-movement budget the user's resting rate, and the line under the bar now reads
-  `1,815 resting rate — no movement recorded yet today` (verified on Home and the Nutrition tab,
-  2026-09-13). What it does not say is what a resting rate excludes.
-- **Two things are genuinely missing from that number**, and the owner named the first himself:
-  *"1350 doesnt count some basic metabolic needs".* He is right — RMR excludes the **thermic effect
-  of food** (~10% of intake, ~140 kcal at his volume) and **non-step NEAT**: standing, fidgeting,
-  housework.
-- **BF-152 chose not to model either, and that decision is the thing to explain rather than
-  revisit.** `bmr × 1.2` is 1,611 on his figures — his own *"move to 1600"* — but a multiplier
-  **asserts** the overhead happened while the step credit **observes** it, and modelling
-  intake-linked TEF as an earned credit makes the budget grow as he eats, a feedback loop the card
-  then has to explain for a number inside food-logging error.
-- **So the ask is copy, not arithmetic:** the ⓘ panel says the base is resting burn only, that
-  eating and everyday fidgeting add some on top, and that movement is credited as it is measured.
-  One or two sentences. Do not add a multiplier to make the sentence unnecessary.
-- **Pass test:** the ⓘ copy names the thermic effect of food and non-step movement as excluded from
-  the base, and nothing on the screen implies the base is a full day's burn.
-- **Reversal cost:** none. It is copy.
-
 ### [platform][nutrition] LB-105 — `day-review-read-through`'s first test is red on `main`, and it may only be red here
 - **Lane:** B — `e2e/day-review-read-through.spec.ts`, or the seed it runs against.
 
@@ -2043,32 +2015,6 @@ this card offers to overwrite with 2,045.
 
 **Pass test:** with the owner's current data the calibrated maintenance lands between 1,600 and
 1,850, and lengthening the window by a fortnight moves it by less than 100 kcal.
-
-### [nutrition] TN-28 — the one card that can act on the maintenance estimate is the one that hides how good it is
-- **Lane:** B — surface only: components/nutrition.
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-09 · found while answering TN-27.
-- **Lane: B** — `components/nutrition/tdee-adaptation-card.tsx:118-124`.
-- **⚠ Amended 2026-09-13:** PR #1128 made the budget follow the owner's **stored goal**, so this card's one-tap write no longer redirects the whole day's eating — it changes the stored target, which is now the thing everything else follows. **That makes the write MORE consequential, not less**, so the missing confidence qualifier still matters.
-- **⚠ Amended again the same day, and it reverses the line above: BF-152 took the stored target back OUT of the budget, and SHIPPED 2026-09-13.** The owner's spec is *"Rmr+body metabolism as base"* — a rule, not a number — so the base is his re-scaled measured resting rate and the stored target is a target again. **The escalation this entry recorded lasted one day.** So the one-tap write is back to changing a target rather than the whole day's eating; the missing confidence qualifier stands on its own merits either way. Read [`the journal entry`](overview/entries/2026-09-13-lane-a-bf152-resting-rate-anchored-budget.md) before acting on this reasoning — the BF-152 queue entry is gone, as a shipped entry should be.
-- **Sibling of TN-27** — TN-27 makes the number better; this makes its uncertainty visible. Fix either order.
-- **Background:** [`review`](reviews/2026-09-09-maintenance-2245-is-too-high.md) §5. (Was `Reference:`; see that field's note at the top of this file.)
-
-`TdeeAdaptationCard` renders the maintenance figure and a one-tap **Use 2,045** that writes straight
-into the calorie goal through `PUT /api/nutrition/targets`. The estimate behind the owner's
-screenshot carries `confidence: 'low'` (coverage 0.714, under the 0.85 medium threshold) and a 95%
-interval of **[1,990 – 2,500] kcal** — a 510 kcal band presented as one number with a button under it.
-
-**Its two siblings already print it.** `energy-card.tsx:260` and `calorie-balance-bar.tsx:100` both
-render *"(low confidence, 10 of 14 days logged)"* beside the same value, from the same payload
-(`maintenance.confidence`, `daysLogged`, `daysInWindow` are already on the wire). Only the card that
-can change the user's calorie goal omits it.
-
-**Do not gate the action on confidence** — that is TN-27's job and a different trade. Show the
-qualifier the siblings show, on the surface where it costs something to be wrong.
-
-**Pass test:** the nudge card names its confidence and day count in the same sentence as the
-maintenance figure, matching the wording already on the energy card.
 
 ### [cardio][heart-rate] TN-26 — the walk prescribes a control that means something different on every surface; prescribe heart rate and record the rest
 - **Lane:** A — both (1 engine, 2 surface) → A, engine half first.

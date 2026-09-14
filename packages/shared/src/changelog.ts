@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.456.4",
+    date: "2026-09-14",
+    changes: [
+      "The energy explainer now says what your calorie base leaves out: the energy it takes to digest food, and small everyday movement your phone cannot count — standing, fidgeting, housework. Neither is estimated, so on a still day your real burn runs a little above what the app shows. You were right that the base misses some basic metabolic needs; the app now says so rather than inflating the number with a guess.",
+      "The Calorie Nudge card now prints how confident that maintenance figure is and how many days it is built from, the same way the energy card and the balance bar already did. It was the only place showing the number without its confidence — and the only one with a button that writes it straight into your goal.",
+    ],
+  },
+  {
     version: "1.456.3",
     date: "2026-09-14",
     changes: [

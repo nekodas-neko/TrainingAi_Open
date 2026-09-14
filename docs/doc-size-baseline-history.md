@@ -11699,3 +11699,14 @@ than the fix.
 Down one from 110. BF-156 folded into the existing run of wrong premises rather than adding a line —
 that run is now nine long, and the shape it records is worth more than any single entry: an entry's
 stated cause is prose until something checks it.
+
+## 2026-09-14 — `projectOverview.md` → 10905, `docs/implementation-backlog.md` → 21586, baton → 106 (LA-102 + TN-28)
+
+The backlog shrank 54 with two entries leaving; its baseline is tightened rather than left as slack.
+projectOverview grew 13, and five of those are a finding neither entry contains: the ⓘ copy existed
+twice, inline in `energy-card.tsx` and `calorie-balance-bar.tsx`, and had already drifted by a
+paragraph. Adding LA-102's sentence to both would have made it three out of step instead of one.
+
+The baton drops 109 → 106. It also **fixes an overage it did not cause**: `main` was sitting at 110
+against a 109 baseline, so a previous merge tightened the number without tightening the file. Two
+paragraphs reflowed onto single lines paid for that and this session's two additions together.
