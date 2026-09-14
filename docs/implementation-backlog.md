@@ -478,6 +478,206 @@ below threshold and left in place for next time.
   stats sheet and strength-trend card must all print the same rep max as the reps last logged. His
   Hanging Leg Raise is the case: **11**, not 8.
 
+### [devices] PS-40 — formalize the data-source connector convention as a typed, checkable declaration
+
+- **Lane:** A — `packages/shared/src/health/`, `scripts/`, `app/api/**` ingest routes.
+- **Added:** 2026-09-14 (one-off session, owner request: a generic data-source connector structure
+  for other rings/straps/platforms, with documentation of what shape each data type expects and
+  where it lands).
+- **Plan:** [`docs/superpowers/plans/2026-09-14-data-source-connector-interface.md`](superpowers/plans/2026-09-14-data-source-connector-interface.md).
+- **Reference:** [`docs/data-source-connector-guide.md`](data-source-connector-guide.md) — the
+  convention already exists across six sources (Oura BLE, Health Connect ×2, Polar H10, Renpho
+  scale, Colmi R09); this doc writes it down from the current code. This entry is only the
+  "make it a typed declaration + CI-checked" follow-up — §10 of the guide.
+- **Why not urgent:** nothing is broken today; every existing source already follows the
+  convention correctly (per the guide's research pass). This is scale-preparation for a future
+  seventh source or a community-contributed connector, not a bug fix.
+- **Not urgent enough to jump the queue** — placed here rather than at the very top; move it if a
+  concrete new device integration is about to start and would benefit from the typed contract
+  existing first.
+
+### [devices][activity] PS-41 — normalize Health Connect's intraday HR series into `oura_heartrate` so Activity Score works for non-ring users
+
+- **Lane:** A — `lib/health-connect-sync.ts` (client sync payload), `app/api/sync-health/route.ts`
+  (write path), `lib/data/repository.ts`/`adapter.ts` (`upsertOuraHeartrate` bulk-write, already
+  exists — this is a new caller, not new storage).
+- **Added:** 2026-09-14 (one-off session; found while tracing every scoring formula's real inputs —
+  see [`docs/data-source-connector-guide.md`](data-source-connector-guide.md) §3a and §4's Activity
+  Score row / §5.5).
+- **The gap:** Health Connect's `HeartRateSeries` record type carries the same intraday HR shape
+  `oura_heartrate` stores, and `lib/health-connect-sync.ts` already reads it
+  (`HC_ENRICH_READ_TYPES`) — but only to backfill `avgHr`/`maxHr` onto individual `activity_logs`
+  rows (`enrichActivityLogs`). It is never written into `oura_heartrate` itself.
+- **The cost:** `computeActivityScore` (`packages/shared/src/health/activity-score.ts`) derives its
+  `zoneMinutes` (10%) and `moveHours` (12%) contributors — 22% of the formula's weight — from
+  intraday `oura_heartrate` via `getHrForWindow`. A Health-Connect-only user (no ring, no strap)
+  renormalizes without them today, even though the HR series that would supply them is already
+  arriving in every `/api/sync-health` payload and being thrown away after one narrow use.
+- **The fix, in shape:** when Health Connect's sync batch includes `HeartRateSeries` samples, map
+  each sample through the same `{timestamp, bpm, source: 'health_connect'}` shape §3a defines and
+  call the same bulk write `oura_heartrate` already accepts from the ring/strap paths (§6's ranked
+  merge doesn't need a rank change — HR/RR precedence is bucket-based, not per-field-ranked, so
+  `health_connect` just needs a precedence slot alongside `ble`/`chest_strap` in whatever reads
+  `getHrForWindow`, defaulting to lowest precedence since it's a computed, less granular signal).
+  Needs a decision on sample density — Health Connect's `HeartRateSeries` records can be sparse
+  compared to a ring's continuous stream, so `zoneMinutes`/`moveHours` may need a completeness floor
+  before trusting a Health-Connect-only day the way a full-ring day is trusted; that's an
+  implementation-time measurement, not a blocker to starting.
+- **Why this one specifically:** it's the single most concrete, self-contained instance of "a
+  generic source's data isn't reaching a shared table it structurally could" found in this pass —
+  small, scoped to one pillar, and directly closes part of the degraded-mode gap the
+  device-agnostic-source goal names as still open.
+
+### [devices][readiness] PS-42 — wire illness radar into the generic (non-Oura) readiness path
+
+- **Lane:** A — `lib/health/readiness-payload.ts`.
+- **Added:** 2026-09-14 (one-off session; same input-tracing pass as PS-41 — see
+  [`docs/data-source-connector-guide.md`](data-source-connector-guide.md) §4's illness radar row).
+- **The gap:** `computeIllnessRadar` (`packages/shared/src/health/illness-radar.ts`) is written to
+  degrade gracefully — its four weighted signals (temperature 0.40, breathing 0.25, RHR 0.20,
+  HRV-balance 0.15) are each optional and the formula renormalizes over whichever are present. But
+  its only caller, `readiness-payload.ts`, computes it *only if* `latestSummary` (an
+  `oura_daily_summary` row) exists — so a Health-Connect-only user gets **no illness computation at
+  all**, not even a temperature-omitted degraded one, despite the formula supporting exactly that
+  case.
+- **The fix, in shape:** call `computeIllnessRadar` from the same generic-fallback branch that
+  already builds `genericComposite` for readiness (the `// Generic-source fallback (Q-43)` code at
+  `readiness-payload.ts:494–541`), passing whatever z-scores that branch already computes (RHR,
+  HRV) and `null` for temperature/breathing (which have no generic source, same as the readiness
+  composite's own temperature contributor) — the formula's existing renormalization handles the rest.
+  This is a wiring change, not a new formula.
+- **Verification:** confirm on a test account with body_metrics/sleep_sessions populated via
+  Health Connect only (no `oura_daily_summary` row) that `/api/readiness-score` returns a non-null
+  illness radar value with `inputsMissing` naming temperature/breathing, rather than omitting the
+  field entirely.
+
+### [devices] PS-43 — decide whether Health Connect's 30-day cold-sync cap should be a deliberate policy or extendable
+
+- **Gate:** owner.
+- **Added:** 2026-09-14 (one-off session; owner asked specifically whether a source "that can't have
+  live data" — i.e. only reachable via a one-time or infrequent sync — "should be able to backfill
+  the necessary activities etc." See
+  [`docs/data-source-connector-guide.md`](data-source-connector-guide.md) §9 for the full backfill
+  capability audit).
+- **What's actually true today, stated plainly:** Health Connect's in-app sync pulls 30 days of
+  history on a device's first sync (or after the app is reinstalled/site data cleared —
+  `ta_hc_last_sync` in `localStorage` is a client-local heuristic, not an account-level "have we ever
+  backfilled this user" flag), 7 days on every sync after. There is no UI, parameter, or route that
+  lets a user request more than 30 days, even though a phone that's had a watch paired for a year
+  commonly holds a year of Health Connect history.
+- **Recommendation: add an explicit "Import more history" action, capped and resumable, rather than
+  raising the default cold-sync window.** Concretely: a button in the Health Connect settings
+  screen that requests N days at a time (e.g. 30/call) via the bounded-batch pattern already used by
+  every admin backfill route in this app (`maxRows`/job-id-and-poll, per the module-map row on long
+  admin operations), writing through the same `upsertBodyMetrics`/`saveSleepSession` ranked-merge
+  path as live sync — so it can never conflict with or double-count a subsequent live sync.
+- **Why not "just raise `SYNC_DAYS_COLD` to 90 or 365":** a bigger *default* silently fires on every
+  first sync/reinstall regardless of whether the user wants it or the platform can serve it without
+  throttling — Health Connect's own read cost scales with the window, and an automatic 365-day pull
+  on first connect is a materially different (and untested) load profile from today's 30-day one. An
+  explicit, user-triggered, resumable import avoids committing to that risk while still answering
+  "can I get my history in" for a user who wants it.
+- **Alternative, and why it's not recommended:** raise the cold-sync constant outright. Simpler (one
+  constant change), but couples "does this device get real backfill" to "how big is the automatic
+  first-sync pull" — the two are different product questions, and conflating them is how the current
+  30-day figure ended up looking like a considered backfill policy when it's actually just a
+  first-run sync-window heuristic that was never revisited.
+- **Reversal cost:** low either way — this is additive UI + a bounded-batch route, not a schema or
+  migration change. The cheap-reversibility argument favors starting with the explicit action rather
+  than debating window size further, since it's easy to widen or narrow after real usage.
+- **What's needed to start:** owner sign-off on the recommendation (or the alternative), since this
+  is a product/UX decision about what "connect a data source" promises the user, not a technical
+  blocker.
+
+### [devices][heart-rate] PS-44 — compute nightly/readiness HRV from raw beat intervals instead of trusting the ring's own figure
+
+- **Gate:** owner. This changes an input to a live health score, not a UI/infra change — same class
+  of decision `CLAUDE.md`'s Standing Agents rules reserve for Tuning-style validation and sign-off,
+  never a silent swap.
+- **Added:** 2026-09-14 (one-off session; owner asked directly whether any Oura-computed value could
+  be calculated by the app itself for future device-consistency — see
+  [`docs/data-source-connector-guide.md`](data-source-connector-guide.md) §5.7).
+- **What already exists, and isn't connected:** `packages/shared/src/health/rmssd.ts` →
+  `rmssdFromRr(rrMs)` is a standard, artifact-filtered rMSSD implementation, already running on real
+  device data — but scoped only to a workout's rest-window HRV
+  (`packages/shared/src/workout/compute-workout-hr.ts`, fed by the Polar H10's `rr_intervals`).
+  Every other HRV consumer (`night-vitals.ts`'s nightly HRV, Readiness's HRV-balance contributor,
+  chronic stress, resilience) reads the ring's own precomputed `0x5d rmssd_ms` exclusively and never
+  touches `rr_intervals`/`rmssdFromRr`.
+- **Why this one, and why now:** it's the one item in §13's "Oura-only, no fallback" list where the
+  raw ingredient (beat-to-beat intervals) is *already streaming into the app* from a second device
+  (the Polar strap) — unlike temperature or MET, which have no existing raw-signal supplier at all.
+  Wiring this up costs a pipeline change, not a new integration.
+- **What this buys:** any future device exposing raw beat intervals (a near-universal HR-hardware
+  capability) could feed nightly HRV/chronic-stress/resilience identically to the ring, closing part
+  of the "Oura-only" gap without needing that device to replicate Oura's own specific per-epoch
+  computation.
+- **The catch, stated so it isn't skipped:** `night-vitals.ts`'s own header comment says the ring's
+  `0x5d` figure is used deliberately, not by oversight. Before this becomes the live source, validate
+  `rmssdFromRr` over raw IBI against the ring's own `0x5d` values across real history — the same
+  "observe, never feed until checked" discipline `daytime-hrv-model.ts` already used once for a
+  different metric. Do not swap the live pipeline on the strength of the formula being textbook-correct
+  alone; artifact rejection and beat-quality gating are exactly where a naive recompute can diverge
+  from a vendor's tuned figure.
+- **Coverage caveat:** the Polar strap isn't worn continuously the way the ring is, so it only
+  supplies nightly coverage on nights it's actually worn to bed — this closes the portability gap in
+  principle, not a coverage gap for the current single-ring setup.
+- **What's needed to start:** owner sign-off on doing the validation pass at all (since it's
+  scoring-adjacent work), then the comparison itself, before any pipeline change ships.
+
+### [devices][platform] PS-45 — a per-user API key/token for external programmatic health-data ingestion
+
+- **Gate:** owner — this is new authentication surface (a credential separate from the login
+  session, capable of writing health data into a specific account), not a routine feature.
+- **Added:** 2026-09-14 (one-off session; a friend the owner is onboarding asked for a real API
+  contract to connect his own device, and hit the actual gap: `/api/sync-health` is real and
+  generic, but only session-cookie authenticated — there is no way for an external script to call it
+  without holding a live login session, which isn't a workflow the app exposes. Full detail:
+  [`docs/sync-health-api-reference.md`](sync-health-api-reference.md) §4).
+- **What exists today:** `POST /api/sync-health` (`app/api/sync-health/route.ts`) already accepts a
+  fully generic, device-agnostic payload — daily body metrics, exercise sessions, sleep records —
+  and writes through the same ranked-provenance path as every other source
+  (`docs/data-source-connector-guide.md` §6). The schema and behavior are already suitable for a
+  third party. Only the auth model isn't.
+- **The shape this needs, roughly:** a `user_api_keys` table (hashed token, not plaintext, per the
+  usual credential-storage practice), a way for a user to generate/revoke one from their own
+  settings screen, and an auth branch on `/api/sync-health` (and any other route worth opening up
+  this way) that accepts `Authorization: Bearer <token>` as an alternative to the session cookie,
+  resolving to the same `userId` scoping every write already requires. Rate limiting and the
+  existing per-record validation need no change — they already key off `userId`, not the auth
+  mechanism.
+- **Scope check before starting:** decide whether this covers `/api/sync-health` only, or a wider
+  set of routes (worth restating: this is a genuinely new capability — "an external, unattended
+  script can write into a specific user's health data" — not a small tweak, hence the owner gate
+  rather than an implementer just building it).
+- **Cheaper interim answer, if the owner wants one now:** point anyone in the friend's position at
+  Android Health Connect first (§4 of the reference doc) — if their device or its companion app
+  already writes there, this entry isn't blocking them at all.
+- **What's needed to start:** owner sign-off that this capability is wanted, and how wide (one route
+  vs. several) — a security-surface decision, not an implementation question.
+
+### [devices] PS-46 — build the Apple HealthKit connector (iOS)
+
+- **Gate:** owner — this needs an Apple Developer Program enrollment ($99/year, a real recurring
+  cost) and a new platform target (no `ios/` directory, no `@capacitor/ios` exists in this repo
+  today), not just an implementer's time.
+- **Added:** 2026-09-14 (one-off session; the owner's friend testing device-source portability is on
+  iPhone/Apple Health, and the owner expects most future users will be too).
+- **Plan:** [`docs/superpowers/plans/2026-09-14-apple-healthkit-ios-connector.md`](superpowers/plans/2026-09-14-apple-healthkit-ios-connector.md)
+  — full mapping table (HealthKit type → canonical shape, mirroring `lib/health-connect-sync.ts`
+  field-by-field), platform setup steps, two decisions that need making before writing code (the
+  HRV-statistic mismatch between HealthKit's SDNN and the app's rMSSD-based fields; whether to
+  extend `SyncHealthSchema` for temperature/respiratory rate), and the TestFlight distribution path.
+- **Why this is real, not speculative:** HealthKit is architecturally identical to Health Connect —
+  a computed source (`docs/data-source-connector-guide.md` §2) needing only a client-side reader and
+  mapping layer, **zero backend changes** (`POST /api/sync-health` already accepts the exact target
+  shape). The plan is concrete and buildable as written; what's gated is the account cost and the
+  decision to stand up a second platform, not technical uncertainty.
+- **Interim note:** the friend's own gap is separately covered — no code change needed if he ends up
+  reachable via Android Health Connect instead; this entry is specifically for Apple Health.
+- **What's needed to start:** owner sign-off on the Apple Developer Program cost/enrollment, then an
+  implementer follows the plan directly.
+
 ### [workouts] BF-162 — the prescription card tells you to load 85 kg onto a Hanging Leg Raise
 
 - **Lane:** B — `components/workout/ai-prescription-card.tsx:283-310`. The data needed to fix it is
