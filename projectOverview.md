@@ -26,8 +26,20 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.456.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.456.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-14.
+
+**Cardio Baselines moved to the Cardio tab (BF-159).** Owner, after having to be told where the
+Cooper test lives: *"That section should be moved to cardio hub."* The card sat in the Health tab's
+`TRAINING_ORDER` between *Muscle Volume This Week* and *Workout Density*, surrounded by lifting
+cards while holding VO₂max and HR recovery — and `/baselines` has **exactly one entrance in the whole
+app**, so a card in the wrong list was the entire discoverability story for all three protocols. It
+now renders under `HeartProfileCard` and above `ModalityPicker`. **Moved, not duplicated** — the
+`TRAINING_ORDER` entry and its `renderTrainingSection` case are both gone, since two entrances to one
+destination is how a stale copy starts. `e2e/cardio-baselines-placement.spec.ts` asserts both halves
+and **each was proven to fail without the change** (the Cardio half against clean `main`, the Health
+half against a deliberately duplicated build). ⚠️ **Not device-verified**
+([journal](docs/overview/entries/2026-09-14-bf159-cardio-baselines-placement.md)).
 
 **The stress chart reads one baseline, and now reaches past days (LA-104).** TN-3b shipped the chart
 reading `/api/body-battery`'s **live** series while LB-102's route served every stored day — and the

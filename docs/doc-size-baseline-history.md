@@ -11636,3 +11636,13 @@ answer arrived before the entry shipped. Leaving the instruction in place would 
 fetch information already in hand. What replaced it is the finding — the failure is the sandbox seed,
 and a spec that is red locally and green on CI is worse than either, because it trains a session to
 skip it.
+
+## 2026-09-14 — `projectOverview.md` → 10864, `docs/implementation-backlog.md` → 21674 (BF-159)
+
+The backlog shrank 28 with BF-159 leaving. projectOverview grew 12 for the status row, and four of
+those twelve are the falsification table's worth of prose — that the Health-absence assertion was
+proven by building the duplicate deliberately, not just by reverting.
+
+That is the detail a shorter row would drop, and it is the one worth keeping: the Cardio assertion
+fails first, so a single negative run never reaches the Health half. It would have shipped unproven
+while appearing tested, guarding exactly the two-entrances failure the entry was written about.

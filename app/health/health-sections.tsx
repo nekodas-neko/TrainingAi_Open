@@ -13,7 +13,6 @@ import { Sparkline } from "@/components/ui/sparkline";
 import { WeeklyStatsHub } from "@/components/stats/weekly-stats-hub";
 import { CalendarWidget } from "@/components/calendar-widget";
 import { ActivityHistoryCard } from "@/components/health/activity-history-card";
-import { LatestBaselineCard } from "@/components/fitness-tests/latest-baseline-card";
 import { AiPeriodizationStatusCard } from "@/components/health/ai-periodization-status-card";
 import { WeeklyMuscleSetsCard } from "@/components/health/weekly-muscle-sets-card";
 import { BodyMuscleCard } from "@/components/health/body-muscle-card";
@@ -687,7 +686,6 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
       case "aiVolume":        return <AiWeeklyVolumeCard key="aiVolume" />;
       case "muscleSets":      return <WeeklyMuscleSetsCard key="muscleSets" muscles={muscleSets ?? []} loading={muscleSets === null} title="Muscle Volume This Week" trainingGoal={trainingGoal} />;
       case "muscleMap":       return <BodyMuscleCard key="muscleMap" muscleSets={muscleSets} recoveryMuscles={recoveryMuscles} />;
-      case "baselineTests":   return <LatestBaselineCard key="baselineTests" userId={userId} />;
       case "activityHistory": return <ActivityHistoryCard key="activityHistory" userId={userId} />;
       case "workoutDensity":  return <WorkoutDensityCard key="workoutDensity" trends={healthTrends} />;
       default: return null;

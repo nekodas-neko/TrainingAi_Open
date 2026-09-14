@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.456.1",
+    date: "2026-09-14",
+    changes: [
+      "Cardio Baselines has moved to the Cardio tab, under your heart profile. It was in the Health tab's training list between Muscle Volume and Workout Density — every card around it about lifting, this one holding VO₂max and heart-rate recovery — and it is the only way into the fitness tests, so it was also the only signpost to the 6-minute walk, Cooper and resting-HR protocols. It now sits beside the rest of your heart data, above the picker where you choose what to do today, which is when taking a test is actually an option.",
+    ],
+  },
+  {
     version: "1.456.0",
     date: "2026-09-14",
     changes: [
