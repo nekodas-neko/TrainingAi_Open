@@ -11647,6 +11647,14 @@ That is the detail a shorter row would drop, and it is the one worth keeping: th
 fails first, so a single negative run never reaches the Health half. It would have shipped unproven
 while appearing tested, guarding exactly the two-entrances failure the entry was written about.
 
+## 2026-09-14 — `docs/implementation-backlog.md` (BF-161)
+
+Thirty-three lines, and most of them are the decision rather than the defect. "Add saved meals to the
+builder" reads as a dropdown until you see `saved_meal_items.food_item_id NOT NULL` — a meal item IS
+a food item, so nesting needs a migration, recursive macro computation and cycle prevention. The entry
+carries both options with the production counts (15 meals, 1.9 items each, 304 foods) that make
+flattening the cheap right answer.
+
 ## 2026-09-14 — `projectOverview.md` → 10878, `docs/implementation-backlog.md` → 21626 (BF-157)
 
 The backlog shrank 48 with BF-157 leaving, and its baseline is tightened to match rather than left
@@ -11667,3 +11675,9 @@ VERIFY line took its native-chip caveat inline.
 The two added are both about proving a test rather than writing one — a negative assertion behind a
 positive one never runs, and a probe that reads the seed instead of creating its state proves
 whatever the seed happens to hold. Both cost a wasted run this session.
+
+### Amendment — the BF-157 backlog number above is 21672, not 21626
+
+Rebased onto `main` after BF-161 was filed. The 21626 was true of the branch and never of `main`; a
+`.size` conflict is recomputed from the merged file, so neither side's number describes it. Recorded
+rather than edited in place, because this file is append-only.
