@@ -447,13 +447,106 @@ below threshold and left in place for next time.
 - **Reference:** [`docs/data-source-connector-guide.md`](data-source-connector-guide.md) — the
   convention already exists across six sources (Oura BLE, Health Connect ×2, Polar H10, Renpho
   scale, Colmi R09); this doc writes it down from the current code. This entry is only the
-  "make it a typed declaration + CI-checked" follow-up — §7 of the guide.
+  "make it a typed declaration + CI-checked" follow-up — §10 of the guide.
 - **Why not urgent:** nothing is broken today; every existing source already follows the
   convention correctly (per the guide's research pass). This is scale-preparation for a future
   seventh source or a community-contributed connector, not a bug fix.
 - **Not urgent enough to jump the queue** — placed here rather than at the very top; move it if a
   concrete new device integration is about to start and would benefit from the typed contract
   existing first.
+
+### [devices][activity] PS-41 — normalize Health Connect's intraday HR series into `oura_heartrate` so Activity Score works for non-ring users
+
+- **Lane:** A — `lib/health-connect-sync.ts` (client sync payload), `app/api/sync-health/route.ts`
+  (write path), `lib/data/repository.ts`/`adapter.ts` (`upsertOuraHeartrate` bulk-write, already
+  exists — this is a new caller, not new storage).
+- **Added:** 2026-09-14 (one-off session; found while tracing every scoring formula's real inputs —
+  see [`docs/data-source-connector-guide.md`](data-source-connector-guide.md) §3a and §4's Activity
+  Score row / §5.5).
+- **The gap:** Health Connect's `HeartRateSeries` record type carries the same intraday HR shape
+  `oura_heartrate` stores, and `lib/health-connect-sync.ts` already reads it
+  (`HC_ENRICH_READ_TYPES`) — but only to backfill `avgHr`/`maxHr` onto individual `activity_logs`
+  rows (`enrichActivityLogs`). It is never written into `oura_heartrate` itself.
+- **The cost:** `computeActivityScore` (`packages/shared/src/health/activity-score.ts`) derives its
+  `zoneMinutes` (10%) and `moveHours` (12%) contributors — 22% of the formula's weight — from
+  intraday `oura_heartrate` via `getHrForWindow`. A Health-Connect-only user (no ring, no strap)
+  renormalizes without them today, even though the HR series that would supply them is already
+  arriving in every `/api/sync-health` payload and being thrown away after one narrow use.
+- **The fix, in shape:** when Health Connect's sync batch includes `HeartRateSeries` samples, map
+  each sample through the same `{timestamp, bpm, source: 'health_connect'}` shape §3a defines and
+  call the same bulk write `oura_heartrate` already accepts from the ring/strap paths (§6's ranked
+  merge doesn't need a rank change — HR/RR precedence is bucket-based, not per-field-ranked, so
+  `health_connect` just needs a precedence slot alongside `ble`/`chest_strap` in whatever reads
+  `getHrForWindow`, defaulting to lowest precedence since it's a computed, less granular signal).
+  Needs a decision on sample density — Health Connect's `HeartRateSeries` records can be sparse
+  compared to a ring's continuous stream, so `zoneMinutes`/`moveHours` may need a completeness floor
+  before trusting a Health-Connect-only day the way a full-ring day is trusted; that's an
+  implementation-time measurement, not a blocker to starting.
+- **Why this one specifically:** it's the single most concrete, self-contained instance of "a
+  generic source's data isn't reaching a shared table it structurally could" found in this pass —
+  small, scoped to one pillar, and directly closes part of the degraded-mode gap the
+  device-agnostic-source goal names as still open.
+
+### [devices][readiness] PS-42 — wire illness radar into the generic (non-Oura) readiness path
+
+- **Lane:** A — `lib/health/readiness-payload.ts`.
+- **Added:** 2026-09-14 (one-off session; same input-tracing pass as PS-41 — see
+  [`docs/data-source-connector-guide.md`](data-source-connector-guide.md) §4's illness radar row).
+- **The gap:** `computeIllnessRadar` (`packages/shared/src/health/illness-radar.ts`) is written to
+  degrade gracefully — its four weighted signals (temperature 0.40, breathing 0.25, RHR 0.20,
+  HRV-balance 0.15) are each optional and the formula renormalizes over whichever are present. But
+  its only caller, `readiness-payload.ts`, computes it *only if* `latestSummary` (an
+  `oura_daily_summary` row) exists — so a Health-Connect-only user gets **no illness computation at
+  all**, not even a temperature-omitted degraded one, despite the formula supporting exactly that
+  case.
+- **The fix, in shape:** call `computeIllnessRadar` from the same generic-fallback branch that
+  already builds `genericComposite` for readiness (the `// Generic-source fallback (Q-43)` code at
+  `readiness-payload.ts:494–541`), passing whatever z-scores that branch already computes (RHR,
+  HRV) and `null` for temperature/breathing (which have no generic source, same as the readiness
+  composite's own temperature contributor) — the formula's existing renormalization handles the rest.
+  This is a wiring change, not a new formula.
+- **Verification:** confirm on a test account with body_metrics/sleep_sessions populated via
+  Health Connect only (no `oura_daily_summary` row) that `/api/readiness-score` returns a non-null
+  illness radar value with `inputsMissing` naming temperature/breathing, rather than omitting the
+  field entirely.
+
+### [devices] PS-43 — decide whether Health Connect's 30-day cold-sync cap should be a deliberate policy or extendable
+
+- **Gate:** owner.
+- **Added:** 2026-09-14 (one-off session; owner asked specifically whether a source "that can't have
+  live data" — i.e. only reachable via a one-time or infrequent sync — "should be able to backfill
+  the necessary activities etc." See
+  [`docs/data-source-connector-guide.md`](data-source-connector-guide.md) §9 for the full backfill
+  capability audit).
+- **What's actually true today, stated plainly:** Health Connect's in-app sync pulls 30 days of
+  history on a device's first sync (or after the app is reinstalled/site data cleared —
+  `ta_hc_last_sync` in `localStorage` is a client-local heuristic, not an account-level "have we ever
+  backfilled this user" flag), 7 days on every sync after. There is no UI, parameter, or route that
+  lets a user request more than 30 days, even though a phone that's had a watch paired for a year
+  commonly holds a year of Health Connect history.
+- **Recommendation: add an explicit "Import more history" action, capped and resumable, rather than
+  raising the default cold-sync window.** Concretely: a button in the Health Connect settings
+  screen that requests N days at a time (e.g. 30/call) via the bounded-batch pattern already used by
+  every admin backfill route in this app (`maxRows`/job-id-and-poll, per the module-map row on long
+  admin operations), writing through the same `upsertBodyMetrics`/`saveSleepSession` ranked-merge
+  path as live sync — so it can never conflict with or double-count a subsequent live sync.
+- **Why not "just raise `SYNC_DAYS_COLD` to 90 or 365":** a bigger *default* silently fires on every
+  first sync/reinstall regardless of whether the user wants it or the platform can serve it without
+  throttling — Health Connect's own read cost scales with the window, and an automatic 365-day pull
+  on first connect is a materially different (and untested) load profile from today's 30-day one. An
+  explicit, user-triggered, resumable import avoids committing to that risk while still answering
+  "can I get my history in" for a user who wants it.
+- **Alternative, and why it's not recommended:** raise the cold-sync constant outright. Simpler (one
+  constant change), but couples "does this device get real backfill" to "how big is the automatic
+  first-sync pull" — the two are different product questions, and conflating them is how the current
+  30-day figure ended up looking like a considered backfill policy when it's actually just a
+  first-run sync-window heuristic that was never revisited.
+- **Reversal cost:** low either way — this is additive UI + a bounded-batch route, not a schema or
+  migration change. The cheap-reversibility argument favors starting with the explicit action rather
+  than debating window size further, since it's easy to widen or narrow after real usage.
+- **What's needed to start:** owner sign-off on the recommendation (or the alternative), since this
+  is a product/UX decision about what "connect a data source" promises the user, not a technical
+  blocker.
 
 ### [nutrition] BF-161 — the meal builder can only reach foods, so a meal made of meals has to be rebuilt ingredient by ingredient
 
