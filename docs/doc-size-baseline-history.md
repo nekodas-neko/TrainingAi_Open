@@ -12094,3 +12094,11 @@ shipped today, not analysis.
 (70.0–72.8 against 57.5–58.0) rather than only the conclusion. That is the difference between a
 future session re-deriving the band width and reading it: the numbers are what make 8% arithmetic
 instead of a preference, and they are what say not to widen it.
+
+## 2026-09-15 — `docs/implementation-backlog.md` (BF-162, BF-163)
+
+Fifty lines for two defects on one card row. BF-162 carries the reproduction table because "85 kg on a
+Hanging Leg Raise" reads as a glitch until you see it is exactly 66% of a stored 128, and the entry
+has to stop the fix being "relabel it as added weight". BF-163 spends its length on the fact that the
+tag is CORRECT by its own definition — an implementer told only "hypertrophy is wrong" would change
+the band table and break every other row.

@@ -437,6 +437,69 @@ below threshold and left in place for next time.
 
 
 
+### [workouts] BF-162 — the prescription card tells you to load 85 kg onto a Hanging Leg Raise
+
+- **Lane:** B — `components/workout/ai-prescription-card.tsx:283-310`. The data needed to fix it is
+  already a prop on this component.
+- **Added:** 2026-09-15 (BugFix intake). The owner, reading his Legs prescription: *"Is this right?"*
+- **Reproduced exactly from his stored values — this is arithmetic, not an anomaly:**
+
+  | exercise | stored `estimated_1rm` | × pct | card shows |
+  |---|---|---|---|
+  | Hanging Leg Raise | **128** | × 66% = 84.5 | **`@ 85kg (66%)`** |
+  | Pull-Up (14 Sept) | **124** | × 72.5% = 89.9 | **`@ 90kg (72.5%)`** |
+
+  Both are `exercise_type = 'bodyweight'` with `equipment = ['bodyweight']` in `exercise_library`.
+  There is no bar to load and no weight to add; the kg figure is a percentage of an internal index.
+- **The component already holds the answer and already documents the rule.** Its own prop comment:
+
+  ```ts
+  // Per session-exercise id: 'weighted' | 'bodyweight'. A bodyweight 1RM change in kg is a change
+  // in an internal index, not in weight lifted, so the rationale must not quote it (Q-19).
+  exerciseTypeById?: Record<string, string | undefined>;
+  ```
+
+  **Q-19 applied that rule to the RATIONALE and not to the exercise rows.** Line 283 computes
+  `weightKg` from `liveOneRm × pct` unconditionally and line 308 prints it, never consulting
+  `exerciseTypeById`.
+- **The fix is to take the branch that already exists.** Line 310 renders `` ` @ ${ex.pct}%` `` when
+  `oneRm` is null — visible on his own card as *Face Pull · 2×12 @ 66%*, which reads correctly. A
+  bodyweight exercise should take that same branch: percent, no kg.
+- **Do not render the number as "added weight" instead.** 85 is not 85 kg of added load — it is 66%
+  of a 128 index derived from bodyweight reps (BF-149's forward path). Relabelling it would turn a
+  visibly absurd number into a plausible wrong one, which is the trap BF-158 is filed against.
+- **Consider, not required:** for a bodyweight exercise the useful target is reps, and `avg_reps` is
+  stored (BF-151 is already about reading it rather than inverting). Showing *"2×12"* with the
+  percent and no kg is complete on its own; a rep target is a further improvement, not part of this.
+- **Verification:** on device, open a session containing a bodyweight exercise and confirm no kg is
+  shown for it while weighted exercises in the same list are unchanged.
+
+### [workouts] BF-163 — the intensity chip is computed from load alone, so it labels a 6-rep set "Hypertrophy · typically 8–12 reps"
+
+- **Lane:** B — `components/workout/ai-prescription-card.tsx:290` and the band table in
+  `packages/shared/src/workout/intensity-zone.ts`.
+- **Added:** 2026-09-15 (BugFix intake). Owner, on the same card: *"Is hypertrogpy the correct tag?"*
+- **By its own definition the label is right, and that is the problem.** `intensityZoneForPct` maps
+  %1RM to a band with no reference to reps: 65–75% → **Hypertrophy**. His squat is prescribed at
+  **72.5%**, so the chip is correct.
+- **The chip's own tooltip contradicts the line it sits beside.** The band carries
+  `reps: '8–12 reps'` and renders as `title="65–75% of 1RM · typically 8–12 reps"` — against a
+  prescription of **2×6**. The row reads *"Hypertrophy · 65–75% … 2×6 @ 57.5kg (72.5%)"*, which is a
+  load in the hypertrophy band driving a rep count the same table calls **Strength** (4–6 reps).
+- **The load and the reps genuinely disagree here; the chip is not merely mislabelled.** 6 reps at
+  72.5% is a strength-leaning stimulus. `goal-ranges.ts` puts hypertrophy at `repMin: 5, repMax: 12`,
+  so 6 is legal for the goal — but the display band and the goal range are different tables with
+  different rep opinions, and the card shows only one of them.
+- **Recommended: label from the pair, not the percentage.** Either widen the chip to consider reps
+  (so 72.5% × 6 reads as the blend it is), or drop the `typically N reps` clause from the tooltip so
+  the chip claims only what it measures — the load band. **The second is the honest minimum** and is
+  a one-line change; the first is the better answer and needs a rule for the disagreement.
+- **Not a defect in the prescription itself.** The session note explains the low volume — *"Due to
+  low external readiness and reported lower back injury/soreness, volume has been reduced across all
+  spinal-loaded movements"* — so 2 sets is deliberate. This entry is about the label, not the plan.
+- **Verification:** on device, confirm no exercise row shows a zone whose stated rep range excludes
+  the reps prescribed on the same line.
+
 ### [nutrition] BF-161 — the meal builder can only reach foods, so a meal made of meals has to be rebuilt ingredient by ingredient
 
 - **Lane:** B for the recommended shape (`components/nutrition/ingredient-search.tsx`,
