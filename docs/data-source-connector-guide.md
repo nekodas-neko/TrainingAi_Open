@@ -6,11 +6,47 @@ open: **given the goal of not being locked to one ring, what does a new data sou
 into — what shape does it send, which table does it land in, which calculation reads it, and what
 happens when it can't supply something?** That doc states the tiers and the invariants; this one is
 the contract a new integration is checked against. No code in this repo implements a formal
-`DataSourceConnector` interface yet — §8 proposes one and files the implementation as a backlog
+`DataSourceConnector` interface yet — §10 proposes one and files the implementation as a backlog
 entry rather than building it inline, per `CLAUDE.md`'s backlog-driven-implementation rule.
 Everything else here (the tables, the formula inputs, the normalize-layer pattern, the backfill
 mechanisms) is described from the current code, not aspirationally — every claim below was checked
 against the source, not summarized from memory.
+
+---
+
+## 0. The model, in two layers
+
+Every source — including Oura — is reduced to exactly the same thing before any score ever sees it:
+
+```
+Layer 1                              Layer 2
+─────────────────────────────────    ───────────────────────────
+Device data, COMPUTED                Our formulas
+(sleep stages, HR series,            (Sleep Score, Readiness,
+ temperature, steps, HRV, ...)       Activity Score, stress, ...)
+```
+
+**For most devices, Layer 1 arrives for free.** Health Connect, a scale, a strap — the vendor's own
+firmware or app already computed the finished value, and we just receive it.
+
+**Oura is not a special case in the design — it's the one source where WE have to produce Layer 1
+ourselves**, because the ring hands us something rawer than a finished value. We run our own
+models (a sleep-staging model, a step-counting model, and so on — see §5.6) specifically to
+manufacture the exact same Layer-1 shape another device would have handed over directly. Once
+that's done, Oura is indistinguishable from any other source: everything from Layer 2 downward reads
+Layer 1 only, never asks which device or which computation produced it.
+
+**This is what makes the app survive losing the ring**: Layer 2 has exactly one dependency (Layer
+1), and Layer 1 already has more than one supplier. §13 lists precisely what Layer 1 needs to
+consist of for every pillar to work at full strength, and which parts of it only Oura supplies
+today — not because they're conceptually tied to the ring, but because nothing else has been wired
+to fill that shape yet.
+
+The rest of this doc is the detail behind that picture: §1-§2 cover *how* data physically arrives,
+§3 is the exact shape of each Layer-1 value, §4 is what each Layer-2 formula consumes, §5 is how
+Oura's own computing step works and where it currently produces a shape nothing downstream reads
+(§5.5/§5.6), §6-§9 cover the mechanics (provenance, isolation, ingestion, backfill), and §13 is the
+full requirements list this section promises.
 
 ---
 
@@ -519,6 +555,48 @@ A source supplying only a subset of §3 is fine — §4 states exactly which cal
 gracefully (Readiness, Sleep Score, Activity Score) versus which have no fallback at all (chronic
 stress, resilience, Body Battery, OTS). That distinction should be shown to the user, not hidden —
 see §10's `supplies` field.
+
+---
+
+## 13. What the app requires — the full Layer-1 input list
+
+§0 promised this: the complete set of "device data, computed" values every score in the app draws
+from, split by whether it powers baseline scoring (any source can supply it, Oura included via its
+own models) or the deeper stress/recovery layer (today, Oura-only — not because the math is
+ring-specific, but because no other source has been wired to fill this shape yet).
+
+### Core — Sleep Score, most of Readiness, Activity Score, training load
+
+| # | Input | Shape (§3 ref) | Feeds | Oura's route to it | A typical other device's route to it |
+|---|---|---|---|---|---|
+| 1 | Sleep session: start/end, stage totals, duration | §3b | Sleep Score, Readiness | our SleepNet model on raw motion/HR/temp (§5.6) | vendor's own stage detection, handed over finished |
+| 2 | Daily steps | §3c | Activity Score | our gait/ONNX step model on raw accelerometer (§5.6) | vendor's own step count, handed over finished |
+| 3 | Daily active calories | §3c | Activity Score, energy balance | derived from our HR/MET-based estimate | vendor's own estimate |
+| 4 | Resting heart rate | §3c | Readiness | our lowest-5-min-bin aggregation over ring-computed bpm (§5.6) | vendor's own RHR figure |
+| 5 | HRV (nightly) | §3c | Readiness | the ring's own computed rMSSD, quality-selected not recomputed (§5.6) | vendor's own HRV figure |
+| 6 | Intraday heart-rate series | §3a | Activity Score (zone/move time), recovery-index | ring-computed bpm from IBI, trivial conversion (§5.6) | vendor's HR series, if exposed (Health Connect's is currently **not** normalized in — §5.5, PS-41) |
+| 7 | Body weight / composition | §3c | `body` pillar | — (ring doesn't measure this) | scale, or Health Connect |
+| 8 | Logged strength workouts | §3d-adjacent | ACWR, Activity Score's strength lane | always user-entered, no device involved either way | same |
+
+### Extended — stress, resilience, Body Battery, illness radar, training-stress score
+
+| # | Input | Shape | Feeds | Oura's route to it | Why nothing else supplies it today |
+|---|---|---|---|---|---|
+| 9 | Skin temperature samples (periodic) | time series | Readiness's temperature term, illness radar, chronic stress | ring-computed samples, we aggregate (§5.6) | Health Connect has no periodic-temperature record type in the app's current read list (`lib/health-connect-sync.ts`'s `HC_SYNC_READ_TYPES`) |
+| 10 | Fine-grained HRV (~5 min cadence) | time series | Chronic stress, resilience | the ring's own `0x5d` samples, decoded directly (§5.6) | Health Connect exposes only a daily/session HRV figure, not a 5-min series, in what this app currently reads |
+| 11 | MET / activity-intensity series (per-minute) | time series | OTS training-stress score, daytime stress | the ring's own `0x50` activity-info stream, decoded directly (§5.6) | no equivalent fine-grained record is read from Health Connect today |
+| 12 | SpO2 | number/night | Illness radar (optional) | our own uncalibrated formula from raw ring sensor data — the weakest link even for Oura (§5.6) | Health Connect can supply this; not yet normalized into the illness-radar path (same class of gap as #6, not separately filed) |
+| 13 | Respiratory rate | number/night | Sleep Score bonus, illness radar | our own median-of-epochs from ring IBI (§5.6) | not commonly exposed by other platforms either |
+
+**Reading the two tables together:** items 1–8 are already device-agnostic in the running app —
+swap the ring for Health Connect today and each one still gets filled, just by a different route.
+Items 9–13 are the real "Oura-only" surface. None of them are architecturally tied to the ring —
+§5.6 shows each is either our own aggregation over a ring-computed intermediate, or (for SpO2) an
+already-weak formula that isn't uniquely an Oura problem. **What's actually missing for a second raw
+device or a richer computed source to close this gap is a Layer-1 supplier for #9-#11's shapes** —
+periodic temperature, sub-hourly HRV, and per-minute activity intensity — which is a real, scoped
+integration project (a new BLE source's decode+normalize step, or extending what's read from Health
+Connect / a future HealthKit connector), not a rewrite of any formula in §4.
 
 ---
 
