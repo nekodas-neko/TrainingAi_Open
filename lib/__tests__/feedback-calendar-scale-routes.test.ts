@@ -26,6 +26,7 @@ type Row = Record<string, unknown>
 
 const createFeedback = vi.fn(async (..._a: unknown[]) => undefined)
 const listPendingScaleSamples = vi.fn(async (_u: string) => [] as Row[])
+const listRecentDismissedScaleSamples = vi.fn(async (_u: string, _limit: number) => [] as Row[])
 const rateLimit = vi.fn((..._a: unknown[]) => true)
 const reportServerError = vi.fn((..._a: unknown[]) => undefined)
 const eventsInsert = vi.fn(async (..._a: unknown[]) => ({ data: { id: 'evt-1' } }))
@@ -37,7 +38,7 @@ vi.mock('@/lib/rate-limit', () => ({ rateLimit: (...a: unknown[]) => rateLimit(.
 vi.mock('@/lib/observability', () => ({ reportServerError: (...a: unknown[]) => reportServerError(...a) }))
 vi.mock('@/lib/data', () => {
   // Built inside the factory: `vi.mock` is hoisted above the consts above.
-  const repo = async () => ({ createFeedback, listPendingScaleSamples })
+  const repo = async () => ({ createFeedback, listPendingScaleSamples, listRecentDismissedScaleSamples })
   return { getRepository: repo, getRepositoryAsync: repo }
 })
 vi.mock('googleapis', () => ({
@@ -64,10 +65,11 @@ const VALID_EVENT = {
 }
 
 beforeEach(() => {
-  for (const m of [createFeedback, listPendingScaleSamples, rateLimit, reportServerError, eventsInsert, setCredentials]) m.mockClear()
+  for (const m of [createFeedback, listPendingScaleSamples, listRecentDismissedScaleSamples, rateLimit, reportServerError, eventsInsert, setCredentials]) m.mockClear()
   rateLimit.mockReturnValue(true)
   eventsInsert.mockResolvedValue({ data: { id: 'evt-1' } })
   listPendingScaleSamples.mockResolvedValue([])
+  listRecentDismissedScaleSamples.mockResolvedValue([])
   session = { user: { id: 'u-1' }, refreshToken: 'rt-1' }
 })
 
@@ -252,6 +254,7 @@ describe('GET /api/scale-ble/pending', () => {
     expect(listPendingScaleSamples).toHaveBeenCalledWith('u-1')
     expect(await res.json()).toEqual({
       pending: [{ id: 11, measuredAt: '2026-03-01T22:15:00.000Z', weightKg: 83.4 }],
+      dismissed: [],
     })
   })
 
@@ -266,9 +269,33 @@ describe('GET /api/scale-ble/pending', () => {
     expect(body.pending.map((p: Row) => [p.id, p.weightKg])).toEqual([[12, null], [13, null]])
   })
 
+  // LA-108: the readings this account DECLINED ride alongside the pending ones, shaped identically,
+  // because the confirm route accepts either — a declined reading has to be reclaimable or nothing
+  // re-anchors the weight band and every later reading is declined too.
+  it('lists the declined readings beside the staged ones, newest first', async () => {
+    listRecentDismissedScaleSamples.mockResolvedValue([
+      { id: 21, measuredAt: new Date('2026-03-05T22:15:00Z'), decoded: { weightKg: 57.8 } },
+      { id: 20, measuredAt: new Date('2026-03-04T22:15:00Z'), decoded: null },
+    ])
+    const body = await (await getPending()).json()
+    expect(body.dismissed).toEqual([
+      { id: 21, measuredAt: '2026-03-05T22:15:00.000Z', weightKg: 57.8 },
+      { id: 20, measuredAt: '2026-03-04T22:15:00.000Z', weightKg: null },
+    ])
+  })
+
+  it('bounds the declined list rather than returning every decline ever made', async () => {
+    await getPending()
+    const [userId, limit] = listRecentDismissedScaleSamples.mock.calls[0] as [string, number]
+    expect(userId).toBe('u-1')
+    expect(limit).toBeGreaterThan(0)
+    expect(limit).toBeLessThanOrEqual(50)
+  })
+
   it('refuses without a session, before reading anything', async () => {
     session = null
     expect((await getPending()).status).toBe(401)
     expect(listPendingScaleSamples).not.toHaveBeenCalled()
+    expect(listRecentDismissedScaleSamples).not.toHaveBeenCalled()
   })
 })
