@@ -12081,3 +12081,16 @@ back gesture is a touch, and `page.goBack()` is not.
 Worth the lines because the next session would otherwise re-derive the same comparison — and because
 the experiment that confirms it (come back with a UI control instead of the gesture) has never been
 run, the entry's own verification step having always specified the gesture.
+
+## 2026-09-14 — BF-58's band split (backlog −34, projectOverview +29)
+
+The backlog **shrank**: BF-58's option analysis (four ways to fix it, option B's full cross-account
+terms) had done its job once the owner chose D, so the entry was cut back to the three things that
+still need the hardware and the rejected option's terms moved into the shipping journal entry. The
+new LA-108 costs most of what was recovered, which is correct — it is a live hazard on code that
+shipped today, not analysis.
+
+`projectOverview.md` grows by the Known Issues row, and it carries the two measured weight clusters
+(70.0–72.8 against 57.5–58.0) rather than only the conclusion. That is the difference between a
+future session re-deriving the band width and reading it: the numbers are what make 8% arithmetic
+instead of a preference, and they are what say not to widen it.

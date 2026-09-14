@@ -114,8 +114,16 @@ Live at the time of writing (2026-07-30):
 - The direct-BLE Renpho scale integration itself is device-verified (2026-07-28) — shared with
   `devices`.
 
-The scale-sync and Renpho entries above are shipped and device-confirmed; Q-56 (above) is the one
-open item. Re-run the greps rather than trusting this list.
+- **Weight-band attribution (BF-58 option D, 2026-09-14)** — one scale, two people: the ingest route
+  claims within 8% of the last confirmed weight, prompts up to 15%, and declines beyond, archiving
+  the raw frame in all three branches. **The 8% is measured** off the owner's 70.0–72.8 kg cluster
+  against the 57.5–58.0 kg one he has dismissed — do not widen it without re-measuring. **Open:**
+  LA-108 (a declined reading has no read path, so a >15% genuine change locks the band out silently)
+  and BF-58's two hardware questions. Shared with `devices`.
+  [Journal](../../overview/entries/2026-09-14-lane-a-bf58-weight-band-attribution.md).
+
+The scale-sync and Renpho entries above are shipped and device-confirmed; Q-56 (above), LA-108 and
+BF-58's device answers are the open items. Re-run the greps rather than trusting this list.
 
 ## History
 

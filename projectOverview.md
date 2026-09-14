@@ -1858,6 +1858,35 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [body][devices] ⚠️ The scale claims a narrower band now, and a big genuine change locks it out silently (BF-58 → LA-108, 2026-09-14)
+
+Shipped in v1.456.12. `/api/scale-ble/samples` now splits a weigh-in three ways instead of two —
+claimed within 8% of the last confirmed weight, *"is this you"* up to 15%, declined beyond — so the
+owner's phone stops asking about readings it can already tell are his partner's. The raw frame is
+archived in **all three** branches, including declined ones, which is the half BF-58 was titled
+after: her weigh-ins were being thrown away.
+
+**The 8% is a measurement, not a round number.** Both clusters were already in the database: his 100
+confirmed readings span **70.0–72.8 kg** (worst day-to-day change 2.85 kg), the 6 he has dismissed
+sit at **57.5–58.0 kg**. 8% of ~70 kg is ±5.6 kg — wider than his whole history, and 6.4 kg clear of
+hers. Do not widen it without re-measuring; widening is what BF-58 was filed to stop.
+
+**The hazard, filed as LA-108 and not yet fixed.** The band is anchored on the last *confirmed*
+weight and only a confirmed reading re-anchors it, so a genuine change of more than 15% between two
+weigh-ins — a long gap plus an illness or injury — puts the owner outside his own band with nothing
+to move it, and every reading after that is outside too. It is narrow (drift normally passes through
+the 8–15% prompt band first, where one tap re-anchors) and nothing is lost (the frames are archived),
+but it is **silent and self-sustaining**: `listPendingScaleSamples` filters to `pending`, so a
+declined reading has no read path at all. The fix is a way to see and claim dismissed readings, not a
+wider band.
+
+**Not device-verified, and only the phone can show it.** JS/server only, so it reaches the S25 through
+Railway with no APK — but what changed is a physical behaviour. **Check on device:** the owner weighs
+in and it saves with no prompt; the partner weighs in on his phone and **no** *"is this you"* appears.
+Two hardware questions BF-58 keeps are still unanswered — whether two phones can hold a GATT
+connection at once, and whether `REQUEST_STORED_MEASUREMENTS_CMD` gets a reply (that one decides
+whether the race between the phones matters at all).
+
 ### [app-shell] ⚠️ Back on a tab now goes Home, and the gesture itself is not device-verified (LB-107, 2026-09-14)
 
 Shipped in v1.456.6. The owner reported that back on a tab *"should go to the home screen"*; what it

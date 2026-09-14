@@ -252,6 +252,15 @@ Live at the time of writing (2026-07-30):
 - **Chest-strap pairing card now shows a live link-status dot** (v1.246.4,
   `components/settings/chest-strap-pairing.tsx` + `lib/live-hr/chest-strap-source.ts`'s
   `getChestStrapLinkStatus()`, 1 Hz poll) — not yet confirmed on-device.
+- 🟠 **Two hardware questions about the Renpho scale are still unanswered (BF-58, open)** — whether
+  two phones can hold a GATT connection at once (inferred from the protocol shape, never measured),
+  and whether `REQUEST_STORED_MEASUREMENTS_CMD` (`0x22 0x04 0x15`) gets a reply. The second decides
+  whether the race between two phones matters at all: if the scale buffers, the losing phone catches
+  up on its next connect. The command is in the code and its own comment says it is speculative and
+  borrowed from a different firmware generation. Weight-band attribution shipped 2026-09-14 without
+  either answer —
+  [journal](../../overview/entries/2026-09-14-lane-a-bf58-weight-band-attribution.md); the band
+  hazard it left is LA-108.
 
 ## History
 
