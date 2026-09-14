@@ -5,7 +5,7 @@
 ## What I found taking the top of the queue
 
 RV-36 printed as READY. It had **shipped on 2026-09-11**
-([journal](2026-09-11-fix-nutrition-scroll-and-day-padding.md)) and was **verified on the S25 on
+([journal](../history-2026-09-14-folded-1.md#2026-09-11-fix-nutrition-scroll-and-day-padding)) and was **verified on the S25 on
 2026-09-13** — one of six that passed that sitting. There was nothing to build.
 
 Re-verifying the premise before implementing is what caught it. The entry would otherwise have been

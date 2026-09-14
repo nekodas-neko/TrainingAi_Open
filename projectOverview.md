@@ -2132,7 +2132,7 @@ The PWA `start_url` pointed at a bare `redirect()`; the boot warm used a bare `f
 `cachedFetch`'s in-flight map cannot see (**A/B: 34 → 29 requests on boot**); the E1-4 rehydrate
 comment claimed a previous-day-workout abandonment production never did; and the weather chip had no
 failure state over a cache that was one unkeyed entry read before any coordinates were known.
-[Journal](docs/overview/entries/2026-09-11-fix-ps35b-boot-and-weather.md).
+[Journal](docs/overview/history-2026-09-14-folded-1.md#2026-09-11-fix-ps35b-boot-and-weather).
 **Owed: the device check, and one path the sandbox cannot reach.** There is no outbound route to
 `api.open-meteo.com` here, so only the weather **failure** branch was rendered — the keyed cache and
 the instant-paint seed are unit-tested, not observed end to end. On the S25: launch from the
