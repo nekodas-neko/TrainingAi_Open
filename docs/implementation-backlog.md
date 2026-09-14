@@ -751,7 +751,7 @@ below threshold and left in place for next time.
   seeds no weather snapshot, so `WeatherChip` renders a skeleton and the real row can be neither
   reproduced nor disproved off the device (BF-96 records the same limitation).
 - **✅ SHIPPED 2026-09-12** (`fix/bf139-header-chip-width`).
-  [Journal](overview/entries/2026-09-12-fix-bf139-header-chip-width.md).
+  [Journal](overview/history-2026-09-14-folded-1.md#2026-09-12-fix-bf139-header-chip-width).
 
 - **Added:** 2026-09-10 · owner, with a Home screenshot: *"the pills in the top are a little cutoff.
   can we make them smaller to fit?"*
@@ -807,7 +807,7 @@ below threshold and left in place for next time.
   dial with haptics beside a new control is a touch-target and gesture question, and the harness
   drives a mouse.
 - **✅ SHIPPED 2026-09-12** (`fix/bf141-weight-dial-unit-toggle`).
-  [Journal](overview/entries/2026-09-12-fix-bf141-weight-dial-unit-toggle.md).
+  [Journal](overview/history-2026-09-14-folded-1.md#2026-09-12-fix-bf141-weight-dial-unit-toggle).
 
 - **Added:** 2026-09-10 · owner, from the live logging screen for **Dumbbell Lateral Raise**:
   *"can there be a 'small' toggle for the weight dial to switch between lb/kg? my Dumbells are
@@ -881,7 +881,7 @@ below threshold and left in place for next time.
 - **Verify:** owner — the replacement sentence names both numbers, and a reader who follows it does
   not expect the gap to close as he moves. He is the person the sentence is for.
 - **✅ SHIPPED 2026-09-12** (`fix/bf142-gap-explainer-sentence`).
-  [Journal](overview/entries/2026-09-12-fix-bf142-gap-explainer-sentence.md).
+  [Journal](overview/history-2026-09-14-folded-1.md#2026-09-12-fix-bf142-gap-explainer-sentence).
 
 - **Added:** 2026-09-11 · owner, on the Nutrition card, third report in this family:
   *"calories still not right"*.
@@ -3625,7 +3625,7 @@ read**, so a moved device shows the old location for 30 minutes. Key it by round
   sandbox has no outbound route to `api.open-meteo.com`, so only the FAILURE path could be
   rendered here** — the success path and the keyed cache are unit-tested, not observed.
 - **✅ SHIPPED 2026-09-11** (`fix/ps35b-boot-and-weather`).
-  [Journal](overview/entries/2026-09-11-fix-ps35b-boot-and-weather.md). All four, plus the palette
+  [Journal](overview/history-2026-09-14-folded-1.md#2026-09-11-fix-ps35b-boot-and-weather). All four, plus the palette
   correction above.
   - **① measured:** `start_url` `/session-select` → `/workout`, the same destination without the
     `redirect()` hop. Where a launch *should* land is PS-35's question, not this one's.
@@ -3994,7 +3994,7 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
   whether the symptom was ever visible needs a day with enough logged to make it scroll, which the
   seeded fixture cannot produce (it renders *"Nothing logged on this day"*).
 - **✅ SHIPPED 2026-09-11** (`fix/rv-36-nutrition-scroll-restoration`, same PR as RV-36 — one device
-  pass covers both). [Journal](overview/entries/2026-09-11-fix-nutrition-scroll-and-day-padding.md).
+  pass covers both). [Journal](overview/history-2026-09-14-folded-1.md#2026-09-11-fix-nutrition-scroll-and-day-padding).
 - **Keep: the fifth-CI-rule question, which is the part that genuinely needed evidence.** No existing
   safe-area rule fires on an **absent** utility, only on a wrong one. A check for "full-height
   scroller with no bottom pad" still wants an allow-list for the sheets and navless full-screens that
