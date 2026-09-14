@@ -11681,3 +11681,21 @@ whatever the seed happens to hold. Both cost a wasted run this session.
 Rebased onto `main` after BF-161 was filed. The 21626 was true of the branch and never of `main`; a
 `.size` conflict is recomputed from the merged file, so neither side's number describes it. Recorded
 rather than edited in place, because this file is append-only.
+
+## 2026-09-14 — `projectOverview.md` → 10892, `docs/implementation-backlog.md` → 21640 (BF-156)
+
+The backlog shrank 32 with BF-156 leaving; its baseline is tightened to match rather than left as
+slack. projectOverview grew 14.
+
+Six of those fourteen are a correction the entry did not contain. BF-156 said the card "looks
+identical for both" states; it does not, and the way it differs is misleading — the two action
+blocks split on a **different axis** than `prescriptionDrivesLoad`, so `transition_recommended` and
+`deload_recommended` share one block with opposite load consequences. Fixing only the block the
+entry described would have left that pair unlabelled, which is why the row records the axis rather
+than the fix.
+
+### `docs/agents/state/implementation-lane-b.md` → 109 (BF-156)
+
+Down one from 110. BF-156 folded into the existing run of wrong premises rather than adding a line —
+that run is now nine long, and the shape it records is worth more than any single entry: an entry's
+stated cause is prose until something checks it.

@@ -11,25 +11,25 @@
 
 ## Now
 
-**BF-157 (v1.456.2):** every ready screen has a bounded clock — the ramp needs a working weight and
-four cases have none. **BF-159 (v1.456.1):** Cardio Baselines moved onto the Cardio tab.
-**LA-104 (v1.456.0):** the stress chart reads the STORED series for every day, mounted on
-`/health/day`. TN-3b, LB-98 ①, RV-35, BF-153, OR-108, LA-105 shipped. `check:rules` **74/74**.
+**BF-156 (v1.456.3):** the AI card says what skipping Accept costs, from `prescriptionDrivesLoad`.
+**BF-157 (v1.456.2):** every ready screen has a bounded clock. **BF-159 (v1.456.1):** Cardio
+Baselines moved onto the Cardio tab. **LA-104 (v1.456.0):** the stress chart reads the STORED series
+for every day. TN-3b, LB-98 ①, RV-35, BF-153, OR-108, LA-105 shipped. `check:rules` **74/74**.
 
 **`Reference:` was undocumented and burying real work.** It means *this entry is READ, not built* —
 "never next"; three sessions used it for "supporting reading". **The tell is a printed reason that is
 a bare link:** seven have it, three were opened, **all three were work** (LA-104 shipped; LA-102 and
 TN-28 now READY). Documented; the four `TN-` ones are **LB-104**.
 
-**NINE running entries were wrong about something load-bearing** — BF-139/141/142/145/146/147, OR-108's writers, LA-104's settled question, BF-157's scope (filed as bodyweight; the gate loses the clock in FOUR cases). **BF-159 was the second that checked out whole.** Measure before you fix what the entry blames; read the route before re-deciding its design.
+**NINE running entries were wrong about something load-bearing** — BF-139/141/142/145/146/147, OR-108's writers, LA-104's settled question, BF-157's scope (FOUR cases, not one), BF-156's ("looks identical" — it differs, on the WRONG AXIS). **BF-159 was the second that checked out whole.** Measure before you fix what the entry blames; read the route before re-deciding its design.
 
 **A 4-hourly silent Routine polls this lane** (`trig_01WcuYTidPtngLFZFD7yKnoL`, `53 */4 * * *`): syncs
 `main`, clears any open PR, runs `next-item.js`, **says nothing when READY is 0**.
 
 ## Next
 
-1. **READY is 5.** BF-156, then **LA-102** and **TN-28** — the two unburied from `Reference:`, both
-   nutrition surface, worth batching. Then LB-105 and the `nutrition-tab-day-and-scroll` batch (RV-36).
+1. **READY is 4.** **LA-102** and **TN-28** — both unburied from `Reference:`, both nutrition
+   surface, worth batching. Then LB-105 and the `nutrition-tab-day-and-scroll` batch (RV-36).
 2. **READY 0 is not "no work" — read KEEP and PARKED.** The console TRUNCATES each Keep; print them
    whole. TN-3b sat in PARKED three days while READY was 0 because its unparking was PROSE. **This is
    the same class as `Reference:` above, and it has now cost four entries in two days.** TN-3b's
