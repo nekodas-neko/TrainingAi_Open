@@ -7,11 +7,13 @@ import { Button } from '@/components/ui/button'
 import { TrendingUpIcon, TrendingDownIcon, MinusIcon } from 'lucide-react'
 import { getLocalStore } from '@/lib/local-store'
 import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
-import { invalidateFitnessTests } from '@/lib/cache-groups'
-import { todayInTz } from '@trainingai/shared/date-utils'
+import { invalidateFitnessTests, invalidateActivityWrites } from '@/lib/cache-groups'
+import { todayInTz, msToHHMMInTz } from '@trainingai/shared/date-utils'
 import { sixMwtVo2max, cooperVo2max, baselineHrr1, restingHrFrom, maxHrFrom, distanceCanBeScored, MIN_SCOREABLE_DISTANCE_M } from '@trainingai/shared/health/fitness-tests'
 import type { HrReading } from '@trainingai/shared/workout/hr-analysis'
 import type { FitnessTestProtocol } from '@trainingai/shared/fitness-tests/protocols'
+import { buildTestActivity } from '@trainingai/shared/fitness-tests/test-activity'
+import { omitNullFields } from '@/lib/local-store/sync-helpers'
 import type { LocalFitnessTest } from '@/lib/local-store/types'
 import type { TestCapture } from './test-active'
 
@@ -100,6 +102,24 @@ export function TestResult({ protocol, capture, previous, profile, userId, onDon
       vo2maxEst: computed.vo2maxEst, method: computed.method, notes: null,
       updatedAt: now, deletedAt: null, syncStatus: 'pending',
     }
+    // BF-160: the effort is worth an activity too — `computeActiveEnergy` sums workouts,
+    // activities and steps, so a test that writes none earns nothing however hard it was. Null
+    // for `resting_hrr` and for a capture with no duration.
+    const activity = buildTestActivity({
+      protocol, startMs: capture.startMs, endMs: capture.endMs,
+      distanceM: capture.distanceM, avgHr: computed.avgHr, maxHr: computed.maxHr,
+    })
+    const activityId = activity ? crypto.randomUUID() : null
+    const activityPayload = activity && activityId
+      ? omitNullFields({
+          id: activityId, activityType: activity.activityType, title: activity.title,
+          durationMin: activity.durationMin, distanceKm: activity.distanceKm,
+          avgHr: activity.avgHr, maxHr: activity.maxHr,
+          startTime: msToHHMMInTz(capture.startMs, tz), endTime: msToHHMMInTz(capture.endMs, tz),
+        })
+      : null
+    const revalidateBoth = () => Promise.all([invalidateFitnessTests(), invalidateActivityWrites()])
+
     const store = userId ? getLocalStore(userId) : null
     if (store) {
       try {
@@ -114,11 +134,37 @@ export function TestResult({ protocol, capture, previous, profile, userId, onDon
             vo2maxEst: record.vo2maxEst ?? undefined, method: record.method ?? undefined,
           },
         })
-        invalidateFitnessTests().catch(() => {})
+        // Its own try/catch, and after the test's write rather than before it: the test is the
+        // record the user asked for, and a failure here must not drop it into the API fallback
+        // that would then re-POST the test under the same id.
+        if (activity && activityId) {
+          try {
+            await store.upsertActivityLog({
+              id: activityId, date: today,
+              activityType: activity.activityType, title: activity.title,
+              durationMin: activity.durationMin, distanceKm: activity.distanceKm,
+              steps: null, avgHr: activity.avgHr, maxHr: activity.maxHr,
+              caloriesBurned: null,
+              startTime: msToHHMMInTz(capture.startMs, tz),
+              endTime: msToHHMMInTz(capture.endMs, tz),
+              notes: null, routePolyline: null, splits: null, bestEfforts: null,
+              paceSeries: null, avgPaceSecPerKm: null,
+              elevationGainM: null, elevationLossM: null, elevationProfile: null,
+              cadenceSpm: null, cadenceSeries: null, cadenceSource: null, segments: null,
+              updatedAt: now, deletedAt: null, syncStatus: 'pending',
+            })
+            await store.queueMutation({
+              userId: userId!, domain: 'activity_logs', date: today, payload: activityPayload!,
+            })
+          } catch (e) {
+            console.error('Fitness test activity write failed; the test itself is saved:', e)
+          }
+        }
+        revalidateBoth().catch(() => {})
         toast.success('Baseline saved')
         onDone()
         router.push('/health?tab=training')
-        pushThenRevalidate(userId!, invalidateFitnessTests)
+        pushThenRevalidate(userId!, revalidateBoth)
         return
       } catch (e) {
         console.error('Fitness test SQLite write failed, falling back to API:', e)
@@ -137,7 +183,13 @@ export function TestResult({ protocol, capture, previous, profile, userId, onDon
         }),
       })
       if (!res.ok) throw new Error()
-      await invalidateFitnessTests()
+      if (activityPayload) {
+        await fetch('/api/activity-logs', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...activityPayload, date: today }),
+        }).catch(() => {})
+      }
+      await revalidateBoth()
       toast.success('Baseline saved')
       onDone()
       router.push('/health?tab=training')

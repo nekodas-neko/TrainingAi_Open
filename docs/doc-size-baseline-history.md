@@ -11974,3 +11974,15 @@ its queue. `Needs:` mis-orders; `Gate:` crosses a line the owner drew. The `Need
 **34.8 from zero distance on the owner's own profile**, which is plausible enough that nothing would
 ever have questioned it. A row recording only the negative would leave the reader thinking the
 obvious case was the whole case.
+
+## 2026-09-14 — `docs/implementation-backlog.md` → 20943, `projectOverview.md` → 10971 (BF-160)
+
+−40 on the backlog for BF-160 leaving the queue; +31 on projectOverview for the row that replaces it.
+
+The row is longer than the fix is complicated because two of its three paragraphs are about things
+that are **not** wrong. The double-count the entry warned about does not exist — `computeZoneQuota`'s
+only actual is an HR-derived cache — and saying so is what stops the next session re-deriving it.
+And the credit's *size* is unverified on any machine in this repo: the 0 → 122 measured locally comes
+from synthetic MET fixtures, and the CI assertion that would check a real magnitude skips for the
+same reason. A row claiming the calories now work, without that sentence, would be claiming more than
+was measured.
