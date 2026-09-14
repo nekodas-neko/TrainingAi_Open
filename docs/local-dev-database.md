@@ -69,6 +69,12 @@ Instead, a local Postgres 16 instance is set up automatically:
   - **Not the named file ALONE.** 5 solo runs of `hr-read-routes.test.ts` are clean, so it does not fail by itself — which is different from being uninvolved, per the amendment above.
   - **Not the `check-comment-blindness` interaction** (the first guess, from its unusually heavy console output): 3 paired runs, clean.
   - **Not fixable by upgrading.** 4.1.11 is the latest 4.1.x and no 4.2 exists.
+  **Fourth sighting 2026-09-14 (Lane A, LA-48), and it holds the pattern on both counts.** Two
+  unhandled errors in one run, both naming `lib/__tests__/hr-read-routes.test.ts`, with
+  **8,665 passed / 0 failed** above them; the file then passed 31/31 alone, and the whole suite
+  re-ran clean on identical code. The diff was walk-segment types and a cadence helper, nothing
+  within reach of `/api/oura/hr-data`. So: still that file, still zero failing tests, still clean on
+  a re-run — four for four.
   - **The run log cannot settle it, and this is the trap worth knowing.** The natural move is to grep the failing log for whatever logged last — e.g. `[pg pool] idle client error`, the one console writer that fires asynchronously outside any test's control. Its absence proves nothing: **the pending `onUserConsoleLog` IS the log that never got delivered**, so the message you are looking for is the one the failure destroys. Absence is guaranteed under every hypothesis. File-based tracing (append in a `console.*` wrapper, never through the RPC) is the only way to see it — that harness worked, it simply had nothing to catch.
   **Do not "fix" this by quieting console output or by setting `dangerouslyIgnoreUnhandledErrors`** — the first treats the symptom that is legible rather than the one that is broken, and the second hides real unhandled rejections too. `disableConsoleIntercept: true` would make `onUserConsoleLog` structurally impossible, and is the one candidate worth considering *if this ever becomes frequent* — it costs per-file log attribution for everyone, which is too high a price for a fault nobody can currently reproduce.
 - **Killing a suite mid-run damages the NEXT run and, worse, the working tree — measured 2026-09-10 (LA-101).** Two distinct kinds of residue survive a `pkill`, and neither announces itself:

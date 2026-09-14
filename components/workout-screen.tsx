@@ -1609,7 +1609,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
           Your program changed, so this link is out of date. We&apos;ve refreshed it — reopen the session from your list.
         </p>
         <a
-          href="/session-select"
+          href="/workout"
           className="mt-2 inline-flex h-12 items-center justify-center rounded-xl bg-brand px-6 text-base font-semibold text-brand-foreground"
         >
           Back to sessions

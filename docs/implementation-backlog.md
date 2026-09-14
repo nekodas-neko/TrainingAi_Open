@@ -637,6 +637,69 @@ below threshold and left in place for next time.
 - **What's needed to start:** owner sign-off on the Apple Developer Program cost/enrollment, then an
   implementer follows the plan directly.
 
+### [workouts] BF-162 — the prescription card tells you to load 85 kg onto a Hanging Leg Raise
+
+- **Lane:** B — `components/workout/ai-prescription-card.tsx:283-310`. The data needed to fix it is
+  already a prop on this component.
+- **Added:** 2026-09-15 (BugFix intake). The owner, reading his Legs prescription: *"Is this right?"*
+- **Reproduced exactly from his stored values — this is arithmetic, not an anomaly:**
+
+  | exercise | stored `estimated_1rm` | × pct | card shows |
+  |---|---|---|---|
+  | Hanging Leg Raise | **128** | × 66% = 84.5 | **`@ 85kg (66%)`** |
+  | Pull-Up (14 Sept) | **124** | × 72.5% = 89.9 | **`@ 90kg (72.5%)`** |
+
+  Both are `exercise_type = 'bodyweight'` with `equipment = ['bodyweight']` in `exercise_library`.
+  There is no bar to load and no weight to add; the kg figure is a percentage of an internal index.
+- **The component already holds the answer and already documents the rule.** Its own prop comment:
+
+  ```ts
+  // Per session-exercise id: 'weighted' | 'bodyweight'. A bodyweight 1RM change in kg is a change
+  // in an internal index, not in weight lifted, so the rationale must not quote it (Q-19).
+  exerciseTypeById?: Record<string, string | undefined>;
+  ```
+
+  **Q-19 applied that rule to the RATIONALE and not to the exercise rows.** Line 283 computes
+  `weightKg` from `liveOneRm × pct` unconditionally and line 308 prints it, never consulting
+  `exerciseTypeById`.
+- **The fix is to take the branch that already exists.** Line 310 renders `` ` @ ${ex.pct}%` `` when
+  `oneRm` is null — visible on his own card as *Face Pull · 2×12 @ 66%*, which reads correctly. A
+  bodyweight exercise should take that same branch: percent, no kg.
+- **Do not render the number as "added weight" instead.** 85 is not 85 kg of added load — it is 66%
+  of a 128 index derived from bodyweight reps (BF-149's forward path). Relabelling it would turn a
+  visibly absurd number into a plausible wrong one, which is the trap BF-158 is filed against.
+- **Consider, not required:** for a bodyweight exercise the useful target is reps, and `avg_reps` is
+  stored (BF-151 is already about reading it rather than inverting). Showing *"2×12"* with the
+  percent and no kg is complete on its own; a rep target is a further improvement, not part of this.
+- **Verification:** on device, open a session containing a bodyweight exercise and confirm no kg is
+  shown for it while weighted exercises in the same list are unchanged.
+
+### [workouts] BF-163 — the intensity chip is computed from load alone, so it labels a 6-rep set "Hypertrophy · typically 8–12 reps"
+
+- **Lane:** B — `components/workout/ai-prescription-card.tsx:290` and the band table in
+  `packages/shared/src/workout/intensity-zone.ts`.
+- **Added:** 2026-09-15 (BugFix intake). Owner, on the same card: *"Is hypertrogpy the correct tag?"*
+- **By its own definition the label is right, and that is the problem.** `intensityZoneForPct` maps
+  %1RM to a band with no reference to reps: 65–75% → **Hypertrophy**. His squat is prescribed at
+  **72.5%**, so the chip is correct.
+- **The chip's own tooltip contradicts the line it sits beside.** The band carries
+  `reps: '8–12 reps'` and renders as `title="65–75% of 1RM · typically 8–12 reps"` — against a
+  prescription of **2×6**. The row reads *"Hypertrophy · 65–75% … 2×6 @ 57.5kg (72.5%)"*, which is a
+  load in the hypertrophy band driving a rep count the same table calls **Strength** (4–6 reps).
+- **The load and the reps genuinely disagree here; the chip is not merely mislabelled.** 6 reps at
+  72.5% is a strength-leaning stimulus. `goal-ranges.ts` puts hypertrophy at `repMin: 5, repMax: 12`,
+  so 6 is legal for the goal — but the display band and the goal range are different tables with
+  different rep opinions, and the card shows only one of them.
+- **Recommended: label from the pair, not the percentage.** Either widen the chip to consider reps
+  (so 72.5% × 6 reads as the blend it is), or drop the `typically N reps` clause from the tooltip so
+  the chip claims only what it measures — the load band. **The second is the honest minimum** and is
+  a one-line change; the first is the better answer and needs a rule for the disagreement.
+- **Not a defect in the prescription itself.** The session note explains the low volume — *"Due to
+  low external readiness and reported lower back injury/soreness, volume has been reduced across all
+  spinal-loaded movements"* — so 2 sets is deliberate. This entry is about the label, not the plan.
+- **Verification:** on device, confirm no exercise row shows a zone whose stated rep range excludes
+  the reps prescribed on the same line.
+
 ### [nutrition] BF-161 — the meal builder can only reach foods, so a meal made of meals has to be rebuilt ingredient by ingredient
 
 - **Lane:** B for the recommended shape (`components/nutrition/ingredient-search.tsx`,
@@ -686,124 +749,19 @@ below threshold and left in place for next time.
 - **What the owner is accepting, restated because it is the part that bites later:** a meal built
   from saved meals is a snapshot. Editing the source meal afterwards does not change it. Nothing on
   screen should imply otherwise — no "from <meal name>" provenance chip that reads as a live link.
-- **Verification:** on device, build a meal from two saved meals and confirm the ingredient rows,
-  their quantities, and the resulting macro total match the sum of the sources.
-
-### [cardio] BF-160 — a fitness test earns no calories and leaves no activity, so twelve minutes of maximal running is invisible to the budget
-
-- **Lane:** A — `components/fitness-tests/test-result.tsx` (`handleSave`) writes only
-  `fitness_tests`; the energy path is `lib/health/energy-balance-service.ts` /
-  `computeActiveEnergy`, which sums workouts + activities + steps and knows nothing about tests.
-- **Added:** 2026-09-14 (BugFix intake), from the owner's Cooper run. Told the test had produced no
-  activity log, he answered: *"Yes it should count."*
-- **Measured on his 2026-09-14 Cooper run** — 1,975 m, 720 s, avg HR 156, peak 175:
-
-  | surface | credited? | evidence |
-  |---|---|---|
-  | Zone minutes | **yes, already** | `getZoneMinutesRange` reads `oura_heartrate`; **581 strap samples ≥80% of max ≈ 9.7 min** in the top zone |
-  | Calorie budget | **no** | not a `workout_session`, not an `activity_log`; `computeActiveEnergy` has no third source |
-  | Cardio history / weekly list | **no** | `activity_logs` for 2026-09-14 returns **0 rows** |
-
-- **The steps path does not rescue it, which is the part worth measuring rather than assuming.**
-  `body_metrics.steps` for the day reads **894** — fewer than a 1,975 m run produces on its own, so
-  the pedometer did not capture the effort either. The hardest twelve minutes of his week contribute
-  **essentially nothing** to the day's earned calories, on the same screen BF-152 and BF-154 have just
-  made anchor to measured movement.
-- **The split is the design problem: HR-derived credit flows automatically, event-derived credit does
-  not.** Anything the strap records reaches the zone quota without an activity row, so a test looks
-  partly credited and the missing half is invisible. That is why this reads as "it counted" until the
-  budget is checked.
-- **Recommended: write an `activity_log` alongside the `fitness_test` on save**, from data the capture
-  already holds — `startMs`/`endMs`, `distanceM`, `avgHr`/`maxHr`, and the protocol name as the title.
-  `activity_types` already carries **Run** (distance-based) and **Other**; a Cooper is a run, a 6MWT a
-  walk, and `resting_hrr` should write nothing (60 s of effort inside three minutes of sitting is not
-  a cardio session). The energy path then credits it with no new source, because it becomes an
-  activity like any other.
-- **Do not double-count, and check this before shipping.** The zone minutes are already credited from
-  HR. Creating an activity must not also add its minutes to the same quota — verify against
-  `computeZoneQuota`'s inputs, which are HR-derived, not activity-derived. The calorie path is the
-  one that genuinely gains a source.
-- **`Needs:` BF-158** — that entry may make the score conditional on a plausible distance; an activity
-  should still be written when the VO₂max is withheld, because the effort happened either way.
-- **Verification:** run a protocol on device and confirm one activity appears in cardio history with
-  the right duration and distance, that the day's earned calories rise, and that the zone quota does
-  **not** jump by a second helping of the same minutes.
-
-### [cardio] BF-158 — the Cooper test has no distance source indoors and no clamp, so a treadmill run saves a NEGATIVE VO₂max
-
-- **Lane:** A — `packages/shared/src/health/fitness-tests.ts` (`cooperVo2max`, `clampVo2`) is the
-  defect; `components/fitness-tests/test-active.tsx` is where a distance source other than GPS would
-  have to come from.
-- **Added:** 2026-09-14 (BugFix intake), from the owner asking for a pre-flight check before running
-  the Cooper test for the first time. **He nearly ran it on a treadmill** — the session immediately
-  before this was about single-speed treadmill walks.
-- **`cooperVo2max` is the only VO₂ equation in the file that is not clamped.**
-
-  ```ts
-  const clampVo2 = (v: number) => round1(Math.max(10, Math.min(100, v)))
-  // sixMwtVo2max: both branches return clampVo2(…)
-  export function cooperVo2max(distanceM: number): number {
-    return round1((distanceM - 504.9) / 44.73)      // ← no clamp
-  }
-  ```
-
-  At `distanceM = 0` that is **−11.3 mL·kg⁻¹·min⁻¹**, written to `fitness_tests.vo2max_est` and into
-  the fitness snapshot. The intercept guarantees it: any distance under 505 m is negative, and the
-  sibling equation in the same file already has the guard.
-- **Zero is the realistic input, not a contrived one.** `test-active.tsx` takes distance from
-  `startGpsWatcher` and nothing else — **no treadmill toggle, no manual entry**, unlike the guided
-  walk, which has an explicit *"Treadmill — skips GPS"* switch. An indoor run therefore produces a
-  full-length, correctly-timed test with a distance near 0.
-- **The existing early-stop guard shows the intended shape and covers the other half of this.**
-  `test-result.tsx` skips the VO₂ score when a fixed-duration protocol ends under 90% of its window
-  (*"the Ross/Cooper equations are calibrated to the FULL protocol"*, review E2-10), saving HR and
-  distance regardless. An implausible **distance** deserves the same treatment as an implausible
-  **duration**, and that is the recommended fix: skip the score and say why, rather than clamp a
-  treadmill run up to 10 and present it as a reading.
-- **Clamping alone is the wrong fix and would be worse than the bug.** `Math.max(10, …)` turns −11.3
-  into a plausible-looking **10.0** that nothing marks as invalid. Prefer: `null` with a reason when
-  the distance is implausible for the protocol (a 12-minute run under ~505 m is not a Cooper result),
-  which is the pattern the early-stop guard already uses.
-- **Worth considering alongside, not required:** a manual distance entry on the result screen, so a
-  treadmill's own readout can be typed in. That makes the test usable indoors rather than merely
-  safe. Owner's call — the safety half stands on its own.
-- **Verification:** run the protocol to full duration with GPS unavailable and confirm no VO₂max is
-  saved and the screen says why; confirm an outdoor run is unchanged. The owner's existing 6MWT row
-  (603 m, 18.8, `ross_2010`, 2026-07-19) is the reference that the clamped sibling still behaves.
-
-
-### [nutrition] BF-154 — the macro grams still key off the stored goal, and the owner has said they should not
-
-- **Lane:** A — `lib/health/energy-balance-service.ts` and `packages/shared/src/nutrition/`, where
-  the base that `scaleMacrosForEarnedKcal` scales FROM is chosen.
-- **This is BUILDABLE WORK, not residue, and it carried a `Keep:` line for one commit by mistake.**
-  `Keep:` is for an entry owing an owner or device *check*; this owes a change to the code, and the
-  owner has already approved it. The field put an answered, startable item under a KEEP heading that
-  tells the lane not to look — the exact shape OR-100 is filed about — so it is a plain queue entry.
-- **The arithmetic half shipped 2026-09-13 (#1155, v1.455.1)** and is not what this entry asks for:
-  the breakdown sentence now names `budgetProvenance`'s own `base` and `earned`, says *resting rate*
-  on the anchored path, and no longer prints two figures both labelled *resting*. Guarded by
-  `components/nutrition/__tests__/bf154-budget-breakdown-addends.test.ts` and
-  `e2e/bf154-budget-breakdown-reconciles.spec.ts`, the latter proven against the defect before it was
-  run against the fix.
-- **✅ THE OWNER ANSWERED, 2026-09-13: the grams follow the budget.** His words — *"Can we have it
-  dynamically sized for my calories? I.e before excercise its 1 value and after its another if
-  calories increase?"* So the gram targets take the **budget** as their base, not the stored 1,660,
-  and the printed gap goes to zero by construction rather than being explained.
-  `scaleMacrosForEarnedKcal` already grows them with `earned` and holds protein fixed while splitting
-  the rest on the stored carb/fat ratio — that half is built and needs no change. What changes is the
-  base it scales FROM.
-- **⚠ Flag when building:** protein is held constant by that function, so re-basing from 1,660 to
-  ~1,294 drops carbs and fat while 150 g protein stands. That is the right shape for a cut and a
-  visible change to his targets — worth confirming on the first day it renders rather than after a
-  week of it.
-- **Two things #1155 left behind become dead when this lands, and go in the same change:** the
-  explanatory paragraph in `components/nutrition/energy-card.tsx` exists only because the two numbers
-  disagree, and `components/nutrition/macro-budget-gap.ts` exists only to measure that disagreement.
-  A gap that is zero by construction needs neither. Do not leave a card explaining a difference that
-  no longer exists.
-- **Added:** 2026-09-13 · re-queued from the shipped half, so the owner's answer is not lost with the
-  entry that carried it.
+- **✅ SHIPPED 2026-09-14** (`fix/bf161-meal-builder-add-saved-meals`, v1.456.8).
+  [Journal](overview/entries/2026-09-14-bf161-builder-adds-saved-meals.md). `savedMealToEntries`
+  (`components/nutrition/saved-meal-flatten.ts`) is the one mapping; the source list is
+  `saved-meal-results.tsx`, a child rather than an addition to `saved-meals-sheet.tsx`, which was
+  788 lines against the hard 800 ceiling. **No schema change and no new fetch** — `SavedMeal`
+  already carries its items and the sheet already loads them.
+- **The quantity question answered itself.** `openBuild` already built the same `{ item, qty }` rows
+  inline to load a meal for editing, at the stored WHOLE-RECIPE multiplier. Both paths now share one
+  helper, which is what makes the check below true as this entry states it.
+- **Keep:** the device check, and only that. On the S25, build a meal from two saved meals and
+  confirm the ingredient rows, their quantities, and the resulting macro total match the sum of the
+  sources. The harness reaches the tab and proves it is wired; it cannot judge the arithmetic on a
+  real library.
 
 ### [app-shell] LB-107 — back on a tab with nothing to pop should land on Home, not leave the app
 - **Lane:** B — the tab shell's history handling; `app/**` and `components/shell/**`.
@@ -843,6 +801,37 @@ below threshold and left in place for next time.
   gesture — Home, not the launcher.
 - **Reversal cost:** low, but it changes what a hardware gesture does, so it wants the device before
   it is called done.
+
+### [platform] LB-109 — three finished Lane B entries print as READY, and they are the top of the lane
+- **Lane:** O — this queue file only. Clearing a completed entry is the Orchestrator's sweep per
+  `CLAUDE.md`, which is why this is filed rather than done.
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-14 · found running `next-item.js --lane B` while
+  picking up PS-35a.
+- **What it costs, concretely.** Lane B's READY list is 6 and **three of them are finished work**:
+  they print above the items that are not, so the top of the lane is a list of things that cannot be
+  started. That is the same failure `Verify:` and `Keep:` exist to prevent, arriving from the other
+  side — not an entry mis-described as blocked, but an entry that is done and still advertising.
+- **The three, with what their own bodies say:**
+  - **BF-141** (lb/kg toggle) — heading still reads *"the device look is what is left"*; the body
+    reads **✅ VERIFIED ON THE S25, 2026-09-13**. Nothing is owed.
+  - **BF-135** (stacked banners on an injured exercise) — heading reads *"device owed"*; the body
+    reads **✅ VERIFIED ON THE S25, 2026-09-13**, owner: *"Havent seen this issue; treat it as fine
+    for now"*. Nothing is owed.
+  - **LB-47** (the `Full` override's false revert claim) — the owner closed it **conditionally**:
+    *"Will let you know when it comes up. Happy to treat as fixed if I dont raise it again."*
+- **⚠ LB-47 is NOT the same case as the other two and must not be swept with them.** Its own text is
+  explicit that *"nothing has confirmed the fix works"* — the owner declined a check rather than
+  passed one. **If that symptom is reported again it is a regression report against an unverified
+  fix, not a new bug, and the reader is meant to start from the original diff.** That sentence has to
+  survive the entry's removal; delete it into `known-issues-resolved.md` rather than out of the repo.
+- **The heading is the thing to fix first, and it is cheap.** Two of these three say *"device owed"*
+  in a heading while saying *verified* in the body, so a reader who trusts the queue's own summary
+  line is misled before opening anything. `next-item.js` reads fields, not headings — but a person
+  scanning the file reads the heading.
+- **Pass test:** `node scripts/next-item.js --lane B` prints no entry whose body records its residue
+  as discharged.
+- **Reversal cost:** none, a queue file.
 
 ### [platform] LB-108 — E2E reports green without running whenever a change lives in `lib/`, and `lib/hooks/**` is UI
 - **Lane:** O — `.github/workflows/ci.yml`, the *"Does this change touch the UI?"* step (~line 637).
@@ -3219,17 +3208,30 @@ sheet is open over the bottom half of it.
     `diary-nested-meal:163` both went flaky on `browser.newContext: Target page, context or browser
     has been closed` after `Received signal 11 SEGV_MAPERR 0000000001b0` — same address, fifth time.
     Both recovered; the run's one hard failure was a real fixture fault in a spec that PR added.
+  - **⚠ EIGHTH SIGHTING 2026-09-14 (#1186), and it is the first with a CONTROLLED re-run.**
+    `back-dismiss-sweep:171` was the hard failure — both its attempts died at `browser.newContext`
+    after `Received signal 11 SEGV_MAPERR 0000000001b0`, the same address for the sixth time — beside
+    `diary-nested-meal:197` (second time) and `saved-meal-tags:75`, which crashed identically and
+    recovered. 201 passed, and a grep of the whole log for `expect(received)` / `Expected:` /
+    `Received:` returned **zero matches**: not one assertion failed in the entire run.
+  - **Re-running the same job on the same commit came back fully green**, which is the datum the
+    previous seven sightings could not supply. The crash is not a property of a commit, and a
+    re-run is an effective mitigation for a single occurrence — at the price of ~30 minutes. That is
+    an argument for this entry's conclusion rather than against it: the job is a coin-flip whose
+    cost is paid per PR, not a signal about the code under test.
+
   - **`touch-target-size:53` failed with `/: no interactive elements found`**, which is the same
     dead-renderer downstream wearing a third mask: the page never rendered, so the measurement had
     nothing to measure and the assertion read as a layout defect. Worth naming, because unlike
     `ERR_ABORTED` and `newContext` it looks like a genuine product failure on its own.
-  - **Seven sightings, eleven different specs** — `preferences-survive-reinstall` (×4, three times as
-    the hard failure), `touch-target-size` (×2), `macro-calorie-warning` (×2), `one-calorie-budget`,
-    `back-dismiss-sweep`, `card-429-error-state`, `home-device-battery-chips`,
-    `baseline-progress-label`, `health-tabs-instant-paint`, `meal-label`, `diary-nested-meal`. Which
-    spec is reported is a scheduling accident, as this entry said at the second sighting; the
-    constant is a renderer crash inside a 21–26 minute run. **It has now cost eight log reads across
-    three sessions**, one of them only to establish the hard failure was something else.
+  - **Eight sightings, twelve different specs** — `preferences-survive-reinstall` (×4, three times as
+    the hard failure), `touch-target-size` (×2), `macro-calorie-warning` (×2), `diary-nested-meal`
+    (×2), `back-dismiss-sweep` (×2, once as the hard failure), `one-calorie-budget`,
+    `card-429-error-state`, `home-device-battery-chips`, `baseline-progress-label`,
+    `health-tabs-instant-paint`, `meal-label`, `saved-meal-tags`. Which spec is reported is a
+    scheduling accident, as this entry said at the second sighting; the constant is a renderer crash
+    inside a 21–30 minute run. **It has now cost nine log reads across four sessions**, one of them
+    only to establish the hard failure was something else.
   - Recorded because a 26-minute job that eats its own browser roughly one run in three is an
     argument about the job, which is what this entry is for. It also means **a red E2E cannot be
     read as a signal without opening the log**, which is the cost LB-54 is about.
@@ -3750,30 +3752,6 @@ present.
 - **Not urgent, and small.** Nothing is broken; the Lint job passes on warnings today and would keep
   passing. This is about whether the output can be read at all.
 
-### [app-shell] PS-35a — five zero-content redirect/duplicate pages, to delete or keep
-
-- **✅ DECIDED 2026-09-14 — delete them.** Owner: *"We only use the APK - delete them if not needed."*
-  The gate is discharged and the bookmark risk the entry raised is dismissed by the same answer: a
-  browser bookmark is not a surface they use.
-- **⚠ ONE CONDITION ATTACHED, and it changes the work.** Owner, in the same breath: *"What page? we
-  only use the APK; so if its not accessible via the APK and is needed; then make sure there is a way
-  to access it from APK."* So this is **not** a blanket delete. For each of the five, establish
-  whether the destination it redirects to is reachable inside the APK by some route the owner
-  actually walks. Where it is, delete the redirect. **Where the only path to a needed screen is that
-  page, give it a real entry point before deleting anything** — otherwise this removes a surface
-  rather than an alias, which is the opposite of what was approved.
-
-- **Lane:** B — `app/{workout-select,session-select,stats,config,profile}/page.tsx`, ~10 call-site edits.
-- **The old `Gate: owner` is removed** — the approval above is the one it was waiting for.
-- **Added:** 2026-09-06, app checkpoint — [report](reviews/2026-09-05-app-checkpoint.md) §4/§P2.
-  **Split from PS-35 on 2026-09-10 (OR-106).**
-- Five pages with no content of their own: each redirects or duplicates a tab. ≤4 in-repo callers
-  each; full table in the report.
-- **What the owner decides:** delete them, or keep them as bookmarkable aliases. Deleting is the
-  recommendation — an alias nobody links to is a route that can rot — but a PWA shortcut or a browser
-  bookmark pointing at one would break, which only the owner can know.
-- **Reversal cost:** low. Restoring a deleted redirect page is a few lines.
-
 ### [app-shell] PS-35b — a wrong PWA start_url, a doubled boot fetch, a dead branch and a stuck weather chip
 
 - **⚠ OWNER DIRECTED 2026-09-13, and it is a scope rule rather than an answer to this entry.**
@@ -3890,11 +3868,29 @@ unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge
 - **✅ DECIDED 2026-09-14 — a deload counts as exercise, so it must not decay the collection.**
   Owner, verbatim: *"A deload week or session should still count as an \"excercise\" so it wont decay
   cats."* That is broader than the question asked: it covers a deload **session** as well as a deload
-  week, and a session is already dated — `workout_sessions.phase_type = 'deload'` — so **half of this
-  ships with no schema change at all**. Do that half first.
-- **The `Gate: owner` is discharged.** What is left is the ordinary engineering it always was: dated
-  deload *sessions* into `pausedDays` now; the deload **phase** interval still needs dates on
-  `program_phases`, which is a Lane A migration and is the only part that was ever blocked.
+  week.
+- **⚠ CORRECTED 2026-09-14: the session half is not cheap to build, it is ALREADY TRUE — and the
+  line that said otherwise was written from the owner's words without reading the code.** It claimed
+  *"half of this ships with no schema change at all. Do that half first."* There is nothing to do.
+  `listTrainedDayKeys` (`adapter.ts:1226`) selects any session with at least one surviving exercise
+  log and carries **no `phase_type` filter of any kind**, so a deload session is already a trained
+  day and already feeds the workout ladder as a faucet. `collection/route.ts` says so in its own
+  comment: *"a deload day you TRAINED is already a faucet day and needs no pause."*
+- **Verified on production, not inferred:** all three sessions ever stamped `deload` (2026-08-10,
+  08-17, 09-02) carry **5 exercise logs each**, so all three are already in `listTrainedDayKeys` and
+  already count. The owner's rule is satisfied for sessions today.
+- **Adding them to `pausedDays` would be actively wrong**, which is why this is a correction rather
+  than a shortcut. `pausedDays` is shared by the steps and sleep ladders, and a deload day is not a
+  compliant pause for either — it would stop those two decaying on a day the user simply trained,
+  which is not what was asked for and not what a pause means.
+- **What is left is the deload PHASE, and only that.** It needs dates on `program_phases`, which is a
+  Lane A migration — and a migration ships alone.
+- **⚠ The remaining half still carries an owner question, and removing the `Gate:` did not answer
+  it.** The 2026-09-14 decision settled the RULE (a deload must not cost cats); it did not settle
+  whether a deload span becomes **first-class stored state**, which is what a dated
+  `program_phases` interval means. Recommendation when this is next picked up: store it, because the
+  alternative — replaying the phase engine per day across all history — gets one answer with no
+  window and keeps it forever. But put that to the owner before writing the migration.
 - **⚠ Do not read the production counts as a reason to skip it.** Three sessions have ever been
   stamped deload, so this has cost the owner almost nothing so far — but they have now said plainly
   what the rule should be, and the cheap half honours it.
@@ -5055,6 +5051,31 @@ feature and not a deletion like LB-41:
 - **Do not re-derive the six traps below to explain it.** They are paid for and in the hook. The
   question is what `/more` does that `health-content` and `session-select-content` do not, given all
   three take the same `PullToSync` path.
+- **⚠ A CANDIDATE CAUSE, found 2026-09-14 by reading the hook rather than the screens — and it
+  explains the harness/device split outright, which no previous hypothesis did.**
+  `use-scroll-restoration.ts:158` attaches `stop` to **`touchstart`** on the scroll container, and
+  `stop` sets `done = true` with **no re-arm**: one touch abandons the pending restore permanently.
+  **The S25's system back gesture IS a touch**, delivered to the WebView as the new screen mounts.
+  `page.goBack()` in Playwright fires no touch at all — which is exactly why the harness restores 840
+  and the device does not, and why a green `scroll-restoration.spec.ts` was never going to see this.
+- **Why `/more` and not the other two, on the same hypothesis:** the cancel only matters while the
+  restore is still PENDING — the hook waits for the container to grow tall enough to hold the saved
+  offset. A screen whose content reaches full height immediately has already restored before any
+  touch can arrive. `/more` mounts both tab panels (`display:none` on the inactive one) plus
+  `SyncHealthCard`, so it is the slowest of the three to reach height. That also fits RV-36's
+  *"Mostly works"* in the same sitting: the fast screens are fine.
+- **THE DISCRIMINATING EXPERIMENT, and it is one tap:** on the S25, scroll `/more` down, tap into
+  *Profile details*, and come back with a **UI back control** rather than the system gesture. If the
+  offset restores that way and not with the gesture, the `touchstart` cancel is the cause and this
+  stops being a mystery. Every device check so far has used the gesture — the entry's own
+  verification step says to — so this path has never been tried.
+- **Proposed fix if it confirms, recorded so it is not re-derived:** move the takeover from
+  `touchstart` to `touchmove`. That keeps the principle the hook already argues for in its own
+  comment — *"user takeover is an INPUT event, not a scroll delta"* — while distinguishing a stray
+  touch from an actual drag, which is what a takeover means. A time-based grace after mount is the
+  weaker alternative: it picks a number, and the number is what breaks on a slower cold start.
+  **Not built, because it must not be shipped on a hypothesis** — it changes takeover behaviour on
+  every screen, and the experiment above costs one tap.
 - **Verification:** on the S25, scroll `/more` well down, tap into *Profile details*, press the
   **system back gesture** (not a UI back button), on a cold cache and a warm one; and confirm
   reaching the same screen forward still starts at the top.
@@ -8008,114 +8029,80 @@ recommendations that were put to them. Do not re-open either.**
   any correlation it surfaces is an observation on n=1 with a dozen confounders — shown as a number
   the owner reads, never as a claim about cause.
 
-### [body][devices][platform] BF-58 — the partner's weigh-ins land in the owner's account and are thrown away; two people, one scale
+### [body][devices][platform] BF-58 — one scale, two people: the two device answers the weight bands could not give
 
-- **Lane:** A — attribution and routing; the consent surface is B.
+- **Lane:** A.
 - **Added:** 2026-08-30 · owner: *"my partner also used this app and the same scale, how can she
   connect so she gets her body data to her app. can we both be connected to the scale at once? (she
-  is who I am getting the readings for that are 'is this you')."*
-- **Needs:** BF-53 — **cleared 2026-08-30: it shipped.** Both routes take `numericRouteId` and the
-  client now reports the failure instead of swallowing it, so the *"is this you"* prompt works again.
-  That matters here because under option D the prompt is the **ambiguity fallback** — the thing that
-  catches a reading the weight bands cannot separate. A device check on BF-53 is still owed.
+  is who I am getting the readings for that are 'is this you'.)"*
+- **Keep:** the two on-device questions below, and the partner-pairing step. **Option D's
+  attribution shipped 2026-09-14** — `/api/scale-ble/samples` now splits three ways (claim within
+  `SCALE_WEIGHT_CLAIM_PCT` 8% · prompt up to `SCALE_WEIGHT_ANOMALY_PCT` 15% · decline beyond), the
+  band width was measured off the two real weight clusters rather than chosen, and a declined
+  reading is **archived** rather than thrown away. Nothing of the band work is outstanding; what is
+  left is everything that needs the hardware.
 
-**Two questions, and the code answers both.**
+**1. Can both phones hold a connection at once?** Almost certainly not, and the app is built on that
+assumption. The reading does not come from the advertisement — `ScaleBleScanManager` uses it only to
+*wake* the app, and `ScaleBleService` then opens a **GATT connection** (`ScaleGattClient`) to read
+the frame. A consumer scale of this class normally accepts one at a time, so two phones would race
+and the loser would get nothing. **That is inferred from the protocol shape, not measured.** Pair
+both phones, step on the scale, see whether one, both or neither receives a frame.
 
-**1. Can both phones connect at once? Almost certainly not, and the app is built on that assumption.**
-The reading does not come from the advertisement — `ScaleBleScanManager` uses the advertisement only
-to *wake* the app, and `ScaleBleService` then opens a **GATT connection** (`ScaleGattClient`) to read
-the frame. A consumer BLE scale of this class normally accepts one GATT connection at a time, so two
-phones would race and the loser would get nothing. **That is an assumption from the protocol shape,
-not a measurement — it needs one on-device test before any design depends on it** (pair both phones,
-step on the scale, see whether one, both or neither receives a frame).
+**2. Does `REQUEST_STORED_MEASUREMENTS_CMD` get a reply?** This is the one that decides whether the
+race matters at all. `0x22 0x04 0x15` and `STORED_RECORD_MARKER` already exist in the code and the
+comment is candid that they are **speculative, borrowed from a different firmware generation and
+never verified against this hardware**. If the scale buffers, the losing phone catches up on its
+next connect and nobody's weigh-in is lost. One command and a look at what comes back; there is
+already a plan at
+`docs/superpowers/plans/2026-07-30-scale-stored-measurement-drain-and-scan-latency.md`.
 
-**2. Where do her readings go now? Into the owner's account, then the bin.** The scale is paired to
-one user. Every frame is attributed to that user; a weight more than `SCALE_WEIGHT_ANOMALY_PCT`
-(15%) from their last confirmed reading is staged **pending** rather than saved — and
-`composition.ts:11` says why in as many words: *"owner's partner also uses this scale"*. The `Not
-me` button then **discards** it. So the app already detects her, already asks, and already knows the
-answer — and then destroys the reading. Every weigh-in she has ever taken on it is gone.
+**3. Have the partner pair the scale in her own app.** The pairing is `localStorage` on the device
+(`ta_paired_scale_v1`, no `user_id`, no table, no uniqueness constraint) — so nothing stops her
+phone pairing the same scale today, and it costs nothing to find out. With D shipped on both
+phones, each app claims only its own owner's band and neither learns anything about the other
+person.
 
-**⚠ THE PAIRING IS `localStorage` ON THE DEVICE — there is no server-side owner, and this changes
-the design.** `lib/scale-ble/paired-scale.ts` stores `{deviceId, name}` under `ta_paired_scale_v1` in
-`localStorage`. No `user_id`, no table, no uniqueness constraint. **So nothing stops the partner's
-phone pairing the same scale today** — the first draft of this entry treated the scale as owned by
-one account, and it is not. What is actually shared is the *radio*, not a record.
+**The residual risk, stated rather than hidden.** Both phones race for one GATT connection, so if
+his wins and declines while her phone is out of range, **that weigh-in is lost** — which is what (2)
+would fix, and failing that, weighing in with your own phone nearby is a habit rather than a
+feature.
 
-**So the problem is narrower than "two people, one scale". It is: whichever phone wins the GATT
-connection attributes the reading to ITS owner.** Both phones wake on the advertisement, both try to
-connect, one wins. That is why his account is collecting her weigh-ins.
+**Option B (a linked household member, readings offered across accounts) was rejected 2026-08-30**
+and is recorded in the shipping journal entry with its terms, so it is not re-proposed from scratch
+if it is ever revived. It builds the app's first cross-account data path — consent, linking,
+revocation, a Play Store health-data implication — and D needs none of it.
 
-**Four ways to fix it.**
+- **Verification:** with both phones paired, the owner steps on the scale and his reading lands in
+  his account with no prompt; the partner steps on and **no** *"is this you"* appears on his phone;
+  and the answer to (1) is recorded either way, because the design of any future work here depends
+  on it.
 
-| | Shape | Verdict |
-|---|---|---|
-| **A** | Both phones pair, both claim whatever they capture | **No.** This is today's behaviour and it is the bug. |
-| **B** | One phone owns the scale; a `Not me` reading is offered to a **linked household member** | **Rejected 2026-08-30.** Builds the app's first cross-account data path — consent, linking, revocation, a Play Store health-data implication — to solve a problem that does not need any of it. Kept below only so it is not re-proposed. |
-| **C** | She uses the Renpho app | Zero work. The honest baseline, and the current interim answer. |
-| **D** | **Both phones pair independently; each claims only weights inside its own owner's band and declines the rest** | **✅ CHOSEN by the owner 2026-08-30.** No linking, no shared account, no server-side owner, no cross-account write. Two self-contained apps that happen to hear the same radio. |
+### [body][devices] LA-108 — a declined weigh-in is invisible, and a big genuine change locks the scale out
 
-**Scope of the build, now that D is decided:**
-1. **Each phone declines rather than asks** when a stable reading falls outside its owner's band.
-   Today the same condition raises the *"is this you"* prompt and then discards on `Not me`.
-2. **Tighten the band for this case.** 15% at 72 kg is ±10.8 kg — wide enough that two adults can sit
-   inside one band. Pick the width from the two real weights rather than a round number, and let
-   anything ambiguous fall through to the prompt instead of guessing.
-3. **The prompt stays** as the ambiguity fallback, which is why `Needs: BF-53` holds: it is dead in
-   production right now.
-4. **No server change, no schema change, no cross-account anything.** If a design step starts
-   reaching for one, it has left option D — stop and re-read this entry.
+- **Lane:** A.
+- **Added:** 2026-09-14 · Lane A, found while shipping BF-58's band split — the hazard the option-D
+  design does not cover, recorded rather than fixed because fixing it is a UI surface and a new read
+  path, not a band width.
 
-**Why D, and why it is mostly already built.** The hard part — deciding a reading is not this user's —
-exists and works: `SCALE_WEIGHT_ANOMALY_PCT` (15% from the user's last confirmed weight) is what
-raises the *"is this you"* prompt today. **D changes what happens next: instead of asking and then
-discarding, a phone simply does not claim a weight outside its owner's band.** Her phone, running the
-same rule against her band, claims it. Neither app learns anything about the other person.
+BF-58 turned the outer band from *ask* into *decline*. That is right for the partner, and it has a
+failure mode for the owner: **the band is anchored on his last confirmed weight, and only a
+confirmed reading re-anchors it.** So a genuine change of more than 15% between two weigh-ins — a
+long gap plus an illness, an injury, a trip — puts him outside his own band with no confirmed
+reading to move it, and **every** reading after that is outside too. Before BF-58 that case raised
+*"is this you"* and one tap fixed it. Now it is silent and self-sustaining.
 
-**The residual risk, stated rather than hidden.** Both phones race for one GATT connection, so if his
-wins and declines, and her phone was not in range, **that weigh-in is lost**. Two mitigations, in
-order:
-1. **Drain the scale's stored measurements** — `ScaleProtocol.REQUEST_STORED_MEASUREMENTS_CMD`
-   (`0x22 0x04 0x15`) and `STORED_RECORD_MARKER` already exist in the code, and the comment is candid
-   that they are **speculative and never verified against this hardware**, borrowed from a different
-   firmware generation. **Test it — it is one command and a look at what comes back.** If the scale
-   buffers, the losing phone catches up on its next connect and the race stops mattering at all.
-   There is already a plan: `docs/superpowers/plans/2026-07-30-scale-stored-measurement-drain-and-scan-latency.md`.
-2. Failing that, weighing in with your own phone nearby is a habit, not a feature.
-
-**Where D breaks, and it is worth knowing up front:** weight-band attribution is identity by proxy.
-If the two users' weights converge into one band it stops discriminating, and a 15% band is wide —
-at 72 kg that is ±10.8 kg. **Tighten the band for the multi-user case and let an ambiguous reading
-fall through to the existing prompt rather than guessing.** The prompt is the right fallback; it is
-being asked too often today, not too rarely.
-
-**⚠ The cross-account requirements below apply to option B ONLY, which is rejected.** D needs none of
-them, and that is most of the argument for D. Kept because if B is ever revived these are its terms:
-- **Two-way consent.** A link is accepted by both accounts, and either can break it. Never inferred
-  from a shared device.
-- **The reading moves, it does not copy.** A weigh-in belongs to one person. Attribute or discard.
-- **The offer carries a weight and nothing else.** Her phone should not receive the owner's history
-  to work out which readings are hers, and nothing about her should reach his account beyond the
-  fact that a pending row was claimed.
-- **Ownership checks still apply at every write** (CLAUDE.md's write-path discipline) — a linked
-  account is not a shared account.
-- **Play Store bearing:** this makes the app genuinely multi-user with health data crossing between
-  accounts, which is exactly what the declared-use-case review looks at. Worth the owner knowing
-  before it is built, not after.
-
-- **✅ Gate: owner CLEARED 2026-08-30** — *"D sounds like the way to go; lets go with that."* B is
-  rejected and C is the interim answer until D ships. **Build D.** What still wants a device answer, and both are cheap: whether two phones can hold a
-  GATT connection at once, and **whether `REQUEST_STORED_MEASUREMENTS_CMD` gets a reply** — the
-  second one decides whether the race matters at all.
-- **Do this first, before any code:** have the partner pair the scale in her own app. The pairing is
-  device-local, so it costs nothing and may reveal that both phones already receive readings — which
-  would shrink this entry to "each phone declines what is not its owner's".
-- **Interim, and worth saying:** until this ships, her readings are lost the moment they are
-  dismissed. If she wants that data, the Renpho app is the only place it currently survives.
-- **Verification:** a reading the owner marks `Not me` appears as a claimable weigh-in on the linked
-  account, with its impedance-derived composition intact; claiming it removes it from the owner's
-  pending list; neither account can see the other's history; and breaking the link stops the flow
-  both ways.
+- **Narrow, but silent, which is the bad half.** Drift is gradual and normally passes *through* the
+  8–15% prompt band first, where one confirmation re-anchors. It needs a discontinuity to bite.
+- **Nothing is lost** — `insertScaleRawSample` archives the frame with `status: 'dismissed'` in every
+  branch. The data is there; there is just no way to see it. `listPendingScaleSamples` is the only
+  read path and it filters to `pending`.
+- **The likely shape**, not yet designed: surface recent `dismissed` readings somewhere the owner can
+  reach them (the pairing screen already lists pending ones) so a wrongly-declined reading can be
+  claimed and re-anchor the band. A repository read for dismissed samples is Lane A; the list is
+  Lane B.
+- **Do not fix it by widening the band** — the 8% was measured against the two real clusters and
+  widening it is the thing BF-58 was filed to stop.
 
 ### [nutrition] BF-47 — the deleted food comes back: the loader calls the server authoritative while the delete is still in the outbox
 
@@ -11619,42 +11606,62 @@ screenshot is a **1:39** walk with the screen on, which exercises none of it.
 - **Verification.** HR live on-device with the strap paired, and the stale guard exercised by walking
   out of range. The notification half is **APK-only** and cannot be checked in `pnpm dev` at all.
 
-### [cardio][devices] LA-48 — a walk's pacer creates an adherence number and nothing stores it
+### [cardio][devices] LA-48 — the walk's pacer creates an adherence number and nothing stores it
 
-- **Branch:** none yet
+- **Lane:** A — the types and the roll-up; a producer on the live screen is Lane B (see below).
 - **Added:** 2026-08-31 · Lane B, splitting the storage half out of Q-410 when the surface half shipped
-- **Lane:** A
-- **Needs:** LA-52
-- **⚠ SCOPE CORRECTED 2026-09-01 by Lane A, from reading the code rather than the entry.** Two of the
-  three claims below moved:
-  - **There is NO migration and NO local schema version.** `activity_logs.segments` is `jsonb` on the
-    server (`$type<>` is a TypeScript annotation) and `TEXT` locally, so nothing is a column edit.
-    What must move together is the **type in four places** — `WalkSegmentStat`
-    (`lib/walk/segment-stats.ts`), the `$type<>` in `schema.ts`, `LocalActivityLog`
-    (`lib/local-store/types.ts`), and **`WalkSegmentStatSchema`
-    (`packages/shared/src/validation/activity-log.ts`)**. That last one is the trap: Zod **strips**
-    unknown keys by default, so a field added everywhere except the wire schema is silently dropped
-    on both write paths with no error — the same silent-loss shape that dead-lettered every guided
-    walk in 2026-08-02, in reverse.
-  - **The adherence roll-up needs no Lane B producer.** `readPacer` is pure and every input is
-    already reconstructible from what `computeWalkSegmentStats` receives — cadence from
-    `cadenceSeries`, hr from `hrSamples`, and speed from `rawPoints` via the *same* cumulative
-    formula the live store uses, so a post-hoc reconstruction matches what the walker saw exactly.
-  - **Which is precisely why this now `Needs: LA-52`.** It matches what the walker saw, and what the
-    walker saw on the speed rung is a whole-walk average. Storing adherence computed from that would
-    bake the defect into the archive as an analysis variable — the class BF-59 exists about. **Ship
-    `steps` first if this is split; it is a clean derivation from `cadenceSeries` and depends on
-    nothing.**
-- **Why this exists separately.** Q-410's surface half shipped 2026-08-31: `lib/walk/walk-pacer.ts`
-  now decides, once a second, which signal is pacing a segment and which band the walker is in. That
-  is a *new* measurement — it did not exist before, so nothing records it — and the owner's ask was
-  explicit: *"make sure all these values get stored so we can do data analysis on it later like steps
-  x distance x time."*
-- **Three additions to the existing `segments` JSONB, not new columns.** Measured against
-  `lib/walk/segment-stats.ts`, which already stores `index`, `setNumber`, `kind`, `startSec`,
-  `endSec`, `avgHr`, `maxHr`, `hrAtStart`, `avgPaceSecPerKm`, `distanceKm`, `avgCadenceSpm`:
-  1. **`steps` per segment** — derivable from `avgCadenceSpm × duration`, but derived-at-read-time
-     means every consumer re-derives it slightly differently. Store it.
+- **Keep:** adherence per segment and which signal paced it. **The `steps` third SHIPPED 2026-09-14**
+  — `WalkSegmentStat.steps`, integrated through the shared `stepsFromCadenceSeries`
+  (`packages/shared/src/health/cadence.ts`), carried through all five type declarations and the wire
+  schema. Nothing of that half is outstanding.
+
+**⚠ THREE THINGS THIS ENTRY SAID ARE WRONG, all found by building the easy third of it.** They are
+corrections rather than notes, because each one changes what the remaining work is.
+
+**1. There are FIVE type places, not four.** The entry named `WalkSegmentStat`, the `$type<>` in
+`schema.ts`, `LocalActivityLog` and `WalkSegmentStatSchema`. It missed
+**`packages/shared/src/types/body.ts`**, which carries its own structural copy of the segment shape
+and is what `ActivityLog` is assembled against — `tsc` found it, nothing else would have. Same shape
+as BF-70's fifth layer: a per-field type repeated in five places is the defect, and the count in a
+backlog entry is not the authority on it.
+
+**2. `steps` was NOT "a clean derivation from `cadenceSeries` that depends on nothing".** Mean spm ×
+duration is wrong, and measurably: `avgCadenceSpm` is cadence *while moving* by construction — a stop
+contributes no readings and so cannot pull it down — so multiplying it by the segment's wall duration
+counts every pause at the walking rate. A segment with 30 s of walking at 120 spm inside a 180 s
+window gives 60 steps by integration and **360** by multiplication. It was also a second answer to a
+question the app already answered: `estimateSteps` in `cadence.ts` (Q-230) integrates bins for the
+walk's own saved `steps`, and its own comment warns against a second integration. Both now call
+`stepsFromCadenceSeries`, so the segments and the walk total cannot drift.
+
+**3. ⚠ THE BIG ONE — a post-hoc reconstruction does NOT match what the walker saw, so the
+"no Lane B producer needed" correction was itself wrong.** The 2026-09-01 correction reasoned that
+every `readPacer` input is reconstructible after the fact. Two of the three are. **Cadence is not.**
+`walk-pacer-bar.tsx:34` bands `snap?.liveSpm` — the tracker's instantaneous reading, ~1 Hz — while
+the only cadence a saved walk carries is `summarizeCadence`'s series, **binned to 10 s and carrying
+the bin MEDIAN** (`CADENCE_SERIES_BIN_SEC`). A median over ten seconds and the instantaneous value
+band differently either side of a target, which is exactly where adherence is decided. So a
+reconstruction would store a plausible number that is **not** the number the walker was shown — the
+BF-59 class the entry already invokes against itself.
+
+**What that leaves, and it is a design step rather than a build step.** Two shapes, and this needs
+deciding before anything is written:
+- **Accumulate live (Lane B).** The walk screen counts ticks per band as they happen and hands the
+  totals to the save. It is the only thing that can record what was actually displayed. Cost: a
+  producer on the live screen, and a walk that crashes mid-way loses its counts.
+- **Reconstruct, and say so (Lane A only).** Store adherence computed from the binned series with the
+  binning recorded beside it, as an approximation that is honest about being one. Cheaper, and
+  permanently a different measurement from the prompts the walker responded to.
+
+**The targets are not at the save site either**, which the reconstruction shape has to solve:
+`walk-summary.tsx` holds `config` (so cadence targets resolve) but not the HR pair — it fetches
+`hr-profile` asynchronously and may not have it when the save effect runs — nor the speed pair, which
+`walk-active.tsx` reads from the `walk-segment-stats` cache. Both are Lane B state on the live screen,
+which is a further argument for the first shape.
+
+**Three additions to the existing `segments` JSONB, not new columns** — one shipped, two remain.
+Measured against `lib/walk/segment-stats.ts`:
+  1. ~~**`steps` per segment**~~ — **shipped 2026-09-14**, integrated rather than multiplied.
   2. **Adherence per segment** — the fraction of the segment spent in each band. This is the number
      the pacer creates and the most interesting thing to analyse later: *did I hit the target, or
      just see the prompt.*
@@ -11662,19 +11669,19 @@ screenshot is a **1:39** walk with the screen on, which exercises none of it.
      an adherence figure is **uninterpretable without it** — 60% in range against a cadence target
      and against a heart-rate target are not the same measurement, and the ladder can change rung
      mid-segment when a strap drops.
-- **The producer is already there and is pure.** `readPacer()` returns the band per tick; the
-  aggregation is "count ticks per band over the segment window", which is the same shape
-  `computeWalkSegmentStats` already runs for HR and pace. Lane B holds the live readings; what is
-  missing is somewhere to put the roll-up.
+- **Why this exists separately.** Q-410's surface half shipped 2026-08-31: `lib/walk/walk-pacer.ts`
+  decides, once a second, which signal is pacing a segment and which band the walker is in. That is a
+  *new* measurement — it did not exist before, so nothing records it — and the owner's ask was
+  explicit: *"make sure all these values get stored so we can do data analysis on it later like steps
+  x distance x time."*
+- **There is NO migration and NO local schema version.** `activity_logs.segments` is `jsonb` on the
+  server (`$type<>` is a TypeScript annotation) and `TEXT` locally, so nothing is a column edit. What
+  must move together is the type in the five places above **and `WalkSegmentStatSchema`** — Zod
+  **strips** unknown keys by default, so a field added everywhere except the wire schema is silently
+  dropped on both write paths with no error. A test that merely *accepts* the payload does not catch
+  it; assert the value survives the parse, as `segment-stats.test.ts` now does.
 - **Verification.** Needs a real walk with the H10 paired to produce a cadence-paced segment at all —
   a browser only ever reaches the speed rung.
-
-> **✅ LB-36 and LA-52 VERIFIED together and removed, 2026-09-14, on one walk.** The cadence pacer ran
-> for the first time on a device and behaved (*"Yes this works fine - no issues"*); the windowed speed
-> rung and the **Stopped** readout were exercised in the same walk, which is what LA-52 was waiting
-> for — the owner asked how to check it separately and the answer is that it could not be, which is
-> why the two were put on one walk. Neither the cadence rung nor the HR rung had ever executed before
-> this, because both need a Polar H10 over BLE and no harness here has one.
 
 ### [workouts][devices] Q-486 — the outbox enqueue for a workout is the only write in the app that fails silently, and it is the last line of defence
 

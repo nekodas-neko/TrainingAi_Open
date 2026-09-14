@@ -76,6 +76,7 @@ describe('aggregateSegmentsByKind', () => {
   const seg = (overrides: Partial<WalkSegmentStat>): WalkSegmentStat => ({
     index: 0, setNumber: 1, kind: 'fast', startSec: 0, endSec: 180,
     avgHr: null, maxHr: null, hrAtStart: null, avgPaceSecPerKm: null, distanceKm: null, avgCadenceSpm: null,
+    steps: null,
     ...overrides,
   })
 
@@ -192,6 +193,74 @@ describe('computeWalkSegmentStats — segment mean HR is wire-safe', () => {
     const res = ActivityLogBody.safeParse({
       date: '2026-08-01', activityType: 'walk', title: 'Interval walk',
       startTime: '08:15', durationMin: 12, segments,
+    })
+    expect(res.success).toBe(true)
+  })
+})
+
+// LA-48: steps per segment. The owner asked for the walk's numbers to be stored for later analysis
+// — *"steps x distance x time"* — and a segment had every one of those but steps.
+describe('computeWalkSegmentStats — steps per segment', () => {
+  it('integrates the cadence series rather than multiplying the segment mean by its duration', () => {
+    // Three 10 s bins of walking inside segment 0's 180 s window, then nothing: the walker stopped.
+    // Mean spm x duration would count the 150 s of standing still at 120 spm (360 steps); the bins
+    // count only the 30 s that had readings (60).
+    const cadenceSeries = [
+      { tSec: 0, spm: 120 },
+      { tSec: 10, spm: 120 },
+      { tSec: 20, spm: 120 },
+    ]
+    const stats = computeWalkSegmentStats({ plan, startedAtMs, hrSamples: [], rawPoints: [], cadenceSeries })
+
+    expect(stats[0].avgCadenceSpm).toBe(120)
+    expect(stats[0].steps).toBe(60)
+    // The derivation the entry proposed, stated so the difference is visible rather than implied.
+    expect(stats[0].avgCadenceSpm! * (180 / 60)).toBe(360)
+  })
+
+  it('assigns each bin to exactly one segment, so the segments sum to the walk', () => {
+    // One bin on each side of the 180 s boundary between segment 0 and segment 1.
+    const cadenceSeries = [
+      { tSec: 170, spm: 120 },
+      { tSec: 180, spm: 120 },
+    ]
+    const stats = computeWalkSegmentStats({ plan, startedAtMs, hrSamples: [], rawPoints: [], cadenceSeries })
+
+    expect(stats[0].steps).toBe(20)
+    expect(stats[1].steps).toBe(20)
+    expect(stats.reduce((sum, s) => sum + (s.steps ?? 0), 0)).toBe(40)
+  })
+
+  it('is null for a segment with no cadence readings, never zero', () => {
+    // A GPS-only walk has no cadence source at all, and "you took 0 steps" is a claim rather than
+    // an absence — the same distinction avgCadenceSpm already makes.
+    const stats = computeWalkSegmentStats({ plan, startedAtMs, hrSamples: [], rawPoints: [], cadenceSeries: null })
+    expect(stats.every(s => s.steps === null)).toBe(true)
+  })
+
+  // The trap named in LA-48: Zod strips unknown keys, so a field added to the four type
+  // declarations and not to the wire schema is dropped on BOTH write paths with no error.
+  // Acceptance is not enough to catch that — this asserts the value SURVIVES the parse.
+  it('survives the wire schema instead of being stripped', () => {
+    const segments = computeWalkSegmentStats({
+      plan, startedAtMs, hrSamples: [], rawPoints: [],
+      cadenceSeries: [{ tSec: 0, spm: 120 }],
+    })
+    const res = ActivityLogBody.safeParse({
+      date: '2026-08-01', activityType: 'walk', title: 'Interval walk',
+      startTime: '08:15', durationMin: 12, segments,
+    })
+    expect(res.success).toBe(true)
+    expect(res.data!.segments![0].steps).toBe(20)
+  })
+
+  it('accepts a segment saved before the field existed', () => {
+    const { steps: _dropped, ...legacy } = computeWalkSegmentStats({
+      plan, startedAtMs, hrSamples: [], rawPoints: [], cadenceSeries: null,
+    })[0]
+    const res = ActivityLogBody.safeParse({
+      date: '2026-08-01', activityType: 'walk', title: 'Interval walk',
+      startTime: '08:15', durationMin: 12, segments: [legacy],
     })
     expect(res.success).toBe(true)
   })

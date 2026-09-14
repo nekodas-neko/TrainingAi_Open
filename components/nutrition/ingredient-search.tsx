@@ -3,9 +3,11 @@
 import { memo, useCallback, useState } from 'react'
 import { Search, X, Loader2, Sparkles, Link2, ScanBarcode } from 'lucide-react'
 import { asHttpsUrl, hostOf } from './recipe-url'
-import type { FoodItem } from '@trainingai/shared/types/nutrition'
+import type { FoodItem, SavedMeal } from '@trainingai/shared/types/nutrition'
 import { FoodRow } from '@/components/nutrition/food-row'
 import { FoodDatabaseResults } from './food-database-results'
+import { SavedMealResults } from './saved-meal-results'
+import { matchSavedMeals } from './saved-meal-flatten'
 import { SegmentedTabs } from '@/components/ui/segmented-tabs'
 import type { ExternalFood } from '@/lib/hooks/use-food-database-search'
 
@@ -35,13 +37,21 @@ interface Props {
   onScan: () => void
   /** A scan is being looked up. Its result arrives as an ingredient, so there is nothing else to show. */
   lookingUpBarcode: boolean
+  /**
+   * Meals the user has already saved (BF-161). Already in hand — the sheet loads them for its own
+   * list — so this source costs no request and works offline like `searchResults`.
+   */
+  savedMeals: SavedMeal[]
+  /** Picking one FLATTENS it into its ingredients. See `saved-meal-flatten.ts` for why, and the cost. */
+  onAddMeal: (meal: SavedMeal) => void
 }
 
 /**
  * Finding an ingredient to put in a meal.
  *
- * Three sources, in the order they can be trusted. The user's **own foods** are instant and work
- * offline. The **AI estimate** always works and is how the library actually grows — this used to be
+ * Four sources, in the order they can be trusted. The user's **own foods** and **own meals** are
+ * instant and work offline — a meal is added by flattening it into its ingredients (BF-161), which
+ * is a shortcut for adding N foods at once rather than a nested component. The **AI estimate** always works and is how the library actually grows — this used to be
  * the missing piece: search only ever looked at foods you had already saved, so it could never
  * return anything new. The **food database** (Open Food Facts, the same source the barcode scanner
  * uses) is a bonus, shown when it responds. Its relevance was fixed in v1.291.0 (region filter plus
@@ -65,6 +75,9 @@ interface Props {
  */
 const SOURCE_TABS = [
   { value: 'yours' as const, label: 'Your foods' },
+  // BF-161. Named "Your meals" and NOT "My Foods": Log Food's `My Foods` tab means saved meals, and
+  // reusing that label one screen in would rebuild the confusion BF-103 removed.
+  { value: 'meals' as const, label: 'Your meals' },
   { value: 'database' as const, label: 'Food database' },
 ]
 type SourceTab = (typeof SOURCE_TABS)[number]['value']
@@ -74,6 +87,7 @@ export function IngredientSearch({
   estimating, onEstimate, importing, onImportRecipe,
   dbResults, dbSearching, dbUnavailable, addingExternal, onAddExternal,
   showAddFood, onAddByHand, onScan, lookingUpBarcode,
+  savedMeals, onAddMeal,
 }: Props) {
   const [source, setSource] = useState<SourceTab>('yours')
   const recipeUrl = asHttpsUrl(query.trim())
@@ -91,7 +105,7 @@ export function IngredientSearch({
             type="text"
             value={query}
             onChange={e => onQueryChange(e.target.value)}
-            placeholder="Search your foods or the food database…"
+            placeholder="Search your foods, meals or the food database…"
             className="flex-1 bg-transparent text-sm outline-none"
           />
           {query && (
@@ -142,6 +156,10 @@ export function IngredientSearch({
             ))}
           </div>
         </div>
+      )}
+
+      {showTabs && source === 'meals' && (
+        <SavedMealResults meals={matchSavedMeals(savedMeals, query)} onAdd={onAddMeal} />
       )}
 
       {/* **The recipe-photo button used to live in this slot and moved to the builder's source row

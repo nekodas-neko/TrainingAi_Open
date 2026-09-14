@@ -137,8 +137,6 @@ html, body {
   --screen-palette-health: radial-gradient(circle at 20% -10%, rgba(56,189,248,0.30), transparent 55%), radial-gradient(circle at 100% 100%, rgba(34,197,94,0.18), transparent 60%), linear-gradient(180deg, #eaf6fb 0%, #f2fbf5 55%, #ffffff 100%);
   --screen-palette-nutrition: radial-gradient(circle at 15% 0%, rgba(249,115,22,0.25), transparent 55%), radial-gradient(circle at 100% 100%, rgba(234,179,8,0.18), transparent 60%), linear-gradient(180deg, #fff6ec 0%, #fffaf0 55%, #ffffff 100%);
   --screen-palette-more: radial-gradient(circle at 85% -10%, rgba(139,92,246,0.22), transparent 55%), radial-gradient(circle at 0% 100%, rgba(99,102,241,0.15), transparent 60%), linear-gradient(180deg, #f5f2ff 0%, #f8f6ff 55%, #ffffff 100%);
-  --screen-palette-stats: radial-gradient(circle at 20% -10%, rgba(37,99,235,0.24), transparent 55%), radial-gradient(circle at 100% 100%, rgba(245,158,11,0.15), transparent 60%), linear-gradient(180deg, #eaf1fd 0%, #f5f8fc 55%, #ffffff 100%);
-  --screen-palette-workout-select: radial-gradient(circle at 15% -10%, rgba(239,68,68,0.22), transparent 55%), radial-gradient(circle at 100% 100%, rgba(225,29,72,0.15), transparent 60%), linear-gradient(180deg, #fdedee 0%, #fdf3f3 55%, #ffffff 100%);
   --screen-palette-session-explain: radial-gradient(circle at 20% -10%, rgba(245,158,11,0.22), transparent 55%), radial-gradient(circle at 100% 100%, rgba(139,92,246,0.16), transparent 60%), linear-gradient(180deg, #fef7ea 0%, #faf7ff 55%, #ffffff 100%);
 }
 
@@ -217,8 +215,6 @@ html, body {
   --screen-palette-health: radial-gradient(circle at 20% -10%, rgba(56,189,248,0.35), transparent 55%), radial-gradient(circle at 100% 100%, rgba(34,197,94,0.22), transparent 60%), linear-gradient(180deg, #071119 0%, #0a1a1f 55%, #05090c 100%);
   --screen-palette-nutrition: radial-gradient(circle at 15% 0%, rgba(249,115,22,0.30), transparent 55%), radial-gradient(circle at 100% 100%, rgba(234,179,8,0.20), transparent 60%), linear-gradient(180deg, #170f08 0%, #1a130a 55%, #0b0705 100%);
   --screen-palette-more: radial-gradient(circle at 85% -10%, rgba(139,92,246,0.30), transparent 55%), radial-gradient(circle at 0% 100%, rgba(99,102,241,0.20), transparent 60%), linear-gradient(180deg, #0d0a17 0%, #100c1c 55%, #06040a 100%);
-  --screen-palette-stats: radial-gradient(circle at 20% -10%, rgba(37,99,235,0.32), transparent 55%), radial-gradient(circle at 100% 100%, rgba(245,158,11,0.16), transparent 60%), linear-gradient(180deg, #0a1120 0%, #0d1526 55%, #05070c 100%);
-  --screen-palette-workout-select: radial-gradient(circle at 15% -10%, rgba(239,68,68,0.32), transparent 55%), radial-gradient(circle at 100% 100%, rgba(225,29,72,0.18), transparent 60%), linear-gradient(180deg, #170708 0%, #1a0809 55%, #0a0303 100%);
   --screen-palette-session-explain: radial-gradient(circle at 20% -10%, rgba(245,158,11,0.30), transparent 55%), radial-gradient(circle at 100% 100%, rgba(139,92,246,0.20), transparent 60%), linear-gradient(180deg, #171008 0%, #1a130d 55%, #0a0705 100%);
 }
 

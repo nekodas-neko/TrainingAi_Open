@@ -6,6 +6,48 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.456.12",
+    date: "2026-09-14",
+    changes: [
+      "The scale stops asking whether every unfamiliar reading is you. It now judges a weigh-in three ways instead of two: close to your last confirmed weight it is simply saved, a long way off it is quietly set aside as somebody else's, and only a reading in between — one it genuinely cannot separate — still asks. The band it claims was measured from your own history rather than picked: every weight you have confirmed sits inside it, including your largest day-to-day swing, and it stays several kilograms clear of the other readings this scale has produced. Readings it sets aside are no longer thrown away either; the raw measurement is kept, so nothing is destroyed by a decision the app made on its own.",
+    ],
+  },
+  {
+    version: "1.456.11",
+    date: "2026-09-14",
+    changes: [
+      "Your protein, carb and fat targets now follow your calorie budget for the day instead of the goal figure stored in settings. They start at your resting rate and grow as you move, so the grams and the calories are finally the same number seen two ways — before this they could differ by several hundred calories, and no amount of walking closed the gap. Protein stays where it is, because it is set per kilogram of bodyweight and a walk does not change what your body is made of; carbs and fat absorb the difference, keeping the ratio between them. If your stored goal was higher than your budget, expect your carb and fat targets to come down. The card no longer carries the paragraph that used to explain the mismatch, because there is no longer a mismatch to explain.",
+    ],
+  },
+  {
+    version: "1.456.10",
+    date: "2026-09-14",
+    changes: [
+      "A completed fitness test now also logs itself as an activity, so it counts towards the calories you have earned for the day. A Cooper run appears as a run and a 6-minute walk test as a walk, with the time, distance and heart rate the test recorded. Before this, the test saved its score and nothing else: your heart-rate zone minutes were credited automatically, which made it look like the test had counted, while the calorie side of the day saw no exercise at all. The quick resting-HR test is unchanged and logs no activity — a minute of effort between two minutes of sitting is not a cardio session.",
+    ],
+  },
+  {
+    version: "1.456.9",
+    date: "2026-09-14",
+    changes: [
+      "The meal builder can now add one of your saved meals. Pick it from the new Your meals tab beside Your foods, and it drops in as its individual ingredients, each of which you can then edit or remove like any other. Building a meal out of other meals no longer means typing every ingredient again. One thing to know: what you add is a copy taken at that moment, so editing the original meal later will not change a meal you have already built from it.",
+    ],
+  },
+  {
+    version: "1.456.8",
+    date: "2026-09-14",
+    changes: [
+      "A fitness test run indoors no longer invents a VO₂max. Both the Cooper run and the 6-minute walk take your distance from GPS and nothing else, so on a treadmill they finished a full, correctly-timed test with almost no distance and scored it anyway — the Cooper as a negative number, the 6-minute walk as a normal-looking figure that was not measured at all. Now the test saves your heart rate and time, skips the score, and says it needs GPS. An outdoor test is unchanged.",
+    ],
+  },
+  {
+    version: "1.456.7",
+    date: "2026-09-14",
+    changes: [
+      "Finishing a workout or an activity now returns you to the Workout tab itself rather than a separate copy of the same screen. The copy was a leftover from before the app had tabs: it looked identical but sat outside the tab bar, so the other tabs had to reload when you moved on, and back from it did not take you Home. Four more leftover addresses that only forwarded somewhere else were removed at the same time. Nothing you tap has changed where it goes.",
+    ],
+  },
+  {
     version: "1.456.6",
     date: "2026-09-14",
     changes: [

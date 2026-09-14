@@ -9,7 +9,7 @@ import { FlameIcon, ChevronRightIcon } from 'lucide-react'
 export function EnergyBudgetPrompt() {
   return (
     <Link
-      href="/profile"
+      href="/more"
       className="flex items-center gap-3 rounded-2xl border border-border bg-muted/30 p-4 transition hover:bg-muted/50"
     >
       <FlameIcon className="h-6 w-6 flex-none" style={{ color: 'var(--accent-amber)' }} />

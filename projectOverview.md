@@ -1858,6 +1858,57 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [cardio][devices] ⚠️ A walk's segments carry a step count that no strap has yet produced (LA-48, 2026-09-14)
+
+Shipped with no version bump — nothing renders it. `WalkSegmentStat.steps` now stores how many steps
+each fast/slow block of a guided walk contained, in the existing `segments` JSONB, so the owner's
+*"steps x distance x time"* analysis has its third number.
+
+**It is integrated from the cadence bins, never `avgCadenceSpm × duration`.** That multiplication
+counts pauses at the walking rate — 360 steps where the integration says 60, on a segment holding
+30 s of walking inside a 180 s window — and `estimateSteps` already owned this arithmetic for the
+walk's own total. Both now call `stepsFromCadenceSeries`. Do not re-derive it at a call site.
+
+**Unverified with real data, and it cannot be verified here.** Cadence needs a Polar H10 over BLE,
+which no sandbox has, so every segment written in testing has `steps: null` — correct for a GPS-only
+walk and silent about a strap-paired one. **Check on the next strap walk:** a saved interval walk's
+segments carry non-null step counts that sum to roughly the walk's own `steps`, and a segment where
+you stopped reads lower than its cadence would imply.
+
+**Two thirds of LA-48 remain and are now a design question, not a build.** Adherence per segment and
+which signal paced it cannot be reconstructed after the fact: the live bar bands the tracker's
+instantaneous reading while the saved series holds 10-second medians, so a reconstruction would store
+a number the walker was never shown. The entry carries both candidate shapes.
+
+### [body][devices] ⚠️ The scale claims a narrower band now, and a big genuine change locks it out silently (BF-58 → LA-108, 2026-09-14)
+
+Shipped in v1.456.12. `/api/scale-ble/samples` now splits a weigh-in three ways instead of two —
+claimed within 8% of the last confirmed weight, *"is this you"* up to 15%, declined beyond — so the
+owner's phone stops asking about readings it can already tell are his partner's. The raw frame is
+archived in **all three** branches, including declined ones, which is the half BF-58 was titled
+after: her weigh-ins were being thrown away.
+
+**The 8% is a measurement, not a round number.** Both clusters were already in the database: his 100
+confirmed readings span **70.0–72.8 kg** (worst day-to-day change 2.85 kg), the 6 he has dismissed
+sit at **57.5–58.0 kg**. 8% of ~70 kg is ±5.6 kg — wider than his whole history, and 6.4 kg clear of
+hers. Do not widen it without re-measuring; widening is what BF-58 was filed to stop.
+
+**The hazard, filed as LA-108 and not yet fixed.** The band is anchored on the last *confirmed*
+weight and only a confirmed reading re-anchors it, so a genuine change of more than 15% between two
+weigh-ins — a long gap plus an illness or injury — puts the owner outside his own band with nothing
+to move it, and every reading after that is outside too. It is narrow (drift normally passes through
+the 8–15% prompt band first, where one tap re-anchors) and nothing is lost (the frames are archived),
+but it is **silent and self-sustaining**: `listPendingScaleSamples` filters to `pending`, so a
+declined reading has no read path at all. The fix is a way to see and claim dismissed readings, not a
+wider band.
+
+**Not device-verified, and only the phone can show it.** JS/server only, so it reaches the S25 through
+Railway with no APK — but what changed is a physical behaviour. **Check on device:** the owner weighs
+in and it saves with no prompt; the partner weighs in on his phone and **no** *"is this you"* appears.
+Two hardware questions BF-58 keeps are still unanswered — whether two phones can hold a GATT
+connection at once, and whether `REQUEST_STORED_MEASUREMENTS_CMD` gets a reply (that one decides
+whether the race between the phones matters at all).
+
 ### [app-shell] ⚠️ Back on a tab now goes Home, and the gesture itself is not device-verified (LB-107, 2026-09-14)
 
 Shipped in v1.456.6. The owner reported that back on a tab *"should go to the home screen"*; what it
@@ -1873,6 +1924,20 @@ code path from the system gesture. What CI does hold is the premise:
 unchanged while a sub-route push grows it. **Check on device:** from Health/Workout/Nutrition/More
 the back gesture lands on Home; from Home it minimises; from a meal or day opened on top of a tab it
 returns to that tab, not Home.
+
+### [nutrition] ⚠️ The meal builder adds saved meals, and the arithmetic is not device-verified (BF-161, 2026-09-14)
+
+Shipped in v1.456.8. The owner asked for it — *"For the meal builder it should let you add
+meals/saved items as part of the meal builder"* — and chose flattening over real nesting, which
+`saved_meal_items.food_item_id` being NOT NULL would have made a migration: *"Okay lets go with
+flatten for now."*
+
+**Two things are owed on the S25.** ① Build a meal from **two** saved meals and confirm the
+ingredient rows, their quantities and the macro total match the sum of the sources — the harness
+reaches the tab and proves the wiring, but cannot judge the arithmetic against a real library.
+② That the snapshot behaviour is not surprising in use: a meal built from a saved meal does **not**
+change when the source is edited later, which is the accepted cost of not paying for a nullable
+`food_item_id` and recursive macro computation.
 
 ### [nutrition] ⚠️ The vial sheet's rewrite is not device-verified (BF-153, 2026-09-13)
 
@@ -2010,10 +2075,11 @@ the answer rather than being struck, because deleting the entry would have delet
 it. It was re-queued with a `Keep:` line first and corrected immediately: `Keep:` marks an owner or
 device *check*, so it filed answered, buildable work under the KEEP bucket headed *"Not new work"* —
 OR-100's exact failure, reproduced within the hour. As a plain entry it sits at #2 of Lane A's READY.
-**Flag for whoever builds it:** `scaleMacrosForEarnedKcal` holds
-protein constant, so re-basing from 1,660 to ~1,294 drops carbs and fat while 150 g protein stands —
-right for a cut, and a visible change to his targets. When it lands, `macro-budget-gap.ts` and the
-paragraph reported here both become dead and should go with it.
+**✅ BUILT 2026-09-14** (BF-154's build half): the grams are fitted to
+`budgetProvenance(...).base + earned` by `macrosForKcal`, so the gap is zero by construction.
+`macro-budget-gap.ts`, its test, the paragraph reported here and three now-dead props went with it —
+`CalorieZoneBar` already printed the same breakdown and is now the only surface that does. Protein is
+held constant as flagged, so his carbs and fat drop while 150 g protein stands.
 
 **Also not device-verified.** JS-only, so it reaches the phone on the next Railway deploy with no
 APK, but nothing has read the sentence at 412 dp. The check is one look at Nutrition: the terms
@@ -2095,6 +2161,8 @@ docstring, because movement is in **both** addends and cancels. It also called t
 goal four lines below the prop comment saying they are earned-scaled. The arithmetic was right to the
 kcal; only the words were wrong. The sentence now names every number and says outright that moving
 will not close the gap.
+
+**⚠ Amended 2026-09-14: the gap this row is about no longer exists.** BF-154's build half fitted the grams to the budget, and `macro-budget-gap.ts` — the module quoted below — was deleted with the sentence it fed. The reasoning is kept because the row is still owner-gated on the base question, and the figures below are the record of how the two numbers drifted.
 
 **The finding underneath it is not fixed and is Lane A's.** The module's docstring pinned the gap at
 *"406 kcal, at every hour of every day"*; the card printed **295 the other way**, so the sign had
@@ -3340,6 +3408,100 @@ check it asked for has now been run. (Found while answering an unrelated Sentry 
 - **Q-354 is a live trap for spec authors, not just a curiosity.** The new spec's `locator.click()` did nothing at all — no toast, no request, no error — because the Nutrition scroll container's date-swipe `useDrag` swallows mouse input, which is what Playwright sends. `tap()` works and is the faithful input anyway. Every future e2e assertion that presses something on this screen has to know this first, and the failure gives no clue.
 - **Q-187 is re-scoped, not struck.** What remains is the owner's second sentence — the day re-calculating remaining meals against what was actually eaten — which has no design and three open questions (what gets re-scaled, whether a floor exists, what to say when the remaining macros are unreachable).
 
+### [nutrition] ⚠️ The macro grams now follow the budget, and his carbs and fat drop; unseen on device (BF-154, 2026-09-14, v1.456.11) · needs: device
+
+The owner's decision, 2026-09-13: *"Can we have it dynamically sized for my calories? I.e before
+excercise its 1 value and after its another if calories increase?"*
+
+The grams were entered against the stored calorie goal; BF-152 moved the budget onto the measured
+resting rate, and the two then disagreed **permanently** — ~1,660 against ~1,294 on his figures. The
+gap was **constant**, which is what made it a design fault rather than a rounding one: the old code
+grew the grams by `earned` and the budget by the same `earned`, so no amount of walking closed it,
+and `macro-budget-gap.ts` existed only to measure that.
+
+Fixed by fitting the grams to `budgetProvenance(...).base + earned` through one shared
+`macrosForKcal`, which `scaleMacrosForEarnedKcal` now delegates to. Measured on the running app: the
+grams cost **1,816 kcal against a 1,815 budget** at rest, and **2,005 against 2,002** after a run
+earning 187 — a one-to-three kcal rounding where a several-hundred-kcal gap used to stand.
+
+**⚠ His carbs and fat will visibly DROP, and that is the change to look at.** Protein is dosed per kg
+of bodyweight, so `macrosForKcal` holds it: re-basing from ~1,660 to ~1,294 takes the difference out
+of carbs and fat while 150 g protein stands. Right for a cut, and a real change to his targets —
+worth confirming on the first day it renders rather than after a week of it. **The seeded test
+account moves the other way** (its budget base is above its stored goal, so carbs rise), so the
+sandbox cannot show what his account will do.
+
+**Deleted with it, because a zero gap needs no explanation:** `macro-budget-gap.ts`, its test, the
+card's breakdown paragraph, and the three props that fed it. Nothing about the budget's provenance
+was lost — `CalorieZoneBar` prints the same *"N resting rate"* line and is now the only surface that
+does, which also settles the duplication the report opened with (*"There is so many numbers here"*).
+
+**Not device-verified.** JS-only, so it reaches the phone on the next Railway deploy with no APK.
+**The check:** open Nutrition and confirm the macro column targets add up to the budget beside them,
+that they rise after a walk, and that protein has not moved.
+
+### [cardio] ⚠️ A fitness test now logs the activity it was, so it reaches the calorie budget; untested on device (BF-160, 2026-09-14, v1.456.10) · needs: device
+
+From the owner's 2026-09-14 Cooper run — 1,975 m, 720 s, avg HR 156. Told the test had produced no
+activity log, he answered *"Yes it should count."*
+
+`computeActiveEnergy` has three sources — strength sessions, logged activities, passive steps — and
+a fitness test was none of them, so the hardest twelve minutes of his week earned **nothing**.
+
+**Why it read as counted.** Zone minutes come from `oura_heartrate`, so the strap's 581 top-zone
+samples *were* credited automatically. HR-derived credit flows without an event row; event-derived
+credit does not — and the missing half is invisible unless the budget is checked specifically. The
+steps path did not cover it either: `body_metrics.steps` read **894** for the whole day, fewer than
+a 1,975 m run produces on its own.
+
+Fixed by giving `FitnessTestProtocol` an `activityType` field (Cooper → `run`, 6MWT → `walk`,
+`resting_hrr` → none) and writing an `activity_log` beside the test — local row plus outbox
+mutation, both cache groups invalidated. The activity is written **whether or not BF-158 scored the
+distance**: the effort happened either way.
+
+**The double-count the entry warned about does not exist**, and this was checked rather than
+assumed: `computeZoneQuota`'s only actual is `getZoneMinutesRange`, which reads an HR-derived cache.
+An activity row is not an input to it. The overlap that *is* real — steps — was already handled, and
+here it takes the passive term to zero, so the run's own estimate becomes the entire credit.
+
+**Not device-verified,** and one figure is not verified anywhere. Measured against the local DB, the
+day's `activeEnergyKcalToday` went **0 → 122** with the rows present and back to 0 without them — but
+this repo has only the synthetic MET fixtures, so **the size of the credit is untested on any machine
+here** (the magnitude assertion skips in CI too). **The check:** run a protocol on device, confirm one
+activity appears in cardio history with the right duration and distance, that the day's earned
+calories rise, and that the zone quota does **not** jump by a second helping of the same minutes.
+
+### [cardio] ⚠️ A fitness test with no distance now withholds its score; the indoor case is untested on device (BF-158, 2026-09-14, v1.456.8) · needs: device
+
+Found from the owner's pre-flight question before his first Cooper test — he nearly ran it on a
+treadmill. **Both distance protocols take distance from GPS and nothing else** (`test-active.tsx`
+has no treadmill toggle and no manual entry, unlike the guided walk), so run indoors they complete a
+full-length, correctly-timed capture with a distance near zero and then score it.
+
+| protocol | scored at 0 m | |
+|---|---|---|
+| Cooper | **−11.3** | unclamped — announces itself |
+| 6MWT (Ross) | **10.0** | clamped up from 4.9 |
+| 6MWT (Burr) | **34.8** | *the owner's own profile* — wholly plausible, entirely fake |
+
+**The entry named only Cooper; the 6MWT was the worse half and is fixed too.** A negative is
+obviously wrong. 34.8 is not, and it would have entered the fitness snapshot as a real reading.
+
+Fixed by guarding the **distance** before any equation runs, with thresholds **derived** from each
+protocol's distance-only equation reaching `clampVo2`'s existing floor of 10 — Cooper 952.2 m,
+6MWT 219.7 m. Both sit below the worst genuine effort: the owner's stored 6MWT (603 m) still scores
+18.8, matching his `ross_2010` record exactly. The score and the `method` are withheld together, and
+the screen says why.
+
+**Deliberately NOT done:** manual distance entry, so a treadmill readout could be typed in. The entry
+calls that the owner's call; the safety half stands alone, and the screen now says the test needs
+GPS rather than failing silently. **If you want indoor tests to work, that is the follow-up.**
+
+**Not device-verified.** A fitness test needs a real 6- or 12-minute GPS capture, which the sandbox
+cannot produce — the guard is verified by unit test and source assertion. **The check:** run a
+protocol to full duration with GPS unavailable, confirm no VO₂max is saved and the screen explains
+why, and confirm an outdoor run is unchanged.
+
 ### [cardio][devices] ⚠️ The guided walk paces you by cadence now; no strap has ever driven it (Q-410, v1.411.0)
 
 **Shipped.** The interval walk leads with **km/h** (the unit the owner asked for by name, with min/km beside it off the same pace series) and its verdict line became a **banded pacer**: a bar, a mark and a sentence against a **cadence pair** you set in the walk config — a floor for the fast blocks, a ceiling for the slow ones, because a slow block walked too hard is what stops the fast one being fast. The band is chosen by **signed** distance, so on a fast block faster than the floor stays green however far above; ±10% out is amber, beyond that red ([`journal`](docs/overview/history-2026-09-10-folded-4.md#2026-08-31-walk-cadence-pacer)).
@@ -3347,7 +3509,7 @@ check it asked for has now been run. (Found while answering an unrelated Sentry 
 - **Standing still no longer scores a perfect slow block.** "Under the ceiling" would make 0 spm the best possible slow segment; below `STOPPED_SPM` the pacer reads **Stopped** in neutral — it does not scold a pause at a crossing and it does not congratulate one.
 - **Keep: only the speed rung has ever executed.** `e2e/walk-pacer-speed-rung.spec.ts` drives a real geolocation series and is mutation-checked, and every guard in `lib/walk/walk-pacer.ts` is too — but **the cadence and heart-rate rungs both need a Polar H10 over BLE**, which does not exist in the sandbox or in `pnpm dev`. So the bands moving with the legs, the Stopped state, the strap-drop fallback and the band colours' contrast at arm's length are all verified by reading. **LB-36** holds the device pass; `BAND_TOLERANCE = 0.10` is a proposal, not a measurement, and is one named constant so a real walk can move it.
 - **The ring cannot pace this and must not be made to.** `RING_CADENCE_VALIDATED = false` still holds (`packages/shared/src/health/cadence.ts`) — the ring signal is octave-ambiguous, not broken, and shipping it uncorrected gives a number wrong by 2×, which is worse than showing none. That correction is Lane A's.
-- **The number the pacer creates is not stored yet.** Per-segment adherence, steps and which signal paced the segment are additions to `activity_logs.segments`, which is a schema edit — filed as **LA-48**.
+- **The number the pacer creates is still not stored.** Per-segment **steps** shipped 2026-09-14 (LA-48, integrated from the cadence bins). **Adherence and which signal paced the segment remain**, and they are not the schema edit this line used to call them — `segments` is JSONB, so they are a type change in five places plus the wire schema. What blocks them is that they cannot be reconstructed after the fact: the live bar bands the tracker's instantaneous reading while the saved series holds 10-second medians, so a reconstruction stores a number the walker was never shown. **LA-48** carries both candidate shapes.
 
 ### [cardio][devices] ⚠️ The free walk shows heart rate at last, but no device has seen it (Q-418, 2026-08-23)
 
