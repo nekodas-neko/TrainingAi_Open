@@ -519,34 +519,6 @@ below threshold and left in place for next time.
   saved and the screen says why; confirm an outdoor run is unchanged. The owner's existing 6MWT row
   (603 m, 18.8, `ross_2010`, 2026-07-19) is the reference that the clamped sibling still behaves.
 
-### [cardio][app-shell] BF-159 — Cardio Baselines sits in the Health tab's strength list, and it is the one card that is purely cardio
-
-- **Lane:** B — `app/health/health-content.tsx:61` (`TRAINING_ORDER`),
-  `app/health/health-sections.tsx:690` (the `baselineTests` case), and
-  `components/cardio/cardio-content.tsx` as the destination.
-- **Added:** 2026-09-14 (BugFix intake). Owner, immediately after having to be told where the Cooper
-  test lives: *"That section should be moved to cardio hub."*
-- **It is filed under Training, between two strength cards.** `TRAINING_ORDER` reads
-  `["calendar","weeklyStats","aiPeriodization","muscleSets","baselineTests","activityHistory","workoutDensity"]`
-  — so **Cardio Baselines** sits between *Muscle Volume This Week* and *Workout Density*. Every card
-  around it is about lifting; this one holds VO₂max and HR recovery.
-- **`/baselines` has exactly one entrance and this card is it.** Nothing else in the app links there
-  (`grep -rn "/baselines"` returns only `latest-baseline-card.tsx`), so a card in the wrong list is
-  the whole discoverability story for all three protocols — 6MWT, Cooper, and Resting HR + Recovery.
-- **The destination already holds its siblings.** `cardio-content.tsx` renders `HeartProfileCard`,
-  `ZoneQuotaCard`, `StepsQuotaCard`, `ModalityPicker` and `CardioTrendsSection`. A VO₂max/HRR
-  baseline belongs in that column, and the card's own heading already says **CARDIO** BASELINES.
-- **Recommended placement: directly under `HeartProfileCard`**, above the zone quotas. Heart profile
-  is *what your heart is doing lately*; the baseline is *what it was measured at* — the two read as a
-  pair, and putting it above `ModalityPicker` means it is seen while deciding what to do today, which
-  is when taking a test is actually a live option.
-- **Move, do not duplicate.** Remove `baselineTests` from `TRAINING_ORDER` and its `renderTraining
-  Section` case in the same PR. Two entrances to a single-destination card is how a stale copy starts.
-- **Not in scope:** a shortcut straight into a specific protocol. The owner asked where to click, not
-  for a deep link, and `/baselines` already lists all three on arrival.
-- **Verification:** on device, confirm the card is on the Cardio tab, that Health no longer renders
-  it, and that its `/baselines` link still works from the new position.
-
 ### [workouts] BF-157 — a bodyweight exercise gets no get-ready countdown, because the timer is gated on the warm-up weight ladder
 
 - **Lane:** B — `components/workout/active-workout-screen.tsx:181-189` is the gate; the durations it

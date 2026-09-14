@@ -8,7 +8,7 @@ export default async function CardioPage() {
 
   return (
     <div className="bg-page h-screen w-full">
-      <CardioContent />
+      <CardioContent userId={session.user.id} />
     </div>
   )
 }
