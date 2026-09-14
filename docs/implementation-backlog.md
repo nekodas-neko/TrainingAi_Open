@@ -611,10 +611,25 @@ below threshold and left in place for next time.
 - **This is a separate requirement from scroll restoration** and shares nothing with it but the
   sitting they were reported in. RV-36 was about restoring an offset; this is about where the back
   gesture goes when the stack is empty.
-- **What is NOT known yet, and must be measured before anything is changed:** which tabs can reach
-  an empty stack (a tab entered directly by URL or by a bottom-nav tap that replaced rather than
-  pushed), and what the WebView currently does — exiting the app is the Android default when there
-  is nothing to pop, so this is likely absent handling rather than wrong handling.
+- **✅ Measured 2026-09-14, and the guess in the line this replaces was wrong.** It is **wrong**
+  handling, not absent, and **all four non-home tabs** reach an empty stack — not an edge case.
+  `mobile-auth-handler.tsx` registers a Capacitor `backButton` listener, which **suppresses the
+  Android default**, then called `window.history.back()` for every path but `/`. `tab-shell.tsx`
+  flips tabs with `history.replaceState` (*"tabs are peers, not a history trail"*), so a tab route
+  has nothing to pop and that call was a **silent no-op**. Back was dead on Health, Workout,
+  Nutrition and More — it did not exit the app, it did nothing.
+- **The stack behaviour is now pinned in a real browser**, not inferred:
+  `e2e/tab-flip-leaves-nothing-to-pop.spec.ts` measures `history.length` across a tab flip
+  (unchanged) against a sub-route push (grows). That contrast is the premise the fix rests on.
+- **Shipped 2026-09-14** (`fix/lb107-back-on-tab-goes-home`): `backActionForPath` in
+  `components/shell/tabs.ts` returns `minimize` on `/`, `home` on a tab route, `pop` otherwise, and
+  the listener switches on it. Home is reached via `navigateToTab`, not a location assignment —
+  the latter reloads the WebView and discards every mounted tab. Sub-routes are untouched because
+  `tabKeyForHref` matches the path **exactly**, so `/nutrition/meal/123` still pops.
+- **Keep:** the device check, and only that. On the S25, from Health/Workout/Nutrition/More press
+  the system back gesture — Home, not the launcher and not a dead press. Then from Home press it
+  again — the app minimizes. The harness cannot send that gesture (`page.goBack()` is a different
+  path), so this is the one part no CI run can close.
 - **⚠ The harness cannot send the system back gesture**, which is what the owner is pressing.
   `page.goBack()` is not it, and `e2e/scroll-restoration.spec.ts`'s header records that
   `page.goto()` is a hard navigation that skips React cleanup entirely. Expect to need the S25.

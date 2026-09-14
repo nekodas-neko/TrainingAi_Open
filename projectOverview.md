@@ -1858,6 +1858,22 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [app-shell] ⚠️ Back on a tab now goes Home, and the gesture itself is not device-verified (LB-107, 2026-09-14)
+
+Shipped in v1.456.6. The owner reported that back on a tab *"should go to the home screen"*; what it
+actually did was **nothing** — and on all four non-home tabs, not an edge case. The Capacitor
+`backButton` listener suppresses the Android default, then called `history.back()`; the shell flips
+tabs with `replaceState`, so there was nothing to pop and the press was swallowed. `backActionForPath`
+now returns `home` for a tab root, `minimize` for `/`, `pop` for everything else.
+
+**The gesture is owed on the S25 and cannot be checked anywhere else.** The whole branch sits behind
+`Capacitor.isNativePlatform()`, so `pnpm dev` never reaches it, and `page.goBack()` is a different
+code path from the system gesture. What CI does hold is the premise:
+`e2e/tab-flip-leaves-nothing-to-pop.spec.ts` measures that a tab flip leaves `history.length`
+unchanged while a sub-route push grows it. **Check on device:** from Health/Workout/Nutrition/More
+the back gesture lands on Home; from Home it minimises; from a meal or day opened on top of a tab it
+returns to that tab, not Home.
+
 ### [nutrition] ⚠️ The vial sheet's rewrite is not device-verified (BF-153, 2026-09-13)
 
 Shipped in v1.454.1: the vial in use is named and moved above the create-form, the form is headed

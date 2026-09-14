@@ -79,8 +79,9 @@ export function TabShell({ initialTab, session }: { initialTab: TabKey; session:
       };
     });
     // Keep the URL honest for refresh/deep-links/back. replaceState (not push):
-    // tab flips are peers, not a history trail — Android back exits the app
-    // like a native tab app, instead of unwinding every tab visit.
+    // tab flips are peers, not a history trail, so back does not unwind every tab visit.
+    // It leaves a tab route with nothing to pop, which is why the native back listener
+    // routes a tab back to Home rather than calling history.back() (backActionForPath).
     window.history.replaceState(null, "", href ?? hrefForTab(key));
   }, []);
 
