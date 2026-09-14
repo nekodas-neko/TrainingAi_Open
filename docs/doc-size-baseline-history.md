@@ -12019,3 +12019,13 @@ discriminator. The measurement showed that discriminator does not catch the case
 written about — the pre-fix spec held no clock reference at all, because the clock lives in the app
 it drives. An entry that had simply said "add a check" would have produced one that passed and
 proved nothing.
+
+## 2026-09-14 — `docs/implementation-backlog.md` → 20930 (LA-106)
+
+−24 for LA-106 leaving the queue.
+
+The entry was right about the thing that had not happened yet, which is why it was worth building
+rather than closing. Its measured harm was a mis-ordered queue — BF-160 above the entry it needed.
+Its unmeasured harm is a `Gate:` that parks nothing, handing an agent owner-gated work with no sign
+anything is wrong. One of those is an annoyance and the other crosses a line the owner drew, and the
+check costs the same either way.

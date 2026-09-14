@@ -500,30 +500,6 @@ below threshold and left in place for next time.
   sources. The harness reaches the tab and proves it is wired; it cannot judge the arithmetic on a
   real library.
 
-### [platform] LA-106 — a backticked `Needs:`/`Gate:` is invisible to the queue tool, and a hidden `Gate:` would unpark owner-gated work
-
-- **Lane:** A — `scripts/next-item.js` (the two field regexes) and
-  `scripts/check-backlog-pointers.js` (where the guard belongs).
-- **Added:** 2026-09-14 · Lane A, found while starting BF-158.
-- **Measured, not inferred.** `next-item.js:73` and `:76` parse the fields as
-  `/^\s*[-*]\s*\*{0,2}(Needs|Gate):\*{0,2}\s*…/i` — asterisks around the name, nothing else.
-  BF-160 wrote ``- **`Needs:` BF-158**`` with a BACKTICK, so its dependency did not parse and
-  **BF-160 printed as READY #1 while BF-158, the entry it needs, sat at #2.** Corrected in place
-  when BF-158 shipped; the trap is what remains.
-- **The `Gate:` case is the one that matters and has not happened yet.** The same regex governs
-  it, so ``- **`Gate: owner`**`` would park nothing — an agent would be handed owner-gated work as
-  the top of its queue with no sign anything was wrong. `Needs:` mis-orders; `Gate:` crosses a
-  line the owner drew.
-- **One occurrence exists today** (grep: `^\s*-\s*\*{0,2}\`(Needs|Gate|Reference):`), which is why
-  this is cheap now.
-- **Fix shape:** do NOT widen the parser to accept backticks — that rewards the ambiguity. Add a
-  check to `check-backlog-pointers.js` that fails on a line matching a field NAME followed by a
-  colon which the field regex does not then match, so the malformed line is a CI failure rather
-  than silence. `Reference:` needs the same treatment; it is parsed elsewhere but has the identical
-  shape.
-- **Verification:** write ``- **`Gate: owner`**`` into a scratch entry and confirm CI fails; confirm
-  `node scripts/next-item.js --lane A --all` is unchanged for every well-formed entry.
-
 ### [nutrition] BF-154 — the macro grams still key off the stored goal, and the owner has said they should not
 
 - **Lane:** A — `lib/health/energy-balance-service.ts` and `packages/shared/src/nutrition/`, where
