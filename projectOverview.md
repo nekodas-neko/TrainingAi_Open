@@ -2078,25 +2078,6 @@ installed icon and check it lands without a redirect flash, and check the chip r
 compared line 26 of one function with line 45 of another, and both keys are live. Dropping them
 would have removed the palette from two real routes.
 
-### [body][nutrition] ⚠️ The vial report is fixed in both halves, and neither has been seen on the phone (BF-136 + LB-99, 2026-09-10, v1.446.2)
-
-Owner: *"its saying no weights taken; but i weigh my self every day."* **Two defects, one report.**
-(1) `openedOn` was hardcoded to `todayInTz(tz)` with no control, so the weight-response window
-started on whichever day the vial was entered — there is an `Opened on` date now, bounded to 180 days
-back, and an existing vial's date is correctable **in place**, which is required rather than optional
-because `listSupplementVials` orders by `openedOn DESC` and a re-dated new vial sorts below the wrong
-one. (2) Correcting the date did **not** clear the symptom: the chip read *"Not enough weigh-ins
-yet"* above its own *"6 weigh-ins over 5 days"*, because `weightResponse()` returns a full result
-whose `verdict` is null when the range straddles the band and the card rendered that as the no-data
-state. It now reads *"Not called yet"*.
-[Journal](docs/overview/entries/2026-09-10-fix-vial-opened-date.md) ·
-[Journal](docs/overview/entries/2026-09-10-fix-weight-response-undecided-label.md).
-**Owed: the S25.** The date control is a native `<input type="date">`, so the picker is the device's
-own and has not been opened on one; and the owner's account is the only one with a real dosing period
-to render against. **Worth reading before the next "no data" report:** LB-99's entry keeps its wrong
-first diagnosis, which blamed the `getLocalStore` fall-through — a card reporting "no data" is not
-evidence that no data reached it.
-
 ### [workouts] ⚠️ Rest vs the plan is on the Trends card, and it renders nowhere but the phone (Q-300, 2026-09-09, v1.445.0)
 
 Health → Trends → Rest discipline now shows what the plan prescribes for rest against what is
@@ -3353,22 +3334,6 @@ meal row now carries a 40 px tile: the photo if there is one, a gradient-and-gly
 **On the S25:** a data-URI `<img>` in a scrolling list is the shape Samsung's WebView compositor has
 mishandled before — check a long day for artefacts and jank. The day screen's tile is always the
 placeholder today; `food_items` has no image column, so only saved meals can carry a photo.
-
-### [nutrition][app-shell] ⚠️ One back-dismiss primitive, three failures, and a device pass none has had (BF-30 v1.378.0 · LB-17 v1.382.0 · BF-34 v1.383.1)
-
-Artboard 4 shipped as a **nested sheet**, and this row said its unwind "rests on BF-27's
-one-press-per-layer guarantee". **That guarantee has now failed twice.** LB-17: an id comparison read
-every entry that was not a sheet's own as "mine is gone" — right at two layers by accident, wrong
-from three, which is what Q-395c built by reaching the list through Log Food. BF-34: the flag marking
-one of our own `history.back()` calls was per-instance, so a sheet closing and a dialog opening in
-the same tick could not see each other's and **the confirm dialog closed on the frame it opened** —
-the owner's *"the delete feature doesnt work"*. Both fixed, both pinned by tests that fail on the old
-logic. **Neither has been felt on a real gesture bar, which is the only place either lived.**
-On the S25: tap a diary row, tap the bin — the confirm dialog must **stay** open and be tappable, and
-Cancel must cancel. Press back from an open meal: it unwinds one layer per press, meal → Log Food →
-the page. **Two presses now, not three** — LB-16 collapsed that screen, so the middle layer is gone and
-`sheet-back-stack.test.ts` carries the three-deep case. Scrolling must never reveal a tray; a left-drag
-opens one, a right-drag closes it, a second row closes the first; a 92vh action row must clear the bar.
 
 ### [nutrition][app-shell] ⚠️ The calorie surface: one budget, a progress bar, and one open cache-ordering bug (Q-415/Q-417/Q-323 fixed, LB-4 open, 2026-08-23)
 
