@@ -1908,6 +1908,41 @@ bucket rejects in prod too, "AI all" writes into a store it cannot read back, an
 proxy-path rows plus the AI style reference stay broken. BF-147 asked for that check before any
 code was written here; the code was orthogonal to it and shipped, the check was not done.
 
+### [workouts] ⚠️ Session durations print correctly again; 33 sessions keep collapsed exercise timestamps (BF-155, 2026-09-14, v1.455.2) · needs: device
+
+Owner: *"my amrap week all has under 5mins workout time."* A 38.3-minute session printed as 3.
+
+**The entry dated this to 6 September and that was the symptom, not the defect.** Measured in
+production rather than assumed: `count(set_end_ms)` equals `sets − exercises` on all **33 sessions
+from 2026-07-30 to 2026-09-13**, and `sets` on the 42 before it — the last set of *every* exercise
+has been losing its end time for six weeks. What changed in September was one set per exercise: on a
+two-set exercise losing one of two is invisible; on a one-set exercise it is the only one, and then
+`logExerciseFromPayload` has no `lastSetEndMs`, every exercise collapses onto `workoutStartedAt`, and
+`day-log`'s reconstruction returns start-plus-the-longest-exercise.
+
+**Cause:** `handleLogCurrentSet` calls `handleCompleteSet` synchronously in the same tick, and that
+function snapshotted the timing arrays from the component's reactive pick — which has not re-rendered
+— so it copied the pre-append value. The file already read `currentSet` fresh via `getState()` nine
+lines above, with a comment naming this exact hazard; the timing arrays two lines below were missed.
+The auto-advance change that introduced the synchronous call is dated 2026-07-28 in its own comment;
+the first broken session is 2026-07-30.
+
+**Fixed in both halves** — the arrays read from `getState()`, and `day-log` prefers the measured
+`completed_at` over a reconstruction (guarded against a backward clock step). Driven over HTTP on
+`pnpm dev` with the production shape seeded: the same row printed **3 min before and 38 min after**.
+
+**What is NOT repaired, and cannot be:** the 33 historical sessions keep their collapsed
+`logged_at` values — the information was never written, so there is nothing to back-fill. That field
+also orders 1RM history, breaks PR ties and keys per-set HR attribution, so those rows' internal
+ordering stays whatever the table returns. Their session-level `completed_at` is intact, which is why
+the displayed duration is right without a backfill.
+
+**Not device-verified.** The `workout-screen.tsx` half is the one that matters on device and cannot
+be driven in the sandbox — vitest is node-only with no JSX transform, so it is guarded by a source
+assertion plus store-level tests of the same-tick semantics. **The check:** log a single-set session
+on the S25, confirm the printed duration matches the wall clock, and confirm the exercise rows carry
+distinct `logged_at` values. Until then (b) is verified by mechanism, not by observation.
+
 ### [workouts] ⚠️ The bodyweight rep max is read now, and no thumb has seen it (BF-151, 2026-09-13, v1.453.0) · needs: hardware
 
 The exercise summary reconstructed a bodyweight rep max by inverting the stored 1RM estimate. That is

@@ -11846,3 +11846,23 @@ one. A week of breadcrumbs across six routes keeps the 667→blank / 826→rende
 overlap, and the same route now appears on both sides — so "one screen fails to render" is dead and
 the defect is in the shell, tracking the viewport and nothing else. A prose sentence saying "still
 separating" would not have carried the route column, which is the part that does the work.
+
+## 2026-09-14 — `docs/implementation-backlog.md` → 20917 (BF-155 shipped)
+
+−51 as BF-155 leaves. The entry was right on the mechanism and wrong on the dates, which is the
+note worth leaving: it said *"every session since 6 September"*, and production says
+`count(set_end_ms) = sets − exercises` on all 33 sessions from **2026-07-30**. The last set of every
+exercise had been dropping its end time for six weeks; what changed in September was one set per
+exercise, which is the only shape where losing it is visible.
+
+It also read its own evidence backwards — citing the 5-of-10 ratio on healthy sessions as proof this
+was NOT "the last set is missing one", when five exercises of two sets with the last of each missing
+is exactly five of ten. Measuring the population took one query and turned two unresolvable
+candidate triggers into one mechanism.
+
+## 2026-09-14 — `projectOverview.md` → 10881 (BF-155's Known-Issues row)
+
++35, and over half of it is the part that cannot be fixed. The 33 historical sessions keep their
+collapsed `logged_at` values — never written, so nothing to back-fill — and that field also orders
+1RM history, breaks PR ties and keys per-set HR attribution. A row recording only the restored
+duration would read as closed while three other consumers still read collapsed timestamps.

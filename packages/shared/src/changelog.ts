@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.456.5",
+    date: "2026-09-14",
+    changes: [
+      "Your workout times are right again. Sessions were printing as two or three minutes — one 38-minute session showed as 3 — because the app was rebuilding the session length from the individual exercises instead of using the finish time it had already recorded, and the last set of every exercise was not saving the moment you logged it. Both are fixed: the day now shows the real length, measured from when you started to when you finished. Sessions logged before this keep the wrong internal timestamps on their exercises, which cannot be recovered, but their displayed length is now correct.",
+    ],
+  },
+  {
     version: "1.456.4",
     date: "2026-09-14",
     changes: [
