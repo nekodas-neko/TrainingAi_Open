@@ -2098,3 +2098,52 @@ rather than a first-session artefact.
 **✅ RESOLVED — verified on the S25, 2026-09-14 (owner's workout pass).** Owner: *"Havent seen this
 issue; if it comes up will re-raise it; treat it as fine for now."* Nothing is owed. Note the shape of
 that answer: the case was not reproduced on demand, it was reported as not occurring in normal use.
+
+---
+
+### [body][nutrition] ⚠️ The vial report is fixed in both halves, and neither has been seen on the phone (BF-136 + LB-99, 2026-09-10, v1.446.2)
+
+Owner: *"its saying no weights taken; but i weigh my self every day."* **Two defects, one report.**
+(1) `openedOn` was hardcoded to `todayInTz(tz)` with no control, so the weight-response window
+started on whichever day the vial was entered — there is an `Opened on` date now, bounded to 180 days
+back, and an existing vial's date is correctable **in place**, which is required rather than optional
+because `listSupplementVials` orders by `openedOn DESC` and a re-dated new vial sorts below the wrong
+one. (2) Correcting the date did **not** clear the symptom: the chip read *"Not enough weigh-ins
+yet"* above its own *"6 weigh-ins over 5 days"*, because `weightResponse()` returns a full result
+whose `verdict` is null when the range straddles the band and the card rendered that as the no-data
+state. It now reads *"Not called yet"*.
+[Journal](entries/2026-09-10-fix-vial-opened-date.md) ·
+[Journal](entries/2026-09-10-fix-weight-response-undecided-label.md).
+**Owed: the S25.** The date control is a native `<input type="date">`, so the picker is the device's
+own and has not been opened on one; and the owner's account is the only one with a real dosing period
+to render against. **Worth reading before the next "no data" report:** LB-99's entry keeps its wrong
+first diagnosis, which blamed the `getLocalStore` fall-through — a card reporting "no data" is not
+evidence that no data reached it.
+
+**✅ RESOLVED — verified on the S25, 2026-09-14.** The vial card renders the date that was entered,
+and LB-99's half has already left the queue. Nothing is owed.
+
+---
+
+### [nutrition][app-shell] ⚠️ One back-dismiss primitive, three failures, and a device pass none has had (BF-30 v1.378.0 · LB-17 v1.382.0 · BF-34 v1.383.1)
+
+Artboard 4 shipped as a **nested sheet**, and this row said its unwind "rests on BF-27's
+one-press-per-layer guarantee". **That guarantee has now failed twice.** LB-17: an id comparison read
+every entry that was not a sheet's own as "mine is gone" — right at two layers by accident, wrong
+from three, which is what Q-395c built by reaching the list through Log Food. BF-34: the flag marking
+one of our own `history.back()` calls was per-instance, so a sheet closing and a dialog opening in
+the same tick could not see each other's and **the confirm dialog closed on the frame it opened** —
+the owner's *"the delete feature doesnt work"*. Both fixed, both pinned by tests that fail on the old
+logic. **Neither has been felt on a real gesture bar, which is the only place either lived.**
+On the S25: tap a diary row, tap the bin — the confirm dialog must **stay** open and be tappable, and
+Cancel must cancel. Press back from an open meal: it unwinds one layer per press, meal → Log Food →
+the page. **Two presses now, not three** — LB-16 collapsed that screen, so the middle layer is gone and
+`sheet-back-stack.test.ts` carries the three-deep case. Scrolling must never reveal a tray; a left-drag
+opens one, a right-drag closes it, a second row closes the first; a 92vh action row must clear the bar.
+
+**✅ RESOLVED — verified on the S25, 2026-09-14.** One press settled all four entries: the Android
+back gesture closes a sheet without closing the app, and the delete-confirm dialog that used to open
+and close on the same frame stays open. BF-27 and BF-34 left the queue with it. **The mechanism is
+worth remembering:** a closing surface's `history.back()` is asynchronous, so a per-instance in-flight
+flag let the pop land on the newly-opened surface, which read it as a genuine back gesture. It is a
+module-level counter in `lib/hooks/sheet-back-stack.ts` now.
