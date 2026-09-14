@@ -11,7 +11,8 @@
 
 ## Now
 
-**BF-159 (v1.456.1):** Cardio Baselines moved onto the Cardio tab — it is `/baselines`' only entrance.
+**BF-157 (v1.456.2):** every ready screen has a bounded clock — the ramp needs a working weight and
+four cases have none. **BF-159 (v1.456.1):** Cardio Baselines moved onto the Cardio tab.
 **LA-104 (v1.456.0):** the stress chart reads the STORED series for every day, mounted on
 `/health/day`. TN-3b, LB-98 ①, RV-35, BF-153, OR-108, LA-105 shipped. `check:rules` **74/74**.
 
@@ -20,17 +21,14 @@
 a bare link:** seven have it, three were opened, **all three were work** (LA-104 shipped; LA-102 and
 TN-28 now READY). Documented; the four `TN-` ones are **LB-104**.
 
-**EIGHT running entries were wrong about something load-bearing** — BF-139/141/142/145/146/147,
-OR-108's writers, LA-104's open question (Lane A had settled it in the route's docstring). **BF-159
-was the second that checked out whole.** Measure before you fix what the entry blames; read the route
-before re-deciding its design.
+**NINE running entries were wrong about something load-bearing** — BF-139/141/142/145/146/147, OR-108's writers, LA-104's settled question, BF-157's scope (filed as bodyweight; the gate loses the clock in FOUR cases). **BF-159 was the second that checked out whole.** Measure before you fix what the entry blames; read the route before re-deciding its design.
 
 **A 4-hourly silent Routine polls this lane** (`trig_01WcuYTidPtngLFZFD7yKnoL`, `53 */4 * * *`): syncs
 `main`, clears any open PR, runs `next-item.js`, **says nothing when READY is 0**.
 
 ## Next
 
-1. **READY is 6.** BF-157, BF-156, then **LA-102** and **TN-28** — the two just unburied, both
+1. **READY is 5.** BF-156, then **LA-102** and **TN-28** — the two unburied from `Reference:`, both
    nutrition surface, worth batching. Then LB-105 and the `nutrition-tab-day-and-scroll` batch (RV-36).
 2. **READY 0 is not "no work" — read KEEP and PARKED.** The console TRUNCATES each Keep; print them
    whole. TN-3b sat in PARKED three days while READY was 0 because its unparking was PROSE. **This is
@@ -42,7 +40,7 @@ before re-deciding its design.
 
 - **LB-105: `day-review-read-through.spec.ts` test 1 is RED locally, GREEN on CI** — so it is the
   sandbox seed, and a spec that disagrees by environment trains a session to skip it. It is READY.
-- **~50 VERIFY entries owe a look.** BF-136 and LB-99 are sharpest (only the owner's account has a real dosing period); BF-139 owes the **daytime** case (no route to open-meteo).
+- **~50 VERIFY entries owe a look.** BF-136/LB-99 sharpest (only the owner's account has a real dosing period); BF-139 owes the **daytime** case. **BF-157's chip-vs-bar agreement is native — unverifiable in the sandbox.**
 - **⚠ OR-108's picture will not show on the S25 until `LA-36` lands** — all three local-store reads omit `image_data_uri`, so the device reads null from a column now filled. Web is fine.
 - **Owner:** the macro/budget anchor (BF-134's residue, TN-29 protects the stored 1,660); LB-61's switch colour; whether the PWA lands on Home rather than Workout (PS-35).
 - **⚠ BF-84 reads startable and is not** — BF-94 supersedes it and is `Gate: device`.
@@ -71,11 +69,12 @@ None held. **Two abandoned Lane B PRs are open whose work is already on `main`**
    wrong. The tell was always a test: BF-146's spec passed with the fix reverted, OR-108's first honest
    run **413'd**. **RV-35 shows re-verifying cuts BOTH ways** — deleting it as stale would have dropped
    the test it owed. **Write the failing check first, and read the Gotchas below before starting.**
-2. **A negative assertion behind a positive one is UNPROVEN — falsify it separately.** BF-159's "gone from Health" never ran once "on Cardio" failed first; reverting proved half. Build the wrong state deliberately (the card in BOTH places) and watch that half go red.
-3. **A mutation that does NOT fail is a finding.** BF-141's `stopPropagation` guards a lossy round-trip (61.0 kg → 61.25) the spec cannot show — the seeded workout round-trips exactly. The test was renamed to what it proves.
-4. **A card reporting "no data" is not evidence none reached it** — LB-99's cause was one label, not the `getLocalStore` fall-through; and a shadowing claim is about ONE function's branch order (PS-35b's two "unreachable" palette keys cited *different* functions, both live).
-5. **Never run `pnpm build` and `npx vitest run` against the one local Postgres at once** — a "failure" that will not reproduce serially is contention, not a defect.
-6. **A stored "state as of" line ages into a wrong answer** — Dependabot read *"2 high"*; `pnpm audit` read **36, 23 high, 2 critical**.
+2. **A negative assertion behind a positive one is UNPROVEN — falsify it separately.** BF-159's "gone from Health" never ran once "on Cardio" failed first; reverting proved half. Build the wrong state deliberately and watch that half go red — or, where it was already true before the change (BF-157's "no ladder"), record it as a regression guard rather than as proof.
+3. **A PROBE MUST CREATE THE STATE IT NEEDS.** BF-157's first spec assumed the seed's exercises were unweighted because none carries an `exercise_id`; the ready screen came up at **73.75 kg** with a full ramp. Repoint the row in `beforeAll`, restore in `afterAll` (`deload-visible.spec.ts`), never read what the seed happens to hold.
+4. **A mutation that does NOT fail is a finding.** BF-141's `stopPropagation` guards a lossy round-trip (61.0 kg → 61.25) the spec cannot show — the seeded workout round-trips exactly. The test was renamed to what it proves.
+5. **A card reporting "no data" is not evidence none reached it** — LB-99's cause was one label, not the `getLocalStore` fall-through; and a shadowing claim is about ONE function's branch order (PS-35b's two "unreachable" palette keys cited *different* functions, both live).
+6. **Never run `pnpm build` and `npx vitest run` against the one local Postgres at once** — a "failure" that will not reproduce serially is contention, not a defect.
+7. **A stored "state as of" line ages into a wrong answer** — Dependabot read *"2 high"*; `pnpm audit` read **36, 23 high, 2 critical**.
 
 ## Gotchas worth carrying
 

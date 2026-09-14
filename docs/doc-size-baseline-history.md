@@ -11646,3 +11646,24 @@ proven by building the duplicate deliberately, not just by reverting.
 That is the detail a shorter row would drop, and it is the one worth keeping: the Cardio assertion
 fails first, so a single negative run never reaches the Health half. It would have shipped unproven
 while appearing tested, guarding exactly the two-entrances failure the entry was written about.
+
+## 2026-09-14 — `projectOverview.md` → 10878, `docs/implementation-backlog.md` → 21626 (BF-157)
+
+The backlog shrank 48 with BF-157 leaving, and its baseline is tightened to match rather than left
+as slack. projectOverview grew 14.
+
+Most of those 14 are one correction to the entry rather than a description of the fix: BF-157 was
+filed as a bodyweight bug, and the render gate loses the clock in **four** cases — bodyweight, an
+AMRAP baseline, solo mode, and anything logged at zero. `startRestChip` counts for all four, and its
+comment already claimed to match "the same total the on-screen ready bar uses". Fixing only the named
+case would have left that comment false in three of them, so the row records the class.
+
+## 2026-09-14 — `docs/agents/state/implementation-lane-b.md` → 110 (BF-157)
+
+Down one from 111. The baton gained two lessons and shed more than it gained: the entry-scope line
+absorbed BF-157 into the existing run of wrong premises rather than starting a new paragraph, and the
+VERIFY line took its native-chip caveat inline.
+
+The two added are both about proving a test rather than writing one — a negative assertion behind a
+positive one never runs, and a probe that reads the seed instead of creating its state proves
+whatever the seed happens to hold. Both cost a wasted run this session.
