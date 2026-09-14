@@ -49,10 +49,23 @@ shrink-only and the ramp's three baselined literals are not this change's to chu
 (`{bodyweight}`) in `beforeAll`, restores it in `afterAll`, drives to the ready screen, and asserts a
 `Get ready` bar reading `m:ss / 1:00` that ticks.
 
-**The first draft of that spec proved nothing.** It assumed the seed's exercises were unweighted
-because none carries an `exercise_id`; the ready screen came up at **73.75 kg** with a full ramp. A
-probe has to create the state it needs — the `deload-visible.spec.ts` pattern — rather than read
-whatever the seed holds.
+**Getting that spec right took three attempts, and both failures are the same mistake in different
+clothes — reading the sandbox instead of creating the state.**
+
+1. It assumed the seed's exercises were unweighted, because none carries an `exercise_id`. The ready
+   screen came up at **73.75 kg** with a full ramp; the spec proved nothing and passed.
+2. It then looked a real `Pull-Up` row up in the sandbox and hardcoded its uuid. CI builds its own
+   `exercise_library`, so the `UPDATE` died on `session_exercises_exercise_id_fkey` —
+   *"Key (exercise_id)=(d94e8afd…) is not present in table exercise_library"* — green locally, red on
+   CI. **Only the Postgres service-container log named the cause**; the Playwright failure was a
+   missing element, which reads like a UI regression.
+3. It now inserts its own row **by name** (`exercise_library.name` is UNIQUE, which is the one thing
+   both databases agree on), upserting so an aborted run leaves nothing behind, and tears down in
+   order: `session_exercises` first, the probe row second — the other way round leaves
+   `ON DELETE SET NULL` to blank the ids it is about to rewrite.
+
+Teardown verified by reading the tables back after a local run: zero probe rows, all three opening
+exercises restored to their original names and null ids.
 
 | Assertion | Status |
 |---|---|

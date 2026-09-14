@@ -16,11 +16,17 @@ import { SEED_EMAIL } from './fixtures'
  * phase is timed.
  *
  * **The spec creates the state it needs and restores it**, rather than reading whatever the seed
- * happens to hold. The first draft assumed the seed's exercises were unweighted because none carries
- * an `exercise_id`; the ready screen came up at **73.75 kg** with a full ramp, so the assumption was
- * wrong and the test proved nothing. Every session's opening exercise is repointed at **Pull-Up**
- * (`{bodyweight}`, `exercise_type = bodyweight`) — the owner's own movement — because the workout
- * that gets recommended is not this spec's to choose.
+ * happens to hold. That took two goes. The first draft assumed the seed's exercises were unweighted
+ * because none carries an `exercise_id`; the ready screen came up at **73.75 kg** with a full ramp,
+ * so it proved nothing. The second looked a real `Pull-Up` row up in the sandbox and hardcoded its
+ * uuid — which is a local id, and CI builds its own library, so the `UPDATE` died on
+ * `session_exercises_exercise_id_fkey` and the spec was red there while green here.
+ *
+ * So it inserts its own row, by NAME, which is the one thing both databases agree on
+ * (`exercise_library.name` is UNIQUE). Every session's opening exercise is repointed at it, because
+ * the workout that gets recommended is not this spec's to choose. Teardown restores
+ * `session_exercises` FIRST and drops the probe row second — the other order would leave
+ * `ON DELETE SET NULL` to blank the ids it is about to rewrite.
  */
 test.use({ contextOptions: { reducedMotion: 'reduce' } })
 test.setTimeout(180_000)
@@ -28,8 +34,10 @@ test.setTimeout(180_000)
 /** `transitionSecForEquipment(['bodyweight'])` — the same 60 s `startRestChip` counts against. */
 const EXPECTED_TOTAL = '1:00'
 
-const PULL_UP = 'd94e8afd-1540-4f8b-a94b-2fedba64800f'
+/** Distinct enough that it cannot collide with a real library row in either database. */
+const PROBE_NAME = 'E2E Bodyweight Probe'
 
+let probeId = ''
 let preExistingSessionIds: string[] = []
 let originals: Array<{ id: string; exercise_name: string; exercise_id: string | null }> = []
 
@@ -56,10 +64,19 @@ test.beforeAll(async () => {
     originals = rows
     expect(originals.length, 'no opening exercise to repoint — the seed changed').toBeGreaterThan(0)
 
+    // Upsert rather than insert: a run that died before teardown leaves the row behind.
+    const { rows: probe } = await db.query<{ id: string }>(
+      `INSERT INTO exercise_library (name, equipment, exercise_type)
+            VALUES ($1, '{bodyweight}', 'bodyweight')
+       ON CONFLICT (name) DO UPDATE
+             SET equipment = EXCLUDED.equipment, exercise_type = EXCLUDED.exercise_type
+         RETURNING id`, [PROBE_NAME])
+    probeId = probe[0].id
+
     await db.query(
-      `UPDATE session_exercises SET exercise_name = 'Pull-Up', exercise_id = $1
-        WHERE id = ANY($2::uuid[])`,
-      [PULL_UP, originals.map(r => r.id)])
+      `UPDATE session_exercises SET exercise_name = $1, exercise_id = $2
+        WHERE id = ANY($3::uuid[])`,
+      [PROBE_NAME, probeId, originals.map(r => r.id)])
   })
 })
 
@@ -76,6 +93,8 @@ test.afterAll(async () => {
       `DELETE FROM workout_sessions ws USING users u
         WHERE u.id = ws.user_id AND u.email = $1 AND NOT (ws.id = ANY($2::uuid[]))`,
       [SEED_EMAIL, preExistingSessionIds])
+    // Last, and only now that nothing references it.
+    if (probeId) await db.query(`DELETE FROM exercise_library WHERE id = $1`, [probeId])
   })
 })
 
