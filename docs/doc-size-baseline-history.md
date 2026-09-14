@@ -11975,7 +11975,21 @@ its queue. `Needs:` mis-orders; `Gate:` crosses a line the owner drew. The `Need
 ever have questioned it. A row recording only the negative would leave the reader thinking the
 obvious case was the whole case.
 
-## 2026-09-14 — `docs/implementation-backlog.md` → 20943, `projectOverview.md` → 10971 (BF-160)
+## 2026-09-14 — `projectOverview.md` → 10954, `docs/implementation-backlog.md` → 20994 (BF-161)
+
++14 on projectOverview and +9 on the backlog for a feature whose code is small and whose DECISION is
+the expensive part. The build is a mapping and a list component; what needed writing down is why
+there is no nesting column, because that is the thing a later session would otherwise re-litigate
+from scratch — `saved_meal_items.food_item_id` is NOT NULL, and making it nullable buys recursive
+macro computation in every consumer plus cycle prevention, for a library of 15 meals averaging 1.9
+items.
+
+Both entries lead with the consequence rather than the mechanism: what the owner accepted is that a
+meal built from a saved meal is a **snapshot**. That is invisible until the day someone edits a
+source meal and expects the built one to follow, which is exactly when a one-line ✅ would have left
+the reader with nothing.
+
+## 2026-09-14 — `docs/implementation-backlog.md` → 20954, `projectOverview.md` → 10985 (BF-160)
 
 −40 on the backlog for BF-160 leaving the queue; +31 on projectOverview for the row that replaces it.
 

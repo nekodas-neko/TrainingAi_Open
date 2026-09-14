@@ -1874,6 +1874,20 @@ unchanged while a sub-route push grows it. **Check on device:** from Health/Work
 the back gesture lands on Home; from Home it minimises; from a meal or day opened on top of a tab it
 returns to that tab, not Home.
 
+### [nutrition] ⚠️ The meal builder adds saved meals, and the arithmetic is not device-verified (BF-161, 2026-09-14)
+
+Shipped in v1.456.8. The owner asked for it — *"For the meal builder it should let you add
+meals/saved items as part of the meal builder"* — and chose flattening over real nesting, which
+`saved_meal_items.food_item_id` being NOT NULL would have made a migration: *"Okay lets go with
+flatten for now."*
+
+**Two things are owed on the S25.** ① Build a meal from **two** saved meals and confirm the
+ingredient rows, their quantities and the macro total match the sum of the sources — the harness
+reaches the tab and proves the wiring, but cannot judge the arithmetic against a real library.
+② That the snapshot behaviour is not surprising in use: a meal built from a saved meal does **not**
+change when the source is edited later, which is the accepted cost of not paying for a nullable
+`food_item_id` and recursive macro computation.
+
 ### [nutrition] ⚠️ The vial sheet's rewrite is not device-verified (BF-153, 2026-09-13)
 
 Shipped in v1.454.1: the vial in use is named and moved above the create-form, the form is headed
@@ -3340,7 +3354,7 @@ check it asked for has now been run. (Found while answering an unrelated Sentry 
 - **Q-354 is a live trap for spec authors, not just a curiosity.** The new spec's `locator.click()` did nothing at all — no toast, no request, no error — because the Nutrition scroll container's date-swipe `useDrag` swallows mouse input, which is what Playwright sends. `tap()` works and is the faithful input anyway. Every future e2e assertion that presses something on this screen has to know this first, and the failure gives no clue.
 - **Q-187 is re-scoped, not struck.** What remains is the owner's second sentence — the day re-calculating remaining meals against what was actually eaten — which has no design and three open questions (what gets re-scaled, whether a floor exists, what to say when the remaining macros are unreachable).
 
-### [cardio] ⚠️ A fitness test now logs the activity it was, so it reaches the calorie budget; untested on device (BF-160, 2026-09-14, v1.456.9) · needs: device
+### [cardio] ⚠️ A fitness test now logs the activity it was, so it reaches the calorie budget; untested on device (BF-160, 2026-09-14, v1.456.10) · needs: device
 
 From the owner's 2026-09-14 Cooper run — 1,975 m, 720 s, avg HR 156. Told the test had produced no
 activity log, he answered *"Yes it should count."*

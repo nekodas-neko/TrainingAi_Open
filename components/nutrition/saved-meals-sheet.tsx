@@ -32,6 +32,7 @@ import { useIngredientQuantities } from './use-ingredient-quantities'
 import { ingredientAmountLabel } from './saved-meal-qty'
 import { MealTypeTags } from './meal-type-tags'
 import { IngredientPicker } from './ingredient-picker'
+import { savedMealToEntries } from './saved-meal-flatten'
 import { MealBatchSize } from './meal-batch-size'
 import { MealBuilderFooter } from './meal-builder-footer'
 import { MealBuilderHeader } from './meal-builder-header'
@@ -148,7 +149,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
   const [mealImage, setMealImage] = useState<string | null>(null)
   const [mealServings, setMealServings] = useState(1)
   const {
-    ingredients, setIngredients, addIngredient, removeIngredient,
+    ingredients, setIngredients, addIngredient, addEntries, removeIngredient,
     unitFor, setUnit, setDisplayQty, stepQty,
   } = useIngredientQuantities()
   // Which meal slots a plan may use this meal in (BF-11f). Empty = every slot, which is what
@@ -216,7 +217,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
     setMealImage(meal?.imageDataUri ?? null)
     setMealServings(meal?.servings ?? 1)
     setMealTypeIds(meal?.mealTypeIds ?? [])
-    setIngredients(meal ? meal.items.map(i => ({ item: i.foodItem, qty: i.quantityMultiplier })) : [])
+    setIngredients(meal ? savedMealToEntries(meal) : [])
     setEditingIngredientId(null)
     setBuildSession(n => n + 1)
     setRenamingMeal(!meal)
@@ -252,15 +253,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
    * with tests because getting it wrong logs a twelfth of a slice and looks plausible.
    */
   function importRecipe(recipe: { name: string; entries: { item: FoodItem; qty: number }[]; recipeYield: number | null }) {
-    setIngredients(prev => {
-      const next = [...prev]
-      for (const { item, qty } of recipe.entries) {
-        const at = next.findIndex(e => e.item.id === item.id)
-        if (at === -1) next.push({ item, qty })
-        else next[at] = { ...next[at], qty: next[at].qty + qty }
-      }
-      return next
-    })
+    addEntries(recipe.entries)
     // Read from the closure, not inside a `setMealName` updater: an updater must be pure, and React
     // may call it twice under StrictMode. This runs from a press, so the current render's name is
     // the right one.
@@ -269,6 +262,14 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
     setMealServings(patch.servings)
     setUnstatedYield(patch.unstatedYield)
     setRenamingMeal(false)
+  }
+
+  /** BF-161 — a saved meal joins the builder as its ingredients. `saved-meal-flatten.ts` owns why. */
+  function addMealAsIngredients(meal: SavedMeal) {
+    const entries = savedMealToEntries(meal)
+    if (entries.length === 0) { toast.error(`"${meal.name}" has no ingredients`); return }
+    addEntries(entries)
+    toast.success(`Added ${entries.length === 1 ? '1 ingredient' : `${entries.length} ingredients`} from "${meal.name}"`)
   }
 
   /**
@@ -693,6 +694,8 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
                   active={open && tab === 'build'}
                   userId={userId}
                   onAdd={addIngredient}
+                  savedMeals={meals}
+                  onAddMeal={addMealAsIngredients}
                   onImportRecipe={importRecipe}
                   onRecipeCandidates={setCandidates}
                 />
