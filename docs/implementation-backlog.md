@@ -421,6 +421,76 @@ below threshold and left in place for next time.
 
 
 
+### [cardio] BF-158 — the Cooper test has no distance source indoors and no clamp, so a treadmill run saves a NEGATIVE VO₂max
+
+- **Lane:** A — `packages/shared/src/health/fitness-tests.ts` (`cooperVo2max`, `clampVo2`) is the
+  defect; `components/fitness-tests/test-active.tsx` is where a distance source other than GPS would
+  have to come from.
+- **Added:** 2026-09-14 (BugFix intake), from the owner asking for a pre-flight check before running
+  the Cooper test for the first time. **He nearly ran it on a treadmill** — the session immediately
+  before this was about single-speed treadmill walks.
+- **`cooperVo2max` is the only VO₂ equation in the file that is not clamped.**
+
+  ```ts
+  const clampVo2 = (v: number) => round1(Math.max(10, Math.min(100, v)))
+  // sixMwtVo2max: both branches return clampVo2(…)
+  export function cooperVo2max(distanceM: number): number {
+    return round1((distanceM - 504.9) / 44.73)      // ← no clamp
+  }
+  ```
+
+  At `distanceM = 0` that is **−11.3 mL·kg⁻¹·min⁻¹**, written to `fitness_tests.vo2max_est` and into
+  the fitness snapshot. The intercept guarantees it: any distance under 505 m is negative, and the
+  sibling equation in the same file already has the guard.
+- **Zero is the realistic input, not a contrived one.** `test-active.tsx` takes distance from
+  `startGpsWatcher` and nothing else — **no treadmill toggle, no manual entry**, unlike the guided
+  walk, which has an explicit *"Treadmill — skips GPS"* switch. An indoor run therefore produces a
+  full-length, correctly-timed test with a distance near 0.
+- **The existing early-stop guard shows the intended shape and covers the other half of this.**
+  `test-result.tsx` skips the VO₂ score when a fixed-duration protocol ends under 90% of its window
+  (*"the Ross/Cooper equations are calibrated to the FULL protocol"*, review E2-10), saving HR and
+  distance regardless. An implausible **distance** deserves the same treatment as an implausible
+  **duration**, and that is the recommended fix: skip the score and say why, rather than clamp a
+  treadmill run up to 10 and present it as a reading.
+- **Clamping alone is the wrong fix and would be worse than the bug.** `Math.max(10, …)` turns −11.3
+  into a plausible-looking **10.0** that nothing marks as invalid. Prefer: `null` with a reason when
+  the distance is implausible for the protocol (a 12-minute run under ~505 m is not a Cooper result),
+  which is the pattern the early-stop guard already uses.
+- **Worth considering alongside, not required:** a manual distance entry on the result screen, so a
+  treadmill's own readout can be typed in. That makes the test usable indoors rather than merely
+  safe. Owner's call — the safety half stands on its own.
+- **Verification:** run the protocol to full duration with GPS unavailable and confirm no VO₂max is
+  saved and the screen says why; confirm an outdoor run is unchanged. The owner's existing 6MWT row
+  (603 m, 18.8, `ross_2010`, 2026-07-19) is the reference that the clamped sibling still behaves.
+
+### [cardio][app-shell] BF-159 — Cardio Baselines sits in the Health tab's strength list, and it is the one card that is purely cardio
+
+- **Lane:** B — `app/health/health-content.tsx:61` (`TRAINING_ORDER`),
+  `app/health/health-sections.tsx:690` (the `baselineTests` case), and
+  `components/cardio/cardio-content.tsx` as the destination.
+- **Added:** 2026-09-14 (BugFix intake). Owner, immediately after having to be told where the Cooper
+  test lives: *"That section should be moved to cardio hub."*
+- **It is filed under Training, between two strength cards.** `TRAINING_ORDER` reads
+  `["calendar","weeklyStats","aiPeriodization","muscleSets","baselineTests","activityHistory","workoutDensity"]`
+  — so **Cardio Baselines** sits between *Muscle Volume This Week* and *Workout Density*. Every card
+  around it is about lifting; this one holds VO₂max and HR recovery.
+- **`/baselines` has exactly one entrance and this card is it.** Nothing else in the app links there
+  (`grep -rn "/baselines"` returns only `latest-baseline-card.tsx`), so a card in the wrong list is
+  the whole discoverability story for all three protocols — 6MWT, Cooper, and Resting HR + Recovery.
+- **The destination already holds its siblings.** `cardio-content.tsx` renders `HeartProfileCard`,
+  `ZoneQuotaCard`, `StepsQuotaCard`, `ModalityPicker` and `CardioTrendsSection`. A VO₂max/HRR
+  baseline belongs in that column, and the card's own heading already says **CARDIO** BASELINES.
+- **Recommended placement: directly under `HeartProfileCard`**, above the zone quotas. Heart profile
+  is *what your heart is doing lately*; the baseline is *what it was measured at* — the two read as a
+  pair, and putting it above `ModalityPicker` means it is seen while deciding what to do today, which
+  is when taking a test is actually a live option.
+- **Move, do not duplicate.** Remove `baselineTests` from `TRAINING_ORDER` and its `renderTraining
+  Section` case in the same PR. Two entrances to a single-destination card is how a stale copy starts.
+- **Not in scope:** a shortcut straight into a specific protocol. The owner asked where to click, not
+  for a deep link, and `/baselines` already lists all three on arrival.
+- **Verification:** on device, confirm the card is on the Cardio tab, that Health no longer renders
+  it, and that its `/baselines` link still works from the new position.
+
 ### [workouts] BF-157 — a bodyweight exercise gets no get-ready countdown, because the timer is gated on the warm-up weight ladder
 
 - **Lane:** B — `components/workout/active-workout-screen.tsx:181-189` is the gate; the durations it

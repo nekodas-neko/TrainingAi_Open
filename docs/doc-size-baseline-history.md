@@ -11587,3 +11587,10 @@ told not to look.
 lane not to look"* — reproduced within an hour of the entry being written, by someone who had read
 OR-100 in the same session. The field is for an owner or device CHECK; this owes code. Re-filed as a
 plain entry, it moves from KEEP to #2 of Lane A's READY.
+
+## 2026-09-14 — `docs/implementation-backlog.md` (BF-158, BF-159)
+
+Fifty lines for two entries out of one pre-flight check. BF-158 spends most of its length arguing
+against the obvious fix — clamping turns a −11.3 VO₂max into a plausible 10.0 that nothing flags —
+because the entry has to survive an implementer who reaches for `Math.max` on sight. BF-159 is short
+and carries one measured fact: `/baselines` has exactly one entrance in the whole app.
