@@ -649,28 +649,6 @@ below threshold and left in place for next time.
 - **Added:** 2026-09-13 · re-queued from the shipped half, so the owner's answer is not lost with the
   entry that carried it.
 
-### [platform][nutrition] LB-105 — `day-review-read-through`'s first test is red on `main`, and it may only be red here
-- **Lane:** B — `e2e/day-review-read-through.spec.ts`, or the seed it runs against.
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-14 · found while regression-testing LA-104.
-- **Observed, not inferred.** *"the wrap-up shows the day it is wrapping up"* fails on a clean
-  checkout of `origin/main` with no local changes — confirmed by stashing, running, and unstashing.
-  `sections.first()` never becomes visible in the `/nutrition?review=day` dialog. The other four
-  tests in the file pass.
-- **The likely cause is the seed, not the app, and that is exactly why it is filed rather than
-  fixed.** Every section of `DayReadThrough` self-hides when its domain is empty, so a day with
-  nothing logged renders a dialog with no sections — which is what the sandbox's local Postgres
-  gives. If CI's seed logs something, this is green there and the finding is "the spec depends on
-  seed contents", not "the wrap-up is broken".
-- **✅ That look has been taken, and it is the seed.** CI's E2E job passed on PR #1160 — the exact
-  tree that fails locally — completing 2026-09-14 01:59 UTC with this spec green. So the wrap-up is
-  not broken; the spec asserts on content the sandbox's local Postgres does not have.
-- **What is left is to make the two agree**, and it is a real cost: a spec that is red locally and
-  green on CI trains a session to skip it, which is how a genuine failure gets waved through. Either
-  seed the day the spec needs (`deload-visible.spec.ts` is the pattern for a probe that creates its
-  own state and restores it) or assert the dialog's frame rather than its contents.
-- **Reversal cost:** none either way.
-
 ### [platform] LB-104 — four more entries may be buried under `Reference:`, and the field now says what it means
 - **Lane:** O — this queue file only; no code.
 

@@ -11710,3 +11710,18 @@ paragraph. Adding LA-102's sentence to both would have made it three out of step
 The baton drops 109 → 106. It also **fixes an overage it did not cause**: `main` was sitting at 110
 against a 109 baseline, so a previous merge tightened the number without tightening the file. Two
 paragraphs reflowed onto single lines paid for that and this session's two additions together.
+
+## 2026-09-14 — `projectOverview.md` → 10918, `docs/implementation-backlog.md` → 21564 (LB-105)
+
+The backlog shrank 22; its baseline is tightened rather than left as slack. projectOverview grew 13
+for a change that ships no product behaviour, which needs justifying.
+
+Seven of the thirteen are the half the entry never knew about. LB-105 was filed as "a spec is red
+locally and green on CI" — true, and the seed explains it. What reading the file turned up is that
+its SECOND test passed on that same empty day, because an unscoped `^Sleep$` matched the day
+screen's own score cell rather than a read-through section. The test guarding "both hosts render one
+implementation" would have passed with the component absent.
+
+A row that recorded only the seed-dependence would leave the next reader believing the other half
+was sound. The label list being wrong as well (`Body composition`, never matched by `^Body$`) is the
+detail that shows how long it had been matching nothing.
