@@ -176,6 +176,39 @@ export interface MacroTargets {
  */
 export function scaleMacrosForEarnedKcal(base: MacroTargets, earnedKcal: number): MacroTargets {
   if (!Number.isFinite(earnedKcal) || earnedKcal <= 0) return base
+  return macrosForKcal(base, macroKcal(base) + earnedKcal)
+}
+
+/** What a macro split costs in calories, by Atwater. */
+export function macroKcal(m: MacroTargets): number {
+  return m.proteinG * KCAL_PER_G.protein + m.carbsG * KCAL_PER_G.carbs + m.fatG * KCAL_PER_G.fat
+}
+
+/**
+ * The same split re-fitted to a different calorie total (BF-154).
+ *
+ * `scaleMacrosForEarnedKcal` grows a target by what movement earned; this is the general form, and
+ * that function now delegates to it so there is one implementation of "hold protein, move the rest
+ * on the carbs:fat ratio" rather than two that can disagree about the edges.
+ *
+ * **Why a target needs re-fitting at all.** The stored grams were entered against a stored calorie
+ * goal, and BF-152 moved the day's budget off that goal onto the measured resting rate. The two
+ * then disagreed permanently — on the owner's figures the grams asked for ~1,660 kcal while the
+ * budget was ~1,294 — and `macro-budget-gap.ts` existed only to measure a difference no arithmetic
+ * was ever going to close. The owner's answer (2026-09-13) was to make the grams follow the budget:
+ * *"Can we have it dynamically sized for my calories? I.e before excercise its 1 value and after
+ * its another if calories increase?"* Re-fitted here, the gap is zero by construction.
+ *
+ * **Protein still holds**, for the reason above: it is dosed per kg of bodyweight, and neither a
+ * walk nor a smaller budget changes what the body is made of. That is what makes this a re-fit
+ * rather than a rescale — everything else absorbs the difference.
+ *
+ * **When protein alone costs more than the whole total**, carbs and fat go to zero rather than
+ * negative. That is a degenerate profile (a protein target above the entire budget), and the honest
+ * rendering is "all of it is protein" rather than grams below nothing.
+ */
+export function macrosForKcal(base: MacroTargets, totalKcal: number): MacroTargets {
+  if (!Number.isFinite(totalKcal)) return base
 
   const carbKcal = base.carbsG * KCAL_PER_G.carbs
   const fatKcal = base.fatG * KCAL_PER_G.fat
@@ -185,10 +218,12 @@ export function scaleMacrosForEarnedKcal(base: MacroTargets, earnedKcal: number)
   // the answer Q-401 reached before the ratio refinement, and the case is degenerate anyway.
   const carbShare = splittable > 0 ? carbKcal / splittable : 1
 
+  const forSplitting = Math.max(0, totalKcal - base.proteinG * KCAL_PER_G.protein)
+
   return {
     proteinG: base.proteinG,
-    carbsG: Math.round(base.carbsG + (earnedKcal * carbShare) / KCAL_PER_G.carbs),
-    fatG: Math.round(base.fatG + (earnedKcal * (1 - carbShare)) / KCAL_PER_G.fat),
+    carbsG: Math.round((forSplitting * carbShare) / KCAL_PER_G.carbs),
+    fatG: Math.round((forSplitting * (1 - carbShare)) / KCAL_PER_G.fat),
   }
 }
 

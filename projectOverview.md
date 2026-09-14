@@ -2024,10 +2024,11 @@ the answer rather than being struck, because deleting the entry would have delet
 it. It was re-queued with a `Keep:` line first and corrected immediately: `Keep:` marks an owner or
 device *check*, so it filed answered, buildable work under the KEEP bucket headed *"Not new work"* —
 OR-100's exact failure, reproduced within the hour. As a plain entry it sits at #2 of Lane A's READY.
-**Flag for whoever builds it:** `scaleMacrosForEarnedKcal` holds
-protein constant, so re-basing from 1,660 to ~1,294 drops carbs and fat while 150 g protein stands —
-right for a cut, and a visible change to his targets. When it lands, `macro-budget-gap.ts` and the
-paragraph reported here both become dead and should go with it.
+**✅ BUILT 2026-09-14** (BF-154's build half): the grams are fitted to
+`budgetProvenance(...).base + earned` by `macrosForKcal`, so the gap is zero by construction.
+`macro-budget-gap.ts`, its test, the paragraph reported here and three now-dead props went with it —
+`CalorieZoneBar` already printed the same breakdown and is now the only surface that does. Protein is
+held constant as flagged, so his carbs and fat drop while 150 g protein stands.
 
 **Also not device-verified.** JS-only, so it reaches the phone on the next Railway deploy with no
 APK, but nothing has read the sentence at 412 dp. The check is one look at Nutrition: the terms
@@ -2109,6 +2110,8 @@ docstring, because movement is in **both** addends and cancels. It also called t
 goal four lines below the prop comment saying they are earned-scaled. The arithmetic was right to the
 kcal; only the words were wrong. The sentence now names every number and says outright that moving
 will not close the gap.
+
+**⚠ Amended 2026-09-14: the gap this row is about no longer exists.** BF-154's build half fitted the grams to the budget, and `macro-budget-gap.ts` — the module quoted below — was deleted with the sentence it fed. The reasoning is kept because the row is still owner-gated on the base question, and the figures below are the record of how the two numbers drifted.
 
 **The finding underneath it is not fixed and is Lane A's.** The module's docstring pinned the gap at
 *"406 kcal, at every hour of every day"*; the card printed **295 the other way**, so the sign had
@@ -3353,6 +3356,38 @@ check it asked for has now been run. (Found while answering an unrelated Sentry 
 - **Keep: the device write path has not run.** `getLocalStore` returns null on web, so every exercised path — including the `plan_meal_answers` decline that suppresses a meal from the offer — took the `/api/nutrition/food-logs` fallback rather than the SQLite write plus outbox a real tap takes. `e2e/plan-day-fill.spec.ts` covers the selection and the write end to end, and all ten guards in the selector are mutation-checked, but on the web path only. The button has not been seen on the S25.
 - **Q-354 is a live trap for spec authors, not just a curiosity.** The new spec's `locator.click()` did nothing at all — no toast, no request, no error — because the Nutrition scroll container's date-swipe `useDrag` swallows mouse input, which is what Playwright sends. `tap()` works and is the faithful input anyway. Every future e2e assertion that presses something on this screen has to know this first, and the failure gives no clue.
 - **Q-187 is re-scoped, not struck.** What remains is the owner's second sentence — the day re-calculating remaining meals against what was actually eaten — which has no design and three open questions (what gets re-scaled, whether a floor exists, what to say when the remaining macros are unreachable).
+
+### [nutrition] ⚠️ The macro grams now follow the budget, and his carbs and fat drop; unseen on device (BF-154, 2026-09-14, v1.456.11) · needs: device
+
+The owner's decision, 2026-09-13: *"Can we have it dynamically sized for my calories? I.e before
+excercise its 1 value and after its another if calories increase?"*
+
+The grams were entered against the stored calorie goal; BF-152 moved the budget onto the measured
+resting rate, and the two then disagreed **permanently** — ~1,660 against ~1,294 on his figures. The
+gap was **constant**, which is what made it a design fault rather than a rounding one: the old code
+grew the grams by `earned` and the budget by the same `earned`, so no amount of walking closed it,
+and `macro-budget-gap.ts` existed only to measure that.
+
+Fixed by fitting the grams to `budgetProvenance(...).base + earned` through one shared
+`macrosForKcal`, which `scaleMacrosForEarnedKcal` now delegates to. Measured on the running app: the
+grams cost **1,816 kcal against a 1,815 budget** at rest, and **2,005 against 2,002** after a run
+earning 187 — a one-to-three kcal rounding where a several-hundred-kcal gap used to stand.
+
+**⚠ His carbs and fat will visibly DROP, and that is the change to look at.** Protein is dosed per kg
+of bodyweight, so `macrosForKcal` holds it: re-basing from ~1,660 to ~1,294 takes the difference out
+of carbs and fat while 150 g protein stands. Right for a cut, and a real change to his targets —
+worth confirming on the first day it renders rather than after a week of it. **The seeded test
+account moves the other way** (its budget base is above its stored goal, so carbs rise), so the
+sandbox cannot show what his account will do.
+
+**Deleted with it, because a zero gap needs no explanation:** `macro-budget-gap.ts`, its test, the
+card's breakdown paragraph, and the three props that fed it. Nothing about the budget's provenance
+was lost — `CalorieZoneBar` prints the same *"N resting rate"* line and is now the only surface that
+does, which also settles the duplication the report opened with (*"There is so many numbers here"*).
+
+**Not device-verified.** JS-only, so it reaches the phone on the next Railway deploy with no APK.
+**The check:** open Nutrition and confirm the macro column targets add up to the budget beside them,
+that they rise after a walk, and that protein has not moved.
 
 ### [cardio] ⚠️ A fitness test now logs the activity it was, so it reaches the calorie budget; untested on device (BF-160, 2026-09-14, v1.456.10) · needs: device
 

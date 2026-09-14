@@ -7,7 +7,6 @@ import type { NutritionTargets } from '@trainingai/shared/types/nutrition'
 import type { EnergyBalanceResponse } from '@/app/api/nutrition/energy-balance/route'
 import { CalorieZoneBar } from './calorie-zone-bar'
 import { macroShares } from './macro-energy'
-import { macroBudgetGap } from './macro-budget-gap'
 import { EnergyExplainer } from './energy-explainer'
 
 interface Props {
@@ -25,18 +24,6 @@ interface Props {
   goalCalories: number | null
   /** The `earned` term inside that same budget — the movement addend, from the same call. */
   earnedKcal: number | null
-  /** The `base` term inside that same budget — the zero-movement half, from the same call.
-   *  BF-154: the breakdown sentence below used to print `balance.restingBaseKcal` instead, which
-   *  stopped being an addend of the budget when BF-152 re-anchored it. */
-  baseKcal: number | null
-  /** `budgetProvenance(...).anchoredToRestingRate`, from the same call. Decides the WORD printed
-   *  beside `baseKcal`, which is not cosmetic: on the anchored path that figure is the resting rate
-   *  and calling it anything else re-opens BF-99. */
-  baseIsRestingRate: boolean
-  /** The goal as STORED in `nutrition_targets`, before any burn-aware substitution (BF-142).
-   *  The card prints it beside the computed budget, because the owner's complaint was that not one
-   *  number on this card was the number he chose. Never used to compute anything. */
-  storedGoalCalories: number | null
   /** The **effective** targets: the caller has already substituted the burn-aware calorie budget and
    *  Q-323's earned-scaled macro grams. Passing the raw stored targets would report fat over on a
    *  day with 551 kcal earned when it was well under. */
@@ -72,7 +59,7 @@ const RING_MASK = 'radial-gradient(farthest-side, transparent 69%, black 70% 89%
  */
 export const EnergyCard = memo(function EnergyCard({
   data, isToday, loading, calories, proteinG, carbsG, fatG, goalCalories, earnedKcal,
-  baseKcal, baseIsRestingRate, storedGoalCalories, targets,
+  targets,
 }: Props) {
   const [showInfo, setShowInfo] = useState(false)
 
@@ -93,10 +80,6 @@ export const EnergyCard = memo(function EnergyCard({
   const overTarget = remaining != null && remaining < 0
 
   const shares = macroShares({ proteinG, carbsG, fatG })
-  // BF-134. Not a fourth budget: this adds up the gram targets **already on this card** and compares
-  // them with the budget **already on this card**, which is the arithmetic the owner did by hand
-  // before asking. Nothing here composes a calorie figure from parts.
-  const macroGap = macroBudgetGap(targets, goal)
   const pct = goal != null && goal > 0 ? Math.min(100, (calories / goal) * 100) : 0
   const sweep = pct * 3.6
   const proteinEnd = shares.protein * sweep
@@ -178,65 +161,6 @@ export const EnergyCard = memo(function EnergyCard({
         </div>
       </div>
 
-      {/* BF-134. The reconciliation Q-401 built for the calorie half never covered the macro row:
-          the donut, the headline and `+N burned` are one quantity seen three ways, and the grams are
-          a fourth thing sitting beside them. On the owner's account they read 406 kcal apart at
-          every hour of every day — see `macro-budget-gap.ts` for why that offset is constant rather
-          than something the day closes.
-
-          Said on the card rather than folded into `TdeeAdaptationCard`'s `Why two numbers` block,
-          which the entry proposed: that block is gated on `maintenance.source === 'formula'` AND
-          the stored goal drifting from the recommendation, neither of which has anything to do with
-          this gap. It would explain the macros in the one case and stay silent in the rest. */}
-      {macroGap != null && (
-        <p className="mt-2.5 text-[10px] leading-snug text-muted-foreground">
-          Macro targets add up to{' '}
-          <span className="font-semibold tabular-nums text-foreground">{macroGap.targetKcal.toLocaleString()} kcal</span>
-          {' '}&mdash; {Math.abs(macroGap.gapKcal).toLocaleString()} {macroGap.gapKcal > 0 ? 'above' : 'below'} the
-          calorie budget.{' '}
-          {storedGoalCalories != null && (
-            <>
-              Your stored goal is{' '}
-              <span className="font-semibold tabular-nums text-foreground">{storedGoalCalories.toLocaleString()}</span>.{' '}
-            </>
-          )}
-          {b != null && goal != null && baseKcal != null && (
-            <>
-              Today&rsquo;s budget is{' '}
-              <span className="font-semibold tabular-nums text-foreground">{goal.toLocaleString()}</span>
-              {' '}&mdash;{' '}
-              {/* BF-154. These terms are the ones `budgetProvenance` actually summed, passed down
-                  from the same call that produced the budget beside them. They used to be
-                  `restingBaseKcal`, `targetNetKcal` and `activeKcal` — the addends of the formula
-                  BF-152 retired — so the sentence named 1,294 and broke it into terms summing to
-                  2,078. On the calibrated path `restingBaseKcal` is `maintenance − avgActive`,
-                  which is the inflated estimator BF-152 moved away from, so it also printed 2,278
-                  as "resting burn" ten lines above 1,294 as "resting rate". */}
-              {baseIsRestingRate
-                ? (earnedKcal != null && earnedKcal > 0
-                    ? <>{baseKcal.toLocaleString()} resting rate</>
-                    // With nothing earned the budget IS the base, and printing the figure again
-                    // three words later adds a number that says nothing — which is how the report
-                    // this came from opened: *"There is so many numbers here."*
-                    : <>your resting rate</>)
-                : <>
-                    {Math.round(b.restingBaseKcal).toLocaleString()} resting burn
-                    {/* The unanchored base folds the goal delta in, so naming it alone would be
-                        BF-99 again. Omitted at 0, where "+ 0 for your goal" is noise. */}
-                    {Math.round(b.targetNetKcal) !== 0 && (
-                      <>, {b.targetNetKcal >= 0 ? '+' : '\u2212'}
-                        {Math.abs(Math.round(b.targetNetKcal)).toLocaleString()} for your goal</>
-                    )}
-                  </>}
-              {earnedKcal != null && earnedKcal > 0
-                ? <>, +{Math.round(earnedKcal).toLocaleString()} moved.{' '}</>
-                : <>, nothing moved yet.{' '}</>}
-            </>
-          )}
-          The grams are that goal scaled up by the same movement, so moving more raises both numbers
-          and the gap stays.
-        </p>
-      )}
 
       {/* Below the drawing, inside the same card. Artboard 1 stops at the two rows above, but the
           band is the only thing that says whether "left" is on track or merely arithmetic — and

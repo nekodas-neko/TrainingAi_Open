@@ -98,31 +98,31 @@ test('the budget the sentence names equals the terms it breaks it into', async (
   await page.goto('/nutrition')
   await settleRouteBoundary(page)
 
-  const sentence = page.getByText(/Today’s budget is/)
+  // BF-154's build half deleted the card's own `Today's budget is …` paragraph: it lived inside
+  // `{macroGap != null && …}`, and the grams are now fitted TO the budget, so there is no gap left
+  // for a sentence to explain. The reconciliation property did not go with it — `CalorieZoneBar`
+  // prints the same breakdown and is now the only surface that does, so the assertion follows it
+  // there rather than being dropped.
+  const sentence = page.getByText(/resting rate/).first()
   await expect(sentence).toBeVisible({ timeout: 30_000 })
-  const text = (await sentence.innerText()).replace(/\s+/g, ' ')
+  // The earned half appends a parenthetical breakdown of its own addends — "(120 workout, 35
+  // steps)" — which are terms of `earned`, not of the budget. Stripped, or they would be counted
+  // twice.
+  const clause = (await sentence.innerText()).replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ')
+  const terms = numbersIn(clause)
 
-  // Isolate the clause, so the macro-gap figures earlier in the paragraph cannot be mistaken for
-  // terms of the budget.
-  const clause = text.slice(text.indexOf('Today’s budget is'))
-  const [named, ...terms] = numbersIn(clause)
+  expect(terms[0], 'the sentence leads with the provenance base').toBe(base)
+  // Not the estimator field it replaced on screen, which is the regression this spec exists for.
+  expect(terms[0]).not.toBe(Math.round(b.restingBaseKcal))
 
-  expect(named, 'the sentence names the budget the app computed').toBe(total)
-
-  if (terms.length === 0) {
-    // The one shape with no terms to add: an anchored day with nothing earned, where the budget IS
-    // the base and repeating the figure would add a number that says nothing. Then the claim is
-    // that the words are true, not that a sum closes.
-    expect(base, 'a term-free sentence is only honest when the budget is the base').toBe(total)
-    expect(earned).toBe(0)
-    expect(clause).toMatch(/your resting rate/)
+  if (earned > 0) {
+    expect(terms, `"${clause}" — the earned term must be named`).toContain(earned)
+    expect(terms.reduce((a, n) => a + n, 0), `"${clause}" — the terms must add up to the budget`).toBe(total)
   } else {
-    const sum = terms.reduce((a, n) => a + n, 0)
-    expect(sum, `"${clause}" — the terms must add up to the budget it names`).toBe(named)
-    // And the base printed is the provenance base, not the estimator field it replaced on screen.
-    expect(terms[0]).toBe(base)
-    expect(terms[0]).not.toBe(Math.round(b.restingBaseKcal))
-    if (earned > 0) expect(terms).toContain(earned)
+    // Nothing earned: the budget IS the base, and the sentence says so in words rather than
+    // repeating the figure.
+    expect(base, 'a term-free sentence is only honest when the budget is the base').toBe(total)
+    expect(clause).toMatch(/no movement recorded yet today/)
   }
 })
 

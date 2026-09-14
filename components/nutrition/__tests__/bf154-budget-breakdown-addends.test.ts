@@ -26,28 +26,25 @@ const ZONE_BAR = read('components/nutrition/calorie-zone-bar.tsx')
  * destructured value beside one word. This call site never asked `budgetProvenance` anything — it
  * read the balance fields directly — so there was nothing for that guard to catch, on a file it was
  * not looking at.
+ *
+ * ── What BF-154's BUILD half then removed, and why it is a deletion rather than a gap ──
+ *
+ * Four assertions here read the card's breakdown paragraph — *"Today's budget is 1,294 — 1,294
+ * resting rate, +0 moved"* — and that paragraph is gone. It existed inside `{macroGap != null && …}`,
+ * whose premise was that the grams and the budget disagree. The grams are now fitted TO the budget,
+ * so the gap is zero by construction and the sentence explaining it has nothing to explain.
+ *
+ * **Nothing about the budget's provenance was lost with it.** `CalorieZoneBar`, rendered by this
+ * same card, prints `{base.toLocaleString()} resting rate` on the anchored path — which is the line
+ * BF-152's device check is about, and the assertion below still pins it. The deleted paragraph was
+ * a second copy of that breakdown wrapped in gap prose, which is the duplication the owner's report
+ * opened with: *"There is so many numbers here."*
+ *
+ * Their arithmetic half is untouched and follows: `budgetProvenance` still has to reconcile, and
+ * that is independent of which surface prints it.
  */
-describe('the breakdown names the addends the budget was actually built from', () => {
-  it('prints the provenance base, not the balance field it replaced', () => {
-    // The specific regression: `restingBaseKcal` standing alone as the whole zero-movement term.
-    expect(CARD).toMatch(/baseKcal\.toLocaleString\(\)\}\s*resting rate/)
-    expect(CARD).toMatch(/baseIsRestingRate/)
-  })
-
-  it('does not call the provenance base anything but a resting rate', () => {
-    // On the anchored path that figure IS the measured RMR re-scaled onto today's fat-free mass.
-    // Calling it "base" or "resting burn" re-opens BF-99, whose report was literally *"why is my
-    // base rate under the 1350 RMR value"*.
-    expect(CARD).not.toMatch(/baseKcal\.toLocaleString\(\)\}\s*(base|resting burn|your goal)/)
-  })
-
-  it('keeps the goal delta named on the unanchored path', () => {
-    // Where the base folds the delta in, printing it alone is BF-99 in the other direction.
-    expect(CARD).toMatch(/for your goal/)
-    expect(CARD).toMatch(/targetNetKcal\)\s*!==\s*0/)
-  })
-
-  it('derives the base from the caller rather than recomputing it on the card', () => {
+describe('the card does not recompute the budget it was handed', () => {
+  it('derives every figure from the caller rather than calling budgetProvenance itself', () => {
     // The card's whole discipline (Q-401, Q-417, Q-323): every number comes from the one call the
     // caller already made. A `budgetProvenance` here would be a second computation of the same
     // quantity, which is what produced two budgets 274 kcal apart on one screen.
@@ -96,19 +93,14 @@ describe('no figure labelled resting appears twice with different values', () =>
   // The second half of the report, and the worse half: the card printed 2,278 as "resting burn" ten
   // lines above the zone bar's 1,294 as "resting rate" — 984 kcal apart, both named resting, one of
   // them the estimator the app has stopped using.
-  it('both surfaces take the anchored figure from the same provenance base', () => {
+  //
+  // With the card's own copy of that breakdown deleted (see the header), the zone bar is the ONE
+  // surface naming it, which settles the duplication outright rather than keeping two in agreement.
+  it('the surviving surface takes the anchored figure from the provenance base', () => {
     expect(ZONE_BAR).toMatch(/\{base\.toLocaleString\(\)\}\s*resting rate/)
-    expect(CARD).toMatch(/baseKcal\.toLocaleString\(\)\}\s*resting rate/)
   })
 
-  it('the card no longer prints restingBaseKcal on the anchored branch', () => {
-    // `restingBaseKcal` survives on the UNANCHORED branch, where it is a real addend, so the check
-    // has to be the anchored arm of the ternary rather than the file. Pinned as the whole arm: a
-    // slice between two landmarks reaches past the `:` and reads the other branch's text, which is
-    // how the first version of this assertion failed against correct code.
-    const anchoredArm = CARD.match(/baseIsRestingRate\s*\?([\s\S]*?)\s*:\s*<>/)
-    expect(anchoredArm).not.toBeNull()
-    expect(anchoredArm![1]).toMatch(/baseKcal/)
-    expect(anchoredArm![1]).not.toMatch(/restingBaseKcal|targetNetKcal/)
+  it('the card prints no second resting figure of its own', () => {
+    expect(CARD).not.toMatch(/resting (rate|burn)/)
   })
 })
