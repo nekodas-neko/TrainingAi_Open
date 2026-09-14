@@ -3605,11 +3605,29 @@ unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge
 - **✅ DECIDED 2026-09-14 — a deload counts as exercise, so it must not decay the collection.**
   Owner, verbatim: *"A deload week or session should still count as an \"excercise\" so it wont decay
   cats."* That is broader than the question asked: it covers a deload **session** as well as a deload
-  week, and a session is already dated — `workout_sessions.phase_type = 'deload'` — so **half of this
-  ships with no schema change at all**. Do that half first.
-- **The `Gate: owner` is discharged.** What is left is the ordinary engineering it always was: dated
-  deload *sessions* into `pausedDays` now; the deload **phase** interval still needs dates on
-  `program_phases`, which is a Lane A migration and is the only part that was ever blocked.
+  week.
+- **⚠ CORRECTED 2026-09-14: the session half is not cheap to build, it is ALREADY TRUE — and the
+  line that said otherwise was written from the owner's words without reading the code.** It claimed
+  *"half of this ships with no schema change at all. Do that half first."* There is nothing to do.
+  `listTrainedDayKeys` (`adapter.ts:1226`) selects any session with at least one surviving exercise
+  log and carries **no `phase_type` filter of any kind**, so a deload session is already a trained
+  day and already feeds the workout ladder as a faucet. `collection/route.ts` says so in its own
+  comment: *"a deload day you TRAINED is already a faucet day and needs no pause."*
+- **Verified on production, not inferred:** all three sessions ever stamped `deload` (2026-08-10,
+  08-17, 09-02) carry **5 exercise logs each**, so all three are already in `listTrainedDayKeys` and
+  already count. The owner's rule is satisfied for sessions today.
+- **Adding them to `pausedDays` would be actively wrong**, which is why this is a correction rather
+  than a shortcut. `pausedDays` is shared by the steps and sleep ladders, and a deload day is not a
+  compliant pause for either — it would stop those two decaying on a day the user simply trained,
+  which is not what was asked for and not what a pause means.
+- **What is left is the deload PHASE, and only that.** It needs dates on `program_phases`, which is a
+  Lane A migration — and a migration ships alone.
+- **⚠ The remaining half still carries an owner question, and removing the `Gate:` did not answer
+  it.** The 2026-09-14 decision settled the RULE (a deload must not cost cats); it did not settle
+  whether a deload span becomes **first-class stored state**, which is what a dated
+  `program_phases` interval means. Recommendation when this is next picked up: store it, because the
+  alternative — replaying the phase engine per day across all history — gets one answer with no
+  window and keeps it forever. But put that to the owner before writing the migration.
 - **⚠ Do not read the production counts as a reason to skip it.** Three sessions have ever been
   stamped deload, so this has cost the owner almost nothing so far — but they have now said plainly
   what the rule should be, and the cheap half honours it.
