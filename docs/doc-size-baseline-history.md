@@ -12107,3 +12107,11 @@ shapes are the entry's most load-bearing content, not padding.
 `projectOverview.md` carries the arithmetic comparison (60 steps integrated vs 360 multiplied) in
 the Known-Issues row, because that is the number that stops the wrong derivation coming back at a
 call site. A row saying only "use the shared helper" would not.
+
+## 2026-09-15 — `docs/implementation-backlog.md` (BF-162, BF-163)
+
+Fifty lines for two defects on one card row. BF-162 carries the reproduction table because "85 kg on a
+Hanging Leg Raise" reads as a glitch until you see it is exactly 66% of a stored 128, and the entry
+has to stop the fix being "relabel it as added weight". BF-163 spends its length on the fact that the
+tag is CORRECT by its own definition — an implementer told only "hypertrophy is wrong" would change
+the band table and break every other row.
