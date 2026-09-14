@@ -26,8 +26,21 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.456.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.456.4 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-14.
+
+**The nutrition surface says two things it knew and withheld (LA-102 + TN-28, batched).** LA-102 —
+the owner on the anchored budget: *"1350 doesnt count some basic metabolic needs".* He is right; the
+ⓘ panel now names the two omissions (thermic effect of food, non-step NEAT) rather than inflating
+the base with a multiplier, which is the trade BF-152 already decided. TN-28 — `TdeeAdaptationCard`
+writes the calorie goal in one tap and was the **only** surface printing the maintenance figure
+without its confidence; it now prints the siblings' exact qualifier.
+**A third finding came out of doing them together:** the ⓘ copy existed **twice**, inline in
+`energy-card.tsx` and `calorie-balance-bar.tsx`, and had already drifted — the card carried BF-134's
+resting-burn paragraph and the bar never got it. Both now render one
+`components/nutrition/energy-explainer.tsx`, and `movement-breakdown.test.ts`'s two-file loop is
+repointed at it plus a new check that neither host re-states the copy. ⚠️ **Not device-verified**
+([journal](docs/overview/entries/2026-09-14-la102-tn28-nutrition-budget-honesty.md)).
 
 **The AI card says what skipping Accept costs (BF-156).** Owner: *"what happens if I dont select to
 apply the session? Its pretty easy to miss that button."* There are two answers.
