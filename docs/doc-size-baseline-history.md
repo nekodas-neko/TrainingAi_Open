@@ -11996,3 +11996,15 @@ fixed rule since 2026-08-03 and cited its worked example; six weeks later the sa
 every branch. The entry is longer than "add a check" because the useful part is the instruction NOT
 to write the regex first — the corpus is unknown, a literal date in a fixture is often legitimate,
 and a rule that flags all of them would be turned off within a week.
+
+## 2026-09-14 — `docs/implementation-backlog.md` → 20983, `projectOverview.md` → 10985 (BF-160)
+
+−40 on the backlog for BF-160 leaving the queue; +31 on projectOverview for the row that replaces it.
+
+The row is longer than the fix is complicated because two of its three paragraphs are about things
+that are **not** wrong. The double-count the entry warned about does not exist — `computeZoneQuota`'s
+only actual is an HR-derived cache — and saying so is what stops the next session re-deriving it.
+And the credit's *size* is unverified on any machine in this repo: the 0 → 122 measured locally comes
+from synthetic MET fixtures, and the CI assertion that would check a real magnitude skips for the
+same reason. A row claiming the calories now work, without that sentence, would be claiming more than
+was measured.

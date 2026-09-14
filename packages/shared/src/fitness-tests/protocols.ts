@@ -27,6 +27,14 @@ export interface FitnessTestProtocol {
   effortFrac: number | null
   /** Which lib/health/fitness-tests.ts equation the result screen applies. */
   vo2Equation: '6mwt' | 'cooper' | null
+  /**
+   * The `activity_logs.activity_type` this protocol's effort is worth, or null when it is not a
+   * cardio session. The effort itself is what earns calories — `computeActiveEnergy` sums
+   * workouts, activities and steps and has no third source — so a test that writes no activity
+   * contributes nothing to the day's budget however hard it was (BF-160). Declared per protocol
+   * rather than switched on the id, so a new row here cannot forget to answer the question.
+   */
+  activityType: string | null
   /** Guided rest→effort→recovery steps for phased tests (resting_hrr); undefined otherwise. */
   phases?: HrrPhase[]
 }
@@ -42,6 +50,7 @@ export const FITNESS_TEST_PROTOCOLS: FitnessTestProtocol[] = [
     captureHrr: false,
     effortFrac: 0.4, // brisk-walk aerobic zone
     vo2Equation: '6mwt',
+    activityType: 'walk',
   },
   {
     id: 'cooper12',
@@ -53,6 +62,7 @@ export const FITNESS_TEST_PROTOCOLS: FitnessTestProtocol[] = [
     captureHrr: false,
     effortFrac: 0.85, // near-max sustained effort
     vo2Equation: 'cooper',
+    activityType: 'run',
   },
   {
     id: 'resting_hrr',
@@ -64,6 +74,8 @@ export const FITNESS_TEST_PROTOCOLS: FitnessTestProtocol[] = [
     captureHrr: true,
     effortFrac: null,
     vo2Equation: null,
+    // 60 s of effort inside three minutes of sitting is not a cardio session.
+    activityType: null,
     phases: [
       { key: 'rest', label: 'Rest', instruction: 'Sit still and relax — reading your resting heart rate.', durationSec: 60 },
       { key: 'effort', label: 'Go hard', instruction: 'Push hard now — get your heart rate as high as you can.', durationSec: 60 },
