@@ -649,27 +649,27 @@ below threshold and left in place for next time.
 - **Added:** 2026-09-13 · re-queued from the shipped half, so the owner's answer is not lost with the
   entry that carried it.
 
-### [platform][nutrition] LB-105 — `day-review-read-through`'s first test is red on `main`, and it may only be red here
-- **Lane:** B — `e2e/day-review-read-through.spec.ts`, or the seed it runs against.
+### [platform] LB-106 — `preferences-survive-reinstall` fails on CI and passes everywhere else, twice in one day
+- **Lane:** B — `e2e/preferences-survive-reinstall.spec.ts`, or the launch-time hydration it waits on.
 
-- **Branch:** _unassigned_ · **Added:** 2026-09-14 · found while regression-testing LA-104.
-- **Observed, not inferred.** *"the wrap-up shows the day it is wrapping up"* fails on a clean
-  checkout of `origin/main` with no local changes — confirmed by stashing, running, and unstashing.
-  `sections.first()` never becomes visible in the `/nutrition?review=day` dialog. The other four
-  tests in the file pass.
-- **The likely cause is the seed, not the app, and that is exactly why it is filed rather than
-  fixed.** Every section of `DayReadThrough` self-hides when its domain is empty, so a day with
-  nothing logged renders a dialog with no sections — which is what the sandbox's local Postgres
-  gives. If CI's seed logs something, this is green there and the finding is "the spec depends on
-  seed contents", not "the wrap-up is broken".
-- **✅ That look has been taken, and it is the seed.** CI's E2E job passed on PR #1160 — the exact
-  tree that fails locally — completing 2026-09-14 01:59 UTC with this spec green. So the wrap-up is
-  not broken; the spec asserts on content the sandbox's local Postgres does not have.
-- **What is left is to make the two agree**, and it is a real cost: a spec that is red locally and
-  green on CI trains a session to skip it, which is how a genuine failure gets waved through. Either
-  seed the day the spec needs (`deload-visible.spec.ts` is the pattern for a probe that creates its
-  own state and restores it) or assert the dialog's frame rather than its contents.
-- **Reversal cost:** none either way.
+- **Branch:** _unassigned_ · **Added:** 2026-09-14 · found blocking LB-105's merge.
+- **Two data points, same day, same base.** It was in the **flaky** list on PR #1162's E2E run
+  (03:47 UTC, passed on retry) and **failed outright** on PR #1166's (07:12 UTC). Neither PR touches
+  it — #1162 was the workout ready screen, #1166 was the day read-through spec.
+- **It passes locally**, run on #1166's branch against the sandbox database: 3 passed.
+- **What it waits for is a race by construction**, which is the reason to suspect the spec rather
+  than the app: it clears `localStorage`, reloads, and polls for `ta_weight_lookback` to reappear
+  from `hydrateUserPreferences`, which the sync provider warms **on launch**. A slow launch under a
+  loaded CI runner is exactly the shape that turns a poll timeout into a failure.
+- **The same run carried a real Chromium crash**, on `plan-rescale.spec.ts` — a native
+  `chrome-headless-shell` segfault with a full stack and `cr2: 0x1b0`. That is runner instability,
+  not app code, and it is context for how loaded that run was rather than a second bug to chase.
+- **Do NOT "fix" this by lengthening the poll timeout first.** That is the change that makes a real
+  hydration regression invisible. Establish which half is slow — instrument how long
+  `hydrateUserPreferences` takes from launch on CI — before touching the wait.
+- **Pass test:** ten consecutive CI runs with no flake on this spec, or a named cause with a fix
+  that is not a longer timeout.
+- **Reversal cost:** none. It is a test.
 
 ### [platform] LB-104 — four more entries may be buried under `Reference:`, and the field now says what it means
 - **Lane:** O — this queue file only; no code.

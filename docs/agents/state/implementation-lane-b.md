@@ -3,7 +3,7 @@
 > **Successor sessions are titled `🚧 Implementation Agent (B) 🟢`** — exactly. A renamed successor
 > is a lost thread.
 
-**Updated:** 2026-09-14 · **By:** the twenty-seventh Lane B run · **Next ID:** `LB-106`
+**Updated:** 2026-09-14 · **By:** the twenty-seventh Lane B run · **Next ID:** `LB-107`
 
 > **A mistyped ID here silently advances the lane's numbering.** Allocate with `grep -rhoE
 > '\bLB-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`, and check the max in the **journal** too — a
@@ -11,7 +11,7 @@
 
 ## Now
 
-**LA-102 + TN-28 (v1.456.4, batched):** the ⓘ panel names what the base leaves out; the nudge card prints its confidence — and the ⓘ copy, duplicated across two files and already drifted, is now one `energy-explainer.tsx`. **BF-156 (v1.456.3):** the AI card says what skipping Accept costs. **BF-157 (v1.456.2):** every ready screen has a bounded clock. **BF-159 (v1.456.1):** Cardio Baselines moved to Cardio. **LA-104 (v1.456.0):** the stress chart reads the STORED series. `check:rules` **74/74**.
+**LB-105:** the read-through spec is seed-independent — and its OTHER test was matching `/health/day`'s own `Sleep` score cell, so it would have passed with the component absent. **LA-102 + TN-28 (v1.456.4, batched):** the ⓘ panel names what the base leaves out; the nudge card prints its confidence — and the ⓘ copy, duplicated across two files and already drifted, is now one `energy-explainer.tsx`. **BF-156 (v1.456.3):** the AI card says what skipping Accept costs. **BF-157 (v1.456.2):** every ready screen has a bounded clock. **BF-159 (v1.456.1):** Cardio Baselines moved to Cardio. **LA-104 (v1.456.0):** the stress chart reads the STORED series. `check:rules` **74/74**.
 
 **`Reference:` was undocumented and burying real work.** It means *this entry is READ, not built* —
 "never next"; three sessions used it for "supporting reading". **The tell is a printed reason that is
@@ -25,7 +25,7 @@ TN-28 now READY). Documented; the four `TN-` ones are **LB-104**.
 
 ## Next
 
-1. **READY is 2.** LB-105 (seed-dependent red spec; its CI answer is in the entry) and the `nutrition-tab-day-and-scroll` batch (RV-36). Then read KEEP and PARKED, per lesson 2.
+1. **READY is 1** — the `nutrition-tab-day-and-scroll` batch (RV-36). Then read KEEP (33) and PARKED, per lesson 2, printing each Keep whole since the console truncates them.
 2. **READY 0 is not "no work" — read KEEP and PARKED.** The console TRUNCATES each Keep; print them
    whole. TN-3b sat in PARKED three days while READY was 0 because its unparking was PROSE. **This is
    the same class as `Reference:` above, and it has now cost four entries in two days.** TN-3b's
@@ -34,8 +34,7 @@ TN-28 now READY). Documented; the four `TN-` ones are **LB-104**.
 
 ## Blocked
 
-- **LB-105: `day-review-read-through.spec.ts` test 1 is RED locally, GREEN on CI** — so it is the
-  sandbox seed, and a spec that disagrees by environment trains a session to skip it. It is READY.
+- **LB-106: `preferences-survive-reinstall` fails on CI, passes locally — flaky 03:47, hard fail 07:12, neither PR touching it.** E2E is advisory; #1166 merged on the required five with this recorded, not waved through.
 - **~50 VERIFY entries owe a look.** BF-136/LB-99 sharpest (only the owner's account has a real dosing period); BF-139 owes the **daytime** case. **BF-157's chip-vs-bar agreement is native — unverifiable in the sandbox.**
 - **⚠ OR-108's picture will not show on the S25 until `LA-36` lands** — all three local-store reads omit `image_data_uri`, so the device reads null from a column now filled. Web is fine.
 - **Owner:** the macro/budget anchor (BF-134's residue, TN-29 protects the stored 1,660); LB-61's switch colour; whether the PWA lands on Home rather than Workout (PS-35).

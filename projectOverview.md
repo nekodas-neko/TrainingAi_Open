@@ -29,6 +29,19 @@
 **Version:** v1.456.4 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-14.
 
+**`day-review-read-through` was broken in both directions, and only one of them was visible
+(LB-105).** Its wrap-up test failed in the sandbox and passed on CI — every section of
+`DayReadThrough` self-hides when its domain is empty and the local seed has **nothing at all**
+recorded for today, so the dialog was legitimately blank. Its `/health/day` test passed on that same
+empty day, which is the half nobody was looking at: the regex matched `^Sleep$` and that screen
+renders a **`Sleep` score cell** of its own above the read-through, so the test guarding *"both hosts
+render ONE implementation"* would have passed with `DayReadThrough` absent entirely. The label list
+was wrong too — the component renders **`Body composition`**, which `^Body$` never matched. The spec
+now records an activity for today and removes it, and both halves scope to a
+`data-testid="day-read-through"`. Proven rather than assumed: with the seed suppressed, the
+`/health/day` test **now fails where it used to pass**. No product behaviour changed
+([journal](docs/overview/entries/2026-09-14-lb105-day-review-seed-independence.md)).
+
 **The nutrition surface says two things it knew and withheld (LA-102 + TN-28, batched).** LA-102 —
 the owner on the anchored budget: *"1350 doesnt count some basic metabolic needs".* He is right; the
 ⓘ panel now names the two omissions (thermic effect of food, non-step NEAT) rather than inflating
