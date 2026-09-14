@@ -11942,3 +11942,16 @@ new run.
 Six lines net: the `Gate: owner` bullet becomes the decision plus the consequence the owner is
 accepting. The extra length is deliberate — *"for now"* invites a nullable `food_item_id` left in
 place for a future nobody has asked for, and flatten only wins because it needs no migration at all.
+
+## 2026-09-14 — `docs/implementation-backlog.md` → 21002 (PS-35a out, LB-109 in)
+
+Net +7 across two opposite moves: PS-35a's 24 lines leave the queue because it shipped, and LB-109's
+31 arrive because three Lane B entries that already shipped did NOT leave, and are now the top of the
+lane.
+
+LB-109 is longer than a "clear these three" note needs to be, and the reason is LB-47. The other two
+are clean sweeps — heading says a device check is owed, body records it verified. LB-47 was closed
+*conditionally*: the owner declined a check rather than passed one, and its own text says outright
+that nothing has confirmed the fix works. Swept with the other two, that sentence disappears and a
+future report of the same symptom reads as a new bug instead of a regression against an unverified
+fix. The lines are there to stop the sweep being uniform.

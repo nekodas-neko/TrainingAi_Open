@@ -55,7 +55,7 @@ export function DoneActivityScreen({ userId }: { userId?: string }) {
 
   // Same as done-screen: every activity ends here and all three exits go to /workout-select, so
   // warm it while the summary is being read. Button pushes get no automatic prefetch (#919).
-  useEffect(() => { router.prefetch('/workout-select') }, [router])
+  useEffect(() => { router.prefetch('/workout') }, [router])
   const { activityType, title, activityLabel, startMs, endMs, draftSummary, resetSession, prescribedRunId } = useActivityStore(
     useShallow(s => ({
       activityType: s.activityType, title: s.title, activityLabel: s.activityLabel,
@@ -261,7 +261,7 @@ export function DoneActivityScreen({ userId }: { userId?: string }) {
         invalidateActivityWrites().catch(() => {})
         toast.success('Activity saved')
         resetSession()
-        router.push('/workout-select')
+        router.push('/workout')
         pushThenRevalidate(userId!, invalidateActivityWrites)
         savedLocally = true
         if (activityType === 'run' && prescribedRunId) {
@@ -307,7 +307,7 @@ export function DoneActivityScreen({ userId }: { userId?: string }) {
       await invalidateActivityWrites()
       toast.success('Activity saved')
       resetSession()
-      router.push('/workout-select')
+      router.push('/workout')
     } catch {
       toast.error('Failed to save activity')
     } finally {
@@ -317,7 +317,7 @@ export function DoneActivityScreen({ userId }: { userId?: string }) {
 
   function handleDiscard() {
     resetSession()
-    router.push('/workout-select')
+    router.push('/workout')
   }
 
   return (

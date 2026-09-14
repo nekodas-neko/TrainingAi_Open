@@ -644,6 +644,37 @@ below threshold and left in place for next time.
 - **Reversal cost:** low, but it changes what a hardware gesture does, so it wants the device before
   it is called done.
 
+### [platform] LB-109 — three finished Lane B entries print as READY, and they are the top of the lane
+- **Lane:** O — this queue file only. Clearing a completed entry is the Orchestrator's sweep per
+  `CLAUDE.md`, which is why this is filed rather than done.
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-14 · found running `next-item.js --lane B` while
+  picking up PS-35a.
+- **What it costs, concretely.** Lane B's READY list is 6 and **three of them are finished work**:
+  they print above the items that are not, so the top of the lane is a list of things that cannot be
+  started. That is the same failure `Verify:` and `Keep:` exist to prevent, arriving from the other
+  side — not an entry mis-described as blocked, but an entry that is done and still advertising.
+- **The three, with what their own bodies say:**
+  - **BF-141** (lb/kg toggle) — heading still reads *"the device look is what is left"*; the body
+    reads **✅ VERIFIED ON THE S25, 2026-09-13**. Nothing is owed.
+  - **BF-135** (stacked banners on an injured exercise) — heading reads *"device owed"*; the body
+    reads **✅ VERIFIED ON THE S25, 2026-09-13**, owner: *"Havent seen this issue; treat it as fine
+    for now"*. Nothing is owed.
+  - **LB-47** (the `Full` override's false revert claim) — the owner closed it **conditionally**:
+    *"Will let you know when it comes up. Happy to treat as fixed if I dont raise it again."*
+- **⚠ LB-47 is NOT the same case as the other two and must not be swept with them.** Its own text is
+  explicit that *"nothing has confirmed the fix works"* — the owner declined a check rather than
+  passed one. **If that symptom is reported again it is a regression report against an unverified
+  fix, not a new bug, and the reader is meant to start from the original diff.** That sentence has to
+  survive the entry's removal; delete it into `known-issues-resolved.md` rather than out of the repo.
+- **The heading is the thing to fix first, and it is cheap.** Two of these three say *"device owed"*
+  in a heading while saying *verified* in the body, so a reader who trusts the queue's own summary
+  line is misled before opening anything. `next-item.js` reads fields, not headings — but a person
+  scanning the file reads the heading.
+- **Pass test:** `node scripts/next-item.js --lane B` prints no entry whose body records its residue
+  as discharged.
+- **Reversal cost:** none, a queue file.
+
 ### [platform] LB-108 — E2E reports green without running whenever a change lives in `lib/`, and `lib/hooks/**` is UI
 - **Lane:** O — `.github/workflows/ci.yml`, the *"Does this change touch the UI?"* step (~line 637).
 
@@ -3549,30 +3580,6 @@ present.
   the order — the reverse fails CI on debt nobody has had a chance to pay.
 - **Not urgent, and small.** Nothing is broken; the Lint job passes on warnings today and would keep
   passing. This is about whether the output can be read at all.
-
-### [app-shell] PS-35a — five zero-content redirect/duplicate pages, to delete or keep
-
-- **✅ DECIDED 2026-09-14 — delete them.** Owner: *"We only use the APK - delete them if not needed."*
-  The gate is discharged and the bookmark risk the entry raised is dismissed by the same answer: a
-  browser bookmark is not a surface they use.
-- **⚠ ONE CONDITION ATTACHED, and it changes the work.** Owner, in the same breath: *"What page? we
-  only use the APK; so if its not accessible via the APK and is needed; then make sure there is a way
-  to access it from APK."* So this is **not** a blanket delete. For each of the five, establish
-  whether the destination it redirects to is reachable inside the APK by some route the owner
-  actually walks. Where it is, delete the redirect. **Where the only path to a needed screen is that
-  page, give it a real entry point before deleting anything** — otherwise this removes a surface
-  rather than an alias, which is the opposite of what was approved.
-
-- **Lane:** B — `app/{workout-select,session-select,stats,config,profile}/page.tsx`, ~10 call-site edits.
-- **The old `Gate: owner` is removed** — the approval above is the one it was waiting for.
-- **Added:** 2026-09-06, app checkpoint — [report](reviews/2026-09-05-app-checkpoint.md) §4/§P2.
-  **Split from PS-35 on 2026-09-10 (OR-106).**
-- Five pages with no content of their own: each redirects or duplicates a tab. ≤4 in-repo callers
-  each; full table in the report.
-- **What the owner decides:** delete them, or keep them as bookmarkable aliases. Deleting is the
-  recommendation — an alias nobody links to is a route that can rot — but a PWA shortcut or a browser
-  bookmark pointing at one would break, which only the owner can know.
-- **Reversal cost:** low. Restoring a deleted redirect page is a few lines.
 
 ### [app-shell] PS-35b — a wrong PWA start_url, a doubled boot fetch, a dead branch and a stuck weather chip
 

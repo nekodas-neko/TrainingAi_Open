@@ -426,7 +426,7 @@ export function AiPrescriptionCard({
                   variant="ghost"
                   className="w-full h-8 text-xs text-brand hover:bg-brand/10"
                   disabled={loading}
-                  onClick={() => router.push('/config?new=program')}
+                  onClick={() => router.push('/program?new=program')}
                 >
                   <PlusIcon className="h-3.5 w-3.5 mr-1" />
                   New program
