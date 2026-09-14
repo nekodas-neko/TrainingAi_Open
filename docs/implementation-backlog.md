@@ -4364,6 +4364,21 @@ stronger reason the measured one wins.
 
 ### [app-shell][platform] BF-110 — the blank resume survives a scroll, which means the renderer never died
 
+- **⚠ RE-MEASURED 2026-09-14 (Orchestrator): the separation HOLDS with more samples, and it is now
+  route-independent — which rules out a hypothesis.** Seven days of `bf110 resume dom-intact` rows,
+  every one of them still on one side or the other, and now spread across **six different routes**:
+
+  | viewport | DOM children | routes seen on |
+  |---|---|---|
+  | **667** | **1–2** | `/` · `/health` · `/nutrition` · `/more` · `/health?tab=training` |
+  | **826** | **7–8** | `/` · `/health` · `/nutrition` · `/workout` |
+
+  **The same route appears on both sides**, so this is not one screen that fails to render. It is the
+  shell, and it tracks the viewport and nothing else. That is as far as the existing breadcrumb can
+  take it: the second reading ~500 ms into the resume is still the thing that separates "the WebView
+  is genuinely stuck at a fallback viewport" from "we measured before it resized", and those two
+  answers still point at different files. **Ship the second log line before writing any fix.**
+
 - **✅ SHIPPED 2026-09-03** (`fix/bf-110-resume-repaint`). Both halves, in the order this entry
   insists on: `handleResume` measures the shell root's box and child count on every resume, then
   promotes and releases a layer for one frame — the same instruction the manual scroll gives the

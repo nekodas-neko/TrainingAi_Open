@@ -11838,3 +11838,11 @@ Two Known-Issues rows archived. The back-dismiss row is the one worth noting: it
 entries (BF-30, LB-17, BF-34, BF-27) across three versions, all of them waiting on the same single
 press, and one press on 2026-09-14 discharged the lot. A row that aggregates on the verification
 rather than the subject is exactly what the batching rule asks for, and this is what it buys.
+
+### `docs/implementation-backlog.md` → 20967 (same PR, the BF-110 re-measurement)
+
++15 for a table on BF-110, and it earns them by **ruling a hypothesis out** rather than restating
+one. A week of breadcrumbs across six routes keeps the 667→blank / 826→rendered separation at zero
+overlap, and the same route now appears on both sides — so "one screen fails to render" is dead and
+the defect is in the shell, tracking the viewport and nothing else. A prose sentence saying "still
+separating" would not have carried the route column, which is the part that does the work.
