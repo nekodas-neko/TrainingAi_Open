@@ -63,6 +63,39 @@ export function resumeReportMessage(s: ShellSample): string {
   return `bf110 resume ${verdict} w=${Math.round(s.width)} h=${Math.round(s.height)} children=${s.childCount}`;
 }
 
+/**
+ * How long after the resume to look again.
+ *
+ * The entry's number, and the reasoning is that it has to be long enough for a WebView that is going
+ * to resize to have done it, and short enough to still be the same resume. Not tuned — if the
+ * readings come back ambiguous, that is a finding about the window, not a licence to keep raising it.
+ */
+export const RESUME_RECHECK_MS = 500;
+
+/**
+ * The second reading, which is the whole point of this pass.
+ *
+ * Sixteen samples separated perfectly by viewport height: every blank resume reported **667**, every
+ * rendered one **826**, and 826 is the S25's real CSS viewport. 384×667 is the classic *default* a
+ * WebView falls back to before it has been told the real size — so the shape is not "the renderer
+ * died", it is "the WebView resumed at a fallback viewport and the app rendered almost nothing into
+ * it".
+ *
+ * **But the data cannot yet separate that from a measurement taken too early.** If the height reads
+ * 826 half a second later, the viewport was always going to resize and the bug is in when the app
+ * decides to render — a JS fix. If it still reads 667, the viewport is genuinely stuck and the fix
+ * is in the native layer. **Those are different files, which is why this ships before any fix.**
+ *
+ * `stuck` / `resized` is the verdict spelled out rather than left for a reader to diff two numbers,
+ * because the person reading `error_events` at that point will be looking for one word.
+ */
+export function resumeRecheckMessage(first: ShellSample, second: ShellSample): string {
+  const h1 = Math.round(first.height);
+  const h2 = Math.round(second.height);
+  const verdict = h1 === h2 ? 'stuck' : 'resized';
+  return `bf110 resume recheck ${verdict} h1=${h1} h2=${h2} w2=${Math.round(second.width)} children2=${second.childCount}`;
+}
+
 /** The subset of an element the nudge writes to. */
 export interface NudgeableEl {
   style: { transform: string };
@@ -98,15 +131,26 @@ export function resetResumeReportingForTest(): void {
 /**
  * Measure, file if it is worth filing, then repaint. Returns the sample so the caller can be tested
  * without reaching into module state.
+ *
+ * @param defer schedules the second reading. Optional so the existing single-argument call and every
+ *   test of the first half keep working unchanged; when it is absent there is simply no recheck.
  */
 export function handleResume(
   el: MeasurableEl & NudgeableEl,
   schedule: (cb: () => void) => void,
+  defer?: (cb: () => void, ms: number) => void,
 ): ShellSample {
   const sample = readShellSample(el);
   if (shouldReportResume(sample, reportedThisLaunch)) {
     reportedThisLaunch = true;
     reportClientError({ message: resumeReportMessage(sample) });
+    // **The recheck rides the first row's budget deliberately.** It fires only when the first sample
+    // was worth filing, so a reported resume costs two rows and an unreported one costs none — the
+    // table prunes at 30 days and is the second-largest object in the database, and a row on every
+    // resume would record nothing, since the DOM is intact either way.
+    defer?.(() => {
+      reportClientError({ message: resumeRecheckMessage(sample, readShellSample(el)) });
+    }, RESUME_RECHECK_MS);
   }
   nudgeRepaint(el, schedule);
   return sample;

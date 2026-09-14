@@ -11881,3 +11881,15 @@ check is the single item releasing the most.
 
 The new lesson 1 is the session's most transferable finding: a field's job done in prose, four times
 in one day, three hiding work the queue should have shown and one showing work it should have parked.
+
+## 2026-09-14 — `projectOverview.md` → 10893, `docs/implementation-backlog.md` → 20925 (BF-110's recheck)
+
++8 on the backlog for a `Keep:` that converts BF-110 from "build this" to "read one row", naming the
+query and what each verdict means. +12 on projectOverview for a change that ships no user-visible
+behaviour, which needs justifying.
+
+It records a question put to the owner, not a fix. The next move is his — one blank resume in normal
+use — and the row it produces decides which of two files the eventual fix lives in: `stuck` means the
+viewport is genuinely held at the WebView's 384×667 default and the fix is native, `resized` means
+the measurement was early and the fix is render timing. A status line saying only "added a log" would
+leave the next reader without the thing that makes the log worth reading.

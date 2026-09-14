@@ -29,6 +29,18 @@
 **Version:** v1.456.4 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-14.
 
+**BF-110's blank resume now gets a second look, and the next move is the owner's (no version bump —
+instrumentation only).** Sixteen `error_events` samples separate perfectly on viewport height: every
+blank resume reports **667**, every rendered one **826**, and 826 is the S25's real CSS viewport.
+384×667 is the classic *default* a WebView falls back to before it is told the real size — so the
+shape is *"resumed at a fallback viewport and rendered almost nothing into it"*, not *"the renderer
+died"*. **What the data could not separate is a viewport genuinely stuck from a measurement taken too
+early**, and those point at different files. `handleResume` now logs the viewport again
+**500 ms into the same resume**, riding the first row's budget so a reported resume costs two rows
+and an unreported one costs none. Next: one blank resume in normal use, then read
+`bf110 resume recheck%` — **`stuck` means native, `resized` means render timing.** No fix before that
+row exists ([journal](docs/overview/entries/2026-09-14-bf110-second-viewport-log.md)).
+
 **BF-100 is failing on the S25, not awaiting a check — and it read as the latter for a day.** Owner,
 2026-09-13: *"Checked on more - and still doesnt work"*, its **second** failure. That was recorded
 inside **RV-36's** body, an entry that had already shipped (2026-09-11) and been S25-verified
