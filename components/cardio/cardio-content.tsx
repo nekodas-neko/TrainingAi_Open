@@ -13,6 +13,7 @@ import { LazyDayCreditCard } from './lazy-day-credit-card'
 import { ModalityPicker } from './modality-picker'
 import { TimePickerSheet } from './time-picker-sheet'
 import { CardioTrendsSection } from './trends-section'
+import { LatestBaselineCard } from '@/components/fitness-tests/latest-baseline-card'
 import type { ZoneQuota } from '@trainingai/shared/health/zone-quota'
 
 interface CardioWeek {
@@ -42,7 +43,7 @@ interface RunningPlanPayload {
   run?: { id: string; status: 'pending' | 'completed' | 'skipped' }
 }
 
-export function CardioContent() {
+export function CardioContent({ userId }: { userId?: string }) {
   const [data, setData] = useState<CardioWeek | null>(null)
   const [runningPlan, setRunningPlan] = useState<RunningPlanPayload | null>(null)
   const [loadError, setLoadError] = useState(false)
@@ -116,6 +117,11 @@ export function CardioContent() {
             maxHrDeltaBpm={data.heart.maxHrDeltaBpm}
             isReliable={data.heart.isReliable}
           />
+          {/* BF-159. Moved off the Health tab's Training list, which is otherwise all lifting, and
+              placed against the heart profile: that card is what the heart is doing lately, this is
+              what it was measured at. Above the modality picker on purpose — taking a test is only a
+              live option while you are deciding what to do today. */}
+          <LatestBaselineCard userId={userId} />
           <ZoneQuotaCard dayQuota={data.dayQuota} weekQuota={data.quota} />
           {!data.trainedToday && (
             <LazyDayCreditCard zone1Min={data.dayQuota.zones.find((z) => z.zoneId === 1)?.doneMin ?? 0} />

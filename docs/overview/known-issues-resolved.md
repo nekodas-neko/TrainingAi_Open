@@ -2027,3 +2027,123 @@ property is now asserted in a unit test (`lb100-one-budget.test.ts`) that runs o
 than only when a browser job is green. The lesson is recorded beside the fix rather than the fix
 alone: **a red advisory check is a signal, not a formality.**
 
+
+---
+
+### [workouts] ⚠️ The weight dial takes pounds now, and no thumb has tried the control (BF-141, 2026-09-12, v1.448.0) · needs: hardware
+
+Owner: *"my Dumbells are pounds and I need to convert it ... then just have it convert to the kg
+equivalent"*. Prevention for a failure that already happened on that exercise — Session 119 logged
+three dumbbell exercises in pounds into the kg field, and the repair needed an admin tool that
+rescaled every set and **backdated the all-time PR**. Tapping the dial's own `kg` suffix swaps it to
+`lb`; the stored value stays kilograms, and the unit is remembered per exercise in `localStorage`.
+
+**Two findings worth more than the feature.** BF-141 claimed `e2e/touch-target-size.spec.ts` would
+catch an undersized control here; it cannot — that spec scans the five tab roots and this dial is
+inside an active workout, so its empty allowlist would have stayed green over a 20 px suffix. And
+the `stopPropagation` on the suffix guards a **real** case that the new spec cannot demonstrate: in
+lb mode a row tap round-trips kg → lb → kg, which is lossy for some weights (61.0 kg returns 61.25),
+but the seeded workout starts at 60 kg, which round-trips exactly. Both are written on the entry so
+neither reads as dead weight later.
+
+**What is owed is the S25.** A scroll-snap dial with haptics beside a new inline control is a
+touch-target and gesture question; the harness drives a mouse, so it can prove the box measures
+44 px and cannot prove a thumb reaches it without also moving the dial.
+
+**✅ RESOLVED — verified on the S25, 2026-09-14 (owner's workout pass).** The kg↔lb toggle swaps
+without the dial scrolling or losing its selection. Nothing is owed.
+
+---
+
+### [app-shell][nutrition] ⚠️ Nutrition keeps its scroll position now, and neither fix has been seen on the phone (RV-36 + RV-37, 2026-09-11, v1.446.4)
+
+**RV-36:** BF-100's scroll restoration reached three tabs, not five — it lives in `PullToSync`, and
+the Nutrition tab owns its own scroller. Measured: `/more` → Profile details → back restored **840**;
+`/nutrition` → `/coach` → back saved **no** key and returned **0**. One hook call fixes it, and the
+wrong *"every screen using the shell inherits it"* phrasing is gone from `pull-to-sync.tsx`'s own
+comment as well as from the entry. **RV-37:** `/health/day`'s scroller had no bottom padding at all,
+so its last card ended flush with the S25's gesture bar; it now carries `pb-nav-safe`.
+[Journal](entries/2026-09-11-fix-nutrition-scroll-and-day-padding.md).
+**Owed: one device pass covering both.** RV-36's check is the **system back gesture**, the one gesture
+the harness cannot send. RV-37 **was never observed and still has not been** — the seeded fixture
+renders "Nothing logged on this day", so the container never scrolls; the missing padding was read
+from source. Still open on RV-37: whether a fifth safe-area CI rule should fire on an **absent**
+utility, which needs an allow-list for the sheets and navless screens that legitimately have none.
+
+**✅ RESOLVED — both halves verified on the S25, 2026-09-14 (owner's app-shell pass).** Scroll
+restoration works across the tabs (*"Mostly works"*) and `/health/day` clears the gesture bar.
+**Two threads left this row and both are tracked in the backlog, not here:** `/more` specifically
+still fails and is **BF-100**, along with the owner's second requirement that back from a tab with
+nothing to pop should land on Home; and the fifth-safe-area-CI-rule question stays on **RV-37**,
+which is the part that genuinely needs evidence.
+
+---
+
+### [workouts][app-shell] ⚠️ The injured-exercise header was rebuilt, and the case that prompted it was never rendered (BF-135, 2026-09-09, v1.446.0)
+
+The active-exercise header is `flex-none` above a `min-h-0` set list and **that branch has no scroll
+container at all**, so two stacked banners pushed set 1 under the logging sheet with nothing to
+recover it. The full injury banner moved to the ready screen — which carried **no injury warning
+before this**, so it used to arrive after the weight was already chosen — and during the set it is a
+chip with Swap intact; the AMRAP banner is gone, since the ready screen already says the same thing
+at more length for every exercise; the header gained `max-h-[45%] overflow-y-auto`.
+[Journal](history-2026-09-12-folded-1.md#2026-09-09-fix-injury-header-crowding).
+**Owed: the device check, and two gaps behind it.** The reported case is an injured exercise on a
+**baseline** session — the two-banner worst case — and the seeded account is mid-`Accumulation`, so
+that state was reasoned about and pinned by a source test but **never rendered**. Nor was any of it
+seen with the logging sheet actually covering the bottom half of an S25, which is where the squeeze
+lives. `isBaseline` never clears while **BF-131** is open, so the banner it removes was permanent
+rather than a first-session artefact.
+
+**✅ RESOLVED — verified on the S25, 2026-09-14 (owner's workout pass).** Owner: *"Havent seen this
+issue; if it comes up will re-raise it; treat it as fine for now."* Nothing is owed. Note the shape of
+that answer: the case was not reproduced on demand, it was reported as not occurring in normal use.
+
+---
+
+### [body][nutrition] ⚠️ The vial report is fixed in both halves, and neither has been seen on the phone (BF-136 + LB-99, 2026-09-10, v1.446.2)
+
+Owner: *"its saying no weights taken; but i weigh my self every day."* **Two defects, one report.**
+(1) `openedOn` was hardcoded to `todayInTz(tz)` with no control, so the weight-response window
+started on whichever day the vial was entered — there is an `Opened on` date now, bounded to 180 days
+back, and an existing vial's date is correctable **in place**, which is required rather than optional
+because `listSupplementVials` orders by `openedOn DESC` and a re-dated new vial sorts below the wrong
+one. (2) Correcting the date did **not** clear the symptom: the chip read *"Not enough weigh-ins
+yet"* above its own *"6 weigh-ins over 5 days"*, because `weightResponse()` returns a full result
+whose `verdict` is null when the range straddles the band and the card rendered that as the no-data
+state. It now reads *"Not called yet"*.
+[Journal](entries/2026-09-10-fix-vial-opened-date.md) ·
+[Journal](entries/2026-09-10-fix-weight-response-undecided-label.md).
+**Owed: the S25.** The date control is a native `<input type="date">`, so the picker is the device's
+own and has not been opened on one; and the owner's account is the only one with a real dosing period
+to render against. **Worth reading before the next "no data" report:** LB-99's entry keeps its wrong
+first diagnosis, which blamed the `getLocalStore` fall-through — a card reporting "no data" is not
+evidence that no data reached it.
+
+**✅ RESOLVED — verified on the S25, 2026-09-14.** The vial card renders the date that was entered,
+and LB-99's half has already left the queue. Nothing is owed.
+
+---
+
+### [nutrition][app-shell] ⚠️ One back-dismiss primitive, three failures, and a device pass none has had (BF-30 v1.378.0 · LB-17 v1.382.0 · BF-34 v1.383.1)
+
+Artboard 4 shipped as a **nested sheet**, and this row said its unwind "rests on BF-27's
+one-press-per-layer guarantee". **That guarantee has now failed twice.** LB-17: an id comparison read
+every entry that was not a sheet's own as "mine is gone" — right at two layers by accident, wrong
+from three, which is what Q-395c built by reaching the list through Log Food. BF-34: the flag marking
+one of our own `history.back()` calls was per-instance, so a sheet closing and a dialog opening in
+the same tick could not see each other's and **the confirm dialog closed on the frame it opened** —
+the owner's *"the delete feature doesnt work"*. Both fixed, both pinned by tests that fail on the old
+logic. **Neither has been felt on a real gesture bar, which is the only place either lived.**
+On the S25: tap a diary row, tap the bin — the confirm dialog must **stay** open and be tappable, and
+Cancel must cancel. Press back from an open meal: it unwinds one layer per press, meal → Log Food →
+the page. **Two presses now, not three** — LB-16 collapsed that screen, so the middle layer is gone and
+`sheet-back-stack.test.ts` carries the three-deep case. Scrolling must never reveal a tray; a left-drag
+opens one, a right-drag closes it, a second row closes the first; a 92vh action row must clear the bar.
+
+**✅ RESOLVED — verified on the S25, 2026-09-14.** One press settled all four entries: the Android
+back gesture closes a sheet without closing the app, and the delete-confirm dialog that used to open
+and close on the same frame stays open. BF-27 and BF-34 left the queue with it. **The mechanism is
+worth remembering:** a closing surface's `history.back()` is asynchronous, so a per-instance in-flight
+flag let the pop land on the newly-opened surface, which read it as a genuine back gesture. It is a
+module-level counter in `lib/hooks/sheet-back-stack.ts` now.

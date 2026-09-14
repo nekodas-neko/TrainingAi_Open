@@ -192,7 +192,20 @@ export async function GET(req: NextRequest) {
     const startMs = isRealStart
       ? ws.startedAt.getTime()
       : Math.min(...timedExercises.map(x => x.t));
-    const endMs = Math.max(...timedExercises.map(x => x.t + x.dur));
+    // BF-155 (a). `completed_at` is the measured end of the session; the max below RECONSTRUCTS
+    // one from per-exercise stamps, and a reconstruction is only as good as its inputs. When the
+    // last set's end time was dropped (see `workout-screen.tsx`, fixed in the same PR) every
+    // exercise fell back to `workoutStartedAt`, so this max returned start-plus-the-single-longest
+    // exercise: a 38.3-minute session printed as 3 minutes while `completed_at` sat correct and
+    // unread on the same row.
+    //
+    // Kept as a fallback rather than replaced, because a session still in progress has no
+    // `completed_at` and the reconstruction is all there is. Guarded on being at or after the
+    // start: a `completed_at` before `startMs` would render a negative duration, and the
+    // reconstruction is the better answer there too.
+    const reconstructedEndMs = Math.max(...timedExercises.map(x => x.t + x.dur));
+    const completedMs = ws.completedAt?.getTime();
+    const endMs = completedMs != null && completedMs >= startMs ? completedMs : reconstructedEndMs;
     workoutDurationsById[ws.id] = {
       start: fmtMs(startMs),
       end:   fmtMs(endMs),

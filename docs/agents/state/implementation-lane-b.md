@@ -3,7 +3,7 @@
 > **Successor sessions are titled `🚧 Implementation Agent (B) 🟢`** — exactly. A renamed successor
 > is a lost thread.
 
-**Updated:** 2026-09-13 · **By:** the twenty-seventh Lane B run · **Next ID:** `LB-104`
+**Updated:** 2026-09-14 · **By:** the twenty-seventh Lane B run · **Next ID:** `LB-107`
 
 > **A mistyped ID here silently advances the lane's numbering.** Allocate with `grep -rhoE
 > '\bLB-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`, and check the max in the **journal** too — a
@@ -11,38 +11,33 @@
 
 ## Now
 
-**Lane A shipped all three entries this lane filed today** — LB-101, LB-102, LB-103 — and **LA-105
-collected the first debt**: OR-108's `THUMB_WIRE_BUDGET` ladder is gone, the photo stores at natural
-quality. TN-3b's chart (v1.455.0), LB-98 ① (v1.454.2), RV-35, BF-153, OR-108 all shipped.
-`check:rules` **74/74**.
+**LB-105:** the read-through spec is seed-independent — and its OTHER test was matching `/health/day`'s own `Sleep` score cell, so it would have passed with the component absent. **LA-102 + TN-28 (v1.456.4, batched):** the ⓘ panel names what the base leaves out; the nudge card prints its confidence — and the ⓘ copy, duplicated across two files and already drifted, is now one `energy-explainer.tsx`. **BF-156 (v1.456.3):** the AI card says what skipping Accept costs. **BF-157 (v1.456.2):** every ready screen has a bounded clock. **BF-159 (v1.456.1):** Cardio Baselines moved to Cardio. **LA-104 (v1.456.0):** the stress chart reads the STORED series. `check:rules` **74/74**.
 
-**SEVEN running entries were wrong about something load-bearing** — BF-139's px, BF-141's gate,
-BF-142's **406**, BF-146's cause, BF-145's fix twice, BF-147's (the badge is **25 px**; the four action
-buttons are **204 of 340**), and OR-108's: two writers named, **three** real, plus a route defect
-nothing hinted at. BF-153 was the first that checked out whole, and verifying it still cost ten
-minutes well spent. **Measure before you fix what the entry blames.**
+**`Reference:` was undocumented and burying real work.** It means *this entry is READ, not built* —
+"never next"; three sessions used it for "supporting reading". **The tell is a printed reason that is
+a bare link:** seven have it, three were opened, **all three were work** (LA-104 shipped; LA-102 and
+TN-28 now READY). Documented; the four `TN-` ones are **LB-104**.
 
-**A 4-hourly silent Routine polls this lane** (`trig_01WcuYTidPtngLFZFD7yKnoL`, session-bound,
-`53 */4 * * *`): syncs `main`, clears any open PR, runs `next-item.js`, **says nothing when READY is 0**.
+**NINE running entries were wrong about something load-bearing** — BF-139/141/142/145/146/147, OR-108's writers, LA-104's settled question, BF-157's scope (FOUR cases, not one), BF-156's ("looks identical" — it differs, on the WRONG AXIS). **BF-159 was the second that checked out whole.** Measure before you fix what the entry blames; read the route before re-deciding its design.
+
+**A 4-hourly silent Routine polls this lane** (`trig_01WcuYTidPtngLFZFD7yKnoL`, `53 */4 * * *`): syncs
+`main`, clears any open PR, runs `next-item.js`, **says nothing when READY is 0**.
 
 ## Next
 
-1. **READY reads 0 and that is not the same as no work.** KEEP holds it and the console TRUNCATES
-   each Keep — print them whole. **And read PARKED too: TN-3b sat there three days while READY was 0,
-   because its unparking is PROSE and the tool reads fields.** Its remaining halves are the HR overlay
-   and the across-days aggregate, both behind `LB-102`. **BF-51 ① is the trap** — built, deliberately
-   unshipped; reproduce on the S25 first, never loosen `meal-photo-picker.spec.ts`.
-2. **`LA-104` is next and it is a REAL finding, not tidy-up** — today's stress chart reads the live
-   series and a past day reads the rollup's, and TN-3a says outright these are two different numbers
-   (`rhrLowBpm` + `nightHrvMs` vs `restingHr` + a 28-day HRV mean). TN-3b's approved pass test is a
-   comparison ACROSS days, so one axis showing two metrics defeats it. Q-305's half is unblocked too.
+1. **READY is 1** — the `nutrition-tab-day-and-scroll` batch (RV-36). Then read KEEP (33) and PARKED, per lesson 2, printing each Keep whole since the console truncates them.
+2. **READY 0 is not "no work" — read KEEP and PARKED.** The console TRUNCATES each Keep; print them
+   whole. TN-3b sat in PARKED three days while READY was 0 because its unparking was PROSE. **This is
+   the same class as `Reference:` above, and it has now cost four entries in two days.** TN-3b's
+   remaining halves: the HR overlay and the across-days aggregate. **BF-51 ① is the trap** — built,
+   deliberately unshipped; reproduce on the S25 first, never loosen `meal-photo-picker.spec.ts`.
 
 ## Blocked
 
-- **~50 VERIFY entries owe a look.** BF-136 and LB-99 are sharpest (only the owner's account has a real dosing period); BF-139 owes the **daytime** case (no route to open-meteo).
+- **LB-106: `preferences-survive-reinstall` fails on CI, passes locally — flaky 03:47, hard fail 07:12, neither PR touching it.** E2E is advisory; #1166 merged on the required five with this recorded, not waved through.
+- **~50 VERIFY entries owe a look.** BF-136/LB-99 sharpest (only the owner's account has a real dosing period); BF-139 owes the **daytime** case. **BF-157's chip-vs-bar agreement is native — unverifiable in the sandbox.**
 - **⚠ OR-108's picture will not show on the S25 until `LA-36` lands** — all three local-store reads omit `image_data_uri`, so the device reads null from a column now filled. Web is fine.
-- **Owner:** the macro/budget anchor (BF-134's residue, TN-29 protects the stored 1,660); LB-61's
-  switch colour; whether the PWA lands on Home rather than Workout (PS-35).
+- **Owner:** the macro/budget anchor (BF-134's residue, TN-29 protects the stored 1,660); LB-61's switch colour; whether the PWA lands on Home rather than Workout (PS-35).
 - **⚠ BF-84 reads startable and is not** — BF-94 supersedes it and is `Gate: device`.
 - **PS-4 is UNCLASSIFIED by design; LB-94 the owner deferred 2026-09-09.** Do not classify either.
 - **⚠ `actions_list` is STALE for RUN EXISTENCE, filtered OR not** — `total_count` showed no run for
@@ -52,30 +47,29 @@ minutes well spent. **Measure before you fix what the entry blames.**
 
 ## Claimed paths
 
-None held. **Two abandoned Lane B PRs are open whose work is already on `main`** — #265
-(Q-323/Q-415/Q-417) and #608 (LB-19): all four entries are out of the queue, the code is in the tree under other filenames, and closing a PR needs the owner.
+None held. **Two abandoned Lane B PRs are open whose work is already on `main`** — #265 (Q-323/Q-415/Q-417) and #608 (LB-19): all four entries are out of the queue, the code is in the tree under other filenames, and closing a PR needs the owner.
 
 ## Do not re-litigate
 
 - **`packages/shared/**`, `app/api/**`, `lib/data/**`, `lib/sqlite/**`, `lib/local-store/**`,
   `lib/cache-groups.ts`, `lib/coach/**` are Lane A** — the **path**, not the nature of the edit.
   `scripts/**` is the Orchestrator's, bar a shrink-only baseline the check demands.
-- **A Lane B half needing a Lane A argument is TWO entries.** `workout-screen.tsx` is shrink-only at
-  1833 lines — derive further down, never thread a prop through it.
+- **A Lane B half needing a Lane A argument is TWO entries.** `workout-screen.tsx` is shrink-only at 1833 lines — derive further down, never thread a prop through it.
 - **E2E is ADVISORY** — wait on it for app-code or new-spec PRs, else the required five are the gate.
 - **Batons are shrink-only.** Ratcheted; a rewrite that grows it fails CI.
 
 ## The lessons that cost real time
 
-1. **An entry's numbers, gate and CAUSE are prose until something checks them** — seven in a row were
+1. **An entry's numbers, gate and CAUSE are prose until something checks them** — eight in a row were
    wrong. The tell was always a test: BF-146's spec passed with the fix reverted, OR-108's first honest
-   run **413'd**. **RV-35 shows re-verifying cuts BOTH ways** — its fix was already in the tree, but
-   deleting it as stale would have dropped the test it owed. **Write the failing check before the fix
-   — and read the Gotchas below first; this file already held the fix for one run's longest detour.**
-2. **A mutation that does NOT fail is a finding.** BF-141's `stopPropagation` guards a lossy round-trip (61.0 kg → 61.25) the spec cannot show — the seeded workout round-trips exactly. The test was renamed to what it proves.
-3. **A card reporting "no data" is not evidence none reached it** — LB-99's cause was one label, not the `getLocalStore` fall-through; and a shadowing claim is about ONE function's branch order (PS-35b's two "unreachable" palette keys cited *different* functions, both live).
-4. **Never run `pnpm build` and `npx vitest run` against the one local Postgres at once** — a "failure" that will not reproduce serially is contention, not a defect.
-5. **A stored "state as of" line ages into a wrong answer** — Dependabot read *"2 high"*; `pnpm audit` read **36, 23 high, 2 critical**.
+   run **413'd**. **RV-35 shows re-verifying cuts BOTH ways** — deleting it as stale would have dropped
+   the test it owed. **Write the failing check first, and read the Gotchas below before starting.**
+2. **A negative assertion behind a positive one is UNPROVEN — falsify it separately.** BF-159's "gone from Health" never ran once "on Cardio" failed first; reverting proved half. Build the wrong state deliberately and watch that half go red — or, where it was already true before the change (BF-157's "no ladder"), record it as a regression guard rather than as proof.
+3. **A PROBE MUST CREATE THE STATE IT NEEDS — and an id read from the sandbox is NOT state you created.** BF-157 cost two runs: draft 1 assumed the seed was unweighted (it met a 73.75 kg ramp), draft 2 hardcoded a local `exercise_library` uuid and died on CI's FK, green here and red there. Insert by NAME (unique in both databases), upsert so an aborted run leaves nothing, restore the referencing table BEFORE deleting the row. **A CI-only e2e failure looks like a missing element; the cause was in the POSTGRES SERVICE-CONTAINER LOG at the bottom of the job — read it.**
+4. **A mutation that does NOT fail is a finding.** BF-141's `stopPropagation` guards a lossy round-trip (61.0 kg → 61.25) the spec cannot show — the seeded workout round-trips exactly. The test was renamed to what it proves.
+5. **A card reporting "no data" is not evidence none reached it** — LB-99's cause was one label, not the `getLocalStore` fall-through; and a shadowing claim is about ONE function's branch order (PS-35b's two "unreachable" palette keys cited *different* functions, both live).
+6. **Never run `pnpm build` and `npx vitest run` against the one local Postgres at once** — a "failure" that will not reproduce serially is contention, not a defect.
+7. **A stored "state as of" line ages into a wrong answer** — Dependabot read *"2 high"*; `pnpm audit` read **36, 23 high, 2 critical**.
 
 ## Gotchas worth carrying
 
