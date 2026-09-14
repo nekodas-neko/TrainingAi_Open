@@ -4,7 +4,7 @@ import { auth } from '@/auth'
 import { getRepositoryAsync } from '@/lib/data'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { rateLimit } from '@/lib/rate-limit'
-import { computeBodyComposition, hasValidImpedance, resolveCompositionInputs, SCALE_WEIGHT_ANOMALY_PCT, type CompositionSkipReason } from '@/lib/scale-ble/composition'
+import { computeBodyComposition, hasValidImpedance, resolveCompositionInputs, SCALE_WEIGHT_ANOMALY_PCT, SCALE_WEIGHT_CLAIM_PCT, type CompositionSkipReason } from '@/lib/scale-ble/composition'
 import { ageFromDob, DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { applyScaleReadingToBodyMetrics } from '@/lib/scale-ble/apply-reading'
 import { resolveMeasuredAt } from '@trainingai/shared/validation/ingest-clock'
@@ -15,10 +15,25 @@ import { reportServerError } from '@/lib/observability'
 // /api/hr-ingest for the Polar chest strap. That's what attributes a reading to the right user:
 // whichever account's session is live on the phone that captured it.
 //
-// Multi-user safety net: the owner's partner also uses this physical scale. A reading that
-// differs from the user's last confirmed weight by more than SCALE_WEIGHT_ANOMALY_PCT is staged
-// as 'pending' instead of auto-saved — see docs/superpowers/plans/2026-07-27-renpho-ble-direct-scale.md
-// "Multi-user safety net" section.
+// Multi-user safety net: the owner's partner also uses this physical scale — see
+// docs/superpowers/plans/2026-07-27-renpho-ble-direct-scale.md "Multi-user safety net".
+//
+// BF-58 option D (owner, 2026-08-30) makes that net three bands rather than two, so that a phone
+// CLAIMS only what is confidently its owner's and stops asking about a reading it can already tell
+// is not:
+//
+//   · within SCALE_WEIGHT_CLAIM_PCT   → saved, no prompt     (it is his)
+//   · up to SCALE_WEIGHT_ANOMALY_PCT  → 'pending', prompt     (ambiguous — ask rather than guess)
+//   · beyond that                     → 'dismissed', no prompt (it is not his)
+//
+// **`dismissed` rather than a new status**, which is not a shortcut: it is already what a reading
+// the user tapped *Not me* on becomes, and "not this user's" is exactly what the band has decided.
+// Reaching for a fourth status would mean a schema change, and BF-58's own scope guard says that a
+// design step reaching for one has left option D.
+//
+// **The raw frame is stored in every one of the three cases**, which is the half worth stating: a
+// dismissed reading is un-attributed, not destroyed. The day the partner's phone is paired, hers
+// are in the table rather than gone — and BF-58's title is that they are thrown away today.
 const MAX_BODY_BYTES = 4 * 1024
 
 // Q-24 §7: `weightKg` was floored at 0. A no-load or mid-stabilisation frame decodes as 0 kg, and
@@ -58,16 +73,22 @@ export async function POST(req: Request) {
 
     const lastWeightKg = await repo.getMostRecentConfirmedWeightKg(userId)
     const deltaPct = lastWeightKg ? Math.abs(weightKg - lastWeightKg) / lastWeightKg : 0
-    const isAnomalous = lastWeightKg != null && deltaPct > SCALE_WEIGHT_ANOMALY_PCT
+    // With no confirmed weight to compare against there is no band to be outside of, so a first
+    // reading is claimed — the same answer this route has always given, kept explicit because the
+    // three-way split below would otherwise read as though it applied.
+    const unbanded = lastWeightKg == null
+    const isNotOurs = !unbanded && deltaPct > SCALE_WEIGHT_ANOMALY_PCT
+    const isAmbiguous = !unbanded && !isNotOurs && deltaPct > SCALE_WEIGHT_CLAIM_PCT
 
-    if (isAnomalous) {
+    if (isNotOurs || isAmbiguous) {
+      const status = isNotOurs ? 'dismissed' as const : 'pending' as const
       await repo.insertScaleRawSample(userId, {
         measuredAt: measuredAtDate, rawHex,
         decoded: { weightKg, impedanceOhmsA, impedanceOhmsB },
-        status: 'pending',
+        status,
       })
       return NextResponse.json({
-        status: 'pending', weightKg, lastWeightKg,
+        status, weightKg, lastWeightKg,
         deltaPct: Math.round(deltaPct * 1000) / 1000,
       })
     }

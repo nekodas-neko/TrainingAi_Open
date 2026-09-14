@@ -7766,114 +7766,80 @@ recommendations that were put to them. Do not re-open either.**
   any correlation it surfaces is an observation on n=1 with a dozen confounders — shown as a number
   the owner reads, never as a claim about cause.
 
-### [body][devices][platform] BF-58 — the partner's weigh-ins land in the owner's account and are thrown away; two people, one scale
+### [body][devices][platform] BF-58 — one scale, two people: the two device answers the weight bands could not give
 
-- **Lane:** A — attribution and routing; the consent surface is B.
+- **Lane:** A.
 - **Added:** 2026-08-30 · owner: *"my partner also used this app and the same scale, how can she
   connect so she gets her body data to her app. can we both be connected to the scale at once? (she
-  is who I am getting the readings for that are 'is this you')."*
-- **Needs:** BF-53 — **cleared 2026-08-30: it shipped.** Both routes take `numericRouteId` and the
-  client now reports the failure instead of swallowing it, so the *"is this you"* prompt works again.
-  That matters here because under option D the prompt is the **ambiguity fallback** — the thing that
-  catches a reading the weight bands cannot separate. A device check on BF-53 is still owed.
+  is who I am getting the readings for that are 'is this you'.)"*
+- **Keep:** the two on-device questions below, and the partner-pairing step. **Option D's
+  attribution shipped 2026-09-14** — `/api/scale-ble/samples` now splits three ways (claim within
+  `SCALE_WEIGHT_CLAIM_PCT` 8% · prompt up to `SCALE_WEIGHT_ANOMALY_PCT` 15% · decline beyond), the
+  band width was measured off the two real weight clusters rather than chosen, and a declined
+  reading is **archived** rather than thrown away. Nothing of the band work is outstanding; what is
+  left is everything that needs the hardware.
 
-**Two questions, and the code answers both.**
+**1. Can both phones hold a connection at once?** Almost certainly not, and the app is built on that
+assumption. The reading does not come from the advertisement — `ScaleBleScanManager` uses it only to
+*wake* the app, and `ScaleBleService` then opens a **GATT connection** (`ScaleGattClient`) to read
+the frame. A consumer scale of this class normally accepts one at a time, so two phones would race
+and the loser would get nothing. **That is inferred from the protocol shape, not measured.** Pair
+both phones, step on the scale, see whether one, both or neither receives a frame.
 
-**1. Can both phones connect at once? Almost certainly not, and the app is built on that assumption.**
-The reading does not come from the advertisement — `ScaleBleScanManager` uses the advertisement only
-to *wake* the app, and `ScaleBleService` then opens a **GATT connection** (`ScaleGattClient`) to read
-the frame. A consumer BLE scale of this class normally accepts one GATT connection at a time, so two
-phones would race and the loser would get nothing. **That is an assumption from the protocol shape,
-not a measurement — it needs one on-device test before any design depends on it** (pair both phones,
-step on the scale, see whether one, both or neither receives a frame).
+**2. Does `REQUEST_STORED_MEASUREMENTS_CMD` get a reply?** This is the one that decides whether the
+race matters at all. `0x22 0x04 0x15` and `STORED_RECORD_MARKER` already exist in the code and the
+comment is candid that they are **speculative, borrowed from a different firmware generation and
+never verified against this hardware**. If the scale buffers, the losing phone catches up on its
+next connect and nobody's weigh-in is lost. One command and a look at what comes back; there is
+already a plan at
+`docs/superpowers/plans/2026-07-30-scale-stored-measurement-drain-and-scan-latency.md`.
 
-**2. Where do her readings go now? Into the owner's account, then the bin.** The scale is paired to
-one user. Every frame is attributed to that user; a weight more than `SCALE_WEIGHT_ANOMALY_PCT`
-(15%) from their last confirmed reading is staged **pending** rather than saved — and
-`composition.ts:11` says why in as many words: *"owner's partner also uses this scale"*. The `Not
-me` button then **discards** it. So the app already detects her, already asks, and already knows the
-answer — and then destroys the reading. Every weigh-in she has ever taken on it is gone.
+**3. Have the partner pair the scale in her own app.** The pairing is `localStorage` on the device
+(`ta_paired_scale_v1`, no `user_id`, no table, no uniqueness constraint) — so nothing stops her
+phone pairing the same scale today, and it costs nothing to find out. With D shipped on both
+phones, each app claims only its own owner's band and neither learns anything about the other
+person.
 
-**⚠ THE PAIRING IS `localStorage` ON THE DEVICE — there is no server-side owner, and this changes
-the design.** `lib/scale-ble/paired-scale.ts` stores `{deviceId, name}` under `ta_paired_scale_v1` in
-`localStorage`. No `user_id`, no table, no uniqueness constraint. **So nothing stops the partner's
-phone pairing the same scale today** — the first draft of this entry treated the scale as owned by
-one account, and it is not. What is actually shared is the *radio*, not a record.
+**The residual risk, stated rather than hidden.** Both phones race for one GATT connection, so if
+his wins and declines while her phone is out of range, **that weigh-in is lost** — which is what (2)
+would fix, and failing that, weighing in with your own phone nearby is a habit rather than a
+feature.
 
-**So the problem is narrower than "two people, one scale". It is: whichever phone wins the GATT
-connection attributes the reading to ITS owner.** Both phones wake on the advertisement, both try to
-connect, one wins. That is why his account is collecting her weigh-ins.
+**Option B (a linked household member, readings offered across accounts) was rejected 2026-08-30**
+and is recorded in the shipping journal entry with its terms, so it is not re-proposed from scratch
+if it is ever revived. It builds the app's first cross-account data path — consent, linking,
+revocation, a Play Store health-data implication — and D needs none of it.
 
-**Four ways to fix it.**
+- **Verification:** with both phones paired, the owner steps on the scale and his reading lands in
+  his account with no prompt; the partner steps on and **no** *"is this you"* appears on his phone;
+  and the answer to (1) is recorded either way, because the design of any future work here depends
+  on it.
 
-| | Shape | Verdict |
-|---|---|---|
-| **A** | Both phones pair, both claim whatever they capture | **No.** This is today's behaviour and it is the bug. |
-| **B** | One phone owns the scale; a `Not me` reading is offered to a **linked household member** | **Rejected 2026-08-30.** Builds the app's first cross-account data path — consent, linking, revocation, a Play Store health-data implication — to solve a problem that does not need any of it. Kept below only so it is not re-proposed. |
-| **C** | She uses the Renpho app | Zero work. The honest baseline, and the current interim answer. |
-| **D** | **Both phones pair independently; each claims only weights inside its own owner's band and declines the rest** | **✅ CHOSEN by the owner 2026-08-30.** No linking, no shared account, no server-side owner, no cross-account write. Two self-contained apps that happen to hear the same radio. |
+### [body][devices] LA-108 — a declined weigh-in is invisible, and a big genuine change locks the scale out
 
-**Scope of the build, now that D is decided:**
-1. **Each phone declines rather than asks** when a stable reading falls outside its owner's band.
-   Today the same condition raises the *"is this you"* prompt and then discards on `Not me`.
-2. **Tighten the band for this case.** 15% at 72 kg is ±10.8 kg — wide enough that two adults can sit
-   inside one band. Pick the width from the two real weights rather than a round number, and let
-   anything ambiguous fall through to the prompt instead of guessing.
-3. **The prompt stays** as the ambiguity fallback, which is why `Needs: BF-53` holds: it is dead in
-   production right now.
-4. **No server change, no schema change, no cross-account anything.** If a design step starts
-   reaching for one, it has left option D — stop and re-read this entry.
+- **Lane:** A.
+- **Added:** 2026-09-14 · Lane A, found while shipping BF-58's band split — the hazard the option-D
+  design does not cover, recorded rather than fixed because fixing it is a UI surface and a new read
+  path, not a band width.
 
-**Why D, and why it is mostly already built.** The hard part — deciding a reading is not this user's —
-exists and works: `SCALE_WEIGHT_ANOMALY_PCT` (15% from the user's last confirmed weight) is what
-raises the *"is this you"* prompt today. **D changes what happens next: instead of asking and then
-discarding, a phone simply does not claim a weight outside its owner's band.** Her phone, running the
-same rule against her band, claims it. Neither app learns anything about the other person.
+BF-58 turned the outer band from *ask* into *decline*. That is right for the partner, and it has a
+failure mode for the owner: **the band is anchored on his last confirmed weight, and only a
+confirmed reading re-anchors it.** So a genuine change of more than 15% between two weigh-ins — a
+long gap plus an illness, an injury, a trip — puts him outside his own band with no confirmed
+reading to move it, and **every** reading after that is outside too. Before BF-58 that case raised
+*"is this you"* and one tap fixed it. Now it is silent and self-sustaining.
 
-**The residual risk, stated rather than hidden.** Both phones race for one GATT connection, so if his
-wins and declines, and her phone was not in range, **that weigh-in is lost**. Two mitigations, in
-order:
-1. **Drain the scale's stored measurements** — `ScaleProtocol.REQUEST_STORED_MEASUREMENTS_CMD`
-   (`0x22 0x04 0x15`) and `STORED_RECORD_MARKER` already exist in the code, and the comment is candid
-   that they are **speculative and never verified against this hardware**, borrowed from a different
-   firmware generation. **Test it — it is one command and a look at what comes back.** If the scale
-   buffers, the losing phone catches up on its next connect and the race stops mattering at all.
-   There is already a plan: `docs/superpowers/plans/2026-07-30-scale-stored-measurement-drain-and-scan-latency.md`.
-2. Failing that, weighing in with your own phone nearby is a habit, not a feature.
-
-**Where D breaks, and it is worth knowing up front:** weight-band attribution is identity by proxy.
-If the two users' weights converge into one band it stops discriminating, and a 15% band is wide —
-at 72 kg that is ±10.8 kg. **Tighten the band for the multi-user case and let an ambiguous reading
-fall through to the existing prompt rather than guessing.** The prompt is the right fallback; it is
-being asked too often today, not too rarely.
-
-**⚠ The cross-account requirements below apply to option B ONLY, which is rejected.** D needs none of
-them, and that is most of the argument for D. Kept because if B is ever revived these are its terms:
-- **Two-way consent.** A link is accepted by both accounts, and either can break it. Never inferred
-  from a shared device.
-- **The reading moves, it does not copy.** A weigh-in belongs to one person. Attribute or discard.
-- **The offer carries a weight and nothing else.** Her phone should not receive the owner's history
-  to work out which readings are hers, and nothing about her should reach his account beyond the
-  fact that a pending row was claimed.
-- **Ownership checks still apply at every write** (CLAUDE.md's write-path discipline) — a linked
-  account is not a shared account.
-- **Play Store bearing:** this makes the app genuinely multi-user with health data crossing between
-  accounts, which is exactly what the declared-use-case review looks at. Worth the owner knowing
-  before it is built, not after.
-
-- **✅ Gate: owner CLEARED 2026-08-30** — *"D sounds like the way to go; lets go with that."* B is
-  rejected and C is the interim answer until D ships. **Build D.** What still wants a device answer, and both are cheap: whether two phones can hold a
-  GATT connection at once, and **whether `REQUEST_STORED_MEASUREMENTS_CMD` gets a reply** — the
-  second one decides whether the race matters at all.
-- **Do this first, before any code:** have the partner pair the scale in her own app. The pairing is
-  device-local, so it costs nothing and may reveal that both phones already receive readings — which
-  would shrink this entry to "each phone declines what is not its owner's".
-- **Interim, and worth saying:** until this ships, her readings are lost the moment they are
-  dismissed. If she wants that data, the Renpho app is the only place it currently survives.
-- **Verification:** a reading the owner marks `Not me` appears as a claimable weigh-in on the linked
-  account, with its impedance-derived composition intact; claiming it removes it from the owner's
-  pending list; neither account can see the other's history; and breaking the link stops the flow
-  both ways.
+- **Narrow, but silent, which is the bad half.** Drift is gradual and normally passes *through* the
+  8–15% prompt band first, where one confirmation re-anchors. It needs a discontinuity to bite.
+- **Nothing is lost** — `insertScaleRawSample` archives the frame with `status: 'dismissed'` in every
+  branch. The data is there; there is just no way to see it. `listPendingScaleSamples` is the only
+  read path and it filters to `pending`.
+- **The likely shape**, not yet designed: surface recent `dismissed` readings somewhere the owner can
+  reach them (the pairing screen already lists pending ones) so a wrongly-declined reading can be
+  claimed and re-anchor the band. A repository read for dismissed samples is Lane A; the list is
+  Lane B.
+- **Do not fix it by widening the band** — the 8% was measured against the two real clusters and
+  widening it is the thing BF-58 was filed to stop.
 
 ### [nutrition] BF-47 — the deleted food comes back: the loader calls the server authoritative while the delete is still in the outbox
 
