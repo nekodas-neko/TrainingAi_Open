@@ -437,6 +437,52 @@ below threshold and left in place for next time.
 
 
 
+### [nutrition] BF-161 — the meal builder can only reach foods, so a meal made of meals has to be rebuilt ingredient by ingredient
+
+- **Lane:** B for the recommended shape (`components/nutrition/ingredient-search.tsx`,
+  `components/nutrition/meal-builder`'s add path). Lane A **only** if the owner chooses true nesting,
+  which needs a migration — see the decision below.
+- **Added:** 2026-09-14 (BugFix intake). Owner: *"For the meal builder it should let you add
+  meals/saved items as part of the meal builder."*
+- **The builder's search has three sources and none of them is a meal.** `ingredient-search.tsx`
+  documents them in its own header: the user's **own foods** (offline, instant), the **AI estimate**,
+  and the **food database** (Open Food Facts). `saved_meals` is absent. The field even says *"Search
+  your foods or the food database…"*, which is accurate and is the whole problem.
+- **`food-list.tsx` already has a `meals` tab** (`show === 'meals'` → *"Filter your meals"*), so Log
+  Food can log a saved meal in one tap. The builder — one screen deeper in the same sheet — cannot
+  see them. The capability exists; it just does not reach here.
+- **The schema forbids nesting today, and this is the decision the entry exists to frame:**
+
+  ```ts
+  export const savedMealItems = pgTable('saved_meal_items', {
+    savedMealId: uuid('saved_meal_id').notNull().references(() => savedMeals.id, …),
+    foodItemId:  uuid('food_item_id').notNull().references(() => foodItems.id, …),  // NOT NULL
+    quantityMultiplier: doublePrecision('quantity_multiplier').notNull().default(1.0),
+  })
+  ```
+
+  A meal item **is** a food item. There is no column a nested meal could occupy.
+- **Recommended: FLATTEN ON ADD — no migration, no recursion, Lane B alone.** Picking a saved meal
+  expands its items into the builder as ordinary food ingredients, quantity multipliers carried
+  through. The saved meal becomes a shortcut for adding N foods at once, which is the thing the owner
+  is actually short of. Measured on his account: **15 saved meals averaging 1.9 items each** against
+  **304 foods** — so the ingredient lists stay short, and the "it makes the list long" objection does
+  not bite at his scale.
+- **What flattening gives up, stated so it is a choice and not an oversight:** no link back. Editing
+  the source meal later does not change a meal built from it. That is arguably correct — a built meal
+  is a recipe you fixed, not a live reference — but it is a real difference and the owner should hear
+  it before it ships.
+- **The alternative, and why it is not recommended:** make `food_item_id` nullable and add
+  `nested_saved_meal_id`. Real composition, edits propagate. It costs a migration, **recursive macro
+  computation in every consumer of `saved_meal_items`**, and cycle prevention (meal A contains B
+  contains A) — a class of bug with no cheap guard. Not worth it for 15 meals of 1.9 items unless the
+  owner specifically wants edits to propagate.
+- **Gate: owner** — flatten vs nest is a product decision about whether a built meal tracks its
+  source, not something an implementer should settle. The recommendation is flatten; a one-line answer
+  unblocks it.
+- **Verification:** on device, build a meal from two saved meals and confirm the ingredient rows,
+  their quantities, and the resulting macro total match the sum of the sources.
+
 ### [cardio] BF-160 — a fitness test earns no calories and leaves no activity, so twelve minutes of maximal running is invisible to the budget
 
 - **Lane:** A — `components/fitness-tests/test-result.tsx` (`handleSave`) writes only
