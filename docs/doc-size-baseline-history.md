@@ -11866,3 +11866,18 @@ candidate triggers into one mechanism.
 collapsed `logged_at` values — never written, so nothing to back-fill — and that field also orders
 1RM history, breaks PR ties and keys per-set HR attribution. A row recording only the restored
 duration would read as closed while three other consumers still read collapsed timestamps.
+
+## 2026-09-14 — `docs/agents/state/implementation-lane-b.md` → 67 (full rewrite, down from 105)
+
+The baton had been updated incrementally across nine PRs and had drifted: it said READY was 1 and
+named a batch (RV-36) that had shipped on 2026-09-11, listed LB-105 as pending, and carried a Next ID
+already consumed. The protocol says rewrite it in full, never append, and this is why.
+
+−38 lines with more current content in it. What paid for the new material: the "Now" section stopped
+re-telling what each PR did — the journal entries carry that — and four lessons collapsed into two
+where they shared a cause. What replaced it is the state a cold restart cannot reconstruct: that the
+lane is blocked on the owner, which entries were checked to establish it, and that BF-61's fast-tap
+check is the single item releasing the most.
+
+The new lesson 1 is the session's most transferable finding: a field's job done in prose, four times
+in one day, three hiding work the queue should have shown and one showing work it should have parked.
