@@ -437,6 +437,24 @@ below threshold and left in place for next time.
 
 
 
+### [devices] PS-40 — formalize the data-source connector convention as a typed, checkable declaration
+
+- **Lane:** A — `packages/shared/src/health/`, `scripts/`, `app/api/**` ingest routes.
+- **Added:** 2026-09-14 (one-off session, owner request: a generic data-source connector structure
+  for other rings/straps/platforms, with documentation of what shape each data type expects and
+  where it lands).
+- **Plan:** [`docs/superpowers/plans/2026-09-14-data-source-connector-interface.md`](superpowers/plans/2026-09-14-data-source-connector-interface.md).
+- **Reference:** [`docs/data-source-connector-guide.md`](data-source-connector-guide.md) — the
+  convention already exists across six sources (Oura BLE, Health Connect ×2, Polar H10, Renpho
+  scale, Colmi R09); this doc writes it down from the current code. This entry is only the
+  "make it a typed declaration + CI-checked" follow-up — §7 of the guide.
+- **Why not urgent:** nothing is broken today; every existing source already follows the
+  convention correctly (per the guide's research pass). This is scale-preparation for a future
+  seventh source or a community-contributed connector, not a bug fix.
+- **Not urgent enough to jump the queue** — placed here rather than at the very top; move it if a
+  concrete new device integration is about to start and would benefit from the typed contract
+  existing first.
+
 ### [nutrition] BF-161 — the meal builder can only reach foods, so a meal made of meals has to be rebuilt ingredient by ingredient
 
 - **Lane:** B for the recommended shape (`components/nutrition/ingredient-search.tsx`,
