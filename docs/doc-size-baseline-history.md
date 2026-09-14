@@ -11955,3 +11955,17 @@ are clean sweeps — heading says a device check is owed, body records it verifi
 that nothing has confirmed the fix works. Swept with the other two, that sentence disappears and a
 future report of the same symptom reads as a new bug instead of a regression against an unverified
 fix. The lines are there to stop the sweep being uniform.
+
+## 2026-09-14 — `projectOverview.md` → 10923, `docs/implementation-backlog.md` → 21013 (BF-161)
+
++14 on projectOverview and +9 on the backlog for a feature whose code is small and whose DECISION is
+the expensive part. The build is a mapping and a list component; what needed writing down is why
+there is no nesting column, because that is the thing a later session would otherwise re-litigate
+from scratch — `saved_meal_items.food_item_id` is NOT NULL, and making it nullable buys recursive
+macro computation in every consumer plus cycle prevention, for a library of 15 meals averaging 1.9
+items.
+
+Both entries lead with the consequence rather than the mechanism: what the owner accepted is that a
+meal built from a saved meal is a **snapshot**. That is invisible until the day someone edits a
+source meal and expects the built one to follow, which is exactly when a one-line ✅ would have left
+the reader with nothing.

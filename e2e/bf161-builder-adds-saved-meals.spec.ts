@@ -55,7 +55,11 @@ test('the builder offers saved meals as a source beside foods', async ({ page })
 
   // Either meals are listed or the account has none — both are correct renders of the new tab, and
   // asserting only the first would make this depend on the seed rather than on the wiring.
+  //
+  // The list heading is scoped to its <p>: "Your meals" is also the TAB's label, so an unscoped
+  // match resolves to two elements and fails strict mode. That it matched twice is the render
+  // working, which is a confusing way to read a failure — hence the scope rather than a `.first()`.
   const empty = page.getByText('No saved meals match that.')
-  const heading = page.getByText('Your meals', { exact: false })
-  await expect(empty.or(heading.first())).toBeVisible({ timeout: 15_000 })
+  const heading = page.locator('p').filter({ hasText: /^Your meals$/ })
+  await expect(empty.or(heading).first()).toBeVisible({ timeout: 15_000 })
 })

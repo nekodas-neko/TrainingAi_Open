@@ -486,8 +486,19 @@ below threshold and left in place for next time.
 - **What the owner is accepting, restated because it is the part that bites later:** a meal built
   from saved meals is a snapshot. Editing the source meal afterwards does not change it. Nothing on
   screen should imply otherwise — no "from <meal name>" provenance chip that reads as a live link.
-- **Verification:** on device, build a meal from two saved meals and confirm the ingredient rows,
-  their quantities, and the resulting macro total match the sum of the sources.
+- **✅ SHIPPED 2026-09-14** (`fix/bf161-meal-builder-add-saved-meals`, v1.456.8).
+  [Journal](overview/entries/2026-09-14-bf161-builder-adds-saved-meals.md). `savedMealToEntries`
+  (`components/nutrition/saved-meal-flatten.ts`) is the one mapping; the source list is
+  `saved-meal-results.tsx`, a child rather than an addition to `saved-meals-sheet.tsx`, which was
+  788 lines against the hard 800 ceiling. **No schema change and no new fetch** — `SavedMeal`
+  already carries its items and the sheet already loads them.
+- **The quantity question answered itself.** `openBuild` already built the same `{ item, qty }` rows
+  inline to load a meal for editing, at the stored WHOLE-RECIPE multiplier. Both paths now share one
+  helper, which is what makes the check below true as this entry states it.
+- **Keep:** the device check, and only that. On the S25, build a meal from two saved meals and
+  confirm the ingredient rows, their quantities, and the resulting macro total match the sum of the
+  sources. The harness reaches the tab and proves it is wired; it cannot judge the arithmetic on a
+  real library.
 
 ### [cardio] BF-160 — a fitness test earns no calories and leaves no activity, so twelve minutes of maximal running is invisible to the budget
 
