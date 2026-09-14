@@ -2027,3 +2027,74 @@ property is now asserted in a unit test (`lb100-one-budget.test.ts`) that runs o
 than only when a browser job is green. The lesson is recorded beside the fix rather than the fix
 alone: **a red advisory check is a signal, not a formality.**
 
+
+---
+
+### [workouts] ⚠️ The weight dial takes pounds now, and no thumb has tried the control (BF-141, 2026-09-12, v1.448.0) · needs: hardware
+
+Owner: *"my Dumbells are pounds and I need to convert it ... then just have it convert to the kg
+equivalent"*. Prevention for a failure that already happened on that exercise — Session 119 logged
+three dumbbell exercises in pounds into the kg field, and the repair needed an admin tool that
+rescaled every set and **backdated the all-time PR**. Tapping the dial's own `kg` suffix swaps it to
+`lb`; the stored value stays kilograms, and the unit is remembered per exercise in `localStorage`.
+
+**Two findings worth more than the feature.** BF-141 claimed `e2e/touch-target-size.spec.ts` would
+catch an undersized control here; it cannot — that spec scans the five tab roots and this dial is
+inside an active workout, so its empty allowlist would have stayed green over a 20 px suffix. And
+the `stopPropagation` on the suffix guards a **real** case that the new spec cannot demonstrate: in
+lb mode a row tap round-trips kg → lb → kg, which is lossy for some weights (61.0 kg returns 61.25),
+but the seeded workout starts at 60 kg, which round-trips exactly. Both are written on the entry so
+neither reads as dead weight later.
+
+**What is owed is the S25.** A scroll-snap dial with haptics beside a new inline control is a
+touch-target and gesture question; the harness drives a mouse, so it can prove the box measures
+44 px and cannot prove a thumb reaches it without also moving the dial.
+
+**✅ RESOLVED — verified on the S25, 2026-09-14 (owner's workout pass).** The kg↔lb toggle swaps
+without the dial scrolling or losing its selection. Nothing is owed.
+
+---
+
+### [app-shell][nutrition] ⚠️ Nutrition keeps its scroll position now, and neither fix has been seen on the phone (RV-36 + RV-37, 2026-09-11, v1.446.4)
+
+**RV-36:** BF-100's scroll restoration reached three tabs, not five — it lives in `PullToSync`, and
+the Nutrition tab owns its own scroller. Measured: `/more` → Profile details → back restored **840**;
+`/nutrition` → `/coach` → back saved **no** key and returned **0**. One hook call fixes it, and the
+wrong *"every screen using the shell inherits it"* phrasing is gone from `pull-to-sync.tsx`'s own
+comment as well as from the entry. **RV-37:** `/health/day`'s scroller had no bottom padding at all,
+so its last card ended flush with the S25's gesture bar; it now carries `pb-nav-safe`.
+[Journal](entries/2026-09-11-fix-nutrition-scroll-and-day-padding.md).
+**Owed: one device pass covering both.** RV-36's check is the **system back gesture**, the one gesture
+the harness cannot send. RV-37 **was never observed and still has not been** — the seeded fixture
+renders "Nothing logged on this day", so the container never scrolls; the missing padding was read
+from source. Still open on RV-37: whether a fifth safe-area CI rule should fire on an **absent**
+utility, which needs an allow-list for the sheets and navless screens that legitimately have none.
+
+**✅ RESOLVED — both halves verified on the S25, 2026-09-14 (owner's app-shell pass).** Scroll
+restoration works across the tabs (*"Mostly works"*) and `/health/day` clears the gesture bar.
+**Two threads left this row and both are tracked in the backlog, not here:** `/more` specifically
+still fails and is **BF-100**, along with the owner's second requirement that back from a tab with
+nothing to pop should land on Home; and the fifth-safe-area-CI-rule question stays on **RV-37**,
+which is the part that genuinely needs evidence.
+
+---
+
+### [workouts][app-shell] ⚠️ The injured-exercise header was rebuilt, and the case that prompted it was never rendered (BF-135, 2026-09-09, v1.446.0)
+
+The active-exercise header is `flex-none` above a `min-h-0` set list and **that branch has no scroll
+container at all**, so two stacked banners pushed set 1 under the logging sheet with nothing to
+recover it. The full injury banner moved to the ready screen — which carried **no injury warning
+before this**, so it used to arrive after the weight was already chosen — and during the set it is a
+chip with Swap intact; the AMRAP banner is gone, since the ready screen already says the same thing
+at more length for every exercise; the header gained `max-h-[45%] overflow-y-auto`.
+[Journal](history-2026-09-12-folded-1.md#2026-09-09-fix-injury-header-crowding).
+**Owed: the device check, and two gaps behind it.** The reported case is an injured exercise on a
+**baseline** session — the two-banner worst case — and the seeded account is mid-`Accumulation`, so
+that state was reasoned about and pinned by a source test but **never rendered**. Nor was any of it
+seen with the logging sheet actually covering the bottom half of an S25, which is where the squeeze
+lives. `isBaseline` never clears while **BF-131** is open, so the banner it removes was permanent
+rather than a first-session artefact.
+
+**✅ RESOLVED — verified on the S25, 2026-09-14 (owner's workout pass).** Owner: *"Havent seen this
+issue; if it comes up will re-raise it; treat it as fine for now."* Nothing is owed. Note the shape of
+that answer: the case was not reproduced on demand, it was reported as not occurring in normal use.

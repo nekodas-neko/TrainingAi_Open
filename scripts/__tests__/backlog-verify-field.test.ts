@@ -94,11 +94,16 @@ describe('the seventeen shipped entries are never parked', () => {
     'BF-76', 'BF-53', 'BF-26', 'BF-27', 'TN-13', 'Q-93',
   ]
 
-  /** One entry's lines: its `### ` heading down to the next one. */
+  // An entry that has LEFT the queue is the third valid state, and the test used to fail on it.
+  // The protocol removes a completed entry, so eight of these seventeen were gone the moment their
+  // device check came back and the last thing they owed was struck (OR-113, 2026-09-14). Demanding
+  // that a finished entry stay in the file to keep a regression test green is the test dictating the
+  // queue's contents — the same reasoning `Needs:` uses when it counts an absent target as shipped.
+  /** One entry's lines: its `### ` heading down to the next one — or `null` if it has shipped out. */
   const entry = (id: string) => {
     const lines = backlog.split('\n')
     const start = lines.findIndex(l => l.startsWith('### ') && new RegExp(`\\b${id}\\b`).test(l))
-    expect(start, `${id} is not in the queue`).toBeGreaterThanOrEqual(0)
+    if (start < 0) return null
     const rest = lines.slice(start + 1).findIndex(l => l.startsWith('### '))
     return lines.slice(start, rest === -1 ? undefined : start + 1 + rest)
   }
@@ -110,6 +115,7 @@ describe('the seventeen shipped entries are never parked', () => {
   for (const id of CONVERTED) {
     it(`${id} is verification debt or already verified, never a block`, () => {
       const lines = entry(id)
+      if (!lines) return // removed from the queue: finished, which is the outcome this rule wants
       // Exactly one of the two, so neither a silently-dropped `Verify:` nor a verified entry that
       // kept the bullet slips through as "fine".
       expect(
@@ -126,7 +132,9 @@ describe('the seventeen shipped entries are never parked', () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { keepFromLines } = require('../lib/keep.js') as { keepFromLines: (l: string[]) => { text: string } | null }
     for (const id of CONVERTED) {
-      expect(keepFromLines(entry(id))?.text, `${id} has no Keep: to describe the check`).toBeTruthy()
+      const lines = entry(id)
+      if (!lines) continue
+      expect(keepFromLines(lines)?.text, `${id} has no Keep: to describe the check`).toBeTruthy()
     }
   })
 })
@@ -172,6 +180,9 @@ describe('next-item.js routes them out of PARKED', () => {
   const stillOwed = CONVERTED2.filter(id => {
     const lines = backlog2.split('\n')
     const start = lines.findIndex(l => l.startsWith('### ') && new RegExp(`\\b${id}\\b`).test(l))
+    // Gone from the queue owes nothing — and a `start` of -1 must be handled explicitly, because the
+    // slice below then reads from the END of the file and answers about somebody else's entry.
+    if (start < 0) return false
     const rest = lines.slice(start + 1).findIndex(l => l.startsWith('### '))
     const body = lines.slice(start, rest === -1 ? undefined : start + 1 + rest)
     return !body.some(l => /\bVERIFIED ON THE S25\b/.test(l))

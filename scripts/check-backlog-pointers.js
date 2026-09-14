@@ -37,7 +37,7 @@ const { verifyFromLines, verifyProblem } = require('./lib/verify');
 const { laneDrift } = require('./lib/lane-drift');
 const { laneFieldProblem, LANE_LOOSE_RE } = require('./lib/lane');
 const { keepFromLines } = require('./lib/keep');
-const { keepKind } = require('./lib/keep-kind');
+const { keepKind, keepIsSettled } = require('./lib/keep-kind');
 const { decoratedField } = require('./lib/decorated-field');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -568,6 +568,32 @@ const verifySummary = withVerify
         `work that genuinely cannot start — the thing BF-90 measured. Convert to \`Verify: device\`, ` +
         `which prints in its own section and does not park. Advisory, not a failure:\n` +
         stragglers.map((r) => `      ${r}`).join('\n'),
+    );
+  }
+}
+
+// The other half of the same class, and the one that actually bit (2026-09-14, OR-113). An entry
+// whose `Keep:` says a CHECK is owed and whose body ALREADY records that the check happened is
+// finished — but it goes on printing as debt, because recording the verification and striking the
+// `Keep:` are two edits and only the first one is satisfying to make.
+//
+// Nineteen entries were in that state after three device passes; fifteen were fully done and left
+// the queue, four owed something else and had their `Keep:` narrowed. Nobody noticed, because every
+// individual entry reads correctly — the ✅ and the `Keep:` are ten lines apart and each is true of
+// its own half. Advisory rather than a failure for the same reason as the block above: the fix is a
+// judgement (strike, or narrow to what is left), not a mechanical edit CI can demand.
+{
+  const settled = [];
+  for (const [id, m] of meta) {
+    if (keepIsSettled(m.keep || null, m.lines)) settled.push(`${id} — ${m.keep.text.slice(0, 90)}`);
+  }
+  if (settled.length) {
+    console.log(
+      `check-backlog-pointers: note — ${settled.length} entr${settled.length === 1 ? 'y' : 'ies'} whose \`Keep:\` ` +
+        `says a device check is owed and whose body already records that check as DONE. Strike the ` +
+        `\`Keep:\` and remove the entry, or narrow it to whatever is genuinely left. Advisory, not a ` +
+        `failure:\n` +
+        settled.map((r) => `      ${r}`).join('\n'),
     );
   }
 }

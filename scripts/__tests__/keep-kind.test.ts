@@ -8,7 +8,10 @@
 // not do (the same reasoning `entries-verdict.js` was extracted for).
 import { describe, it, expect } from 'vitest'
 
-const { keepKind } = require('../lib/keep-kind.js') as { keepKind: (t: string) => string }
+const { keepKind, keepIsSettled } = require('../lib/keep-kind.js') as {
+  keepKind: (t: string) => string
+  keepIsSettled: (k: { text: string; gate: 'owner' | 'device' | null } | null, lines: string[]) => boolean
+}
 
 describe('keepKind — a residue that is a verification', () => {
   // The commonest shape by far, and it is correctly a Keep: nobody can write code for it.
@@ -79,5 +82,46 @@ describe('keepKind — check beats build on a residue that says both', () => {
   it('prefers the verification when both appear', () => {
     expect(keepKind('the ENGINE half shipped; what is owed is the device check, and only that.'))
       .toBe('check')
+  })
+})
+
+// OR-113 — nineteen entries came out of three device passes with the verification recorded and the
+// `Keep:` still claiming the check was owed, so finished work kept printing as debt. The two edits
+// are ten lines apart in the file and each reads correctly on its own, which is why reading did not
+// catch it.
+describe('keepIsSettled — the check already happened', () => {
+  const VERIFIED = ['- **✅ VERIFIED ON THE S25, 2026-09-13** (owner pass): the sheet behaved.']
+
+  it('flags a check residue on an entry that records the verification', () => {
+    expect(keepIsSettled({ text: 'the device check, and only that.', gate: null }, VERIFIED)).toBe(true)
+  })
+
+  it('stays quiet when nothing records a verification', () => {
+    expect(keepIsSettled({ text: 'the device check, and only that.', gate: null }, ['- **Lane:** B'])).toBe(false)
+  })
+
+  // The acknowledgement. A Keep narrowed against the recorded verification names the half that is
+  // DONE — without this the rule fires hardest on the entries someone handled correctly.
+  it('stays quiet once the residue says which half is DONE', () => {
+    expect(
+      keepIsSettled(
+        { text: 'the design question only — the device check is DONE (2026-09-13, below).', gate: null },
+        VERIFIED,
+      ),
+    ).toBe(false)
+  })
+
+  // A residue that is a BUILD is not this class at all: the code does not exist, so a device
+  // verification of some other half says nothing about it.
+  it('ignores a build residue even on a verified entry', () => {
+    expect(keepIsSettled({ text: 'the UI half, which is still unbuilt.', gate: null }, VERIFIED)).toBe(false)
+  })
+
+  it('treats a residue carrying a Gate as a check by construction', () => {
+    expect(keepIsSettled({ text: 'the remaining half.', gate: 'device' }, VERIFIED)).toBe(true)
+  })
+
+  it('is false when there is no residue', () => {
+    expect(keepIsSettled(null, VERIFIED)).toBe(false)
   })
 })
