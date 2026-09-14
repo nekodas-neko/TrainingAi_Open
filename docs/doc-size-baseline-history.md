@@ -11710,3 +11710,18 @@ paragraph. Adding LA-102's sentence to both would have made it three out of step
 The baton drops 109 → 106. It also **fixes an overage it did not cause**: `main` was sitting at 110
 against a 109 baseline, so a previous merge tightened the number without tightening the file. Two
 paragraphs reflowed onto single lines paid for that and this session's two additions together.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21598 (the workout device pass)
+
+Twelve net lines. Three entries gained a one-line verification, two gained a conditional-close note,
+PS-10 left the queue entirely, and BF-59 gained a table.
+
+That table is the spend worth defending. The owner delegated the call — *"you can make the decision
+here"* — and the measurement retired half the entry: the `14/10` flat binary it is written around
+belongs to **Shikai**, which stopped being the active program on 2026-09-06. Bankai's stored targets
+are already a six-value gradient. Writing the three programs side by side is what makes that legible;
+"the premise is stale" without the numbers is a claim the next session has to re-derive.
+
+The conditional-close note on BF-64 and LB-47 is deliberately longer than "owner says treat as fixed".
+It has to say that nothing was verified, so a later report of the same symptom is read as a regression
+against an unverified fix rather than as a fresh bug.
