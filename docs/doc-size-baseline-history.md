@@ -11906,7 +11906,24 @@ so — the prefix list simply never grew a `lib/` clause, because `lib/` was not
 it was written. Second, the warning not to verify by reading the workflow diff: the failure mode is a
 check that passes without running, so the evidence is the job DURATION, not the YAML.
 
-## 2026-09-14 — `docs/implementation-backlog.md` → 20974 (LB-106's cause, replaced)
+## 2026-09-14 — `projectOverview.md` → 10909, `docs/implementation-backlog.md` → 20968 (LB-107)
+
++16 on projectOverview for a device-verification row, +15 on the backlog for converting LB-107 from
+READY to KEEP. Both are paying for the same thing: the entry's stated cause was **wrong**, and
+replacing it costs more lines than deleting it would.
+
+LB-107 guessed *"exiting the app is the Android default when there is nothing to pop, so this is
+likely absent handling"*. Both halves are false — a Capacitor `backButton` listener suppresses that
+default, so the handling was present and wrong, and the dead press reached **all four** non-home
+tabs rather than some deep-link edge case. A one-line ✅ would leave the next reader with the guess
+still looking plausible, and it is exactly the kind of guess that gets re-made.
+
+The rest is the device check, which is the whole of what is still owed: the branch sits behind
+`Capacitor.isNativePlatform()`, so no sandbox run reaches the gesture, and `page.goBack()` is a
+different code path. What CI does hold is written down beside it — the premise that a tab flip
+leaves `history.length` unchanged — so the reader can tell which half is covered.
+
+## 2026-09-14 — `docs/implementation-backlog.md` → 20989 (LB-106's cause, replaced)
 
 +6 net on an entry that grew by more than that and shed the parts that were wrong. LB-106 said a
 loaded runner turned a poll timeout into a failure; the log says `page.goto: net::ERR_ABORTED` at

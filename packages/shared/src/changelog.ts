@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.456.6",
+    date: "2026-09-14",
+    changes: [
+      "Pressing back on Health, Workout, Nutrition or More now takes you to Home. It used to do nothing at all: the app switches between the five tabs without adding to the browsing history — they are side by side, not stacked — so there was nothing for back to go back to, and the press was simply swallowed. Back from Home still minimises the app, and back from a screen you opened on top of a tab (a meal, a day) still returns to that tab rather than jumping Home.",
+    ],
+  },
+  {
     version: "1.456.5",
     date: "2026-09-14",
     changes: [

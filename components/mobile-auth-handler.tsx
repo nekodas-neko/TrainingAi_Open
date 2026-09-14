@@ -4,18 +4,26 @@
 // after the Chrome Custom Tab OAuth flow completes.  Exchanges the one-time
 // token for the session cookie so the WebView is authenticated.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useWorkoutStore, isWorkoutActive } from "@/lib/stores/workout-store";
 import { LeaveWorkoutDialog } from "@/components/workout/leave-workout-dialog";
 import { useGuidedWalkStore, isGuidedWalkActive } from "@/lib/stores/guided-walk-store";
 import { LeaveWalkDialog } from "@/components/guided-walk/leave-walk-dialog";
 import { useActivityStore, isActivityActive } from "@/lib/stores/activity-store";
 import { LeaveActivityDialog } from "@/components/activity/leave-activity-dialog";
+import { backActionForPath } from "@/components/shell/tabs";
+import { navigateToTab } from "@/lib/shell-nav";
 
 export function MobileAuthHandler({ hasSession }: { hasSession: boolean }) {
   const [confirmLeaveOpen, setConfirmLeaveOpen] = useState(false);
   const [confirmLeaveWalkOpen, setConfirmLeaveWalkOpen] = useState(false);
   const [confirmLeaveActivityOpen, setConfirmLeaveActivityOpen] = useState(false);
+  // Held in a ref rather than an effect dependency: adding the router to the deps below would
+  // re-run the whole listener setup, and that effect also replays the cold-launch deep link.
+  const router = useRouter();
+  const routerRef = useRef(router);
+  routerRef.current = router;
 
   useEffect(() => {
     let cleanup: (() => void) | undefined;
@@ -27,8 +35,9 @@ export function MobileAuthHandler({ hasSession }: { hasSession: boolean }) {
       const { App } = await import("@capacitor/app");
       const { Browser } = await import("@capacitor/browser");
 
-      // Back button: navigate back through history, minimize (don't close)
-      // when already at the root — same behaviour as Messenger/Instagram.
+      // Back button: pop real history, go Home from a tab (which has nothing to pop —
+      // the shell flips tabs with replaceState), minimize (don't close) when already at
+      // the root — same behaviour as Messenger/Instagram.
       // Mid-workout, the hardware/gesture back button bypassed every other
       // "leave workout?" guard (the in-screen back arrow and the bottom-nav
       // tabs both confirm, but this global listener didn't) — confirm here too
@@ -46,10 +55,19 @@ export function MobileAuthHandler({ hasSession }: { hasSession: boolean }) {
           setConfirmLeaveActivityOpen(true);
           return;
         }
-        if (window.location.pathname === "/") {
-          App.minimizeApp();
-        } else {
-          window.history.back();
+        switch (backActionForPath(window.location.pathname)) {
+          case "minimize":
+            App.minimizeApp();
+            break;
+          case "home":
+            // The shell replaced rather than pushed to get here, so there is nothing to pop.
+            // Going through navigateToTab keeps the persistent shell — a location assignment
+            // would reload the WebView and throw away every mounted tab.
+            navigateToTab(routerRef.current, "/");
+            break;
+          case "pop":
+            window.history.back();
+            break;
         }
       });
 
