@@ -11881,3 +11881,15 @@ check is the single item releasing the most.
 
 The new lesson 1 is the session's most transferable finding: a field's job done in prose, four times
 in one day, three hiding work the queue should have shown and one showing work it should have parked.
+
+### `docs/implementation-backlog.md` → 20945 (LB-108, the E2E blind spot)
+
++28 for an entry found by noticing that a check passed too fast. PR #1173's E2E went green in **40
+seconds** on a suite that takes ~28 minutes; the job log is Postgres starting and stopping and no
+Playwright invocation at all.
+
+Most of the entry's length is the two things that stop it being "fixed" wrongly. First, LA-22's
+always-run-always-report design and LA-63's `app/api/**` exclusion are both sound and the entry says
+so — the prefix list simply never grew a `lib/` clause, because `lib/` was not browser-reached when
+it was written. Second, the warning not to verify by reading the workflow diff: the failure mode is a
+check that passes without running, so the evidence is the job DURATION, not the YAML.
