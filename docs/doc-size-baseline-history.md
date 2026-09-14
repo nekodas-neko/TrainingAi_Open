@@ -12094,3 +12094,16 @@ shipped today, not analysis.
 (70.0–72.8 against 57.5–58.0) rather than only the conclusion. That is the difference between a
 future session re-deriving the band width and reading it: the numbers are what make 8% arithmetic
 instead of a preference, and they are what say not to widen it.
+
+## 2026-09-14 — LA-48's steps half (backlog +20, projectOverview +22)
+
+Both grow for the same reason and it is the useful kind. LA-48's entry gained three corrections
+found by building it — a fifth type declaration the entry did not know about, a steps derivation
+that was wrong by 6× on a segment with a pause, and the discovery that the entry's own 2026-09-01
+correction was itself wrong about adherence being reconstructible. The third is what re-scopes the
+remaining two thirds from a build into a design decision, so the lines that describe both candidate
+shapes are the entry's most load-bearing content, not padding.
+
+`projectOverview.md` carries the arithmetic comparison (60 steps integrated vs 360 multiplied) in
+the Known-Issues row, because that is the number that stops the wrong derivation coming back at a
+call site. A row saying only "use the shared helper" would not.

@@ -43,6 +43,14 @@ const WalkSegmentStatSchema = z.object({
   avgPaceSecPerKm: z.number().positive().max(MAX_PACE_SEC_PER_KM).nullable(),
   distanceKm: z.number().nonnegative().max(MAX_ACTIVITY_DISTANCE_KM).nullable(),
   avgCadenceSpm: z.number().nonnegative().max(MAX_PLAUSIBLE_SPM).nullable(),
+  // LA-48. **This line is the whole reason the field ships in one commit with the three type
+  // declarations.** Zod strips unknown keys by default, so a `steps` added to the types and not
+  // here is dropped silently on BOTH write paths — no error, no dead letter, just an absent field
+  // — which is the 2026-08-02 silent-loss shape in reverse. Optional so that a segment written by
+  // an older client still validates.
+  // Ceiling is the fastest plausible cadence held for the longest plausible activity, which is
+  // the most steps any single segment could contain — no new constant to drift from these two.
+  steps: z.number().nonnegative().max(MAX_PLAUSIBLE_SPM * MAX_ACTIVITY_DURATION_MIN).nullable().optional(),
 })
 
 export const ActivityLogBody = z.object({
