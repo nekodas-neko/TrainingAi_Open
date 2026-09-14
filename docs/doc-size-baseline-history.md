@@ -11574,3 +11574,16 @@ still an open question for the owner and rewritten once his answer surfaced, so 
 outstanding work is a BUILD rather than a decision — including the consequence he has not seen, that
 protein holds while carbs and fat drop. A row that recorded only the fix would read as closed, and
 the next session would find the gap and refile it.
+
+## 2026-09-13 — `docs/implementation-backlog.md` → 21551 (BF-154 re-filed as buildable, not residue)
+
++4 net, and the reason is worth more than the lines. BF-154 was re-queued an hour earlier with a
+`Keep:` line so the owner's macro-anchor answer would survive the entry being deleted. That saved the
+decision and then hid it: `next-item.js` files `Keep:` entries under a bucket headed *"shipped; only
+the stated residue is owed. Not new work."* — so an answered, startable item sat where the lane is
+told not to look.
+
+**That is OR-100's failure exactly** — *"`Keep:` files buildable work under a heading that tells the
+lane not to look"* — reproduced within an hour of the entry being written, by someone who had read
+OR-100 in the same session. The field is for an owner or device CHECK; this owes code. Re-filed as a
+plain entry, it moves from KEEP to #2 of Lane A's READY.

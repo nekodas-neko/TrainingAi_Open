@@ -556,10 +556,14 @@ below threshold and left in place for next time.
 
 - **Lane:** A — `lib/health/energy-balance-service.ts` and `packages/shared/src/nutrition/`, where
   the base that `scaleMacrosForEarnedKcal` scales FROM is chosen.
-- **Keep:** the macro re-anchor, and only that. **The arithmetic half shipped 2026-09-13 (#1155,
-  v1.455.1)** — the breakdown sentence now names `budgetProvenance`'s own `base` and `earned`, says
-  *resting rate* on the anchored path, and no longer prints two different figures both labelled
-  *resting*. Guarded by `components/nutrition/__tests__/bf154-budget-breakdown-addends.test.ts` and
+- **This is BUILDABLE WORK, not residue, and it carried a `Keep:` line for one commit by mistake.**
+  `Keep:` is for an entry owing an owner or device *check*; this owes a change to the code, and the
+  owner has already approved it. The field put an answered, startable item under a KEEP heading that
+  tells the lane not to look — the exact shape OR-100 is filed about — so it is a plain queue entry.
+- **The arithmetic half shipped 2026-09-13 (#1155, v1.455.1)** and is not what this entry asks for:
+  the breakdown sentence now names `budgetProvenance`'s own `base` and `earned`, says *resting rate*
+  on the anchored path, and no longer prints two figures both labelled *resting*. Guarded by
+  `components/nutrition/__tests__/bf154-budget-breakdown-addends.test.ts` and
   `e2e/bf154-budget-breakdown-reconciles.spec.ts`, the latter proven against the defect before it was
   run against the fix.
 - **✅ THE OWNER ANSWERED, 2026-09-13: the grams follow the budget.** His words — *"Can we have it
