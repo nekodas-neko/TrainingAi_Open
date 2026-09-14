@@ -500,92 +500,6 @@ below threshold and left in place for next time.
   sources. The harness reaches the tab and proves it is wired; it cannot judge the arithmetic on a
   real library.
 
-### [platform] LA-107 — a spec can pin an absolute date against a clock-derived value, and nothing catches it until the day turns
-
-- **Lane:** A — `scripts/check-*.js` (a new Custom Rules step) plus the `e2e/` and `__tests__/`
-  fixtures it would flag.
-- **Added:** 2026-09-14 · Lane A, from the E2E failure that blocked every branch for the second time
-  in six weeks. See [the journal entry](overview/entries/2026-09-14-e2e-budget-honesty-date-rollover.md).
-- **Two incidents, same rule, both already written down and neither prevented.** CLAUDE.md states
-  it plainly — a fixture may hold an absolute date only when BOTH sides of the comparison are fixed
-  — and cites `scale-ble-day-keying.test.ts` (2026-08-03) as the worked example. On **2026-09-14**
-  `e2e/nutrition-budget-honesty.spec.ts` did the same thing: `date: '2026-09-14'` stubbed against a
-  page that guards on `todayInTz('Australia/Brisbane')`. It went red at 14:00 UTC, on every branch,
-  and does not recover. The prose rule has now failed twice; a check has not been tried once.
-- **The shape is statically visible, which is what makes this worth a script.** A literal
-  `'YYYY-MM-DD'` or `'…T…Z'` inside a test fixture is one regex. Being a literal is not itself
-  wrong — `day-rollover-checkin.spec.ts` pins a fixed instant deliberately and says so — so the
-  check needs a way to bless one, and the existing scripts' baseline-plus-exemption-with-a-reason
-  pattern is the one to copy.
-- **Start by measuring, not by writing the regex.** The flag is cheap and the corpus is not known:
-  count today's matches across `e2e/**` and `**/__tests__/**` first. If most are legitimate, a bare
-  literal-date rule is noise and the discriminator has to be narrower — a literal in the same file
-  as `todayInTz`, `AT TIME ZONE`, `Date.now()` or `new Date()` is the obvious candidate, because
-  that pairing is exactly the both-sides-fixed rule being broken.
-- **Thirteen specs already derive the user's day correctly** (`plan-day-fill.spec.ts:58` via `Intl`,
-  `one-calorie-budget.spec.ts:79` via `AT TIME ZONE`), so the check has a large known-good set to
-  validate against before it is turned on.
-- **Verification:** reintroduce `date: '2026-09-14'` into `nutrition-budget-honesty.spec.ts` and
-  confirm the check fails; confirm a clean `pnpm check:rules` on unmodified `main`, with the run
-  printing how many files it inspected rather than only that it passed.
-
-### [platform] LA-106 — a backticked `Needs:`/`Gate:` is invisible to the queue tool, and a hidden `Gate:` would unpark owner-gated work
-
-- **Lane:** A — `scripts/next-item.js` (the two field regexes) and
-  `scripts/check-backlog-pointers.js` (where the guard belongs).
-- **Added:** 2026-09-14 · Lane A, found while starting BF-158.
-- **Measured, not inferred.** `next-item.js:73` and `:76` parse the fields as
-  `/^\s*[-*]\s*\*{0,2}(Needs|Gate):\*{0,2}\s*…/i` — asterisks around the name, nothing else.
-  BF-160 wrote ``- **`Needs:` BF-158**`` with a BACKTICK, so its dependency did not parse and
-  **BF-160 printed as READY #1 while BF-158, the entry it needs, sat at #2.** Corrected in place
-  when BF-158 shipped; the trap is what remains.
-- **The `Gate:` case is the one that matters and has not happened yet.** The same regex governs
-  it, so ``- **`Gate: owner`**`` would park nothing — an agent would be handed owner-gated work as
-  the top of its queue with no sign anything was wrong. `Needs:` mis-orders; `Gate:` crosses a
-  line the owner drew.
-- **One occurrence exists today** (grep: `^\s*-\s*\*{0,2}\`(Needs|Gate|Reference):`), which is why
-  this is cheap now.
-- **Fix shape:** do NOT widen the parser to accept backticks — that rewards the ambiguity. Add a
-  check to `check-backlog-pointers.js` that fails on a line matching a field NAME followed by a
-  colon which the field regex does not then match, so the malformed line is a CI failure rather
-  than silence. `Reference:` needs the same treatment; it is parsed elsewhere but has the identical
-  shape.
-- **Verification:** write ``- **`Gate: owner`**`` into a scratch entry and confirm CI fails; confirm
-  `node scripts/next-item.js --lane A --all` is unchanged for every well-formed entry.
-
-### [nutrition] BF-154 — the macro grams still key off the stored goal, and the owner has said they should not
-
-- **Lane:** A — `lib/health/energy-balance-service.ts` and `packages/shared/src/nutrition/`, where
-  the base that `scaleMacrosForEarnedKcal` scales FROM is chosen.
-- **This is BUILDABLE WORK, not residue, and it carried a `Keep:` line for one commit by mistake.**
-  `Keep:` is for an entry owing an owner or device *check*; this owes a change to the code, and the
-  owner has already approved it. The field put an answered, startable item under a KEEP heading that
-  tells the lane not to look — the exact shape OR-100 is filed about — so it is a plain queue entry.
-- **The arithmetic half shipped 2026-09-13 (#1155, v1.455.1)** and is not what this entry asks for:
-  the breakdown sentence now names `budgetProvenance`'s own `base` and `earned`, says *resting rate*
-  on the anchored path, and no longer prints two figures both labelled *resting*. Guarded by
-  `components/nutrition/__tests__/bf154-budget-breakdown-addends.test.ts` and
-  `e2e/bf154-budget-breakdown-reconciles.spec.ts`, the latter proven against the defect before it was
-  run against the fix.
-- **✅ THE OWNER ANSWERED, 2026-09-13: the grams follow the budget.** His words — *"Can we have it
-  dynamically sized for my calories? I.e before excercise its 1 value and after its another if
-  calories increase?"* So the gram targets take the **budget** as their base, not the stored 1,660,
-  and the printed gap goes to zero by construction rather than being explained.
-  `scaleMacrosForEarnedKcal` already grows them with `earned` and holds protein fixed while splitting
-  the rest on the stored carb/fat ratio — that half is built and needs no change. What changes is the
-  base it scales FROM.
-- **⚠ Flag when building:** protein is held constant by that function, so re-basing from 1,660 to
-  ~1,294 drops carbs and fat while 150 g protein stands. That is the right shape for a cut and a
-  visible change to his targets — worth confirming on the first day it renders rather than after a
-  week of it.
-- **Two things #1155 left behind become dead when this lands, and go in the same change:** the
-  explanatory paragraph in `components/nutrition/energy-card.tsx` exists only because the two numbers
-  disagree, and `components/nutrition/macro-budget-gap.ts` exists only to measure that disagreement.
-  A gap that is zero by construction needs neither. Do not leave a card explaining a difference that
-  no longer exists.
-- **Added:** 2026-09-13 · re-queued from the shipped half, so the owner's answer is not lost with the
-  entry that carried it.
-
 ### [app-shell] LB-107 — back on a tab with nothing to pop should land on Home, not leave the app
 - **Lane:** B — the tab shell's history handling; `app/**` and `components/shell/**`.
 
@@ -3038,17 +2952,30 @@ sheet is open over the bottom half of it.
     `diary-nested-meal:163` both went flaky on `browser.newContext: Target page, context or browser
     has been closed` after `Received signal 11 SEGV_MAPERR 0000000001b0` — same address, fifth time.
     Both recovered; the run's one hard failure was a real fixture fault in a spec that PR added.
+  - **⚠ EIGHTH SIGHTING 2026-09-14 (#1186), and it is the first with a CONTROLLED re-run.**
+    `back-dismiss-sweep:171` was the hard failure — both its attempts died at `browser.newContext`
+    after `Received signal 11 SEGV_MAPERR 0000000001b0`, the same address for the sixth time — beside
+    `diary-nested-meal:197` (second time) and `saved-meal-tags:75`, which crashed identically and
+    recovered. 201 passed, and a grep of the whole log for `expect(received)` / `Expected:` /
+    `Received:` returned **zero matches**: not one assertion failed in the entire run.
+  - **Re-running the same job on the same commit came back fully green**, which is the datum the
+    previous seven sightings could not supply. The crash is not a property of a commit, and a
+    re-run is an effective mitigation for a single occurrence — at the price of ~30 minutes. That is
+    an argument for this entry's conclusion rather than against it: the job is a coin-flip whose
+    cost is paid per PR, not a signal about the code under test.
+
   - **`touch-target-size:53` failed with `/: no interactive elements found`**, which is the same
     dead-renderer downstream wearing a third mask: the page never rendered, so the measurement had
     nothing to measure and the assertion read as a layout defect. Worth naming, because unlike
     `ERR_ABORTED` and `newContext` it looks like a genuine product failure on its own.
-  - **Seven sightings, eleven different specs** — `preferences-survive-reinstall` (×4, three times as
-    the hard failure), `touch-target-size` (×2), `macro-calorie-warning` (×2), `one-calorie-budget`,
-    `back-dismiss-sweep`, `card-429-error-state`, `home-device-battery-chips`,
-    `baseline-progress-label`, `health-tabs-instant-paint`, `meal-label`, `diary-nested-meal`. Which
-    spec is reported is a scheduling accident, as this entry said at the second sighting; the
-    constant is a renderer crash inside a 21–26 minute run. **It has now cost eight log reads across
-    three sessions**, one of them only to establish the hard failure was something else.
+  - **Eight sightings, twelve different specs** — `preferences-survive-reinstall` (×4, three times as
+    the hard failure), `touch-target-size` (×2), `macro-calorie-warning` (×2), `diary-nested-meal`
+    (×2), `back-dismiss-sweep` (×2, once as the hard failure), `one-calorie-budget`,
+    `card-429-error-state`, `home-device-battery-chips`, `baseline-progress-label`,
+    `health-tabs-instant-paint`, `meal-label`, `saved-meal-tags`. Which spec is reported is a
+    scheduling accident, as this entry said at the second sighting; the constant is a renderer crash
+    inside a 21–30 minute run. **It has now cost nine log reads across four sessions**, one of them
+    only to establish the hard failure was something else.
   - Recorded because a 26-minute job that eats its own browser roughly one run in three is an
     argument about the job, which is what this entry is for. It also means **a red E2E cannot be
     read as a signal without opening the log**, which is the cost LB-54 is about.

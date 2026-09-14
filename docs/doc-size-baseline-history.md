@@ -12007,14 +12007,59 @@ from synthetic MET fixtures, and the CI assertion that would check a real magnit
 same reason. A row claiming the calories now work, without that sentence, would be claiming more than
 was measured.
 
-## 2026-09-11 — `docs/implementation-backlog.md` → 20958 (RV-42 shipped)
+## 2026-09-14 — `docs/implementation-backlog.md` → 20954 (LA-107)
+
+−29 for LA-107 leaving the queue, the same day it entered it.
+
+Worth one line because the entry's value was almost entirely in a method instruction rather than a
+specification: it said to measure the corpus before writing the regex, and named a candidate
+discriminator. The measurement showed that discriminator does not catch the case the entry was
+written about — the pre-fix spec held no clock reference at all, because the clock lives in the app
+it drives. An entry that had simply said "add a check" would have produced one that passed and
+proved nothing.
+
+## 2026-09-14 — `docs/implementation-backlog.md` → 20930 (LA-106)
+
+−24 for LA-106 leaving the queue.
+
+The entry was right about the thing that had not happened yet, which is why it was worth building
+rather than closing. Its measured harm was a mis-ordered queue — BF-160 above the entry it needed.
+Its unmeasured harm is a `Gate:` that parks nothing, handing an agent owner-gated work with no sign
+anything is wrong. One of those is an annoyance and the other crosses a line the owner drew, and the
+check costs the same either way.
+
+## 2026-09-14 — `docs/implementation-backlog.md` → 20897, `projectOverview.md` → 11020 (BF-154)
+
+−33 on the backlog for BF-154 leaving the queue; +35 on projectOverview, which is more than the fix
+is complicated and is spent on one warning.
+
+The change makes the owner's carb and fat targets visibly DROP — protein is held per kg of
+bodyweight, so re-basing from ~1,660 to ~1,294 takes the whole difference out of the other two. The
+seeded test account moves the **other way**, because its budget base sits above its stored goal, so
+the sandbox cannot show him what he will see. A row recording only "the grams follow the budget now"
+would be true and would leave him to discover the rest on a Tuesday morning.
+
+## 2026-09-14 — `docs/implementation-backlog.md` → 20910 (LB-56's eighth sighting)
+
++14 to record the E2E renderer crash's eighth occurrence on LB-56, which already tracked seven.
+
+Worth the lines for one datum the previous seven could not supply: the same job, re-run on the same
+commit, came back fully green. That separates the crash from the code under test outright, and makes
+a re-run a known mitigation priced at ~30 minutes. It is evidence for the entry's own conclusion
+rather than against it.
+
+**A new entry was nearly filed instead**, on the belief that nothing had recorded the pattern. LB-56
+had recorded it seven times. The check that caught it was one grep for `SEGV_MAPERR` across `docs/`
+before writing, which is cheaper than the duplicate would have been to unpick.
+
+## 2026-09-11 — `docs/implementation-backlog.md` → 20885 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 
-**This figure has been rewritten TWENTY-NINE times and the churn is the note worth leaving.**
-Eighty-five other merges have landed on `main` while this PR waited on an owner decision, and each one
+**This figure has been rewritten THIRTY times and the churn is the note worth leaving.**
+Eighty-nine other merges have landed on `main` while this PR waited on an owner decision, and each one
 moved the base out from under it — so the starting figure is no longer even quoted here, because it
-changed again between the last two rewrites. **Twenty-nine rewrites of one number is the cost of a
+changed again between the last two rewrites. **Thirty rewrites of one number is the cost of a
 green PR waiting**, recorded rather than smoothed because the alternative reading — that someone kept
 getting the arithmetic wrong — is the wrong lesson. Both counts are measurements, not tallies kept by
 hand: the rewrites are the first-parent commits on this branch that touch this file, the merges are
@@ -12022,7 +12067,7 @@ the first-parent commits on `main` since its branch point. The hand-kept version
 numbers read "twenty-five" and "forty-five" when they were really twenty-seven and seventy-three,
 which is its own small argument for deriving a figure rather than incrementing one. The per-file
 `.size` split (LA-33) is what keeps this to one number instead of a whole map: no other document's
-baseline has conflicted once across all twenty-nine. Nothing was wrong with any of them — each was
+baseline has conflicted once across all thirty. Nothing was wrong with any of them — each was
 correct against the `main` of its hour. Under six concurrent lanes plus an owner gate, a baseline is a
 reading of a moving number, and a PR that waits will re-read it once per merge that overtakes it.
 Recomputed by `pnpm fix:baselines` after each merge, which is the only thing that makes the

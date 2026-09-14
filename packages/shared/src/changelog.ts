@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.456.11",
+    date: "2026-09-14",
+    changes: [
+      "Your protein, carb and fat targets now follow your calorie budget for the day instead of the goal figure stored in settings. They start at your resting rate and grow as you move, so the grams and the calories are finally the same number seen two ways — before this they could differ by several hundred calories, and no amount of walking closed the gap. Protein stays where it is, because it is set per kilogram of bodyweight and a walk does not change what your body is made of; carbs and fat absorb the difference, keeping the ratio between them. If your stored goal was higher than your budget, expect your carb and fat targets to come down. The card no longer carries the paragraph that used to explain the mismatch, because there is no longer a mismatch to explain.",
+    ],
+  },
+  {
     version: "1.456.10",
     date: "2026-09-14",
     changes: [
