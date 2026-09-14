@@ -11725,3 +11725,14 @@ implementation" would have passed with the component absent.
 A row that recorded only the seed-dependence would leave the next reader believing the other half
 was sound. The label list being wrong as well (`Body composition`, never matched by `^Body$`) is the
 detail that shows how long it had been matching nothing.
+
+### `docs/implementation-backlog.md` → 21586, baton → 105 (LB-106, filed during LB-105's merge)
+
++22 for one entry, filed rather than waved through. `preferences-survive-reinstall` failed on CI on a
+PR that does not touch it, having been flaky on a different PR's run four hours earlier, and passes
+locally. E2E is advisory and the required five were green, so #1166 merged — but merging past a red
+check without recording why is how a real failure gets waved through, which is the exact sentence
+LB-105's own entry is about.
+
+Most of the entry's length is the instruction NOT to lengthen the poll timeout first: that is the
+fix that makes a genuine hydration regression invisible, and it is what a reader reaches for.

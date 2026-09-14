@@ -3,7 +3,7 @@
 > **Successor sessions are titled `🚧 Implementation Agent (B) 🟢`** — exactly. A renamed successor
 > is a lost thread.
 
-**Updated:** 2026-09-14 · **By:** the twenty-seventh Lane B run · **Next ID:** `LB-106`
+**Updated:** 2026-09-14 · **By:** the twenty-seventh Lane B run · **Next ID:** `LB-107`
 
 > **A mistyped ID here silently advances the lane's numbering.** Allocate with `grep -rhoE
 > '\bLB-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`, and check the max in the **journal** too — a
@@ -34,8 +34,7 @@ TN-28 now READY). Documented; the four `TN-` ones are **LB-104**.
 
 ## Blocked
 
-- **LB-105: `day-review-read-through.spec.ts` test 1 is RED locally, GREEN on CI** — so it is the
-  sandbox seed, and a spec that disagrees by environment trains a session to skip it. It is READY.
+- **LB-106: `preferences-survive-reinstall` fails on CI, passes locally — flaky 03:47, hard fail 07:12, neither PR touching it.** E2E is advisory; #1166 merged on the required five with this recorded, not waved through.
 - **~50 VERIFY entries owe a look.** BF-136/LB-99 sharpest (only the owner's account has a real dosing period); BF-139 owes the **daytime** case. **BF-157's chip-vs-bar agreement is native — unverifiable in the sandbox.**
 - **⚠ OR-108's picture will not show on the S25 until `LA-36` lands** — all three local-store reads omit `image_data_uri`, so the device reads null from a column now filled. Web is fine.
 - **Owner:** the macro/budget anchor (BF-134's residue, TN-29 protects the stored 1,660); LB-61's switch colour; whether the PWA lands on Home rather than Workout (PS-35).
