@@ -12040,3 +12040,16 @@ bodyweight, so re-basing from ~1,660 to ~1,294 takes the whole difference out of
 seeded test account moves the **other way**, because its budget base sits above its stored goal, so
 the sandbox cannot show him what he will see. A row recording only "the grams follow the budget now"
 would be true and would leave him to discover the rest on a Tuesday morning.
+
+## 2026-09-14 — `docs/implementation-backlog.md` → 20910 (LB-56's eighth sighting)
+
++14 to record the E2E renderer crash's eighth occurrence on LB-56, which already tracked seven.
+
+Worth the lines for one datum the previous seven could not supply: the same job, re-run on the same
+commit, came back fully green. That separates the crash from the code under test outright, and makes
+a re-run a known mitigation priced at ~30 minutes. It is evidence for the entry's own conclusion
+rather than against it.
+
+**A new entry was nearly filed instead**, on the belief that nothing had recorded the pattern. LB-56
+had recorded it seven times. The check that caught it was one grep for `SEGV_MAPERR` across `docs/`
+before writing, which is cheaper than the duplicate would have been to unpick.
