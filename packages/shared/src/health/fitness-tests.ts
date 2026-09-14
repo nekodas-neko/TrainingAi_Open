@@ -8,7 +8,49 @@ function round1(x: number): number {
   return Math.round(x * 10) / 10
 }
 
-const clampVo2 = (v: number): number => round1(Math.max(10, Math.min(100, v)))
+/** The lowest VO₂max this file treats as a reading. Below it, a number is not a measurement. */
+const VO2_FLOOR = 10
+
+const clampVo2 = (v: number): number => round1(Math.max(VO2_FLOOR, Math.min(100, v)))
+
+/**
+ * The shortest distance each protocol can turn into a reading (BF-158).
+ *
+ * **Both distance protocols take distance from GPS and nothing else** — `test-active.tsx` has no
+ * treadmill toggle and no manual entry, unlike the guided walk. Run indoors, they complete a
+ * full-length, correctly-timed capture with a distance near zero, and then score it.
+ *
+ * What they scored before this guard, measured:
+ *
+ * | protocol | at 0 m | why it is bad |
+ * |---|---|---|
+ * | Cooper | **−11.3** | unclamped; the 504.9 intercept makes anything under 505 m negative |
+ * | 6MWT (Ross) | **10.0** | clamped up from 4.9 — a floor presented as a reading |
+ * | 6MWT (Burr) | **34.8** | profile terms dominate distance; entirely plausible, entirely fake |
+ *
+ * **The Burr case is the worst and is why clamping is not the fix.** A negative announces itself;
+ * 34.8 does not. So the guard is on the DISTANCE, before any equation runs.
+ *
+ * Each threshold is the distance at which that protocol's **distance-only** equation reaches
+ * `VO2_FLOOR` — derived, not chosen, so the two protocols agree on what counts as a reading.
+ * Cooper: `10 × 44.73 + 504.9`. 6MWT: `(10 − 4.948) / 0.023` from the Ross fallback, which is the
+ * branch that depends on distance alone. Both sit below the worst genuine effort — a 12-minute run
+ * under 952 m is 4.8 km/h, and a 6-minute walk under 220 m is 2.2 km/h.
+ */
+export const MIN_SCOREABLE_DISTANCE_M: Record<Vo2Equation, number> = {
+  cooper: round1(VO2_FLOOR * 44.73 + 504.9),      // 952.2
+  '6mwt': round1((VO2_FLOOR - 4.948) / 0.023),    // 219.7
+}
+
+export type Vo2Equation = '6mwt' | 'cooper'
+
+/**
+ * False when the capture's distance cannot have come from the protocol, so the score is withheld
+ * rather than invented. NaN and undefined fail the comparison and are withheld too.
+ */
+export function distanceCanBeScored(equation: Vo2Equation, distanceM: number): boolean {
+  return distanceM >= MIN_SCOREABLE_DISTANCE_M[equation]
+}
 
 export interface SixMwtInputs {
   distanceM: number

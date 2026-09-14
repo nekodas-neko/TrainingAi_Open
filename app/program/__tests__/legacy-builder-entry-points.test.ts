@@ -14,69 +14,67 @@ import { join } from 'node:path'
  * query string. `?new=program` never arrived, so the AI prescription card's post-deload "New
  * program" action opened the Builder and silently failed to open the sheet.
  *
- * **Q-235** made the Builder its own route, `/program`, which is why this file was rewritten rather
- * than deleted when its original assertions stopped compiling against reality: the *invariant*
- * survives the restructure even though every specific it named is gone. There is no `tab=` value to
- * agree on any more; what must still hold is that every legacy entry point lands on the Builder and
- * carries its parameters.
+ * **PS-35a deleted `/config` itself** (owner, 2026-09-14: *"We only use the APK - delete them if not
+ * needed"*), which is why this file moved out of `app/config/__tests__/` and was re-pointed rather
+ * than deleted. **The invariant outlived every specific that named it, twice now** — first the
+ * `tab=` value when Q-235 gave the Builder its own route, now the redirect hop itself. What must
+ * still hold is that every entry point to the Builder lands on it and carries its parameters.
+ *
+ * The forwarding guard is the one that changed shape. There is no redirect left to forward a query
+ * string, so the thing that can now silently drop `new=program` is the **call site**: the
+ * prescription card has to pass it and `/program` has to read it. Both are asserted below.
  *
  * A source-text check is the honest shape here — the repo runs `environment: 'node'` with no jsdom,
  * so rendering these routes to assert where they land is not available without a dependency
  * decision this test should not make.
  */
-/** Comments are not behaviour. Both negative assertions below first failed on prose describing the
- *  very bugs they guard — the comment in `config/page.tsx` explaining the old `/more?tab=` target,
- *  and the one in `config-screen.tsx` explaining the old `window.location.search` read. Stripping
- *  comments keeps the assertions strict about code without making them unwritable-about. */
+/** Comments are not behaviour. The negative assertions below first failed on prose describing the
+ *  very bugs they guard — the comment in `config-screen.tsx` explaining the old
+ *  `window.location.search` read. Stripping comments keeps the assertions strict about code without
+ *  making them unwritable-about. */
 function code(src: string): string {
   return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
 }
 
 const root = process.cwd()
-const CONFIG_PAGE = readFileSync(join(root, 'app/config/page.tsx'), 'utf8')
 const MORE_CONTENT = readFileSync(join(root, 'app/more/more-content.tsx'), 'utf8')
 const PROGRAM_CONTENT = readFileSync(join(root, 'app/program/program-content.tsx'), 'utf8')
+const PROGRAM_PAGE = readFileSync(join(root, 'app/program/page.tsx'), 'utf8')
+const PRESCRIPTION_CARD = readFileSync(join(root, 'components/workout/ai-prescription-card.tsx'), 'utf8')
 
 describe('legacy entry points reach the Program Builder', () => {
   it('/program is where the Builder actually mounts', () => {
-    // Everything below asserts a redirect *to* /program. If ConfigScreen ever stops being what
+    // Everything below asserts a link *to* /program. If ConfigScreen ever stops being what
     // /program renders, those assertions would all still pass while pointing at nothing.
     expect(PROGRAM_CONTENT).toMatch(/import\(["']@\/components\/config-screen["']\)/)
     expect(PROGRAM_CONTENT).toMatch(/<ConfigScreen/)
   })
 
-  it('/config redirects to /program', () => {
-    expect(CONFIG_PAGE).toMatch(/redirect\([^)]*['"`]\/program/)
-    // The pre-Q-235 target. A redirect back into a More sub-tab would resurrect both bugs at once.
-    expect(code(CONFIG_PAGE)).not.toMatch(/\/more\?tab=/)
+  it('the deleted /config alias has not come back', () => {
+    // PS-35a removed it. A re-added redirect is not harmless: it reintroduces the hop whose
+    // query-string handling is what Q-256 was.
+    expect(() => readFileSync(join(root, 'app/config/page.tsx'), 'utf8')).toThrow()
   })
 
-  // The other assertions here read source text, which is enough for "does this file still say the
-  // right thing". It is NOT enough for forwarding: a first version of this test asserted that
-  // `searchParams` and `URLSearchParams` appear in the file, and a mutation that kept both and set
-  // the suffix to `''` passed it while dropping every param — a guard recognising the shape of the
-  // fix rather than its effect. So this one calls the route. `redirect()` throws a NEXT_REDIRECT
-  // whose digest carries the target, which is the observable behaviour and cannot be faked by
-  // mentioning the right identifiers.
-  async function redirectTargetOf(params: Record<string, string>): Promise<string> {
-    const mod = await import('@/app/config/page')
-    try {
-      await mod.default({ searchParams: Promise.resolve(params) })
-    } catch (err) {
-      const digest = (err as { digest?: string }).digest ?? ''
-      const m = digest.match(/NEXT_REDIRECT;[^;]*;([^;]*)/)
-      if (m) return m[1]
-      throw err
+  it('the new-program deep link is passed by the caller and read by the route (Q-256)', () => {
+    // With the redirect gone, this is the whole path: the card must send the param and the route
+    // must consume it. Either half missing is the original silent failure in a new place.
+    expect(PRESCRIPTION_CARD).toMatch(/['"`]\/program\?new=program['"`]/)
+    expect(PROGRAM_PAGE).toMatch(/newParam === ["']program["']/)
+  })
+
+  it('no in-repo caller still points at a deleted alias route', () => {
+    // The five PS-35a deleted: /config, /stats, /profile (bare), /session-select, /workout-select.
+    // A missed call site is a 404 inside the APK, which is exactly what the owner's condition on
+    // that entry was about.
+    for (const [file, src] of [
+      ['ai-prescription-card', PRESCRIPTION_CARD],
+      ['more-content', MORE_CONTENT],
+      ['program-content', PROGRAM_CONTENT],
+    ] as const) {
+      expect(code(src), `${file} still links to a deleted alias`)
+        .not.toMatch(/["'`]\/(config|stats|session-select|workout-select)(["'`?])/)
     }
-    throw new Error('/config did not redirect')
-  }
-
-  it('/config forwards its query string rather than dropping it (Q-256)', async () => {
-    expect(await redirectTargetOf({ new: 'program' })).toBe('/program?new=program')
-  })
-
-  it('/config with no params redirects cleanly, without a trailing ?', async () => {
-    expect(await redirectTargetOf({})).toBe('/program')
   })
 
   it('/more?tab=workout still resolves to the Builder instead of falling through (Q-223)', () => {
@@ -95,7 +93,7 @@ describe('legacy entry points reach the Program Builder', () => {
   it('the new-program deep link is a prop, not a window.location read (Q-256)', () => {
     // window.location.search is what let a dropped param fail silently: the component asked the URL
     // directly, so nothing between the link and the screen had to know the param existed. As a prop
-    // resolved from /program's own searchParams, a redirect that forgets it changes a call site.
+    // resolved from /program's own searchParams, a caller that forgets it changes a call site.
     const CONFIG_SCREEN = readFileSync(join(root, 'components/config-screen.tsx'), 'utf8')
     expect(CONFIG_SCREEN).toMatch(/openNewProgram\?: boolean/)
     expect(code(CONFIG_SCREEN)).not.toMatch(/window\.location\.search/)

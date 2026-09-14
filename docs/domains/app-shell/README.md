@@ -30,16 +30,24 @@ split is "does it feel slow" vs "is it actually slow at the source".
 - Reviews: [`docs/reviews/2026-07-21-ui-responsiveness-audit.md`](../../reviews/2026-07-21-ui-responsiveness-audit.md) ·
   [`docs/reviews/2026-07-11-offline-feel-performance-review.md`](../../reviews/2026-07-11-offline-feel-performance-review.md) ·
   [`docs/reviews/2026-07-20-wiring-caching-perf-audit.md`](../../reviews/2026-07-20-wiring-caching-perf-audit.md)
-- [`docs/overview/entries/2026-09-11-fix-nutrition-scroll-and-day-padding.md`](../../overview/entries/2026-09-11-fix-nutrition-scroll-and-day-padding.md)
+- [`2026-09-11-fix-nutrition-scroll-and-day-padding`](../../overview/history-2026-09-14-folded-1.md#2026-09-11-fix-nutrition-scroll-and-day-padding)
   — **Nutrition keeps its scroll position; `/health/day` clears the gesture bar (RV-36, RV-37),
   2026-09-11.** BF-100's restoration lives in `PullToSync` and therefore reached **three** screens,
   not five — *"every screen using the shell inherits it"* was wrong at the call site as well as in
   the entry, and is now gone from both. **A screen that scrolls its own container gets no restoration
   from being inside the shell — check the call, not the layout.** `/health/day`'s scroller had no
   bottom padding at all. Both owe **one** device pass; RV-37 has still never been observed.
+- [`docs/overview/entries/2026-09-14-lb107-back-on-tab-goes-home.md`](../../overview/entries/2026-09-14-lb107-back-on-tab-goes-home.md)
+  — **Back on a tab was a silent no-op, on all four non-home tabs (LB-107), 2026-09-14.** Registering
+  a Capacitor `backButton` listener **suppresses the Android default**, so the app was never going to
+  exit; the listener then called `history.back()`, and the shell flips tabs with `replaceState`, so
+  there was nothing to pop. **A `backButton` listener owns the whole gesture — any path it does not
+  handle is dead, not defaulted.** `tab-shell.tsx` carried a comment asserting the opposite
+  (*"Android back exits the app like a native tab app"*), which is how it survived; the fix corrects
+  it. `backActionForPath` (`components/shell/tabs.ts`) is the one place that decides. Device pass owed.
 - [`docs/reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md`](../../reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md)
 - [`docs/reviews/2026-09-06-deload-confirm-eviction-gap.md`](../../reviews/2026-09-06-deload-confirm-eviction-gap.md) — **the owner's stale-screen report traced to cause, 2026-09-06** (RV-49 — the Home deload confirm calls `invalidatePrescriptionChanged()` id-less, which the group's own conditional turns into a no-op for every `workout-card:<id>`, and `next-session` is not in the group; RV-50 — three raw seed-only `readCacheSync('workout-card:<id>')` reads that can never revalidate). The nutrition add surface swept in the same pass is **clean at source** — all nine writers close the `onLogged` loop.
-- [`docs/overview/entries/2026-09-11-fix-ps35b-boot-and-weather.md`](../../overview/entries/2026-09-11-fix-ps35b-boot-and-weather.md)
+- [`2026-09-11-fix-ps35b-boot-and-weather`](../../overview/history-2026-09-14-folded-1.md#2026-09-11-fix-ps35b-boot-and-weather)
   — **four boot/chip fixes from the checkpoint (PS-35b), 2026-09-11.** PWA `start_url` pointed at a
   bare `redirect()`; the boot warm used a bare `fetch` the in-flight map cannot see (**A/B 34 → 29
   requests**); the E1-4 rehydrate comment claimed a previous-day abandonment production never did —

@@ -2063,7 +2063,7 @@ the Nutrition tab owns its own scroller. Measured: `/more` → Profile details �
 wrong *"every screen using the shell inherits it"* phrasing is gone from `pull-to-sync.tsx`'s own
 comment as well as from the entry. **RV-37:** `/health/day`'s scroller had no bottom padding at all,
 so its last card ended flush with the S25's gesture bar; it now carries `pb-nav-safe`.
-[Journal](entries/2026-09-11-fix-nutrition-scroll-and-day-padding.md).
+[Journal](history-2026-09-14-folded-1.md#2026-09-11-fix-nutrition-scroll-and-day-padding).
 **Owed: one device pass covering both.** RV-36's check is the **system back gesture**, the one gesture
 the harness cannot send. RV-37 **was never observed and still has not been** — the seeded fixture
 renders "Nothing logged on this day", so the container never scrolls; the missing padding was read
@@ -2112,8 +2112,8 @@ one. (2) Correcting the date did **not** clear the symptom: the chip read *"Not 
 yet"* above its own *"6 weigh-ins over 5 days"*, because `weightResponse()` returns a full result
 whose `verdict` is null when the range straddles the band and the card rendered that as the no-data
 state. It now reads *"Not called yet"*.
-[Journal](entries/2026-09-10-fix-vial-opened-date.md) ·
-[Journal](entries/2026-09-10-fix-weight-response-undecided-label.md).
+[Journal](history-2026-09-14-folded-1.md#2026-09-10-fix-vial-opened-date) ·
+[Journal](history-2026-09-14-folded-1.md#2026-09-10-fix-weight-response-undecided-label).
 **Owed: the S25.** The date control is a native `<input type="date">`, so the picker is the device's
 own and has not been opened on one; and the owner's account is the only one with a real dosing period
 to render against. **Worth reading before the next "no data" report:** LB-99's entry keeps its wrong

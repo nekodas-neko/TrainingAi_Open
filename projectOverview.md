@@ -29,6 +29,18 @@
 **Version:** v1.456.4 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-14.
 
+**BF-110's blank resume now gets a second look, and the next move is the owner's (no version bump —
+instrumentation only).** Sixteen `error_events` samples separate perfectly on viewport height: every
+blank resume reports **667**, every rendered one **826**, and 826 is the S25's real CSS viewport.
+384×667 is the classic *default* a WebView falls back to before it is told the real size — so the
+shape is *"resumed at a fallback viewport and rendered almost nothing into it"*, not *"the renderer
+died"*. **What the data could not separate is a viewport genuinely stuck from a measurement taken too
+early**, and those point at different files. `handleResume` now logs the viewport again
+**500 ms into the same resume**, riding the first row's budget so a reported resume costs two rows
+and an unreported one costs none. Next: one blank resume in normal use, then read
+`bf110 resume recheck%` — **`stuck` means native, `resized` means render timing.** No fix before that
+row exists ([journal](docs/overview/entries/2026-09-14-bf110-second-viewport-log.md)).
+
 **BF-100 is failing on the S25, not awaiting a check — and it read as the latter for a day.** Owner,
 2026-09-13: *"Checked on more - and still doesnt work"*, its **second** failure. That was recorded
 inside **RV-36's** body, an entry that had already shipped (2026-09-11) and been S25-verified
@@ -1846,6 +1858,22 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [app-shell] ⚠️ Back on a tab now goes Home, and the gesture itself is not device-verified (LB-107, 2026-09-14)
+
+Shipped in v1.456.6. The owner reported that back on a tab *"should go to the home screen"*; what it
+actually did was **nothing** — and on all four non-home tabs, not an edge case. The Capacitor
+`backButton` listener suppresses the Android default, then called `history.back()`; the shell flips
+tabs with `replaceState`, so there was nothing to pop and the press was swallowed. `backActionForPath`
+now returns `home` for a tab root, `minimize` for `/`, `pop` for everything else.
+
+**The gesture is owed on the S25 and cannot be checked anywhere else.** The whole branch sits behind
+`Capacitor.isNativePlatform()`, so `pnpm dev` never reaches it, and `page.goBack()` is a different
+code path from the system gesture. What CI does hold is the premise:
+`e2e/tab-flip-leaves-nothing-to-pop.spec.ts` measures that a tab flip leaves `history.length`
+unchanged while a sub-route push grows it. **Check on device:** from Health/Workout/Nutrition/More
+the back gesture lands on Home; from Home it minimises; from a meal or day opened on top of a tab it
+returns to that tab, not Home.
+
 ### [nutrition] ⚠️ The vial sheet's rewrite is not device-verified (BF-153, 2026-09-13)
 
 Shipped in v1.454.1: the vial in use is named and moved above the create-form, the form is headed
@@ -2104,7 +2132,7 @@ The PWA `start_url` pointed at a bare `redirect()`; the boot warm used a bare `f
 `cachedFetch`'s in-flight map cannot see (**A/B: 34 → 29 requests on boot**); the E1-4 rehydrate
 comment claimed a previous-day-workout abandonment production never did; and the weather chip had no
 failure state over a cache that was one unkeyed entry read before any coordinates were known.
-[Journal](docs/overview/entries/2026-09-11-fix-ps35b-boot-and-weather.md).
+[Journal](docs/overview/history-2026-09-14-folded-1.md#2026-09-11-fix-ps35b-boot-and-weather).
 **Owed: the device check, and one path the sandbox cannot reach.** There is no outbound route to
 `api.open-meteo.com` here, so only the weather **failure** branch was rendered — the keyed cache and
 the instant-paint seed are unit-tested, not observed end to end. On the S25: launch from the
@@ -3311,6 +3339,37 @@ check it asked for has now been run. (Found while answering an unrelated Sentry 
 - **Keep: the device write path has not run.** `getLocalStore` returns null on web, so every exercised path — including the `plan_meal_answers` decline that suppresses a meal from the offer — took the `/api/nutrition/food-logs` fallback rather than the SQLite write plus outbox a real tap takes. `e2e/plan-day-fill.spec.ts` covers the selection and the write end to end, and all ten guards in the selector are mutation-checked, but on the web path only. The button has not been seen on the S25.
 - **Q-354 is a live trap for spec authors, not just a curiosity.** The new spec's `locator.click()` did nothing at all — no toast, no request, no error — because the Nutrition scroll container's date-swipe `useDrag` swallows mouse input, which is what Playwright sends. `tap()` works and is the faithful input anyway. Every future e2e assertion that presses something on this screen has to know this first, and the failure gives no clue.
 - **Q-187 is re-scoped, not struck.** What remains is the owner's second sentence — the day re-calculating remaining meals against what was actually eaten — which has no design and three open questions (what gets re-scaled, whether a floor exists, what to say when the remaining macros are unreachable).
+
+### [cardio] ⚠️ A fitness test with no distance now withholds its score; the indoor case is untested on device (BF-158, 2026-09-14, v1.456.8) · needs: device
+
+Found from the owner's pre-flight question before his first Cooper test — he nearly ran it on a
+treadmill. **Both distance protocols take distance from GPS and nothing else** (`test-active.tsx`
+has no treadmill toggle and no manual entry, unlike the guided walk), so run indoors they complete a
+full-length, correctly-timed capture with a distance near zero and then score it.
+
+| protocol | scored at 0 m | |
+|---|---|---|
+| Cooper | **−11.3** | unclamped — announces itself |
+| 6MWT (Ross) | **10.0** | clamped up from 4.9 |
+| 6MWT (Burr) | **34.8** | *the owner's own profile* — wholly plausible, entirely fake |
+
+**The entry named only Cooper; the 6MWT was the worse half and is fixed too.** A negative is
+obviously wrong. 34.8 is not, and it would have entered the fitness snapshot as a real reading.
+
+Fixed by guarding the **distance** before any equation runs, with thresholds **derived** from each
+protocol's distance-only equation reaching `clampVo2`'s existing floor of 10 — Cooper 952.2 m,
+6MWT 219.7 m. Both sit below the worst genuine effort: the owner's stored 6MWT (603 m) still scores
+18.8, matching his `ross_2010` record exactly. The score and the `method` are withheld together, and
+the screen says why.
+
+**Deliberately NOT done:** manual distance entry, so a treadmill readout could be typed in. The entry
+calls that the owner's call; the safety half stands alone, and the screen now says the test needs
+GPS rather than failing silently. **If you want indoor tests to work, that is the follow-up.**
+
+**Not device-verified.** A fitness test needs a real 6- or 12-minute GPS capture, which the sandbox
+cannot produce — the guard is verified by unit test and source assertion. **The check:** run a
+protocol to full duration with GPS unavailable, confirm no VO₂max is saved and the screen explains
+why, and confirm an outdoor run is unchanged.
 
 ### [cardio][devices] ⚠️ The guided walk paces you by cadence now; no strap has ever driven it (Q-410, v1.411.0)
 

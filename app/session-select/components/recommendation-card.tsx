@@ -194,7 +194,7 @@ function RecommendationCardComponent({
             displaySessionPhase.blockComplete ? (
               <div className="flex items-center justify-between text-xs rounded-xl bg-muted/50 px-3 py-2">
                 <span className="flex items-center gap-1 font-semibold"><PartyPopperIcon className="w-3.5 h-3.5" /> Block complete!</span>
-                <a href="/config" className="font-medium" style={{ color: _rtColor }}>
+                <a href="/program" className="font-medium" style={{ color: _rtColor }}>
                   Start new block →
                 </a>
               </div>

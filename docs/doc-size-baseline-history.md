@@ -11865,18 +11865,131 @@ collapsed `logged_at` values — never written, so nothing to back-fill — and 
 1RM history, breaks PR ties and keys per-set HR attribution. A row recording only the restored
 duration would read as closed while three other consumers still read collapsed timestamps.
 
-## 2026-09-11 — `docs/implementation-backlog.md` → 20892 (RV-42 shipped)
+## 2026-09-14 — `docs/agents/state/implementation-lane-b.md` → 67 (full rewrite, down from 105)
+
+The baton had been updated incrementally across nine PRs and had drifted: it said READY was 1 and
+named a batch (RV-36) that had shipped on 2026-09-11, listed LB-105 as pending, and carried a Next ID
+already consumed. The protocol says rewrite it in full, never append, and this is why.
+
+−38 lines with more current content in it. What paid for the new material: the "Now" section stopped
+re-telling what each PR did — the journal entries carry that — and four lessons collapsed into two
+where they shared a cause. What replaced it is the state a cold restart cannot reconstruct: that the
+lane is blocked on the owner, which entries were checked to establish it, and that BF-61's fast-tap
+check is the single item releasing the most.
+
+The new lesson 1 is the session's most transferable finding: a field's job done in prose, four times
+in one day, three hiding work the queue should have shown and one showing work it should have parked.
+
+## 2026-09-14 — `projectOverview.md` → 10893, `docs/implementation-backlog.md` → 20925 (BF-110's recheck)
+
++8 on the backlog for a `Keep:` that converts BF-110 from "build this" to "read one row", naming the
+query and what each verdict means. +12 on projectOverview for a change that ships no user-visible
+behaviour, which needs justifying.
+
+It records a question put to the owner, not a fix. The next move is his — one blank resume in normal
+use — and the row it produces decides which of two files the eventual fix lives in: `stuck` means the
+viewport is genuinely held at the WebView's 384×667 default and the fix is native, `resized` means
+the measurement was early and the fix is render timing. A status line saying only "added a log" would
+leave the next reader without the thing that makes the log worth reading.
+
+## 2026-09-14 — `docs/implementation-backlog.md` → 20953 (LB-108, the E2E blind spot)
+
++28 for an entry found by noticing that a check passed too fast. PR #1173's E2E went green in **40
+seconds** on a suite that takes ~28 minutes; the job log is Postgres starting and stopping and no
+Playwright invocation at all.
+
+Most of the entry's length is the two things that stop it being "fixed" wrongly. First, LA-22's
+always-run-always-report design and LA-63's `app/api/**` exclusion are both sound and the entry says
+so — the prefix list simply never grew a `lib/` clause, because `lib/` was not browser-reached when
+it was written. Second, the warning not to verify by reading the workflow diff: the failure mode is a
+check that passes without running, so the evidence is the job DURATION, not the YAML.
+
+## 2026-09-14 — `projectOverview.md` → 10909, `docs/implementation-backlog.md` → 20968 (LB-107)
+
++16 on projectOverview for a device-verification row, +15 on the backlog for converting LB-107 from
+READY to KEEP. Both are paying for the same thing: the entry's stated cause was **wrong**, and
+replacing it costs more lines than deleting it would.
+
+LB-107 guessed *"exiting the app is the Android default when there is nothing to pop, so this is
+likely absent handling"*. Both halves are false — a Capacitor `backButton` listener suppresses that
+default, so the handling was present and wrong, and the dead press reached **all four** non-home
+tabs rather than some deep-link edge case. A one-line ✅ would leave the next reader with the guess
+still looking plausible, and it is exactly the kind of guess that gets re-made.
+
+The rest is the device check, which is the whole of what is still owed: the branch sits behind
+`Capacitor.isNativePlatform()`, so no sandbox run reaches the gesture, and `page.goBack()` is a
+different code path. What CI does hold is written down beside it — the premise that a tab flip
+leaves `history.length` unchanged — so the reader can tell which half is covered.
+
+## 2026-09-14 — `docs/implementation-backlog.md` → 20989 (LB-106's cause, replaced)
+
++6 net on an entry that grew by more than that and shed the parts that were wrong. LB-106 said a
+loaded runner turned a poll timeout into a failure; the log says `page.goto: net::ERR_ABORTED` at
+the relaunch, with the poll never reached. Replacing a stated cause costs more lines than adding
+one, because the reader has to be told which of the two to stop believing.
+
+The added length is mostly the things now ruled out by reading — no `storage` listener, the
+`location.assign` sites behind a native-only event, `beforeunload` mounted only mid-workout — and a
+`Keep:` that says outright the fix is not claimed to work, with the condition that would disprove
+it. That shape is what made today's conclusion possible at all: the 2026-08-30 header wrote *"if the
+abort returns, the SW was not it"*, and a fortnight later the return of the abort settled it with no
+new run.
+
+## 2026-09-14 — `docs/implementation-backlog.md` (BF-161's gate lifted)
+
+Six lines net: the `Gate: owner` bullet becomes the decision plus the consequence the owner is
+accepting. The extra length is deliberate — *"for now"* invites a nullable `food_item_id` left in
+place for a future nobody has asked for, and flatten only wins because it needs no migration at all.
+
+## 2026-09-14 — `docs/implementation-backlog.md` → 21002 (PS-35a out, LB-109 in)
+
+Net +7 across two opposite moves: PS-35a's 24 lines leave the queue because it shipped, and LB-109's
+31 arrive because three Lane B entries that already shipped did NOT leave, and are now the top of the
+lane.
+
+LB-109 is longer than a "clear these three" note needs to be, and the reason is LB-47. The other two
+are clean sweeps — heading says a device check is owed, body records it verified. LB-47 was closed
+*conditionally*: the owner declined a check rather than passed one, and its own text says outright
+that nothing has confirmed the fix works. Swept with the other two, that sentence disappears and a
+future report of the same symptom reads as a new bug instead of a regression against an unverified
+fix. The lines are there to stop the sweep being uniform.
+
+## 2026-09-14 — `docs/implementation-backlog.md` → 20983 (BF-158 shipped, LA-106 filed)
+
+−19 net: BF-158's 43 lines leave, LA-106's 24 arrive. The swap is the point. LA-106 was found while
+starting BF-158 and is the more general defect: BF-160 wrote its dependency as ``**`Needs:` BF-158**``
+and `next-item.js` parses `\*{0,2}Needs:\*{0,2}` — asterisks, not backticks — so **BF-160 printed as
+READY #1 while the entry it needs sat at #2.**
+
+The same regex governs `Gate:`, which is why this earned an entry rather than just a one-line fix. A
+backticked ``**`Gate: owner`**`` would park nothing and hand an agent owner-gated work as the top of
+its queue. `Needs:` mis-orders; `Gate:` crosses a line the owner drew. The `Needs:` count going 49 →
+50 is how the in-place correction was confirmed.
+
+## 2026-09-14 — `projectOverview.md` → 10940 (BF-158's Known-Issues row)
+
++31, and most of it is the half the entry did not find. BF-158 named Cooper's −11.3; the 6MWT scores
+**34.8 from zero distance on the owner's own profile**, which is plausible enough that nothing would
+ever have questioned it. A row recording only the negative would leave the reader thinking the
+obvious case was the whole case.
+
+## 2026-09-11 — `docs/implementation-backlog.md` → 20958 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 
-**This figure has been rewritten TWENTY-FIVE times and the churn is the note worth leaving.** Forty-five
-other merges landed on `main` while this PR waited on an owner decision, and each one moved the base
-out from under it — so the starting figure is no longer even quoted here, because it changed again
-between the last two rewrites. **Twenty-five rewrites of one number is the cost of a green PR waiting**,
-recorded rather than smoothed because the alternative reading — that someone kept getting the
-arithmetic wrong — is the wrong lesson. The per-file `.size` split (LA-33) is what keeps this to one
-number instead of a whole map: no other document's baseline has conflicted once across all twenty-five.
-Nothing was wrong with any of the three — each was correct against the `main` of its hour. Under six
-concurrent lanes plus an owner gate, a baseline is a reading of a moving number, and a PR that waits
-will re-read it once per merge that overtakes it. Recomputed by `pnpm fix:baselines` after each
-merge, which is the only thing that makes the subtraction mean anything.
+**This figure has been rewritten TWENTY-EIGHT times and the churn is the note worth leaving.**
+Eighty-two other merges have landed on `main` while this PR waited on an owner decision, and each one
+moved the base out from under it — so the starting figure is no longer even quoted here, because it
+changed again between the last two rewrites. **Twenty-eight rewrites of one number is the cost of a
+green PR waiting**, recorded rather than smoothed because the alternative reading — that someone kept
+getting the arithmetic wrong — is the wrong lesson. Both counts are measurements, not tallies kept by
+hand: the rewrites are the first-parent commits on this branch that touch this file, the merges are
+the first-parent commits on `main` since its branch point. The hand-kept version of the same two
+numbers read "twenty-five" and "forty-five" when they were really twenty-seven and seventy-three,
+which is its own small argument for deriving a figure rather than incrementing one. The per-file
+`.size` split (LA-33) is what keeps this to one number instead of a whole map: no other document's
+baseline has conflicted once across all twenty-eight. Nothing was wrong with any of them — each was
+correct against the `main` of its hour. Under six concurrent lanes plus an owner gate, a baseline is a
+reading of a moving number, and a PR that waits will re-read it once per merge that overtakes it.
+Recomputed by `pnpm fix:baselines` after each merge, which is the only thing that makes the
+subtraction mean anything.

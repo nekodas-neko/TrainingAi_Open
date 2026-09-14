@@ -31,18 +31,18 @@ export function pathnameToSection(pathname: string): BackgroundSection | null {
 
 // Screens rendering a static per-screen palette (chunk 2/3) instead of the
 // shared time-of-day/weather sky system, keyed finer than the 5-key toggle
-// bucket above so multiple distinct scenes can share one on/off switch (e.g.
-// stats gates off the "home" toggle; workout-select gates off
-// the "workout" toggle while the actual in-progress /workout screen — which
-// paints its own bg-black during the active phase — keeps the shared sky
-// scene unchanged). Returns null for Home and the active workout screen.
+// bucket above so multiple distinct scenes can share one on/off switch.
+// Returns null for Home and the active workout screen.
+//
+// PS-35a deleted `/stats` and `/workout-select`, the two routes whose palettes
+// this used to name — they were alias pages for the Health and Workout tabs, and
+// the tabs themselves keep the shared sky. Their keys and CSS variables went with
+// them rather than staying as scenes nothing can reach.
 export function pathnameToPaletteKey(pathname: string): ScreenPaletteKey | null {
   if (/^\/health\/(sleep|readiness|activity|heart-rate)(\/|$)/.test(pathname)) return null
   if (pathname.startsWith('/health')) return 'health'
   if (pathname.startsWith('/nutrition')) return 'nutrition'
   if (pathname.startsWith('/more') || pathname.startsWith('/profile')) return 'more'
-  if (pathname.startsWith('/stats')) return 'stats'
-  if (pathname.startsWith('/workout-select')) return 'workoutSelect'
   if (pathname.startsWith('/session-explain')) return 'sessionExplain'
   return null
 }

@@ -6,6 +6,27 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.456.8",
+    date: "2026-09-14",
+    changes: [
+      "A fitness test run indoors no longer invents a VO₂max. Both the Cooper run and the 6-minute walk take your distance from GPS and nothing else, so on a treadmill they finished a full, correctly-timed test with almost no distance and scored it anyway — the Cooper as a negative number, the 6-minute walk as a normal-looking figure that was not measured at all. Now the test saves your heart rate and time, skips the score, and says it needs GPS. An outdoor test is unchanged.",
+    ],
+  },
+  {
+    version: "1.456.7",
+    date: "2026-09-14",
+    changes: [
+      "Finishing a workout or an activity now returns you to the Workout tab itself rather than a separate copy of the same screen. The copy was a leftover from before the app had tabs: it looked identical but sat outside the tab bar, so the other tabs had to reload when you moved on, and back from it did not take you Home. Four more leftover addresses that only forwarded somewhere else were removed at the same time. Nothing you tap has changed where it goes.",
+    ],
+  },
+  {
+    version: "1.456.6",
+    date: "2026-09-14",
+    changes: [
+      "Pressing back on Health, Workout, Nutrition or More now takes you to Home. It used to do nothing at all: the app switches between the five tabs without adding to the browsing history — they are side by side, not stacked — so there was nothing for back to go back to, and the press was simply swallowed. Back from Home still minimises the app, and back from a screen you opened on top of a tab (a meal, a day) still returns to that tab rather than jumping Home.",
+    ],
+  },
+  {
     version: "1.456.5",
     date: "2026-09-14",
     changes: [

@@ -477,9 +477,15 @@ below threshold and left in place for next time.
   computation in every consumer of `saved_meal_items`**, and cycle prevention (meal A contains B
   contains A) — a class of bug with no cheap guard. Not worth it for 15 meals of 1.9 items unless the
   owner specifically wants edits to propagate.
-- **Gate: owner** — flatten vs nest is a product decision about whether a built meal tracks its
-  source, not something an implementer should settle. The recommendation is flatten; a one-line answer
-  unblocks it.
+- **✅ OWNER DECIDED 2026-09-14: FLATTEN.** *"Okay lets go with flatten for now"* — the gate is
+  lifted and this is startable. **Build the flatten path only; do not add a nesting column.** The
+  *"for now"* is noted and changes nothing about the build: if propagation is wanted later it is a
+  new entry with its own migration, not a half-measure designed in here. Leaving room for nesting
+  would mean a nullable `food_item_id` today for a feature nobody has asked to build, which is the
+  cost this decision avoids.
+- **What the owner is accepting, restated because it is the part that bites later:** a meal built
+  from saved meals is a snapshot. Editing the source meal afterwards does not change it. Nothing on
+  screen should imply otherwise — no "from <meal name>" provenance chip that reads as a live link.
 - **Verification:** on device, build a meal from two saved meals and confirm the ingredient rows,
   their quantities, and the resulting macro total match the sum of the sources.
 
@@ -517,54 +523,35 @@ below threshold and left in place for next time.
   HR. Creating an activity must not also add its minutes to the same quota — verify against
   `computeZoneQuota`'s inputs, which are HR-derived, not activity-derived. The calorie path is the
   one that genuinely gains a source.
-- **`Needs:` BF-158** — that entry may make the score conditional on a plausible distance; an activity
+- **Needs:** BF-158 — that entry may make the score conditional on a plausible distance; an activity
   should still be written when the VO₂max is withheld, because the effort happened either way.
 - **Verification:** run a protocol on device and confirm one activity appears in cardio history with
   the right duration and distance, that the day's earned calories rise, and that the zone quota does
   **not** jump by a second helping of the same minutes.
 
-### [cardio] BF-158 — the Cooper test has no distance source indoors and no clamp, so a treadmill run saves a NEGATIVE VO₂max
+### [platform] LA-106 — a backticked `Needs:`/`Gate:` is invisible to the queue tool, and a hidden `Gate:` would unpark owner-gated work
 
-- **Lane:** A — `packages/shared/src/health/fitness-tests.ts` (`cooperVo2max`, `clampVo2`) is the
-  defect; `components/fitness-tests/test-active.tsx` is where a distance source other than GPS would
-  have to come from.
-- **Added:** 2026-09-14 (BugFix intake), from the owner asking for a pre-flight check before running
-  the Cooper test for the first time. **He nearly ran it on a treadmill** — the session immediately
-  before this was about single-speed treadmill walks.
-- **`cooperVo2max` is the only VO₂ equation in the file that is not clamped.**
-
-  ```ts
-  const clampVo2 = (v: number) => round1(Math.max(10, Math.min(100, v)))
-  // sixMwtVo2max: both branches return clampVo2(…)
-  export function cooperVo2max(distanceM: number): number {
-    return round1((distanceM - 504.9) / 44.73)      // ← no clamp
-  }
-  ```
-
-  At `distanceM = 0` that is **−11.3 mL·kg⁻¹·min⁻¹**, written to `fitness_tests.vo2max_est` and into
-  the fitness snapshot. The intercept guarantees it: any distance under 505 m is negative, and the
-  sibling equation in the same file already has the guard.
-- **Zero is the realistic input, not a contrived one.** `test-active.tsx` takes distance from
-  `startGpsWatcher` and nothing else — **no treadmill toggle, no manual entry**, unlike the guided
-  walk, which has an explicit *"Treadmill — skips GPS"* switch. An indoor run therefore produces a
-  full-length, correctly-timed test with a distance near 0.
-- **The existing early-stop guard shows the intended shape and covers the other half of this.**
-  `test-result.tsx` skips the VO₂ score when a fixed-duration protocol ends under 90% of its window
-  (*"the Ross/Cooper equations are calibrated to the FULL protocol"*, review E2-10), saving HR and
-  distance regardless. An implausible **distance** deserves the same treatment as an implausible
-  **duration**, and that is the recommended fix: skip the score and say why, rather than clamp a
-  treadmill run up to 10 and present it as a reading.
-- **Clamping alone is the wrong fix and would be worse than the bug.** `Math.max(10, …)` turns −11.3
-  into a plausible-looking **10.0** that nothing marks as invalid. Prefer: `null` with a reason when
-  the distance is implausible for the protocol (a 12-minute run under ~505 m is not a Cooper result),
-  which is the pattern the early-stop guard already uses.
-- **Worth considering alongside, not required:** a manual distance entry on the result screen, so a
-  treadmill's own readout can be typed in. That makes the test usable indoors rather than merely
-  safe. Owner's call — the safety half stands on its own.
-- **Verification:** run the protocol to full duration with GPS unavailable and confirm no VO₂max is
-  saved and the screen says why; confirm an outdoor run is unchanged. The owner's existing 6MWT row
-  (603 m, 18.8, `ross_2010`, 2026-07-19) is the reference that the clamped sibling still behaves.
-
+- **Lane:** A — `scripts/next-item.js` (the two field regexes) and
+  `scripts/check-backlog-pointers.js` (where the guard belongs).
+- **Added:** 2026-09-14 · Lane A, found while starting BF-158.
+- **Measured, not inferred.** `next-item.js:73` and `:76` parse the fields as
+  `/^\s*[-*]\s*\*{0,2}(Needs|Gate):\*{0,2}\s*…/i` — asterisks around the name, nothing else.
+  BF-160 wrote ``- **`Needs:` BF-158**`` with a BACKTICK, so its dependency did not parse and
+  **BF-160 printed as READY #1 while BF-158, the entry it needs, sat at #2.** Corrected in place
+  when BF-158 shipped; the trap is what remains.
+- **The `Gate:` case is the one that matters and has not happened yet.** The same regex governs
+  it, so ``- **`Gate: owner`**`` would park nothing — an agent would be handed owner-gated work as
+  the top of its queue with no sign anything was wrong. `Needs:` mis-orders; `Gate:` crosses a
+  line the owner drew.
+- **One occurrence exists today** (grep: `^\s*-\s*\*{0,2}\`(Needs|Gate|Reference):`), which is why
+  this is cheap now.
+- **Fix shape:** do NOT widen the parser to accept backticks — that rewards the ambiguity. Add a
+  check to `check-backlog-pointers.js` that fails on a line matching a field NAME followed by a
+  colon which the field regex does not then match, so the malformed line is a CI failure rather
+  than silence. `Reference:` needs the same treatment; it is parsed elsewhere but has the identical
+  shape.
+- **Verification:** write ``- **`Gate: owner`**`` into a scratch entry and confirm CI fails; confirm
+  `node scripts/next-item.js --lane A --all` is unchanged for every well-formed entry.
 
 ### [nutrition] BF-154 — the macro grams still key off the stored goal, and the owner has said they should not
 
@@ -611,10 +598,25 @@ below threshold and left in place for next time.
 - **This is a separate requirement from scroll restoration** and shares nothing with it but the
   sitting they were reported in. RV-36 was about restoring an offset; this is about where the back
   gesture goes when the stack is empty.
-- **What is NOT known yet, and must be measured before anything is changed:** which tabs can reach
-  an empty stack (a tab entered directly by URL or by a bottom-nav tap that replaced rather than
-  pushed), and what the WebView currently does — exiting the app is the Android default when there
-  is nothing to pop, so this is likely absent handling rather than wrong handling.
+- **✅ Measured 2026-09-14, and the guess in the line this replaces was wrong.** It is **wrong**
+  handling, not absent, and **all four non-home tabs** reach an empty stack — not an edge case.
+  `mobile-auth-handler.tsx` registers a Capacitor `backButton` listener, which **suppresses the
+  Android default**, then called `window.history.back()` for every path but `/`. `tab-shell.tsx`
+  flips tabs with `history.replaceState` (*"tabs are peers, not a history trail"*), so a tab route
+  has nothing to pop and that call was a **silent no-op**. Back was dead on Health, Workout,
+  Nutrition and More — it did not exit the app, it did nothing.
+- **The stack behaviour is now pinned in a real browser**, not inferred:
+  `e2e/tab-flip-leaves-nothing-to-pop.spec.ts` measures `history.length` across a tab flip
+  (unchanged) against a sub-route push (grows). That contrast is the premise the fix rests on.
+- **Shipped 2026-09-14** (`fix/lb107-back-on-tab-goes-home`): `backActionForPath` in
+  `components/shell/tabs.ts` returns `minimize` on `/`, `home` on a tab route, `pop` otherwise, and
+  the listener switches on it. Home is reached via `navigateToTab`, not a location assignment —
+  the latter reloads the WebView and discards every mounted tab. Sub-routes are untouched because
+  `tabKeyForHref` matches the path **exactly**, so `/nutrition/meal/123` still pops.
+- **Keep:** the device check, and only that. On the S25, from Health/Workout/Nutrition/More press
+  the system back gesture — Home, not the launcher and not a dead press. Then from Home press it
+  again — the app minimizes. The harness cannot send that gesture (`page.goBack()` is a different
+  path), so this is the one part no CI run can close.
 - **⚠ The harness cannot send the system back gesture**, which is what the owner is pressing.
   `page.goBack()` is not it, and `e2e/scroll-restoration.spec.ts`'s header records that
   `page.goto()` is a hard navigation that skips React cleanup entirely. Expect to need the S25.
@@ -622,6 +624,65 @@ below threshold and left in place for next time.
   gesture — Home, not the launcher.
 - **Reversal cost:** low, but it changes what a hardware gesture does, so it wants the device before
   it is called done.
+
+### [platform] LB-109 — three finished Lane B entries print as READY, and they are the top of the lane
+- **Lane:** O — this queue file only. Clearing a completed entry is the Orchestrator's sweep per
+  `CLAUDE.md`, which is why this is filed rather than done.
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-14 · found running `next-item.js --lane B` while
+  picking up PS-35a.
+- **What it costs, concretely.** Lane B's READY list is 6 and **three of them are finished work**:
+  they print above the items that are not, so the top of the lane is a list of things that cannot be
+  started. That is the same failure `Verify:` and `Keep:` exist to prevent, arriving from the other
+  side — not an entry mis-described as blocked, but an entry that is done and still advertising.
+- **The three, with what their own bodies say:**
+  - **BF-141** (lb/kg toggle) — heading still reads *"the device look is what is left"*; the body
+    reads **✅ VERIFIED ON THE S25, 2026-09-13**. Nothing is owed.
+  - **BF-135** (stacked banners on an injured exercise) — heading reads *"device owed"*; the body
+    reads **✅ VERIFIED ON THE S25, 2026-09-13**, owner: *"Havent seen this issue; treat it as fine
+    for now"*. Nothing is owed.
+  - **LB-47** (the `Full` override's false revert claim) — the owner closed it **conditionally**:
+    *"Will let you know when it comes up. Happy to treat as fixed if I dont raise it again."*
+- **⚠ LB-47 is NOT the same case as the other two and must not be swept with them.** Its own text is
+  explicit that *"nothing has confirmed the fix works"* — the owner declined a check rather than
+  passed one. **If that symptom is reported again it is a regression report against an unverified
+  fix, not a new bug, and the reader is meant to start from the original diff.** That sentence has to
+  survive the entry's removal; delete it into `known-issues-resolved.md` rather than out of the repo.
+- **The heading is the thing to fix first, and it is cheap.** Two of these three say *"device owed"*
+  in a heading while saying *verified* in the body, so a reader who trusts the queue's own summary
+  line is misled before opening anything. `next-item.js` reads fields, not headings — but a person
+  scanning the file reads the heading.
+- **Pass test:** `node scripts/next-item.js --lane B` prints no entry whose body records its residue
+  as discharged.
+- **Reversal cost:** none, a queue file.
+
+### [platform] LB-108 — E2E reports green without running whenever a change lives in `lib/`, and `lib/hooks/**` is UI
+- **Lane:** O — `.github/workflows/ci.yml`, the *"Does this change touch the UI?"* step (~line 637).
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-14 · found shipping BF-110's recheck.
+- **Observed, not reasoned.** PR #1173's E2E check went **green in 40 seconds** on a suite that takes
+  ~28 minutes. The job log is Postgres starting and stopping and **nothing else** — no Playwright
+  invocation at all. The PR changes `lib/resume-repaint.ts` and `lib/hooks/use-resume-repaint.ts`.
+- **The detector matches four prefixes** and `lib/` is not among them:
+  `grep -vE '^app/api/' | grep -qE '^(app/|components/|e2e/|playwright\.config\.ts$)'`.
+- **`lib/hooks/**` is UI by the repo's own lane rule** — CLAUDE.md puts `lib/hooks/**` and
+  `lib/stores/**` in Lane B, the surface lane, beside `components/**`. **26 files under `lib/` carry
+  `'use client'`**, including `use-cached-value.ts`, `use-scroll-restoration.ts` and
+  `use-resume-repaint.ts` — the last two mounted on the shell container **every screen inherits**.
+  A change to any of them currently ships with E2E green having tested nothing.
+- **LA-22's design is right and this is not an argument against it.** The job deliberately always
+  runs and always reports, skipping its expensive half, so that a required check never leaves a PR
+  pending. LA-63 then dropped `app/api/**` because no browser reaches it. Both are sound. **The
+  prefix list simply never grew a `lib/` clause**, and `lib/` was not a browser-reached directory
+  when it was written.
+- **Recommended shape:** add the client-reachable `lib/` subtrees to the same positive match —
+  `lib/hooks/`, `lib/stores/`, and `lib/media/` — rather than matching all of `lib/`, which would
+  re-buy the full suite for every engine change and undo LA-63.
+- **⚠ Do not verify this by reading the diff of the workflow.** The failure mode is a check that
+  passes without running, so the evidence is the JOB DURATION and the absence of a Playwright line in
+  the log. A 40-second E2E is the tell; confirm the fix the same way, by a run that takes minutes.
+- **Pass test:** a PR touching only `lib/hooks/**` runs the browser suite.
+- **Reversal cost:** none, one line of shell in a workflow.
 
 ### [platform] LB-106 — `preferences-survive-reinstall` fails on CI and passes everywhere else, twice in one day
 - **Lane:** B — `e2e/preferences-survive-reinstall.spec.ts`, or the launch-time hydration it waits on.
@@ -631,16 +692,37 @@ below threshold and left in place for next time.
   (03:47 UTC, passed on retry) and **failed outright** on PR #1166's (07:12 UTC). Neither PR touches
   it — #1162 was the workout ready screen, #1166 was the day read-through spec.
 - **It passes locally**, run on #1166's branch against the sandbox database: 3 passed.
-- **What it waits for is a race by construction**, which is the reason to suspect the spec rather
-  than the app: it clears `localStorage`, reloads, and polls for `ta_weight_lookback` to reappear
-  from `hydrateUserPreferences`, which the sync provider warms **on launch**. A slow launch under a
-  loaded CI runner is exactly the shape that turns a poll timeout into a failure.
+- **⚠ That race is NOT what happened, and this line replaces the guess with the log.** Read from
+  run 34814623905 on 2026-09-14: the failure is
+  **`Error: page.goto: net::ERR_ABORTED at http://localhost:3100/`** at **line 53**, the relaunch —
+  **identically on the initial attempt and on Retry #1**. Line 57's poll is never reached, so
+  `hydrateUserPreferences` was never slow; it was never called. Instrumenting it, which the line
+  below asks for, would have measured a function the failing run does not execute.
+- **The spec had already predicted this and nobody checked.** Its header carries a service-worker
+  block added 2026-08-30 against this same `ERR_ABORTED`, with an explicit falsification condition:
+  *"If the abort returns, the SW was not it."* **It returned, with the block in place.** The
+  header's other claim — that `page.reload()` *"aborts the navigation every run"* — is also stale:
+  measured 2026-09-14, reload and a same-URL `goto` both complete in the sandbox.
+- **No cause is claimed. It does not reproduce locally**, so the honest position is a named failure
+  POINT and not a named cause. Ruled out by reading rather than guessed at: no `storage` listener
+  anywhere in the app, the two `location.assign` call sites are behind a native-only custom event,
+  and the one `beforeunload` handler mounts only mid-workout on the workout screen — none can
+  supersede a navigation on `/`.
 - **The same run carried a real Chromium crash**, on `plan-rescale.spec.ts` — a native
   `chrome-headless-shell` segfault with a full stack and `cr2: 0x1b0`. That is runner instability,
   not app code, and it is context for how loaded that run was rather than a second bug to chase.
-- **Do NOT "fix" this by lengthening the poll timeout first.** That is the change that makes a real
-  hydration regression invisible. Establish which half is slow — instrument how long
-  `hydrateUserPreferences` takes from launch on CI — before touching the wait.
+- **Do NOT "fix" this by lengthening the poll timeout.** That is the change that makes a real
+  hydration regression invisible — and on this evidence it would also be aimed at the wrong line.
+- **Changed 2026-09-14** (`fix/lb106-preferences-relaunch`): the relaunch is now a **new page**
+  rather than a re-navigation of the live one. It is defensible on fidelity alone, independent of
+  the abort — clearing storage under a running app leaves its React state, timers and sync provider
+  alive, and that instance can write a preference key back or start a navigation of its own, where
+  a reinstall is a cold process. `localStorage` is per-origin, so the clear carries over.
+- **Keep:** whether that FIXES the abort is unestablished, and this entry stays open until CI says.
+  It removes the operation that aborted; it does not explain it. **If a run aborts again — on
+  `fresh.goto` this time — the relaunch shape was not it either**, the SW block should then be
+  dropped as justified by nothing, and the runner becomes the remaining suspect: the same run
+  carried a native `chrome-headless-shell` segfault on `plan-rescale.spec.ts`.
 - **Pass test:** ten consecutive CI runs with no flake on this spec, or a named cause with a fix
   that is not a longer timeout.
 - **Reversal cost:** none. It is a test.
@@ -687,7 +769,7 @@ below threshold and left in place for next time.
   seeds no weather snapshot, so `WeatherChip` renders a skeleton and the real row can be neither
   reproduced nor disproved off the device (BF-96 records the same limitation).
 - **✅ SHIPPED 2026-09-12** (`fix/bf139-header-chip-width`).
-  [Journal](overview/entries/2026-09-12-fix-bf139-header-chip-width.md).
+  [Journal](overview/history-2026-09-14-folded-1.md#2026-09-12-fix-bf139-header-chip-width).
 
 - **Added:** 2026-09-10 · owner, with a Home screenshot: *"the pills in the top are a little cutoff.
   can we make them smaller to fit?"*
@@ -743,7 +825,7 @@ below threshold and left in place for next time.
   dial with haptics beside a new control is a touch-target and gesture question, and the harness
   drives a mouse.
 - **✅ SHIPPED 2026-09-12** (`fix/bf141-weight-dial-unit-toggle`).
-  [Journal](overview/entries/2026-09-12-fix-bf141-weight-dial-unit-toggle.md).
+  [Journal](overview/history-2026-09-14-folded-1.md#2026-09-12-fix-bf141-weight-dial-unit-toggle).
 
 - **Added:** 2026-09-10 · owner, from the live logging screen for **Dumbbell Lateral Raise**:
   *"can there be a 'small' toggle for the weight dial to switch between lb/kg? my Dumbells are
@@ -817,7 +899,7 @@ below threshold and left in place for next time.
 - **Verify:** owner — the replacement sentence names both numbers, and a reader who follows it does
   not expect the gap to close as he moves. He is the person the sentence is for.
 - **✅ SHIPPED 2026-09-12** (`fix/bf142-gap-explainer-sentence`).
-  [Journal](overview/entries/2026-09-12-fix-bf142-gap-explainer-sentence.md).
+  [Journal](overview/history-2026-09-14-folded-1.md#2026-09-12-fix-bf142-gap-explainer-sentence).
 
 - **Added:** 2026-09-11 · owner, on the Nutrition card, third report in this family:
   *"calories still not right"*.
@@ -3487,30 +3569,6 @@ present.
 - **Not urgent, and small.** Nothing is broken; the Lint job passes on warnings today and would keep
   passing. This is about whether the output can be read at all.
 
-### [app-shell] PS-35a — five zero-content redirect/duplicate pages, to delete or keep
-
-- **✅ DECIDED 2026-09-14 — delete them.** Owner: *"We only use the APK - delete them if not needed."*
-  The gate is discharged and the bookmark risk the entry raised is dismissed by the same answer: a
-  browser bookmark is not a surface they use.
-- **⚠ ONE CONDITION ATTACHED, and it changes the work.** Owner, in the same breath: *"What page? we
-  only use the APK; so if its not accessible via the APK and is needed; then make sure there is a way
-  to access it from APK."* So this is **not** a blanket delete. For each of the five, establish
-  whether the destination it redirects to is reachable inside the APK by some route the owner
-  actually walks. Where it is, delete the redirect. **Where the only path to a needed screen is that
-  page, give it a real entry point before deleting anything** — otherwise this removes a surface
-  rather than an alias, which is the opposite of what was approved.
-
-- **Lane:** B — `app/{workout-select,session-select,stats,config,profile}/page.tsx`, ~10 call-site edits.
-- **The old `Gate: owner` is removed** — the approval above is the one it was waiting for.
-- **Added:** 2026-09-06, app checkpoint — [report](reviews/2026-09-05-app-checkpoint.md) §4/§P2.
-  **Split from PS-35 on 2026-09-10 (OR-106).**
-- Five pages with no content of their own: each redirects or duplicates a tab. ≤4 in-repo callers
-  each; full table in the report.
-- **What the owner decides:** delete them, or keep them as bookmarkable aliases. Deleting is the
-  recommendation — an alias nobody links to is a route that can rot — but a PWA shortcut or a browser
-  bookmark pointing at one would break, which only the owner can know.
-- **Reversal cost:** low. Restoring a deleted redirect page is a few lines.
-
 ### [app-shell] PS-35b — a wrong PWA start_url, a doubled boot fetch, a dead branch and a stuck weather chip
 
 - **⚠ OWNER DIRECTED 2026-09-13, and it is a scope rule rather than an answer to this entry.**
@@ -3568,7 +3626,7 @@ read**, so a moved device shows the old location for 30 minutes. Key it by round
   sandbox has no outbound route to `api.open-meteo.com`, so only the FAILURE path could be
   rendered here** — the success path and the keyed cache are unit-tested, not observed.
 - **✅ SHIPPED 2026-09-11** (`fix/ps35b-boot-and-weather`).
-  [Journal](overview/entries/2026-09-11-fix-ps35b-boot-and-weather.md). All four, plus the palette
+  [Journal](overview/history-2026-09-14-folded-1.md#2026-09-11-fix-ps35b-boot-and-weather). All four, plus the palette
   correction above.
   - **① measured:** `start_url` `/session-select` → `/workout`, the same destination without the
     `redirect()` hop. Where a launch *should* land is PS-35's question, not this one's.
@@ -3905,7 +3963,7 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
   whether the symptom was ever visible needs a day with enough logged to make it scroll, which the
   seeded fixture cannot produce (it renders *"Nothing logged on this day"*).
 - **✅ SHIPPED 2026-09-11** (`fix/rv-36-nutrition-scroll-restoration`, same PR as RV-36 — one device
-  pass covers both). [Journal](overview/entries/2026-09-11-fix-nutrition-scroll-and-day-padding.md).
+  pass covers both). [Journal](overview/history-2026-09-14-folded-1.md#2026-09-11-fix-nutrition-scroll-and-day-padding).
 - **Keep: the fifth-CI-rule question, which is the part that genuinely needed evidence.** No existing
   safe-area rule fires on an **absent** utility, only on a wrong one. A check for "full-height
   scroller with no bottom pad" still wants an allow-list for the sheets and navless full-screens that
@@ -4288,6 +4346,14 @@ stronger reason the measured one wins.
   its longest single session.**
 
 ### [app-shell][platform] BF-110 — the blank resume survives a scroll, which means the renderer never died
+
+- **Keep:** the READING, and only that. The second viewport log **shipped 2026-09-14**
+  (`feat/bf110-second-viewport-log`), so nothing here is owed a build. What is owed is one blank
+  resume in the owner's normal use, then `error_events`:
+  `... WHERE message LIKE 'bf110 resume recheck%'`. **`stuck` → the viewport is genuinely held at
+  384×667 and the fix is native; `resized` → the measurement was early and the fix is when the app
+  decides to render.** Still do not write a fix before that row exists — the two answers point at
+  different files.
 
 - **⚠ RE-MEASURED 2026-09-14 (Orchestrator): the separation HOLDS with more samples, and it is now
   route-independent — which rules out a hypothesis.** Seven days of `bf110 resume dom-intact` rows,
