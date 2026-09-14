@@ -12150,3 +12150,10 @@ still lists, no dismiss action, and do not widen the band instead.
 introduced this lockout. It did not — the predicate made an accidental *Not me* tap irreversible
 long before the band split existed. A row that misattributes a defect to the change that revealed it
 sends the next session to the wrong file, so the retraction is worth more lines than the fix.
+
+## 2026-09-15 — `docs/implementation-backlog.md` (BF-164)
+
+Thirty lines correcting BF-149's scope. The table of four call sites is the entry — "the rep max is
+wrong" was already filed and fixed once, so what this needs to carry is WHERE it is still wrong and
+that one of the four prescribes reps rather than printing them. It also records why the sweep missed:
+BF-149 grepped the function's direct callers and not the wrapper seven surfaces import.
