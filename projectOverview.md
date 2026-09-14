@@ -29,6 +29,18 @@
 **Version:** v1.456.4 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-14.
 
+**BF-100 is failing on the S25, not awaiting a check — and it read as the latter for a day.** Owner,
+2026-09-13: *"Checked on more - and still doesnt work"*, its **second** failure. That was recorded
+inside **RV-36's** body, an entry that had already shipped (2026-09-11) and been S25-verified
+(2026-09-13), while BF-100 itself still carried `Keep:` + `Verify: device` and printed under
+*"shipped; a look is owed, nothing is blocked"*. RV-36 is removed; BF-100 is a plain buildable entry
+and now prints READY. **It is a device-only failure and the harness contradicts it** — `/more` →
+Profile details → back restores **840** in Playwright — so a green `scroll-restoration.spec.ts` is
+not evidence, which is how it could be declared fixed a third time. A second owner request found in
+the same body had **no entry anywhere** and is now **LB-107**: back on a tab with nothing to pop
+should land on Home rather than leave the app
+([journal](docs/overview/entries/2026-09-14-refile-shipped-rv36.md)).
+
 **`day-review-read-through` was broken in both directions, and only one of them was visible
 (LB-105).** Its wrap-up test failed in the sandbox and passed on CI — every section of
 `DayReadThrough` self-hides when its domain is empty and the local seed has **nothing at all**
