@@ -12053,3 +12053,17 @@ rather than against it.
 **A new entry was nearly filed instead**, on the belief that nothing had recorded the pattern. LB-56
 had recorded it seven times. The check that caught it was one grep for `SEGV_MAPERR` across `docs/`
 before writing, which is cheaper than the duplicate would have been to unpick.
+
+## 2026-09-14 — `docs/implementation-backlog.md` → 20928 (LA-76's correction)
+
++16 to correct a claim that would have produced a wrong change.
+
+LA-76's newest block said the deload-session half "ships with no schema change at all — do that half
+first". It ships nothing: `listTrainedDayKeys` carries no `phase_type` filter, so a deload session is
+already a trained day, and all three ever stamped carry five exercise logs each on production. The
+owner's rule is already satisfied for sessions.
+
+Worth the lines because the instruction was not merely redundant, it was harmful: `pausedDays` is
+shared with the steps and sleep ladders, so adding deload sessions to it would have stopped those two
+decaying on a day the user simply trained. An entry written from an owner's words without reading the
+code can be confidently wrong in a direction the words themselves never implied.
