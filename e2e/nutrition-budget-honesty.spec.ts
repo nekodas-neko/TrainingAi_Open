@@ -25,8 +25,28 @@ import { settleRouteBoundary } from './fixtures'
 test.use({ serviceWorkers: 'block' })
 test.setTimeout(120_000)
 
+/**
+ * The seeded user's day, not the runner's and not a literal.
+ *
+ * `nutrition-content.tsx` renders both cards under `energyBalance?.date === selectedDate`, and
+ * `selectedDate` is `todayInTz('Australia/Brisbane')`. A hardcoded date therefore matches for the
+ * rest of the day it was written on and never again: this file pinned `2026-09-14` and went red at
+ * 14:00 UTC that day, on every branch, permanently — the page took the stub, compared its date to
+ * Brisbane's 2026-09-15, and rendered the no-balance state, so both locators were genuinely absent.
+ *
+ * It is the `scale-ble-day-keying.test.ts` shape rather than the `periodization-soft-delete` one:
+ * that class fires for two hours a day and recovers, this one detonates once and stays red. Both
+ * come from the same rule — a fixture may hold an absolute date only when BOTH sides of the
+ * comparison are fixed, and here the other side is the clock.
+ *
+ * `Intl` rather than a DB round-trip because nothing in this file needs the database: the payload
+ * is stubbed precisely so the estimator is not under test. `plan-day-fill.spec.ts:58` is the same
+ * shape. 'en-CA' is what yields YYYY-MM-DD.
+ */
+const TODAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Brisbane' }).format(new Date())
+
 const PAYLOAD = {
-  date: '2026-09-14',
+  date: TODAY,
   balance: {
     intakeKcal: 1200, expenditureKcal: 2100, restingBaseKcal: 1815, activeKcal: 285,
     netKcal: -900, targetNetKcal: -500, deviationKcal: -400, remainingKcal: 400,
