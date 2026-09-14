@@ -31,6 +31,25 @@ export function useIngredientQuantities() {
     })
   }
 
+  /**
+   * Add several ingredients at once, summing the quantity where one is already in the list.
+   *
+   * Two callers need exactly this and differ only in what ELSE they set: a pasted recipe also fills
+   * the meal's name and servings (BF-11c), a flattened saved meal sets nothing but the rows
+   * (BF-161). The merge itself is the same, and two copies of a merge is how they drift.
+   */
+  function addEntries(entries: IngredientEntry[]) {
+    setIngredients(prev => {
+      const next = [...prev]
+      for (const { item, qty } of entries) {
+        const at = next.findIndex(e => e.item.id === item.id)
+        if (at === -1) next.push({ item, qty })
+        else next[at] = { ...next[at], qty: next[at].qty + qty }
+      }
+      return next
+    })
+  }
+
   function removeIngredient(id: string) {
     setIngredients(prev => prev.filter(e => e.item.id !== id))
   }
@@ -69,7 +88,7 @@ export function useIngredientQuantities() {
 
   return {
     ingredients, setIngredients,
-    addIngredient, removeIngredient,
+    addIngredient, addEntries, removeIngredient,
     unitFor, setUnit, setDisplayQty, stepQty,
   }
 }

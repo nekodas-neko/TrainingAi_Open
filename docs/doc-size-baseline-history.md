@@ -11973,14 +11973,48 @@ its queue. `Needs:` mis-orders; `Gate:` crosses a line the owner drew. The `Need
 ever have questioned it. A row recording only the negative would leave the reader thinking the
 obvious case was the whole case.
 
+## 2026-09-14 — `projectOverview.md` → 10954, `docs/implementation-backlog.md` → 20994 (BF-161)
+
++14 on projectOverview and +9 on the backlog for a feature whose code is small and whose DECISION is
+the expensive part. The build is a mapping and a list component; what needed writing down is why
+there is no nesting column, because that is the thing a later session would otherwise re-litigate
+from scratch — `saved_meal_items.food_item_id` is NOT NULL, and making it nullable buys recursive
+macro computation in every consumer plus cycle prevention, for a library of 15 meals averaging 1.9
+items.
+
+Both entries lead with the consequence rather than the mechanism: what the owner accepted is that a
+meal built from a saved meal is a **snapshot**. That is invisible until the day someone edits a
+source meal and expects the built one to follow, which is exactly when a one-line ✅ would have left
+the reader with nothing.
+
+## 2026-09-14 — `docs/implementation-backlog.md` → 21023 (LA-107)
+
++29 for an entry that exists because a prose rule failed twice. CLAUDE.md has stated the both-sides-
+fixed rule since 2026-08-03 and cited its worked example; six weeks later the same class went red on
+every branch. The entry is longer than "add a check" because the useful part is the instruction NOT
+to write the regex first — the corpus is unknown, a literal date in a fixture is often legitimate,
+and a rule that flags all of them would be turned off within a week.
+
+## 2026-09-14 — `docs/implementation-backlog.md` → 20983, `projectOverview.md` → 10985 (BF-160)
+
+−40 on the backlog for BF-160 leaving the queue; +31 on projectOverview for the row that replaces it.
+
+The row is longer than the fix is complicated because two of its three paragraphs are about things
+that are **not** wrong. The double-count the entry warned about does not exist — `computeZoneQuota`'s
+only actual is an HR-derived cache — and saying so is what stops the next session re-deriving it.
+And the credit's *size* is unverified on any machine in this repo: the 0 → 122 measured locally comes
+from synthetic MET fixtures, and the CI assertion that would check a real magnitude skips for the
+same reason. A row claiming the calories now work, without that sentence, would be claiming more than
+was measured.
+
 ## 2026-09-11 — `docs/implementation-backlog.md` → 20958 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 
-**This figure has been rewritten TWENTY-EIGHT times and the churn is the note worth leaving.**
-Eighty-two other merges have landed on `main` while this PR waited on an owner decision, and each one
+**This figure has been rewritten TWENTY-NINE times and the churn is the note worth leaving.**
+Eighty-five other merges have landed on `main` while this PR waited on an owner decision, and each one
 moved the base out from under it — so the starting figure is no longer even quoted here, because it
-changed again between the last two rewrites. **Twenty-eight rewrites of one number is the cost of a
+changed again between the last two rewrites. **Twenty-nine rewrites of one number is the cost of a
 green PR waiting**, recorded rather than smoothed because the alternative reading — that someone kept
 getting the arithmetic wrong — is the wrong lesson. Both counts are measurements, not tallies kept by
 hand: the rewrites are the first-parent commits on this branch that touch this file, the merges are
@@ -11988,7 +12022,7 @@ the first-parent commits on `main` since its branch point. The hand-kept version
 numbers read "twenty-five" and "forty-five" when they were really twenty-seven and seventy-three,
 which is its own small argument for deriving a figure rather than incrementing one. The per-file
 `.size` split (LA-33) is what keeps this to one number instead of a whole map: no other document's
-baseline has conflicted once across all twenty-eight. Nothing was wrong with any of them — each was
+baseline has conflicted once across all twenty-nine. Nothing was wrong with any of them — each was
 correct against the `main` of its hour. Under six concurrent lanes plus an owner gate, a baseline is a
 reading of a moving number, and a PR that waits will re-read it once per merge that overtakes it.
 Recomputed by `pnpm fix:baselines` after each merge, which is the only thing that makes the

@@ -1874,6 +1874,20 @@ unchanged while a sub-route push grows it. **Check on device:** from Health/Work
 the back gesture lands on Home; from Home it minimises; from a meal or day opened on top of a tab it
 returns to that tab, not Home.
 
+### [nutrition] ⚠️ The meal builder adds saved meals, and the arithmetic is not device-verified (BF-161, 2026-09-14)
+
+Shipped in v1.456.8. The owner asked for it — *"For the meal builder it should let you add
+meals/saved items as part of the meal builder"* — and chose flattening over real nesting, which
+`saved_meal_items.food_item_id` being NOT NULL would have made a migration: *"Okay lets go with
+flatten for now."*
+
+**Two things are owed on the S25.** ① Build a meal from **two** saved meals and confirm the
+ingredient rows, their quantities and the macro total match the sum of the sources — the harness
+reaches the tab and proves the wiring, but cannot judge the arithmetic against a real library.
+② That the snapshot behaviour is not surprising in use: a meal built from a saved meal does **not**
+change when the source is edited later, which is the accepted cost of not paying for a nullable
+`food_item_id` and recursive macro computation.
+
 ### [nutrition] ⚠️ The vial sheet's rewrite is not device-verified (BF-153, 2026-09-13)
 
 Shipped in v1.454.1: the vial in use is named and moved above the create-form, the form is headed
@@ -3339,6 +3353,37 @@ check it asked for has now been run. (Found while answering an unrelated Sentry 
 - **Keep: the device write path has not run.** `getLocalStore` returns null on web, so every exercised path — including the `plan_meal_answers` decline that suppresses a meal from the offer — took the `/api/nutrition/food-logs` fallback rather than the SQLite write plus outbox a real tap takes. `e2e/plan-day-fill.spec.ts` covers the selection and the write end to end, and all ten guards in the selector are mutation-checked, but on the web path only. The button has not been seen on the S25.
 - **Q-354 is a live trap for spec authors, not just a curiosity.** The new spec's `locator.click()` did nothing at all — no toast, no request, no error — because the Nutrition scroll container's date-swipe `useDrag` swallows mouse input, which is what Playwright sends. `tap()` works and is the faithful input anyway. Every future e2e assertion that presses something on this screen has to know this first, and the failure gives no clue.
 - **Q-187 is re-scoped, not struck.** What remains is the owner's second sentence — the day re-calculating remaining meals against what was actually eaten — which has no design and three open questions (what gets re-scaled, whether a floor exists, what to say when the remaining macros are unreachable).
+
+### [cardio] ⚠️ A fitness test now logs the activity it was, so it reaches the calorie budget; untested on device (BF-160, 2026-09-14, v1.456.10) · needs: device
+
+From the owner's 2026-09-14 Cooper run — 1,975 m, 720 s, avg HR 156. Told the test had produced no
+activity log, he answered *"Yes it should count."*
+
+`computeActiveEnergy` has three sources — strength sessions, logged activities, passive steps — and
+a fitness test was none of them, so the hardest twelve minutes of his week earned **nothing**.
+
+**Why it read as counted.** Zone minutes come from `oura_heartrate`, so the strap's 581 top-zone
+samples *were* credited automatically. HR-derived credit flows without an event row; event-derived
+credit does not — and the missing half is invisible unless the budget is checked specifically. The
+steps path did not cover it either: `body_metrics.steps` read **894** for the whole day, fewer than
+a 1,975 m run produces on its own.
+
+Fixed by giving `FitnessTestProtocol` an `activityType` field (Cooper → `run`, 6MWT → `walk`,
+`resting_hrr` → none) and writing an `activity_log` beside the test — local row plus outbox
+mutation, both cache groups invalidated. The activity is written **whether or not BF-158 scored the
+distance**: the effort happened either way.
+
+**The double-count the entry warned about does not exist**, and this was checked rather than
+assumed: `computeZoneQuota`'s only actual is `getZoneMinutesRange`, which reads an HR-derived cache.
+An activity row is not an input to it. The overlap that *is* real — steps — was already handled, and
+here it takes the passive term to zero, so the run's own estimate becomes the entire credit.
+
+**Not device-verified,** and one figure is not verified anywhere. Measured against the local DB, the
+day's `activeEnergyKcalToday` went **0 → 122** with the rows present and back to 0 without them — but
+this repo has only the synthetic MET fixtures, so **the size of the credit is untested on any machine
+here** (the magnitude assertion skips in CI too). **The check:** run a protocol on device, confirm one
+activity appears in cardio history with the right duration and distance, that the day's earned
+calories rise, and that the zone quota does **not** jump by a second helping of the same minutes.
 
 ### [cardio] ⚠️ A fitness test with no distance now withholds its score; the indoor case is untested on device (BF-158, 2026-09-14, v1.456.8) · needs: device
 

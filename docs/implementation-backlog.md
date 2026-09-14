@@ -486,48 +486,48 @@ below threshold and left in place for next time.
 - **What the owner is accepting, restated because it is the part that bites later:** a meal built
   from saved meals is a snapshot. Editing the source meal afterwards does not change it. Nothing on
   screen should imply otherwise — no "from <meal name>" provenance chip that reads as a live link.
-- **Verification:** on device, build a meal from two saved meals and confirm the ingredient rows,
-  their quantities, and the resulting macro total match the sum of the sources.
+- **✅ SHIPPED 2026-09-14** (`fix/bf161-meal-builder-add-saved-meals`, v1.456.8).
+  [Journal](overview/entries/2026-09-14-bf161-builder-adds-saved-meals.md). `savedMealToEntries`
+  (`components/nutrition/saved-meal-flatten.ts`) is the one mapping; the source list is
+  `saved-meal-results.tsx`, a child rather than an addition to `saved-meals-sheet.tsx`, which was
+  788 lines against the hard 800 ceiling. **No schema change and no new fetch** — `SavedMeal`
+  already carries its items and the sheet already loads them.
+- **The quantity question answered itself.** `openBuild` already built the same `{ item, qty }` rows
+  inline to load a meal for editing, at the stored WHOLE-RECIPE multiplier. Both paths now share one
+  helper, which is what makes the check below true as this entry states it.
+- **Keep:** the device check, and only that. On the S25, build a meal from two saved meals and
+  confirm the ingredient rows, their quantities, and the resulting macro total match the sum of the
+  sources. The harness reaches the tab and proves it is wired; it cannot judge the arithmetic on a
+  real library.
 
-### [cardio] BF-160 — a fitness test earns no calories and leaves no activity, so twelve minutes of maximal running is invisible to the budget
+### [platform] LA-107 — a spec can pin an absolute date against a clock-derived value, and nothing catches it until the day turns
 
-- **Lane:** A — `components/fitness-tests/test-result.tsx` (`handleSave`) writes only
-  `fitness_tests`; the energy path is `lib/health/energy-balance-service.ts` /
-  `computeActiveEnergy`, which sums workouts + activities + steps and knows nothing about tests.
-- **Added:** 2026-09-14 (BugFix intake), from the owner's Cooper run. Told the test had produced no
-  activity log, he answered: *"Yes it should count."*
-- **Measured on his 2026-09-14 Cooper run** — 1,975 m, 720 s, avg HR 156, peak 175:
-
-  | surface | credited? | evidence |
-  |---|---|---|
-  | Zone minutes | **yes, already** | `getZoneMinutesRange` reads `oura_heartrate`; **581 strap samples ≥80% of max ≈ 9.7 min** in the top zone |
-  | Calorie budget | **no** | not a `workout_session`, not an `activity_log`; `computeActiveEnergy` has no third source |
-  | Cardio history / weekly list | **no** | `activity_logs` for 2026-09-14 returns **0 rows** |
-
-- **The steps path does not rescue it, which is the part worth measuring rather than assuming.**
-  `body_metrics.steps` for the day reads **894** — fewer than a 1,975 m run produces on its own, so
-  the pedometer did not capture the effort either. The hardest twelve minutes of his week contribute
-  **essentially nothing** to the day's earned calories, on the same screen BF-152 and BF-154 have just
-  made anchor to measured movement.
-- **The split is the design problem: HR-derived credit flows automatically, event-derived credit does
-  not.** Anything the strap records reaches the zone quota without an activity row, so a test looks
-  partly credited and the missing half is invisible. That is why this reads as "it counted" until the
-  budget is checked.
-- **Recommended: write an `activity_log` alongside the `fitness_test` on save**, from data the capture
-  already holds — `startMs`/`endMs`, `distanceM`, `avgHr`/`maxHr`, and the protocol name as the title.
-  `activity_types` already carries **Run** (distance-based) and **Other**; a Cooper is a run, a 6MWT a
-  walk, and `resting_hrr` should write nothing (60 s of effort inside three minutes of sitting is not
-  a cardio session). The energy path then credits it with no new source, because it becomes an
-  activity like any other.
-- **Do not double-count, and check this before shipping.** The zone minutes are already credited from
-  HR. Creating an activity must not also add its minutes to the same quota — verify against
-  `computeZoneQuota`'s inputs, which are HR-derived, not activity-derived. The calorie path is the
-  one that genuinely gains a source.
-- **Needs:** BF-158 — that entry may make the score conditional on a plausible distance; an activity
-  should still be written when the VO₂max is withheld, because the effort happened either way.
-- **Verification:** run a protocol on device and confirm one activity appears in cardio history with
-  the right duration and distance, that the day's earned calories rise, and that the zone quota does
-  **not** jump by a second helping of the same minutes.
+- **Lane:** A — `scripts/check-*.js` (a new Custom Rules step) plus the `e2e/` and `__tests__/`
+  fixtures it would flag.
+- **Added:** 2026-09-14 · Lane A, from the E2E failure that blocked every branch for the second time
+  in six weeks. See [the journal entry](overview/entries/2026-09-14-e2e-budget-honesty-date-rollover.md).
+- **Two incidents, same rule, both already written down and neither prevented.** CLAUDE.md states
+  it plainly — a fixture may hold an absolute date only when BOTH sides of the comparison are fixed
+  — and cites `scale-ble-day-keying.test.ts` (2026-08-03) as the worked example. On **2026-09-14**
+  `e2e/nutrition-budget-honesty.spec.ts` did the same thing: `date: '2026-09-14'` stubbed against a
+  page that guards on `todayInTz('Australia/Brisbane')`. It went red at 14:00 UTC, on every branch,
+  and does not recover. The prose rule has now failed twice; a check has not been tried once.
+- **The shape is statically visible, which is what makes this worth a script.** A literal
+  `'YYYY-MM-DD'` or `'…T…Z'` inside a test fixture is one regex. Being a literal is not itself
+  wrong — `day-rollover-checkin.spec.ts` pins a fixed instant deliberately and says so — so the
+  check needs a way to bless one, and the existing scripts' baseline-plus-exemption-with-a-reason
+  pattern is the one to copy.
+- **Start by measuring, not by writing the regex.** The flag is cheap and the corpus is not known:
+  count today's matches across `e2e/**` and `**/__tests__/**` first. If most are legitimate, a bare
+  literal-date rule is noise and the discriminator has to be narrower — a literal in the same file
+  as `todayInTz`, `AT TIME ZONE`, `Date.now()` or `new Date()` is the obvious candidate, because
+  that pairing is exactly the both-sides-fixed rule being broken.
+- **Thirteen specs already derive the user's day correctly** (`plan-day-fill.spec.ts:58` via `Intl`,
+  `one-calorie-budget.spec.ts:79` via `AT TIME ZONE`), so the check has a large known-good set to
+  validate against before it is turned on.
+- **Verification:** reintroduce `date: '2026-09-14'` into `nutrition-budget-honesty.spec.ts` and
+  confirm the check fails; confirm a clean `pnpm check:rules` on unmodified `main`, with the run
+  printing how many files it inspected rather than only that it passed.
 
 ### [platform] LA-106 — a backticked `Needs:`/`Gate:` is invisible to the queue tool, and a hidden `Gate:` would unpark owner-gated work
 

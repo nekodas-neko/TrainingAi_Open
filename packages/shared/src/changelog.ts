@@ -6,6 +6,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.456.10",
+    date: "2026-09-14",
+    changes: [
+      "A completed fitness test now also logs itself as an activity, so it counts towards the calories you have earned for the day. A Cooper run appears as a run and a 6-minute walk test as a walk, with the time, distance and heart rate the test recorded. Before this, the test saved its score and nothing else: your heart-rate zone minutes were credited automatically, which made it look like the test had counted, while the calorie side of the day saw no exercise at all. The quick resting-HR test is unchanged and logs no activity — a minute of effort between two minutes of sitting is not a cardio session.",
+    ],
+  },
+  {
+    version: "1.456.9",
+    date: "2026-09-14",
+    changes: [
+      "The meal builder can now add one of your saved meals. Pick it from the new Your meals tab beside Your foods, and it drops in as its individual ingredients, each of which you can then edit or remove like any other. Building a meal out of other meals no longer means typing every ingredient again. One thing to know: what you add is a copy taken at that moment, so editing the original meal later will not change a meal you have already built from it.",
+    ],
+  },
+  {
     version: "1.456.8",
     date: "2026-09-14",
     changes: [
