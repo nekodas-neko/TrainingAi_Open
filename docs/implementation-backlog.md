@@ -2945,17 +2945,30 @@ sheet is open over the bottom half of it.
     `diary-nested-meal:163` both went flaky on `browser.newContext: Target page, context or browser
     has been closed` after `Received signal 11 SEGV_MAPERR 0000000001b0` — same address, fifth time.
     Both recovered; the run's one hard failure was a real fixture fault in a spec that PR added.
+  - **⚠ EIGHTH SIGHTING 2026-09-14 (#1186), and it is the first with a CONTROLLED re-run.**
+    `back-dismiss-sweep:171` was the hard failure — both its attempts died at `browser.newContext`
+    after `Received signal 11 SEGV_MAPERR 0000000001b0`, the same address for the sixth time — beside
+    `diary-nested-meal:197` (second time) and `saved-meal-tags:75`, which crashed identically and
+    recovered. 201 passed, and a grep of the whole log for `expect(received)` / `Expected:` /
+    `Received:` returned **zero matches**: not one assertion failed in the entire run.
+  - **Re-running the same job on the same commit came back fully green**, which is the datum the
+    previous seven sightings could not supply. The crash is not a property of a commit, and a
+    re-run is an effective mitigation for a single occurrence — at the price of ~30 minutes. That is
+    an argument for this entry's conclusion rather than against it: the job is a coin-flip whose
+    cost is paid per PR, not a signal about the code under test.
+
   - **`touch-target-size:53` failed with `/: no interactive elements found`**, which is the same
     dead-renderer downstream wearing a third mask: the page never rendered, so the measurement had
     nothing to measure and the assertion read as a layout defect. Worth naming, because unlike
     `ERR_ABORTED` and `newContext` it looks like a genuine product failure on its own.
-  - **Seven sightings, eleven different specs** — `preferences-survive-reinstall` (×4, three times as
-    the hard failure), `touch-target-size` (×2), `macro-calorie-warning` (×2), `one-calorie-budget`,
-    `back-dismiss-sweep`, `card-429-error-state`, `home-device-battery-chips`,
-    `baseline-progress-label`, `health-tabs-instant-paint`, `meal-label`, `diary-nested-meal`. Which
-    spec is reported is a scheduling accident, as this entry said at the second sighting; the
-    constant is a renderer crash inside a 21–26 minute run. **It has now cost eight log reads across
-    three sessions**, one of them only to establish the hard failure was something else.
+  - **Eight sightings, twelve different specs** — `preferences-survive-reinstall` (×4, three times as
+    the hard failure), `touch-target-size` (×2), `macro-calorie-warning` (×2), `diary-nested-meal`
+    (×2), `back-dismiss-sweep` (×2, once as the hard failure), `one-calorie-budget`,
+    `card-429-error-state`, `home-device-battery-chips`, `baseline-progress-label`,
+    `health-tabs-instant-paint`, `meal-label`, `saved-meal-tags`. Which spec is reported is a
+    scheduling accident, as this entry said at the second sighting; the constant is a renderer crash
+    inside a 21–30 minute run. **It has now cost nine log reads across four sessions**, one of them
+    only to establish the hard failure was something else.
   - Recorded because a 26-minute job that eats its own browser roughly one run in three is an
     argument about the job, which is what this entry is for. It also means **a red E2E cannot be
     read as a signal without opening the log**, which is the cost LB-54 is about.
