@@ -11595,7 +11595,14 @@ against the obvious fix — clamping turns a −11.3 VO₂max into a plausible 1
 because the entry has to survive an implementer who reaches for `Math.max` on sight. BF-159 is short
 and carries one measured fact: `/baselines` has exactly one entrance in the whole app.
 
-## 2026-09-14 — `docs/implementation-backlog.md` → 21570 (BF-155 shipped)
+## 2026-09-14 — `docs/implementation-backlog.md` (BF-160)
+
+Thirty lines. Most of them are the credited/not-credited table and the 894-step measurement, because
+the entry's whole point is that the run IS partly credited — the zone minutes arrive from the strap
+without an activity row — and the missing half is therefore invisible. An implementer who assumes
+"nothing counted" would double-count the zone minutes fixing it.
+
+## 2026-09-14 — `docs/implementation-backlog.md` → 21610 (BF-155 shipped)
 
 −51 as BF-155 leaves. The entry was right on the mechanism and wrong on the dates, which is the
 note worth leaving: it said *"every session since 6 September"*, and production says
