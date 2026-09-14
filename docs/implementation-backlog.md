@@ -534,54 +534,35 @@ below threshold and left in place for next time.
   HR. Creating an activity must not also add its minutes to the same quota — verify against
   `computeZoneQuota`'s inputs, which are HR-derived, not activity-derived. The calorie path is the
   one that genuinely gains a source.
-- **`Needs:` BF-158** — that entry may make the score conditional on a plausible distance; an activity
+- **Needs:** BF-158 — that entry may make the score conditional on a plausible distance; an activity
   should still be written when the VO₂max is withheld, because the effort happened either way.
 - **Verification:** run a protocol on device and confirm one activity appears in cardio history with
   the right duration and distance, that the day's earned calories rise, and that the zone quota does
   **not** jump by a second helping of the same minutes.
 
-### [cardio] BF-158 — the Cooper test has no distance source indoors and no clamp, so a treadmill run saves a NEGATIVE VO₂max
+### [platform] LA-106 — a backticked `Needs:`/`Gate:` is invisible to the queue tool, and a hidden `Gate:` would unpark owner-gated work
 
-- **Lane:** A — `packages/shared/src/health/fitness-tests.ts` (`cooperVo2max`, `clampVo2`) is the
-  defect; `components/fitness-tests/test-active.tsx` is where a distance source other than GPS would
-  have to come from.
-- **Added:** 2026-09-14 (BugFix intake), from the owner asking for a pre-flight check before running
-  the Cooper test for the first time. **He nearly ran it on a treadmill** — the session immediately
-  before this was about single-speed treadmill walks.
-- **`cooperVo2max` is the only VO₂ equation in the file that is not clamped.**
-
-  ```ts
-  const clampVo2 = (v: number) => round1(Math.max(10, Math.min(100, v)))
-  // sixMwtVo2max: both branches return clampVo2(…)
-  export function cooperVo2max(distanceM: number): number {
-    return round1((distanceM - 504.9) / 44.73)      // ← no clamp
-  }
-  ```
-
-  At `distanceM = 0` that is **−11.3 mL·kg⁻¹·min⁻¹**, written to `fitness_tests.vo2max_est` and into
-  the fitness snapshot. The intercept guarantees it: any distance under 505 m is negative, and the
-  sibling equation in the same file already has the guard.
-- **Zero is the realistic input, not a contrived one.** `test-active.tsx` takes distance from
-  `startGpsWatcher` and nothing else — **no treadmill toggle, no manual entry**, unlike the guided
-  walk, which has an explicit *"Treadmill — skips GPS"* switch. An indoor run therefore produces a
-  full-length, correctly-timed test with a distance near 0.
-- **The existing early-stop guard shows the intended shape and covers the other half of this.**
-  `test-result.tsx` skips the VO₂ score when a fixed-duration protocol ends under 90% of its window
-  (*"the Ross/Cooper equations are calibrated to the FULL protocol"*, review E2-10), saving HR and
-  distance regardless. An implausible **distance** deserves the same treatment as an implausible
-  **duration**, and that is the recommended fix: skip the score and say why, rather than clamp a
-  treadmill run up to 10 and present it as a reading.
-- **Clamping alone is the wrong fix and would be worse than the bug.** `Math.max(10, …)` turns −11.3
-  into a plausible-looking **10.0** that nothing marks as invalid. Prefer: `null` with a reason when
-  the distance is implausible for the protocol (a 12-minute run under ~505 m is not a Cooper result),
-  which is the pattern the early-stop guard already uses.
-- **Worth considering alongside, not required:** a manual distance entry on the result screen, so a
-  treadmill's own readout can be typed in. That makes the test usable indoors rather than merely
-  safe. Owner's call — the safety half stands on its own.
-- **Verification:** run the protocol to full duration with GPS unavailable and confirm no VO₂max is
-  saved and the screen says why; confirm an outdoor run is unchanged. The owner's existing 6MWT row
-  (603 m, 18.8, `ross_2010`, 2026-07-19) is the reference that the clamped sibling still behaves.
-
+- **Lane:** A — `scripts/next-item.js` (the two field regexes) and
+  `scripts/check-backlog-pointers.js` (where the guard belongs).
+- **Added:** 2026-09-14 · Lane A, found while starting BF-158.
+- **Measured, not inferred.** `next-item.js:73` and `:76` parse the fields as
+  `/^\s*[-*]\s*\*{0,2}(Needs|Gate):\*{0,2}\s*…/i` — asterisks around the name, nothing else.
+  BF-160 wrote ``- **`Needs:` BF-158**`` with a BACKTICK, so its dependency did not parse and
+  **BF-160 printed as READY #1 while BF-158, the entry it needs, sat at #2.** Corrected in place
+  when BF-158 shipped; the trap is what remains.
+- **The `Gate:` case is the one that matters and has not happened yet.** The same regex governs
+  it, so ``- **`Gate: owner`**`` would park nothing — an agent would be handed owner-gated work as
+  the top of its queue with no sign anything was wrong. `Needs:` mis-orders; `Gate:` crosses a
+  line the owner drew.
+- **One occurrence exists today** (grep: `^\s*-\s*\*{0,2}\`(Needs|Gate|Reference):`), which is why
+  this is cheap now.
+- **Fix shape:** do NOT widen the parser to accept backticks — that rewards the ambiguity. Add a
+  check to `check-backlog-pointers.js` that fails on a line matching a field NAME followed by a
+  colon which the field regex does not then match, so the malformed line is a CI failure rather
+  than silence. `Reference:` needs the same treatment; it is parsed elsewhere but has the identical
+  shape.
+- **Verification:** write ``- **`Gate: owner`**`` into a scratch entry and confirm CI fails; confirm
+  `node scripts/next-item.js --lane A --all` is unchanged for every well-formed entry.
 
 ### [nutrition] BF-154 — the macro grams still key off the stored goal, and the owner has said they should not
 

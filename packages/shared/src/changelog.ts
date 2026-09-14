@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.456.8",
+    version: "1.456.9",
     date: "2026-09-14",
     changes: [
       "The meal builder can now add one of your saved meals. Pick it from the new Your meals tab beside Your foods, and it drops in as its individual ingredients, each of which you can then edit or remove like any other. Building a meal out of other meals no longer means typing every ingredient again. One thing to know: what you add is a copy taken at that moment, so editing the original meal later will not change a meal you have already built from it.",
+    ],
+  },
+  {
+    version: "1.456.8",
+    date: "2026-09-14",
+    changes: [
+      "A fitness test run indoors no longer invents a VO₂max. Both the Cooper run and the 6-minute walk take your distance from GPS and nothing else, so on a treadmill they finished a full, correctly-timed test with almost no distance and scored it anyway — the Cooper as a negative number, the 6-minute walk as a normal-looking figure that was not measured at all. Now the test saves your heart rate and time, skips the score, and says it needs GPS. An outdoor test is unchanged.",
     ],
   },
   {
