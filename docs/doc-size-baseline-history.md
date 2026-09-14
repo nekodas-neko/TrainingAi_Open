@@ -11752,7 +11752,21 @@ The conditional-close note on BF-64 and LB-47 is deliberately longer than "owner
 It has to say that nothing was verified, so a later report of the same symptom is read as a regression
 against an unverified fix rather than as a fresh bug.
 
-## 2026-09-14 — `docs/implementation-backlog.md` → 21095 (OR-113, the shell pass and the settled-Keep sweep)
+## 2026-09-14 — `projectOverview.md` → 10930, `docs/implementation-backlog.md` → 21574 (RV-36 refiled)
+
+The backlog shrank 12 net: RV-36's 49 lines left, LB-107's entry and BF-100's correction replaced
+most of them. projectOverview grew 12 for a docs-only change, which needs justifying.
+
+It records a **status correction, not a fix**: BF-100 has failed on the S25 twice and was filed as
+`Keep:` + `Verify: device`, printing under "shipped; a look is owed, nothing is blocked". A reader
+scanning the status section would otherwise carry on believing the app-shell pass left nothing
+failing.
+
+The device-only clause is the half that earns its length. `/more` restores 840 in Playwright and
+fails on the phone, so a green spec is evidence for the wrong proposition — and this entry has
+already been declared fixed twice.
+
+## 2026-09-14 — `docs/implementation-backlog.md` → 21081 (OR-113, the shell pass and the settled-Keep sweep)
 
 **503 lines, the largest single drop this file has recorded, and almost none of it is the shell
 pass.** Fifteen entries left the queue because their device check had already happened and nobody
@@ -11770,7 +11784,7 @@ The growth is `keepIsSettled` in `scripts/lib/keep-kind.js` plus its six tests, 
 this recurring: the check is advisory and is suppressed by the word DONE in the residue, so an entry
 someone has already narrowed correctly does not get re-flagged.
 
-### `projectOverview.md` → 10869 (same PR)
+### `projectOverview.md` → 10881 (same PR)
 
 Three Known-Issues rows moved to `known-issues-resolved.md` whole — BF-141, BF-135 and RV-36+RV-37,
 all three verified on the S25 in the last two passes. Net −49 after the BF-82 paragraph was rewritten
@@ -11780,3 +11794,11 @@ I would like"* is worth the next reader seeing.
 **The two threads RV-36's row was carrying are named where they went** rather than travelling to the
 archive with it: `/more` still fails and is BF-100's, and the fifth-safe-area-CI-rule question stays
 on RV-37. A row that moves with live threads inside it is how a thread gets lost.
+
+### Both numbers re-derived after merging #1168 (same PR)
+
+#1168 landed the same refile from the other direction — it removed RV-36 outright and split the
+owner's back-to-Home requirement into **LB-107** — so the counts above were stale before this branch
+opened. Recomputed rather than spliced, which is the standing rule for a `.size` file: the number is
+a measurement of the merged result, and a conflict in one is two sessions each reporting a count that
+was true of a file neither of them now has.

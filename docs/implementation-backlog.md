@@ -649,6 +649,30 @@ below threshold and left in place for next time.
 - **Added:** 2026-09-13 · re-queued from the shipped half, so the owner's answer is not lost with the
   entry that carried it.
 
+### [app-shell] LB-107 — back on a tab with nothing to pop should land on Home, not leave the app
+- **Lane:** B — the tab shell's history handling; `app/**` and `components/shell/**`.
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-14 · found while clearing RV-36 from the queue.
+- **The owner asked for this by name** during the 2026-09-13 app-shell pass: *"Just need to make
+  sure when you press back on a tab and there is no where to go it should go to the home screen."*
+- **It had no entry.** It was recorded inside **RV-36's body** — an entry that had already shipped
+  and been verified — and in that session's journal. RV-36's removal is what surfaced it; left
+  there, it would have been deleted with the entry that was done.
+- **This is a separate requirement from scroll restoration** and shares nothing with it but the
+  sitting they were reported in. RV-36 was about restoring an offset; this is about where the back
+  gesture goes when the stack is empty.
+- **What is NOT known yet, and must be measured before anything is changed:** which tabs can reach
+  an empty stack (a tab entered directly by URL or by a bottom-nav tap that replaced rather than
+  pushed), and what the WebView currently does — exiting the app is the Android default when there
+  is nothing to pop, so this is likely absent handling rather than wrong handling.
+- **⚠ The harness cannot send the system back gesture**, which is what the owner is pressing.
+  `page.goBack()` is not it, and `e2e/scroll-restoration.spec.ts`'s header records that
+  `page.goto()` is a hard navigation that skips React cleanup entirely. Expect to need the S25.
+- **Pass test:** on the S25, open a tab with nothing pushed on top of it and press the system back
+  gesture — Home, not the launcher.
+- **Reversal cost:** low, but it changes what a hardware gesture does, so it wants the device before
+  it is called done.
+
 ### [platform] LB-106 — `preferences-survive-reinstall` fails on CI and passes everywhere else, twice in one day
 - **Lane:** B — `e2e/preferences-survive-reinstall.spec.ts`, or the launch-time hydration it waits on.
 
@@ -3912,45 +3936,6 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
 - **Verify:** device — the ring card's real state is BLE, which the web build cannot reach at all, so
   a web-green paint says nothing about what the APK shows here.
 
-### [app-shell][nutrition] RV-36 — scroll restoration reaches 3 of 5 tabs; BF-100's entry says it reaches all of them
-
-- **Lane:** B — `app/nutrition/nutrition-content.tsx`, plus a correction to BF-100's entry above.
-- **Batch:** nutrition-tab-day-and-scroll
-- **Added:** 2026-09-03, Review sweep 41 —
-  [`write-up §3`](reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md)
-- **⚠ Correct BF-100's claim in the same PR.** That entry and the call site both say the hook is called
-  from `pull-to-sync.tsx` *"so every screen using the shell inherits it"*. Three screens use
-  `PullToSync` — `health-content`, `more-content`, `session-select-content`. The Nutrition tab owns its
-  own scroller (`nutrition-content.tsx:563`) and inherits nothing. Left as written, the next session
-  reads Nutrition as already handled.
-- **Measured**, with BF-100's own verified recipe (wheel scroll → in-app `router.push` → `goBack`):
-  `/more` → *Profile details* → back restores **840**; `/nutrition` → `/coach` → back saves **no**
-  `ta_scroll:` key and returns **0**.
-- **The gap is one path, not many — this was counted.** Restoration only matters where a user pushes
-  deeper and returns. Every other routable screen that scrolls at the mobile viewport
-  (`/health/sleep` 1200 px, `/health/heart-rate` 661, `/cardio` 374, `/config` 148, `/program` 148)
-  contains **no** `router.push` or `<Link>` to a deeper route — they are leaves, and re-entering one is
-  a fresh arrival that correctly starts at the top. `/workout-select` does not scroll at all. So the
-  live gap is Nutrition's single deeper push, `/coach?scope=nutrition`.
-- **The fix is one hook call**, not a `PullToSync` wrap: `useScrollRestoration(ref)` takes a ref and
-  nothing about it is tab-specific. Wrapping Nutrition in `PullToSync` would also give it a
-  pull-to-refresh gesture nobody asked for.
-- **How to test locally:** extend `e2e/scroll-restoration.spec.ts` with the `/nutrition` → `/coach` →
-  back case. Keep its precondition assertions — BF-100 records four spec traps that all report
-  `expected 840, received 0`, and a fifth this sweep paid for: `page.goto()` is a hard navigation, so
-  React cleanup never runs and **no** screen saves an offset.
-- **✅ VERIFIED ON THE S25, 2026-09-13** (owner's app-shell pass): scroll restoration works across the tabs — owner: *"Mostly works"*; the residue is recorded on BF-100.
-  against and the one gesture the harness cannot send. It is a `Verify:` now rather than the note
-  below, because the work is built: that note was correct while it was unbuilt (OR-105, 2026-09-10),
-  since a `Verify:` files unbuilt work under "shipped; nothing is blocked" where nobody looks for it.
-- **✅ SHIPPED 2026-09-11** (`fix/rv-36-nutrition-scroll-restoration`).
-  [Journal](overview/entries/2026-09-11-fix-nutrition-scroll-and-day-padding.md). One hook call on
-  the tab's own scroller, the `/nutrition` → `/coach` → back case added to
-  `e2e/scroll-restoration.spec.ts` — **confirmed red with the fix stashed**, failing on the
-  precondition (`Received string: "{}"`, nothing saved) rather than the ambiguous
-  `expected 840, received 0` that file's header warns about — and BF-100's wrong phrasing removed
-  from `pull-to-sync.tsx`'s own comment, not only from its entry.
-
 ### [app-shell][platform] RV-37 — `/health/day` scrolls with no bottom padding (structural; NOT observed)
 
 - **Lane:** B — `app/health/day/day-detail-content.tsx:226`
@@ -4869,26 +4854,27 @@ feature and not a deletion like LB-41:
 
 ### [app-shell] BF-100 — back navigation always lands at the top, because the scroll position is not on the document
 
-- **❌ FAILED ON THE S25, 2026-09-13 — the second failure of this entry.** Owner: *"Checked on more -
-  and still doesnt work"*.
-- **⚠ That failure was written into RV-36's entry by mistake and moved here 2026-09-14.** For a day
-  the entry that FAILED read as shipped-and-awaiting-a-look, while the entry that PASSED carried a
-  failure note contradicting its own verification a few lines lower. Worth stating because the
-  misfiling is invisible from either entry alone — both are about the same hook.
-- **RV-36 passed in the same sitting, which narrows this rather than contradicting it.** Owner there:
-  *"Mostly works. Just need to make sure when you press back on a tab and there is no where to go it
-  should go to the home screen."* So scroll restoration is largely working; what is failing is
-  **`/more` specifically**, and there is a second, separate requirement: **back from a tab with
-  nothing to pop should land on Home, not exit.** That second requirement is the one
-  **Q-93-followup** also asked for `/health/day`, and it lives here now that Q-93-followup has left
-  the queue.
-- **Do not re-fix this blind.** It has been declared fixed twice. The next attempt names which route
-  it reproduced on and how, before changing anything.
-- **Keep:** the device pass, and only that.
-- **Verify:** device — on the S25, scroll a tab screen well down, tap into a detail screen, press the
-  **system back gesture** (not a UI back button), and confirm it returns to the same offset on a cold
-  cache and a warm one; and that reaching the same screen forward still starts at the top. **Start
-  with `/more`**, which is where it failed.
+- **❌ FAILED ON THE S25 TWICE — most recently 2026-09-13.** Owner: *"Checked on more - and still
+  doesnt work"*. **This is buildable work, not a pending check**, and the `Keep:`/`Verify: device`
+  this entry carried until 2026-09-14 said the opposite — it printed under *"shipped; a look is owed,
+  nothing is blocked"* while the look had already been taken and failed. That is the trap the
+  `Verify:` field's own documentation names (OR-105), and it hid this for a day.
+- **RV-36 passed in the same sitting, which narrows this rather than contradicting it.** Owner
+  there: *"Mostly works."* Scroll restoration largely works; **`/more` specifically does not.**
+- **⚠ It is a DEVICE-ONLY failure, and the harness says the opposite.** Measured in Playwright,
+  `/more` → *Profile details* → back restores **840**. So a green `e2e/scroll-restoration.spec.ts` is
+  not evidence here, and the next attempt must not read it as any. Whatever differs is the S25's
+  system back gesture or the WebView's restore timing — neither reachable from the sandbox.
+- **Do not re-derive the six traps below to explain it.** They are paid for and in the hook. The
+  question is what `/more` does that `health-content` and `session-select-content` do not, given all
+  three take the same `PullToSync` path.
+- **Verification:** on the S25, scroll `/more` well down, tap into *Profile details*, press the
+  **system back gesture** (not a UI back button), on a cold cache and a warm one; and confirm
+  reaching the same screen forward still starts at the top.
+- **⚠ Q-93-followup asked for the same back behaviour on `/health/day`** — whether its back control
+  returns to Home rather than stranding the user on a navless route. That entry left the queue on
+  2026-09-14 (its taps were verified on the S25); the back half is **LB-107**, which generalises it,
+  so nothing was dropped when it went.
 - **✅ SHIPPED** (`feat/bf-100-scroll-restoration`, 2026-09-01).
   `lib/hooks/use-scroll-restoration.ts`, called once from `pull-to-sync.tsx` so every screen using
   the shell inherits it rather than 62 separate fixes. `e2e/scroll-restoration.spec.ts` is **green**
