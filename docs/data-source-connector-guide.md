@@ -651,6 +651,9 @@ Connect / a future HealthKit connector), not a rewrite of any formula in §4.
   (`POST /api/sync-health`) — exact field names, types, nullability, rejection rules, and the honest
   gap (no external API-key auth yet, PS-45). Send someone here when they want to connect their own
   device, not to this design doc.
+- [`docs/superpowers/plans/2026-09-14-apple-healthkit-ios-connector.md`](superpowers/plans/2026-09-14-apple-healthkit-ios-connector.md)
+  — a buildable plan for the Apple HealthKit connector (PS-46), mirroring Health Connect's real
+  implementation field-by-field. iOS-side work only; the backend already accepts what it produces.
 - [`device-agnostic-source-architecture.md`](device-agnostic-source-architecture.md) — the goal, the
   tiers, the invariants. Read first.
 - [`docs/oura-ble-operations.md`](oura-ble-operations.md) — the operations manual for the one

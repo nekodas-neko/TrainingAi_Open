@@ -615,6 +615,28 @@ below threshold and left in place for next time.
 - **What's needed to start:** owner sign-off that this capability is wanted, and how wide (one route
   vs. several) — a security-surface decision, not an implementation question.
 
+### [devices] PS-46 — build the Apple HealthKit connector (iOS)
+
+- **Gate:** owner — this needs an Apple Developer Program enrollment ($99/year, a real recurring
+  cost) and a new platform target (no `ios/` directory, no `@capacitor/ios` exists in this repo
+  today), not just an implementer's time.
+- **Added:** 2026-09-14 (one-off session; the owner's friend testing device-source portability is on
+  iPhone/Apple Health, and the owner expects most future users will be too).
+- **Plan:** [`docs/superpowers/plans/2026-09-14-apple-healthkit-ios-connector.md`](superpowers/plans/2026-09-14-apple-healthkit-ios-connector.md)
+  — full mapping table (HealthKit type → canonical shape, mirroring `lib/health-connect-sync.ts`
+  field-by-field), platform setup steps, two decisions that need making before writing code (the
+  HRV-statistic mismatch between HealthKit's SDNN and the app's rMSSD-based fields; whether to
+  extend `SyncHealthSchema` for temperature/respiratory rate), and the TestFlight distribution path.
+- **Why this is real, not speculative:** HealthKit is architecturally identical to Health Connect —
+  a computed source (`docs/data-source-connector-guide.md` §2) needing only a client-side reader and
+  mapping layer, **zero backend changes** (`POST /api/sync-health` already accepts the exact target
+  shape). The plan is concrete and buildable as written; what's gated is the account cost and the
+  decision to stand up a second platform, not technical uncertainty.
+- **Interim note:** the friend's own gap is separately covered — no code change needed if he ends up
+  reachable via Android Health Connect instead; this entry is specifically for Apple Health.
+- **What's needed to start:** owner sign-off on the Apple Developer Program cost/enrollment, then an
+  implementer follows the plan directly.
+
 ### [nutrition] BF-161 — the meal builder can only reach foods, so a meal made of meals has to be rebuilt ingredient by ingredient
 
 - **Lane:** B for the recommended shape (`components/nutrition/ingredient-search.tsx`,
