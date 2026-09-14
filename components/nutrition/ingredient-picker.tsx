@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import type { FoodItem, NutritionScanResult } from '@trainingai/shared/types/nutrition'
+import type { FoodItem, NutritionScanResult, SavedMeal } from '@trainingai/shared/types/nutrition'
 import { createFoodItem } from '@trainingai/shared/nutrition/create-food-item'
 import { getLocalStore } from '@/lib/local-store'
 import { AddFoodByHandForm, type AddFoodByHandValues } from './add-food-by-hand-form'
@@ -34,6 +34,10 @@ interface Props {
    * foods to the library for one press.
    */
   onRecipeCandidates: (candidates: RecipeCandidate[]) => void
+  /** The user's saved meals, for the builder's fourth source (BF-161). Already loaded by the sheet. */
+  savedMeals: SavedMeal[]
+  /** Picking one flattens it into ingredients — see `saved-meal-flatten.ts`. */
+  onAddMeal: (meal: SavedMeal) => void
 }
 
 /**
@@ -48,7 +52,9 @@ interface Props {
  * without the other and neither repeats the other's job. The database search left for
  * `useFoodDatabaseSearch` in BF-48, once Log Food needed the same query.
  */
-export function IngredientPicker({ active, userId, onAdd, onImportRecipe, onRecipeCandidates }: Props) {
+export function IngredientPicker({
+  active, userId, onAdd, onImportRecipe, onRecipeCandidates, savedMeals, onAddMeal,
+}: Props) {
   const [query, setQuery] = useState('')
   const [searchResults, setSearchResults] = useState<FoodItem[]>([])
   const { results: dbResults, searching: dbSearching, unavailable: dbUnavailable } =
@@ -300,6 +306,10 @@ export function IngredientPicker({ active, userId, onAdd, onImportRecipe, onReci
       <IngredientSearch
         onScan={() => setScanning(true)}
         lookingUpBarcode={lookingUp}
+        savedMeals={savedMeals}
+        // Clear the query the way `accept` does for a food: the meal's rows are now in the list
+        // above, so leaving the search filled would keep offering to add them again.
+        onAddMeal={meal => { onAddMeal(meal); setQuery('') }}
         query={query}
         onQueryChange={setQuery}
         searchResults={searchResults}
