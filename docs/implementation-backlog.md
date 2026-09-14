@@ -500,6 +500,35 @@ below threshold and left in place for next time.
   sources. The harness reaches the tab and proves it is wired; it cannot judge the arithmetic on a
   real library.
 
+### [platform] LA-107 — a spec can pin an absolute date against a clock-derived value, and nothing catches it until the day turns
+
+- **Lane:** A — `scripts/check-*.js` (a new Custom Rules step) plus the `e2e/` and `__tests__/`
+  fixtures it would flag.
+- **Added:** 2026-09-14 · Lane A, from the E2E failure that blocked every branch for the second time
+  in six weeks. See [the journal entry](overview/entries/2026-09-14-e2e-budget-honesty-date-rollover.md).
+- **Two incidents, same rule, both already written down and neither prevented.** CLAUDE.md states
+  it plainly — a fixture may hold an absolute date only when BOTH sides of the comparison are fixed
+  — and cites `scale-ble-day-keying.test.ts` (2026-08-03) as the worked example. On **2026-09-14**
+  `e2e/nutrition-budget-honesty.spec.ts` did the same thing: `date: '2026-09-14'` stubbed against a
+  page that guards on `todayInTz('Australia/Brisbane')`. It went red at 14:00 UTC, on every branch,
+  and does not recover. The prose rule has now failed twice; a check has not been tried once.
+- **The shape is statically visible, which is what makes this worth a script.** A literal
+  `'YYYY-MM-DD'` or `'…T…Z'` inside a test fixture is one regex. Being a literal is not itself
+  wrong — `day-rollover-checkin.spec.ts` pins a fixed instant deliberately and says so — so the
+  check needs a way to bless one, and the existing scripts' baseline-plus-exemption-with-a-reason
+  pattern is the one to copy.
+- **Start by measuring, not by writing the regex.** The flag is cheap and the corpus is not known:
+  count today's matches across `e2e/**` and `**/__tests__/**` first. If most are legitimate, a bare
+  literal-date rule is noise and the discriminator has to be narrower — a literal in the same file
+  as `todayInTz`, `AT TIME ZONE`, `Date.now()` or `new Date()` is the obvious candidate, because
+  that pairing is exactly the both-sides-fixed rule being broken.
+- **Thirteen specs already derive the user's day correctly** (`plan-day-fill.spec.ts:58` via `Intl`,
+  `one-calorie-budget.spec.ts:79` via `AT TIME ZONE`), so the check has a large known-good set to
+  validate against before it is turned on.
+- **Verification:** reintroduce `date: '2026-09-14'` into `nutrition-budget-honesty.spec.ts` and
+  confirm the check fails; confirm a clean `pnpm check:rules` on unmodified `main`, with the run
+  printing how many files it inspected rather than only that it passed.
+
 ### [platform] LA-106 — a backticked `Needs:`/`Gate:` is invisible to the queue tool, and a hidden `Gate:` would unpark owner-gated work
 
 - **Lane:** A — `scripts/next-item.js` (the two field regexes) and

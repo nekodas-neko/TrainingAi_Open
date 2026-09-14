@@ -11989,7 +11989,15 @@ meal built from a saved meal is a **snapshot**. That is invisible until the day 
 source meal and expects the built one to follow, which is exactly when a one-line ✅ would have left
 the reader with nothing.
 
-## 2026-09-14 — `docs/implementation-backlog.md` → 20954, `projectOverview.md` → 10985 (BF-160)
+## 2026-09-14 — `docs/implementation-backlog.md` → 21023 (LA-107)
+
++29 for an entry that exists because a prose rule failed twice. CLAUDE.md has stated the both-sides-
+fixed rule since 2026-08-03 and cited its worked example; six weeks later the same class went red on
+every branch. The entry is longer than "add a check" because the useful part is the instruction NOT
+to write the regex first — the corpus is unknown, a literal date in a fixture is often legitimate,
+and a rule that flags all of them would be turned off within a week.
+
+## 2026-09-14 — `docs/implementation-backlog.md` → 20983, `projectOverview.md` → 10985 (BF-160)
 
 −40 on the backlog for BF-160 leaving the queue; +31 on projectOverview for the row that replaces it.
 
