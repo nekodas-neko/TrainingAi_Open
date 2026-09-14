@@ -18,6 +18,12 @@ import { settleRouteBoundary, suppressMorningCheckin } from './fixtures'
  * The layout arithmetic — bucketing, the gap threshold, the coverage figure, the timezone — is
  * covered in node by `components/body-battery/__tests__/stress-day.test.ts`; what only a browser can
  * show is that the thing draws, with the axis and the gap in it.
+ *
+ * **The chart reads `/api/body-battery/stress-day`, NOT the battery response's live series (LA-104)**
+ * — the two are built from different baselines, so today drawn from the live one would not be
+ * comparable with a past day drawn from storage. The last test is what proves the source actually
+ * switched: it leaves a full live series on `/api/body-battery` and empties the stored day, and the
+ * chart must follow storage.
  */
 
 // The card fetches `/api/body-battery`, and the service worker re-issues every `/api/` request where
@@ -36,6 +42,13 @@ const STRESS_SERIES = [
   // …then the afternoon, running hard negative — the window the owner wants to place.
   ...[[13, 15, -0.52], [13, 45, -0.62], [14, 15, -0.69], [14, 45, -0.80], [15, 15, -0.74]],
 ].map(([hh, mm, level]) => ({ t: at(hh, mm), level }))
+
+/** The stored day, as `/api/body-battery/stress-day` returns it. */
+const STRESS_DAY = {
+  date: '2026-09-08',
+  series: STRESS_SERIES,
+  throughMs: STRESS_SERIES[STRESS_SERIES.length - 1].t,
+}
 
 const BATTERY = {
   current: 62, label: 'Good', trend: 'draining', anchor: 78, anchorSource: 'readiness',
@@ -69,9 +82,23 @@ async function openBatteryCard(page: import('@playwright/test').Page) {
     .toBeVisible({ timeout: 15_000 })
 }
 
+/**
+ * Both endpoints, in this order.
+ *
+ * `**\/api/body-battery**` also matches the `stress-day` child, so the specific handler has to be
+ * registered SECOND — Playwright runs the most recently added matching route first.
+ */
+async function stubBattery(
+  page: import('@playwright/test').Page,
+  opts?: { battery?: unknown; stressDay?: unknown },
+) {
+  const json = (body: unknown) => ({ status: 200, contentType: 'application/json', body: JSON.stringify(body) })
+  await page.route('**/api/body-battery**', route => route.fulfill(json(opts?.battery ?? BATTERY)))
+  await page.route('**/api/body-battery/stress-day**', route => route.fulfill(json(opts?.stressDay ?? STRESS_DAY)))
+}
+
 test('the day’s stress is drawn against a clock, with the unmeasured hours left blank', async ({ page }) => {
-  await page.route('**/api/body-battery**', route =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(BATTERY) }))
+  await stubBattery(page)
 
   await openBatteryCard(page)
 
@@ -91,11 +118,14 @@ test('the day’s stress is drawn against a clock, with the unmeasured hours lef
   // Coverage stated, and it excludes the hole: 30 + 30 minutes of morning span, plus 120 + 30 of
   // afternoon, is 3.5 h out of a nine-hour wall-clock reach.
   await expect(page.getByText('3.5 h measured')).toBeVisible()
+
+  // Where the readings stop. Without it a day whose ring went quiet at 15:15 reads as a calm
+  // evening, which is the honest cost of serving today from storage rather than live.
+  await expect(page.getByText('15:15').first()).toBeVisible()
 })
 
 test('no stress series draws no chart, rather than an empty frame', async ({ page }) => {
-  await page.route('**/api/body-battery**', route =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...BATTERY, stress: null }) }))
+  await stubBattery(page, { battery: { ...BATTERY, stress: null }, stressDay: { ...STRESS_DAY, series: [], throughMs: null } })
 
   await openBatteryCard(page)
 
@@ -103,4 +133,37 @@ test('no stress series draws no chart, rather than an empty frame', async ({ pag
   // card's. Asserting a missing element inside a section nobody opened proves nothing.
   await expect(page.getByText(/charged/).first()).toBeVisible({ timeout: 30_000 })
   await expect(page.getByRole('img', { name: /Stress by time of day/ })).toHaveCount(0)
+})
+
+test('the chart follows the stored day, not the battery response’s live series', async ({ page }) => {
+  // The live series is the full seven buckets; storage has none. Before LA-104 this drew a chart.
+  await stubBattery(page, { stressDay: { ...STRESS_DAY, series: [], throughMs: null } })
+
+  await openBatteryCard(page)
+
+  // The strip still renders off the live series, so the expanded half really is populated — the
+  // chart's absence below is the source switch, not an unopened card.
+  await expect(page.getByText(/charged/).first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('img', { name: /Stress by time of day/ })).toHaveCount(0)
+})
+
+test('a past day carries the same chart, which is what makes the comparison possible', async ({ page }) => {
+  // The entry's pass test is *"open a past day, read a stressed window off the axis, and say whether
+  // it matches what you were doing"* — so a past-day surface is not a nice-to-have here, it is the
+  // half that makes the one-baseline change observable at all.
+  await page.route('**/api/body-battery/stress-day**', route => route.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify(STRESS_DAY),
+  }))
+
+  await page.goto('/health/day?date=2026-09-08')
+  await settleRouteBoundary(page)
+
+  const chart = page.getByRole('img', { name: /Stress by time of day/ })
+  await expect(chart, 'the chart never reached the day screen').toBeVisible({ timeout: 60_000 })
+  await expect(chart.locator('polyline')).toHaveCount(2)
+
+  // "today" would be a lie on a day you navigated back to, and the heading is the only thing that
+  // knows which day it is drawing.
+  await expect(page.getByText('When the day ran stressed')).toBeVisible()
+  await expect(page.getByText('When today ran stressed')).toHaveCount(0)
 })

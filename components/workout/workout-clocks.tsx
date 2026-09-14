@@ -63,6 +63,77 @@ export function ExerciseClock({ startMs }: { startMs: number | null }) {
 }
 
 /**
+ * The bounded get-ready bar, for every ready screen the three-stage ramp does not cover.
+ *
+ * BF-157. Owner, on the Pull-Up ready screen with the session clock at **8:42**: *"The body weight
+ * screens have no warmup timer or load time so its just infinite on this screen."* The ramp is built
+ * from a percentage ladder off the working weight, so it is correctly absent at zero load — 50/74/92%
+ * of nothing is not a warm-up — but the clock was rendered *from* that ladder, so dropping one
+ * dropped the other. Two ideas, one gate.
+ *
+ * **The notification chip was counting the whole time**, against the same
+ * `transitionSecForEquipment` total, and its comment already claims it is *"the same total the
+ * on-screen ready bar uses"*. This makes that true. It matters past the screen: `handleStart` submits
+ * the ready-screen elapsed as `prepTimeSec`, which feeds the duration model — an unbounded ready
+ * screen measures whatever distraction occurred and then prints it on the session card.
+ */
+export function GetReadyProgress({
+  startMs,
+  baselineSec,
+  totalSec,
+}: {
+  startMs: number | null;
+  baselineSec: number | null;
+  totalSec: number;
+}) {
+  const sessionElapsed = useElapsedSec(startMs);
+  const readyElapsedSec = baselineSec != null ? Math.max(0, sessionElapsed - baselineSec) : 0;
+  const done = readyElapsedSec >= totalSec;
+  const fillPct = Math.min(1, readyElapsedSec / totalSec) * 100;
+  return (
+    <div className="w-full">
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Get ready</p>
+        <p className="font-mono text-[10px] tabular-nums text-muted-foreground">
+          {formatTime(Math.min(readyElapsedSec, totalSec))} / {formatTime(totalSec)}
+        </p>
+      </div>
+      {/* The ramp beside this one still carries `#22c55e`/rgba for the same states. Those are its
+          three baselined literals and are not this component's to churn; new colour comes from the
+          token, which is what `check-hex-literals.js` is ratcheting toward. */}
+      <div
+        className="relative h-9 overflow-hidden rounded-xl border"
+        style={{
+          borderColor: done
+            ? "color-mix(in oklch, var(--accent-green) 30%, transparent)"
+            : "color-mix(in oklch, var(--color-brand) 30%, transparent)",
+          background: done
+            ? "color-mix(in oklch, var(--accent-green) 7%, transparent)"
+            : "color-mix(in oklch, var(--color-muted) 40%, transparent)",
+        }}
+      >
+        <div
+          className="absolute inset-y-0 left-0"
+          style={{
+            width: `${fillPct}%`,
+            background: done
+              ? "color-mix(in oklch, var(--accent-green) 12%, transparent)"
+              : "color-mix(in oklch, var(--color-brand) 12%, transparent)",
+            transition: done ? "none" : "width 1s linear",
+          }}
+        />
+        <p
+          className="relative flex h-full items-center justify-center text-[11px] font-bold uppercase tracking-wide"
+          style={{ color: done ? "var(--accent-green)" : "var(--color-brand)" }}
+        >
+          {done ? "\u2713 Ready" : "Get set up"}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Warm-up ramp segments. Derives its own progress from the session clock minus the baseline
  * captured when the ready screen opened, so the parent no longer needs the session tick to
  * drive it. Markup is unchanged from where this lived inline.

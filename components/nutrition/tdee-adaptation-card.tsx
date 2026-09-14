@@ -116,9 +116,20 @@ export function TdeeAdaptationCard({ energyBalance, onApplied }: Props) {
   return (
     <div className="rounded-2xl border border-border bg-muted/60 p-4 space-y-3">
       <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Calorie Nudge</p>
+      {/* TN-28. The qualifier is the same one `energy-card.tsx` and `calorie-balance-bar.tsx`
+          already print beside this figure, from the same payload fields — and this was the only
+          surface omitting it, which is the one that WRITES the user's calorie goal. The estimate
+          behind the owner's screenshot carried `confidence: 'low'` on 10 of 14 days, with a 95%
+          interval of [1,990–2,500] kcal: a 510 kcal band presented as one number with a button
+          under it.
+
+          Deliberately NOT gating the button on confidence — that is TN-27's trade, not this one.
+          Reaching this branch means `canSuggest`, which already requires a calibrated maintenance,
+          so no source check is needed here. */}
       <p className="text-sm">
-        Your measured maintenance is {maintenance!.kcal.toLocaleString()} kcal, so your goal works out
-        to <span className="font-semibold">{recommended.toLocaleString()} kcal/day</span>
+        Your measured maintenance is {maintenance!.kcal.toLocaleString()} kcal
+        {' '}({maintenance!.confidence} confidence, {maintenance!.daysLogged} of {maintenance!.daysInWindow} days logged),
+        so your goal works out to <span className="font-semibold">{recommended.toLocaleString()} kcal/day</span>
         {current != null && <> — your target is set to {current.toLocaleString()}</>}.
       </p>
       <div className="flex items-center gap-2">

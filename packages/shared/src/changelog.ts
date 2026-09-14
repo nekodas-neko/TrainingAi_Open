@@ -6,10 +6,46 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.455.2",
+    version: "1.456.5",
     date: "2026-09-14",
     changes: [
       "Your workout times are right again. Sessions were printing as two or three minutes — one 38-minute session showed as 3 — because the app was rebuilding the session length from the individual exercises instead of using the finish time it had already recorded, and the last set of every exercise was not saving the moment you logged it. Both are fixed: the day now shows the real length, measured from when you started to when you finished. Sessions logged before this keep the wrong internal timestamps on their exercises, which cannot be recovered, but their displayed length is now correct.",
+    ],
+  },
+  {
+    version: "1.456.4",
+    date: "2026-09-14",
+    changes: [
+      "The energy explainer now says what your calorie base leaves out: the energy it takes to digest food, and small everyday movement your phone cannot count — standing, fidgeting, housework. Neither is estimated, so on a still day your real burn runs a little above what the app shows. You were right that the base misses some basic metabolic needs; the app now says so rather than inflating the number with a guess.",
+      "The Calorie Nudge card now prints how confident that maintenance figure is and how many days it is built from, the same way the energy card and the balance bar already did. It was the only place showing the number without its confidence — and the only one with a button that writes it straight into your goal.",
+    ],
+  },
+  {
+    version: "1.456.3",
+    date: "2026-09-14",
+    changes: [
+      "The AI recommendation card now tells you what happens if you don't press Accept, because the answer depends on the recommendation and the card looked the same either way. On a normal progression it says the numbers are already loaded and Accept only settles the phase decision. On a deload, a swapped session or a rest day it warns, in bold, that starting the workout without answering trains your program's normal loads rather than what is on screen — which is the case where ignoring the button quietly discards the advice.",
+    ],
+  },
+  {
+    version: "1.456.2",
+    date: "2026-09-14",
+    changes: [
+      "The get-ready screen has a clock again on bodyweight exercises. The warm-up bar was built from percentages of your working weight, so on a pull-up — where there is no weight to take a percentage of — the whole thing disappeared and the screen just sat there. Your phone's notification was counting down the same 60 seconds the entire time. There is now a plain get-ready bar wherever the three-stage ramp does not apply: bodyweight, an AMRAP test, solo mode, or anything logged at zero. It runs to the same total the notification uses.",
+    ],
+  },
+  {
+    version: "1.456.1",
+    date: "2026-09-14",
+    changes: [
+      "Cardio Baselines has moved to the Cardio tab, under your heart profile. It was in the Health tab's training list between Muscle Volume and Workout Density — every card around it about lifting, this one holding VO₂max and heart-rate recovery — and it is the only way into the fitness tests, so it was also the only signpost to the 6-minute walk, Cooper and resting-HR protocols. It now sits beside the rest of your heart data, above the picker where you choose what to do today, which is when taking a test is actually an option.",
+    ],
+  },
+  {
+    version: "1.456.0",
+    date: "2026-09-14",
+    changes: [
+      "The stress-by-hour chart now reaches past days. Swipe to any day on the day screen and it is there under the read-through, drawn the same way as today's — which is the point of the change rather than a side effect: today's chart used to be built from a different calculation than a stored day's, so comparing one day against another was comparing two things. Both now come from the same stored readings. The cost is stated on the chart: it says the time the readings stop at, because a stored day ends at the last sync rather than at this minute.",
     ],
   },
   {

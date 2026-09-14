@@ -26,8 +26,98 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.442.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-09-09.
+**Version:** v1.456.4 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-09-14.
+
+**BF-100 is failing on the S25, not awaiting a check — and it read as the latter for a day.** Owner,
+2026-09-13: *"Checked on more - and still doesnt work"*, its **second** failure. That was recorded
+inside **RV-36's** body, an entry that had already shipped (2026-09-11) and been S25-verified
+(2026-09-13), while BF-100 itself still carried `Keep:` + `Verify: device` and printed under
+*"shipped; a look is owed, nothing is blocked"*. RV-36 is removed; BF-100 is a plain buildable entry
+and now prints READY. **It is a device-only failure and the harness contradicts it** — `/more` →
+Profile details → back restores **840** in Playwright — so a green `scroll-restoration.spec.ts` is
+not evidence, which is how it could be declared fixed a third time. A second owner request found in
+the same body had **no entry anywhere** and is now **LB-107**: back on a tab with nothing to pop
+should land on Home rather than leave the app
+([journal](docs/overview/entries/2026-09-14-refile-shipped-rv36.md)).
+
+**`day-review-read-through` was broken in both directions, and only one of them was visible
+(LB-105).** Its wrap-up test failed in the sandbox and passed on CI — every section of
+`DayReadThrough` self-hides when its domain is empty and the local seed has **nothing at all**
+recorded for today, so the dialog was legitimately blank. Its `/health/day` test passed on that same
+empty day, which is the half nobody was looking at: the regex matched `^Sleep$` and that screen
+renders a **`Sleep` score cell** of its own above the read-through, so the test guarding *"both hosts
+render ONE implementation"* would have passed with `DayReadThrough` absent entirely. The label list
+was wrong too — the component renders **`Body composition`**, which `^Body$` never matched. The spec
+now records an activity for today and removes it, and both halves scope to a
+`data-testid="day-read-through"`. Proven rather than assumed: with the seed suppressed, the
+`/health/day` test **now fails where it used to pass**. No product behaviour changed
+([journal](docs/overview/entries/2026-09-14-lb105-day-review-seed-independence.md)).
+
+**The nutrition surface says two things it knew and withheld (LA-102 + TN-28, batched).** LA-102 —
+the owner on the anchored budget: *"1350 doesnt count some basic metabolic needs".* He is right; the
+ⓘ panel now names the two omissions (thermic effect of food, non-step NEAT) rather than inflating
+the base with a multiplier, which is the trade BF-152 already decided. TN-28 — `TdeeAdaptationCard`
+writes the calorie goal in one tap and was the **only** surface printing the maintenance figure
+without its confidence; it now prints the siblings' exact qualifier.
+**A third finding came out of doing them together:** the ⓘ copy existed **twice**, inline in
+`energy-card.tsx` and `calorie-balance-bar.tsx`, and had already drifted — the card carried BF-134's
+resting-burn paragraph and the bar never got it. Both now render one
+`components/nutrition/energy-explainer.tsx`, and `movement-breakdown.test.ts`'s two-file loop is
+repointed at it plus a new check that neither host re-states the copy. ⚠️ **Not device-verified**
+([journal](docs/overview/entries/2026-09-14-la102-tn28-nutrition-budget-honesty.md)).
+
+**The AI card says what skipping Accept costs (BF-156).** Owner: *"what happens if I dont select to
+apply the session? Its pretty easy to miss that button."* There are two answers.
+`prescriptionDrivesLoad` splits the five phase actions: a pending `stay` or
+`transition_recommended` already drives today's loads, so ignoring the button costs only the phase
+decision; a pending `deload_recommended`, `session_swap_recommended` or `rest_day_recommended` does
+not, so ignoring it trains the base progression style instead of what is on screen. **The card's own
+two button blocks split on a DIFFERENT axis**, which the entry did not note and is why the shape of
+the buttons was never a usable signal: `transition_recommended` and `deload_recommended` share the
+"Move to …" block with opposite load consequences, and `stay` shares "Accept" with
+`session_swap_recommended`. One `ConsequenceLine` now reads `prescriptionDrivesLoad` in both blocks
+— no second copy of the split — muted on the driving half, bold amber on the opt-in half. ⚠️ **Not
+device-verified**, and the owner has a live `session_swap_recommended` to check it against
+([journal](docs/overview/entries/2026-09-14-bf156-accept-consequence.md)).
+
+**The bodyweight ready screen has a clock again (BF-157).** Owner, on the Pull-Up ready screen with
+the session clock at **8:42**: *"The body weight screens have no warmup timer or load time so its
+just infinite on this screen."* The three-stage ramp is built from 50/74/92% of the working weight
+and is correctly absent at zero load — but the clock was rendered *from* that ladder, so dropping one
+dropped the other. **Four cases have no working weight, not one:** bodyweight, an AMRAP baseline,
+solo mode, and anything logged at zero; the entry named only the first. All four now render a
+`GetReadyProgress` bar running to `transitionSecForEquipment(equipment)` — the same total
+`startRestChip` was already counting against, whose comment claimed it was *"the same total the
+on-screen ready bar uses"* and was wrong for every one of them. It matters past the screen:
+`handleStart` submits the ready-screen elapsed as `prepTimeSec`, so an unbounded ready screen was
+measuring whatever distraction occurred and feeding it to the session card's time budget. ⚠️ **Not
+device-verified**
+([journal](docs/overview/entries/2026-09-14-bf157-bodyweight-get-ready-clock.md)).
+
+**Cardio Baselines moved to the Cardio tab (BF-159).** Owner, after having to be told where the
+Cooper test lives: *"That section should be moved to cardio hub."* The card sat in the Health tab's
+`TRAINING_ORDER` between *Muscle Volume This Week* and *Workout Density*, surrounded by lifting
+cards while holding VO₂max and HR recovery — and `/baselines` has **exactly one entrance in the whole
+app**, so a card in the wrong list was the entire discoverability story for all three protocols. It
+now renders under `HeartProfileCard` and above `ModalityPicker`. **Moved, not duplicated** — the
+`TRAINING_ORDER` entry and its `renderTrainingSection` case are both gone, since two entrances to one
+destination is how a stale copy starts. `e2e/cardio-baselines-placement.spec.ts` asserts both halves
+and **each was proven to fail without the change** (the Cardio half against clean `main`, the Health
+half against a deliberately duplicated build). ⚠️ **Not device-verified**
+([journal](docs/overview/entries/2026-09-14-bf159-cardio-baselines-placement.md)).
+
+**The stress chart reads one baseline, and now reaches past days (LA-104).** TN-3b shipped the chart
+reading `/api/body-battery`'s **live** series while LB-102's route served every stored day — and the
+two are not the same number: measured in production over the eight days that had both, the sign
+differed on **6** and high-stress minutes by **4–8×**. So today drawn one way and yesterday drawn the
+other made the owner's own pass test — *"open a past day, read a stressed window off the axis"* —
+compare two metrics on one axis. Both halves now come from `/api/body-battery/stress-day`. The chart
+is also **mounted on `/health/day`**, which is what makes that test runnable at all; before this
+there was no past-day surface, so the claim was unobservable. The honest cost is printed on the
+chart: *"Measured through HH:MM — the last reading stored, not the end of your day."* ⚠️ **Not
+device-verified** — the Home card and the day screen were exercised on `pnpm dev` at 412 dp only
+([journal](docs/overview/entries/2026-09-14-la104-stress-chart-one-baseline.md)).
 
 **The AMRAP baseline session was never consumed (BF-131).** Owner: *"even though the session was
 done it's saying baseline needed"*. He ran both baseline sessions as instructed and
@@ -3244,7 +3334,9 @@ check it asked for has now been run. (Found while answering an unrelated Sentry 
 - **The +0.557 headline is reconciled**, not retracted: that was the baseline-relative *contributor score*, which measures **−0.553 (n = 35)** — same magnitude, sign carried by two scales running opposite ways. **Dropping the 4 `provisional: true` days (score pinned at 50) takes it from −0.395 to −0.553** — check that before any future correlation against `readiness_contributors`.
 - **A waking-rest HR is a real second-tile candidate** (10th pct of BLE samples 08–21; 70 days, 984 samples/day, moving **6.24 bpm/night** against the tile's 0.44) and the better **stress** proxy — but **nothing in the app computes it**, so it is not folded into TN-13.
 - **TN-17 — Activity as a pace-to-goal score.** Mechanically sound: `body_metrics.steps` is a running daily total. **⛔ `step_live_windows` is effectively empty (8 rows / 6 days)** and would read a flat zero. **The obstacle is goal calibration** — median day **4,649 steps**, 7,000 reached on **32%** of days and 10,000 on **15%**, so a paced score goes red from mid-morning where today's average reads 63–82. **Pacing does not create that; it stops the averaging from hiding it.** `Needs: Q-524`, `Gate: owner`.
-- **TN-3a's persistence half has SHIPPED** — `oura_daytime_stress_buckets` live via migrations 212/213, **69 rows / 3 days / ~26 buckets a day**. The **back-fill has not**, so the entry stays queued with a `Keep:`. **This does not unblock TN-3b** — it and TN-16 are parked on Q-507's sign, unchanged.
+- **TN-3a's persistence half has SHIPPED** — `oura_daytime_stress_buckets` live via migrations 212/213, **69 rows / 3 days / ~26 buckets a day**. The **back-fill has not**, so the entry stays queued with a `Keep:`. ~~**This does not unblock TN-3b**~~ — **superseded 2026-09-14:** TN-3b shipped 2026-09-13 (it makes
+  no claim about the sign, which is what kept it shippable while Q-507 is open) and LA-104 has since
+  pointed it at the stored buckets and mounted it on `/health/day`. TN-16 is still parked on Q-507.
 
 ### [readiness][sleep][activity][heart-rate][body] 🔴 The five Home pillars, answered one at a time — four new findings (TN-13…TN-16, 2026-08-26)
 

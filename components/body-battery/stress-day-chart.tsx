@@ -1,8 +1,12 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
-import { toSegments, coveredMinutes, type StressBucket } from './stress-day'
+import { useCachedValue } from '@/lib/hooks/use-cached-value'
+import { todayInTz, msToHHMMInTz } from '@trainingai/shared/date-utils'
+import { BODY_BATTERY_TTL } from '@trainingai/shared/cache-ttl'
+import { toSegments, coveredMinutes } from './stress-day'
+import type { StressDayResponse } from '@/app/api/body-battery/stress-day/route'
 
 /**
  * A day's stress against a clock (TN-3b).
@@ -24,6 +28,18 @@ import { toSegments, coveredMinutes, type StressBucket } from './stress-day'
  * 07:00–21:00. Unbanded, a reader takes the nightly rise as a judgement about their sleep rather
  * than a property of the series — and it is the same asymmetry that drags the daily scalar to −0.02
  * on a day whose whole working morning ran past −0.5.
+ *
+ * **It reads the STORED series, today included, and that is the point of LA-104.** The rollup writes
+ * `oura_daytime_stress_buckets` from `latest.rhrLowBpm` + `nightHrvMs`; `/api/body-battery` computes
+ * a live series of its own from `restingHr` + a 28-day HRV mean. They are not the same number —
+ * measured in production over the eight days that had both, the sign differed on **6** and
+ * high-stress minutes by **4–8×**. Drawing today from the live one and a past day from storage
+ * would put two metrics on one axis, in exactly the dimension the owner's pass test compares:
+ * *"open a past day, read a stressed window off the axis, and say whether it matches what you were
+ * doing."* So every day comes from `/api/body-battery/stress-day`, one baseline.
+ *
+ * The cost is real and is stated on the chart rather than hidden: today's stored series ends at the
+ * last rollup, not at this minute, which is what `throughMs` is printed for.
  */
 const NIGHT_START_MIN = 22 * 60
 const NIGHT_END_MIN = 6 * 60
@@ -43,21 +59,53 @@ function y(level: number): number {
 
 const HOUR_TICKS = [0, 6, 12, 18, 24]
 
-export function StressDayChart({ buckets }: { buckets: StressBucket[] }) {
+/**
+ * @param date `YYYY-MM-DD`; omit for today. The day screen passes the day it is showing — which is
+ *   what makes the entry's pass test runnable, since comparing days needs a past day to open.
+ * @param className extra classes on the ROOT, so a caller can frame it as a card. It has to be on
+ *   the root rather than a wrapper at the call site: this renders nothing on a day with no readings,
+ *   and a wrapper would leave an empty frame behind.
+ */
+export function StressDayChart({ date, className }: { date?: string; className?: string } = {}) {
   const tz = useUserTimezone()
-  const segments = useMemo(() => toSegments(buckets, tz), [buckets, tz])
+  const [failed, setFailed] = useState(false)
+  const today = todayInTz(tz)
+  const day = date ?? today
+  // Date in the key, not a today-scoped variant, so the chart re-fetches by itself across midnight
+  // instead of holding yesterday's shape in the persistent tab shell.
+  const data = useCachedValue<StressDayResponse>(
+    `stress-day:${day}`,
+    `/api/body-battery/stress-day?date=${day}`,
+    // Same cadence as the card around it; a second name for the same number is what drifts.
+    BODY_BATTERY_TTL,
+    { onError: () => setFailed(true) },
+  )
+
+  const series = data?.series
+  const segments = useMemo(() => toSegments(series ?? [], tz), [series, tz])
   const covered = useMemo(() => coveredMinutes(segments), [segments])
 
+  // `cachedFetch` swallows `!res.ok`, this route's own rate limit included — without this the chart
+  // would vanish on a failed request and read as "no stress recorded".
+  if (failed && !data) {
+    return (
+      <div className={className}>
+        <p className="text-[10px] leading-relaxed text-muted-foreground">
+          Couldn&apos;t load when the stress happened. Pull down to retry.
+        </p>
+      </div>
+    )
+  }
   if (segments.length === 0) return null
 
   const amber = 'var(--accent-amber)'
   const coveredHours = Math.round((covered / 60) * 10) / 10
 
   return (
-    <div className="space-y-1">
+    <div className={className ? `space-y-1 ${className}` : 'space-y-1'}>
       <div className="flex items-baseline gap-2">
         <p className="flex-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-          When today ran stressed
+          {day === today ? 'When today ran stressed' : 'When the day ran stressed'}
         </p>
         {/* The coverage figure is not decoration. The ring stops sampling when you are still, so a
             day holds 13 hours of readings on average — printing it stops a sparse day reading as a
@@ -113,16 +161,28 @@ export function StressDayChart({ buckets }: { buckets: StressBucket[] }) {
         {HOUR_TICKS.map(h => <span key={h}>{String(h).padStart(2, '0')}:00</span>)}
       </div>
 
+      {/* Where the day's data stops, so a chart that runs out at lunchtime does not read as a
+          calm afternoon. 24-hour to match the axis above it. */}
+      {data?.throughMs != null && (
+        <p className="text-[10px] tabular-nums text-muted-foreground">
+          Measured through <span className="font-semibold text-foreground">{msToHHMMInTz(data.throughMs, tz)}</span> —
+          the last reading stored, not the end of your day.
+        </p>
+      )}
+
       {/* **The gridlines are meaningless without this, which the screenshot is what showed.** The
           drawn chart is an amber line between three unlabelled rules: a reader can see *when*
           something happened and cannot see *what*. Naming the upper line and the shading is the
           difference between a shape and a reading.
 
           It stays a description of the axis, not a verdict on the day — `−0.5` is the same
-          threshold the strip above already calls "High", so the two agree rather than the chart
-          inventing a second vocabulary. Nothing here says whether the day was good. */}
+          threshold `stress-strip.tsx` calls "High", so the two agree rather than the chart
+          inventing a second vocabulary. Nothing here says whether the day was good.
+
+          It names the threshold itself rather than pointing at "the reading above": the strip is
+          only above this on the Home card, and on the day screen there is nothing there. */}
       <p className="text-[10px] leading-relaxed text-muted-foreground">
-        Higher means more stress; above the top line is what the reading above calls
+        Higher means more stress; above the top line counts as
         <span className="font-semibold"> High</span>. Shaded hours are overnight, which runs
         positive for everyone. Blank stretches are hours the ring did not record.
       </p>
