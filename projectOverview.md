@@ -26,8 +26,22 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.456.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.456.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-14.
+
+**The AI card says what skipping Accept costs (BF-156).** Owner: *"what happens if I dont select to
+apply the session? Its pretty easy to miss that button."* There are two answers.
+`prescriptionDrivesLoad` splits the five phase actions: a pending `stay` or
+`transition_recommended` already drives today's loads, so ignoring the button costs only the phase
+decision; a pending `deload_recommended`, `session_swap_recommended` or `rest_day_recommended` does
+not, so ignoring it trains the base progression style instead of what is on screen. **The card's own
+two button blocks split on a DIFFERENT axis**, which the entry did not note and is why the shape of
+the buttons was never a usable signal: `transition_recommended` and `deload_recommended` share the
+"Move to …" block with opposite load consequences, and `stay` shares "Accept" with
+`session_swap_recommended`. One `ConsequenceLine` now reads `prescriptionDrivesLoad` in both blocks
+— no second copy of the split — muted on the driving half, bold amber on the opt-in half. ⚠️ **Not
+device-verified**, and the owner has a live `session_swap_recommended` to check it against
+([journal](docs/overview/entries/2026-09-14-bf156-accept-consequence.md)).
 
 **The bodyweight ready screen has a clock again (BF-157).** Owner, on the Pull-Up ready screen with
 the session clock at **8:42**: *"The body weight screens have no warmup timer or load time so its

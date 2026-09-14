@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.456.3",
+    date: "2026-09-14",
+    changes: [
+      "The AI recommendation card now tells you what happens if you don't press Accept, because the answer depends on the recommendation and the card looked the same either way. On a normal progression it says the numbers are already loaded and Accept only settles the phase decision. On a deload, a swapped session or a rest day it warns, in bold, that starting the workout without answering trains your program's normal loads rather than what is on screen — which is the case where ignoring the button quietly discards the advice.",
+    ],
+  },
+  {
     version: "1.456.2",
     date: "2026-09-14",
     changes: [

@@ -616,38 +616,6 @@ below threshold and left in place for next time.
 - **Verification:** on device, log a single-set session and confirm the printed duration matches the
   wall clock, and that the exercise rows carry distinct `logged_at` values.
 
-### [workouts] BF-156 — what "Accept" costs you depends on the recommendation, and the card never says which kind it is
-
-- **Lane:** B — `components/workout/ai-prescription-card.tsx`. The rule it must surface already
-  exists in `packages/shared/src/ai-periodization/apply-prescription.ts` (`prescriptionDrivesLoad`);
-  nothing about the decision changes.
-- **Added:** 2026-09-13 (BugFix intake). Owner: *"what happens if I dont select to apply the
-  session? Its pretty easy to miss that button."*
-- **There are two answers and the card looks identical for both.** `prescriptionDrivesLoad` splits
-  the five phase actions in half. A pending **`stay`** or **`transition_recommended`** *does* drive
-  today's loads — skipping Accept costs nothing but the phase decision. A pending **`deload`**,
-  **`session_swap_recommended`** or **rest** does *not* — skipping Accept silently reverts the
-  session to the program's base progression style, and the recommendation on screen is simply not
-  what you train.
-- **This is live for him right now, not hypothetical.** `session_periodization` holds a row at
-  **`prescription_status = 'pending'`, `phaseAction = 'session_swap_recommended'`** — the opt-in
-  half. Missing that button means training something the app was recommending against, with no
-  indication either way.
-- **The existing design is right and this entry does not reargue it.** `apply-prescription.ts`
-  explains the split at length: the generator runs its full chain regardless, so discarding the
-  numbers over an unresolved *phase* choice would silently revert to the base style, while recovery
-  decisions "represent a decision, not a default". The defect is that a rule with two opposite
-  consequences is presented through one unlabelled button.
-- **Recommended shape:** say the consequence on the card, from `prescriptionDrivesLoad` rather than a
-  second copy of the rule — *"These numbers are already loaded; Accept only confirms the phase
-  change"* on the driving half, against *"Start Workout without accepting and you'll train the
-  program's normal loads"* on the opt-in half. The opt-in half is also the one worth making harder to
-  scroll past, since it is the one where doing nothing discards the advice.
-- **Not in scope:** changing which actions drive load, and auto-applying the opt-in half. Both are
-  the owner's calls and neither is needed to make the button honest.
-- **Verification:** on device, open a session in each state and confirm the card says what Start
-  Workout will do without Accept. A `session_swap_recommended` is available on his account now.
-
 ### [nutrition] BF-154 — the macro grams still key off the stored goal, and the owner has said they should not
 
 - **Lane:** A — `lib/health/energy-balance-service.ts` and `packages/shared/src/nutrition/`, where
