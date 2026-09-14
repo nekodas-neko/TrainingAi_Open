@@ -12067,3 +12067,17 @@ Worth the lines because the instruction was not merely redundant, it was harmful
 shared with the steps and sleep ladders, so adding deload sessions to it would have stopped those two
 decaying on a day the user simply trained. An entry written from an owner's words without reading the
 code can be confidently wrong in a direction the words themselves never implied.
+
+## 2026-09-14 — `docs/implementation-backlog.md` → 20953 (BF-100's candidate cause)
+
++26 for a hypothesis and the one-tap experiment that settles it.
+
+BF-100 has failed on the S25 twice while the Playwright spec restores 840 every time, and the entry
+could say only that the difference was "the system back gesture or the WebView's restore timing".
+Reading the hook rather than the three screens named a mechanism that explains the split exactly:
+`use-scroll-restoration.ts:158` cancels a pending restore on `touchstart` with no re-arm, the S25's
+back gesture is a touch, and `page.goBack()` is not.
+
+Worth the lines because the next session would otherwise re-derive the same comparison — and because
+the experiment that confirms it (come back with a UI control instead of the gesture) has never been
+run, the entry's own verification step having always specified the gesture.

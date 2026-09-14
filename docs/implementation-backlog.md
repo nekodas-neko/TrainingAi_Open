@@ -4788,6 +4788,31 @@ feature and not a deletion like LB-41:
 - **Do not re-derive the six traps below to explain it.** They are paid for and in the hook. The
   question is what `/more` does that `health-content` and `session-select-content` do not, given all
   three take the same `PullToSync` path.
+- **⚠ A CANDIDATE CAUSE, found 2026-09-14 by reading the hook rather than the screens — and it
+  explains the harness/device split outright, which no previous hypothesis did.**
+  `use-scroll-restoration.ts:158` attaches `stop` to **`touchstart`** on the scroll container, and
+  `stop` sets `done = true` with **no re-arm**: one touch abandons the pending restore permanently.
+  **The S25's system back gesture IS a touch**, delivered to the WebView as the new screen mounts.
+  `page.goBack()` in Playwright fires no touch at all — which is exactly why the harness restores 840
+  and the device does not, and why a green `scroll-restoration.spec.ts` was never going to see this.
+- **Why `/more` and not the other two, on the same hypothesis:** the cancel only matters while the
+  restore is still PENDING — the hook waits for the container to grow tall enough to hold the saved
+  offset. A screen whose content reaches full height immediately has already restored before any
+  touch can arrive. `/more` mounts both tab panels (`display:none` on the inactive one) plus
+  `SyncHealthCard`, so it is the slowest of the three to reach height. That also fits RV-36's
+  *"Mostly works"* in the same sitting: the fast screens are fine.
+- **THE DISCRIMINATING EXPERIMENT, and it is one tap:** on the S25, scroll `/more` down, tap into
+  *Profile details*, and come back with a **UI back control** rather than the system gesture. If the
+  offset restores that way and not with the gesture, the `touchstart` cancel is the cause and this
+  stops being a mystery. Every device check so far has used the gesture — the entry's own
+  verification step says to — so this path has never been tried.
+- **Proposed fix if it confirms, recorded so it is not re-derived:** move the takeover from
+  `touchstart` to `touchmove`. That keeps the principle the hook already argues for in its own
+  comment — *"user takeover is an INPUT event, not a scroll delta"* — while distinguishing a stray
+  touch from an actual drag, which is what a takeover means. A time-based grace after mount is the
+  weaker alternative: it picks a number, and the number is what breaks on a slower cold start.
+  **Not built, because it must not be shipped on a hypothesis** — it changes takeover behaviour on
+  every screen, and the experiment above costs one tap.
 - **Verification:** on the S25, scroll `/more` well down, tap into *Profile details*, press the
   **system back gesture** (not a UI back button), on a cold cache and a warm one; and confirm
   reaching the same screen forward still starts at the top.
