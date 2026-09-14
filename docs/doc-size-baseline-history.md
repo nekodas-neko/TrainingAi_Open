@@ -11751,3 +11751,17 @@ are already a six-value gradient. Writing the three programs side by side is wha
 The conditional-close note on BF-64 and LB-47 is deliberately longer than "owner says treat as fixed".
 It has to say that nothing was verified, so a later report of the same symptom is read as a regression
 against an unverified fix rather than as a fresh bug.
+
+## 2026-09-14 — `projectOverview.md` → 10930, `docs/implementation-backlog.md` → 21574 (RV-36 refiled)
+
+The backlog shrank 12 net: RV-36's 49 lines left, LB-107's entry and BF-100's correction replaced
+most of them. projectOverview grew 12 for a docs-only change, which needs justifying.
+
+It records a **status correction, not a fix**: BF-100 has failed on the S25 twice and was filed as
+`Keep:` + `Verify: device`, printing under "shipped; a look is owed, nothing is blocked". A reader
+scanning the status section would otherwise carry on believing the app-shell pass left nothing
+failing.
+
+The device-only clause is the half that earns its length. `/more` restores 840 in Playwright and
+fails on the phone, so a green spec is evidence for the wrong proposition — and this entry has
+already been declared fixed twice.
