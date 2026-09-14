@@ -67,4 +67,28 @@ function keepKind(text) {
   return 'unclear';
 }
 
-module.exports = { keepKind, CHECK, BUILD };
+/**
+ * Has this entry's device check already happened, while its `Keep:` still asks for one?
+ *
+ * The state nineteen entries were in after three device passes (OR-113, 2026-09-14): the owner's
+ * verification was recorded as a `✅ VERIFIED ON THE S25` line and the `Keep:` above it went on
+ * claiming the check was owed, so `next-item.js` kept printing finished work as debt. Both halves
+ * read correctly on their own, ten lines apart, which is why nobody caught it by reading.
+ *
+ * A `Keep:` reconciled against a recorded verification says which half is **DONE** — that word is
+ * the acknowledgement, and it suppresses this. Without it the rule fires hardest on the entries
+ * someone has already narrowed correctly (BF-145, Q-531, Q-187 all did), and an advisory that is
+ * wrong as often as it is right gets scrolled past.
+ *
+ * @param {{ text: string, gate: 'owner'|'device'|null } | null} keep  the parsed `Keep:`
+ * @param {string[]} lines  the entry's body
+ */
+function keepIsSettled(keep, lines) {
+  if (!keep) return false;
+  const kind = keep.gate ? 'check' : keepKind(keep.text);
+  if (kind !== 'check') return false;
+  if (!lines.some((l) => /VERIFIED ON THE S25/.test(l))) return false;
+  return !/\bDONE\b/.test(keep.text);
+}
+
+module.exports = { keepKind, keepIsSettled, CHECK, BUILD };

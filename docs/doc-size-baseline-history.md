@@ -11751,3 +11751,32 @@ are already a six-value gradient. Writing the three programs side by side is wha
 The conditional-close note on BF-64 and LB-47 is deliberately longer than "owner says treat as fixed".
 It has to say that nothing was verified, so a later report of the same symptom is read as a regression
 against an unverified fix rather than as a fresh bug.
+
+## 2026-09-14 — `docs/implementation-backlog.md` → 21095 (OR-113, the shell pass and the settled-Keep sweep)
+
+**503 lines, the largest single drop this file has recorded, and almost none of it is the shell
+pass.** Fifteen entries left the queue because their device check had already happened and nobody
+struck the `Keep:` that said it was owed. They were spread across three passes — nutrition, workouts,
+app shell — and every one of them read correctly on its own: a `✅ VERIFIED ON THE S25` line and, ten
+lines above it, a `Keep:` claiming the check. BF-46 alone was 191 lines.
+
+Three removals kept a `>` note instead of vanishing, and the rule for which is worth stating: a note
+survives where the entry held knowledge nothing else pins. BF-76's finding that the `vh` hypothesis
+is not the safe-area mechanism, BF-57's two label kinds (`shared-meal` carries the recipe,
+`meal-id` is a pointer that only resolves for its owner), and BF-46's `fetch()` of a `data:` URL
+being governed by `connect-src`. The other twelve were shipped work whose record is the journal.
+
+The growth is `keepIsSettled` in `scripts/lib/keep-kind.js` plus its six tests, which is what stops
+this recurring: the check is advisory and is suppressed by the word DONE in the residue, so an entry
+someone has already narrowed correctly does not get re-flagged.
+
+### `projectOverview.md` → 10869 (same PR)
+
+Three Known-Issues rows moved to `known-issues-resolved.md` whole — BF-141, BF-135 and RV-36+RV-37,
+all three verified on the S25 in the last two passes. Net −49 after the BF-82 paragraph was rewritten
+in place: its row stays, because the entry left the queue but the owner's *"still not as organised as
+I would like"* is worth the next reader seeing.
+
+**The two threads RV-36's row was carrying are named where they went** rather than travelling to the
+archive with it: `/more` still fails and is BF-100's, and the fifth-safe-area-CI-rule question stays
+on RV-37. A row that moves with live threads inside it is how a thread gets lost.

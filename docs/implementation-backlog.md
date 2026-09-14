@@ -1109,8 +1109,9 @@ below threshold and left in place for next time.
 ### [app-shell] BF-145 — the palette half shipped; the sheet half is refuted as specified and needs a decision
 
 - **Lane:** B
-- **Keep:** two things, neither of them the palette. ① the device check on the shipped ramp, ② the
-  sheet question below, which is a decision rather than an implementation.
+- **Keep:** ② only — the sheet question below, which is a decision rather than an implementation.
+  **① the device check on the shipped ramp is DONE** (2026-09-13, below); it was still listed here
+  until 2026-09-14, which made a half-owed entry read as fully owed.
 - **✅ VERIFIED ON THE S25, 2026-09-13** (owner's app-shell pass): owner: *"Seems good so far"*.
   and body text still clears 4.5:1 on the tinted surfaces. Dark only, per the dark-only rule.
 - **Added:** 2026-09-11 · owner, on the Edit Program sheet: *"Needs a major uplift + addung in a
@@ -2570,21 +2571,30 @@ absent one, because the next scan trusts it. Add one only from a commit that act
 
 ### [app-shell] BF-126 — the cat collection's drawn art, once the mechanic has been lived with
 
+- **✅ DECIDED ON THE S25, 2026-09-14** (owner's app-shell pass): *"Yes we need to create artwork for
+  these."* The gate is discharged — the drawn set is wanted, and the glyphs were judged good enough to
+  keep the mechanic but not to be the finished thing.
 - **Lane:** B — `components/home/collection-sprites.ts` and whatever it points at.
 - **Added:** 2026-09-07 · Lane B, deferred out of BF-122b rather than dropped.
-- **Gate:** owner
+- **⚠ Two things the answer did NOT settle, and the build has to decide them before spending on art.**
+  ① **The brief.** The owner said yes to artwork, not to a scope — one cat silhouette with props by
+  tier (~12 assets) is what this entry proposed, and nine glyphs currently cover the three ladders.
+  Put the count in front of them before commissioning, because it is the whole cost.
+  ② **The 32 px constraint stands and is a real risk to the answer.** An emoji is drawn to read at that
+  size and a detailed sprite is not, so it is entirely possible the drawn set looks *worse* on the
+  widget. **Ship one tier's asset first and compare it against its glyph on the device** rather than
+  commissioning twelve and finding out.
+- **Keep the glyph map as the fallback.** `collection-sprites.ts` should end up with art *and* glyphs,
+  not art instead of them — an asset that fails to load must not leave an empty tier.
 - **BF-122b shipped every code deliverable and glyphs in place of sprites.** The widget, the
   collection screen and the information surface are live; `collection-sprites.ts` maps tier → emoji
   and is the only file that would change. That was deliberate: the entry called the art *"the only
   unrecoverable spend"*, and spending it before the owner has seen the mechanic working is the
   wrong order.
-- **What the owner decides:** whether the drawn set is worth it at all now the glyphs are running,
-  and if so whether the brief is still one cat silhouette with props by tier (~12 assets) or
-  something smaller. Nine glyphs cover the three ladders today, since the bottom rung is shared.
-- **The binding constraint has not changed:** they have to read at **~32 px** on the S25. That is
-  what an emoji is designed for and a detailed sprite is not, so a drawn set is a real risk of
-  looking worse, not just costing more. Check the glyphs on device first — that check is owed by
-  BF-122b anyway.
+- **The code change is small and it is not the blocker — the asset files are.** Swapping a tier's
+  emoji for an `<img>`/inline SVG in `collection-sprites.ts` is an afternoon; nothing can start until
+  the artwork exists, and this session cannot draw it. So this entry sits READY for the wiring and the
+  real next step is the owner (or whoever they commission) producing one tier's asset to compare.
 - **Reversal cost:** none while it is glyphs. Once assets exist, reverting means deleting them.
 
 ### [workouts] LA-65 — the transition constant is charged once too often at a value that is too low, and the two errors cancel at five exercises
@@ -3904,16 +3914,6 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
 
 ### [app-shell][nutrition] RV-36 — scroll restoration reaches 3 of 5 tabs; BF-100's entry says it reaches all of them
 
-- **❌ FAILED ON THE S25, 2026-09-13 — the second failure of this entry.** Owner: *"Checked on more -
-  and still doesnt work"*.
-- **RV-36 passed in the same sitting, which narrows it rather than contradicting it.** Owner there:
-  *"Mostly works. Just need to make sure when you press back on a tab and there is no where to go it
-  should go to the home screen."* So scroll restoration is largely working; what is failing is
-  **`/more` specifically**, and there is a second, separate requirement: **back from a tab with
-  nothing to pop should land on Home, not exit.**
-- **Do not re-fix this blind.** It has been declared fixed twice. The next attempt names which route
-  it reproduced on and how, before changing anything.
-
 - **Lane:** B — `app/nutrition/nutrition-content.tsx`, plus a correction to BF-100's entry above.
 - **Batch:** nutrition-tab-day-and-scroll
 - **Added:** 2026-09-03, Review sweep 41 —
@@ -3994,11 +3994,10 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
 
 - **Lane:** B — `components/nutrition/review-step.tsx` and `macro-calorie-warning.tsx`. The shared
   check it calls is Lane A's and did not need touching.
-- **Keep:** two checks this branch could not make. **(a) A real barcode scan of `9350167000490`** —
-  the e2e reaches the identical `ReviewStep` with the identical props by the manual road, because a
-  barcode needs a camera, so what is proven is the sheet's behaviour given those numbers and not
-  `/api/nutrition/barcode` delivering them. **(b) The device** — a new banner between the Calories
-  field and Protein, inside a sheet that already scrolls.
+- **Keep:** (a) only — **a real barcode scan of `9350167000490`**. The e2e reaches the identical
+  `ReviewStep` with the identical props by the manual road, because a barcode needs a camera, so what
+  is proven is the sheet's behaviour given those numbers and **not** `/api/nutrition/barcode`
+  delivering them. **(b), the device look at the banner, is DONE** (2026-09-13, below).
 - **✅ VERIFIED ON THE S25, 2026-09-13** (owner's nutrition pass): the Review sheet's cross-check behaved.
   Protein without pushing `Log it` off-screen, that `Use 514 kcal` fills the field, and that a
   sibling Core Powerfoods product (internally consistent) shows nothing.
@@ -4446,9 +4445,21 @@ stronger reason the measured one wins.
   then, this is a measurement-too-early bug and the fix is in when the app decides to render; if it
   is still 667, the viewport is genuinely stuck and the fix is in the native layer. **Do that before
   writing any fix** — the two answers point at different files.
-- **Gate:** device — and here it is the whole verdict, not a formality. This is a Samsung WebView
-  compositor failure: Chrome and `pnpm dev` cannot show it, so the suite proves the effect RUNS and
-  nothing about whether it FIXES anything. Reproduce as the entry says (background the app on low
+- **⚠ THE GATE WAS WRONG AND IS REMOVED, 2026-09-14 (Orchestrator, app-shell pass).** `Gate: device`
+  parked this entry, and the next step it asks for **needs no device at all**: the delayed second
+  viewport log below is a code change in the shell, shippable and mergeable here. What needs the
+  device is the *verdict on a fix*, which is a `Verify: device` after something ships — not a gate in
+  front of instrumentation. **This is the same defect PS-35b names**: a gate scoped by prose to one
+  paragraph parks the whole entry, and `next-item.js` cannot see the scoping. The owner sat on this
+  item twice in device passes with nothing they could usefully do, because the question was never
+  theirs.
+- **So the next action is Lane B's, and it is one line:** log the viewport a second time ~500 ms into
+  the same resume. Ship it, wait for the owner to hit a blank resume in normal use, then read
+  `error_events`. **Still do not write a fix before that reading** — the two answers point at
+  different files.
+- **When a fix does ship, the verdict IS the device**, and this is why the gate looked right. It is a
+  Samsung WebView compositor failure: Chrome and `pnpm dev` cannot show it, so a suite proves the
+  effect RUNS and nothing about whether it FIXES anything. Reproduce as the entry says (background the app on low
   memory — the original report had battery at 10% with Messenger running), then resume and confirm
   the screen paints without a scroll. Check `error_events` for `bf110 resume` afterwards: a
   `dom-intact` row is the measurement this entry wanted, and a `dom-lost` row would put BF-80 back
@@ -4776,85 +4787,6 @@ by a spoken word** — Fast · Slow · Cool down · Warm up · Walk complete.
   where the notification path fails today.
 
 
-### [nutrition] BF-104 — log a meal at ½× / 1× / 1½× (shipped; device check owed)
-
-- **Keep:** the device check. Three segments join an already-full detail sheet at 412 dp, each on the
-  48 dp floor, directly above the action row — whether the sheet still fits without scrolling to
-  reach `Log this meal` is the only thing unchecked.
-- **✅ VERIFIED ON THE S25, 2026-09-13** (owner's nutrition pass): the ½× / 1× / 1½× portion buttons log correctly.
-- **✅ SHIPPED** (`feat/bf-104-meal-scale`, 2026-09-02, v1.431.0). `MealPortionPicker` on the meal
-  detail sheet, with the values in `meal-portion-scale.ts` and `logMealItems`'s LB-49 `scale`
-  argument threaded through `quickLog`.
-- **⚠ The picker had to change the sheet's OWN figures, and that was not in the entry.** The detail
-  sheet's headline calories and macro columns are documented there as *"per portion — that is what
-  `Log this meal` writes"*. The moment the button can write 1.5 portions, a figure fixed at one stops
-  describing the button — the two-numbers-for-one-thing class LA-45 and BF-99 each closed. They now
-  scale with the picker, and the label under the headline says which portion it is showing.
-- **`SegmentedTabs`, not `QuantityEditor`.** The entry said to reuse rather than add a third quantity
-  control; `QuantityEditor` is the wrong one to reuse — it edits a **single food** in grams or
-  servings with a stepper, a unit toggle and macro tiles. The primitive `QuantityEditor` itself uses
-  for its own toggle is the one that fits a meal-level portion.
-- **The row's one-tap log is unchanged**, defaulting to 1. Only the detail sheet, where a portion is
-  actually chosen, passes anything else.
-- **The scale resets to 1× whenever a different meal opens.** A portion is a fact about one sitting;
-  a sheet that reopened on ½× would log half a meal silently.
-- **⚠ The scanned-label path deliberately has no picker.** `food-logger-sheet.tsx`'s
-  `handleScannedSavedMeal` is scan-and-go in a kitchen — interrupting it with a portion question is
-  the opposite of what that flow is for, and the owner's request was about deliberate logging.
-- **⚠ `saved-meals-sheet.tsx` is at 798 lines against the 800 limit.** Two lines of headroom. The
-  next thing added there has to extract something first; it is not in `check-component-size`'s
-  baseline, so it fails as a *new* file over the limit rather than as a tracked hotspot.
-- **Verification:** 11 unit tests (**seven mutations**) and `e2e/meal-portion-scale.spec.ts` — 2 tests
-  driving the real sheet, **three mutations**, asserting the headline moves 400 → 200 → 600 with the
-  picker and that logging at 1½× writes `quantity_multiplier` **1.5** in `food_logs`, read back from
-  the database rather than from a toast.
-- **Added:** 2026-09-01 · owner: *"when logging food/meals we should be able to choose how much of the
-  meal; i.e full at 1x or 1.5 or 0.5 etc."*
-
-### [nutrition] BF-103 — one label, `My Foods`, on every surface (owner decision, 2026-09-01)
-
-- **Keep:** one look on the S25. `My Foods` is two characters longer than `Meals` and three tabs
-  share the strip's width, so whether it wraps or truncates at 412 dp is the only thing unchecked.
-- **✅ VERIFIED ON THE S25, 2026-09-13** (owner's nutrition pass): `My Foods` reads consistently on every surface.
-- **✅ SHIPPED** (`fix/bf-103-my-foods-one-label`, 2026-09-01, v1.425.0). Tab, page button, toast
-  (both arms), picker hint and empty state, two plan buttons, and the plan row's badge, action and
-  **`aria-label`**. The BF-37 and BF-60 comments that read as a standing prohibition on the name are
-  rewritten to say why unifying satisfies their reasoning — left alone, they are what a future
-  session reverts this on.
-- **⚠ The entry's own file table was incomplete, and the guard is what found it.** Twelve **e2e
-  spec files** asserted on `My Meals` — button lookups, an `In My Meals` assertion, a
-  `Save all N to My Meals` regex. A rename that leaves its tests on the old label breaks CI on the
-  next run rather than at review. All swept.
-  `components/nutrition/__tests__/one-saved-list-label.test.ts` covers `app/`, `components/` **and
-  `e2e/`** for exactly that reason.
-- **⚠ Do not re-merge the tab strip.** `My Foods` was once the name of a *merged* list (v1.382.0),
-  split back three versions later because a recipe and a single ingredient in one list made "log
-  this" mean two different things. **That revert was about the merge, not the name.** The guard pins
-  the strip at `Recent · My Foods · Search`; one of its four mutations is the re-merge.
-- **The changelog's historical entries still say `My Meals` and must stay that way** — they describe
-  what shipped at the time.
-- **Added:** 2026-09-01 · owner, deciding it himself: *"we only need one. lets go with MyFoods."*
-
-### [nutrition][body] BF-101 — a "Recommended" value per goal field, computed rather than generated
-
-- **Keep:** one look on the S25. Six new controls land inside an already-dense collapsible, and the
-  offer button carries two lines of text at 412 dp — whether it crowds the fields around it, and
-  whether the macro pane still reads as a form, is the only thing unchecked.
-- **✅ VERIFIED ON THE S25, 2026-09-13** (owner's nutrition pass): the goals form and macro pane did not read as crowded.
-- **✅ SHIPPED** (`feat/bf-101-recommended-values`, 2026-09-01, v1.426.0). Steps, water and calories
-  on the goals form; calories, protein, carbs and fat in the macro pane. No route, no model: it
-  assembles the same `BaselineInput` `/api/nutrition-goals/recommend` assembles and calls the same
-  `calculateBaseline`, so the button and the AI sheet's starting point cannot disagree.
-- **The measured RMR is carried through, and that was the one real decision.** `calculateBaseline`
-  routes it via `personalRmr` (BF-33), so omitting it would have quoted a *predicted* resting rate
-  on a screen whose Health card shows the measured one — the "two numbers for one thing" class
-  LA-45 and BF-99 both closed. It costs one `GET /api/measured-rmr` on the profile tab.
-- **Sleep and fiber have no button, deliberately** — `BaselineResult` carries no figure for either,
-  and an invented one would sit unsourced beside seven sourced ones. Both are pinned by the guard.
-- **Added:** 2026-09-01 · owner, on the Profile goal fields: *"maybe each should have a button under
-  it that says (Recommended value) — id assume we use AI here to choose but maybe we could have some
-  logic to decide so not using the ai if not needed?"*
-
 ### [nutrition][platform] BF-102 — "Calibrated" activity level, and a prompt that tells the model something false
 
 - **Lane:** B — the `Calibrated` option in the activity-level picker
@@ -4937,10 +4869,26 @@ feature and not a deletion like LB-41:
 
 ### [app-shell] BF-100 — back navigation always lands at the top, because the scroll position is not on the document
 
+- **❌ FAILED ON THE S25, 2026-09-13 — the second failure of this entry.** Owner: *"Checked on more -
+  and still doesnt work"*.
+- **⚠ That failure was written into RV-36's entry by mistake and moved here 2026-09-14.** For a day
+  the entry that FAILED read as shipped-and-awaiting-a-look, while the entry that PASSED carried a
+  failure note contradicting its own verification a few lines lower. Worth stating because the
+  misfiling is invisible from either entry alone — both are about the same hook.
+- **RV-36 passed in the same sitting, which narrows this rather than contradicting it.** Owner there:
+  *"Mostly works. Just need to make sure when you press back on a tab and there is no where to go it
+  should go to the home screen."* So scroll restoration is largely working; what is failing is
+  **`/more` specifically**, and there is a second, separate requirement: **back from a tab with
+  nothing to pop should land on Home, not exit.** That second requirement is the one
+  **Q-93-followup** also asked for `/health/day`, and it lives here now that Q-93-followup has left
+  the queue.
+- **Do not re-fix this blind.** It has been declared fixed twice. The next attempt names which route
+  it reproduced on and how, before changing anything.
 - **Keep:** the device pass, and only that.
 - **Verify:** device — on the S25, scroll a tab screen well down, tap into a detail screen, press the
   **system back gesture** (not a UI back button), and confirm it returns to the same offset on a cold
-  cache and a warm one; and that reaching the same screen forward still starts at the top.
+  cache and a warm one; and that reaching the same screen forward still starts at the top. **Start
+  with `/more`**, which is where it failed.
 - **✅ SHIPPED** (`feat/bf-100-scroll-restoration`, 2026-09-01).
   `lib/hooks/use-scroll-restoration.ts`, called once from `pull-to-sync.tsx` so every screen using
   the shell inherits it rather than 62 separate fixes. `e2e/scroll-restoration.spec.ts` is **green**
@@ -5612,30 +5560,6 @@ two screens, and a user who sets one has no way to know the other exists.
   called it a pass.
 - **Added:** 2026-09-01 · found while tracing BF-94.
 
-### [app-shell] BF-82 — the More page is seven groups of one row each, with one of them behaving differently
-
-- **Keep:** one look on the S25. Nothing else is owed.
-- **✅ VERIFIED ON THE S25, 2026-09-13** (owner's app-shell pass): the More page works — owner: *"Still not as organised/separated as I would like it to be"*, which is a **design complaint, not a defect**, and is left as one rather than converted into a fix nobody asked for.
-- **Lane:** B.
-- **✅ The grouping and interaction half SHIPPED** (`feat/bf-82-more-page-grouping`, PR #749,
-  2026-09-01, v1.419.0) — nine single-row groups became two headings of three or four rows,
-  `Feedback` moved to the bottom actions where the other sheet-openers live, `Developer` on the
-  Settings sub-screen lost its heading, and `Goals` stopped wearing `MoreRowGroup`'s chrome.
-  `components/more/__tests__/more-row-group-arity.test.ts` is what stops the next one; it was
-  mutation-verified against a restored `label="Developer"`.
-- **✅ The "sliders" question is ANSWERED and there is no control change to make.** Asked directly on
-  2026-09-01; the owner: *"yes it wasnt the sliders specifically; more that its messy and needs
-  re'organisation."* So the word was loose and the complaint was the layout, which is what shipped.
-  **Do not change any control on this screen off the original wording** — measured the same day,
-  More and its six sub-screens carry **no slider and no `<select>` at all**: the value controls are
-  typed number boxes, and activity level and fitness goal are already roving radio-button groups.
-- **Added:** 2026-08-31 · owner: *"a review of all the pages/chevrons in the More page and
-  reorganize/group things together that can be. It's very messy and not very organized. Some items
-  could be changed from sliders to text or buttons etc. All needs to be reviewed."*
-- **If the device look says it is still messy**, that is a new entry against what the owner points
-  at, not a re-opening of this one — the plan's §3/§4 are built and the parity is enumerated in #749.
-- **Plan:** [`2026-08-31-more-page-grouping-and-interaction-model.md`](superpowers/plans/2026-08-31-more-page-grouping-and-interaction-model.md).
-
 ### [readiness][devices] BF-81 — two producers write the daytime-stress metric and they disagree on every day measured
 
 > **⚑ THE DIVERGENCE IS FIXED 2026-08-31. What remains is one owner decision and one finding.**
@@ -5989,36 +5913,6 @@ description will silently drop the field that turns out to matter. **The owner i
   number is ever displayed as fact before the owner confirms it (CLAUDE.md — a model handed a score
   of 80 called it *"perfect"*).
 
-### [nutrition] BF-72 — the diary's hydration wiped its own meal grouping (fixed; device check owed)
-
-- **Lane:** B · **Batch:** `nutrition-ui-uplift`
-- **✅ VERIFIED ON THE S25, 2026-09-13** (owner's nutrition pass): grouped meals survive the diary's hydration.
-- **Keep:** the **device check**, and only that — and here it is not a formality. The whole defect
-  lives in `getLocalStore`, which **returns null in the web sandbox**, so the repaired path cannot
-  execute off-device at all. What is proven is the mapping (`app/nutrition/food-log-hydration.ts`,
-  six tests, mutation-checked against the exact omission). What is unproven is the owner's own
-  report: log a saved meal, wait for the refetch, and it must stay ONE row with its name and photo
-  rather than breaking into ingredients. Then reload the tab — still grouped, because the local copy
-  kept its ids.
-- **Added:** 2026-08-31 · owner: *"when I add my saved meal it starts as the meal with the image,
-  then breaks into its ingredients."*
-
-**Cause, as filed:** `applyDelta`'s `foodLogs` payload omitted `savedMealId` and `mealGroupId`, and
-a local upsert overwrites every column it is given — so the omission wrote NULL over correct values,
-and the next line re-read and rendered the stripped copy.
-
-**The sweep the entry demanded came back with one site, and that is now evidence rather than an
-assumption.** There are exactly two `applyDelta` callers: this one and the sync engine's, and the
-engine's mapping already carries both ids under a BF-39 comment explaining why it must. The mapping
-is extracted to a named function because the defect was a *missing field in an object literal* —
-the one shape no type error catches, since every field is optional going in.
-
-**The entry's second finding was measured and is inert — decided, not inherited.** `applyDelta`'s
-food-logs arm hardcodes `'synced'` in both its VALUES and its SET and never reads the payload's
-`syncStatus`, then gates the upsert on `WHERE food_logs.sync_status='synced'`. So a row with a
-mutation still in the outbox is protected by its *stored* status regardless of what the screen
-passes. Changing the field would have looked like a fix and been none.
-
 ### [nutrition][app-shell] BF-74 — the meal photo's ✕ sat in the dismiss corner (fixed; device check owed)
 
 - **❌ FAILED ON THE S25, 2026-09-13.** Owner: *"it gives me an undo option; but no warning before
@@ -6047,118 +5941,20 @@ round-trip without putting a dialog in front of the common case.
 `hero`, but **both call sites pass `hero`** — `tile` has no callers. The shared control is fixed for
 both regardless.
 
-### [nutrition][app-shell] BF-76 — the nutrition safe-area sweep: enumerated, and the hypothesis was wrong
+> **BF-76 VERIFIED and removed, 2026-09-14 — and its finding is the part worth keeping.** The
+> nutrition safe-area sweep enumerated all twelve sheets, found **nothing under-padded**, and changed
+> **no code**, because every available change would have made something worse. The `vh` hypothesis it
+> was filed on is **not** the mechanism: a bottom sheet is `fixed inset-x-0 bottom-0` and does not
+> depend on viewport height. Owner walked the twelve on the S25 in both navigation modes and reported
+> them clear. **Do not re-open a nutrition safe-area sweep without a specific sheet and a screenshot.**
 
-- **Lane:** B · **Batch:** `nutrition-ui-uplift`
-- **✅ VERIFIED ON THE S25, 2026-09-13** (owner's nutrition pass): the safe-area sweep is clear on the S25.
-- **Keep:** **the device pass itself, which is now the only way forward on this** — and the reason is
-  the finding below. All twelve sheets are enumerated with their computed clearance; nothing in
-  nutrition is under-padded; and no code changed, because every available change would have made
-  something worse. On the S25 in **both** navigation modes, walk the twelve and report which (if any)
-  actually sits wrong — a real measurement now replaces a hypothesis rather than a guess replacing it.
-- **Added:** 2026-08-31 · owner, after BF-62: *"safe spacing off in this place — need to do a review
-  cause lots of nutrition screens are wrong."*
-
-**The `vh` hypothesis is not the mechanism.** A bottom sheet is `fixed inset-x-0 bottom-0`, so its
-height moves only its TOP edge; the bottom clearance is entirely the baked `pb-safe-*` class.
-`h-[92vh]` → `dvh` would change where a sheet is clipped at the top and nothing about the gesture
-bar. The suggested `grep` for `vh` finds 11 sheets and none of them for this reason.
-
-**Measured, in a browser, with the real class strings** (sandbox reports the inset as 0):
-`pb-safe-action` = 12 px, `pb-safe-action-lg` = 64 px, and `p-0` does **not** strip either — both
-`p-0` sheets compute 12 px, so the repo's standing claim about tailwind-merge holds.
-
-| clearance below the bottom control | sheets |
-|---|---|
-| 64 px — the BF-62 reference | `meal-detail`, `saved-meals` (inset declared once, on the content) |
-| **76 px web / 88 px device — declared twice** | `meal-plan-setup`, `meal-plan-manage`, `meal-plan-edit` |
-| 12 px web / 24 px device, content-sized, no bottom control | the other seven |
-
-**Nothing is under-padded — three are OVER-padded**, which is the opposite of what the entry
-expected, and it is why no code changed. Those three put the inset on the `SheetContent` (default
-`action`) *and* on a `SheetFooter` (`takeover`), and the two add. **The primitive cannot express the
-fix**: `SheetContent side="bottom"` and `SheetFooter` each always emit a `pb-safe-*` class, so the
-options are 76 px (today), 80 px (move it to the content), or adding a `"none"` escape hatch whose
-failure mode is a sheet with no bottom inset at all. Trading a 12–24 px cosmetic gap for that footgun
-is a bad deal, and every candidate is within ~24 px of the reference anyway.
-
-### [nutrition] BF-73 — bigger capture tiles, and `New` outranks `Delete meals` (shipped; device check owed)
-
-- **Lane:** B · **Batch:** `nutrition-ui-uplift`
-- **✅ VERIFIED ON THE S25, 2026-09-13** (owner's nutrition pass): the capture tiles and the `New` / `Delete meals` ordering read right.
-- **Keep:** the **device check**. Measured at 412 dp in a browser: tiles **60 px → 79 px**, `New`
-  324×48 filling the row, the bin 48×48 beside it. What the phone decides is whether that reads as
-  *prominent* rather than merely bigger, and whether the bin still feels reachable at 48 dp in the
-  corner of a sheet.
-- **Added:** 2026-08-31 · owner: *"the icons/sections for photo/barcode/describe should be larger.
-  Delete meals + New should be different. Maybe a big 'New' button + a small delete bin."*
-
-**① is an owner override of the artboard, recorded as one** so the next parity sweep does not
-correct it back to 62 (BF-28 rule 2).
-
-**The mechanism turned out not to be the one the entry assumed, and this is the durable part:
-`min-h-[Npx]` does nothing on a `<button>` in this app.** `globals.css` sets a bare
-`button, [role="button"] { min-height: 48px }` and it beats the utility — measured, a button with
-`min-h-[84px]` computes `48px` while the same class on a `<div>` computes `84px`. So **BF-50 ①'s
-`min-h-[62px]` never applied either**: that tile measured **60 px**, its content's own height, not
-the 62 its comment claimed. The height here is padding- and icon-driven instead, and the inert class
-was removed rather than left to imply otherwise. Filed as **LB-32**.
-
-**② keeps BF-50 ④'s words where they still count.** The bin is icon-only but its accessible name is
-`Delete meals`, not `Delete` — those words are the fix BF-50 shipped for *"you cant do anything with
-it except delete"*, and only the accessible name still carries them. It opens selection mode and
-deletes nothing on tap, which is what makes an icon-only entry point defensible here.
-
-### [nutrition][platform] BF-57 — a meal label anyone can scan (shipped; the two-phone print test needs the device)
-
-- **Lane:** B
-- **✅ VERIFIED ON THE S25, 2026-09-13** (owner's nutrition pass): **the two-phone, two-account test PASSED** — a friend scanned a `Share code` label from their own account and the meal saved.
-- **Shipped 2026-08-31**, branch `feat/shared-meal-labels-bf57`. The engine half landed 2026-08-30
-  (`packages/shared/src/nutrition/label-payload.ts`); this is the surface that finally emits it.
-  Journal: [`2026-08-31-shared-meal-labels.md`](overview/history-2026-09-10-folded-4.md#2026-08-31-shared-meal-labels).
-- **The entry's item 1 was reconciled rather than implemented, and that is the durable part.** It
-  asked for the code to be given ~30 mm so version 11 fits *every* label, reasoning from a code of
-  12.2–16.4 mm — a pre-Q-411 figure. Measured against the square canvas the five print styles run
-  16.4–20.9 mm and each is **already** the largest value that clears its own content by 6 units, so
-  none can grow; 30 mm is 128 of the 171 usable units. Four of the six cannot hold even 62 bytes, at
-  which point `encodeSharedMeal` starts trimming the meal's **name**. So two payloads ship: the
-  print styles keep the private id token, and a new `share` style spends the whole label on a
-  34.4 mm code. `mealLabelShareBudget` derives the budget from each style's geometry and
-  `meal-label-code-size.test.ts` holds the finding, so "why not just share from every style?" is
-  answered by CI rather than re-argued.
-- **Keep:** the two-phone, two-account verification in item 4, and only that. On the S25 and a second
-  device: print or share a `Share code` label for a 3-ingredient meal, scan it **in airplane mode**
-  from the second account, and confirm the copy carries the same portions and macros; repeat with a
-  12-ingredient meal and confirm the totals match with the tail grouped into one labelled remainder;
-  and confirm a label printed before 2026-08-31 still resolves for its owner. The scan path runs
-  through `getLocalStore`, which returns null in the web sandbox, so none of it executes off-device.
-  The **print** half is owed separately and is older than this entry: no label of any style has been
-  put through a real printer, so 0.49 mm per module remains a convention rather than a measurement.
-
-### [nutrition][app-shell] BF-75 — the nutrition sheets carry the tab's palette (shipped; the contrast check needs the device)
-
-- **Lane:** B
-- **✅ VERIFIED ON THE S25, 2026-09-13** (owner's nutrition pass): the nutrition sheets carry the tab palette.
-- **Shipped 2026-08-31**, branch `feat/nutrition-sheet-surface-bf75`.
-  Journal: [`2026-08-31-nutrition-sheet-surface.md`](overview/history-2026-09-10-folded-4.md#2026-08-31-nutrition-sheet-surface).
-  `SheetContent` gained an opt-in `surface="page"`; the five nutrition sheets named in the entry pass
-  it and nothing else in the app does.
-- **⚠ TWO THINGS THE ENTRY DID NOT KNOW, and the first one changes what "fixed" means here.**
-  **(1) The dynamic background ships `enabled: false`**, so a viewer with wallpapers off sees no
-  change at all — by design, since a sheet painting a gradient over a plain page is worse than the
-  opaque sheet it replaced. The owner's own screenshots show the warm brown behind the day screen, so
-  they have it on and will see this; anyone else has to turn it on first.
-  **(2) Making the sheet translucent could never have worked.** The wallpaper is `fixed inset-0
-  z-[-1]` while `SheetOverlay` and `SheetContent` are both `z-50`, so transparency reveals the
-  overlay's `bg-black/50`, not the tab. The palette is *painted inside* the sheet instead.
-- **Keep:** the contrast check, and only that. On the S25 with wallpapers on: open Log Food, the meal
-  builder, meal detail, quantity and quick-edit, and confirm body and secondary text still measure
-  ≥4.5:1 over the gradient plus `ScrimLayer` — the dense sheets (macro numbers, ingredient rows,
-  small grey secondary text) are where it will fail if it does. Also confirm a Health, Workout and
-  More sheet is visually unchanged; that they do not opt in is held by a test, but how they *look*
-  beside a changed nutrition sheet is not. **Nothing about the wallpaper can be judged in the
-  sandbox** — the feature is off by default there, so the e2e has to switch it on to assert anything
-  at all.
+> **BF-57 VERIFIED and removed, 2026-09-14 — the two-phone, two-account test PASSED.** A friend
+> scanned a `Share code` label from their own account and the meal saved. **The distinction that test
+> established is the durable part:** `packages/shared/src/nutrition/label-payload.ts` has two label
+> kinds — **`shared-meal`** carries the whole recipe and works cross-account, and **`meal-id`** is a
+> 22-character pointer that only resolves for the owner. **Six of the seven label styles are pointer
+> styles**; only *Share code* carries the recipe, which is why the first attempt failed with *"no
+> saved meal"*. Both surfaces already explain this in-app; the failure was reading, not code.
 
 ### [nutrition][platform] LB-50 — the measured activity factor, and a prompt that tells the model something false
 
@@ -7351,33 +7147,6 @@ owner has to re-describe in a wizard what the app already knows.
   is exactly the failure this entry is written to prevent. A program id belonging to another user is
   rejected, not read.
 
-### [workouts] BF-65 — the exercise clip on the ready screen (shipped; it must be seen *moving*)
-
-- **Lane:** B
-- **✅ VERIFIED ON THE S25, 2026-09-13** (owner's workout pass): the exercise clip plays on the ready screen.
-- **Added:** 2026-08-30 · owner: *"id like the exercise gif in the pre session screen so it shows you
-  what movement you will be doing."*
-- **Shipped 2026-08-31** — `exercise-media-panel.tsx` renders the clip at 64 px beside the exercise
-  name, tappable into a full-width strip, with the warm-up screen's dumbbell fallback for anything
-  the route cannot match. `useExerciseMedia` (`lib/hooks/use-exercise-media.ts`) is now the only
-  place `/api/exercise-gif` is fetched — it replaced the four hand-rolled copies rather than
-  becoming a fifth — and the shared `exercise-media:<name>` key is what lets the ready screen paint
-  from what the warm-up screen fetched a minute earlier.
-- **The layout question in the original entry is decided:** the collapsed thumbnail costs so little
-  height that `SET TARGETS`, which was cut off behind the action row in the owner's screenshot, is
-  now fully visible. The expand exists for a proper look and is not needed to see the movement.
-- **Keep:** the **device check**, and only that — and it is the half no harness here can reach. The
-  clip must be **moving** rather than a frozen first frame, which is what `unoptimized` decides and
-  what a screenshot cannot tell you; a guard test holds the prop on every exercise-media `<Image>`,
-  but a passing prop is not a moving picture. **The dataset host is unreachable from the sandbox**
-  (`raw.githubusercontent.com` is dropped by the egress proxy, so the warm-up screen's own
-  long-standing thumbnails are blank there too), so every clip this was verified against was a
-  substituted same-origin file. On the S25: each exercise's ready screen shows **its own** clip and
-  it animates; an unmatched or bodyweight movement shows the dumbbell rather than a gap; and in
-  airplane mode the clip still plays, because the warm-up screen's prefetch put it in the service
-  worker.
-
-
 ### [workouts] LB-47 — the `Full` override CLAIMED a revert that had not happened (shipped; device owed)
 
 - **⚠ OWNER CLOSED THIS CONDITIONALLY, 2026-09-13.** Verbatim: *"Will let you know when it comes up.
@@ -7599,196 +7368,12 @@ that handler defers, the way it already defers to a carousel.
   exactly that delete, which is why the two are checked in one pass. ①②④ are equally unverified: the
   sandbox renders at desktop width and cannot judge a gutter or a ring.
 
-### [nutrition] BF-46 — the meal builder's photo picker and quantity sheet (all shipped; device check owed)
-
-- **Lane:** B
-- **Batch:** `nutrition-ui-uplift` — ships with BF-45.
-- **✅ VERIFIED ON THE S25, 2026-09-13** (owner's nutrition pass): the photo picker and quantity sheet both work.
-- **Keep:** the **device check**, and only that. All four parts have shipped — ① (a) the single
-  picker at the top (v1.402.0), ① (b) the CSP fix that was the save failure's real cause (v1.399.0),
-  ② grams-only ingredient rows and ③ Option A (both v1.401.0). **The device-gate field above was
-  deliberately withheld while they were unbuilt** — that field parks an entry, and parking unbuilt
-  work would have hidden it. Now that nothing here is unbuilt, its absence did the opposite: it left
-  an entry with no work in it heading `next-item.js`'s READY list, which is the one thing that tool
-  exists to prevent. *(That sentence used to name the field in backticks, and `keep.js` reads a
-  `Gate:` from anywhere in a Keep block — so a sentence saying the gate was withheld WAS the gate.
-  It only showed once the owner's 2026-09-13 sign-off removed the `Verify:` that had been cancelling
-  it, and it turned a verified entry back into a parked one on every branch. The parser half is filed
-  as LA-103, and FIXED there on 2026-09-13 — `keep.js` now requires a gate to be set off from the
-  prose, so this sentence could be written either way today.)* On the S25, per ① (b)'s own note: pick a photo in Edit Meal, save, reopen. If it
-  still fails it now fails *loudly*, which is the smaller half of that fix.
-- **Added:** 2026-08-27 · owner, with screenshots. *"overall just a UI rework/uplift. almost there."*
-
-**① Two things, and the owner corrected the first reading of them. ⚠ THE SAVE FAILURE IS REAL AND
-UNEXPLAINED — do not treat this as a layout ticket.**
-
-Asked whether they had ever found the picker, the owner answered: *"Yes I found the photo picker;
-its in two locations; once at the top of the page and once at the bottom. I only want the one at the
-top; I saved it; and it didnt show."* So a photo **was** attached and saved, and did not appear. The
-earlier guess in this entry — that the control was simply never found — is **wrong and is corrected
-here** rather than quietly deleted, because a session that reads only the fix would go looking for
-the wrong thing.
-
-**(a) One picker, at the top.** Two affordances say *Add a photo*: the detail sheet's hero
-(`meal-detail-sheet.tsx:107`), which **is not a picker at all** — it calls `onEdit` and drops the
-user into the builder — and the builder's real tile at `saved-meals-sheet.tsx:672`, rendered
-**below `Add ingredient`** at the bottom of a scroll. Owner wants the top one and only the top one.
-**Move the real tile to the top of the builder at hero scale**, matching the detail sheet's band, so
-the two screens agree where a meal's photo lives and there is one control rather than two things
-wearing one label.
-
-**✅ (b)'s ROOT CAUSE IS FOUND AND FIXED (v1.399.0) — the save was never the save path.**
-`MealPhotoTile`'s **native** branch asked the camera plugin for `CameraResultType.DataUrl` and then
-did `await fetch(photo.dataUrl)` to get a Blob. **A `fetch()` of a `data:` URL is governed by
-`connect-src`**, and `lib/security/csp.ts` does not open `connect-src` to `data:` — so the call
-rejected with a bare `TypeError`, into a `catch {}` written to swallow picker cancellations. Picking
-a meal photo on the phone therefore did nothing and *said* nothing, which is exactly the owner's
-*"always the default cant add a custom picture"*. The web branch takes a `File` from an `<input>`
-and fetches nothing, which is why `meal-photo-picker.spec.ts` passed on every run. It now asks for
-`Base64` — as the working `capture-actions.tsx` already does — decodes with `dataUrlToBlob`, and
-toasts anything that is not a recognised cancellation.
-`lib/media/__tests__/no-data-url-fetch.test.ts` scans source and fails on the next one.
-
-- **⚠ NOT DEVICE-VERIFIED, and this fix in particular cannot be verified anywhere else.** The
-  failing branch only runs inside the Capacitor WebView. What is *checkable* here is the mechanism
-  (the CSP has no `data:`; the plugin call and the decode are the shape `capture-actions.tsx` runs on
-  the same device every day) — the outcome is not. **On the S25: pick a photo in Edit Meal, save,
-  reopen.** If it still fails it now fails *loudly*, which is itself the smaller half of this fix.
-- **(a), the PLACEMENT, is still owed** — one picker, at the top, at hero scale — and so is removing
-  the detail sheet's fake *Add a photo*, which calls `onEdit` rather than picking anything.
-
-**✅ (a) SHIPPED (v1.402.0), and the held rebuild's failure was the SPEC, not the app.** Both screens
-have a real picker at the top now, at the size the artboard gives a meal's photo. The meal's own
-screen writes through the parent's `saveMealToLibrary` — the same function the builder calls — so
-there is still one write path to `image_data_uri`, which is what the old comment argued for and
-achieved by having no picker there at all. `MealPhotoTile` grew a `variant="hero"` rather than a
-`MealPhotoHero` being built beside it.
-
-**And the previous session's measurement is now explained.** Rebuilt, the same failure reproduced —
-`onChange` firing with a valid data URI and the component never receiving it. The cause: the meal's
-own screen is **still in the DOM while it closes**, so its picker and the builder's are momentarily
-both mounted with the same accessible name, and the spec waited for that name before picking. It was
-already satisfied by the screen it was leaving, and the photo went to that instance. *A precondition
-satisfied by the state it is meant to replace cannot fail* — the third time this repo has hit that
-shape in a day. The spec waits for `Update Meal` now, and both pickers are named after the meal.
-
-**⚠ (a) WAS BUILT AND HELD, AND WHAT IT MEASURED BEARS DIRECTLY ON (b) — read this first.**
-2026-08-30, Lane B. The rework is straightforward and it did not work, in a way that looks like the
-same defect (b) describes. What was built: `useMealPhotoPicker` (`lib/hooks/`) for the acquisition —
-plugin call, 128 px WebP re-encode, cap check — and `MealPhotoHero` for the band, used by the builder
-at the TOP of its scroll and by the meal's own screen, whose *Add a photo* became a real picker
-writing through `setSavedMealPhoto` → the same `saveMealToLibrary` the builder uses. `MealPhotoTile`
-was deleted, since it was the second affordance this entry exists to remove.
-
-**Then `e2e/meal-photo-picker.spec.ts` failed, and instrumenting it says the picture reaches
-nothing.** In the builder, with exactly ONE `input[type=file]` in the DOM and it inside the hero:
-`handleFile` fires with `size=442985`; `accept` runs with a **4,247-char** data URI and
-`reject=null`; and the live hero's own state is untouched (`probe=none`) with `mealImage` still
-`null`. So the file arrives, the re-encode succeeds, the result passes the cap — and the component
-never receives it. A `useRef` for the callback did not fix it; neither did callback identity (a
-wrapper arrow appeared to fix it once and did not reproduce — that run was Fast-Refresh luck, and
-**every measurement here was re-taken on a cold dev server** because of it). The same spec passes on
-`main` and passes with the photo work reverted.
-
-**Why this is (b), probably.** (b) says a photo *was* attached and saved and did not appear, and that
-it does not reproduce in source. This reproduces, in the sandbox, on the web path — a picked image
-that is acquired correctly and lands nowhere. Whoever takes this has a handle (b) did not have.
-Start from the instrumentation above rather than from the layout. **The work is stashed, not
-committed, so it does not survive the container** — rebuild from this description; it is a couple of
-hours and the description is the valuable half.
-
-**(b) The save failure does not reproduce in source, so reproduce it on the device first.** Every
-layer reads correct: `openBuild` seeds `mealImage` from the meal being edited
-(`saved-meals-sheet.tsx:200`), the save sends it explicitly rather than omitting it (`:361`, the
-Q-396 rule), and the column, route, `getSyncDelta` mapping and local table all carry `imageDataUri`.
-**Candidates, in the order worth checking:** the Capacitor path re-encodes to WebP on Samsung's
-WebView and a failed encode returns a PNG data URI far over the 16 KB cap — `accept()` rejects with a
-toast that a user mid-flow can miss, and the save then proceeds with no photo; `width`/`height` on
-`CapCamera.getPhoto` are a first pass only, as the file's own comment says; or the write lands and a
-**read** path renders the placeholder anyway. Distinguish them by reading the row back
-(`/api/nutrition/saved-meals`) after a save that appeared to succeed — if the column holds a URI, it
-is a render bug and not a write bug, and that single check splits the two.
-
-⚠ **Do not ship (a) and call the report closed.** Moving the control does not make a photo save.
-**Re-confirmed 2026-08-30 from the meal detail screen** — owner: *"the photo still doesnt get added
-from this screen at the top. not saving."* The hero still reads `Add a photo` on a meal the owner has
-tried to give one. Two independent attempts, same result, so this is reproducible rather than a
-one-off.
-
-**Device pass, 2026-08-30 — the failure is confirmed and its shape is narrower than feared.** Owner,
-N4: *"Meal photo tile shows; but its always the default cant add a custom picture"*, and N5: the top
-control *"should be able to be set from there"*. So the tile renders (no compositor problem with
-data URIs in a list) and the placeholder is what persists. **BF-51 ② carries the same finding from the
-builder side** — read them together; they are one bug seen from two screens.
-
-**✅ ② SHIPPED (v1.401.0).** An ingredient row reads `1000 g` and nothing else. The rule is
-`ingredientAmountLabel` in `saved-meal-qty.ts` — extracted from the hook so it is testable at all —
-and servings survive only for a food with no serving size, which has no gram equivalent to show
-instead. Display only: grams were already the stored truth, and the editor still offers both units.
-
-**✅ ③ SHIPPED (v1.401.0), Option A, with one stated departure.** The toggle sits in a narrow column
-to the right of the stepper; the presets span the width in equal columns; the calorie total stands
-alone at the largest type; the macros are three named tiles rather than `P`/`C`/`F`. **The drawing
-puts the toggle at the stepper's height and that is not buildable here** — every `button` carries a
-48 dp floor (`globals.css`), so a stacked two-option toggle is 96 px and cannot shrink to meet a
-56 px stepper; `.tap-dense` exists for inline text buttons, not for a real control. **The stepper
-grew to 96 px instead**, which the drawing's own intent supports — the value is meant to be the
-tallest, heaviest thing there. A food with no serving size has no toggle and keeps the short row.
-`SegmentedTabs` gained `orientation="vertical"`. Guarded by `e2e/quantity-editor-option-a.spec.ts`,
-which asserts the toggle's **geometry** and not merely its presence, because "beside the stepper" is
-the whole of the request and is invisible to a text-only check.
-
-- **⚠ Option A is the tallest of the three drawings and may scroll on a long food name** — that was
-  put to the owner and accepted. **If it scrolls badly on the S25, tighten the gaps**; do not merge
-  the total and the macros back into one block, which is option B and a settled question.
-
-**② A serving inside a serving.** Owner: *"I see there are serving size of each ingredient within the
-meal; so a serving size in a serving size is probably excessive; we should keep it weight/portion."*
-The builder lists `8 servings · 1000 g` per ingredient while the meal itself is measured in portions,
-so "serving" means two different things one line apart. **Settled by the owner, 2026-08-27:
-*"just the weight would be fine for the meals. Only portions are really needed when making serving
-sizes for the meals."*** So an ingredient row reads `1000 g` and nothing else — **not** a per-portion
-gram figure alongside it, which is what started the doubling. Portions stay the meal's own unit.
-Grams are already the stored truth, so this is display only.
-
-**③ The quantity sheet's layout.** Owner: *"the grams/serve could be smaller and to the right of the
-− x + button then the other buttons could be enlarged and spread to match the width it has: more
-distinct macro and total calorie buttons."* One component to change —
-`components/nutrition/quantity-editor.tsx`, which BF-26 converged both sheets onto, so this lands
-everywhere at once. The srv/g toggle currently takes a full-width row of its own; the presets are a
-cramped four; the macro line is small text under them. Rework so the toggle is secondary and beside
-the stepper, the presets span the width, and the calorie total and macros read as the result they
-are. **Keep BF-26's earned constraints:** the macro colours stay (four uncoloured columns were the
-*"everything looks the same"* complaint), and the grams chip is still hidden when there is no serving
-size to divide by, since a chip that cannot apply is worse than no chip.
-
-**✅ LAYOUT CHOSEN — OPTION A, owner, 2026-08-27: *"option A looks the best lets go with that."***
-Drawing: <https://claude.ai/code/artifact/9388bd52-37e4-4986-b145-45cf96c5c3cb> (three options at
-412 dp on the app's real dark tokens; A is the left one). **Build A. Do not re-derive it from the
-prose above** — where the two disagree, the drawing wins, and B and C are recorded only so nobody
-re-opens a settled question.
-
-**Option A, top to bottom:**
-
-| Band | What it is |
-|---|---|
-| Title | Food name, and `1 serving = 65 g` beneath it. Close ✕ at the right. |
-| **Stepper** | `−` · the value · `+`, the value tallest and heaviest — it is what the sheet exists to set. |
-| **Unit toggle** | `srv` / `g` **stacked vertically in a narrow column to the RIGHT of the stepper**, same height as it. This is the owner's *"smaller and to the right of the − x + button"* and it is what frees the width below. |
-| **Presets** | Four equal chips spanning the full width — `1 srv` `2 srv` `3 srv` `100 g`. Three wide when the food has no serving size (see below). |
-| **Calorie total** | The number alone, centred, largest type on the sheet, with a small `KCAL` label under it. It leads; nothing sits beside it. |
-| **Macro tiles** | Three equal tiles — Protein · Carbs · Fat — each a bordered surface with the value in its macro colour and the name spelled out beneath. Not `P`/`C`/`F`. |
-| Footer | Delete at the left, `Save` filling the rest. |
-
-**What A costs, so it is not discovered late:** it is the tallest of the three, because the total and
-the macros are two stacked blocks rather than one. On a long food name the sheet may scroll. That was
-put to the owner and accepted — distinctness was the goal. If it scrolls badly on the S25, tighten
-the gaps rather than merging the two blocks back together, which would be option B.
-
-- **Verification — the whole of what is still owed for ② and ③.** On the S25, in both sheets that render the editor: a photo attached in the
-  builder appears in the list, the detail hero and the diary row; ingredients read in grams; every
-  control clears the 48 dp floor and the action row clears the gesture bar (`pb-safe-action*`, which
-  renders 0 in the sandbox).
+> **BF-46 VERIFIED and removed, 2026-09-14 — one trap in it is pinned by a test and worth naming.**
+> The meal photo save failed on the device and nowhere else because `MealPhotoTile`'s native branch
+> did `await fetch(photo.dataUrl)` on a `data:` URL — **a `fetch()` of a `data:` URL is governed by
+> `connect-src`**, which `lib/security/csp.ts` does not open to `data:`, so it rejected into a
+> `catch {}` written for picker cancellations. It asks the plugin for `Base64` now.
+> `lib/media/__tests__/no-data-url-fetch.test.ts` fails on the next one.
 
 ### [nutrition][app-shell] BF-51 — back from Edit exits the tab, and `Recently used` is not a tab (④ shipped)
 
@@ -7933,30 +7518,6 @@ the match. `Gate: owner` when it is next picked up.
 - **Verification (for the barcode half, when it is built).** Scan the same barcode twice → one row —
   and *first* confirm a non-null `barcode` actually lands in the column, per the external-field rule:
   a wrong or missing field reads as `undefined` and fails silently.
-
-### [nutrition] BF-52 — one AI meal builder entry point (shipped; the label wrap needs the device)
-
-- **Lane:** B
-- **✅ VERIFIED ON THE S25, 2026-09-13** (owner's nutrition pass): one AI meal-builder entry point, label does not wrap.
-- **Shipped 2026-08-31**, branch `feat/meal-builder-entry-point-bf52`, following its own plan
-  [`2026-08-31-ai-meal-builder-entry-point.md`](superpowers/plans/2026-08-31-ai-meal-builder-entry-point.md).
-  Journal: [`2026-08-31-meal-builder-entry-point.md`](overview/history-2026-09-10-folded-4.md#2026-08-31-meal-builder-entry-point).
-  A `Recipe photo · Recipe link · Describe it` row sits in the builder **above** the collapsed
-  ingredient picker — the old affordances lived inside a search field you had to open first.
-- **The plan declined this entry's instruction to absorb BF-63's barcode**, and shipped that way:
-  these three produce a whole ingredient list, a barcode names one product. It stays on the search.
-- **Two things found while building it.** The URL branch in the search slot **stays**, and not for
-  convenience — without it a pasted link falls through to the AI estimate, which turns a URL into a
-  food called "https" with invented macros. It is a guard. And `runRecipeImport` came out of
-  `ingredient-picker.tsx` so two callers could share it, which made the multi-candidate branch, the
-  serial minting, the 0.01 floor and the `recipeYield` refusal **testable for the first time** —
-  they were defended by prose alone, because exercising them meant rendering a component and neither
-  vitest project runs a DOM.
-- **Keep:** the S25 check, and only that. *"Describe or enter"*-length labels wrap to two lines in a
-  third of 412 dp; the tiles are padding-driven so they grow rather than clip, but whether three
-  tiles plus their expanded input read well on the phone is a judgement the sandbox cannot make.
-  Also confirm the recipe-photo picker still reaches the gallery (Capacitor `CameraSource.Prompt`)
-  now that it draws as a tile — the picking code is unchanged, the chrome around it is not.
 
 ### [nutrition][platform] BF-77 — sharing meals with a partner: copies work today, a shared library is a different product
 
@@ -8630,32 +8191,6 @@ P/C/F chips gone. Journal:
   artboard is 812 px and stops at the fold. Decided, not outstanding.
 - **The device check**, and the owner's provisional ④ watching brief on grouped-section backgrounds.
 
-### [nutrition] BF-26 — the two quantity sheets converged; the phone has not seen it
-
-- **Branch:** `fix/quantity-sheet-convergence` (merged 2026-08-25)
-- **Lane: B**
-- **✅ VERIFIED ON THE S25, 2026-09-13** (owner's nutrition pass): the two quantity sheets match.
-- **Spec:** BF-28.
-
-**Shipped.** Both sheets render one `components/nutrition/quantity-editor.tsx`, so the diary sheet
-gained artboard 6's `srv`/`g` toggle, its absolute presets (`1 srv · 2 srv · 3 srv · 100 g`) and the
-inline macro line — and both now use `MACRO_COLORS`, matching the row that opened them. Cancel is
-gone: the drawing has none and the sheet already had two ways out (the X, and the back gesture from
-BF-27), so a third beside a bin was the ambiguous control. `qtyFromInput`/`steppedQty` are shared
-rather than re-derived, which was the entry's actual point. Journal:
-[`2026-08-25-quantity-sheet-convergence`](overview/history-2026-09-10-folded-3.md#2026-08-25-quantity-sheet-convergence).
-
-**The finding worth keeping:** `globals.css` sets `input { font-size: 16px !important }` under
-`max-width:640px` (the iOS-zoom guard), so **a `text-*` size class on an input is inert at every
-phone width** — the value needed `!text-2xl` to be bigger than its steppers at all. Measured across
-the app: only two other inputs carry a size class and both want ≤16 px, which is what the guard is
-for. So this is narrow, not systemic — but it is silent, and the next person wanting a large input
-will hit it.
-
-- **Keep:** the device pass. The action row's safe-area inset renders 0 in the sandbox and Remove
-  sits in that row; and whether the sheet now reads as one thing is the owner's call, not a
-  measurement.
-
 ### [body][nutrition] BF-33 — a measured RMR has nowhere to go, and the four-number panel the test sheet already draws
 
 - **⚑ Owner directive 2026-08-27: *"we need to get these numbers into the app."*** The measurement
@@ -8737,40 +8272,6 @@ That number is more valuable than either input on its own.
 - **Verification.** The real sheet's numbers (measured 1714, predicted 1513, +13%) entered by hand and
   by photo, landing identically. Then prove the goal actually moves: `goal-recommendation.ts` must
   return a different calorie target with the measured RMR present than without.
-
-### [nutrition][app-shell] Q-406 — the shared food row: all four call sites converted (shipped v1.383.5)
-
-- **Lane:** B
-- **✅ VERIFIED ON THE S25, 2026-09-13** (owner's nutrition pass): the shared food row is consistent across all four call sites.
-- **Shipped 2026-08-26.** All four call sites now draw `components/nutrition/food-row.tsx`. The last
-  one — the external food-database result in `ingredient-search.tsx` — was blocked because the
-  decided warning design (option A) moved its sentence to *the food's detail*, and **this surface has
-  none**: the tap adds the food outright. Building A would have deleted the only visible explanation
-  on a warning meant to be read before use.
-- **⭐ OWNER DECISION 2026-08-26 — keep the sentence in the row.** Chosen from the three the blocked
-  note offered. It is what already shipped, so there is no regression, and option B's losing reason
-  (it *replaced* the serving line) does not apply to keeping it *alongside*. Upgrading to a detail
-  step later stays additive.
-- **This knowingly overrides one bullet of the old design — say so rather than let it read as drift.**
-  That design said *"do not add a warning slot to `FoodRow`"*, written on the assumption the sentence
-  was leaving the row. It is not, so a slot is what keeping it costs: **one optional
-  `warning?: string | null`**, which three call sites omit exactly as they omit the six other optional
-  props. The alternative was leaving the external row bespoke forever, which is the thing this entry
-  existed to end.
-- **The `+` and the per-row spinner went with the conversion, and nothing was lost.**
-  `SearchResultRow` beside it has had neither since v1.338.0 — the tap adds the food. The tapped row
-  still identifies itself through the existing `highlighted` prop.
-- **It also removed a hex literal** (`#f59e0b` → `var(--accent-amber)`), so
-  `check-hex-literals.js` drops that baseline row: 427 across 85 files.
-- **Verification:** `e2e/food-row-shared.spec.ts` gained the external row, with the search route
-  **stubbed** — it reaches Open Food Facts, which is why this row had no e2e cover at all before. It
-  asserts the shared shape (calories in their own column), the sentence, and that the macros stay
-  readable beside it.
-- **Keep:** the device press. Not seen on the S25 — the amber caution line is new markup in a list,
-  and the row lost an affordance. On device: search the food database for something with disagreeing
-  macros; the row must show the sentence, and a tap must still add it. **Reachable from Log Food →
-  Single foods since BF-48** (v1.396.0), which is where the owner tried and could not get to it —
-  the meal builder still works and is the same row either way.
 
 ### [nutrition][app-shell] Q-395 — the nutrition rework: the spec every phase reads, and the final checkpoint
 
@@ -13477,8 +12978,12 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 ### [app-shell][devices] Q-531 — Q-234 moved the device consoles out of /admin, and in use that made them worse
 
 - **Keep:** the owner walking the drain → re-sync → verify flow on the S25 and saying whether the
-  section order matches what they actually do. That was never a blocker and is not one now; it is the
-  only part that cannot be answered from the sandbox.
+  section order matches what they actually do — **the findability half is DONE** (2026-09-13, below).
+  That was never a blocker and is not one now; it is the only part that cannot be answered from the
+  sandbox.
+- **⚠ The pass came with a complaint and it is left as one:** *"Works but could be labeled better."*
+  No label was named, so there is nothing to change yet; ask which one when the flow walk happens,
+  rather than renaming six sections on a guess.
 - **✅ VERIFIED ON THE S25, 2026-09-13** (owner's app-shell pass): the device consoles are findable where they moved to — owner: *"Works but could be labeled better"*.
 - **✅ SHIPPED** (`fix/device-console-ia`, 2026-09-01, v1.421.0). `/admin` grew a **Devices** tab;
   `/admin/oura-ble` is six numbered sections in §4-of-the-runbook order rather than fourteen stacked
@@ -17959,10 +17464,9 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [nutrition] Q-187 — the day recalculates against what was actually eaten (shipped; device check owed)
 
-- **Keep:** the device check, and one design question the owner can only answer by living with it.
-  On the S25: with food logged, the plan card's expanded rows must show the adjusted figure with
-  `(planned N)` beside it and stay readable at 412 dp — two numbers now share a line that held one.
-  **And the open half of the owner's answer:** he said *"would be nice to have the option"* (spread
+- **Keep:** the design question only — **the device check is DONE** (2026-09-13, below: the day
+  recalculates without a refresh, and the `(planned N)` rows read fine at 412 dp).
+  **The open half of the owner's answer:** he said *"would be nice to have the option"* (spread
   vs next-meal-only). Spread shipped; whether the option is ever wanted is a question only use can
   settle, and it decides where the control would live and what it defaults to. **Do not build the
   preference before that.**
@@ -18638,29 +18142,18 @@ per-field merge where an AI write has no honest source rank to claim.
 - `updateUserGoals` also writes through to localStorage; Home widgets read those keys, not the DB.
 
 
-### [app-shell] ⛔ Q-147 — cold app start has never been measured on the device (owner action)
-
-- **Gate:** device
-
-- **Added:** 2026-08-08 · [journal](overview/history-2026-08-07.md)
-- **⛔ blocked: needs the S25.** Not implementable in a session — filed so the gap is tracked rather
-  than rediscovered.
-- **What is known.** Bundle sizes are now measured (first time): **105 kB shared by every route**,
-  and the four main tab screens sit at **316 kB First Load JS** while carrying only 235 B of their
-  own code — so the weight is shared-layer, and screen-level splitting would move almost none of it.
-  `/workout` is heaviest at 361 kB.
-- **What is not.** The 2026-08-05 device capture measured **in-app navigation** — 22 navigations,
-  warm 22 · cold 0, no RSC payload fetched at all, worst sample entirely client-side render. That
-  rules bundle transfer out as the *navigation* cost. It says nothing about **cold app start**, which
-  is when the shared baseline and a screen's First Load are actually paid, and which no capture has
-  ever covered.
-- **Do not "optimise the bundle" off the numbers above.** They are a baseline, not a finding —
-  nothing has been shown to be slower because of them. Q-127 (same day) is the cautionary case: a
-  real static import chain whose claimed cold-start consequence did not reproduce under measurement.
-  Measure first, on the device.
-- **Method:** add a cold-start timing to `docs/device-smoke-checklist.md` — app killed, then time to
-  first interactive paint — and compare against the in-app navigation median of 146.2 ms already on
-  record.
+> **Q-147 ANSWERED and removed, 2026-09-14 — cold start is fine, and no number was ever taken.**
+> Owner, on the S25 app-shell pass: *"Seems good now."* The entry existed because cold app start had
+> never been measured; it is closed on a judgement rather than on the measurement it asked for, which
+> is the honest reading and is why this note exists. **There is no cold-start baseline in this repo.**
+> If the app ever starts feeling slow to open, the first step is still the capture this entry
+> specified — app killed, then time to first interactive paint, against the in-app navigation median
+> of **146.2 ms** already on record — because there is nothing to compare a regression against.
+> The bundle numbers it recorded stand and are a baseline, not a finding: **105 kB shared by every
+> route**, the four tab screens at **316 kB** First Load JS carrying 235 B of their own code,
+> `/workout` heaviest at 361 kB. Do not optimise off them.
+> **This answer also props up Q-1b's hold** — that entry says to reopen only if *"the app starts
+> feeling slow to open"*, and the owner has just said it does not.
 
 
 > **Q-180 DECIDED and removed, 2026-08-14 — KEEP, and the code now says why.** The entry asked one
@@ -19201,19 +18694,18 @@ per-field merge where an AI write has no honest source rank to claim.
   existing scale-toast Known-Issues entry in `projectOverview.md` rather than adding a duplicate
   when this ships.
 
-### [app-shell] Q-93-followup — the timeline's workout and walk taps have not been pressed on the phone
-
-- **Branch:** `feat/timeline-workout-day-detail` (merged 2026-08-25, v1.371.0) · **Lane: B**
-- **✅ VERIFIED ON THE S25, 2026-09-13** (owner's app-shell pass): the timeline's workout and walk taps both open correctly.
-- Built and guarded: `workout` and `walk` cards navigate to `/health/day?date=`, proved by the
-  mutation-checked `e2e/timeline-card-navigation.spec.ts`; `bedtime`/`tag` stay inert on purpose
-  ([`journal`](overview/history-2026-09-10-folded-3.md#2026-08-25-timeline-workout-day-detail)).
-- **Keep:** the press itself, on the S25 — whether the row competes with `PullToSync`'s vertical
-  gesture under a real finger, and whether `/health/day`'s back control returns to Home rather than
-  stranding the user on a navless route. Both already ship for the meal and sleep cards, so this is
-  confirmation, not discovery. Strike once pressed.
-
 ### [app-shell] 🔴 Q-51 — the perf work is not aimed at the screen the owner actually uses
+
+> **⚑ THE PREMISE SOFTENED, 2026-09-14 — the owner no longer reports this as pain.** On the S25
+> app-shell pass: *"Its mostly fine; I'd still like it to be faster if possible."* This entry was
+> placed high because it was *"the owner's stated felt pain"* (their words, below: *"it's the home
+> screen and switching tabs"*). **That justification is gone and the placement should go with it** —
+> what is left is a want, not a complaint, and it competes with entries that have live symptoms.
+> Nothing else in the entry changes: the `/workout` first-mount outlier is still the one measured
+> number, and the instruction below to **measure before refactoring** is now more binding, not less,
+> because a large refactor is a poor trade against "mostly fine".
+> **Q-147 was closed the same day on the same pass** (*"Seems good now"* on cold start), so both
+> halves of the app-open story now read as acceptable to the owner.
 
 > **⚑ Now has evidence, 2026-08-05 — and it points HERE rather than at the network.** The device
 > capture makes the residual file-splitting work the *only* perf item with a measurement behind it.
@@ -19842,14 +19334,19 @@ describing a safety net that no longer exists.
 > parks on that character, and the hold below is what keeps this out of the work list.
 
 - **Lane:** A
-- **Keep:** the two halves of this entry contradict each other and only the owner can resolve it.
-  **2026-08-02:** the owner deferred Phase 3 explicitly *"not cancelled"* — *"we can push it till
-  we HAVE to do it"* — and said not to retire the entry. **2026-08-04:** the gating measurement
-  came back at 472 ms to paint Home, of which 439 ms is the document round trip, against the 1.5 s
-  threshold the owner’s own Q-51 set for "already fine, do not bundle". Evidence says drop it;
-  the owner has never been shown that evidence against their deferral. **Q-31 and Q-32 no longer
-  wait on this** — Q-49 released those gates and the public cut has since happened.
-- **Gate:** owner
+- **⚠ `Gate: owner` REMOVED 2026-09-14 (Orchestrator) — it was counting this as owner debt against
+  the entry's own instruction not to ask them.** The gate was right while the two halves contradicted
+  each other; the 2026-09-01 hold above resolved that by putting the measurement in front of the
+  owner and taking their answer. Leaving the field on kept a settled entry printing in every
+  owner-decision sweep, which is how it reached a device checklist twice. `Keep:` alone holds it out
+  of the work list, which is all that is wanted.
+- **Keep:** the entry itself, for the plan documents below — not a decision. **Settled twice:**
+  **2026-08-02** the owner deferred Phase 3 explicitly *"not cancelled"* — *"we can push it till we
+  HAVE to do it"* — and said not to retire it; **2026-09-01** they were shown the 472 ms / 439 ms /
+  1.5 s numbers and chose the same deferral knowingly. **2026-09-14 adds a third data point in the
+  same direction:** Q-147 closed on the owner reporting cold start *"Seems good now"*, and cold start
+  was this entry's last remaining case. **Q-31 and Q-32 no longer wait on this** — Q-49 released
+  those gates and the public cut has since happened.
 
 > **The gating measurement was taken (Q-51 Task 3, owner on the S25, 2026-08-04) and it does not
 > support this.** Home paints in **472 ms**, of which **439 ms is the document round trip to
