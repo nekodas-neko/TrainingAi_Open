@@ -12008,3 +12008,14 @@ And the credit's *size* is unverified on any machine in this repo: the 0 → 122
 from synthetic MET fixtures, and the CI assertion that would check a real magnitude skips for the
 same reason. A row claiming the calories now work, without that sentence, would be claiming more than
 was measured.
+
+## 2026-09-14 — `docs/implementation-backlog.md` → 20954 (LA-107)
+
+−29 for LA-107 leaving the queue, the same day it entered it.
+
+Worth one line because the entry's value was almost entirely in a method instruction rather than a
+specification: it said to measure the corpus before writing the regex, and named a candidate
+discriminator. The measurement showed that discriminator does not catch the case the entry was
+written about — the pre-fix spec held no clock reference at all, because the clock lives in the app
+it drives. An entry that had simply said "add a check" would have produced one that passed and
+proved nothing.
