@@ -118,9 +118,14 @@ Live at the time of writing (2026-07-30):
   claims within 8% of the last confirmed weight, prompts up to 15%, and declines beyond, archiving
   the raw frame in all three branches. **The 8% is measured** off the owner's 70.0–72.8 kg cluster
   against the 57.5–58.0 kg one he has dismissed — do not widen it without re-measuring. **Open:**
-  LA-108 (a declined reading has no read path, so a >15% genuine change locks the band out silently)
-  and BF-58's two hardware questions. Shared with `devices`.
+  LA-108's list (Lane B) and BF-58's two hardware questions. Shared with `devices`.
   [Journal](../../overview/entries/2026-09-14-lane-a-bf58-weight-band-attribution.md).
+- **Claiming a declined weigh-in back (LA-108, 2026-09-14)** — `confirmScaleSample` accepts
+  `pending` **or** `dismissed` (never `confirmed`), and `GET /api/scale-ble/pending` returns a
+  bounded `dismissed[]`. **The lockout it fixes predates BF-58**: the old `status='pending'`
+  predicate made an accidental *Not me* tap irreversible, and only a confirmed reading re-anchors
+  the band. The list that reaches this is still owed (Lane B).
+  [Journal](../../overview/entries/2026-09-14-lane-a-la108-claim-a-declined-weighin.md).
 
 The scale-sync and Renpho entries above are shipped and device-confirmed; Q-56 (above), LA-108 and
 BF-58's device answers are the open items. Re-run the greps rather than trusting this list.

@@ -12115,3 +12115,17 @@ Hanging Leg Raise" reads as a glitch until you see it is exactly 66% of a stored
 has to stop the fix being "relabel it as added weight". BF-163 spends its length on the fact that the
 tag is CORRECT by its own definition — an implementer told only "hypertrophy is wrong" would change
 the band table and break every other row.
+
+## 2026-09-14 — LA-108's engine half (backlog +11, projectOverview +7)
+
+LA-108 was filed this morning describing a missing read path, and building it found the real lock
+was one SQL predicate — `confirmScaleSample` matching `status='pending'` only. The entry grows a
+little even though most of its speculation about shape is now answered, because what replaces that
+speculation is four concrete notes for whoever renders the list: preserve newest-first (in the
+lockout, the top rows are the wrongly-declined ones), a declined row may carry a null weight and
+still lists, no dismiss action, and do not widen the band instead.
+
+`projectOverview.md` grows by a correction rather than by content: its own row claimed BF-58
+introduced this lockout. It did not — the predicate made an accidental *Not me* tap irreversible
+long before the band split existed. A row that misattributes a defect to the change that revealed it
+sends the next session to the wrong file, so the retraction is worth more lines than the fix.

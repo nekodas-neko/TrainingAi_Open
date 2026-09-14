@@ -1893,14 +1893,21 @@ confirmed readings span **70.0–72.8 kg** (worst day-to-day change 2.85 kg), th
 sit at **57.5–58.0 kg**. 8% of ~70 kg is ±5.6 kg — wider than his whole history, and 6.4 kg clear of
 hers. Do not widen it without re-measuring; widening is what BF-58 was filed to stop.
 
-**The hazard, filed as LA-108 and not yet fixed.** The band is anchored on the last *confirmed*
-weight and only a confirmed reading re-anchors it, so a genuine change of more than 15% between two
-weigh-ins — a long gap plus an illness or injury — puts the owner outside his own band with nothing
-to move it, and every reading after that is outside too. It is narrow (drift normally passes through
-the 8–15% prompt band first, where one tap re-anchors) and nothing is lost (the frames are archived),
-but it is **silent and self-sustaining**: `listPendingScaleSamples` filters to `pending`, so a
-declined reading has no read path at all. The fix is a way to see and claim dismissed readings, not a
-wider band.
+**The hazard, LA-108 — engine half fixed the same day, the screen is still owed.** The band anchors
+on the last *confirmed* weight and only a confirmed reading re-anchors it, so a genuine change of
+more than 15% between two weigh-ins — a long gap plus an illness or injury — puts the owner outside
+his own band with nothing to move it, and every reading after that is outside too. Narrow (drift
+normally passes through the 8–15% prompt band first, where one tap re-anchors) and nothing is lost
+(the frames are archived), but **silent and self-sustaining**.
+
+**⚠ It predates BF-58 — an earlier version of this row said BF-58 introduced it, and that was
+wrong.** `confirmScaleSample` matched `status='pending'` only, so an accidental *Not me* tap has
+always been irreversible and has always failed to re-anchor. BF-58's outer band made the state
+reachable without a tap; it did not create it. The predicate now accepts `pending` or `dismissed`
+(never `confirmed`, so claiming twice cannot double-apply a reading), and
+`GET /api/scale-ble/pending` returns a bounded `dismissed[]` beside the pending rows — the confirm
+route already took one of these ids unchanged. **What is left is the list that reaches it**
+(`scale-pairing.tsx`, Lane B). Not a wider band: the 8% is the measurement.
 
 **Not device-verified, and only the phone can show it.** JS/server only, so it reaches the S25 through
 Railway with no APK — but what changed is a physical behaviour. **Check on device:** the owner weighs
