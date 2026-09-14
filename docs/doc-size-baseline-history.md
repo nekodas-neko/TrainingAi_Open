@@ -11737,6 +11737,21 @@ LB-105's own entry is about.
 Most of the entry's length is the instruction NOT to lengthen the poll timeout first: that is the
 fix that makes a genuine hydration regression invisible, and it is what a reader reaches for.
 
+## 2026-09-13 — `docs/implementation-backlog.md` → 21598 (the workout device pass)
+
+Twelve net lines. Three entries gained a one-line verification, two gained a conditional-close note,
+PS-10 left the queue entirely, and BF-59 gained a table.
+
+That table is the spend worth defending. The owner delegated the call — *"you can make the decision
+here"* — and the measurement retired half the entry: the `14/10` flat binary it is written around
+belongs to **Shikai**, which stopped being the active program on 2026-09-06. Bankai's stored targets
+are already a six-value gradient. Writing the three programs side by side is what makes that legible;
+"the premise is stale" without the numbers is a claim the next session has to re-derive.
+
+The conditional-close note on BF-64 and LB-47 is deliberately longer than "owner says treat as fixed".
+It has to say that nothing was verified, so a later report of the same symptom is read as a regression
+against an unverified fix rather than as a fresh bug.
+
 ## 2026-09-14 — `projectOverview.md` → 10930, `docs/implementation-backlog.md` → 21574 (RV-36 refiled)
 
 The backlog shrank 12 net: RV-36's 49 lines left, LB-107's entry and BF-100's correction replaced

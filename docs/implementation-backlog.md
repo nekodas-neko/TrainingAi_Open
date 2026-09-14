@@ -788,7 +788,7 @@ below threshold and left in place for next time.
 ### [workouts] BF-141 — a lb/kg toggle on the weight dial (shipped; the device look is what is left)
 
 - **Lane:** B
-- **Verify:** device — on the S25, tapping the unit suffix swaps kg↔lb without the dial also
+- **✅ VERIFIED ON THE S25, 2026-09-13** (owner's workout pass): the kg↔lb toggle swaps without the dial scrolling or losing its selection.
   scrolling or re-selecting, and the 44 px touch box is reachable at the drawn size. A scroll-snap
   dial with haptics beside a new control is a touch-target and gesture question, and the harness
   drives a mouse.
@@ -2855,7 +2855,7 @@ short all day.
 - **Lane:** B — `components/workout/active-workout-screen.tsx`.
 - **Added:** 2026-09-09 · owner, mid-set on Legs: *"ui gets a bit quoted for injury ones"* — screenshot of Barbell Hip Thrust with the injury banner, the AMRAP banner, and set 1 disappearing behind the logging sheet.
 - **Needs:** — nothing.
-- **Verify:** device — the failure is vertical space on the S25 with the log sheet open, which is not
+- **✅ VERIFIED ON THE S25, 2026-09-13** (owner's workout pass): the two stacked banners do not squeeze the set list — owner: *"Havent seen this issue; treat it as fine for now"*.
   reproducible from dimensions alone. Two things the sandbox could not produce: **(a)** an injured
   exercise on a **baseline** session (the two-banner worst case the owner reported — the seeded
   account is mid-`Accumulation`, and forcing `isBaseline` wants the program's phase set rewritten),
@@ -5064,11 +5064,16 @@ computes that as `entries` (`:35`, from `groupDiaryEntries`). One group is one r
 
 ### [workouts][app-shell] BF-94 — swipe the Start button to reveal Rest, instead of a permanent two-button row
 
+- **✅ OWNER ANSWERED 2026-09-13: yes, build the swipe.** Verbatim: *"Yes I would rather be able to
+  swipe the start button to reveal the rest."* That settles the design question this entry was gated
+  on — the permanent two-button row goes, Start becomes the single control, and Rest is revealed by
+  a swipe.
+- **The `Gate: device` is discharged by the answer, not by a look:** it was waiting on this
+  preference, and BF-61's fast-tap concern stays as an implementation constraint on the swipe rather
+  than a blocker on deciding.
+
 - **Lane:** B — `app/session-select/components/recommendation-card.tsx:252-296` and
   `components/ui/swipe-actions.tsx`.
-- **Gate:** device — BF-61's fast-tap check, per the warning further down this entry. It was stated
-  only in prose, so `next-item.js` could not see it while the `Needs:` it *could* see had already
-  been discharged.
 - **⚠ The `Needs: BF-84` this entry carried is DISCHARGED and has been removed (2026-09-03).** Its
   stated reason was that BF-84 *"rewrites what `onRestDay` does"* and that rebuilding how it is
   invoked first would touch the same call site twice. **That rewrite shipped 2026-09-01** (migration
@@ -6485,36 +6490,6 @@ is public. That is a materially different proposition from "a cheap second opini
 - **Do NOT flash the mod firmware for a higher rate** (plan §8). ~20 Hz stock is enough to find out
   whether the signal is worth anything.
 
-### [app-shell][devices] PS-10 — ring gestures for hands-free workout navigation (owner idea, unproven)
-
-- **Lane:** B (the surface); depends on **PS-9** for the raw stream
-- **Needs:** PS-9
-- **Gate:** device
-- **Added:** 2026-08-26 · owner: *"the gestures one if it works well would be good for cycling
-  through the workout pages. would need a lot of testing though"* — the caveat is the entry.
-
-The problem is real: mid-set the phone is on a bench, hands are chalked or sweaty, and advancing
-the workout screen means picking it up. A wrist flick would be better than a tap.
-
-**Why this is filed rather than built, and what would have to be true first.**
-
-- **False positives are the whole risk, and resistance training is the worst case for them.** A
-  gesture recogniser trained on a still hand has to run while the same hand is doing barbell rows.
-  A missed gesture is an annoyance; a *false* one that skips a set mid-lift corrupts the log, which
-  is the app's actual product. Any design starts from a gesture that cannot occur during a lift —
-  and it needs a confirmation beat before anything destructive.
-- **It needs PS-9's stream running continuously through a workout**, which is exactly the battery
-  cost PS-9 says to bound. A workout is bounded, so this is the one place it may be affordable.
-- **The recogniser has to be ours.** The client the owner saw trains gestures in the browser and
-  keeps them there; nothing in that transfers.
-- **Cheaper alternative to weigh first:** the phone is already on a tripod for PS-7's camera work,
-  and voice is already wired for the AI chat. Neither needs a ring. Whether a gesture beats them is
-  a question worth answering before building the hardest of the three.
-
-**Recommendation: do not start this until PS-9 has produced a real capture and someone has looked at
-what a rack pull looks like in that data.** The answer to "would this false-positive constantly"
-lives in that file and nowhere else.
-
 ### [devices][platform] PS-8 — the Colmi R09 in learning mode: ingest it, compare it, score nothing with it
 
 - **Branch:** `claude/alternative-ring-testing-jzk8el` (plan + CI guard landed; the spike is a later branch)
@@ -6837,6 +6812,32 @@ Lane A's.
   exactly this, and it fails when the seed is switched to the corrected value.
 
 ### [workouts] BF-59 — the AI's set prescription still steers off the flat binary
+
+- **✅ OWNER DELEGATED THE CALL 2026-09-13, and the measurement retires half the entry.** Owner:
+  *"You should have all the data to see my prescribed sets; you can make the decision here."*
+
+  **The "flat binary" is Shikai's, and Shikai is not the active program any more.** Measured in
+  production 2026-09-13:
+
+  | program | active | distinct target values | range |
+  |---|---|---|---|
+  | **Bankai** | ✅ | **6** | 5–13 |
+  | Shikai | no | **2** | 10–14 |
+  | AI-Phase1 | no | 2 | 8–12 |
+
+  Shikai holds exactly the `14/10` pair this entry names. **Bankai, which the owner built by hand on
+  2026-09-06, is already graded**: abs/chest/lats/shoulders 13 · biceps/calves/quads/upper-back 11 ·
+  hamstrings/triceps 10 · glutes/traps 8 · forearms/lower-back 6 · adductors/hip-flexors 5.
+
+- **So item 1 is still worth doing and its STATED SYMPTOM is not reproducible.** `signals.ts:399`
+  does still read `vt.targetSetsPerWeek` instead of the phase-scaled `weeklyVolumeTarget`, and the
+  engine/screen inconsistency is real. What is gone is the consequence the entry sells it on — a
+  prescription steering off two values — because the active program's stored numbers are already
+  a sensible sixteen-muscle gradient. **Re-scope it as the architectural fix it is, at the priority
+  that deserves, rather than as a live prescription defect.**
+- **⚠ And do not "fix" this by regrading Bankai.** The owner set those numbers deliberately when they
+  rebuilt the program around less lower-back work. The phase scaling multiplies them; it does not
+  replace them.
 
 > **✅ THE SCREEN'S HALF SHIPPED 2026-09-01.** The Training card's weekly targets are **derived**
 > from `volumeLandmarks(goal, muscle)` scaled by the week's phase mix, not read from
@@ -7341,7 +7342,7 @@ owner has to re-describe in a wizard what the app already knows.
 ### [workouts] BF-65 — the exercise clip on the ready screen (shipped; it must be seen *moving*)
 
 - **Lane:** B
-- **Verify:** device
+- **✅ VERIFIED ON THE S25, 2026-09-13** (owner's workout pass): the exercise clip plays on the ready screen.
 - **Added:** 2026-08-30 · owner: *"id like the exercise gif in the pre session screen so it shows you
   what movement you will be doing."*
 - **Shipped 2026-08-31** — `exercise-media-panel.tsx` renders the clip at 64 px beside the exercise
@@ -7367,12 +7368,18 @@ owner has to re-describe in a wizard what the app already knows.
 
 ### [workouts] LB-47 — the `Full` override CLAIMED a revert that had not happened (shipped; device owed)
 
+- **⚠ OWNER CLOSED THIS CONDITIONALLY, 2026-09-13.** Verbatim: *"Will let you know when it comes up.
+  Happy to treat as fixed if I dont raise it again."* The trigger needs a specific program state to
+  arrive on its own, which is not something to ask for on demand.
+- **That is a decision to stop waiting, NOT a verification — and the distinction has teeth.** Its
+  `Verify: device` is removed so it stops printing as a debt, but **nothing has confirmed the fix
+  works.** If this entry's symptom is ever reported again, it is a REGRESSION REPORT against an
+  unverified fix, not a new bug: start from the original diff.
+- **What that buys, on RV-35's terms:** the fix rests on code and tests alone, so a later change here
+  needs a test that fails before it and passes after.
+
 - **Lane:** B — `components/workout/utils.ts` and `ai-prescription-card.tsx`. No Lane A half was
   needed, which the entry thought it might be.
-- **Verify:** device — the case needs a prescription whose `deload` flag is true while the server
-  reports `isDeloadActive` false, which production has not produced (0 of 5). Worth a look the next
-  time a deload day appears, alongside whether the toggle's absence on a real session deload should
-  itself carry a line of explanation (see the last bullet).
 - **✅ SHIPPED** (`fix/lb-47-deload-override-honesty`, 2026-09-02). `deloadOverrideOutcome` gives the
   card a fourth state, `nothing-to-revert`, and the card no longer confirms an override that did not
   occur.
@@ -7432,12 +7439,17 @@ owner has to re-describe in a wizard what the app already knows.
 
 ### [workouts] BF-64 — the Full/Deload toggle can only ADD deload, never remove one, so `Full · Override` overrides nothing
 
+- **⚠ OWNER CLOSED THIS CONDITIONALLY, 2026-09-13.** Verbatim: *"Will let you know when it comes up.
+  Happy to treat as fixed if I dont raise it again."* The trigger needs a specific program state to
+  arrive on its own, which is not something to ask for on demand.
+- **That is a decision to stop waiting, NOT a verification — and the distinction has teeth.** Its
+  `Verify: device` is removed so it stops printing as a debt, but **nothing has confirmed the fix
+  works.** If this entry's symptom is ever reported again, it is a REGRESSION REPORT against an
+  unverified fix, not a new bug: start from the original diff.
+- **What that buys, on RV-35's terms:** the fix rests on code and tests alone, so a later change here
+  needs a test that fails before it and passes after.
+
 - **Keep:** the device pass, and only that. Everything else shipped.
-- **Verify:** device — **AI-dynamic program, a day with a deload prescription.** Pick `Full`: the
-  listed weights rise to the pre-deload numbers and the card says the override is on. Pick `Deload`:
-  they drop back. Complete a set under `Full` → it counts toward the 1RM/PR; complete one under
-  `Deload` → it does not. Then the reverse case, a **full** prescription with `Deload` picked, still
-  behaves as Q-109/Q-175 built it — that path works today and must not regress.
 - **✅ SHIPPED** (`fix/deload-full-override-actually-reverts`, 2026-09-01). Session-level `Full` is
   now the per-exercise revert applied to every deloaded exercise that carries pre-deload numbers, as
   this entry recommended: no LLM call, no 429 budget, works offline. `isFullOverride`,
