@@ -659,16 +659,37 @@ below threshold and left in place for next time.
   (03:47 UTC, passed on retry) and **failed outright** on PR #1166's (07:12 UTC). Neither PR touches
   it — #1162 was the workout ready screen, #1166 was the day read-through spec.
 - **It passes locally**, run on #1166's branch against the sandbox database: 3 passed.
-- **What it waits for is a race by construction**, which is the reason to suspect the spec rather
-  than the app: it clears `localStorage`, reloads, and polls for `ta_weight_lookback` to reappear
-  from `hydrateUserPreferences`, which the sync provider warms **on launch**. A slow launch under a
-  loaded CI runner is exactly the shape that turns a poll timeout into a failure.
+- **⚠ That race is NOT what happened, and this line replaces the guess with the log.** Read from
+  run 34814623905 on 2026-09-14: the failure is
+  **`Error: page.goto: net::ERR_ABORTED at http://localhost:3100/`** at **line 53**, the relaunch —
+  **identically on the initial attempt and on Retry #1**. Line 57's poll is never reached, so
+  `hydrateUserPreferences` was never slow; it was never called. Instrumenting it, which the line
+  below asks for, would have measured a function the failing run does not execute.
+- **The spec had already predicted this and nobody checked.** Its header carries a service-worker
+  block added 2026-08-30 against this same `ERR_ABORTED`, with an explicit falsification condition:
+  *"If the abort returns, the SW was not it."* **It returned, with the block in place.** The
+  header's other claim — that `page.reload()` *"aborts the navigation every run"* — is also stale:
+  measured 2026-09-14, reload and a same-URL `goto` both complete in the sandbox.
+- **No cause is claimed. It does not reproduce locally**, so the honest position is a named failure
+  POINT and not a named cause. Ruled out by reading rather than guessed at: no `storage` listener
+  anywhere in the app, the two `location.assign` call sites are behind a native-only custom event,
+  and the one `beforeunload` handler mounts only mid-workout on the workout screen — none can
+  supersede a navigation on `/`.
 - **The same run carried a real Chromium crash**, on `plan-rescale.spec.ts` — a native
   `chrome-headless-shell` segfault with a full stack and `cr2: 0x1b0`. That is runner instability,
   not app code, and it is context for how loaded that run was rather than a second bug to chase.
-- **Do NOT "fix" this by lengthening the poll timeout first.** That is the change that makes a real
-  hydration regression invisible. Establish which half is slow — instrument how long
-  `hydrateUserPreferences` takes from launch on CI — before touching the wait.
+- **Do NOT "fix" this by lengthening the poll timeout.** That is the change that makes a real
+  hydration regression invisible — and on this evidence it would also be aimed at the wrong line.
+- **Changed 2026-09-14** (`fix/lb106-preferences-relaunch`): the relaunch is now a **new page**
+  rather than a re-navigation of the live one. It is defensible on fidelity alone, independent of
+  the abort — clearing storage under a running app leaves its React state, timers and sync provider
+  alive, and that instance can write a preference key back or start a navigation of its own, where
+  a reinstall is a cold process. `localStorage` is per-origin, so the clear carries over.
+- **Keep:** whether that FIXES the abort is unestablished, and this entry stays open until CI says.
+  It removes the operation that aborted; it does not explain it. **If a run aborts again — on
+  `fresh.goto` this time — the relaunch shape was not it either**, the SW block should then be
+  dropped as justified by nothing, and the runner becomes the remaining suspect: the same run
+  carried a native `chrome-headless-shell` segfault on `plan-rescale.spec.ts`.
 - **Pass test:** ten consecutive CI runs with no flake on this spec, or a named cause with a fix
   that is not a longer timeout.
 - **Reversal cost:** none. It is a test.

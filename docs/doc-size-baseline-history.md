@@ -11905,3 +11905,17 @@ always-run-always-report design and LA-63's `app/api/**` exclusion are both soun
 so — the prefix list simply never grew a `lib/` clause, because `lib/` was not browser-reached when
 it was written. Second, the warning not to verify by reading the workflow diff: the failure mode is a
 check that passes without running, so the evidence is the job DURATION, not the YAML.
+
+## 2026-09-14 — `docs/implementation-backlog.md` → 20974 (LB-106's cause, replaced)
+
++6 net on an entry that grew by more than that and shed the parts that were wrong. LB-106 said a
+loaded runner turned a poll timeout into a failure; the log says `page.goto: net::ERR_ABORTED` at
+the relaunch, with the poll never reached. Replacing a stated cause costs more lines than adding
+one, because the reader has to be told which of the two to stop believing.
+
+The added length is mostly the things now ruled out by reading — no `storage` listener, the
+`location.assign` sites behind a native-only event, `beforeunload` mounted only mid-workout — and a
+`Keep:` that says outright the fix is not claimed to work, with the condition that would disprove
+it. That shape is what made today's conclusion possible at all: the 2026-08-30 header wrote *"if the
+abort returns, the SW was not it"*, and a fortnight later the return of the abort settled it with no
+new run.
