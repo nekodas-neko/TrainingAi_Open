@@ -52,8 +52,11 @@ test.beforeAll(async () => {
     await db.query('DELETE FROM exercise_logs WHERE workout_session_id = ANY($1)', [[MORNING_ID, EVENING_ID]])
     await db.query('DELETE FROM workout_sessions WHERE id = ANY($1)', [[MORNING_ID, EVENING_ID]])
 
-    // 08:00→08:32 and 17:00→18:22 Brisbane on DAY. The two windows are deliberately far apart so a
-    // collision shows up as one duration on both cards rather than as a near-miss.
+    // 08:00→08:40 and 17:00→18:30 Brisbane on DAY, by `completed_at`. The two windows are
+    // deliberately far apart so a collision shows up as one duration on both cards rather than as a
+    // near-miss. Each session's single exercise is logged eight or ten minutes before its real end,
+    // which is what a last exercise looks like — and what BF-155 changed which of the two the card
+    // reads.
     for (const [id, startedAt, completedAt, exercise, loggedAt] of [
       [MORNING_ID, '2025-05-13 22:00:00+00', '2025-05-13 22:40:00+00', 'Bench Press', '2025-05-13 22:30:00+00'],
       [EVENING_ID, '2025-05-14 07:00:00+00', '2025-05-14 08:30:00+00', 'Overhead Press', '2025-05-14 08:20:00+00'],
@@ -99,8 +102,14 @@ test('the day detail gives each of two same-named sessions its own duration', as
   await expect(page.getByText('Bench Press')).toBeVisible({ timeout: 30_000 })
   await expect(page.getByText('Overhead Press')).toBeVisible()
 
-  // 32 and 82 minutes. Both must be present: with a name-keyed lookup the later session's 82
-  // appeared twice and 32 appeared nowhere.
-  await expect(page.getByText(/\b32 min\b/)).toBeVisible()
-  await expect(page.getByText(/\b82 min\b/)).toBeVisible()
+  // 40 and 90 minutes. Both must be present: with a name-keyed lookup the later session's duration
+  // appeared twice and the earlier one appeared nowhere (Q-362a), and the two stay far apart so
+  // that collision cannot read as a near-miss.
+  //
+  // BF-155 moved these from 32 and 82. The route used to RECONSTRUCT the end as
+  // `max(loggedAt + timeToComplete)` — here 08:32 and 18:22, each stopping at the last exercise —
+  // and now prefers the measured `completed_at`, 08:40 and 18:30. The fixture always seeded those
+  // ends; only which of the two the card reads has changed.
+  await expect(page.getByText(/\b40 min\b/)).toBeVisible()
+  await expect(page.getByText(/\b90 min\b/)).toBeVisible()
 })
