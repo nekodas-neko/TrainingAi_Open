@@ -469,57 +469,6 @@ below threshold and left in place for next time.
   countdown appears and agrees with the notification chip, then a barbell exercise and confirm its
   ladder and 240 s are unchanged.
 
-### [workouts] BF-155 — every session since 6 September reports 2–3 minutes because one fallback collapses five timestamps into one
-
-- **Lane:** A — `packages/shared/src/workout/log-exercise.ts:275-277` is the fallback,
-  `app/api/day-log/route.ts:177-200` is the consumer that turns it into the printed duration, and
-  `components/workout-screen.tsx:1120` (`appendSetEndMs`) is where the missing input should come from.
-- **Added:** 2026-09-13 (BugFix intake). Owner: *"my amrap week all has under 5mins workout time."*
-  He is right about the symptom and the cause is not AMRAP-specific — it is **every session since
-  6 September**.
-- **Measured in production, five broken sessions against seven good ones:**
-
-  | session | real (`completed_at − started_at`) | printed | set rows | with `set_end_ms` |
-  |---|---|---|---|---|
-  | 12 Sep | **12.0 min** | **3 min** | 5 | **0** |
-  | 10 Sep | **38.3 min** | **3 min** | 5 | **0** |
-  | 9 Sep | 33.3 min | 2 min | 5 | 0 |
-  | 7 Sep | 40.0 min | 2 min | 5 | 0 |
-  | 6 Sep | 22.8 min | 2 min | 4 | 0 |
-  | 5 Sep | 63.4 min | 61 min | 10 | 5 |
-  | 3 Sep | 53.7 min | 51 min | 10 | 5 |
-
-- **The mechanism, end to end.** `logExerciseFromPayload` stamps the row as
-  `lastSetEndMs ?? workoutStartedAt ?? now`. `lastSetEndMs` comes from `setEndTimes`, which comes
-  from the store's `setEndMsArray`, appended on **"Log Set"**. In these sessions **no set row carries
-  a `set_end_ms` at all**, so every exercise falls to the second rung — and `workoutStartedAt` is the
-  same value for all five. All five rows on 12 Sep read
-  **`logged_at = started_at = 00:38:37.167`, identical to the millisecond.**
-- **`day-log` then computes the duration from those timestamps and never looks at `completed_at`.**
-  `end = max(loggedAt + timeToComplete)` — with every `loggedAt` collapsed onto the start, that is
-  start plus the single **longest** exercise (202 s on 12 Sep), giving 3 min. `completed_at` is
-  correct on the session row the whole time, sitting unread beside it.
-- **Two candidate triggers and the data cannot separate them — say so rather than pick.** Every
-  broken session has **exactly one set per exercise** and every good one has two or more; every
-  broken session is also in the AMRAP/baseline shape. Whether the single set never reaches
-  `appendSetEndMs`, or the baseline path submits without it, needs the code path walked — the 5-of-10
-  ratio on the good sessions says `set_end_ms` is already sparse on the working path, so this is not
-  simply "the last set is missing one".
-- **The blast radius is larger than the card, which is why this is Lane A rather than a display
-  fix.** `logged_at` orders 1RM history and trend (`ORDER BY loggedAt`), breaks PR ties, and keys
-  per-set HR attribution. Five sessions now carry five rows that claim to have happened at the same
-  instant, so their internal order is whatever the table returns.
-- **Fix shape, in two parts.** (a) Make `day-log` prefer `completed_at` when the session has one —
-  it is the measured end and needs no reconstruction. (b) Find why the single set carries no
-  `set_end_ms` and restore it, because (a) repairs the card while leaving `logged_at` collapsed for
-  everything else that reads it. **(a) alone is not the fix**, and shipping only (a) would close this
-  entry on the visible half.
-- **Historical rows:** the five affected sessions cannot be reconstructed per-exercise — the
-  information was never written. Their session-level `completed_at` is intact, so (a) repairs what is
-  displayed without a backfill.
-- **Verification:** on device, log a single-set session and confirm the printed duration matches the
-  wall clock, and that the exercise rows carry distinct `logged_at` values.
-
 ### [workouts] BF-156 — what "Accept" costs you depends on the recommendation, and the card never says which kind it is
 
 - **Lane:** B — `components/workout/ai-prescription-card.tsx`. The rule it must surface already
