@@ -11573,17 +11573,30 @@ outstanding work is a BUILD rather than a decision — including the consequence
 protein holds while carbs and fat drop. A row that recorded only the fix would read as closed, and
 the next session would find the gap and refile it.
 
-## 2026-09-11 — `docs/implementation-backlog.md` → 21522 (RV-42 shipped)
+## 2026-09-13 — `docs/implementation-backlog.md` → 21551 (BF-154 re-filed as buildable, not residue)
+
++4 net, and the reason is worth more than the lines. BF-154 was re-queued an hour earlier with a
+`Keep:` line so the owner's macro-anchor answer would survive the entry being deleted. That saved the
+decision and then hid it: `next-item.js` files `Keep:` entries under a bucket headed *"shipped; only
+the stated residue is owed. Not new work."* — so an answered, startable item sat where the lane is
+told not to look.
+
+**That is OR-100's failure exactly** — *"`Keep:` files buildable work under a heading that tells the
+lane not to look"* — reproduced within an hour of the entry being written, by someone who had read
+OR-100 in the same session. The field is for an owner or device CHECK; this owes code. Re-filed as a
+plain entry, it moves from KEEP to #2 of Lane A's READY.
+
+## 2026-09-11 — `docs/implementation-backlog.md` → 21526 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 
-**This figure has been rewritten TWENTY-THREE times and the churn is the note worth leaving.** Twenty-nine
+**This figure has been rewritten TWENTY-FOUR times and the churn is the note worth leaving.** Thirty
 other merges landed on `main` while this PR waited on an owner decision, and each one moved the base
 out from under it — so the starting figure is no longer even quoted here, because it changed again
-between the last two rewrites. **Twenty-three rewrites of one number is the cost of a green PR waiting**,
+between the last two rewrites. **Twenty-four rewrites of one number is the cost of a green PR waiting**,
 recorded rather than smoothed because the alternative reading — that someone kept getting the
 arithmetic wrong — is the wrong lesson. The per-file `.size` split (LA-33) is what keeps this to one
-number instead of a whole map: no other document's baseline has conflicted once across all twenty-three.
+number instead of a whole map: no other document's baseline has conflicted once across all twenty-four.
 Nothing was wrong with any of the three — each was correct against the `main` of its hour. Under six
 concurrent lanes plus an owner gate, a baseline is a reading of a moving number, and a PR that waits
 will re-read it once per merge that overtakes it. Recomputed by `pnpm fix:baselines` after each

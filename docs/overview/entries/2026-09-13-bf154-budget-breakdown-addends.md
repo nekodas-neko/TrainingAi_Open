@@ -52,8 +52,15 @@ value and after its another if calories increase?"* The grams follow the budget.
 
 The answer arrived attached to BF-154's backlog entry — the entry this PR was deleting. Resolving
 that conflict by removing the entry would have removed the decision with it, which is the failure
-this repo's backlog rule exists to prevent. **BF-154 stays queued with a `Keep:` line** naming the
-re-anchor as what is owed and carrying his words verbatim. `macro-budget-gap.ts` now records that
+this repo's backlog rule exists to prevent. **BF-154 stays queued** with the re-anchor named as what
+is owed, carrying his words verbatim.
+
+It was re-queued with a `Keep:` line first, and that was wrong — corrected immediately after. `Keep:`
+marks an entry owing an owner or device *check*, and `next-item.js` files those under a KEEP bucket
+headed *"shipped; only the stated residue is owed. Not new work."* This owes a code change the owner
+has already approved, so the field hid startable work under a heading telling the lane not to look —
+the exact failure OR-100 is filed about, reproduced within an hour of writing it. As a plain entry it
+sits at #2 of Lane A's READY, which is where an answered, buildable item belongs. `macro-budget-gap.ts` now records that
 the question is settled and that **the module itself should be deleted** when the re-anchor lands:
 it exists only to measure a disagreement that will then be zero by construction, and so does the
 paragraph this PR just fixed.
