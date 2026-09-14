@@ -48,7 +48,19 @@ inside **RV-36's** body, an entry that had already shipped (2026-09-11) and been
 *"shipped; a look is owed, nothing is blocked"*. RV-36 is removed; BF-100 is a plain buildable entry
 and now prints READY. **It is a device-only failure and the harness contradicts it** — `/more` →
 Profile details → back restores **840** in Playwright — so a green `scroll-restoration.spec.ts` is
-not evidence, which is how it could be declared fixed a third time. A second owner request found in
+not evidence, which is how it could be declared fixed a third time.
+
+**⚠ There is now a candidate cause and a ONE-TAP experiment that settles it, and it has never been
+tried** (2026-09-14, #1189 — the detail lives in BF-100's backlog entry). `use-scroll-restoration.ts`
+attaches its user-takeover to **`touchstart`**, and the takeover sets `done` with no re-arm — so a
+single touch abandons the pending restore for good. **The S25's system back gesture IS a touch;
+`page.goBack()` fires none**, which explains the harness/device split that no earlier hypothesis did.
+**The test:** come back from *Profile details* with a **UI back control** instead of the gesture. If
+the offset restores that way, the cause is settled. Every device pass so far has used the gesture,
+because this entry's own verification step says to. **The fix is deliberately not built** — it
+changes takeover behaviour on every screen, and must not ship on a hypothesis when one tap decides it.
+
+A second owner request found in
 the same body had **no entry anywhere** and is now **LB-107**: back on a tab with nothing to pop
 should land on Home rather than leave the app
 ([journal](docs/overview/entries/2026-09-14-refile-shipped-rv36.md)).

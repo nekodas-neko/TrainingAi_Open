@@ -12081,3 +12081,16 @@ back gesture is a touch, and `page.goBack()` is not.
 Worth the lines because the next session would otherwise re-derive the same comparison — and because
 the experiment that confirms it (come back with a UI control instead of the gesture) has never been
 run, the entry's own verification step having always specified the gesture.
+
+## 2026-09-14 — `projectOverview.md` → 11032 (BF-100's one-tap experiment, surfaced)
+
++10 to move a finding from the backlog into the document every session reads first. #1189 named a
+candidate cause for BF-100 — `use-scroll-restoration.ts` cancels its pending restore on
+`touchstart` with no re-arm, the S25 back gesture is a touch, `page.goBack()` is not — and a
+one-tap experiment that settles it. The overview still described BF-100 as a plain buildable entry
+with a device-only failure and no cause.
+
+The lines are worth it because the experiment is the cheapest unblock in the lane and **has never
+been tried**: every device pass used the system gesture, which is what the entry's own verification
+step asks for, so the one path that would discriminate was the one nobody walked. A finding that
+lives only in a queue entry is read by whoever opens that entry; this one needed the owner.
