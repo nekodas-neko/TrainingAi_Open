@@ -11654,3 +11654,30 @@ builder" reads as a dropdown until you see `saved_meal_items.food_item_id NOT NU
 a food item, so nesting needs a migration, recursive macro computation and cycle prevention. The entry
 carries both options with the production counts (15 meals, 1.9 items each, 304 foods) that make
 flattening the cheap right answer.
+
+## 2026-09-14 — `projectOverview.md` → 10878, `docs/implementation-backlog.md` → 21626 (BF-157)
+
+The backlog shrank 48 with BF-157 leaving, and its baseline is tightened to match rather than left
+as slack. projectOverview grew 14.
+
+Most of those 14 are one correction to the entry rather than a description of the fix: BF-157 was
+filed as a bodyweight bug, and the render gate loses the clock in **four** cases — bodyweight, an
+AMRAP baseline, solo mode, and anything logged at zero. `startRestChip` counts for all four, and its
+comment already claimed to match "the same total the on-screen ready bar uses". Fixing only the named
+case would have left that comment false in three of them, so the row records the class.
+
+## 2026-09-14 — `docs/agents/state/implementation-lane-b.md` → 110 (BF-157)
+
+Down one from 111. The baton gained two lessons and shed more than it gained: the entry-scope line
+absorbed BF-157 into the existing run of wrong premises rather than starting a new paragraph, and the
+VERIFY line took its native-chip caveat inline.
+
+The two added are both about proving a test rather than writing one — a negative assertion behind a
+positive one never runs, and a probe that reads the seed instead of creating its state proves
+whatever the seed happens to hold. Both cost a wasted run this session.
+
+### Amendment — the BF-157 backlog number above is 21672, not 21626
+
+Rebased onto `main` after BF-161 was filed. The 21626 was true of the branch and never of `main`; a
+`.size` conflict is recomputed from the merged file, so neither side's number describes it. Recorded
+rather than edited in place, because this file is append-only.

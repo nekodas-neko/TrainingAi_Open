@@ -26,8 +26,22 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.456.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.456.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-14.
+
+**The bodyweight ready screen has a clock again (BF-157).** Owner, on the Pull-Up ready screen with
+the session clock at **8:42**: *"The body weight screens have no warmup timer or load time so its
+just infinite on this screen."* The three-stage ramp is built from 50/74/92% of the working weight
+and is correctly absent at zero load — but the clock was rendered *from* that ladder, so dropping one
+dropped the other. **Four cases have no working weight, not one:** bodyweight, an AMRAP baseline,
+solo mode, and anything logged at zero; the entry named only the first. All four now render a
+`GetReadyProgress` bar running to `transitionSecForEquipment(equipment)` — the same total
+`startRestChip` was already counting against, whose comment claimed it was *"the same total the
+on-screen ready bar uses"* and was wrong for every one of them. It matters past the screen:
+`handleStart` submits the ready-screen elapsed as `prepTimeSec`, so an unbounded ready screen was
+measuring whatever distraction occurred and feeding it to the session card's time budget. ⚠️ **Not
+device-verified**
+([journal](docs/overview/entries/2026-09-14-bf157-bodyweight-get-ready-clock.md)).
 
 **Cardio Baselines moved to the Cardio tab (BF-159).** Owner, after having to be told where the
 Cooper test lives: *"That section should be moved to cardio hub."* The card sat in the Health tab's

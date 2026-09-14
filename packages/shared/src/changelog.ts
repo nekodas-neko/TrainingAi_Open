@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.456.2",
+    date: "2026-09-14",
+    changes: [
+      "The get-ready screen has a clock again on bodyweight exercises. The warm-up bar was built from percentages of your working weight, so on a pull-up — where there is no weight to take a percentage of — the whole thing disappeared and the screen just sat there. Your phone's notification was counting down the same 60 seconds the entire time. There is now a plain get-ready bar wherever the three-stage ramp does not apply: bodyweight, an AMRAP test, solo mode, or anything logged at zero. It runs to the same total the notification uses.",
+    ],
+  },
+  {
     version: "1.456.1",
     date: "2026-09-14",
     changes: [

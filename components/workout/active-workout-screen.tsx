@@ -19,12 +19,12 @@ import { displayOneRm, displayOneRmSeries } from "@trainingai/shared/1rm";
 import { EXERCISE_HISTORY_TTL } from '@trainingai/shared/cache-ttl';
 import { getLocalStore } from "@/lib/local-store";
 import { todayInTz, shiftDateStr } from "@trainingai/shared/date-utils";
-import { SessionRing, SessionPill, ExerciseClock, WarmupRampProgress, RestTimer } from "./workout-clocks";
+import { SessionRing, SessionPill, ExerciseClock, WarmupRampProgress, GetReadyProgress, RestTimer } from "./workout-clocks";
 import { useWorkoutStore } from "@/lib/stores/workout-store";
 import { ExerciseMediaPanel } from "./exercise-media-panel";
 import { InjuryBanner, InjuryChip } from "./injury-notice";
 import { injuredMusclesFor } from "./injury-muscles";
-import { warmupRampSectionSec } from "@trainingai/shared/workout/duration-model";
+import { warmupRampSectionSec, transitionSecForEquipment } from "@trainingai/shared/workout/duration-model";
 
 interface ActiveWorkoutScreenProps {
   exercise: WorkoutExercise | undefined;
@@ -341,13 +341,24 @@ export function ActiveWorkoutScreen({
               </div>
             )}
 
-            {/* Warmup ramp-up — segmented timer */}
-            {warmupSets && !isBaseline && !isBodyweight && (
+            {/* Warm-up ramp-up, or the bare get-ready bar where there is no weight to ramp.
+                BF-157: the ramp needs a working weight and four cases have none — bodyweight, an
+                AMRAP baseline, solo mode, and any exercise logged at zero. All four left the screen
+                with no clock at all while the notification chip counted down against the same
+                `transitionSecForEquipment` total, so the two surfaces disagreed about whether the
+                phase was timed. Both branches run to that one total; only the shape differs. */}
+            {warmupSets && !isBaseline && !isBodyweight ? (
               <WarmupRampProgress
                 startMs={workoutStartMs}
                 baselineSec={timerStarted ? null : readyElapsedBaselineSec}
                 sectionSec={WARMUP_SECTION_SEC}
                 warmupSets={warmupSets}
+              />
+            ) : (
+              <GetReadyProgress
+                startMs={workoutStartMs}
+                baselineSec={timerStarted ? null : readyElapsedBaselineSec}
+                totalSec={transitionSecForEquipment(exercise?.equipment)}
               />
             )}
 
