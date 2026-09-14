@@ -802,8 +802,10 @@ moved to the bottom actions where the other sheet-openers are; Goals presents as
 `StatsGrid` and `TrophyCase` above it, with its disclosure untouched.
 `more-row-group-arity.test.ts` fails a labelled group under two rows and was mutation-verified.
 **Destination parity was clicked, not read** — all seven rows still land where they did, admin and
-non-admin. **Not device-verified**, and the bottom actions row moved, so the clearance under Sign Out
-is unseen; BF-82 stays queued on `Verify: device` and nothing else. **The *"sliders"* half is
+non-admin. **✅ Verified on the S25, 2026-09-13, and the entry has left the queue** — with the owner's grumble
+recorded rather than converted into work: *"Still not as organised/separated as I would like it to
+be."* No second group was named and nothing was pointed at, so there is nothing to act on; a pass
+with a complaint is not a defect, and inventing the fix invents the requirement too. **The *"sliders"* half is
 answered — the word was loose:** *"yes it wasnt the sliders specifically; more that its messy and
 needs re'organisation."* No control changes, and none should be made off the original wording —
 More and its six sub-screens carry no slider and no `<select>` at all
@@ -2042,26 +2044,6 @@ the owner is 158 cm, so Mifflin BMR is **1,527** and the card calls **2,150** hi
 numbers differ, so the harness proves the sentence renders and its parts add up, not that it reads
 true to the person it is for.
 
-### [workouts] ⚠️ The weight dial takes pounds now, and no thumb has tried the control (BF-141, 2026-09-12, v1.448.0) · needs: hardware
-
-Owner: *"my Dumbells are pounds and I need to convert it ... then just have it convert to the kg
-equivalent"*. Prevention for a failure that already happened on that exercise — Session 119 logged
-three dumbbell exercises in pounds into the kg field, and the repair needed an admin tool that
-rescaled every set and **backdated the all-time PR**. Tapping the dial's own `kg` suffix swaps it to
-`lb`; the stored value stays kilograms, and the unit is remembered per exercise in `localStorage`.
-
-**Two findings worth more than the feature.** BF-141 claimed `e2e/touch-target-size.spec.ts` would
-catch an undersized control here; it cannot — that spec scans the five tab roots and this dial is
-inside an active workout, so its empty allowlist would have stayed green over a 20 px suffix. And
-the `stopPropagation` on the suffix guards a **real** case that the new spec cannot demonstrate: in
-lb mode a row tap round-trips kg → lb → kg, which is lossy for some weights (61.0 kg returns 61.25),
-but the seeded workout starts at 60 kg, which round-trips exactly. Both are written on the entry so
-neither reads as dead weight later.
-
-**What is owed is the S25.** A scroll-snap dial with haptics beside a new inline control is a
-touch-target and gesture question; the harness drives a mouse, so it can prove the box measures
-44 px and cannot prove a thumb reaches it without also moving the dial.
-
 ### [app-shell] ⚠️ Home's three header chips fit now, and the fit has only been measured, not seen (BF-139, 2026-09-12, v1.447.0) · needs: browser
 
 Owner, with a screenshot: *"the pills in the top are a little cutoff. can we make them smaller to
@@ -2080,21 +2062,6 @@ accessible name. Worst case is now **208.6 px** with 15.4 px left for the date.
 the seeded database has no weather snapshot, so `WeatherChip` renders only a skeleton and the
 three-chip row cannot be assembled from real data off the device. BF-96 records the same limitation;
 a mutation-checked source guard holds the classes meanwhile, and three mutations were run against it.
-
-### [app-shell][nutrition] ⚠️ Nutrition keeps its scroll position now, and neither fix has been seen on the phone (RV-36 + RV-37, 2026-09-11, v1.446.4)
-
-**RV-36:** BF-100's scroll restoration reached three tabs, not five — it lives in `PullToSync`, and
-the Nutrition tab owns its own scroller. Measured: `/more` → Profile details → back restored **840**;
-`/nutrition` → `/coach` → back saved **no** key and returned **0**. One hook call fixes it, and the
-wrong *"every screen using the shell inherits it"* phrasing is gone from `pull-to-sync.tsx`'s own
-comment as well as from the entry. **RV-37:** `/health/day`'s scroller had no bottom padding at all,
-so its last card ended flush with the S25's gesture bar; it now carries `pb-nav-safe`.
-[Journal](docs/overview/entries/2026-09-11-fix-nutrition-scroll-and-day-padding.md).
-**Owed: one device pass covering both.** RV-36's check is the **system back gesture**, the one gesture
-the harness cannot send. RV-37 **was never observed and still has not been** — the seeded fixture
-renders "Nothing logged on this day", so the container never scrolls; the missing padding was read
-from source. Still open on RV-37: whether a fifth safe-area CI rule should fire on an **absent**
-utility, which needs an allow-list for the sheets and navless screens that legitimately have none.
 
 ### [app-shell] ⚠️ Four boot/chip fixes shipped, and only the failure half could be rendered (PS-35b, 2026-09-11, v1.446.3)
 
@@ -2129,22 +2096,6 @@ own and has not been opened on one; and the owner's account is the only one with
 to render against. **Worth reading before the next "no data" report:** LB-99's entry keeps its wrong
 first diagnosis, which blamed the `getLocalStore` fall-through — a card reporting "no data" is not
 evidence that no data reached it.
-
-### [workouts][app-shell] ⚠️ The injured-exercise header was rebuilt, and the case that prompted it was never rendered (BF-135, 2026-09-09, v1.446.0)
-
-The active-exercise header is `flex-none` above a `min-h-0` set list and **that branch has no scroll
-container at all**, so two stacked banners pushed set 1 under the logging sheet with nothing to
-recover it. The full injury banner moved to the ready screen — which carried **no injury warning
-before this**, so it used to arrive after the weight was already chosen — and during the set it is a
-chip with Swap intact; the AMRAP banner is gone, since the ready screen already says the same thing
-at more length for every exercise; the header gained `max-h-[45%] overflow-y-auto`.
-[Journal](docs/overview/history-2026-09-12-folded-1.md#2026-09-09-fix-injury-header-crowding).
-**Owed: the device check, and two gaps behind it.** The reported case is an injured exercise on a
-**baseline** session — the two-banner worst case — and the seeded account is mid-`Accumulation`, so
-that state was reasoned about and pinned by a source test but **never rendered**. Nor was any of it
-seen with the logging sheet actually covering the bottom half of an S25, which is where the squeeze
-lives. `isBaseline` never clears while **BF-131** is open, so the banner it removes was permanent
-rather than a first-session artefact.
 
 ### [workouts] ⚠️ Rest vs the plan is on the Trends card, and it renders nowhere but the phone (Q-300, 2026-09-09, v1.445.0)
 

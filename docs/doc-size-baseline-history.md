@@ -11775,3 +11775,46 @@ has been done on the device."* BF-61 is shipped and still owes that check, so it
 Fourth instance today of a field's job being done in prose, and the first one INVERTED: the previous
 three buried work the queue should have shown, this one showed work the queue should have parked. An
 implementer would have built the swipe and then discovered it unshippable.
+
+## 2026-09-14 — `docs/implementation-backlog.md` → 21081 (OR-113, the shell pass and the settled-Keep sweep)
+
+**503 lines, the largest single drop this file has recorded, and almost none of it is the shell
+pass.** Fifteen entries left the queue because their device check had already happened and nobody
+struck the `Keep:` that said it was owed. They were spread across three passes — nutrition, workouts,
+app shell — and every one of them read correctly on its own: a `✅ VERIFIED ON THE S25` line and, ten
+lines above it, a `Keep:` claiming the check. BF-46 alone was 191 lines.
+
+Three removals kept a `>` note instead of vanishing, and the rule for which is worth stating: a note
+survives where the entry held knowledge nothing else pins. BF-76's finding that the `vh` hypothesis
+is not the safe-area mechanism, BF-57's two label kinds (`shared-meal` carries the recipe,
+`meal-id` is a pointer that only resolves for its owner), and BF-46's `fetch()` of a `data:` URL
+being governed by `connect-src`. The other twelve were shipped work whose record is the journal.
+
+The growth is `keepIsSettled` in `scripts/lib/keep-kind.js` plus its six tests, which is what stops
+this recurring: the check is advisory and is suppressed by the word DONE in the residue, so an entry
+someone has already narrowed correctly does not get re-flagged.
+
+### `projectOverview.md` → 10881 (same PR)
+
+Three Known-Issues rows moved to `known-issues-resolved.md` whole — BF-141, BF-135 and RV-36+RV-37,
+all three verified on the S25 in the last two passes. Net −49 after the BF-82 paragraph was rewritten
+in place: its row stays, because the entry left the queue but the owner's *"still not as organised as
+I would like"* is worth the next reader seeing.
+
+**The two threads RV-36's row was carrying are named where they went** rather than travelling to the
+archive with it: `/more` still fails and is BF-100's, and the fifth-safe-area-CI-rule question stays
+on RV-37. A row that moves with live threads inside it is how a thread gets lost.
+
+### Both numbers re-derived after merging #1168 (same PR)
+
+#1168 landed the same refile from the other direction — it removed RV-36 outright and split the
+owner's back-to-Home requirement into **LB-107** — so the counts above were stale before this branch
+opened. Recomputed rather than spliced, which is the standing rule for a `.size` file: the number is
+a measurement of the merged result, and a conflict in one is two sessions each reporting a count that
+was true of a file neither of them now has.
+
+### Re-derived a second time after #1170 (same PR)
+
++6 from #1170 parking BF-94, merged in while this branch was open. Third recomputation of this one
+number in a morning — which is the argument for `.size` files being recomputed rather than merged:
+each side's number is a true measurement of a file that no longer exists by the time the merge lands.
