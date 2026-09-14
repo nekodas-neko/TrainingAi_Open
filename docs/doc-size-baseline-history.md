@@ -11819,7 +11819,35 @@ was true of a file neither of them now has.
 number in a morning — which is the argument for `.size` files being recomputed rather than merged:
 each side's number is a true measurement of a file that no longer exists by the time the merge lands.
 
-## 2026-09-14 — `docs/implementation-backlog.md` → 21037 (BF-155 shipped)
+## 2026-09-14 — `docs/implementation-backlog.md` → 20952 (OR-114, round four of the device pass)
+
+−135 net, and the composition matters more than the number: **eleven entries left**, against one new
+one filed (OR-115) and eleven surviving entries that each grew a paragraph recording what the owner
+said. So the removals paid for the recording, which is the trade this file should make every time.
+
+Three removals kept a `>` note. **Q-537** because the ring-key warning outlives the entry — the key
+is backed up now, and the uninstall hazard is unchanged. **BF-27/BF-34** because the mechanism behind
+them (a per-instance in-flight flag versus a module-level counter, on an asynchronous
+`history.back()`) is the kind of thing a future session re-derives from scratch. **LB-36/LA-52**
+because the reason they were merged into one walk is itself the answer to the owner's *"how to check
+this?"* — they could not be checked separately.
+
+### `projectOverview.md` → 10846 (same PR)
+
+Two Known-Issues rows archived. The back-dismiss row is the one worth noting: it covered **four**
+entries (BF-30, LB-17, BF-34, BF-27) across three versions, all of them waiting on the same single
+press, and one press on 2026-09-14 discharged the lot. A row that aggregates on the verification
+rather than the subject is exactly what the batching rule asks for, and this is what it buys.
+
+### `docs/implementation-backlog.md` → 20967 (same PR, the BF-110 re-measurement)
+
++15 for a table on BF-110, and it earns them by **ruling a hypothesis out** rather than restating
+one. A week of breadcrumbs across six routes keeps the 667→blank / 826→rendered separation at zero
+overlap, and the same route now appears on both sides — so "one screen fails to render" is dead and
+the defect is in the shell, tracking the viewport and nothing else. A prose sentence saying "still
+separating" would not have carried the route column, which is the part that does the work.
+
+## 2026-09-14 — `docs/implementation-backlog.md` → 20917 (BF-155 shipped)
 
 −51 as BF-155 leaves. The entry was right on the mechanism and wrong on the dates, which is the
 note worth leaving: it said *"every session since 6 September"*, and production says
@@ -11832,7 +11860,7 @@ was NOT "the last set is missing one", when five exercises of two sets with the 
 is exactly five of ten. Measuring the population took one query and turned two unresolvable
 candidate triggers into one mechanism.
 
-## 2026-09-14 — `projectOverview.md` → 10916 (BF-155's Known-Issues row)
+## 2026-09-14 — `projectOverview.md` → 10881 (BF-155's Known-Issues row)
 
 +35, and over half of it is the part that cannot be fixed. The 33 historical sessions keep their
 collapsed `logged_at` values — never written, so nothing to back-fill — and that field also orders
