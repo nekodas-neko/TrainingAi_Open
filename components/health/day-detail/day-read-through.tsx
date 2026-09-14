@@ -68,7 +68,11 @@ export function DayReadThrough({
   )
 
   return (
-    <div className="space-y-4">
+    // The testid is the only way an e2e can tell this component's sections from labels that happen
+    // to share a word with them: `/health/day` renders a `Sleep` score cell of its own, and the
+    // spec that guards "both hosts render ONE implementation" was satisfied by that cell rather
+    // than by anything here (LB-105).
+    <div className="space-y-4" data-testid="day-read-through">
       {data && (
         <TrainingSection
           data={data}

@@ -3,6 +3,7 @@
 import { memo, useState } from 'react'
 import { Info } from 'lucide-react'
 import { CalorieZoneBar } from './calorie-zone-bar'
+import { EnergyExplainer } from './energy-explainer'
 import type { EnergyBalanceResponse } from '@/app/api/nutrition/energy-balance/route'
 
 interface Props {
@@ -110,24 +111,8 @@ export const CalorieBalanceBar = memo(function CalorieBalanceBar({ data, isToday
       )}
 
       {showInfo && (
-        <div className="mt-3 rounded-xl bg-muted/50 p-3 space-y-2">
-          <p className="text-[10px] text-muted-foreground leading-relaxed">
-            <span className="font-semibold text-foreground">Calories out</span> = your resting burn
-            ({b.restingBaseKcal.toLocaleString()} kcal) plus measured movement ({b.activeKcal.toLocaleString()} kcal
-            from workouts, activities, and every step you take).
-          </p>
-          <p className="text-[10px] text-muted-foreground leading-relaxed">
-            <span className="font-semibold text-foreground">On target</span> means your net
-            ({b.netKcal >= 0 ? '+' : ''}{b.netKcal.toLocaleString()}) is within 150 kcal of the
-            {' '}{b.targetNetKcal >= 0 ? '+' : ''}{b.targetNetKcal.toLocaleString()} kcal/day your goal calls for.
-            Sustaining today&apos;s net works out to {b.projectedWeeklyKg >= 0 ? '+' : ''}{b.projectedWeeklyKg} kg/week.
-          </p>
-          {m?.source === 'calibrated' && (
-            <p className="text-[10px] text-muted-foreground leading-relaxed">
-              Maintenance is measured from your own logged intake against your weight trend, not a
-              formula — it re-calibrates as you log.
-            </p>
-          )}
+        <div className="mt-3">
+          <EnergyExplainer data={data!} />
         </div>
       )}
     </div>

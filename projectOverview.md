@@ -26,8 +26,86 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.456.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.456.4 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-14.
+
+**BF-110's blank resume now gets a second look, and the next move is the owner's (no version bump —
+instrumentation only).** Sixteen `error_events` samples separate perfectly on viewport height: every
+blank resume reports **667**, every rendered one **826**, and 826 is the S25's real CSS viewport.
+384×667 is the classic *default* a WebView falls back to before it is told the real size — so the
+shape is *"resumed at a fallback viewport and rendered almost nothing into it"*, not *"the renderer
+died"*. **What the data could not separate is a viewport genuinely stuck from a measurement taken too
+early**, and those point at different files. `handleResume` now logs the viewport again
+**500 ms into the same resume**, riding the first row's budget so a reported resume costs two rows
+and an unreported one costs none. Next: one blank resume in normal use, then read
+`bf110 resume recheck%` — **`stuck` means native, `resized` means render timing.** No fix before that
+row exists ([journal](docs/overview/entries/2026-09-14-bf110-second-viewport-log.md)).
+
+**BF-100 is failing on the S25, not awaiting a check — and it read as the latter for a day.** Owner,
+2026-09-13: *"Checked on more - and still doesnt work"*, its **second** failure. That was recorded
+inside **RV-36's** body, an entry that had already shipped (2026-09-11) and been S25-verified
+(2026-09-13), while BF-100 itself still carried `Keep:` + `Verify: device` and printed under
+*"shipped; a look is owed, nothing is blocked"*. RV-36 is removed; BF-100 is a plain buildable entry
+and now prints READY. **It is a device-only failure and the harness contradicts it** — `/more` →
+Profile details → back restores **840** in Playwright — so a green `scroll-restoration.spec.ts` is
+not evidence, which is how it could be declared fixed a third time. A second owner request found in
+the same body had **no entry anywhere** and is now **LB-107**: back on a tab with nothing to pop
+should land on Home rather than leave the app
+([journal](docs/overview/entries/2026-09-14-refile-shipped-rv36.md)).
+
+**`day-review-read-through` was broken in both directions, and only one of them was visible
+(LB-105).** Its wrap-up test failed in the sandbox and passed on CI — every section of
+`DayReadThrough` self-hides when its domain is empty and the local seed has **nothing at all**
+recorded for today, so the dialog was legitimately blank. Its `/health/day` test passed on that same
+empty day, which is the half nobody was looking at: the regex matched `^Sleep$` and that screen
+renders a **`Sleep` score cell** of its own above the read-through, so the test guarding *"both hosts
+render ONE implementation"* would have passed with `DayReadThrough` absent entirely. The label list
+was wrong too — the component renders **`Body composition`**, which `^Body$` never matched. The spec
+now records an activity for today and removes it, and both halves scope to a
+`data-testid="day-read-through"`. Proven rather than assumed: with the seed suppressed, the
+`/health/day` test **now fails where it used to pass**. No product behaviour changed
+([journal](docs/overview/entries/2026-09-14-lb105-day-review-seed-independence.md)).
+
+**The nutrition surface says two things it knew and withheld (LA-102 + TN-28, batched).** LA-102 —
+the owner on the anchored budget: *"1350 doesnt count some basic metabolic needs".* He is right; the
+ⓘ panel now names the two omissions (thermic effect of food, non-step NEAT) rather than inflating
+the base with a multiplier, which is the trade BF-152 already decided. TN-28 — `TdeeAdaptationCard`
+writes the calorie goal in one tap and was the **only** surface printing the maintenance figure
+without its confidence; it now prints the siblings' exact qualifier.
+**A third finding came out of doing them together:** the ⓘ copy existed **twice**, inline in
+`energy-card.tsx` and `calorie-balance-bar.tsx`, and had already drifted — the card carried BF-134's
+resting-burn paragraph and the bar never got it. Both now render one
+`components/nutrition/energy-explainer.tsx`, and `movement-breakdown.test.ts`'s two-file loop is
+repointed at it plus a new check that neither host re-states the copy. ⚠️ **Not device-verified**
+([journal](docs/overview/entries/2026-09-14-la102-tn28-nutrition-budget-honesty.md)).
+
+**The AI card says what skipping Accept costs (BF-156).** Owner: *"what happens if I dont select to
+apply the session? Its pretty easy to miss that button."* There are two answers.
+`prescriptionDrivesLoad` splits the five phase actions: a pending `stay` or
+`transition_recommended` already drives today's loads, so ignoring the button costs only the phase
+decision; a pending `deload_recommended`, `session_swap_recommended` or `rest_day_recommended` does
+not, so ignoring it trains the base progression style instead of what is on screen. **The card's own
+two button blocks split on a DIFFERENT axis**, which the entry did not note and is why the shape of
+the buttons was never a usable signal: `transition_recommended` and `deload_recommended` share the
+"Move to …" block with opposite load consequences, and `stay` shares "Accept" with
+`session_swap_recommended`. One `ConsequenceLine` now reads `prescriptionDrivesLoad` in both blocks
+— no second copy of the split — muted on the driving half, bold amber on the opt-in half. ⚠️ **Not
+device-verified**, and the owner has a live `session_swap_recommended` to check it against
+([journal](docs/overview/entries/2026-09-14-bf156-accept-consequence.md)).
+
+**The bodyweight ready screen has a clock again (BF-157).** Owner, on the Pull-Up ready screen with
+the session clock at **8:42**: *"The body weight screens have no warmup timer or load time so its
+just infinite on this screen."* The three-stage ramp is built from 50/74/92% of the working weight
+and is correctly absent at zero load — but the clock was rendered *from* that ladder, so dropping one
+dropped the other. **Four cases have no working weight, not one:** bodyweight, an AMRAP baseline,
+solo mode, and anything logged at zero; the entry named only the first. All four now render a
+`GetReadyProgress` bar running to `transitionSecForEquipment(equipment)` — the same total
+`startRestChip` was already counting against, whose comment claimed it was *"the same total the
+on-screen ready bar uses"* and was wrong for every one of them. It matters past the screen:
+`handleStart` submits the ready-screen elapsed as `prepTimeSec`, so an unbounded ready screen was
+measuring whatever distraction occurred and feeding it to the session card's time budget. ⚠️ **Not
+device-verified**
+([journal](docs/overview/entries/2026-09-14-bf157-bodyweight-get-ready-clock.md)).
 
 **Cardio Baselines moved to the Cardio tab (BF-159).** Owner, after having to be told where the
 Cooper test lives: *"That section should be moved to cardio hub."* The card sat in the Health tab's
@@ -736,8 +814,10 @@ moved to the bottom actions where the other sheet-openers are; Goals presents as
 `StatsGrid` and `TrophyCase` above it, with its disclosure untouched.
 `more-row-group-arity.test.ts` fails a labelled group under two rows and was mutation-verified.
 **Destination parity was clicked, not read** — all seven rows still land where they did, admin and
-non-admin. **Not device-verified**, and the bottom actions row moved, so the clearance under Sign Out
-is unseen; BF-82 stays queued on `Verify: device` and nothing else. **The *"sliders"* half is
+non-admin. **✅ Verified on the S25, 2026-09-13, and the entry has left the queue** — with the owner's grumble
+recorded rather than converted into work: *"Still not as organised/separated as I would like it to
+be."* No second group was named and nothing was pointed at, so there is nothing to act on; a pass
+with a complaint is not a defect, and inventing the fix invents the requirement too. **The *"sliders"* half is
 answered — the word was loose:** *"yes it wasnt the sliders specifically; more that its messy and
 needs re'organisation."* No control changes, and none should be made off the original wording —
 More and its six sub-screens carry no slider and no `<select>` at all
@@ -1778,6 +1858,22 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [app-shell] ⚠️ Back on a tab now goes Home, and the gesture itself is not device-verified (LB-107, 2026-09-14)
+
+Shipped in v1.456.6. The owner reported that back on a tab *"should go to the home screen"*; what it
+actually did was **nothing** — and on all four non-home tabs, not an edge case. The Capacitor
+`backButton` listener suppresses the Android default, then called `history.back()`; the shell flips
+tabs with `replaceState`, so there was nothing to pop and the press was swallowed. `backActionForPath`
+now returns `home` for a tab root, `minimize` for `/`, `pop` for everything else.
+
+**The gesture is owed on the S25 and cannot be checked anywhere else.** The whole branch sits behind
+`Capacitor.isNativePlatform()`, so `pnpm dev` never reaches it, and `page.goBack()` is a different
+code path from the system gesture. What CI does hold is the premise:
+`e2e/tab-flip-leaves-nothing-to-pop.spec.ts` measures that a tab flip leaves `history.length`
+unchanged while a sub-route push grows it. **Check on device:** from Health/Workout/Nutrition/More
+the back gesture lands on Home; from Home it minimises; from a meal or day opened on top of a tab it
+returns to that tab, not Home.
+
 ### [nutrition] ⚠️ The vial sheet's rewrite is not device-verified (BF-153, 2026-09-13)
 
 Shipped in v1.454.1: the vial in use is named and moved above the create-form, the form is headed
@@ -1839,6 +1935,41 @@ credentials** — the sandbox reports `SignatureDoesNotMatch (403)` from the sha
 bucket rejects in prod too, "AI all" writes into a store it cannot read back, and the six
 proxy-path rows plus the AI style reference stay broken. BF-147 asked for that check before any
 code was written here; the code was orthogonal to it and shipped, the check was not done.
+
+### [workouts] ⚠️ Session durations print correctly again; 33 sessions keep collapsed exercise timestamps (BF-155, 2026-09-14, v1.455.2) · needs: device
+
+Owner: *"my amrap week all has under 5mins workout time."* A 38.3-minute session printed as 3.
+
+**The entry dated this to 6 September and that was the symptom, not the defect.** Measured in
+production rather than assumed: `count(set_end_ms)` equals `sets − exercises` on all **33 sessions
+from 2026-07-30 to 2026-09-13**, and `sets` on the 42 before it — the last set of *every* exercise
+has been losing its end time for six weeks. What changed in September was one set per exercise: on a
+two-set exercise losing one of two is invisible; on a one-set exercise it is the only one, and then
+`logExerciseFromPayload` has no `lastSetEndMs`, every exercise collapses onto `workoutStartedAt`, and
+`day-log`'s reconstruction returns start-plus-the-longest-exercise.
+
+**Cause:** `handleLogCurrentSet` calls `handleCompleteSet` synchronously in the same tick, and that
+function snapshotted the timing arrays from the component's reactive pick — which has not re-rendered
+— so it copied the pre-append value. The file already read `currentSet` fresh via `getState()` nine
+lines above, with a comment naming this exact hazard; the timing arrays two lines below were missed.
+The auto-advance change that introduced the synchronous call is dated 2026-07-28 in its own comment;
+the first broken session is 2026-07-30.
+
+**Fixed in both halves** — the arrays read from `getState()`, and `day-log` prefers the measured
+`completed_at` over a reconstruction (guarded against a backward clock step). Driven over HTTP on
+`pnpm dev` with the production shape seeded: the same row printed **3 min before and 38 min after**.
+
+**What is NOT repaired, and cannot be:** the 33 historical sessions keep their collapsed
+`logged_at` values — the information was never written, so there is nothing to back-fill. That field
+also orders 1RM history, breaks PR ties and keys per-set HR attribution, so those rows' internal
+ordering stays whatever the table returns. Their session-level `completed_at` is intact, which is why
+the displayed duration is right without a backfill.
+
+**Not device-verified.** The `workout-screen.tsx` half is the one that matters on device and cannot
+be driven in the sandbox — vitest is node-only with no JSX transform, so it is guarded by a source
+assertion plus store-level tests of the same-tick semantics. **The check:** log a single-set session
+on the S25, confirm the printed duration matches the wall clock, and confirm the exercise rows carry
+distinct `logged_at` values. Until then (b) is verified by mechanism, not by observation.
 
 ### [workouts] ⚠️ The bodyweight rep max is read now, and no thumb has seen it (BF-151, 2026-09-13, v1.453.0) · needs: hardware
 
@@ -1976,26 +2107,6 @@ the owner is 158 cm, so Mifflin BMR is **1,527** and the card calls **2,150** hi
 numbers differ, so the harness proves the sentence renders and its parts add up, not that it reads
 true to the person it is for.
 
-### [workouts] ⚠️ The weight dial takes pounds now, and no thumb has tried the control (BF-141, 2026-09-12, v1.448.0) · needs: hardware
-
-Owner: *"my Dumbells are pounds and I need to convert it ... then just have it convert to the kg
-equivalent"*. Prevention for a failure that already happened on that exercise — Session 119 logged
-three dumbbell exercises in pounds into the kg field, and the repair needed an admin tool that
-rescaled every set and **backdated the all-time PR**. Tapping the dial's own `kg` suffix swaps it to
-`lb`; the stored value stays kilograms, and the unit is remembered per exercise in `localStorage`.
-
-**Two findings worth more than the feature.** BF-141 claimed `e2e/touch-target-size.spec.ts` would
-catch an undersized control here; it cannot — that spec scans the five tab roots and this dial is
-inside an active workout, so its empty allowlist would have stayed green over a 20 px suffix. And
-the `stopPropagation` on the suffix guards a **real** case that the new spec cannot demonstrate: in
-lb mode a row tap round-trips kg → lb → kg, which is lossy for some weights (61.0 kg returns 61.25),
-but the seeded workout starts at 60 kg, which round-trips exactly. Both are written on the entry so
-neither reads as dead weight later.
-
-**What is owed is the S25.** A scroll-snap dial with haptics beside a new inline control is a
-touch-target and gesture question; the harness drives a mouse, so it can prove the box measures
-44 px and cannot prove a thumb reaches it without also moving the dial.
-
 ### [app-shell] ⚠️ Home's three header chips fit now, and the fit has only been measured, not seen (BF-139, 2026-09-12, v1.447.0) · needs: browser
 
 Owner, with a screenshot: *"the pills in the top are a little cutoff. can we make them smaller to
@@ -2015,28 +2126,13 @@ the seeded database has no weather snapshot, so `WeatherChip` renders only a ske
 three-chip row cannot be assembled from real data off the device. BF-96 records the same limitation;
 a mutation-checked source guard holds the classes meanwhile, and three mutations were run against it.
 
-### [app-shell][nutrition] ⚠️ Nutrition keeps its scroll position now, and neither fix has been seen on the phone (RV-36 + RV-37, 2026-09-11, v1.446.4)
-
-**RV-36:** BF-100's scroll restoration reached three tabs, not five — it lives in `PullToSync`, and
-the Nutrition tab owns its own scroller. Measured: `/more` → Profile details → back restored **840**;
-`/nutrition` → `/coach` → back saved **no** key and returned **0**. One hook call fixes it, and the
-wrong *"every screen using the shell inherits it"* phrasing is gone from `pull-to-sync.tsx`'s own
-comment as well as from the entry. **RV-37:** `/health/day`'s scroller had no bottom padding at all,
-so its last card ended flush with the S25's gesture bar; it now carries `pb-nav-safe`.
-[Journal](docs/overview/entries/2026-09-11-fix-nutrition-scroll-and-day-padding.md).
-**Owed: one device pass covering both.** RV-36's check is the **system back gesture**, the one gesture
-the harness cannot send. RV-37 **was never observed and still has not been** — the seeded fixture
-renders "Nothing logged on this day", so the container never scrolls; the missing padding was read
-from source. Still open on RV-37: whether a fifth safe-area CI rule should fire on an **absent**
-utility, which needs an allow-list for the sheets and navless screens that legitimately have none.
-
 ### [app-shell] ⚠️ Four boot/chip fixes shipped, and only the failure half could be rendered (PS-35b, 2026-09-11, v1.446.3)
 
 The PWA `start_url` pointed at a bare `redirect()`; the boot warm used a bare `fetch` that
 `cachedFetch`'s in-flight map cannot see (**A/B: 34 → 29 requests on boot**); the E1-4 rehydrate
 comment claimed a previous-day-workout abandonment production never did; and the weather chip had no
 failure state over a cache that was one unkeyed entry read before any coordinates were known.
-[Journal](docs/overview/entries/2026-09-11-fix-ps35b-boot-and-weather.md).
+[Journal](docs/overview/history-2026-09-14-folded-1.md#2026-09-11-fix-ps35b-boot-and-weather).
 **Owed: the device check, and one path the sandbox cannot reach.** There is no outbound route to
 `api.open-meteo.com` here, so only the weather **failure** branch was rendered — the keyed cache and
 the instant-paint seed are unit-tested, not observed end to end. On the S25: launch from the
@@ -2044,41 +2140,6 @@ installed icon and check it lands without a redirect flash, and check the chip r
 **Also recorded:** the checkpoint report's "two unreachable palette keys" claim is **wrong** — it
 compared line 26 of one function with line 45 of another, and both keys are live. Dropping them
 would have removed the palette from two real routes.
-
-### [body][nutrition] ⚠️ The vial report is fixed in both halves, and neither has been seen on the phone (BF-136 + LB-99, 2026-09-10, v1.446.2)
-
-Owner: *"its saying no weights taken; but i weigh my self every day."* **Two defects, one report.**
-(1) `openedOn` was hardcoded to `todayInTz(tz)` with no control, so the weight-response window
-started on whichever day the vial was entered — there is an `Opened on` date now, bounded to 180 days
-back, and an existing vial's date is correctable **in place**, which is required rather than optional
-because `listSupplementVials` orders by `openedOn DESC` and a re-dated new vial sorts below the wrong
-one. (2) Correcting the date did **not** clear the symptom: the chip read *"Not enough weigh-ins
-yet"* above its own *"6 weigh-ins over 5 days"*, because `weightResponse()` returns a full result
-whose `verdict` is null when the range straddles the band and the card rendered that as the no-data
-state. It now reads *"Not called yet"*.
-[Journal](docs/overview/entries/2026-09-10-fix-vial-opened-date.md) ·
-[Journal](docs/overview/entries/2026-09-10-fix-weight-response-undecided-label.md).
-**Owed: the S25.** The date control is a native `<input type="date">`, so the picker is the device's
-own and has not been opened on one; and the owner's account is the only one with a real dosing period
-to render against. **Worth reading before the next "no data" report:** LB-99's entry keeps its wrong
-first diagnosis, which blamed the `getLocalStore` fall-through — a card reporting "no data" is not
-evidence that no data reached it.
-
-### [workouts][app-shell] ⚠️ The injured-exercise header was rebuilt, and the case that prompted it was never rendered (BF-135, 2026-09-09, v1.446.0)
-
-The active-exercise header is `flex-none` above a `min-h-0` set list and **that branch has no scroll
-container at all**, so two stacked banners pushed set 1 under the logging sheet with nothing to
-recover it. The full injury banner moved to the ready screen — which carried **no injury warning
-before this**, so it used to arrive after the weight was already chosen — and during the set it is a
-chip with Swap intact; the AMRAP banner is gone, since the ready screen already says the same thing
-at more length for every exercise; the header gained `max-h-[45%] overflow-y-auto`.
-[Journal](docs/overview/history-2026-09-12-folded-1.md#2026-09-09-fix-injury-header-crowding).
-**Owed: the device check, and two gaps behind it.** The reported case is an injured exercise on a
-**baseline** session — the two-banner worst case — and the seeded account is mid-`Accumulation`, so
-that state was reasoned about and pinned by a source test but **never rendered**. Nor was any of it
-seen with the logging sheet actually covering the bottom half of an S25, which is where the squeeze
-lives. `isBaseline` never clears while **BF-131** is open, so the banner it removes was permanent
-rather than a first-session artefact.
 
 ### [workouts] ⚠️ Rest vs the plan is on the Trends card, and it renders nowhere but the phone (Q-300, 2026-09-09, v1.445.0)
 
@@ -3336,22 +3397,6 @@ meal row now carries a 40 px tile: the photo if there is one, a gradient-and-gly
 **On the S25:** a data-URI `<img>` in a scrolling list is the shape Samsung's WebView compositor has
 mishandled before — check a long day for artefacts and jank. The day screen's tile is always the
 placeholder today; `food_items` has no image column, so only saved meals can carry a photo.
-
-### [nutrition][app-shell] ⚠️ One back-dismiss primitive, three failures, and a device pass none has had (BF-30 v1.378.0 · LB-17 v1.382.0 · BF-34 v1.383.1)
-
-Artboard 4 shipped as a **nested sheet**, and this row said its unwind "rests on BF-27's
-one-press-per-layer guarantee". **That guarantee has now failed twice.** LB-17: an id comparison read
-every entry that was not a sheet's own as "mine is gone" — right at two layers by accident, wrong
-from three, which is what Q-395c built by reaching the list through Log Food. BF-34: the flag marking
-one of our own `history.back()` calls was per-instance, so a sheet closing and a dialog opening in
-the same tick could not see each other's and **the confirm dialog closed on the frame it opened** —
-the owner's *"the delete feature doesnt work"*. Both fixed, both pinned by tests that fail on the old
-logic. **Neither has been felt on a real gesture bar, which is the only place either lived.**
-On the S25: tap a diary row, tap the bin — the confirm dialog must **stay** open and be tappable, and
-Cancel must cancel. Press back from an open meal: it unwinds one layer per press, meal → Log Food →
-the page. **Two presses now, not three** — LB-16 collapsed that screen, so the middle layer is gone and
-`sheet-back-stack.test.ts` carries the three-deep case. Scrolling must never reveal a tray; a left-drag
-opens one, a right-drag closes it, a second row closes the first; a 92vh action row must clear the bar.
 
 ### [nutrition][app-shell] ⚠️ The calorie surface: one budget, a progress bar, and one open cache-ordering bug (Q-415/Q-417/Q-323 fixed, LB-4 open, 2026-08-23)
 

@@ -168,11 +168,28 @@ describe('the threshold is gone, and no copy re-states it', () => {
     expect(src).not.toContain('nothing earned from movement yet today')
   })
 
-  it('both "calories out" explainers say every step counts', () => {
+  /**
+   * There is ONE "calories out" explainer now, and that is the point of the change rather than a
+   * loosening of this guard.
+   *
+   * This used to loop over `calorie-balance-bar.tsx` and `energy-card.tsx`, because each held its
+   * own inline copy of the paragraph and BF-87's wording had to be kept true in both. They had
+   * already drifted anyway — the card grew BF-134's resting-burn paragraph and the bar never got
+   * it — so the loop was pinning one sentence of two copies that differed elsewhere. LA-102 pulled
+   * both into `energy-explainer.tsx`; the invariant survives, and now it cannot be half-satisfied.
+   */
+  it('the "calories out" explainer says every step counts', () => {
+    const src = code('components/nutrition/energy-explainer.tsx')
+    expect(src).toContain('every step you take')
+    expect(src).not.toContain('steps above a baseline')
+  })
+
+  /** And the two hosts render it rather than re-stating it — which is what stops the drift coming back. */
+  it('both surfaces render the shared explainer instead of their own copy', () => {
     for (const rel of ['components/nutrition/calorie-balance-bar.tsx', 'components/nutrition/energy-card.tsx']) {
       const src = code(rel)
-      expect(src, rel).toContain('every step you take')
-      expect(src, rel).not.toContain('steps above a baseline')
+      expect(src, rel).toContain('<EnergyExplainer')
+      expect(src, rel).not.toContain('every step you take')
     }
   })
 

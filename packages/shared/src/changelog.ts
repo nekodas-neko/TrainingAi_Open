@@ -6,6 +6,42 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.456.6",
+    date: "2026-09-14",
+    changes: [
+      "Pressing back on Health, Workout, Nutrition or More now takes you to Home. It used to do nothing at all: the app switches between the five tabs without adding to the browsing history — they are side by side, not stacked — so there was nothing for back to go back to, and the press was simply swallowed. Back from Home still minimises the app, and back from a screen you opened on top of a tab (a meal, a day) still returns to that tab rather than jumping Home.",
+    ],
+  },
+  {
+    version: "1.456.5",
+    date: "2026-09-14",
+    changes: [
+      "Your workout times are right again. Sessions were printing as two or three minutes — one 38-minute session showed as 3 — because the app was rebuilding the session length from the individual exercises instead of using the finish time it had already recorded, and the last set of every exercise was not saving the moment you logged it. Both are fixed: the day now shows the real length, measured from when you started to when you finished. Sessions logged before this keep the wrong internal timestamps on their exercises, which cannot be recovered, but their displayed length is now correct.",
+    ],
+  },
+  {
+    version: "1.456.4",
+    date: "2026-09-14",
+    changes: [
+      "The energy explainer now says what your calorie base leaves out: the energy it takes to digest food, and small everyday movement your phone cannot count — standing, fidgeting, housework. Neither is estimated, so on a still day your real burn runs a little above what the app shows. You were right that the base misses some basic metabolic needs; the app now says so rather than inflating the number with a guess.",
+      "The Calorie Nudge card now prints how confident that maintenance figure is and how many days it is built from, the same way the energy card and the balance bar already did. It was the only place showing the number without its confidence — and the only one with a button that writes it straight into your goal.",
+    ],
+  },
+  {
+    version: "1.456.3",
+    date: "2026-09-14",
+    changes: [
+      "The AI recommendation card now tells you what happens if you don't press Accept, because the answer depends on the recommendation and the card looked the same either way. On a normal progression it says the numbers are already loaded and Accept only settles the phase decision. On a deload, a swapped session or a rest day it warns, in bold, that starting the workout without answering trains your program's normal loads rather than what is on screen — which is the case where ignoring the button quietly discards the advice.",
+    ],
+  },
+  {
+    version: "1.456.2",
+    date: "2026-09-14",
+    changes: [
+      "The get-ready screen has a clock again on bodyweight exercises. The warm-up bar was built from percentages of your working weight, so on a pull-up — where there is no weight to take a percentage of — the whole thing disappeared and the screen just sat there. Your phone's notification was counting down the same 60 seconds the entire time. There is now a plain get-ready bar wherever the three-stage ramp does not apply: bodyweight, an AMRAP test, solo mode, or anything logged at zero. It runs to the same total the notification uses.",
+    ],
+  },
+  {
     version: "1.456.1",
     date: "2026-09-14",
     changes: [

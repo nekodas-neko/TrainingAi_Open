@@ -19,7 +19,7 @@ export function useResumeRepaint(ref: RefObject<HTMLDivElement | null>): void {
       if (document.visibilityState !== 'visible') return
       const el = ref.current
       if (!el) return
-      handleResume(el, cb => requestAnimationFrame(cb))
+      handleResume(el, cb => requestAnimationFrame(cb), (cb, ms) => setTimeout(cb, ms))
     }
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)

@@ -10,6 +10,7 @@ import { cn } from "@trainingai/shared/utils";
 import type { AiPrescription, PrescriptionStatus, PeriodizationPhase } from "@trainingai/shared/types/ai-periodization";
 import { LOW_CONFIDENCE_THRESHOLD } from "@trainingai/shared/ai-periodization/confidence";
 import { explainExerciseChoice } from "@trainingai/shared/ai-periodization/explain";
+import { prescriptionDrivesLoad } from "@trainingai/shared/ai-periodization/apply-prescription";
 import { mroundStepUp, weightStepFor, type DeloadOverrideOutcome } from "@/components/workout/utils";
 import { intensityZoneForPct } from "@trainingai/shared/workout/intensity-zone";
 import { RoleChip } from "./role-chip";
@@ -52,6 +53,42 @@ interface AiPrescriptionCardProps {
   onPhaseChanged?: () => void;
 }
 
+/**
+ * What starting the workout without answering this card will actually do (BF-156).
+ *
+ * Owner: *"what happens if I dont select to apply the session? Its pretty easy to miss that
+ * button."* There are two answers and they are opposite. `prescriptionDrivesLoad` splits the five
+ * phase actions: a pending `stay` or `transition_recommended` already drives today's loads, so
+ * ignoring the button costs only the phase decision; a pending `deload_recommended`,
+ * `session_swap_recommended` or `rest_day_recommended` does not, so ignoring it silently trains the
+ * program's base progression style instead of what is on screen.
+ *
+ * **The card's own two button blocks split on a DIFFERENT axis**, which is why saying nothing was
+ * not neutral: `transition_recommended` and `deload_recommended` share the "Move to …" block while
+ * having opposite load consequences, and `stay` shares "Accept" with `session_swap_recommended`. So
+ * the shape of the buttons is not a reliable signal either way, and this reads the rule instead.
+ *
+ * Read from `prescriptionDrivesLoad`, never a second copy of the split — one formula, one place.
+ */
+function ConsequenceLine({ drivesLoad, action }: { drivesLoad: boolean; action: 'accept' | 'move' }) {
+  if (drivesLoad) {
+    return (
+      <p className="text-[11px] leading-relaxed text-muted-foreground">
+        Today&apos;s numbers are already loaded — {action === 'move' ? 'moving' : 'accepting'} only
+        settles the phase decision.
+      </p>
+    );
+  }
+  // Bold rather than a second amber panel: the low-confidence warning above already owns that shape
+  // in this block, and two stacked panels read as one thing to scroll past.
+  return (
+    <p className="text-[11px] font-semibold leading-relaxed text-amber-700 dark:text-amber-300">
+      Start the workout without {action === 'move' ? 'choosing' : 'accepting'} and you&apos;ll train the
+      program&apos;s normal loads, not these.
+    </p>
+  );
+}
+
 export function AiPrescriptionCard({
   prescription,
   prescriptionStatus,
@@ -83,6 +120,7 @@ export function AiPrescriptionCard({
   const isPending = prescriptionStatus === 'pending';
   const isTransitionRecommended = prescription.phaseAction === 'transition_recommended';
   const isDeloadRecommended = prescription.phaseAction === 'deload_recommended';
+  const drivesLoad = prescriptionDrivesLoad(prescription.phaseAction, prescriptionStatus);
   // A transition whose target is accumulation means the deload (recovery) block is done
   // and a fresh cycle is starting — offer building a new program as an alternative.
   const isCycleRestart = isTransitionRecommended && prescription.phase === 'accumulation';
@@ -357,6 +395,9 @@ export function AiPrescriptionCard({
 
           {isPending && (isTransitionRecommended || isDeloadRecommended) && (
             <div className="space-y-1.5 pt-1">
+              {/* Both actions land here and they disagree: a transition's numbers are already
+                  loaded, a deload's are not. */}
+              <ConsequenceLine drivesLoad={drivesLoad} action="move" />
               <div className="flex gap-2">
                 <Button
                   size="sm"
@@ -403,6 +444,7 @@ export function AiPrescriptionCard({
                   </p>
                 </div>
               )}
+              <ConsequenceLine drivesLoad={drivesLoad} action="accept" />
               <div className="flex gap-2">
                 <Button
                   size="sm"

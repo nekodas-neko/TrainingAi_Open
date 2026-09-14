@@ -8,6 +8,7 @@ import type { EnergyBalanceResponse } from '@/app/api/nutrition/energy-balance/r
 import { CalorieZoneBar } from './calorie-zone-bar'
 import { macroShares } from './macro-energy'
 import { macroBudgetGap } from './macro-budget-gap'
+import { EnergyExplainer } from './energy-explainer'
 
 interface Props {
   data: EnergyBalanceResponse | null
@@ -347,37 +348,7 @@ function EnergyDetail({ data }: { data: EnergyBalanceResponse }) {
         </p>
       )}
 
-      <div className="space-y-2 rounded-xl bg-muted/50 p-3">
-        <p className="text-[10px] leading-relaxed text-muted-foreground">
-          <span className="font-semibold text-foreground">Calories out</span> = your resting burn
-          ({b.restingBaseKcal.toLocaleString()} kcal) plus measured movement ({b.activeKcal.toLocaleString()} kcal
-          from workouts, activities, and every step you take).
-        </p>
-        {/* BF-134's reported symptom. The owner read `1,453 base − 200 for your goal` as two
-            deductions, because one of them is: the resting burn already has habitual movement
-            removed. That subtraction is real, it is not the goal delta, and nothing on the card
-            named it. The mechanism differs by path — the formula base holds back the energy of
-            the first steps, the calibrated base subtracts the window's average movement — so this
-            says the thing true of both rather than a figure only one of them produces. */}
-        <p className="text-[10px] leading-relaxed text-muted-foreground">
-          Your <span className="font-semibold text-foreground">resting burn</span> already has your
-          habitual daily movement taken out of it, which is why it sits below your maintenance. That
-          is what lets the movement you record be added once rather than counted twice — it is not a
-          second deduction for your goal.
-        </p>
-        <p className="text-[10px] leading-relaxed text-muted-foreground">
-          <span className="font-semibold text-foreground">On target</span> means your net
-          ({b.netKcal >= 0 ? '+' : ''}{b.netKcal.toLocaleString()}) is within 150 kcal of the
-          {' '}{b.targetNetKcal >= 0 ? '+' : ''}{b.targetNetKcal.toLocaleString()} kcal/day your goal calls for.
-          Sustaining today&apos;s net works out to {b.projectedWeeklyKg >= 0 ? '+' : ''}{b.projectedWeeklyKg} kg/week.
-        </p>
-        {m?.source === 'calibrated' && (
-          <p className="text-[10px] leading-relaxed text-muted-foreground">
-            Maintenance is measured from your own logged intake against your weight trend, not a
-            formula — it re-calibrates as you log.
-          </p>
-        )}
-      </div>
+      <EnergyExplainer data={data} />
     </div>
   )
 }
