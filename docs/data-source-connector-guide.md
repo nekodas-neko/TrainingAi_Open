@@ -646,6 +646,11 @@ Connect / a future HealthKit connector), not a rewrite of any formula in §4.
 
 ## References
 
+- [`docs/sync-health-api-reference.md`](sync-health-api-reference.md) — **the actual, code-derived
+  JSON request/response contract for the one generic ingestion endpoint that exists today**
+  (`POST /api/sync-health`) — exact field names, types, nullability, rejection rules, and the honest
+  gap (no external API-key auth yet, PS-45). Send someone here when they want to connect their own
+  device, not to this design doc.
 - [`device-agnostic-source-architecture.md`](device-agnostic-source-architecture.md) — the goal, the
   tiers, the invariants. Read first.
 - [`docs/oura-ble-operations.md`](oura-ble-operations.md) — the operations manual for the one

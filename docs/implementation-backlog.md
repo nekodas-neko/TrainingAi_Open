@@ -584,6 +584,37 @@ below threshold and left in place for next time.
 - **What's needed to start:** owner sign-off on doing the validation pass at all (since it's
   scoring-adjacent work), then the comparison itself, before any pipeline change ships.
 
+### [devices][platform] PS-45 — a per-user API key/token for external programmatic health-data ingestion
+
+- **Gate:** owner — this is new authentication surface (a credential separate from the login
+  session, capable of writing health data into a specific account), not a routine feature.
+- **Added:** 2026-09-14 (one-off session; a friend the owner is onboarding asked for a real API
+  contract to connect his own device, and hit the actual gap: `/api/sync-health` is real and
+  generic, but only session-cookie authenticated — there is no way for an external script to call it
+  without holding a live login session, which isn't a workflow the app exposes. Full detail:
+  [`docs/sync-health-api-reference.md`](sync-health-api-reference.md) §4).
+- **What exists today:** `POST /api/sync-health` (`app/api/sync-health/route.ts`) already accepts a
+  fully generic, device-agnostic payload — daily body metrics, exercise sessions, sleep records —
+  and writes through the same ranked-provenance path as every other source
+  (`docs/data-source-connector-guide.md` §6). The schema and behavior are already suitable for a
+  third party. Only the auth model isn't.
+- **The shape this needs, roughly:** a `user_api_keys` table (hashed token, not plaintext, per the
+  usual credential-storage practice), a way for a user to generate/revoke one from their own
+  settings screen, and an auth branch on `/api/sync-health` (and any other route worth opening up
+  this way) that accepts `Authorization: Bearer <token>` as an alternative to the session cookie,
+  resolving to the same `userId` scoping every write already requires. Rate limiting and the
+  existing per-record validation need no change — they already key off `userId`, not the auth
+  mechanism.
+- **Scope check before starting:** decide whether this covers `/api/sync-health` only, or a wider
+  set of routes (worth restating: this is a genuinely new capability — "an external, unattended
+  script can write into a specific user's health data" — not a small tweak, hence the owner gate
+  rather than an implementer just building it).
+- **Cheaper interim answer, if the owner wants one now:** point anyone in the friend's position at
+  Android Health Connect first (§4 of the reference doc) — if their device or its companion app
+  already writes there, this entry isn't blocking them at all.
+- **What's needed to start:** owner sign-off that this capability is wanted, and how wide (one route
+  vs. several) — a security-surface decision, not an implementation question.
+
 ### [nutrition] BF-161 — the meal builder can only reach foods, so a meal made of meals has to be rebuilt ingredient by ingredient
 
 - **Lane:** B for the recommended shape (`components/nutrition/ingredient-search.tsx`,

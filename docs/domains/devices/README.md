@@ -86,7 +86,10 @@ documentation cluster in the repo (~45 known issues, ~38 plans, 300+ model files
    scored-vs-learning-mode isolation decision, and the shared ingestion-route pattern. Read this
    before wiring any new ring/strap/platform source; it's the "where does X actually land" answer
    the architecture doc below doesn't spell out.
-7. [`docs/device-agnostic-source-architecture.md`](../../device-agnostic-source-architecture.md) —
+   [`docs/sync-health-api-reference.md`](../../sync-health-api-reference.md) is its companion for
+   someone actually integrating a device: the real JSON schema for `/api/sync-health`, and the
+   honest note that there's no external API-key auth yet (PS-45).
+8. [`docs/device-agnostic-source-architecture.md`](../../device-agnostic-source-architecture.md) —
    the raw-capable vs computed source tiers, and
    [`docs/overview/history-2026-07-30.md`](../../overview/history-2026-07-30.md)
    for what tiers 1-2 actually landed as (Q-43): sleep has one write path with a required `source`,
