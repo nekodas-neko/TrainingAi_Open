@@ -3076,21 +3076,31 @@ fault channel every session is told to read first.
 [`Review sweep 43 §4`](docs/reviews/2026-09-03-ownership-rule-a-and-body-supplied-ids.md).
 **Web build, local database.**
 
-### [readiness][app-shell] 🟡 Body Battery prints 50 and calls it "Good" for an account with no data (RV-38, 2026-09-03)
+### [readiness][app-shell] ⚠️ Body Battery no longer prints an unqualified 50 for an empty account — but the NUMBER is Tuning's (RV-38, 2026-09-03)
 
-The route is honest and the card ignores it. For the zero-data account `GET /api/body-battery`
-answers `hasData: false`, `sampleCount: 0`, `samplesPerHour: 0`, `sufficient: false`,
-`anchorSource: "default"` — and the card renders **Good / Steady / 50** with a colour-coded label, a
-bar filled to 50%, and no "Limited data" badge. The badge is gated on `hasData`
-(`body-battery-card.tsx:95`), so the qualification gets *weaker* as the data gets worse: too few
-samples shows the warning, none at all shows nothing.
+**Treatment fixed in v1.456.17. Two things are still owed and neither is this lane's.**
 
-Everything else on that screen degrades correctly for the same account — streak `—days`, the week grid
-`—` on all seven days, the score chip row absent, and `/health/readiness` reading `—`. Readiness is the
-number Body Battery opens at, by the card's own explainer. **This does not reopen Q-43** (degrade
-rather than blank): the app already computes "I cannot support this number" and already has the
-component to say so. [`Review sweep 42 §2`](docs/reviews/2026-09-03-first-run-honesty-and-instant-paint.md).
-**Web build only.**
+The route was honest and the card ignored it: for the zero-data account `GET /api/body-battery`
+answers `hasData: false`, `sampleCount: 0`, `sufficient: false`, `anchorSource: "default"` — and the
+card rendered **Good / Steady / 50** with a colour-coded label, a bar filled to 50%, and no badge.
+
+**The guard got weaker as the data got worse**, which is why it survived a reading:
+`lowData = battery.hasData && …` meant enough samples → no badge (right), too few → "Limited data"
+(right), **none at all → no badge**. Dropping the `hasData` term is the whole fix; `sufficient` is
+already false in both cases that deserve the badge. Proven by an e2e that runs as the zero-data
+account and asserts the **payload beside the rendered text** — a rendered 50 alone cannot tell a bug
+from a fixture — and that fails on the unfixed card.
+
+**⚑ The number itself is with Tuning**, handed over by the owner on 2026-09-14 (*"This requires
+tuning still"*). A Body Battery re-fit silently re-scores months of history, so it goes through a
+proposal stating how many other days it moves. Nothing in this fix touches it.
+
+**⚑ An owner decision is open and was deliberately not blocked on:** whether no-data deserves
+something stronger than the badge — an `—` like Readiness, the posture `/health/heart-rate` already
+takes. The badge is strictly better than what shipped and reverses in one line, so it does not
+foreclose the answer. **This does not reopen Q-43** (degrade rather than blank).
+
+**NOT verified on device.** [`Review sweep 42 §2`](docs/reviews/2026-09-03-first-run-honesty-and-instant-paint.md).
 
 ### [devices][app-shell] ⚠️ The `/more/devices` ring card flashes a skeleton on a warm repeat visit (RV-39, 2026-09-03)
 

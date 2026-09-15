@@ -12355,3 +12355,12 @@ lines, but the reason BF-49 is *not* this, and the reason BF-100 is now readable
 the next session would otherwise re-derive from the two coupled entries that said the opposite.
 
 A negative result costs lines exactly once and saves a re-run every time someone reads the pair.
+
+## 2026-09-15 — `projectOverview.md` → 11273, `docs/implementation-backlog.md` → 21404 (RV-38)
+
+Both **shrank**, which is the interesting part: the fix is one term removed from a boolean, and the
+documents got smaller because an open finding became a shipped one with a shorter residue.
+
+What survives at length in both is the thing that is *not* fixed — the number is Tuning's, and the
+`—`-versus-badge question is the owner's. An entry that reads as closed when two of its three parts
+are still owed is how a KEEP turns into a dropped finding.

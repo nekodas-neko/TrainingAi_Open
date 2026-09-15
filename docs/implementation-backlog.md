@@ -4083,50 +4083,42 @@ the 288/day currently stored. If it does not hold, the future-dated rejection is
 job and this closes as understood. Either way the rejection stays — a sample ahead of now is a bad
 clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
 
-### [readiness][app-shell] RV-38 — Body Battery prints 50 and calls it "Good" for an account that has never worn anything
+### [readiness][app-shell] RV-38 — Body Battery printed 50 and called it "Good" for an empty account (treatment fixed; the NUMBER is Tuning's)
 
-- **⚠ HANDED TO TUNING BY THE OWNER, 2026-09-14.** *"This requires tuning still. Should be flagged
-  for tuning with the tuning agent."* So the no-data treatment this entry asks about is **not** the
-  thing they want fixed — the number itself is. The `Verify: owner` is answered in the sense that
-  they looked; what they reported is a calibration complaint.
-- **Tuning owns the next move**, and per the standing rule it proposes rather than ships: any change
-  must state how many other days it moves, because a Body Battery re-fit silently re-scores months of
-  history.
-
-- **Lane:** B for the no-data treatment the entry was filed about — `components/body-battery-card.tsx`
-  only, the route needs no change. **But that is no longer the live half.** The owner has handed the
-  *number* to **Tuning** (above), and a calibration proposal is not either implementer lane's work
-  until it is signed off. **Tuning proposes, the owner signs off, Lane A implements** — so do not
-  take this as Lane B surface work expecting to fix what was reported.
-- **The owner-verification field is removed** — they looked, and answered. What came back was a different request.
+- **⚠ TWO HALVES, AND ONLY ONE WAS EVER LANE B's.** The owner handed the **number** to Tuning on
+  2026-09-14: *"This requires tuning still. Should be flagged for tuning with the tuning agent."*
+  Tuning proposes, the owner signs off, Lane A implements — and a proposal must state how many other
+  days it moves, because a Body Battery re-fit silently re-scores months of history. **Nothing below
+  touches the number.**
+- **Lane:** B for the no-data *treatment*, `components/body-battery-card.tsx` only. Shipped
+  2026-09-15; the route needed no change and got none.
 - **Added:** 2026-09-03, Review sweep 42 —
   [`write-up §2`](reviews/2026-09-03-first-run-honesty-and-instant-paint.md)
-- **The route is honest and the card ignores it.** `GET /api/body-battery` for the zero-data account:
-  `{"current":50,"label":"Good","trend":"steady","hasData":false,`
-  `"confidence":{"sampleCount":0,"samplesPerHour":0,"sufficient":false},"anchor":50,`
-  `"anchorSource":"default"}`. Four fields say it has nothing. The card renders **Good / Steady / 50**
-  with a colour-coded label, a bar filled to 50%, and **no "Limited data" badge** (asserted: count 0).
-- **Why the guard misses.** `body-battery-card.tsx:95` — `const lowData = battery.hasData && conf !=
-  null && !conf.sufficient`. The badge is gated on `hasData`, so the qualification gets *weaker* as
-  the data gets worse: enough samples → no badge (right); too few → "Limited data" (right); **none at
-  all → no badge**. `hasData` is otherwise used only to gate the expanded chart (line 164), so the
-  collapsed card has no path that can say there is nothing behind the number.
-- **The contrast is on the same screen, same account.** Streak `—days`; the week grid `—` on all seven
-  days; the Readiness/HR/Sleep chip row absent entirely; `/health/readiness` reads `—`. Only Body
-  Battery prints a figure — and Readiness is the number it *opens at*, per the card's own explainer.
-- **Do not reopen Q-43.** That decision (degrade rather than blank) stands and this does not depend on
-  it. The narrow point: the app already computes "I cannot support this number", already has a
-  component that says so, and does not use it in the case where it is most true. Minimum fix is
-  dropping `battery.hasData &&` from line 95. **Whether no-data deserves something stronger than the
-  "Limited data" badge — an `—` like Readiness — is the owner's call**, so put it to them rather than
-  picking one. `/health/heart-rate` is the reference for the stronger posture: it prints `—` for
-  min/avg/max and names the estimate outright (*"Working max: 190 bpm (age-estimated)"*).
-- **While in this file:** the comment at lines 134–139 says the explainer paragraph *"only renders in
-  the NO-DATA state"*, two lines below the Q-276 note saying it is *"always visible"*. The JSX is
-  unconditional and it was observed rendering for the seeded user too. Delete the stale half.
-- **How to test locally:** the harness's `ZERO_DATA_STORAGE_STATE` account, `/`, asserting the API's
-  `hasData: false` beside what the card renders. Assert the **payload next to the text** — a rendered
-  50 alone cannot distinguish a bug from a fixture.
+- **The route was honest and the card ignored it.** `GET /api/body-battery` for the zero-data
+  account says it has nothing in four fields at once — `hasData: false`, `sampleCount: 0`,
+  `sufficient: false`, `anchorSource: "default"` — and the card rendered **Good / Steady / 50** with
+  a colour-coded label, a bar filled to 50%, and no badge.
+- **The guard got WEAKER as the data got worse, which is why this survived.**
+  `lowData = battery.hasData && conf != null && !conf.sufficient`: enough samples → no badge
+  (right), too few → "Limited data" (right), **none at all → no badge**. Dropping `battery.hasData
+  &&` is the whole fix — `sufficient` is false in both cases that deserve the badge, so it is the
+  correct condition on its own.
+- **The expanded copy needed no guard**, checked rather than assumed: the *"your ring recorded only
+  N readings"* paragraph sits inside the `battery.hasData ?` branch, so a zero-data account never
+  reaches it and cannot be told it recorded "only 0".
+- **Proven load-bearing.** `e2e/rv38-body-battery-no-data-badge.spec.ts` runs as the zero-data
+  account and **captures the response beside the rendered text** — a rendered 50 alone cannot tell a
+  bug from a fixture. Against `main`'s unfixed card the badge is simply absent.
+- **The stale comment is gone.** Lines 134–139 said the explainer *"only renders in the NO-DATA
+  state"* two lines below the Q-276 note saying it is always visible; the JSX is unconditional.
+- **Keep:** ① **the number, with Tuning** — the live complaint, and not this lane's.
+  ② **an owner decision, unasked so far:** whether no-data deserves something stronger than the
+  badge — an `—` like Readiness, which is the posture `/health/heart-rate` already takes (it prints
+  `—` for min/avg/max and names the estimate outright). The badge is strictly better than what
+  shipped before and is reversible in one line, so it was not worth blocking on; the stronger
+  posture is still open. **Do not reopen Q-43** (degrade rather than blank) — this does not depend
+  on it.
+  ③ the device check on the S25.
 
 ### [devices][app-shell] RV-39 — the `/more/devices` ring card flashes a skeleton on a warm repeat visit
 
