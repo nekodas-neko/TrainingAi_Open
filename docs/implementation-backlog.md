@@ -20240,8 +20240,23 @@ estimates from real work.**
   app's own convention elsewhere (an absent metric beats a wrong one).
 - **Do not "fix" it by widening the trend thresholds.** That hides a real decline as readily as a
   false one.
-- `session_periodization.baseline_1rm` exists and may already be the intended like-for-like anchor;
-  check whether it was meant for this before adding anything.
+- ~~`session_periodization.baseline_1rm` exists and may already be the intended like-for-like
+  anchor~~ — **ruled out 2026-09-15, do not re-walk it.** `signals.ts:246` says *"baseline1rm is
+  retained as the starting weight anchor only — do NOT use"*, and `prompt.ts` repeats it twice, once
+  as prose to the model and once inline as `[anchor only — do not use for trend]`. Using it would
+  contradict an explicit instruction in three places. **The fix needs a genuinely new like-for-like
+  rule**, which is what makes it a design decision rather than a wiring change.
+
+**Two more leads closed the same day, so the next attempt starts from a shorter list:**
+- **The unit half is already handled.** A `rm1ChangeKg` for a bodyweight exercise is an index delta,
+  not kilograms — but Q-19b already routes it through `displayOneRmDelta` in `prompt.ts`, so the
+  model is given *"+1 rep"* rather than *"+1.0 kg"*. That path improved again on 2026-09-15 when
+  BF-164 pointed `displayOneRmDelta` at `bodyweightRepMax`. Nothing to do here.
+- **The guard asymmetry is real but trivial.** `oneRmTrendStatus` has a ±0.5 dead zone and
+  `rm1ChangeKg` has none, so a 0.3 kg move reports `rm1Trend: flat` beside a non-zero change. Same
+  *shape* as the Q-298 contradiction, three orders of magnitude smaller in effect. **Not worth its
+  own fix**, and worth knowing about only so it is not mistaken for this entry's defect when
+  someone reads the two fields side by side.
 
 **Verification:** on the owner's account after a phase transition, no primary/secondary compound
 reports a double-digit decline it did not earn, and the strength card's delta for Barbell Bench Press

@@ -12334,3 +12334,15 @@ Q-52 grows too, because its own outstanding precondition was attempted and faile
 attempt matters more than recording the result — without it the next session runs the same query,
 gets the same six declines, and builds a feature on a confounded signal. The `Needs: LA-110` is the
 operative part; the boxed note is the evidence.
+
+## 2026-09-15 — LA-110: three leads closed (backlog +15)
+
+Fifteen lines that make the next attempt shorter rather than longer. LA-110 offered
+`session_periodization.baseline_1rm` as a possible like-for-like anchor; it is explicitly forbidden
+for trend use in three places, including twice in the AI prompt. Two adjacent leads are closed the
+same way: the bodyweight unit problem was already solved by Q-19b, and the guard asymmetry between
+`oneRmTrendStatus` and `rm1ChangeKg` is real but three orders of magnitude too small to be this
+defect.
+
+A "ruled out, do not re-walk" list is worth more per line than the finding it sits under — it is the
+difference between an implementer spending an hour confirming a dead end and reading one sentence.
