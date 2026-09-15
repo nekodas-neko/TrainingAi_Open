@@ -571,6 +571,71 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
   are no longer load-bearing — the estimate is informational now. **TN-28 went the other way**: the
   stored target is now what everything follows, so that card's one-tap write matters MORE. **Re-read
   an entry's consequence, not just its correctness, after main moves under it.**
+- **⛔⛔ THE DELOAD ENGINE HAS ONE WAY TO SAY "TRAIN NORMALLY" (TN-36).** Nine conditions can
+  recommend a deload; exactly one — `consecutiveTrainingDays < 3` — can decline it. Past three
+  training days **every branch returns `recommended: true`** and readiness only picks the strength, so
+  **a readiness of 100 still recommends a deload** (and `?? 70` means a missing readiness does too).
+  **Measured: 28 of 45 days cleared, all 28 by the streak counter, none on merit.** ⚠ Perverse by
+  construction — a rest day buys three clear days regardless of recovery.
+- **⚑⚑ FIXING A BUG SWITCHED ON A TRIGGER NOBODY HAD SEEN FIRE, AND THE OWNER FELT IT.** Deload went
+  **19% in August to 79% in September**; the stress override fired **0 times then 9 times**. The
+  threshold never moved — `7c428a7f` fixed TN-22's storage defect, and before it the stored scalar
+  came out near zero and **could not reach 120**. **A threshold that never fires is not calibrated,
+  it is disabled** — and repairing its input is a behaviour change that needs measuring as one.
+  **When an owner reports a step change, date it against `git log` before calling it tuning.**
+- **⚠ The readiness ladder fired on 65, 73, 69, 66, 52, 33, 50, 38** — a readiness of **73** produced
+  a deload recommendation. Mistuned, but the smaller half: the bands are choosing a strength when
+  §2 says they should first be choosing whether.
+- **⚑ THE PIPELINE ARCHITECTURE IS ALREADY WRITTEN DOWN — `docs/data-source-connector-guide.md`.**
+  §0 "the model, in two layers", §5 "decode, normalize, then write", §6 the ranked per-field merge.
+  **Audit against it; do not re-propose it.** The input layer genuinely holds: `body_metrics` carries
+  a per-field `source_map` resolved by `SOURCE_RANK`, measured at **16 fields across two live sources**
+  over 30 days.
+- **⛔⛔ BUT §5.4'S INVARIANT IS FALSE (TN-37): *"every calculation reads generic tables, never a
+  device-specific one."*** `readiness-payload.ts:278-291` reads **four device-specific stores** in one
+  `Promise.all` — `getOuraDaily`, `getOuraDailySummary`, `getOuraDailyDerived`,
+  `getLatestOuraCloudVitals` — and **~20 payload fields never pass the normalise layer.**
+  `oura_daily_derived` is written by the Oura rollup and nothing else. **A written invariant the code
+  does not hold is worse than none**, because the next connector author trusts it.
+- **⚠ Two softeners, and quoting the finding without them overstates it:** `oura_daily` rows exist
+  through today but **every scored column on recent rows is NULL** (the Cloud retired 2026-08-13 —
+  dead shells, a wasted query rather than a wrong number), and **Health Connect writes zero rows**, so
+  the divergence has no victim yet. **Latent, not live.**
+- **⚠ The guide names one violation and believes it is the only one** (§5.5, the discarded Health
+  Connect `HeartRateSeries`, PS-41 — *"the concrete, fixable instance"*, singular). **When a doc names
+  an instance of a general rule, check whether it is the only one before trusting the count.**
+- **⚑ NORMALISATION IS IMPLEMENTED THREE WAYS AND NOTHING NAMES THEM AS ONE (TN-38, plan
+  `2026-09-15-normalised-inputs-and-source-aware-scoring.md`).** `body_metrics` scalars merge at
+  **write** by `SOURCE_RANK`; `oura_heartrate` series merge at **read** via `preferStrapBuckets`
+  (10 s buckets, strap wins); `oura_daily_derived` has **no merge — one writer**. Each is sound; the
+  guide's §5 names the stages and never says the merge step has three implementations. **The rule,
+  once stated: scalars merge at write by rank, series merge at read by resolution, derived rows have
+  one writer.**
+- **⚑ A SECOND SOURCE IS LIVE TODAY — the chest strap outnumbers the ring SIX TO ONE** in
+  `oura_heartrate` (74,860 against 12,673 over 45 days). **Multi-source is not hypothetical here**,
+  and `preferStrapBuckets` already handles that pair — ⚠ but it was written for two sources, so a
+  third (Health Connect, PS-41) must **prove** the three-way case rather than extend it on faith.
+- **⚠ Several pillars CANNOT be made source-neutral and the plan says so rather than scoping them.**
+  §4 of the guide traced it: chronic stress, resilience, daytime HRV, Body Battery and the OTS score
+  read raw BLE frames with **zero fallback branches anywhere in the call chain**, and readiness's
+  temperature contributor (0.10) passes `null` on every generic path. **"Normalise these" means
+  re-implementing vendored models — a project, not a task.** Record what a non-ring user gets instead.
+- **⛔⛔ "DEGRADES GRACEFULLY" IS NOT THE SAME AS THE OWNER'S TIER MODEL, AND THE CODE DOES THE FIRST
+  (TN-38 task C).** `sleep-score.ts:399` renormalises the weighted mean over whichever contributors
+  are present; readiness passes a neutral 50. **So connecting a sensor changes the DENOMINATOR — the
+  score moves for a reason unrelated to the user's body, and two users' 78s are computed from
+  different weight sets.** The owner asked for `core + adjustments`: one core quantity everyone
+  shares, optional inputs as **signed deltas**. *"78 — core 74, +6 HRV, −2 SpO₂"*. **⚠ It re-scores
+  history**, so the 2026-08-24 policy applies and it is `Gate: owner`.
+- **⚑ THE MEASUREMENT LAYER ALREADY DOES WHAT THE OWNER DESCRIBES — quote it back rather than
+  planning it.** The ring decodes frames to a step count and writes `body_metrics.steps` through the
+  same method every source calls; nothing downstream knows it came from a ring. Same for `hrv_ms`,
+  `resting_heart_rate`, `spo2_pct`. **The derived/score layer is what bypasses it (TN-37).** When an
+  owner describes an architecture, check which half is already built before scoping either.
+- **⚠ THE OWNER WILL NOT USE HEALTH CONNECT — other users will (2026-09-15).** That makes basic-source
+  quality a product requirement rather than an internal tidy-up, and it means **PS-41 and anything
+  else HC-shaped cannot be validated on the owner's account.** A Health-Connect-only test user is a
+  prerequisite, not a nicety.
 - **The threshold is usually right and the input usually wrong** — Q-506, Q-512, Q-514, now TN-6.
   Check the input's distribution before touching any constant.
 - **Do NOT lift the sleep scale toward its old mean** — sleep/readiness agreeing is load-bearing for
