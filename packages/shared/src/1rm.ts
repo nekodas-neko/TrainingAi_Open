@@ -200,7 +200,13 @@ export function bestSetOneRm(sets: OneRmSetInput[], opts: Pick<OneRmEstimateOpts
 }
 
 // Largest integer rep count R (1..REP_CEILING) whose reference-weight (+ addedKg) 1RM does
-// not exceed oneRm. Pass addedKg for a weighted-variation 1RM so the inversion happens at
+// not exceed oneRm.
+//
+// **Kept, and deliberately NOT the one the display helpers call (BF-164).** This inverts the
+// unscaled `calc1RM`, which is right for exactly one caller: `exercise-stats-sheet.tsx` builds its
+// comparison table with `calc1RM` too, so that pair is self-consistent. Everything that inverts a
+// STORED estimate wants `bodyweightRepMax`, because stored bodyweight estimates go through
+// `calcAmrap1RM`. Do not "unify" the two — they answer different questions. Pass addedKg for a weighted-variation 1RM so the inversion happens at
 // the load it was actually earned on, not bare bodyweight — inverting a 1RM proven on
 // weighted pull-ups at bare bodyweight prescribes inflated rep targets. The +0.5 tolerance
 // absorbs the 0.25 rounding in stored estimates. Returns 0 when there is no estimate.
@@ -312,7 +318,13 @@ export interface OneRmDisplay {
 /**
  * Render a stored `estimated1rm` in the unit that means something for this exercise. Pass
  * `addedKg` for a weighted variation of a bodyweight movement so the rep-max inversion happens at
- * the load it was actually earned on (see {@link repMaxFromOneRm}).
+ * the load it was actually earned on (see {@link bodyweightRepMax}).
+ *
+ * **BF-164: through `bodyweightRepMax`, never `repMaxFromOneRm`.** This and its three siblings
+ * below inverted the UNSCALED `calc1RM`, while `estimateOneRm` stores every bodyweight set through
+ * `calcAmrap1RM` — so a stored 128 read back as **8 RM** on a set of **11**, and the ready screen
+ * printed "Last: 11 reps" four lines above "REP MAX 8 RM". BF-149 fixed one screen by changing that
+ * screen; the four helpers here are what the other seven surfaces actually import.
  */
 export function displayOneRm(
   oneRm: number,
@@ -320,7 +332,7 @@ export function displayOneRm(
   addedKg = 0,
 ): OneRmDisplay {
   if (isBodyweightType(exerciseType)) {
-    const reps = repMaxFromOneRm(oneRm, addedKg)
+    const reps = bodyweightRepMax({ oneRm, addedKg }) ?? 0
     return { value: reps, unit: 'RM', text: `${reps} RM` }
   }
   const kg = mround(oneRm, 0.25)
@@ -341,7 +353,7 @@ export function displayOneRmDelta(
   if (previous == null || previous <= 0) return null
   const unit = oneRmUnit(exerciseType)
   const diff = isBodyweightType(exerciseType)
-    ? repMaxFromOneRm(current, addedKg) - repMaxFromOneRm(previous, addedKg)
+    ? (bodyweightRepMax({ oneRm: current, addedKg }) ?? 0) - (bodyweightRepMax({ oneRm: previous, addedKg }) ?? 0)
     : Math.round((current - previous) * 100) / 100
   const sign = diff > 0 ? '+' : ''
   const text = unit === 'RM'
@@ -393,19 +405,21 @@ export function displayOneRmSeries(
   addedKg = 0,
 ): number[] {
   if (!isBodyweightType(exerciseType)) return values
-  return values.map(v => repMaxFromOneRm(v, addedKg))
+  return values.map(v => bodyweightRepMax({ oneRm: v, addedKg }) ?? 0)
 }
 
 // Rescales a STATIC progression style's reps for a bodyweight exercise from its
-// per-set pct targets and the lifter's rep-max (inverted from their bodyweight 1RM
-// via repMaxFromOneRm). Only ever call this for the static base-style path — an AI
+// per-set pct targets and the lifter's rep-max (via bodyweightRepMax — BF-164; it
+// used to invert the UNSCALED calc1RM, which understated every prescribed rep count
+// by the amrap discount, ~8 reps where the lifter had logged 11).
+// Only ever call this for the static base-style path — an AI
 // Dynamic Periodization prescription (prescriptionStyleForExercise,
 // lib/ai-periodization/apply-prescription.ts) already decides bodyweight-appropriate
 // reps directly from its own signals; re-deriving them here a second time silently
 // discards the AI's decision (the bug this function's extraction fixes — see
 // docs/superpowers/plans/2026-07-05-bodyweight-reps-ai-prescription-override.md).
 export function rescaleBodyweightReps<T extends RMStyleSet>(style: T[], basis: number): T[] {
-  const repMax = repMaxFromOneRm(basis)
+  const repMax = bodyweightRepMax({ oneRm: basis }) ?? 0
   if (repMax <= 0) return style
   return style.map(s => ({ ...s, reps: Math.max(1, Math.floor((s.pct / 100) * repMax)) }))
 }

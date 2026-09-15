@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.456.13",
+    date: "2026-09-15",
+    changes: [
+      "Bodyweight exercises now show the rep max you actually reached. A set of 11 hanging leg raises was being read back as an 8 RM, on the ready screen, the pre-workout list, the stats sheet, the strength card, the trend charts and the year review \u2014 the screen printed \"Last: 11 reps\" four lines above \"REP MAX 8 RM\". The cause was that the estimate is stored with an all-out-set discount applied and was being converted back without it. The same number sets your prescribed reps on bodyweight moves, so those were short by the same proportion, roughly a quarter: expect target reps on those exercises to go up. Your coach was being told the low figure too, and a line meant to suggest a working set had been telling it to aim for a single rep on every bodyweight exercise; it now suggests 80% of your real rep max.",
+    ],
+  },
+  {
     version: "1.456.12",
     date: "2026-09-14",
     changes: [
