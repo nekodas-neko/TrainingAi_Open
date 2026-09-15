@@ -12274,7 +12274,20 @@ is no `/more` scroll position to restore, so only one of the two failures can be
 other stands. Without the link, the next session picks up BF-100, fixes a real `touchstart` bug, and
 still cannot tell whether it worked.
 
-## 2026-09-15 — `projectOverview.md` → 11210, `docs/implementation-backlog.md` → 21252 (BF-162)
+## 2026-09-15 — PS-41's owner gate restored (backlog +44)
+
+It merged in #1202 and then vanished from `main`. The next rebase of the same branch hit a conflict
+where `main` had deleted the adjacent PS-42 entry (it shipped) while the branch still carried it;
+git folded that deletion and this edit into one hunk, and "take main's side" did the right thing for
+PS-42 and silently discarded this.
+
+The restoration is +33; the other +11 is the note explaining it, and that is the part worth keeping.
+A conflict hunk does not respect entry boundaries, and the after-check everyone uses — diffing the
+heading list against `main`'s — **cannot** catch a body-only edit going missing, because there is no
+heading to miss. Recorded here and in `docs/local-dev-database.md` beside the other conflict recipes,
+where the next person resolving this file will actually be looking.
+
+## 2026-09-15 — `projectOverview.md` → 11210, `docs/implementation-backlog.md` → 21296 (BF-162)
 
 +11 on each for a one-guard fix, and the length is carrying one thing: why the harness is not going
 to catch this class. `exercise_library` holds 27 bodyweight exercises and none of them is in any
