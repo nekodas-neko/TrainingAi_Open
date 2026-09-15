@@ -12240,3 +12240,12 @@ who trusted the mutation score without reading why it survived.
 
 The rest is the device-verification gap: the owner cannot test this one, because having a ring is
 what makes his path safe here and also what makes the new branch unreachable from his account.
+
+## 2026-09-15 — BF-7 planned (backlog +10)
+
+A ten-line net change that replaces a question with its answer. The entry asked whether
+`DurationPreset` should stay an enum or become a number and said seven call sites depend on it —
+framing it as a typing decision. It is not one: `short` and `long` select different algorithms, and
+`standard` must never expand because that under-fill is the finish-early margin. Those lines are the
+reason the number is safe rather than a rewrite, and an implementer who read only the old wording
+would have converted the type and quietly lost the margin.

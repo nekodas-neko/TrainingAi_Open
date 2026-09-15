@@ -20952,9 +20952,19 @@ in the Postgres schema, the local SQLite tables or `lib/local-store/types.ts` �
 comment says *"the choice is never written to the program, it only tags the plan it produced"*. So
 this needs **no migration and no sync work**, which is unusual for a change this visible.
 
-**Feature request, so the next step is a planning session** writing to `docs/superpowers/plans/` —
-intake traced it and did not design it. The plan should also decide whether `DurationPreset` stays an
-enum with more members or becomes a minutes number, since seven call sites depend on the answer.
+**✅ PLANNED 2026-09-15 —
+[`docs/superpowers/plans/2026-09-15-session-duration-ladder.md`](superpowers/plans/2026-09-15-session-duration-ladder.md).**
+Ready to build; the plan splits it PR 2a (Lane A engine) / PR 2b (Lane B control), and 2a is
+shippable alone because the direction rule reproduces today's behaviour exactly at 30/60/90.
+
+**The enum-vs-number question this entry raised is answered, and it was not a typing question.**
+`short` and `long` select **different algorithms**, not just budgets
+(`generate-prescription.ts:485`, `:504`): `short` → `dropToBudget` (drops whole exercises),
+`standard` → `fitToBudget` (drops sets only), `long` → `fitToBudget` + `expandToBudget` (adds sets to
+MRV). And `standard` must never expand — the under-fill **is** the finish-early margin the owner's
+sessions rely on. The plan takes the minutes number and selects the algorithm by
+`sign(chosen − anchor)`, which reproduces all three exactly and extends to 45 with no new rule. An
+enum with more members would mean inventing a label per rung and re-deciding the algorithm for each.
 
 **Done looks like:** a 45-minute session can be chosen for today, the session's own configured length
 is still what the control defaults to, the picked length is what the plan is trimmed against *and*
