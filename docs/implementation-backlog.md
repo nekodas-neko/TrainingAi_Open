@@ -437,6 +437,86 @@ below threshold and left in place for next time.
 
 
 
+### [workouts] BF-169 — the COMPLETED stamp is gated on the exercise library loading, so it vanishes on a slow or failed load
+
+- **Lane:** B — `app/workout-select/workout-select-content.tsx:111-114` and `:437`.
+- **Added:** 2026-09-16 (BugFix intake). Owner: *"some workouts show the completed sign straight after
+  the workout. But some days dont. I dont know the pattern. It may be some specific excercises or how
+  long it takes to leave the last screen."* Both of his guesses are right, and they are the same
+  cause.
+- **The stamp needs two things true, and only one of them is about having trained:**
+
+  ```tsx
+  {trainedToday && muscleActivations.length > 0 && <CompletedStamp />}
+  ```
+
+  ```tsx
+  const muscleActivations = useMemo(
+    () => (library.length > 0 && currentSession ? buildMuscleActivations(currentSession, library) : []),
+    [currentSession, library],
+  )
+  ```
+
+  **`library` is the exercise library — a separate fetch.** Until it arrives, `muscleActivations` is
+  `[]` and the stamp does not render, however completed the session is. That is the *"how long it
+  takes"* half. A session whose exercises produce no assignments yields the same empty array, which
+  is the *"specific exercises"* half.
+- **Every other completion signal on the card is driven by `trainedToday` alone** — the green ring
+  (`:357`), the screen-reader text (`:420`), and the button reading **Start Again** instead of Start
+  Workout (`:457`). So the card knows it is complete and says so three ways while the one visual the
+  owner looks for is absent. His own screenshot shows *Start Again* on a card with no stamp.
+- **How it got here, since it is not a careless line.** `:432` reads
+  `muscleActivations.length > 0 ? <MuscleHeatmap …/> : …` — a correct guard, because a heatmap with
+  no assignments is nothing. The stamp is laid **over** that diagram and was written inside the same
+  condition. The guard is right for the diagram and wrong for the stamp.
+- **Fix: gate the stamp on `trainedToday` alone.** It is a rubber stamp over the card, not a layer of
+  the heatmap; it needs no assignments to be meaningful. Keep `:432`'s guard exactly as it is.
+- **Check the empty-diagram case when fixing**, because it is the reason the two were entangled: with
+  the library absent the card renders whatever `:432`'s else-branch is, and the stamp must sit
+  legibly over that too rather than over a blank area.
+- **Verification:** on device, complete a session and confirm the stamp appears; then open the tab
+  with the library cache cleared (or offline) and confirm the stamp is still there while the diagram
+  is not.
+
+### [workouts] BF-168 — "Leave workout?" fires on the session-select tab after the workout is finished
+
+- **Lane:** B — `components/mobile-auth-handler.tsx:46-49`, against
+  `isWorkoutActive` in `lib/stores/workout-store.ts:457`.
+- **Added:** 2026-09-16 (BugFix intake). Owner: *"After excercise is conplete it still asks for
+  confirmation to leave."* His screenshot shows the dialog over the **session-select** screen, with
+  the card reading COMPLETED and **Start Again** behind it.
+- **The guard is a two-term predicate and both terms are looser than they read:**
+
+  ```ts
+  if (isWorkoutActive(useWorkoutStore.getState()) && window.location.pathname.startsWith("/workout"))
+  ```
+  ```ts
+  isWorkoutActive = !!state.workoutStartMs && state.mode !== 'done'
+  ```
+
+  **`/workout` is the session-select TAB as well as the workout screen**, so the path term does not
+  distinguish "in a workout" from "looking at the list". Anything that leaves `workoutStartMs` set
+  with `mode` not `'done'` raises the dialog on a screen where there is nothing to leave.
+- **⚠ The exact state was NOT reproduced, and the entry says so rather than guessing.** Read in the
+  source: `resetSession()` restores `INITIAL_STATE` (both `workoutStartMs: null` and `mode: 'pre'`),
+  and the completion path sets `mode = 'done'` — either of which makes the predicate false. The
+  mount-time reset at `workout-screen.tsx:624` depends only on `[sessionType]`, so it does not run
+  when the user simply returns to the tab. `rolloverDay` touches neither field. **Something leaves
+  the pair in `startMs != null, mode !== 'done'` and reading did not find it.**
+- **One observation narrows it and should be tested first:** the card behind the dialog offers
+  **Start Again**. If that was tapped, a new session legitimately begins (`workoutStartMs` set, mode
+  not yet `'done'`) and the dialog is then *correct* — while the card still says COMPLETED, which is
+  why it reads as a bug. **Ask the owner whether Start Again was pressed before the back press.** If
+  yes this is a labelling problem, not a stale-state one, and the fix is different.
+- **Do not "fix" it by widening `isWorkoutActive`.** Its two terms are each load-bearing elsewhere —
+  the same predicate guards the guided-walk and activity equivalents in the same listener, and the
+  `beforeunload` warning at `workout-screen.tsx:641` uses the same pair. A fix belongs in the path
+  term (distinguish the workout screen from the tab) or in whatever leaves the state set.
+- **Verification:** on device, complete a session, return to the tab **without** tapping Start Again,
+  press back, and confirm no dialog. Then mid-workout, confirm the dialog still appears — BF-166's
+  entry records that this guard is the only thing standing between a back press and a discarded
+  session.
+
 ### [workouts] BF-167 — one prescription says `deload: false` at the top and `deloaded: true` on every exercise, so the toggle claims "Full" over a deloaded session
 
 - **Lane:** B — `components/workout/pre-workout-screen.tsx:233-239` is the wrong read.

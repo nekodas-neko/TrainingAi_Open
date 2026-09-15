@@ -12709,3 +12709,11 @@ Forty-six lines. The table earns its space because "is the deload on?" is answer
 contradicted by the screen, and an implementer needs both halves side by side. The rest is two
 guardrails: deload-toggle.tsx is ALREADY correct and must not be "fixed", and the rationale's
 "50-min working budget" is right rather than a hallucination — I nearly filed that one.
+
+## 2026-09-16 — `docs/implementation-backlog.md` (BF-168, BF-169)
+
+Fifty-eight lines for two reports. BF-169 is short because the cause is one condition. BF-168 spends
+most of its length on what was RULED OUT — resetSession, the completion path, the mount-time reset,
+rolloverDay — because the trigger was not found by reading, and an entry that implied otherwise would
+send an implementer looking in the four places already checked. It also asks the owner one question
+that would change the fix entirely.
