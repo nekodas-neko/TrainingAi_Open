@@ -35,8 +35,13 @@ test('back from a tab sub-route returns to that tab, not Home', async ({ page })
   await settleRouteBoundary(page)
   await expect(page.getByRole('heading', { name: 'More' }).first()).toBeVisible({ timeout: 30_000 })
 
-  // A real Next push onto a sub-route of that tab.
-  await page.goto('/more/details')
+  // **Tapped, not `goto`-ed, and this is the whole spec.** `page.goto('/more/details')` is a full
+  // document load: it rebuilds history from scratch, so the stale entry never survives to be popped
+  // and the test passes while the bug is untouched. Measured — a first draft did exactly that and
+  // went green. It is also precisely why BF-49 was filed as "does not reproduce in the web harness".
+  // `profile-tab.tsx` reaches this screen with `router.push`, which is what the owner's tap runs.
+  await page.getByRole('button', { name: 'Profile details' }).tap()
+  await page.waitForFunction(() => window.location.pathname === '/more/details')
   await settleRouteBoundary(page)
 
   await page.goBack()
