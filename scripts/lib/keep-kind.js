@@ -70,6 +70,13 @@ function keepKind(text) {
 /**
  * Has this entry's device check already happened, while its `Keep:` still asks for one?
  *
+ * **A FAILED look counts, and missing that was this rule's own blind spot (TN-13, 2026-09-15).**
+ * The first version keyed on `VERIFIED` alone, so an entry whose check came back BROKEN went on
+ * advertising itself as *"shipped; a look is owed, nothing is blocked"* — which is worse than the
+ * case the rule was written for, not better: it is live, buildable work filed as finished. TN-13 sat
+ * that way with the wrong lane on it as well, because the lane was chosen for where the entry
+ * assumed the defect was rather than where the failing look proved it is.
+ *
  * The state nineteen entries were in after three device passes (OR-113, 2026-09-14): the owner's
  * verification was recorded as a `✅ VERIFIED ON THE S25` line and the `Keep:` above it went on
  * claiming the check was owed, so `next-item.js` kept printing finished work as debt. Both halves
@@ -83,11 +90,13 @@ function keepKind(text) {
  * @param {{ text: string, gate: 'owner'|'device'|null } | null} keep  the parsed `Keep:`
  * @param {string[]} lines  the entry's body
  */
+const S25_OUTCOME = /(VERIFIED|FAILED|REPORTED BROKEN) ON THE S25/;
+
 function keepIsSettled(keep, lines) {
   if (!keep) return false;
   const kind = keep.gate ? 'check' : keepKind(keep.text);
   if (kind !== 'check') return false;
-  if (!lines.some((l) => /VERIFIED ON THE S25/.test(l))) return false;
+  if (!lines.some((l) => S25_OUTCOME.test(l))) return false;
   return !/\bDONE\b/.test(keep.text);
 }
 

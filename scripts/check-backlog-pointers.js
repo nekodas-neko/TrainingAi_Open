@@ -646,9 +646,10 @@ const verifySummary = withVerify
   if (settled.length) {
     console.log(
       `check-backlog-pointers: note — ${settled.length} entr${settled.length === 1 ? 'y' : 'ies'} whose \`Keep:\` ` +
-        `says a device check is owed and whose body already records that check as DONE. Strike the ` +
-        `\`Keep:\` and remove the entry, or narrow it to whatever is genuinely left. Advisory, not a ` +
-        `failure:\n` +
+        `says a device check is owed and whose body already records that check as DONE — VERIFIED, ` +
+        `FAILED or BROKEN. Strike the \`Keep:\` and remove the entry, narrow it to whatever is ` +
+        `genuinely left, or — if the look FAILED — strike the \`Verify:\` too and re-lane it for ` +
+        `where the failure actually is. Advisory, not a failure:\n` +
         settled.map((r) => `      ${r}`).join('\n'),
     );
   }

@@ -437,6 +437,50 @@ below threshold and left in place for next time.
 
 
 
+### [activity][cardio] BF-165 — "Other activity" is a dead tap on device, and the whole source path reads correct
+
+- **Lane:** B — `components/workout/log-activity-sheet.tsx`,
+  `components/activity/activity-type-grid.tsx`, `components/activity/activity-screen.tsx`,
+  `lib/view-transition.ts`. **Start from the device console, not from these files** — see the
+  elimination list.
+- **Added:** 2026-09-15 (BugFix intake). Owner: *"when I try click the treadmill; or any 'Other
+  activity' nothing actually happens."* Reported on the APK.
+- **This blocks a path the owner was told to use yesterday.** BF-160 established that a fitness test
+  earns no calories, and "Other activity → Treadmill" is the recommended way to log a steady
+  treadmill walk (the guided walk is interval-only, minimum 1 fast + 1 slow block). That
+  recommendation currently leads to a dead button.
+- **⚠ The source path is correct end to end and UNCHANGED. Do not re-read these — they were traced
+  and cleared on 2026-09-15:**
+
+  | checked | verdict |
+  |---|---|
+  | `log-activity-sheet.tsx` → `selectType` | correct: `startActivity(...)` → `onOpenChange(false)` → `router.push('/activity')`, with a prefetch on open |
+  | `activity-type-grid.tsx` | correct: `onClick={() => onSelect(type)}` on a real `<button>` |
+  | `activity-store.startActivity` | sets `mode: 'pre'` + type/label/icon; `reconcileRehydratedActivity` only demotes `done` or a stale `active`, so it cannot wipe a fresh selection |
+  | `activity-screen.tsx` | correct: `pre` + a type → `PreActivityScreen` |
+  | `app/activity/page.tsx` | auth guard only |
+  | `pre-activity-screen.tsx` | no mount-time fetch, no throw candidate (59 lines) |
+  | `getActivityIcon` | has a `?? DotsThreeCircle` fallback, so a bad icon cannot throw |
+  | `tabKeyForHref('/activity')` | returns **null** → treated as a real navigation, not a shell flip |
+  | `/api/activity-types` | exists; production returns all **10** types including `treadmill` |
+  | `git log --since=2026-09-10` on every file above | **no changes** |
+
+- **So the defect is at runtime, and the entry's job is to say where to look.** Three candidates, in
+  the order they are cheap to test on device:
+  1. **The view transition never commits.** `useTransitionRouter` freezes the outgoing screen and
+     polls for route commit against a **300 ms** cap. Its own comments record this path misbehaving
+     twice before. A navigation that fails to commit leaves the old screen up — exactly "nothing
+     happens". Test by checking whether the URL changes while the screen does not.
+  2. **The `/activity` route fails to load in the WebView** (chunk/network), which is invisible
+     without the console.
+  3. **The sheet's close animation cancels the push** — `onOpenChange(false)` runs immediately
+     before `router.push` in the same tick.
+- **`error_events` holds nothing for this**, checked over three days: no `/activity` or `/cardio` row
+  at all. Absence is not evidence here — a navigation that silently does not happen throws nothing —
+  but it does rule out an uncaught exception being reported.
+- **Verification:** on device with the WebView console attached, tap Cardio → Other activity →
+  Treadmill and record whether (a) the sheet closes, (b) the URL becomes `/activity`, (c) anything is
+  logged. Those three answers pick between the candidates above.
 ### [app-shell][platform] LA-109 — a tab flip leaves the PREVIOUS tab's route tree on the history entry, so back renders the wrong screen
 
 - **Lane:** B — `components/shell/tab-shell.tsx`.
@@ -601,6 +645,8 @@ which is why this reads as "back went to the home page".
 
 ### [devices] PS-43 — decide whether Health Connect's 30-day cold-sync cap should be a deliberate policy or extendable
 
+- **Lane:** A — a sync-policy decision that lands in the Health Connect ingest path. (Assigned 2026-09-15, OR-116 lane sweep.)
+
 - **Gate:** owner.
 - **Added:** 2026-09-14 (one-off session; owner asked specifically whether a source "that can't have
   live data" — i.e. only reachable via a one-time or infrequent sync — "should be able to backfill
@@ -639,6 +685,8 @@ which is why this reads as "back went to the home page".
 
 ### [devices][heart-rate] PS-44 — compute nightly/readiness HRV from raw beat intervals instead of trusting the ring's own figure
 
+- **Lane:** A — `packages/shared/src/health/rmssd.ts` — domain math, and it changes a stored input. (Assigned 2026-09-15, OR-116 lane sweep.)
+
 - **Gate:** owner. This changes an input to a live health score, not a UI/infra change — same class
   of decision `CLAUDE.md`'s Standing Agents rules reserve for Tuning-style validation and sign-off,
   never a silent swap.
@@ -675,6 +723,8 @@ which is why this reads as "back went to the home page".
 
 ### [devices][platform] PS-45 — a per-user API key/token for external programmatic health-data ingestion
 
+- **Lane:** A — `app/api/sync-health/route.ts` plus new authentication — engine by both halves of the rule. (Assigned 2026-09-15, OR-116 lane sweep.)
+
 - **Gate:** owner — this is new authentication surface (a credential separate from the login
   session, capable of writing health data into a specific account), not a routine feature.
 - **Added:** 2026-09-14 (one-off session; a friend the owner is onboarding asked for a real API
@@ -705,6 +755,8 @@ which is why this reads as "back went to the home page".
   vs. several) — a security-surface decision, not an implementation question.
 
 ### [devices] PS-46 — build the Apple HealthKit connector (iOS)
+
+- **Lane:** A — `lib/health-connect-sync.ts` and a new native connector. (Assigned 2026-09-15, OR-116 lane sweep.)
 
 - **Gate:** owner — this needs an Apple Developer Program enrollment ($99/year, a real recurring
   cost) and a new platform target (no `ios/` directory, no `@capacitor/ios` exists in this repo
@@ -891,36 +943,18 @@ which is why this reads as "back went to the home page".
 - **Reversal cost:** low, but it changes what a hardware gesture does, so it wants the device before
   it is called done.
 
-### [platform] LB-109 — three finished Lane B entries print as READY, and they are the top of the lane
-- **Lane:** O — this queue file only. Clearing a completed entry is the Orchestrator's sweep per
-  `CLAUDE.md`, which is why this is filed rather than done.
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-14 · found running `next-item.js --lane B` while
-  picking up PS-35a.
-- **What it costs, concretely.** Lane B's READY list is 6 and **three of them are finished work**:
-  they print above the items that are not, so the top of the lane is a list of things that cannot be
-  started. That is the same failure `Verify:` and `Keep:` exist to prevent, arriving from the other
-  side — not an entry mis-described as blocked, but an entry that is done and still advertising.
-- **The three, with what their own bodies say:**
-  - **BF-141** (lb/kg toggle) — heading still reads *"the device look is what is left"*; the body
-    reads **✅ VERIFIED ON THE S25, 2026-09-13**. Nothing is owed.
-  - **BF-135** (stacked banners on an injured exercise) — heading reads *"device owed"*; the body
-    reads **✅ VERIFIED ON THE S25, 2026-09-13**, owner: *"Havent seen this issue; treat it as fine
-    for now"*. Nothing is owed.
-  - **LB-47** (the `Full` override's false revert claim) — the owner closed it **conditionally**:
-    *"Will let you know when it comes up. Happy to treat as fixed if I dont raise it again."*
-- **⚠ LB-47 is NOT the same case as the other two and must not be swept with them.** Its own text is
-  explicit that *"nothing has confirmed the fix works"* — the owner declined a check rather than
-  passed one. **If that symptom is reported again it is a regression report against an unverified
-  fix, not a new bug, and the reader is meant to start from the original diff.** That sentence has to
-  survive the entry's removal; delete it into `known-issues-resolved.md` rather than out of the repo.
-- **The heading is the thing to fix first, and it is cheap.** Two of these three say *"device owed"*
-  in a heading while saying *verified* in the body, so a reader who trusts the queue's own summary
-  line is misled before opening anything. `next-item.js` reads fields, not headings — but a person
-  scanning the file reads the heading.
-- **Pass test:** `node scripts/next-item.js --lane B` prints no entry whose body records its residue
-  as discharged.
-- **Reversal cost:** none, a queue file.
+> **✅ LB-109 DONE and removed, 2026-09-15 (OR-116).** All three cleared. **BF-141** and **BF-135**
+> were verified and left the queue; **LB-47** was handled as this entry insisted — not swept with
+> them, but removed alongside BF-64 under a shared note recording that **nothing verified either
+> fix**, so a later report of the same symptom is read as a regression against an unverified fix
+> rather than as a fresh bug.
+>
+> **Lane B's diagnosis was exactly right and worth keeping:** a finished entry that still advertises
+> is the same failure `Verify:` and `Keep:` exist to prevent, arriving from the other side. The sweep
+> that followed found the class was wider than three — and that the check written for it on
+> 2026-09-14 had its own blind spot, keying on `VERIFIED` and therefore missing an entry whose look
+> came back **FAILED**, which is the worse case: live, unbuilt work filed as finished. `keepIsSettled`
+> reads all three outcomes now, and that widening immediately turned up **BF-74** and **TN-13**.
 
 ### [platform] LB-108 — E2E reports green without running whenever a change lives in `lib/`, and `lib/hooks/**` is UI
 - **Lane:** O — `.github/workflows/ci.yml`, the *"Does this change touch the UI?"* step (~line 637).
@@ -1081,72 +1115,6 @@ which is why this reads as "back went to the home page".
   arithmetic rather than only the wrap fix: one `rounded-full` in the battery chip, no drawn `%`,
   one `opacity-50`, `px-2` on both weather pills. Three mutations were run against it and each was
   caught. Update it with any sizing change; do not delete it.
-- **Needs:** nothing.
-
-### [workouts] BF-141 — a lb/kg toggle on the weight dial (shipped; the device look is what is left)
-
-- **Lane:** B
-- **✅ VERIFIED ON THE S25, 2026-09-13** (owner's workout pass): the kg↔lb toggle swaps without the dial scrolling or losing its selection.
-  scrolling or re-selecting, and the 44 px touch box is reachable at the drawn size. A scroll-snap
-  dial with haptics beside a new control is a touch-target and gesture question, and the harness
-  drives a mouse.
-- **✅ SHIPPED 2026-09-12** (`fix/bf141-weight-dial-unit-toggle`).
-  [Journal](overview/history-2026-09-14-folded-1.md#2026-09-12-fix-bf141-weight-dial-unit-toggle).
-
-- **Added:** 2026-09-10 · owner, from the live logging screen for **Dumbbell Lateral Raise**:
-  *"can there be a 'small' toggle for the weight dial to switch between lb/kg? my Dumbells are
-  pounds and I need to convert it. im 90% in kg but some are lb so a very small switch would be
-  good. then just have it convert to the kg equivalent"*.
-
-- **This is prevention for a failure that has already happened, on this exercise.** Session 119
-  (2026-06-15): **Dumbbell Lateral Raise, Dumbbell Preacher Curl and Dumbbell Shoulder Press** were
-  *"originally logged in lbs but recorded into the kg field, inflating estimated 1RM, target80,
-  volume and personal records"*. The repair was an admin preview/apply tool that still exists —
-  `app/api/admin/fix-exercise-units/route.ts`, `computeLbsToKgFix`,
-  `components/admin/exercise-unit-fix.tsx` — which rescales each set, recomputes volume and
-  **backdates the all-time personal record**. Its own example was a 20 kg Lateral Raise set becoming
-  9 kg, 1RM 28.5 → 13.
-- **The write payload still has no unit field and this did not add one.** `weights:
-  z.array(z.number().min(-100).max(500))` and `set_logs.weight_kg` are unchanged — the fix is to stop
-  pounds reaching the payload, not to record which unit arrived.
-
-- **⚑ THE ENTRY WAS WRONG ABOUT ITS OWN TEST GATE, AND THAT MATTERS MORE THAN THE FEATURE.** It said
-  *"`e2e/touch-target-size.spec.ts` will fail this if it is done any other way"*. It cannot:
-  that spec scans `SCREENS = ['/', '/health', '/workout', '/nutrition', '/more']`, the five tab
-  roots. This dial lives inside an **active** workout at `/workout?session=…`, which is none of them,
-  so its deliberately-empty allowlist would have stayed green over a 20 px suffix. A new spec,
-  `e2e/weight-dial-unit-toggle.spec.ts`, drives into the first set and measures the control; removing
-  `.tap-target-44` turns its box from `44px` to `auto` and fails it.
-- **⚠ `stopPropagation` on the suffix guards a real case that reads as hypothetical — do not delete
-  it because the spec passes without it.** The dial row is itself a click target calling `onChange`
-  with the row's own value, and in lb mode that round-trips kg → lb (2.5 lb detent) → kg, which is
-  lossy for some weights: **61.0 kg comes back 61.25**. A unit tap that also reached the row would
-  quietly rewrite the logged weight, which is this entry's whole subject. Measured 2026-09-12:
-  the spec stays green with the line removed, because the seeded workout starts at **60 kg**, which
-  round-trips exactly (132.5 lb → 60.0). That is a property of the fixture, not of the code.
-- **The rounding hazard was the thing to get right, and it is pinned by test.** `mround125` and
-  `mroundStep` are `Math.max(5, …)`, so a 5 lb dumbbell — 2.27 kg — comes out of either as **5 kg**,
-  silently more than doubling. `fromDisplay` rounds to **0.25 kg** (the precision the 2026-06-15
-  repair tool used) and routes through neither; the test asserts the clamp explicitly, so the
-  mutation that reintroduces it fails three cases.
-- **In lb mode the dial steps 2.5 lb**, because 1.25 kg is 2.76 lb — a grid with no lb dumbbell on
-  it. Reusing the kg step and relabelling it was the named trap and is mutation-checked.
-- **The control is the `kg` label itself**, per the owner's correction: *"a very small button to swap
-  to lb - something you wouldnt see or hidden in away"*. `SegmentedTabs` stays ruled out at 96 px
-  tall. Only the **selected** row's suffix is interactive — the unit renders on every visible row,
-  and three live toggles in a scrolling column is not what "hidden" means. A dotted underline is the
-  whole affordance.
-- **The unit is remembered per exercise in `localStorage`**, keyed by `sessionExerciseId` — session
-  identity is the DB id, never the name. Deliberately not `UserPreferencesSchema`: it is `.strict()`,
-  so a key there means editing the schema *and* `PREFERENCE_STORAGE`, and this is a fact about which
-  dumbbells are in one room rather than something that should follow him to another device.
-- **`workout-screen.tsx` was never touched.** It is shrink-only at 1833 lines, and the entry's
-  "one prop threaded" would have broken that — except `active-workout-screen.tsx` already holds
-  `exercise` in scope and is not pinned, so the thread is three unpinned files. The entry's
-  "if the per-exercise memory pulls in more than expected, a plan is the right call" fork did not
-  trigger.
-- **Display stays kilograms everywhere else**, per *"just have it convert to the kg equivalent"* —
-  the set card's non-editable branch, the last-session chips and the 1RM trend are unchanged.
 - **Needs:** nothing.
 
 ### [nutrition] BF-142 — the gap explainer gave a reason its own module rules out (fixed; the owner says whether it reads true)
@@ -1681,6 +1649,8 @@ demonstrated one — the TN-19 lesson.
 the rest of that day; and `perceived_recovery` carries at least three distinct values over 21 days.
 
 ### [platform] LB-94 — the journal's recent window is 332 entries, and 297 of them are pinned by a citation
+
+- **Lane:** O — the journal and its citation graph are the Orchestrator's docs, not either implementer lane's. (Assigned 2026-09-15, OR-116 lane sweep.)
 
 - **The ceiling is not a size problem, it is a linking problem.** `docs/overview/entries/` is meant
   to be the *readable recent* window, folded into the batched `docs/overview/history-*.md` by the
@@ -2922,10 +2892,15 @@ absent one, because the next scan trusts it. Add one only from a commit that act
   and is the only file that would change. That was deliberate: the entry called the art *"the only
   unrecoverable spend"*, and spending it before the owner has seen the mechanic working is the
   wrong order.
+- **Gate:** owner — **re-applied 2026-09-15 (OR-116) after a day at the head of Lane B's READY list
+  with nothing startable in it.** The gate was removed on 2026-09-14 because the *decision* had been
+  made, which was right about the decision and wrong about the entry: **the blocker moved rather than
+  cleared.** Nothing can start until the artwork exists, this session cannot draw it, and Lane B
+  picking this up would find an afternoon's wiring and no assets to wire. The gate now names the
+  asset, not the decision.
 - **The code change is small and it is not the blocker — the asset files are.** Swapping a tier's
-  emoji for an `<img>`/inline SVG in `collection-sprites.ts` is an afternoon; nothing can start until
-  the artwork exists, and this session cannot draw it. So this entry sits READY for the wiring and the
-  real next step is the owner (or whoever they commission) producing one tier's asset to compare.
+  emoji for an `<img>`/inline SVG in `collection-sprites.ts` is an afternoon. **What unparks this is
+  one tier's asset landing in the repo**, at which point the gate comes off for good.
 - **Reversal cost:** none while it is glyphs. Once assets exist, reverting means deleting them.
 
 ### [workouts] LA-65 — the transition constant is charged once too often at a value that is too low, and the two errors cancel at five exercises
@@ -3166,77 +3141,6 @@ short all day.
 
 - **Reversal cost:** near zero for the labelling. Any change to the macro *anchor* is a behaviour
   change on a shared service, needs TN-29 read first, and is not this entry's recommendation.
-
-### [workouts][app-shell] BF-135 — two stacked banners squeeze the set list on an injured exercise (shipped; device owed)
-
-- **Lane:** B — `components/workout/active-workout-screen.tsx`.
-- **Added:** 2026-09-09 · owner, mid-set on Legs: *"ui gets a bit quoted for injury ones"* — screenshot of Barbell Hip Thrust with the injury banner, the AMRAP banner, and set 1 disappearing behind the logging sheet.
-- **Needs:** — nothing.
-- **✅ VERIFIED ON THE S25, 2026-09-13** (owner's workout pass): the two stacked banners do not squeeze the set list — owner: *"Havent seen this issue; treat it as fine for now"*.
-  reproducible from dimensions alone. Two things the sandbox could not produce: **(a)** an injured
-  exercise on a **baseline** session (the two-banner worst case the owner reported — the seeded
-  account is mid-`Accumulation`, and forcing `isBaseline` wants the program's phase set rewritten),
-  and **(b)** the same screen with the logging sheet actually over the bottom half. Check set 1 is
-  reachable and the `⚠ Injury: …  Swap` chip is tappable with a thumb.
-- **✅ SHIPPED 2026-09-09** (`fix/injury-header-crowding`) — the whole recommendation.
-  [Journal](overview/history-2026-09-12-folded-1.md#2026-09-09-fix-injury-header-crowding). The full banner moved to the
-  ready screen (which **had no injury warning at all** before this, so the warning used to arrive
-  after the weight was chosen); during the set it is a chip with Swap; the header gained
-  `max-h-[45%] overflow-y-auto` so the next thing added to it scrolls rather than pushing set 1 off.
-- **The AMRAP banner is deleted rather than made conditional, which is a change from this entry's
-  recommendation.** The ready screen already carries the same instruction in fuller form for **every**
-  exercise, and every exercise passes through it — including one resumed from a superset buffer,
-  whose `timerStarted: true` only exists because it was started there. So "first exercise only" is
-  still one row of duplication of copy the lifter has just read.
-- **Two defects found in the same code and fixed here:** the muscle filter never de-duplicated, so an
-  exercise listing the injured muscle as both main and secondary read *"Lower back, Lower back"*; and
-  it hand-rolled the lowercase match instead of `activeInjuredMuscles()`, the shared list the swap
-  sheet's own filter reads.
-
-**Traced.** The active-exercise column is `flex flex-col flex-1 min-h-0` (`:439`) and its header is
-**`flex-none space-y-2 mb-2`** (`:441`) — a block that holds the exercise name, the injury banner
-(`:459`), the AMRAP banner (`:479`) and the `SetsGrid`, and that **never shrinks**. Below it,
-`:509` is the flexible region. **Nothing in this branch has `overflow-y-auto`** — the only scroll
-container on the screen is `:243`, which belongs to the *ready* state, not this one. So when the
-header grows, the region below is squeezed and the set rows end up under the log sheet with no scroll
-to recover them.
-
-**Two banners is the worst case, and it is the case the owner is in right now:**
-- The **injury banner** fires when any of the exercise's main or secondary muscles matches an active
-  injury. Measured against his live program: **3 of Bankai's 24 exercises** trigger it — Barbell Hip
-  Thrust (in Legs *and* Lower) and Single Leg Romanian Deadlift, all on `lower back`.
-- The **AMRAP banner** is gated on `isBaseline`. **BF-131 is why that gate never clears**: the
-  baseline never completes, so this banner is not a one-session artefact — it is permanent until that
-  entry ships. The crowding therefore has a fixed cause and an indefinite duration, which is worth
-  saying because "it will sort itself out after baseline" is the natural and wrong assumption.
-
-**Both banners are static, per-exercise, and permanent for the whole exercise.** Neither changes
-between set 1 and set 5, and the AMRAP one is instructional copy — *"pick a challenging weight and do
-as many reps as possible with good form"* — which is useful the first time and noise on every
-exercise thereafter. They occupy the most valuable vertical space on the screen at the moment the log
-sheet is open over the bottom half of it.
-
-**Recommendation: move the guidance to where the decision is made, and leave a chip where it is not.**
-- **Both facts are needed *before* the weight is chosen**, not while the sheet is open — so the
-  natural home is the **ready screen for that exercise** (the `:243` branch, which already scrolls and
-  has room). That is where a lifter decides whether to swap the movement or how heavy to go.
-- **During the set, collapse the injury banner to a single chip** beside the exercise name — `⚠ Lower
-  back` — with **Swap** kept reachable. Do not delete the swap affordance: it is the entry's only
-  action, and an injury warning you cannot act on is worse than none.
-- **Show the AMRAP instruction on the first exercise of a baseline session only**, not on all five.
-- **Whatever is kept, give the header a scroll or a cap.** A `flex-none` block whose height depends
-  on data will overflow again the next time something conditional is added to it — a third banner is
-  one feature away.
-
-- **⚠ Do not fix this by making the injury banner conditional on set number or dismissible per
-  session.** A dismissed safety warning that stays dismissed is the shape that gets someone hurt, and
-  this owner's lumbar constraint is the reason the banner exists at all. Relocating it is fine;
-  suppressing it is not.
-- **Check the sibling surface**: the same two-banner stack renders for any user with an injury on a
-  baseline session, and the ready screen already scrolls, so moving them there costs no layout work.
-- **Reversal cost:** low — layout and placement in one component, no data change.
-- **Worth a device look when it ships**, since the failure is vertical space on the S25 with the log
-  sheet open, which is not reproducible from the dimensions alone.
 
 ### [platform] LB-56 — E2E costs 26 minutes a UI PR and currently gates nothing; decide which of those to change
 
@@ -4202,7 +4106,12 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
   must state how many other days it moves, because a Body Battery re-fit silently re-scores months of
   history.
 
-- **Lane:** B — `components/body-battery-card.tsx` only. The route needs no change; it is already correct.
+- **Lane:** B for the no-data treatment the entry was filed about — `components/body-battery-card.tsx`
+  only, the route needs no change. **But that is no longer the live half.** The owner has handed the
+  *number* to **Tuning** (above), and a calibration proposal is not either implementer lane's work
+  until it is signed off. **Tuning proposes, the owner signs off, Lane A implements** — so do not
+  take this as Lane B surface work expecting to fix what was reported.
+- **The owner-verification field is removed** — they looked, and answered. What came back was a different request.
 - **Added:** 2026-09-03, Review sweep 42 —
   [`write-up §2`](reviews/2026-09-03-first-run-honesty-and-instant-paint.md)
 - **The route is honest and the card ignores it.** `GET /api/body-battery` for the zero-data account:
@@ -4231,7 +4140,6 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
 - **How to test locally:** the harness's `ZERO_DATA_STORAGE_STATE` account, `/`, asserting the API's
   `hasData: false` beside what the card renders. Assert the **payload next to the text** — a rendered
   50 alone cannot distinguish a bug from a fixture.
-- **Verify:** owner — whether the no-data treatment reads right to them on Home.
 
 ### [devices][app-shell] RV-39 — the `/more/devices` ring card flashes a skeleton on a warm repeat visit
 
@@ -4847,6 +4755,14 @@ on a production measurement.
 
 ### [platform] BF-106 — press the `VACUUM FULL` on `oura_raw_samples`; the packer freed the space and nothing returned it
 
+- **⏸ ACKNOWLEDGED AND DEFERRED BY THE OWNER, 2026-09-15:** *"Keep this as a task to complete
+  later."* The `Gate: owner` stays — `VACUUM FULL` cannot be run from the app.
+- **Re-measured 2026-09-14 before it was put to them, and the finding is unchanged:**
+  `oura_raw_samples` is **74 MB total — 30 MB heap against 44 MB of index.** The index is larger than
+  the data it indexes. Growth has flattened (73 → 74 MB in two weeks), so this is **reclaim, not a
+  leak**, and it is not urgent in money terms. What it costs is legibility: every future size reading
+  has to be interpreted around this, and bloat of exactly this kind masked a real outage once.
+
 - **Lane:** O — an **owner action against production**, not a code change, so it is in neither
   implementer lane; `Gate: owner` below parks it regardless. (Was `Lane: none`, which the lane
   reader cannot parse — LB-59.) Filed so it is not lost, and so the reading that follows it has
@@ -5094,6 +5010,8 @@ feature and not a deletion like LB-41:
 
 ### [nutrition][body] BF-99 — the line says "base" and shows base MINUS the goal deficit, so the owner read his RMR as broken
 
+- **Lane:** A — the defect is in what the number MEANS — base against base-minus-deficit — which is the budget derivation, not the label that prints it. (Assigned 2026-09-15, OR-116 lane sweep.)
+
 - **⚠ NOT CHECKED 2026-09-13 — the checklist sent the owner to the wrong place, and the answer
   recorded is about that, not about this entry.** Owner: *"nutrition + gear icon has no settings
   except the meal time names"*. That is true and is my error: the goals form is not behind the
@@ -5125,6 +5043,8 @@ feature and not a deletion like LB-41:
   points; the fix does not depend on it, because it relabels figures the component already holds.
 
 ### [app-shell] BF-100 — back navigation always lands at the top, because the scroll position is not on the document
+
+- **Lane:** B — `lib/hooks/use-scroll-restoration.ts` and `components/pull-to-sync.tsx` — reached only from `components/**`, and it stores nothing. (Assigned 2026-09-15, OR-116 lane sweep.)
 
 - **❌ FAILED ON THE S25 TWICE — most recently 2026-09-13.** Owner: *"Checked on more - and still
   doesnt work"*. **This is buildable work, not a pending check**, and the `Keep:`/`Verify: device`
@@ -5708,6 +5628,8 @@ two screens, and a user who sets one has no way to know the other exists.
 
 ### [sleep] BF-83 — a night still filling says so; the morning that proves it has not happened
 
+- **Lane:** A — `lib/sleep/provisional.ts` is the engine half and the surfaces read it; both halves, so Lane A, engine first. (Assigned 2026-09-15, OR-116 lane sweep.)
+
 - **Keep:** the device check, and only that. All three halves shipped — the engine 2026-08-31
   (`lib/sleep/provisional.ts`, `/api/sleep-sessions` returns `provisional` per row), the badge on
   Home's chip row, the Body tab's sleep card and `/health/sleep`, and the baseline exclusion in
@@ -6212,11 +6134,16 @@ description will silently drop the field that turns out to matter. **The owner i
   not recoverable once it passes. Either confirm first, or make the undo durable rather than a toast.
 
 - **Lane:** B · **Batch:** `nutrition-ui-uplift`
-- **Verify:** device
-- **Keep:** the **device check**. On the S25: tapping the top-right of the meal photo must no longer
-  discard it, the bin must read as removal, and the undo toast must be reachable before it dismisses
-  — that last one is the part a desktop browser cannot judge, because the toast timeout against a
-  thumb is the whole question.
+- **⚠ The `Verify: device` and the `Keep:` are struck, 2026-09-15 (OR-116).** The check happened on
+  2026-09-13 and **failed**; both fields went on saying it was owed, so this entry advertised itself
+  as *"shipped; a look is owed, nothing is blocked"* while holding live, unbuilt work. Found by
+  widening `keepIsSettled` to treat a FAILED look as a settled one — the first version keyed on
+  `VERIFIED` only, which is the wrong half of the class to catch.
+- **What the struck `Keep:` was asking is now the acceptance test for the fix**, so it is kept as
+  that rather than deleted: on the S25, tapping the top-right of the meal photo must not discard it,
+  the bin must read as removal, and **the undo toast must be reachable before it dismisses** — that
+  last part is the half a desktop browser cannot judge, because the toast timeout against a thumb is
+  the whole question. It is also the half the owner's report says is currently the only protection.
 - **Added:** 2026-08-31 · owner: *"the delete image button is easy to hit with no confirmation."*
 
 **Three things were wrong and only one was size.** `meal-detail-sheet` passes `hideCloseButton`, so
@@ -7378,46 +7305,6 @@ owner has to re-describe in a wizard what the app already knows.
   is exactly the failure this entry is written to prevent. A program id belonging to another user is
   rejected, not read.
 
-### [workouts] LB-47 — the `Full` override CLAIMED a revert that had not happened (shipped; device owed)
-
-- **⚠ OWNER CLOSED THIS CONDITIONALLY, 2026-09-13.** Verbatim: *"Will let you know when it comes up.
-  Happy to treat as fixed if I dont raise it again."* The trigger needs a specific program state to
-  arrive on its own, which is not something to ask for on demand.
-- **That is a decision to stop waiting, NOT a verification — and the distinction has teeth.** Its
-  `Verify: device` is removed so it stops printing as a debt, but **nothing has confirmed the fix
-  works.** If this entry's symptom is ever reported again, it is a REGRESSION REPORT against an
-  unverified fix, not a new bug: start from the original diff.
-- **What that buys, on RV-35's terms:** the fix rests on code and tests alone, so a later change here
-  needs a test that fails before it and passes after.
-
-- **Lane:** B — `components/workout/utils.ts` and `ai-prescription-card.tsx`. No Lane A half was
-  needed, which the entry thought it might be.
-- **✅ SHIPPED** (`fix/lb-47-deload-override-honesty`, 2026-09-02). `deloadOverrideOutcome` gives the
-  card a fourth state, `nothing-to-revert`, and the card no longer confirms an override that did not
-  occur.
-- **⚠ The entry's MEASUREMENT was exactly right and its CONCLUSION was not. Re-measured against
-  production 2026-09-02:** 5 stored prescriptions, 1 with a session-level `deload: true` carrying 0
-  exercises with `deloaded`/`preDeload`, 2 with a per-exercise deload, 0 with both — the entry's
-  figures to the row. What it did not check is what the *screen* does with that.
-- **On the owner's real session-level deload the toggle is not rendered at all**, so `Full` is not
-  "an override that does nothing" — it is not offerable. That prescription carries `phase: 'deload'`,
-  so `aiDynamicFallbackPhaseStatus` returns `isDeloadActive: true`, and `pre-workout-screen.tsx`
-  gates the whole `DeloadToggle` on `!phaseStatus?.isDeloadActive`.
-- **What IS reachable is worse than the entry described.** `deloadOverrideBlocked` returns empty in
-  that shape too, and the card read `blocked.length === 0` as *everything reverted* — rendering
-  **"Every exercise is back to its pre-deload weights and sets, and these sets count toward your
-  1RM."** Both clauses false. It needs `prescription.deload === true` while the server reports
-  `isDeloadActive` false — a prescription whose `deload` flag and `phase` disagree, which nothing
-  forbids and which production has not yet produced. Latent, not the owner's reported symptom.
-- **BF-64 was not reverted and its per-exercise path is untouched**, exactly as the entry insisted.
-  What changed is only the sentence shown when nothing was reverted.
-- **Still open, and deliberately not built here:** a real "run this at full intensity" path on a
-  session-level deload. It needs a regeneration `/prescribe` cannot do (the route takes no intensity
-  input), so it is a Lane A + owner question, not a copy change. **And the toggle's silent absence
-  is a smaller open question of its own** — the user who wants a full session sees no control and no
-  reason. One line of explanation where the toggle would be is cheap; whether it is wanted is the
-  owner's call, so it is not assumed here.
-
 ### [workouts] LB-46 — how a deload reaches the AI Prescription card, and why a hand-built fixture misleads
 
 - **✅ CLOSED 2026-09-01 by measurement against production.** No code change. Kept as a
@@ -7449,35 +7336,15 @@ owner has to re-describe in a wizard what the app already knows.
   guard against it would be in `reevaluate.ts`, which is Lane A's.
 - **Added:** 2026-09-01 by Lane B · closed the same day.
 
-### [workouts] BF-64 — the Full/Deload toggle can only ADD deload, never remove one, so `Full · Override` overrides nothing
-
-- **⚠ OWNER CLOSED THIS CONDITIONALLY, 2026-09-13.** Verbatim: *"Will let you know when it comes up.
-  Happy to treat as fixed if I dont raise it again."* The trigger needs a specific program state to
-  arrive on its own, which is not something to ask for on demand.
-- **That is a decision to stop waiting, NOT a verification — and the distinction has teeth.** Its
-  `Verify: device` is removed so it stops printing as a debt, but **nothing has confirmed the fix
-  works.** If this entry's symptom is ever reported again, it is a REGRESSION REPORT against an
-  unverified fix, not a new bug: start from the original diff.
-- **What that buys, on RV-35's terms:** the fix rests on code and tests alone, so a later change here
-  needs a test that fails before it and passes after.
-
-- **Keep:** the device pass, and only that. Everything else shipped.
-- **✅ SHIPPED** (`fix/deload-full-override-actually-reverts`, 2026-09-01). Session-level `Full` is
-  now the per-exercise revert applied to every deloaded exercise that carries pre-deload numbers, as
-  this entry recommended: no LLM call, no 429 budget, works offline. `isFullOverride`,
-  `deloadRevertNames` and `deloadOverrideBlocked` (`components/workout/utils.ts`) hold the rules;
-  `components/workout/__tests__/deload-full-override.test.ts` pins them, mutation-verified five ways
-  including the 1RM hazard.
-- **All three of this entry's warnings were honoured and are worth keeping:** the override keys on an
-  **explicit choice**, never `deload === false` (the first-render flash); an exercise with no
-  `preDeload` **stays deloaded** and the card names it rather than reverting silently; and 1RM
-  accounting follows without a separate change, because the revert clears `deloaded` and the
-  completion path already reads the reverted array.
-- **Added:** 2026-08-30 · owner, on the Pull pre-workout screen: *"pressing full or deload doesnt
-  change the 'prescription' not sure if its over writing it."*
-- **The `useFor1rm: false` on every `preDeloadStyle` set is still NOT a bug** — `estimateOneRm`
-  treats an all-false style as "no per-set preference, use them all", and `deloaded` is the
-  unambiguous signal. Left exactly as it is; it is the shape someone corrects on sight.
+> **⚠ BF-64 and LB-47 CLOSED CONDITIONALLY and removed, 2026-09-14/15 — nothing verified either fix.**
+> Owner, on both: *"Will let you know when it comes up. Happy to treat as fixed if I dont raise it
+> again."* Both need a specific program state to reproduce — a day where the AI has prescribed a
+> deload — and that state did not occur during the pass. **So if the `Full`/`Deload` toggle is
+> reported again, it is a REGRESSION AGAINST AN UNVERIFIED FIX, not a fresh bug**: start from the
+> shipped diff (`components/workout/utils.ts` and its `deload-full-override.test.ts`) rather than
+> re-deriving the cause. They were removed from the queue rather than left READY because they had
+> nothing left to build, and a finished entry at the head of a lane's work list is the one thing
+> `next-item.js` exists to prevent.
 
 ### [platform][app-shell] LB-32 — `min-h-[Npx]` is inert on every button in the app, and one comment already describes a size that never applied
 
@@ -9496,6 +9363,27 @@ the day's move-hours total is below the goal.
 
 ### [heart-rate] TN-13 — the HR tile shows a 7-day average of the one signal that best predicts how the owner feels
 
+- **❌ REPORTED BROKEN ON THE S25, 2026-09-15 — the cue does not render, and the cause is found.**
+  Owner, once sent to the right screen: *"on the homescreen HR chip it just says a number."* They are
+  correct, and it is not a data problem. **`RING_GEOMETRY` gives `showDot: true` to exactly ONE of
+  the eighteen ring styles — `accentring`** — and `oura-score-chip-row.tsx:189` renders the cue only
+  under `geo.showDot`. **So TN-13's delta shipped invisible on seventeen styles including the
+  default.** A later ring-style pass dropped the cue deliberately for the score cards (their colour
+  moved to the icon) and took the HR delta with it, which is a different thing: a score card's cue
+  duplicates a number that is already on screen, and the HR cue is the only place the comparison
+  exists at all.
+- **The number itself is CORRECT and was verified against production.** Home read **60**;
+  `body_metrics` holds `resting_heart_rate = 60` for 2026-09-15 against 57 · 55 · 54 · 55 on the four
+  nights before. **So the cue that did not render would have read about `+4 vs usual` — an elevated
+  morning, which is exactly the signal this entry was filed to surface.** The feature failed on the
+  one day it had something to say.
+- **⚠ The owner's other observation is a SECOND defect and is filed as OR-116** — Home's 60 matches
+  nothing on the Heart Rate screen (current 73 · min 50 · avg 89 · max 125) because they are
+  different metrics with nothing saying so. Do not fix it here.
+- **Owner's own verdict on the bare number:** *"which is fine as it makes it consistent with the
+  rest."* Take that as a constraint on the fix, not a closure: whatever restores the comparison
+  should not make the HR chip the odd one out in the row.
+
 - **⚠ THE CHECK WAS ASKED WITH THE WRONG LOCATION, 2026-09-14 — my error, not a finding, and it is
   now traced.** Owner: *"Not sure where to look - is there a heart rate tile in health? I only see
   Resting HR/HRV/SPO2."* **They were right and they were looking in the wrong place because I sent
@@ -9509,19 +9397,26 @@ the day's move-hours total is below the goal.
   bare number with no comparison, while Home's shows the same signal with a delta against baseline.
   Two surfaces for one metric, disagreeing about how much context it needs — worth deciding rather
   than leaving as an accident of which entry touched which file.
-- **Lane:** A — engine only: packages/shared.
+- **Lane:** B — **CHANGED FROM A, 2026-09-15, because the failure is not where the entry assumed.**
+  The engine half is correct and shipped: `packages/shared/src/health/resting-hr-cue.ts` computes the
+  delta, and production has the data to make it (`resting_heart_rate` 60 today against a 54–57
+  baseline). What is broken is the **render condition** in
+  `components/oura-score-chip-row.tsx` — `RING_GEOMETRY`'s `showDot` and the `geo.showDot && props.cue`
+  guard at line 189. Reached only from `components/**`, so Lane B by the path rule.
 
-- **Verify:** device
+- **The `Verify: device` is removed** — the look was taken on 2026-09-15 and it **failed**. Leaving
+  it would file live, buildable work under *"shipped; a look is owed, nothing is blocked"*, which is
+  the OR-105 trap in its most misleading form: not merely parked, but parked as finished.
 > **✅ SHIPPED 2026-08-30, both halves together — which the entry required.** The tile reads **last
 > night's** resting HR and renders a **delta against the owner's own baseline** ("50 · −7 vs usual")
 > rather than a bare bpm. `restingHrLastNight` + `restingHrLastNightDate` are new on
 > `readiness-payload.ts`; `restingHrCue` moved to
 > `packages/shared/src/health/resting-hr-cue.ts`, where it is importable and therefore testable.
 
-- **Keep:** the DEVICE check, and only that. Verify on the S25 that the Heart Rate tile shows a
-  number that moved since yesterday and a signed cue beside it, and that the cue is legible at the
-  tile's type size — **the cue text grew** from one word ("Low") to five ("−7 vs usual"), and the row
-  has 20 layout styles. Reaches the phone through a Railway deploy; no new APK.
+- **The `Keep:` that asked for this check is struck** — it has happened. Its wording is worth
+  carrying into the fix, though: it asked whether the cue is *legible* at the tile's type size,
+  having grown from one word to five. That question is still unanswered, because the cue has never
+  been on screen to judge.
 
 > **✅ "Should the tile show HRV instead?" — ASKED AND ANSWERED 2026-08-31. No. Do not re-open.**
 > ([review](reviews/2026-08-31-hrv-as-a-tile-metric.md).) Measured in contributor form, which is the
@@ -9564,6 +9459,27 @@ the number far less than raw-versus-relative does — so the defect was showing 
 Computed as the 10th percentile of BLE HR samples 08:00–21:00 Brisbane it moves 6.24 bpm night to
 night — 2.5× the nightly resting HR — which makes it the better **stress** candidate the owner
 intuited, but nothing in the app computes it and it does not belong on a tile labelled "Heart Rate".
+
+### [heart-rate][app-shell] OR-116 — Home and the Heart Rate screen show one metric as four numbers that agree with nothing
+
+- **Lane:** B — `components/oura-score-chip-row.tsx`, `components/health/body-cards/rhr-hrv-spo2-card.tsx`
+  and the `/health/heart-rate` detail. Reached only from `components/**`; no storage, no derivation change.
+- **Added:** 2026-09-15 · owner, while checking TN-13: *"I dont see any other values that match that
+  home screen HR value — current = 73, min = 50, average = 89, max = 125, and the HR card says 60."*
+- **Nothing is computing the wrong number.** Verified against production: Home's **60** is
+  `body_metrics.resting_heart_rate` for today — last night's **resting** rate. The detail screen's
+  73 / 50 / 89 / 125 are **intraday** current/min/average/max. Both are right. **The defect is that
+  no label says they are different things**, so a user comparing them concludes one is broken.
+- **This is the shape to fix, not the arithmetic:** one metric name — "heart rate" — covering a
+  nightly resting figure and a live intraday series, on two screens, with no qualifier on either.
+  Naming Home's chip for what it is (last night's resting rate) is probably most of the fix.
+- **⚠ There is a THIRD presentation of the same signal**, which is what makes this worth an entry
+  rather than a one-line rename: Health's own Resting HR tile shows the identical value as a bare
+  number with no comparison, while Home's shows it with a delta against baseline (when it renders at
+  all — see TN-13). **Three surfaces, one number, three different amounts of context.** Decide what
+  each surface is for before touching any of them.
+- **Do not fold this into TN-13.** That entry is about a cue that does not render; this is about what
+  the number is called. They meet on one screen and have different fixes.
 
 ### [activity] TN-17 — Activity as a pace-to-goal score: the mechanic works, the goals make it punishing
 - **Lane:** A — engine only: packages/shared.
@@ -10609,6 +10525,13 @@ without a queue entry is a dropped finding.*
 
 ### [platform] LB-52 — GitHub's auto-merge API does not see a Ruleset, so every PR is a hand-caught race
 
+- **⏸ ACKNOWLEDGED AND DEFERRED BY THE OWNER, 2026-09-15:** *"Keep this as a task to complete
+  later."* So the remedy is accepted and the timing is theirs. **The `Gate: owner` stays** — nothing
+  here is buildable by any agent; it is a repository setting.
+- **⚠ The cost keeps being paid in the meantime and is worth restating: 2026-09-14 alone, one PR
+  needed three base re-merges** (#1168 and #1170 landing under it, then again under the next one).
+  That is the tax this entry measures, and it scales with how many agents are running.
+
 - **Lane:** O — the Orchestrator's. The fix is a repository *setting*, not code in either lane's paths.
 - **Gate:** owner — the remedy is a repo setting only the owner can make.
 - **⚠️ THIS ENTRY'S ORIGINAL DIAGNOSIS WAS WRONG, and the correction is the point (2026-09-03).** It
@@ -10683,6 +10606,8 @@ without a queue entry is a dropped finding.*
   changelog before. Repeating that resolution N times per PR is where the real hazard sits.
 
 ### [platform] PS-4 — the batons are the cross-lane coordination mechanism and none of them fits on a screen
+
+- **Lane: ?** — **left unclassified on purpose; the OR-116 lane sweep tried to set `Lane: O` on 2026-09-15 and reverted it**, because this entry's own text below gives the reason and it still holds: each role rewrites its own baton, so this is done by whoever hands over next rather than assigned to anybody. (One correction to that text: the runner reads `O` now as well as A and B, so "the runner accepts only A or B" is stale. The argument does not depend on it.)
 
 - **Branch:** `docs/baton-compaction`
 - **Added:** 2026-08-19 · measured while adding batons to the size ratchet
@@ -12122,6 +12047,8 @@ Measured against `lib/walk/segment-stats.ts`:
   `Gate: device`.
 ### [platform] Q-551 — OWNER DECISION: stay on Railway or leave, once the D-track has shrunk the server
 
+- **Lane:** O — an owner decision about hosting with no code in either lane's paths. (Assigned 2026-09-15, OR-116 lane sweep.)
+
 > **⏸ HELD BY THE OWNER, 2026-08-30 — *"hold the railway portion of leaving it for now."*** Not
 > answered, not withdrawn: parked. **Do not re-put this to the owner** until Q-545 has shrunk the
 > server, which the entry already says is the right order. Nothing depends on it and it costs about
@@ -12900,6 +12827,8 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [devices][platform] Q-538 — `oura_raw.db` grows without bound on the phone: `pruneRaw` has no caller, and `rolled_up` is never set
 
+- **Lane:** A — `lib/local-store/**` pruning on the device — storage, so Lane A by the first clause of the rule. (Assigned 2026-09-15, OR-116 lane sweep.)
+
 > **⚑ MEASURED ON THE DEVICE 2026-08-30, and it is bigger than the entry assumed.** Owner, via the
 > console's Read stats: **652,417 total rows, 95.7 MB on disk.** That is the local `oura_raw.db`
 > with `pruneRaw` still having no caller. For scale: the owner's whole production Postgres was
@@ -13516,6 +13445,8 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   needs the precise cutover date rather than the month. Nothing else is owed.
 
 ### [workouts] Q-305 — the volume landmarks are computed and never shown to anyone
+
+- **Lane:** B — the landmarks are already computed; what is missing is a surface that shows them. (Assigned 2026-09-15, OR-116 lane sweep.)
 
 - **Branch:** `feat/surface-volume-landmarks`
 - **Plan:** none yet
@@ -16860,6 +16791,8 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [platform] Q-297 — cover Nutrition's day navigation (done; two residues, one of them owner's)
 
+- **Lane:** A — e2e specs and CI wiring, which is platform work and sits with the engine lane by convention. (Assigned 2026-09-15, OR-116 lane sweep.)
+
 - **Keep — TWO things, and neither is ordinary implementation work:**
   1. **A warmed-server instant-paint budget.** The 20 s skeleton budget catches a card that *never*
      seeds; it cannot tell "seeds instantly from cache" from "seeds in 8 s off the network", because
@@ -17257,6 +17190,8 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [platform][app-shell] Q-254 — strike the device-verification rows an E2E spec can now cover (re-tagging landed 2026-08-15; the striking half remains)
 
+- **Lane:** B — `components/profile-tab.tsx` plus a check script; the surface half dominates. Parked on `Needs: Q-297` regardless. (Assigned 2026-09-15, OR-116 lane sweep.)
+
 - **Needs:** Q-297
 - **Re-measured 2026-08-20:** **85 rows still match the device-verification pattern, and 3 of them
   carry no `needs:` tag at all** — `projectOverview.md:1209` (Q-281 colour-only-state),
@@ -17623,6 +17558,8 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   in the same session, not a Known-Issues row.
 
 ### [nutrition] Q-187 — the day recalculates against what was actually eaten (shipped; device check owed)
+
+- **Lane:** B — `components/nutrition/plan-rescale.ts` — the residue is a design question about a control, reached only from `components/**`. (Assigned 2026-09-15, OR-116 lane sweep.)
 
 - **Keep:** the design question only — **the device check is DONE** (2026-09-13, below: the day
   recalculates without a refresh, and the `(planned N)` rows read fine at 412 dp).
@@ -19316,6 +19253,8 @@ describing a safety net that no longer exists.
 
 ### [platform][app-shell] 🟠 Q-48 — roadmap gaps found by the 2026-08-02 native-convergence review
 
+- **Lane:** A — migrations and `scripts/check-push-mutations.js`. (Assigned 2026-09-15, OR-116 lane sweep.)
+
 - **The `Gate: owner` was removed 2026-09-01 — nothing here is the owner's any more.** F1, F2, F3
   and F7 are all answered (dates and quotes in the table below); F8 was fixed in this entry's own
   PR. What is left is **F4** and **F5**, both planning passes, and **F6**, a sequencing line Q-49
@@ -19514,6 +19453,16 @@ describing a safety net that no longer exists.
   origin. **Not** the workspace split, **not** `output: 'export'` — those are Q-1b.
 
 ### [app-shell] Q-1b — native ("Swift-like") feel: Phase 3 (bundle the shell into the APK) — HELD by the owner, who has now seen the measurement
+
+- **⏸ DEFERRED A THIRD TIME, 2026-09-15 — and this one comes with a trigger, which the previous two
+  did not.** Owner, shown the measurement they asked for: *"Yes defer for now; but keep it as a goal
+  for when we reach version 2 of the app."*
+- **The number they asked for, recorded here so it is not re-derived:** bundling buys **~0.44 s, on
+  cold open only**. Home paints in 472 ms, of which **439 ms is the document round trip to Railway**
+  and ~15 ms is JavaScript. It does not touch native process start, Capacitor init, or tab switching
+  — those never reach the network.
+- **What changes:** this stops being "deferred pending a decision" and becomes **scheduled for a v2
+  milestone**. Do not put it to the owner again before then.
 
 > **⏸ HELD BY THE OWNER, 2026-09-01 — and this time with the evidence in front of them, which is
 > what the entry said was missing.** Shown the 472 ms / 439 ms / 1.5 s numbers below and asked
@@ -20536,6 +20485,8 @@ that is not a device proof, and this is the code path with the worst data-loss h
 
 ### [workouts][platform] 🟡 `exercise_estimates` has no local mirror, but do not build one on its own
 
+- **Lane:** A — `lib/local-store/program-assembler.ts`; it is a local-store mirror, so storage by the first clause of the rule. (Assigned 2026-09-15, OR-116 lane sweep. This entry has no ID in its heading, which is why every previous lane count missed it — the scanner keys on the ID.)
+
 Found while building the `meal_types` local mirror (2026-07-30): mirroring
 `exercise_estimates` alone would be **inert**. `lib/local-store/program-assembler.ts`
 deliberately renders an offline program as *structure only* — `estimated1rm`,
@@ -20554,6 +20505,8 @@ wiring together, with a device check, rather than building a mirror table nobody
 reads.
 
 ### [platform] 🟡 J1 residual — CI-enforced cache/fetch hygiene gates
+
+- **Lane:** A — `lib/cache-groups.ts` and `scripts/migrate.js`. (Assigned 2026-09-15, OR-116 lane sweep.)
 
 - ✅ **`invalidateCache(` outside `lib/cache-groups.ts` — DONE 2026-07-30.** All 7 remaining raw
   call sites migrated to named group helpers (`invalidateOuraWorkoutReview`,
@@ -21114,6 +21067,8 @@ Health entry point, drawing its charts from values the route returned rather tha
 with the recap week visibly compared against the one before it.
 
 ### [workouts][devices] 🔵 PS-7 — camera form capture, Phase 0 only: can the S25 WebView run a pose landmarker at all?
+
+- **Lane:** A — a native/WebView feasibility spike, not a screen. (Assigned 2026-09-15, OR-116 lane sweep.)
 
 - Plan: [`docs/superpowers/plans/2026-08-26-camera-form-capture.md`](superpowers/plans/2026-08-26-camera-form-capture.md)
 - Branch: `spike/camera-pose-feasibility`
