@@ -21332,7 +21332,37 @@ what the warm-up countdown shows, and dragging the control does not fire a presc
 
 ### [app-shell][platform] 🔵 BF-5 — the week in review should be a page, not a banner that expands
 
-- **Lane:** A — classified 2026-08-30 by CLAUDE.md's path rule (*touches storage or `app/api/**` → A; both halves → A, engine first*). The route must return its numbers before a page can chart them; the page follows as **B**.
+- **Lane:** B — **reclassified 2026-09-15 when the engine half shipped.** It was A while the route
+  was the blocker (*touches storage or `app/api/**` → A; both halves → A, engine first*). The route
+  now returns its numbers, so what is left is reached only from `app/**` and `components/**`, which
+  is Lane B by the same path rule. `lib/day-review-reminders.ts` is in neither lane's path list; it
+  is scheduled from client code and reaches no storage, so it follows the surface half.
+- **Keep:** PR 2b, the surface. The page, its permanent Health entry point, the banner becoming
+  navigation, the notification retarget, and the stray trailing `*`.
+
+**✅ PR 2a SHIPPED 2026-09-15 — the route returns the metrics it used to throw away.**
+`packages/shared/src/health/weekly-digest-metrics.ts` owns `WeeklyDigestMetrics` and
+`buildWeeklyDigestContext`; `app/api/weekly-digest/route.ts` assembles the metrics, formats the
+prompt **from** them, and returns them on the fresh **and the cached** path — the cached one is what
+the banner almost always takes, so a page fed only by cache misses would be blank. No migration:
+metrics are recomputed, per this entry's own *"recomputing is the cheaper first cut"*.
+**The prompt is byte-identical**, and that was measured rather than asserted — the same fixture was
+run through `origin/main`'s route and the rewritten one and the two context blocks diffed equal.
+Nothing user-visible changed, which is why 2a shipped without a version bump.
+
+**⚠ Three of this entry's own claims were stale; corrected in the plan rather than here:** the
+notification already carries `extra: { route: '/?review=week' }` (line 105, **not** `'/'` at line 99)
+and `lib/__tests__/reminder-deep-links.test.ts` pins that row, so retargeting it edits a test too;
+`day-detail-content.tsx` is 299 lines, not 253; the route returns four fields, not two.
+
+**⚠ The entry's open scoping question — whether a daily series is in scope — is ANSWERED, and the
+answer is that it was never a cost.** Every one of readiness, sleep score, sleep hours, daytime
+stress, HRV and volume is *already computed per day and then averaged away*; the series is not
+extra work, it is not discarding what is in hand. Shipped in 2a. The one real subtlety is HRV: its
+overnight-vs-body-metrics fallback is chosen for the **whole window**, and the series keeps that —
+a per-day fallback would draw two instruments on one line with nothing marking the change.
+
+- **Plan:** [`2026-09-15-week-in-review-page.md`](superpowers/plans/2026-09-15-week-in-review-page.md) — splits 2a (engine, shipped) / 2b (surface, owed).
 
 
 **Owner request, 2026-08-23 (verbatim):** *"rather than chevron type display; id rathee its own page
