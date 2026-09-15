@@ -6341,53 +6341,45 @@ description will silently drop the field that turns out to matter. **The owner i
   number is ever displayed as fact before the owner confirms it (CLAUDE.md — a model handed a score
   of 80 called it *"perfect"*).
 
-### [nutrition][app-shell] BF-74 — the meal photo's ✕ sat in the dismiss corner (fixed; device check owed)
-
-- **❌ FAILED ON THE S25, 2026-09-13.** Owner: *"it gives me an undo option; but no warning before
-  removal"*. So the ✕ is reachable — the corner fix worked — but it **destroys the photo on a single
-  tap** and offers only an undo toast afterwards. The entry checked WHERE the control sits and never
-  asked what it costs to hit by accident, which on a photo the user just took is the whole risk.
-  **Undo-after is not equivalent to confirm-before here:** the toast is time-limited and a photo is
-  not recoverable once it passes. Either confirm first, or make the undo durable rather than a toast.
+### [nutrition][app-shell] BF-74 — the meal photo's remove control (corner, glyph and confirm all fixed; device check owed)
 
 - **Lane:** B · **Batch:** `nutrition-ui-uplift`
-- **⚠ The `Verify: device` and the `Keep:` are struck, 2026-09-15 (OR-116).** The check happened on
-  2026-09-13 and **failed**; both fields went on saying it was owed, so this entry advertised itself
-  as *"shipped; a look is owed, nothing is blocked"* while holding live, unbuilt work. Found by
-  widening `keepIsSettled` to treat a FAILED look as a settled one — the first version keyed on
-  `VERIFIED` only, which is the wrong half of the class to catch.
-- **What the struck `Keep:` was asking is now the acceptance test for the fix**, so it is kept as
-  that rather than deleted: on the S25, tapping the top-right of the meal photo must not discard it,
-  the bin must read as removal, and **the undo toast must be reachable before it dismisses** — that
-  last part is the half a desktop browser cannot judge, because the toast timeout against a thumb is
-  the whole question. It is also the half the owner's report says is currently the only protection.
 - **Added:** 2026-08-31 · owner: *"the delete image button is easy to hit with no confirmation."*
-
-**Three things were wrong and only one was size.** `meal-detail-sheet` passes `hideCloseButton`, so
-this ✕ at `right-0 top-0` was the **only** ✕ on the screen, in the corner a reach for "close" lands
-on — a wrong-meaning problem, which is why making it bigger would have made it easier to hit by
-accident. It is a **bin at the bottom-right** now, at 44 dp (48 after the global floor), and removal
-is **undoable** rather than confirmed: re-picking is already one tap, so a toast spares the gallery
-round-trip without putting a dialog in front of the common case.
-
-**The sibling sweep found one shape, not two.** `MealPhotoTile` has a `tile` variant as well as
-`hero`, but **both call sites pass `hero`** — `tile` has no callers. The shared control is fixed for
-both regardless.
-
-> **BF-76 VERIFIED and removed, 2026-09-14 — and its finding is the part worth keeping.** The
-> nutrition safe-area sweep enumerated all twelve sheets, found **nothing under-padded**, and changed
-> **no code**, because every available change would have made something worse. The `vh` hypothesis it
-> was filed on is **not** the mechanism: a bottom sheet is `fixed inset-x-0 bottom-0` and does not
-> depend on viewport height. Owner walked the twelve on the S25 in both navigation modes and reported
-> them clear. **Do not re-open a nutrition safe-area sweep without a specific sheet and a screenshot.**
-
-> **BF-57 VERIFIED and removed, 2026-09-14 — the two-phone, two-account test PASSED.** A friend
-> scanned a `Share code` label from their own account and the meal saved. **The distinction that test
-> established is the durable part:** `packages/shared/src/nutrition/label-payload.ts` has two label
-> kinds — **`shared-meal`** carries the whole recipe and works cross-account, and **`meal-id`** is a
-> 22-character pointer that only resolves for the owner. **Six of the seven label styles are pointer
-> styles**; only *Share code* carries the recipe, which is why the first attempt failed with *"no
-> saved meal"*. Both surfaces already explain this in-app; the failure was reading, not code.
+- **Two rounds. The first fixed WHERE the control sits; the second fixes WHAT IT COSTS to hit.**
+  Round one moved the ✕ out of the dismiss corner and made it a bin. Round two, shipped 2026-09-15,
+  puts a confirmation in front of it.
+- **The 2026-09-13 device pass failed, and that is what round two answers.** Owner: *"it gives
+  me an undo option; but no warning before removal"*. The corner fix worked — the control was
+  reachable and read as removal — and it still destroyed the photo on one tap.
+- **⚠ The component's own comment argued AGAINST a confirm, and it was measurably wrong.** It said
+  *"a confirm dialog is the crude answer; undo is the better one, because re-picking is already one
+  tap — the tile is a real picker — so the toast just spares the gallery round-trip."* **Checked:
+  `CapCamera.getPhoto` is called with no `saveToGallery`, which defaults to false**, so a photo taken
+  through this tile is never written to the gallery or anywhere else — it exists only as the base64
+  the component holds. **There is no gallery round-trip to spare, because there is nothing in the
+  gallery.** A toast is time-limited; once it passes the photo is gone. So the confirm is not a
+  matter of taste, and the entry's either/or resolves on evidence rather than preference.
+  (The argument does hold for a gallery-*sourced* photo, which is why the undo is kept as well.)
+- **Reuses `components/ui/confirm-dialog.tsx`** rather than hand-rolling — it already exists and is
+  what five other surfaces use.
+- **One non-obvious wiring detail:** the dialog is wrapped in a `stopPropagation` div. It renders
+  inside the picker's own `role="button"`, so a click on Cancel would otherwise bubble out and open
+  the camera behind the dialog it just closed.
+- **Proven load-bearing:** `e2e/meal-photo-picker.spec.ts`'s removal test now drives **both arms** —
+  cancel must leave the photo, confirm must clear it — and it fails against `main` on the missing
+  dialog. The cancel arm is asserted first, because a confirm that removes anyway passes every
+  happy-path assertion. **The spec was strengthened, not loosened.**
+- **Verify: device**
+- **Keep:** the look, and only that — and it is a NEW one. The 2026-09-13 check failed, which
+  converted this entry back into work; round two answers it, so what it owes now is another look
+  rather than a fix. On the S25: tapping the top-right of the meal photo must not discard it, the
+  bin must read as removal, **the confirm must appear before anything is lost**, and the undo toast
+  must still be reachable before it dismisses. That last part is the half a desktop browser cannot
+  judge, because the toast timeout against a thumb is the whole question.
+- **Shipped alone rather than with its batch, deliberately.** `nutrition-ui-uplift` holds six
+  entries; four are shipped-and-device-owed with no code to write, and BF-51 ① is device-blocked. The
+  batch exists to aggregate a *device sitting*, which is unaffected — there was nothing else
+  buildable to fold in.
 
 ### [nutrition][platform] LB-50 — the measured activity factor, and a prompt that tells the model something false
 

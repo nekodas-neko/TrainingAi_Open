@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { cn } from '@trainingai/shared/utils'
 import { dataUrlToBlob, downscaleToThumbDataUrl, THUMB_MAX_DIM } from '@/lib/media/downscale-image'
 import { mealImageBytes, rejectMealImage, mealImageRejectionMessage } from '@trainingai/shared/nutrition/meal-image'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 
 /**
  * `@capacitor/camera` reports a cancelled picker by throwing, with no code to test — only a message.
@@ -55,6 +56,7 @@ interface Props {
  * cheapest tripwire, and it is `mealImageBytes` — the same arithmetic the server rejects on.
  */
 export function MealPhotoTile({ value, onChange, disabled, variant = 'tile', label }: Props) {
+  const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
 
@@ -147,17 +149,35 @@ export function MealPhotoTile({ value, onChange, disabled, variant = 'tile', lab
   // **The glyph meant the wrong thing too.** An ✕ is dismissal; a bin is removal. Changing it is
   // half of why the control now reads as what it does, and it costs nothing.
   //
-  // **And it was unrecoverable.** The parent saves immediately, so a mis-tap lost the photo. A
-  // confirm dialog is the crude answer; undo is the better one, because re-picking is already one
-  // tap — the tile is a real picker — so the toast just spares the gallery round-trip.
+  // **And it was unrecoverable — which the undo toast did NOT fix, measured on the S25.** Owner,
+  // 2026-09-13: *"it gives me an undo option; but no warning before removal"*. The comment that
+  // stood here argued a confirm was crude because *"re-picking is already one tap … the toast just
+  // spares the gallery round-trip"*. **That is false for a photo taken with the camera.**
+  // `getPhoto` above is called with no `saveToGallery`, which defaults to false, so a camera
+  // capture is never written anywhere — it exists only as the base64 this component holds. There is
+  // no gallery round-trip to spare, because there is nothing in the gallery. A toast is
+  // time-limited; the photo is gone when it passes.
+  //
+  // So the confirm is not a matter of taste here, and it is the owner's own word for what was
+  // missing. **The undo stays as well** — it costs nothing and still helps the gallery-sourced case,
+  // where re-picking really is one tap.
+  const remove = () => {
+    // `?? null` because this is no longer inside the `value && !busy &&` narrowing the inline
+    // handler had — the dialog's confirm is a separate call site. Undefined means "not loaded yet",
+    // which restores to the same empty state as null, so collapsing them is correct rather than
+    // merely convenient.
+    const previous = value ?? null
+    setConfirmRemoveOpen(false)
+    onChange(null)
+    toast('Photo removed', { action: { label: 'Undo', onClick: () => onChange(previous) } })
+  }
+
   const removeButton = value && !busy && (
     <button
       type="button"
       onClick={e => {
         e.stopPropagation()
-        const previous = value
-        onChange(null)
-        toast('Photo removed', { action: { label: 'Undo', onClick: () => onChange(previous) } })
+        setConfirmRemoveOpen(true)
       }}
       aria-label={label ? `Remove the photo from ${label}` : 'Remove meal photo'}
       className={cn(
@@ -169,6 +189,22 @@ export function MealPhotoTile({ value, onChange, disabled, variant = 'tile', lab
     >
       <Trash2 className={variant === 'hero' ? 'h-[18px] w-[18px]' : 'h-4 w-4'} />
     </button>
+  )
+
+  // Rendered unconditionally rather than beside `removeButton`: this sits inside the picker's
+  // `role="button"` wrapper, and a click inside the dialog would otherwise bubble out and reopen the
+  // camera behind it. `stopPropagation` on the container is what keeps the two controls separate.
+  const confirmRemove = (
+    <div onClick={e => e.stopPropagation()}>
+      <ConfirmDialog
+        open={confirmRemoveOpen}
+        onOpenChange={setConfirmRemoveOpen}
+        title="Remove this photo?"
+        message="A photo you took with the camera is not saved anywhere else, so removing it here deletes it."
+        confirmLabel="Remove"
+        onConfirm={remove}
+      />
+    </div>
   )
 
   // A control containing a second control is a div with role=button, never a nested <button> —
@@ -228,6 +264,7 @@ export function MealPhotoTile({ value, onChange, disabled, variant = 'tile', lab
           </span>
         )}
         {removeButton}
+        {confirmRemove}
         {fileInput}
       </div>
     )
@@ -256,6 +293,7 @@ export function MealPhotoTile({ value, onChange, disabled, variant = 'tile', lab
           : <span className="inline-flex items-center gap-0.5"><ImagePlus className="h-2.5 w-2.5" /> Photo</span>}
       </p>
 
+      {confirmRemove}
       {fileInput}
     </div>
   )

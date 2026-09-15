@@ -12507,7 +12507,17 @@ existed under different names — so the entry as written would have produced tw
 about what is open, which is worse than the bug it was filed against. Recording *where* the registry
 is, and that the obvious grep returns a false negative, is what stops the next session repeating it.
 
-## 2026-09-11 — `docs/implementation-backlog.md` → 21229 (RV-42 shipped)
+## 2026-09-15 — `projectOverview.md` → 11382, `docs/implementation-backlog.md` → 21560 (BF-74)
+
++24 and −10: the backlog shrank because round two closed most of what the entry was carrying, and
+the index grew by the one thing that would otherwise be lost.
+
+That thing is a refutation of a comment already in the code. `meal-photo-tile.tsx` argued in writing
+that a confirm was crude because re-picking is one tap — and `getPhoto` is called with no
+`saveToGallery`, so for a camera capture there is nothing to re-pick. A future reader who finds the
+confirm annoying will find that comment first; the lines here are what stop them acting on it.
+
+## 2026-09-11 — `docs/implementation-backlog.md` → 21535 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 
@@ -12528,9 +12538,11 @@ reading of a moving number, and a PR that waits will re-read it once per merge t
 Recomputed by `pnpm fix:baselines` after each merge, which is the only thing that makes the
 subtraction mean anything.
 
-**Recomputed again 2026-09-15** (→ 21229). The two counts above are left at their 2026-09-11
+**Recomputed again 2026-09-15** (→ 21535). The two counts above are left at their 2026-09-11
 measurement rather than incremented, because incrementing by hand is the exact failure this note
 already records — and the derivation no longer reproduces: repeated merges of `main` move
 `merge-base` forward, so it now returns the last re-merge rather than the original branch point.
-What can be measured cleanly is that **8** first-parent merges overtook this branch since its
-previous re-merge alone. The headline figure is the live one; the two counts are a floor.
+What can be measured cleanly is the rewrite count itself, which does not depend on `merge-base`:
+**34** first-parent commits on this branch touch this file, and this is the thirty-fifth. That is the
+one number here worth trusting — the headline figure is the live one, and the two counts above are a
+floor.
