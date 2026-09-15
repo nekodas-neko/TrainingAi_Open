@@ -12384,3 +12384,14 @@ session to go looking for the arithmetic bug that is not there.
 
 The other weight is the two things NOT fixed — `hrMin` standing in for the resting rate, and the
 three-surfaces context question. Both would read as closed if the entry were shorter.
+
+## 2026-09-15 — `docs/implementation-backlog.md` → 21332 (TN-13 closed)
+
+The backlog **shrank 105 lines**: TN-13 left the queue entirely, because the owner's answer means
+nothing is owed and `check-backlog-pointers.js` is right to refuse a heading that announces its own
+completion. `projectOverview.md` is unchanged in length — the existing TN-13 paragraph absorbed the
+closure rather than gaining a new row, which is the correct shape for an entry that was already
+described there as shipped.
+
+The substance moved to a journal entry. That is the point of the rule: a queue that still lists a
+closed item is a queue nobody trusts, and the reasoning is not lost by being somewhere else.

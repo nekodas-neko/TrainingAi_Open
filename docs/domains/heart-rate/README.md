@@ -98,6 +98,16 @@ Live at the time of writing (2026-08-05):
 
 ## History
 
+- [`2026-09-15-tn13-closed-bare-number`](../../overview/entries/2026-09-15-tn13-closed-bare-number.md)
+  — **TN-13 (2026-09-15): CLOSED on a decision, not a fix — the bare number stays.** The resting-HR
+  delta shipped 2026-08-30 and **was never on screen**: `RING_GEOMETRY` sets `showDot: true` on 1 of
+  18 ring styles and the cue renders only under it, so it was invisible on seventeen including the
+  default. It failed on the one day it had something to say (60 against a 54–57 baseline → about
+  `+4 vs usual`). Offered four restorations, the owner chose the bare number — the HR chip would
+  otherwise be the only cell in the row with a second line. **The engine half stays**
+  (`resting-hr-cue.ts`) and still reaches the accessible name, so the comparison is spoken but not
+  drawn. **Do not re-open this, and do not "fix" the render condition.**
+
 - [`2026-09-15-or116-resting-vs-intraday-hr`](../../overview/entries/2026-09-15-or116-resting-vs-intraday-hr.md)
   — **OR-116 (2026-09-15): one metric name over two metrics.** Home's chip carries last night's
   **resting** rate; `/health/heart-rate` shows today's **intraday** current/min/average/max. Both

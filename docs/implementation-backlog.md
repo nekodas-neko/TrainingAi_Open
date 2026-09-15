@@ -9382,105 +9382,6 @@ like the feature works and would quietly teach the owner to ignore it.
 **Pass test:** on a day with a genuinely sedentary hour, that hour's cell reads empty on the strip and
 the day's move-hours total is below the goal.
 
-### [heart-rate] TN-13 — the HR tile shows a 7-day average of the one signal that best predicts how the owner feels
-
-- **❌ REPORTED BROKEN ON THE S25, 2026-09-15 — the cue does not render, and the cause is found.**
-  Owner, once sent to the right screen: *"on the homescreen HR chip it just says a number."* They are
-  correct, and it is not a data problem. **`RING_GEOMETRY` gives `showDot: true` to exactly ONE of
-  the eighteen ring styles — `accentring`** — and `oura-score-chip-row.tsx:189` renders the cue only
-  under `geo.showDot`. **So TN-13's delta shipped invisible on seventeen styles including the
-  default.** A later ring-style pass dropped the cue deliberately for the score cards (their colour
-  moved to the icon) and took the HR delta with it, which is a different thing: a score card's cue
-  duplicates a number that is already on screen, and the HR cue is the only place the comparison
-  exists at all.
-- **The number itself is CORRECT and was verified against production.** Home read **60**;
-  `body_metrics` holds `resting_heart_rate = 60` for 2026-09-15 against 57 · 55 · 54 · 55 on the four
-  nights before. **So the cue that did not render would have read about `+4 vs usual` — an elevated
-  morning, which is exactly the signal this entry was filed to surface.** The feature failed on the
-  one day it had something to say.
-- **⚠ The owner's other observation is a SECOND defect and is filed as OR-116** — Home's 60 matches
-  nothing on the Heart Rate screen (current 73 · min 50 · avg 89 · max 125) because they are
-  different metrics with nothing saying so. Do not fix it here.
-- **Owner's own verdict on the bare number:** *"which is fine as it makes it consistent with the
-  rest."* Take that as a constraint on the fix, not a closure: whatever restores the comparison
-  should not make the HR chip the odd one out in the row.
-
-- **⚠ THE CHECK WAS ASKED WITH THE WRONG LOCATION, 2026-09-14 — my error, not a finding, and it is
-  now traced.** Owner: *"Not sure where to look - is there a heart rate tile in health? I only see
-  Resting HR/HRV/SPO2."* **They were right and they were looking in the wrong place because I sent
-  them there.** What they saw is `components/health/body-cards/rhr-hrv-spo2-card.tsx` — a different
-  card, three tiles, no delta cue on any of them.
-- **The tile this entry shipped is on HOME, labelled `Heart Rate`,** in the score chip row beside
-  Readiness (`components/oura-score-chip-row.tsx:427`, rendered from
-  `app/session-select/session-select-content.tsx:1123`, which is the Home tab). That is where
-  `restingHrLastNight` and the `restingHrCue` delta render. **Re-ask against Home, not Health.**
-- **⚠ And there is a real question hiding behind the mistake.** Health's own Resting HR tile shows a
-  bare number with no comparison, while Home's shows the same signal with a delta against baseline.
-  Two surfaces for one metric, disagreeing about how much context it needs — worth deciding rather
-  than leaving as an accident of which entry touched which file.
-- **Lane:** B — **CHANGED FROM A, 2026-09-15, because the failure is not where the entry assumed.**
-  The engine half is correct and shipped: `packages/shared/src/health/resting-hr-cue.ts` computes the
-  delta, and production has the data to make it (`resting_heart_rate` 60 today against a 54–57
-  baseline). What is broken is the **render condition** in
-  `components/oura-score-chip-row.tsx` — `RING_GEOMETRY`'s `showDot` and the `geo.showDot && props.cue`
-  guard at line 189. Reached only from `components/**`, so Lane B by the path rule.
-
-- **The `Verify: device` is removed** — the look was taken on 2026-09-15 and it **failed**. Leaving
-  it would file live, buildable work under *"shipped; a look is owed, nothing is blocked"*, which is
-  the OR-105 trap in its most misleading form: not merely parked, but parked as finished.
-> **✅ SHIPPED 2026-08-30, both halves together — which the entry required.** The tile reads **last
-> night's** resting HR and renders a **delta against the owner's own baseline** ("50 · −7 vs usual")
-> rather than a bare bpm. `restingHrLastNight` + `restingHrLastNightDate` are new on
-> `readiness-payload.ts`; `restingHrCue` moved to
-> `packages/shared/src/health/resting-hr-cue.ts`, where it is importable and therefore testable.
-
-- **The `Keep:` that asked for this check is struck** — it has happened. Its wording is worth
-  carrying into the fix, though: it asked whether the cue is *legible* at the tile's type size,
-  having grown from one word to five. That question is still unanswered, because the cue has never
-  been on screen to judge.
-
-> **✅ "Should the tile show HRV instead?" — ASKED AND ANSWERED 2026-08-31. No. Do not re-open.**
-> ([review](reviews/2026-08-31-hrv-as-a-tile-metric.md).) Measured in contributor form, which is the
-> only fair comparison, against the owner's check-in (`perceived_recovery + sleep_quality_feel`;
-> negative r is correct, `provisional` rows excluded):
->
-> | contributor | r vs check-in |
-> |---|---|
-> | **restingHeartRate** | **−0.491** (n = 40) |
-> | hrvBalance | **−0.331** (n = 39) |
->
-> **HR wins, and it is not even a choice between two independent signals** — the two contributors
-> correlate **+0.751 with each other (56 % shared variance)**, so swapping loses a third of the
-> correlation and buys almost no new information. HRV is also the noisier vital: **CV 17.2 %** against
-> resting HR's **5.6 %**, night-to-night swing **7.42 ms** on a mean of 55.6 (**13 %**). It is real
-> signal, not noise (lag-1 autocorrelation **+0.439**; noise ratio 0.77 against 1.13 for white noise)
-> — it is simply a weaker single-night reading. **HRV belongs on a detail screen, not on this tile.**
-
-**Pass test, measured against production rather than asserted (71 nights, 2026-08-30):**
-
-| | value |
-|---|---|
-| nights where the **nightly** value changed | **61 of 70** |
-| nights where the **rounded 7-day mean** changed | 29 of 70 |
-| nightly mean absolute night-to-night change | **2.50 bpm** |
-| 7-day mean's change | 0.58 bpm |
-
-So the tile stood still on nearly six days in ten, and discarded **77 %** of the daily movement.
-**TN-13 recorded 2.11 / 0.33 / 84 % over 50 nights** — the direction is unchanged and the figures are
-restated because a number nobody re-measures drifts. Live check on `pnpm dev`: changing only last
-night moved the tile 50 → 62 (a 12 bpm swing) while the old 7-day value moved 55 → 57.
-
-**Why a delta and not a tier word.** Against `perceived_recovery`, expressing either candidate as a
-deviation from the owner's own baseline roughly **doubles** its correlation with felt state (+0.291
-vs +0.176 for waking-rest HR; +0.278 vs +0.129 for the nightly value). Which metric you pick moves
-the number far less than raw-versus-relative does — so the defect was showing an absolute bpm at all.
-69 means nothing without knowing the usual is 63.
-
-**The owner's "average awake resting HR" is still a separate entry and was NOT folded in here.**
-Computed as the 10th percentile of BLE HR samples 08:00–21:00 Brisbane it moves 6.24 bpm night to
-night — 2.5× the nightly resting HR — which makes it the better **stress** candidate the owner
-intuited, but nothing in the app computes it and it does not belong on a tile labelled "Heart Rate".
-
 ### [heart-rate][app-shell] OR-116 — one metric name over two metrics (labels fixed; the third surface's CONTEXT is still open)
 
 - **Lane:** B — `components/oura-score-chip-row.tsx` and `app/health/heart-rate/page.tsx`. Reached
@@ -9516,8 +9417,10 @@ intuited, but nothing in the app computes it and it does not belong on a tile la
   baseline, and the detail screen shows neither. Three surfaces, one number, three amounts of
   context — **decide what each surface is for**. Labelling stopped the numbers reading as broken; it
   did not decide that. ② the `hrMin`-as-resting question above. ③ the device check.
-- **Do not fold this into TN-13.** That entry is about a cue that does not render; this is about what
-  the number is called.
+- **TN-13 was the other half of the same owner report and is CLOSED** (2026-09-15, owner chose the
+  bare number over restoring the delta cue — see the journal entry, not the queue; it has been
+  removed). It was about a cue that does not render; this is about what the number is called. Its
+  closure does **not** cover the Keeps above.
 
 ### [activity] TN-17 — Activity as a pace-to-goal score: the mechanic works, the goals make it punishing
 - **Lane:** A — engine only: packages/shared.
