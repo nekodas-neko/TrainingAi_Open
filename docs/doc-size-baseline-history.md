@@ -12346,3 +12346,12 @@ defect.
 
 A "ruled out, do not re-walk" list is worth more per line than the finding it sits under — it is the
 difference between an implementer spending an hour confirming a dead end and reading one sentence.
+
+## 2026-09-15 — `projectOverview.md` → 11263, `docs/implementation-backlog.md` → 21412 (LA-109)
+
+The index grew 7 and the backlog **shrank** 8, which is the right direction for a session that
+closed an entry. The 7 are almost entirely the refutation: LA-109's own row could have been three
+lines, but the reason BF-49 is *not* this, and the reason BF-100 is now readable, are both things
+the next session would otherwise re-derive from the two coupled entries that said the opposite.
+
+A negative result costs lines exactly once and saves a re-run every time someone reads the pair.

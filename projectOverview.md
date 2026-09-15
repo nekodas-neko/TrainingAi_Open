@@ -2051,35 +2051,42 @@ Two hardware questions BF-58 keeps are still unanswered — whether two phones c
 connection at once, and whether `REQUEST_STORED_MEASUREMENTS_CMD` gets a reply (that one decides
 whether the race between the phones matters at all).
 
-### [app-shell][platform] 🟠 A tab flip leaves the previous tab's route tree on the history entry, so back renders the wrong screen (LA-109, 2026-09-15) · needs: fix
+### [app-shell][platform] ⚠️ A tab flip left the previous tab's route tree on the history entry, so back rendered the wrong screen (LA-109, 2026-09-15)
 
-**Open — found, measured, not fixed.** Owner: *"Going to more; then going to profile details and
-pressing back gets me to the home page again."*
+**Fixed — and the fix is proven, not merely green. The device gesture is what is still owed.** Owner:
+*"Going to more; then going to profile details and pressing back gets me to the home page again."*
 
-**Not LB-107 mis-classifying the path**, which was the first guess. `backActionForPath('/more/details')`
-correctly returns `pop`, and a test already pins that sub-routes pop.
+**Cause, measured by dumping `history.state` rather than reasoned.** After the More tab flip the URL
+reads `/more` while Next's recorded route tree for that entry is still `(home)` → `/`. `show()`
+(`tab-shell.tsx`) flips tabs with `window.history.replaceState(null, "", href)`, which moves the
+address bar; Next's patched `replaceState` re-injects its own current tree, still Home's, because no
+Next navigation happened. Popping back restores the Home tree — right URL, wrong screen.
 
-**Measured in Playwright by dumping `history.state`**, not reasoned: after the More tab flip the URL
-reads `/more` while Next's recorded route tree for that entry is **still `(home)` → `/`**. `show()`
-(`tab-shell.tsx:85`) flips tabs with `window.history.replaceState(null, "", href)`, which moves the
-address bar; Next's patched `replaceState` re-injects its own current tree, which is still Home's
-because no Next navigation happened. Popping back to that entry restores the Home tree and Home
-renders — right URL, wrong screen.
+**The fix reads the address bar at mount.** `TabShell`'s `useState` is now a lazy initializer that
+prefers `tabKeyForHref(window.location.pathname)` over the `initialTab` the stale tree produced.
+`usePathname()` would not do — it reads from the very tree that is wrong. Nothing reaches into
+`__PRIVATE_NEXTJS_INTERNALS_TREE`, which the entry had flagged as the risky shape. All three
+invariants hold: the flip still adds no history entry, the URL stays honest for refresh and deep
+links, and LB-107's back-to-Home from a tab root is unchanged.
 
-**⚑ BF-100 may be downstream of this.** It reports "back always lands at the top" on the same route,
-has failed on the S25 twice with its cause recorded as unknown, and restores correctly in the
-harness — and if back renders Home, there is no `/more` scroll position to restore. Fix this first,
-then re-test BF-100; only one of the two can be confirmed while the other stands. It does not retire
-BF-100: the `use-scroll-restoration.ts` `touchstart` finding is a real mechanism on its own.
+**Why "proven" is the right word.** `e2e/la109-back-from-subroute.spec.ts` was run against `main`'s
+unfixed `tab-shell.tsx` and goes **red** there. This check was not ceremony: the spec's first draft
+used `goto('/more/details')`, a full document load that rebuilds history, and passed while the bug
+was untouched.
 
-**⚑ BF-49 is very likely the same defect** (*"tapping a workout, then back, leads to health training
-not home"*) — it is marked "does not reproduce in the web harness" and concluded "the fix is not in
-the router", both consistent with this, since its harness repro began with a direct `goto` and so
-never carried a stale tree. Read the two together; do not fix them separately.
+**⚑ The BF-49 link is REFUTED.** LA-109's entry held that BF-49 (*"tapping a workout, then back,
+leads to health training not home"*) was very likely the same defect, and that neither should be
+fixed before one was tried against the other's repro. That trial ran: the same spec's second test
+drives BF-49's shape with the stale tree supplied deliberately, and it **passes against the unfixed
+file** in the same run where LA-109's test fails. BF-49 stays open on its own device repro, and the
+test is kept as a regression guard labelled as not being a BF-49 reproduction.
 
-**A fix must preserve all three of:** a tab flip not growing the history stack (pinned by
-`e2e/tab-flip-leaves-nothing-to-pop.spec.ts`), the URL staying honest for refresh and deep links, and
-LB-107's back-to-Home from a tab root. Filed as **LA-109**, Lane B.
+**⚑ BF-100 is unblocked.** It could not be read while this stood — if back rendered Home there was
+no `/more` scroll position to restore. It needs a device pass now, not more reading.
+
+**NOT verified on device.** The Android system back gesture and the WebView's history handling are
+not reachable from the sandbox; Playwright's `goBack()` is the same history step but not the same
+gesture. Kept as LA-109's `Keep:`.
 
 ### [workouts] ⚠️ A bodyweight exercise no longer shows a kg target, and that is not device-verified (BF-162, 2026-09-15)
 
