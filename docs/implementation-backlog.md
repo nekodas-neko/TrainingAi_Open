@@ -17584,6 +17584,18 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   into a file nobody opens is how a rule stops firing, and this repo has already paid for that.
 - **Does not block the public cut**, and should not be bundled into it. It makes every session
   after it cheaper, which is the argument for soon rather than never.
+- **⚠ Lane A reached this entry on 2026-09-15 and deferred it deliberately — recorded so the next
+  implementer does not re-derive the reasoning and defer it again silently.** Lever 3 is not a
+  discrete task by its own terms (*"incrementally, on touch, never as a big-bang rewrite"*), so what
+  is actually queued here is **Lever 2**, and Lever 2 is a bulk move of ~207 open entries out of the
+  single file that **five other concurrent agents append to every session**. Its conflict surface is
+  the whole file, and the failure mode is not a merge marker but a silently dropped entry — the same
+  shape that put LB-4, Q-454, Q-455 and Q-465 back into the queue three times from ordinary
+  two-deletion conflicts. Lever 1 also already demonstrated the specific hazard: **19 of 72
+  ✅-marked entries still had something owed**, and a sweep that moved all of them would have hidden
+  a check that was still being chased. **This wants a quiet window and the Orchestrator's docs
+  authority, not an implementer lane racing five writers.** Nothing about the measurement is
+  disputed — the cost is real and the entry stays queued.
 
 > **Q-173 removed 2026-08-11 — it was already shipped.** #1223 ("Tell the user why the early-deload
 > card fired") added `earlyDeload: EarlyDeloadReason | null` to `ReadinessScoreResponse` and gave
@@ -21175,11 +21187,27 @@ partner and consent is obviously present — but the mechanism has to hold for t
 puts in the confirm-first carve-out, and unlike most entries the carve-out is the whole feature rather
 than one migration inside it.
 
-**Related and currently open: PR #124** (`fix/exercises-route-admin-db-check`) tightens
-`isAdminUser` so an API route can no longer authorize from the stale JWT claim, and adds
-`scripts/check-admin-claim-in-api.js` to keep it that way. It has been green and awaiting the owner's
-word since **2026-08-18**. A trainer feature raises the stakes on exactly that check — landing #124
-first is the cheaper order.
+**✅ PLANNED 2026-09-15 —
+[`2026-09-15-trainer-role.md`](superpowers/plans/2026-09-15-trainer-role.md).** Splits PR 1
+(migration, alone) / PR 2 (engine, Lane A) / PR 3 (trainer UI, Lane B). It settles the one thing
+this entry left open and the one thing it got wrong; read §2 before writing any code.
+
+**⚠ THE CHEAP VERSION OF THIS FEATURE REBUILDS RV-42, and that is not obvious from this entry.**
+`app/api/workout-templates/route.ts:74` validates styles with `progressionStyleIdsOwned(userId, …)`,
+scoped `eq(progressionStyles.userId, userId)`. Aim it at the trainee and a trainer cannot use a
+single style from their own library; aim it at the trainer — the obvious fix — and you have a row in
+one account pointing at a row in another, where `session_exercises.style_id` is `ON DELETE SET NULL`
+and the FK is the only ownership link. That is RV-42's rule (c) exactly, in a second domain, while
+RV-42's own fix is still unmerged. **The plan's answer is copy-on-assign**: copy the style into the
+trainee's account and reference the copy, so the trainee owns every row their program depends on.
+
+**⚠ PR #124 IS MERGED — this entry's claim that it is "currently open" and "awaiting the owner's word
+since 2026-08-18" is STALE (corrected 2026-09-15 against `main`, not against the PR title).** It
+merged **2026-08-23** and all three artifacts are present: `scripts/check-admin-claim-in-api.js`
+exists, it is wired into the Custom Rules job, and `lib/__tests__/admin-claim-not-authoritative.test.ts`
+pins the two helpers apart. The only `isAdminUser(` left under `app/api/**` is the comment recording
+the fix. **So the "land #124 first" ordering is discharged and BF-9 has no prerequisite left** — it
+is blocked only on the owner's word to merge, which §7 of the plan states.
 
 **Scope, per the owner:** workout programs first, **meal plans deferred**. Say so in the plan so the
 deferral is a decision rather than an omission.

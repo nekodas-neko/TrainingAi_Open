@@ -18,6 +18,21 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-15 — `docs/implementation-backlog.md` → 21641, `projectOverview.md` → 11423 (BF-9 plan)
+
+Both grew, and for once the growth is a correction rather than a record.
+
+The lines added to BF-9 say that the obvious implementation of the trainer role reproduces RV-42 —
+a cross-account row reference on an `ON DELETE SET NULL` foreign key — and that this entry's own
+claim about PR #124 being open is stale by three weeks. **A stale claim costs more than the lines
+that retract it**: an implementer who believes #124 is unmerged waits for an owner who has already
+answered, and one who does not read §2 ships the bug in a second domain while the first is still
+awaiting a decision.
+
+Q-220 also gained a paragraph recording why Lane A reached it and deferred it. That is the cheapest
+line in this diff and the one most likely to save a session — without it the next implementer
+re-derives the same reasoning, defers it again, and leaves no trace for the one after that.
+
 ## 2026-09-15 — `docs/implementation-backlog.md` → 21590, `projectOverview.md` → 11393 (BF-5 PR 2a)
 
 +30 and +11, and both are the same thing: an entry that shipped **half** of itself.
