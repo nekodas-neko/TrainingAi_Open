@@ -1891,6 +1891,32 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [readiness][devices] ⚠️ A ring-less user gets an illness radar now, and no such account has been driven (PS-42, 2026-09-15)
+
+Shipped with no version bump — nothing changes for a ring user. `computeIllnessRadar` renormalizes
+over whichever of its four signals are present, so it is built for partial input; its only caller ran
+it as `latestSummary ? compute(…) : null`, so a user without a ring got **no illness computation at
+all**. It now runs on the generic branch with temperature and breathing null (no generic source
+supplies either) and the resting-HR/HRV z-scores taken from the readiness composite rather than
+recomputed.
+
+**The owner's path is untouched, and that was checked:** he has `oura_daily_summary` for 30 of the
+last 30 days, so `latestSummary` is non-null and the ring branch runs exactly as before.
+
+**New behaviour worth stating:** a generic user's readiness can now be *suppressed* by the radar —
+that line already existed and simply never had a non-null radar to read. `learning` suppresses
+nothing.
+
+**A coupling recorded in the code, because it looks like a bug:** `nHistory` is passed to the radar
+here and is currently unreachable as a discriminator. `trailingBaselineZ` needs `BASELINE_MIN_NIGHTS`
+prior samples before returning anything, so a non-null z already implies a mature baseline. Both
+gates stay — the coupling is an accident of the current threshold, not a guarantee.
+
+**Not verified on a real account.** The sandbox has no Health-Connect-only user and the owner cannot
+be one. **What a pass looks like:** a test account with `body_metrics`/`sleep_sessions` populated and
+no `oura_daily_summary` row returns a non-null illness flag from `/api/readiness-score`, with
+temperature and breathing absent from its biomarkers.
+
 ### [workouts] ⚠️ Bodyweight rep maxes read true now, on every surface — and prescribed reps go up (BF-164, 2026-09-15, v1.456.13) · needs: device
 
 Owner, on the Hanging Leg Raise ready screen showing **"Last: 11 reps"** directly above **"REP MAX
@@ -1978,6 +2004,30 @@ in and it saves with no prompt; the partner weighs in on his phone and **no** *"
 Two hardware questions BF-58 keeps are still unanswered — whether two phones can hold a GATT
 connection at once, and whether `REQUEST_STORED_MEASUREMENTS_CMD` gets a reply (that one decides
 whether the race between the phones matters at all).
+
+### [app-shell][platform] 🟠 A tab flip leaves the previous tab's route tree on the history entry, so back renders the wrong screen (LA-109, 2026-09-15) · needs: fix
+
+**Open — found, measured, not fixed.** Owner: *"Going to more; then going to profile details and
+pressing back gets me to the home page again."*
+
+**Not LB-107 mis-classifying the path**, which was the first guess. `backActionForPath('/more/details')`
+correctly returns `pop`, and a test already pins that sub-routes pop.
+
+**Measured in Playwright by dumping `history.state`**, not reasoned: after the More tab flip the URL
+reads `/more` while Next's recorded route tree for that entry is **still `(home)` → `/`**. `show()`
+(`tab-shell.tsx:85`) flips tabs with `window.history.replaceState(null, "", href)`, which moves the
+address bar; Next's patched `replaceState` re-injects its own current tree, which is still Home's
+because no Next navigation happened. Popping back to that entry restores the Home tree and Home
+renders — right URL, wrong screen.
+
+**⚑ BF-49 is very likely the same defect** (*"tapping a workout, then back, leads to health training
+not home"*) — it is marked "does not reproduce in the web harness" and concluded "the fix is not in
+the router", both consistent with this, since its harness repro began with a direct `goto` and so
+never carried a stale tree. Read the two together; do not fix them separately.
+
+**A fix must preserve all three of:** a tab flip not growing the history stack (pinned by
+`e2e/tab-flip-leaves-nothing-to-pop.spec.ts`), the URL staying honest for refresh and deep links, and
+LB-107's back-to-Home from a tab root. Filed as **LA-109**, Lane B.
 
 ### [workouts] ⚠️ A bodyweight exercise no longer shows a kg target, and that is not device-verified (BF-162, 2026-09-15)
 

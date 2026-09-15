@@ -475,12 +475,79 @@ below threshold and left in place for next time.
      without the console.
   3. **The sheet's close animation cancels the push** — `onOpenChange(false)` runs immediately
      before `router.push` in the same tick.
+- **⚑ SYMPTOM NARROWED BY THE OWNER, 2026-09-15 — this confirms candidate 1 and demotes the other
+  two.** Asked whether the sheet closes, he answered: *"When i tap any activity from other activity
+  it just scrolls to the top of cardio hub."* So the sheet **does** close, the screen **stays** on
+  `/cardio`, and the hub's scroll position **resets to the top**. A tap that did nothing would not
+  move the scroll; a chunk-load failure would not either.
+- **The scroll reset has a mechanism, and it is consistent with a view transition that completes on
+  the same page.** `cardio-content.tsx:87` scrolls in a **nested `overflow-y-auto` div**, not the
+  document scroller. `use-scroll-restoration.ts` says in its own opening lines that it works on the
+  *"window/document scroller, so it cannot see, save or restore a nested element's `scrollTop`"* —
+  and `/cardio` does not call it in any case (only `pull-to-sync` and `nutrition-content` do). A view
+  transition snapshots and re-lays-out the page; the root scroller survives that, a nested one is not
+  covered. So `startViewTransition` running to completion **without a navigation** would leave the
+  hub exactly where he is seeing it: same screen, scrolled to top.
+  **Not verified on device** — stated as the mechanism that fits, not as a measurement. Proving it is
+  one console line: log `location.href` inside the commit poll and see whether it ever changes.
+- **What this means for the fix.** The question is no longer "does the tap fire" but **"why does
+  `router.push('/activity')` not commit within the 300 ms cap"** — the sheet's `onOpenChange(false)`
+  runs in the same tick immediately before it, and Radix unmounts the portal on close. A fix that
+  merely lengthens `NAVIGATION_TIMEOUT_MS` would turn a dead tap into a slow dead tap; the cap is a
+  safety net, not the bug.
 - **`error_events` holds nothing for this**, checked over three days: no `/activity` or `/cardio` row
   at all. Absence is not evidence here — a navigation that silently does not happen throws nothing —
   but it does rule out an uncaught exception being reported.
 - **Verification:** on device with the WebView console attached, tap Cardio → Other activity →
   Treadmill and record whether (a) the sheet closes, (b) the URL becomes `/activity`, (c) anything is
   logged. Those three answers pick between the candidates above.
+### [app-shell][platform] LA-109 — a tab flip leaves the PREVIOUS tab's route tree on the history entry, so back renders the wrong screen
+
+- **Lane:** B — `components/shell/tab-shell.tsx`.
+- **Added:** 2026-09-15 · owner, live report: *"Going to more; then going to profile details and
+  pressing back gets me to the home page again."*
+- **⚠ This is NOT LB-107 mis-classifying the path, which was the first guess and is wrong.**
+  `backActionForPath('/more/details')` correctly returns `pop` — `tabKeyForHref` requires an exact
+  match against a tab href, and `components/shell/__tests__/back-action-on-tab.test.ts` already
+  asserts sub-routes pop. The resolver is not the defect and changing it would break tab backs.
+
+**MEASURED 2026-09-15 in Playwright against `pnpm dev`, by dumping `history.state` rather than
+reasoning about it.** Load `/`, then click the More tab:
+
+| where | `history.length` | URL | Next's recorded tree for that entry |
+|---|---|---|---|
+| `/` | 2 | `/` | `["", {children: ["(home)", …"/"…]}]` |
+| after the More tab flip | 2 | **`/more`** | `["", {children: ["(home)", …"/"…]}]` — **unchanged** |
+| `/more/details` | 3 | `/more/details` | `["", {children: ["more", {children: ["details", …]}]}]` |
+
+**The middle row is the bug.** `show()` (`tab-shell.tsx:85`) flips tabs with
+`window.history.replaceState(null, "", href)`, which updates the address bar — and Next's patched
+`replaceState` re-injects **its own current tree**, which is still Home's, because no Next
+navigation happened. So the entry ends up reading `/more` while carrying the route tree for `/`.
+Popping back to it restores that tree, and Home renders. The URL is right and the screen is wrong,
+which is why this reads as "back went to the home page".
+
+- **The comment above that line describes the intent correctly and the mechanism incompletely.** It
+  says replaceState keeps "the URL honest for refresh/deep-links/back". It keeps the URL honest; it
+  leaves the *tree* stale, and only back can see the difference.
+- **⚑ BF-49 is very likely the same defect and should be read with this.** *"Tapping a workout, then
+  back, leads to health training not home. Same with tapping a food item from timeline."* That entry
+  is marked *"does not reproduce in the web harness"* and concluded *"the fix is not in the router"* —
+  both consistent with this, since the harness sequence it drove started with a direct `goto` rather
+  than a tab flip, so no entry ever carried a stale tree. **Do not fix the two separately** until one
+  has been tried against the other's repro.
+- **What a fix has to preserve**, all three of which the current shape gets right and a naive change
+  would break: a tab flip must not grow the history stack (`e2e/tab-flip-leaves-nothing-to-pop.spec.ts`
+  pins this), the URL must stay honest for refresh and deep links, and LB-107's back-to-Home from a
+  tab root must keep working. The likely shape is to hand `replaceState` a state object carrying the
+  destination tab's tree rather than letting Next re-inject the old one — but that reaches into
+  Next's internals (`__PRIVATE_NEXTJS_INTERNALS_TREE`), so **measure a candidate before adopting it**.
+- **Reproduction note for whoever takes it:** the row-click route is awkward in the harness — a daily
+  check-in sheet opens over Home and intercepts pointer events, and Escape does not dismiss it.
+  Dumping `history.state` after the tab flip is the cheap measurement and needs no row click at all.
+- **Verification:** from Home, flip to More, open Profile details, press back — arrive on **More**
+  with the More tab active, not Home. Then repeat BF-49's sequence and confirm it, too.
+
 
 ### [devices] PS-40 — formalize the data-source connector convention as a typed, checkable declaration
 
@@ -531,29 +598,6 @@ below threshold and left in place for next time.
   generic source's data isn't reaching a shared table it structurally could" found in this pass —
   small, scoped to one pillar, and directly closes part of the degraded-mode gap the
   device-agnostic-source goal names as still open.
-
-### [devices][readiness] PS-42 — wire illness radar into the generic (non-Oura) readiness path
-
-- **Lane:** A — `lib/health/readiness-payload.ts`.
-- **Added:** 2026-09-14 (one-off session; same input-tracing pass as PS-41 — see
-  [`docs/data-source-connector-guide.md`](data-source-connector-guide.md) §4's illness radar row).
-- **The gap:** `computeIllnessRadar` (`packages/shared/src/health/illness-radar.ts`) is written to
-  degrade gracefully — its four weighted signals (temperature 0.40, breathing 0.25, RHR 0.20,
-  HRV-balance 0.15) are each optional and the formula renormalizes over whichever are present. But
-  its only caller, `readiness-payload.ts`, computes it *only if* `latestSummary` (an
-  `oura_daily_summary` row) exists — so a Health-Connect-only user gets **no illness computation at
-  all**, not even a temperature-omitted degraded one, despite the formula supporting exactly that
-  case.
-- **The fix, in shape:** call `computeIllnessRadar` from the same generic-fallback branch that
-  already builds `genericComposite` for readiness (the `// Generic-source fallback (Q-43)` code at
-  `readiness-payload.ts:494–541`), passing whatever z-scores that branch already computes (RHR,
-  HRV) and `null` for temperature/breathing (which have no generic source, same as the readiness
-  composite's own temperature contributor) — the formula's existing renormalization handles the rest.
-  This is a wiring change, not a new formula.
-- **Verification:** confirm on a test account with body_metrics/sleep_sessions populated via
-  Health Connect only (no `oura_daily_summary` row) that `/api/readiness-score` returns a non-null
-  illness radar value with `inputsMissing` naming temperature/breathing, rather than omitting the
-  field entirely.
 
 ### [devices] PS-43 — decide whether Health Connect's 30-day cold-sync cap should be a deliberate policy or extendable
 

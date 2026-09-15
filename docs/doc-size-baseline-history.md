@@ -12208,7 +12208,53 @@ one BF-164 described, found only by grepping rather than trusting the entry's li
 the lines because the same "80% of the estimate" idea will look correct to the next person who
 writes it.
 
-## 2026-09-15 — `projectOverview.md` → 11154, `docs/implementation-backlog.md` → 21177 (BF-162)
+## 2026-09-15 — LA-109 filed (backlog +37, projectOverview +24)
+
+Both grow for a finding that is cheap to state wrongly and expensive to re-derive. The owner
+reported back from Profile details landing on Home; the obvious reading is that LB-107, which
+shipped the day before, mis-classified the path. It did not — `backActionForPath('/more/details')`
+returns `pop` correctly, and a test already pins that. An entry that only said "back goes to the
+wrong screen" would send the next session straight at the resolver and break tab backs fixing
+nothing.
+
+What earns the lines is the measurement: a `history.state` dump showing the entry reading `/more`
+while carrying Next's route tree for `/`. That is three numbers in a table and it converts the
+entry from a symptom into a mechanism — and it is what lets LA-109 say BF-49 is probably the same
+defect, which is worth more than either entry alone.
+
+## 2026-09-15 — `docs/implementation-backlog.md` (BF-165 narrowed)
+
+Twenty-six lines onto BF-165. The owner's "it just scrolls to the top of cardio hub" is evidence
+rather than colour — a tap that never fired would not move the scroll — so the entry now carries the
+nested-scroller mechanism that explains it, and the warning that raising the navigation timeout turns
+a dead tap into a slow dead tap.
+
+## 2026-09-15 — PS-42 shipped (backlog −23, projectOverview +26)
+
+The row costs more than the entry saved, and the surplus is one paragraph: `nHistory` is passed to
+the illness radar on the generic path and is currently unreachable as a discriminator, because
+`trailingBaselineZ` will not return a z-score until the baseline is already mature. That reads as
+dead code and is not — it becomes load-bearing the moment anyone lowers that threshold. It survived
+a mutation as an equivalent mutant, which is exactly how it would have been "cleaned up" by someone
+who trusted the mutation score without reading why it survived.
+
+The rest is the device-verification gap: the owner cannot test this one, because having a ring is
+what makes his path safe here and also what makes the new branch unreachable from his account.
+
+## 2026-09-15 — PS-41 gated on the owner (backlog +33)
+
+The entry described a degraded-mode feature for users without a ring. Reading the merge path and
+measuring production found it is a change to the **owner's own** Activity Score: there is no
+precedence ladder to add a slot to (`getHrForWindow` applies one rule, `preferStrapBuckets`, and
+passes everything else through unranked), and he is a Health Connect user whose HR coverage is
+already 31 of 31 days at ~2,240 rows a day. Sparse phone samples interleaved into that series feed
+22% of the Activity Score's weight.
+
+Worth every line because the entry reads as safe. An implementer who trusted it would have shipped a
+scoring change without knowing it was one — which is the exact thing CLAUDE.md's "Tuning proposes,
+the owner signs off" rule exists to stop.
+
+## 2026-09-15 — `projectOverview.md` → 11204, `docs/implementation-backlog.md` → 21221 (BF-162)
 
 +11 on each for a one-guard fix, and the length is carrying one thing: why the harness is not going
 to catch this class. `exercise_library` holds 27 bodyweight exercises and none of them is in any
