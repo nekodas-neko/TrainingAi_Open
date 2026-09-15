@@ -714,7 +714,22 @@ resolution; derived rows have one writer.**
   measured against production. **Its finding, which should decide it: the line barely matters for
   Activity (63% → 100% core on a basic wearable), matters some for Readiness (35% → 66%), and is the
   whole question for Sleep (35% → 55% → 87%), because 48 of sleep's 110 points sit in HRV, stages and
-  restfulness.** Owner, 2026-09-15: *"the app works fine with less sources but is more
+  restfulness.**
+- **✅ OWNER REQUIREMENT, 2026-09-15, and the measurement that settles the shape:** the owner objected
+  that a duration-only core could reach 100, and that adding staging must make 100 harder rather than
+  simply adding a delta. **He is right, and the current model is backwards.** One real night — 8 h,
+  consistent window, poor deep/REM, HRV below baseline — run through the live renormalising formula
+  scores **74 with the ring (10 contributors), 84 on a basic watch (6), and 92 on phone/manual only
+  (3).** **The app pays 18 points for taking the ring OFF**, because renormalising drops the
+  contributors that were pulling the score down. So the defect is not that a phone-only user scores
+  well; it is that **more information can only ever hurt**.
+  **The shape this forces: the core must NOT reach 100.** Core tops out at **~92** (*"as good as it
+  looks from here"*), adjustments run roughly **−20 to +8** and are weighted toward deduction, and
+  the night above lands on 74 either way (core 92, adjustments −18). 100 then means *confirmed good
+  by everything visible*; 92 means *nothing visible is wrong, and little is visible*.
+  **⛔ Do NOT cap the core far below 100** (e.g. sleep core 0–55 with adjustments filling the rest) —
+  a phone-only user pinned at 55 reads as *"you sleep badly"* when the truth is *"we cannot see"*.
+  What remains the owner's is the **input list** per pillar, not this shape. Owner, 2026-09-15: *"the app works fine with less sources but is more
   accurate and tuned with more sources."* **⚑ That is NOT what the code does.** `sleep-score.ts:399`
   renormalises the weighted mean over whichever contributors are present, and readiness passes a
   neutral 50 — so **connecting a ring changes the denominator and moves the score for a reason
