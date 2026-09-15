@@ -1937,6 +1937,19 @@ Two hardware questions BF-58 keeps are still unanswered — whether two phones c
 connection at once, and whether `REQUEST_STORED_MEASUREMENTS_CMD` gets a reply (that one decides
 whether the race between the phones matters at all).
 
+### [workouts] ⚠️ A bodyweight exercise no longer shows a kg target, and that is not device-verified (BF-162, 2026-09-15)
+
+The owner, reading his Legs prescription: *"Is this right?"* The card printed **`@ 85kg (66%)`**
+against a **Hanging Leg Raise** — 66% of a stored `estimated_1rm` of 128, which for a bodyweight
+exercise is an internal index derived from reps (BF-149), not a load. There is no bar. Pull-Up showed
+`@ 90kg` the same way.
+
+Fixed by one guard using the shared `isBodyweightType`; the row falls through to the percent-only
+branch the card already rendered for exercises with no 1RM. **Check on device:** a session containing
+a bodyweight exercise shows no kg for it, while weighted exercises in the same list are unchanged.
+**The harness cannot cover this** — 27 bodyweight exercises exist in the library and none is in any
+session, so the row cannot be rendered without inventing fixture state.
+
 ### [app-shell] ⚠️ Back on a tab now goes Home, and the gesture itself is not device-verified (LB-107, 2026-09-14)
 
 Shipped in v1.456.6. The owner reported that back on a tab *"should go to the home screen"*; what it

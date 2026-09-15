@@ -712,8 +712,16 @@ below threshold and left in place for next time.
 - **Consider, not required:** for a bodyweight exercise the useful target is reps, and `avg_reps` is
   stored (BF-151 is already about reading it rather than inverting). Showing *"2×12"* with the
   percent and no kg is complete on its own; a rep target is a further improvement, not part of this.
-- **Verification:** on device, open a session containing a bodyweight exercise and confirm no kg is
-  shown for it while weighted exercises in the same list are unchanged.
+- **✅ SHIPPED 2026-09-15** (`fix/bf162-bodyweight-no-kg`).
+  [Journal](overview/entries/2026-09-15-bf162-bodyweight-no-kg.md). One guard on `weightKg`, using
+  the **shared** `isBodyweightType` from `packages/shared/src/1rm.ts` rather than a ninth inline
+  `=== 'bodyweight'` — there were eight. A bodyweight exercise falls through to the `@ ${ex.pct}%`
+  branch the card already rendered when a 1RM was missing.
+- **Keep:** the device check, and only that — open a session containing a bodyweight exercise and
+  confirm no kg is shown for it while weighted exercises in the same list are unchanged. **The
+  harness cannot stand in for it:** `exercise_library` holds 27 bodyweight exercises and **none is in
+  any `session_exercises` row**, so a prescription row for one cannot be rendered without inventing
+  fixture state — which would test a situation built for the test rather than the one reported.
 
 ### [workouts] BF-163 — the intensity chip is computed from load alone, so it labels a 6-rep set "Hypertrophy · typically 8–12 reps"
 

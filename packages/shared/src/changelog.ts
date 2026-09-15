@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.456.13",
+    date: "2026-09-15",
+    changes: [
+      "Bodyweight exercises no longer show a weight to load. The prescription card was telling you to put 85 kg on a Hanging Leg Raise and 90 kg on a Pull-Up — there is no bar on either. Those numbers were a percentage of the internal strength score the app keeps for bodyweight moves, which is built from your reps, not from any weight. The card now shows the percentage on its own for those exercises, the way it already did for anything it had no strength figure for. Weighted exercises are unchanged.",
+    ],
+  },
+  {
     version: "1.456.12",
     date: "2026-09-14",
     changes: [

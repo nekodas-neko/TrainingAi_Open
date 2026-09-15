@@ -13,6 +13,7 @@ import { explainExerciseChoice } from "@trainingai/shared/ai-periodization/expla
 import { prescriptionDrivesLoad } from "@trainingai/shared/ai-periodization/apply-prescription";
 import { mroundStepUp, weightStepFor, type DeloadOverrideOutcome } from "@/components/workout/utils";
 import { intensityZoneForPct } from "@trainingai/shared/workout/intensity-zone";
+import { isBodyweightType } from "@trainingai/shared/1rm";
 import { RoleChip } from "./role-chip";
 import { invalidatePrescriptionChanged } from "@/lib/cache-groups";
 
@@ -280,7 +281,15 @@ export function AiPrescriptionCard({
           <div className="space-y-1.5">
             {shownExercises.map(ex => {
               const oneRm = liveOneRm[ex.sessionExerciseId] ?? null;
-              const weightKg = oneRm != null
+              // A bodyweight 1RM is an internal index derived from reps (BF-149), not a load, so a
+              // percentage of it is not kilograms — the card was printing `@ 85kg (66%)` against a
+              // Hanging Leg Raise, which has no bar to load (BF-162). Q-19 established the rule and
+              // applied it to the rationale only; this is the same rule on the exercise rows.
+              //
+              // Falls through to the `@ ${ex.pct}%` branch the card already renders when a 1RM is
+              // missing. Deliberately NOT relabelled as added weight: 85 is 66% of a 128 index, so
+              // calling it "added" would turn a visibly absurd number into a plausible wrong one.
+              const weightKg = oneRm != null && !isBodyweightType(exerciseTypeById?.[ex.sessionExerciseId])
                 ? mroundStepUp(oneRm * ex.pct / 100, weightStepFor(equipmentById?.[ex.sessionExerciseId]))
                 : null;
               const mode = lastSetModeById?.[ex.sessionExerciseId];

@@ -12157,3 +12157,14 @@ Thirty lines correcting BF-149's scope. The table of four call sites is the entr
 wrong" was already filed and fixed once, so what this needs to carry is WHERE it is still wrong and
 that one of the four prescribes reps rather than printing them. It also records why the sweep missed:
 BF-149 grepped the function's direct callers and not the wrapper seven surfaces import.
+
+## 2026-09-15 — `projectOverview.md` → 11112, `docs/implementation-backlog.md` → 21262 (BF-162)
+
++11 on each for a one-guard fix, and the length is carrying one thing: why the harness is not going
+to catch this class. `exercise_library` holds 27 bodyweight exercises and none of them is in any
+`session_exercises` row, so a prescription row for one cannot be rendered without building the
+fixture that would make it appear — which tests a situation constructed for the test.
+
+Recording that is what stops the next session either writing the e2e and believing it, or reading
+"no e2e" as an omission. The rest is the two stored numbers that produced the report, so the
+arithmetic stays reproducible after the data moves on.
