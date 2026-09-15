@@ -26,8 +26,19 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.456.4 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-09-14.
+**Version:** v1.456.20 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-09-15.
+
+**The weekly digest returns its numbers now, so the week in review can be drawn rather than
+described (BF-5 PR 2a — no version bump, nothing user-visible changed).** `/api/weekly-digest`
+computed every figure the Home banner talks about, flattened them into the model's prompt and threw
+the values away; it now builds `WeeklyDigestMetrics`, formats the prompt **from** that, and returns
+it — on the cached path too, which is the one the banner almost always takes. The prompt is
+byte-identical, and that was measured rather than claimed: the same fixture run through the old
+route and the new one produced identical context blocks, now frozen as a test. Each metric carries a
+7-day series because the route was already computing one per day and averaging it away — so the
+entry's open "is a daily series in scope" question was never a cost. **The page itself is Lane B's
+and is still owed**; BF-5 stays queued and was reclassified to Lane B.
 
 **A generic data-source connector contract now exists, written from the code rather than intent (no
 version bump — docs only).** Owner request: a structure so a second user's own ring/strap/phone can

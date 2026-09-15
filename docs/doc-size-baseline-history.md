@@ -18,6 +18,20 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-15 — `docs/implementation-backlog.md` → 21590, `projectOverview.md` → 11393 (BF-5 PR 2a)
+
++30 and +11, and both are the same thing: an entry that shipped **half** of itself.
+
+BF-5's engine half landed and its surface half did not, so the entry stays queued and had to say
+which half — plus a `Lane:` reclassified from A to B, a `Keep:` naming what is owed, and three of
+its own claims struck as stale. A completed entry shrinks this file; a half-completed one grows it,
+because "what is left" is longer to state than "done".
+
+The eleven lines in the index are the part that would otherwise be lost: that the prompt is
+byte-identical **and how that was established** — the same fixture run through both routes and the
+context blocks diffed, rather than a transcription checked against itself. A later session reading
+only "refactored to return metrics" would have no reason to trust it and would re-derive it.
+
 ## 2026-09-01 — `docs/implementation-backlog.md` 14506 → 14521 (BF-55's owner gate cleared)
 
 Fifteen lines recording the owner's approval to drop `oura_heartrate_user_updated`, and the

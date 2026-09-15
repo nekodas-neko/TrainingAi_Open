@@ -19,10 +19,20 @@ split is "does it feel slow" vs "is it actually slow at the source".
 
 ## Reference docs
 
+- [`docs/superpowers/plans/2026-09-15-week-in-review-page.md`](../../superpowers/plans/2026-09-15-week-in-review-page.md)
+  — **BF-5, the week in review as a page.** The engine half shipped 2026-09-15:
+  `/api/weekly-digest` now returns `WeeklyDigestMetrics` alongside the prose instead of flattening
+  every number into the prompt and discarding it. The surface half — a week page alongside the
+  existing `app/health/day/`, its permanent Health entry point, the banner becoming navigation,
+  the notification retarget — does not exist yet; it is Lane B's and still owed. Read §1 before
+  touching it, because three of the backlog entry's own claims about the current code were stale.
 - [`docs/superpowers/plans/2026-08-25-unified-day-review.md`](../../superpowers/plans/2026-08-25-unified-day-review.md)
   — **Q-112, the unified day review.** Relevant here for the entry points: Home's day-review banner,
-  the two local reminders in `lib/day-review-reminders.ts` (which deep-link to `/`, not to the
-  review), and the argument for `/health/day` being the read-through rather than a third day surface.
+  the two local reminders in `lib/day-review-reminders.ts`, and the argument for `/health/day` being
+  the read-through rather than a third day surface. ⚠ Its parenthetical that the reminders
+  *"deep-link to `/`, not to the review"* is **stale** — corrected 2026-09-15. They carry
+  `/nutrition?review=day` and `/?review=week`, both read by a screen, and
+  `lib/__tests__/reminder-deep-links.test.ts` pins each row.
 - [`docs/app-responsiveness-investigation.md`](../../app-responsiveness-investigation.md) —
   **start here.** Why the app doesn't feel native; the investigation brief behind the current
   performance push.
