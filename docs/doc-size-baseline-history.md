@@ -12692,3 +12692,10 @@ byte-for-byte a dead tap: no throw, no 4xx, no console error, URL unchanged. The
 destination with a direct `goto` before measuring a push) is cheap to state and was expensive to find.
 
 Left the superseded entries in place rather than rewriting them. The sequence is the lesson.
+
+## 2026-09-16 — `docs/implementation-backlog.md` (BF-167)
+
+Forty-six lines. The table earns its space because "is the deload on?" is answered by the data and
+contradicted by the screen, and an implementer needs both halves side by side. The rest is two
+guardrails: deload-toggle.tsx is ALREADY correct and must not be "fixed", and the rationale's
+"50-min working budget" is right rather than a hallucination — I nearly filed that one.
