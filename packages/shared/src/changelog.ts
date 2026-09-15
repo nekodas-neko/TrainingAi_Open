@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.456.20",
+    date: "2026-09-15",
+    changes: [
+      "Removing a meal photo now asks first. The bin on a meal picture deleted it on a single tap and offered only an undo notice afterwards \u2014 and that notice disappears on its own. A photo you take in the app is not saved to your gallery, so once it went it was gone for good. You get a confirmation now, and the undo is still there behind it for a picture you chose from your gallery, which you can always pick again.",
+    ],
+  },
+  {
     version: "1.456.19",
     date: "2026-09-15",
     changes: [

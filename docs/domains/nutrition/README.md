@@ -322,6 +322,16 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- [`2026-09-15-bf74-photo-remove-confirm`](../../overview/entries/2026-09-15-bf74-photo-remove-confirm.md)
+  — **BF-74 round two (2026-09-15): removing a meal photo asks first.** Round one moved the ✕ out of
+  the dismiss corner and made it a bin; the device pass still found it destroyed the photo on one
+  tap. **The component's comment argued against a confirm on the grounds that re-picking is one tap —
+  checkable, and wrong:** `CapCamera.getPhoto` is called with **no `saveToGallery`** (defaults false),
+  so a camera capture lives only as the base64 the component holds and a time-limited toast is the
+  only protection. Uses the existing `confirm-dialog.tsx`; the undo stays for the gallery-sourced
+  case. The e2e drives cancel *then* confirm — cancel first, because a confirm that removes anyway
+  passes every happy-path assertion. Device check owed.
+
 - **[`docs/handoff-2026-09-02-nutrition-lane-a-session.md`](../../handoff-2026-09-02-nutrition-lane-a-session.md)**
   — 🆕 **Lane A session, 2026-09-02: ten PRs.** BF-69 stage 1 (supplement contributions, migrations
   254/255, local SQLite v34), LB-48, LB-49's meal-log `scale`, LB-50's prompt fix, LB-18's unscoped
