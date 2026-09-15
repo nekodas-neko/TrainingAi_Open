@@ -12679,6 +12679,18 @@ The part that is not diagnosis is the part that matters most to the owner: **Gui
 dead tap and he has not reported it.** A narrowing that found a second instance of the bug is not
 bookkeeping.
 
+## 2026-09-15 — `projectOverview.md` → 11450, `docs/implementation-backlog.md` → 22025 (BF-165 retraction)
+
+The index **shrank 20** and the backlog grew 37, which is the right shape for a retraction: the false
+narrowing comes out of the orientation doc, and the reason it was false goes into the entry.
+
+Three rounds of confident, wrong conclusions — including a fabricated second defect — came from one
+missing control. `next dev` compiles on demand, so a cold route's RSC fetch hangs, and that is
+byte-for-byte a dead tap: no throw, no 4xx, no console error, URL unchanged. The rule (warm the
+destination with a direct `goto` before measuring a push) is cheap to state and was expensive to find.
+
+Left the superseded entries in place rather than rewriting them. The sequence is the lesson.
+
 ## 2026-09-11 — `docs/implementation-backlog.md` → 21535 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
