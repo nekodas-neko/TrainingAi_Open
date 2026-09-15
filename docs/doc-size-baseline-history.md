@@ -12576,3 +12576,24 @@ almost every day.
 
 Recording a correction to my own measurement costs more lines than restating the original finding
 would have, which is the reason to spend them.
+
+## 2026-09-15 — backlog → 21774: three entries from the unused-signal audit, and a retraction on PS-44
+
++103 lines for an audit the owner asked for — *"what other metrics can we calculate from our data"* —
+and the lines are mostly measurements, which are what stop each entry being re-argued.
+
+**TN-39 earns the most and is the point of the audit.** The daytime-stress model is an imputation
+that has never been checked against measured HRV, and the measured HRV is in the database: the
+chest strap is worn 07:00–13:00, which is exactly the window the model guesses about. The
+strap-beats-against-stress-minutes table is the whole argument — without it the entry reads as a
+nice-to-have rather than a check on the number driving deload recommendations.
+
+**The retraction on PS-44 is the expensive part and had to be.** That entry says the raw ingredient
+is "already streaming into the app", which is true and misleading: 136,440 beats, and **242 of them
+at night across 6 nights**. A row count looks like plenty until it is grouped by hour, so the entry
+now says that outright rather than leaving the next implementer to discover it after starting.
+
+**Two killed hypotheses are recorded deliberately.** `ehr_*` is not workout detection (event counts
+run highest on days with no workout), and there are no computed-but-unsurfaced metrics — four
+modules looked dead on a narrow grep and all four are consumed. The second is written down because
+the same narrow grep will produce the same false result again.
