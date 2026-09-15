@@ -29,6 +29,17 @@
 **Version:** v1.456.20 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-15.
 
+**The trainer role has a plan, and the plan's main job is stopping it rebuilding a bug we already
+have open (BF-9 — docs only, no code).** `saveProgram` is already parameterised by user id, so a
+trainer route is "call the same function with a different id" — which is what makes the feature
+cheap and what makes it dangerous. The style-ownership check in front of it is scoped to one user:
+aim it at the trainee and a trainer cannot use their own library, aim it at the trainer and you have
+a row in one account pointing at a row in another on an `ON DELETE SET NULL` foreign key. That is
+**RV-42's exact shape in a second domain, while RV-42's own fix is still unmerged**. The plan's
+answer is copy-on-assign. Also corrected: the entry's claim that PR #124 is open and awaiting the
+owner is stale — **it merged 2026-08-23**, verified against `main`, so BF-9 has no prerequisite left
+and is blocked only on the owner's word to merge.
+
 **The weekly digest returns its numbers now, so the week in review can be drawn rather than
 described (BF-5 PR 2a — no version bump, nothing user-visible changed).** `/api/weekly-digest`
 computed every figure the Home banner talks about, flattened them into the model's prompt and threw
