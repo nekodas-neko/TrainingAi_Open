@@ -598,6 +598,43 @@ below threshold and left in place for next time.
   pulls in — `activity-screen.tsx`, `activity-store`, `reconcileRehydratedActivity`) does on a
   CLIENT-side commit that `app/running/page.tsx` does not. A direct `goto('/activity')` renders fine,
   so whatever it is only bites on the push path.
+
+---
+
+## ⛔ RETRACTION, 2026-09-15 — EVERYTHING ABOVE FROM "REPRODUCED IN THE PLAYWRIGHT HARNESS" IS WRONG
+
+**BF-165 does NOT reproduce in the harness. It was `next dev` compiling the route on demand.**
+
+Warm the destination first — `goto('/activity/guided-walk')`, then `goto('/activity')`, then back to
+`/cardio` — and the tap **works**: the URL becomes `/activity/guided-walk` and the RSC request returns
+**200**. Every "dead tap" measured here was a **cold route**.
+
+**What this retracts, specifically:**
+
+| claim | status |
+|---|---|
+| "Reproduced in the harness — not device-only" | **WRONG.** It does not reproduce. The entry's original device gate was right. |
+| "Guided walk is a SECOND dead button the owner has not reported" | **WRONG.** Guided walk is fine. Do not chase it. |
+| "Both failures share the `/activity` prefix" | **WRONG.** `/running` merely compiled faster than `ActivityScreen`'s tree inside the same wait. |
+| "The sheet's `history.back()` is not the cause" | **UNPROVEN.** That experiment also ran against a cold route, so it established nothing either way. |
+| "`/activity` serves 200 and renders on a direct visit" | **Still true** — a direct `goto` is unaffected. |
+
+**The mechanism, and it is the part worth keeping.** `next dev` compiles a route the first time it is
+requested. A client-side `router.push` issues an RSC fetch (`/activity/guided-walk?_rsc=…`) which then
+**hangs until compilation finishes** — measured here as unresolved after 8 s while two sibling `/api/*`
+calls on the same page returned 200. Nothing throws, nothing 4xx/5xx, no console error. **It is
+indistinguishable from a dead tap**, and no wait you pick is long enough to be safe, because the
+compile time depends on the size of the tree behind the route.
+
+**⚠ THE RULE FOR ANY NAVIGATION PROBE IN THIS HARNESS: warm the destination with a direct `goto`
+BEFORE measuring a client-side push to it.** Without that, "the navigation did not happen" means
+nothing. This cost three rounds of confident, wrong conclusions here, including a fabricated second
+defect.
+
+**BF-165 is back to what it was:** device-gated, cause unknown, three candidates open. The `Lane:` and
+the source-path elimination table at the top of this entry are unaffected — those came from reading,
+not from the harness.
+
 ### [app-shell][platform] LA-109 — a tab flip leaves the PREVIOUS tab's route tree on the history entry (fixed; device check owed)
 
 - **Lane:** B — `components/shell/tab-shell.tsx`.
