@@ -92,6 +92,25 @@ the offset restores that way, the cause is settled. Every device pass so far has
 because this entry's own verification step says to. **The fix is deliberately not built** — it
 changes takeover behaviour on every screen, and must not ship on a hypothesis when one tap decides it.
 
+**⚠ PROBED IN THE HARNESS 2026-09-15, AND THE RESULT IS INCONCLUSIVE — the obvious probe does not
+work, so do not re-run it.** The `/more` push-and-back was driven twice in one test with equal settle
+windows, once plain and once dispatching a synthetic `touchstart` on the scroll container right after
+`goBack()`. **The control restored. The touch arm restored too, to 840.** That **refutes the probe,
+not the hypothesis**: the element was picked as *"first node taller than its client height"*, which
+need not be the `ref` the hook listens on, and the dispatch fires as soon as the URL settles, which
+may be after the restore has already landed. The next attempt must confirm **which element carries
+the listener** and that the event arrives **inside `RESTORE_WINDOW_MS`** before reading anything into
+the outcome. **The one-tap device experiment above is still the thing that settles it.**
+
+**⚠ And a finding about the spec rather than the bug:** `scroll-restoration.spec.ts` asserts an
+**exact** offset (`toBe(before)`). Measured locally against clean `main` it restored to **1019**
+against a saved **778** and went red — the content grows on revalidation between save and restore.
+Restoration was working; the assertion was not. It survives in CI, so this is a local/CI divergence
+rather than a live regression, but **an exact-offset assertion cannot tell _cancelled_ from
+_imprecise_** — which is the exact distinction BF-100 turns on. A probe for this class needs a coarse
+measure (*did it move off the top at all*), not equality.
+([journal](docs/overview/entries/2026-09-15-bf100-touchstart-probe-inconclusive.md))
+
 A second owner request found in
 the same body had **no entry anywhere** and is now **LB-107**: back on a tab with nothing to pop
 should land on Home rather than leave the app

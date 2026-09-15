@@ -47,6 +47,15 @@ split is "does it feel slow" vs "is it actually slow at the source".
   the entry, and is now gone from both. **A screen that scrolls its own container gets no restoration
   from being inside the shell — check the call, not the layout.** `/health/day`'s scroller had no
   bottom padding at all. Both owe **one** device pass; RV-37 has still never been observed.
+- [`docs/overview/entries/2026-09-15-bf100-touchstart-probe-inconclusive.md`](../../overview/entries/2026-09-15-bf100-touchstart-probe-inconclusive.md)
+  — **BF-100's `touchstart` candidate probed in the harness, INCONCLUSIVE (2026-09-15).** The
+  mechanism is real in source (`stop()` latches `done`, no re-arm, registered for
+  `wheel`/`touchstart`/`keydown`), but a synthetic `touchstart` on the scroll container after
+  `goBack()` did **not** cancel the restore — it landed at 840. **That refutes the probe, not the
+  hypothesis:** the element may not be the hook's `ref`, and the dispatch may miss
+  `RESTORE_WINDOW_MS`. **Instrument before re-running.** Also here: the spec's `toBe(before)` is an
+  exact-offset assertion that went red locally at 1019-against-778 while restoration was working —
+  it cannot tell *cancelled* from *imprecise*, which is the distinction BF-100 turns on.
 - [`docs/overview/entries/2026-09-15-bf166-back-closes-overlay.md`](../../overview/entries/2026-09-15-bf166-back-closes-overlay.md)
   — **The back listener ignored the overlay stack the app already had (BF-166), 2026-09-15.**
   **Read this before adding any overlay/back machinery:** the registry exists — `sheet-back-stack.ts`

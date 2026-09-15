@@ -12532,3 +12532,15 @@ That thing is a refutation of a comment already in the code. `meal-photo-tile.ts
 that a confirm was crude because re-picking is one tap — and `getPhoto` is called with no
 `saveToGallery`, so for a camera capture there is nothing to re-pick. A future reader who finds the
 confirm annoying will find that comment first; the lines here are what stop them acting on it.
+
+## 2026-09-15 — `projectOverview.md` → 11401, `docs/implementation-backlog.md` → 21583 (BF-100 probe)
+
++19 and +23 for a session that shipped no code, and that is the right trade here.
+
+An inconclusive result is the easiest thing to leave out and the most expensive to re-derive: without
+these lines the next session writes the same synthetic-`touchstart` probe, gets the same 840, and has
+to work out from scratch whether that killed the hypothesis or just the probe. The lines say which,
+and name the two things to instrument.
+
+The second half — that the existing spec asserts an exact offset and cannot tell *cancelled* from
+*imprecise* — is what makes any future probe in this area readable at all.

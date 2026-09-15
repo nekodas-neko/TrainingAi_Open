@@ -5302,6 +5302,29 @@ feature and not a deletion like LB-41:
 - **Do not re-derive the six traps below to explain it.** They are paid for and in the hook. The
   question is what `/more` does that `health-content` and `session-select-content` do not, given all
   three take the same `PullToSync` path.
+- **⚠ THE `touchstart` CANDIDATE WAS PROBED IN THE HARNESS ON 2026-09-15 AND THE RESULT IS
+  INCONCLUSIVE — read this before re-running it, because the obvious probe does not work.**
+  The mechanism is real *in source*: `stop()` latches `done = true` and disconnects the observer, and
+  it is registered for `wheel`/`touchstart`/`keydown` with **no re-arm**. What is not established is
+  that the back gesture's touch reaches it in time.
+  **What was run:** the existing `/more` push-and-back, twice in one test with equal settle windows —
+  once plain, once dispatching `new Event('touchstart', {bubbles:true})` on the scroll container
+  immediately after `goBack()`. **Control restored. The touch arm ALSO restored, to 840.**
+  **That refutes the PROBE, not the hypothesis**, and the two reasons are specific:
+  (a) the element was picked as *"first node whose `scrollHeight` exceeds `clientHeight`"*, which is
+  not necessarily the `ref` the hook attached its listener to; and (b) the dispatch may land after the
+  restore has already completed, since it fires as soon as the URL settles.
+  **The next attempt must instrument, not guess:** confirm which element carries the listener and
+  that the event arrives *inside* the restore window, before reading anything into the outcome.
+  `__scrollRestorationInternals` exports `RESTORE_WINDOW_MS`, which is where that timing comes from.
+- **⚠ A SECOND finding from the same run, about the existing spec rather than the bug.**
+  `scroll-restoration.spec.ts` asserts `toBe(before)` — an **exact** offset. Measured locally against
+  clean `main`: it restored to **1019** against a saved **778** and went red, because the content
+  grows on revalidation between save and restore. **Restoration was working; the assertion was not.**
+  It survives in CI, so this is a local/CI divergence rather than a live regression — but an
+  exact-offset assertion cannot tell *cancelled* from *imprecise*, which is precisely the distinction
+  BF-100 turns on. A probe for this class needs a coarse measure (*did it move off the top at all*),
+  not equality.
 - **⚠ A CANDIDATE CAUSE, found 2026-09-14 by reading the hook rather than the screens — and it
   explains the harness/device split outright, which no previous hypothesis did.**
   `use-scroll-restoration.ts:158` attaches `stop` to **`touchstart`** on the scroll container, and
