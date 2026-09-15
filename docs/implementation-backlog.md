@@ -437,6 +437,76 @@ below threshold and left in place for next time.
 
 
 
+### [workouts] BF-167 — one prescription says `deload: false` at the top and `deloaded: true` on every exercise, so the toggle claims "Full" over a deloaded session
+
+- **Lane:** B — `components/workout/pre-workout-screen.tsx:233-239` is the wrong read.
+  `components/workout/deload-toggle.tsx` is already correct and needs no change; see below.
+- **Added:** 2026-09-16 (BugFix intake). Owner: *"I dont know if its triggered deload or not. I
+  accepted the ai reccomensatuon."* He could not tell from the screen, and the screen is the reason.
+- **The deload IS applied. Measured on his accepted 2026-09-16 Push prescription:**
+
+  | exercise | prescribed | `preDeload` | |
+  |---|---|---|---|
+  | Barbell Bench Press | **52%** | 76% | `deloaded: true` |
+  | Barbell Overhead Press | **52%** | 72.5% | `deloaded: true` |
+  | Cable Chest Dips | **52%** | 70.5% | `deloaded: true` |
+  | Dumbbell Fly | **52%** | 76% | `deloaded: true` |
+  | Tricep Cable Combo | **52%** | 76% | `deloaded: true` |
+
+  Every row carries `deloadNote: "Deload — illness radar: elevated"`, and every row renders it.
+- **And the SAME stored object has `prescription.deload = false`.** Verified against
+  `session_periodization` — the top-level flag reads **false** on this row and on the three before
+  it, while the exercises inside read `deloaded: true`. The disagreement is inside one JSON blob.
+- **That flag is what the toggle reads, which is why it says the wrong thing:**
+
+  ```tsx
+  prescribedDeload={
+    periodization?.state.prescriptionStatus !== 'consumed'
+    && !!periodization?.state.prescription?.deload     // ← false here
+  }
+  ```
+
+  With `prescribedDeload` false, `DeloadToggle` renders *Full — **As prescribed*** and *Deload —
+  Lighter loads*. That is exactly his screenshot, over a session where every exercise is cut to 52%.
+- **`deload-toggle.tsx` is not the defect and must not be "fixed".** BF-8 already made it label
+  correctly, and its comment names this precise failure: *"When the engine has already applied a
+  deload, Full is an OVERRIDE of it — and saying 'as prescribed' there is how the screen came to
+  contradict the card below it (BF-8)."* The component does the right thing **when told the truth**.
+- **The root is that the two fields answer different questions.** `prescription.deload` means *this
+  is a deload prescription* — a phase decision. `exercises[].deloaded` means *this exercise's load
+  was cut*, here by the illness radar **after** the model produced its plan. BF-8 wired the label to
+  the phase flag, and a per-exercise safety deload does not set it.
+- **Recommended: derive the label from the exercises, not the flag** —
+  `prescription.exercises.some(e => e.deloaded)` — because that is the question the label asks
+  ("are the loads in front of you reduced?"). Keep the `!== 'consumed'` guard. Leaving
+  `prescription.deload` alone is deliberate: it is correct for what it means, and a phase deload
+  sets `deloaded` on its exercises too, so one read covers both.
+- **Checked for existing infrastructure before proposing the read, because BF-166's entry did not
+  and was wrong for it.** That entry claimed no overlay registry existed and proposed building one;
+  `lib/hooks/sheet-back-stack.ts` already had it under different names, and building the proposal
+  would have left two stacks disagreeing. So, for this one: `grep -rn 'export function .*[Dd]eload'`
+  across `packages/shared/src` and `lib` returns `isDeloadActive`, `isEarlyDeloadWeek`,
+  `deloadAwareStylePhase`, `deloadOverrideForGoal`, `deloadStyleForGoal`, `computePerExerciseDeload`
+  and `shouldTriggerEmergencyDeload` — **none of which answers "is any exercise in this prescription
+  deloaded?"**. `computePerExerciseDeload` is the *producer* of the flag (the soreness quadrant;
+  the illness radar writes the same shape), not a predicate over a stored prescription. The
+  `.some()` read is genuinely new, and it is one line.
+- **Second contradiction from the same cause, same screen.** The rationale paragraph reads *"focus on
+  volume within the **72.5-80%** intensity band for the primary compound"* against rows showing
+  **52%**. Those figures describe the **preDeload** numbers (bench 76%, inside that band) — the prose
+  was written before the radar cut the loads and nothing regenerated it. This is the BF-99 class:
+  prose naming numbers that are not on screen. Fixing the toggle does not fix this; the rationale
+  needs either a regeneration after the deload pass or a line saying the loads below were reduced
+  afterwards.
+- **NOT a defect, checked and cleared so it is not refiled:** the rationale's *"50-min working
+  budget"* against a picker showing **Normal 60 min**. `effectiveTimeBudgetMin` is
+  `workingBudgetMin(total)` — the budget minus the warm-up carve-out — so ~48–50 of a 60-minute
+  session is correct, and the model says *"working budget"* precisely. Both numbers are right and
+  they measure different things. His `program_sessions.time_budget_minutes` is **60** on all 23 rows.
+- **Verification:** on device, open a session whose prescription has any `deloaded: true` exercise and
+  confirm the toggle reads *Deload — As prescribed* with Full offered as *Override*; then a normal
+  session and confirm the labels are unchanged from today.
+
 ### [app-shell] BF-166 — the back listener ignored the overlay stack the app already had (fixed; device check owed)
 
 - **Lane:** B — `lib/hooks/sheet-back-stack.ts` and `components/mobile-auth-handler.tsx`. Shipped

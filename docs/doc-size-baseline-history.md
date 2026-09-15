@@ -12702,3 +12702,10 @@ only mention of it anywhere is the line pointing at it. So a real blocker (verif
 `/api/body-battery` is `GET()` with no parameters) was waiting on work nobody was tracking, and the
 `Needs:`-style "an absent target counts as shipped" rule does not rescue it, because this was prose
 in a `Keep:` rather than a field the checker reads.
+
+## 2026-09-16 — `docs/implementation-backlog.md` (BF-167)
+
+Forty-six lines. The table earns its space because "is the deload on?" is answered by the data and
+contradicted by the screen, and an implementer needs both halves side by side. The rest is two
+guardrails: deload-toggle.tsx is ALREADY correct and must not be "fixed", and the rationale's
+"50-min working budget" is right rather than a hallucination — I nearly filed that one.
