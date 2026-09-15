@@ -12157,3 +12157,16 @@ Thirty lines correcting BF-149's scope. The table of four call sites is the entr
 wrong" was already filed and fixed once, so what this needs to carry is WHERE it is still wrong and
 that one of the four prescribes reps rather than printing them. It also records why the sweep missed:
 BF-149 grepped the function's direct callers and not the wrapper seven surfaces import.
+
+## 2026-09-14 — `projectOverview.md` → 11111 (BF-100's one-tap experiment, surfaced)
+
++10 to move a finding from the backlog into the document every session reads first. #1189 named a
+candidate cause for BF-100 — `use-scroll-restoration.ts` cancels its pending restore on
+`touchstart` with no re-arm, the S25 back gesture is a touch, `page.goBack()` is not — and a
+one-tap experiment that settles it. The overview still described BF-100 as a plain buildable entry
+with a device-only failure and no cause.
+
+The lines are worth it because the experiment is the cheapest unblock in the lane and **has never
+been tried**: every device pass used the system gesture, which is what the entry's own verification
+step asks for, so the one path that would discriminate was the one nobody walked. A finding that
+lives only in a queue entry is read by whoever opens that entry; this one needed the owner.
