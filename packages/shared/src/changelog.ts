@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.456.17",
+    date: "2026-09-15",
+    changes: [
+      "Body Battery now admits when it has nothing to go on. An account that has never worn the ring was shown a level of 50 labelled \"Good\", with a half-filled bar and no warning \u2014 while everything else on the same screen correctly showed a dash. The \"Limited data\" note it already had was being skipped in exactly that case: it appeared when there were too few readings, and disappeared again when there were none at all. It now appears whenever the reading cannot be supported, so a number you should not trust says so.",
+    ],
+  },
+  {
     version: "1.456.16",
     date: "2026-09-15",
     changes: [

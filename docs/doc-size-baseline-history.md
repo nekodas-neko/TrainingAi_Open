@@ -12365,3 +12365,12 @@ What the lines buy is that the chip was **correct** and still had to change. An 
 claims from one input and only one of them was supported. Someone re-reading this in a month with
 `zone.reps` sitting unused needs to find out why it was left rather than deleted, or they will
 delete it and foreclose the Lane A answer that needs it.
+
+## 2026-09-15 — `projectOverview.md` → 11297, `docs/implementation-backlog.md` → 21412 (RV-38)
+
+Both **shrank**, which is the interesting part: the fix is one term removed from a boolean, and the
+documents got smaller because an open finding became a shipped one with a shorter residue.
+
+What survives at length in both is the thing that is *not* fixed — the number is Tuning's, and the
+`—`-versus-badge question is the owner's. An entry that reads as closed when two of its three parts
+are still owed is how a KEEP turns into a dropped finding.
