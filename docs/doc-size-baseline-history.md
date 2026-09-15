@@ -12185,3 +12185,10 @@ One assignment was made and then **reverted**: PS-4 argues in its own body for s
 and it is right — each role rewrites its own baton, so it is done by whoever hands over next. The
 revert is recorded in place rather than silently undone, because the next sweep will be tempted the
 same way.
+
+## 2026-09-15 — `docs/implementation-backlog.md` (BF-165)
+
+Thirty-four lines, and the elimination table is most of them. The whole source path for "Other
+activity" reads correct and none of it has changed since before the report, so the entry's value is
+the list of files already cleared plus three ranked runtime candidates — without it the next session
+spends the same hours reaching the same place.
