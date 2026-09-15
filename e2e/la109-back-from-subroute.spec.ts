@@ -79,7 +79,14 @@ test('back from a push off Home returns to Home, not the tab whose tree is stale
   await settleRouteBoundary(page)
 
   // The flip rewrites the URL to "/" and leaves Health's tree on that entry.
-  await page.locator('nav').getByRole('link', { name: 'Home', exact: true }).click()
+  //
+  // Dispatched through `evaluate` rather than `click()`: on `/health` the nav link resolves but never
+  // satisfies Playwright's stability check — measured, 63 retries of "visible, enabled and stable"
+  // before a 180 s timeout — because that screen keeps something animating beneath it. The
+  // `waitForFunction` below is what makes a forced dispatch safe: a click that lands on nothing fails
+  // right here instead of surfacing later as a wrong-looking assertion.
+  await page.locator('nav').getByRole('link', { name: 'Home', exact: true })
+    .evaluate(el => (el as HTMLElement).click())
   await page.waitForFunction(() => window.location.pathname === '/')
   await settleRouteBoundary(page)
 
