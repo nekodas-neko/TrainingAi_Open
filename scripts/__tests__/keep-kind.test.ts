@@ -124,4 +124,15 @@ describe('keepIsSettled — the check already happened', () => {
   it('is false when there is no residue', () => {
     expect(keepIsSettled(null, VERIFIED)).toBe(false)
   })
+
+  // The rule's own blind spot, found the day after it shipped (TN-13, then BF-74). Keying on
+  // VERIFIED alone let an entry whose check came back BROKEN keep advertising itself as "shipped; a
+  // look is owed, nothing is blocked" — worse than the case the rule was written for, because that
+  // is live unbuilt work filed as finished.
+  it.each([
+    ['- **❌ FAILED ON THE S25, 2026-09-13.** Owner: it still does not work.'],
+    ['- **❌ REPORTED BROKEN ON THE S25, 2026-09-15** — the cue does not render.'],
+  ])('counts a failed look as a settled one: %s', (line) => {
+    expect(keepIsSettled({ text: 'the device check, and only that.', gate: null }, [line])).toBe(true)
+  })
 })

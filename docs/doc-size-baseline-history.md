@@ -12170,3 +12170,18 @@ The lines are worth it because the experiment is the cheapest unblock in the lan
 been tried**: every device pass used the system gesture, which is what the entry's own verification
 step asks for, so the one path that would discriminate was the one nobody walked. A finding that
 lives only in a queue entry is read by whoever opens that entry; this one needed the owner.
+
+## 2026-09-15 — `docs/implementation-backlog.md` → 21165 (OR-116, the lane sweep)
+
+Four entries left the queue (BF-141, BF-135, LB-47, BF-64) and LB-109 closed, against eighteen `Lane:`
+assignments and two new entries — so the net is nearly flat and the composition is the point.
+
+The assignments are the reason this file did not shrink, and they are worth their lines: **BF-100 had
+no lane and was therefore printing as READY in BOTH lanes at once**, which is the one failure mode
+that makes the queue tool actively misleading rather than merely incomplete. Seventeen more entries
+were parked, so nobody had noticed.
+
+One assignment was made and then **reverted**: PS-4 argues in its own body for staying unclassified,
+and it is right — each role rewrites its own baton, so it is done by whoever hands over next. The
+revert is recorded in place rather than silently undone, because the next sweep will be tempted the
+same way.

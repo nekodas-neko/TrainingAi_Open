@@ -15,13 +15,14 @@ Local SQLite **v38**.
 Start with `node scripts/next-item.js --lane A --all`. **`--all` is not optional** — the display
 truncates READY at 10 and a startable item has sat unnoticed at position 12.
 
-**As of 2026-09-13 READY holds nine entries and all nine are standing exclusions**, so "nothing
-startable" is the normal answer until the owner releases something. Do not widen the exclusion list
-to find work; it has been widened three times without being asked.
+**⚠ CORRECTED 2026-09-15 (Orchestrator, OR-116): this said READY was nine and all nine excluded.
+READY is 14 and six are startable** — a stale "nothing startable" reads exactly like a true one.
 
-- Owner-gated or parked: Q-220 (Orchestrator's), Q-44 Phase 3 PR 1, Q-1a, LA-95, Q-30, Q-52, Q-28,
-  Q-29 Task 5, LA-100, LA-89.
-- **LA-91 sits inside the original do-not-take band LA-84..LA-92.**
+- **Startable, top first: BF-164** (BF-149 fixed one of eight bodyweight surfaces), **PS-41**,
+  **PS-42**, **LA-76**, **Q-52**, **Q-28**. LA-76 was released by the owner 2026-09-14 and **half
+  needs no migration** — a deload *session* is already dated by `workout_sessions.phase_type`.
+- Still excluded: Q-220 (Orchestrator's), Q-44 Phase 3 PR 1, Q-1a, Q-29 Task 5, LA-95, Q-30,
+  LA-100, LA-89. **LA-91 sits inside the original do-not-take band LA-84..LA-92.**
 - Feature work (BF-9 trainer role, BF-7 session-length picker, BF-5 week-in-review page) is a
   different kind of change from a small verifiable fix and is not begun unilaterally.
 
@@ -32,17 +33,16 @@ to find work; it has been widened three times without being asked.
 security change, and CLAUDE.md's confirm-first carve-out covers it. Merging auto-deploys to Railway.
 Keep it rebased and mergeable only — merge `origin/main` in, re-run the gate, push.
 
-Its two recurring conflicts, sixteen times now: `docs/doc-size/docs/implementation-backlog.md.size`
-(overwrite with a bare integer FIRST — `pnpm fix:baselines` **throws** on conflict markers — then run
-it) and `docs/doc-size-baseline-history.md` (append-only, so keep BOTH sides with main's first). The
-recompute churn is recorded deliberately in the history note; do not tidy it.
+Its two recurring conflicts, sixteen times now: the `.size` file (overwrite with a bare integer
+FIRST — `pnpm fix:baselines` **throws** on conflict markers — then run it) and
+`doc-size-baseline-history.md` (append-only: keep BOTH sides, main's first).
 
-## Four owner decisions on the record — do not re-ask them
+## Owner decisions on the record — do not re-ask them
 
 1. Merge #1098. 2. Drop the dead `program_session_id` column. 3. Release Q-52 and Q-28.
-4. ~~The calorie goal, 1350 vs 1660~~ — **answered 2026-09-13 and shipped as BF-152**: he answered
-with a rule, not a figure, so the budget anchors to his measured resting rate and reads no typed
-number at all. The question evaporated rather than being decided.
+4. LA-76: a deload must not decay the collection (2026-09-14). 5. The calorie anchor: **settled by
+BF-152** — a rule, not a figure, so the budget reads his measured resting rate and no typed number;
+confirmed on the S25 2026-09-15 (*"my expected base value + my excercise bonus calories"*).
 
 ## Three device checks owed
 
