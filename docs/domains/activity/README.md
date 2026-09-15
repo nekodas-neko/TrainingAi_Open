@@ -159,6 +159,14 @@ cause of one class was a posted step window coming from a *different stream* tha
 
 ## History
 
+- [`2026-09-15-bf165-retraction-cold-route`](../../overview/entries/2026-09-15-bf165-retraction-cold-route.md)
+  — **⛔ RETRACTS the two BF-165 entries below it (2026-09-15).** BF-165 does **not** reproduce in the
+  harness; there is **no** second dead button; the `/activity`-prefix narrowing is void. The cause was
+  **`next dev` compiling the route on demand** — a client push issues an RSC fetch that hangs until
+  compilation finishes (unresolved after 8 s while sibling `/api/*` calls returned 200), with no
+  throw, no 4xx/5xx and no console error. **Warm the destination with a direct `goto` before measuring
+  any client-side push**; without it, "the navigation did not happen" carries no information.
+
 - [`2026-09-15-bf165-activity-prefix-narrowing`](../../overview/entries/2026-09-15-bf165-activity-prefix-narrowing.md)
   — **BF-165 narrowed to the `/activity` PREFIX, and a second dead button found (2026-09-15).**
   On `/cardio`, through the identical `useTransitionRouter`/`animate()` path with no sheet involved:

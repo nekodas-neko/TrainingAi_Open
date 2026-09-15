@@ -3165,52 +3165,32 @@ first because a confirm that removes anyway passes every happy-path assertion; i
 **NOT verified on device**, and the outstanding half is structurally out of reach of a browser:
 whether the undo toast is still reachable by a thumb before it dismisses.
 
-### [activity][cardio] 🟠 "Other activity" is a dead tap — REPRODUCED in the harness, two of three candidates dead (BF-165, 2026-09-15)
+### [activity][cardio] 🟠 "Other activity" is a dead tap on device — and my harness "reproduction" was RETRACTED (BF-165, 2026-09-15)
 
-**Open, and no longer device-gated.** Owner, on the APK: *"when I try click the treadmill; or any
-'Other activity' nothing actually happens"* — narrowed by him to *"it just scrolls to the top of
-cardio hub."*
+**Open, device-gated, cause unknown. Three candidates still open.** Owner, on the APK: *"when I try
+click the treadmill; or any 'Other activity' nothing actually happens"* — narrowed by him to *"it just
+scrolls to the top of cardio hub."*
 
-**It reproduces in a browser.** `/cardio` → Other activity → Treadmill leaves the URL on `/cardio`.
-The entry's "start from the device console" instruction is wrong; no device is needed to work on it.
+**⛔ RETRACTION.** Earlier today this row claimed BF-165 reproduced in Playwright, that *Guided walk*
+was a second dead button, and that the failures shared the `/activity` prefix. **All three were
+wrong.** Warm the destination first with a direct `goto` and the tap works — URL becomes
+`/activity/guided-walk`, RSC request returns **200**. Every "dead tap" measured was a **cold route**.
 
-**Refuted by experiment, not by reading:**
-- **The `/activity` route loads fine** — a direct visit returns 200, renders *"Log Activity — What are
-  you doing?"*, zero page errors.
-- **The sheet's history pop is not the cause**, despite being the obvious mechanism: `SheetContent`
-  renders `BackDismiss`, so an open sheet holds a pushed entry and closing it fires `history.back()`.
-  Deferring the close by **1200 ms** so no pop is near the navigation leaves it **still on `/cardio`**.
+**The mechanism, which is the part worth keeping.** `next dev` compiles a route on first request, so a
+client-side `router.push` issues an RSC fetch that **hangs until compilation finishes** — measured
+unresolved after 8 s while two sibling `/api/*` calls returned 200. Nothing throws, no 4xx/5xx, no
+console error, and the URL never changes because Next commits on response. **It is byte-for-byte the
+signature of a dead tap**, including the "fails silently, so `error_events` has nothing" reasoning I
+offered as corroboration.
 
-**The survivor:** `router.push('/activity')` never commits. It routes through `animate()`, which runs
-the push inside `startViewTransition` against a **300 ms** cap; sampled every 10 ms for 4 s the URL
-never becomes `/activity`, not even transiently.
+**⚠ THE RULE: warm the destination with a direct `goto` before measuring any client-side push to it.**
+Otherwise "the navigation did not happen" carries no information, and no fixed wait is safe — compile
+time scales with the tree behind the route. **There is no second dead button; Guided walk works.**
 
-**⚠ A trap worth carrying:** *"the URL never showed `/activity`"* does **not** prove the push never
-started — Next updates the URL at **commit**, so an aborted commit and a never-started push look
-identical from `location`. Only the deferred-close experiment separates them.
-
-**✅ That experiment ran, and it narrows the bug sharply.** `modality-picker.tsx` already had the
-control it needed — two buttons on `/cardio`, same router, same `animate()` path, **neither in a
-sheet**: **Running → `/running` NAVIGATES**; **Guided walk → `/activity/guided-walk` DOES NOT**.
-So `animate()` is not the defect (it commits fine for `/running`) and the sheet is not the variable
-(Guided walk has none). **Both failures share the `/activity` prefix; the success does not.**
-
-**⚠ A SECOND DEAD BUTTON, unreported: *Guided walk* on the Cardio hub does not navigate either.** The
-report covered only "Other activity", so the scope is wider than filed — anything reaching an
-`/activity*` route from a client-side push. Both routes into that surface from the hub are dead, and
-BF-160 made "Other activity → Treadmill" the recommended way to log a steady treadmill walk.
-
-**It fails silently** — no console errors, no `pageerror`, no failed requests, nothing ≥ 400 — which
-matches `error_events` holding nothing across three days and rules out a chunk-load failure.
-**Not a routing-config difference either:** both pages are plain, neither has a `layout.tsx`, and
-`middleware.ts` mentions neither.
-
-**Next:** bisect what `app/activity/page.tsx` and its tree (`activity-screen.tsx`, `activity-store`,
-`reconcileRehydratedActivity`) do on a CLIENT commit that `app/running/page.tsx` does not — a direct
-`goto('/activity')` renders fine, so it bites only on the push path. **Do not lengthen
-`NAVIGATION_TIMEOUT_MS`** — that turns a dead tap into a slow dead tap.
-([narrowing](docs/overview/entries/2026-09-15-bf165-activity-prefix-narrowing.md))
-([journal](docs/overview/entries/2026-09-15-bf165-reproduced-in-harness.md))
+**What survives:** `/activity` serves 200 and renders on a direct visit, and the entry's source-path
+elimination table (which came from reading, not the harness). **The sheet's `history.back()` theory is
+back to unproven** — that experiment also ran cold.
+([retraction](docs/overview/entries/2026-09-15-bf165-retraction-cold-route.md))
 
 ### [app-shell] ⚠️ The Android back button ignored the overlay stack the app already had (BF-166, 2026-09-15)
 
