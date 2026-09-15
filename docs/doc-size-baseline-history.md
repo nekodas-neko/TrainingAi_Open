@@ -12297,3 +12297,15 @@ fixture that would make it appear — which tests a situation constructed for th
 Recording that is what stops the next session either writing the e2e and believing it, or reading
 "no e2e" as an omission. The rest is the two stored numbers that produced the report, so the
 arithmetic stays reproducible after the data moves on.
+
+## 2026-09-15 — BF-7 PR 2a (backlog +10, projectOverview +19)
+
+Both carry the same correction, and it is the reason the lines exist: the plan written this morning
+said to compare the *chosen* budget against the anchor, and `budgetForPreset` clamps at the
+20-minute floor. A session configured at or near that floor would have reported "same" and silently
+switched from dropping exercises to trimming sets — a behaviour change smuggled inside a refactor
+advertised as behaviour-preserving, on exactly the sessions least able to absorb it.
+
+A plan that is wrong in one clause is more dangerous than one that is vague, because it reads as
+settled. Correcting it in place and saying so in the row is cheaper than the next implementer
+re-deriving why `requestedBudgetMin` exists and deciding it is redundant.
