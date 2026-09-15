@@ -1,5 +1,5 @@
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
-import { mround, displayOneRm, isBodyweightType, repMaxFromOneRm } from '@trainingai/shared/1rm'
+import { mround, displayOneRm, isBodyweightType, bodyweightRepMax } from '@trainingai/shared/1rm'
 import type { Program, WorkoutSession } from "@trainingai/shared/types";
 import type { SleepSession } from '@trainingai/shared/types'
 import type { OuraDailyRow, OuraDailyDerivedRow } from '@/lib/data/repository'
@@ -65,9 +65,25 @@ export function build1RmTargets(
   const lines = ['## Estimated 1RMs & target working weights (precomputed — quote, never recompute)']
   for (const [name, { orm }] of [...latest.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
     if (isBodyweightType(exerciseTypeByName?.get(name))) {
+      // BF-164 — and this line was wrong in a way swapping the inverse does NOT fix, so the fix is
+      // the arithmetic rather than the helper.
+      //
+      // It read `repMaxFromOneRm(orm * 0.8)`: take 80% of the estimate and ask what rep count that
+      // is. That is a WEIGHTED-lift idea — 80% of a 1RM is a real working weight — and a bodyweight
+      // `estimated1rm` is not a weight at all. It is a BW_REF-relative index that starts at 101.75
+      // for a single rep, so scaling it by 0.8 lands BELOW the bottom of the scale for every
+      // bodyweight exercise there is. Measured on the owner's Hanging Leg Raise: a stored 128
+      // (eleven reps) produced **"target working set 1 reps"**, and it would have for any value.
+      // Both inverses return 1 there, which is why this needed judging rather than swapping.
+      //
+      // The percentage applies to REPS, which is how the app already answers this question for
+      // bodyweight everywhere else — `rescaleBodyweightReps` sets `reps = floor(pct/100 × repMax)`.
+      // Same convention, one place: 80% of an 11 RM is 8 reps.
+      const repMax = bodyweightRepMax({ oneRm: orm }) ?? 0
+      const target = Math.max(1, Math.floor(repMax * 0.8))
       lines.push(
         `${name}: ${displayOneRm(orm, 'bodyweight').text} (bodyweight — measured in reps, NOT kilograms; ` +
-        `target working set ${repMaxFromOneRm(orm * 0.8)} reps)`,
+        `target working set ${target} reps)`,
       )
     } else {
       lines.push(`${name}: est 1RM ${mround(orm, 0.25)}kg → target working weight ${mround(orm * 0.8, 0.25)}kg`)

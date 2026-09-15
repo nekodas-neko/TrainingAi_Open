@@ -12158,6 +12158,251 @@ wrong" was already filed and fixed once, so what this needs to carry is WHERE it
 that one of the four prescribes reps rather than printing them. It also records why the sweep missed:
 BF-149 grepped the function's direct callers and not the wrapper seven surfaces import.
 
+## 2026-09-14 — `projectOverview.md` → 11111 (BF-100's one-tap experiment, surfaced)
+
++10 to move a finding from the backlog into the document every session reads first. #1189 named a
+candidate cause for BF-100 — `use-scroll-restoration.ts` cancels its pending restore on
+`touchstart` with no re-arm, the S25 back gesture is a touch, `page.goBack()` is not — and a
+one-tap experiment that settles it. The overview still described BF-100 as a plain buildable entry
+with a device-only failure and no cause.
+
+The lines are worth it because the experiment is the cheapest unblock in the lane and **has never
+been tried**: every device pass used the system gesture, which is what the entry's own verification
+step asks for, so the one path that would discriminate was the one nobody walked. A finding that
+lives only in a queue entry is read by whoever opens that entry; this one needed the owner.
+
+## 2026-09-15 — `docs/implementation-backlog.md` → 21165 (OR-116, the lane sweep)
+
+Four entries left the queue (BF-141, BF-135, LB-47, BF-64) and LB-109 closed, against eighteen `Lane:`
+assignments and two new entries — so the net is nearly flat and the composition is the point.
+
+The assignments are the reason this file did not shrink, and they are worth their lines: **BF-100 had
+no lane and was therefore printing as READY in BOTH lanes at once**, which is the one failure mode
+that makes the queue tool actively misleading rather than merely incomplete. Seventeen more entries
+were parked, so nobody had noticed.
+
+One assignment was made and then **reverted**: PS-4 argues in its own body for staying unclassified,
+and it is right — each role rewrites its own baton, so it is done by whoever hands over next. The
+revert is recorded in place rather than silently undone, because the next sweep will be tempted the
+same way.
+
+## 2026-09-15 — `docs/implementation-backlog.md` (BF-165)
+
+Thirty-four lines, and the elimination table is most of them. The whole source path for "Other
+activity" reads correct and none of it has changed since before the report, so the entry's value is
+the list of files already cleared plus three ranked runtime candidates — without it the next session
+spends the same hours reaching the same place.
+
+## 2026-09-15 — BF-164 shipped (backlog −41, projectOverview +30)
+
+The backlog shrinks by the whole entry, which is the ordinary case. What is not ordinary is where
+the lines went: `projectOverview.md` carries the two numbers that make the fix checkable —
+`calcAmrap1RM(BW_REF, 11)` is exactly 128, the old inverse gave 8 — plus the warning that prescribed
+reps on bodyweight exercises will now rise by about a quarter. That second part is the one the owner
+needs before he sees it happen, and a row saying only "rep max reads correctly" would not have
+prepared him for a set count going up.
+
+It also records the thing the entry did not know: two call sites feed the coach, and one of them was
+telling it to target a single rep on every bodyweight exercise. That is a different defect from the
+one BF-164 described, found only by grepping rather than trusting the entry's list, and it is worth
+the lines because the same "80% of the estimate" idea will look correct to the next person who
+writes it.
+
+## 2026-09-15 — LA-109 filed (backlog +37, projectOverview +24)
+
+Both grow for a finding that is cheap to state wrongly and expensive to re-derive. The owner
+reported back from Profile details landing on Home; the obvious reading is that LB-107, which
+shipped the day before, mis-classified the path. It did not — `backActionForPath('/more/details')`
+returns `pop` correctly, and a test already pins that. An entry that only said "back goes to the
+wrong screen" would send the next session straight at the resolver and break tab backs fixing
+nothing.
+
+What earns the lines is the measurement: a `history.state` dump showing the entry reading `/more`
+while carrying Next's route tree for `/`. That is three numbers in a table and it converts the
+entry from a symptom into a mechanism — and it is what lets LA-109 say BF-49 is probably the same
+defect, which is worth more than either entry alone.
+
+## 2026-09-15 — `docs/implementation-backlog.md` (BF-165 narrowed)
+
+Twenty-six lines onto BF-165. The owner's "it just scrolls to the top of cardio hub" is evidence
+rather than colour — a tap that never fired would not move the scroll — so the entry now carries the
+nested-scroller mechanism that explains it, and the warning that raising the navigation timeout turns
+a dead tap into a slow dead tap.
+
+## 2026-09-15 — PS-42 shipped (backlog −23, projectOverview +26)
+
+The row costs more than the entry saved, and the surplus is one paragraph: `nHistory` is passed to
+the illness radar on the generic path and is currently unreachable as a discriminator, because
+`trailingBaselineZ` will not return a z-score until the baseline is already mature. That reads as
+dead code and is not — it becomes load-bearing the moment anyone lowers that threshold. It survived
+a mutation as an equivalent mutant, which is exactly how it would have been "cleaned up" by someone
+who trusted the mutation score without reading why it survived.
+
+The rest is the device-verification gap: the owner cannot test this one, because having a ring is
+what makes his path safe here and also what makes the new branch unreachable from his account.
+
+## 2026-09-15 — PS-41 gated on the owner (backlog +33)
+
+The entry described a degraded-mode feature for users without a ring. Reading the merge path and
+measuring production found it is a change to the **owner's own** Activity Score: there is no
+precedence ladder to add a slot to (`getHrForWindow` applies one rule, `preferStrapBuckets`, and
+passes everything else through unranked), and he is a Health Connect user whose HR coverage is
+already 31 of 31 days at ~2,240 rows a day. Sparse phone samples interleaved into that series feed
+22% of the Activity Score's weight.
+
+Worth every line because the entry reads as safe. An implementer who trusted it would have shipped a
+scoring change without knowing it was one — which is the exact thing CLAUDE.md's "Tuning proposes,
+the owner signs off" rule exists to stop.
+
+## 2026-09-15 — BF-7 planned (backlog +10)
+
+A ten-line net change that replaces a question with its answer. The entry asked whether
+`DurationPreset` should stay an enum or become a number and said seven call sites depend on it —
+framing it as a typing decision. It is not one: `short` and `long` select different algorithms, and
+`standard` must never expand because that under-fill is the finish-early margin. Those lines are the
+reason the number is safe rather than a rewrite, and an implementer who read only the old wording
+would have converted the type and quietly lost the margin.
+
+## 2026-09-15 — BF-100 ↔ LA-109 cross-link (backlog +21, projectOverview +6)
+
+Two entries describing the same route, filed a day apart, neither naming the other. BF-100 records
+its cause as unknown — *"whatever differs is the S25's system back gesture or the WebView's restore
+timing"* — and LA-109 measured a device-observable difference on exactly that route the next morning.
+
+The lines buy sequencing, which is the expensive thing to get wrong here: if back renders Home there
+is no `/more` scroll position to restore, so only one of the two failures can be confirmed while the
+other stands. Without the link, the next session picks up BF-100, fixes a real `touchstart` bug, and
+still cannot tell whether it worked.
+
+## 2026-09-15 — PS-41's owner gate restored (backlog +44)
+
+It merged in #1202 and then vanished from `main`. The next rebase of the same branch hit a conflict
+where `main` had deleted the adjacent PS-42 entry (it shipped) while the branch still carried it;
+git folded that deletion and this edit into one hunk, and "take main's side" did the right thing for
+PS-42 and silently discarded this.
+
+The restoration is +33; the other +11 is the note explaining it, and that is the part worth keeping.
+A conflict hunk does not respect entry boundaries, and the after-check everyone uses — diffing the
+heading list against `main`'s — **cannot** catch a body-only edit going missing, because there is no
+heading to miss. Recorded here and in `docs/local-dev-database.md` beside the other conflict recipes,
+where the next person resolving this file will actually be looking.
+
+## 2026-09-15 — `projectOverview.md` → 11210, `docs/implementation-backlog.md` → 21296 (BF-162)
+
++11 on each for a one-guard fix, and the length is carrying one thing: why the harness is not going
+to catch this class. `exercise_library` holds 27 bodyweight exercises and none of them is in any
+`session_exercises` row, so a prescription row for one cannot be rendered without building the
+fixture that would make it appear — which tests a situation constructed for the test.
+
+Recording that is what stops the next session either writing the e2e and believing it, or reading
+"no e2e" as an omission. The rest is the two stored numbers that produced the report, so the
+arithmetic stays reproducible after the data moves on.
+
+## 2026-09-15 — BF-7 PR 2a (backlog +10, projectOverview +19)
+
+Both carry the same correction, and it is the reason the lines exist: the plan written this morning
+said to compare the *chosen* budget against the anchor, and `budgetForPreset` clamps at the
+20-minute floor. A session configured at or near that floor would have reported "same" and silently
+switched from dropping exercises to trimming sets — a behaviour change smuggled inside a refactor
+advertised as behaviour-preserving, on exactly the sessions least able to absorb it.
+
+A plan that is wrong in one clause is more dangerous than one that is vague, because it reads as
+settled. Correcting it in place and saying so in the row is cheaper than the next implementer
+re-deriving why `requestedBudgetMin` exists and deciding it is redundant.
+
+## 2026-09-15 — Q-44 Phase 3 audited and gated (backlog +22)
+
+The lines carry three measurements that change what Q-44 is, none of which were in the plan. The
+second recording device already exists and did not share a table — `colmi_*` is live with 5,568 rows
+across three tables — so the "generically-named single-vendor table" the 2026-09-11 note warned
+about is the state the schema is already in, not a risk ahead of it. The two devices use opposite
+idioms, which makes "the same tables" a design problem rather than a rename. And `oura_bucket`, the
+table singled out as the one a second device would most need to share, has never been written.
+
+Worth the lines because the entry currently reads as a decided goal with a written plan, and an
+implementer trusting that would spend a 2,813-reference sweep to arrive no closer to what the owner
+asked for. The `Gate: owner` is the operative change; the rest is why.
+
+## 2026-09-15 — LA-110 filed, Q-52's re-measure recorded as unanswerable (backlog +77, projectOverview +27)
+
+The largest single-entry addition in a while, and the table is why: six rows showing reps going up
+while the estimated 1RM goes down, plus the one riser showing the inverse. Prose asserting "this is a
+rep-range artifact" is arguable; the table is not, and it is what stops the next reader treating six
+declining compounds as a training problem.
+
+Q-52 grows too, because its own outstanding precondition was attempted and failed. Recording the
+attempt matters more than recording the result — without it the next session runs the same query,
+gets the same six declines, and builds a feature on a confounded signal. The `Needs: LA-110` is the
+operative part; the boxed note is the evidence.
+
+## 2026-09-15 — LA-110: three leads closed (backlog +15)
+
+Fifteen lines that make the next attempt shorter rather than longer. LA-110 offered
+`session_periodization.baseline_1rm` as a possible like-for-like anchor; it is explicitly forbidden
+for trend use in three places, including twice in the AI prompt. Two adjacent leads are closed the
+same way: the bodyweight unit problem was already solved by Q-19b, and the guard asymmetry between
+`oneRmTrendStatus` and `rm1ChangeKg` is real but three orders of magnitude too small to be this
+defect.
+
+A "ruled out, do not re-walk" list is worth more per line than the finding it sits under — it is the
+difference between an implementer spending an hour confirming a dead end and reading one sentence.
+
+## 2026-09-15 — `projectOverview.md` → 11263, `docs/implementation-backlog.md` → 21412 (LA-109)
+
+The index grew 7 and the backlog **shrank** 8, which is the right direction for a session that
+closed an entry. The 7 are almost entirely the refutation: LA-109's own row could have been three
+lines, but the reason BF-49 is *not* this, and the reason BF-100 is now readable, are both things
+the next session would otherwise re-derive from the two coupled entries that said the opposite.
+
+A negative result costs lines exactly once and saves a re-run every time someone reads the pair.
+
+## 2026-09-15 — `projectOverview.md` → 11287, `docs/implementation-backlog.md` → 21420 (BF-163)
+
++24 and +5 for a one-line tooltip change, and the ratio is the point: almost none of it is the fix.
+
+What the lines buy is that the chip was **correct** and still had to change. An entry reading
+"Hypertrophy is the right tag" closes itself; the reason it does not is that the chip made two
+claims from one input and only one of them was supported. Someone re-reading this in a month with
+`zone.reps` sitting unused needs to find out why it was left rather than deleted, or they will
+delete it and foreclose the Lane A answer that needs it.
+
+## 2026-09-15 — `projectOverview.md` → 11297, `docs/implementation-backlog.md` → 21412 (RV-38)
+
+Both **shrank**, which is the interesting part: the fix is one term removed from a boolean, and the
+documents got smaller because an open finding became a shipped one with a shorter residue.
+
+What survives at length in both is the thing that is *not* fixed — the number is Tuning's, and the
+`—`-versus-badge question is the owner's. An entry that reads as closed when two of its three parts
+are still owed is how a KEEP turns into a dropped finding.
+
+## 2026-09-15 — `projectOverview.md` → 11329, `docs/implementation-backlog.md` → 21429 (OR-116)
+
++22 and +25 for two label strings, and the ratio is defensible for once: the diff is small because
+**nothing was computing the wrong number**, and that is precisely the fact a reader will not believe
+without the figures in front of them. An entry that just says "labelled the HR chip" invites the next
+session to go looking for the arithmetic bug that is not there.
+
+The other weight is the two things NOT fixed — `hrMin` standing in for the resting rate, and the
+three-surfaces context question. Both would read as closed if the entry were shorter.
+
+## 2026-09-15 — `docs/implementation-backlog.md` (BF-166)
+
+Thirty-eight lines. The report names one screen and the defect is all 52 Sheet/Dialog files, so the
+entry has to establish that before an implementer patches the meal builder alone. The ordering
+paragraph earns its length too: the overlay check must sit AFTER the three mode guards, or a confirm
+dialog raised by one of them gets dismissed by the very back press meant to answer it.
+
+## 2026-09-15 — `docs/implementation-backlog.md` → 21380 (TN-13 closed)
+
+The backlog **shrank 105 lines**: TN-13 left the queue entirely, because the owner's answer means
+nothing is owed and `check-backlog-pointers.js` is right to refuse a heading that announces its own
+completion. `projectOverview.md` is unchanged in length — the existing TN-13 paragraph absorbed the
+closure rather than gaining a new row, which is the correct shape for an entry that was already
+described there as shipped.
+
+The substance moved to a journal entry. That is the point of the rule: a queue that still lists a
+closed item is a queue nobody trusts, and the reasoning is not lost by being somewhere else.
+
 ## 2026-09-14 — backlog → 21454, `tuning.md` → 614: every deload trigger measured (TN-36)
 
 The owner reported constant deload recommendations and guessed at bad tuning. It is not tuning, and
@@ -12241,3 +12486,15 @@ holds for `hrv_ms`, `resting_heart_rate` and `spo2_pct`. Quoting that back is mo
 planning it. And **the owner will not use Health Connect — other users will**, which turns
 basic-source quality into a product requirement and means PS-41 cannot be validated on his account at
 all.
+
+## 2026-09-15 — backlog → 21575: re-resolving TN-36/37/38 onto a moved `main`
+
+Arithmetic, not new prose. The branch carrying TN-36, TN-37 and TN-38 was opened against a `main`
+that has since taken BF-165, BF-166 and LA-109 and *removed* BF-154, BF-164 and PS-42 as shipped.
+The conflict was the mixed case the git-workflow rule warns about — **additions on one side and
+deletions on the other in the same hunk** — so "keep both" would have resurrected three completed
+entries, which is the failure that has already happened three times in this repository.
+
+Resolved by rebuilding the file from `origin/main` and re-inserting only the three TN entries,
+rather than splicing the hunk. The three live device entries keep the top of the queue ahead of
+them; a latent documentation divergence does not outrank a dead button on the APK.

@@ -69,7 +69,19 @@ inside **RV-36's** body, an entry that had already shipped (2026-09-11) and been
 *"shipped; a look is owed, nothing is blocked"*. RV-36 is removed; BF-100 is a plain buildable entry
 and now prints READY. **It is a device-only failure and the harness contradicts it** — `/more` →
 Profile details → back restores **840** in Playwright — so a green `scroll-restoration.spec.ts` is
-not evidence, which is how it could be declared fixed a third time. A second owner request found in
+not evidence, which is how it could be declared fixed a third time.
+
+**⚠ There is now a candidate cause and a ONE-TAP experiment that settles it, and it has never been
+tried** (2026-09-14, #1189 — the detail lives in BF-100's backlog entry). `use-scroll-restoration.ts`
+attaches its user-takeover to **`touchstart`**, and the takeover sets `done` with no re-arm — so a
+single touch abandons the pending restore for good. **The S25's system back gesture IS a touch;
+`page.goBack()` fires none**, which explains the harness/device split that no earlier hypothesis did.
+**The test:** come back from *Profile details* with a **UI back control** instead of the gesture. If
+the offset restores that way, the cause is settled. Every device pass so far has used the gesture,
+because this entry's own verification step says to. **The fix is deliberately not built** — it
+changes takeover behaviour on every screen, and must not ship on a hypothesis when one tap decides it.
+
+A second owner request found in
 the same body had **no entry anywhere** and is now **LB-107**: back on a tab with nothing to pop
 should land on Home rather than leave the app
 ([journal](docs/overview/entries/2026-09-14-refile-shipped-rv36.md)).
@@ -1193,7 +1205,7 @@ would have missed it ([journal](docs/overview/history-2026-09-10-folded-4.md#202
 
 **The accessibility scanner that would have passed a 12 px button (Q-282).** `@axe-core/playwright` was installed, measured and removed: WCAG 2.5.8 exempts a *spaced* undersized control, so a deliberately-shrunk **12×12** button (confirmed by `boundingBox`) came back a **pass**, and `color-contrast` cannot read this app at all — it fails to parse the `oklch` tokens (*"Could not parse color string oklab(…)"*) and **evaluated no nodes on Home**. `e2e/touch-target-size.spec.ts` ships instead: DOM geometry against **this repo's 48 dp bar**, covering the roles `globals.css`'s `button, [role="button"]` floor cannot (`<a>`, `role="tab"`, `role="radio"`). It fails on the mutation axe passed. One real finding, **LB-26**: Home's APK-banner link is 258×33 ([journal](docs/overview/history-2026-09-10-folded-4.md#2026-08-30-touch-target-gate)).
 
-**The Heart Rate tile shows last night, as a delta (TN-13).** It read the **7-day mean** and printed it as a bare bpm — in the signal that best predicts how you feel (r = +0.557 against your own check-in, best of nine). Re-measured over 71 production nights: the nightly value changes on **61 of 70** night-pairs, the rounded mean on **29**, so the tile stood still nearly six days in ten and discarded 77 % of the daily movement. And a bare number says nothing: expressing the reading as a deviation from your own baseline roughly **doubles** its correlation with felt state, which is why it now reads `50 · −7 vs usual`. Both halves shipped together because the entry required it — half a fix here is the one that looks like progress. **Still owed: the S25 check** — the cue grew from one word to five across 20 layout styles ([journal](docs/overview/history-2026-09-10-folded-3.md#2026-08-30-feat-hr-tile-nightly-resting)).
+**The Heart Rate tile shows last night, as a delta (TN-13).** It read the **7-day mean** and printed it as a bare bpm — in the signal that best predicts how you feel (r = +0.557 against your own check-in, best of nine). Re-measured over 71 production nights: the nightly value changes on **61 of 70** night-pairs, the rounded mean on **29**, so the tile stood still nearly six days in ten and discarded 77 % of the daily movement. And a bare number says nothing: expressing the reading as a deviation from your own baseline roughly **doubles** its correlation with felt state, which is why it now reads `50 · −7 vs usual`. Both halves shipped together because the entry required it — half a fix here is the one that looks like progress. **⚠ The delta was then never drawn, and TN-13 is now CLOSED on the owner's decision to leave it that way (2026-09-15).** `RING_GEOMETRY` sets `showDot: true` on **1 of 18** ring styles, and the cue renders only under it, so the comparison was invisible on seventeen styles including the default — for a fortnight. It failed on the one day it had something to say: `resting_heart_rate` **60** on 2026-09-15 against 57 · 55 · 54 · 55 before it, so it would have read about `+4 vs usual`. Offered four ways to restore it, the owner chose the bare number — *"which is fine as it makes it consistent with the rest"* — because the HR chip would otherwise be the only cell in the row with a second line, and cueing all four puts a cue under three numbers that already interpret themselves. **The engine half stays and still reaches the accessible name**, so the comparison is spoken even though it is not drawn; the legibility question is struck as moot ([journal](docs/overview/entries/2026-09-15-tn13-closed-bare-number.md)).
 
 **Changing a supplement's dose no longer rewrites every log you already made (BF-3, gap 1).** The
 dose lived on the definition and not on the log, so raising retatrutide from 2 mg to 4 mg made last
@@ -1879,6 +1891,108 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [workouts][platform] 🟠 A phase change makes every compound read as a strength decline (LA-110, 2026-09-15) · found, not fixed
+
+**Open.** `listRecent1rm` returns the two most recent real 1RM estimates for an exercise **from any
+phase and any rep range**. So a transition into `accumulation` — lighter, higher reps — compares a
+15-rep estimate against a 3.5-rep one and reports the difference as a strength trend.
+
+**Measured on production 2026-09-15**, all five sessions having entered accumulation 09-09 → 09-12:
+six primary/secondary compounds read as declining 7.7–64.6%, **and every one has its rep count going
+UP** (bench 3.5 → 15 reps, −20.2%; Bulgarian split squat 6 → 13, −64.6%). The single riser has reps
+going **down** (squat 12 → 10, +18.3%). That is a rep-range signature, not a training one.
+
+**Three consumers believe it**, and not all are cosmetic: the periodization signals (`rm1Trend` /
+`rm1ChangeKg`), the strength-progress card, and the AI prompt. So the engine currently sees six
+compounds trending down right after a phase change it made itself.
+
+**⚑ Possibly related to TN-36** (*"workouts are constantly being recommended for deload"*, PR #1154,
+open) — **not established**; nobody has traced `rm1Trend` into the deload decision. Check before
+assuming either fixes the other.
+
+**Third defect in one family.** `listRecent1rm`'s doc comment records Q-298 and PS-26, both deload
+sentinels fixed by excluding rows. **This one cannot be — the rows are real estimates from real
+work.** `exercise_logs.avg_reps` is stored, so a like-for-like comparison is available; do not widen
+the trend thresholds, which would hide a real decline as readily as a false one.
+
+**It also blocks Q-52**, whose own "re-measure once blocks cycle" step is unanswerable while the
+signal it would count is confounded.
+
+### [workouts] 🟢 The prescription branches on duration DIRECTION now, not on the preset label (BF-7 PR 2a, 2026-09-15)
+
+No user-visible change and none intended — the control still offers three segments and the plans it
+produces are byte-identical. What moved is the thing blocking the 45-minute session the owner asked
+for: `short` and `long` were selecting **three different algorithms** (drop exercises / trim sets /
+expand to MRV), and the labels only work as a proxy for "shorter / same / longer than your session"
+while there are exactly three of them. `durationDirection` derives it from minutes, so PR 2b can add
+rungs without re-deciding an algorithm per rung.
+
+**The plan written the same morning was wrong about one thing, corrected on implementation.**
+`budgetForPreset` clamps at `MIN_PRESET_BUDGET_MIN` (20), so a session configured at or near the
+floor has its `short` clamped back up to its own budget — and a direction read off the clamped value
+says "same", silently switching those sessions from dropping exercises to trimming sets. The
+direction reads `requestedBudgetMin` (unclamped) instead. The request is the intent; the clamp is
+what is achievable.
+
+**Remaining: PR 2b (Lane B)** — the type becomes a number, the route's enum widens, and the control
+offers 30/45/60/90 committing on release. The device check belongs there, when 45 becomes selectable.
+
+### [readiness][devices] ⚠️ A ring-less user gets an illness radar now, and no such account has been driven (PS-42, 2026-09-15)
+
+Shipped with no version bump — nothing changes for a ring user. `computeIllnessRadar` renormalizes
+over whichever of its four signals are present, so it is built for partial input; its only caller ran
+it as `latestSummary ? compute(…) : null`, so a user without a ring got **no illness computation at
+all**. It now runs on the generic branch with temperature and breathing null (no generic source
+supplies either) and the resting-HR/HRV z-scores taken from the readiness composite rather than
+recomputed.
+
+**The owner's path is untouched, and that was checked:** he has `oura_daily_summary` for 30 of the
+last 30 days, so `latestSummary` is non-null and the ring branch runs exactly as before.
+
+**New behaviour worth stating:** a generic user's readiness can now be *suppressed* by the radar —
+that line already existed and simply never had a non-null radar to read. `learning` suppresses
+nothing.
+
+**A coupling recorded in the code, because it looks like a bug:** `nHistory` is passed to the radar
+here and is currently unreachable as a discriminator. `trailingBaselineZ` needs `BASELINE_MIN_NIGHTS`
+prior samples before returning anything, so a non-null z already implies a mature baseline. Both
+gates stay — the coupling is an accident of the current threshold, not a guarantee.
+
+**Not verified on a real account.** The sandbox has no Health-Connect-only user and the owner cannot
+be one. **What a pass looks like:** a test account with `body_metrics`/`sleep_sessions` populated and
+no `oura_daily_summary` row returns a non-null illness flag from `/api/readiness-score`, with
+temperature and breathing absent from its biomarkers.
+
+### [workouts] ⚠️ Bodyweight rep maxes read true now, on every surface — and prescribed reps go up (BF-164, 2026-09-15, v1.456.13) · needs: device
+
+Owner, on the Hanging Leg Raise ready screen showing **"Last: 11 reps"** directly above **"REP MAX
+8 RM"**: *"How is this right?"* It wasn't. A bodyweight estimate is stored through `calcAmrap1RM`
+(an all-out-set discount on top of `calc1RM`), and four helpers in `packages/shared/src/1rm.ts`
+inverted the **unscaled** formula — so every stored estimate read back short by that discount.
+Measured: `calcAmrap1RM(BW_REF, 11)` is exactly **128**, his stored value; the old inverse gave
+**8**, the right one gives **11**.
+
+BF-149 found this and fixed `exercise-summary-screen.tsx`; BF-151 replaced that fix. Both changed
+**one file**. The four helpers are what the other seven surfaces import.
+
+**Expect prescribed reps on bodyweight exercises to rise by about a quarter.** `rescaleBodyweightReps`
+sets `reps = floor(pct/100 × repMax)`, so the understated rep max was understating every target by
+the same 8/11 — that is training volume, not a label.
+
+**Two more call sites the entry did not name, both feeding the model.** `lib/ai-chat/tools.ts` had
+the same defect. `lib/ai-chat/context.ts` had a worse one that swapping the inverse does **not** fix:
+it read `repMaxFromOneRm(orm * 0.8)`, and a bodyweight index starts at 101.75 for a single rep, so
+scaling it by 0.8 falls off the bottom of the scale and **both** inverses return 1. The coach was
+being told *"target working set 1 reps"* for every bodyweight exercise at every strength level. The
+percentage now applies to reps, matching `rescaleBodyweightReps`.
+
+**`repMaxFromOneRm` is kept and must be.** `exercise-stats-sheet.tsx` builds its comparison table
+with `calc1RM`, so inverting `calc1RM` is right there and only there. Do not unify the two.
+
+**Not device-verified, and the AI path was not driven end to end.** **Check on device:** one
+bodyweight exercise's ready screen, pre-workout row, trend chart, stats sheet and strength card all
+printing the reps last logged, and its prescribed reps visibly higher.
+
 ### [cardio][devices] ⚠️ A walk's segments carry a step count that no strap has yet produced (LA-48, 2026-09-14)
 
 Shipped with no version bump — nothing renders it. `WalkSegmentStat.steps` now stores how many steps
@@ -1936,6 +2050,80 @@ in and it saves with no prompt; the partner weighs in on his phone and **no** *"
 Two hardware questions BF-58 keeps are still unanswered — whether two phones can hold a GATT
 connection at once, and whether `REQUEST_STORED_MEASUREMENTS_CMD` gets a reply (that one decides
 whether the race between the phones matters at all).
+
+### [app-shell][platform] ⚠️ A tab flip left the previous tab's route tree on the history entry, so back rendered the wrong screen (LA-109, 2026-09-15)
+
+**Fixed — and the fix is proven, not merely green. The device gesture is what is still owed.** Owner:
+*"Going to more; then going to profile details and pressing back gets me to the home page again."*
+
+**Cause, measured by dumping `history.state` rather than reasoned.** After the More tab flip the URL
+reads `/more` while Next's recorded route tree for that entry is still `(home)` → `/`. `show()`
+(`tab-shell.tsx`) flips tabs with `window.history.replaceState(null, "", href)`, which moves the
+address bar; Next's patched `replaceState` re-injects its own current tree, still Home's, because no
+Next navigation happened. Popping back restores the Home tree — right URL, wrong screen.
+
+**The fix reads the address bar at mount.** `TabShell`'s `useState` is now a lazy initializer that
+prefers `tabKeyForHref(window.location.pathname)` over the `initialTab` the stale tree produced.
+`usePathname()` would not do — it reads from the very tree that is wrong. Nothing reaches into
+`__PRIVATE_NEXTJS_INTERNALS_TREE`, which the entry had flagged as the risky shape. All three
+invariants hold: the flip still adds no history entry, the URL stays honest for refresh and deep
+links, and LB-107's back-to-Home from a tab root is unchanged.
+
+**Why "proven" is the right word.** `e2e/la109-back-from-subroute.spec.ts` was run against `main`'s
+unfixed `tab-shell.tsx` and goes **red** there. This check was not ceremony: the spec's first draft
+used `goto('/more/details')`, a full document load that rebuilds history, and passed while the bug
+was untouched.
+
+**⚑ The BF-49 link is REFUTED.** LA-109's entry held that BF-49 (*"tapping a workout, then back,
+leads to health training not home"*) was very likely the same defect, and that neither should be
+fixed before one was tried against the other's repro. That trial ran: the same spec's second test
+drives BF-49's shape with the stale tree supplied deliberately, and it **passes against the unfixed
+file** in the same run where LA-109's test fails. BF-49 stays open on its own device repro, and the
+test is kept as a regression guard labelled as not being a BF-49 reproduction.
+
+**⚑ BF-100 is unblocked.** It could not be read while this stood — if back rendered Home there was
+no `/more` scroll position to restore. It needs a device pass now, not more reading.
+
+**NOT verified on device.** The Android system back gesture and the WebView's history handling are
+not reachable from the sandbox; Playwright's `goBack()` is the same history step but not the same
+gesture. Kept as LA-109's `Keep:`.
+
+### [workouts] ⚠️ The intensity chip now claims only the load it measures; judging load AND reps is still owed (BF-163, 2026-09-15)
+
+**Card half shipped in v1.456.16. The blend rule is Lane A's and is not built.** Owner: *"Is
+hypertrogpy the correct tag?"*
+
+**It was — by the band's own definition, which is what made it worth fixing.** `intensityZoneForPct`
+maps %1RM to a zone with no reference to reps, so a squat prescribed at **72.5%** is Hypertrophy and
+the chip was correct. The contradiction was inside the chip: its tooltip claimed `typically 8–12
+reps` one line above a prescription of **2×6**, a rep count the same table calls **Strength**.
+
+**The fix makes the chip claim one thing.** The tooltip now reads `<label> · <range> of 1RM — named
+from load alone`. It does not simply drop the clause: that would leave a tooltip repeating the label
+already visible, and a reader whose reps disagree with the band's name would still have no way to
+see why. `zone.reps` is now unused and deliberately kept — the better answer needs it.
+
+**Still open, and it is a real gap rather than polish:** at 72.5% × 6 the load and the reps genuinely
+disagree, and the app has no rule for that. `goal-ranges.ts` puts hypertrophy at `repMin: 5,
+repMax: 12`, so 6 is legal for the goal while the display band calls it Strength — two tables with
+different rep opinions, and the card shows one. Judging the pair is **Lane A's** (the band table is
+`packages/shared`). Not urgent: the chip no longer asserts anything false without it.
+
+**NOT verified on device.** A `title` is a hover affordance; on the S25 it is reached by long press
+in the WebView. Kept as BF-163's `Keep:` ②.
+
+### [workouts] ⚠️ A bodyweight exercise no longer shows a kg target, and that is not device-verified (BF-162, 2026-09-15)
+
+The owner, reading his Legs prescription: *"Is this right?"* The card printed **`@ 85kg (66%)`**
+against a **Hanging Leg Raise** — 66% of a stored `estimated_1rm` of 128, which for a bodyweight
+exercise is an internal index derived from reps (BF-149), not a load. There is no bar. Pull-Up showed
+`@ 90kg` the same way.
+
+Fixed by one guard using the shared `isBodyweightType`; the row falls through to the percent-only
+branch the card already rendered for exercises with no 1RM. **Check on device:** a session containing
+a bodyweight exercise shows no kg for it, while weighted exercises in the same list are unchanged.
+**The harness cannot cover this** — 27 bodyweight exercises exist in the library and none is in any
+session, so the row cannot be rendered without inventing fixture state.
 
 ### [app-shell] ⚠️ Back on a tab now goes Home, and the gesture itself is not device-verified (LB-107, 2026-09-14)
 
@@ -2912,21 +3100,63 @@ fault channel every session is told to read first.
 [`Review sweep 43 §4`](docs/reviews/2026-09-03-ownership-rule-a-and-body-supplied-ids.md).
 **Web build, local database.**
 
-### [readiness][app-shell] 🟡 Body Battery prints 50 and calls it "Good" for an account with no data (RV-38, 2026-09-03)
+### [heart-rate][app-shell] ⚠️ One metric name covered two heart rates; labelled, but the third surface's context is still undecided (OR-116, 2026-09-15)
 
-The route is honest and the card ignores it. For the zero-data account `GET /api/body-battery`
-answers `hasData: false`, `sampleCount: 0`, `samplesPerHour: 0`, `sufficient: false`,
-`anchorSource: "default"` — and the card renders **Good / Steady / 50** with a colour-coded label, a
-bar filled to 50%, and no "Limited data" badge. The badge is gated on `hasData`
-(`body-battery-card.tsx:95`), so the qualification gets *weaker* as the data gets worse: too few
-samples shows the warning, none at all shows nothing.
+**Labels shipped in v1.456.18. Two things remain open and one of them may be a real defect.**
 
-Everything else on that screen degrades correctly for the same account — streak `—days`, the week grid
-`—` on all seven days, the score chip row absent, and `/health/readiness` reading `—`. Readiness is the
-number Body Battery opens at, by the card's own explainer. **This does not reopen Q-43** (degrade
-rather than blank): the app already computes "I cannot support this number" and already has the
-component to say so. [`Review sweep 42 §2`](docs/reviews/2026-09-03-first-run-honesty-and-instant-paint.md).
-**Web build only.**
+Owner: *"I dont see any other values that match that home screen HR value — current = 73, min = 50,
+average = 89, max = 125, and the HR card says 60."* **Every number was right.** Home's 60 is last
+night's **resting** rate; the 73/50/89/125 are today's **intraday** series. Both screens said "Heart
+Rate", so the pair read as one metric disagreeing with itself.
+
+Home's chip now reads **"Resting HR"** and the detail screen's stats are captioned **"Today so far"**.
+**The Home label follows its source**, which is the part not to simplify later: the value is
+`restingHrLastNight ?? restingHr ?? hrCurrent`, and that last fallback is a live BLE sample — a desk
+reading, not a night — so an unconditional "Resting HR" would move the false claim rather than remove
+it. Wording matches Health's existing tile rather than inventing a third vocabulary.
+
+The e2e fails on both surfaces against the unfixed code, and **measures the layout** with
+`getBoundingClientRect()` — "Rest HR" is the longest short label in a four-cell row, and a wrapped
+label would be a new defect traded for the old one.
+
+**⚑ A FOURTH presentation, found while reading and NOT fixed:** the detail page passes
+`restingHr={data?.hrMin ?? null}` into `HrFactorsCard` — today's intraday **minimum** standing in for
+the resting rate (the owner's own figures: 50 against 60). Whether that is a deliberate proxy or an
+oversight has to be established before it is "fixed", so it is recorded rather than changed.
+
+**⚑ Still undecided, and the reason the entry was filed:** Health's tile shows this value bare,
+Home's with a delta against baseline, the detail screen with neither. Three surfaces, one number,
+three amounts of context. Labelling stopped them reading as broken; it did not decide what each
+surface is for.
+
+**NOT verified on device** — and this change wants it: the short label only renders in the band ring
+style, so the owner's chosen style decides whether "Rest HR" appears at all.
+
+### [readiness][app-shell] ⚠️ Body Battery no longer prints an unqualified 50 for an empty account — but the NUMBER is Tuning's (RV-38, 2026-09-03)
+
+**Treatment fixed in v1.456.17. Two things are still owed and neither is this lane's.**
+
+The route was honest and the card ignored it: for the zero-data account `GET /api/body-battery`
+answers `hasData: false`, `sampleCount: 0`, `sufficient: false`, `anchorSource: "default"` — and the
+card rendered **Good / Steady / 50** with a colour-coded label, a bar filled to 50%, and no badge.
+
+**The guard got weaker as the data got worse**, which is why it survived a reading:
+`lowData = battery.hasData && …` meant enough samples → no badge (right), too few → "Limited data"
+(right), **none at all → no badge**. Dropping the `hasData` term is the whole fix; `sufficient` is
+already false in both cases that deserve the badge. Proven by an e2e that runs as the zero-data
+account and asserts the **payload beside the rendered text** — a rendered 50 alone cannot tell a bug
+from a fixture — and that fails on the unfixed card.
+
+**⚑ The number itself is with Tuning**, handed over by the owner on 2026-09-14 (*"This requires
+tuning still"*). A Body Battery re-fit silently re-scores months of history, so it goes through a
+proposal stating how many other days it moves. Nothing in this fix touches it.
+
+**⚑ An owner decision is open and was deliberately not blocked on:** whether no-data deserves
+something stronger than the badge — an `—` like Readiness, the posture `/health/heart-rate` already
+takes. The badge is strictly better than what shipped and reverses in one line, so it does not
+foreclose the answer. **This does not reopen Q-43** (degrade rather than blank).
+
+**NOT verified on device.** [`Review sweep 42 §2`](docs/reviews/2026-09-03-first-run-honesty-and-instant-paint.md).
 
 ### [devices][app-shell] ⚠️ The `/more/devices` ring card flashes a skeleton on a warm repeat visit (RV-39, 2026-09-03)
 

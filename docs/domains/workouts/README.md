@@ -234,6 +234,16 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- [`2026-09-15-bf163-intensity-chip-load-only`](../../overview/entries/2026-09-15-bf163-intensity-chip-load-only.md)
+  — **BF-163 (2026-09-15): the intensity chip was correct and still had to change.**
+  `intensityZoneForPct` reads %1RM only, so 72.5% → Hypertrophy is right by the band's own
+  definition — while the chip's tooltip claimed `typically 8–12 reps` one line above a prescribed
+  **2×6**, which the same table calls Strength. The tooltip now names its input
+  (`— named from load alone`) rather than asserting reps it cannot see. **`zone.reps` is now unused
+  and deliberately kept**: judging load *and* reps together is the better answer, needs the field,
+  and is **Lane A's** (the band table is `packages/shared`). Note the two tables disagree —
+  `goal-ranges.ts` calls 6 reps legal for hypertrophy, the display band calls it Strength.
+
 - **[`2026-09-02-lb-47-deload-override-honesty`](../../overview/history-2026-09-10-folded-5.md#2026-09-02-lb-47-deload-override-honesty)**
   — **LB-47 (2026-09-02).** `deloadOverrideOutcome` and the card's `nothing-to-revert` copy. **Read
   this before reasoning about the `Full` override on a session-level deload:** the toggle is not

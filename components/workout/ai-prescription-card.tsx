@@ -13,6 +13,7 @@ import { explainExerciseChoice } from "@trainingai/shared/ai-periodization/expla
 import { prescriptionDrivesLoad } from "@trainingai/shared/ai-periodization/apply-prescription";
 import { mroundStepUp, weightStepFor, type DeloadOverrideOutcome } from "@/components/workout/utils";
 import { intensityZoneForPct } from "@trainingai/shared/workout/intensity-zone";
+import { isBodyweightType } from "@trainingai/shared/1rm";
 import { RoleChip } from "./role-chip";
 import { invalidatePrescriptionChanged } from "@/lib/cache-groups";
 
@@ -280,7 +281,15 @@ export function AiPrescriptionCard({
           <div className="space-y-1.5">
             {shownExercises.map(ex => {
               const oneRm = liveOneRm[ex.sessionExerciseId] ?? null;
-              const weightKg = oneRm != null
+              // A bodyweight 1RM is an internal index derived from reps (BF-149), not a load, so a
+              // percentage of it is not kilograms — the card was printing `@ 85kg (66%)` against a
+              // Hanging Leg Raise, which has no bar to load (BF-162). Q-19 established the rule and
+              // applied it to the rationale only; this is the same rule on the exercise rows.
+              //
+              // Falls through to the `@ ${ex.pct}%` branch the card already renders when a 1RM is
+              // missing. Deliberately NOT relabelled as added weight: 85 is 66% of a 128 index, so
+              // calling it "added" would turn a visibly absurd number into a plausible wrong one.
+              const weightKg = oneRm != null && !isBodyweightType(exerciseTypeById?.[ex.sessionExerciseId])
                 ? mroundStepUp(oneRm * ex.pct / 100, weightStepFor(equipmentById?.[ex.sessionExerciseId]))
                 : null;
               const mode = lastSetModeById?.[ex.sessionExerciseId];
@@ -298,7 +307,15 @@ export function AiPrescriptionCard({
                     {zone ? (
                       <span
                         className="inline-block flex-none rounded-full bg-muted/70 px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground"
-                        title={`${zone.range} of 1RM · typically ${zone.reps}`}
+                        // **The chip is named from LOAD ALONE, and the tooltip used to claim reps
+                        // it cannot see (BF-163).** `intensityZoneForPct` reads only the %1RM, so a
+                        // 72.5% prescription is "Hypertrophy" by the band's own definition — while
+                        // `typically 8–12 reps` sat one line above a prescribed 2×6, which the same
+                        // table calls Strength. The load and the reps genuinely disagree here; the
+                        // honest fix is for the chip to claim only what it measures rather than to
+                        // guess which side is right. Judging the pair together is the better answer
+                        // and needs a rule for the disagreement — see BF-163's Keep, Lane A.
+                        title={`${zone.label} · ${zone.range} of 1RM — named from load alone`}
                       >
                         {zone.label} · {zone.range}
                       </span>
