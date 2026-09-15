@@ -12323,7 +12323,31 @@ Worth the lines because the entry currently reads as a decided goal with a writt
 implementer trusting that would spend a 2,813-reference sweep to arrive no closer to what the owner
 asked for. The `Gate: owner` is the operative change; the rest is why.
 
-## 2026-09-15 — `projectOverview.md` → 11237, `docs/implementation-backlog.md` → 21321 (LA-109)
+## 2026-09-15 — LA-110 filed, Q-52's re-measure recorded as unanswerable (backlog +77, projectOverview +27)
+
+The largest single-entry addition in a while, and the table is why: six rows showing reps going up
+while the estimated 1RM goes down, plus the one riser showing the inverse. Prose asserting "this is a
+rep-range artifact" is arguable; the table is not, and it is what stops the next reader treating six
+declining compounds as a training problem.
+
+Q-52 grows too, because its own outstanding precondition was attempted and failed. Recording the
+attempt matters more than recording the result — without it the next session runs the same query,
+gets the same six declines, and builds a feature on a confounded signal. The `Needs: LA-110` is the
+operative part; the boxed note is the evidence.
+
+## 2026-09-15 — LA-110: three leads closed (backlog +15)
+
+Fifteen lines that make the next attempt shorter rather than longer. LA-110 offered
+`session_periodization.baseline_1rm` as a possible like-for-like anchor; it is explicitly forbidden
+for trend use in three places, including twice in the AI prompt. Two adjacent leads are closed the
+same way: the bodyweight unit problem was already solved by Q-19b, and the guard asymmetry between
+`oneRmTrendStatus` and `rm1ChangeKg` is real but three orders of magnitude too small to be this
+defect.
+
+A "ruled out, do not re-walk" list is worth more per line than the finding it sits under — it is the
+difference between an implementer spending an hour confirming a dead end and reading one sentence.
+
+## 2026-09-15 — `projectOverview.md` → 11263, `docs/implementation-backlog.md` → 21412 (LA-109)
 
 The index grew 7 and the backlog **shrank** 8, which is the right direction for a session that
 closed an entry. The 7 are almost entirely the refutation: LA-109's own row could have been three

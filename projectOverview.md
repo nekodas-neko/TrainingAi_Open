@@ -1891,6 +1891,33 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [workouts][platform] 🟠 A phase change makes every compound read as a strength decline (LA-110, 2026-09-15) · found, not fixed
+
+**Open.** `listRecent1rm` returns the two most recent real 1RM estimates for an exercise **from any
+phase and any rep range**. So a transition into `accumulation` — lighter, higher reps — compares a
+15-rep estimate against a 3.5-rep one and reports the difference as a strength trend.
+
+**Measured on production 2026-09-15**, all five sessions having entered accumulation 09-09 → 09-12:
+six primary/secondary compounds read as declining 7.7–64.6%, **and every one has its rep count going
+UP** (bench 3.5 → 15 reps, −20.2%; Bulgarian split squat 6 → 13, −64.6%). The single riser has reps
+going **down** (squat 12 → 10, +18.3%). That is a rep-range signature, not a training one.
+
+**Three consumers believe it**, and not all are cosmetic: the periodization signals (`rm1Trend` /
+`rm1ChangeKg`), the strength-progress card, and the AI prompt. So the engine currently sees six
+compounds trending down right after a phase change it made itself.
+
+**⚑ Possibly related to TN-36** (*"workouts are constantly being recommended for deload"*, PR #1154,
+open) — **not established**; nobody has traced `rm1Trend` into the deload decision. Check before
+assuming either fixes the other.
+
+**Third defect in one family.** `listRecent1rm`'s doc comment records Q-298 and PS-26, both deload
+sentinels fixed by excluding rows. **This one cannot be — the rows are real estimates from real
+work.** `exercise_logs.avg_reps` is stored, so a like-for-like comparison is available; do not widen
+the trend thresholds, which would hide a real decline as readily as a false one.
+
+**It also blocks Q-52**, whose own "re-measure once blocks cycle" step is unanswerable while the
+signal it would count is confounded.
+
 ### [workouts] 🟢 The prescription branches on duration DIRECTION now, not on the preset label (BF-7 PR 2a, 2026-09-15)
 
 No user-visible change and none intended — the control still offers three segments and the plans it
