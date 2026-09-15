@@ -802,31 +802,39 @@ below threshold and left in place for next time.
   any `session_exercises` row**, so a prescription row for one cannot be rendered without inventing
   fixture state — which would test a situation built for the test rather than the one reported.
 
-### [workouts] BF-163 — the intensity chip is computed from load alone, so it labels a 6-rep set "Hypertrophy · typically 8–12 reps"
+### [workouts] BF-163 — the intensity chip is computed from load alone (card half shipped; the blend rule is Lane A's)
 
-- **Lane:** B — `components/workout/ai-prescription-card.tsx:290` and the band table in
-  `packages/shared/src/workout/intensity-zone.ts`.
+- **Lane:** B for the card half — `components/workout/ai-prescription-card.tsx`. **The band table
+  `packages/shared/src/workout/intensity-zone.ts` is Lane A by the path rule**, which the entry's
+  original `Lane: B` did not account for. It did not need touching.
 - **Added:** 2026-09-15 (BugFix intake). Owner, on the same card: *"Is hypertrogpy the correct tag?"*
-- **By its own definition the label is right, and that is the problem.** `intensityZoneForPct` maps
-  %1RM to a band with no reference to reps: 65–75% → **Hypertrophy**. His squat is prescribed at
-  **72.5%**, so the chip is correct.
-- **The chip's own tooltip contradicts the line it sits beside.** The band carries
-  `reps: '8–12 reps'` and renders as `title="65–75% of 1RM · typically 8–12 reps"` — against a
-  prescription of **2×6**. The row reads *"Hypertrophy · 65–75% … 2×6 @ 57.5kg (72.5%)"*, which is a
-  load in the hypertrophy band driving a rep count the same table calls **Strength** (4–6 reps).
-- **The load and the reps genuinely disagree here; the chip is not merely mislabelled.** 6 reps at
-  72.5% is a strength-leaning stimulus. `goal-ranges.ts` puts hypertrophy at `repMin: 5, repMax: 12`,
-  so 6 is legal for the goal — but the display band and the goal range are different tables with
-  different rep opinions, and the card shows only one of them.
-- **Recommended: label from the pair, not the percentage.** Either widen the chip to consider reps
-  (so 72.5% × 6 reads as the blend it is), or drop the `typically N reps` clause from the tooltip so
-  the chip claims only what it measures — the load band. **The second is the honest minimum** and is
-  a one-line change; the first is the better answer and needs a rule for the disagreement.
+- **By its own definition the label was right, and that was the problem.** `intensityZoneForPct`
+  maps %1RM to a band with no reference to reps: 65–75% → **Hypertrophy**. His squat is prescribed at
+  **72.5%**, so the chip was correct. What contradicted it was the chip's **own tooltip** —
+  `typically 8–12 reps` — one line above a prescription of **2×6**, a rep count the same table calls
+  **Strength**.
+- **Shipped 2026-09-15: the chip now claims only what it measures.** The tooltip reads
+  `<label> · <range> of 1RM — named from load alone`. It does not go silent: dropping the clause
+  outright would leave a tooltip that only repeats the visible label, and a reader whose reps do not
+  match the band's name would still have no way to see why. Naming the input is the whole fix.
+- **`zone.reps` is now unused and is DELIBERATELY LEFT IN PLACE.** It was the field's only consumer
+  repo-wide (grepped). The better answer below needs it, and deleting it is a `packages/shared` edit.
+- **Proven load-bearing at BOTH layers.** The unit test
+  (`components/workout/__tests__/bf163-intensity-chip-load-only.test.ts`) reproduces the
+  contradiction from the real 72.5% prescription; because two of its assertions are source matches,
+  there is also `e2e/bf163-intensity-chip-load-only.spec.ts`, which renders the owner's own row and
+  reads the `title` off the DOM. Against `main`'s unfixed card the e2e captures the defect verbatim:
+  received `65–75% of 1RM · typically 8–12 reps`, one line above a rendered `2×6`.
 - **Not a defect in the prescription itself.** The session note explains the low volume — *"Due to
   low external readiness and reported lower back injury/soreness, volume has been reduced across all
-  spinal-loaded movements"* — so 2 sets is deliberate. This entry is about the label, not the plan.
-- **Verification:** on device, confirm no exercise row shows a zone whose stated rep range excludes
-  the reps prescribed on the same line.
+  spinal-loaded movements"* — so 2 sets is deliberate.
+- **Keep:** ① the better answer, which is **Lane A's** — judge the band from the **pair** (load *and*
+  reps) so 72.5% × 6 reads as the blend it is, rather than as either pure zone. It needs a rule for
+  the disagreement: `goal-ranges.ts` puts hypertrophy at `repMin: 5, repMax: 12`, so 6 is legal for
+  the goal while the display band calls it Strength — two tables with different rep opinions, and
+  the card shows one. Not urgent: the chip no longer asserts anything false without it.
+  ② the device check — on the S25, confirm no exercise row shows a zone whose tooltip contradicts the
+  reps prescribed on the same line.
 
 ### [nutrition] BF-161 — the meal builder can only reach foods, so a meal made of meals has to be rebuilt ingredient by ingredient
 

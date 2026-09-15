@@ -307,7 +307,15 @@ export function AiPrescriptionCard({
                     {zone ? (
                       <span
                         className="inline-block flex-none rounded-full bg-muted/70 px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground"
-                        title={`${zone.range} of 1RM · typically ${zone.reps}`}
+                        // **The chip is named from LOAD ALONE, and the tooltip used to claim reps
+                        // it cannot see (BF-163).** `intensityZoneForPct` reads only the %1RM, so a
+                        // 72.5% prescription is "Hypertrophy" by the band's own definition — while
+                        // `typically 8–12 reps` sat one line above a prescribed 2×6, which the same
+                        // table calls Strength. The load and the reps genuinely disagree here; the
+                        // honest fix is for the chip to claim only what it measures rather than to
+                        // guess which side is right. Judging the pair together is the better answer
+                        // and needs a rule for the disagreement — see BF-163's Keep, Lane A.
+                        title={`${zone.label} · ${zone.range} of 1RM — named from load alone`}
                       >
                         {zone.label} · {zone.range}
                       </span>

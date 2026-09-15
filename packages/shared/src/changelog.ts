@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.456.16",
+    date: "2026-09-15",
+    changes: [
+      "The intensity tag on each exercise no longer claims a rep range it is not reading. A squat prescribed at 72.5% was tagged Hypertrophy \u2014 correct, since the tag is worked out from the weight alone \u2014 but its tooltip said \"typically 8\u201312 reps\" directly above a prescription of 2\u00d76, which the same table calls Strength. The tooltip now says the tag is named from load alone, so it tells you what it measured instead of contradicting the set and rep count beside it.",
+    ],
+  },
+  {
     version: "1.456.15",
     date: "2026-09-15",
     changes: [

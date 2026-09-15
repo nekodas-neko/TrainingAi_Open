@@ -12355,3 +12355,13 @@ lines, but the reason BF-49 is *not* this, and the reason BF-100 is now readable
 the next session would otherwise re-derive from the two coupled entries that said the opposite.
 
 A negative result costs lines exactly once and saves a re-run every time someone reads the pair.
+
+## 2026-09-15 — `projectOverview.md` → 11287, `docs/implementation-backlog.md` → 21420 (BF-163)
+
++24 and +5 for a one-line tooltip change, and the ratio is the point: almost none of it is the fix.
+
+What the lines buy is that the chip was **correct** and still had to change. An entry reading
+"Hypertrophy is the right tag" closes itself; the reason it does not is that the chip made two
+claims from one input and only one of them was supported. Someone re-reading this in a month with
+`zone.reps` sitting unused needs to find out why it was left rather than deleted, or they will
+delete it and foreclose the Lane A answer that needs it.
