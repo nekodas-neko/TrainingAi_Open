@@ -2146,6 +2146,20 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return rows.map(r => ({ id: r.id, measuredAt: r.measuredAt, decoded: r.decoded as Record<string, unknown> | null }))
   }
 
+  async listRecentDismissedScaleSamples(userId: string, limit: number): Promise<ScalePendingSample[]> {
+    const rows = await this.db.select({
+      id: s.scaleRawSamples.id, measuredAt: s.scaleRawSamples.measuredAt, decoded: s.scaleRawSamples.decoded,
+    })
+      .from(s.scaleRawSamples)
+      .where(and(eq(s.scaleRawSamples.userId, userId), eq(s.scaleRawSamples.status, 'dismissed')))
+      // Newest first, and that ordering is the feature rather than a convention. In the lockout
+      // this exists for, the readings at the top ARE the locked-out user's — the scale is mostly
+      // theirs, so the most recent declines are the ones that were wrongly declined.
+      .orderBy(desc(s.scaleRawSamples.measuredAt))
+      .limit(limit)
+    return rows.map(r => ({ id: r.id, measuredAt: r.measuredAt, decoded: r.decoded as Record<string, unknown> | null }))
+  }
+
   async listPendingScaleSamples(userId: string): Promise<ScalePendingSample[]> {
     const rows = await this.db.select({
       id: s.scaleRawSamples.id, measuredAt: s.scaleRawSamples.measuredAt, decoded: s.scaleRawSamples.decoded,
@@ -2159,7 +2173,16 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async confirmScaleSample(userId: string, id: number): Promise<ScalePendingSample | null> {
     const [row] = await this.db.update(s.scaleRawSamples)
       .set({ status: 'confirmed' })
-      .where(and(eq(s.scaleRawSamples.id, id), eq(s.scaleRawSamples.userId, userId), eq(s.scaleRawSamples.status, 'pending')))
+      // LA-108: a DISMISSED row is claimable too, not just a pending one. Dismissed is a decision
+      // the app made — or a tap the owner made — and until this it was final: the row could never
+      // be confirmed, so nothing re-anchored `getMostRecentConfirmedWeightKg`, so every later
+      // reading fell outside the band as well. Still narrow on purpose — an ALREADY-CONFIRMED row
+      // stays excluded, or claiming one twice would re-apply it to body_metrics.
+      .where(and(
+        eq(s.scaleRawSamples.id, id),
+        eq(s.scaleRawSamples.userId, userId),
+        inArray(s.scaleRawSamples.status, ['pending', 'dismissed']),
+      ))
       .returning({ id: s.scaleRawSamples.id, measuredAt: s.scaleRawSamples.measuredAt, decoded: s.scaleRawSamples.decoded })
     if (!row) return null
     return { id: row.id, measuredAt: row.measuredAt, decoded: row.decoded as Record<string, unknown> | null }

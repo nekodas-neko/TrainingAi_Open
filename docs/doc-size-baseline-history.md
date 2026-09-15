@@ -12082,7 +12082,83 @@ Worth the lines because the next session would otherwise re-derive the same comp
 the experiment that confirms it (come back with a UI control instead of the gesture) has never been
 run, the entry's own verification step having always specified the gesture.
 
-## 2026-09-14 — `projectOverview.md` → 11032 (BF-100's one-tap experiment, surfaced)
+## 2026-09-14 — BF-58's band split (backlog −34, projectOverview +29)
+
+The backlog **shrank**: BF-58's option analysis (four ways to fix it, option B's full cross-account
+terms) had done its job once the owner chose D, so the entry was cut back to the three things that
+still need the hardware and the rejected option's terms moved into the shipping journal entry. The
+new LA-108 costs most of what was recovered, which is correct — it is a live hazard on code that
+shipped today, not analysis.
+
+`projectOverview.md` grows by the Known Issues row, and it carries the two measured weight clusters
+(70.0–72.8 against 57.5–58.0) rather than only the conclusion. That is the difference between a
+future session re-deriving the band width and reading it: the numbers are what make 8% arithmetic
+instead of a preference, and they are what say not to widen it.
+
+## 2026-09-14 — LA-48's steps half (backlog +20, projectOverview +22)
+
+Both grow for the same reason and it is the useful kind. LA-48's entry gained three corrections
+found by building it — a fifth type declaration the entry did not know about, a steps derivation
+that was wrong by 6× on a segment with a pause, and the discovery that the entry's own 2026-09-01
+correction was itself wrong about adherence being reconstructible. The third is what re-scopes the
+remaining two thirds from a build into a design decision, so the lines that describe both candidate
+shapes are the entry's most load-bearing content, not padding.
+
+`projectOverview.md` carries the arithmetic comparison (60 steps integrated vs 360 multiplied) in
+the Known-Issues row, because that is the number that stops the wrong derivation coming back at a
+call site. A row saying only "use the shared helper" would not.
+
+## 2026-09-15 — `docs/implementation-backlog.md` (BF-162, BF-163)
+
+Fifty lines for two defects on one card row. BF-162 carries the reproduction table because "85 kg on a
+Hanging Leg Raise" reads as a glitch until you see it is exactly 66% of a stored 128, and the entry
+has to stop the fix being "relabel it as added weight". BF-163 spends its length on the fact that the
+tag is CORRECT by its own definition — an implementer told only "hypertrophy is wrong" would change
+the band table and break every other row.
+
+## 2026-09-14 — `docs/implementation-backlog.md` (PS-40 … PS-46, generic data-source connector)
+
+21002 → 21202. Seven entries from one docs-only session designing a generic data-source connector
+(a friend connecting his own device, and what the app needs to keep working without the Oura ring):
+PS-40 (a typed connector registry), PS-41 (Health Connect's HR series isn't normalized into the
+table Activity Score reads), PS-42 (illness radar's own formula degrades gracefully but its caller
+never invokes it for non-Oura users), PS-43 (Health Connect's 30-day backfill cap is a client
+heuristic, not a decided policy), PS-44 (a working rMSSD-from-raw-beats calculator already exists
+and is only wired to workout summaries), PS-45 (no per-user API key exists for external ingestion),
+PS-46 (the Apple HealthKit connector plan). Each carries the file/function evidence for its claim
+rather than a bare assertion, because the whole point of the session was to stop the next person
+re-deriving what six existing integrations already established by reading each other's code — an
+entry that only asserted "wire X into Y" would recreate exactly that problem one level up.
+
+## 2026-09-14 — `projectOverview.md` (generic data-source connector session)
+
+11071 → 11092. One Current Status paragraph pointing at three new reference docs and six backlog
+entries from the same session as the row above. Kept to a pointer rather than restating the guide's
+content, because the guide itself is the record — this paragraph exists so a session reading
+`projectOverview.md` first (the standing session-start rule) knows the connector docs exist at all.
+
+## 2026-09-14 — LA-108's engine half (backlog +11, projectOverview +7)
+
+LA-108 was filed this morning describing a missing read path, and building it found the real lock
+was one SQL predicate — `confirmScaleSample` matching `status='pending'` only. The entry grows a
+little even though most of its speculation about shape is now answered, because what replaces that
+speculation is four concrete notes for whoever renders the list: preserve newest-first (in the
+lockout, the top rows are the wrongly-declined ones), a declined row may carry a null weight and
+still lists, no dismiss action, and do not widen the band instead.
+
+`projectOverview.md` grows by a correction rather than by content: its own row claimed BF-58
+introduced this lockout. It did not — the predicate made an accidental *Not me* tap irreversible
+long before the band split existed. A row that misattributes a defect to the change that revealed it
+sends the next session to the wrong file, so the retraction is worth more lines than the fix.
+
+## 2026-09-15 — `docs/implementation-backlog.md` (BF-164)
+
+Thirty lines correcting BF-149's scope. The table of four call sites is the entry — "the rep max is
+wrong" was already filed and fixed once, so what this needs to carry is WHERE it is still wrong and
+that one of the four prescribes reps rather than printing them. It also records why the sweep missed:
+BF-149 grepped the function's direct callers and not the wrapper seven surfaces import.
+
+## 2026-09-14 — `projectOverview.md` → 11111 (BF-100's one-tap experiment, surfaced)
 
 +10 to move a finding from the backlog into the document every session reads first. #1189 named a
 candidate cause for BF-100 — `use-scroll-restoration.ts` cancels its pending restore on

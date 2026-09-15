@@ -437,6 +437,310 @@ below threshold and left in place for next time.
 
 
 
+### [workouts] BF-164 — BF-149 fixed ONE of eight surfaces; every other bodyweight rep max still reads 8 RM for an 11-rep set
+
+- **Lane:** A — `packages/shared/src/1rm.ts`. Four call sites inside that one file feed all eight
+  surfaces, so the fix is central; no component needs to change.
+- **Added:** 2026-09-15 (BugFix intake). The owner, on the Hanging Leg Raise ready screen showing
+  **"Last: 11 reps · 12 Sept"** directly above **"REP MAX 8 RM"**: *"How is this right?"*
+- **It is the defect BF-149 was filed for, on the surfaces BF-149 did not touch.** BF-149 swapped
+  `exercise-summary-screen.tsx` to the AMRAP-scaled inverse and BF-151 replaced that with
+  `bodyweightRepMax`. **Both changed that one file.** `repMaxFromOneRm` — the inverse of the
+  *unscaled* `calc1RM`, which BF-149 proved wrong for a bodyweight estimate — is still what four
+  helpers in `1rm.ts` call:
+
+  | site | what it feeds |
+  |---|---|
+  | `displayOneRm` (:323) | the ready screen, pre-workout list, stats sheet, strength-trend card, baseline hints, year review |
+  | `displayOneRmSeries` (:396) | every rep-max trend chart, including the one under his 8 RM |
+  | `displayOneRmDelta` (:344) | the rep-change arrow |
+  | `rescaleBodyweightReps` (:408) | **prescribed reps**, not display |
+
+- **The arithmetic is the same one BF-149 published.** His stored estimate is **128**;
+  `repMaxFromOneRm(128)` = **8**, `repMaxFromAmrapOneRm(128)` = **11**, and `avg_reps` for that log
+  is **11**. The screen prints the true figure and the wrong one four lines apart.
+- **`rescaleBodyweightReps` is the half that is not cosmetic.** It sets
+  `reps = floor(pct/100 × repMax)` for the static progression style. An understated rep max
+  understates every prescribed rep count by the same proportion — at his numbers ~8/11, so roughly a
+  **27% shortfall** on any bodyweight exercise the AI did not prescribe directly. That is training
+  volume, not a label.
+- **The fix is one decision applied in one file.** `bodyweightRepMax` already exists and already does
+  the right thing — prefer `storedReps`, else `repMaxFromAmrapOneRm`. Route the four sites through it
+  (passing stored reps where the caller has them, oneRm where it does not). **`repMaxFromOneRm` stays
+  exported**: BF-149 established it is correct for the exercise stats sheet, whose comparison table is
+  built from `calc1RM`, so that pair is self-consistent — and `exercise-stats-sheet.tsx` imports it
+  directly for exactly that.
+- **Why it was missed, recorded because the rule it broke is in CLAUDE.md.** BF-149's journal checked
+  the *direct* callers of `repMaxFromOneRm`, found the stats sheet, and declared the other caller
+  sound. It did not look for **wrappers**: `displayOneRm` is one call deeper and is what seven
+  surfaces actually import. The sibling-surface sweep has to follow the helper up, not only across.
+- **Verification:** on device, one bodyweight exercise's ready screen, pre-workout row, trend chart,
+  stats sheet and strength-trend card must all print the same rep max as the reps last logged. His
+  Hanging Leg Raise is the case: **11**, not 8.
+
+### [devices] PS-40 — formalize the data-source connector convention as a typed, checkable declaration
+
+- **Lane:** A — `packages/shared/src/health/`, `scripts/`, `app/api/**` ingest routes.
+- **Added:** 2026-09-14 (one-off session, owner request: a generic data-source connector structure
+  for other rings/straps/platforms, with documentation of what shape each data type expects and
+  where it lands).
+- **Plan:** [`docs/superpowers/plans/2026-09-14-data-source-connector-interface.md`](superpowers/plans/2026-09-14-data-source-connector-interface.md).
+- **Reference:** [`docs/data-source-connector-guide.md`](data-source-connector-guide.md) — the
+  convention already exists across six sources (Oura BLE, Health Connect ×2, Polar H10, Renpho
+  scale, Colmi R09); this doc writes it down from the current code. This entry is only the
+  "make it a typed declaration + CI-checked" follow-up — §10 of the guide.
+- **Why not urgent:** nothing is broken today; every existing source already follows the
+  convention correctly (per the guide's research pass). This is scale-preparation for a future
+  seventh source or a community-contributed connector, not a bug fix.
+- **Not urgent enough to jump the queue** — placed here rather than at the very top; move it if a
+  concrete new device integration is about to start and would benefit from the typed contract
+  existing first.
+
+### [devices][activity] PS-41 — normalize Health Connect's intraday HR series into `oura_heartrate` so Activity Score works for non-ring users
+
+- **Lane:** A — `lib/health-connect-sync.ts` (client sync payload), `app/api/sync-health/route.ts`
+  (write path), `lib/data/repository.ts`/`adapter.ts` (`upsertOuraHeartrate` bulk-write, already
+  exists — this is a new caller, not new storage).
+- **Added:** 2026-09-14 (one-off session; found while tracing every scoring formula's real inputs —
+  see [`docs/data-source-connector-guide.md`](data-source-connector-guide.md) §3a and §4's Activity
+  Score row / §5.5).
+- **The gap:** Health Connect's `HeartRateSeries` record type carries the same intraday HR shape
+  `oura_heartrate` stores, and `lib/health-connect-sync.ts` already reads it
+  (`HC_ENRICH_READ_TYPES`) — but only to backfill `avgHr`/`maxHr` onto individual `activity_logs`
+  rows (`enrichActivityLogs`). It is never written into `oura_heartrate` itself.
+- **The cost:** `computeActivityScore` (`packages/shared/src/health/activity-score.ts`) derives its
+  `zoneMinutes` (10%) and `moveHours` (12%) contributors — 22% of the formula's weight — from
+  intraday `oura_heartrate` via `getHrForWindow`. A Health-Connect-only user (no ring, no strap)
+  renormalizes without them today, even though the HR series that would supply them is already
+  arriving in every `/api/sync-health` payload and being thrown away after one narrow use.
+- **The fix, in shape:** when Health Connect's sync batch includes `HeartRateSeries` samples, map
+  each sample through the same `{timestamp, bpm, source: 'health_connect'}` shape §3a defines and
+  call the same bulk write `oura_heartrate` already accepts from the ring/strap paths (§6's ranked
+  merge doesn't need a rank change — HR/RR precedence is bucket-based, not per-field-ranked, so
+  `health_connect` just needs a precedence slot alongside `ble`/`chest_strap` in whatever reads
+  `getHrForWindow`, defaulting to lowest precedence since it's a computed, less granular signal).
+  Needs a decision on sample density — Health Connect's `HeartRateSeries` records can be sparse
+  compared to a ring's continuous stream, so `zoneMinutes`/`moveHours` may need a completeness floor
+  before trusting a Health-Connect-only day the way a full-ring day is trusted; that's an
+  implementation-time measurement, not a blocker to starting.
+- **Why this one specifically:** it's the single most concrete, self-contained instance of "a
+  generic source's data isn't reaching a shared table it structurally could" found in this pass —
+  small, scoped to one pillar, and directly closes part of the degraded-mode gap the
+  device-agnostic-source goal names as still open.
+
+### [devices][readiness] PS-42 — wire illness radar into the generic (non-Oura) readiness path
+
+- **Lane:** A — `lib/health/readiness-payload.ts`.
+- **Added:** 2026-09-14 (one-off session; same input-tracing pass as PS-41 — see
+  [`docs/data-source-connector-guide.md`](data-source-connector-guide.md) §4's illness radar row).
+- **The gap:** `computeIllnessRadar` (`packages/shared/src/health/illness-radar.ts`) is written to
+  degrade gracefully — its four weighted signals (temperature 0.40, breathing 0.25, RHR 0.20,
+  HRV-balance 0.15) are each optional and the formula renormalizes over whichever are present. But
+  its only caller, `readiness-payload.ts`, computes it *only if* `latestSummary` (an
+  `oura_daily_summary` row) exists — so a Health-Connect-only user gets **no illness computation at
+  all**, not even a temperature-omitted degraded one, despite the formula supporting exactly that
+  case.
+- **The fix, in shape:** call `computeIllnessRadar` from the same generic-fallback branch that
+  already builds `genericComposite` for readiness (the `// Generic-source fallback (Q-43)` code at
+  `readiness-payload.ts:494–541`), passing whatever z-scores that branch already computes (RHR,
+  HRV) and `null` for temperature/breathing (which have no generic source, same as the readiness
+  composite's own temperature contributor) — the formula's existing renormalization handles the rest.
+  This is a wiring change, not a new formula.
+- **Verification:** confirm on a test account with body_metrics/sleep_sessions populated via
+  Health Connect only (no `oura_daily_summary` row) that `/api/readiness-score` returns a non-null
+  illness radar value with `inputsMissing` naming temperature/breathing, rather than omitting the
+  field entirely.
+
+### [devices] PS-43 — decide whether Health Connect's 30-day cold-sync cap should be a deliberate policy or extendable
+
+- **Gate:** owner.
+- **Added:** 2026-09-14 (one-off session; owner asked specifically whether a source "that can't have
+  live data" — i.e. only reachable via a one-time or infrequent sync — "should be able to backfill
+  the necessary activities etc." See
+  [`docs/data-source-connector-guide.md`](data-source-connector-guide.md) §9 for the full backfill
+  capability audit).
+- **What's actually true today, stated plainly:** Health Connect's in-app sync pulls 30 days of
+  history on a device's first sync (or after the app is reinstalled/site data cleared —
+  `ta_hc_last_sync` in `localStorage` is a client-local heuristic, not an account-level "have we ever
+  backfilled this user" flag), 7 days on every sync after. There is no UI, parameter, or route that
+  lets a user request more than 30 days, even though a phone that's had a watch paired for a year
+  commonly holds a year of Health Connect history.
+- **Recommendation: add an explicit "Import more history" action, capped and resumable, rather than
+  raising the default cold-sync window.** Concretely: a button in the Health Connect settings
+  screen that requests N days at a time (e.g. 30/call) via the bounded-batch pattern already used by
+  every admin backfill route in this app (`maxRows`/job-id-and-poll, per the module-map row on long
+  admin operations), writing through the same `upsertBodyMetrics`/`saveSleepSession` ranked-merge
+  path as live sync — so it can never conflict with or double-count a subsequent live sync.
+- **Why not "just raise `SYNC_DAYS_COLD` to 90 or 365":** a bigger *default* silently fires on every
+  first sync/reinstall regardless of whether the user wants it or the platform can serve it without
+  throttling — Health Connect's own read cost scales with the window, and an automatic 365-day pull
+  on first connect is a materially different (and untested) load profile from today's 30-day one. An
+  explicit, user-triggered, resumable import avoids committing to that risk while still answering
+  "can I get my history in" for a user who wants it.
+- **Alternative, and why it's not recommended:** raise the cold-sync constant outright. Simpler (one
+  constant change), but couples "does this device get real backfill" to "how big is the automatic
+  first-sync pull" — the two are different product questions, and conflating them is how the current
+  30-day figure ended up looking like a considered backfill policy when it's actually just a
+  first-run sync-window heuristic that was never revisited.
+- **Reversal cost:** low either way — this is additive UI + a bounded-batch route, not a schema or
+  migration change. The cheap-reversibility argument favors starting with the explicit action rather
+  than debating window size further, since it's easy to widen or narrow after real usage.
+- **What's needed to start:** owner sign-off on the recommendation (or the alternative), since this
+  is a product/UX decision about what "connect a data source" promises the user, not a technical
+  blocker.
+
+### [devices][heart-rate] PS-44 — compute nightly/readiness HRV from raw beat intervals instead of trusting the ring's own figure
+
+- **Gate:** owner. This changes an input to a live health score, not a UI/infra change — same class
+  of decision `CLAUDE.md`'s Standing Agents rules reserve for Tuning-style validation and sign-off,
+  never a silent swap.
+- **Added:** 2026-09-14 (one-off session; owner asked directly whether any Oura-computed value could
+  be calculated by the app itself for future device-consistency — see
+  [`docs/data-source-connector-guide.md`](data-source-connector-guide.md) §5.7).
+- **What already exists, and isn't connected:** `packages/shared/src/health/rmssd.ts` →
+  `rmssdFromRr(rrMs)` is a standard, artifact-filtered rMSSD implementation, already running on real
+  device data — but scoped only to a workout's rest-window HRV
+  (`packages/shared/src/workout/compute-workout-hr.ts`, fed by the Polar H10's `rr_intervals`).
+  Every other HRV consumer (`night-vitals.ts`'s nightly HRV, Readiness's HRV-balance contributor,
+  chronic stress, resilience) reads the ring's own precomputed `0x5d rmssd_ms` exclusively and never
+  touches `rr_intervals`/`rmssdFromRr`.
+- **Why this one, and why now:** it's the one item in §13's "Oura-only, no fallback" list where the
+  raw ingredient (beat-to-beat intervals) is *already streaming into the app* from a second device
+  (the Polar strap) — unlike temperature or MET, which have no existing raw-signal supplier at all.
+  Wiring this up costs a pipeline change, not a new integration.
+- **What this buys:** any future device exposing raw beat intervals (a near-universal HR-hardware
+  capability) could feed nightly HRV/chronic-stress/resilience identically to the ring, closing part
+  of the "Oura-only" gap without needing that device to replicate Oura's own specific per-epoch
+  computation.
+- **The catch, stated so it isn't skipped:** `night-vitals.ts`'s own header comment says the ring's
+  `0x5d` figure is used deliberately, not by oversight. Before this becomes the live source, validate
+  `rmssdFromRr` over raw IBI against the ring's own `0x5d` values across real history — the same
+  "observe, never feed until checked" discipline `daytime-hrv-model.ts` already used once for a
+  different metric. Do not swap the live pipeline on the strength of the formula being textbook-correct
+  alone; artifact rejection and beat-quality gating are exactly where a naive recompute can diverge
+  from a vendor's tuned figure.
+- **Coverage caveat:** the Polar strap isn't worn continuously the way the ring is, so it only
+  supplies nightly coverage on nights it's actually worn to bed — this closes the portability gap in
+  principle, not a coverage gap for the current single-ring setup.
+- **What's needed to start:** owner sign-off on doing the validation pass at all (since it's
+  scoring-adjacent work), then the comparison itself, before any pipeline change ships.
+
+### [devices][platform] PS-45 — a per-user API key/token for external programmatic health-data ingestion
+
+- **Gate:** owner — this is new authentication surface (a credential separate from the login
+  session, capable of writing health data into a specific account), not a routine feature.
+- **Added:** 2026-09-14 (one-off session; a friend the owner is onboarding asked for a real API
+  contract to connect his own device, and hit the actual gap: `/api/sync-health` is real and
+  generic, but only session-cookie authenticated — there is no way for an external script to call it
+  without holding a live login session, which isn't a workflow the app exposes. Full detail:
+  [`docs/sync-health-api-reference.md`](sync-health-api-reference.md) §4).
+- **What exists today:** `POST /api/sync-health` (`app/api/sync-health/route.ts`) already accepts a
+  fully generic, device-agnostic payload — daily body metrics, exercise sessions, sleep records —
+  and writes through the same ranked-provenance path as every other source
+  (`docs/data-source-connector-guide.md` §6). The schema and behavior are already suitable for a
+  third party. Only the auth model isn't.
+- **The shape this needs, roughly:** a `user_api_keys` table (hashed token, not plaintext, per the
+  usual credential-storage practice), a way for a user to generate/revoke one from their own
+  settings screen, and an auth branch on `/api/sync-health` (and any other route worth opening up
+  this way) that accepts `Authorization: Bearer <token>` as an alternative to the session cookie,
+  resolving to the same `userId` scoping every write already requires. Rate limiting and the
+  existing per-record validation need no change — they already key off `userId`, not the auth
+  mechanism.
+- **Scope check before starting:** decide whether this covers `/api/sync-health` only, or a wider
+  set of routes (worth restating: this is a genuinely new capability — "an external, unattended
+  script can write into a specific user's health data" — not a small tweak, hence the owner gate
+  rather than an implementer just building it).
+- **Cheaper interim answer, if the owner wants one now:** point anyone in the friend's position at
+  Android Health Connect first (§4 of the reference doc) — if their device or its companion app
+  already writes there, this entry isn't blocking them at all.
+- **What's needed to start:** owner sign-off that this capability is wanted, and how wide (one route
+  vs. several) — a security-surface decision, not an implementation question.
+
+### [devices] PS-46 — build the Apple HealthKit connector (iOS)
+
+- **Gate:** owner — this needs an Apple Developer Program enrollment ($99/year, a real recurring
+  cost) and a new platform target (no `ios/` directory, no `@capacitor/ios` exists in this repo
+  today), not just an implementer's time.
+- **Added:** 2026-09-14 (one-off session; the owner's friend testing device-source portability is on
+  iPhone/Apple Health, and the owner expects most future users will be too).
+- **Plan:** [`docs/superpowers/plans/2026-09-14-apple-healthkit-ios-connector.md`](superpowers/plans/2026-09-14-apple-healthkit-ios-connector.md)
+  — full mapping table (HealthKit type → canonical shape, mirroring `lib/health-connect-sync.ts`
+  field-by-field), platform setup steps, two decisions that need making before writing code (the
+  HRV-statistic mismatch between HealthKit's SDNN and the app's rMSSD-based fields; whether to
+  extend `SyncHealthSchema` for temperature/respiratory rate), and the TestFlight distribution path.
+- **Why this is real, not speculative:** HealthKit is architecturally identical to Health Connect —
+  a computed source (`docs/data-source-connector-guide.md` §2) needing only a client-side reader and
+  mapping layer, **zero backend changes** (`POST /api/sync-health` already accepts the exact target
+  shape). The plan is concrete and buildable as written; what's gated is the account cost and the
+  decision to stand up a second platform, not technical uncertainty.
+- **Interim note:** the friend's own gap is separately covered — no code change needed if he ends up
+  reachable via Android Health Connect instead; this entry is specifically for Apple Health.
+- **What's needed to start:** owner sign-off on the Apple Developer Program cost/enrollment, then an
+  implementer follows the plan directly.
+
+### [workouts] BF-162 — the prescription card tells you to load 85 kg onto a Hanging Leg Raise
+
+- **Lane:** B — `components/workout/ai-prescription-card.tsx:283-310`. The data needed to fix it is
+  already a prop on this component.
+- **Added:** 2026-09-15 (BugFix intake). The owner, reading his Legs prescription: *"Is this right?"*
+- **Reproduced exactly from his stored values — this is arithmetic, not an anomaly:**
+
+  | exercise | stored `estimated_1rm` | × pct | card shows |
+  |---|---|---|---|
+  | Hanging Leg Raise | **128** | × 66% = 84.5 | **`@ 85kg (66%)`** |
+  | Pull-Up (14 Sept) | **124** | × 72.5% = 89.9 | **`@ 90kg (72.5%)`** |
+
+  Both are `exercise_type = 'bodyweight'` with `equipment = ['bodyweight']` in `exercise_library`.
+  There is no bar to load and no weight to add; the kg figure is a percentage of an internal index.
+- **The component already holds the answer and already documents the rule.** Its own prop comment:
+
+  ```ts
+  // Per session-exercise id: 'weighted' | 'bodyweight'. A bodyweight 1RM change in kg is a change
+  // in an internal index, not in weight lifted, so the rationale must not quote it (Q-19).
+  exerciseTypeById?: Record<string, string | undefined>;
+  ```
+
+  **Q-19 applied that rule to the RATIONALE and not to the exercise rows.** Line 283 computes
+  `weightKg` from `liveOneRm × pct` unconditionally and line 308 prints it, never consulting
+  `exerciseTypeById`.
+- **The fix is to take the branch that already exists.** Line 310 renders `` ` @ ${ex.pct}%` `` when
+  `oneRm` is null — visible on his own card as *Face Pull · 2×12 @ 66%*, which reads correctly. A
+  bodyweight exercise should take that same branch: percent, no kg.
+- **Do not render the number as "added weight" instead.** 85 is not 85 kg of added load — it is 66%
+  of a 128 index derived from bodyweight reps (BF-149's forward path). Relabelling it would turn a
+  visibly absurd number into a plausible wrong one, which is the trap BF-158 is filed against.
+- **Consider, not required:** for a bodyweight exercise the useful target is reps, and `avg_reps` is
+  stored (BF-151 is already about reading it rather than inverting). Showing *"2×12"* with the
+  percent and no kg is complete on its own; a rep target is a further improvement, not part of this.
+- **Verification:** on device, open a session containing a bodyweight exercise and confirm no kg is
+  shown for it while weighted exercises in the same list are unchanged.
+
+### [workouts] BF-163 — the intensity chip is computed from load alone, so it labels a 6-rep set "Hypertrophy · typically 8–12 reps"
+
+- **Lane:** B — `components/workout/ai-prescription-card.tsx:290` and the band table in
+  `packages/shared/src/workout/intensity-zone.ts`.
+- **Added:** 2026-09-15 (BugFix intake). Owner, on the same card: *"Is hypertrogpy the correct tag?"*
+- **By its own definition the label is right, and that is the problem.** `intensityZoneForPct` maps
+  %1RM to a band with no reference to reps: 65–75% → **Hypertrophy**. His squat is prescribed at
+  **72.5%**, so the chip is correct.
+- **The chip's own tooltip contradicts the line it sits beside.** The band carries
+  `reps: '8–12 reps'` and renders as `title="65–75% of 1RM · typically 8–12 reps"` — against a
+  prescription of **2×6**. The row reads *"Hypertrophy · 65–75% … 2×6 @ 57.5kg (72.5%)"*, which is a
+  load in the hypertrophy band driving a rep count the same table calls **Strength** (4–6 reps).
+- **The load and the reps genuinely disagree here; the chip is not merely mislabelled.** 6 reps at
+  72.5% is a strength-leaning stimulus. `goal-ranges.ts` puts hypertrophy at `repMin: 5, repMax: 12`,
+  so 6 is legal for the goal — but the display band and the goal range are different tables with
+  different rep opinions, and the card shows only one of them.
+- **Recommended: label from the pair, not the percentage.** Either widen the chip to consider reps
+  (so 72.5% × 6 reads as the blend it is), or drop the `typically N reps` clause from the tooltip so
+  the chip claims only what it measures — the load band. **The second is the honest minimum** and is
+  a one-line change; the first is the better answer and needs a rule for the disagreement.
+- **Not a defect in the prescription itself.** The session note explains the low volume — *"Due to
+  low external readiness and reported lower back injury/soreness, volume has been reduced across all
+  spinal-loaded movements"* — so 2 sets is deliberate. This entry is about the label, not the plan.
+- **Verification:** on device, confirm no exercise row shows a zone whose stated rep range excludes
+  the reps prescribed on the same line.
+
 ### [nutrition] BF-161 — the meal builder can only reach foods, so a meal made of meals has to be rebuilt ingredient by ingredient
 
 - **Lane:** B for the recommended shape (`components/nutrition/ingredient-search.tsx`,
@@ -7766,114 +8070,91 @@ recommendations that were put to them. Do not re-open either.**
   any correlation it surfaces is an observation on n=1 with a dozen confounders — shown as a number
   the owner reads, never as a claim about cause.
 
-### [body][devices][platform] BF-58 — the partner's weigh-ins land in the owner's account and are thrown away; two people, one scale
+### [body][devices][platform] BF-58 — one scale, two people: the two device answers the weight bands could not give
 
-- **Lane:** A — attribution and routing; the consent surface is B.
+- **Lane:** A.
 - **Added:** 2026-08-30 · owner: *"my partner also used this app and the same scale, how can she
   connect so she gets her body data to her app. can we both be connected to the scale at once? (she
-  is who I am getting the readings for that are 'is this you')."*
-- **Needs:** BF-53 — **cleared 2026-08-30: it shipped.** Both routes take `numericRouteId` and the
-  client now reports the failure instead of swallowing it, so the *"is this you"* prompt works again.
-  That matters here because under option D the prompt is the **ambiguity fallback** — the thing that
-  catches a reading the weight bands cannot separate. A device check on BF-53 is still owed.
+  is who I am getting the readings for that are 'is this you'.)"*
+- **Keep:** the two on-device questions below, and the partner-pairing step. **Option D's
+  attribution shipped 2026-09-14** — `/api/scale-ble/samples` now splits three ways (claim within
+  `SCALE_WEIGHT_CLAIM_PCT` 8% · prompt up to `SCALE_WEIGHT_ANOMALY_PCT` 15% · decline beyond), the
+  band width was measured off the two real weight clusters rather than chosen, and a declined
+  reading is **archived** rather than thrown away. Nothing of the band work is outstanding; what is
+  left is everything that needs the hardware.
 
-**Two questions, and the code answers both.**
+**1. Can both phones hold a connection at once?** Almost certainly not, and the app is built on that
+assumption. The reading does not come from the advertisement — `ScaleBleScanManager` uses it only to
+*wake* the app, and `ScaleBleService` then opens a **GATT connection** (`ScaleGattClient`) to read
+the frame. A consumer scale of this class normally accepts one at a time, so two phones would race
+and the loser would get nothing. **That is inferred from the protocol shape, not measured.** Pair
+both phones, step on the scale, see whether one, both or neither receives a frame.
 
-**1. Can both phones connect at once? Almost certainly not, and the app is built on that assumption.**
-The reading does not come from the advertisement — `ScaleBleScanManager` uses the advertisement only
-to *wake* the app, and `ScaleBleService` then opens a **GATT connection** (`ScaleGattClient`) to read
-the frame. A consumer BLE scale of this class normally accepts one GATT connection at a time, so two
-phones would race and the loser would get nothing. **That is an assumption from the protocol shape,
-not a measurement — it needs one on-device test before any design depends on it** (pair both phones,
-step on the scale, see whether one, both or neither receives a frame).
+**2. Does `REQUEST_STORED_MEASUREMENTS_CMD` get a reply?** This is the one that decides whether the
+race matters at all. `0x22 0x04 0x15` and `STORED_RECORD_MARKER` already exist in the code and the
+comment is candid that they are **speculative, borrowed from a different firmware generation and
+never verified against this hardware**. If the scale buffers, the losing phone catches up on its
+next connect and nobody's weigh-in is lost. One command and a look at what comes back; there is
+already a plan at
+`docs/superpowers/plans/2026-07-30-scale-stored-measurement-drain-and-scan-latency.md`.
 
-**2. Where do her readings go now? Into the owner's account, then the bin.** The scale is paired to
-one user. Every frame is attributed to that user; a weight more than `SCALE_WEIGHT_ANOMALY_PCT`
-(15%) from their last confirmed reading is staged **pending** rather than saved — and
-`composition.ts:11` says why in as many words: *"owner's partner also uses this scale"*. The `Not
-me` button then **discards** it. So the app already detects her, already asks, and already knows the
-answer — and then destroys the reading. Every weigh-in she has ever taken on it is gone.
+**3. Have the partner pair the scale in her own app.** The pairing is `localStorage` on the device
+(`ta_paired_scale_v1`, no `user_id`, no table, no uniqueness constraint) — so nothing stops her
+phone pairing the same scale today, and it costs nothing to find out. With D shipped on both
+phones, each app claims only its own owner's band and neither learns anything about the other
+person.
 
-**⚠ THE PAIRING IS `localStorage` ON THE DEVICE — there is no server-side owner, and this changes
-the design.** `lib/scale-ble/paired-scale.ts` stores `{deviceId, name}` under `ta_paired_scale_v1` in
-`localStorage`. No `user_id`, no table, no uniqueness constraint. **So nothing stops the partner's
-phone pairing the same scale today** — the first draft of this entry treated the scale as owned by
-one account, and it is not. What is actually shared is the *radio*, not a record.
+**The residual risk, stated rather than hidden.** Both phones race for one GATT connection, so if
+his wins and declines while her phone is out of range, **that weigh-in is lost** — which is what (2)
+would fix, and failing that, weighing in with your own phone nearby is a habit rather than a
+feature.
 
-**So the problem is narrower than "two people, one scale". It is: whichever phone wins the GATT
-connection attributes the reading to ITS owner.** Both phones wake on the advertisement, both try to
-connect, one wins. That is why his account is collecting her weigh-ins.
+**Option B (a linked household member, readings offered across accounts) was rejected 2026-08-30**
+and is recorded in the shipping journal entry with its terms, so it is not re-proposed from scratch
+if it is ever revived. It builds the app's first cross-account data path — consent, linking,
+revocation, a Play Store health-data implication — and D needs none of it.
 
-**Four ways to fix it.**
+- **Verification:** with both phones paired, the owner steps on the scale and his reading lands in
+  his account with no prompt; the partner steps on and **no** *"is this you"* appears on his phone;
+  and the answer to (1) is recorded either way, because the design of any future work here depends
+  on it.
 
-| | Shape | Verdict |
-|---|---|---|
-| **A** | Both phones pair, both claim whatever they capture | **No.** This is today's behaviour and it is the bug. |
-| **B** | One phone owns the scale; a `Not me` reading is offered to a **linked household member** | **Rejected 2026-08-30.** Builds the app's first cross-account data path — consent, linking, revocation, a Play Store health-data implication — to solve a problem that does not need any of it. Kept below only so it is not re-proposed. |
-| **C** | She uses the Renpho app | Zero work. The honest baseline, and the current interim answer. |
-| **D** | **Both phones pair independently; each claims only weights inside its own owner's band and declines the rest** | **✅ CHOSEN by the owner 2026-08-30.** No linking, no shared account, no server-side owner, no cross-account write. Two self-contained apps that happen to hear the same radio. |
+### [body][devices] LA-108 — a declined weigh-in has no screen, so the recovery path built for it cannot be reached
 
-**Scope of the build, now that D is decided:**
-1. **Each phone declines rather than asks** when a stable reading falls outside its owner's band.
-   Today the same condition raises the *"is this you"* prompt and then discards on `Not me`.
-2. **Tighten the band for this case.** 15% at 72 kg is ±10.8 kg — wide enough that two adults can sit
-   inside one band. Pick the width from the two real weights rather than a round number, and let
-   anything ambiguous fall through to the prompt instead of guessing.
-3. **The prompt stays** as the ambiguity fallback, which is why `Needs: BF-53` holds: it is dead in
-   production right now.
-4. **No server change, no schema change, no cross-account anything.** If a design step starts
-   reaching for one, it has left option D — stop and re-read this entry.
+- **Lane:** B — the list. `components/settings/scale-pairing.tsx`, beside the pending one it already
+  renders.
+- **Added:** 2026-09-14 · Lane A, found while shipping BF-58's band split.
+- **Keep:** the list, and only the list. **The engine half shipped 2026-09-14** and is the half that
+  was actually locked: `confirmScaleSample` matched `status='pending'` only, so no declined reading
+  could ever be filed. It now accepts `pending` **or** `dismissed` (never `confirmed`, so claiming
+  twice cannot double-apply a reading), `listRecentDismissedScaleSamples` exists, and
+  `GET /api/scale-ble/pending` returns a bounded `dismissed[]` shaped exactly like `pending[]`.
+  **`POST /api/scale-ble/pending/<id>/confirm` already accepts one of these ids and needed no
+  change** — it files the weight against the reading's own `measuredAt` and re-anchors the band.
 
-**Why D, and why it is mostly already built.** The hard part — deciding a reading is not this user's —
-exists and works: `SCALE_WEIGHT_ANOMALY_PCT` (15% from the user's last confirmed weight) is what
-raises the *"is this you"* prompt today. **D changes what happens next: instead of asking and then
-discarding, a phone simply does not claim a weight outside its owner's band.** Her phone, running the
-same rule against her band, claims it. Neither app learns anything about the other person.
+**Why it matters, which is more than "a lost reading".** The band anchors on the last CONFIRMED
+weight and only a confirmed reading moves it. So a genuine change of more than
+`SCALE_WEIGHT_ANOMALY_PCT` between two weigh-ins — a long gap plus an illness or an injury — puts
+the owner outside his own band with nothing to move it, and **every** reading after that is outside
+too. Silent and self-sustaining.
 
-**The residual risk, stated rather than hidden.** Both phones race for one GATT connection, so if his
-wins and declines, and her phone was not in range, **that weigh-in is lost**. Two mitigations, in
-order:
-1. **Drain the scale's stored measurements** — `ScaleProtocol.REQUEST_STORED_MEASUREMENTS_CMD`
-   (`0x22 0x04 0x15`) and `STORED_RECORD_MARKER` already exist in the code, and the comment is candid
-   that they are **speculative and never verified against this hardware**, borrowed from a different
-   firmware generation. **Test it — it is one command and a look at what comes back.** If the scale
-   buffers, the losing phone catches up on its next connect and the race stops mattering at all.
-   There is already a plan: `docs/superpowers/plans/2026-07-30-scale-stored-measurement-drain-and-scan-latency.md`.
-2. Failing that, weighing in with your own phone nearby is a habit, not a feature.
+**This predates BF-58 rather than being caused by it**, which is the correction worth carrying: an
+accidental *Not me* tap has always been irreversible and has always failed to re-anchor. BF-58 made
+the state reachable without a tap, and that is what made it worth finding.
 
-**Where D breaks, and it is worth knowing up front:** weight-band attribution is identity by proxy.
-If the two users' weights converge into one band it stops discriminating, and a 15% band is wide —
-at 72 kg that is ±10.8 kg. **Tighten the band for the multi-user case and let an ambiguous reading
-fall through to the existing prompt rather than guessing.** The prompt is the right fallback; it is
-being asked too often today, not too rarely.
+**What is left is one list.** `GET /api/scale-ble/pending` now returns `{ pending, dismissed }`, both
+arrays of `{ id, measuredAt, weightKg }`. Render `dismissed` under the pending section with a
+claim action that POSTs to the same confirm route the pending rows use. Notes for whoever builds it:
+- **Newest first is deliberate and should be preserved in the render.** In the lockout this exists
+  for, the readings at the top ARE the locked-out user's — the scale is mostly his, so the most
+  recent declines are the wrongly-declined ones.
+- **A declined row may have `weightKg: null`** (a frame that would not decode is archived too), same
+  as a pending row. It still lists; do not hide it.
+- **Do not add a dismiss action to this list.** These are already dismissed; the only move is to
+  claim one back.
+- **Do not fix the underlying hazard by widening the band** — the 8% was measured against the two
+  real clusters and widening it is the thing BF-58 was filed to stop.
 
-**⚠ The cross-account requirements below apply to option B ONLY, which is rejected.** D needs none of
-them, and that is most of the argument for D. Kept because if B is ever revived these are its terms:
-- **Two-way consent.** A link is accepted by both accounts, and either can break it. Never inferred
-  from a shared device.
-- **The reading moves, it does not copy.** A weigh-in belongs to one person. Attribute or discard.
-- **The offer carries a weight and nothing else.** Her phone should not receive the owner's history
-  to work out which readings are hers, and nothing about her should reach his account beyond the
-  fact that a pending row was claimed.
-- **Ownership checks still apply at every write** (CLAUDE.md's write-path discipline) — a linked
-  account is not a shared account.
-- **Play Store bearing:** this makes the app genuinely multi-user with health data crossing between
-  accounts, which is exactly what the declared-use-case review looks at. Worth the owner knowing
-  before it is built, not after.
-
-- **✅ Gate: owner CLEARED 2026-08-30** — *"D sounds like the way to go; lets go with that."* B is
-  rejected and C is the interim answer until D ships. **Build D.** What still wants a device answer, and both are cheap: whether two phones can hold a
-  GATT connection at once, and **whether `REQUEST_STORED_MEASUREMENTS_CMD` gets a reply** — the
-  second one decides whether the race matters at all.
-- **Do this first, before any code:** have the partner pair the scale in her own app. The pairing is
-  device-local, so it costs nothing and may reveal that both phones already receive readings — which
-  would shrink this entry to "each phone declines what is not its owner's".
-- **Interim, and worth saying:** until this ships, her readings are lost the moment they are
-  dismissed. If she wants that data, the Renpho app is the only place it currently survives.
-- **Verification:** a reading the owner marks `Not me` appears as a claimable weigh-in on the linked
-  account, with its impedance-derived composition intact; claiming it removes it from the owner's
-  pending list; neither account can see the other's history; and breaking the link stops the flow
-  both ways.
 
 ### [nutrition] BF-47 — the deleted food comes back: the loader calls the server authoritative while the delete is still in the outbox
 
@@ -11377,42 +11658,62 @@ screenshot is a **1:39** walk with the screen on, which exercises none of it.
 - **Verification.** HR live on-device with the strap paired, and the stale guard exercised by walking
   out of range. The notification half is **APK-only** and cannot be checked in `pnpm dev` at all.
 
-### [cardio][devices] LA-48 — a walk's pacer creates an adherence number and nothing stores it
+### [cardio][devices] LA-48 — the walk's pacer creates an adherence number and nothing stores it
 
-- **Branch:** none yet
+- **Lane:** A — the types and the roll-up; a producer on the live screen is Lane B (see below).
 - **Added:** 2026-08-31 · Lane B, splitting the storage half out of Q-410 when the surface half shipped
-- **Lane:** A
-- **Needs:** LA-52
-- **⚠ SCOPE CORRECTED 2026-09-01 by Lane A, from reading the code rather than the entry.** Two of the
-  three claims below moved:
-  - **There is NO migration and NO local schema version.** `activity_logs.segments` is `jsonb` on the
-    server (`$type<>` is a TypeScript annotation) and `TEXT` locally, so nothing is a column edit.
-    What must move together is the **type in four places** — `WalkSegmentStat`
-    (`lib/walk/segment-stats.ts`), the `$type<>` in `schema.ts`, `LocalActivityLog`
-    (`lib/local-store/types.ts`), and **`WalkSegmentStatSchema`
-    (`packages/shared/src/validation/activity-log.ts`)**. That last one is the trap: Zod **strips**
-    unknown keys by default, so a field added everywhere except the wire schema is silently dropped
-    on both write paths with no error — the same silent-loss shape that dead-lettered every guided
-    walk in 2026-08-02, in reverse.
-  - **The adherence roll-up needs no Lane B producer.** `readPacer` is pure and every input is
-    already reconstructible from what `computeWalkSegmentStats` receives — cadence from
-    `cadenceSeries`, hr from `hrSamples`, and speed from `rawPoints` via the *same* cumulative
-    formula the live store uses, so a post-hoc reconstruction matches what the walker saw exactly.
-  - **Which is precisely why this now `Needs: LA-52`.** It matches what the walker saw, and what the
-    walker saw on the speed rung is a whole-walk average. Storing adherence computed from that would
-    bake the defect into the archive as an analysis variable — the class BF-59 exists about. **Ship
-    `steps` first if this is split; it is a clean derivation from `cadenceSeries` and depends on
-    nothing.**
-- **Why this exists separately.** Q-410's surface half shipped 2026-08-31: `lib/walk/walk-pacer.ts`
-  now decides, once a second, which signal is pacing a segment and which band the walker is in. That
-  is a *new* measurement — it did not exist before, so nothing records it — and the owner's ask was
-  explicit: *"make sure all these values get stored so we can do data analysis on it later like steps
-  x distance x time."*
-- **Three additions to the existing `segments` JSONB, not new columns.** Measured against
-  `lib/walk/segment-stats.ts`, which already stores `index`, `setNumber`, `kind`, `startSec`,
-  `endSec`, `avgHr`, `maxHr`, `hrAtStart`, `avgPaceSecPerKm`, `distanceKm`, `avgCadenceSpm`:
-  1. **`steps` per segment** — derivable from `avgCadenceSpm × duration`, but derived-at-read-time
-     means every consumer re-derives it slightly differently. Store it.
+- **Keep:** adherence per segment and which signal paced it. **The `steps` third SHIPPED 2026-09-14**
+  — `WalkSegmentStat.steps`, integrated through the shared `stepsFromCadenceSeries`
+  (`packages/shared/src/health/cadence.ts`), carried through all five type declarations and the wire
+  schema. Nothing of that half is outstanding.
+
+**⚠ THREE THINGS THIS ENTRY SAID ARE WRONG, all found by building the easy third of it.** They are
+corrections rather than notes, because each one changes what the remaining work is.
+
+**1. There are FIVE type places, not four.** The entry named `WalkSegmentStat`, the `$type<>` in
+`schema.ts`, `LocalActivityLog` and `WalkSegmentStatSchema`. It missed
+**`packages/shared/src/types/body.ts`**, which carries its own structural copy of the segment shape
+and is what `ActivityLog` is assembled against — `tsc` found it, nothing else would have. Same shape
+as BF-70's fifth layer: a per-field type repeated in five places is the defect, and the count in a
+backlog entry is not the authority on it.
+
+**2. `steps` was NOT "a clean derivation from `cadenceSeries` that depends on nothing".** Mean spm ×
+duration is wrong, and measurably: `avgCadenceSpm` is cadence *while moving* by construction — a stop
+contributes no readings and so cannot pull it down — so multiplying it by the segment's wall duration
+counts every pause at the walking rate. A segment with 30 s of walking at 120 spm inside a 180 s
+window gives 60 steps by integration and **360** by multiplication. It was also a second answer to a
+question the app already answered: `estimateSteps` in `cadence.ts` (Q-230) integrates bins for the
+walk's own saved `steps`, and its own comment warns against a second integration. Both now call
+`stepsFromCadenceSeries`, so the segments and the walk total cannot drift.
+
+**3. ⚠ THE BIG ONE — a post-hoc reconstruction does NOT match what the walker saw, so the
+"no Lane B producer needed" correction was itself wrong.** The 2026-09-01 correction reasoned that
+every `readPacer` input is reconstructible after the fact. Two of the three are. **Cadence is not.**
+`walk-pacer-bar.tsx:34` bands `snap?.liveSpm` — the tracker's instantaneous reading, ~1 Hz — while
+the only cadence a saved walk carries is `summarizeCadence`'s series, **binned to 10 s and carrying
+the bin MEDIAN** (`CADENCE_SERIES_BIN_SEC`). A median over ten seconds and the instantaneous value
+band differently either side of a target, which is exactly where adherence is decided. So a
+reconstruction would store a plausible number that is **not** the number the walker was shown — the
+BF-59 class the entry already invokes against itself.
+
+**What that leaves, and it is a design step rather than a build step.** Two shapes, and this needs
+deciding before anything is written:
+- **Accumulate live (Lane B).** The walk screen counts ticks per band as they happen and hands the
+  totals to the save. It is the only thing that can record what was actually displayed. Cost: a
+  producer on the live screen, and a walk that crashes mid-way loses its counts.
+- **Reconstruct, and say so (Lane A only).** Store adherence computed from the binned series with the
+  binning recorded beside it, as an approximation that is honest about being one. Cheaper, and
+  permanently a different measurement from the prompts the walker responded to.
+
+**The targets are not at the save site either**, which the reconstruction shape has to solve:
+`walk-summary.tsx` holds `config` (so cadence targets resolve) but not the HR pair — it fetches
+`hr-profile` asynchronously and may not have it when the save effect runs — nor the speed pair, which
+`walk-active.tsx` reads from the `walk-segment-stats` cache. Both are Lane B state on the live screen,
+which is a further argument for the first shape.
+
+**Three additions to the existing `segments` JSONB, not new columns** — one shipped, two remain.
+Measured against `lib/walk/segment-stats.ts`:
+  1. ~~**`steps` per segment**~~ — **shipped 2026-09-14**, integrated rather than multiplied.
   2. **Adherence per segment** — the fraction of the segment spent in each band. This is the number
      the pacer creates and the most interesting thing to analyse later: *did I hit the target, or
      just see the prompt.*
@@ -11420,19 +11721,19 @@ screenshot is a **1:39** walk with the screen on, which exercises none of it.
      an adherence figure is **uninterpretable without it** — 60% in range against a cadence target
      and against a heart-rate target are not the same measurement, and the ladder can change rung
      mid-segment when a strap drops.
-- **The producer is already there and is pure.** `readPacer()` returns the band per tick; the
-  aggregation is "count ticks per band over the segment window", which is the same shape
-  `computeWalkSegmentStats` already runs for HR and pace. Lane B holds the live readings; what is
-  missing is somewhere to put the roll-up.
+- **Why this exists separately.** Q-410's surface half shipped 2026-08-31: `lib/walk/walk-pacer.ts`
+  decides, once a second, which signal is pacing a segment and which band the walker is in. That is a
+  *new* measurement — it did not exist before, so nothing records it — and the owner's ask was
+  explicit: *"make sure all these values get stored so we can do data analysis on it later like steps
+  x distance x time."*
+- **There is NO migration and NO local schema version.** `activity_logs.segments` is `jsonb` on the
+  server (`$type<>` is a TypeScript annotation) and `TEXT` locally, so nothing is a column edit. What
+  must move together is the type in the five places above **and `WalkSegmentStatSchema`** — Zod
+  **strips** unknown keys by default, so a field added everywhere except the wire schema is silently
+  dropped on both write paths with no error. A test that merely *accepts* the payload does not catch
+  it; assert the value survives the parse, as `segment-stats.test.ts` now does.
 - **Verification.** Needs a real walk with the H10 paired to produce a cadence-paced segment at all —
   a browser only ever reaches the speed rung.
-
-> **✅ LB-36 and LA-52 VERIFIED together and removed, 2026-09-14, on one walk.** The cadence pacer ran
-> for the first time on a device and behaved (*"Yes this works fine - no issues"*); the windowed speed
-> rung and the **Stopped** readout were exercised in the same walk, which is what LA-52 was waiting
-> for — the owner asked how to check it separately and the answer is that it could not be, which is
-> why the two were put on one walk. Neither the cadence rung nor the HR rung had ever executed before
-> this, because both need a Polar H10 over BLE and no harness here has one.
 
 ### [workouts][devices] Q-486 — the outbox enqueue for a workout is the only write in the app that fails silently, and it is the last line of defence
 

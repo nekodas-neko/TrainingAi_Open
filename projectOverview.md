@@ -29,6 +29,27 @@
 **Version:** v1.456.4 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-14.
 
+**A generic data-source connector contract now exists, written from the code rather than intent (no
+version bump — docs only).** Owner request: a structure so a second user's own ring/strap/phone can
+feed the app, prompted by a friend testing on an iPhone with Apple Health rather than Android's
+Health Connect. [`docs/data-source-connector-guide.md`](docs/data-source-connector-guide.md) is the
+result — the canonical shape of every data type, which calculation reads what and degrades how
+without it, and a metric-by-metric classification of what Oura's ring computes for us versus what
+the app computes itself (this matters for portability: the stress/resilience/Body-Battery family
+runs on the ring's own per-epoch outputs, not raw sensor waveforms, which lowers the bar for a future
+device considerably).
+[`docs/sync-health-api-reference.md`](docs/sync-health-api-reference.md) is the actual JSON contract
+for `POST /api/sync-health`, and [`docs/superpowers/plans/2026-09-14-apple-healthkit-ios-connector.md`](docs/superpowers/plans/2026-09-14-apple-healthkit-ios-connector.md)
+is a buildable HealthKit plan mirroring the real Health Connect sync field-by-field. **Six backlog
+entries filed, none built yet:** PS-40 (typed connector registry), PS-41 (Health Connect's HR series
+never reaches the table Activity Score depends on), PS-42 (illness radar's own formula degrades
+gracefully but its caller skips it for non-Oura users), PS-43 (Health Connect's 30-day backfill cap
+is an undecided client heuristic), PS-44 (a working rMSSD-from-raw-beats calculator already exists,
+wired only to workout summaries — nightly HRV could use it too, pending validation), PS-45 (no
+per-user API key for external device integration), PS-46 (the HealthKit connector itself — needs a
+real Apple Developer account, hence owner-gated)
+([journal](docs/overview/entries/2026-09-14-generic-datasource-connector.md)).
+
 **BF-110's blank resume now gets a second look, and the next move is the owner's (no version bump —
 instrumentation only).** Sixteen `error_events` samples separate perfectly on viewport height: every
 blank resume reports **667**, every rendered one **826**, and 826 is the S25's real CSS viewport.
@@ -1870,6 +1891,64 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [cardio][devices] ⚠️ A walk's segments carry a step count that no strap has yet produced (LA-48, 2026-09-14)
+
+Shipped with no version bump — nothing renders it. `WalkSegmentStat.steps` now stores how many steps
+each fast/slow block of a guided walk contained, in the existing `segments` JSONB, so the owner's
+*"steps x distance x time"* analysis has its third number.
+
+**It is integrated from the cadence bins, never `avgCadenceSpm × duration`.** That multiplication
+counts pauses at the walking rate — 360 steps where the integration says 60, on a segment holding
+30 s of walking inside a 180 s window — and `estimateSteps` already owned this arithmetic for the
+walk's own total. Both now call `stepsFromCadenceSeries`. Do not re-derive it at a call site.
+
+**Unverified with real data, and it cannot be verified here.** Cadence needs a Polar H10 over BLE,
+which no sandbox has, so every segment written in testing has `steps: null` — correct for a GPS-only
+walk and silent about a strap-paired one. **Check on the next strap walk:** a saved interval walk's
+segments carry non-null step counts that sum to roughly the walk's own `steps`, and a segment where
+you stopped reads lower than its cadence would imply.
+
+**Two thirds of LA-48 remain and are now a design question, not a build.** Adherence per segment and
+which signal paced it cannot be reconstructed after the fact: the live bar bands the tracker's
+instantaneous reading while the saved series holds 10-second medians, so a reconstruction would store
+a number the walker was never shown. The entry carries both candidate shapes.
+
+### [body][devices] ⚠️ The scale claims a narrower band now, and a big genuine change locks it out silently (BF-58 → LA-108, 2026-09-14)
+
+Shipped in v1.456.12. `/api/scale-ble/samples` now splits a weigh-in three ways instead of two —
+claimed within 8% of the last confirmed weight, *"is this you"* up to 15%, declined beyond — so the
+owner's phone stops asking about readings it can already tell are his partner's. The raw frame is
+archived in **all three** branches, including declined ones, which is the half BF-58 was titled
+after: her weigh-ins were being thrown away.
+
+**The 8% is a measurement, not a round number.** Both clusters were already in the database: his 100
+confirmed readings span **70.0–72.8 kg** (worst day-to-day change 2.85 kg), the 6 he has dismissed
+sit at **57.5–58.0 kg**. 8% of ~70 kg is ±5.6 kg — wider than his whole history, and 6.4 kg clear of
+hers. Do not widen it without re-measuring; widening is what BF-58 was filed to stop.
+
+**The hazard, LA-108 — engine half fixed the same day, the screen is still owed.** The band anchors
+on the last *confirmed* weight and only a confirmed reading re-anchors it, so a genuine change of
+more than 15% between two weigh-ins — a long gap plus an illness or injury — puts the owner outside
+his own band with nothing to move it, and every reading after that is outside too. Narrow (drift
+normally passes through the 8–15% prompt band first, where one tap re-anchors) and nothing is lost
+(the frames are archived), but **silent and self-sustaining**.
+
+**⚠ It predates BF-58 — an earlier version of this row said BF-58 introduced it, and that was
+wrong.** `confirmScaleSample` matched `status='pending'` only, so an accidental *Not me* tap has
+always been irreversible and has always failed to re-anchor. BF-58's outer band made the state
+reachable without a tap; it did not create it. The predicate now accepts `pending` or `dismissed`
+(never `confirmed`, so claiming twice cannot double-apply a reading), and
+`GET /api/scale-ble/pending` returns a bounded `dismissed[]` beside the pending rows — the confirm
+route already took one of these ids unchanged. **What is left is the list that reaches it**
+(`scale-pairing.tsx`, Lane B). Not a wider band: the 8% is the measurement.
+
+**Not device-verified, and only the phone can show it.** JS/server only, so it reaches the S25 through
+Railway with no APK — but what changed is a physical behaviour. **Check on device:** the owner weighs
+in and it saves with no prompt; the partner weighs in on his phone and **no** *"is this you"* appears.
+Two hardware questions BF-58 keeps are still unanswered — whether two phones can hold a GATT
+connection at once, and whether `REQUEST_STORED_MEASUREMENTS_CMD` gets a reply (that one decides
+whether the race between the phones matters at all).
+
 ### [app-shell] ⚠️ Back on a tab now goes Home, and the gesture itself is not device-verified (LB-107, 2026-09-14)
 
 Shipped in v1.456.6. The owner reported that back on a tab *"should go to the home screen"*; what it
@@ -3470,7 +3549,7 @@ why, and confirm an outdoor run is unchanged.
 - **Standing still no longer scores a perfect slow block.** "Under the ceiling" would make 0 spm the best possible slow segment; below `STOPPED_SPM` the pacer reads **Stopped** in neutral — it does not scold a pause at a crossing and it does not congratulate one.
 - **Keep: only the speed rung has ever executed.** `e2e/walk-pacer-speed-rung.spec.ts` drives a real geolocation series and is mutation-checked, and every guard in `lib/walk/walk-pacer.ts` is too — but **the cadence and heart-rate rungs both need a Polar H10 over BLE**, which does not exist in the sandbox or in `pnpm dev`. So the bands moving with the legs, the Stopped state, the strap-drop fallback and the band colours' contrast at arm's length are all verified by reading. **LB-36** holds the device pass; `BAND_TOLERANCE = 0.10` is a proposal, not a measurement, and is one named constant so a real walk can move it.
 - **The ring cannot pace this and must not be made to.** `RING_CADENCE_VALIDATED = false` still holds (`packages/shared/src/health/cadence.ts`) — the ring signal is octave-ambiguous, not broken, and shipping it uncorrected gives a number wrong by 2×, which is worse than showing none. That correction is Lane A's.
-- **The number the pacer creates is not stored yet.** Per-segment adherence, steps and which signal paced the segment are additions to `activity_logs.segments`, which is a schema edit — filed as **LA-48**.
+- **The number the pacer creates is still not stored.** Per-segment **steps** shipped 2026-09-14 (LA-48, integrated from the cadence bins). **Adherence and which signal paced the segment remain**, and they are not the schema edit this line used to call them — `segments` is JSONB, so they are a type change in five places plus the wire schema. What blocks them is that they cannot be reconstructed after the fact: the live bar bands the tracker's instantaneous reading while the saved series holds 10-second medians, so a reconstruction stores a number the walker was never shown. **LA-48** carries both candidate shapes.
 
 ### [cardio][devices] ⚠️ The free walk shows heart rate at last, but no device has seen it (Q-418, 2026-08-23)
 

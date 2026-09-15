@@ -81,6 +81,8 @@ export interface ActivityLog {
     startSec: number; endSec: number
     avgHr: number | null; maxHr: number | null; hrAtStart: number | null
     avgPaceSecPerKm: number | null; distanceKm: number | null; avgCadenceSpm: number | null
+    // LA-48. Optional because pre-2026-09-14 walks have no `steps` key — see schema.ts.
+    steps?: number | null
   }[]
   createdAt: Date
 }

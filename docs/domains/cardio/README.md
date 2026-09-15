@@ -96,6 +96,14 @@ Live at the time of writing (2026-07-30):
   [`lib/walk/walk-pacer.ts`](../../../lib/walk/walk-pacer.ts). Outcome:
   [`journal`](../../overview/history-2026-09-10-folded-4.md#2026-08-31-walk-cadence-pacer). **Only the speed rung has ever
   executed** — the other two need a Polar H10 (LB-36); per-segment adherence storage is LA-48.
+- **Per-segment `steps` (LA-48, 2026-09-14)** — a guided walk's segments now store their own step
+  count in the `segments` JSONB, integrated from the cadence bins through the shared
+  `stepsFromCadenceSeries` (`packages/shared/src/health/cadence.ts`), **never** `avgCadenceSpm ×
+  duration`, which counts pauses at the walking rate. It is the same arithmetic as the walk's own
+  total, so the two cannot drift.
+  [Journal](../../overview/entries/2026-09-14-lane-a-la48-walk-segment-steps.md). **Open:** adherence
+  and the pacing signal, which a post-hoc reconstruction cannot produce faithfully — the live bar
+  bands an instantaneous reading, the saved series holds 10-second medians.
 - Guided walk GPS/pace, per-segment stats, the elevation profile, the run execution screen, the
   cardio hub/trends/picker and the baseline fitness tests are all shipped but **not
   device-verified**; several were only ever exercised on single-week or single-run data.

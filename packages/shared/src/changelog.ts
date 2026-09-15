@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.456.12",
+    date: "2026-09-14",
+    changes: [
+      "The scale stops asking whether every unfamiliar reading is you. It now judges a weigh-in three ways instead of two: close to your last confirmed weight it is simply saved, a long way off it is quietly set aside as somebody else's, and only a reading in between — one it genuinely cannot separate — still asks. The band it claims was measured from your own history rather than picked: every weight you have confirmed sits inside it, including your largest day-to-day swing, and it stays several kilograms clear of the other readings this scale has produced. Readings it sets aside are no longer thrown away either; the raw measurement is kept, so nothing is destroyed by a decision the app made on its own.",
+    ],
+  },
+  {
     version: "1.456.11",
     date: "2026-09-14",
     changes: [
