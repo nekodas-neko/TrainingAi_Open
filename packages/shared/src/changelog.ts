@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.456.19",
+    date: "2026-09-15",
+    changes: [
+      "The back button closes an open panel instead of moving the page behind it. With the meal builder open, pressing back was taking you to the home screen with the builder still sitting on top \u2014 and anything you had typed into it went with the page. The same thing happened to every sheet and dialog in the app: on a tab it jumped you home, and on the home screen itself it put the app in the background. Back now closes whatever is on top first, by the same route the X button takes, so anything a panel does when you close it still happens. Pressing back during a workout still asks before leaving.",
+    ],
+  },
+  {
     version: "1.456.18",
     date: "2026-09-15",
     changes: [

@@ -12402,3 +12402,13 @@ described there as shipped.
 
 The substance moved to a journal entry. That is the point of the rule: a queue that still lists a
 closed item is a queue nobody trusts, and the reasoning is not lost by being somewhere else.
+
+## 2026-09-15 — `projectOverview.md` → 11358, `docs/implementation-backlog.md` → 21373 (BF-166)
+
+The backlog **shrank 7** while the index grew 29, and the asymmetry is the finding: almost none of
+this is the fix, which is one exported predicate and one `if`.
+
+What the lines buy is a correction. BF-166 asked for an overlay registry to be built and one already
+existed under different names — so the entry as written would have produced two stacks disagreeing
+about what is open, which is worse than the bug it was filed against. Recording *where* the registry
+is, and that the obvious grep returns a false negative, is what stops the next session repeating it.
