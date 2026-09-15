@@ -12597,3 +12597,20 @@ now says that outright rather than leaving the next implementer to discover it a
 run highest on days with no workout), and there are no computed-but-unsurfaced metrics — four
 modules looked dead on a narrow grep and all four are consumed. The second is written down because
 the same narrow grep will produce the same false result again.
+
+## 2026-09-15 — backlog → the sleep-score direction defect, recorded in TN-38
+
++17 lines to carry a measurement that reverses how this entry reads. The owner objected that a
+duration-only core could reach 100 and that staging must then make 100 harder. Checking it against
+the live weights found something worse than the comparability problem the entry was already filed
+for: **one night scores 74 with the ring, 84 on a watch and 92 on a phone alone** — the app pays 18
+points for removing a sensor, because renormalising drops the contributors that were pulling the
+score down.
+
+The three-row table earns its lines because the direction is the finding. "Two users' 78s are not
+the same quantity" is abstract and easy to defer; "more information can only ever hurt you" is not,
+and it is the same defect seen from the angle the owner actually felt.
+
+The ⛔ line rules out the obvious fix — capping the core far below 100 so sensors add rather than
+deduct — and states the reason, because it is the design a reader reaches for first and it pins a
+phone-only user at 55 for hardware they do not own.
