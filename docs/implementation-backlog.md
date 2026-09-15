@@ -475,6 +475,26 @@ below threshold and left in place for next time.
      without the console.
   3. **The sheet's close animation cancels the push** — `onOpenChange(false)` runs immediately
      before `router.push` in the same tick.
+- **⚑ SYMPTOM NARROWED BY THE OWNER, 2026-09-15 — this confirms candidate 1 and demotes the other
+  two.** Asked whether the sheet closes, he answered: *"When i tap any activity from other activity
+  it just scrolls to the top of cardio hub."* So the sheet **does** close, the screen **stays** on
+  `/cardio`, and the hub's scroll position **resets to the top**. A tap that did nothing would not
+  move the scroll; a chunk-load failure would not either.
+- **The scroll reset has a mechanism, and it is consistent with a view transition that completes on
+  the same page.** `cardio-content.tsx:87` scrolls in a **nested `overflow-y-auto` div**, not the
+  document scroller. `use-scroll-restoration.ts` says in its own opening lines that it works on the
+  *"window/document scroller, so it cannot see, save or restore a nested element's `scrollTop`"* —
+  and `/cardio` does not call it in any case (only `pull-to-sync` and `nutrition-content` do). A view
+  transition snapshots and re-lays-out the page; the root scroller survives that, a nested one is not
+  covered. So `startViewTransition` running to completion **without a navigation** would leave the
+  hub exactly where he is seeing it: same screen, scrolled to top.
+  **Not verified on device** — stated as the mechanism that fits, not as a measurement. Proving it is
+  one console line: log `location.href` inside the commit poll and see whether it ever changes.
+- **What this means for the fix.** The question is no longer "does the tap fire" but **"why does
+  `router.push('/activity')` not commit within the 300 ms cap"** — the sheet's `onOpenChange(false)`
+  runs in the same tick immediately before it, and Radix unmounts the portal on close. A fix that
+  merely lengthens `NAVIGATION_TIMEOUT_MS` would turn a dead tap into a slow dead tap; the cap is a
+  safety net, not the bug.
 - **`error_events` holds nothing for this**, checked over three days: no `/activity` or `/cardio` row
   at all. Absence is not evidence here — a navigation that silently does not happen throws nothing —
   but it does rule out an uncaught exception being reported.

@@ -12222,6 +12222,13 @@ while carrying Next's route tree for `/`. That is three numbers in a table and i
 entry from a symptom into a mechanism — and it is what lets LA-109 say BF-49 is probably the same
 defect, which is worth more than either entry alone.
 
+## 2026-09-15 — `docs/implementation-backlog.md` (BF-165 narrowed)
+
+Twenty-six lines onto BF-165. The owner's "it just scrolls to the top of cardio hub" is evidence
+rather than colour — a tap that never fired would not move the scroll — so the entry now carries the
+nested-scroller mechanism that explains it, and the warning that raising the navigation timeout turns
+a dead tap into a slow dead tap.
+
 ## 2026-09-15 — PS-41 gated on the owner (backlog +33)
 
 The entry described a degraded-mode feature for users without a ring. Reading the merge path and
