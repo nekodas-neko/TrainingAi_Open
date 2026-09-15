@@ -12171,6 +12171,28 @@ been tried**: every device pass used the system gesture, which is what the entry
 step asks for, so the one path that would discriminate was the one nobody walked. A finding that
 lives only in a queue entry is read by whoever opens that entry; this one needed the owner.
 
+## 2026-09-15 — `docs/implementation-backlog.md` → 21165 (OR-116, the lane sweep)
+
+Four entries left the queue (BF-141, BF-135, LB-47, BF-64) and LB-109 closed, against eighteen `Lane:`
+assignments and two new entries — so the net is nearly flat and the composition is the point.
+
+The assignments are the reason this file did not shrink, and they are worth their lines: **BF-100 had
+no lane and was therefore printing as READY in BOTH lanes at once**, which is the one failure mode
+that makes the queue tool actively misleading rather than merely incomplete. Seventeen more entries
+were parked, so nobody had noticed.
+
+One assignment was made and then **reverted**: PS-4 argues in its own body for staying unclassified,
+and it is right — each role rewrites its own baton, so it is done by whoever hands over next. The
+revert is recorded in place rather than silently undone, because the next sweep will be tempted the
+same way.
+
+## 2026-09-15 — `docs/implementation-backlog.md` (BF-165)
+
+Thirty-four lines, and the elimination table is most of them. The whole source path for "Other
+activity" reads correct and none of it has changed since before the report, so the entry's value is
+the list of files already cleared plus three ranked runtime candidates — without it the next session
+spends the same hours reaching the same place.
+
 ## 2026-09-15 — BF-164 shipped (backlog −41, projectOverview +30)
 
 The backlog shrinks by the whole entry, which is the ordinary case. What is not ordinary is where
