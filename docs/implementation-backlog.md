@@ -20183,9 +20183,75 @@ the `lfhf` epoch field and `W_LFHF = 0.5` are all on `main`.
 - **Item 4 (offline clustering fit)** — not started, and correctly sequenced last: it wants item 2
   landed and more accumulated real nights before an unsupervised fit means anything.
 
+### [workouts][platform] LA-110 — a phase change makes every compound read as a strength decline, and three surfaces believe it
+
+- **Lane:** A — `lib/data/postgres/adapter.ts` (`listRecent1rm`) and
+  `packages/shared/src/ai-periodization/signals.ts`.
+- **Added:** 2026-09-15 · Lane A, found taking Q-52's own outstanding "re-measure once blocks cycle"
+  step. The re-measure cannot be taken by the method Q-52 implies, and **why** is this entry.
+
+**`listRecent1rm` returns the two most recent real 1RM estimates for an exercise, from any phase and
+any rep range.** Nothing keys the comparison to like-for-like work. So when a session transitions
+into `accumulation` — lighter loads, higher reps — the newest estimate is computed from a 10–15 rep
+set while the one before it came from a 3–7 rep set, and the difference is read as a **strength
+trend**.
+
+**Measured on production 2026-09-15**, comparing each active-program exercise's last two real
+estimates. All five sessions had entered `accumulation` between 09-09 and 09-12:
+
+| exercise | role | reps prev → cur | est. 1RM prev → cur | % |
+|---|---|---|---|---|
+| Dumbbell Bulgarian Split Squat | secondary | 6 → **13** | 32.5 → 11.5 | **−64.6** |
+| Incline Bench Press | primary | 5.5 → **8** | 81.5 → 48.8 | **−40.2** |
+| Barbell Overhead Press | secondary | 7 → **11** | 58.0 → 44.8 | −22.8 |
+| Barbell Bench Press | primary | 3.5 → **15** | 103.8 → 82.8 | −20.2 |
+| Barbell Chest Supported Row | primary | 4 → **8** | 77.8 → 68.0 | −12.5 |
+| Barbell Squat | primary | 12 → **10** | 79.3 → 93.8 | **+18.3** |
+
+**Every decline has reps going UP, and the only riser has reps going DOWN.** That is a rep-range
+signature, not a training one — a 1RM estimated from a 15-rep set is systematically lower than one
+from a 3.5-rep set, which is why this repo already carries a high-rep guard, a `REP_CEILING` and the
+AMRAP scaling BF-164 corrected. **The owner did not lose 21 kg of bench press in two weeks.**
+
+**Three consumers read it, and they are not all cosmetic:**
+1. `signals.ts:133` `buildCardExerciseSignals` → `rm1Trend` and `rm1ChangeKg`, which feed the
+   **periodization signals** — so the engine currently sees six compounds trending down immediately
+   after a phase change it made itself.
+2. `packages/shared/src/health/strength-progress.ts:47` → `displayOneRmDelta` on a user-facing card.
+3. `ai-periodization/prompt.ts:198` → the same delta, in text, to the model.
+
+**⚑ Likely related to TN-36 (PR #1154, open): "workouts are constantly being recommended for
+deload".** A phase transition manufacturing six down-trending compounds is a plausible contributor,
+and both were found within days of each other. **Not established** — nobody has traced `rm1Trend`
+into the deload decision yet. Do that before assuming either fixes the other.
+
+**This is the THIRD defect in one family, which is the argument for fixing the comparison rather than
+the symptom.** `listRecent1rm`'s own doc comment records the other two: Q-298 (a deload's
+`estimated_1rm = 0` admitted as an estimate, so `rm1ChangeKg` reported the lifter's entire 1RM as a
+gain) and PS-26 (the same sentinel read as a *current* value, rendering "−<the whole 1RM> kg" on 16
+of 34 exercises). Both were fixed by excluding rows. **This one cannot be — the rows are real
+estimates from real work.**
+
+**Shape of a fix, not yet decided:**
+- **Compare like-for-like.** Either restrict the pair to the same phase, or to a comparable rep band,
+  or carry the rep count so a consumer can refuse a cross-band comparison. `exercise_logs.avg_reps`
+  is already stored, so the data is there.
+- **Or mark the comparison as unavailable across a boundary** rather than reporting a number — the
+  app's own convention elsewhere (an absent metric beats a wrong one).
+- **Do not "fix" it by widening the trend thresholds.** That hides a real decline as readily as a
+  false one.
+- `session_periodization.baseline_1rm` exists and may already be the intended like-for-like anchor;
+  check whether it was meant for this before adding anything.
+
+**Verification:** on the owner's account after a phase transition, no primary/secondary compound
+reports a double-digit decline it did not earn, and the strength card's delta for Barbell Bench Press
+is not −21 kg.
+
+
 ### [workouts] 🟡 Q-52 — per-exercise phase hold: a stalled compound stays behind while the session moves on
 
 - **Lane:** A
+- **Needs:** LA-110 — its own re-measure precondition is unanswerable until the 1RM trend stops being confounded by phase transitions (attempted 2026-09-15; see the boxed note below).
 Plan: [`docs/superpowers/plans/2026-08-02-per-exercise-phase-hold.md`](superpowers/plans/2026-08-02-per-exercise-phase-hold.md).
 Branch: `feat/exercise-phase-hold`. Added 2026-08-02 from an owner design question.
 
@@ -20247,7 +20313,18 @@ if the transition fix means blocks now actually cycle, the picture may change.
 >
 > **What was right:** Barbell Front Squat is indeed no longer in the active program.
 >
-> **The "re-measure once blocks cycle" note is still outstanding.** Checked the same day: four of
+> **⚠ THE RE-MEASURE WAS ATTEMPTED 2026-09-15 AND CANNOT BE TAKEN THIS WAY — see LA-110 above.**
+> The blocks have now cycled: all five sessions re-entered `accumulation` between 09-09 and 09-12,
+> so the precondition below is finally met. Run naively, the measurement says **6 primary/secondary
+> compounds are declining** (7.7–64.6%) against August's one — which would read as "build it".
+>
+> **It is an artifact.** Every one of those six has its rep count going UP across the phase boundary
+> (bench 3.5 → 15 reps, split squat 6 → 13), and the single riser has reps going DOWN (squat 12 →
+> 10). `listRecent1rm` compares the two most recent real estimates regardless of rep range, so a
+> transition into accumulation manufactures declines. **Q-52 cannot count stalling compounds until
+> LA-110 is fixed**, because the signal it would count is the one that is confounded.
+>
+> The original note, kept for the record — checked 2026-08-03: four of
 > five sessions (Legs, Pull, Push, Upper) are still in `accumulation`, and only Lower has moved —
 > on 2026-08-01, *before* v1.252.0 landed. **No session has transitioned since the auto-apply fix
 > shipped**, so the picture that fix might change has not had a chance to change yet. Re-run this

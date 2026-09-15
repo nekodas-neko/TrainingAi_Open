@@ -12322,3 +12322,15 @@ table singled out as the one a second device would most need to share, has never
 Worth the lines because the entry currently reads as a decided goal with a written plan, and an
 implementer trusting that would spend a 2,813-reference sweep to arrive no closer to what the owner
 asked for. The `Gate: owner` is the operative change; the rest is why.
+
+## 2026-09-15 — LA-110 filed, Q-52's re-measure recorded as unanswerable (backlog +77, projectOverview +27)
+
+The largest single-entry addition in a while, and the table is why: six rows showing reps going up
+while the estimated 1RM goes down, plus the one riser showing the inverse. Prose asserting "this is a
+rep-range artifact" is arguable; the table is not, and it is what stops the next reader treating six
+declining compounds as a training problem.
+
+Q-52 grows too, because its own outstanding precondition was attempted and failed. Recording the
+attempt matters more than recording the result — without it the next session runs the same query,
+gets the same six declines, and builds a feature on a confounded signal. The `Needs: LA-110` is the
+operative part; the boxed note is the evidence.
