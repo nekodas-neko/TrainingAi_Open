@@ -93,7 +93,14 @@ export function BodyBatteryCard({ battery }: { battery: BodyBatteryResponse }) {
   // payload (`readTodayCacheSync`), and a seed written before this field shipped has no such key.
   // Absent means "not known", which must read as no warning rather than as a warning.
   const conf = battery.confidence as BodyBatteryResponse['confidence'] | undefined
-  const lowData = battery.hasData && conf != null && !conf.sufficient
+  // **`hasData` is deliberately NOT a condition here (RV-38).** Gating the badge on it made the
+  // qualification weaker as the data got worse: enough samples → no badge (right), too few →
+  // "Limited data" (right), **none at all → no badge**, so a zero-data account read `Good / Steady /
+  // 50` with nothing marking it. The route says so in four fields at once — `hasData: false`,
+  // `sampleCount: 0`, `sufficient: false`, `anchorSource: "default"` — and the card was the only
+  // thing not passing it on. `sufficient` is false in both cases, which is what makes it the right
+  // condition on its own.
+  const lowData = conf != null && !conf.sufficient
 
   return (
     <div className="mx-4 mb-3">
@@ -135,8 +142,7 @@ export function BodyBatteryCard({ battery }: { battery: BodyBatteryResponse }) {
         {/* Q-276 — what question this number answers, always visible.
             Readiness and Body Battery correlate at r = +0.12 by end of day and sit one above the
             other on Home, so a reader takes them for the same thing. The owner settled it: they are
-            different questions. The explainer below says this well and only renders in the NO-DATA
-            state, which means on any ordinary day nobody ever reads it. */}
+            different questions, and this line is why the distinction is on screen every day. */}
         <p className="mb-2 text-[10px] leading-snug text-muted-foreground">
           Energy left right now — opens at your readiness and drains as you use it.
         </p>

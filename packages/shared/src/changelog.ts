@@ -6,6 +6,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.456.18",
+    date: "2026-09-15",
+    changes: [
+      "The heart rate on your home screen and the one on the Heart Rate page stop looking like they disagree. Home shows last night\u2019s resting rate; the detail page shows today\u2019s current, lowest, average and highest. Both were simply labelled \"Heart Rate\", so a resting 60 sitting beside a current 73, a low of 50 and a high of 125 read as one number being wrong. Home now says \"Resting HR\" \u2014 except on the rare occasion it can only find a live reading, where it stays generic because that one is not a resting rate \u2014 and the four figures on the detail page are now headed \"Today so far\".",
+    ],
+  },
+  {
+    version: "1.456.17",
+    date: "2026-09-15",
+    changes: [
+      "Body Battery now admits when it has nothing to go on. An account that has never worn the ring was shown a level of 50 labelled \"Good\", with a half-filled bar and no warning \u2014 while everything else on the same screen correctly showed a dash. The \"Limited data\" note it already had was being skipped in exactly that case: it appeared when there were too few readings, and disappeared again when there were none at all. It now appears whenever the reading cannot be supported, so a number you should not trust says so.",
+    ],
+  },
+  {
     version: "1.456.16",
     date: "2026-09-15",
     changes: [
