@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.456.13",
+    version: "1.456.14",
     date: "2026-09-15",
     changes: [
       "Bodyweight exercises no longer show a weight to load. The prescription card was telling you to put 85 kg on a Hanging Leg Raise and 90 kg on a Pull-Up — there is no bar on either. Those numbers were a percentage of the internal strength score the app keeps for bodyweight moves, which is built from your reps, not from any weight. The card now shows the percentage on its own for those exercises, the way it already did for anything it had no strength figure for. Weighted exercises are unchanged.",
+    ],
+  },
+  {
+    version: "1.456.13",
+    date: "2026-09-15",
+    changes: [
+      "Bodyweight exercises now show the rep max you actually reached. A set of 11 hanging leg raises was being read back as an 8 RM, on the ready screen, the pre-workout list, the stats sheet, the strength card, the trend charts and the year review \u2014 the screen printed \"Last: 11 reps\" four lines above \"REP MAX 8 RM\". The cause was that the estimate is stored with an all-out-set discount applied and was being converted back without it. The same number sets your prescribed reps on bodyweight moves, so those were short by the same proportion, roughly a quarter: expect target reps on those exercises to go up. Your coach was being told the low figure too, and a line meant to suggest a working set had been telling it to aim for a single rep on every bodyweight exercise; it now suggests 80% of your real rep max.",
     ],
   },
   {
