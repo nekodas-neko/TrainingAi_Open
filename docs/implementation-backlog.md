@@ -570,6 +570,34 @@ below threshold and left in place for next time.
   the defect, which is app-wide navigation and must not be changed on a hypothesis.
   **Do not lengthen `NAVIGATION_TIMEOUT_MS`** — the entry's own warning stands: that turns a dead tap
   into a slow dead tap.
+
+- **✅ THAT EXPERIMENT WAS RUN, 2026-09-15, AND IT NARROWS THE BUG SHARPLY. `animate()` is NOT the
+  defect, and the sheet is NOT the variable.** `modality-picker.tsx` already provides the control the
+  experiment needed — two buttons on `/cardio`, same `useTransitionRouter`, same `animate()` path,
+  non-tab hrefs, **neither inside a sheet**:
+
+  | tap | destination | result |
+  |---|---|---|
+  | **Running** | `/running` | **navigates** ✓ |
+  | **Guided walk** | `/activity/guided-walk` | **stays on `/cardio`** ✗ |
+  | Other activity → Treadmill | `/activity` | stays on `/cardio` ✗ |
+
+  **Both failures share the `/activity` prefix and the success does not.** `animate()` commits fine
+  for `/running` through the identical code path, so the view-transition machinery works; and Guided
+  walk fails with no sheet anywhere near it, so the portal context is not it either.
+- **⚠ THIS IS A SECOND, UNREPORTED DEAD BUTTON: *Guided walk* on the Cardio hub does not navigate
+  either.** The owner reported only "Other activity". The entry's scope is therefore wider than
+  filed — anything reaching an `/activity*` route from a client-side push.
+- **It fails SILENTLY, which is why nothing was ever logged.** During the failing tap: **no console
+  errors, no `pageerror`, no failed requests, and no response ≥ 400.** That is consistent with
+  `error_events` holding nothing for this across three days, and it rules out a chunk-load failure.
+- **The two routes are structurally identical**, checked rather than assumed: `app/activity/page.tsx`
+  and `app/running/page.tsx` are both plain pages, **neither has a `layout.tsx`**, and `middleware.ts`
+  mentions neither. So the difference is not in routing configuration.
+- **The next experiment, narrowed accordingly:** bisect what `app/activity/page.tsx` (and the tree it
+  pulls in — `activity-screen.tsx`, `activity-store`, `reconcileRehydratedActivity`) does on a
+  CLIENT-side commit that `app/running/page.tsx` does not. A direct `goto('/activity')` renders fine,
+  so whatever it is only bites on the push path.
 ### [app-shell][platform] LA-109 — a tab flip leaves the PREVIOUS tab's route tree on the history entry (fixed; device check owed)
 
 - **Lane:** B — `components/shell/tab-shell.tsx`.

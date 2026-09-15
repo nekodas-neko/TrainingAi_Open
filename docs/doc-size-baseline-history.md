@@ -12667,6 +12667,18 @@ the next session designing around a limit that is not there.
 **TN-43 is the shortest and stays short.** Four composites, a table, and one rule about not
 laundering an inferred value into something that looks measured.
 
+## 2026-09-15 — `projectOverview.md` → 11470, `docs/implementation-backlog.md` → 21988 (BF-165 narrowing)
+
++17 and +30 to kill two hypotheses and find a second dead button.
+
+The table is the whole entry: Running navigates, Guided walk does not, and neither is in a sheet.
+Three lines of measurement retire "animate() is broken" and "the sheet cancels the push", which
+between them had two sessions of plausible reasoning behind them.
+
+The part that is not diagnosis is the part that matters most to the owner: **Guided walk is also a
+dead tap and he has not reported it.** A narrowing that found a second instance of the bug is not
+bookkeeping.
+
 ## 2026-09-11 — `docs/implementation-backlog.md` → 21535 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
