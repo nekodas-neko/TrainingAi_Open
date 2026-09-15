@@ -12322,3 +12322,12 @@ table singled out as the one a second device would most need to share, has never
 Worth the lines because the entry currently reads as a decided goal with a written plan, and an
 implementer trusting that would spend a 2,813-reference sweep to arrive no closer to what the owner
 asked for. The `Gate: owner` is the operative change; the rest is why.
+
+## 2026-09-15 — `projectOverview.md` → 11237, `docs/implementation-backlog.md` → 21321 (LA-109)
+
+The index grew 7 and the backlog **shrank** 8, which is the right direction for a session that
+closed an entry. The 7 are almost entirely the refutation: LA-109's own row could have been three
+lines, but the reason BF-49 is *not* this, and the reason BF-100 is now readable, are both things
+the next session would otherwise re-derive from the two coupled entries that said the opposite.
+
+A negative result costs lines exactly once and saves a re-run every time someone reads the pair.

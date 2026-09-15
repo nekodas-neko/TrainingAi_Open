@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.456.15",
+    date: "2026-09-15",
+    changes: [
+      "Pressing back from a screen you opened inside a tab returns you to that tab instead of dumping you on Home. Going to More, opening Profile details and pressing back was landing on the home screen while the address still said More \u2014 the app was restoring the screen you were on before you switched tabs, not the tab itself. Switching tabs and then going back now behaves the same way whichever tab you started from.",
+    ],
+  },
+  {
     version: "1.456.14",
     date: "2026-09-15",
     changes: [
