@@ -12509,7 +12509,7 @@ existed under different names — so the entry as written would have produced tw
 about what is open, which is worse than the bug it was filed against. Recording *where* the registry
 is, and that the obvious grep returns a false negative, is what stops the next session repeating it.
 
-## 2026-09-15 — `projectOverview.md` → 11382, `docs/implementation-backlog.md` → 21558 (BF-74)
+## 2026-09-15 — `projectOverview.md` → 11382, `docs/implementation-backlog.md` → 21560 (BF-74)
 
 +24 and −10: the backlog shrank because round two closed most of what the entry was carrying, and
 the index grew by the one thing that would otherwise be lost.

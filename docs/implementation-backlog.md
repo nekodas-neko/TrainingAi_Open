@@ -6373,7 +6373,7 @@ description will silently drop the field that turns out to matter. **The owner i
 - **Two rounds. The first fixed WHERE the control sits; the second fixes WHAT IT COSTS to hit.**
   Round one moved the ✕ out of the dismiss corner and made it a bin. Round two, shipped 2026-09-15,
   puts a confirmation in front of it.
-- **❌ The device pass on 2026-09-13 FAILED, and that is what round two answers.** Owner: *"it gives
+- **The 2026-09-13 device pass failed, and that is what round two answers.** Owner: *"it gives
   me an undo option; but no warning before removal"*. The corner fix worked — the control was
   reachable and read as removal — and it still destroyed the photo on one tap.
 - **⚠ The component's own comment argued AGAINST a confirm, and it was measurably wrong.** It said
@@ -6394,11 +6394,13 @@ description will silently drop the field that turns out to matter. **The owner i
   cancel must leave the photo, confirm must clear it — and it fails against `main` on the missing
   dialog. The cancel arm is asserted first, because a confirm that removes anyway passes every
   happy-path assertion. **The spec was strengthened, not loosened.**
-- **Keep: the device check, and only that** — the same one round one owed, now covering round two.
-  On the S25: tapping the top-right of the meal photo must not discard it, the bin must read as
-  removal, **the confirm must appear before anything is lost**, and the undo toast must still be
-  reachable before it dismisses. That last part is the half a desktop browser cannot judge, because
-  the toast timeout against a thumb is the whole question.
+- **Verify: device**
+- **Keep:** the look, and only that — and it is a NEW one. The 2026-09-13 check failed, which
+  converted this entry back into work; round two answers it, so what it owes now is another look
+  rather than a fix. On the S25: tapping the top-right of the meal photo must not discard it, the
+  bin must read as removal, **the confirm must appear before anything is lost**, and the undo toast
+  must still be reachable before it dismisses. That last part is the half a desktop browser cannot
+  judge, because the toast timeout against a thumb is the whole question.
 - **Shipped alone rather than with its batch, deliberately.** `nutrition-ui-uplift` holds six
   entries; four are shipped-and-device-owed with no code to write, and BF-51 ① is device-blocked. The
   batch exists to aggregate a *device sitting*, which is unaffected — there was nothing else

@@ -24,17 +24,39 @@ describe('nutrition uplift', () => {
     expect(button).toMatch(/bottom-0 right-0/)
   })
 
-  it('BF-74: removing a photo is undoable and clears the tap floor', () => {
+  it('BF-74: removing a photo CONFIRMS first, is still undoable, and clears the tap floor', () => {
     const src = read('components/nutrition/meal-photo-tile.tsx')
-    const button = src.slice(src.indexOf('const removeButton'), src.indexOf('const pickProps'))
+    // From `const remove`, not `const removeButton`: round two moved the undo into a named handler
+    // the dialog's confirm arm calls, so a slice starting at the button no longer contains it. The
+    // region under test is the whole removal path.
+    const removal = src.slice(src.indexOf('const remove'), src.indexOf('const pickProps'))
 
-    // The parent saves immediately, so without this a mis-tap loses the photo. Undo is cheaper than
-    // a confirm dialog and does not stand between the user and the common case.
-    expect(button, 'the parent saves at once — a mis-tap must be recoverable').toMatch(/Undo/)
+    // **Round two, and it reverses the comment that used to sit here.** This test read: *"Undo is
+    // cheaper than a confirm dialog and does not stand between the user and the common case."* The
+    // device pass refuted it — *"it gives me an undo option; but no warning before removal"* — and
+    // the reason is checkable rather than a matter of taste: `getPhoto` is called with no
+    // `saveToGallery`, which defaults to false, so a camera capture is never written anywhere else.
+    // There is nothing to re-pick and the toast is time-limited.
+    expect(removal, 'the photo is unrecoverable — removal must be confirmed').toMatch(/ConfirmDialog/)
+    expect(removal, 'the confirm must be what calls the removal, not a separate path').toMatch(/onConfirm=\{remove\}/)
+    // Undo STAYS behind the confirm: the old argument still holds for a gallery-sourced photo.
+    expect(removal, 'undo is the second line, not the replaced one').toMatch(/Undo/)
     // 44 dp on the hero, which is the only variant with call sites.
-    expect(button).toMatch(/h-11 w-11/)
+    expect(removal).toMatch(/h-11 w-11/)
     // A bin, not an ✕: the glyph is half of why it now reads as removal rather than dismissal.
-    expect(button).toMatch(/Trash2/)
+    expect(removal).toMatch(/Trash2/)
+  })
+
+  it('BF-74: the tile says WHY the photo is unrecoverable, rather than asking blankly', () => {
+    const src = read('components/nutrition/meal-photo-tile.tsx')
+    // A bare "Are you sure?" trains people to tap through. The reason is the whole value of the
+    // dialog, and it is the fact that made the confirm necessary in the first place.
+    expect(src).toMatch(/not saved anywhere else/)
+    // And the claim the dialog rests on stays true: no saveToGallery on the camera CALL. Comments
+    // are stripped first — the component explains this bug in prose and names the option, so a raw
+    // match reports the explanation as the thing it warns against. (Measured: it did.)
+    const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+    expect(code, 'a saveToGallery here would make the dialog\'s message false').not.toMatch(/saveToGallery/)
   })
 
   it('BF-73: the meal bin keeps the words BF-50 gave it, in its accessible name', () => {
