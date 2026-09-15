@@ -437,6 +437,57 @@ below threshold and left in place for next time.
 
 
 
+### [platform][devices] TN-38 — normalisation is implemented three different ways and nothing names them as one concept
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-15 · owner: *"lets work on getting some normalised inputs; then creating our scoring system on it."*
+- **Lane: A** for tasks B–D; **task A is docs-only and unblocks the rest.**
+- **Plan:** [`2026-09-15-normalised-inputs-and-source-aware-scoring.md`](superpowers/plans/2026-09-15-normalised-inputs-and-source-aware-scoring.md).
+- **Reference:** [`review`](reviews/2026-09-15-pillars-against-the-connector-guide.md) · contract is [`data-source-connector-guide.md`](data-source-connector-guide.md) §3–§6.
+- **Sibling of TN-37** (which found §5.4's invariant false) and of **PS-40** (the connector registry). **⛔ Not a redesign** — the architecture is written; this finishes it.
+
+**A second source is live TODAY, not hypothetical.** Over 45 days `oura_heartrate` holds **74,860
+chest-strap samples against 12,673 ring samples** — the strap outnumbers the ring **six to one**.
+
+**Each mechanism is individually sound. Nothing names them as one concept:**
+
+| data | mechanism | merged at | multi-source today? |
+|---|---|---|---|
+| `body_metrics` scalars | `source_map` + `SOURCE_RANK` (`mergeSet`) | **write** | **yes** — `oura_ble` ×4, `scale_ble` ×12 |
+| `oura_heartrate` series | `preferStrapBuckets` — 10 s buckets, strap wins | **read**, in `getHrForWindow` | **yes** — 74,860 / 12,673 |
+| `oura_daily_derived` | **none — single writer** (`rollup-io.ts:83`) | — | **no** |
+
+**§5 of the guide describes the stages (decode → normalize → write) and never says the merge step
+has three implementations depending on what you are writing.** A new connector's author reads §3 for
+the shape and has no way to learn which merge governs it.
+
+**The rule that decides it, once stated:** **scalars merge at write by rank; series merge at read by
+resolution; derived rows have one writer.**
+
+**Four steps, in order — A first because it is cheapest and everything later is checked against it:**
+- **A. Name the three mechanisms in the guide**, and amend **§5.4**, whose invariant TN-37 measured
+  as false. Docs-only.
+- **B. Close the two filed gaps** — **PS-41** (Health Connect's `HeartRateSeries` is read, used
+  inline, then discarded instead of normalised) and **PS-42** (the illness radar gated on an
+  `oura_daily_summary` row rather than on its inputs). **PS-41 unlocks 22% of Activity Score for a
+  non-ring user.**
+- **C. Make each score return what it consumed** — which inputs were present, which absent, what
+  weight was renormalised away, surfaced by one component. **⛔ A return-shape change, not a formula
+  change.**
+- **D. Record what a non-ring user actually gets** — §4 already traced it. **⚠ Not "normalise these":
+  chronic stress, resilience, daytime HRV, Body Battery and OTS read raw BLE frames with zero
+  fallback branches, and readiness's temperature term (0.10) passes null on every generic path.**
+  Source-neutrality there means re-implementing vendor models — a project, not a task.
+
+**⚠ Three things that could make this wrong, and each is checkable before committing to it:**
+`preferStrapBuckets` was written for two sources and **task B's three-way case must be proven, not
+assumed**; **Health Connect writes zero rows today**, so B's value is latent and **should be
+confirmed as planned before starting**; and the `oura_daily_derived` single-writer design **may
+simply be correct** — if everything in it is genuinely ring-derived the fix is documentation, which
+task A settles.
+
+**Pass test:** a connector author can read §3 and know which merge governs the data type they
+supply; and a rendered score can say what it was computed without.
+
 ### [platform][readiness] TN-37 — the connector guide states an invariant the pillars do not hold: readiness reads four device-specific stores
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-15 · owner: *"we get data from Oura; then we normalise/calculate it into usable fields… then we use those fields to calculate our pillars. Can we make sure we are doing this correctly?"*

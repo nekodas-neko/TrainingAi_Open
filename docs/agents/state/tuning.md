@@ -604,6 +604,22 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
 - **⚠ The guide names one violation and believes it is the only one** (§5.5, the discarded Health
   Connect `HeartRateSeries`, PS-41 — *"the concrete, fixable instance"*, singular). **When a doc names
   an instance of a general rule, check whether it is the only one before trusting the count.**
+- **⚑ NORMALISATION IS IMPLEMENTED THREE WAYS AND NOTHING NAMES THEM AS ONE (TN-38, plan
+  `2026-09-15-normalised-inputs-and-source-aware-scoring.md`).** `body_metrics` scalars merge at
+  **write** by `SOURCE_RANK`; `oura_heartrate` series merge at **read** via `preferStrapBuckets`
+  (10 s buckets, strap wins); `oura_daily_derived` has **no merge — one writer**. Each is sound; the
+  guide's §5 names the stages and never says the merge step has three implementations. **The rule,
+  once stated: scalars merge at write by rank, series merge at read by resolution, derived rows have
+  one writer.**
+- **⚑ A SECOND SOURCE IS LIVE TODAY — the chest strap outnumbers the ring SIX TO ONE** in
+  `oura_heartrate` (74,860 against 12,673 over 45 days). **Multi-source is not hypothetical here**,
+  and `preferStrapBuckets` already handles that pair — ⚠ but it was written for two sources, so a
+  third (Health Connect, PS-41) must **prove** the three-way case rather than extend it on faith.
+- **⚠ Several pillars CANNOT be made source-neutral and the plan says so rather than scoping them.**
+  §4 of the guide traced it: chronic stress, resilience, daytime HRV, Body Battery and the OTS score
+  read raw BLE frames with **zero fallback branches anywhere in the call chain**, and readiness's
+  temperature contributor (0.10) passes `null` on every generic path. **"Normalise these" means
+  re-implementing vendored models — a project, not a task.** Record what a non-ring user gets instead.
 - **The threshold is usually right and the input usually wrong** — Q-506, Q-512, Q-514, now TN-6.
   Check the input's distribution before touching any constant.
 - **Do NOT lift the sleep scale toward its old mean** — sleep/readiness agreeing is load-bearing for

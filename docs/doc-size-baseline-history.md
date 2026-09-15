@@ -12199,3 +12199,24 @@ Two softeners take their own paragraph because quoting the finding without them 
 `oura_daily`'s recent scored columns are **all NULL** (dead Cloud shells — a wasted query, not a wrong
 number) and **Health Connect writes zero rows**, so the divergence has no victim yet. Latent, not
 live — which is what keeps the entry off the 🔴 LIVE marker and sets the fix order.
+
+## 2026-09-15 — backlog → 21473, `tuning.md` → 648: the normalise plan (TN-38)
+
+The owner asked to build normalised inputs and a scoring system on them. The architecture is already
+written down, so the entry's job is to find what the guide does not say — and it is this: **the merge
+step has three implementations and nothing names them as one concept.**
+
+The three-row table is the entry. `body_metrics` scalars merge at **write** by `SOURCE_RANK`;
+`oura_heartrate` series merge at **read** through `preferStrapBuckets`; `oura_daily_derived` has **no
+merge and one writer**. Each is individually sound, which is why this is a documentation gap rather
+than a defect — and why the one-line rule underneath it earns its place: scalars merge at write by
+rank, series merge at read by resolution, derived rows have one writer.
+
+The measurement that makes it urgent rather than tidy: **the chest strap outnumbers the ring six to
+one** in the HR series, 74,860 samples against 12,673 over 45 days. Multi-source is live today.
+
+The last paragraph is the one most likely to be cut and should not be: several pillars **cannot** be
+made source-neutral. Chronic stress, resilience, daytime HRV, Body Battery and OTS read raw BLE
+frames with zero fallback branches, and readiness's temperature contributor passes null on every
+generic path. Writing that down stops a future session scoping "normalise these" as a task when it is
+a vendored-model reimplementation.
