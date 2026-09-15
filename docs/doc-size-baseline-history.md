@@ -10957,8 +10957,6 @@ the lane is device-blocked, which is the one thing a successor cannot re-derive 
 RV-44's 18-line entry leaves the queue. The nine longhand Atwater sites in `scan-totals.ts` and
 `meal-split.ts` now import `KCAL_PER_G`, which is what `atwater.ts` was created for.
 
-Written by `pnpm fix:baselines`.
-
 ## 2026-09-11 — `docs/implementation-backlog.md` 20714 → 20672 (RV-41 shipped)
 
 RV-41's 42-line entry leaves the queue. The goal bounds now live once, in
@@ -12692,3 +12690,33 @@ byte-for-byte a dead tap: no throw, no 4xx, no console error, URL unchanged. The
 destination with a direct `goto` before measuring a push) is cheap to state and was expensive to find.
 
 Left the superseded entries in place rather than rewriting them. The sequence is the lesson.
+
+## 2026-09-11 — `docs/implementation-backlog.md` → 21535 (RV-42 shipped)
+
+RV-42's 31-line entry leaves the queue with the write-path ownership fix.
+
+**This figure has been rewritten THIRTY times and the churn is the note worth leaving.**
+Eighty-nine other merges have landed on `main` while this PR waited on an owner decision, and each one
+moved the base out from under it — so the starting figure is no longer even quoted here, because it
+changed again between the last two rewrites. **Thirty rewrites of one number is the cost of a
+green PR waiting**, recorded rather than smoothed because the alternative reading — that someone kept
+getting the arithmetic wrong — is the wrong lesson. Both counts are measurements, not tallies kept by
+hand: the rewrites are the first-parent commits on this branch that touch this file, the merges are
+the first-parent commits on `main` since its branch point. The hand-kept version of the same two
+numbers read "twenty-five" and "forty-five" when they were really twenty-seven and seventy-three,
+which is its own small argument for deriving a figure rather than incrementing one. The per-file
+`.size` split (LA-33) is what keeps this to one number instead of a whole map: no other document's
+baseline has conflicted once across all thirty. Nothing was wrong with any of them — each was
+correct against the `main` of its hour. Under six concurrent lanes plus an owner gate, a baseline is a
+reading of a moving number, and a PR that waits will re-read it once per merge that overtakes it.
+Recomputed by `pnpm fix:baselines` after each merge, which is the only thing that makes the
+subtraction mean anything.
+
+**Recomputed again 2026-09-15** (→ 21535). The two counts above are left at their 2026-09-11
+measurement rather than incremented, because incrementing by hand is the exact failure this note
+already records — and the derivation no longer reproduces: repeated merges of `main` move
+`merge-base` forward, so it now returns the last re-merge rather than the original branch point.
+What can be measured cleanly is the rewrite count itself, which does not depend on `merge-base`:
+**34** first-parent commits on this branch touch this file, and this is the thirty-fifth. That is the
+one number here worth trusting — the headline figure is the live one, and the two counts above are a
+floor.
