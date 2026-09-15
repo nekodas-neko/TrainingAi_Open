@@ -729,7 +729,50 @@ resolution; derived rows have one writer.**
   by everything visible*; 92 means *nothing visible is wrong, and little is visible*.
   **⛔ Do NOT cap the core far below 100** (e.g. sleep core 0–55 with adjustments filling the rest) —
   a phone-only user pinned at 55 reads as *"you sleep badly"* when the truth is *"we cannot see"*.
-  What remains the owner's is the **input list** per pillar, not this shape. Owner, 2026-09-15: *"the app works fine with less sources but is more
+- **⚠ RETRACTED, 2026-09-15, same day: the "core tops out at ~92" shape above is WRONG and the owner
+  found why.** A permanent ceiling for not owning hardware is a penalty, not honesty. **The design is
+  now: every contributor ALWAYS carries a value — measured where possible, INFERRED where not.** That
+  escapes the trilemma (reaches 100 / means the same for everyone / stable across a hardware change —
+  every other design gets two of three) by removing its cause, a score with holes in it. Connecting a
+  sensor then moves the score only where the measurement differs from the estimate, which is a fact
+  about the body rather than the hardware.
+- **⛔ INFER CONDITIONALLY — inserting the population-typical pattern is measured to FAIL.** The
+  owner's first formulation was to split the known duration into the most commonly seen stage pattern,
+  *"nothing good or bad"*. A neutral value stops being neutral once it carries **72 of sleep's 110
+  points**: a textbook night falls to **80** and a poor night rises to **66**, collapsing the scale to
+  14 points and inverting the ranking. Conditioning the estimate on the observables (8 consistent
+  hours predicts better-than-average stages, not average) restores the full range — **100 / 78 / 57
+  today vs 92 / 75 / 52 conditional**.
+- **Three rules that ship with it:** every value carries a `measured | inferred` flag **and an
+  uncertainty**, surfaced in the UI (the owner asked for the flag unprompted); **⛔ an inferred value
+  must NEVER trigger an action** — no deload off an estimated contributor, same class as CLAUDE.md's
+  rule on model-reported numbers; and inference needs something to infer FROM — a user with sensor
+  history is estimated from their own baselines (`personal-baseline.ts` already maintains exactly this
+  for six metrics), a user who never had the sensor has no prior and a population prior cannot be
+  fitted from one account.
+- **Needs:** TN-39 — **the app already infers and nobody has checked whether it works.** Daytime stress
+  guesses HRV from HR and temperature; TN-39 validates that against measured HRV. It is the same
+  technique this design rests on, so validate it where ground truth exists before extending inference
+  into scoring.
+- **The interim, cheap and locking nothing in:** score on what is present and **say so** — *"82, from
+  3 of 10 signals"*. Today's behaviour plus a label.
+- **✅ THE CONTRACT — what a pillar requires, settled 2026-09-15.** Required = what is needed to score
+  at all; everything else is measured when available and inferred when not.
+
+  | pillar | minimum required input | measured share |
+  |---|---|---:|
+  | Sleep | bed + wake time | 35% |
+  | Readiness | check-in + sleep + prior activity | 35% |
+  | Activity | steps + logged workouts | 63% |
+  | Workouts | logged sets/reps/load | 100% |
+  | Body | body weight | ~100% |
+  | Nutrition | food log | 100% |
+  | **Cardio** | **a heart-rate source — no substitute** | **0%** |
+
+  **Six inputs carry the whole app: bed/wake times, steps, body weight, logged workouts, logged food,
+  daily check-in** — all from a phone and a person. **⚠ Cardio is the single exception and should be
+  HIDDEN rather than scored at zero for a user with no HR source:** it has no manual floor and nothing
+  to infer from. Owner, 2026-09-15: *"the app works fine with less sources but is more
   accurate and tuned with more sources."* **⚑ That is NOT what the code does.** `sleep-score.ts:399`
   renormalises the weighted mean over whichever contributors are present, and readiness passes a
   neutral 50 — so **connecting a ring changes the denominator and moves the score for a reason
