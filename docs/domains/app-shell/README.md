@@ -37,6 +37,16 @@ split is "does it feel slow" vs "is it actually slow at the source".
   the entry, and is now gone from both. **A screen that scrolls its own container gets no restoration
   from being inside the shell — check the call, not the layout.** `/health/day`'s scroller had no
   bottom padding at all. Both owe **one** device pass; RV-37 has still never been observed.
+- [`docs/overview/entries/2026-09-15-la109-tab-flip-stale-tree.md`](../../overview/entries/2026-09-15-la109-tab-flip-stale-tree.md)
+  — **A tab flip left the previous tab's Next route tree on the history entry (LA-109), 2026-09-15.**
+  `show()` uses `replaceState`, and Next's patched `replaceState` re-injects its **own** current
+  tree, so the `/more` entry carried the tree for `/`: right URL, wrong screen on back. Fixed by
+  reading `window.location.pathname` in `TabShell`'s lazy `useState` initializer — `usePathname()`
+  cannot be used, because it reads from the very tree that is wrong. **Proven by running the spec
+  against the unfixed file**, which matters because the spec's first draft used `goto()` and passed
+  vacuously. **The BF-49 link is REFUTED here** — its sequence passes unfixed even with the stale
+  tree supplied on purpose, so BF-49 still needs its device repro. BF-100 is unblocked. Device pass
+  owed.
 - [`docs/overview/entries/2026-09-14-lb107-back-on-tab-goes-home.md`](../../overview/entries/2026-09-14-lb107-back-on-tab-goes-home.md)
   — **Back on a tab was a silent no-op, on all four non-home tabs (LB-107), 2026-09-14.** Registering
   a Capacitor `backButton` listener **suppresses the Android default**, so the app was never going to

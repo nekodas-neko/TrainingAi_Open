@@ -501,58 +501,32 @@ below threshold and left in place for next time.
 - **Verification:** on device with the WebView console attached, tap Cardio → Other activity →
   Treadmill and record whether (a) the sheet closes, (b) the URL becomes `/activity`, (c) anything is
   logged. Those three answers pick between the candidates above.
-### [app-shell][platform] LA-109 — a tab flip leaves the PREVIOUS tab's route tree on the history entry, so back renders the wrong screen
+### [app-shell][platform] LA-109 — a tab flip leaves the PREVIOUS tab's route tree on the history entry (fixed; device check owed)
 
 - **Lane:** B — `components/shell/tab-shell.tsx`.
 - **Added:** 2026-09-15 · owner, live report: *"Going to more; then going to profile details and
   pressing back gets me to the home page again."*
-- **⚠ This is NOT LB-107 mis-classifying the path, which was the first guess and is wrong.**
-  `backActionForPath('/more/details')` correctly returns `pop` — `tabKeyForHref` requires an exact
-  match against a tab href, and `components/shell/__tests__/back-action-on-tab.test.ts` already
-  asserts sub-routes pop. The resolver is not the defect and changing it would break tab backs.
-
-**MEASURED 2026-09-15 in Playwright against `pnpm dev`, by dumping `history.state` rather than
-reasoning about it.** Load `/`, then click the More tab:
-
-| where | `history.length` | URL | Next's recorded tree for that entry |
-|---|---|---|---|
-| `/` | 2 | `/` | `["", {children: ["(home)", …"/"…]}]` |
-| after the More tab flip | 2 | **`/more`** | `["", {children: ["(home)", …"/"…]}]` — **unchanged** |
-| `/more/details` | 3 | `/more/details` | `["", {children: ["more", {children: ["details", …]}]}]` |
-
-**The middle row is the bug.** `show()` (`tab-shell.tsx:85`) flips tabs with
-`window.history.replaceState(null, "", href)`, which updates the address bar — and Next's patched
-`replaceState` re-injects **its own current tree**, which is still Home's, because no Next
-navigation happened. So the entry ends up reading `/more` while carrying the route tree for `/`.
-Popping back to it restores that tree, and Home renders. The URL is right and the screen is wrong,
-which is why this reads as "back went to the home page".
-
-- **The comment above that line describes the intent correctly and the mechanism incompletely.** It
-  says replaceState keeps "the URL honest for refresh/deep-links/back". It keeps the URL honest; it
-  leaves the *tree* stale, and only back can see the difference.
-- **⚑ BF-100 may be downstream of this — see its entry (linked 2026-09-15).** It reports "back
-  always lands at the top" on the **same route**, has failed on the S25 twice with its cause recorded
-  as unknown, and restores correctly in the harness. If back renders Home, there is no `/more` scroll
-  position to restore. Fix this first, then re-test BF-100: only one of the two can be confirmed
-  while the other stands.
-- **⚑ BF-49 is very likely the same defect and should be read with this.** *"Tapping a workout, then
-  back, leads to health training not home. Same with tapping a food item from timeline."* That entry
-  is marked *"does not reproduce in the web harness"* and concluded *"the fix is not in the router"* —
-  both consistent with this, since the harness sequence it drove started with a direct `goto` rather
-  than a tab flip, so no entry ever carried a stale tree. **Do not fix the two separately** until one
-  has been tried against the other's repro.
-- **What a fix has to preserve**, all three of which the current shape gets right and a naive change
-  would break: a tab flip must not grow the history stack (`e2e/tab-flip-leaves-nothing-to-pop.spec.ts`
-  pins this), the URL must stay honest for refresh and deep links, and LB-107's back-to-Home from a
-  tab root must keep working. The likely shape is to hand `replaceState` a state object carrying the
-  destination tab's tree rather than letting Next re-inject the old one — but that reaches into
-  Next's internals (`__PRIVATE_NEXTJS_INTERNALS_TREE`), so **measure a candidate before adopting it**.
-- **Reproduction note for whoever takes it:** the row-click route is awkward in the harness — a daily
-  check-in sheet opens over Home and intercepts pointer events, and Escape does not dismiss it.
-  Dumping `history.state` after the tab flip is the cheap measurement and needs no row click at all.
-- **Verification:** from Home, flip to More, open Profile details, press back — arrive on **More**
-  with the More tab active, not Home. Then repeat BF-49's sequence and confirm it, too.
-
+- **Shipped 2026-09-15.** The cause held up: `show()` flips tabs with
+  `window.history.replaceState(null, "", href)`, and Next's patched `replaceState` re-injects its own
+  current tree — still the previous tab's, because no Next navigation happened. Popping back to that
+  entry restores the stale tree, so the URL reads `/more` and Home renders.
+- **The fix reads the address bar at mount instead of reaching into Next's internals.** `TabShell`'s
+  `useState` became a lazy initializer that prefers `tabKeyForHref(window.location.pathname)` over
+  the `initialTab` the stale tree produced. `usePathname()` would not work — it reads from the very
+  tree that is wrong. Nothing touches `__PRIVATE_NEXTJS_INTERNALS_TREE`, and all three things a fix
+  had to preserve still hold: the flip adds no history entry, the URL stays honest, and LB-107's
+  back-to-Home from a tab root is unchanged (both specs re-run green).
+- **Proven load-bearing, not merely green.** `e2e/la109-back-from-subroute.spec.ts` was run against
+  `main`'s unfixed `tab-shell.tsx` and goes **red** there. This is the check the first draft of the
+  spec failed: it used `goto('/more/details')`, a full document load that rebuilds history, and
+  passed while the bug was untouched.
+- **⚑ The BF-49 link is REFUTED — see BF-49's entry.** The trial this entry demanded was run and came
+  back negative. Do not re-run it.
+- **⚑ BF-100 is now re-testable.** This entry blocked it: if back rendered Home there was no `/more`
+  scroll position to restore. That blocker is gone, so BF-100's own cause can be read on its own.
+- **Keep:** the device check, and only that. On the S25: from Home flip to More, open Profile
+  details, press the system back gesture — arrive on **More** with the More tab active. The harness
+  cannot speak for the Android back gesture or the WebView's history handling.
 
 ### [devices] PS-40 — formalize the data-source connector convention as a typed, checkable declaration
 
@@ -5078,8 +5052,8 @@ feature and not a deletion like LB-41:
   `/more` → *Profile details* → back restores **840**. So a green `e2e/scroll-restoration.spec.ts` is
   not evidence here, and the next attempt must not read it as any. Whatever differs is the S25's
   system back gesture or the WebView's restore timing — neither reachable from the sandbox.
-- **⚑ LA-109 may BE the "whatever differs", and this should be re-tested after LA-109 ships rather
-  than attacked now (linked 2026-09-15, Lane A).** LA-109 is the owner's same-day report on the
+- **⚑ LA-109 SHIPPED 2026-09-15, so the block this carried is lifted — re-test on the next device
+  pass before reading anything below as still open.** LA-109 is the owner's same-day report on the
   **same route**: *"Going to more; then going to profile details and pressing back gets me to the
   home page again."* It is measured — after a tab flip the history entry reads `/more` while carrying
   Next's route tree for `/`, so popping back restores the Home tree and Home renders under the right
@@ -5094,6 +5068,9 @@ feature and not a deletion like LB-41:
   the other stands, so fixing LA-109 first tells you whether anything is left here. It also explains
   the harness disagreement without needing the WebView: the spec's route never goes through a tab
   flip, so it never carries a stale tree.
+  **Status 2026-09-15:** LA-109's fix is on `main` and is proven load-bearing (its spec goes red
+  against the unfixed file). So the sequencing condition is satisfied and this entry is unblocked —
+  what it now needs is a device pass to say whether anything is left, not more reading.
 - **Do not re-derive the six traps below to explain it.** They are paid for and in the hook. The
   question is what `/more` does that `health-content` and `session-select-content` do not, given all
   three take the same `PullToSync` path.
@@ -7752,6 +7729,21 @@ back resolving to the tab that owns the destination instead of unwinding to the 
   disagrees with the phone: what screen preceded Home, and whether "back" was the gesture, the
   three-button key, or the on-screen arrow. The difference has to be found, not guessed — the code
   it would touch is app-wide navigation.
+- **⚠ THE LA-109 HYPOTHESIS IS REFUTED — measured 2026-09-15, and this is the one thing here worth
+  not re-doing.** LA-109 found that a tab flip leaves the previous tab's Next route tree on the
+  history entry, and its entry said BF-49 *"is very likely the same defect"* and that neither should
+  be fixed until one was tried against the other's repro. **That trial was run and came back
+  negative.** `e2e/la109-back-from-subroute.spec.ts`'s second test drives BF-49's shape with the
+  stale-tree precondition supplied deliberately — a real load of `/health`, a **flip** to Home (not a
+  `goto`), an in-app `router.push` to `/health?tab=training` off the streak card, then back — and it
+  **passes against `main`'s UNFIXED `tab-shell.tsx`**, in the same run where LA-109's own test goes
+  red. So the sequence does not reproduce even when the precondition is handed to it.
+  This is a stronger negative than the 2026-08-30 note above, which could be explained away by its
+  repro having begun with a `goto`. That explanation is now spent. The test is kept in the file as a
+  regression guard and is labelled in its own docstring as **not** a BF-49 repro, so a future green
+  run is not misread as a confirmation.
+- **So LA-109 shipping does NOT close this**, and the device repro this entry has always asked for is
+  still the whole of what it needs.
 
 ### [nutrition] BF-35 — fill the food placeholder: two of the three sources are already free
 
@@ -20191,9 +20183,90 @@ the `lfhf` epoch field and `W_LFHF = 0.5` are all on `main`.
 - **Item 4 (offline clustering fit)** — not started, and correctly sequenced last: it wants item 2
   landed and more accumulated real nights before an unsupervised fit means anything.
 
+### [workouts][platform] LA-110 — a phase change makes every compound read as a strength decline, and three surfaces believe it
+
+- **Lane:** A — `lib/data/postgres/adapter.ts` (`listRecent1rm`) and
+  `packages/shared/src/ai-periodization/signals.ts`.
+- **Added:** 2026-09-15 · Lane A, found taking Q-52's own outstanding "re-measure once blocks cycle"
+  step. The re-measure cannot be taken by the method Q-52 implies, and **why** is this entry.
+
+**`listRecent1rm` returns the two most recent real 1RM estimates for an exercise, from any phase and
+any rep range.** Nothing keys the comparison to like-for-like work. So when a session transitions
+into `accumulation` — lighter loads, higher reps — the newest estimate is computed from a 10–15 rep
+set while the one before it came from a 3–7 rep set, and the difference is read as a **strength
+trend**.
+
+**Measured on production 2026-09-15**, comparing each active-program exercise's last two real
+estimates. All five sessions had entered `accumulation` between 09-09 and 09-12:
+
+| exercise | role | reps prev → cur | est. 1RM prev → cur | % |
+|---|---|---|---|---|
+| Dumbbell Bulgarian Split Squat | secondary | 6 → **13** | 32.5 → 11.5 | **−64.6** |
+| Incline Bench Press | primary | 5.5 → **8** | 81.5 → 48.8 | **−40.2** |
+| Barbell Overhead Press | secondary | 7 → **11** | 58.0 → 44.8 | −22.8 |
+| Barbell Bench Press | primary | 3.5 → **15** | 103.8 → 82.8 | −20.2 |
+| Barbell Chest Supported Row | primary | 4 → **8** | 77.8 → 68.0 | −12.5 |
+| Barbell Squat | primary | 12 → **10** | 79.3 → 93.8 | **+18.3** |
+
+**Every decline has reps going UP, and the only riser has reps going DOWN.** That is a rep-range
+signature, not a training one — a 1RM estimated from a 15-rep set is systematically lower than one
+from a 3.5-rep set, which is why this repo already carries a high-rep guard, a `REP_CEILING` and the
+AMRAP scaling BF-164 corrected. **The owner did not lose 21 kg of bench press in two weeks.**
+
+**Three consumers read it, and they are not all cosmetic:**
+1. `signals.ts:133` `buildCardExerciseSignals` → `rm1Trend` and `rm1ChangeKg`, which feed the
+   **periodization signals** — so the engine currently sees six compounds trending down immediately
+   after a phase change it made itself.
+2. `packages/shared/src/health/strength-progress.ts:47` → `displayOneRmDelta` on a user-facing card.
+3. `ai-periodization/prompt.ts:198` → the same delta, in text, to the model.
+
+**⚑ Likely related to TN-36 (PR #1154, open): "workouts are constantly being recommended for
+deload".** A phase transition manufacturing six down-trending compounds is a plausible contributor,
+and both were found within days of each other. **Not established** — nobody has traced `rm1Trend`
+into the deload decision yet. Do that before assuming either fixes the other.
+
+**This is the THIRD defect in one family, which is the argument for fixing the comparison rather than
+the symptom.** `listRecent1rm`'s own doc comment records the other two: Q-298 (a deload's
+`estimated_1rm = 0` admitted as an estimate, so `rm1ChangeKg` reported the lifter's entire 1RM as a
+gain) and PS-26 (the same sentinel read as a *current* value, rendering "−<the whole 1RM> kg" on 16
+of 34 exercises). Both were fixed by excluding rows. **This one cannot be — the rows are real
+estimates from real work.**
+
+**Shape of a fix, not yet decided:**
+- **Compare like-for-like.** Either restrict the pair to the same phase, or to a comparable rep band,
+  or carry the rep count so a consumer can refuse a cross-band comparison. `exercise_logs.avg_reps`
+  is already stored, so the data is there.
+- **Or mark the comparison as unavailable across a boundary** rather than reporting a number — the
+  app's own convention elsewhere (an absent metric beats a wrong one).
+- **Do not "fix" it by widening the trend thresholds.** That hides a real decline as readily as a
+  false one.
+- ~~`session_periodization.baseline_1rm` exists and may already be the intended like-for-like
+  anchor~~ — **ruled out 2026-09-15, do not re-walk it.** `signals.ts:246` says *"baseline1rm is
+  retained as the starting weight anchor only — do NOT use"*, and `prompt.ts` repeats it twice, once
+  as prose to the model and once inline as `[anchor only — do not use for trend]`. Using it would
+  contradict an explicit instruction in three places. **The fix needs a genuinely new like-for-like
+  rule**, which is what makes it a design decision rather than a wiring change.
+
+**Two more leads closed the same day, so the next attempt starts from a shorter list:**
+- **The unit half is already handled.** A `rm1ChangeKg` for a bodyweight exercise is an index delta,
+  not kilograms — but Q-19b already routes it through `displayOneRmDelta` in `prompt.ts`, so the
+  model is given *"+1 rep"* rather than *"+1.0 kg"*. That path improved again on 2026-09-15 when
+  BF-164 pointed `displayOneRmDelta` at `bodyweightRepMax`. Nothing to do here.
+- **The guard asymmetry is real but trivial.** `oneRmTrendStatus` has a ±0.5 dead zone and
+  `rm1ChangeKg` has none, so a 0.3 kg move reports `rm1Trend: flat` beside a non-zero change. Same
+  *shape* as the Q-298 contradiction, three orders of magnitude smaller in effect. **Not worth its
+  own fix**, and worth knowing about only so it is not mistaken for this entry's defect when
+  someone reads the two fields side by side.
+
+**Verification:** on the owner's account after a phase transition, no primary/secondary compound
+reports a double-digit decline it did not earn, and the strength card's delta for Barbell Bench Press
+is not −21 kg.
+
+
 ### [workouts] 🟡 Q-52 — per-exercise phase hold: a stalled compound stays behind while the session moves on
 
 - **Lane:** A
+- **Needs:** LA-110 — its own re-measure precondition is unanswerable until the 1RM trend stops being confounded by phase transitions (attempted 2026-09-15; see the boxed note below).
 Plan: [`docs/superpowers/plans/2026-08-02-per-exercise-phase-hold.md`](superpowers/plans/2026-08-02-per-exercise-phase-hold.md).
 Branch: `feat/exercise-phase-hold`. Added 2026-08-02 from an owner design question.
 
@@ -20255,7 +20328,18 @@ if the transition fix means blocks now actually cycle, the picture may change.
 >
 > **What was right:** Barbell Front Squat is indeed no longer in the active program.
 >
-> **The "re-measure once blocks cycle" note is still outstanding.** Checked the same day: four of
+> **⚠ THE RE-MEASURE WAS ATTEMPTED 2026-09-15 AND CANNOT BE TAKEN THIS WAY — see LA-110 above.**
+> The blocks have now cycled: all five sessions re-entered `accumulation` between 09-09 and 09-12,
+> so the precondition below is finally met. Run naively, the measurement says **6 primary/secondary
+> compounds are declining** (7.7–64.6%) against August's one — which would read as "build it".
+>
+> **It is an artifact.** Every one of those six has its rep count going UP across the phase boundary
+> (bench 3.5 → 15 reps, split squat 6 → 13), and the single riser has reps going DOWN (squat 12 →
+> 10). `listRecent1rm` compares the two most recent real estimates regardless of rep range, so a
+> transition into accumulation manufactures declines. **Q-52 cannot count stalling compounds until
+> LA-110 is fixed**, because the signal it would count is the one that is confounded.
+>
+> The original note, kept for the record — checked 2026-08-03: four of
 > five sessions (Legs, Pull, Push, Upper) are still in `accumulation`, and only Lower has moved —
 > on 2026-08-01, *before* v1.252.0 landed. **No session has transitioned since the auto-apply fix
 > shipped**, so the picture that fix might change has not had a chance to change yet. Re-run this
