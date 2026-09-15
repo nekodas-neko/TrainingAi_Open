@@ -12356,7 +12356,17 @@ the next session would otherwise re-derive from the two coupled entries that sai
 
 A negative result costs lines exactly once and saves a re-run every time someone reads the pair.
 
-## 2026-09-15 — `projectOverview.md` → 11273, `docs/implementation-backlog.md` → 21404 (RV-38)
+## 2026-09-15 — `projectOverview.md` → 11287, `docs/implementation-backlog.md` → 21420 (BF-163)
+
++24 and +5 for a one-line tooltip change, and the ratio is the point: almost none of it is the fix.
+
+What the lines buy is that the chip was **correct** and still had to change. An entry reading
+"Hypertrophy is the right tag" closes itself; the reason it does not is that the chip made two
+claims from one input and only one of them was supported. Someone re-reading this in a month with
+`zone.reps` sitting unused needs to find out why it was left rather than deleted, or they will
+delete it and foreclose the Lane A answer that needs it.
+
+## 2026-09-15 — `projectOverview.md` → 11297, `docs/implementation-backlog.md` → 21412 (RV-38)
 
 Both **shrank**, which is the interesting part: the fix is one term removed from a boolean, and the
 documents got smaller because an open finding became a shipped one with a shorter residue.
