@@ -481,6 +481,16 @@ below threshold and left in place for next time.
   ("are the loads in front of you reduced?"). Keep the `!== 'consumed'` guard. Leaving
   `prescription.deload` alone is deliberate: it is correct for what it means, and a phase deload
   sets `deloaded` on its exercises too, so one read covers both.
+- **Checked for existing infrastructure before proposing the read, because BF-166's entry did not
+  and was wrong for it.** That entry claimed no overlay registry existed and proposed building one;
+  `lib/hooks/sheet-back-stack.ts` already had it under different names, and building the proposal
+  would have left two stacks disagreeing. So, for this one: `grep -rn 'export function .*[Dd]eload'`
+  across `packages/shared/src` and `lib` returns `isDeloadActive`, `isEarlyDeloadWeek`,
+  `deloadAwareStylePhase`, `deloadOverrideForGoal`, `deloadStyleForGoal`, `computePerExerciseDeload`
+  and `shouldTriggerEmergencyDeload` — **none of which answers "is any exercise in this prescription
+  deloaded?"**. `computePerExerciseDeload` is the *producer* of the flag (the soreness quadrant;
+  the illness radar writes the same shape), not a predicate over a stored prescription. The
+  `.some()` read is genuinely new, and it is one line.
 - **Second contradiction from the same cause, same screen.** The rationale paragraph reads *"focus on
   volume within the **72.5-80%** intensity band for the primary compound"* against rows showing
   **52%**. Those figures describe the **preDeload** numbers (bench 76%, inside that band) — the prose
