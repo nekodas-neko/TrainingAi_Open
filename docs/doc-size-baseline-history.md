@@ -12558,6 +12558,115 @@ and name the two things to instrument.
 The second half — that the existing spec asserts an exact offset and cannot tell *cancelled* from
 *imprecise* — is what makes any future probe in this area readable at all.
 
+## 2026-09-15 — backlog → 21671: four owner decisions landed on three entries
+
++26 lines, all of it decisions rather than findings, and decisions are what the queue exists to
+carry forward. TN-31 takes `tempo`; TN-38's task B is cleared to build unvalidated; TN-38's task C
+gains a pointer to the metric inventory that will settle it.
+
+**TN-36 earns most of the lines and needed every one.** Its gate is lifted and its fix order is
+**reversed**, so the entry has to say why or the next reader will follow the original ordering that
+is still quoted in the merged PR body and the journal. Simulating each fix against the last 22 real
+days: today 11 of 15 September days recommend a deload, unwiring the stress override alone takes
+that to 1, and the readiness-clears rule that was filed as *the cause* changes nothing further —
+the owner's streak reaches 3 exactly once in 22 days, so the streak brake was already clearing
+almost every day.
+
+Recording a correction to my own measurement costs more lines than restating the original finding
+would have, which is the reason to spend them.
+
+## 2026-09-15 — backlog → 21774: three entries from the unused-signal audit, and a retraction on PS-44
+
++103 lines for an audit the owner asked for — *"what other metrics can we calculate from our data"* —
+and the lines are mostly measurements, which are what stop each entry being re-argued.
+
+**TN-39 earns the most and is the point of the audit.** The daytime-stress model is an imputation
+that has never been checked against measured HRV, and the measured HRV is in the database: the
+chest strap is worn 07:00–13:00, which is exactly the window the model guesses about. The
+strap-beats-against-stress-minutes table is the whole argument — without it the entry reads as a
+nice-to-have rather than a check on the number driving deload recommendations.
+
+**The retraction on PS-44 is the expensive part and had to be.** That entry says the raw ingredient
+is "already streaming into the app", which is true and misleading: 136,440 beats, and **242 of them
+at night across 6 nights**. A row count looks like plenty until it is grouped by hour, so the entry
+now says that outright rather than leaving the next implementer to discover it after starting.
+
+**Two killed hypotheses are recorded deliberately.** `ehr_*` is not workout detection (event counts
+run highest on days with no workout), and there are no computed-but-unsurfaced metrics — four
+modules looked dead on a narrow grep and all four are consumed. The second is written down because
+the same narrow grep will produce the same false result again.
+
+## 2026-09-15 — backlog → the sleep-score direction defect, recorded in TN-38
+
++17 lines to carry a measurement that reverses how this entry reads. The owner objected that a
+duration-only core could reach 100 and that staging must then make 100 harder. Checking it against
+the live weights found something worse than the comparability problem the entry was already filed
+for: **one night scores 74 with the ring, 84 on a watch and 92 on a phone alone** — the app pays 18
+points for removing a sensor, because renormalising drops the contributors that were pulling the
+score down.
+
+The three-row table earns its lines because the direction is the finding. "Two users' 78s are not
+the same quantity" is abstract and easy to defer; "more information can only ever hurt you" is not,
+and it is the same defect seen from the angle the owner actually felt.
+
+The ⛔ line rules out the obvious fix — capping the core far below 100 so sensors add rather than
+deduct — and states the reason, because it is the design a reader reaches for first and it pins a
+phone-only user at 55 for hardware they do not own.
+
+## 2026-09-15 — `projectOverview.md` → 11453, `docs/implementation-backlog.md` → 21817 (BF-165)
+
++52 and +116 for a session that shipped no code, and the second number is the one to justify.
+
+BF-165 was sitting at the top of READY as unstartable, with an instruction to start from the device
+console. It reproduces in a browser. Most of these lines are the two candidates now dead **by
+experiment** — the `/activity` route loads fine, and the sheet's `history.back()` is not the cause
+even though it is the obvious mechanism and looked certain.
+
+The rest is one trap: Next updates the URL at commit, so *"the URL never showed /activity"* cannot
+tell an aborted commit from a never-started push. That inference was made here and was wrong, and
+without the note the next session makes it too.
+
+## 2026-09-15 — backlog → TN-38 task C rewritten twice in one day, and the second one is the keeper
+
+The shape of this task changed twice against owner pushback, and both corrections are in the entry
+rather than only the newest, because the rejected ones are what stop a future reader re-proposing
+them.
+
+**First shape — a core capped at ~92 — is retracted in place.** The owner's objection is one line
+and unanswerable: a permanent ceiling for not owning hardware is a penalty, not honesty.
+
+**Second shape — fill every missing contributor with the population-typical pattern — is recorded as
+MEASURED TO FAIL**, which is worth more lines than the design that replaced it. A neutral value
+stops being neutral once it carries 72 of sleep's 110 points: a textbook night falls to 80, a poor
+night rises to 66, and the ranking inverts. That is deeply counter-intuitive — "just use the average
+where you don't know" sounds obviously safe — so the three-row table stays.
+
+**The contract table is the part the entry existed to produce** and it is short: six inputs carry
+the whole app, and Cardio is the one pillar with no manual floor, so it is hidden rather than scored
+at zero. An implementer can build against that without re-reading the argument above it.
+
+## 2026-09-15 — backlog → 21917: the reachability audit, composites, and the Health Connect gap
+
++100 lines across three entries answering the owner's core-tuning question. The lines are almost all
+measurements, and one of them changes what the app is understood to be doing.
+
+**TN-42 is the one that had to be written down.** The owner's requirement was a single sentence —
+*"I should be able to get 100"* — and the measurement says he cannot: **readiness has never reached
+90 in 62 days.** The contributor table is the entry, because the cause is specific and
+counter-intuitive: `temperature` is scored *closer-better*, 100 sits exactly at the personal
+baseline, and the baseline is miscentred, so 100 is unreachable by construction rather than by
+difficulty. Two ⛔ lines guard the obvious wrong fixes — re-tuning the curve to compensate for a
+broken input, and filing `LATENCY`'s 90 ceiling as a bug when the final calibration already
+compensates for it.
+
+**TN-44 retires a claim, which is worth more than the ten rows it adds.** The connector guide says
+skin temperature has no second source. Health Connect defines `SkinTemperatureRecord`. The ring-only
+list was always a statement about our read list and the user's device, and writing that down stops
+the next session designing around a limit that is not there.
+
+**TN-43 is the shortest and stays short.** Four composites, a table, and one rule about not
+laundering an inferred value into something that looks measured.
+
 ## 2026-09-11 — `docs/implementation-backlog.md` → 21535 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.

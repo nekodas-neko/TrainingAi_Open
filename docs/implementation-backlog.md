@@ -542,6 +542,34 @@ below threshold and left in place for next time.
 - **Verification:** on device with the WebView console attached, tap Cardio → Other activity →
   Treadmill and record whether (a) the sheet closes, (b) the URL becomes `/activity`, (c) anything is
   logged. Those three answers pick between the candidates above.
+
+- **✅ REPRODUCED IN THE PLAYWRIGHT HARNESS, 2026-09-15 — this is NOT device-only, and the entry's
+  "start from the device console" instruction is wrong.** Driving `/cardio` → *Other activity* →
+  *Treadmill* in a browser: the URL stays **`/cardio`**. No device, no WebView, no console needed.
+- **Two of the three candidates are now REFUTED by experiment, not by reading:**
+  - **Candidate 2 (the `/activity` route fails to load) is dead.** A direct `goto('/activity')`
+    returns **200**, renders *"Log Activity — What are you doing?"*, and logs **zero** page errors.
+  - **Candidate 3 (the close cancels the push) is dead, and so is the sharper version of it.** The
+    obvious mechanism — `SheetContent` renders `BackDismiss`, so an open sheet holds a pushed history
+    entry, and `closeSurface` fires **`history.back()`** when it closes — looked decisive and is not.
+    Reordering `selectType` to push first and deferring `onOpenChange(false)` by **1200 ms**, so no
+    pop is anywhere near the navigation, leaves it **still on `/cardio`**. The popstate moves to
+    ~1.5 s after the tap and changes nothing.
+- **Candidate 1 is the survivor: `router.push('/activity')` never commits.** `push()` routes
+  `/activity` through `animate()` (it is not a tab href and not the current URL), which runs the
+  push inside `document.startViewTransition` and polls for the URL against the **300 ms** cap.
+  Sampled every **10 ms for 4 s**, the URL never becomes `/activity` — not even transiently.
+- **⚠ A trap for the next session, because it cost a wrong conclusion here.** *"The URL never showed
+  `/activity`"* does **not** prove the push never started: Next updates the URL at **commit**, so an
+  aborted commit and a never-started push look identical from `location`. The deferred-close
+  experiment above is what separates them, and it is the one worth repeating — a sampler alone
+  cannot.
+- **The next experiment, stated so it is not re-derived:** drive the same
+  `useTransitionRouter.push('/activity')` from a control on `/cardio` that is **not inside a sheet**.
+  If it navigates, the sheet/portal context is the variable; if it does not, `animate()` itself is
+  the defect, which is app-wide navigation and must not be changed on a hypothesis.
+  **Do not lengthen `NAVIGATION_TIMEOUT_MS`** — the entry's own warning stands: that turns a dead tap
+  into a slow dead tap.
 ### [app-shell][platform] LA-109 — a tab flip leaves the PREVIOUS tab's route tree on the history entry (fixed; device check owed)
 
 - **Lane:** B — `components/shell/tab-shell.tsx`.
@@ -568,6 +596,197 @@ below threshold and left in place for next time.
 - **Keep:** the device check, and only that. On the S25: from Home flip to More, open Profile
   details, press the system back gesture — arrive on **More** with the More tab active. The harness
   cannot speak for the Android back gesture or the WebView's history handling.
+
+### [readiness][heart-rate] TN-39 — the daytime-stress model is an imputation that has never been checked against the measured HRV sitting in the database 🔴 LIVE
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-15 · owner: *"this might be a good opportunity to investigate other metrics we can calculate from our data too."*
+- **Lane: A** — `packages/shared/src/health/daytime-hrv-model.ts` · `packages/shared/src/health/rmssd.ts` · reads `rr_intervals` via `getRrForWindow`.
+- **Reference:** [`audit`](reviews/2026-09-15-what-else-our-data-could-tell-us.md).
+- **Sibling of TN-33** (which measured the stress signal) and **TN-34** (the override). **This is the validation both of those had to assume.**
+
+**Daytime stress is imputed, not measured.** The ring streams HRV events for ~7% of waking hours, so
+the model fits `ln(rmssd) = a + b·hr + c·temp` on NIGHT data and applies it to daytime HR and temp.
+That imputation produces `stress_high_minutes`, which drives the deload override that fired on **10
+of the owner's last 22 days** (TN-36).
+
+**Ground truth exists and nobody has looked at it.** The Polar H10 writes raw beat intervals to
+`rr_intervals` — measured 2026-09-15: **136,440 beats across 48 days**, worn **07:00–13:00, peaking
+at 08:00**. That is exactly the window the model is guessing about. Twelve of the last fourteen
+strap days carry thousands of beats on days the stress model also ran:
+
+| day | strap beats | stress_high_minutes |
+|---|---:|---:|
+| 2026-09-14 | 5,559 | 150 |
+| 2026-09-08 | 5,993 | 90 |
+| 2026-09-01 | 5,843 | 270 |
+| 2026-09-06 | 4,369 | 150 |
+
+**The work:** compute `rmssdFromRr` over the overlapping 30-minute buckets, compare against the
+imputed dHRV for the same buckets, and report agreement. `rmssdFromRr` already exists, is
+artifact-filtered, and already runs on this exact data for workout windows — so this is a
+measurement, not an integration.
+
+**⚠ Do NOT change the model on the strength of this before the owner sees the result** — scoring
+changes are Tuning-proposes/owner-signs-off. The output is a number and a verdict, not a patch.
+
+**⚠ The comparison is only valid on overlapping buckets** — the strap covers ~6 waking hours, not
+the whole day, so a day's `stress_high_minutes` cannot be compared as a total.
+
+**Pass test:** a written agreement figure between imputed and measured daytime HRV over at least
+ten days, with the disagreement characterised (bias, spread) rather than summarised as good or bad.
+
+### [devices][heart-rate] TN-40 — the strap's 136,440 beats produce exactly one number, while three models that could use them run on the ring alone
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-15 · from the same audit as TN-39.
+- **Lane: A** — `lib/oura-ble/rollup/run.ts` (where the three models are called) · `getRrForWindow`.
+- **Reference:** [`audit`](reviews/2026-09-15-what-else-our-data-could-tell-us.md).
+- **Needs:** TN-39 — the validation tells you whether the strap's beats agree with the ring's at all, which decides whether these should merge or stay separate series.
+
+`rollup/run.ts` calls `lfhfFromIbi`, `breathingFromIbi` and `computeHrv5MinSeries` **exclusively on
+the ring's IBI stream**. `getRrForWindow`, which reads the strap, is called from two places only:
+the comparison harness and `compute-workout-hr.ts`. So the strap's beats yield **one number** — a
+workout's rest-window rMSSD — while three richer models sit written, tested and pointed elsewhere.
+
+**Because the strap is worn in waking hours and the ring is weakest there**, running these on strap
+data produces *daytime* LF/HF, *daytime* breathing rate and a *daytime* HRV series — signal the app
+has from no source today.
+
+**⚠ Not a merge into the existing series.** Per TN-38's rule, series merge at READ by resolution;
+whether strap-derived daytime HRV belongs in the same series as ring-derived nightly HRV is exactly
+what TN-39 answers. Build it as its own series first.
+
+**Pass test:** a daytime HRV/LF-HF/breathing series exists for a day the strap was worn, computed
+from `rr_intervals`, with no change to any ring-derived series.
+
+### [devices] TN-41 — four raw tags are stored and never decoded, and one of them has no decoder at all
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-15 · from the same audit as TN-39.
+- **Lane: A** — `lib/oura-ble/decode.ts` · `lib/oura-ble/rollup-consumed-tags.ts`.
+- **Gate: owner** — `0x73` cannot be decoded from this repository; see below.
+- **Reference:** [`audit`](reviews/2026-09-15-what-else-our-data-could-tell-us.md).
+
+`body_hex` is kept permanently, so a decoder added later back-fills. Four tags never reach the rollup:
+
+| tag | event | rows | decoder? |
+|---|---|---:|---|
+| `0x73` | `ehr_trace_event` | **2,988** (1,494 paired) | **none** |
+| `0x6c` | `feature_session` | 2,708 | exists, unconsumed |
+| `0x74` | `ehr_acm_intensity_event` | 648 | exists, unconsumed |
+| `0x6b` | `motion_period` | 390 | exists, unconsumed |
+
+`0x73`'s two payload sizes (5 and 14 bytes) each appear exactly 1,494 times and their leading bytes
+run as one consecutive counter, so they interleave as a single stream of 1,494 episodes.
+
+**⛔ Its layout was NOT inferred and must not be.** CLAUDE.md: byte layouts come from the `open_oura`
+Rust source, never memory and never Oura's public docs. That source now lives only in the archived
+private repo — **decoding `0x73` starts by retrieving it, which is why this entry is owner-gated.**
+
+**⚠ Measured and killed: `ehr_*` is not workout detection.** Event counts run *highest on days with
+no workout* (802 events / 0 workouts on 2026-09-15; 764 / 0 on 09-11; 54 / 1 on 09-10). Do not
+re-test this.
+
+**⚠ Value is modest and stated honestly** — `0x6c` is diagnostics rather than a health metric, and
+`0x6b`/`0x74` are real signal at low volume. This ranks below TN-39 and TN-40 deliberately.
+
+### [readiness] TN-42 — readiness has never reached 90 in 62 days, and the cap is a contributor that cannot reach its own optimum 🔴 LIVE
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-15 · owner: *"as long as with my current metrics I have a way to get 100 score on pillars I am happy. It should be achievable."*
+- **Lane: A** — `packages/shared/src/health/readiness-composite.ts` · the temperature baseline.
+- **Reference:** [`review`](reviews/2026-09-15-base-data-reachability-and-composites.md).
+- **Needs:** TN-6 — the miscentred temperature baseline is the cause; this entry is the measurement that prices it.
+
+**Measured over production, every day with a score:**
+
+| pillar | best ever | mean | days | days ≥ 90 |
+|---|---:|---:|---:|---:|
+| Sleep | 97 | 73 | 63 | 19 |
+| Activity | 91 | 73 | 50 | 1 |
+| **Readiness** | **87** | 64 | 62 | **0** |
+
+**`temperature` (weight .10) has never reached 100 in 62 days** — max 96, mean 76. It is scored
+*closer-better*, 100 exactly at the personal baseline, so **a miscentred baseline makes 100
+unreachable by construction.** That is TN-6 (0.36 °C low, −16 pt on 89% of days) and BF-13 (the
+baseline EMA seeds at zero). **`recoveryIndex` averages 43 against a max of 100** and is the
+second-largest drag, explained by no queued entry.
+
+**⚠ `checkin` is NOT a defect** — `CHECKIN_ENERGY_SCORE` maps `pumped → 100`; the owner's observed
+max is `good → 88` because he has never logged `pumped`. Honest self-report. Do not "fix" it.
+
+**⛔ Do NOT re-tune the readiness curves to make 100 reachable.** The ceiling is caused by an input
+that is wrong; re-shaping a curve to compensate is the "threshold is right, the input is wrong"
+mistake this pillar has made five times. Fix TN-6/BF-13 first, then re-measure.
+
+**⚠ Sleep needs no change.** `SCORE_CALIBRATION` maps a blend of 93 to a displayed 100 and the
+theoretical max blend is 99.2, so 100 is reachable — an excellent night computes to 94 and the best
+in 63 was 97. Steep, not capped. **`LATENCY` peaks at 90 and `TIMING` at 95 and that is FINE**,
+because the calibration compensates — check the calibration before filing either as a bug.
+
+**Pass test:** after TN-6/BF-13, the temperature contributor reaches 100 on a day at baseline, and a
+readiness ≥ 90 becomes possible on a good day.
+
+### [platform][readiness] TN-43 — four composite metrics from values already computed, two of which work on the base set
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-15 · owner asked whether combining computed values yields new metrics.
+- **Lane: A** — `packages/shared/src/health/` — pure functions over existing series, no new data.
+- **Reference:** [`review`](reviews/2026-09-15-base-data-reachability-and-composites.md).
+- **Needs:** TN-38 — each composite must declare which parts were inferred, which is task C's flag.
+
+Checked as genuinely absent: no `sleepDebt`, no autonomic-balance composite, no true-sleep figure,
+no load-vs-readiness.
+
+| composite | = | why it beats its parts | base-set safe? |
+|---|---|---|---|
+| **Load vs readiness** | ACWR × readiness | *"training hard while recovering badly"* is the actual deload question — **this is what the deload engine should consult instead of the stress override it is losing (TN-34/TN-36)** | ✅ |
+| **Sleep debt** | rolling (need − actual) over 14 d | one short night is noise, four is a state | ✅ **duration only** |
+| **Autonomic balance** | RHR trend + HRV trend agreeing | a single-signal move is noise; both moving together is signal. Cheapest noise reduction available | needs HR |
+| **True sleep time** | duration × efficiency | separates *"8 h in bed"* from *"8 h asleep"* | needs efficiency |
+
+**Build the first two first** — they work on bed/wake times, steps, logged workouts and the check-in,
+so they add value to exactly the user who has least data.
+
+**⛔ A composite containing an inferred part may NOT trigger an action** (TN-38 task C). A composite
+is the easiest place to launder an estimate into something that looks measured.
+
+**Pass test:** load-vs-readiness is computable for a user with no wearable at all, and every
+composite reports which of its inputs were inferred.
+
+### [devices] TN-44 — Health Connect defines ten record types our pillars want and we do not read, including skin temperature
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-15 · owner supplied the Health Connect type list.
+- **Lane: A** — `lib/health-connect-sync.ts` (`HC_SYNC_READ_TYPES`).
+- **Reference:** [`review`](reviews/2026-09-15-base-data-reachability-and-composites.md).
+- **Sibling of PS-41** (normalising HC's HR series) and **TN-38** (the tier model this feeds).
+
+**⚠ This retires a claim the connector guide makes.** §5.6 classifies skin temperature as a hardware
+dependency with no second source, costing readiness 0.10 and the illness radar 0.40. **Health
+Connect defines `SkinTemperatureRecord`**, and `HeartRateVariabilityRmssdRecord` for HRV. The
+ring-only list is a claim about *our read list and the user's device*, not about the platform:
+**Health Connect can carry every input our pillars need except beat-to-beat intervals.**
+
+We read 11 types. Ten more exist that the pillars would use:
+
+| record | feeds |
+|---|---|
+| `SkinTemperatureRecord` | readiness .10 · illness radar .40 — **the largest gap** |
+| `RespiratoryRateRecord` | illness radar .25 |
+| `ActiveCaloriesBurnedRecord` | activity 15/100 — we read *Total*, not *Active* |
+| `Vo2MaxRecord` | cardio, progress markers |
+| `DistanceRecord` · `HydrationRecord` | activity · nutrition |
+| `BasalMetabolicRateRecord` | energy balance |
+| `LeanBodyMassRecord` · `BoneMassRecord` · `BodyWaterMassRecord` | body composition — the scale covers the owner, a HC user has no other route |
+
+**⚠ Two defects on the same path, found while reading the file — both hit the Health-Connect user
+specifically:** the overnight HRV and SpO₂ windows filter on `d.getHours()` (lines 347, 369) and
+`toLocalDate` resolves the **device** timezone, which is the class CLAUDE.md bans — invisible until
+the device leaves the user's zone, then a night's HRV lands on the wrong day. And line 51 documents
+`hrvMs` as *"SDNN"* while the code reads rMSSD; the code is right, and the comment is worth fixing
+because this repo has already shipped that exact mix-up once.
+
+**⚠ Reading a type is not receiving it** — not all devices write all records, which is the owner's
+own caveat and the argument for TN-38's inferred contributors rather than against reading the type.
+
+**Pass test:** `HC_SYNC_READ_TYPES` covers skin temperature and respiratory rate, the overnight
+windows use the user's timezone, and a Health-Connect-only account can populate the illness radar.
 
 ### [platform][devices] TN-38 — normalisation is implemented three different ways and nothing names them as one concept
 
@@ -609,12 +828,79 @@ resolution; derived rows have one writer.**
 **Four steps, in order — A first because it is cheapest and everything later is checked against it:**
 - **A. Name the three mechanisms in the guide**, and amend **§5.4**, whose invariant TN-37 measured
   as false. Docs-only.
+- **✅ OWNER DECISION, 2026-09-15 on task B's validation** — build it now, validate when a friend
+  onboards, with the untested-path gap stated rather than blocking. There is no Health-Connect-only
+  account to test against and the owner will not create one.
 - **B. Close the two filed gaps** — **PS-41** (Health Connect's `HeartRateSeries` is read, used
   inline, then discarded instead of normalised) and **PS-42** (the illness radar gated on an
   `oura_daily_summary` row rather than on its inputs). **PS-41 unlocks 22% of Activity Score for a
   non-ring user.**
-- **C. Split every score into a CORE and ADJUSTMENTS** — **`Gate: owner`**, and the one genuine
-  design decision here. Owner, 2026-09-15: *"the app works fine with less sources but is more
+- **C. Split every score into a CORE and ADJUSTMENTS** — **`Gate: owner`** (the line itself; the
+  inventory it needs is now written), and the one genuine design decision here. **The full metric
+  inventory and three candidate lines are in
+  [`reviews/2026-09-15-every-metric-and-the-core-line.md`](reviews/2026-09-15-every-metric-and-the-core-line.md)**,
+  measured against production. **Its finding, which should decide it: the line barely matters for
+  Activity (63% → 100% core on a basic wearable), matters some for Readiness (35% → 66%), and is the
+  whole question for Sleep (35% → 55% → 87%), because 48 of sleep's 110 points sit in HRV, stages and
+  restfulness.**
+- **✅ OWNER REQUIREMENT, 2026-09-15, and the measurement that settles the shape:** the owner objected
+  that a duration-only core could reach 100, and that adding staging must make 100 harder rather than
+  simply adding a delta. **He is right, and the current model is backwards.** One real night — 8 h,
+  consistent window, poor deep/REM, HRV below baseline — run through the live renormalising formula
+  scores **74 with the ring (10 contributors), 84 on a basic watch (6), and 92 on phone/manual only
+  (3).** **The app pays 18 points for taking the ring OFF**, because renormalising drops the
+  contributors that were pulling the score down. So the defect is not that a phone-only user scores
+  well; it is that **more information can only ever hurt**.
+  **The shape this forces: the core must NOT reach 100.** Core tops out at **~92** (*"as good as it
+  looks from here"*), adjustments run roughly **−20 to +8** and are weighted toward deduction, and
+  the night above lands on 74 either way (core 92, adjustments −18). 100 then means *confirmed good
+  by everything visible*; 92 means *nothing visible is wrong, and little is visible*.
+  **⛔ Do NOT cap the core far below 100** (e.g. sleep core 0–55 with adjustments filling the rest) —
+  a phone-only user pinned at 55 reads as *"you sleep badly"* when the truth is *"we cannot see"*.
+- **⚠ RETRACTED, 2026-09-15, same day: the "core tops out at ~92" shape above is WRONG and the owner
+  found why.** A permanent ceiling for not owning hardware is a penalty, not honesty. **The design is
+  now: every contributor ALWAYS carries a value — measured where possible, INFERRED where not.** That
+  escapes the trilemma (reaches 100 / means the same for everyone / stable across a hardware change —
+  every other design gets two of three) by removing its cause, a score with holes in it. Connecting a
+  sensor then moves the score only where the measurement differs from the estimate, which is a fact
+  about the body rather than the hardware.
+- **⛔ INFER CONDITIONALLY — inserting the population-typical pattern is measured to FAIL.** The
+  owner's first formulation was to split the known duration into the most commonly seen stage pattern,
+  *"nothing good or bad"*. A neutral value stops being neutral once it carries **72 of sleep's 110
+  points**: a textbook night falls to **80** and a poor night rises to **66**, collapsing the scale to
+  14 points and inverting the ranking. Conditioning the estimate on the observables (8 consistent
+  hours predicts better-than-average stages, not average) restores the full range — **100 / 78 / 57
+  today vs 92 / 75 / 52 conditional**.
+- **Three rules that ship with it:** every value carries a `measured | inferred` flag **and an
+  uncertainty**, surfaced in the UI (the owner asked for the flag unprompted); **⛔ an inferred value
+  must NEVER trigger an action** — no deload off an estimated contributor, same class as CLAUDE.md's
+  rule on model-reported numbers; and inference needs something to infer FROM — a user with sensor
+  history is estimated from their own baselines (`personal-baseline.ts` already maintains exactly this
+  for six metrics), a user who never had the sensor has no prior and a population prior cannot be
+  fitted from one account.
+- **Needs:** TN-39 — **the app already infers and nobody has checked whether it works.** Daytime stress
+  guesses HRV from HR and temperature; TN-39 validates that against measured HRV. It is the same
+  technique this design rests on, so validate it where ground truth exists before extending inference
+  into scoring.
+- **The interim, cheap and locking nothing in:** score on what is present and **say so** — *"82, from
+  3 of 10 signals"*. Today's behaviour plus a label.
+- **✅ THE CONTRACT — what a pillar requires, settled 2026-09-15.** Required = what is needed to score
+  at all; everything else is measured when available and inferred when not.
+
+  | pillar | minimum required input | measured share |
+  |---|---|---:|
+  | Sleep | bed + wake time | 35% |
+  | Readiness | check-in + sleep + prior activity | 35% |
+  | Activity | steps + logged workouts | 63% |
+  | Workouts | logged sets/reps/load | 100% |
+  | Body | body weight | ~100% |
+  | Nutrition | food log | 100% |
+  | **Cardio** | **a heart-rate source — no substitute** | **0%** |
+
+  **Six inputs carry the whole app: bed/wake times, steps, body weight, logged workouts, logged food,
+  daily check-in** — all from a phone and a person. **⚠ Cardio is the single exception and should be
+  HIDDEN rather than scored at zero for a user with no HR source:** it has no manual floor and nothing
+  to infer from. Owner, 2026-09-15: *"the app works fine with less sources but is more
   accurate and tuned with more sources."* **⚑ That is NOT what the code does.** `sleep-score.ts:399`
   renormalises the weighted mean over whichever contributors are present, and readiness passes a
   neutral 50 — so **connecting a ring changes the denominator and moves the score for a reason
@@ -701,7 +987,20 @@ pillars degrade for a Health-Connect-only user" from the guide rather than by gr
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-14 · owner: *"workouts are constantly being recommended for deload… I'm sure it's just bad tuning."*
 - **Lane: A** — `packages/shared/src/ai-periodization/ai-dynamic.ts:182-236`.
-- **Gate: owner** — step 1 changes what the app tells the owner to do with their training. Steps 2 and 3 are not gated.
+- **✅ OWNER DECISION, 2026-09-15 — gate lifted, and the ORDER IS REVERSED.** Unwire the stress
+  override (TN-34) **first and alone**, then the structural fix as an ungated follow-up. *"Happy to
+  go with your recommendation, whatever will lead us to our future-proof answer."*
+- **⚠ The measurement that reversed it, run 2026-09-15 over the 22 days to date:** simulating each
+  fix against real readiness/stress/streak values, **today 11 of 15 September days recommend a
+  deload; unwiring the stress override alone takes that to 1 of 15; adding the readiness-clears rule
+  on top changes nothing further.** The owner's streak reaches 3 exactly once in 22 days, so the
+  streak brake was already clearing almost every day and **the stress override is doing essentially
+  all of the over-recommending.** Step 1 remains a real structural defect — readiness 100 still
+  returns `recommended: true` — but it is **not** what the owner is feeling, and it only starts
+  mattering once readiness runs higher than it does now. Sequencing them separately is what makes
+  the re-measure readable.
+- **Reference:** [`metric inventory`](reviews/2026-09-15-every-metric-and-the-core-line.md) is a
+  sibling of this entry only in that both came out of the same session; no dependency.
 - **Sibling of TN-34**, which covers the stress override alone. **This entry is the cause; TN-34 is what made it visible.**
 - **Reference:** [`review`](reviews/2026-09-14-what-triggers-a-deload.md).
 
@@ -744,12 +1043,16 @@ buckets, r = +0.072 with readiness over 18 days.
 **The readiness ladder is the smaller half but is also mistuned:** it fired on
 **65, 73, 69, 66, 52, 33, 50, 38**. A readiness of **73** produced a deload recommendation.
 
-**Fix in this order:**
-1. **Give readiness a way to CLEAR a day** — `r >= 70` returns `{ recommended: false }` instead of
-   "soft". One line, and it is the cause. **`Gate: owner`.**
-2. **Unwire the stress override** — TN-34, one line, reversible, and it is what changed on 09-01.
-3. **Re-measure before touching the bands.** With 1 and 2 done the rate falls to the ladder's own
-   contribution — **19% in August** — which may need no tuning at all.
+**Fix in this order (revised 2026-09-15 by measurement — the old order had these swapped):**
+1. **Unwire the stress override** — TN-34, one line, reversible, and it is what changed on 09-01.
+   **On the last 22 days this alone takes September from 11 deloads in 15 days to 1.** Ship it
+   alone so the re-measure below has one variable.
+2. **Re-measure.** The remaining recommendation on 2026-09-15 is legitimate — three training days
+   behind it and readiness 40 — which is the engine working.
+3. **Give readiness a way to CLEAR a day** — `r >= 70` returns `{ recommended: false }` instead of
+   "soft". Still the structural defect, and still worth fixing: it changes **nothing** on the
+   current 22 days because readiness only clears 70 on three of them, so it is a cleanup rather
+   than the cure it was filed as.
 
 **⛔ Do not raise the 120-minute threshold and do not raise the streak from 3.** Both are the
 "threshold is right, the input is wrong" mistake, which this pillar has now made five times — the
@@ -918,6 +1221,18 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
 - **Why this one, and why now:** it's the one item in §13's "Oura-only, no fallback" list where the
   raw ingredient (beat-to-beat intervals) is *already streaming into the app* from a second device
   (the Polar strap) — unlike temperature or MET, which have no existing raw-signal supplier at all.
+- **⚠ CORRECTION, measured 2026-09-15 (TN-39's audit): the ingredient streams, but NOT AT NIGHT, so
+  this entry cannot be validated on current data.** `rr_intervals` holds 136,440 beats over 48 days,
+  and the wear pattern is **07:00–13:00, peaking at 08:00, with ZERO beats between 22:00 and 05:00**
+  — **242 beats across 6 nights in total.** The architectural claim below stands: any future device
+  exposing beat intervals could feed nightly HRV identically, which is the portability argument.
+  What does not stand is the implied validation path — you cannot check `rmssdFromRr(strap)` against
+  the ring's nightly figure without nights to check on. **Two ways forward, and the owner picks:**
+  wear the strap to bed for a validation window, or ship on the workout-window agreement alone and
+  say so in the entry. **This also retracts a statement made to the owner in session on 2026-09-15**
+  that nightly HRV could come from the strap today with a pipeline change only — the pipeline change
+  is real, the nightly data is not there. **Do not re-derive this from the row count; 136,440 beats
+  looks like plenty until you group them by hour.**
   Wiring this up costs a pipeline change, not a new integration.
 - **What this buys:** any future device exposing raw beat intervals (a near-universal HR-hardware
   capability) could feed nightly HRV/chronic-stress/resilience identically to the ring, closing part
@@ -2213,14 +2528,14 @@ owner's names are mostly a relabelling:
 **And "decided scientifically based on my week/day" is `recommendRunType(quota)`, which already
 exists and is already deterministic** — it picks whichever type fills the week's biggest open zone
 gap. **So the work is: expose the existing types under names the owner recognises, route the walking
-interval protocol to `tempo`, and surface the selector.** A sixth bespoke type for the 3-on/3-off
-protocol is deferred — `tempo` covers the intensity and a new type is only worth it once these are
+interval protocol to `tempo`, and surface the selector.** **✅ OWNER DECISION, 2026-09-15 — reuse
+`tempo`.** A sixth bespoke type for the 3-on/3-off protocol is deferred — `tempo` covers the intensity and a new type is only worth it once these are
 run regularly.
 
 **⚠ `interval` targets zones 4–5 (153–164 bpm at the pinned 178 anchor) and the walking protocol's
-fast phase is ~70% of peak — nearer `tempo`.** Neither is an exact fit, so the owner's decision is: reuse
-`tempo`, or add a sixth run type for the 3-on/3-off walking-derived protocol. **Do not silently map it
-to `interval`** — that prescribes a materially harder session than the research it comes from.
+fast phase is ~70% of peak — nearer `tempo`.** Neither is an exact fit; **the owner chose `tempo`
+(2026-09-15)**, on the reasoning that a new type is only worth its band once the protocol is run
+regularly enough to tune it. **Do not silently map it to `interval`** — that prescribes a materially harder session than the research it comes from.
 
 **Reference point from the owner's own data:** a 9.2-minute run on 2026-07-24 averaged **145 bpm**,
 which is Zone 2 under the current 187 anchor and Zone 3 under 168 — **so which run type this maps to
