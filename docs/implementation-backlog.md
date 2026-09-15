@@ -10832,6 +10832,30 @@ record explicitly why not.
      belongs with TN-3b, which is the thing that needs a consistent read across days.
   3. **TN-3b is still blocked on a back-fill existing**, not merely on the table existing.
 
+### [readiness][platform] LB-110 — `/api/body-battery` takes no date, so TN-3b's past-day half waits on an entry that does not exist
+
+- **Lane:** A — `app/api/body-battery/route.ts`. Filed by Lane B (found while scanning the queue,
+  2026-09-15); the letter records who found it, not who ships it.
+- **This is an ORPHANED DEPENDENCY, which is why it is worth an entry of its own.** TN-3b's `Keep:`
+  says its past-day half is *"blocked on `LB-102` (Lane A)"*. **`LB-102` is not in the backlog** —
+  `grep '^### .*LB-102'` returns nothing, and the only mention in the whole file is TN-3b's own line
+  pointing at it. So the work TN-3b waits on is tracked nowhere and nobody will ever pick it up.
+- **The blocker itself is real, and was verified in source rather than taken from the entry:**
+  `app/api/body-battery/route.ts:94` is `export async function GET()` — **no parameters**. Only today
+  is reachable.
+- **Everything downstream of it is already built.** The buckets are persisted (TN-3a,
+  `oura_daytime_stress_buckets`, 478 buckets over 18 days as of 2026-09-10), and `stress-day-chart.tsx`
+  takes a plain `buckets` array, so the surface accepts any day it is handed. **What is missing is
+  only the read.**
+- **It blocks two named pieces of TN-3b:** the past-day chart (*"the owner opens a past day, reads a
+  stressed window off the axis"* — TN-33's level-2 test, and the first test in that ladder that can
+  actually fail), and the stress-by-hour aggregate across days.
+- **Scope:** accept a `date` param, normalise it through `normalizeDateParam` per the repo's
+  date-param rule, default to `todayInTz(session.user.timezone)`, and keep the existing rate limit.
+  The response shape does not change.
+- **Not started, and not Lane B's to start.** Filed so the dependency is tracked; TN-3b's `Keep:` now
+  points here instead of at a missing entry.
+
 ### [readiness] TN-3b — surface stress by hour, and on the HR charts
 - **Lane:** B — surface only: components/body-battery.
 - **✅ THE TODAY CHART SHIPPED 2026-09-13** (`feat/tn-3b-stress-by-hour`).
@@ -10842,7 +10866,9 @@ record explicitly why not.
   one-dropped-reading tolerance, coverage excluding gaps); `e2e/stress-by-hour.spec.ts` proves it
   draws as **two** polylines rather than one joined line.
   [Journal](overview/entries/2026-09-13-tn-3b-stress-by-hour.md).
-- **Keep: the PAST-DAY half, which is blocked on `LB-102` (Lane A).** The pass test — *"the owner
+- **Keep: the PAST-DAY half, which is blocked on `LB-110` (Lane A) — re-pointed 2026-09-15.** It
+  said `LB-102`, and **that entry does not exist anywhere in this file**, so the dependency was
+  untracked; `LB-110` is the same work, filed. The pass test — *"the owner
   opens a past day, reads a stressed window off the axis"* — cannot be met yet: `/api/body-battery`
   is `export async function GET()` with **no parameters**, so only today is reachable. The buckets are
   persisted (TN-3a, `oura_daytime_stress_buckets`, from 2026-08-24), and the chart takes a plain

@@ -100,6 +100,20 @@ Instead, a local Postgres 16 instance is set up automatically:
     settles it. What the run costs is ~4.5 minutes, which is the whole price of not guessing.
   - **The run log cannot settle it, and this is the trap worth knowing.** The natural move is to grep the failing log for whatever logged last — e.g. `[pg pool] idle client error`, the one console writer that fires asynchronously outside any test's control. Its absence proves nothing: **the pending `onUserConsoleLog` IS the log that never got delivered**, so the message you are looking for is the one the failure destroys. Absence is guaranteed under every hypothesis. File-based tracing (append in a `console.*` wrapper, never through the RPC) is the only way to see it — that harness worked, it simply had nothing to catch.
   **Do not "fix" this by quieting console output or by setting `dangerouslyIgnoreUnhandledErrors`** — the first treats the symptom that is legible rather than the one that is broken, and the second hides real unhandled rejections too. `disableConsoleIntercept: true` would make `onUserConsoleLog` structurally impossible, and is the one candidate worth considering *if this ever becomes frequent* — it costs per-file log attribution for everyone, which is too high a price for a fault nobody can currently reproduce.
+  - **Seventh, same day: `lib/__tests__/user-account-routes.test.ts`** — a FOURTH distinct file.
+    Re-run clean, seven for seven.
+  - **⚠ EIGHTH, same day, and it names `hr-read-routes.test.ts` AGAIN — which the amendment above
+    said would matter, so it is recorded rather than folded into the tally.** That file has now been
+    named in **5 of 8** sightings while three others account for one each. The 2026-09-11 amendment
+    retracted the single-file theory on the strength of one miss; eight observations say something
+    weaker but not nothing — the file is over-represented, and the fire-and-forget
+    `upsertWorkoutHrStats` shape (`void repo.upsertWorkoutHrStats(…).catch(…)`, a promise no test
+    awaits, whose `.catch` calls `reportServerError`) is back to being the best available lead rather
+    than a discarded one. **It is still not a cause**, and nothing here changes what to do: the
+    re-run was clean, eight for eight. What changes is where to point a file-based trace first, if
+    anyone ever does. Do not re-retract the amendment either — the fifth, sixth and seventh sightings
+    named other files and are equally real; the honest summary is *mostly one file, but not only*.
+
 - **Killing a suite mid-run damages the NEXT run and, worse, the working tree — measured 2026-09-10 (LA-101).** Two distinct kinds of residue survive a `pkill`, and neither announces itself:
   1. **Fixture rows.** DB tests clean up in `afterEach`/`afterAll`, which a killed run never reaches. `program-session-tombstone.test.ts` left its `LB-66 Program` row behind, and the next full run failed with `UserFacingError: A program named "LB-66 Program" already exists` — an error that reads like a bug in the program-name guard and is really a corpse from the run you killed. It then **self-heals**, because that run's own `afterEach` clears the row, so it fails exactly once and looks like a flake.
   2. **Real source files.** `scripts/__tests__/check-comment-blindness.test.ts` injects fixtures into actual components (`components/workout/set-card.tsx`, `app/api/user/goals/route.ts`) and restores them in a `finally` the kill skips. The next run then reads the *polluted* file as its baseline and faithfully restores to that, so the injection is permanent and no later run will clean it. A `// <svg><polyline .../>` comment sat in `set-card.tsx` across eight clean full runs this way, one `git add -A` from being committed.
