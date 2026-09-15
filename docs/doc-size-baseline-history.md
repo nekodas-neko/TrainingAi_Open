@@ -12375,9 +12375,21 @@ What survives at length in both is the thing that is *not* fixed — the number 
 `—`-versus-badge question is the owner's. An entry that reads as closed when two of its three parts
 are still owed is how a KEEP turns into a dropped finding.
 
+<<<<<<< HEAD
 ## 2026-09-15 — `docs/implementation-backlog.md` (BF-166)
 
 Thirty-eight lines. The report names one screen and the defect is all 52 Sheet/Dialog files, so the
 entry has to establish that before an implementer patches the meal builder alone. The ordering
 paragraph earns its length too: the overlay check must sit AFTER the three mode guards, or a confirm
 dialog raised by one of them gets dismissed by the very back press meant to answer it.
+=======
+## 2026-09-15 — `projectOverview.md` → 11329, `docs/implementation-backlog.md` → 21429 (OR-116)
+
++22 and +25 for two label strings, and the ratio is defensible for once: the diff is small because
+**nothing was computing the wrong number**, and that is precisely the fact a reader will not believe
+without the figures in front of them. An entry that just says "labelled the HR chip" invites the next
+session to go looking for the arithmetic bug that is not there.
+
+The other weight is the two things NOT fixed — `hrMin` standing in for the resting rate, and the
+three-surfaces context question. Both would read as closed if the entry were shorter.
+>>>>>>> origin/main

@@ -101,16 +101,25 @@ export default function HeartRateDetailPage() {
             <button type="button" onClick={loadReadiness} className="text-xs font-medium text-brand">Retry</button>
           </div>
         )}
-        <div className="grid grid-cols-2 gap-3">
-          {stats.map(s => (
-            <div key={s.label} className="rounded-xl border border-border bg-muted/20 p-4 text-center">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{s.label}</p>
-              <p className="text-xl font-bold tabular-nums mt-1">
-                {s.value != null ? s.value : "—"}
-                {s.value != null && <span className="text-xs font-normal text-muted-foreground ml-1">{s.unit}</span>}
-              </p>
-            </div>
-          ))}
+        {/* **OR-116 — say which window these four cover.** They are TODAY's intraday series, while
+            Home's chip carries last night's RESTING rate. Both were labelled "heart rate" and
+            nothing distinguished them, so the owner compared 60 against 73/50/89/125 and concluded
+            one was broken. Neither was: they are different metrics sharing a name. */}
+        {/* The caption is inside this wrapper, not a sibling of the grid: the page stack is
+            `space-y-5`, which would set a 20px gap between a label and the thing it labels. */}
+        <div className="space-y-2">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Today so far</p>
+          <div className="grid grid-cols-2 gap-3">
+            {stats.map(s => (
+              <div key={s.label} className="rounded-xl border border-border bg-muted/20 p-4 text-center">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{s.label}</p>
+                <p className="text-xl font-bold tabular-nums mt-1">
+                  {s.value != null ? s.value : "—"}
+                  {s.value != null && <span className="text-xs font-normal text-muted-foreground ml-1">{s.unit}</span>}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
 
         <ObservedHrCard />

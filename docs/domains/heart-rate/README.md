@@ -98,6 +98,17 @@ Live at the time of writing (2026-08-05):
 
 ## History
 
+- [`2026-09-15-or116-resting-vs-intraday-hr`](../../overview/entries/2026-09-15-or116-resting-vs-intraday-hr.md)
+  — **OR-116 (2026-09-15): one metric name over two metrics.** Home's chip carries last night's
+  **resting** rate; `/health/heart-rate` shows today's **intraday** current/min/average/max. Both
+  were called "Heart Rate", so the owner compared 60 against 73/50/89/125 and reasonably concluded
+  one was broken. **Nothing was miscomputed.** Home now says "Resting HR" — **conditionally**, because
+  the value's third fallback (`hrCurrent`) is a live BLE sample and not a resting rate at all — and
+  the detail stats are captioned "Today so far". **Two things stay open:** the detail page feeds
+  `hrMin` into `HrFactorsCard` as `restingHr` (intraday minimum standing in for the resting rate, 50
+  against 60 on the owner's own figures — establish whether that is a deliberate proxy before
+  changing it), and the three-surfaces-one-number context question the entry was filed on.
+
 - Handoffs: `ls docs/handoff-*-heart-rate-*.md`
 - Journal: `grep -rl 'live.HR\|HRV\|hr-zone' docs/overview/entries/`
 
