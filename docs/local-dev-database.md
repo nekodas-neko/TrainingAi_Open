@@ -89,6 +89,13 @@ Instead, a local Postgres 16 instance is set up automatically:
   `upsertWorkoutHrStats` theory is still a plausible *shape* (a promise settling past teardown) but
   it is now one candidate among many files, not a lead. Do not delete the amendment — the four
   sightings it records are real, and a future sixth that names that file again would matter.
+  - **Sixth sighting, 2026-09-15 (BF-5's gate): `lib/__tests__/ingest-routes-fail-closed.test.ts`** —
+    a THIRD distinct file, and not the one the amendment said would matter. 919 files passed, 8,717
+    tests passed, zero failed, one unhandled error; the immediate re-run on identical code was clean,
+    **six for six**. So the spread across files is now the signature, and any theory tied to one
+    suite's fire-and-forget write is weaker again rather than stronger. The operational rule is
+    unchanged and is all you need: a red run reporting **zero** failing tests is this, and a re-run
+    settles it. What the run costs is ~4.5 minutes, which is the whole price of not guessing.
   - **The run log cannot settle it, and this is the trap worth knowing.** The natural move is to grep the failing log for whatever logged last — e.g. `[pg pool] idle client error`, the one console writer that fires asynchronously outside any test's control. Its absence proves nothing: **the pending `onUserConsoleLog` IS the log that never got delivered**, so the message you are looking for is the one the failure destroys. Absence is guaranteed under every hypothesis. File-based tracing (append in a `console.*` wrapper, never through the RPC) is the only way to see it — that harness worked, it simply had nothing to catch.
   **Do not "fix" this by quieting console output or by setting `dangerouslyIgnoreUnhandledErrors`** — the first treats the symptom that is legible rather than the one that is broken, and the second hides real unhandled rejections too. `disableConsoleIntercept: true` would make `onUserConsoleLog` structurally impossible, and is the one candidate worth considering *if this ever becomes frequent* — it costs per-file log attribution for everyone, which is too high a price for a fault nobody can currently reproduce.
 - **Killing a suite mid-run damages the NEXT run and, worse, the working tree — measured 2026-09-10 (LA-101).** Two distinct kinds of residue survive a `pkill`, and neither announces itself:
