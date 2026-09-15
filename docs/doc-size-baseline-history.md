@@ -12221,3 +12221,16 @@ What earns the lines is the measurement: a `history.state` dump showing the entr
 while carrying Next's route tree for `/`. That is three numbers in a table and it converts the
 entry from a symptom into a mechanism — and it is what lets LA-109 say BF-49 is probably the same
 defect, which is worth more than either entry alone.
+
+## 2026-09-15 — PS-41 gated on the owner (backlog +33)
+
+The entry described a degraded-mode feature for users without a ring. Reading the merge path and
+measuring production found it is a change to the **owner's own** Activity Score: there is no
+precedence ladder to add a slot to (`getHrForWindow` applies one rule, `preferStrapBuckets`, and
+passes everything else through unranked), and he is a Health Connect user whose HR coverage is
+already 31 of 31 days at ~2,240 rows a day. Sparse phone samples interleaved into that series feed
+22% of the Activity Score's weight.
+
+Worth every line because the entry reads as safe. An implementer who trusted it would have shipped a
+scoring change without knowing it was one — which is the exact thing CLAUDE.md's "Tuning proposes,
+the owner signs off" rule exists to stop.

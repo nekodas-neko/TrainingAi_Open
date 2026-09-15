@@ -579,6 +579,39 @@ which is why this reads as "back went to the home page".
   small, scoped to one pillar, and directly closes part of the degraded-mode gap the
   device-agnostic-source goal names as still open.
 
+- **Gate:** owner
+- **⚠ ADDED 2026-09-15 by Lane A, from reading the merge path and measuring production. Two of this
+  entry's premises do not hold, and together they make this a change to the OWNER'S OWN Activity
+  Score rather than a degraded-mode feature for someone else.**
+
+  **1. There is no precedence ladder to add a slot to.** The entry says `health_connect` "just needs
+  a precedence slot alongside `ble`/`chest_strap`". `getHrForWindow` (`slices/oura.ts:801`) applies
+  exactly one rule — `preferStrapBuckets` — which elevates `chest_strap` within its bucket and
+  passes **everything else through unranked**. A `health_connect` row would rank equal to a ring
+  row and both would be returned, interleaved, with nothing to separate them.
+
+  **2. The owner is a Health Connect user, so this writes into his table too.** Measured on
+  production 2026-09-15: `body_metrics.source_map` carries `health_connect` for steps, weight and
+  body fat, most recently **2026-08-01**. And his HR coverage is already complete —
+  **31 of the last 31 days**, **67,292 rows** (~2,240/day) from `chest_strap` (92,055 lifetime) and
+  `ble` (20,254). `oura_heartrate` already holds six concurrent sources for him, four of them dead
+  Oura Cloud tiers frozen at the 2026-07-06 re-key.
+
+  So for the owner, Health Connect HR adds no coverage and can only perturb: sparse phone-derived
+  samples interleaved into a continuous ring series, feeding `computeActivityScore`'s `zoneMinutes`
+  (10%) and `moveHours` (12%) — **22% of the formula**. CLAUDE.md is explicit that a scoring change
+  is the owner's call and that a bad calibration is hard to notice from inside.
+
+  **Recommendation when it is answered: write the HC series only when the user has no better HR
+  source for that window.** It closes the degraded-mode gap exactly as the entry intends, leaves a
+  ring user's score untouched, and needs no precedence rung at all — the gate does the work the
+  ladder was supposed to do. The alternative (write always, add a real rung to `preferStrapBuckets`)
+  is more code, moves the owner's score, and cannot be adopted without measuring how many of his
+  days it moves — which is the standing bar for any tuning proposal.
+
+  **Do not start the implementation until this is answered**: the two shapes differ at the write
+  site, so building one is not a step toward the other.
+
 ### [devices][readiness] PS-42 — wire illness radar into the generic (non-Oura) readiness path
 
 - **Lane:** A — `lib/health/readiness-payload.ts`.
