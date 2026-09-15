@@ -12253,3 +12253,12 @@ already 31 of 31 days at ~2,240 rows a day. Sparse phone samples interleaved int
 Worth every line because the entry reads as safe. An implementer who trusted it would have shipped a
 scoring change without knowing it was one — which is the exact thing CLAUDE.md's "Tuning proposes,
 the owner signs off" rule exists to stop.
+
+## 2026-09-15 — BF-7 planned (backlog +10)
+
+A ten-line net change that replaces a question with its answer. The entry asked whether
+`DurationPreset` should stay an enum or become a number and said seven call sites depend on it —
+framing it as a typing decision. It is not one: `short` and `long` select different algorithms, and
+`standard` must never expand because that under-fill is the finish-early margin. Those lines are the
+reason the number is safe rather than a rewrite, and an implementer who read only the old wording
+would have converted the type and quietly lost the margin.
