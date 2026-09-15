@@ -9489,26 +9489,43 @@ Computed as the 10th percentile of BLE HR samples 08:00–21:00 Brisbane it move
 night — 2.5× the nightly resting HR — which makes it the better **stress** candidate the owner
 intuited, but nothing in the app computes it and it does not belong on a tile labelled "Heart Rate".
 
-### [heart-rate][app-shell] OR-116 — Home and the Heart Rate screen show one metric as four numbers that agree with nothing
+### [heart-rate][app-shell] OR-116 — one metric name over two metrics (labels fixed; the third surface's CONTEXT is still open)
 
-- **Lane:** B — `components/oura-score-chip-row.tsx`, `components/health/body-cards/rhr-hrv-spo2-card.tsx`
-  and the `/health/heart-rate` detail. Reached only from `components/**`; no storage, no derivation change.
+- **Lane:** B — `components/oura-score-chip-row.tsx` and `app/health/heart-rate/page.tsx`. Reached
+  only from `components/**` / `app/**`; no storage, no derivation change. Shipped 2026-09-15.
 - **Added:** 2026-09-15 · owner, while checking TN-13: *"I dont see any other values that match that
   home screen HR value — current = 73, min = 50, average = 89, max = 125, and the HR card says 60."*
-- **Nothing is computing the wrong number.** Verified against production: Home's **60** is
-  `body_metrics.resting_heart_rate` for today — last night's **resting** rate. The detail screen's
-  73 / 50 / 89 / 125 are **intraday** current/min/average/max. Both are right. **The defect is that
-  no label says they are different things**, so a user comparing them concludes one is broken.
-- **This is the shape to fix, not the arithmetic:** one metric name — "heart rate" — covering a
-  nightly resting figure and a live intraday series, on two screens, with no qualifier on either.
-  Naming Home's chip for what it is (last night's resting rate) is probably most of the fix.
-- **⚠ There is a THIRD presentation of the same signal**, which is what makes this worth an entry
-  rather than a one-line rename: Health's own Resting HR tile shows the identical value as a bare
-  number with no comparison, while Home's shows it with a delta against baseline (when it renders at
-  all — see TN-13). **Three surfaces, one number, three different amounts of context.** Decide what
-  each surface is for before touching any of them.
+- **Nothing was computing the wrong number**, verified against production: Home's 60 is
+  `body_metrics.resting_heart_rate` — last night's **resting** rate; the 73/50/89/125 are **intraday**
+  current/min/average/max. Both correct, neither labelled, so the pair read as one metric disagreeing
+  with itself.
+- **Shipped: each surface now names its own metric.** Home's chip reads **"Resting HR"** (short
+  "Rest HR"), and the detail screen's four stats are captioned **"Today so far"**.
+- **⚠ The Home label follows the SOURCE, and this is the part not to simplify later.** The value is
+  `restingHrLastNight ?? restingHr ?? hrCurrent`, and the **third fallback is a different metric** —
+  `hrCurrent` is a live BLE sample, a desk reading rather than a night. So the label is conditional:
+  "Resting HR" when either resting source supplied it, "Heart Rate" when it fell through to
+  `hrCurrent`. Making it unconditional would move the false claim rather than remove it.
+- **Wording matches Health's existing tile** (`rhr-hrv-spo2-card.tsx` already renders "Resting HR" at
+  the same 9px uppercase treatment) rather than inventing a third vocabulary for one signal.
+- **Proven load-bearing, and the layout is MEASURED not eyeballed.**
+  `e2e/or116-resting-vs-intraday-hr.spec.ts` asserts both surfaces and both fail against `main`.
+  "Rest HR" is the longest short label in a four-cell row, so the spec also checks with
+  `getBoundingClientRect()` that no child exceeds its cell and the page does not scroll sideways at
+  phone width — a label that wraps would be a new defect traded for the old one.
+- **⚠ A FOURTH presentation found while reading, and it may be a real defect rather than a labelling
+  one.** `app/health/heart-rate/page.tsx` passes `restingHr={data?.hrMin ?? null}` into
+  `HrFactorsCard` — today's **intraday minimum** standing in for the resting rate. Those are not the
+  same number (the owner's own figures: min 50, resting 60). Not touched here because it changes what
+  a card computes from rather than what it is called, and the entry's scope is the name. **Someone
+  should establish whether `hrMin` is a deliberate proxy or an oversight before it is "fixed".**
+- **Keep:** ① the third-surface question the entry was filed on, which is **not** answered by
+  labelling: Health's Resting HR tile shows the value bare, Home's shows it with a delta against
+  baseline, and the detail screen shows neither. Three surfaces, one number, three amounts of
+  context — **decide what each surface is for**. Labelling stopped the numbers reading as broken; it
+  did not decide that. ② the `hrMin`-as-resting question above. ③ the device check.
 - **Do not fold this into TN-13.** That entry is about a cue that does not render; this is about what
-  the number is called. They meet on one screen and have different fixes.
+  the number is called.
 
 ### [activity] TN-17 — Activity as a pace-to-goal score: the mechanic works, the goals make it punishing
 - **Lane:** A — engine only: packages/shared.

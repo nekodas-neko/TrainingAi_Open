@@ -3100,6 +3100,38 @@ fault channel every session is told to read first.
 [`Review sweep 43 §4`](docs/reviews/2026-09-03-ownership-rule-a-and-body-supplied-ids.md).
 **Web build, local database.**
 
+### [heart-rate][app-shell] ⚠️ One metric name covered two heart rates; labelled, but the third surface's context is still undecided (OR-116, 2026-09-15)
+
+**Labels shipped in v1.456.18. Two things remain open and one of them may be a real defect.**
+
+Owner: *"I dont see any other values that match that home screen HR value — current = 73, min = 50,
+average = 89, max = 125, and the HR card says 60."* **Every number was right.** Home's 60 is last
+night's **resting** rate; the 73/50/89/125 are today's **intraday** series. Both screens said "Heart
+Rate", so the pair read as one metric disagreeing with itself.
+
+Home's chip now reads **"Resting HR"** and the detail screen's stats are captioned **"Today so far"**.
+**The Home label follows its source**, which is the part not to simplify later: the value is
+`restingHrLastNight ?? restingHr ?? hrCurrent`, and that last fallback is a live BLE sample — a desk
+reading, not a night — so an unconditional "Resting HR" would move the false claim rather than remove
+it. Wording matches Health's existing tile rather than inventing a third vocabulary.
+
+The e2e fails on both surfaces against the unfixed code, and **measures the layout** with
+`getBoundingClientRect()` — "Rest HR" is the longest short label in a four-cell row, and a wrapped
+label would be a new defect traded for the old one.
+
+**⚑ A FOURTH presentation, found while reading and NOT fixed:** the detail page passes
+`restingHr={data?.hrMin ?? null}` into `HrFactorsCard` — today's intraday **minimum** standing in for
+the resting rate (the owner's own figures: 50 against 60). Whether that is a deliberate proxy or an
+oversight has to be established before it is "fixed", so it is recorded rather than changed.
+
+**⚑ Still undecided, and the reason the entry was filed:** Health's tile shows this value bare,
+Home's with a delta against baseline, the detail screen with neither. Three surfaces, one number,
+three amounts of context. Labelling stopped them reading as broken; it did not decide what each
+surface is for.
+
+**NOT verified on device** — and this change wants it: the short label only renders in the band ring
+style, so the owner's chosen style decides whether "Rest HR" appears at all.
+
 ### [readiness][app-shell] 🟡 Body Battery prints 50 and calls it "Good" for an account with no data (RV-38, 2026-09-03)
 
 The route is honest and the card ignores it. For the zero-data account `GET /api/body-battery`

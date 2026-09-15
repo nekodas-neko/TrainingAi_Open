@@ -12365,3 +12365,13 @@ What the lines buy is that the chip was **correct** and still had to change. An 
 claims from one input and only one of them was supported. Someone re-reading this in a month with
 `zone.reps` sitting unused needs to find out why it was left rather than deleted, or they will
 delete it and foreclose the Lane A answer that needs it.
+
+## 2026-09-15 — `projectOverview.md` → 11319, `docs/implementation-backlog.md` → 21437 (OR-116)
+
++22 and +25 for two label strings, and the ratio is defensible for once: the diff is small because
+**nothing was computing the wrong number**, and that is precisely the fact a reader will not believe
+without the figures in front of them. An entry that just says "labelled the HR chip" invites the next
+session to go looking for the arithmetic bug that is not there.
+
+The other weight is the two things NOT fixed — `hrMin` standing in for the resting rate, and the
+three-surfaces context question. Both would read as closed if the entry were shorter.
