@@ -609,12 +609,21 @@ resolution; derived rows have one writer.**
 **Four steps, in order — A first because it is cheapest and everything later is checked against it:**
 - **A. Name the three mechanisms in the guide**, and amend **§5.4**, whose invariant TN-37 measured
   as false. Docs-only.
+- **✅ OWNER DECISION, 2026-09-15 on task B's validation** — build it now, validate when a friend
+  onboards, with the untested-path gap stated rather than blocking. There is no Health-Connect-only
+  account to test against and the owner will not create one.
 - **B. Close the two filed gaps** — **PS-41** (Health Connect's `HeartRateSeries` is read, used
   inline, then discarded instead of normalised) and **PS-42** (the illness radar gated on an
   `oura_daily_summary` row rather than on its inputs). **PS-41 unlocks 22% of Activity Score for a
   non-ring user.**
-- **C. Split every score into a CORE and ADJUSTMENTS** — **`Gate: owner`**, and the one genuine
-  design decision here. Owner, 2026-09-15: *"the app works fine with less sources but is more
+- **C. Split every score into a CORE and ADJUSTMENTS** — **`Gate: owner`** (the line itself; the
+  inventory it needs is now written), and the one genuine design decision here. **The full metric
+  inventory and three candidate lines are in
+  [`reviews/2026-09-15-every-metric-and-the-core-line.md`](reviews/2026-09-15-every-metric-and-the-core-line.md)**,
+  measured against production. **Its finding, which should decide it: the line barely matters for
+  Activity (63% → 100% core on a basic wearable), matters some for Readiness (35% → 66%), and is the
+  whole question for Sleep (35% → 55% → 87%), because 48 of sleep's 110 points sit in HRV, stages and
+  restfulness.** Owner, 2026-09-15: *"the app works fine with less sources but is more
   accurate and tuned with more sources."* **⚑ That is NOT what the code does.** `sleep-score.ts:399`
   renormalises the weighted mean over whichever contributors are present, and readiness passes a
   neutral 50 — so **connecting a ring changes the denominator and moves the score for a reason
@@ -701,7 +710,20 @@ pillars degrade for a Health-Connect-only user" from the guide rather than by gr
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-14 · owner: *"workouts are constantly being recommended for deload… I'm sure it's just bad tuning."*
 - **Lane: A** — `packages/shared/src/ai-periodization/ai-dynamic.ts:182-236`.
-- **Gate: owner** — step 1 changes what the app tells the owner to do with their training. Steps 2 and 3 are not gated.
+- **✅ OWNER DECISION, 2026-09-15 — gate lifted, and the ORDER IS REVERSED.** Unwire the stress
+  override (TN-34) **first and alone**, then the structural fix as an ungated follow-up. *"Happy to
+  go with your recommendation, whatever will lead us to our future-proof answer."*
+- **⚠ The measurement that reversed it, run 2026-09-15 over the 22 days to date:** simulating each
+  fix against real readiness/stress/streak values, **today 11 of 15 September days recommend a
+  deload; unwiring the stress override alone takes that to 1 of 15; adding the readiness-clears rule
+  on top changes nothing further.** The owner's streak reaches 3 exactly once in 22 days, so the
+  streak brake was already clearing almost every day and **the stress override is doing essentially
+  all of the over-recommending.** Step 1 remains a real structural defect — readiness 100 still
+  returns `recommended: true` — but it is **not** what the owner is feeling, and it only starts
+  mattering once readiness runs higher than it does now. Sequencing them separately is what makes
+  the re-measure readable.
+- **Reference:** [`metric inventory`](reviews/2026-09-15-every-metric-and-the-core-line.md) is a
+  sibling of this entry only in that both came out of the same session; no dependency.
 - **Sibling of TN-34**, which covers the stress override alone. **This entry is the cause; TN-34 is what made it visible.**
 - **Reference:** [`review`](reviews/2026-09-14-what-triggers-a-deload.md).
 
@@ -744,12 +766,16 @@ buckets, r = +0.072 with readiness over 18 days.
 **The readiness ladder is the smaller half but is also mistuned:** it fired on
 **65, 73, 69, 66, 52, 33, 50, 38**. A readiness of **73** produced a deload recommendation.
 
-**Fix in this order:**
-1. **Give readiness a way to CLEAR a day** — `r >= 70` returns `{ recommended: false }` instead of
-   "soft". One line, and it is the cause. **`Gate: owner`.**
-2. **Unwire the stress override** — TN-34, one line, reversible, and it is what changed on 09-01.
-3. **Re-measure before touching the bands.** With 1 and 2 done the rate falls to the ladder's own
-   contribution — **19% in August** — which may need no tuning at all.
+**Fix in this order (revised 2026-09-15 by measurement — the old order had these swapped):**
+1. **Unwire the stress override** — TN-34, one line, reversible, and it is what changed on 09-01.
+   **On the last 22 days this alone takes September from 11 deloads in 15 days to 1.** Ship it
+   alone so the re-measure below has one variable.
+2. **Re-measure.** The remaining recommendation on 2026-09-15 is legitimate — three training days
+   behind it and readiness 40 — which is the engine working.
+3. **Give readiness a way to CLEAR a day** — `r >= 70` returns `{ recommended: false }` instead of
+   "soft". Still the structural defect, and still worth fixing: it changes **nothing** on the
+   current 22 days because readiness only clears 70 on three of them, so it is a cleanup rather
+   than the cure it was filed as.
 
 **⛔ Do not raise the 120-minute threshold and do not raise the streak from 3.** Both are the
 "threshold is right, the input is wrong" mistake, which this pillar has now made five times — the
@@ -2213,14 +2239,14 @@ owner's names are mostly a relabelling:
 **And "decided scientifically based on my week/day" is `recommendRunType(quota)`, which already
 exists and is already deterministic** — it picks whichever type fills the week's biggest open zone
 gap. **So the work is: expose the existing types under names the owner recognises, route the walking
-interval protocol to `tempo`, and surface the selector.** A sixth bespoke type for the 3-on/3-off
-protocol is deferred — `tempo` covers the intensity and a new type is only worth it once these are
+interval protocol to `tempo`, and surface the selector.** **✅ OWNER DECISION, 2026-09-15 — reuse
+`tempo`.** A sixth bespoke type for the 3-on/3-off protocol is deferred — `tempo` covers the intensity and a new type is only worth it once these are
 run regularly.
 
 **⚠ `interval` targets zones 4–5 (153–164 bpm at the pinned 178 anchor) and the walking protocol's
-fast phase is ~70% of peak — nearer `tempo`.** Neither is an exact fit, so the owner's decision is: reuse
-`tempo`, or add a sixth run type for the 3-on/3-off walking-derived protocol. **Do not silently map it
-to `interval`** — that prescribes a materially harder session than the research it comes from.
+fast phase is ~70% of peak — nearer `tempo`.** Neither is an exact fit; **the owner chose `tempo`
+(2026-09-15)**, on the reasoning that a new type is only worth its band once the protocol is run
+regularly enough to tune it. **Do not silently map it to `interval`** — that prescribes a materially harder session than the research it comes from.
 
 **Reference point from the owner's own data:** a 9.2-minute run on 2026-07-24 averaged **145 bpm**,
 which is Zone 2 under the current 187 anchor and Zone 3 under 168 — **so which run type this maps to

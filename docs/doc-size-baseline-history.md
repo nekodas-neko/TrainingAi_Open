@@ -12559,3 +12559,20 @@ and name the two things to instrument.
 
 The second half — that the existing spec asserts an exact offset and cannot tell *cancelled* from
 *imprecise* — is what makes any future probe in this area readable at all.
+
+## 2026-09-15 — backlog → 21671: four owner decisions landed on three entries
+
++26 lines, all of it decisions rather than findings, and decisions are what the queue exists to
+carry forward. TN-31 takes `tempo`; TN-38's task B is cleared to build unvalidated; TN-38's task C
+gains a pointer to the metric inventory that will settle it.
+
+**TN-36 earns most of the lines and needed every one.** Its gate is lifted and its fix order is
+**reversed**, so the entry has to say why or the next reader will follow the original ordering that
+is still quoted in the merged PR body and the journal. Simulating each fix against the last 22 real
+days: today 11 of 15 September days recommend a deload, unwiring the stress override alone takes
+that to 1, and the readiness-clears rule that was filed as *the cause* changes nothing further —
+the owner's streak reaches 3 exactly once in 22 days, so the streak brake was already clearing
+almost every day.
+
+Recording a correction to my own measurement costs more lines than restating the original finding
+would have, which is the reason to spend them.
