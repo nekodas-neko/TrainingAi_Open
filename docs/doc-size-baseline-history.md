@@ -12391,3 +12391,14 @@ Thirty-eight lines. The report names one screen and the defect is all 52 Sheet/D
 entry has to establish that before an implementer patches the meal builder alone. The ordering
 paragraph earns its length too: the overlay check must sit AFTER the three mode guards, or a confirm
 dialog raised by one of them gets dismissed by the very back press meant to answer it.
+
+## 2026-09-15 — `docs/implementation-backlog.md` → 21380 (TN-13 closed)
+
+The backlog **shrank 105 lines**: TN-13 left the queue entirely, because the owner's answer means
+nothing is owed and `check-backlog-pointers.js` is right to refuse a heading that announces its own
+completion. `projectOverview.md` is unchanged in length — the existing TN-13 paragraph absorbed the
+closure rather than gaining a new row, which is the correct shape for an entry that was already
+described there as shipped.
+
+The substance moved to a journal entry. That is the point of the rule: a queue that still lists a
+closed item is a queue nobody trusts, and the reasoning is not lost by being somewhere else.
