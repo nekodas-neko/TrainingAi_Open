@@ -12576,3 +12576,16 @@ almost every day.
 
 Recording a correction to my own measurement costs more lines than restating the original finding
 would have, which is the reason to spend them.
+
+## 2026-09-15 — `projectOverview.md` → 11453, `docs/implementation-backlog.md` → 21699 (BF-165)
+
++52 and +116 for a session that shipped no code, and the second number is the one to justify.
+
+BF-165 was sitting at the top of READY as unstartable, with an instruction to start from the device
+console. It reproduces in a browser. Most of these lines are the two candidates now dead **by
+experiment** — the `/activity` route loads fine, and the sheet's `history.back()` is not the cause
+even though it is the obvious mechanism and looked certain.
+
+The rest is one trap: Next updates the URL at commit, so *"the URL never showed /activity"* cannot
+tell an aborted commit from a never-started push. That inference was made here and was wrong, and
+without the note the next session makes it too.
