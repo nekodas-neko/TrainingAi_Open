@@ -586,6 +586,24 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
 - **⚠ The readiness ladder fired on 65, 73, 69, 66, 52, 33, 50, 38** — a readiness of **73** produced
   a deload recommendation. Mistuned, but the smaller half: the bands are choosing a strength when
   §2 says they should first be choosing whether.
+- **⚑ THE PIPELINE ARCHITECTURE IS ALREADY WRITTEN DOWN — `docs/data-source-connector-guide.md`.**
+  §0 "the model, in two layers", §5 "decode, normalize, then write", §6 the ranked per-field merge.
+  **Audit against it; do not re-propose it.** The input layer genuinely holds: `body_metrics` carries
+  a per-field `source_map` resolved by `SOURCE_RANK`, measured at **16 fields across two live sources**
+  over 30 days.
+- **⛔⛔ BUT §5.4'S INVARIANT IS FALSE (TN-37): *"every calculation reads generic tables, never a
+  device-specific one."*** `readiness-payload.ts:278-291` reads **four device-specific stores** in one
+  `Promise.all` — `getOuraDaily`, `getOuraDailySummary`, `getOuraDailyDerived`,
+  `getLatestOuraCloudVitals` — and **~20 payload fields never pass the normalise layer.**
+  `oura_daily_derived` is written by the Oura rollup and nothing else. **A written invariant the code
+  does not hold is worse than none**, because the next connector author trusts it.
+- **⚠ Two softeners, and quoting the finding without them overstates it:** `oura_daily` rows exist
+  through today but **every scored column on recent rows is NULL** (the Cloud retired 2026-08-13 —
+  dead shells, a wasted query rather than a wrong number), and **Health Connect writes zero rows**, so
+  the divergence has no victim yet. **Latent, not live.**
+- **⚠ The guide names one violation and believes it is the only one** (§5.5, the discarded Health
+  Connect `HeartRateSeries`, PS-41 — *"the concrete, fixable instance"*, singular). **When a doc names
+  an instance of a general rule, check whether it is the only one before trusting the count.**
 - **The threshold is usually right and the input usually wrong** — Q-506, Q-512, Q-514, now TN-6.
   Check the input's distribution before touching any constant.
 - **Do NOT lift the sleep scale toward its old mean** — sleep/readiness agreeing is load-bearing for

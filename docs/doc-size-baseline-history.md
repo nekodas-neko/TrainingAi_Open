@@ -12178,3 +12178,24 @@ step change against `git log` before calling it tuning.
 
 The ⛔ line closing the entry is the fifth instance of the same mistake in this pillar, and the file
 being edited names four of them eleven lines above the condition in question.
+
+## 2026-09-15 — backlog → 21422, `tuning.md` → 632: the pillars against the connector guide (TN-37)
+
+The owner asked whether the decode → normalise → pillar pipeline is being done correctly. It is
+already written down — `docs/data-source-connector-guide.md` §0 and §5 — so the entry audits the code
+against that contract rather than proposing an architecture, and its length is the evidence for a
+divergence the guide does not know about.
+
+**The input layer holds and the entry says so first**, with the measurement: 16 fields across two
+live sources over 30 days, resolved by a per-field `source_map` and `SOURCE_RANK`. Establishing that
+half is sound is what makes the other half worth reading.
+
+**§5.4 states *"every calculation reads generic tables, never a device-specific one"* and
+`readiness-payload.ts:278-291` reads four device-specific stores in one `Promise.all`.** The table
+naming all seven reads is the finding; ~20 payload fields never pass the normalise layer, and
+`oura_daily_derived` is written by the Oura rollup and nothing else.
+
+Two softeners take their own paragraph because quoting the finding without them overstates it:
+`oura_daily`'s recent scored columns are **all NULL** (dead Cloud shells — a wasted query, not a wrong
+number) and **Health Connect writes zero rows**, so the divergence has no victim yet. Latent, not
+live — which is what keeps the entry off the 🔴 LIVE marker and sets the fix order.

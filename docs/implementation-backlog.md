@@ -437,6 +437,65 @@ below threshold and left in place for next time.
 
 
 
+### [platform][readiness] TN-37 — the connector guide states an invariant the pillars do not hold: readiness reads four device-specific stores
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-15 · owner: *"we get data from Oura; then we normalise/calculate it into usable fields… then we use those fields to calculate our pillars. Can we make sure we are doing this correctly?"*
+- **Lane: A** for steps 2–3 (`lib/health/readiness-payload.ts:278-291`); **step 1 is docs-only and should not wait.**
+- **Reference:** [`review`](reviews/2026-09-15-pillars-against-the-connector-guide.md) · the contract is [`docs/data-source-connector-guide.md`](data-source-connector-guide.md) §5.4.
+- **⛔ Not a redesign.** The architecture the owner describes is already written down and already built at the input layer. This entry closes the gap between the guide and the code.
+
+**✅ The input layer holds.** `body_metrics` carries a per-field `source_map` resolved by
+`SOURCE_RANK` (`manual > scale_ble > oura_ble > oura_cloud > health_connect`). Measured over 30 days:
+**16 fields, two live sources** — `oura_ble` supplies `hrv_ms`/`resting_heart_rate`/`spo2_pct`/`steps`
+(31 days each), `scale_ble` the twelve body-composition fields (30 days each). **This half needs no
+work.**
+
+**❌ The scoring layer does not read only from it, and §5.4 says it does:** *"Every calculation in §4
+reads generic tables, never a device-specific one."* `readiness-payload.ts:278-291` reads, in one
+`Promise.all`:
+
+| read | layer |
+|---|---|
+| `listBodyMetrics`, `listSleepSessions` | ✅ normalised |
+| `getOuraDaily`, `getLatestOuraCloudVitals` | ❌ Oura **Cloud** |
+| `getOuraDailySummary`, `getOuraDailyDerived` | ❌ Oura-specific |
+| `getHrForWindow` | ❌ raw HR series |
+
+**`oura_daily_derived` is written by the Oura rollup and nothing else** (`rollup-io.ts:83` plus one
+adapter mutation path). **~20 payload fields come from these stores rather than the normalised
+layer** — `daySummary`, `temperatureDeviation`, `stressHigh`/`recoveryHigh`, `recommendedBedtime*`,
+`vo2Max`, `vascularAge`, `readinessScore`, `sleepScore`, `activityScore`, `steps`, `zoneMinutes` and
+every contributor block. **For those fields a non-Oura source is structurally invisible.**
+
+**⚠ Two things that keep this from being urgent, and they are the reason it is not marked LIVE.**
+`oura_daily` rows exist through today but **every scored column on recent rows is NULL** — the Cloud
+retired 2026-08-13 and the rows are shells, so this costs a query and a branch, not a wrong number.
+And **Health Connect writes zero rows today**, so the divergence currently has no victim. **It fires
+the first time a second source supplies a field the pillars take from the Oura path.**
+
+**⚠ The guide already names ONE violation and believes it is the only one.** §5.5 covers Health
+Connect's discarded `HeartRateSeries` (**PS-41**) and calls it *"the concrete, fixable instance of the
+general rule"* — singular. This is a second, larger instance.
+
+**Three steps, rising cost:**
+1. **Amend §5.4 to say what is true**, naming the readiness read list. **A written invariant the code
+   does not hold is worse than none** — the next connector author will trust it. Docs-only; do not
+   make it wait on 2 or 3.
+2. **Drop the two dead Cloud reads** — `getOuraDaily` and `getLatestOuraCloudVitals` return nothing
+   usable and are half the violation. **⚠ Re-verify the NULL-on-recent-rows finding at the time of the
+   change** rather than trusting this snapshot.
+3. **Then decide what the derived layer IS** — app-computed and source-neutral (the rename plan
+   applies, any source should contribute), or genuinely Oura-only (then §4's table should mark which
+   pillars degrade without a ring). **⛔ Do not start 3 without its own plan** — `2026-08-02-de-oura-naming.md`
+   already says so, and `oura_daily_derived` is one of six tables a rename touches.
+
+**⛔ Not a reason to delay the connector registry** (PS-40, `2026-09-14-data-source-connector-interface.md`).
+That plan is metadata over existing ingest routes and is unaffected — a `supplies` declaration is
+exactly what would have surfaced this without an audit.
+
+**Pass test:** §5.4 describes the code, or the code matches §5.4; and a reader can answer "which
+pillars degrade for a Health-Connect-only user" from the guide rather than by grepping read paths.
+
 ### [workouts] BF-164 — BF-149 fixed ONE of eight surfaces; every other bodyweight rep max still reads 8 RM for an 11-rep set
 
 - **Lane:** A — `packages/shared/src/1rm.ts`. Four call sites inside that one file feed all eight
