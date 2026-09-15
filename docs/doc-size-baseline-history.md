@@ -12158,7 +12158,20 @@ wrong" was already filed and fixed once, so what this needs to carry is WHERE it
 that one of the four prescribes reps rather than printing them. It also records why the sweep missed:
 BF-149 grepped the function's direct callers and not the wrapper seven surfaces import.
 
-## 2026-09-15 — `projectOverview.md` → 11112, `docs/implementation-backlog.md` → 21262 (BF-162)
+## 2026-09-14 — `projectOverview.md` → 11111 (BF-100's one-tap experiment, surfaced)
+
++10 to move a finding from the backlog into the document every session reads first. #1189 named a
+candidate cause for BF-100 — `use-scroll-restoration.ts` cancels its pending restore on
+`touchstart` with no re-arm, the S25 back gesture is a touch, `page.goBack()` is not — and a
+one-tap experiment that settles it. The overview still described BF-100 as a plain buildable entry
+with a device-only failure and no cause.
+
+The lines are worth it because the experiment is the cheapest unblock in the lane and **has never
+been tried**: every device pass used the system gesture, which is what the entry's own verification
+step asks for, so the one path that would discriminate was the one nobody walked. A finding that
+lives only in a queue entry is read by whoever opens that entry; this one needed the owner.
+
+## 2026-09-15 — `projectOverview.md` → 11124, `docs/implementation-backlog.md` → 21262 (BF-162)
 
 +11 on each for a one-guard fix, and the length is carrying one thing: why the harness is not going
 to catch this class. `exercise_library` holds 27 bodyweight exercises and none of them is in any
