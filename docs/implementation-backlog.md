@@ -569,6 +569,201 @@ below threshold and left in place for next time.
   details, press the system back gesture — arrive on **More** with the More tab active. The harness
   cannot speak for the Android back gesture or the WebView's history handling.
 
+### [platform][devices] TN-38 — normalisation is implemented three different ways and nothing names them as one concept
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-15 · owner: *"lets work on getting some normalised inputs; then creating our scoring system on it."*
+- **Lane: A** for tasks B–D; **task A is docs-only and unblocks the rest.**
+- **Plan:** [`2026-09-15-normalised-inputs-and-source-aware-scoring.md`](superpowers/plans/2026-09-15-normalised-inputs-and-source-aware-scoring.md).
+- **Reference:** [`review`](reviews/2026-09-15-pillars-against-the-connector-guide.md) · contract is [`data-source-connector-guide.md`](data-source-connector-guide.md) §3–§6.
+- **Sibling of TN-37** (which found §5.4's invariant false) and of **PS-40** (the connector registry). **⛔ Not a redesign** — the architecture is written; this finishes it.
+
+**A second source is live TODAY, not hypothetical.** Over 45 days `oura_heartrate` holds **74,860
+chest-strap samples against 12,673 ring samples** — the strap outnumbers the ring **six to one**.
+
+**⚑ And this is a PRODUCT requirement, not a tidy-up: the owner will not use Health Connect, other
+users will** (2026-09-15). The app has to be good on basic sources alone, with the ring as
+refinement. **⚠ Which means B cannot be validated on the owner's account** — it needs a
+Health-Connect-only test user.
+
+**⚑ The measurement layer already does what the owner describes, and is the template.** The ring
+decodes frames into a step count and writes `body_metrics.steps` through the same method every source
+calls; nothing downstream knows it came from a ring. Same for `hrv_ms`, `resting_heart_rate`,
+`spo2_pct`. **It is the derived/score layer that bypasses it (TN-37)** — that is where this entry's
+weight sits, not in the measurements.
+
+**Each mechanism is individually sound. Nothing names them as one concept:**
+
+| data | mechanism | merged at | multi-source today? |
+|---|---|---|---|
+| `body_metrics` scalars | `source_map` + `SOURCE_RANK` (`mergeSet`) | **write** | **yes** — `oura_ble` ×4, `scale_ble` ×12 |
+| `oura_heartrate` series | `preferStrapBuckets` — 10 s buckets, strap wins | **read**, in `getHrForWindow` | **yes** — 74,860 / 12,673 |
+| `oura_daily_derived` | **none — single writer** (`rollup-io.ts:83`) | — | **no** |
+
+**§5 of the guide describes the stages (decode → normalize → write) and never says the merge step
+has three implementations depending on what you are writing.** A new connector's author reads §3 for
+the shape and has no way to learn which merge governs it.
+
+**The rule that decides it, once stated:** **scalars merge at write by rank; series merge at read by
+resolution; derived rows have one writer.**
+
+**Four steps, in order — A first because it is cheapest and everything later is checked against it:**
+- **A. Name the three mechanisms in the guide**, and amend **§5.4**, whose invariant TN-37 measured
+  as false. Docs-only.
+- **B. Close the two filed gaps** — **PS-41** (Health Connect's `HeartRateSeries` is read, used
+  inline, then discarded instead of normalised) and **PS-42** (the illness radar gated on an
+  `oura_daily_summary` row rather than on its inputs). **PS-41 unlocks 22% of Activity Score for a
+  non-ring user.**
+- **C. Split every score into a CORE and ADJUSTMENTS** — **`Gate: owner`**, and the one genuine
+  design decision here. Owner, 2026-09-15: *"the app works fine with less sources but is more
+  accurate and tuned with more sources."* **⚑ That is NOT what the code does.** `sleep-score.ts:399`
+  renormalises the weighted mean over whichever contributors are present, and readiness passes a
+  neutral 50 — so **connecting a ring changes the denominator and moves the score for a reason
+  unrelated to the user's body, and two users' 78s are computed from different weight sets.** Under
+  `clamp(core + Σ adjustments)` the core is the same quantity for everyone, an extra sensor adds a
+  signed delta, and the app can say *"78 — core 74, +6 HRV, −2 SpO₂"*. **⚠ The core input set per
+  pillar is the owner's decision**; everything else is mechanical. **⚠ This re-scores history** — the
+  2026-08-24 policy applies, stamp the model and leave stored days, and size it first.
+- **D. Record what a non-ring user actually gets** — §4 already traced it. **⚠ Not "normalise these":
+  chronic stress, resilience, daytime HRV, Body Battery and OTS read raw BLE frames with zero
+  fallback branches, and readiness's temperature term (0.10) passes null on every generic path.**
+  Source-neutrality there means re-implementing vendor models — a project, not a task.
+
+**⚠ Three things that could make this wrong, and each is checkable before committing to it:**
+`preferStrapBuckets` was written for two sources and **task B's three-way case must be proven, not
+assumed**; **Health Connect writes zero rows today**, so B's value is latent and **should be
+confirmed as planned before starting**; and the `oura_daily_derived` single-writer design **may
+simply be correct** — if everything in it is genuinely ring-derived the fix is documentation, which
+task A settles.
+
+**Pass test:** a connector author can read §3 and know which merge governs the data type they
+supply; and a rendered score can say what it was computed without.
+
+### [platform][readiness] TN-37 — the connector guide states an invariant the pillars do not hold: readiness reads four device-specific stores
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-15 · owner: *"we get data from Oura; then we normalise/calculate it into usable fields… then we use those fields to calculate our pillars. Can we make sure we are doing this correctly?"*
+- **Lane: A** for steps 2–3 (`lib/health/readiness-payload.ts:278-291`); **step 1 is docs-only and should not wait.**
+- **Reference:** [`review`](reviews/2026-09-15-pillars-against-the-connector-guide.md) · the contract is [`docs/data-source-connector-guide.md`](data-source-connector-guide.md) §5.4.
+- **⛔ Not a redesign.** The architecture the owner describes is already written down and already built at the input layer. This entry closes the gap between the guide and the code.
+
+**✅ The input layer holds.** `body_metrics` carries a per-field `source_map` resolved by
+`SOURCE_RANK` (`manual > scale_ble > oura_ble > oura_cloud > health_connect`). Measured over 30 days:
+**16 fields, two live sources** — `oura_ble` supplies `hrv_ms`/`resting_heart_rate`/`spo2_pct`/`steps`
+(31 days each), `scale_ble` the twelve body-composition fields (30 days each). **This half needs no
+work.**
+
+**❌ The scoring layer does not read only from it, and §5.4 says it does:** *"Every calculation in §4
+reads generic tables, never a device-specific one."* `readiness-payload.ts:278-291` reads, in one
+`Promise.all`:
+
+| read | layer |
+|---|---|
+| `listBodyMetrics`, `listSleepSessions` | ✅ normalised |
+| `getOuraDaily`, `getLatestOuraCloudVitals` | ❌ Oura **Cloud** |
+| `getOuraDailySummary`, `getOuraDailyDerived` | ❌ Oura-specific |
+| `getHrForWindow` | ❌ raw HR series |
+
+**`oura_daily_derived` is written by the Oura rollup and nothing else** (`rollup-io.ts:83` plus one
+adapter mutation path). **~20 payload fields come from these stores rather than the normalised
+layer** — `daySummary`, `temperatureDeviation`, `stressHigh`/`recoveryHigh`, `recommendedBedtime*`,
+`vo2Max`, `vascularAge`, `readinessScore`, `sleepScore`, `activityScore`, `steps`, `zoneMinutes` and
+every contributor block. **For those fields a non-Oura source is structurally invisible.**
+
+**⚠ Two things that keep this from being urgent, and they are the reason it is not marked LIVE.**
+`oura_daily` rows exist through today but **every scored column on recent rows is NULL** — the Cloud
+retired 2026-08-13 and the rows are shells, so this costs a query and a branch, not a wrong number.
+And **Health Connect writes zero rows today**, so the divergence currently has no victim. **It fires
+the first time a second source supplies a field the pillars take from the Oura path.**
+
+**⚠ The guide already names ONE violation and believes it is the only one.** §5.5 covers Health
+Connect's discarded `HeartRateSeries` (**PS-41**) and calls it *"the concrete, fixable instance of the
+general rule"* — singular. This is a second, larger instance.
+
+**Three steps, rising cost:**
+1. **Amend §5.4 to say what is true**, naming the readiness read list. **A written invariant the code
+   does not hold is worse than none** — the next connector author will trust it. Docs-only; do not
+   make it wait on 2 or 3.
+2. **Drop the two dead Cloud reads** — `getOuraDaily` and `getLatestOuraCloudVitals` return nothing
+   usable and are half the violation. **⚠ Re-verify the NULL-on-recent-rows finding at the time of the
+   change** rather than trusting this snapshot.
+3. **Then decide what the derived layer IS** — app-computed and source-neutral (the rename plan
+   applies, any source should contribute), or genuinely Oura-only (then §4's table should mark which
+   pillars degrade without a ring). **⛔ Do not start 3 without its own plan** — `2026-08-02-de-oura-naming.md`
+   already says so, and `oura_daily_derived` is one of six tables a rename touches.
+
+**⛔ Not a reason to delay the connector registry** (PS-40, `2026-09-14-data-source-connector-interface.md`).
+That plan is metadata over existing ingest routes and is unaffected — a `supplies` declaration is
+exactly what would have surfaced this without an audit.
+
+**Pass test:** §5.4 describes the code, or the code matches §5.4; and a reader can answer "which
+pillars degrade for a Health-Connect-only user" from the guide rather than by grepping read paths.
+
+### [workouts][readiness] TN-36 — the deload engine has ONE way to say "train normally", and a bug fix switched on its loudest trigger 🔴 LIVE
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-14 · owner: *"workouts are constantly being recommended for deload… I'm sure it's just bad tuning."*
+- **Lane: A** — `packages/shared/src/ai-periodization/ai-dynamic.ts:182-236`.
+- **Gate: owner** — step 1 changes what the app tells the owner to do with their training. Steps 2 and 3 are not gated.
+- **Sibling of TN-34**, which covers the stress override alone. **This entry is the cause; TN-34 is what made it visible.**
+- **Reference:** [`review`](reviews/2026-09-14-what-triggers-a-deload.md).
+
+**It is not tuning. Nine conditions can recommend a deload and exactly ONE can decline it.**
+
+```ts
+if (consecutiveTrainingDays < 3) {
+  return { recommended: false, strength: 'soft' }   // the only false in the function
+}
+const r = readinessScore ?? 70
+if (r >= 70) return { recommended: true, strength: 'soft' }
+if (r >= 50) return { recommended: true, strength: 'recommended' }
+return       { recommended: true, strength: 'strong' }
+```
+
+**Past three consecutive training days every branch returns `recommended: true`** — readiness picks
+the *strength*, never the *verdict*. **A readiness of 100 recommends a deload**, and `?? 70` means a
+day with no readiness does too.
+
+**Measured over 45 days: 28 days were not recommended and all 28 were cleared by
+`consecutiveTrainingDays < 3`. Not one on merit.** The engine has never said *"you are recovered"* —
+only *"you have not trained enough days in a row yet"*. **⚠ Which makes the rule perverse:** a rest
+day buys three clear days regardless of recovery, while four good days in a row guarantees a deload.
+
+**⚑ AND THE SECOND DEFECT HAS A DATE — this is the step change the owner is describing:**
+
+| | August (31 d) | September (14 d) |
+|---|---|---|
+| **deload recommended** | **6 — 19%** | **11 — 79%** |
+| fired by the stress override | **0** | **9** |
+| stored `stress_high_minutes` max | **90** | **330** |
+| days ≥ the 120 threshold | **0 of 27** | **9 of 14** |
+
+**The threshold did not move.** Commit `7c428a7f` (2026-08-31) fixed TN-22's storage defect; before
+it the stored scalar was written by a second producer off a different HR baseline and came out near
+zero, **so it never reached 120 and the override never fired.** Fixing the bug switched on a trigger
+nobody had seen fire. **⚠ And it is the number TN-33 measured as carrying no signal** — 57% night
+buckets, r = +0.072 with readiness over 18 days.
+
+**The readiness ladder is the smaller half but is also mistuned:** it fired on
+**65, 73, 69, 66, 52, 33, 50, 38**. A readiness of **73** produced a deload recommendation.
+
+**Fix in this order:**
+1. **Give readiness a way to CLEAR a day** — `r >= 70` returns `{ recommended: false }` instead of
+   "soft". One line, and it is the cause. **`Gate: owner`.**
+2. **Unwire the stress override** — TN-34, one line, reversible, and it is what changed on 09-01.
+3. **Re-measure before touching the bands.** With 1 and 2 done the rate falls to the ladder's own
+   contribution — **19% in August** — which may need no tuning at all.
+
+**⛔ Do not raise the 120-minute threshold and do not raise the streak from 3.** Both are the
+"threshold is right, the input is wrong" mistake, which this pillar has now made five times — the
+same file names four of them eleven lines above the stress condition. **The streak is not a recovery
+signal; it is a proxy standing in for one.**
+
+**⚠ Stated rather than implied:** `consecutiveTrainingDays` counts `hasExercises`, this
+reconstruction used `completed_at IS NOT NULL`, so real streaks are **the same or longer** and the
+real rate is at or above these figures. `energyLevel` and `selfReportedSick` were not reconstructed
+and can only escalate. Temperature and illness never fired in this window.
+
+**Pass test:** a day with readiness ≥ 70 and four training days behind it is **not** recommended for
+deload; and over a month the recommendation rate sits nearer 20% than 80%.
+
 ### [devices] PS-40 — formalize the data-source connector convention as a typed, checkable declaration
 
 - **Lane:** A — `packages/shared/src/health/`, `scripts/`, `app/api/**` ingest routes.
