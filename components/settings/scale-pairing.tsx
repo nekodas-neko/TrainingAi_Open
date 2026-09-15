@@ -39,6 +39,10 @@ export function ScalePairing() {
   const [bgSyncEnabled, setBgSyncEnabled] = useState(false)
   const [bgSyncBusy, setBgSyncBusy] = useState(false)
   const [pending, setPending] = useState<PendingReading[]>([])
+  // LA-108. Same shape as `pending`, and deliberately a separate list rather than a flag on one
+  // array: the two have different actions, and the order the server sends them means different
+  // things (see the render).
+  const [dismissed, setDismissed] = useState<PendingReading[]>([])
   const [pendingBusyId, setPendingBusyId] = useState<number | null>(null)
   const [today, setToday] = useState<TodayReading[]>([])
 
@@ -46,8 +50,11 @@ export function ScalePairing() {
     try {
       const res = await fetch('/api/scale-ble/pending')
       if (!res.ok) return
-      const data = await res.json() as { pending: PendingReading[] }
+      const data = await res.json() as { pending: PendingReading[]; dismissed?: PendingReading[] }
       setPending(data.pending)
+      // `?? []` because this component ships to a WebView that may still be running against an
+      // older deploy of the route for one refresh — an absent key must read as "none", not crash.
+      setDismissed(data.dismissed ?? [])
     } catch { /* best-effort — the list just stays as-is */ }
   }, [])
 
@@ -165,6 +172,32 @@ export function ScalePairing() {
     }
   }
 
+  // LA-108 — claim back a reading that was declined, by accident or by someone else's tap.
+  //
+  // **It POSTs the SAME confirm route the pending rows use, and that is the point.** The engine half
+  // widened `confirmScaleSample` to match `pending` OR `dismissed` (never `confirmed`, so claiming
+  // twice cannot double-apply), and the route already files the weight against the reading's own
+  // `measuredAt` and re-anchors the band. So there is no second write path to keep in step.
+  //
+  // The invalidation pair is the same one `confirmReading` fires, for the same reason (Q-126): this
+  // writes to `body_metrics`, so the weight card, Progress card and nutrition TDEE header are stale
+  // without it. Invalidate before the refetch, per the ordering rule.
+  async function claimReading(id: number) {
+    setPendingBusyId(id)
+    setError(null)
+    try {
+      const res = await fetch(`/api/scale-ble/pending/${id}/confirm`, { method: 'POST' })
+      if (!res.ok) return pendingActionFailed(res, 'claim')
+      setDismissed(d => d.filter(r => r.id !== id))
+      await Promise.all([invalidateBodyMetricWrite(), invalidateReadinessInputs()]).catch(() => {})
+      loadToday()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not claim the reading.')
+    } finally {
+      setPendingBusyId(null)
+    }
+  }
+
   return (
     <div className="rounded-2xl bg-muted/40 border border-border p-4 space-y-3">
       <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
@@ -242,6 +275,46 @@ export function ScalePairing() {
                   It&apos;s me
                 </Button>
               </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* LA-108 — the recovery path for a declined reading, which until now had no screen.
+          The band anchors on the last CONFIRMED weight and only a confirmed reading moves it, so an
+          accidental *Not me* tap was irreversible: a real change bigger than the anomaly threshold
+          put the owner outside his own band with nothing able to move it, and every reading after
+          that was outside too. Silent and self-sustaining.
+
+          **Server order is preserved — do not sort.** The list is newest-first on purpose: in the
+          lockout this exists for, the readings at the top ARE the wrongly-declined ones, because the
+          scale is mostly his.
+
+          **No dismiss action here.** These are already dismissed; the only move is to claim one
+          back. */}
+      {dismissed.length > 0 && (
+        <div className="space-y-2 pt-1 border-t border-border">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground pt-2">
+            Declined weigh-ins
+          </p>
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            Declined by mistake? Claiming one files it and re-anchors your weight range.
+          </p>
+          {dismissed.map(r => (
+            <div key={r.id} className="flex items-center justify-between gap-2 text-sm">
+              <span className="min-w-0">
+                {/* A declined reading can be days old, unlike a pending one, so the time is what
+                    tells you which is which. `formatTimeOfDay` with the user's tz, never the
+                    device's. A frame that would not decode is archived too, so `weightKg` may be
+                    null — it still lists. */}
+                {r.weightKg != null ? `${r.weightKg.toFixed(1)} kg` : 'Unknown weight'}
+                <span className="ml-1.5 text-xs text-muted-foreground tabular-nums">
+                  {formatTimeOfDay(r.measuredAt, userTz)}
+                </span>
+              </span>
+              <Button size="sm" className="flex-none" disabled={pendingBusyId === r.id} onClick={() => claimReading(r.id)}>
+                It&apos;s me
+              </Button>
             </div>
           ))}
         </div>

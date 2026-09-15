@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.456.21",
+    date: "2026-09-15",
+    changes: [
+      "A weigh-in you declined by mistake can be claimed back. Tapping \"Not me\" used to be final, and that mattered more than a lost reading: your healthy weight range is anchored to the last weigh-in you confirmed, so if your weight genuinely moved a long way \u2014 a gap, an illness, an injury \u2014 and the reading that proved it was declined, every weigh-in afterwards fell outside the range too, with nothing able to reset it. Scale settings now lists recent declined weigh-ins with the time each was taken, and claiming one files the weight and re-anchors your range.",
+    ],
+  },
+  {
     version: "1.456.20",
     date: "2026-09-15",
     changes: [

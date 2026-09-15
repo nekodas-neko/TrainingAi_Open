@@ -12702,3 +12702,13 @@ only mention of it anywhere is the line pointing at it. So a real blocker (verif
 `/api/body-battery` is `GET()` with no parameters) was waiting on work nobody was tracking, and the
 `Needs:`-style "an absent target counts as shipped" rule does not rescue it, because this was prose
 in a `Keep:` rather than a field the checker reads.
+
+## 2026-09-15 — `projectOverview.md` → 11476, `docs/implementation-backlog.md` → 22049 (LA-108)
+
+The index grew for a fix that had been sitting in plain sight, filed as done.
+
+LA-108 printed under KEEP — *"shipped; only the stated residue is owed, not new work"* — for a day,
+while its residue was a buildable UI task with a lane, a file and three implementation notes. The
+lines that matter are the ones saying **why an accidental *Not me* tap was irreversible**: the band
+anchors on the last confirmed weight, so one declined reading could lock every later one outside the
+range. That is not obvious from the diff, which is a list and a button.
