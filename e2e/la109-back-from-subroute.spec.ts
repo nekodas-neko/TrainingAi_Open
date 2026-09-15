@@ -55,3 +55,46 @@ test('back from a tab sub-route returns to that tab, not Home', async ({ page })
     'back from /more/details rendered something other than the More tab',
   ).toBeVisible({ timeout: 30_000 })
 })
+
+/**
+ * BF-49, which LA-109's entry says must be tried against this repro before either is fixed:
+ * *"Tapping a workout, then back, leads to health training not home."*
+ *
+ * **Same defect, opposite direction, and that is the reason it reads as a different bug.** A REAL
+ * load of `/health` leaves Next's tree on Health. Flipping to Home then rewrites the URL to `/` with
+ * `replaceState` and leaves that Health tree in place, so the `/` entry is the poisoned one. An
+ * in-app push off Home and a press of back restores it — and Health renders under a `/` URL, which
+ * is exactly "back took me to health training instead of home".
+ *
+ * BF-49 was filed *"does not reproduce in the web harness"* and concluded *"the fix is not in the
+ * router"*. Both follow from a sequence that began with a `goto`: no entry ever carried a stale tree,
+ * so there was nothing for back to restore wrongly.
+ */
+test('back from a push off Home returns to Home, not the tab whose tree is stale', async ({ page }) => {
+  test.setTimeout(180_000)
+  await suppressMorningCheckin(page)
+
+  // A REAL navigation, so Next's tree is genuinely Health's — that is the precondition.
+  await page.goto('/health')
+  await settleRouteBoundary(page)
+
+  // The flip rewrites the URL to "/" and leaves Health's tree on that entry.
+  await page.locator('nav').getByRole('link', { name: 'Home', exact: true }).click()
+  await page.waitForFunction(() => window.location.pathname === '/')
+  await settleRouteBoundary(page)
+
+  // An in-app push off Home. The streak card pushes /health?tab=training — the very screen the
+  // owner reported landing on, which is what first tied these two entries together.
+  await page.getByRole('button', { name: /Day Streak|Sessions/i }).first().tap()
+  await page.waitForFunction(() => window.location.pathname.startsWith('/health'))
+  await settleRouteBoundary(page)
+
+  await page.goBack()
+  await settleRouteBoundary(page)
+
+  expect(new URL(page.url()).pathname, 'the URL half was never the bug').toBe('/')
+  await expect(
+    page.getByRole('heading', { name: /Good (morning|afternoon|evening)/ }).first(),
+    'back from a push off Home rendered the stale tab instead of Home',
+  ).toBeVisible({ timeout: 30_000 })
+})
