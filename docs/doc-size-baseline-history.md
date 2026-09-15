@@ -12309,3 +12309,16 @@ advertised as behaviour-preserving, on exactly the sessions least able to absorb
 A plan that is wrong in one clause is more dangerous than one that is vague, because it reads as
 settled. Correcting it in place and saying so in the row is cheaper than the next implementer
 re-deriving why `requestedBudgetMin` exists and deciding it is redundant.
+
+## 2026-09-15 — Q-44 Phase 3 audited and gated (backlog +22)
+
+The lines carry three measurements that change what Q-44 is, none of which were in the plan. The
+second recording device already exists and did not share a table — `colmi_*` is live with 5,568 rows
+across three tables — so the "generically-named single-vendor table" the 2026-09-11 note warned
+about is the state the schema is already in, not a risk ahead of it. The two devices use opposite
+idioms, which makes "the same tables" a design problem rather than a rename. And `oura_bucket`, the
+table singled out as the one a second device would most need to share, has never been written.
+
+Worth the lines because the entry currently reads as a decided goal with a written plan, and an
+implementer trusting that would spend a 2,813-reference sweep to arrive no closer to what the owner
+asked for. The `Gate: owner` is the operative change; the rest is why.
