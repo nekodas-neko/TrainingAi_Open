@@ -21216,6 +21216,10 @@ than one migration inside it.
 [`2026-09-15-trainer-role.md`](superpowers/plans/2026-09-15-trainer-role.md).** Splits PR 1
 (migration, alone) / PR 2 (engine, Lane A) / PR 3 (trainer UI, Lane B). It settles the one thing
 this entry left open and the one thing it got wrong; read §2 before writing any code.
+**⚠ The plan's §7 was corrected the same day** — its first version carved PR 1 out of this entry's
+*"ask the owner before merging any of it"*, reading the "rather than one migration inside it" clause
+as an exemption when it means the gate is wider than usual. **Every PR here is gated, the migration
+included.** If you are reading a copy of the plan that says otherwise, it is the pre-correction one.
 
 **⚠ THE CHEAP VERSION OF THIS FEATURE REBUILDS RV-42, and that is not obvious from this entry.**
 `app/api/workout-templates/route.ts:74` validates styles with `progressionStyleIdsOwned(userId, …)`,
