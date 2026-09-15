@@ -569,6 +569,97 @@ below threshold and left in place for next time.
   details, press the system back gesture — arrive on **More** with the More tab active. The harness
   cannot speak for the Android back gesture or the WebView's history handling.
 
+### [readiness][heart-rate] TN-39 — the daytime-stress model is an imputation that has never been checked against the measured HRV sitting in the database 🔴 LIVE
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-15 · owner: *"this might be a good opportunity to investigate other metrics we can calculate from our data too."*
+- **Lane: A** — `packages/shared/src/health/daytime-hrv-model.ts` · `packages/shared/src/health/rmssd.ts` · reads `rr_intervals` via `getRrForWindow`.
+- **Reference:** [`audit`](reviews/2026-09-15-what-else-our-data-could-tell-us.md).
+- **Sibling of TN-33** (which measured the stress signal) and **TN-34** (the override). **This is the validation both of those had to assume.**
+
+**Daytime stress is imputed, not measured.** The ring streams HRV events for ~7% of waking hours, so
+the model fits `ln(rmssd) = a + b·hr + c·temp` on NIGHT data and applies it to daytime HR and temp.
+That imputation produces `stress_high_minutes`, which drives the deload override that fired on **10
+of the owner's last 22 days** (TN-36).
+
+**Ground truth exists and nobody has looked at it.** The Polar H10 writes raw beat intervals to
+`rr_intervals` — measured 2026-09-15: **136,440 beats across 48 days**, worn **07:00–13:00, peaking
+at 08:00**. That is exactly the window the model is guessing about. Twelve of the last fourteen
+strap days carry thousands of beats on days the stress model also ran:
+
+| day | strap beats | stress_high_minutes |
+|---|---:|---:|
+| 2026-09-14 | 5,559 | 150 |
+| 2026-09-08 | 5,993 | 90 |
+| 2026-09-01 | 5,843 | 270 |
+| 2026-09-06 | 4,369 | 150 |
+
+**The work:** compute `rmssdFromRr` over the overlapping 30-minute buckets, compare against the
+imputed dHRV for the same buckets, and report agreement. `rmssdFromRr` already exists, is
+artifact-filtered, and already runs on this exact data for workout windows — so this is a
+measurement, not an integration.
+
+**⚠ Do NOT change the model on the strength of this before the owner sees the result** — scoring
+changes are Tuning-proposes/owner-signs-off. The output is a number and a verdict, not a patch.
+
+**⚠ The comparison is only valid on overlapping buckets** — the strap covers ~6 waking hours, not
+the whole day, so a day's `stress_high_minutes` cannot be compared as a total.
+
+**Pass test:** a written agreement figure between imputed and measured daytime HRV over at least
+ten days, with the disagreement characterised (bias, spread) rather than summarised as good or bad.
+
+### [devices][heart-rate] TN-40 — the strap's 136,440 beats produce exactly one number, while three models that could use them run on the ring alone
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-15 · from the same audit as TN-39.
+- **Lane: A** — `lib/oura-ble/rollup/run.ts` (where the three models are called) · `getRrForWindow`.
+- **Reference:** [`audit`](reviews/2026-09-15-what-else-our-data-could-tell-us.md).
+- **Needs:** TN-39 — the validation tells you whether the strap's beats agree with the ring's at all, which decides whether these should merge or stay separate series.
+
+`rollup/run.ts` calls `lfhfFromIbi`, `breathingFromIbi` and `computeHrv5MinSeries` **exclusively on
+the ring's IBI stream**. `getRrForWindow`, which reads the strap, is called from two places only:
+the comparison harness and `compute-workout-hr.ts`. So the strap's beats yield **one number** — a
+workout's rest-window rMSSD — while three richer models sit written, tested and pointed elsewhere.
+
+**Because the strap is worn in waking hours and the ring is weakest there**, running these on strap
+data produces *daytime* LF/HF, *daytime* breathing rate and a *daytime* HRV series — signal the app
+has from no source today.
+
+**⚠ Not a merge into the existing series.** Per TN-38's rule, series merge at READ by resolution;
+whether strap-derived daytime HRV belongs in the same series as ring-derived nightly HRV is exactly
+what TN-39 answers. Build it as its own series first.
+
+**Pass test:** a daytime HRV/LF-HF/breathing series exists for a day the strap was worn, computed
+from `rr_intervals`, with no change to any ring-derived series.
+
+### [devices] TN-41 — four raw tags are stored and never decoded, and one of them has no decoder at all
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-15 · from the same audit as TN-39.
+- **Lane: A** — `lib/oura-ble/decode.ts` · `lib/oura-ble/rollup-consumed-tags.ts`.
+- **Gate: owner** — `0x73` cannot be decoded from this repository; see below.
+- **Reference:** [`audit`](reviews/2026-09-15-what-else-our-data-could-tell-us.md).
+
+`body_hex` is kept permanently, so a decoder added later back-fills. Four tags never reach the rollup:
+
+| tag | event | rows | decoder? |
+|---|---|---:|---|
+| `0x73` | `ehr_trace_event` | **2,988** (1,494 paired) | **none** |
+| `0x6c` | `feature_session` | 2,708 | exists, unconsumed |
+| `0x74` | `ehr_acm_intensity_event` | 648 | exists, unconsumed |
+| `0x6b` | `motion_period` | 390 | exists, unconsumed |
+
+`0x73`'s two payload sizes (5 and 14 bytes) each appear exactly 1,494 times and their leading bytes
+run as one consecutive counter, so they interleave as a single stream of 1,494 episodes.
+
+**⛔ Its layout was NOT inferred and must not be.** CLAUDE.md: byte layouts come from the `open_oura`
+Rust source, never memory and never Oura's public docs. That source now lives only in the archived
+private repo — **decoding `0x73` starts by retrieving it, which is why this entry is owner-gated.**
+
+**⚠ Measured and killed: `ehr_*` is not workout detection.** Event counts run *highest on days with
+no workout* (802 events / 0 workouts on 2026-09-15; 764 / 0 on 09-11; 54 / 1 on 09-10). Do not
+re-test this.
+
+**⚠ Value is modest and stated honestly** — `0x6c` is diagnostics rather than a health metric, and
+`0x6b`/`0x74` are real signal at low volume. This ranks below TN-39 and TN-40 deliberately.
+
 ### [platform][devices] TN-38 — normalisation is implemented three different ways and nothing names them as one concept
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-15 · owner: *"lets work on getting some normalised inputs; then creating our scoring system on it."*
@@ -944,6 +1035,18 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
 - **Why this one, and why now:** it's the one item in §13's "Oura-only, no fallback" list where the
   raw ingredient (beat-to-beat intervals) is *already streaming into the app* from a second device
   (the Polar strap) — unlike temperature or MET, which have no existing raw-signal supplier at all.
+- **⚠ CORRECTION, measured 2026-09-15 (TN-39's audit): the ingredient streams, but NOT AT NIGHT, so
+  this entry cannot be validated on current data.** `rr_intervals` holds 136,440 beats over 48 days,
+  and the wear pattern is **07:00–13:00, peaking at 08:00, with ZERO beats between 22:00 and 05:00**
+  — **242 beats across 6 nights in total.** The architectural claim below stands: any future device
+  exposing beat intervals could feed nightly HRV identically, which is the portability argument.
+  What does not stand is the implied validation path — you cannot check `rmssdFromRr(strap)` against
+  the ring's nightly figure without nights to check on. **Two ways forward, and the owner picks:**
+  wear the strap to bed for a validation window, or ship on the workout-window agreement alone and
+  say so in the entry. **This also retracts a statement made to the owner in session on 2026-09-15**
+  that nightly HRV could come from the strap today with a pipeline change only — the pipeline change
+  is real, the nightly data is not there. **Do not re-derive this from the row count; 136,440 beats
+  looks like plenty until you group them by hour.**
   Wiring this up costs a pipeline change, not a new integration.
 - **What this buys:** any future device exposing raw beat intervals (a near-universal HR-hardware
   capability) could feed nightly HRV/chronic-stress/resilience identically to the ring, closing part
