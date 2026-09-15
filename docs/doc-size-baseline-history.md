@@ -12157,3 +12157,18 @@ Thirty lines correcting BF-149's scope. The table of four call sites is the entr
 wrong" was already filed and fixed once, so what this needs to carry is WHERE it is still wrong and
 that one of the four prescribes reps rather than printing them. It also records why the sweep missed:
 BF-149 grepped the function's direct callers and not the wrapper seven surfaces import.
+
+## 2026-09-15 — `docs/implementation-backlog.md` → 21165 (OR-116, the lane sweep)
+
+Four entries left the queue (BF-141, BF-135, LB-47, BF-64) and LB-109 closed, against eighteen `Lane:`
+assignments and two new entries — so the net is nearly flat and the composition is the point.
+
+The assignments are the reason this file did not shrink, and they are worth their lines: **BF-100 had
+no lane and was therefore printing as READY in BOTH lanes at once**, which is the one failure mode
+that makes the queue tool actively misleading rather than merely incomplete. Seventeen more entries
+were parked, so nobody had noticed.
+
+One assignment was made and then **reverted**: PS-4 argues in its own body for staying unclassified,
+and it is right — each role rewrites its own baton, so it is done by whoever hands over next. The
+revert is recorded in place rather than silently undone, because the next sweep will be tempted the
+same way.

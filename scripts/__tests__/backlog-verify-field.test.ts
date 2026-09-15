@@ -112,10 +112,20 @@ describe('the seventeen shipped entries are never parked', () => {
   const verifiedOnDevice = (lines: string[]) =>
     lines.some(l => /\bVERIFIED ON THE S25\b/.test(l))
 
+  // The third outcome, and this file asserted it could not happen (OR-116, 2026-09-15). A device
+  // look can come back BROKEN, and that does not leave verification debt — it converts the entry
+  // back into WORK. Such an entry correctly carries neither a `Verify:` nor a `Keep:` asking for a
+  // check, because the check happened; what it carries is a defect and a lane pointing at where the
+  // failure actually is. TN-13 and BF-74 are both in that state, and TN-13 had to be re-laned A→B
+  // as part of it, since the failing look proved the defect was not where the entry assumed.
+  const failedOnDevice = (lines: string[]) =>
+    lines.some(l => /\b(FAILED|REPORTED BROKEN) ON THE S25\b/.test(l))
+
   for (const id of CONVERTED) {
     it(`${id} is verification debt or already verified, never a block`, () => {
       const lines = entry(id)
       if (!lines) return // removed from the queue: finished, which is the outcome this rule wants
+      if (failedOnDevice(lines)) return // the look failed: it is work now, not verification debt
       // Exactly one of the two, so neither a silently-dropped `Verify:` nor a verified entry that
       // kept the bullet slips through as "fine".
       expect(
@@ -133,7 +143,7 @@ describe('the seventeen shipped entries are never parked', () => {
     const { keepFromLines } = require('../lib/keep.js') as { keepFromLines: (l: string[]) => { text: string } | null }
     for (const id of CONVERTED) {
       const lines = entry(id)
-      if (!lines) continue
+      if (!lines || failedOnDevice(lines)) continue
       expect(keepFromLines(lines)?.text, `${id} has no Keep: to describe the check`).toBeTruthy()
     }
   })
@@ -177,6 +187,15 @@ describe('next-item.js routes them out of PARKED', () => {
    * say which ids are in scope at all.
    */
   const backlog2 = readFileSync(join(ROOT2, 'docs/implementation-backlog.md'), 'utf8')
+  const entry2 = (id: string) => {
+    const lines = backlog2.split('\n')
+    const start = lines.findIndex(l => l.startsWith('### ') && new RegExp(`\\b${id}\\b`).test(l))
+    if (start < 0) return null
+    const rest = lines.slice(start + 1).findIndex(l => l.startsWith('### '))
+    return lines.slice(start, rest === -1 ? undefined : start + 1 + rest)
+  }
+  const failedOnDevice2 = (lines: string[]) =>
+    lines.some(l => /\b(FAILED|REPORTED BROKEN) ON THE S25\b/.test(l))
   const stillOwed = CONVERTED2.filter(id => {
     const lines = backlog2.split('\n')
     const start = lines.findIndex(l => l.startsWith('### ') && new RegExp(`\\b${id}\\b`).test(l))
@@ -185,14 +204,21 @@ describe('next-item.js routes them out of PARKED', () => {
     if (start < 0) return false
     const rest = lines.slice(start + 1).findIndex(l => l.startsWith('### '))
     const body = lines.slice(start, rest === -1 ? undefined : start + 1 + rest)
+    // A failed look owes no further look either — it owes a fix.
+    if (failedOnDevice2(body)) return false
     return !body.some(l => /\bVERIFIED ON THE S25\b/.test(l))
   })
 
   it('prints a VERIFY section holding every entry that still owes a look', () => {
     const verify = section('VERIFY')
     expect(verify).toContain('shipped; a look is owed, nothing is blocked')
-    expect(stillOwed.length, 'the snapshot cannot all be verified or this block asserts nothing')
-      .toBeGreaterThan(0)
+    // `stillOwed` is EMPTY as of 2026-09-15 and that is the correct answer, not a broken fixture:
+    // all seventeen of the snapshot have been worked through — verified on the S25, failed there and
+    // converted back to work, or removed from the queue outright. This used to assert the list was
+    // non-empty, on the reasoning that an all-verified snapshot asserts nothing. True, and the remedy
+    // is not to keep the snapshot artificially unfinished: the loop below still guards every id that
+    // has not been settled, and the section header is asserted above either way. If a future device
+    // pass puts one of these back into debt, this starts asserting again on its own.
     for (const id of stillOwed) expect(verify, `${id} missing from VERIFY`).toContain(id)
   })
 
@@ -213,6 +239,11 @@ describe('next-item.js routes them out of PARKED', () => {
     // something to build.
     for (const id of CONVERTED2) {
       expect(listsEntry(section('PARKED'), id), `${id} is still parked`).toBe(false)
+      // An entry whose look came back BROKEN is *supposed* to be offered as startable work — that is
+      // the point of striking its `Verify:`. Only the ones still reading as shipped must stay out of
+      // READY, which is the invariant BF-90 actually measured.
+      const lines = entry2(id)
+      if (lines && failedOnDevice2(lines)) continue
       expect(listsEntry(section('READY'), id), `${id} is offered as startable work`).toBe(false)
     }
     // VERIFY is the more specific claim than KEEP, so an entry that still owes a look belongs in one
