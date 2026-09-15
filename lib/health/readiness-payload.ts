@@ -512,17 +512,25 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   const hasGenericRecoverySignal =
     sleepScore100 != null || genericHrvSeries.length >= 2 || genericRhrSeries.length >= 2
 
+  // Hoisted out of the composite call because the illness radar below reads the SAME two z-scores
+  // (PS-42). Computing them twice is how the readiness a user sees and the illness flag beside it
+  // would come to disagree about the same night.
+  const genericRhrZ = trailingBaselineZ(genericRhrSeries)
+  const genericHrvZ = trailingBaselineZ(genericHrvSeries)
+  // The generic stand-in for the rollup's night count, shared for the same reason.
+  const genericNHistory = Math.max(0, genericHistoryDays - 1)
+
   const genericComposite: ReadinessCompositeResult | null = (!latestSummary && hasGenericRecoverySignal)
     ? computeReadinessComposite({
-        rhrZ: trailingBaselineZ(genericRhrSeries),
-        hrvZ: trailingBaselineZ(genericHrvSeries),
+        rhrZ: genericRhrZ,
+        hrvZ: genericHrvZ,
         tempZ: null,
         sleepBalanceZ: trailingBaselineZ(genericSleepMinSeries),
         previousNightScore: sleepScore100,
         prevDayActivityScore,
         activityBalanceScore: ownActivityScore,
         checkinScore,
-        nHistory: Math.max(0, genericHistoryDays - 1),
+        nHistory: genericNHistory,
       })
     : null
 
@@ -544,9 +552,26 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   // temp/RHR/HRV z-scores. Surfaced as a bounded readiness suppression + advisory, never a new
   // weighted contributor (those biomarkers are already composite contributors — that would
   // double-count). Stays "learning" until the baseline is mature, so a cold user is never flagged.
+  //
+  // **PS-42: the generic path gets one too.** This used to be `latestSummary ? … : null`, so a user
+  // without a ring got NO illness computation — not even a degraded one — although the formula is
+  // built for exactly that: it renormalizes over whichever signals are present and returns
+  // `learning` while the baseline is cold. Temperature and breathing have no generic source and
+  // stay null, the same way the generic readiness composite leaves its temperature contributor
+  // null rather than approximating it. The z-scores and the history count are the composite's own,
+  // not recomputed.
+  //
+  // `nHistory` is passed and is currently unreachable as a discriminator here, which is worth
+  // stating rather than discovering: `trailingBaselineZ` needs BASELINE_MIN_NIGHTS prior samples
+  // before it returns anything, so a non-null z on this path already implies a mature baseline and
+  // the radar's own cold-start gate can never be the one that fires. It stays because that coupling
+  // is an accident of the current minimum — lower `trailingBaselineZ`'s threshold and the gate
+  // becomes load-bearing the same day.
   const illness = latestSummary
     ? computeIllnessRadar({ tempZ, rhrZ, hrvZ, breathZ, nHistory: latestSummary.nHistory })
-    : null
+    : genericComposite
+      ? computeIllnessRadar({ tempZ: null, breathZ: null, rhrZ: genericRhrZ, hrvZ: genericHrvZ, nHistory: genericNHistory })
+      : null
 
   // ── Score + source ──────────────────────────────────────────────────────────
 

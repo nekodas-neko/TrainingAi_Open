@@ -124,9 +124,48 @@ export function warmupGoalSecFor(
 }
 
 export function budgetForPreset(sessionBudgetMin: number, preset: DurationPreset | undefined): number {
+  return Math.max(MIN_PRESET_BUDGET_MIN, requestedBudgetMin(sessionBudgetMin, preset))
+}
+
+/**
+ * The budget the choice ASKS for, before the floor is applied (BF-7 PR 2a).
+ *
+ * Split out from `budgetForPreset` because the clamp destroys the one thing the prescription needs
+ * downstream: whether today is shorter, the same, or longer than the session. A session configured
+ * at or below `MIN_PRESET_BUDGET_MIN` clamps `short` back up to its own budget, so a direction read
+ * off the clamped value would say "same" and quietly switch that session from dropping exercises to
+ * trimming sets. The request is the intent; the clamp is what is achievable.
+ */
+export function requestedBudgetMin(sessionBudgetMin: number, preset: DurationPreset | undefined): number {
   if (preset == null || preset === 'standard') return sessionBudgetMin
   if (preset === 'long') return sessionBudgetMin + DURATION_PRESET_DELTA_MIN
-  return Math.max(MIN_PRESET_BUDGET_MIN, sessionBudgetMin - DURATION_PRESET_DELTA_MIN)
+  return sessionBudgetMin - DURATION_PRESET_DELTA_MIN
+}
+
+/**
+ * Is today shorter than, the same as, or longer than the session's configured length?
+ *
+ * **This is the thing the prescription actually branches on, and until BF-7 it was reading the
+ * label instead** — `durationPreset === 'short'` selected `dropToBudget` and `=== 'long'` selected
+ * `expandToBudget` (`generate-prescription.ts`). Those are three different algorithms, not three
+ * budgets, and the labels were only ever a proxy for the direction.
+ *
+ * Deriving it from minutes is what lets the ladder grow past three rungs (BF-7 wants 30/45/60/90
+ * around the session's own length): when `DurationPreset` becomes a number, this function is the
+ * only one that changes, and the algorithm selection downstream is already correct. Today it
+ * returns exactly what the labels did, which is the point — this step is behaviour-preserving by
+ * construction and the tests assert that rather than taking it on trust.
+ *
+ * `0` must keep meaning "do not expand": the duration model is deliberately conservative and that
+ * under-fill IS the finish-early margin (see `DURATION_PRESET_DELTA_MIN`). Expanding a standard
+ * session would spend exactly that margin.
+ */
+export function durationDirection(
+  sessionBudgetMin: number,
+  preset: DurationPreset | undefined,
+): -1 | 0 | 1 {
+  const requested = requestedBudgetMin(sessionBudgetMin, preset)
+  return requested < sessionBudgetMin ? -1 : requested > sessionBudgetMin ? 1 : 0
 }
 
 // Per-exercise transition overhead: walking over, adjusting the station, loading the bar.
