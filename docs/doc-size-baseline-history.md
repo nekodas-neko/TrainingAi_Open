@@ -12241,6 +12241,19 @@ who trusted the mutation score without reading why it survived.
 The rest is the device-verification gap: the owner cannot test this one, because having a ring is
 what makes his path safe here and also what makes the new branch unreachable from his account.
 
+## 2026-09-15 — PS-41 gated on the owner (backlog +33)
+
+The entry described a degraded-mode feature for users without a ring. Reading the merge path and
+measuring production found it is a change to the **owner's own** Activity Score: there is no
+precedence ladder to add a slot to (`getHrForWindow` applies one rule, `preferStrapBuckets`, and
+passes everything else through unranked), and he is a Health Connect user whose HR coverage is
+already 31 of 31 days at ~2,240 rows a day. Sparse phone samples interleaved into that series feed
+22% of the Activity Score's weight.
+
+Worth every line because the entry reads as safe. An implementer who trusted it would have shipped a
+scoring change without knowing it was one — which is the exact thing CLAUDE.md's "Tuning proposes,
+the owner signs off" rule exists to stop.
+
 ## 2026-09-15 — BF-7 planned (backlog +10)
 
 A ten-line net change that replaces a question with its answer. The entry asked whether
