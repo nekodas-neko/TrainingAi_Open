@@ -12384,3 +12384,10 @@ session to go looking for the arithmetic bug that is not there.
 
 The other weight is the two things NOT fixed — `hrMin` standing in for the resting rate, and the
 three-surfaces context question. Both would read as closed if the entry were shorter.
+
+## 2026-09-15 — `docs/implementation-backlog.md` (BF-166)
+
+Thirty-eight lines. The report names one screen and the defect is all 52 Sheet/Dialog files, so the
+entry has to establish that before an implementer patches the meal builder alone. The ordering
+paragraph earns its length too: the overlay check must sit AFTER the three mode guards, or a confirm
+dialog raised by one of them gets dismissed by the very back press meant to answer it.

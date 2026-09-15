@@ -437,6 +437,54 @@ below threshold and left in place for next time.
 
 
 
+### [app-shell] BF-166 — the Android back button cannot see an open sheet, so it navigates the page underneath one
+
+- **Lane:** B — `components/mobile-auth-handler.tsx:45-71` (the listener) plus
+  `components/ui/sheet.tsx` and `components/ui/dialog.tsx` (where the registration belongs).
+  **The 52 call sites need no changes** — see the fix shape.
+- **Added:** 2026-09-15 (BugFix intake). Owner: *"If you have a nutrition meal creator menu open and
+  you press the back button - it makes the page behind it go back to main."*
+- **The global `backButton` listener has three guards and none of them is an overlay.** It checks an
+  active workout, an active guided walk, and an active activity — each a full-screen *mode* — then
+  falls straight through:
+
+  ```ts
+  switch (backActionForPath(window.location.pathname)) {
+    case "minimize": App.minimizeApp(); break
+    case "home":     navigateToTab(routerRef.current, "/"); break   // ← what he hit
+    case "pop":      window.history.back(); break
+  }
+  ```
+
+  `/nutrition` is a tab, so `backActionForPath` returns **`"home"`** and the app navigates to Home
+  with the builder still open on top. His description — *"the page behind it go back to main"* — is
+  precisely what that line does.
+- **Android's hardware back does not produce an Escape key**, which is the gap. Radix closes a
+  `Sheet`/`Dialog` on Escape and on an overlay tap, so this never shows up in the browser; the
+  Capacitor `backButton` event is a separate channel that the overlay primitives know nothing about.
+  That is why the three existing guards are all Zustand-store modes — those were the only closable
+  states anyone had a handle on.
+- **It is every overlay in the app, not the meal builder.** **52 files** render a `<Sheet>` or
+  `<Dialog>`, and **no overlay registry exists** (`grep` for `openOverlay|overlayStack|topOverlay`
+  returns nothing). Any of them open over a tab route sends the user Home; over a sub-route it pops
+  the page instead of closing the overlay. The meal builder is simply the one with enough typed-in
+  state to make the loss obvious.
+- **Fix shape, and the point is that it is central.** A module-level stack — `SheetContent` and
+  `DialogContent` push a close-callback on mount and pop it on unmount — consulted by the listener
+  **before** `backActionForPath`: if the stack is non-empty, close the topmost and return. Two
+  primitives and one guard; the 52 consumers are untouched because they already go through those
+  primitives.
+- **Order matters against the existing guards.** The overlay check belongs **after** the three
+  mode guards, not before: a confirm dialog raised BY one of those guards (`setConfirmLeaveOpen`) is
+  itself an overlay, and checking overlays first would make the second back press close the
+  confirmation rather than answer it. Mid-workout back must keep reaching its own prompt.
+- **Not in scope:** changing what back does with no overlay open. `backActionForPath` returning
+  `"home"` for a tab is deliberate and documented — tabs are peers reached by `replaceState`, so
+  there is nothing to pop.
+- **Verification:** on device, open a sheet over each of a tab route (`/nutrition`) and a sub-route,
+  press back, and confirm the overlay closes and the page does not move. Then mid-workout: back must
+  still raise the leave-workout prompt, and a second back must not dismiss it by the new path.
+
 ### [activity][cardio] BF-165 — "Other activity" is a dead tap on device, and the whole source path reads correct
 
 - **Lane:** B — `components/workout/log-activity-sheet.tsx`,
