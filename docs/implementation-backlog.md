@@ -481,6 +481,53 @@ below threshold and left in place for next time.
 - **Verification:** on device with the WebView console attached, tap Cardio → Other activity →
   Treadmill and record whether (a) the sheet closes, (b) the URL becomes `/activity`, (c) anything is
   logged. Those three answers pick between the candidates above.
+### [app-shell][platform] LA-109 — a tab flip leaves the PREVIOUS tab's route tree on the history entry, so back renders the wrong screen
+
+- **Lane:** B — `components/shell/tab-shell.tsx`.
+- **Added:** 2026-09-15 · owner, live report: *"Going to more; then going to profile details and
+  pressing back gets me to the home page again."*
+- **⚠ This is NOT LB-107 mis-classifying the path, which was the first guess and is wrong.**
+  `backActionForPath('/more/details')` correctly returns `pop` — `tabKeyForHref` requires an exact
+  match against a tab href, and `components/shell/__tests__/back-action-on-tab.test.ts` already
+  asserts sub-routes pop. The resolver is not the defect and changing it would break tab backs.
+
+**MEASURED 2026-09-15 in Playwright against `pnpm dev`, by dumping `history.state` rather than
+reasoning about it.** Load `/`, then click the More tab:
+
+| where | `history.length` | URL | Next's recorded tree for that entry |
+|---|---|---|---|
+| `/` | 2 | `/` | `["", {children: ["(home)", …"/"…]}]` |
+| after the More tab flip | 2 | **`/more`** | `["", {children: ["(home)", …"/"…]}]` — **unchanged** |
+| `/more/details` | 3 | `/more/details` | `["", {children: ["more", {children: ["details", …]}]}]` |
+
+**The middle row is the bug.** `show()` (`tab-shell.tsx:85`) flips tabs with
+`window.history.replaceState(null, "", href)`, which updates the address bar — and Next's patched
+`replaceState` re-injects **its own current tree**, which is still Home's, because no Next
+navigation happened. So the entry ends up reading `/more` while carrying the route tree for `/`.
+Popping back to it restores that tree, and Home renders. The URL is right and the screen is wrong,
+which is why this reads as "back went to the home page".
+
+- **The comment above that line describes the intent correctly and the mechanism incompletely.** It
+  says replaceState keeps "the URL honest for refresh/deep-links/back". It keeps the URL honest; it
+  leaves the *tree* stale, and only back can see the difference.
+- **⚑ BF-49 is very likely the same defect and should be read with this.** *"Tapping a workout, then
+  back, leads to health training not home. Same with tapping a food item from timeline."* That entry
+  is marked *"does not reproduce in the web harness"* and concluded *"the fix is not in the router"* —
+  both consistent with this, since the harness sequence it drove started with a direct `goto` rather
+  than a tab flip, so no entry ever carried a stale tree. **Do not fix the two separately** until one
+  has been tried against the other's repro.
+- **What a fix has to preserve**, all three of which the current shape gets right and a naive change
+  would break: a tab flip must not grow the history stack (`e2e/tab-flip-leaves-nothing-to-pop.spec.ts`
+  pins this), the URL must stay honest for refresh and deep links, and LB-107's back-to-Home from a
+  tab root must keep working. The likely shape is to hand `replaceState` a state object carrying the
+  destination tab's tree rather than letting Next re-inject the old one — but that reaches into
+  Next's internals (`__PRIVATE_NEXTJS_INTERNALS_TREE`), so **measure a candidate before adopting it**.
+- **Reproduction note for whoever takes it:** the row-click route is awkward in the harness — a daily
+  check-in sheet opens over Home and intercepts pointer events, and Escape does not dismiss it.
+  Dumping `history.state` after the tab flip is the cheap measurement and needs no row click at all.
+- **Verification:** from Home, flip to More, open Profile details, press back — arrive on **More**
+  with the More tab active, not Home. Then repeat BF-49's sequence and confirm it, too.
+
 
 ### [devices] PS-40 — formalize the data-source connector convention as a typed, checkable declaration
 

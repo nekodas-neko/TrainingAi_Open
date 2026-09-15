@@ -12207,3 +12207,17 @@ telling it to target a single rep on every bodyweight exercise. That is a differ
 one BF-164 described, found only by grepping rather than trusting the entry's list, and it is worth
 the lines because the same "80% of the estimate" idea will look correct to the next person who
 writes it.
+
+## 2026-09-15 — LA-109 filed (backlog +37, projectOverview +24)
+
+Both grow for a finding that is cheap to state wrongly and expensive to re-derive. The owner
+reported back from Profile details landing on Home; the obvious reading is that LB-107, which
+shipped the day before, mis-classified the path. It did not — `backActionForPath('/more/details')`
+returns `pop` correctly, and a test already pins that. An entry that only said "back goes to the
+wrong screen" would send the next session straight at the resolver and break tab backs fixing
+nothing.
+
+What earns the lines is the measurement: a `history.state` dump showing the entry reading `/more`
+while carrying Next's route tree for `/`. That is three numbers in a table and it converts the
+entry from a symptom into a mechanism — and it is what lets LA-109 say BF-49 is probably the same
+defect, which is worth more than either entry alone.
