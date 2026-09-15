@@ -12498,3 +12498,13 @@ entries, which is the failure that has already happened three times in this repo
 Resolved by rebuilding the file from `origin/main` and re-inserting only the three TN entries,
 rather than splicing the hunk. The three live device entries keep the top of the queue ahead of
 them; a latent documentation divergence does not outrank a dead button on the APK.
+
+## 2026-09-15 — `projectOverview.md` → 11358, `docs/implementation-backlog.md` → 21568 (BF-166)
+
+The backlog **shrank 7** while the index grew 29, and the asymmetry is the finding: almost none of
+this is the fix, which is one exported predicate and one `if`.
+
+What the lines buy is a correction. BF-166 asked for an overlay registry to be built and one already
+existed under different names — so the entry as written would have produced two stacks disagreeing
+about what is open, which is worse than the bug it was filed against. Recording *where* the registry
+is, and that the obvious grep returns a false negative, is what stops the next session repeating it.

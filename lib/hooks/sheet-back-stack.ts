@@ -81,6 +81,24 @@ export function handlePop(state: unknown, history: HistoryLike): void {
   }
 }
 
+/**
+ * Is any sheet or dialog currently open? (BF-166.)
+ *
+ * **The Capacitor `backButton` listener needs this because a pushed entry is invisible to it.**
+ * `openSurface` pushes with no URL, so `window.location.pathname` is unchanged — and
+ * `backActionForPath` decides from the pathname alone. On a tab route it answers `"home"` and the
+ * listener calls `navigateToTab` instead of popping; on `/` it answers `"minimize"`. Neither touches
+ * history, so the surface's entry is never consumed and the page moves out from under an open sheet.
+ * That is the owner's report: *"a nutrition meal creator menu open and you press the back button —
+ * it makes the page behind it go back to main."*
+ *
+ * Only the `"pop"` branch happened to work, and only by coincidence: it calls `history.back()`,
+ * which is what consumes the entry.
+ */
+export function hasOpenSurface(): boolean {
+  return stack.length > 0
+}
+
 /** Tests only — the stack outlives any one component by design. */
 export function resetSheetBackStack(): void {
   stack.length = 0
