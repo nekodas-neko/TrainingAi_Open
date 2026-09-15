@@ -99,8 +99,8 @@ different rows and both may exist.
 - Take the **next free migration number at implementation time**, not one reserved now — this plan
   may sit in the queue while other Lane A migrations land.
 - Add the `claude_ro` view in the same migration, as the sibling tables do.
-- **Reversible:** it creates a table and drops nothing, so it is outside the destructive carve-out.
-  The *feature* still needs the owner's word before merge (§7); this migration does not.
+- **Reversible** in the destructive sense — it creates a table and drops nothing — **but it is still
+  gated (§7).** Reversibility is not the only trigger for the carve-out here; see §7.
 
 ## 5. PR 2 — the engine
 
@@ -163,9 +163,20 @@ trainee. Nothing here decides authorization; it consumes §5's routes.
   about trainees, not an argument for handing a training partner raw SQL against production).
 - **No fine-grained read scopes.** ~3 users, 5 at most, all known to the owner: no permission matrix,
   no audit trail, no tenancy model, no invite-at-scale flow.
-- **⚠ Ask the owner before merging PR 2 or PR 3.** This is an authorization change, and unlike most
-  entries the confirm-first carve-out is the whole feature rather than one migration inside it.
-  PR 1 (the migration) is reversible and additive and does not need that gate.
+- **⚠ Ask the owner before merging ANY of it, PR 1 included.** BF-9's entry is explicit — *"Ask the
+  owner before merging **any of it** … unlike most entries the carve-out is the whole feature rather
+  than one migration inside it"* — and that second clause means the gate is WIDER than usual, not
+  that the migration falls outside it.
+  **⚠ Corrected 2026-09-15, hours after this plan was first written, because the first version got
+  this backwards and did it in the most misleading way available: it quoted the entry's own sentence
+  while inverting what the sentence says.** It read the "rather than one migration inside it" clause
+  as carving the migration out, and argued from `CREATE TABLE` being additive and reversible. That
+  argument is sound about *destructiveness* and beside the point about *authorization* — which is a
+  separate trigger in CLAUDE.md's carve-out, and the one the owner's instruction is aimed at. The
+  harm from acting on the wrong version would have been small (an empty table on production) and the
+  harm from the pattern is not: a plan that quietly loosens a gate the owner set, using the gate's
+  own words, is how a stated decision stops binding. Nothing about the table's shape changed — only
+  whether it may merge unasked. It may not.
 
 ## 8. The acceptance test
 
