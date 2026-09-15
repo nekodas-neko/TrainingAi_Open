@@ -12374,3 +12374,13 @@ documents got smaller because an open finding became a shipped one with a shorte
 What survives at length in both is the thing that is *not* fixed — the number is Tuning's, and the
 `—`-versus-badge question is the owner's. An entry that reads as closed when two of its three parts
 are still owed is how a KEEP turns into a dropped finding.
+
+## 2026-09-15 — `projectOverview.md` → 11329, `docs/implementation-backlog.md` → 21429 (OR-116)
+
++22 and +25 for two label strings, and the ratio is defensible for once: the diff is small because
+**nothing was computing the wrong number**, and that is precisely the fact a reader will not believe
+without the figures in front of them. An entry that just says "labelled the HR chip" invites the next
+session to go looking for the arithmetic bug that is not there.
+
+The other weight is the two things NOT fixed — `hrMin` standing in for the resting rate, and the
+three-surfaces context question. Both would read as closed if the entry were shorter.

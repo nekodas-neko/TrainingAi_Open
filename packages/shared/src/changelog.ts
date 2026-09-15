@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.456.18",
+    date: "2026-09-15",
+    changes: [
+      "The heart rate on your home screen and the one on the Heart Rate page stop looking like they disagree. Home shows last night\u2019s resting rate; the detail page shows today\u2019s current, lowest, average and highest. Both were simply labelled \"Heart Rate\", so a resting 60 sitting beside a current 73, a low of 50 and a high of 125 read as one number being wrong. Home now says \"Resting HR\" \u2014 except on the rare occasion it can only find a live reading, where it stays generic because that one is not a resting rate \u2014 and the four figures on the detail page are now headed \"Today so far\".",
+    ],
+  },
+  {
     version: "1.456.17",
     date: "2026-09-15",
     changes: [

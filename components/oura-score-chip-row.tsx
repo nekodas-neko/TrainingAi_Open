@@ -409,6 +409,19 @@ export const OuraScoreChipRow = memo(function OuraScoreChipRow({ readiness, slee
   // rate — a desk reading, not a night.
   const hr = readiness.restingHrLastNight ?? readiness.restingHr ?? readiness.hrCurrent;
 
+  // **OR-116 — the label follows the SOURCE, because the last fallback is a different metric.**
+  // The owner: *"I dont see any other values that match that home screen HR value — current = 73,
+  // min = 50, average = 89, max = 125, and the HR card says 60."* Nothing was computing the wrong
+  // number: 60 is last night's RESTING rate, the 73/50/89/125 are today's INTRADAY series, and both
+  // screens called their figure "Heart Rate". One name over two metrics reads as one metric
+  // disagreeing with itself.
+  //
+  // Naming it unconditionally "Resting HR" would just move the false claim: `hrCurrent` is a live
+  // BLE sample — a desk reading, not a night — so on that fallback the honest label is the generic
+  // one. Health's own tile already says "Resting HR" for the same value, so the wording matches
+  // rather than inventing a third vocabulary.
+  const hrIsResting = readiness.restingHrLastNight != null || readiness.restingHr != null;
+
   const cells: CellProps[] = [
     {
       label: "Readiness",
@@ -424,8 +437,8 @@ export const OuraScoreChipRow = memo(function OuraScoreChipRow({ readiness, slee
       limited: readiness.limited,
     },
     {
-      label: "Heart Rate",
-      short: "HR",
+      label: hrIsResting ? "Resting HR" : "Heart Rate",
+      short: hrIsResting ? "Rest HR" : "HR",
       display: hr != null ? String(hr) : "—",
       cue: restingHrCue(hr, readiness.restingHrBaseline),
       accent: "#f87171",
