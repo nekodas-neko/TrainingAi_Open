@@ -12508,3 +12508,13 @@ What the lines buy is a correction. BF-166 asked for an overlay registry to be b
 existed under different names — so the entry as written would have produced two stacks disagreeing
 about what is open, which is worse than the bug it was filed against. Recording *where* the registry
 is, and that the obvious grep returns a false negative, is what stops the next session repeating it.
+
+## 2026-09-15 — `projectOverview.md` → 11382, `docs/implementation-backlog.md` → 21560 (BF-74)
+
++24 and −10: the backlog shrank because round two closed most of what the entry was carrying, and
+the index grew by the one thing that would otherwise be lost.
+
+That thing is a refutation of a comment already in the code. `meal-photo-tile.tsx` argued in writing
+that a confirm was crude because re-picking is one tap — and `getPhoto` is called with no
+`saveToGallery`, so for a camera capture there is nothing to re-pick. A future reader who finds the
+confirm annoying will find that comment first; the lines here are what stop them acting on it.

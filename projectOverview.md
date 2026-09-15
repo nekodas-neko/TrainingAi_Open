@@ -3100,6 +3100,30 @@ fault channel every session is told to read first.
 [`Review sweep 43 §4`](docs/reviews/2026-09-03-ownership-rule-a-and-body-supplied-ids.md).
 **Web build, local database.**
 
+### [nutrition][app-shell] ⚠️ Removing a meal photo now asks first, because the photo is genuinely unrecoverable (BF-74, 2026-08-31)
+
+**Shipped in v1.456.20; the device check is still owed, and one half of it a browser cannot judge.**
+
+Owner, device pass 2026-09-13: *"it gives me an undo option; but no warning before removal"*. Round
+one of BF-74 had moved the ✕ out of the dismiss corner and made it a bin — both correct, and the
+control still destroyed the photo on one tap.
+
+**The component's own comment argued against a confirm, and it was checkable and wrong.** It said
+*"re-picking is already one tap … so the toast just spares the gallery round-trip."* But
+`CapCamera.getPhoto` is called with **no `saveToGallery`** (the plugin defaults it to false), so a
+camera capture is never written to the gallery or anywhere else — it lives only as the base64 the
+component holds. There is no round-trip to spare, and a time-limited toast is the only thing standing
+between a mis-tap and a lost photo. So the entry's "confirm, or make undo durable" resolves on
+evidence, not taste. The undo stays as a second line, since the argument does hold for a
+gallery-sourced photo.
+
+Reuses the existing `confirm-dialog.tsx`. The e2e drives **both arms — cancel then confirm**, cancel
+first because a confirm that removes anyway passes every happy-path assertion; it fails against
+`main` on the missing dialog. **The spec was strengthened, not loosened.**
+
+**NOT verified on device**, and the outstanding half is structurally out of reach of a browser:
+whether the undo toast is still reachable by a thumb before it dismisses.
+
 ### [app-shell] ⚠️ The Android back button ignored the overlay stack the app already had (BF-166, 2026-09-15)
 
 **Fixed in v1.456.19 — one line, after the entry's premise turned out to be wrong. Device check owed.**

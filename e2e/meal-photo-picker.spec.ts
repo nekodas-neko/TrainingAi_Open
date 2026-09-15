@@ -185,7 +185,26 @@ test('the photo can be removed, and a rename on its own leaves it alone', async 
   // where the sheet's close button would be, and its accessible name carries the meal so the two
   // tiles that are briefly mounted together cannot be confused — the same reason the pick label
   // was named. The bare fallback only applies when no `label` is passed, and both call sites do.
+  //
+  // **It now CONFIRMS first, and the cancel arm is asserted before the confirm arm.** The owner's
+  // device pass on 2026-09-13 found the corner fix worked and the control still destroyed the photo
+  // on one tap — *"it gives me an undo option; but no warning before removal"*. Undo was justified
+  // in the component on the grounds that re-picking is one tap; that is false for a camera capture,
+  // because `getPhoto` is called with no `saveToGallery` and the photo exists nowhere else.
   await tap(page, /^Remove the photo from /)
+  await expect(page.getByText('Remove this photo?')).toBeVisible({ timeout: 10_000 })
+
+  // Cancel first: a confirm that removes anyway is the failure worth catching, and it would pass
+  // every assertion below if only the happy path were driven.
+  await tap(page, /^Cancel$/)
+  await expect(page.getByText('Remove this photo?')).toHaveCount(0)
+  await tap(page, /^Update Meal$/)
+  await expect.poll(storedImage, { timeout: 20_000 }).not.toBeNull()
+
+  await openEditMeal(page)
+  await tap(page, /^Remove the photo from /)
+  await expect(page.getByText('Remove this photo?')).toBeVisible({ timeout: 10_000 })
+  await tap(page, /^Remove$/)
   await tap(page, /^Update Meal$/)
   await expect.poll(storedImage, { timeout: 20_000 }).toBeNull()
 })
