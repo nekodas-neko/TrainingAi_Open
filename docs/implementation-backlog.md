@@ -599,29 +599,6 @@ which is why this reads as "back went to the home page".
   small, scoped to one pillar, and directly closes part of the degraded-mode gap the
   device-agnostic-source goal names as still open.
 
-### [devices][readiness] PS-42 — wire illness radar into the generic (non-Oura) readiness path
-
-- **Lane:** A — `lib/health/readiness-payload.ts`.
-- **Added:** 2026-09-14 (one-off session; same input-tracing pass as PS-41 — see
-  [`docs/data-source-connector-guide.md`](data-source-connector-guide.md) §4's illness radar row).
-- **The gap:** `computeIllnessRadar` (`packages/shared/src/health/illness-radar.ts`) is written to
-  degrade gracefully — its four weighted signals (temperature 0.40, breathing 0.25, RHR 0.20,
-  HRV-balance 0.15) are each optional and the formula renormalizes over whichever are present. But
-  its only caller, `readiness-payload.ts`, computes it *only if* `latestSummary` (an
-  `oura_daily_summary` row) exists — so a Health-Connect-only user gets **no illness computation at
-  all**, not even a temperature-omitted degraded one, despite the formula supporting exactly that
-  case.
-- **The fix, in shape:** call `computeIllnessRadar` from the same generic-fallback branch that
-  already builds `genericComposite` for readiness (the `// Generic-source fallback (Q-43)` code at
-  `readiness-payload.ts:494–541`), passing whatever z-scores that branch already computes (RHR,
-  HRV) and `null` for temperature/breathing (which have no generic source, same as the readiness
-  composite's own temperature contributor) — the formula's existing renormalization handles the rest.
-  This is a wiring change, not a new formula.
-- **Verification:** confirm on a test account with body_metrics/sleep_sessions populated via
-  Health Connect only (no `oura_daily_summary` row) that `/api/readiness-score` returns a non-null
-  illness radar value with `inputsMissing` naming temperature/breathing, rather than omitting the
-  field entirely.
-
 ### [devices] PS-43 — decide whether Health Connect's 30-day cold-sync cap should be a deliberate policy or extendable
 
 - **Lane:** A — a sync-policy decision that lands in the Health Connect ingest path. (Assigned 2026-09-15, OR-116 lane sweep.)

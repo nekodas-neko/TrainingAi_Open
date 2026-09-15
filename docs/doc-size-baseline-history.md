@@ -12228,3 +12228,15 @@ Twenty-six lines onto BF-165. The owner's "it just scrolls to the top of cardio 
 rather than colour — a tap that never fired would not move the scroll — so the entry now carries the
 nested-scroller mechanism that explains it, and the warning that raising the navigation timeout turns
 a dead tap into a slow dead tap.
+
+## 2026-09-15 — PS-42 shipped (backlog −23, projectOverview +26)
+
+The row costs more than the entry saved, and the surplus is one paragraph: `nHistory` is passed to
+the illness radar on the generic path and is currently unreachable as a discriminator, because
+`trailingBaselineZ` will not return a z-score until the baseline is already mature. That reads as
+dead code and is not — it becomes load-bearing the moment anyone lowers that threshold. It survived
+a mutation as an equivalent mutant, which is exactly how it would have been "cleaned up" by someone
+who trusted the mutation score without reading why it survived.
+
+The rest is the device-verification gap: the owner cannot test this one, because having a ring is
+what makes his path safe here and also what makes the new branch unreachable from his account.
