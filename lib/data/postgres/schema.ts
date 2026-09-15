@@ -392,6 +392,11 @@ export const activityLogs = pgTable('activity_logs', {
     startSec: number; endSec: number
     avgHr: number | null; maxHr: number | null; hrAtStart: number | null
     avgPaceSecPerKm: number | null; distanceKm: number | null; avgCadenceSpm: number | null
+    // LA-48. **Optional, and it must stay optional**: every walk saved before this shipped has a
+    // `segments` jsonb with no `steps` key at all, and a required field here would be a type
+    // asserting something about stored rows that is not true. `computeWalkSegmentStats` always
+    // produces it, so only history is absent.
+    steps?: number | null
   }[]>(),
   createdAt:       timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:       timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

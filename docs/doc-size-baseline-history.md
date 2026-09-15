@@ -12052,7 +12052,111 @@ rather than against it.
 had recorded it seven times. The check that caught it was one grep for `SEGV_MAPERR` across `docs/`
 before writing, which is cheaper than the duplicate would have been to unpick.
 
-## 2026-09-11 — `docs/implementation-backlog.md` → 20885 (RV-42 shipped)
+## 2026-09-14 — `docs/implementation-backlog.md` → 20928 (LA-76's correction)
+
++16 to correct a claim that would have produced a wrong change.
+
+LA-76's newest block said the deload-session half "ships with no schema change at all — do that half
+first". It ships nothing: `listTrainedDayKeys` carries no `phase_type` filter, so a deload session is
+already a trained day, and all three ever stamped carry five exercise logs each on production. The
+owner's rule is already satisfied for sessions.
+
+Worth the lines because the instruction was not merely redundant, it was harmful: `pausedDays` is
+shared with the steps and sleep ladders, so adding deload sessions to it would have stopped those two
+decaying on a day the user simply trained. An entry written from an owner's words without reading the
+code can be confidently wrong in a direction the words themselves never implied.
+
+## 2026-09-14 — `docs/implementation-backlog.md` → 20953 (BF-100's candidate cause)
+
++26 for a hypothesis and the one-tap experiment that settles it.
+
+BF-100 has failed on the S25 twice while the Playwright spec restores 840 every time, and the entry
+could say only that the difference was "the system back gesture or the WebView's restore timing".
+Reading the hook rather than the three screens named a mechanism that explains the split exactly:
+`use-scroll-restoration.ts:158` cancels a pending restore on `touchstart` with no re-arm, the S25's
+back gesture is a touch, and `page.goBack()` is not.
+
+Worth the lines because the next session would otherwise re-derive the same comparison — and because
+the experiment that confirms it (come back with a UI control instead of the gesture) has never been
+run, the entry's own verification step having always specified the gesture.
+
+## 2026-09-14 — BF-58's band split (backlog −34, projectOverview +29)
+
+The backlog **shrank**: BF-58's option analysis (four ways to fix it, option B's full cross-account
+terms) had done its job once the owner chose D, so the entry was cut back to the three things that
+still need the hardware and the rejected option's terms moved into the shipping journal entry. The
+new LA-108 costs most of what was recovered, which is correct — it is a live hazard on code that
+shipped today, not analysis.
+
+`projectOverview.md` grows by the Known Issues row, and it carries the two measured weight clusters
+(70.0–72.8 against 57.5–58.0) rather than only the conclusion. That is the difference between a
+future session re-deriving the band width and reading it: the numbers are what make 8% arithmetic
+instead of a preference, and they are what say not to widen it.
+
+## 2026-09-14 — LA-48's steps half (backlog +20, projectOverview +22)
+
+Both grow for the same reason and it is the useful kind. LA-48's entry gained three corrections
+found by building it — a fifth type declaration the entry did not know about, a steps derivation
+that was wrong by 6× on a segment with a pause, and the discovery that the entry's own 2026-09-01
+correction was itself wrong about adherence being reconstructible. The third is what re-scopes the
+remaining two thirds from a build into a design decision, so the lines that describe both candidate
+shapes are the entry's most load-bearing content, not padding.
+
+`projectOverview.md` carries the arithmetic comparison (60 steps integrated vs 360 multiplied) in
+the Known-Issues row, because that is the number that stops the wrong derivation coming back at a
+call site. A row saying only "use the shared helper" would not.
+
+## 2026-09-15 — `docs/implementation-backlog.md` (BF-162, BF-163)
+
+Fifty lines for two defects on one card row. BF-162 carries the reproduction table because "85 kg on a
+Hanging Leg Raise" reads as a glitch until you see it is exactly 66% of a stored 128, and the entry
+has to stop the fix being "relabel it as added weight". BF-163 spends its length on the fact that the
+tag is CORRECT by its own definition — an implementer told only "hypertrophy is wrong" would change
+the band table and break every other row.
+
+## 2026-09-14 — `docs/implementation-backlog.md` (PS-40 … PS-46, generic data-source connector)
+
+21002 → 21202. Seven entries from one docs-only session designing a generic data-source connector
+(a friend connecting his own device, and what the app needs to keep working without the Oura ring):
+PS-40 (a typed connector registry), PS-41 (Health Connect's HR series isn't normalized into the
+table Activity Score reads), PS-42 (illness radar's own formula degrades gracefully but its caller
+never invokes it for non-Oura users), PS-43 (Health Connect's 30-day backfill cap is a client
+heuristic, not a decided policy), PS-44 (a working rMSSD-from-raw-beats calculator already exists
+and is only wired to workout summaries), PS-45 (no per-user API key exists for external ingestion),
+PS-46 (the Apple HealthKit connector plan). Each carries the file/function evidence for its claim
+rather than a bare assertion, because the whole point of the session was to stop the next person
+re-deriving what six existing integrations already established by reading each other's code — an
+entry that only asserted "wire X into Y" would recreate exactly that problem one level up.
+
+## 2026-09-14 — `projectOverview.md` (generic data-source connector session)
+
+11071 → 11092. One Current Status paragraph pointing at three new reference docs and six backlog
+entries from the same session as the row above. Kept to a pointer rather than restating the guide's
+content, because the guide itself is the record — this paragraph exists so a session reading
+`projectOverview.md` first (the standing session-start rule) knows the connector docs exist at all.
+
+## 2026-09-14 — LA-108's engine half (backlog +11, projectOverview +7)
+
+LA-108 was filed this morning describing a missing read path, and building it found the real lock
+was one SQL predicate — `confirmScaleSample` matching `status='pending'` only. The entry grows a
+little even though most of its speculation about shape is now answered, because what replaces that
+speculation is four concrete notes for whoever renders the list: preserve newest-first (in the
+lockout, the top rows are the wrongly-declined ones), a declined row may carry a null weight and
+still lists, no dismiss action, and do not widen the band instead.
+
+`projectOverview.md` grows by a correction rather than by content: its own row claimed BF-58
+introduced this lockout. It did not — the predicate made an accidental *Not me* tap irreversible
+long before the band split existed. A row that misattributes a defect to the change that revealed it
+sends the next session to the wrong file, so the retraction is worth more lines than the fix.
+
+## 2026-09-15 — `docs/implementation-backlog.md` (BF-164)
+
+Thirty lines correcting BF-149's scope. The table of four call sites is the entry — "the rep max is
+wrong" was already filed and fixed once, so what this needs to carry is WHERE it is still wrong and
+that one of the four prescribes reps rather than printing them. It also records why the sweep missed:
+BF-149 grepped the function's direct callers and not the wrapper seven surfaces import.
+
+## 2026-09-11 — `docs/implementation-backlog.md` → 21229 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 
@@ -12072,3 +12176,10 @@ correct against the `main` of its hour. Under six concurrent lanes plus an owner
 reading of a moving number, and a PR that waits will re-read it once per merge that overtakes it.
 Recomputed by `pnpm fix:baselines` after each merge, which is the only thing that makes the
 subtraction mean anything.
+
+**Recomputed again 2026-09-15** (→ 21229). The two counts above are left at their 2026-09-11
+measurement rather than incremented, because incrementing by hand is the exact failure this note
+already records — and the derivation no longer reproduces: repeated merges of `main` move
+`merge-base` forward, so it now returns the last re-merge rather than the original branch point.
+What can be measured cleanly is that **8** first-parent merges overtook this branch since its
+previous re-merge alone. The headline figure is the live one; the two counts are a floor.

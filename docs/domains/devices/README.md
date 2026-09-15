@@ -79,7 +79,17 @@ documentation cluster in the repo (~45 known issues, ~38 plans, 300+ model files
    [`docs/oura-ble-open-oura-audit-2026-07-08.md`](../../oura-ble-open-oura-audit-2026-07-08.md) ·
    the extracted-model inventory and bundle-provisioning docs (private archive — see
    `scripts/private-paths.json`)
-6. [`docs/device-agnostic-source-architecture.md`](../../device-agnostic-source-architecture.md) —
+6. [`docs/data-source-connector-guide.md`](../../data-source-connector-guide.md) — **the concrete
+   contract a new data source is checked against (2026-09-14, PS-40):** transport categories, the
+   canonical shape of every data type (HR as a time-series list, sleep as a session + stage-interval
+   array, body metrics as sparse daily scalars, etc.), the ranked-provenance merge, the
+   scored-vs-learning-mode isolation decision, and the shared ingestion-route pattern. Read this
+   before wiring any new ring/strap/platform source; it's the "where does X actually land" answer
+   the architecture doc below doesn't spell out.
+   [`docs/sync-health-api-reference.md`](../../sync-health-api-reference.md) is its companion for
+   someone actually integrating a device: the real JSON schema for `/api/sync-health`, and the
+   honest note that there's no external API-key auth yet (PS-45).
+8. [`docs/device-agnostic-source-architecture.md`](../../device-agnostic-source-architecture.md) —
    the raw-capable vs computed source tiers, and
    [`docs/overview/history-2026-07-30.md`](../../overview/history-2026-07-30.md)
    for what tiers 1-2 actually landed as (Q-43): sleep has one write path with a required `source`,
@@ -252,6 +262,15 @@ Live at the time of writing (2026-07-30):
 - **Chest-strap pairing card now shows a live link-status dot** (v1.246.4,
   `components/settings/chest-strap-pairing.tsx` + `lib/live-hr/chest-strap-source.ts`'s
   `getChestStrapLinkStatus()`, 1 Hz poll) — not yet confirmed on-device.
+- 🟠 **Two hardware questions about the Renpho scale are still unanswered (BF-58, open)** — whether
+  two phones can hold a GATT connection at once (inferred from the protocol shape, never measured),
+  and whether `REQUEST_STORED_MEASUREMENTS_CMD` (`0x22 0x04 0x15`) gets a reply. The second decides
+  whether the race between two phones matters at all: if the scale buffers, the losing phone catches
+  up on its next connect. The command is in the code and its own comment says it is speculative and
+  borrowed from a different firmware generation. Weight-band attribution shipped 2026-09-14 without
+  either answer —
+  [journal](../../overview/entries/2026-09-14-lane-a-bf58-weight-band-attribution.md); the band
+  hazard it left is LA-108.
 
 ## History
 

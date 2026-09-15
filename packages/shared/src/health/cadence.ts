@@ -393,8 +393,36 @@ function estimateSteps(valid: CadenceReading[], startMs: number): number | null 
     if (existing) existing.push(r.spm)
     else bins.set(bin, [r.spm])
   }
+  return stepsFromCadenceSeries([...bins.entries()].map(([tSec, values]) => ({ tSec, spm: median(values) })))
+}
+
+/**
+ * Steps from an already-binned cadence series — the one piece of "cadence to steps" arithmetic.
+ *
+ * `estimateSteps` above bins raw readings and calls this; a per-segment step count calls it with
+ * the slice of the persisted series inside that segment's window. Two integrations of the same
+ * quantity is how a walk's total and the sum of its segments end up disagreeing by a few hundred
+ * steps with nothing to say which is right.
+ *
+ * **One divergence is real and is not hidden.** `estimateSteps` filters to STRAP readings before
+ * binning (Q-230), and the persisted series does not carry a source, so a caller slicing that
+ * series cannot apply the same filter. Today the two agree exactly, because `pickLiveCadence`
+ * returns null on the ring branch while `RING_CADENCE_VALIDATED` is false and every reading in the
+ * series is therefore a strap reading. The day ring calibration ships, a walk that mixed sources
+ * would have segment steps counting ring data that the walk total excludes — at which point the
+ * series needs a source per point, and this comment is where to start.
+ *
+ * Each populated bin contributes its value over a full `CADENCE_SERIES_BIN_SEC`, so a window that
+ * cuts a bin in half still counts the whole bin. Over a 60 s-plus segment that is under a bin's
+ * worth either way; over anything shorter it would not be, and nothing should call this with one.
+ */
+export function stepsFromCadenceSeries(
+  series: CadenceSeriesPoint[],
+  binSec: number = CADENCE_SERIES_BIN_SEC,
+): number | null {
+  if (series.length === 0) return null
   let steps = 0
-  for (const values of bins.values()) steps += median(values) * (CADENCE_SERIES_BIN_SEC / 60)
+  for (const p of series) steps += p.spm * (binSec / 60)
   return Math.round(steps)
 }
 

@@ -3,6 +3,7 @@ import type { RoutePoint } from '@/lib/activity/route-encoding'
 import { computeTotalDistanceKm, computeAvgPaceSecPerKm } from '@/lib/activity/activity-metrics'
 import { samplesInWindow } from './segment-window'
 import { formatPace } from '@trainingai/shared/health/vdot'
+import { stepsFromCadenceSeries } from '@trainingai/shared/health/cadence'
 
 export interface WalkSegmentStat {
   index: number
@@ -18,6 +19,20 @@ export interface WalkSegmentStat {
   avgPaceSecPerKm: number | null
   distanceKm: number | null
   avgCadenceSpm: number | null
+  /**
+   * Steps taken during this segment, integrated from the cadence series rather than multiplied
+   * out of `avgCadenceSpm` (LA-48).
+   *
+   * The obvious derivation — mean spm × duration — counts a pause at the moving average, because
+   * `avgCadenceSpm` is cadence *while moving* by construction: a stop contributes no readings and
+   * so cannot pull it down. It is also a second answer to a question the app already answers, and
+   * `stepsFromCadenceSeries` is the one place that answers it — the same arithmetic behind the
+   * walk's own saved `steps`, so the segments and the total cannot drift apart.
+   *
+   * Stored rather than derived at read time for the same reason: every consumer re-deriving it is
+   * every consumer rounding it differently.
+   */
+  steps: number | null
 }
 
 function avg(nums: number[]): number | null {
@@ -78,6 +93,7 @@ export function computeWalkSegmentStats({
       avgPaceSecPerKm,
       distanceKm,
       avgCadenceSpm: avg(cadenceInWindow.map(c => c.spm)),
+      steps: stepsFromCadenceSeries(cadenceInWindow),
     }
   })
 }
