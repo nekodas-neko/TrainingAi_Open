@@ -10,7 +10,7 @@ import { aggregateExerciseHrTrend, summarizeHrByExercise } from '@trainingai/sha
 import { computeHrRecoveryProfile } from '@trainingai/shared/health/compute-hr-recovery-profile'
 import { liveReadinessByDay } from '@trainingai/shared/health/live-readiness'
 import { resilienceLevelToBand } from '@/lib/health/stress-resilience'
-import { isBodyweightType, repMaxFromOneRm } from '@trainingai/shared/1rm'
+import { isBodyweightType, bodyweightRepMax } from '@trainingai/shared/1rm'
 import { todayMidnightUtc, shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
 import { computeEnergyBalance } from '@/lib/health/energy-balance-service'
@@ -29,11 +29,16 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
     typesPromise ??= repo.listExerciseLibrary().then(lib => new Map(lib.map(e => [e.name, e.exerciseType])))
     return typesPromise
   }
-  /** The stored estimate rendered in the unit that means something for this exercise. */
+  /** The stored estimate rendered in the unit that means something for this exercise.
+   *
+   *  BF-164: `bodyweightRepMax`, not `repMaxFromOneRm`. Stored bodyweight estimates go through
+   *  `calcAmrap1RM`, so inverting the unscaled formula handed the model a rep max short by the
+   *  amrap discount — 8 where the lifter had logged 11. A number the model then reasons from and
+   *  quotes back is worse than a wrong label on a card. */
   const oneRmFields = (oneRm: number | null | undefined, type: string | undefined) => {
     if (oneRm == null || oneRm <= 0) return { estimated1rm: null }
     return isBodyweightType(type)
-      ? { estimated1rm: repMaxFromOneRm(oneRm), unit: 'reps (bodyweight — a rep max, NOT kilograms)' }
+      ? { estimated1rm: bodyweightRepMax({ oneRm }), unit: 'reps (bodyweight — a rep max, NOT kilograms)' }
       : { estimated1rm: oneRm, unit: 'kg' }
   }
 

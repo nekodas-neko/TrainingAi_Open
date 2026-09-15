@@ -522,9 +522,17 @@ describe('bodyweight strength displays as reps, not kilograms (Q-12)', () => {
     expect(displayOneRm(oneRm, 'bodyweight', 0).value).toBeGreaterThan(5)
   })
 
+  // BF-164: the bodyweight fixtures are DERIVED from `calcAmrap1RM`, which is what
+  // `estimateOneRm` actually stores for a bodyweight set — they used to be hand-written values from
+  // `calc1RM`, a forward map this path never uses. A stored 118 is 7 reps under the real map and 6
+  // under the one the old fixtures came from, so the numbers agreed with the inverse under test and
+  // with nothing else. Seven and eight, not five and six: five and six collide (the 1.0 → 0.97
+  // step cancels the rep-factor gain) and no inverse can separate them.
+  const bwStored = (reps: number) => calcAmrap1RM(BW_REF, reps)
+
   it('expresses a bodyweight delta in whole reps and a weighted one in kg', () => {
-    expect(displayOneRmDelta(118, 114.5, 'bodyweight')?.text).toBe('+1 rep')
-    expect(displayOneRmDelta(114.5, 118, 'bodyweight')?.text).toBe('-1 rep')
+    expect(displayOneRmDelta(bwStored(8), bwStored(7), 'bodyweight')?.text).toBe('+1 rep')
+    expect(displayOneRmDelta(bwStored(7), bwStored(8), 'bodyweight')?.text).toBe('-1 rep')
     expect(displayOneRmDelta(95, 92.5, 'weighted')?.text).toBe('+2.50 kg')
     expect(displayOneRmDelta(100, null, 'weighted')).toBeNull()
   })
@@ -535,8 +543,23 @@ describe('bodyweight strength displays as reps, not kilograms (Q-12)', () => {
   })
 
   it('converts a whole series for charts, and leaves weighted series untouched', () => {
-    expect(displayOneRmSeries([114.5, 118, 128], 'bodyweight')).toEqual([5, 6, 8])
+    expect(displayOneRmSeries([bwStored(5), bwStored(7), bwStored(11)], 'bodyweight')).toEqual([5, 7, 11])
     expect(displayOneRmSeries([90, 92.5], 'weighted')).toEqual([90, 92.5])
+  })
+
+  // The owner's live report, as the assertion. His Hanging Leg Raise stored 128 from an 11-rep set
+  // and every surface below printed "8 RM" four lines under "Last: 11 reps".
+  it('reads a real stored estimate back as the reps it came from', () => {
+    expect(calcAmrap1RM(BW_REF, 11)).toBe(128)
+    expect(displayOneRm(128, 'bodyweight').text).toBe('11 RM')
+    expect(displayOneRmSeries([128], 'bodyweight')).toEqual([11])
+  })
+
+  // Not cosmetic: this one sets prescribed reps. An understated rep max understates every target
+  // by the same proportion — 8/11 is a 27% shortfall in training volume, not a label.
+  it('prescribes reps off the true rep max', () => {
+    expect(rescaleBodyweightReps([{ pct: 100, reps: 0 }], 128)[0].reps).toBe(11)
+    expect(rescaleBodyweightReps([{ pct: 80, reps: 0 }], 128)[0].reps).toBe(8)
   })
 
   it('labels the metric for the exercise', () => {
@@ -565,8 +588,10 @@ describe('migration 148 backfill values match the real estimator (Q-12)', () => 
 
 describe('describePersonalRecord (Q-19)', () => {
   it('announces a bodyweight record as a rep max, never a weight', () => {
-    expect(describePersonalRecord('Pull-Up', 118, 'bodyweight')).toBe('Pull-Up 6 RM')
-    expect(describePersonalRecord('Pull-Up', 118, 'bodyweight')).not.toMatch(/kg/i)
+    // Derived, per the BF-164 note above: `calcAmrap1RM(BW_REF, 7)` is 118, so a stored 118 is a
+    // 7 RM. It read 6 while the fixture came from `calc1RM`, which is not what gets stored.
+    expect(describePersonalRecord('Pull-Up', calcAmrap1RM(BW_REF, 7), 'bodyweight')).toBe('Pull-Up 7 RM')
+    expect(describePersonalRecord('Pull-Up', calcAmrap1RM(BW_REF, 7), 'bodyweight')).not.toMatch(/kg/i)
   })
 
   it('keeps the existing phrasing for weighted lifts', () => {
