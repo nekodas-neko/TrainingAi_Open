@@ -12627,3 +12627,25 @@ even though it is the obvious mechanism and looked certain.
 The rest is one trap: Next updates the URL at commit, so *"the URL never showed /activity"* cannot
 tell an aborted commit from a never-started push. That inference was made here and was wrong, and
 without the note the next session makes it too.
+
+## 2026-09-15 — backlog → 21917: the reachability audit, composites, and the Health Connect gap
+
++100 lines across three entries answering the owner's core-tuning question. The lines are almost all
+measurements, and one of them changes what the app is understood to be doing.
+
+**TN-42 is the one that had to be written down.** The owner's requirement was a single sentence —
+*"I should be able to get 100"* — and the measurement says he cannot: **readiness has never reached
+90 in 62 days.** The contributor table is the entry, because the cause is specific and
+counter-intuitive: `temperature` is scored *closer-better*, 100 sits exactly at the personal
+baseline, and the baseline is miscentred, so 100 is unreachable by construction rather than by
+difficulty. Two ⛔ lines guard the obvious wrong fixes — re-tuning the curve to compensate for a
+broken input, and filing `LATENCY`'s 90 ceiling as a bug when the final calibration already
+compensates for it.
+
+**TN-44 retires a claim, which is worth more than the ten rows it adds.** The connector guide says
+skin temperature has no second source. Health Connect defines `SkinTemperatureRecord`. The ring-only
+list was always a statement about our read list and the user's device, and writing that down stops
+the next session designing around a limit that is not there.
+
+**TN-43 is the shortest and stays short.** Four composites, a table, and one rule about not
+laundering an inferred value into something that looks measured.

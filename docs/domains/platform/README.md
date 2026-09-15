@@ -28,6 +28,7 @@ layer**) through §16. Read it before building any shared helper.
 ## Reference docs
 
 - [`docs/superpowers/plans/2026-09-15-trainer-role.md`](../../superpowers/plans/2026-09-15-trainer-role.md)
+- [`docs/reviews/2026-09-15-base-data-reachability-and-composites.md`](../../reviews/2026-09-15-base-data-reachability-and-composites.md) — **base data reviewed against Health Connect, score reachability measured, and four composite metrics, 2026-09-15** (TN-42/43/44). **Readiness has never reached 90 in 62 days** — the `temperature` contributor is scored closer-better and its baseline is miscentred, so 100 is unreachable by construction (TN-6/BF-13). ⚠ **Retires "skin temperature has no second source"**: Health Connect defines `SkinTemperatureRecord` and `HeartRateVariabilityRmssdRecord`, so the ring-only list is about our read list and the user's device, not the platform.
   — **BF-9, the trainer role.** A trainer relationship table beside `friendships`, the friendship
   consent handshake copied as-is, and workout programs only (meal plans deferred by the owner).
   **Read §2 before writing any code**: the obvious implementation reproduces RV-42 — a trainer-authored

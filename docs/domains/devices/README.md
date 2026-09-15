@@ -34,6 +34,7 @@ documentation cluster in the repo (~45 known issues, ~38 plans, 300+ model files
   `DeviceMetricsPanel` below `OuraBleDebug` (Q-544 — they answer on a desktop, which is the point
   when the APK is the thing that is broken). `device-console-access.test.ts` fails on either.
 - [`docs/superpowers/plans/2026-08-26-camera-form-capture.md`](../../superpowers/plans/2026-08-26-camera-form-capture.md)
+- [`docs/reviews/2026-09-15-base-data-reachability-and-composites.md`](../../reviews/2026-09-15-base-data-reachability-and-composites.md) — **base data reviewed against Health Connect, score reachability measured, and four composite metrics, 2026-09-15** (TN-42/43/44). **Readiness has never reached 90 in 62 days** — the `temperature` contributor is scored closer-better and its baseline is miscentred, so 100 is unreachable by construction (TN-6/BF-13). ⚠ **Retires "skin temperature has no second source"**: Health Connect defines `SkinTemperatureRecord` and `HeartRateVariabilityRmssdRecord`, so the ring-only list is about our read list and the user's device, not the platform.
   — **design only, nothing built or measured (PS-7, 2026-08-26).** Proposes the phone camera as a
   sensor: `@mediapipe/tasks-vision` in the WebView (self-hosted — the documented CDN path is
   blocked by `connect-src 'self'`), with a native CameraX + MediaPipe Kotlin plugin as the
