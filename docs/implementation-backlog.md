@@ -437,6 +437,51 @@ below threshold and left in place for next time.
 
 
 
+### [activity][cardio] BF-165 — "Other activity" is a dead tap on device, and the whole source path reads correct
+
+- **Lane:** B — `components/workout/log-activity-sheet.tsx`,
+  `components/activity/activity-type-grid.tsx`, `components/activity/activity-screen.tsx`,
+  `lib/view-transition.ts`. **Start from the device console, not from these files** — see the
+  elimination list.
+- **Added:** 2026-09-15 (BugFix intake). Owner: *"when I try click the treadmill; or any 'Other
+  activity' nothing actually happens."* Reported on the APK.
+- **This blocks a path the owner was told to use yesterday.** BF-160 established that a fitness test
+  earns no calories, and "Other activity → Treadmill" is the recommended way to log a steady
+  treadmill walk (the guided walk is interval-only, minimum 1 fast + 1 slow block). That
+  recommendation currently leads to a dead button.
+- **⚠ The source path is correct end to end and UNCHANGED. Do not re-read these — they were traced
+  and cleared on 2026-09-15:**
+
+  | checked | verdict |
+  |---|---|
+  | `log-activity-sheet.tsx` → `selectType` | correct: `startActivity(...)` → `onOpenChange(false)` → `router.push('/activity')`, with a prefetch on open |
+  | `activity-type-grid.tsx` | correct: `onClick={() => onSelect(type)}` on a real `<button>` |
+  | `activity-store.startActivity` | sets `mode: 'pre'` + type/label/icon; `reconcileRehydratedActivity` only demotes `done` or a stale `active`, so it cannot wipe a fresh selection |
+  | `activity-screen.tsx` | correct: `pre` + a type → `PreActivityScreen` |
+  | `app/activity/page.tsx` | auth guard only |
+  | `pre-activity-screen.tsx` | no mount-time fetch, no throw candidate (59 lines) |
+  | `getActivityIcon` | has a `?? DotsThreeCircle` fallback, so a bad icon cannot throw |
+  | `tabKeyForHref('/activity')` | returns **null** → treated as a real navigation, not a shell flip |
+  | `/api/activity-types` | exists; production returns all **10** types including `treadmill` |
+  | `git log --since=2026-09-10` on every file above | **no changes** |
+
+- **So the defect is at runtime, and the entry's job is to say where to look.** Three candidates, in
+  the order they are cheap to test on device:
+  1. **The view transition never commits.** `useTransitionRouter` freezes the outgoing screen and
+     polls for route commit against a **300 ms** cap. Its own comments record this path misbehaving
+     twice before. A navigation that fails to commit leaves the old screen up — exactly "nothing
+     happens". Test by checking whether the URL changes while the screen does not.
+  2. **The `/activity` route fails to load in the WebView** (chunk/network), which is invisible
+     without the console.
+  3. **The sheet's close animation cancels the push** — `onOpenChange(false)` runs immediately
+     before `router.push` in the same tick.
+- **`error_events` holds nothing for this**, checked over three days: no `/activity` or `/cardio` row
+  at all. Absence is not evidence here — a navigation that silently does not happen throws nothing —
+  but it does rule out an uncaught exception being reported.
+- **Verification:** on device with the WebView console attached, tap Cardio → Other activity →
+  Treadmill and record whether (a) the sheet closes, (b) the URL becomes `/activity`, (c) anything is
+  logged. Those three answers pick between the candidates above.
+
 ### [workouts] BF-164 — BF-149 fixed ONE of eight surfaces; every other bodyweight rep max still reads 8 RM for an 11-rep set
 
 - **Lane:** A — `packages/shared/src/1rm.ts`. Four call sites inside that one file feed all eight
