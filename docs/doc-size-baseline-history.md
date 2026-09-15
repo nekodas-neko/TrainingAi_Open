@@ -12286,3 +12286,39 @@ A conflict hunk does not respect entry boundaries, and the after-check everyone 
 heading list against `main`'s — **cannot** catch a body-only edit going missing, because there is no
 heading to miss. Recorded here and in `docs/local-dev-database.md` beside the other conflict recipes,
 where the next person resolving this file will actually be looking.
+
+## 2026-09-15 — `projectOverview.md` → 11210, `docs/implementation-backlog.md` → 21296 (BF-162)
+
++11 on each for a one-guard fix, and the length is carrying one thing: why the harness is not going
+to catch this class. `exercise_library` holds 27 bodyweight exercises and none of them is in any
+`session_exercises` row, so a prescription row for one cannot be rendered without building the
+fixture that would make it appear — which tests a situation constructed for the test.
+
+Recording that is what stops the next session either writing the e2e and believing it, or reading
+"no e2e" as an omission. The rest is the two stored numbers that produced the report, so the
+arithmetic stays reproducible after the data moves on.
+
+## 2026-09-15 — BF-7 PR 2a (backlog +10, projectOverview +19)
+
+Both carry the same correction, and it is the reason the lines exist: the plan written this morning
+said to compare the *chosen* budget against the anchor, and `budgetForPreset` clamps at the
+20-minute floor. A session configured at or near that floor would have reported "same" and silently
+switched from dropping exercises to trimming sets — a behaviour change smuggled inside a refactor
+advertised as behaviour-preserving, on exactly the sessions least able to absorb it.
+
+A plan that is wrong in one clause is more dangerous than one that is vague, because it reads as
+settled. Correcting it in place and saying so in the row is cheaper than the next implementer
+re-deriving why `requestedBudgetMin` exists and deciding it is redundant.
+
+## 2026-09-15 — Q-44 Phase 3 audited and gated (backlog +22)
+
+The lines carry three measurements that change what Q-44 is, none of which were in the plan. The
+second recording device already exists and did not share a table — `colmi_*` is live with 5,568 rows
+across three tables — so the "generically-named single-vendor table" the 2026-09-11 note warned
+about is the state the schema is already in, not a risk ahead of it. The two devices use opposite
+idioms, which makes "the same tables" a design problem rather than a rename. And `oura_bucket`, the
+table singled out as the one a second device would most need to share, has never been written.
+
+Worth the lines because the entry currently reads as a decided goal with a written plan, and an
+implementer trusting that would spend a 2,813-reference sweep to arrive no closer to what the owner
+asked for. The `Gate: owner` is the operative change; the rest is why.

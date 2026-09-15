@@ -1891,6 +1891,25 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [workouts] 🟢 The prescription branches on duration DIRECTION now, not on the preset label (BF-7 PR 2a, 2026-09-15)
+
+No user-visible change and none intended — the control still offers three segments and the plans it
+produces are byte-identical. What moved is the thing blocking the 45-minute session the owner asked
+for: `short` and `long` were selecting **three different algorithms** (drop exercises / trim sets /
+expand to MRV), and the labels only work as a proxy for "shorter / same / longer than your session"
+while there are exactly three of them. `durationDirection` derives it from minutes, so PR 2b can add
+rungs without re-deciding an algorithm per rung.
+
+**The plan written the same morning was wrong about one thing, corrected on implementation.**
+`budgetForPreset` clamps at `MIN_PRESET_BUDGET_MIN` (20), so a session configured at or near the
+floor has its `short` clamped back up to its own budget — and a direction read off the clamped value
+says "same", silently switching those sessions from dropping exercises to trimming sets. The
+direction reads `requestedBudgetMin` (unclamped) instead. The request is the intent; the clamp is
+what is achievable.
+
+**Remaining: PR 2b (Lane B)** — the type becomes a number, the route's enum widens, and the control
+offers 30/45/60/90 committing on release. The device check belongs there, when 45 becomes selectable.
+
 ### [readiness][devices] ⚠️ A ring-less user gets an illness radar now, and no such account has been driven (PS-42, 2026-09-15)
 
 Shipped with no version bump — nothing changes for a ring user. `computeIllnessRadar` renormalizes
@@ -2041,6 +2060,19 @@ no `/more` scroll position to restore. It needs a device pass now, not more read
 **NOT verified on device.** The Android system back gesture and the WebView's history handling are
 not reachable from the sandbox; Playwright's `goBack()` is the same history step but not the same
 gesture. Kept as LA-109's `Keep:`.
+
+### [workouts] ⚠️ A bodyweight exercise no longer shows a kg target, and that is not device-verified (BF-162, 2026-09-15)
+
+The owner, reading his Legs prescription: *"Is this right?"* The card printed **`@ 85kg (66%)`**
+against a **Hanging Leg Raise** — 66% of a stored `estimated_1rm` of 128, which for a bodyweight
+exercise is an internal index derived from reps (BF-149), not a load. There is no bar. Pull-Up showed
+`@ 90kg` the same way.
+
+Fixed by one guard using the shared `isBodyweightType`; the row falls through to the percent-only
+branch the card already rendered for exercises with no 1RM. **Check on device:** a session containing
+a bodyweight exercise shows no kg for it, while weighted exercises in the same list are unchanged.
+**The harness cannot cover this** — 27 bodyweight exercises exist in the library and none is in any
+session, so the row cannot be rendered without inventing fixture state.
 
 ### [app-shell] ⚠️ Back on a tab now goes Home, and the gesture itself is not device-verified (LB-107, 2026-09-14)
 

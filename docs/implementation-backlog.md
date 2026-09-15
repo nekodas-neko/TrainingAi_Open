@@ -791,8 +791,16 @@ below threshold and left in place for next time.
 - **Consider, not required:** for a bodyweight exercise the useful target is reps, and `avg_reps` is
   stored (BF-151 is already about reading it rather than inverting). Showing *"2×12"* with the
   percent and no kg is complete on its own; a rep target is a further improvement, not part of this.
-- **Verification:** on device, open a session containing a bodyweight exercise and confirm no kg is
-  shown for it while weighted exercises in the same list are unchanged.
+- **✅ SHIPPED 2026-09-15** (`fix/bf162-bodyweight-no-kg`).
+  [Journal](overview/entries/2026-09-15-bf162-bodyweight-no-kg.md). One guard on `weightKg`, using
+  the **shared** `isBodyweightType` from `packages/shared/src/1rm.ts` rather than a ninth inline
+  `=== 'bodyweight'` — there were eight. A bodyweight exercise falls through to the `@ ${ex.pct}%`
+  branch the card already rendered when a 1RM was missing.
+- **Keep:** the device check, and only that — open a session containing a bodyweight exercise and
+  confirm no kg is shown for it while weighted exercises in the same list are unchanged. **The
+  harness cannot stand in for it:** `exercise_library` holds 27 bodyweight exercises and **none is in
+  any `session_exercises` row**, so a prescription row for one cannot be rendered without inventing
+  fixture state — which would test a situation built for the test rather than the one reported.
 
 ### [workouts] BF-163 — the intensity chip is computed from load alone, so it labels a 6-rep set "Hypertrophy · typically 8–12 reps"
 
@@ -19346,6 +19354,28 @@ describing a safety net that no longer exists.
   like `oura_raw_samples` already does and for the same reason)? Do it in the same PR as each
   table's rename — a generically-named table with no discriminator is the state that invites a
   later writer to assume portability the schema cannot deliver.
+- **Gate:** owner
+- **⚠ AUDITED 2026-09-15 (Lane A) — the rename as planned does not deliver what was asked for, and
+  the decision is the owner's:**
+  [`docs/reviews/2026-09-15-vendor-table-rename-discriminator-audit.md`](reviews/2026-09-15-vendor-table-rename-discriminator-audit.md).
+  - **The second recording device already exists and did NOT share a table.** `colmi_readings`
+    (4,237 rows), `colmi_raw_frames` (1,173) and `colmi_sleep_segments` (158) are live in production.
+    So the *"worse than the honest vendor name"* outcome is not a risk to avoid — it is the state the
+    schema is already in, and renaming `oura_*` leaves `colmi_*` exactly where it is.
+  - **The two devices use opposite idioms, so "the same tables" is not a rename.** Oura is one table
+    per metric with a `source` column; Colmi is one `colmi_readings` table with a `kind` column keyed
+    `(userId, kind, measuredAt)`. Unifying them is a design problem about what a row is.
+  - **`oura_bucket` — the table the 2026-09-11 note singled out as the one a second device would most
+    need to share — holds 0 rows.** It has never been written.
+  - **The plan's 13 tables omit five `oura_*` tables** (`oura_ble_rekey_declarations`,
+    `oura_daytime_stress_buckets`, `oura_raw_packed`, `oura_redecode_jobs`, `oura_rollup_state`);
+    there are **18**. The earlier "22" was not an overcount — it was 18 `oura_*` + 3 `colmi_*` +
+    `rr_intervals`. A PR built from the short list leaves the schema half-renamed.
+  - **Recommendation: rename only what is genuinely multi-source now** — `oura_heartrate`, whose rows
+    are **73% Polar chest strap**, so its name actively misleads — leave the rest vendor-named until a
+    second writer exists (the plan's own `oura_raw_samples` argument), and file the real goal
+    (reconciling `colmi_*` with `oura_*`) as its own entry. Reversal cost is low for a single table
+    behind a compatibility view and high for a 2,813-reference sweep.
 - ✅ **Phase 3 now HAS its plan (2026-08-04):**
   [`docs/superpowers/plans/2026-08-04-vendor-table-rename-phase-3.md`](superpowers/plans/2026-08-04-vendor-table-rename-phase-3.md).
   Three PRs, not one: rename behind compatibility **views** (an `ALTER TABLE … RENAME` is
@@ -21008,6 +21038,16 @@ session per day.
 in the Postgres schema, the local SQLite tables or `lib/local-store/types.ts` — the hook's own
 comment says *"the choice is never written to the program, it only tags the plan it produced"*. So
 this needs **no migration and no sync work**, which is unusual for a change this visible.
+
+**✅ PR 2a SHIPPED 2026-09-15** — `durationDirection` lives in `duration-model.ts` and the
+prescription branches on it instead of the label. Behaviour-preserving by construction and asserted
+as such; touches no Lane B file and no wire contract. **What remains is PR 2b (Lane B):**
+`DurationPreset` becomes a minutes number, the route's Zod enum widens to accept one, and the control
+offers 30/45/60/90 around the session's anchor, committing on release. **A correction the plan needed
+on implementation:** the direction must read the **requested** budget, not the clamped one —
+`budgetForPreset` clamps at `MIN_PRESET_BUDGET_MIN`, so a session at the floor would otherwise report
+"same" and switch from dropping exercises to trimming sets. `requestedBudgetMin` is the unclamped
+half, split out for that.
 
 **✅ PLANNED 2026-09-15 —
 [`docs/superpowers/plans/2026-09-15-session-duration-ladder.md`](superpowers/plans/2026-09-15-session-duration-ladder.md).**
