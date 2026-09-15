@@ -60,10 +60,27 @@ export function TabShell({ initialTab, session }: { initialTab: TabKey; session:
   // ever offered for the current day, so a day whose evening is never synced loses them for good.
   useColmiAutoSync(useUserTimezone());
 
-  const [state, setState] = useState<ShellState>({
-    active: initialTab,
-    mounted: [initialTab],
-    epochs: { home: 0, health: 0, workout: 0, nutrition: 0, more: 0 },
+  // **The URL outranks `initialTab` at mount (LA-109).** A tab flip below uses `replaceState`, and
+  // Next's patched `replaceState` re-injects its OWN current tree — still the previous tab's, since
+  // no Next navigation happened. So the `/more` entry carries the route tree for `/`. Popping back
+  // to it restores that tree, Next renders `(home)/page`, and this component is handed
+  // `initialTab="home"` while the address bar says `/more`. Measured: the owner's
+  // More → Profile details → back lands on Home with the URL still reading `/more`.
+  //
+  // Reading the address bar instead is the whole fix. It needs no Next internals, and it cannot
+  // disagree on a genuine load — a real navigation to `/more` gives a matching tree and a matching
+  // URL, so this only ever differs when the tree is the stale one.
+  //
+  // A lazy initializer, and `window.location` rather than `usePathname()`: the latter reads from the
+  // very tree that is wrong here, so it would agree with `initialTab` and change nothing.
+  const [state, setState] = useState<ShellState>(() => {
+    const fromUrl = typeof window === 'undefined' ? null : tabKeyForHref(window.location.pathname);
+    const start = fromUrl ?? initialTab;
+    return {
+      active: start,
+      mounted: [start],
+      epochs: { home: 0, health: 0, workout: 0, nutrition: 0, more: 0 },
+    };
   });
 
   const show = useCallback((key: TabKey, href?: string) => {
