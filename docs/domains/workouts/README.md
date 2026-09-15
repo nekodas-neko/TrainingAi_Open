@@ -28,6 +28,15 @@ Mode flow and the orchestrator pattern are documented in [`CLAUDE.md`](../../../
 
 ## Reference docs
 
+- [`docs/superpowers/plans/2026-09-15-trainer-role.md`](../../superpowers/plans/2026-09-15-trainer-role.md)
+  — **BF-9, the trainer role.** A trainer relationship table beside `friendships`, the friendship
+  consent handshake copied as-is, and workout programs only (meal plans deferred by the owner).
+  **Read §2 before writing any code**: the obvious implementation reproduces RV-42 — a trainer-authored
+  program referencing the trainer's own progression style is a cross-account row reference on an
+  `ON DELETE SET NULL` foreign key. The plan's answer is copy-on-assign. Not built; the merge is
+  owner-gated as an authorization change.
+
+
 - [`docs/superpowers/plans/2026-08-26-camera-form-capture.md`](../../superpowers/plans/2026-08-26-camera-form-capture.md)
   — **design only, nothing built (PS-7, 2026-08-26).** Camera on a tripod → on-device pose
   landmarks → stick-figure playback of a set, with the bar path taken from the wrist midpoint.
