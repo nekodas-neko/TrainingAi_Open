@@ -12692,3 +12692,13 @@ byte-for-byte a dead tap: no throw, no 4xx, no console error, URL unchanged. The
 destination with a direct `goto` before measuring a push) is cheap to state and was expensive to find.
 
 Left the superseded entries in place rather than rewriting them. The sequence is the lesson.
+
+## 2026-09-15 — `docs/implementation-backlog.md` → 22051 (LB-110)
+
++25 for one filed entry, and the entry exists because of a dangling pointer rather than a defect.
+
+TN-3b's `Keep:` said its past-day half was blocked on `LB-102`. That entry is not in the file — the
+only mention of it anywhere is the line pointing at it. So a real blocker (verified in source:
+`/api/body-battery` is `GET()` with no parameters) was waiting on work nobody was tracking, and the
+`Needs:`-style "an absent target counts as shipped" rule does not rescue it, because this was prose
+in a `Keep:` rather than a field the checker reads.
