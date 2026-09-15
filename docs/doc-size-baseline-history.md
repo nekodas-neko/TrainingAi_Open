@@ -12262,3 +12262,14 @@ framing it as a typing decision. It is not one: `short` and `long` select differ
 `standard` must never expand because that under-fill is the finish-early margin. Those lines are the
 reason the number is safe rather than a rewrite, and an implementer who read only the old wording
 would have converted the type and quietly lost the margin.
+
+## 2026-09-15 — BF-100 ↔ LA-109 cross-link (backlog +21, projectOverview +6)
+
+Two entries describing the same route, filed a day apart, neither naming the other. BF-100 records
+its cause as unknown — *"whatever differs is the S25's system back gesture or the WebView's restore
+timing"* — and LA-109 measured a device-observable difference on exactly that route the next morning.
+
+The lines buy sequencing, which is the expensive thing to get wrong here: if back renders Home there
+is no `/more` scroll position to restore, so only one of the two failures can be confirmed while the
+other stands. Without the link, the next session picks up BF-100, fixes a real `touchstart` bug, and
+still cannot tell whether it worked.
