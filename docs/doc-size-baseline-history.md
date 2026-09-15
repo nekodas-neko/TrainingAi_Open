@@ -12273,3 +12273,16 @@ The lines buy sequencing, which is the expensive thing to get wrong here: if bac
 is no `/more` scroll position to restore, so only one of the two failures can be confirmed while the
 other stands. Without the link, the next session picks up BF-100, fixes a real `touchstart` bug, and
 still cannot tell whether it worked.
+
+## 2026-09-15 — PS-41's owner gate restored (backlog +44)
+
+It merged in #1202 and then vanished from `main`. The next rebase of the same branch hit a conflict
+where `main` had deleted the adjacent PS-42 entry (it shipped) while the branch still carried it;
+git folded that deletion and this edit into one hunk, and "take main's side" did the right thing for
+PS-42 and silently discarded this.
+
+The restoration is +33; the other +11 is the note explaining it, and that is the part worth keeping.
+A conflict hunk does not respect entry boundaries, and the after-check everyone uses — diffing the
+heading list against `main`'s — **cannot** catch a body-only edit going missing, because there is no
+heading to miss. Recorded here and in `docs/local-dev-database.md` beside the other conflict recipes,
+where the next person resolving this file will actually be looking.
