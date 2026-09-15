@@ -12221,3 +12221,68 @@ What earns the lines is the measurement: a `history.state` dump showing the entr
 while carrying Next's route tree for `/`. That is three numbers in a table and it converts the
 entry from a symptom into a mechanism — and it is what lets LA-109 say BF-49 is probably the same
 defect, which is worth more than either entry alone.
+
+## 2026-09-15 — `docs/implementation-backlog.md` (BF-165 narrowed)
+
+Twenty-six lines onto BF-165. The owner's "it just scrolls to the top of cardio hub" is evidence
+rather than colour — a tap that never fired would not move the scroll — so the entry now carries the
+nested-scroller mechanism that explains it, and the warning that raising the navigation timeout turns
+a dead tap into a slow dead tap.
+
+## 2026-09-15 — PS-42 shipped (backlog −23, projectOverview +26)
+
+The row costs more than the entry saved, and the surplus is one paragraph: `nHistory` is passed to
+the illness radar on the generic path and is currently unreachable as a discriminator, because
+`trailingBaselineZ` will not return a z-score until the baseline is already mature. That reads as
+dead code and is not — it becomes load-bearing the moment anyone lowers that threshold. It survived
+a mutation as an equivalent mutant, which is exactly how it would have been "cleaned up" by someone
+who trusted the mutation score without reading why it survived.
+
+The rest is the device-verification gap: the owner cannot test this one, because having a ring is
+what makes his path safe here and also what makes the new branch unreachable from his account.
+
+## 2026-09-15 — PS-41 gated on the owner (backlog +33)
+
+The entry described a degraded-mode feature for users without a ring. Reading the merge path and
+measuring production found it is a change to the **owner's own** Activity Score: there is no
+precedence ladder to add a slot to (`getHrForWindow` applies one rule, `preferStrapBuckets`, and
+passes everything else through unranked), and he is a Health Connect user whose HR coverage is
+already 31 of 31 days at ~2,240 rows a day. Sparse phone samples interleaved into that series feed
+22% of the Activity Score's weight.
+
+Worth every line because the entry reads as safe. An implementer who trusted it would have shipped a
+scoring change without knowing it was one — which is the exact thing CLAUDE.md's "Tuning proposes,
+the owner signs off" rule exists to stop.
+
+## 2026-09-15 — BF-7 planned (backlog +10)
+
+A ten-line net change that replaces a question with its answer. The entry asked whether
+`DurationPreset` should stay an enum or become a number and said seven call sites depend on it —
+framing it as a typing decision. It is not one: `short` and `long` select different algorithms, and
+`standard` must never expand because that under-fill is the finish-early margin. Those lines are the
+reason the number is safe rather than a rewrite, and an implementer who read only the old wording
+would have converted the type and quietly lost the margin.
+
+## 2026-09-15 — BF-100 ↔ LA-109 cross-link (backlog +21, projectOverview +6)
+
+Two entries describing the same route, filed a day apart, neither naming the other. BF-100 records
+its cause as unknown — *"whatever differs is the S25's system back gesture or the WebView's restore
+timing"* — and LA-109 measured a device-observable difference on exactly that route the next morning.
+
+The lines buy sequencing, which is the expensive thing to get wrong here: if back renders Home there
+is no `/more` scroll position to restore, so only one of the two failures can be confirmed while the
+other stands. Without the link, the next session picks up BF-100, fixes a real `touchstart` bug, and
+still cannot tell whether it worked.
+
+## 2026-09-15 — PS-41's owner gate restored (backlog +44)
+
+It merged in #1202 and then vanished from `main`. The next rebase of the same branch hit a conflict
+where `main` had deleted the adjacent PS-42 entry (it shipped) while the branch still carried it;
+git folded that deletion and this edit into one hunk, and "take main's side" did the right thing for
+PS-42 and silently discarded this.
+
+The restoration is +33; the other +11 is the note explaining it, and that is the part worth keeping.
+A conflict hunk does not respect entry boundaries, and the after-check everyone uses — diffing the
+heading list against `main`'s — **cannot** catch a body-only edit going missing, because there is no
+heading to miss. Recorded here and in `docs/local-dev-database.md` beside the other conflict recipes,
+where the next person resolving this file will actually be looking.

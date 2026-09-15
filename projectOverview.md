@@ -1891,6 +1891,32 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [readiness][devices] ⚠️ A ring-less user gets an illness radar now, and no such account has been driven (PS-42, 2026-09-15)
+
+Shipped with no version bump — nothing changes for a ring user. `computeIllnessRadar` renormalizes
+over whichever of its four signals are present, so it is built for partial input; its only caller ran
+it as `latestSummary ? compute(…) : null`, so a user without a ring got **no illness computation at
+all**. It now runs on the generic branch with temperature and breathing null (no generic source
+supplies either) and the resting-HR/HRV z-scores taken from the readiness composite rather than
+recomputed.
+
+**The owner's path is untouched, and that was checked:** he has `oura_daily_summary` for 30 of the
+last 30 days, so `latestSummary` is non-null and the ring branch runs exactly as before.
+
+**New behaviour worth stating:** a generic user's readiness can now be *suppressed* by the radar —
+that line already existed and simply never had a non-null radar to read. `learning` suppresses
+nothing.
+
+**A coupling recorded in the code, because it looks like a bug:** `nHistory` is passed to the radar
+here and is currently unreachable as a discriminator. `trailingBaselineZ` needs `BASELINE_MIN_NIGHTS`
+prior samples before returning anything, so a non-null z already implies a mature baseline. Both
+gates stay — the coupling is an accident of the current threshold, not a guarantee.
+
+**Not verified on a real account.** The sandbox has no Health-Connect-only user and the owner cannot
+be one. **What a pass looks like:** a test account with `body_metrics`/`sleep_sessions` populated and
+no `oura_daily_summary` row returns a non-null illness flag from `/api/readiness-score`, with
+temperature and breathing absent from its biomarkers.
+
 ### [workouts] ⚠️ Bodyweight rep maxes read true now, on every surface — and prescribed reps go up (BF-164, 2026-09-15, v1.456.13) · needs: device
 
 Owner, on the Hanging Leg Raise ready screen showing **"Last: 11 reps"** directly above **"REP MAX
@@ -1993,6 +2019,12 @@ reads `/more` while Next's recorded route tree for that entry is **still `(home)
 address bar; Next's patched `replaceState` re-injects its own current tree, which is still Home's
 because no Next navigation happened. Popping back to that entry restores the Home tree and Home
 renders — right URL, wrong screen.
+
+**⚑ BF-100 may be downstream of this.** It reports "back always lands at the top" on the same route,
+has failed on the S25 twice with its cause recorded as unknown, and restores correctly in the
+harness — and if back renders Home, there is no `/more` scroll position to restore. Fix this first,
+then re-test BF-100; only one of the two can be confirmed while the other stands. It does not retire
+BF-100: the `use-scroll-restoration.ts` `touchstart` finding is a real mechanism on its own.
 
 **⚑ BF-49 is very likely the same defect** (*"tapping a workout, then back, leads to health training
 not home"*) — it is marked "does not reproduce in the web harness" and concluded "the fix is not in
