@@ -542,6 +542,34 @@ below threshold and left in place for next time.
 - **Verification:** on device with the WebView console attached, tap Cardio → Other activity →
   Treadmill and record whether (a) the sheet closes, (b) the URL becomes `/activity`, (c) anything is
   logged. Those three answers pick between the candidates above.
+
+- **✅ REPRODUCED IN THE PLAYWRIGHT HARNESS, 2026-09-15 — this is NOT device-only, and the entry's
+  "start from the device console" instruction is wrong.** Driving `/cardio` → *Other activity* →
+  *Treadmill* in a browser: the URL stays **`/cardio`**. No device, no WebView, no console needed.
+- **Two of the three candidates are now REFUTED by experiment, not by reading:**
+  - **Candidate 2 (the `/activity` route fails to load) is dead.** A direct `goto('/activity')`
+    returns **200**, renders *"Log Activity — What are you doing?"*, and logs **zero** page errors.
+  - **Candidate 3 (the close cancels the push) is dead, and so is the sharper version of it.** The
+    obvious mechanism — `SheetContent` renders `BackDismiss`, so an open sheet holds a pushed history
+    entry, and `closeSurface` fires **`history.back()`** when it closes — looked decisive and is not.
+    Reordering `selectType` to push first and deferring `onOpenChange(false)` by **1200 ms**, so no
+    pop is anywhere near the navigation, leaves it **still on `/cardio`**. The popstate moves to
+    ~1.5 s after the tap and changes nothing.
+- **Candidate 1 is the survivor: `router.push('/activity')` never commits.** `push()` routes
+  `/activity` through `animate()` (it is not a tab href and not the current URL), which runs the
+  push inside `document.startViewTransition` and polls for the URL against the **300 ms** cap.
+  Sampled every **10 ms for 4 s**, the URL never becomes `/activity` — not even transiently.
+- **⚠ A trap for the next session, because it cost a wrong conclusion here.** *"The URL never showed
+  `/activity`"* does **not** prove the push never started: Next updates the URL at **commit**, so an
+  aborted commit and a never-started push look identical from `location`. The deferred-close
+  experiment above is what separates them, and it is the one worth repeating — a sampler alone
+  cannot.
+- **The next experiment, stated so it is not re-derived:** drive the same
+  `useTransitionRouter.push('/activity')` from a control on `/cardio` that is **not inside a sheet**.
+  If it navigates, the sheet/portal context is the variable; if it does not, `animate()` itself is
+  the defect, which is app-wide navigation and must not be changed on a hypothesis.
+  **Do not lengthen `NAVIGATION_TIMEOUT_MS`** — the entry's own warning stands: that turns a dead tap
+  into a slow dead tap.
 ### [app-shell][platform] LA-109 — a tab flip leaves the PREVIOUS tab's route tree on the history entry (fixed; device check owed)
 
 - **Lane:** B — `components/shell/tab-shell.tsx`.
