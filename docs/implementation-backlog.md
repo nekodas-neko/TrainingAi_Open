@@ -19362,6 +19362,28 @@ describing a safety net that no longer exists.
   like `oura_raw_samples` already does and for the same reason)? Do it in the same PR as each
   table's rename — a generically-named table with no discriminator is the state that invites a
   later writer to assume portability the schema cannot deliver.
+- **Gate:** owner
+- **⚠ AUDITED 2026-09-15 (Lane A) — the rename as planned does not deliver what was asked for, and
+  the decision is the owner's:**
+  [`docs/reviews/2026-09-15-vendor-table-rename-discriminator-audit.md`](reviews/2026-09-15-vendor-table-rename-discriminator-audit.md).
+  - **The second recording device already exists and did NOT share a table.** `colmi_readings`
+    (4,237 rows), `colmi_raw_frames` (1,173) and `colmi_sleep_segments` (158) are live in production.
+    So the *"worse than the honest vendor name"* outcome is not a risk to avoid — it is the state the
+    schema is already in, and renaming `oura_*` leaves `colmi_*` exactly where it is.
+  - **The two devices use opposite idioms, so "the same tables" is not a rename.** Oura is one table
+    per metric with a `source` column; Colmi is one `colmi_readings` table with a `kind` column keyed
+    `(userId, kind, measuredAt)`. Unifying them is a design problem about what a row is.
+  - **`oura_bucket` — the table the 2026-09-11 note singled out as the one a second device would most
+    need to share — holds 0 rows.** It has never been written.
+  - **The plan's 13 tables omit five `oura_*` tables** (`oura_ble_rekey_declarations`,
+    `oura_daytime_stress_buckets`, `oura_raw_packed`, `oura_redecode_jobs`, `oura_rollup_state`);
+    there are **18**. The earlier "22" was not an overcount — it was 18 `oura_*` + 3 `colmi_*` +
+    `rr_intervals`. A PR built from the short list leaves the schema half-renamed.
+  - **Recommendation: rename only what is genuinely multi-source now** — `oura_heartrate`, whose rows
+    are **73% Polar chest strap**, so its name actively misleads — leave the rest vendor-named until a
+    second writer exists (the plan's own `oura_raw_samples` argument), and file the real goal
+    (reconciling `colmi_*` with `oura_*`) as its own entry. Reversal cost is low for a single table
+    behind a compatibility view and high for a 2,813-reference sweep.
 - ✅ **Phase 3 now HAS its plan (2026-08-04):**
   [`docs/superpowers/plans/2026-08-04-vendor-table-rename-phase-3.md`](superpowers/plans/2026-08-04-vendor-table-rename-phase-3.md).
   Three PRs, not one: rename behind compatibility **views** (an `ALTER TABLE … RENAME` is
