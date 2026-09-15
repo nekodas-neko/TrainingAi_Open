@@ -448,6 +448,17 @@ below threshold and left in place for next time.
 **A second source is live TODAY, not hypothetical.** Over 45 days `oura_heartrate` holds **74,860
 chest-strap samples against 12,673 ring samples** — the strap outnumbers the ring **six to one**.
 
+**⚑ And this is a PRODUCT requirement, not a tidy-up: the owner will not use Health Connect, other
+users will** (2026-09-15). The app has to be good on basic sources alone, with the ring as
+refinement. **⚠ Which means B cannot be validated on the owner's account** — it needs a
+Health-Connect-only test user.
+
+**⚑ The measurement layer already does what the owner describes, and is the template.** The ring
+decodes frames into a step count and writes `body_metrics.steps` through the same method every source
+calls; nothing downstream knows it came from a ring. Same for `hrv_ms`, `resting_heart_rate`,
+`spo2_pct`. **It is the derived/score layer that bypasses it (TN-37)** — that is where this entry's
+weight sits, not in the measurements.
+
 **Each mechanism is individually sound. Nothing names them as one concept:**
 
 | data | mechanism | merged at | multi-source today? |
@@ -470,9 +481,16 @@ resolution; derived rows have one writer.**
   inline, then discarded instead of normalised) and **PS-42** (the illness radar gated on an
   `oura_daily_summary` row rather than on its inputs). **PS-41 unlocks 22% of Activity Score for a
   non-ring user.**
-- **C. Make each score return what it consumed** — which inputs were present, which absent, what
-  weight was renormalised away, surfaced by one component. **⛔ A return-shape change, not a formula
-  change.**
+- **C. Split every score into a CORE and ADJUSTMENTS** — **`Gate: owner`**, and the one genuine
+  design decision here. Owner, 2026-09-15: *"the app works fine with less sources but is more
+  accurate and tuned with more sources."* **⚑ That is NOT what the code does.** `sleep-score.ts:399`
+  renormalises the weighted mean over whichever contributors are present, and readiness passes a
+  neutral 50 — so **connecting a ring changes the denominator and moves the score for a reason
+  unrelated to the user's body, and two users' 78s are computed from different weight sets.** Under
+  `clamp(core + Σ adjustments)` the core is the same quantity for everyone, an extra sensor adds a
+  signed delta, and the app can say *"78 — core 74, +6 HRV, −2 SpO₂"*. **⚠ The core input set per
+  pillar is the owner's decision**; everything else is mechanical. **⚠ This re-scores history** — the
+  2026-08-24 policy applies, stamp the model and leave stored days, and size it first.
 - **D. Record what a non-ring user actually gets** — §4 already traced it. **⚠ Not "normalise these":
   chronic stress, resilience, daytime HRV, Body Battery and OTS read raw BLE frames with zero
   fallback branches, and readiness's temperature term (0.10) passes null on every generic path.**

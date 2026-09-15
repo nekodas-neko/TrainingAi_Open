@@ -620,6 +620,22 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
   read raw BLE frames with **zero fallback branches anywhere in the call chain**, and readiness's
   temperature contributor (0.10) passes `null` on every generic path. **"Normalise these" means
   re-implementing vendored models — a project, not a task.** Record what a non-ring user gets instead.
+- **⛔⛔ "DEGRADES GRACEFULLY" IS NOT THE SAME AS THE OWNER'S TIER MODEL, AND THE CODE DOES THE FIRST
+  (TN-38 task C).** `sleep-score.ts:399` renormalises the weighted mean over whichever contributors
+  are present; readiness passes a neutral 50. **So connecting a sensor changes the DENOMINATOR — the
+  score moves for a reason unrelated to the user's body, and two users' 78s are computed from
+  different weight sets.** The owner asked for `core + adjustments`: one core quantity everyone
+  shares, optional inputs as **signed deltas**. *"78 — core 74, +6 HRV, −2 SpO₂"*. **⚠ It re-scores
+  history**, so the 2026-08-24 policy applies and it is `Gate: owner`.
+- **⚑ THE MEASUREMENT LAYER ALREADY DOES WHAT THE OWNER DESCRIBES — quote it back rather than
+  planning it.** The ring decodes frames to a step count and writes `body_metrics.steps` through the
+  same method every source calls; nothing downstream knows it came from a ring. Same for `hrv_ms`,
+  `resting_heart_rate`, `spo2_pct`. **The derived/score layer is what bypasses it (TN-37).** When an
+  owner describes an architecture, check which half is already built before scoping either.
+- **⚠ THE OWNER WILL NOT USE HEALTH CONNECT — other users will (2026-09-15).** That makes basic-source
+  quality a product requirement rather than an internal tidy-up, and it means **PS-41 and anything
+  else HC-shaped cannot be validated on the owner's account.** A Health-Connect-only test user is a
+  prerequisite, not a nicety.
 - **The threshold is usually right and the input usually wrong** — Q-506, Q-512, Q-514, now TN-6.
   Check the input's distribution before touching any constant.
 - **Do NOT lift the sleep scale toward its old mean** — sleep/readiness agreeing is load-bearing for

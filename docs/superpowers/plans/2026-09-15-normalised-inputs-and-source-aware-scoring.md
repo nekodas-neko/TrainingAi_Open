@@ -15,6 +15,17 @@ it."* The input layer already works for the 16 fields in `body_metrics`, and a s
 **live today, not hypothetical**: over 45 days `oura_heartrate` holds **74,860 chest-strap samples
 against 12,673 ring samples** — the strap outnumbers the ring six to one.
 
+**⚑ And the owner will not use Health Connect — other users will** (2026-09-15). That is the
+difference between an internal tidy-up and a product requirement: **the app has to be good on basic
+sources alone**, with the ring as refinement rather than as the floor. It also means **B's value
+cannot be measured on the owner's account** — a Health-Connect-only test user is needed.
+
+**The steps example the owner gave is already correct, and is the template.** The ring decodes frames
+into a step count and writes `body_metrics.steps` through the same method any source calls; nothing
+downstream knows it came from a ring. **The same is already true of `hrv_ms`, `resting_heart_rate`
+and `spo2_pct`.** The measurement layer does what he describes. **It is the derived/score layer that
+does not** — that is TN-37, and it is where this plan's weight sits.
+
 ## The finding this plan exists for: normalisation is implemented THREE ways
 
 Each is individually sound. Nothing names them as one concept, so a new connector's author has to
@@ -54,18 +65,49 @@ TN-37's argument and it applies to its own fix.
    renormalises over whatever is present; its only caller computes it *only if* an
    `oura_daily_summary` row exists. Move the gate onto the inputs. **Formula untouched.**
 
-### C. Make the scoring declare what it consumed
+### C. Split every score into a CORE and ADJUSTMENTS — the owner's tier model
 
-5. **Every score returns its input provenance.** Sleep score already renormalises over present
-   weights and readiness already has a Q-43 generic path — **the pattern exists; make it the rule.**
-   Each score returns which inputs were present, which were absent, and what weight was
-   renormalised away. **⛔ Not a new formula** — a return-shape change.
-6. **Surface it once.** One component reads that shape wherever a score renders, so *"78 — computed
-   without temperature or recovery index"* replaces a bare 78. The owner has asked what is behind a
-   number repeatedly this quarter; this is the general answer.
-7. **A CI check that a scoring module reads only generic tables.** Baseline the current violations
-   rather than fixing them all at once — `readiness-payload.ts` is the only one, and TN-37 step 2
-   removes half of it.
+**⚑ This replaces "degrade gracefully", which is what the code does today and is not the same thing.**
+
+**Owner, 2026-09-15:** *"ideally we have whatever data we can get from basic sources like health
+connect; and have its own rating/scoring system. Then have our extra data we pull from oura give us
+more fidelity and adjust the scores more. So app works fine with less sources but is more accurate
+and tuned with more sources."*
+
+**Today's behaviour is renormalise-on-absence**, and `sleep-score.ts:399` says so outright:
+*"contributors are included only when their input is present, and the weighted mean is renormalised
+over the included weights."* Readiness does the equivalent by passing a neutral 50.
+
+| | renormalise-on-absence (today) | core + adjustments (the owner's) |
+|---|---|---|
+| formula | `Σ(present w × sub) / Σ(present w)` | `clamp(core + Σ adjustments)` |
+| adding a sensor | changes the **denominator** — the whole score shifts | **adds an adjustment**, core untouched |
+| two users' 78s | computed from **different weight sets** — not comparable | **the same quantity**, differently refined |
+| explainability | a contributor is inside a mean; no delta exists | *"78 — core 74, +6 HRV, −2 SpO₂"* |
+
+**The decisive argument is the second row.** Under renormalisation, connecting a ring changes a
+user's score for a reason that has nothing to do with their body. Under core+adjustments it moves by
+a stated amount, for a named input. That is the owner's *"works fine with less, more accurate with
+more"*, made literal — and it is also the general answer to *"why is this number what it is"*, asked
+repeatedly this quarter.
+
+5. **Define the CORE input set per pillar** — the inputs any basic source or manual logging can
+   guarantee. **⚠ This is the one genuine design decision in this plan and it needs the owner**;
+   everything else is mechanical. A starting proposal, to be argued with rather than accepted:
+   sleep duration and stages · steps · active calories · logged workout volume · resting HR · the
+   daily check-in.
+6. **Every score returns `{ core, adjustments[], final, missing[] }`** — each adjustment a signed
+   delta with the input that produced it. **⛔ Not a new formula**: the core keeps today's curves,
+   and the optional contributors become deltas instead of mean-members.
+7. **Surface it once.** One component renders that shape wherever a score appears.
+8. **A CI check that a scoring module reads only generic tables.** Baseline the current violations
+   rather than fixing them at once — `readiness-payload.ts` is the only one, and TN-37 step 2 removes
+   half of it.
+
+**⚠ Re-scoring risk, and it is the reason this is `Gate: owner`.** Changing from a renormalised mean
+to core+adjustments **moves every stored score**, including history. The 2026-08-24 history policy
+applies — leave stored days and stamp the new model. **Size it before building**: TN-5's calibration
+work is the precedent for how far a blend change reaches.
 
 ### D. Then, and only then, the ring-only pillars
 

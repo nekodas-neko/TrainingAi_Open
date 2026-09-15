@@ -12220,3 +12220,24 @@ made source-neutral. Chronic stress, resilience, daytime HRV, Body Battery and O
 frames with zero fallback branches, and readiness's temperature contributor passes null on every
 generic path. Writing that down stops a future session scoping "normalise these" as a task when it is
 a vendored-model reimplementation.
+
+## 2026-09-15 — backlog → 21491, `tuning.md` → 664: the tier model (TN-38 task C revised)
+
+The owner clarified the architecture and the clarification changed a task rather than decorating it.
+*"The app works fine with less sources but is more accurate and tuned with more sources"* is **not**
+what the code does, and the four-row comparison table is what makes the difference visible rather
+than arguable.
+
+`sleep-score.ts:399` renormalises the weighted mean over whichever contributors are present. So
+connecting a sensor changes the **denominator**: the score moves for a reason unrelated to the user's
+body, and two users' 78s are computed from different weight sets. Under `core + adjustments` the core
+is one quantity everyone shares and optional inputs are signed deltas — which is also the general
+answer to *"why is this number what it is"*, asked repeatedly this quarter.
+
+Two shorter additions earn their lines for the opposite reason — they stop work rather than starting
+it. **The measurement layer already does what the owner described**: the ring decodes frames to a
+step count and writes `body_metrics.steps` through the same method every source calls, and the same
+holds for `hrv_ms`, `resting_heart_rate` and `spo2_pct`. Quoting that back is more useful than
+planning it. And **the owner will not use Health Connect — other users will**, which turns
+basic-source quality into a product requirement and means PS-41 cannot be validated on his account at
+all.
