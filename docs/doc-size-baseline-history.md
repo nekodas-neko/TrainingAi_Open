@@ -12614,3 +12614,16 @@ and it is the same defect seen from the angle the owner actually felt.
 The ⛔ line rules out the obvious fix — capping the core far below 100 so sensors add rather than
 deduct — and states the reason, because it is the design a reader reaches for first and it pins a
 phone-only user at 55 for hardware they do not own.
+
+## 2026-09-15 — `projectOverview.md` → 11453, `docs/implementation-backlog.md` → 21817 (BF-165)
+
++52 and +116 for a session that shipped no code, and the second number is the one to justify.
+
+BF-165 was sitting at the top of READY as unstartable, with an instruction to start from the device
+console. It reproduces in a browser. Most of these lines are the two candidates now dead **by
+experiment** — the `/activity` route loads fine, and the sheet's `history.back()` is not the cause
+even though it is the obvious mechanism and looked certain.
+
+The rest is one trap: Next updates the URL at commit, so *"the URL never showed /activity"* cannot
+tell an aborted commit from a never-started push. That inference was made here and was wrong, and
+without the note the next session makes it too.

@@ -159,6 +159,15 @@ cause of one class was a posted step window coming from a *different stream* tha
 
 ## History
 
+- [`2026-09-15-bf165-reproduced-in-harness`](../../overview/entries/2026-09-15-bf165-reproduced-in-harness.md)
+  — **BF-165 (2026-09-15): "Other activity" is a dead tap, and it is NOT device-only.** It reproduces
+  in Playwright — `/cardio` → Other activity → Treadmill leaves the URL on `/cardio`. **Two candidates
+  refuted by experiment:** `/activity` loads fine directly (200, no page errors), and the sheet's
+  `history.back()` on close is not the cause (deferring the close 1200 ms changes nothing).
+  **Survivor:** `router.push` never commits, routed through `animate()`'s 300 ms `startViewTransition`
+  cap. **Trap:** Next updates the URL at commit, so "the URL never showed /activity" cannot tell an
+  aborted commit from a never-started push — only the deferred-close experiment can.
+
 - **[`2026-09-02-bf-108-activity-store-stale`](../../overview/history-2026-09-10-folded-5.md#2026-09-02-bf-108-activity-store-stale)**
   — **BF-108 (2026-09-02).** `reconcileRehydratedActivity` clears the setup when a session is demoted
   to `pre`. **Read this before touching the activity store's rehydrate path:** the completion path
