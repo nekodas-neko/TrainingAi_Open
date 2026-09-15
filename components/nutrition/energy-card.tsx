@@ -7,7 +7,7 @@ import type { NutritionTargets } from '@trainingai/shared/types/nutrition'
 import type { EnergyBalanceResponse } from '@/app/api/nutrition/energy-balance/route'
 import { CalorieZoneBar } from './calorie-zone-bar'
 import { macroShares } from './macro-energy'
-import { macroBudgetGap } from './macro-budget-gap'
+import { EnergyExplainer } from './energy-explainer'
 
 interface Props {
   data: EnergyBalanceResponse | null
@@ -24,10 +24,6 @@ interface Props {
   goalCalories: number | null
   /** The `earned` term inside that same budget — the movement addend, from the same call. */
   earnedKcal: number | null
-  /** The goal as STORED in `nutrition_targets`, before any burn-aware substitution (BF-142).
-   *  The card prints it beside the computed budget, because the owner's complaint was that not one
-   *  number on this card was the number he chose. Never used to compute anything. */
-  storedGoalCalories: number | null
   /** The **effective** targets: the caller has already substituted the burn-aware calorie budget and
    *  Q-323's earned-scaled macro grams. Passing the raw stored targets would report fat over on a
    *  day with 551 kcal earned when it was well under. */
@@ -63,7 +59,7 @@ const RING_MASK = 'radial-gradient(farthest-side, transparent 69%, black 70% 89%
  */
 export const EnergyCard = memo(function EnergyCard({
   data, isToday, loading, calories, proteinG, carbsG, fatG, goalCalories, earnedKcal,
-  storedGoalCalories, targets,
+  targets,
 }: Props) {
   const [showInfo, setShowInfo] = useState(false)
 
@@ -84,10 +80,6 @@ export const EnergyCard = memo(function EnergyCard({
   const overTarget = remaining != null && remaining < 0
 
   const shares = macroShares({ proteinG, carbsG, fatG })
-  // BF-134. Not a fourth budget: this adds up the gram targets **already on this card** and compares
-  // them with the budget **already on this card**, which is the arithmetic the owner did by hand
-  // before asking. Nothing here composes a calorie figure from parts.
-  const macroGap = macroBudgetGap(targets, goal)
   const pct = goal != null && goal > 0 ? Math.min(100, (calories / goal) * 100) : 0
   const sweep = pct * 3.6
   const proteinEnd = shares.protein * sweep
@@ -169,41 +161,6 @@ export const EnergyCard = memo(function EnergyCard({
         </div>
       </div>
 
-      {/* BF-134. The reconciliation Q-401 built for the calorie half never covered the macro row:
-          the donut, the headline and `+N burned` are one quantity seen three ways, and the grams are
-          a fourth thing sitting beside them. On the owner's account they read 406 kcal apart at
-          every hour of every day — see `macro-budget-gap.ts` for why that offset is constant rather
-          than something the day closes.
-
-          Said on the card rather than folded into `TdeeAdaptationCard`'s `Why two numbers` block,
-          which the entry proposed: that block is gated on `maintenance.source === 'formula'` AND
-          the stored goal drifting from the recommendation, neither of which has anything to do with
-          this gap. It would explain the macros in the one case and stay silent in the rest. */}
-      {macroGap != null && (
-        <p className="mt-2.5 text-[10px] leading-snug text-muted-foreground">
-          Macro targets add up to{' '}
-          <span className="font-semibold tabular-nums text-foreground">{macroGap.targetKcal.toLocaleString()} kcal</span>
-          {' '}&mdash; {Math.abs(macroGap.gapKcal).toLocaleString()} {macroGap.gapKcal > 0 ? 'above' : 'below'} the
-          calorie budget.{' '}
-          {storedGoalCalories != null && (
-            <>
-              Your stored goal is{' '}
-              <span className="font-semibold tabular-nums text-foreground">{storedGoalCalories.toLocaleString()}</span>.{' '}
-            </>
-          )}
-          {b != null && goal != null && (
-            <>
-              Today&rsquo;s budget is{' '}
-              <span className="font-semibold tabular-nums text-foreground">{goal.toLocaleString()}</span>
-              {' '}&mdash; {Math.round(b.restingBaseKcal).toLocaleString()} resting burn,
-              {' '}{b.targetNetKcal >= 0 ? '+' : '\u2212'}{Math.abs(Math.round(b.targetNetKcal)).toLocaleString()} for your goal,
-              {' '}+{Math.round(b.activeKcal).toLocaleString()} moved.{' '}
-            </>
-          )}
-          The grams are that goal scaled up by the same movement, so moving more raises both numbers
-          and the gap stays.
-        </p>
-      )}
 
       {/* Below the drawing, inside the same card. Artboard 1 stops at the two rows above, but the
           band is the only thing that says whether "left" is on track or merely arithmetic — and
@@ -315,37 +272,7 @@ function EnergyDetail({ data }: { data: EnergyBalanceResponse }) {
         </p>
       )}
 
-      <div className="space-y-2 rounded-xl bg-muted/50 p-3">
-        <p className="text-[10px] leading-relaxed text-muted-foreground">
-          <span className="font-semibold text-foreground">Calories out</span> = your resting burn
-          ({b.restingBaseKcal.toLocaleString()} kcal) plus measured movement ({b.activeKcal.toLocaleString()} kcal
-          from workouts, activities, and every step you take).
-        </p>
-        {/* BF-134's reported symptom. The owner read `1,453 base − 200 for your goal` as two
-            deductions, because one of them is: the resting burn already has habitual movement
-            removed. That subtraction is real, it is not the goal delta, and nothing on the card
-            named it. The mechanism differs by path — the formula base holds back the energy of
-            the first steps, the calibrated base subtracts the window's average movement — so this
-            says the thing true of both rather than a figure only one of them produces. */}
-        <p className="text-[10px] leading-relaxed text-muted-foreground">
-          Your <span className="font-semibold text-foreground">resting burn</span> already has your
-          habitual daily movement taken out of it, which is why it sits below your maintenance. That
-          is what lets the movement you record be added once rather than counted twice — it is not a
-          second deduction for your goal.
-        </p>
-        <p className="text-[10px] leading-relaxed text-muted-foreground">
-          <span className="font-semibold text-foreground">On target</span> means your net
-          ({b.netKcal >= 0 ? '+' : ''}{b.netKcal.toLocaleString()}) is within 150 kcal of the
-          {' '}{b.targetNetKcal >= 0 ? '+' : ''}{b.targetNetKcal.toLocaleString()} kcal/day your goal calls for.
-          Sustaining today&apos;s net works out to {b.projectedWeeklyKg >= 0 ? '+' : ''}{b.projectedWeeklyKg} kg/week.
-        </p>
-        {m?.source === 'calibrated' && (
-          <p className="text-[10px] leading-relaxed text-muted-foreground">
-            Maintenance is measured from your own logged intake against your weight trend, not a
-            formula — it re-calibrates as you log.
-          </p>
-        )}
-      </div>
+      <EnergyExplainer data={data} />
     </div>
   )
 }

@@ -27,14 +27,14 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   be excluded from aggregates rather than counted as zero. **Stage 1 shipped 2026-09-01**, so the
   unique constraint it says has to go is already gone.
 
-- [`docs/overview/entries/2026-09-11-fix-nutrition-scroll-and-day-padding.md`](../../overview/entries/2026-09-11-fix-nutrition-scroll-and-day-padding.md)
+- [`2026-09-11-fix-nutrition-scroll-and-day-padding`](../../overview/history-2026-09-14-folded-1.md#2026-09-11-fix-nutrition-scroll-and-day-padding)
   — **Nutrition keeps its scroll position; `/health/day` clears the gesture bar (RV-36, RV-37),
   2026-09-11.** BF-100's restoration lives in `PullToSync` and therefore reached **three** screens,
   not five — *"every screen using the shell inherits it"* was wrong at the call site as well as in
   the entry, and is now gone from both. **A screen that scrolls its own container gets no restoration
   from being inside the shell — check the call, not the layout.** `/health/day`'s scroller had no
   bottom padding at all. Both owe **one** device pass; RV-37 has still never been observed.
-- [`docs/overview/entries/2026-09-10-fix-weight-response-undecided-label.md`](../../overview/entries/2026-09-10-fix-weight-response-undecided-label.md)
+- [`2026-09-10-fix-weight-response-undecided-label`](../../overview/history-2026-09-14-folded-1.md#2026-09-10-fix-weight-response-undecided-label)
   — **"not enough weigh-ins", printed above six of them (LB-99), 2026-09-10.** BF-136's second half.
   `weightResponse()` returns null only when there is no interval to compute; it returns a **full
   result with `verdict: null`** when the readings are plentiful and the range straddles the band —
@@ -42,6 +42,15 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   rendered as the first. `responseState()` separates them; undecided now reads "Not called yet".
   **The entry keeps a wrong first diagnosis on the record**: a card reporting "no data" is not
   evidence that no data reached it.
+- [`docs/overview/entries/2026-09-14-bf161-builder-adds-saved-meals.md`](../../overview/entries/2026-09-14-bf161-builder-adds-saved-meals.md)
+  — **The meal builder can add a saved meal, flattened (BF-161), 2026-09-14.** `saved_meal_items
+  .food_item_id` is NOT NULL, so a meal item **is** a food item and there is no column a nested meal
+  could occupy — real nesting means a migration, recursive macro computation in every consumer, and
+  cycle prevention. The owner chose flattening, so **what is added is a snapshot**: editing the
+  source meal later does not change one already built from it, and nothing on screen may imply a
+  live link. `savedMealToEntries` (`saved-meal-flatten.ts`) is the single mapping — the edit-load
+  path had been doing it inline, which is what settled the whole-recipe-vs-portion question. Device
+  check owed.
 - [`docs/overview/entries/2026-09-13-lane-a-bf152-resting-rate-anchored-budget.md`](../../overview/entries/2026-09-13-lane-a-bf152-resting-rate-anchored-budget.md)
   — **the calorie budget anchors to a rule, not a number (BF-152), 2026-09-13.** `budgetProvenance`'s
   zero-movement base was the user's stored calorie target for one day (BF-150); it is now their
@@ -52,7 +61,7 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   which it changes one line of. The residual it deliberately does not model — the thermic effect of
   food and non-step NEAT, together about the `bmr × 1.2` the owner's *"1600"* implies — is copy owed
   under **LA-102**, not arithmetic.
-- [`docs/overview/entries/2026-09-10-fix-vial-opened-date.md`](../../overview/entries/2026-09-10-fix-vial-opened-date.md)
+- [`2026-09-10-fix-vial-opened-date`](../../overview/history-2026-09-14-folded-1.md#2026-09-10-fix-vial-opened-date)
   — **a vial records when it was mixed, not when it was entered (BF-136), 2026-09-10.** `openedOn`
   was `todayInTz(tz)` with no control, and it anchors every figure on the vial card — a vial entered
   five days late dropped five days of weigh-ins and the card said it had one. Correcting an existing
@@ -65,10 +74,15 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   2026-09-09.** The grams come from stored `nutrition_targets`; the budget from
   `restingBase + goalDelta + earned`. **The gap is a CONSTANT** — `scaleMacrosForEarnedKcal` grows
   the grams by the same `earned` that grows the budget, so it cancels and 406 kcal is left at every
-  hour of every day. BF-134's own text says they converge at ~406 earned; they do not, and
-  `components/nutrition/__tests__/macro-budget-gap.test.ts` pins it. Q-401's "one budget, three
-  views" guarantee on `energy-card.tsx` covers the calorie half only — the macro row was never in
-  it. **Whether the two should share an anchor is the owner's and Lane A's**, and untouched.
+  hour of every day. BF-134's own text says they converge at ~406 earned; they do not.
+  Q-401's "one budget, three views" guarantee on `energy-card.tsx` covered the calorie half only —
+  the macro row was never in it.
+  **✅ CLOSED 2026-09-14 (BF-154), and the anchor question was the owner's answer:** the grams are
+  fitted to `budgetProvenance(...).base + earned` by `macrosForKcal`
+  (`packages/shared/src/nutrition/calorie-balance.ts`), so the two share an anchor and the gap is
+  zero by construction. `macro-budget-gap.ts` and its test were deleted with the sentence they fed —
+  the paths named here are gone on purpose. The constant-gap analysis above is kept as the record of
+  why a module existed to measure it.
 - [`2026-09-02-q517-tdee-bmr-floor`](../../overview/history-2026-09-10-folded-5.md#2026-09-02-q517-tdee-bmr-floor) — **the calibrated maintenance is floored at BMR, 2026-09-02 (Q-517).** `adaptive-tdee.ts` clamped at a universal **1000** against its own header's prediction that the failure would land at 1200; the owner's worst window computed **1052**. The floor is now the user's own BMR — the **measured** resting rate where one exists, because `energy-balance-service.ts` already resolves `personalRmr(measured) ?? comp.bmrKcal ?? mifflinStJeorBmr` two dozen lines above the call, which also disposes of the addendum's fallback ladder. Below it the window is **rejected, not clamped**, so the resolver falls back to the formula baseline. **The right floor already existed one line below on `restingBaseKcal`** — protecting what the balance *displays*, not the maintenance that becomes the recommendation and then `users.calorie_goal`. **SAFE, not CORRECT:** survivors still sit under the formula's 2,397, and within-day incompleteness detection stays on the `Keep:`.
 - [`2026-09-06-bf-112-dose-entry`](../../overview/history-2026-09-10-folded-6.md#2026-09-06-bf-112-dose-entry)
   — **the dose can be typed in (BF-112, BF-69 stage 2), 2026-09-06.** The manage sheet writes

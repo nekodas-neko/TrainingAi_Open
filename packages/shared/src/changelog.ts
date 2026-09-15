@@ -6,6 +6,105 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.456.12",
+    date: "2026-09-14",
+    changes: [
+      "The scale stops asking whether every unfamiliar reading is you. It now judges a weigh-in three ways instead of two: close to your last confirmed weight it is simply saved, a long way off it is quietly set aside as somebody else's, and only a reading in between — one it genuinely cannot separate — still asks. The band it claims was measured from your own history rather than picked: every weight you have confirmed sits inside it, including your largest day-to-day swing, and it stays several kilograms clear of the other readings this scale has produced. Readings it sets aside are no longer thrown away either; the raw measurement is kept, so nothing is destroyed by a decision the app made on its own.",
+    ],
+  },
+  {
+    version: "1.456.11",
+    date: "2026-09-14",
+    changes: [
+      "Your protein, carb and fat targets now follow your calorie budget for the day instead of the goal figure stored in settings. They start at your resting rate and grow as you move, so the grams and the calories are finally the same number seen two ways — before this they could differ by several hundred calories, and no amount of walking closed the gap. Protein stays where it is, because it is set per kilogram of bodyweight and a walk does not change what your body is made of; carbs and fat absorb the difference, keeping the ratio between them. If your stored goal was higher than your budget, expect your carb and fat targets to come down. The card no longer carries the paragraph that used to explain the mismatch, because there is no longer a mismatch to explain.",
+    ],
+  },
+  {
+    version: "1.456.10",
+    date: "2026-09-14",
+    changes: [
+      "A completed fitness test now also logs itself as an activity, so it counts towards the calories you have earned for the day. A Cooper run appears as a run and a 6-minute walk test as a walk, with the time, distance and heart rate the test recorded. Before this, the test saved its score and nothing else: your heart-rate zone minutes were credited automatically, which made it look like the test had counted, while the calorie side of the day saw no exercise at all. The quick resting-HR test is unchanged and logs no activity — a minute of effort between two minutes of sitting is not a cardio session.",
+    ],
+  },
+  {
+    version: "1.456.9",
+    date: "2026-09-14",
+    changes: [
+      "The meal builder can now add one of your saved meals. Pick it from the new Your meals tab beside Your foods, and it drops in as its individual ingredients, each of which you can then edit or remove like any other. Building a meal out of other meals no longer means typing every ingredient again. One thing to know: what you add is a copy taken at that moment, so editing the original meal later will not change a meal you have already built from it.",
+    ],
+  },
+  {
+    version: "1.456.8",
+    date: "2026-09-14",
+    changes: [
+      "A fitness test run indoors no longer invents a VO₂max. Both the Cooper run and the 6-minute walk take your distance from GPS and nothing else, so on a treadmill they finished a full, correctly-timed test with almost no distance and scored it anyway — the Cooper as a negative number, the 6-minute walk as a normal-looking figure that was not measured at all. Now the test saves your heart rate and time, skips the score, and says it needs GPS. An outdoor test is unchanged.",
+    ],
+  },
+  {
+    version: "1.456.7",
+    date: "2026-09-14",
+    changes: [
+      "Finishing a workout or an activity now returns you to the Workout tab itself rather than a separate copy of the same screen. The copy was a leftover from before the app had tabs: it looked identical but sat outside the tab bar, so the other tabs had to reload when you moved on, and back from it did not take you Home. Four more leftover addresses that only forwarded somewhere else were removed at the same time. Nothing you tap has changed where it goes.",
+    ],
+  },
+  {
+    version: "1.456.6",
+    date: "2026-09-14",
+    changes: [
+      "Pressing back on Health, Workout, Nutrition or More now takes you to Home. It used to do nothing at all: the app switches between the five tabs without adding to the browsing history — they are side by side, not stacked — so there was nothing for back to go back to, and the press was simply swallowed. Back from Home still minimises the app, and back from a screen you opened on top of a tab (a meal, a day) still returns to that tab rather than jumping Home.",
+    ],
+  },
+  {
+    version: "1.456.5",
+    date: "2026-09-14",
+    changes: [
+      "Your workout times are right again. Sessions were printing as two or three minutes — one 38-minute session showed as 3 — because the app was rebuilding the session length from the individual exercises instead of using the finish time it had already recorded, and the last set of every exercise was not saving the moment you logged it. Both are fixed: the day now shows the real length, measured from when you started to when you finished. Sessions logged before this keep the wrong internal timestamps on their exercises, which cannot be recovered, but their displayed length is now correct.",
+    ],
+  },
+  {
+    version: "1.456.4",
+    date: "2026-09-14",
+    changes: [
+      "The energy explainer now says what your calorie base leaves out: the energy it takes to digest food, and small everyday movement your phone cannot count — standing, fidgeting, housework. Neither is estimated, so on a still day your real burn runs a little above what the app shows. You were right that the base misses some basic metabolic needs; the app now says so rather than inflating the number with a guess.",
+      "The Calorie Nudge card now prints how confident that maintenance figure is and how many days it is built from, the same way the energy card and the balance bar already did. It was the only place showing the number without its confidence — and the only one with a button that writes it straight into your goal.",
+    ],
+  },
+  {
+    version: "1.456.3",
+    date: "2026-09-14",
+    changes: [
+      "The AI recommendation card now tells you what happens if you don't press Accept, because the answer depends on the recommendation and the card looked the same either way. On a normal progression it says the numbers are already loaded and Accept only settles the phase decision. On a deload, a swapped session or a rest day it warns, in bold, that starting the workout without answering trains your program's normal loads rather than what is on screen — which is the case where ignoring the button quietly discards the advice.",
+    ],
+  },
+  {
+    version: "1.456.2",
+    date: "2026-09-14",
+    changes: [
+      "The get-ready screen has a clock again on bodyweight exercises. The warm-up bar was built from percentages of your working weight, so on a pull-up — where there is no weight to take a percentage of — the whole thing disappeared and the screen just sat there. Your phone's notification was counting down the same 60 seconds the entire time. There is now a plain get-ready bar wherever the three-stage ramp does not apply: bodyweight, an AMRAP test, solo mode, or anything logged at zero. It runs to the same total the notification uses.",
+    ],
+  },
+  {
+    version: "1.456.1",
+    date: "2026-09-14",
+    changes: [
+      "Cardio Baselines has moved to the Cardio tab, under your heart profile. It was in the Health tab's training list between Muscle Volume and Workout Density — every card around it about lifting, this one holding VO₂max and heart-rate recovery — and it is the only way into the fitness tests, so it was also the only signpost to the 6-minute walk, Cooper and resting-HR protocols. It now sits beside the rest of your heart data, above the picker where you choose what to do today, which is when taking a test is actually an option.",
+    ],
+  },
+  {
+    version: "1.456.0",
+    date: "2026-09-14",
+    changes: [
+      "The stress-by-hour chart now reaches past days. Swipe to any day on the day screen and it is there under the read-through, drawn the same way as today's — which is the point of the change rather than a side effect: today's chart used to be built from a different calculation than a stored day's, so comparing one day against another was comparing two things. Both now come from the same stored readings. The cost is stated on the chart: it says the time the readings stop at, because a stored day ends at the last sync rather than at this minute.",
+    ],
+  },
+  {
+    version: "1.455.1",
+    date: "2026-09-13",
+    changes: [
+      "The line under your macro targets that explains the day's calorie budget now adds up. It was breaking the budget into a resting figure, your goal adjustment and what you had moved \u2014 the three parts of the old calculation \u2014 while the budget beside them came from the new one, so it named 1,294 and then listed parts totalling 2,078. It also meant two different numbers on the same screen were both called your resting figure. It now names the parts the budget was actually built from, and on a day before you have moved it simply says the budget is your resting rate rather than printing the same number twice.",
+    ],
+  },
+  {
     version: "1.455.0",
     date: "2026-09-13",
     changes: [

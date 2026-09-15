@@ -27,7 +27,7 @@ import { settleRouteBoundary } from './fixtures'
  */
 
 // Cold routes compile on first use under `pnpm dev`, and this spec crosses `/activity`,
-// `/api/activity-types`, `/api/activity-logs` and `/workout-select`.
+// `/api/activity-types`, `/api/activity-logs` and `/workout`.
 test.setTimeout(180_000)
 
 test('a typeless /activity offers a type picker instead of a recordable blank screen', async ({ page }) => {
@@ -78,7 +78,11 @@ test('an activity recorded after picking a type actually saves', async ({ page }
   await save.click()
 
   // The old failure was Save doing *nothing at all* — no toast, no navigation, no request. Asserting
-  // the navigation rather than the toast: `handleSave` pushes `/workout-select` only after the write
+  // the navigation rather than the toast: `handleSave` pushes `/workout` only after the write
   // settles, so it cannot be reached by a save that bailed.
-  await expect(page).toHaveURL(/\/workout-select/, { timeout: 60_000 })
+  //
+  // The destination was `/workout-select` until PS-35a deleted that route — it was a copy of the
+  // Workout tab mounted outside the tab shell. `/workout` is the same screen inside it. The regex is
+  // anchored so it cannot pass on a URL that merely starts that way.
+  await expect(page).toHaveURL(/\/workout(\?|$)/, { timeout: 60_000 })
 })

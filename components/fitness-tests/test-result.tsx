@@ -7,11 +7,13 @@ import { Button } from '@/components/ui/button'
 import { TrendingUpIcon, TrendingDownIcon, MinusIcon } from 'lucide-react'
 import { getLocalStore } from '@/lib/local-store'
 import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
-import { invalidateFitnessTests } from '@/lib/cache-groups'
-import { todayInTz } from '@trainingai/shared/date-utils'
-import { sixMwtVo2max, cooperVo2max, baselineHrr1, restingHrFrom, maxHrFrom } from '@trainingai/shared/health/fitness-tests'
+import { invalidateFitnessTests, invalidateActivityWrites } from '@/lib/cache-groups'
+import { todayInTz, msToHHMMInTz } from '@trainingai/shared/date-utils'
+import { sixMwtVo2max, cooperVo2max, baselineHrr1, restingHrFrom, maxHrFrom, distanceCanBeScored, MIN_SCOREABLE_DISTANCE_M } from '@trainingai/shared/health/fitness-tests'
 import type { HrReading } from '@trainingai/shared/workout/hr-analysis'
 import type { FitnessTestProtocol } from '@trainingai/shared/fitness-tests/protocols'
+import { buildTestActivity } from '@trainingai/shared/fitness-tests/test-activity'
+import { omitNullFields } from '@/lib/local-store/sync-helpers'
 import type { LocalFitnessTest } from '@/lib/local-store/types'
 import type { TestCapture } from './test-active'
 
@@ -45,9 +47,15 @@ export function TestResult({ protocol, capture, previous, profile, userId, onDon
     // score in that case (HR + distance stats are still saved), and flag it to the user.
     const elapsedSec = (capture.endMs - capture.startMs) / 1000
     const endedEarly = protocol.durationSec != null && elapsedSec < protocol.durationSec * 0.9
+    // BF-158. The same treatment as `endedEarly`, for the other input the equations depend on.
+    // Distance comes from GPS and nothing else, so an indoor run completes a full-length capture
+    // with a distance near zero — which scored −11.3 on Cooper and a plausible-looking 34.8 on the
+    // 6MWT's profile-weighted branch. `MIN_SCOREABLE_DISTANCE_M` carries the derivation.
+    const distanceTooShort = protocol.vo2Equation != null && protocol.captureDistance &&
+      !distanceCanBeScored(protocol.vo2Equation, capture.distanceM)
     let vo2maxEst: number | null = null
     let method: string | null = null
-    if (!endedEarly) {
+    if (!endedEarly && !distanceTooShort) {
       if (protocol.vo2Equation === '6mwt') {
         // Burr 2011 (healthy adults) when profile terms are present; Ross 2010 fallback otherwise.
         vo2maxEst = sixMwtVo2max({
@@ -68,7 +76,7 @@ export function TestResult({ protocol, capture, previous, profile, userId, onDon
       // post-peak samples it reads exist.
       hrr1Bpm = baselineHrr1(readings)
     }
-    return { avgHr, maxHr, vo2maxEst, method, restingHr, hrr1Bpm, endedEarly }
+    return { avgHr, maxHr, vo2maxEst, method, restingHr, hrr1Bpm, endedEarly, distanceTooShort }
   }, [protocol, capture, profile])
 
   const primary = protocol.vo2Equation != null
@@ -94,6 +102,24 @@ export function TestResult({ protocol, capture, previous, profile, userId, onDon
       vo2maxEst: computed.vo2maxEst, method: computed.method, notes: null,
       updatedAt: now, deletedAt: null, syncStatus: 'pending',
     }
+    // BF-160: the effort is worth an activity too — `computeActiveEnergy` sums workouts,
+    // activities and steps, so a test that writes none earns nothing however hard it was. Null
+    // for `resting_hrr` and for a capture with no duration.
+    const activity = buildTestActivity({
+      protocol, startMs: capture.startMs, endMs: capture.endMs,
+      distanceM: capture.distanceM, avgHr: computed.avgHr, maxHr: computed.maxHr,
+    })
+    const activityId = activity ? crypto.randomUUID() : null
+    const activityPayload = activity && activityId
+      ? omitNullFields({
+          id: activityId, activityType: activity.activityType, title: activity.title,
+          durationMin: activity.durationMin, distanceKm: activity.distanceKm,
+          avgHr: activity.avgHr, maxHr: activity.maxHr,
+          startTime: msToHHMMInTz(capture.startMs, tz), endTime: msToHHMMInTz(capture.endMs, tz),
+        })
+      : null
+    const revalidateBoth = () => Promise.all([invalidateFitnessTests(), invalidateActivityWrites()])
+
     const store = userId ? getLocalStore(userId) : null
     if (store) {
       try {
@@ -108,11 +134,37 @@ export function TestResult({ protocol, capture, previous, profile, userId, onDon
             vo2maxEst: record.vo2maxEst ?? undefined, method: record.method ?? undefined,
           },
         })
-        invalidateFitnessTests().catch(() => {})
+        // Its own try/catch, and after the test's write rather than before it: the test is the
+        // record the user asked for, and a failure here must not drop it into the API fallback
+        // that would then re-POST the test under the same id.
+        if (activity && activityId) {
+          try {
+            await store.upsertActivityLog({
+              id: activityId, date: today,
+              activityType: activity.activityType, title: activity.title,
+              durationMin: activity.durationMin, distanceKm: activity.distanceKm,
+              steps: null, avgHr: activity.avgHr, maxHr: activity.maxHr,
+              caloriesBurned: null,
+              startTime: msToHHMMInTz(capture.startMs, tz),
+              endTime: msToHHMMInTz(capture.endMs, tz),
+              notes: null, routePolyline: null, splits: null, bestEfforts: null,
+              paceSeries: null, avgPaceSecPerKm: null,
+              elevationGainM: null, elevationLossM: null, elevationProfile: null,
+              cadenceSpm: null, cadenceSeries: null, cadenceSource: null, segments: null,
+              updatedAt: now, deletedAt: null, syncStatus: 'pending',
+            })
+            await store.queueMutation({
+              userId: userId!, domain: 'activity_logs', date: today, payload: activityPayload!,
+            })
+          } catch (e) {
+            console.error('Fitness test activity write failed; the test itself is saved:', e)
+          }
+        }
+        revalidateBoth().catch(() => {})
         toast.success('Baseline saved')
         onDone()
         router.push('/health?tab=training')
-        pushThenRevalidate(userId!, invalidateFitnessTests)
+        pushThenRevalidate(userId!, revalidateBoth)
         return
       } catch (e) {
         console.error('Fitness test SQLite write failed, falling back to API:', e)
@@ -131,7 +183,13 @@ export function TestResult({ protocol, capture, previous, profile, userId, onDon
         }),
       })
       if (!res.ok) throw new Error()
-      await invalidateFitnessTests()
+      if (activityPayload) {
+        await fetch('/api/activity-logs', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...activityPayload, date: today }),
+        }).catch(() => {})
+      }
+      await revalidateBoth()
       toast.success('Baseline saved')
       onDone()
       router.push('/health?tab=training')
@@ -160,6 +218,16 @@ export function TestResult({ protocol, capture, previous, profile, userId, onDon
         {computed.endedEarly && protocol.vo2Equation != null && (
           <p className="mt-2 text-xs text-muted-foreground">
             Ended early — VO₂max needs the full {Math.round((protocol.durationSec ?? 0) / 60)} min, so it wasn&apos;t scored.
+          </p>
+        )}
+        {/* BF-158. `endedEarly` wins the wording when both are true: a truncated capture explains
+            the short distance, so naming the distance would send you looking for a GPS fault. */}
+        {!computed.endedEarly && computed.distanceTooShort && protocol.vo2Equation != null && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            No distance recorded — VO₂max needs at least{' '}
+            {(MIN_SCOREABLE_DISTANCE_M[protocol.vo2Equation] / 1000).toFixed(2)} km, so it wasn&apos;t
+            scored. Your heart rate and time are saved. Indoors the test needs GPS; a treadmill run
+            can&apos;t be scored yet.
           </p>
         )}
       </div>

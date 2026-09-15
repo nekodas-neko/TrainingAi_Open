@@ -194,8 +194,13 @@ export function BodyBatteryCard({ battery }: { battery: BodyBatteryResponse }) {
                       {/* TN-3b. Beside the strip rather than replacing it: the strip carries the
                           current state and the "high ~N min" figure, this answers "when". The owner
                           did not know the strip existed, so the entry counts discoverability as
-                          part of the work — a labelled axis is what makes it findable. */}
-                      <StressDayChart buckets={battery.stress.series.map(p => ({ t: p.t, level: p.level }))} />
+                          part of the work — a labelled axis is what makes it findable.
+
+                          It fetches the STORED series itself rather than taking this response's
+                          live one (LA-104): the two are built from different baselines, so a chart
+                          fed from here would not be comparable with the same chart on a past day,
+                          which is the comparison the owner's pass test makes. */}
+                      <StressDayChart />
                     </>
                   )}
                 </>

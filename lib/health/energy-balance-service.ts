@@ -11,6 +11,7 @@ import { personalRmr, bodyComposition } from '@trainingai/shared/health/body-com
 import { correctBodyFatPct } from '@trainingai/shared/health/body-fat-calibration'
 import {
   computeCalorieBalance, targetFromMaintenance, GOAL_DAILY_DELTA, scaleMacrosForEarnedKcal,
+  macrosForKcal, budgetProvenance,
 } from '@trainingai/shared/nutrition/calorie-balance'
 import {
   resolveMaintenance, maintenanceGapMessage, MAX_WINDOW_DAYS, type MaintenanceDay,
@@ -183,11 +184,27 @@ export async function computeEnergyBalance(
    * Q-323. `earned` is today's measured movement — the same figure the budget on screen adds to the
    * rest-day floor — so the grams and the calories move together instead of the card asking for
    * 300 more kcal without saying of what. Null when there is no stored macro target to grow.
+   *
+   * **BF-154: `budgetBaseKcal` is what the grams are fitted to, and the owner chose it.** The stored
+   * grams were entered against the stored calorie goal; BF-152 moved the budget onto the measured
+   * resting rate, and the two then disagreed permanently — ~1,660 against ~1,294 on his figures.
+   * His answer: *"Can we have it dynamically sized for my calories? I.e before excercise its 1 value
+   * and after its another if calories increase?"* So both halves are re-fitted rather than only
+   * grown: `base` is the zero-movement split and `scaled` the same split at `budgetBase + earned`.
+   * The gap the card used to explain is now zero by construction.
+   *
+   * Null `budgetBaseKcal` means there is no budget to fit to — the missing-profile path below, where
+   * the BMR the anchor needs cannot be computed. The stored grams stand there, unchanged, because a
+   * target a human typed beats one fitted to a number that does not exist.
    */
-  const macroTargetsFor = (earned: number) => {
+  const macroTargetsFor = (earned: number, budgetBaseKcal: number | null) => {
     if (targets?.proteinG == null || targets.carbsG == null || targets.fatG == null) return null
-    const base = { proteinG: targets.proteinG, carbsG: targets.carbsG, fatG: targets.fatG }
-    return { base, scaled: scaleMacrosForEarnedKcal(base, earned), earnedKcal: Math.round(earned) }
+    const stored = { proteinG: targets.proteinG, carbsG: targets.carbsG, fatG: targets.fatG }
+    const base = budgetBaseKcal == null ? stored : macrosForKcal(stored, budgetBaseKcal)
+    const scaled = budgetBaseKcal == null
+      ? scaleMacrosForEarnedKcal(stored, earned)
+      : macrosForKcal(stored, budgetBaseKcal + Math.max(0, earned))
+    return { base, scaled, earnedKcal: Math.round(earned) }
   }
 
   if (missingProfileFields.length > 0) {
@@ -196,7 +213,7 @@ export async function computeEnergyBalance(
       target: { recommendedKcal: null, currentKcal: targets?.calories ?? null, driftsFromRecommendation: false },
       // Still populated: a missing height does not stop the stored macros being real, and the
       // measured movement is independent of the BMR formula that is blocked.
-      macroTargets: macroTargetsFor(activeEnergy.total),
+      macroTargets: macroTargetsFor(activeEnergy.total, null),
       activeBreakdown, goal, missingProfileFields,
     }
   }
@@ -332,7 +349,12 @@ export async function computeEnergyBalance(
       currentKcal,
       driftsFromRecommendation: currentKcal != null && Math.abs(currentKcal - recommendedKcal) > 100,
     },
-    macroTargets: macroTargetsFor(activeEnergy.total),
+    // The SAME inputs `computeCalorieBalance` was handed, so the grams are fitted to the very
+    // budget the card prints rather than to a second derivation of it.
+    macroTargets: macroTargetsFor(activeEnergy.total, budgetProvenance({
+      restingBaseKcal, activeKcal: activeEnergy.total,
+      targetNetKcal: balance.targetNetKcal, restingRateKcal: Math.round(bmr),
+    }).base),
     activeBreakdown,
     goal,
     missingProfileFields: [],

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
-import { settleRouteBoundary } from './fixtures'
+import { Client } from 'pg'
+import { SEED_EMAIL, settleRouteBoundary } from './fixtures'
 
 /**
  * The evening wrap-up draws the same read-through `/health/day` draws (Q-112b).
@@ -8,7 +9,65 @@ import { settleRouteBoundary } from './fixtures'
  * hosts off the same `day-log:<date>` cache key. A second copy would look identical on the day it
  * was written and drift from the next section change onward, which is the failure this exists to
  * make loud.
+ *
+ * **LB-105 — both halves of that claim were broken, in opposite directions.**
+ *
+ * The wrap-up test failed on a clean `origin/main` in the sandbox and passed on CI. It asserted that
+ * a section label was visible, and every section of `DayReadThrough` self-hides when its domain is
+ * empty; the local seed has nothing at all recorded for today, so the dialog was legitimately blank.
+ * A spec that is red locally and green on CI is worse than one that is simply wrong — it trains a
+ * session to skip it, which is how a genuine failure gets waved through. So this now **records an
+ * activity for today** and removes it again, rather than reading whatever the seed happens to hold.
+ *
+ * The `/health/day` test had the opposite problem: it passed on that same empty day. Its regex
+ * matched `^Sleep$`, and that screen renders a **`Sleep` score cell** of its own, above the
+ * read-through — so it was satisfied by a label that is not a section and would have passed with
+ * `DayReadThrough` absent entirely. Both tests now scope to `data-testid="day-read-through"`.
+ *
+ * The label list was wrong too: the component renders **`Body composition`**, which `^Body$` never
+ * matched.
  */
+
+/** What `day-sections.tsx` actually renders, checked against the file rather than remembered. */
+const SECTION_LABELS = /^(Training|Activity|Energy|Sleep|Body composition|Heart rate through the day)$/
+
+let seededActivityId = ''
+
+async function withDb<T>(fn: (db: Client) => Promise<T>): Promise<T> {
+  const connectionString = process.env.DATABASE_URL
+  expect(connectionString, 'DATABASE_URL must be set — see e2e/README.md').toBeTruthy()
+  const db = new Client({ connectionString })
+  await db.connect()
+  try { return await fn(db) } finally { await db.end() }
+}
+
+test.beforeAll(async () => {
+  await withDb(async db => {
+    const { rows: users } = await db.query<{ id: string; timezone: string | null }>(
+      'SELECT id, timezone FROM users WHERE email = $1', [SEED_EMAIL])
+    const user = users[0]
+    expect(user, `${SEED_EMAIL} is not seeded — run pnpm db:local`).toBeTruthy()
+
+    // The user's local day, read back from Postgres in their own timezone rather than computed here
+    // — the app buckets by the user's day, and a UTC "today" is the wrong one for two hours of it.
+    const { rows: days } = await db.query<{ d: string }>(
+      `SELECT to_char((now() AT TIME ZONE $1)::date, 'YYYY-MM-DD') AS d`,
+      [user.timezone ?? 'Australia/Brisbane'])
+
+    const { rows } = await db.query<{ id: string }>(
+      `INSERT INTO activity_logs (user_id, date, activity_type, title, duration_min, calories_burned)
+            VALUES ($1, $2, 'walk', 'Read-through fixture walk', 20, 80)
+         RETURNING id`,
+      [user.id, days[0].d])
+    seededActivityId = rows[0].id
+  })
+})
+
+test.afterAll(async () => {
+  if (!seededActivityId) return
+  await withDb(db => db.query('DELETE FROM activity_logs WHERE id = $1', [seededActivityId]))
+})
+
 test('the wrap-up shows the day it is wrapping up', async ({ page }) => {
   await page.goto('/nutrition?review=day')
   await settleRouteBoundary(page)
@@ -16,11 +75,10 @@ test('the wrap-up shows the day it is wrapping up', async ({ page }) => {
   const review = page.getByRole('dialog')
   await expect(review).toBeVisible({ timeout: 60_000 })
 
-  // Section labels come from `day-sections.tsx`, which is what both hosts render. Asserting on the
-  // labels rather than on any one day's numbers keeps this independent of the seed's contents —
-  // every section self-hides when its domain is empty, so at least one must be present for the
-  // read-through to be doing anything at all.
-  const sections = review.getByText(/^(Training|Activity|Energy|Sleep|Body|Heart rate through the day)$/)
+  // Scoped to the read-through itself. Asserting on labels rather than on any one day's numbers is
+  // still right — the numbers are the seed's, the labels are the component's — but the label has to
+  // come from inside the component for that to mean anything.
+  const sections = review.getByTestId('day-read-through').getByText(SECTION_LABELS)
   await expect(sections.first()).toBeVisible({ timeout: 60_000 })
 })
 
@@ -28,7 +86,7 @@ test('the same section labels appear on /health/day', async ({ page }) => {
   // The other half of the claim. If these two ever diverge, one host grew its own copy.
   await page.goto('/health/day')
   await settleRouteBoundary(page)
-  const sections = page.getByText(/^(Training|Activity|Energy|Sleep|Body|Heart rate through the day)$/)
+  const sections = page.getByTestId('day-read-through').getByText(SECTION_LABELS)
   await expect(sections.first()).toBeVisible({ timeout: 60_000 })
 })
 

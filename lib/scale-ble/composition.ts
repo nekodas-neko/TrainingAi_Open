@@ -11,6 +11,30 @@
  *  as "pending" instead of auto-saved (owner's partner also uses this scale). */
 export const SCALE_WEIGHT_ANOMALY_PCT = 0.15
 
+/**
+ * The band inside which a reading is confidently THIS user's, so it is claimed without asking.
+ *
+ * BF-58, option D (owner's choice, 2026-08-30): two phones hear one scale, and each app claims only
+ * what falls in its own owner's band rather than linking accounts. This is the width that decision
+ * needed, and the entry said to pick it "from the two real weights rather than a round number".
+ *
+ * **Both real weights were in the database and nobody had looked.** Measured 2026-09-14 over the
+ * owner's 100 confirmed readings and the 6 he has tapped *Not me* on:
+ *
+ *   · his confirmed weight   **70.0 – 72.8 kg**  (whole history spans 5.2 kg)
+ *   · his day-to-day change  **0.39 kg mean, 1.40 at p95, 2.85 worst**
+ *   · the dismissed cluster  **57.5 – 58.0 kg**  — tight, and 12.0 kg below his lowest
+ *
+ * 8% of ~70 kg is ±5.6 kg: wider than his entire historical spread, so no genuine reading of his
+ * falls outside it even after a long gap, and still **6.4 kg clear** of her cluster. The old 15%
+ * (±10.5 kg) reached down to 59.5 and cleared her by only 1.5 kg, which is the thin margin BF-58
+ * was written about.
+ *
+ * **This is identity by proxy and it degrades if the two weights converge** — which is why anything
+ * between this band and `SCALE_WEIGHT_ANOMALY_PCT` still asks rather than guessing.
+ */
+export const SCALE_WEIGHT_CLAIM_PCT = 0.08
+
 /** BIA requires bare-skin contact with both foot plates to complete the current path. Socks,
  *  stockings, or dry/calloused feet break that path and the scale reports impedance as 0 (no
  *  measurable value) rather than omitting the reading. Real bare-foot adult readings are on the

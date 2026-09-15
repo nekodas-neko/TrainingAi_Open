@@ -37,7 +37,7 @@ const { verifyFromLines, verifyProblem } = require('./lib/verify');
 const { laneDrift } = require('./lib/lane-drift');
 const { laneFieldProblem, LANE_LOOSE_RE } = require('./lib/lane');
 const { keepFromLines } = require('./lib/keep');
-const { keepKind } = require('./lib/keep-kind');
+const { keepKind, keepIsSettled } = require('./lib/keep-kind');
 const { decoratedField } = require('./lib/decorated-field');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -246,6 +246,62 @@ for (const [id, m] of meta) {
       `only. next-item.js reads a FIELD, so this entry still prints as startable work — add ` +
       `\`- **Reference:** <why it is read rather than built>\` beside the sentence.`,
   );
+}
+
+// ---- A field name the readers cannot parse -------------------------------
+//
+// LA-106. Every field in this file is read by a regex of the same shape — the name, wrapped in at
+// most `**`, then the colon:
+//
+//   /^\s*[-*]\s*\*{0,2}Needs:\*{0,2}\s*(.+)$/i        next-item.js:73
+//   /^\s*[-*]\s*\*{0,2}Gate:\*{0,2}\s*([a-z]+)/i      next-item.js:76
+//   …and the same for Lane, Batch, Reference, Verify, Keep in scripts/lib/.
+//
+// Asterisks and nothing else. BF-160 wrote ``- **`Needs:` BF-158**`` with a BACKTICK, the
+// dependency did not parse, and **BF-160 printed as READY #1 while BF-158 — the entry it needs —
+// sat at #2**. Nothing anywhere said so; the field was simply invisible.
+//
+// **The `Gate:` case is the one that matters and has not happened yet.** The same shape governs it,
+// so ``- **`Gate: owner`**`` would park nothing, and an agent would be handed owner-gated work at
+// the top of its queue with no sign anything was wrong. `Needs:` mis-orders a list. `Gate:` crosses
+// a line the owner drew.
+//
+// **Widening the readers to accept backticks was considered and rejected** — that rewards the
+// ambiguity and leaves two spellings of every field for the next reader to disagree about. A
+// malformed field should be loud, not tolerated.
+//
+// Covers all seven names rather than the four the entry listed: they share the shape, so they share
+// the failure, and the extra three cost one array element each. The baseline is EMPTY — there are
+// zero malformed fields today — so any hit is a regression rather than a debt row.
+const FIELD_NAMES = ['Lane', 'Needs', 'Gate', 'Batch', 'Reference', 'Verify', 'Keep'];
+
+// What a reader accepts: bullet, at most `**`, the name, then the colon (Reference also takes a
+// dash separator, so the separator class is shared here rather than restated per field).
+const wellFormed = (line, name) =>
+  new RegExp(`^\\s*[-*]\\s*\\*{0,2}${name}\\s*(?::|[—–-])`, 'i').test(line);
+
+// What a human plausibly MEANT: the same bullet with any run of emphasis characters in front of the
+// name — backticks, underscores, extra asterisks — which is how the malformed ones get written.
+const looksLikeField = (line, name) => {
+  const bullet = line.match(/^\s*[-*]\s+(.*)$/);
+  if (!bullet) return false;
+  const bare = bullet[1].replace(/^[*`_\s]+/, '');
+  return new RegExp(`^${name}\\s*:`, 'i').test(bare);
+};
+
+for (const [id, m] of meta) {
+  for (const line of m.lines) {
+    for (const name of FIELD_NAMES) {
+      if (!looksLikeField(line, name)) continue;
+      if (wellFormed(line, name)) continue;
+      failures.push(
+        `${id} writes a \`${name}:\` field the readers cannot parse — the name may be wrapped in ` +
+          `\`**\` and nothing else, so this field is silently IGNORED and the entry sorts as though ` +
+          `it were absent:\n    ${line.trim().slice(0, 120)}\n    Write it as ` +
+          `\`- **${name}:** …\`.`,
+      );
+    }
+  }
 }
 
 const GATES = new Set(['owner', 'device']);
@@ -568,6 +624,32 @@ const verifySummary = withVerify
         `work that genuinely cannot start — the thing BF-90 measured. Convert to \`Verify: device\`, ` +
         `which prints in its own section and does not park. Advisory, not a failure:\n` +
         stragglers.map((r) => `      ${r}`).join('\n'),
+    );
+  }
+}
+
+// The other half of the same class, and the one that actually bit (2026-09-14, OR-113). An entry
+// whose `Keep:` says a CHECK is owed and whose body ALREADY records that the check happened is
+// finished — but it goes on printing as debt, because recording the verification and striking the
+// `Keep:` are two edits and only the first one is satisfying to make.
+//
+// Nineteen entries were in that state after three device passes; fifteen were fully done and left
+// the queue, four owed something else and had their `Keep:` narrowed. Nobody noticed, because every
+// individual entry reads correctly — the ✅ and the `Keep:` are ten lines apart and each is true of
+// its own half. Advisory rather than a failure for the same reason as the block above: the fix is a
+// judgement (strike, or narrow to what is left), not a mechanical edit CI can demand.
+{
+  const settled = [];
+  for (const [id, m] of meta) {
+    if (keepIsSettled(m.keep || null, m.lines)) settled.push(`${id} — ${m.keep.text.slice(0, 90)}`);
+  }
+  if (settled.length) {
+    console.log(
+      `check-backlog-pointers: note — ${settled.length} entr${settled.length === 1 ? 'y' : 'ies'} whose \`Keep:\` ` +
+        `says a device check is owed and whose body already records that check as DONE. Strike the ` +
+        `\`Keep:\` and remove the entry, or narrow it to whatever is genuinely left. Advisory, not a ` +
+        `failure:\n` +
+        settled.map((r) => `      ${r}`).join('\n'),
     );
   }
 }

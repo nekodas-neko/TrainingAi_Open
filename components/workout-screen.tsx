@@ -1177,8 +1177,9 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
     const snapWeights = [...hot.setWeights];
     const snapReps = [...hot.reps];
     const snapLapTimes = [...hot.lapTimes];
-    const snapSetStartTimes = [...store.setStartMsArray];
-    const snapSetEndTimes = [...store.setEndMsArray];
+    // BF-155: `hot`, not the reactive pick — same tick as the append (see bf155-set-end-times-read-fresh.test.ts).
+    const snapSetStartTimes = [...hot.setStartMsArray];
+    const snapSetEndTimes = [...hot.setEndMsArray];
     const snapRestTimes = [...hot.restTimes];
     // The last set's rest (last-set log → "Complete →" tap) was never recorded: restTimes only
     // gets an entry when the NEXT set starts, and the final set has no next set — so that rest
@@ -1362,9 +1363,9 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
     });
     isLoggingRef.current = false;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveExercises, store.currentIdx, store.currentSet, store.sets,
-      sessionType, sessionDisplayName, programSessionId, store.accumulatedRestMs,
-      store.setStartMsArray, store.setEndMsArray, store.exerciseStartMs,
+  // BF-155: the timing arrays are absent on purpose — the body reads them through getState().
+  }, [effectiveExercises, store.currentIdx, store.currentSet, store.sets, sessionType,
+      sessionDisplayName, programSessionId, store.accumulatedRestMs, store.exerciseStartMs,
       store.lastExerciseEndMs, store.workoutSessionId, store.workoutStartMs, store.warmupEndedMs, phaseStatus, deload]);
 
   // ── Screen keep-awake ─────────────────────────────────────────────────────
@@ -1608,7 +1609,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
           Your program changed, so this link is out of date. We&apos;ve refreshed it — reopen the session from your list.
         </p>
         <a
-          href="/session-select"
+          href="/workout"
           className="mt-2 inline-flex h-12 items-center justify-center rounded-xl bg-brand px-6 text-base font-semibold text-brand-foreground"
         >
           Back to sessions

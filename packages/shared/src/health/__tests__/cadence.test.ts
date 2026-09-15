@@ -4,6 +4,7 @@ import {
   cadenceFromStrideHz,
   detectCadence,
   summarizeCadence,
+  stepsFromCadenceSeries,
   cadenceFieldsForSave,
   compareCadence,
   isPlausibleCadence,
@@ -463,5 +464,35 @@ describe('summarizeCadence — the step estimate (Q-230)', () => {
   it('uses the per-bin median, so one harmonic mis-lock cannot double the count', () => {
     const readings = [at(0, 60), at(1, 60), at(2, 121)]
     expect(summarizeCadence(readings, START).stepsEstimate).toBe(10)
+  })
+})
+
+// LA-48 factored the walk's own step integration out so a per-segment count could reuse it. These
+// pin the two halves of that: the arithmetic itself, and that routing `estimateSteps` through it
+// did not change the number a saved walk already carries.
+describe('stepsFromCadenceSeries', () => {
+  const start = 1_000_000
+
+  it('counts each populated bin over a full bin duration', () => {
+    expect(stepsFromCadenceSeries([{ tSec: 0, spm: 120 }, { tSec: 10, spm: 120 }])).toBe(40)
+  })
+
+  it('is null on an empty series — no readings is not zero steps', () => {
+    expect(stepsFromCadenceSeries([])).toBeNull()
+  })
+
+  it('counts only the bins present, so a pause does not get the moving rate', () => {
+    // Two bins of walking either side of a 60 s stop. Mean spm across the span would count the
+    // stop; the bins do not.
+    const walked = stepsFromCadenceSeries([{ tSec: 0, spm: 120 }, { tSec: 70, spm: 120 }])
+    expect(walked).toBe(40)
+  })
+
+  it('still produces the walk total that summarizeCadence always produced', () => {
+    const readings = [0, 10, 20, 30].map(sec => ({
+      atMs: start + sec * 1000, spm: 120, source: 'strap' as const,
+    }))
+    // Four 10 s bins at 120 spm = 40 s of walking = 80 steps.
+    expect(summarizeCadence(readings, start).stepsEstimate).toBe(80)
   })
 })
