@@ -3189,10 +3189,27 @@ never becomes `/activity`, not even transiently.
 started — Next updates the URL at **commit**, so an aborted commit and a never-started push look
 identical from `location`. Only the deferred-close experiment separates them.
 
-**Next:** drive the same `useTransitionRouter.push('/activity')` from a control on `/cardio` that is
-**not** inside a sheet. Navigates → the portal context is the variable; does not → `animate()` is the
-defect, which is app-wide navigation. **Do not lengthen `NAVIGATION_TIMEOUT_MS`** — that turns a dead
-tap into a slow dead tap.
+**✅ That experiment ran, and it narrows the bug sharply.** `modality-picker.tsx` already had the
+control it needed — two buttons on `/cardio`, same router, same `animate()` path, **neither in a
+sheet**: **Running → `/running` NAVIGATES**; **Guided walk → `/activity/guided-walk` DOES NOT**.
+So `animate()` is not the defect (it commits fine for `/running`) and the sheet is not the variable
+(Guided walk has none). **Both failures share the `/activity` prefix; the success does not.**
+
+**⚠ A SECOND DEAD BUTTON, unreported: *Guided walk* on the Cardio hub does not navigate either.** The
+report covered only "Other activity", so the scope is wider than filed — anything reaching an
+`/activity*` route from a client-side push. Both routes into that surface from the hub are dead, and
+BF-160 made "Other activity → Treadmill" the recommended way to log a steady treadmill walk.
+
+**It fails silently** — no console errors, no `pageerror`, no failed requests, nothing ≥ 400 — which
+matches `error_events` holding nothing across three days and rules out a chunk-load failure.
+**Not a routing-config difference either:** both pages are plain, neither has a `layout.tsx`, and
+`middleware.ts` mentions neither.
+
+**Next:** bisect what `app/activity/page.tsx` and its tree (`activity-screen.tsx`, `activity-store`,
+`reconcileRehydratedActivity`) do on a CLIENT commit that `app/running/page.tsx` does not — a direct
+`goto('/activity')` renders fine, so it bites only on the push path. **Do not lengthen
+`NAVIGATION_TIMEOUT_MS`** — that turns a dead tap into a slow dead tap.
+([narrowing](docs/overview/entries/2026-09-15-bf165-activity-prefix-narrowing.md))
 ([journal](docs/overview/entries/2026-09-15-bf165-reproduced-in-harness.md))
 
 ### [app-shell] ⚠️ The Android back button ignored the overlay stack the app already had (BF-166, 2026-09-15)

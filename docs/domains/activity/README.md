@@ -159,6 +159,16 @@ cause of one class was a posted step window coming from a *different stream* tha
 
 ## History
 
+- [`2026-09-15-bf165-activity-prefix-narrowing`](../../overview/entries/2026-09-15-bf165-activity-prefix-narrowing.md)
+  — **BF-165 narrowed to the `/activity` PREFIX, and a second dead button found (2026-09-15).**
+  On `/cardio`, through the identical `useTransitionRouter`/`animate()` path with no sheet involved:
+  **Running → `/running` navigates; Guided walk → `/activity/guided-walk` does not.** So `animate()`
+  is not the defect and the sheet is not the variable — both failures share the `/activity` prefix.
+  **Guided walk is a second dead button the owner has not reported.** It fails silently (no console
+  errors, no failed requests, nothing ≥ 400) and is not a routing-config difference (both pages
+  plain, no `layout.tsx`, no middleware). **Next:** bisect what `app/activity/page.tsx`'s tree does on
+  a client commit that `app/running/page.tsx` does not.
+
 - [`2026-09-15-bf165-reproduced-in-harness`](../../overview/entries/2026-09-15-bf165-reproduced-in-harness.md)
   — **BF-165 (2026-09-15): "Other activity" is a dead tap, and it is NOT device-only.** It reproduces
   in Playwright — `/cardio` → Other activity → Treadmill leaves the URL on `/cardio`. **Two candidates
