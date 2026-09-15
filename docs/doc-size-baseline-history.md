@@ -12374,3 +12374,10 @@ documents got smaller because an open finding became a shipped one with a shorte
 What survives at length in both is the thing that is *not* fixed — the number is Tuning's, and the
 `—`-versus-badge question is the owner's. An entry that reads as closed when two of its three parts
 are still owed is how a KEEP turns into a dropped finding.
+
+## 2026-09-15 — `docs/implementation-backlog.md` (BF-166)
+
+Thirty-eight lines. The report names one screen and the defect is all 52 Sheet/Dialog files, so the
+entry has to establish that before an implementer patches the meal builder alone. The ordering
+paragraph earns its length too: the overlay check must sit AFTER the three mode guards, or a confirm
+dialog raised by one of them gets dismissed by the very back press meant to answer it.
