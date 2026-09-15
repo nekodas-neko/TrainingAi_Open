@@ -437,6 +437,47 @@ below threshold and left in place for next time.
 
 
 
+### [app-shell] BF-166 — the back listener ignored the overlay stack the app already had (fixed; device check owed)
+
+- **Lane:** B — `lib/hooks/sheet-back-stack.ts` and `components/mobile-auth-handler.tsx`. Shipped
+  2026-09-15. **`components/ui/sheet.tsx` and `dialog.tsx` needed NO change**, and neither did the 52
+  call sites.
+- **Added:** 2026-09-15 (BugFix intake). Owner: *"If you have a nutrition meal creator menu open and
+  you press the back button - it makes the page behind it go back to main."*
+- **⚠ THIS ENTRY'S PREMISE WAS WRONG, and acting on it would have made things worse.** It stated
+  *"no overlay registry exists"* and proposed building a module-level stack that `SheetContent` and
+  `DialogContent` push to. **One already exists**: `lib/hooks/sheet-back-stack.ts`, reached via
+  `useSheetBackDismiss` → `BackDismiss`, which **both** primitives already render (BF-27 put it
+  there, deliberately central, for this exact reason). The grep that found nothing looked for
+  `openOverlay|overlayStack|topOverlay`; the real names are `openSurface`/`closeSurface`. **Building
+  the proposed registry would have left two stacks disagreeing about what is open.**
+- **The real defect is one line and narrower than described.** `openSurface` pushes with
+  `pushState(state, '')` — **no URL** — so `window.location.pathname` never moves. And
+  `backActionForPath` reads nothing but the pathname. So on a tab route it answers `"home"` and the
+  listener calls `navigateToTab`; on `/` it answers `"minimize"`. **Neither touches history**, so the
+  surface's pushed entry is never consumed and the page moves out from under an open sheet.
+  **Only `"pop"` ever worked, and only by coincidence** — `history.back()` happens to be the thing
+  that consumes the entry.
+- **So `"minimize"` is a second symptom the entry did not name:** a sheet open on Home and the app
+  goes to the background instead of closing it.
+- **The fix:** export `hasOpenSurface()` from the existing stack, and have the listener
+  `history.back()` when it is true. That reaches `handlePop`, which closes the topmost surface
+  through Radix's own `onOpenChange` — the identical path as the X button, so every guard already on
+  a sheet's close still runs.
+- **The entry's ordering instruction was right and is kept.** The overlay check sits **after** the
+  three mode guards, because each of them *raises* a dialog (`LeaveWorkoutDialog` and siblings) that
+  is itself on this stack; checking overlays first would make a mid-workout back press close the
+  confirmation instead of answering it. A test pins that order.
+- **Proven load-bearing:** `components/__tests__/bf166-back-closes-overlay.test.ts` — **4 of its 5
+  assertions fail against `main`**. The fifth deliberately passes on both sides: it records that the
+  primitives were already wired, which is the finding that stopped a duplicate registry being built.
+- **Keep: the device check, and only that.** Android's hardware back is a Capacitor channel that
+  Playwright cannot fire, so **no harness run can exercise this** — the unit tests cover the stack's
+  behaviour and the listener's ordering, not the gesture. On the S25: open a sheet over a tab route
+  (`/nutrition` meal builder) and over a sub-route, press back, confirm the overlay closes and the
+  page does not move; open one on Home and confirm back closes it rather than minimising the app;
+  then mid-workout, confirm back still raises the leave prompt.
+
 ### [activity][cardio] BF-165 — "Other activity" is a dead tap on device, and the whole source path reads correct
 
 - **Lane:** B — `components/workout/log-activity-sheet.tsx`,
@@ -527,6 +568,201 @@ below threshold and left in place for next time.
 - **Keep:** the device check, and only that. On the S25: from Home flip to More, open Profile
   details, press the system back gesture — arrive on **More** with the More tab active. The harness
   cannot speak for the Android back gesture or the WebView's history handling.
+
+### [platform][devices] TN-38 — normalisation is implemented three different ways and nothing names them as one concept
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-15 · owner: *"lets work on getting some normalised inputs; then creating our scoring system on it."*
+- **Lane: A** for tasks B–D; **task A is docs-only and unblocks the rest.**
+- **Plan:** [`2026-09-15-normalised-inputs-and-source-aware-scoring.md`](superpowers/plans/2026-09-15-normalised-inputs-and-source-aware-scoring.md).
+- **Reference:** [`review`](reviews/2026-09-15-pillars-against-the-connector-guide.md) · contract is [`data-source-connector-guide.md`](data-source-connector-guide.md) §3–§6.
+- **Sibling of TN-37** (which found §5.4's invariant false) and of **PS-40** (the connector registry). **⛔ Not a redesign** — the architecture is written; this finishes it.
+
+**A second source is live TODAY, not hypothetical.** Over 45 days `oura_heartrate` holds **74,860
+chest-strap samples against 12,673 ring samples** — the strap outnumbers the ring **six to one**.
+
+**⚑ And this is a PRODUCT requirement, not a tidy-up: the owner will not use Health Connect, other
+users will** (2026-09-15). The app has to be good on basic sources alone, with the ring as
+refinement. **⚠ Which means B cannot be validated on the owner's account** — it needs a
+Health-Connect-only test user.
+
+**⚑ The measurement layer already does what the owner describes, and is the template.** The ring
+decodes frames into a step count and writes `body_metrics.steps` through the same method every source
+calls; nothing downstream knows it came from a ring. Same for `hrv_ms`, `resting_heart_rate`,
+`spo2_pct`. **It is the derived/score layer that bypasses it (TN-37)** — that is where this entry's
+weight sits, not in the measurements.
+
+**Each mechanism is individually sound. Nothing names them as one concept:**
+
+| data | mechanism | merged at | multi-source today? |
+|---|---|---|---|
+| `body_metrics` scalars | `source_map` + `SOURCE_RANK` (`mergeSet`) | **write** | **yes** — `oura_ble` ×4, `scale_ble` ×12 |
+| `oura_heartrate` series | `preferStrapBuckets` — 10 s buckets, strap wins | **read**, in `getHrForWindow` | **yes** — 74,860 / 12,673 |
+| `oura_daily_derived` | **none — single writer** (`rollup-io.ts:83`) | — | **no** |
+
+**§5 of the guide describes the stages (decode → normalize → write) and never says the merge step
+has three implementations depending on what you are writing.** A new connector's author reads §3 for
+the shape and has no way to learn which merge governs it.
+
+**The rule that decides it, once stated:** **scalars merge at write by rank; series merge at read by
+resolution; derived rows have one writer.**
+
+**Four steps, in order — A first because it is cheapest and everything later is checked against it:**
+- **A. Name the three mechanisms in the guide**, and amend **§5.4**, whose invariant TN-37 measured
+  as false. Docs-only.
+- **B. Close the two filed gaps** — **PS-41** (Health Connect's `HeartRateSeries` is read, used
+  inline, then discarded instead of normalised) and **PS-42** (the illness radar gated on an
+  `oura_daily_summary` row rather than on its inputs). **PS-41 unlocks 22% of Activity Score for a
+  non-ring user.**
+- **C. Split every score into a CORE and ADJUSTMENTS** — **`Gate: owner`**, and the one genuine
+  design decision here. Owner, 2026-09-15: *"the app works fine with less sources but is more
+  accurate and tuned with more sources."* **⚑ That is NOT what the code does.** `sleep-score.ts:399`
+  renormalises the weighted mean over whichever contributors are present, and readiness passes a
+  neutral 50 — so **connecting a ring changes the denominator and moves the score for a reason
+  unrelated to the user's body, and two users' 78s are computed from different weight sets.** Under
+  `clamp(core + Σ adjustments)` the core is the same quantity for everyone, an extra sensor adds a
+  signed delta, and the app can say *"78 — core 74, +6 HRV, −2 SpO₂"*. **⚠ The core input set per
+  pillar is the owner's decision**; everything else is mechanical. **⚠ This re-scores history** — the
+  2026-08-24 policy applies, stamp the model and leave stored days, and size it first.
+- **D. Record what a non-ring user actually gets** — §4 already traced it. **⚠ Not "normalise these":
+  chronic stress, resilience, daytime HRV, Body Battery and OTS read raw BLE frames with zero
+  fallback branches, and readiness's temperature term (0.10) passes null on every generic path.**
+  Source-neutrality there means re-implementing vendor models — a project, not a task.
+
+**⚠ Three things that could make this wrong, and each is checkable before committing to it:**
+`preferStrapBuckets` was written for two sources and **task B's three-way case must be proven, not
+assumed**; **Health Connect writes zero rows today**, so B's value is latent and **should be
+confirmed as planned before starting**; and the `oura_daily_derived` single-writer design **may
+simply be correct** — if everything in it is genuinely ring-derived the fix is documentation, which
+task A settles.
+
+**Pass test:** a connector author can read §3 and know which merge governs the data type they
+supply; and a rendered score can say what it was computed without.
+
+### [platform][readiness] TN-37 — the connector guide states an invariant the pillars do not hold: readiness reads four device-specific stores
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-15 · owner: *"we get data from Oura; then we normalise/calculate it into usable fields… then we use those fields to calculate our pillars. Can we make sure we are doing this correctly?"*
+- **Lane: A** for steps 2–3 (`lib/health/readiness-payload.ts:278-291`); **step 1 is docs-only and should not wait.**
+- **Reference:** [`review`](reviews/2026-09-15-pillars-against-the-connector-guide.md) · the contract is [`docs/data-source-connector-guide.md`](data-source-connector-guide.md) §5.4.
+- **⛔ Not a redesign.** The architecture the owner describes is already written down and already built at the input layer. This entry closes the gap between the guide and the code.
+
+**✅ The input layer holds.** `body_metrics` carries a per-field `source_map` resolved by
+`SOURCE_RANK` (`manual > scale_ble > oura_ble > oura_cloud > health_connect`). Measured over 30 days:
+**16 fields, two live sources** — `oura_ble` supplies `hrv_ms`/`resting_heart_rate`/`spo2_pct`/`steps`
+(31 days each), `scale_ble` the twelve body-composition fields (30 days each). **This half needs no
+work.**
+
+**❌ The scoring layer does not read only from it, and §5.4 says it does:** *"Every calculation in §4
+reads generic tables, never a device-specific one."* `readiness-payload.ts:278-291` reads, in one
+`Promise.all`:
+
+| read | layer |
+|---|---|
+| `listBodyMetrics`, `listSleepSessions` | ✅ normalised |
+| `getOuraDaily`, `getLatestOuraCloudVitals` | ❌ Oura **Cloud** |
+| `getOuraDailySummary`, `getOuraDailyDerived` | ❌ Oura-specific |
+| `getHrForWindow` | ❌ raw HR series |
+
+**`oura_daily_derived` is written by the Oura rollup and nothing else** (`rollup-io.ts:83` plus one
+adapter mutation path). **~20 payload fields come from these stores rather than the normalised
+layer** — `daySummary`, `temperatureDeviation`, `stressHigh`/`recoveryHigh`, `recommendedBedtime*`,
+`vo2Max`, `vascularAge`, `readinessScore`, `sleepScore`, `activityScore`, `steps`, `zoneMinutes` and
+every contributor block. **For those fields a non-Oura source is structurally invisible.**
+
+**⚠ Two things that keep this from being urgent, and they are the reason it is not marked LIVE.**
+`oura_daily` rows exist through today but **every scored column on recent rows is NULL** — the Cloud
+retired 2026-08-13 and the rows are shells, so this costs a query and a branch, not a wrong number.
+And **Health Connect writes zero rows today**, so the divergence currently has no victim. **It fires
+the first time a second source supplies a field the pillars take from the Oura path.**
+
+**⚠ The guide already names ONE violation and believes it is the only one.** §5.5 covers Health
+Connect's discarded `HeartRateSeries` (**PS-41**) and calls it *"the concrete, fixable instance of the
+general rule"* — singular. This is a second, larger instance.
+
+**Three steps, rising cost:**
+1. **Amend §5.4 to say what is true**, naming the readiness read list. **A written invariant the code
+   does not hold is worse than none** — the next connector author will trust it. Docs-only; do not
+   make it wait on 2 or 3.
+2. **Drop the two dead Cloud reads** — `getOuraDaily` and `getLatestOuraCloudVitals` return nothing
+   usable and are half the violation. **⚠ Re-verify the NULL-on-recent-rows finding at the time of the
+   change** rather than trusting this snapshot.
+3. **Then decide what the derived layer IS** — app-computed and source-neutral (the rename plan
+   applies, any source should contribute), or genuinely Oura-only (then §4's table should mark which
+   pillars degrade without a ring). **⛔ Do not start 3 without its own plan** — `2026-08-02-de-oura-naming.md`
+   already says so, and `oura_daily_derived` is one of six tables a rename touches.
+
+**⛔ Not a reason to delay the connector registry** (PS-40, `2026-09-14-data-source-connector-interface.md`).
+That plan is metadata over existing ingest routes and is unaffected — a `supplies` declaration is
+exactly what would have surfaced this without an audit.
+
+**Pass test:** §5.4 describes the code, or the code matches §5.4; and a reader can answer "which
+pillars degrade for a Health-Connect-only user" from the guide rather than by grepping read paths.
+
+### [workouts][readiness] TN-36 — the deload engine has ONE way to say "train normally", and a bug fix switched on its loudest trigger 🔴 LIVE
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-14 · owner: *"workouts are constantly being recommended for deload… I'm sure it's just bad tuning."*
+- **Lane: A** — `packages/shared/src/ai-periodization/ai-dynamic.ts:182-236`.
+- **Gate: owner** — step 1 changes what the app tells the owner to do with their training. Steps 2 and 3 are not gated.
+- **Sibling of TN-34**, which covers the stress override alone. **This entry is the cause; TN-34 is what made it visible.**
+- **Reference:** [`review`](reviews/2026-09-14-what-triggers-a-deload.md).
+
+**It is not tuning. Nine conditions can recommend a deload and exactly ONE can decline it.**
+
+```ts
+if (consecutiveTrainingDays < 3) {
+  return { recommended: false, strength: 'soft' }   // the only false in the function
+}
+const r = readinessScore ?? 70
+if (r >= 70) return { recommended: true, strength: 'soft' }
+if (r >= 50) return { recommended: true, strength: 'recommended' }
+return       { recommended: true, strength: 'strong' }
+```
+
+**Past three consecutive training days every branch returns `recommended: true`** — readiness picks
+the *strength*, never the *verdict*. **A readiness of 100 recommends a deload**, and `?? 70` means a
+day with no readiness does too.
+
+**Measured over 45 days: 28 days were not recommended and all 28 were cleared by
+`consecutiveTrainingDays < 3`. Not one on merit.** The engine has never said *"you are recovered"* —
+only *"you have not trained enough days in a row yet"*. **⚠ Which makes the rule perverse:** a rest
+day buys three clear days regardless of recovery, while four good days in a row guarantees a deload.
+
+**⚑ AND THE SECOND DEFECT HAS A DATE — this is the step change the owner is describing:**
+
+| | August (31 d) | September (14 d) |
+|---|---|---|
+| **deload recommended** | **6 — 19%** | **11 — 79%** |
+| fired by the stress override | **0** | **9** |
+| stored `stress_high_minutes` max | **90** | **330** |
+| days ≥ the 120 threshold | **0 of 27** | **9 of 14** |
+
+**The threshold did not move.** Commit `7c428a7f` (2026-08-31) fixed TN-22's storage defect; before
+it the stored scalar was written by a second producer off a different HR baseline and came out near
+zero, **so it never reached 120 and the override never fired.** Fixing the bug switched on a trigger
+nobody had seen fire. **⚠ And it is the number TN-33 measured as carrying no signal** — 57% night
+buckets, r = +0.072 with readiness over 18 days.
+
+**The readiness ladder is the smaller half but is also mistuned:** it fired on
+**65, 73, 69, 66, 52, 33, 50, 38**. A readiness of **73** produced a deload recommendation.
+
+**Fix in this order:**
+1. **Give readiness a way to CLEAR a day** — `r >= 70` returns `{ recommended: false }` instead of
+   "soft". One line, and it is the cause. **`Gate: owner`.**
+2. **Unwire the stress override** — TN-34, one line, reversible, and it is what changed on 09-01.
+3. **Re-measure before touching the bands.** With 1 and 2 done the rate falls to the ladder's own
+   contribution — **19% in August** — which may need no tuning at all.
+
+**⛔ Do not raise the 120-minute threshold and do not raise the streak from 3.** Both are the
+"threshold is right, the input is wrong" mistake, which this pillar has now made five times — the
+same file names four of them eleven lines above the stress condition. **The streak is not a recovery
+signal; it is a proxy standing in for one.**
+
+**⚠ Stated rather than implied:** `consecutiveTrainingDays` counts `hasExercises`, this
+reconstruction used `completed_at IS NOT NULL`, so real streaks are **the same or longer** and the
+real rate is at or above these figures. `energyLevel` and `selfReportedSick` were not reconstructed
+and can only escalate. Temperature and illness never fired in this window.
+
+**Pass test:** a day with readiness ≥ 70 and four training days behind it is **not** recommended for
+deload; and over a month the recommendation rate sits nearer 20% than 80%.
 
 ### [devices] PS-40 — formalize the data-source connector convention as a typed, checkable declaration
 
@@ -802,31 +1038,39 @@ below threshold and left in place for next time.
   any `session_exercises` row**, so a prescription row for one cannot be rendered without inventing
   fixture state — which would test a situation built for the test rather than the one reported.
 
-### [workouts] BF-163 — the intensity chip is computed from load alone, so it labels a 6-rep set "Hypertrophy · typically 8–12 reps"
+### [workouts] BF-163 — the intensity chip is computed from load alone (card half shipped; the blend rule is Lane A's)
 
-- **Lane:** B — `components/workout/ai-prescription-card.tsx:290` and the band table in
-  `packages/shared/src/workout/intensity-zone.ts`.
+- **Lane:** B for the card half — `components/workout/ai-prescription-card.tsx`. **The band table
+  `packages/shared/src/workout/intensity-zone.ts` is Lane A by the path rule**, which the entry's
+  original `Lane: B` did not account for. It did not need touching.
 - **Added:** 2026-09-15 (BugFix intake). Owner, on the same card: *"Is hypertrogpy the correct tag?"*
-- **By its own definition the label is right, and that is the problem.** `intensityZoneForPct` maps
-  %1RM to a band with no reference to reps: 65–75% → **Hypertrophy**. His squat is prescribed at
-  **72.5%**, so the chip is correct.
-- **The chip's own tooltip contradicts the line it sits beside.** The band carries
-  `reps: '8–12 reps'` and renders as `title="65–75% of 1RM · typically 8–12 reps"` — against a
-  prescription of **2×6**. The row reads *"Hypertrophy · 65–75% … 2×6 @ 57.5kg (72.5%)"*, which is a
-  load in the hypertrophy band driving a rep count the same table calls **Strength** (4–6 reps).
-- **The load and the reps genuinely disagree here; the chip is not merely mislabelled.** 6 reps at
-  72.5% is a strength-leaning stimulus. `goal-ranges.ts` puts hypertrophy at `repMin: 5, repMax: 12`,
-  so 6 is legal for the goal — but the display band and the goal range are different tables with
-  different rep opinions, and the card shows only one of them.
-- **Recommended: label from the pair, not the percentage.** Either widen the chip to consider reps
-  (so 72.5% × 6 reads as the blend it is), or drop the `typically N reps` clause from the tooltip so
-  the chip claims only what it measures — the load band. **The second is the honest minimum** and is
-  a one-line change; the first is the better answer and needs a rule for the disagreement.
+- **By its own definition the label was right, and that was the problem.** `intensityZoneForPct`
+  maps %1RM to a band with no reference to reps: 65–75% → **Hypertrophy**. His squat is prescribed at
+  **72.5%**, so the chip was correct. What contradicted it was the chip's **own tooltip** —
+  `typically 8–12 reps` — one line above a prescription of **2×6**, a rep count the same table calls
+  **Strength**.
+- **Shipped 2026-09-15: the chip now claims only what it measures.** The tooltip reads
+  `<label> · <range> of 1RM — named from load alone`. It does not go silent: dropping the clause
+  outright would leave a tooltip that only repeats the visible label, and a reader whose reps do not
+  match the band's name would still have no way to see why. Naming the input is the whole fix.
+- **`zone.reps` is now unused and is DELIBERATELY LEFT IN PLACE.** It was the field's only consumer
+  repo-wide (grepped). The better answer below needs it, and deleting it is a `packages/shared` edit.
+- **Proven load-bearing at BOTH layers.** The unit test
+  (`components/workout/__tests__/bf163-intensity-chip-load-only.test.ts`) reproduces the
+  contradiction from the real 72.5% prescription; because two of its assertions are source matches,
+  there is also `e2e/bf163-intensity-chip-load-only.spec.ts`, which renders the owner's own row and
+  reads the `title` off the DOM. Against `main`'s unfixed card the e2e captures the defect verbatim:
+  received `65–75% of 1RM · typically 8–12 reps`, one line above a rendered `2×6`.
 - **Not a defect in the prescription itself.** The session note explains the low volume — *"Due to
   low external readiness and reported lower back injury/soreness, volume has been reduced across all
-  spinal-loaded movements"* — so 2 sets is deliberate. This entry is about the label, not the plan.
-- **Verification:** on device, confirm no exercise row shows a zone whose stated rep range excludes
-  the reps prescribed on the same line.
+  spinal-loaded movements"* — so 2 sets is deliberate.
+- **Keep:** ① the better answer, which is **Lane A's** — judge the band from the **pair** (load *and*
+  reps) so 72.5% × 6 reads as the blend it is, rather than as either pure zone. It needs a rule for
+  the disagreement: `goal-ranges.ts` puts hypertrophy at `repMin: 5, repMax: 12`, so 6 is legal for
+  the goal while the display band calls it Strength — two tables with different rep opinions, and
+  the card shows one. Not urgent: the chip no longer asserts anything false without it.
+  ② the device check — on the S25, confirm no exercise row shows a zone whose tooltip contradicts the
+  reps prescribed on the same line.
 
 ### [nutrition] BF-161 — the meal builder can only reach foods, so a meal made of meals has to be rebuilt ingredient by ingredient
 
@@ -4058,50 +4302,42 @@ the 288/day currently stored. If it does not hold, the future-dated rejection is
 job and this closes as understood. Either way the rejection stays — a sample ahead of now is a bad
 clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
 
-### [readiness][app-shell] RV-38 — Body Battery prints 50 and calls it "Good" for an account that has never worn anything
+### [readiness][app-shell] RV-38 — Body Battery printed 50 and called it "Good" for an empty account (treatment fixed; the NUMBER is Tuning's)
 
-- **⚠ HANDED TO TUNING BY THE OWNER, 2026-09-14.** *"This requires tuning still. Should be flagged
-  for tuning with the tuning agent."* So the no-data treatment this entry asks about is **not** the
-  thing they want fixed — the number itself is. The `Verify: owner` is answered in the sense that
-  they looked; what they reported is a calibration complaint.
-- **Tuning owns the next move**, and per the standing rule it proposes rather than ships: any change
-  must state how many other days it moves, because a Body Battery re-fit silently re-scores months of
-  history.
-
-- **Lane:** B for the no-data treatment the entry was filed about — `components/body-battery-card.tsx`
-  only, the route needs no change. **But that is no longer the live half.** The owner has handed the
-  *number* to **Tuning** (above), and a calibration proposal is not either implementer lane's work
-  until it is signed off. **Tuning proposes, the owner signs off, Lane A implements** — so do not
-  take this as Lane B surface work expecting to fix what was reported.
-- **The owner-verification field is removed** — they looked, and answered. What came back was a different request.
+- **⚠ TWO HALVES, AND ONLY ONE WAS EVER LANE B's.** The owner handed the **number** to Tuning on
+  2026-09-14: *"This requires tuning still. Should be flagged for tuning with the tuning agent."*
+  Tuning proposes, the owner signs off, Lane A implements — and a proposal must state how many other
+  days it moves, because a Body Battery re-fit silently re-scores months of history. **Nothing below
+  touches the number.**
+- **Lane:** B for the no-data *treatment*, `components/body-battery-card.tsx` only. Shipped
+  2026-09-15; the route needed no change and got none.
 - **Added:** 2026-09-03, Review sweep 42 —
   [`write-up §2`](reviews/2026-09-03-first-run-honesty-and-instant-paint.md)
-- **The route is honest and the card ignores it.** `GET /api/body-battery` for the zero-data account:
-  `{"current":50,"label":"Good","trend":"steady","hasData":false,`
-  `"confidence":{"sampleCount":0,"samplesPerHour":0,"sufficient":false},"anchor":50,`
-  `"anchorSource":"default"}`. Four fields say it has nothing. The card renders **Good / Steady / 50**
-  with a colour-coded label, a bar filled to 50%, and **no "Limited data" badge** (asserted: count 0).
-- **Why the guard misses.** `body-battery-card.tsx:95` — `const lowData = battery.hasData && conf !=
-  null && !conf.sufficient`. The badge is gated on `hasData`, so the qualification gets *weaker* as
-  the data gets worse: enough samples → no badge (right); too few → "Limited data" (right); **none at
-  all → no badge**. `hasData` is otherwise used only to gate the expanded chart (line 164), so the
-  collapsed card has no path that can say there is nothing behind the number.
-- **The contrast is on the same screen, same account.** Streak `—days`; the week grid `—` on all seven
-  days; the Readiness/HR/Sleep chip row absent entirely; `/health/readiness` reads `—`. Only Body
-  Battery prints a figure — and Readiness is the number it *opens at*, per the card's own explainer.
-- **Do not reopen Q-43.** That decision (degrade rather than blank) stands and this does not depend on
-  it. The narrow point: the app already computes "I cannot support this number", already has a
-  component that says so, and does not use it in the case where it is most true. Minimum fix is
-  dropping `battery.hasData &&` from line 95. **Whether no-data deserves something stronger than the
-  "Limited data" badge — an `—` like Readiness — is the owner's call**, so put it to them rather than
-  picking one. `/health/heart-rate` is the reference for the stronger posture: it prints `—` for
-  min/avg/max and names the estimate outright (*"Working max: 190 bpm (age-estimated)"*).
-- **While in this file:** the comment at lines 134–139 says the explainer paragraph *"only renders in
-  the NO-DATA state"*, two lines below the Q-276 note saying it is *"always visible"*. The JSX is
-  unconditional and it was observed rendering for the seeded user too. Delete the stale half.
-- **How to test locally:** the harness's `ZERO_DATA_STORAGE_STATE` account, `/`, asserting the API's
-  `hasData: false` beside what the card renders. Assert the **payload next to the text** — a rendered
-  50 alone cannot distinguish a bug from a fixture.
+- **The route was honest and the card ignored it.** `GET /api/body-battery` for the zero-data
+  account says it has nothing in four fields at once — `hasData: false`, `sampleCount: 0`,
+  `sufficient: false`, `anchorSource: "default"` — and the card rendered **Good / Steady / 50** with
+  a colour-coded label, a bar filled to 50%, and no badge.
+- **The guard got WEAKER as the data got worse, which is why this survived.**
+  `lowData = battery.hasData && conf != null && !conf.sufficient`: enough samples → no badge
+  (right), too few → "Limited data" (right), **none at all → no badge**. Dropping `battery.hasData
+  &&` is the whole fix — `sufficient` is false in both cases that deserve the badge, so it is the
+  correct condition on its own.
+- **The expanded copy needed no guard**, checked rather than assumed: the *"your ring recorded only
+  N readings"* paragraph sits inside the `battery.hasData ?` branch, so a zero-data account never
+  reaches it and cannot be told it recorded "only 0".
+- **Proven load-bearing.** `e2e/rv38-body-battery-no-data-badge.spec.ts` runs as the zero-data
+  account and **captures the response beside the rendered text** — a rendered 50 alone cannot tell a
+  bug from a fixture. Against `main`'s unfixed card the badge is simply absent.
+- **The stale comment is gone.** Lines 134–139 said the explainer *"only renders in the NO-DATA
+  state"* two lines below the Q-276 note saying it is always visible; the JSX is unconditional.
+- **Keep:** ① **the number, with Tuning** — the live complaint, and not this lane's.
+  ② **an owner decision, unasked so far:** whether no-data deserves something stronger than the
+  badge — an `—` like Readiness, which is the posture `/health/heart-rate` already takes (it prints
+  `—` for min/avg/max and names the estimate outright). The badge is strictly better than what
+  shipped before and is reversible in one line, so it was not worth blocking on; the stronger
+  posture is still open. **Do not reopen Q-43** (degrade rather than blank) — this does not depend
+  on it.
+  ③ the device check on the S25.
 
 ### [devices][app-shell] RV-39 — the `/more/devices` ring card flashes a skeleton on a warm repeat visit
 
@@ -9357,125 +9593,45 @@ like the feature works and would quietly teach the owner to ignore it.
 **Pass test:** on a day with a genuinely sedentary hour, that hour's cell reads empty on the strip and
 the day's move-hours total is below the goal.
 
-### [heart-rate] TN-13 — the HR tile shows a 7-day average of the one signal that best predicts how the owner feels
+### [heart-rate][app-shell] OR-116 — one metric name over two metrics (labels fixed; the third surface's CONTEXT is still open)
 
-- **❌ REPORTED BROKEN ON THE S25, 2026-09-15 — the cue does not render, and the cause is found.**
-  Owner, once sent to the right screen: *"on the homescreen HR chip it just says a number."* They are
-  correct, and it is not a data problem. **`RING_GEOMETRY` gives `showDot: true` to exactly ONE of
-  the eighteen ring styles — `accentring`** — and `oura-score-chip-row.tsx:189` renders the cue only
-  under `geo.showDot`. **So TN-13's delta shipped invisible on seventeen styles including the
-  default.** A later ring-style pass dropped the cue deliberately for the score cards (their colour
-  moved to the icon) and took the HR delta with it, which is a different thing: a score card's cue
-  duplicates a number that is already on screen, and the HR cue is the only place the comparison
-  exists at all.
-- **The number itself is CORRECT and was verified against production.** Home read **60**;
-  `body_metrics` holds `resting_heart_rate = 60` for 2026-09-15 against 57 · 55 · 54 · 55 on the four
-  nights before. **So the cue that did not render would have read about `+4 vs usual` — an elevated
-  morning, which is exactly the signal this entry was filed to surface.** The feature failed on the
-  one day it had something to say.
-- **⚠ The owner's other observation is a SECOND defect and is filed as OR-116** — Home's 60 matches
-  nothing on the Heart Rate screen (current 73 · min 50 · avg 89 · max 125) because they are
-  different metrics with nothing saying so. Do not fix it here.
-- **Owner's own verdict on the bare number:** *"which is fine as it makes it consistent with the
-  rest."* Take that as a constraint on the fix, not a closure: whatever restores the comparison
-  should not make the HR chip the odd one out in the row.
-
-- **⚠ THE CHECK WAS ASKED WITH THE WRONG LOCATION, 2026-09-14 — my error, not a finding, and it is
-  now traced.** Owner: *"Not sure where to look - is there a heart rate tile in health? I only see
-  Resting HR/HRV/SPO2."* **They were right and they were looking in the wrong place because I sent
-  them there.** What they saw is `components/health/body-cards/rhr-hrv-spo2-card.tsx` — a different
-  card, three tiles, no delta cue on any of them.
-- **The tile this entry shipped is on HOME, labelled `Heart Rate`,** in the score chip row beside
-  Readiness (`components/oura-score-chip-row.tsx:427`, rendered from
-  `app/session-select/session-select-content.tsx:1123`, which is the Home tab). That is where
-  `restingHrLastNight` and the `restingHrCue` delta render. **Re-ask against Home, not Health.**
-- **⚠ And there is a real question hiding behind the mistake.** Health's own Resting HR tile shows a
-  bare number with no comparison, while Home's shows the same signal with a delta against baseline.
-  Two surfaces for one metric, disagreeing about how much context it needs — worth deciding rather
-  than leaving as an accident of which entry touched which file.
-- **Lane:** B — **CHANGED FROM A, 2026-09-15, because the failure is not where the entry assumed.**
-  The engine half is correct and shipped: `packages/shared/src/health/resting-hr-cue.ts` computes the
-  delta, and production has the data to make it (`resting_heart_rate` 60 today against a 54–57
-  baseline). What is broken is the **render condition** in
-  `components/oura-score-chip-row.tsx` — `RING_GEOMETRY`'s `showDot` and the `geo.showDot && props.cue`
-  guard at line 189. Reached only from `components/**`, so Lane B by the path rule.
-
-- **The `Verify: device` is removed** — the look was taken on 2026-09-15 and it **failed**. Leaving
-  it would file live, buildable work under *"shipped; a look is owed, nothing is blocked"*, which is
-  the OR-105 trap in its most misleading form: not merely parked, but parked as finished.
-> **✅ SHIPPED 2026-08-30, both halves together — which the entry required.** The tile reads **last
-> night's** resting HR and renders a **delta against the owner's own baseline** ("50 · −7 vs usual")
-> rather than a bare bpm. `restingHrLastNight` + `restingHrLastNightDate` are new on
-> `readiness-payload.ts`; `restingHrCue` moved to
-> `packages/shared/src/health/resting-hr-cue.ts`, where it is importable and therefore testable.
-
-- **The `Keep:` that asked for this check is struck** — it has happened. Its wording is worth
-  carrying into the fix, though: it asked whether the cue is *legible* at the tile's type size,
-  having grown from one word to five. That question is still unanswered, because the cue has never
-  been on screen to judge.
-
-> **✅ "Should the tile show HRV instead?" — ASKED AND ANSWERED 2026-08-31. No. Do not re-open.**
-> ([review](reviews/2026-08-31-hrv-as-a-tile-metric.md).) Measured in contributor form, which is the
-> only fair comparison, against the owner's check-in (`perceived_recovery + sleep_quality_feel`;
-> negative r is correct, `provisional` rows excluded):
->
-> | contributor | r vs check-in |
-> |---|---|
-> | **restingHeartRate** | **−0.491** (n = 40) |
-> | hrvBalance | **−0.331** (n = 39) |
->
-> **HR wins, and it is not even a choice between two independent signals** — the two contributors
-> correlate **+0.751 with each other (56 % shared variance)**, so swapping loses a third of the
-> correlation and buys almost no new information. HRV is also the noisier vital: **CV 17.2 %** against
-> resting HR's **5.6 %**, night-to-night swing **7.42 ms** on a mean of 55.6 (**13 %**). It is real
-> signal, not noise (lag-1 autocorrelation **+0.439**; noise ratio 0.77 against 1.13 for white noise)
-> — it is simply a weaker single-night reading. **HRV belongs on a detail screen, not on this tile.**
-
-**Pass test, measured against production rather than asserted (71 nights, 2026-08-30):**
-
-| | value |
-|---|---|
-| nights where the **nightly** value changed | **61 of 70** |
-| nights where the **rounded 7-day mean** changed | 29 of 70 |
-| nightly mean absolute night-to-night change | **2.50 bpm** |
-| 7-day mean's change | 0.58 bpm |
-
-So the tile stood still on nearly six days in ten, and discarded **77 %** of the daily movement.
-**TN-13 recorded 2.11 / 0.33 / 84 % over 50 nights** — the direction is unchanged and the figures are
-restated because a number nobody re-measures drifts. Live check on `pnpm dev`: changing only last
-night moved the tile 50 → 62 (a 12 bpm swing) while the old 7-day value moved 55 → 57.
-
-**Why a delta and not a tier word.** Against `perceived_recovery`, expressing either candidate as a
-deviation from the owner's own baseline roughly **doubles** its correlation with felt state (+0.291
-vs +0.176 for waking-rest HR; +0.278 vs +0.129 for the nightly value). Which metric you pick moves
-the number far less than raw-versus-relative does — so the defect was showing an absolute bpm at all.
-69 means nothing without knowing the usual is 63.
-
-**The owner's "average awake resting HR" is still a separate entry and was NOT folded in here.**
-Computed as the 10th percentile of BLE HR samples 08:00–21:00 Brisbane it moves 6.24 bpm night to
-night — 2.5× the nightly resting HR — which makes it the better **stress** candidate the owner
-intuited, but nothing in the app computes it and it does not belong on a tile labelled "Heart Rate".
-
-### [heart-rate][app-shell] OR-116 — Home and the Heart Rate screen show one metric as four numbers that agree with nothing
-
-- **Lane:** B — `components/oura-score-chip-row.tsx`, `components/health/body-cards/rhr-hrv-spo2-card.tsx`
-  and the `/health/heart-rate` detail. Reached only from `components/**`; no storage, no derivation change.
+- **Lane:** B — `components/oura-score-chip-row.tsx` and `app/health/heart-rate/page.tsx`. Reached
+  only from `components/**` / `app/**`; no storage, no derivation change. Shipped 2026-09-15.
 - **Added:** 2026-09-15 · owner, while checking TN-13: *"I dont see any other values that match that
   home screen HR value — current = 73, min = 50, average = 89, max = 125, and the HR card says 60."*
-- **Nothing is computing the wrong number.** Verified against production: Home's **60** is
-  `body_metrics.resting_heart_rate` for today — last night's **resting** rate. The detail screen's
-  73 / 50 / 89 / 125 are **intraday** current/min/average/max. Both are right. **The defect is that
-  no label says they are different things**, so a user comparing them concludes one is broken.
-- **This is the shape to fix, not the arithmetic:** one metric name — "heart rate" — covering a
-  nightly resting figure and a live intraday series, on two screens, with no qualifier on either.
-  Naming Home's chip for what it is (last night's resting rate) is probably most of the fix.
-- **⚠ There is a THIRD presentation of the same signal**, which is what makes this worth an entry
-  rather than a one-line rename: Health's own Resting HR tile shows the identical value as a bare
-  number with no comparison, while Home's shows it with a delta against baseline (when it renders at
-  all — see TN-13). **Three surfaces, one number, three different amounts of context.** Decide what
-  each surface is for before touching any of them.
-- **Do not fold this into TN-13.** That entry is about a cue that does not render; this is about what
-  the number is called. They meet on one screen and have different fixes.
+- **Nothing was computing the wrong number**, verified against production: Home's 60 is
+  `body_metrics.resting_heart_rate` — last night's **resting** rate; the 73/50/89/125 are **intraday**
+  current/min/average/max. Both correct, neither labelled, so the pair read as one metric disagreeing
+  with itself.
+- **Shipped: each surface now names its own metric.** Home's chip reads **"Resting HR"** (short
+  "Rest HR"), and the detail screen's four stats are captioned **"Today so far"**.
+- **⚠ The Home label follows the SOURCE, and this is the part not to simplify later.** The value is
+  `restingHrLastNight ?? restingHr ?? hrCurrent`, and the **third fallback is a different metric** —
+  `hrCurrent` is a live BLE sample, a desk reading rather than a night. So the label is conditional:
+  "Resting HR" when either resting source supplied it, "Heart Rate" when it fell through to
+  `hrCurrent`. Making it unconditional would move the false claim rather than remove it.
+- **Wording matches Health's existing tile** (`rhr-hrv-spo2-card.tsx` already renders "Resting HR" at
+  the same 9px uppercase treatment) rather than inventing a third vocabulary for one signal.
+- **Proven load-bearing, and the layout is MEASURED not eyeballed.**
+  `e2e/or116-resting-vs-intraday-hr.spec.ts` asserts both surfaces and both fail against `main`.
+  "Rest HR" is the longest short label in a four-cell row, so the spec also checks with
+  `getBoundingClientRect()` that no child exceeds its cell and the page does not scroll sideways at
+  phone width — a label that wraps would be a new defect traded for the old one.
+- **⚠ A FOURTH presentation found while reading, and it may be a real defect rather than a labelling
+  one.** `app/health/heart-rate/page.tsx` passes `restingHr={data?.hrMin ?? null}` into
+  `HrFactorsCard` — today's **intraday minimum** standing in for the resting rate. Those are not the
+  same number (the owner's own figures: min 50, resting 60). Not touched here because it changes what
+  a card computes from rather than what it is called, and the entry's scope is the name. **Someone
+  should establish whether `hrMin` is a deliberate proxy or an oversight before it is "fixed".**
+- **Keep:** ① the third-surface question the entry was filed on, which is **not** answered by
+  labelling: Health's Resting HR tile shows the value bare, Home's shows it with a delta against
+  baseline, and the detail screen shows neither. Three surfaces, one number, three amounts of
+  context — **decide what each surface is for**. Labelling stopped the numbers reading as broken; it
+  did not decide that. ② the `hrMin`-as-resting question above. ③ the device check.
+- **TN-13 was the other half of the same owner report and is CLOSED** (2026-09-15, owner chose the
+  bare number over restoring the delta cue — see the journal entry, not the queue; it has been
+  removed). It was about a cue that does not render; this is about what the number is called. Its
+  closure does **not** cover the Keeps above.
 
 ### [activity] TN-17 — Activity as a pace-to-goal score: the mechanic works, the goals make it punishing
 - **Lane:** A — engine only: packages/shared.

@@ -37,6 +37,16 @@ split is "does it feel slow" vs "is it actually slow at the source".
   the entry, and is now gone from both. **A screen that scrolls its own container gets no restoration
   from being inside the shell — check the call, not the layout.** `/health/day`'s scroller had no
   bottom padding at all. Both owe **one** device pass; RV-37 has still never been observed.
+- [`docs/overview/entries/2026-09-15-bf166-back-closes-overlay.md`](../../overview/entries/2026-09-15-bf166-back-closes-overlay.md)
+  — **The back listener ignored the overlay stack the app already had (BF-166), 2026-09-15.**
+  **Read this before adding any overlay/back machinery:** the registry exists — `sheet-back-stack.ts`
+  via `BackDismiss`, rendered by BOTH `SheetContent` and `DialogContent` (BF-27). A grep for
+  `overlayStack`/`topOverlay` finds nothing and is a false negative. The defect was that
+  `openSurface` pushes with **no URL**, so `backActionForPath` — which reads only the pathname —
+  answered `"home"` on a tab route and `"minimize"` on `/`, and neither touches history, so the
+  pushed entry was never consumed. Only `"pop"` worked, coincidentally. Fixed by querying
+  `hasOpenSurface()` and popping, **after** the three mode guards (each raises a dialog that is
+  itself on the stack). No harness can test it — Capacitor channel. Device pass owed.
 - [`docs/overview/entries/2026-09-15-la109-tab-flip-stale-tree.md`](../../overview/entries/2026-09-15-la109-tab-flip-stale-tree.md)
   — **A tab flip left the previous tab's Next route tree on the history entry (LA-109), 2026-09-15.**
   `show()` uses `replaceState`, and Next's patched `replaceState` re-injects its **own** current

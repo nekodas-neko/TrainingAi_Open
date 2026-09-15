@@ -6,6 +6,34 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.456.19",
+    date: "2026-09-15",
+    changes: [
+      "The back button closes an open panel instead of moving the page behind it. With the meal builder open, pressing back was taking you to the home screen with the builder still sitting on top \u2014 and anything you had typed into it went with the page. The same thing happened to every sheet and dialog in the app: on a tab it jumped you home, and on the home screen itself it put the app in the background. Back now closes whatever is on top first, by the same route the X button takes, so anything a panel does when you close it still happens. Pressing back during a workout still asks before leaving.",
+    ],
+  },
+  {
+    version: "1.456.18",
+    date: "2026-09-15",
+    changes: [
+      "The heart rate on your home screen and the one on the Heart Rate page stop looking like they disagree. Home shows last night\u2019s resting rate; the detail page shows today\u2019s current, lowest, average and highest. Both were simply labelled \"Heart Rate\", so a resting 60 sitting beside a current 73, a low of 50 and a high of 125 read as one number being wrong. Home now says \"Resting HR\" \u2014 except on the rare occasion it can only find a live reading, where it stays generic because that one is not a resting rate \u2014 and the four figures on the detail page are now headed \"Today so far\".",
+    ],
+  },
+  {
+    version: "1.456.17",
+    date: "2026-09-15",
+    changes: [
+      "Body Battery now admits when it has nothing to go on. An account that has never worn the ring was shown a level of 50 labelled \"Good\", with a half-filled bar and no warning \u2014 while everything else on the same screen correctly showed a dash. The \"Limited data\" note it already had was being skipped in exactly that case: it appeared when there were too few readings, and disappeared again when there were none at all. It now appears whenever the reading cannot be supported, so a number you should not trust says so.",
+    ],
+  },
+  {
+    version: "1.456.16",
+    date: "2026-09-15",
+    changes: [
+      "The intensity tag on each exercise no longer claims a rep range it is not reading. A squat prescribed at 72.5% was tagged Hypertrophy \u2014 correct, since the tag is worked out from the weight alone \u2014 but its tooltip said \"typically 8\u201312 reps\" directly above a prescription of 2\u00d76, which the same table calls Strength. The tooltip now says the tag is named from load alone, so it tells you what it measured instead of contradicting the set and rep count beside it.",
+    ],
+  },
+  {
     version: "1.456.15",
     date: "2026-09-15",
     changes: [

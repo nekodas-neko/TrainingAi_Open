@@ -12354,6 +12354,159 @@ the next session would otherwise re-derive from the two coupled entries that sai
 
 A negative result costs lines exactly once and saves a re-run every time someone reads the pair.
 
+## 2026-09-15 — `projectOverview.md` → 11287, `docs/implementation-backlog.md` → 21420 (BF-163)
+
++24 and +5 for a one-line tooltip change, and the ratio is the point: almost none of it is the fix.
+
+What the lines buy is that the chip was **correct** and still had to change. An entry reading
+"Hypertrophy is the right tag" closes itself; the reason it does not is that the chip made two
+claims from one input and only one of them was supported. Someone re-reading this in a month with
+`zone.reps` sitting unused needs to find out why it was left rather than deleted, or they will
+delete it and foreclose the Lane A answer that needs it.
+
+## 2026-09-15 — `projectOverview.md` → 11297, `docs/implementation-backlog.md` → 21412 (RV-38)
+
+Both **shrank**, which is the interesting part: the fix is one term removed from a boolean, and the
+documents got smaller because an open finding became a shipped one with a shorter residue.
+
+What survives at length in both is the thing that is *not* fixed — the number is Tuning's, and the
+`—`-versus-badge question is the owner's. An entry that reads as closed when two of its three parts
+are still owed is how a KEEP turns into a dropped finding.
+
+## 2026-09-15 — `projectOverview.md` → 11329, `docs/implementation-backlog.md` → 21429 (OR-116)
+
++22 and +25 for two label strings, and the ratio is defensible for once: the diff is small because
+**nothing was computing the wrong number**, and that is precisely the fact a reader will not believe
+without the figures in front of them. An entry that just says "labelled the HR chip" invites the next
+session to go looking for the arithmetic bug that is not there.
+
+The other weight is the two things NOT fixed — `hrMin` standing in for the resting rate, and the
+three-surfaces context question. Both would read as closed if the entry were shorter.
+
+## 2026-09-15 — `docs/implementation-backlog.md` (BF-166)
+
+Thirty-eight lines. The report names one screen and the defect is all 52 Sheet/Dialog files, so the
+entry has to establish that before an implementer patches the meal builder alone. The ordering
+paragraph earns its length too: the overlay check must sit AFTER the three mode guards, or a confirm
+dialog raised by one of them gets dismissed by the very back press meant to answer it.
+
+## 2026-09-15 — `docs/implementation-backlog.md` → 21380 (TN-13 closed)
+
+The backlog **shrank 105 lines**: TN-13 left the queue entirely, because the owner's answer means
+nothing is owed and `check-backlog-pointers.js` is right to refuse a heading that announces its own
+completion. `projectOverview.md` is unchanged in length — the existing TN-13 paragraph absorbed the
+closure rather than gaining a new row, which is the correct shape for an entry that was already
+described there as shipped.
+
+The substance moved to a journal entry. That is the point of the rule: a queue that still lists a
+closed item is a queue nobody trusts, and the reasoning is not lost by being somewhere else.
+
+## 2026-09-14 — backlog → 21454, `tuning.md` → 614: every deload trigger measured (TN-36)
+
+The owner reported constant deload recommendations and guessed at bad tuning. It is not tuning, and
+the entry needs its length because there are two defects rather than one.
+
+**The structural half is a code shape, so the entry quotes it.** Nine conditions can recommend a
+deload and exactly one — `consecutiveTrainingDays < 3` — can decline it; past three training days
+every branch returns `recommended: true` and readiness only picks the strength. **Measured: 28 of 45
+days cleared, every one by the streak counter and none on merit.** A five-line quotation makes that
+undeniable where a sentence would invite a reader to assume the ladder must clear somewhere.
+
+**The dated half is the finding the owner actually felt, and the table is the proof.** Deload went
+**19% in August to 79% in September** while the threshold never moved: `7c428a7f` fixed TN-22's
+storage defect, and before it the stored stress scalar came out near zero and **could not reach 120**,
+so the override had never once fired. Repairing an input switched on a trigger nobody had seen — which
+is a behaviour change that needed measuring as one, and is why the baton now says to date a reported
+step change against `git log` before calling it tuning.
+
+The ⛔ line closing the entry is the fifth instance of the same mistake in this pillar, and the file
+being edited names four of them eleven lines above the condition in question.
+
+## 2026-09-15 — backlog → 21422, `tuning.md` → 632: the pillars against the connector guide (TN-37)
+
+The owner asked whether the decode → normalise → pillar pipeline is being done correctly. It is
+already written down — `docs/data-source-connector-guide.md` §0 and §5 — so the entry audits the code
+against that contract rather than proposing an architecture, and its length is the evidence for a
+divergence the guide does not know about.
+
+**The input layer holds and the entry says so first**, with the measurement: 16 fields across two
+live sources over 30 days, resolved by a per-field `source_map` and `SOURCE_RANK`. Establishing that
+half is sound is what makes the other half worth reading.
+
+**§5.4 states *"every calculation reads generic tables, never a device-specific one"* and
+`readiness-payload.ts:278-291` reads four device-specific stores in one `Promise.all`.** The table
+naming all seven reads is the finding; ~20 payload fields never pass the normalise layer, and
+`oura_daily_derived` is written by the Oura rollup and nothing else.
+
+Two softeners take their own paragraph because quoting the finding without them overstates it:
+`oura_daily`'s recent scored columns are **all NULL** (dead Cloud shells — a wasted query, not a wrong
+number) and **Health Connect writes zero rows**, so the divergence has no victim yet. Latent, not
+live — which is what keeps the entry off the 🔴 LIVE marker and sets the fix order.
+
+## 2026-09-15 — backlog → 21473, `tuning.md` → 648: the normalise plan (TN-38)
+
+The owner asked to build normalised inputs and a scoring system on them. The architecture is already
+written down, so the entry's job is to find what the guide does not say — and it is this: **the merge
+step has three implementations and nothing names them as one concept.**
+
+The three-row table is the entry. `body_metrics` scalars merge at **write** by `SOURCE_RANK`;
+`oura_heartrate` series merge at **read** through `preferStrapBuckets`; `oura_daily_derived` has **no
+merge and one writer**. Each is individually sound, which is why this is a documentation gap rather
+than a defect — and why the one-line rule underneath it earns its place: scalars merge at write by
+rank, series merge at read by resolution, derived rows have one writer.
+
+The measurement that makes it urgent rather than tidy: **the chest strap outnumbers the ring six to
+one** in the HR series, 74,860 samples against 12,673 over 45 days. Multi-source is live today.
+
+The last paragraph is the one most likely to be cut and should not be: several pillars **cannot** be
+made source-neutral. Chronic stress, resilience, daytime HRV, Body Battery and OTS read raw BLE
+frames with zero fallback branches, and readiness's temperature contributor passes null on every
+generic path. Writing that down stops a future session scoping "normalise these" as a task when it is
+a vendored-model reimplementation.
+
+## 2026-09-15 — backlog → 21491, `tuning.md` → 664: the tier model (TN-38 task C revised)
+
+The owner clarified the architecture and the clarification changed a task rather than decorating it.
+*"The app works fine with less sources but is more accurate and tuned with more sources"* is **not**
+what the code does, and the four-row comparison table is what makes the difference visible rather
+than arguable.
+
+`sleep-score.ts:399` renormalises the weighted mean over whichever contributors are present. So
+connecting a sensor changes the **denominator**: the score moves for a reason unrelated to the user's
+body, and two users' 78s are computed from different weight sets. Under `core + adjustments` the core
+is one quantity everyone shares and optional inputs are signed deltas — which is also the general
+answer to *"why is this number what it is"*, asked repeatedly this quarter.
+
+Two shorter additions earn their lines for the opposite reason — they stop work rather than starting
+it. **The measurement layer already does what the owner described**: the ring decodes frames to a
+step count and writes `body_metrics.steps` through the same method every source calls, and the same
+holds for `hrv_ms`, `resting_heart_rate` and `spo2_pct`. Quoting that back is more useful than
+planning it. And **the owner will not use Health Connect — other users will**, which turns
+basic-source quality into a product requirement and means PS-41 cannot be validated on his account at
+all.
+
+## 2026-09-15 — backlog → 21575: re-resolving TN-36/37/38 onto a moved `main`
+
+Arithmetic, not new prose. The branch carrying TN-36, TN-37 and TN-38 was opened against a `main`
+that has since taken BF-165, BF-166 and LA-109 and *removed* BF-154, BF-164 and PS-42 as shipped.
+The conflict was the mixed case the git-workflow rule warns about — **additions on one side and
+deletions on the other in the same hunk** — so "keep both" would have resurrected three completed
+entries, which is the failure that has already happened three times in this repository.
+
+Resolved by rebuilding the file from `origin/main` and re-inserting only the three TN entries,
+rather than splicing the hunk. The three live device entries keep the top of the queue ahead of
+them; a latent documentation divergence does not outrank a dead button on the APK.
+
+## 2026-09-15 — `projectOverview.md` → 11358, `docs/implementation-backlog.md` → 21568 (BF-166)
+
+The backlog **shrank 7** while the index grew 29, and the asymmetry is the finding: almost none of
+this is the fix, which is one exported predicate and one `if`.
+
+What the lines buy is a correction. BF-166 asked for an overlay registry to be built and one already
+existed under different names — so the entry as written would have produced two stacks disagreeing
+about what is open, which is worse than the bug it was filed against. Recording *where* the registry
+is, and that the obvious grep returns a false negative, is what stops the next session repeating it.
+
 ## 2026-09-11 — `docs/implementation-backlog.md` → 21229 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.

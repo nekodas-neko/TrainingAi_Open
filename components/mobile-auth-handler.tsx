@@ -13,6 +13,7 @@ import { LeaveWalkDialog } from "@/components/guided-walk/leave-walk-dialog";
 import { useActivityStore, isActivityActive } from "@/lib/stores/activity-store";
 import { LeaveActivityDialog } from "@/components/activity/leave-activity-dialog";
 import { backActionForPath } from "@/components/shell/tabs";
+import { hasOpenSurface } from "@/lib/hooks/sheet-back-stack";
 import { navigateToTab } from "@/lib/shell-nav";
 
 export function MobileAuthHandler({ hasSession }: { hasSession: boolean }) {
@@ -53,6 +54,28 @@ export function MobileAuthHandler({ hasSession }: { hasSession: boolean }) {
         }
         if (isActivityActive(useActivityStore.getState()) && window.location.pathname === "/activity") {
           setConfirmLeaveActivityOpen(true);
+          return;
+        }
+        // **An open sheet or dialog is consumed FIRST, and it has to be checked rather than
+        // inferred (BF-166).** `SheetContent` and `DialogContent` both render `BackDismiss`, which
+        // pushes a history entry while the surface is open — but `pushState` is called with no URL,
+        // so `window.location.pathname` does not move, and `backActionForPath` reads nothing else.
+        // On a tab route it therefore answers "home" and we navigate away with the sheet still up:
+        // the owner's *"nutrition meal creator menu open and you press the back button - it makes
+        // the page behind it go back to main."* On "/" it answers "minimize" and the app goes to the
+        // background instead. Only "pop" worked, and only because `history.back()` is coincidentally
+        // the thing that consumes the entry.
+        //
+        // Going through `history.back()` here takes the identical path — `handlePop` closes the
+        // topmost surface through Radix's own `onOpenChange`, so every guard already on a sheet's
+        // close still runs.
+        //
+        // **AFTER the three mode guards, never before.** Each of them RAISES a dialog
+        // (`LeaveWorkoutDialog` and its siblings), and that dialog is itself on this stack. Checking
+        // overlays first would make a mid-workout back press close the confirmation instead of
+        // answering it, which is the guard it was added to reach.
+        if (hasOpenSurface()) {
+          window.history.back();
           return;
         }
         switch (backActionForPath(window.location.pathname)) {

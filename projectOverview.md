@@ -1205,7 +1205,7 @@ would have missed it ([journal](docs/overview/history-2026-09-10-folded-4.md#202
 
 **The accessibility scanner that would have passed a 12 px button (Q-282).** `@axe-core/playwright` was installed, measured and removed: WCAG 2.5.8 exempts a *spaced* undersized control, so a deliberately-shrunk **12×12** button (confirmed by `boundingBox`) came back a **pass**, and `color-contrast` cannot read this app at all — it fails to parse the `oklch` tokens (*"Could not parse color string oklab(…)"*) and **evaluated no nodes on Home**. `e2e/touch-target-size.spec.ts` ships instead: DOM geometry against **this repo's 48 dp bar**, covering the roles `globals.css`'s `button, [role="button"]` floor cannot (`<a>`, `role="tab"`, `role="radio"`). It fails on the mutation axe passed. One real finding, **LB-26**: Home's APK-banner link is 258×33 ([journal](docs/overview/history-2026-09-10-folded-4.md#2026-08-30-touch-target-gate)).
 
-**The Heart Rate tile shows last night, as a delta (TN-13).** It read the **7-day mean** and printed it as a bare bpm — in the signal that best predicts how you feel (r = +0.557 against your own check-in, best of nine). Re-measured over 71 production nights: the nightly value changes on **61 of 70** night-pairs, the rounded mean on **29**, so the tile stood still nearly six days in ten and discarded 77 % of the daily movement. And a bare number says nothing: expressing the reading as a deviation from your own baseline roughly **doubles** its correlation with felt state, which is why it now reads `50 · −7 vs usual`. Both halves shipped together because the entry required it — half a fix here is the one that looks like progress. **Still owed: the S25 check** — the cue grew from one word to five across 20 layout styles ([journal](docs/overview/history-2026-09-10-folded-3.md#2026-08-30-feat-hr-tile-nightly-resting)).
+**The Heart Rate tile shows last night, as a delta (TN-13).** It read the **7-day mean** and printed it as a bare bpm — in the signal that best predicts how you feel (r = +0.557 against your own check-in, best of nine). Re-measured over 71 production nights: the nightly value changes on **61 of 70** night-pairs, the rounded mean on **29**, so the tile stood still nearly six days in ten and discarded 77 % of the daily movement. And a bare number says nothing: expressing the reading as a deviation from your own baseline roughly **doubles** its correlation with felt state, which is why it now reads `50 · −7 vs usual`. Both halves shipped together because the entry required it — half a fix here is the one that looks like progress. **⚠ The delta was then never drawn, and TN-13 is now CLOSED on the owner's decision to leave it that way (2026-09-15).** `RING_GEOMETRY` sets `showDot: true` on **1 of 18** ring styles, and the cue renders only under it, so the comparison was invisible on seventeen styles including the default — for a fortnight. It failed on the one day it had something to say: `resting_heart_rate` **60** on 2026-09-15 against 57 · 55 · 54 · 55 before it, so it would have read about `+4 vs usual`. Offered four ways to restore it, the owner chose the bare number — *"which is fine as it makes it consistent with the rest"* — because the HR chip would otherwise be the only cell in the row with a second line, and cueing all four puts a cue under three numbers that already interpret themselves. **The engine half stays and still reaches the accessible name**, so the comparison is spoken even though it is not drawn; the legibility question is struck as moot ([journal](docs/overview/entries/2026-09-15-tn13-closed-bare-number.md)).
 
 **Changing a supplement's dose no longer rewrites every log you already made (BF-3, gap 1).** The
 dose lived on the definition and not on the log, so raising retatrutide from 2 mg to 4 mg made last
@@ -2087,6 +2087,30 @@ no `/more` scroll position to restore. It needs a device pass now, not more read
 **NOT verified on device.** The Android system back gesture and the WebView's history handling are
 not reachable from the sandbox; Playwright's `goBack()` is the same history step but not the same
 gesture. Kept as LA-109's `Keep:`.
+
+### [workouts] ⚠️ The intensity chip now claims only the load it measures; judging load AND reps is still owed (BF-163, 2026-09-15)
+
+**Card half shipped in v1.456.16. The blend rule is Lane A's and is not built.** Owner: *"Is
+hypertrogpy the correct tag?"*
+
+**It was — by the band's own definition, which is what made it worth fixing.** `intensityZoneForPct`
+maps %1RM to a zone with no reference to reps, so a squat prescribed at **72.5%** is Hypertrophy and
+the chip was correct. The contradiction was inside the chip: its tooltip claimed `typically 8–12
+reps` one line above a prescription of **2×6**, a rep count the same table calls **Strength**.
+
+**The fix makes the chip claim one thing.** The tooltip now reads `<label> · <range> of 1RM — named
+from load alone`. It does not simply drop the clause: that would leave a tooltip repeating the label
+already visible, and a reader whose reps disagree with the band's name would still have no way to
+see why. `zone.reps` is now unused and deliberately kept — the better answer needs it.
+
+**Still open, and it is a real gap rather than polish:** at 72.5% × 6 the load and the reps genuinely
+disagree, and the app has no rule for that. `goal-ranges.ts` puts hypertrophy at `repMin: 5,
+repMax: 12`, so 6 is legal for the goal while the display band calls it Strength — two tables with
+different rep opinions, and the card shows one. Judging the pair is **Lane A's** (the band table is
+`packages/shared`). Not urgent: the chip no longer asserts anything false without it.
+
+**NOT verified on device.** A `title` is a hover affordance; on the S25 it is reached by long press
+in the WebView. Kept as BF-163's `Keep:` ②.
 
 ### [workouts] ⚠️ A bodyweight exercise no longer shows a kg target, and that is not device-verified (BF-162, 2026-09-15)
 
@@ -3076,21 +3100,92 @@ fault channel every session is told to read first.
 [`Review sweep 43 §4`](docs/reviews/2026-09-03-ownership-rule-a-and-body-supplied-ids.md).
 **Web build, local database.**
 
-### [readiness][app-shell] 🟡 Body Battery prints 50 and calls it "Good" for an account with no data (RV-38, 2026-09-03)
+### [app-shell] ⚠️ The Android back button ignored the overlay stack the app already had (BF-166, 2026-09-15)
 
-The route is honest and the card ignores it. For the zero-data account `GET /api/body-battery`
-answers `hasData: false`, `sampleCount: 0`, `samplesPerHour: 0`, `sufficient: false`,
-`anchorSource: "default"` — and the card renders **Good / Steady / 50** with a colour-coded label, a
-bar filled to 50%, and no "Limited data" badge. The badge is gated on `hasData`
-(`body-battery-card.tsx:95`), so the qualification gets *weaker* as the data gets worse: too few
-samples shows the warning, none at all shows nothing.
+**Fixed in v1.456.19 — one line, after the entry's premise turned out to be wrong. Device check owed.**
 
-Everything else on that screen degrades correctly for the same account — streak `—days`, the week grid
-`—` on all seven days, the score chip row absent, and `/health/readiness` reading `—`. Readiness is the
-number Body Battery opens at, by the card's own explainer. **This does not reopen Q-43** (degrade
-rather than blank): the app already computes "I cannot support this number" and already has the
-component to say so. [`Review sweep 42 §2`](docs/reviews/2026-09-03-first-run-honesty-and-instant-paint.md).
-**Web build only.**
+Owner: *"If you have a nutrition meal creator menu open and you press the back button - it makes the
+page behind it go back to main."*
+
+**The entry proposed building an overlay registry, on the grounds that none existed. One does** —
+`lib/hooks/sheet-back-stack.ts`, reached via `BackDismiss`, which `SheetContent` and `DialogContent`
+both already render (BF-27 put it there). The grep that found nothing searched for
+`overlayStack`/`topOverlay`; the real names are `openSurface`/`closeSurface`. **Building the proposed
+one would have left two stacks disagreeing about what is open** — worse than the bug.
+
+**The real defect:** `openSurface` pushes with `pushState(state, '')` — no URL — so the pathname
+never moves, and `backActionForPath` reads nothing else. On a tab route it answers `"home"` and the
+listener navigates; on `/` it answers `"minimize"` and the app backgrounds. **Neither touches
+history, so the pushed entry is never consumed.** Only `"pop"` worked, and only because
+`history.back()` is coincidentally what consumes it. The `"minimize"` case is a second symptom the
+report did not name.
+
+**The fix** exports `hasOpenSurface()` and pops when it is true, which reaches `handlePop` and closes
+the topmost surface through Radix's own `onOpenChange` — the same path as the X button, so every
+guard on a sheet's close still runs. It sits **after** the three mode guards, because each raises a
+dialog that is itself on this stack.
+
+**NOT verified on device, and no harness run can help.** Android's hardware back is a Capacitor
+channel Playwright cannot fire, and in a browser Radix closes on Escape so the bug never appears. The
+unit tests (4 of 5 red against `main`) cover the stack and the listener's ordering, not the gesture.
+
+### [heart-rate][app-shell] ⚠️ One metric name covered two heart rates; labelled, but the third surface's context is still undecided (OR-116, 2026-09-15)
+
+**Labels shipped in v1.456.18. Two things remain open and one of them may be a real defect.**
+
+Owner: *"I dont see any other values that match that home screen HR value — current = 73, min = 50,
+average = 89, max = 125, and the HR card says 60."* **Every number was right.** Home's 60 is last
+night's **resting** rate; the 73/50/89/125 are today's **intraday** series. Both screens said "Heart
+Rate", so the pair read as one metric disagreeing with itself.
+
+Home's chip now reads **"Resting HR"** and the detail screen's stats are captioned **"Today so far"**.
+**The Home label follows its source**, which is the part not to simplify later: the value is
+`restingHrLastNight ?? restingHr ?? hrCurrent`, and that last fallback is a live BLE sample — a desk
+reading, not a night — so an unconditional "Resting HR" would move the false claim rather than remove
+it. Wording matches Health's existing tile rather than inventing a third vocabulary.
+
+The e2e fails on both surfaces against the unfixed code, and **measures the layout** with
+`getBoundingClientRect()` — "Rest HR" is the longest short label in a four-cell row, and a wrapped
+label would be a new defect traded for the old one.
+
+**⚑ A FOURTH presentation, found while reading and NOT fixed:** the detail page passes
+`restingHr={data?.hrMin ?? null}` into `HrFactorsCard` — today's intraday **minimum** standing in for
+the resting rate (the owner's own figures: 50 against 60). Whether that is a deliberate proxy or an
+oversight has to be established before it is "fixed", so it is recorded rather than changed.
+
+**⚑ Still undecided, and the reason the entry was filed:** Health's tile shows this value bare,
+Home's with a delta against baseline, the detail screen with neither. Three surfaces, one number,
+three amounts of context. Labelling stopped them reading as broken; it did not decide what each
+surface is for.
+
+**NOT verified on device** — and this change wants it: the short label only renders in the band ring
+style, so the owner's chosen style decides whether "Rest HR" appears at all.
+
+### [readiness][app-shell] ⚠️ Body Battery no longer prints an unqualified 50 for an empty account — but the NUMBER is Tuning's (RV-38, 2026-09-03)
+
+**Treatment fixed in v1.456.17. Two things are still owed and neither is this lane's.**
+
+The route was honest and the card ignored it: for the zero-data account `GET /api/body-battery`
+answers `hasData: false`, `sampleCount: 0`, `sufficient: false`, `anchorSource: "default"` — and the
+card rendered **Good / Steady / 50** with a colour-coded label, a bar filled to 50%, and no badge.
+
+**The guard got weaker as the data got worse**, which is why it survived a reading:
+`lowData = battery.hasData && …` meant enough samples → no badge (right), too few → "Limited data"
+(right), **none at all → no badge**. Dropping the `hasData` term is the whole fix; `sufficient` is
+already false in both cases that deserve the badge. Proven by an e2e that runs as the zero-data
+account and asserts the **payload beside the rendered text** — a rendered 50 alone cannot tell a bug
+from a fixture — and that fails on the unfixed card.
+
+**⚑ The number itself is with Tuning**, handed over by the owner on 2026-09-14 (*"This requires
+tuning still"*). A Body Battery re-fit silently re-scores months of history, so it goes through a
+proposal stating how many other days it moves. Nothing in this fix touches it.
+
+**⚑ An owner decision is open and was deliberately not blocked on:** whether no-data deserves
+something stronger than the badge — an `—` like Readiness, the posture `/health/heart-rate` already
+takes. The badge is strictly better than what shipped and reverses in one line, so it does not
+foreclose the answer. **This does not reopen Q-43** (degrade rather than blank).
+
+**NOT verified on device.** [`Review sweep 42 §2`](docs/reviews/2026-09-03-first-run-honesty-and-instant-paint.md).
 
 ### [devices][app-shell] ⚠️ The `/more/devices` ring card flashes a skeleton on a warm repeat visit (RV-39, 2026-09-03)
 
