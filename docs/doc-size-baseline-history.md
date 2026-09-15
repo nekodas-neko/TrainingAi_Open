@@ -12322,3 +12322,13 @@ table singled out as the one a second device would most need to share, has never
 Worth the lines because the entry currently reads as a decided goal with a written plan, and an
 implementer trusting that would spend a 2,813-reference sweep to arrive no closer to what the owner
 asked for. The `Gate: owner` is the operative change; the rest is why.
+
+## 2026-09-15 — `projectOverview.md` → 11254, `docs/implementation-backlog.md` → 21337 (BF-163)
+
++24 and +5 for a one-line tooltip change, and the ratio is the point: almost none of it is the fix.
+
+What the lines buy is that the chip was **correct** and still had to change. An entry reading
+"Hypertrophy is the right tag" closes itself; the reason it does not is that the chip made two
+claims from one input and only one of them was supported. Someone re-reading this in a month with
+`zone.reps` sitting unused needs to find out why it was left rather than deleted, or they will
+delete it and foreclose the Lane A answer that needs it.

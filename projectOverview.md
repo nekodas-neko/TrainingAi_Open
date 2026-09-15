@@ -2054,6 +2054,30 @@ never carried a stale tree. Read the two together; do not fix them separately.
 `e2e/tab-flip-leaves-nothing-to-pop.spec.ts`), the URL staying honest for refresh and deep links, and
 LB-107's back-to-Home from a tab root. Filed as **LA-109**, Lane B.
 
+### [workouts] ⚠️ The intensity chip now claims only the load it measures; judging load AND reps is still owed (BF-163, 2026-09-15)
+
+**Card half shipped in v1.456.16. The blend rule is Lane A's and is not built.** Owner: *"Is
+hypertrogpy the correct tag?"*
+
+**It was — by the band's own definition, which is what made it worth fixing.** `intensityZoneForPct`
+maps %1RM to a zone with no reference to reps, so a squat prescribed at **72.5%** is Hypertrophy and
+the chip was correct. The contradiction was inside the chip: its tooltip claimed `typically 8–12
+reps` one line above a prescription of **2×6**, a rep count the same table calls **Strength**.
+
+**The fix makes the chip claim one thing.** The tooltip now reads `<label> · <range> of 1RM — named
+from load alone`. It does not simply drop the clause: that would leave a tooltip repeating the label
+already visible, and a reader whose reps disagree with the band's name would still have no way to
+see why. `zone.reps` is now unused and deliberately kept — the better answer needs it.
+
+**Still open, and it is a real gap rather than polish:** at 72.5% × 6 the load and the reps genuinely
+disagree, and the app has no rule for that. `goal-ranges.ts` puts hypertrophy at `repMin: 5,
+repMax: 12`, so 6 is legal for the goal while the display band calls it Strength — two tables with
+different rep opinions, and the card shows one. Judging the pair is **Lane A's** (the band table is
+`packages/shared`). Not urgent: the chip no longer asserts anything false without it.
+
+**NOT verified on device.** A `title` is a hover affordance; on the S25 it is reached by long press
+in the WebView. Kept as BF-163's `Keep:` ②.
+
 ### [workouts] ⚠️ A bodyweight exercise no longer shows a kg target, and that is not device-verified (BF-162, 2026-09-15)
 
 The owner, reading his Legs prescription: *"Is this right?"* The card printed **`@ 85kg (66%)`**
