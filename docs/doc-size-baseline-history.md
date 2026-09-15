@@ -12286,3 +12286,14 @@ A conflict hunk does not respect entry boundaries, and the after-check everyone 
 heading list against `main`'s — **cannot** catch a body-only edit going missing, because there is no
 heading to miss. Recorded here and in `docs/local-dev-database.md` beside the other conflict recipes,
 where the next person resolving this file will actually be looking.
+
+## 2026-09-15 — `projectOverview.md` → 11210, `docs/implementation-backlog.md` → 21296 (BF-162)
+
++11 on each for a one-guard fix, and the length is carrying one thing: why the harness is not going
+to catch this class. `exercise_library` holds 27 bodyweight exercises and none of them is in any
+`session_exercises` row, so a prescription row for one cannot be rendered without building the
+fixture that would make it appear — which tests a situation constructed for the test.
+
+Recording that is what stops the next session either writing the e2e and believing it, or reading
+"no e2e" as an omission. The rest is the two stored numbers that produced the report, so the
+arithmetic stays reproducible after the data moves on.

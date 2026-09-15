@@ -2,13 +2,13 @@
 
 > **Successor sessions are titled `🚧 Implementation Agent (B) 🟢`** — exactly. A renamed successor is a lost thread.
 
-**Updated:** 2026-09-14 · **By:** the twenty-seventh Lane B run · **Next ID:** `LB-110`
+**Updated:** 2026-09-15 · **By:** the twenty-seventh Lane B run · **Next ID:** `LB-110`
 
 > **A mistyped ID here silently advances the lane's numbering.** Allocate with `grep -rhoE '\bLB-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`, and check the max in the **journal** too — a shipped entry leaves the queue. The pointer above is a floor, not an allocation.
 
 ## Now
 
-**Sixteen PRs, v1.456.0→.8.** Since the last rewrite: **LB-107** (back on a tab went nowhere) · **LB-108** (filed: E2E green without running) · **LB-106** (the flake's cause replaced) · **PS-35a** (five alias routes deleted) · the **journal fold** (40 entries) · **BF-161** (saved meals in the builder). `check:rules` **74/74** throughout.
+**Eighteen PRs, v1.456.0→.13.** LB-107 · LB-108 · LB-106 · PS-35a · the journal fold (40 entries) · BF-161 (saved meals in the builder) · BF-100's one-tap experiment surfaced · **BF-162** (the card said "load 85kg" onto a Hanging Leg Raise). **`check:rules` is `Ran 75 of 75` now, not 74** — the count moves, which is why the rule says quote it rather than "pass".
 
 **BF-110 still waits on the owner:** one blank resume in normal use, then read `bf110 resume recheck%` — **`stuck` → native, `resized` → render timing**. No fix before that row.
 
@@ -16,17 +16,18 @@
 
 ## Next
 
-1. **RE-SCAN AFTER ANY MERGE BY ANOTHER AGENT — this fired THREE times in one day.** READY went 6→9 on Lane A's BF-155; BF-110 surfaced and shipped the same hour; **BF-161 became startable minutes after I had reported the lane empty**, because another agent's merge lifted its `Gate: owner`. **A "blocked" finding has a shelf life of one merge.** Never conclude "no work" without re-running `next-item.js` first.
-2. **LB-109 IS DONE — the Orchestrator swept it 2026-09-15 (OR-116).** BF-141, BF-135 and LB-47 are out of the queue; LB-47 went with the caveat you insisted on, recorded beside BF-64. **BF-126 is re-parked on `Gate: owner`** — the artwork decision was made, but the blocker moved to the assets rather than clearing, so it should never have headed your READY. **READY is now 4 and three are real: BF-162, BF-163, BF-100** — plus **OR-116** (three surfaces render one heart-rate number with three different amounts of context) and **TN-13**, re-laned A→B because its cue is invisible on 17 of 18 ring styles: `RING_GEOMETRY.showDot` is true only for `accentring`. BF-100 is still the device-only failure the harness contradicts.
-3. **BF-61's fast-tap check is the keystone.** It releases **BF-94** (owner-approved, otherwise ready) and the same S25 sitting clears BF-100, BF-141, BF-135, LB-47 and most of the KEEP entries.
-4. **READY running low is not "no work" — read KEEP and PARKED, printing each Keep whole** (the console truncates them); TN-3b sat in PARKED three days while READY was 0. **BF-51 ① is the trap** — built, deliberately unshipped; reproduce on the S25 first, never loosen `meal-photo-picker.spec.ts`.
+1. **RE-SCAN BEFORE CONCLUDING ANYTHING — this has now fired FIVE times.** READY went 6→9 on Lane A's BF-155; BF-110 surfaced and shipped the same hour; **BF-161 became startable minutes after I reported the lane empty**; the queue went **319 → 330** overnight with BF-162/BF-163 arriving on top; and **the Orchestrator's OR-116 sweep changed the lane again while this baton was mid-rewrite**. **A "blocked" or "empty" finding has a shelf life of one merge.** Never report "no work" without re-running `next-item.js`.
+2. **LB-109 IS DONE — the Orchestrator swept it 2026-09-15 (OR-116).** BF-141, BF-135 and LB-47 are out of the queue; LB-47 went with the caveat about its unverified fix, recorded beside BF-64. **BF-126 is re-parked on `Gate: owner`** — the artwork decision was made but the blocker moved to the assets rather than clearing, so it should never have headed READY. Also new: **OR-116** (three surfaces render one heart-rate number with three different amounts of context) and **TN-13**, re-laned A→B because its cue is invisible on 17 of 18 ring styles (`RING_GEOMETRY.showDot` is true only for `accentring`).
+3. **BF-163 is next, and its stated Lane is wrong in a way that would cost a session.** It says `Lane: B` but names `packages/shared/src/workout/intensity-zone.ts`, which is **Lane A** by the path rule. **Resolved already:** the entry's own "honest minimum" — drop the `typically ${zone.reps}` clause from the chip tooltip — is composed in the CARD, and that tooltip is the only consumer of `zone.reps` in the repo, so the card half is pure Lane B. **Leave the `reps` field**; the better answer (judge load AND reps together) needs it and is Lane A's.
+4. **BF-61's fast-tap check is the keystone.** It releases **BF-94** (owner-approved, otherwise ready) and the same S25 sitting clears BF-100 and most of the KEEP entries.
+5. **READY running low is not "no work" — read KEEP and PARKED, printing each Keep whole** (the console truncates them); TN-3b sat in PARKED three days while READY was 0. **BF-51 ① is the trap** — built, deliberately unshipped; reproduce on the S25 first, never loosen `meal-photo-picker.spec.ts`.
 
 ## Blocked
 
 - **Owner decisions:** BF-126, Q-551, the macro/budget anchor, LB-61's switch colour, PS-35's PWA landing. *(BF-161 and PS-35a were both answered 2026-09-14 and shipped.)*
 - **LB-106 is open with its fix UNCLAIMED.** Its stated cause was wrong: the log says `page.goto: net::ERR_ABORTED` at the **relaunch**, so the poll it blamed is never reached. The relaunch is now a fresh page — defensible on fidelity alone, **not claimed to fix the abort**. It passed one CI run; the abort was always intermittent, so that is a data point, not proof. **If it aborts again on `fresh.goto`, the relaunch shape was not it either** — drop the SW block as justified by nothing and suspect the runner.
-- **~50 VERIFY entries owe a look.** BF-136/LB-99 sharpest. **BF-157's chip-vs-bar agreement is native — unverifiable in the sandbox.**
-- **⚠ OR-108's picture will not show on the S25 until `LA-36` lands** — all three local-store reads omit `image_data_uri`. Web is fine.
+- **⚠ BF-100 now has a CANDIDATE CAUSE and a one-tap test that has never been run** (#1189, surfaced to `projectOverview.md`): `use-scroll-restoration.ts` cancels its pending restore on **`touchstart`** with no re-arm; the S25 back gesture is a touch, `page.goBack()` is not — which explains the harness/device split. **The test: come back with a UI back control, not the gesture.** Every device pass used the gesture because the entry's own verification step says to. **Do not build the `touchmove` fix on the hypothesis** — it changes takeover on every screen.
+- **~50 VERIFY entries owe a look** (BF-136/LB-99 sharpest; BF-157's chip-vs-bar is native). **⚠ OR-108's picture will not show on the S25 until `LA-36` lands** — the local-store reads omit `image_data_uri`; web is fine.
 - **⚠ BF-94 is parked on `Needs: BF-61`. ⚠ BF-84 reads startable and is not. PS-4 is UNCLASSIFIED by design; LB-94 the owner deferred.** Do not classify either.
 - **⚠ Q-254 is device-free Lane B work parked behind `Needs: Q-297`**, itself `Gate: owner`; its premise is stale (says one spec exists, there are **84**). Do not unpark.
 
@@ -55,8 +56,7 @@ None held. **Two abandoned Lane B PRs are open whose work is already on `main`**
 - **`npx tsc --noEmit` TYPECHECKS NOTHING UNDER `__tests__`; CI's `Build` does**, and it also catches `react-hooks/rules-of-hooks`. `e2e/` **is** covered. Both vitest projects are `environment: 'node'`. **After deleting a route, `tsc` fails on `.next/types/validator.ts` until a clean rebuild — that is the GENERATED file, not your source.**
 - **The doc-size baseline is the rebase tax, and the check FAILS ON SLACK** — it must equal `wc -l` + 1 exactly. Recompute, never splice. `doc-size-baseline-history.md` is APPEND-ONLY, keep both with main's first; on the backlog a conflict is usually two *deletions* — keep neither, unless both sides EDITED different entries, then keep both.
 - **A worktree control on `origin/main` CANNOT work** — symlinked `node_modules` breaks turbopack package resolution.
-- **`refusing to merge unrelated histories` is the shallow-clone graft** — `git fetch origin --deepen=100` (or 150).
-- **Rebuild `package.json` / `changelog.ts` from `git show origin/main:…`, never splice.** Never `open(p,'w').write(open(p).read()…)` in one expression — it truncates before it reads.
+- **`refusing to merge unrelated histories` is the shallow-clone graft** — `git fetch origin --deepen=150`. **Rebuild `package.json` / `changelog.ts` from `git show origin/main:…`, never splice**, and never `open(p,'w').write(open(p).read()…)` in one expression — it truncates before it reads.
 - **`locator.click()` does nothing on Nutrition** — copy an opener that already works (`builder-barcode-scan.spec.ts`: `touchscreen.tap` on a measured box, tapping only while the sheet is closed) rather than writing a new one. This cost a run TWICE.
 - **`getByText` resolves to the INNERMOST match** and matches a tab label as readily as a heading — scope to the element (`locator('p').filter({ hasText })`) or hit a strict-mode violation that reads like a failure when it is the render working.
 - **`scrollIntoViewIfNeeded()` lands a tap on the Workout tab** — scrolls every ancestor and stops early. Use `scrollIntoView({ block: 'center', inline: 'nearest' })`.
