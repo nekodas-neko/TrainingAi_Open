@@ -688,6 +688,106 @@ re-test this.
 **⚠ Value is modest and stated honestly** — `0x6c` is diagnostics rather than a health metric, and
 `0x6b`/`0x74` are real signal at low volume. This ranks below TN-39 and TN-40 deliberately.
 
+### [readiness] TN-42 — readiness has never reached 90 in 62 days, and the cap is a contributor that cannot reach its own optimum 🔴 LIVE
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-15 · owner: *"as long as with my current metrics I have a way to get 100 score on pillars I am happy. It should be achievable."*
+- **Lane: A** — `packages/shared/src/health/readiness-composite.ts` · the temperature baseline.
+- **Reference:** [`review`](reviews/2026-09-15-base-data-reachability-and-composites.md).
+- **Needs:** TN-6 — the miscentred temperature baseline is the cause; this entry is the measurement that prices it.
+
+**Measured over production, every day with a score:**
+
+| pillar | best ever | mean | days | days ≥ 90 |
+|---|---:|---:|---:|---:|
+| Sleep | 97 | 73 | 63 | 19 |
+| Activity | 91 | 73 | 50 | 1 |
+| **Readiness** | **87** | 64 | 62 | **0** |
+
+**`temperature` (weight .10) has never reached 100 in 62 days** — max 96, mean 76. It is scored
+*closer-better*, 100 exactly at the personal baseline, so **a miscentred baseline makes 100
+unreachable by construction.** That is TN-6 (0.36 °C low, −16 pt on 89% of days) and BF-13 (the
+baseline EMA seeds at zero). **`recoveryIndex` averages 43 against a max of 100** and is the
+second-largest drag, explained by no queued entry.
+
+**⚠ `checkin` is NOT a defect** — `CHECKIN_ENERGY_SCORE` maps `pumped → 100`; the owner's observed
+max is `good → 88` because he has never logged `pumped`. Honest self-report. Do not "fix" it.
+
+**⛔ Do NOT re-tune the readiness curves to make 100 reachable.** The ceiling is caused by an input
+that is wrong; re-shaping a curve to compensate is the "threshold is right, the input is wrong"
+mistake this pillar has made five times. Fix TN-6/BF-13 first, then re-measure.
+
+**⚠ Sleep needs no change.** `SCORE_CALIBRATION` maps a blend of 93 to a displayed 100 and the
+theoretical max blend is 99.2, so 100 is reachable — an excellent night computes to 94 and the best
+in 63 was 97. Steep, not capped. **`LATENCY` peaks at 90 and `TIMING` at 95 and that is FINE**,
+because the calibration compensates — check the calibration before filing either as a bug.
+
+**Pass test:** after TN-6/BF-13, the temperature contributor reaches 100 on a day at baseline, and a
+readiness ≥ 90 becomes possible on a good day.
+
+### [platform][readiness] TN-43 — four composite metrics from values already computed, two of which work on the base set
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-15 · owner asked whether combining computed values yields new metrics.
+- **Lane: A** — `packages/shared/src/health/` — pure functions over existing series, no new data.
+- **Reference:** [`review`](reviews/2026-09-15-base-data-reachability-and-composites.md).
+- **Needs:** TN-38 — each composite must declare which parts were inferred, which is task C's flag.
+
+Checked as genuinely absent: no `sleepDebt`, no autonomic-balance composite, no true-sleep figure,
+no load-vs-readiness.
+
+| composite | = | why it beats its parts | base-set safe? |
+|---|---|---|---|
+| **Load vs readiness** | ACWR × readiness | *"training hard while recovering badly"* is the actual deload question — **this is what the deload engine should consult instead of the stress override it is losing (TN-34/TN-36)** | ✅ |
+| **Sleep debt** | rolling (need − actual) over 14 d | one short night is noise, four is a state | ✅ **duration only** |
+| **Autonomic balance** | RHR trend + HRV trend agreeing | a single-signal move is noise; both moving together is signal. Cheapest noise reduction available | needs HR |
+| **True sleep time** | duration × efficiency | separates *"8 h in bed"* from *"8 h asleep"* | needs efficiency |
+
+**Build the first two first** — they work on bed/wake times, steps, logged workouts and the check-in,
+so they add value to exactly the user who has least data.
+
+**⛔ A composite containing an inferred part may NOT trigger an action** (TN-38 task C). A composite
+is the easiest place to launder an estimate into something that looks measured.
+
+**Pass test:** load-vs-readiness is computable for a user with no wearable at all, and every
+composite reports which of its inputs were inferred.
+
+### [devices] TN-44 — Health Connect defines ten record types our pillars want and we do not read, including skin temperature
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-15 · owner supplied the Health Connect type list.
+- **Lane: A** — `lib/health-connect-sync.ts` (`HC_SYNC_READ_TYPES`).
+- **Reference:** [`review`](reviews/2026-09-15-base-data-reachability-and-composites.md).
+- **Sibling of PS-41** (normalising HC's HR series) and **TN-38** (the tier model this feeds).
+
+**⚠ This retires a claim the connector guide makes.** §5.6 classifies skin temperature as a hardware
+dependency with no second source, costing readiness 0.10 and the illness radar 0.40. **Health
+Connect defines `SkinTemperatureRecord`**, and `HeartRateVariabilityRmssdRecord` for HRV. The
+ring-only list is a claim about *our read list and the user's device*, not about the platform:
+**Health Connect can carry every input our pillars need except beat-to-beat intervals.**
+
+We read 11 types. Ten more exist that the pillars would use:
+
+| record | feeds |
+|---|---|
+| `SkinTemperatureRecord` | readiness .10 · illness radar .40 — **the largest gap** |
+| `RespiratoryRateRecord` | illness radar .25 |
+| `ActiveCaloriesBurnedRecord` | activity 15/100 — we read *Total*, not *Active* |
+| `Vo2MaxRecord` | cardio, progress markers |
+| `DistanceRecord` · `HydrationRecord` | activity · nutrition |
+| `BasalMetabolicRateRecord` | energy balance |
+| `LeanBodyMassRecord` · `BoneMassRecord` · `BodyWaterMassRecord` | body composition — the scale covers the owner, a HC user has no other route |
+
+**⚠ Two defects on the same path, found while reading the file — both hit the Health-Connect user
+specifically:** the overnight HRV and SpO₂ windows filter on `d.getHours()` (lines 347, 369) and
+`toLocalDate` resolves the **device** timezone, which is the class CLAUDE.md bans — invisible until
+the device leaves the user's zone, then a night's HRV lands on the wrong day. And line 51 documents
+`hrvMs` as *"SDNN"* while the code reads rMSSD; the code is right, and the comment is worth fixing
+because this repo has already shipped that exact mix-up once.
+
+**⚠ Reading a type is not receiving it** — not all devices write all records, which is the owner's
+own caveat and the argument for TN-38's inferred contributors rather than against reading the type.
+
+**Pass test:** `HC_SYNC_READ_TYPES` covers skin temperature and respiratory rate, the overnight
+windows use the user's timezone, and a Health-Connect-only account can populate the illness radar.
+
 ### [platform][devices] TN-38 — normalisation is implemented three different ways and nothing names them as one concept
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-15 · owner: *"lets work on getting some normalised inputs; then creating our scoring system on it."*
