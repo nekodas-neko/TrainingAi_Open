@@ -1937,6 +1937,30 @@ Two hardware questions BF-58 keeps are still unanswered — whether two phones c
 connection at once, and whether `REQUEST_STORED_MEASUREMENTS_CMD` gets a reply (that one decides
 whether the race between the phones matters at all).
 
+### [app-shell][platform] 🟠 A tab flip leaves the previous tab's route tree on the history entry, so back renders the wrong screen (LA-109, 2026-09-15) · needs: fix
+
+**Open — found, measured, not fixed.** Owner: *"Going to more; then going to profile details and
+pressing back gets me to the home page again."*
+
+**Not LB-107 mis-classifying the path**, which was the first guess. `backActionForPath('/more/details')`
+correctly returns `pop`, and a test already pins that sub-routes pop.
+
+**Measured in Playwright by dumping `history.state`**, not reasoned: after the More tab flip the URL
+reads `/more` while Next's recorded route tree for that entry is **still `(home)` → `/`**. `show()`
+(`tab-shell.tsx:85`) flips tabs with `window.history.replaceState(null, "", href)`, which moves the
+address bar; Next's patched `replaceState` re-injects its own current tree, which is still Home's
+because no Next navigation happened. Popping back to that entry restores the Home tree and Home
+renders — right URL, wrong screen.
+
+**⚑ BF-49 is very likely the same defect** (*"tapping a workout, then back, leads to health training
+not home"*) — it is marked "does not reproduce in the web harness" and concluded "the fix is not in
+the router", both consistent with this, since its harness repro began with a direct `goto` and so
+never carried a stale tree. Read the two together; do not fix them separately.
+
+**A fix must preserve all three of:** a tab flip not growing the history stack (pinned by
+`e2e/tab-flip-leaves-nothing-to-pop.spec.ts`), the URL staying honest for refresh and deep links, and
+LB-107's back-to-Home from a tab root. Filed as **LA-109**, Lane B.
+
 ### [app-shell] ⚠️ Back on a tab now goes Home, and the gesture itself is not device-verified (LB-107, 2026-09-14)
 
 Shipped in v1.456.6. The owner reported that back on a tab *"should go to the home screen"*; what it

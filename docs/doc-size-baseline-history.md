@@ -12157,3 +12157,17 @@ Thirty lines correcting BF-149's scope. The table of four call sites is the entr
 wrong" was already filed and fixed once, so what this needs to carry is WHERE it is still wrong and
 that one of the four prescribes reps rather than printing them. It also records why the sweep missed:
 BF-149 grepped the function's direct callers and not the wrapper seven surfaces import.
+
+## 2026-09-15 — LA-109 filed (backlog +37, projectOverview +24)
+
+Both grow for a finding that is cheap to state wrongly and expensive to re-derive. The owner
+reported back from Profile details landing on Home; the obvious reading is that LB-107, which
+shipped the day before, mis-classified the path. It did not — `backActionForPath('/more/details')`
+returns `pop` correctly, and a test already pins that. An entry that only said "back goes to the
+wrong screen" would send the next session straight at the resolver and break tab backs fixing
+nothing.
+
+What earns the lines is the measurement: a `history.state` dump showing the entry reading `/more`
+while carrying Next's route tree for `/`. That is three numbers in a table and it converts the
+entry from a symptom into a mechanism — and it is what lets LA-109 say BF-49 is probably the same
+defect, which is worth more than either entry alone.
