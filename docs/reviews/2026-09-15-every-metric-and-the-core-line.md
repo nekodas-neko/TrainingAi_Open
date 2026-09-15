@@ -134,3 +134,56 @@ with **zero fallback branches**, and readiness's temperature term (0.10) passes 
 path. These are not "normalise these" work — making them source-neutral means re-implementing
 vendor models, which is a project rather than a task. Recorded here so it is not scoped as a task
 later (TN-38 step D).
+
+---
+
+## 5. The owner's objection, and the measurement that answers it
+
+**Raised 2026-09-15:** *"We can get all the data but no sleep data… from this we only get wake/sleep
+time/duration — and this would need to score on the pillar and be able to get 100 I'd imagine. But
+then when we add sleep staging in, it's got to make it more tuned and now that alone isn't enough
+for 100."*
+
+The objection is right and the current model has the problem **backwards**.
+
+### One night, scored three ways
+
+Eight hours in a consistent window, poor deep and REM, HRV below the personal baseline. Sub-scores
+run through the live renormalising formula in `sleep-score.ts`:
+
+| scored with | contributors seen | sleep score |
+|---|---|---:|
+| ring | 10 of 10 | **74** |
+| basic watch | 6 of 10 | 84 |
+| phone or manual only | 3 of 10 | **92** |
+
+**The app currently pays 18 points for taking the ring off.** Same night, same body. Renormalising
+over whichever contributors are present means removing the ones that were dragging the score down
+*raises* it. So the defect is not that a phone-only user can score well — it is that **more
+information can only ever hurt you**, which is exactly backwards and is a stronger argument for
+core + adjustments than comparability alone.
+
+### The resolution: the core does not reach 100
+
+- **Core tops out at ~92**, not 100. Duration, timing and consistency earn *"as good as it looks
+  from here"*. The last 8 points are not withheld as punishment — they are not knowable without
+  deeper signals.
+- **Adjustments run roughly −20 to +8**, weighted toward deduction. Staging, HRV and overnight HR
+  mostly reveal a night that was worse than its duration implied; occasionally they confirm
+  excellence, which is what unlocks the top of the range.
+- The night above lands on **74 either way** — core 92, adjustments −18 — so a ring user's number is
+  unchanged, while taking the ring off now leaves 92 **with lower confidence** instead of a free
+  18-point gift.
+
+**What this makes true, and it is the owner's requirement stated precisely:** 100 means *confirmed
+good by everything visible*; 92 means *nothing visible is wrong, and little is visible*. **Adding
+staging makes a perfect score possible AND a bad score possible.** Today it can only push the score
+down.
+
+### ⚠ The alternative this rules out, and why
+
+Capping the core well below 100 (say sleep core 0–55, adjustments filling the rest) is the obvious
+way to make sensors "add" rather than "deduct". **Reject it:** a phone-only user would be
+permanently capped at 55, which reads as *"you sleep badly"* when the truth is *"we cannot see."*
+Punishing a user for hardware they do not own is worse than an optimistic estimate carried with a
+stated confidence.
