@@ -1891,6 +1891,36 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [workouts] ⚠️ Bodyweight rep maxes read true now, on every surface — and prescribed reps go up (BF-164, 2026-09-15, v1.456.13) · needs: device
+
+Owner, on the Hanging Leg Raise ready screen showing **"Last: 11 reps"** directly above **"REP MAX
+8 RM"**: *"How is this right?"* It wasn't. A bodyweight estimate is stored through `calcAmrap1RM`
+(an all-out-set discount on top of `calc1RM`), and four helpers in `packages/shared/src/1rm.ts`
+inverted the **unscaled** formula — so every stored estimate read back short by that discount.
+Measured: `calcAmrap1RM(BW_REF, 11)` is exactly **128**, his stored value; the old inverse gave
+**8**, the right one gives **11**.
+
+BF-149 found this and fixed `exercise-summary-screen.tsx`; BF-151 replaced that fix. Both changed
+**one file**. The four helpers are what the other seven surfaces import.
+
+**Expect prescribed reps on bodyweight exercises to rise by about a quarter.** `rescaleBodyweightReps`
+sets `reps = floor(pct/100 × repMax)`, so the understated rep max was understating every target by
+the same 8/11 — that is training volume, not a label.
+
+**Two more call sites the entry did not name, both feeding the model.** `lib/ai-chat/tools.ts` had
+the same defect. `lib/ai-chat/context.ts` had a worse one that swapping the inverse does **not** fix:
+it read `repMaxFromOneRm(orm * 0.8)`, and a bodyweight index starts at 101.75 for a single rep, so
+scaling it by 0.8 falls off the bottom of the scale and **both** inverses return 1. The coach was
+being told *"target working set 1 reps"* for every bodyweight exercise at every strength level. The
+percentage now applies to reps, matching `rescaleBodyweightReps`.
+
+**`repMaxFromOneRm` is kept and must be.** `exercise-stats-sheet.tsx` builds its comparison table
+with `calc1RM`, so inverting `calc1RM` is right there and only there. Do not unify the two.
+
+**Not device-verified, and the AI path was not driven end to end.** **Check on device:** one
+bodyweight exercise's ready screen, pre-workout row, trend chart, stats sheet and strength card all
+printing the reps last logged, and its prescribed reps visibly higher.
+
 ### [cardio][devices] ⚠️ A walk's segments carry a step count that no strap has yet produced (LA-48, 2026-09-14)
 
 Shipped with no version bump — nothing renders it. `WalkSegmentStat.steps` now stores how many steps

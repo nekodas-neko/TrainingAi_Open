@@ -12192,3 +12192,18 @@ Thirty-four lines, and the elimination table is most of them. The whole source p
 activity" reads correct and none of it has changed since before the report, so the entry's value is
 the list of files already cleared plus three ranked runtime candidates — without it the next session
 spends the same hours reaching the same place.
+
+## 2026-09-15 — BF-164 shipped (backlog −41, projectOverview +30)
+
+The backlog shrinks by the whole entry, which is the ordinary case. What is not ordinary is where
+the lines went: `projectOverview.md` carries the two numbers that make the fix checkable —
+`calcAmrap1RM(BW_REF, 11)` is exactly 128, the old inverse gave 8 — plus the warning that prescribed
+reps on bodyweight exercises will now rise by about a quarter. That second part is the one the owner
+needs before he sees it happen, and a row saying only "rep max reads correctly" would not have
+prepared him for a set count going up.
+
+It also records the thing the entry did not know: two call sites feed the coach, and one of them was
+telling it to target a single rep on every bodyweight exercise. That is a different defect from the
+one BF-164 described, found only by grepping rather than trusting the entry's list, and it is worth
+the lines because the same "80% of the estimate" idea will look correct to the next person who
+writes it.
