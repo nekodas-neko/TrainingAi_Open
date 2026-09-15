@@ -91,6 +91,20 @@ than a shrug.
 
 ## 4. Work, in order
 
+**✅ PR 2a SHIPPED 2026-09-15** — steps 3 and the direction rule below, as a behaviour-preserving
+step that touches no Lane B file and no wire contract: `durationDirection(sessionBudgetMin, preset)`
+lives in `duration-model.ts` and the prescription branches on it. Steps 1, 2 and 4 (the type becoming
+a number, and the route schema widening) are PR 2b's, since they are what the control's new values
+need.
+
+**⚠ One thing this plan got wrong, corrected on implementation.** It said to compare the chosen
+budget with the anchor. `budgetForPreset` **clamps** at `MIN_PRESET_BUDGET_MIN`, so a session
+configured at or near the floor has its `short` clamped back up to its own budget — and a direction
+read off the clamped value says "same", silently switching that session from dropping exercises to
+trimming sets. The direction must come from the **requested** budget, which is now
+`requestedBudgetMin` (the unclamped half, split out for exactly this). The request is the intent; the
+clamp is what is achievable.
+
 **PR 2a (Lane A, engine).**
 1. `packages/shared/src/workout/duration-model.ts` — `DurationPreset` becomes `number` (minutes).
    Keep `budgetForPreset(sessionBudgetMin, chosenMin)` as the one place that resolves a choice to a

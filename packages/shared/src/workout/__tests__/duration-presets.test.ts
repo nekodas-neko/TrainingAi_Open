@@ -6,6 +6,8 @@ import {
   DURATION_PRESET_DELTA_MIN,
   MIN_PRESET_BUDGET_MIN,
   MIN_WARMUP_MIN,
+  durationDirection,
+  requestedBudgetMin,
 } from '@trainingai/shared/workout/duration-model'
 
 describe('budgetForPreset', () => {
@@ -105,5 +107,83 @@ describe('warmupGoalSecFor — the timer and the plan agree', () => {
     expect(warmupGoalSecFor(undefined, 'short')).toBeNull()
     expect(warmupGoalSecFor(0, 'standard')).toBeNull()
     expect(warmupGoalSecFor(Number.NaN, 'standard')).toBeNull()
+  })
+})
+
+// BF-7 PR 2a. The prescription used to branch on the LABEL — `durationPreset === 'short'` selected
+// dropToBudget, `=== 'long'` selected expandToBudget. Those are three different algorithms, and the
+// labels were only ever a proxy for "shorter / same / longer than the session". Deriving the
+// direction from minutes is what lets the ladder grow past three rungs.
+describe('durationDirection (BF-7)', () => {
+  it('returns exactly what the three labels used to select', () => {
+    // Behaviour-preserving by construction, asserted rather than taken on trust: these three rows
+    // ARE the old `=== 'short'` / neither / `=== 'long'` branches.
+    expect(durationDirection(60, 'short')).toBe(-1)
+    expect(durationDirection(60, 'standard')).toBe(0)
+    expect(durationDirection(60, undefined)).toBe(0)
+    expect(durationDirection(60, 'long')).toBe(1)
+  })
+
+  it('is relative to the session, not to a fixed clock', () => {
+    // A 90-minute session asked to go short is still SHORTER, even though 60 would be "standard"
+    // for the owner's usual session. Reading an absolute number here is the bug this prevents.
+    expect(durationDirection(90, 'short')).toBe(-1)
+    expect(durationDirection(30, 'long')).toBe(1)
+  })
+
+  // The edge the BF-7 plan did not name. `budgetForPreset` clamps at MIN_PRESET_BUDGET_MIN, so a
+  // session configured AT the floor has its 'short' clamped back up to its own budget — and a
+  // direction read off the clamped value would say "same" and silently switch that session from
+  // dropping exercises to trimming sets. The request is the intent; the clamp is what is achievable.
+  it('reads the REQUESTED budget, not the clamped one, at the floor', () => {
+    const atFloor = MIN_PRESET_BUDGET_MIN
+    expect(budgetForPreset(atFloor, 'short')).toBe(atFloor)      // clamped: nowhere lower to go
+    expect(durationDirection(atFloor, 'short')).toBe(-1)         // still a request to shorten
+
+    const belowDelta = MIN_PRESET_BUDGET_MIN + 5                 // clamps too: 25 − 30 < 20
+    expect(budgetForPreset(belowDelta, 'short')).toBe(MIN_PRESET_BUDGET_MIN)
+    expect(durationDirection(belowDelta, 'short')).toBe(-1)
+  })
+
+  it('never reports "longer" for a standard session — that is the finish-early margin', () => {
+    // direction > 0 is the only thing that runs expandToBudget. A standard session must never
+    // expand: the duration model's under-fill IS why the owner's sessions land on time.
+    for (const budget of [20, 30, 45, 60, 75, 90, 120]) {
+      expect(durationDirection(budget, 'standard'), `budget ${budget}`).toBe(0)
+      expect(durationDirection(budget, undefined), `budget ${budget}`).toBe(0)
+    }
+  })
+})
+
+describe('requestedBudgetMin (BF-7)', () => {
+  it('is budgetForPreset without the floor', () => {
+    expect(requestedBudgetMin(60, 'short')).toBe(60 - DURATION_PRESET_DELTA_MIN)
+    expect(requestedBudgetMin(60, 'long')).toBe(60 + DURATION_PRESET_DELTA_MIN)
+    expect(requestedBudgetMin(60, 'standard')).toBe(60)
+  })
+
+  it('can go below the floor, which is the whole reason it exists', () => {
+    expect(requestedBudgetMin(25, 'short')).toBe(-5)
+    expect(budgetForPreset(25, 'short')).toBe(MIN_PRESET_BUDGET_MIN)
+  })
+})
+
+// The substitution above is only worth anything if the prescription actually calls it. Nothing else
+// would catch a revert: `durationDirection` returns exactly what the labels selected, so reverting
+// the call site to `durationPreset === 'short'` leaves every behavioural test green. Asserted at the
+// source because `runPrescriptionGeneration` is unreachable without standing up a repository and an
+// AI client — a weaker test than the ones above, and here because the alternative is none.
+describe('the prescription branches on direction, not on the label (BF-7)', () => {
+  it('selects its algorithms from durationDirection', async () => {
+    const { readFile } = await import('node:fs/promises')
+    const raw = await readFile(
+      new URL('../../ai-periodization/generate-prescription.ts', import.meta.url), 'utf8')
+    // Comments stripped first: the change's own note names the labels it replaced, and a substring
+    // check that reads prose fails on the explanation rather than on the code.
+    const code = raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+
+    expect(code).toContain('durationDirection(')
+    expect(code).not.toMatch(/durationPreset\s*===\s*'short'/)
+    expect(code).not.toMatch(/durationPreset\s*===\s*'long'/)
   })
 })

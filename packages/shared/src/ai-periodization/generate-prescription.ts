@@ -15,7 +15,7 @@ import { capLoadToAnchor } from '@trainingai/shared/ai-periodization/role-plausi
 import { resolveMeasuredRestSec } from '@trainingai/shared/workout/time-profile'
 import { normalizeMuscle } from '@trainingai/shared/muscles'
 import { volumeLandmarks } from '@trainingai/shared/ai-periodization/volume-targets'
-import { budgetForPreset, type DurationPreset } from '@trainingai/shared/workout/duration-model'
+import { budgetForPreset, durationDirection, type DurationPreset } from '@trainingai/shared/workout/duration-model'
 import { applyAutoregulation, clampPrescribedPct } from '@trainingai/shared/ai-periodization/autoregulation'
 import { shouldTriggerEmergencyDeload } from '@trainingai/shared/ai-periodization/emergency-deload'
 import { computePerExerciseDeload } from '@trainingai/shared/ai-periodization/per-exercise-deload'
@@ -482,7 +482,13 @@ async function runPrescriptionGeneration(
   // to repair a shape the model chose blind.
   const plausible = applyRoleSetPlausibility(timedExercises, muscleVolume)
 
-  const dropped = durationPreset === 'short'
+  // BF-7 PR 2a: branch on the DIRECTION today runs in, not on the label. `short`/`long` were only
+  // ever a proxy for "shorter than the session" / "longer than the session", and reading the label
+  // is what stops the ladder growing past three rungs. `durationDirection` derives it from minutes,
+  // so when the preset becomes a number this call site is already correct.
+  const direction = durationDirection(validSession.timeBudgetMinutes, durationPreset)
+
+  const dropped = direction < 0
     ? dropToBudget(plausible, signals.effectiveTimeBudgetMin, autoreg.earnedSetIds, muscleVolume)
     : null
   const trimmed = dropped?.exercises ?? fitToBudget(
@@ -501,7 +507,7 @@ async function runPrescriptionGeneration(
   // margin — the owner's sessions land on time because of it. Expanding by default would
   // spend exactly that margin.
   let sized = trimmed
-  if (durationPreset === 'long') {
+  if (direction > 0) {
     const mrvByMuscle = new Map<string, number>(
       [...new Set(timedExercises.flatMap(e => (e.muscleGroups ?? []).map(m => m.muscle)))]
         .map(muscle => [muscle, volumeLandmarks(signals.trainingGoal, muscle).mrv]),

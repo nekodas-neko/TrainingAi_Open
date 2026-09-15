@@ -21017,6 +21017,16 @@ in the Postgres schema, the local SQLite tables or `lib/local-store/types.ts` �
 comment says *"the choice is never written to the program, it only tags the plan it produced"*. So
 this needs **no migration and no sync work**, which is unusual for a change this visible.
 
+**✅ PR 2a SHIPPED 2026-09-15** — `durationDirection` lives in `duration-model.ts` and the
+prescription branches on it instead of the label. Behaviour-preserving by construction and asserted
+as such; touches no Lane B file and no wire contract. **What remains is PR 2b (Lane B):**
+`DurationPreset` becomes a minutes number, the route's Zod enum widens to accept one, and the control
+offers 30/45/60/90 around the session's anchor, committing on release. **A correction the plan needed
+on implementation:** the direction must read the **requested** budget, not the clamped one —
+`budgetForPreset` clamps at `MIN_PRESET_BUDGET_MIN`, so a session at the floor would otherwise report
+"same" and switch from dropping exercises to trimming sets. `requestedBudgetMin` is the unclamped
+half, split out for that.
+
 **✅ PLANNED 2026-09-15 —
 [`docs/superpowers/plans/2026-09-15-session-duration-ladder.md`](superpowers/plans/2026-09-15-session-duration-ladder.md).**
 Ready to build; the plan splits it PR 2a (Lane A engine) / PR 2b (Lane B control), and 2a is

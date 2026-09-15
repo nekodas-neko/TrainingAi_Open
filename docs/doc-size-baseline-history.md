@@ -12286,3 +12286,15 @@ A conflict hunk does not respect entry boundaries, and the after-check everyone 
 heading list against `main`'s — **cannot** catch a body-only edit going missing, because there is no
 heading to miss. Recorded here and in `docs/local-dev-database.md` beside the other conflict recipes,
 where the next person resolving this file will actually be looking.
+
+## 2026-09-15 — BF-7 PR 2a (backlog +10, projectOverview +19)
+
+Both carry the same correction, and it is the reason the lines exist: the plan written this morning
+said to compare the *chosen* budget against the anchor, and `budgetForPreset` clamps at the
+20-minute floor. A session configured at or near that floor would have reported "same" and silently
+switched from dropping exercises to trimming sets — a behaviour change smuggled inside a refactor
+advertised as behaviour-preserving, on exactly the sessions least able to absorb it.
+
+A plan that is wrong in one clause is more dangerous than one that is vague, because it reads as
+settled. Correcting it in place and saying so in the row is cheaper than the next implementer
+re-deriving why `requestedBudgetMin` exists and deciding it is redundant.
