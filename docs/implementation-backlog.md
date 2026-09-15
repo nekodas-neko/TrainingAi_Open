@@ -530,6 +530,11 @@ which is why this reads as "back went to the home page".
 - **The comment above that line describes the intent correctly and the mechanism incompletely.** It
   says replaceState keeps "the URL honest for refresh/deep-links/back". It keeps the URL honest; it
   leaves the *tree* stale, and only back can see the difference.
+- **⚑ BF-100 may be downstream of this — see its entry (linked 2026-09-15).** It reports "back
+  always lands at the top" on the **same route**, has failed on the S25 twice with its cause recorded
+  as unknown, and restores correctly in the harness. If back renders Home, there is no `/more` scroll
+  position to restore. Fix this first, then re-test BF-100: only one of the two can be confirmed
+  while the other stands.
 - **⚑ BF-49 is very likely the same defect and should be read with this.** *"Tapping a workout, then
   back, leads to health training not home. Same with tapping a food item from timeline."* That entry
   is marked *"does not reproduce in the web harness"* and concluded *"the fix is not in the router"* —
@@ -5021,6 +5026,22 @@ feature and not a deletion like LB-41:
   `/more` → *Profile details* → back restores **840**. So a green `e2e/scroll-restoration.spec.ts` is
   not evidence here, and the next attempt must not read it as any. Whatever differs is the S25's
   system back gesture or the WebView's restore timing — neither reachable from the sandbox.
+- **⚑ LA-109 may BE the "whatever differs", and this should be re-tested after LA-109 ships rather
+  than attacked now (linked 2026-09-15, Lane A).** LA-109 is the owner's same-day report on the
+  **same route**: *"Going to more; then going to profile details and pressing back gets me to the
+  home page again."* It is measured — after a tab flip the history entry reads `/more` while carrying
+  Next's route tree for `/`, so popping back restores the Home tree and Home renders under the right
+  URL.
+  **If back lands on Home, there is no `/more` scroll position to restore, because you are not on
+  `/more`.** That is a different failure wearing the same description, and it would look exactly like
+  "back always lands at the top" to someone checking the screen rather than the URL.
+  **This does not retire BF-100.** Scroll restoration genuinely works elsewhere (RV-36, same
+  sitting: *"Mostly works"*), and the `use-scroll-restoration.ts:158` finding — takeover cancelled on
+  `touchstart` with no re-arm, which the S25's gesture triggers and `page.goBack()` does not — is a
+  real mechanism on its own. **The point is sequencing:** only one of the two can be confirmed while
+  the other stands, so fixing LA-109 first tells you whether anything is left here. It also explains
+  the harness disagreement without needing the WebView: the spec's route never goes through a tab
+  flip, so it never carries a stale tree.
 - **Do not re-derive the six traps below to explain it.** They are paid for and in the hook. The
   question is what `/more` does that `health-content` and `session-select-content` do not, given all
   three take the same `PullToSync` path.

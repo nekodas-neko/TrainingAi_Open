@@ -2020,6 +2020,12 @@ address bar; Next's patched `replaceState` re-injects its own current tree, whic
 because no Next navigation happened. Popping back to that entry restores the Home tree and Home
 renders — right URL, wrong screen.
 
+**⚑ BF-100 may be downstream of this.** It reports "back always lands at the top" on the same route,
+has failed on the S25 twice with its cause recorded as unknown, and restores correctly in the
+harness — and if back renders Home, there is no `/more` scroll position to restore. Fix this first,
+then re-test BF-100; only one of the two can be confirmed while the other stands. It does not retire
+BF-100: the `use-scroll-restoration.ts` `touchstart` finding is a real mechanism on its own.
+
 **⚑ BF-49 is very likely the same defect** (*"tapping a workout, then back, leads to health training
 not home"*) — it is marked "does not reproduce in the web harness" and concluded "the fix is not in
 the router", both consistent with this, since its harness repro began with a direct `goto` and so
