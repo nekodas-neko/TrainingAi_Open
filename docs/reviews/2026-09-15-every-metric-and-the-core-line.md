@@ -187,3 +187,97 @@ way to make sensors "add" rather than "deduct". **Reject it:** a phone-only user
 permanently capped at 55, which reads as *"you sleep badly"* when the truth is *"we cannot see."*
 Punishing a user for hardware they do not own is worse than an optimistic estimate carried with a
 stated confidence.
+
+---
+
+## 6. Where this landed: inferred contributors, not a capped core
+
+**⚠ §5's "core tops out at ~92" is RETRACTED.** The owner's objection to it is correct and fatal:
+a permanent ceiling for not owning hardware is a penalty, not honesty. What follows replaces it.
+
+### The trilemma, which is why this felt unresolvable
+
+Three properties; **any design gets two**:
+
+| | reaches 100 | means the same for everyone | stable across a hardware change |
+|---|---|---|---|
+| today — renormalise over what is present | ✅ | ❌ | ❌ (the 18-point jump, §5) |
+| the retracted 92-cap | ❌ | ✅ | ✅ |
+| **every contributor always has a value** | ✅ | ✅ | ✅ |
+
+The third escapes the trilemma by removing its cause — **a score with holes in it**. If every
+contributor always carries a value, measured where possible and inferred where not, everyone is
+scored on the same list, 100 stays reachable, and connecting a sensor moves the score only when the
+measurement differs from the estimate — which is a fact about the user's body, not their hardware.
+
+### ⛔ Infer CONDITIONALLY. Inserting the population-typical pattern does not work.
+
+The owner's first formulation was to split the known duration into *"the most commonly seen stage
+pattern — nothing good or bad, just the commonly seen one."* **A neutral value stops being neutral
+once it carries two-thirds of the weight.** A phone-only user has 38 of sleep's 110 points measured
+and 72 inferred, so a fixed fill dominates the measured third and drags every user to the middle:
+
+| night | today | unconditional fill | **conditional fill** |
+|---|---:|---:|---:|
+| textbook — 8 h, consistent | 100 | **80** | 92 |
+| ordinary — 7.5 h | 78 | 73 | 75 |
+| poor — 6 h, erratic | 57 | **66** | 52 |
+
+**Unconditional filling collapses the scale to 14 points and inverts the ranking** — it rewards the
+poor sleeper (66 against today's 57) and punishes the good one (80 against 100).
+
+Condition the inference on the observables instead: eight consistent hours does not predict *average*
+deep sleep, it predicts better than average, because the population average includes every six-hour
+night. The estimate then moves with the evidence and the full range survives. It lands near the
+retracted cap for the extremes — but **derived rather than decreed**, and, critically, **the score
+does not jump when the sensor returns**, because a measurement replaces an estimate drawn from the
+same distribution.
+
+### Three rules that ship with it
+
+1. **Every value carries a `measured | inferred` flag and an uncertainty**, surfaced in the UI.
+   The owner asked for the flag unprompted; the uncertainty is what makes it actionable.
+2. **⛔ An inferred value must never trigger an action** — no deload, no alert, no recommendation off
+   an estimated contributor. Same class as CLAUDE.md's rule that no model-reported number may gate an
+   automatic action or be shown as fact.
+3. **Inference needs something to infer FROM.** A user with sensor history (the owner) can be
+   estimated from their own baselines — `personal-baseline.ts` already maintains exactly this
+   rolling mean and deviation for six metrics. A user who has *never* had the sensor has no personal
+   prior, and a population prior cannot be fitted from one account. **They get the interim below
+   until the data exists.**
+
+### Sequencing — validate before betting on it
+
+**The app already infers, and nobody has checked whether it works.** Daytime stress guesses HRV from
+heart rate and temperature; **TN-39** validates that against measured HRV from the chest strap. It is
+the same technique this design rests on. **Validate there, where ground truth exists, before
+extending inference into scoring.**
+
+**The interim, which is cheap and locks nothing in:** score on what is present and *say so* —
+"82, from 3 of 10 signals". That is today's behaviour plus a label. **Do not ship the 92-cap.**
+
+---
+
+## 7. The contract: what a pillar actually requires
+
+Required = what the app needs to produce a score at all. Everything else is measured when available
+and inferred when not.
+
+| pillar | minimum required input | supplied by | measured share |
+|---|---|---|---:|
+| **Sleep** | bed time + wake time | manual entry | 35% |
+| **Readiness** | daily check-in + sleep + prior activity | manual entry | 35% |
+| **Activity** | steps + logged workouts | phone + manual | 63% |
+| **Workouts** | logged sets, reps, load | manual entry | 100% |
+| **Body** | body weight | manual entry | ~100% |
+| **Nutrition** | food log | manual entry | 100% |
+| **Cardio** | **a heart-rate source** | **hardware — no substitute** | 0% |
+
+**Six inputs carry the whole app: bed/wake times, steps, body weight, logged workouts, logged food,
+and the daily check-in.** Every one can come from a phone and a person. That is the base set, and it
+is a floor rather than a target — each pillar improves as real measurements replace inferred ones.
+
+**⚠ Cardio is the single exception and should be treated as optional rather than scored at zero.**
+It has no manual-entry floor and nothing to infer from: heart rate cannot be derived from steps or
+sleep times. A user with no HR source should not see a Cardio score of 0 — they should not see the
+pillar.

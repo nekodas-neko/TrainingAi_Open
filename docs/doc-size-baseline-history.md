@@ -12627,3 +12627,22 @@ even though it is the obvious mechanism and looked certain.
 The rest is one trap: Next updates the URL at commit, so *"the URL never showed /activity"* cannot
 tell an aborted commit from a never-started push. That inference was made here and was wrong, and
 without the note the next session makes it too.
+
+## 2026-09-15 — backlog → TN-38 task C rewritten twice in one day, and the second one is the keeper
+
+The shape of this task changed twice against owner pushback, and both corrections are in the entry
+rather than only the newest, because the rejected ones are what stop a future reader re-proposing
+them.
+
+**First shape — a core capped at ~92 — is retracted in place.** The owner's objection is one line
+and unanswerable: a permanent ceiling for not owning hardware is a penalty, not honesty.
+
+**Second shape — fill every missing contributor with the population-typical pattern — is recorded as
+MEASURED TO FAIL**, which is worth more lines than the design that replaced it. A neutral value
+stops being neutral once it carries 72 of sleep's 110 points: a textbook night falls to 80, a poor
+night rises to 66, and the ranking inverts. That is deeply counter-intuitive — "just use the average
+where you don't know" sounds obviously safe — so the three-row table stays.
+
+**The contract table is the part the entry existed to produce** and it is short: six inputs carry
+the whole app, and Cardio is the one pillar with no manual floor, so it is hidden rather than scored
+at zero. An implementer can build against that without re-reading the argument above it.
