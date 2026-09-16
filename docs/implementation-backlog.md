@@ -830,6 +830,26 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
 - **Not a defect, checked and cleared:** the ordering itself. Freshness, balance and the recovery
   weights all behave as documented, and the 0.55/0.25/0.20 low-readiness weighting fired correctly
   (his readiness was 37).
+- **⚠ Two further hypotheses were measured and BOTH cleared — do not re-open them (2026-09-16).**
+  The owner's follow-up was *"is this correct or should it have been lower?"*, so the ground is
+  written down rather than left to be re-covered.
+
+  1. **"Freshness and balance are keyed on session NAME while recovery is keyed on MUSCLE, so an
+     overlapping session gets credit for rest half its muscles did not get."** True as a
+     description — **44.4%** of Upper's weighted muscle work was trained in the previous 24 h, and
+     it still scores freshness 100 — but it changes nothing here. Upper's muscle-weighted age is
+     **49.7 h**, which is past `sessionFreshnessScore`'s 48 h cap, so a muscle-derived freshness
+     saturates at 100 too and Upper lands at **83.5 instead of 84**. Push is the only session the
+     change moves (37.2 → 40.8, i.e. further from selection). **Do not rebuild freshness on muscle
+     age expecting it to separate overlapping sessions — the 48 h cap is what makes it not.**
+  2. **"The overlap with yesterday is invisible to the score."** It is not — it is already priced
+     in as Upper's recovery **70** against Pull's **91**.
+- **What the numbers DO say, and it is a presentation question rather than a scoring one:** Upper
+  **84** and Pull **82** is a near-tie decided by under a point. Pull is the better-recovered option
+  and loses only on being less overdue (balance 50 vs 100). The home card presents the winner as a
+  definite recommendation with no indication the runner-up is within noise. Filed nowhere yet
+  deliberately — it is a design call for the owner, not a defect, and BF-172 fixes the part of this
+  frame that IS wrong.
 
 ### [workouts][app-shell] BF-172 — the explain screen calls the session-fit score "readiness", so it reads 84 HIGH directly above "readiness 37 · Low"
 

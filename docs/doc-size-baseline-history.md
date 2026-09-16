@@ -13068,3 +13068,12 @@ BF-171 carries a five-row measured score table because the recommendation the ow
 out to be **correct** — the table is what shows that, and it is also what shows the defect is beside
 it rather than in it. The alternative was a journal-only table and an entry that asserts the numbers,
 which is the shape that gets re-measured by the implementer.
+
+## 2026-09-16 (same PR) — `docs/implementation-backlog.md` 22957 → 22977
+
+The owner's follow-up to BF-171 — *"is this correct or should it have been lower?"* — was answered by
+measuring two further hypotheses about the score, and both cleared. The cleared ground is written
+into the entry rather than only into the journal, because both are the kind of hypothesis an
+implementer forms from reading the code alone: that name-keyed freshness overstates an overlapping
+session (it does, and the 48 h cap makes it not matter), and that the overlap is missing from the
+score (it is already in the recovery component). Fourteen lines here save re-deriving them.

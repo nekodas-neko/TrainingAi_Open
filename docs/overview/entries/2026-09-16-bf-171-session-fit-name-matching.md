@@ -61,3 +61,21 @@ components were checked against the reproduction and all behave as documented.
 
 Nothing ran on the S25. Both entries are settled off-device by design — BF-171 is pure shared math
 with a unit test named in the entry, BF-172 is a caption in the browser.
+
+## Follow-up: *"is this correct or should it have been lower?"*
+
+Two further hypotheses measured, both cleared, both written into BF-171 so they are not re-opened:
+
+1. **Freshness and balance are session-name-keyed while recovery is muscle-keyed.** True —
+   **44.4%** of Upper's weighted muscle work was trained in the previous 24 h and it still scores
+   freshness 100 — but it changes nothing, because Upper's muscle-weighted age is **49.7 h**, past
+   `sessionFreshnessScore`'s 48 h cap. A muscle-derived freshness saturates at 100 too and Upper
+   lands at 83.5. Push is the only session it moves, and it moves further from selection.
+2. **The overlap is invisible to the score.** It is not; it is already Upper's recovery 70 against
+   Pull's 91.
+
+**So 84 is correct as a fit score, and the app's verdict was never "you are fresh"** — it said
+strong deload advised, offered Rest, and showed readiness 37. What remains true is that Upper 84 and
+Pull 82 is a near-tie decided by under a point, with the better-recovered session losing only on
+being less overdue. That is a design call for the owner rather than a defect, and it is noted in
+BF-171 without a separate entry.
