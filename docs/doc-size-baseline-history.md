@@ -13054,3 +13054,19 @@ those words.
 Also recorded: the band returns 101–118 where the entry quotes 105–118 — the standard 0.60 lower edge
 against a rounded figure, 4 bpm apart. Naming a small discrepancy costs two lines; discovering later
 that a shipped constant silently disagreed with the entry it came from costs an investigation.
+
+## 2026-09-16 — `docs/implementation-backlog.md` 22675 → 22873, `projectOverview.md` 11532 → 11592
+
+`fix/lb113-health-connect-timezone` (LB-113), and LB-111's merge folded in.
+
+LB-113's own growth is two ⚠ paragraphs, and both record a thing the entry got wrong that the diff
+cannot show:
+
+- It said *"two call sites in one component"*. The component had **one**; the other was inside
+  `syncHealthConnect`, where `tz` was already in scope and being dropped. Fixing only the component
+  would have satisfied the entry's own stated pass test while enrichment kept bucketing in Brisbane.
+- It said *"the provider has the session"*. It is a bare client component with no props; the
+  timezone came from `useUserTimezone()` instead.
+
+Both are the kind of claim that reads as settled fact and takes one grep to check. Writing them on
+the entry is what stops the next reader inheriting them.

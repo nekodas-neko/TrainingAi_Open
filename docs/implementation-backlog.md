@@ -1507,8 +1507,28 @@ composite reports which of its inputs were inferred.
   observed on the device. Per the external-API rule, the integration is not done until a value is in
   the column.
 
-### [platform][devices] LB-113 — the Health Connect sync takes the user's timezone; nothing passes it yet
+### [platform][devices] LB-113 — the Health Connect sync took the user's timezone and nothing passed it (fixed; device look owed)
 
+- **Verify:** device — Health Connect only runs natively (`syncHealthConnect` returns immediately off
+  `Capacitor.isNativePlatform()`), so **no harness run can exercise this at all**. On the S25 with a
+  non-Brisbane profile timezone: sync, then confirm a day's metrics land on the day the phone shows.
+  What the harness did confirm (2026-09-16) is that the root layout still paints — the provider is
+  mounted in `app/layout.tsx`, so a fault there takes every tab with it (`tabs-instant-paint`, 7 passed).
+- **✅ SHIPPED 2026-09-16** (`fix/lb113-health-connect-timezone`).
+  [Journal](overview/entries/2026-09-16-fix-lb113-health-connect-timezone.md). The provider reads
+  `useUserTimezone()` — it is mounted inside `UserTimezoneProvider`, which `app/layout.tsx` feeds
+  `session?.user?.timezone`, so the real value is there on the first render and there is no
+  placeholder flip to double-sync on. The effect depends on `tz` rather than `[]`, so changing the
+  profile timezone re-syncs instead of pinning whatever was current at mount.
+- **⚠ THIS ENTRY NAMED THE WRONG SECOND CALL SITE, and the one it missed is the one that mattered.**
+  It said *"`components/health-connect-provider.tsx` calls both without it"* and *"two call sites in
+  one component"*. The provider calls **only** `syncHealthConnect`. The un-timezoned
+  `enrichActivityLogs` call is at **`lib/health-connect-sync.ts:471`, inside `syncHealthConnect`
+  itself** — where `tz` is already in scope and was being dropped. Fixing only the component would
+  have satisfied this entry's own pass test while enrichment went on bucketing in Brisbane.
+- **⚠ And the provider did NOT have the session**, which the entry assumed (*"the provider has the
+  session and can pass `session.user.timezone`"*). It is a bare client component with no props. The
+  timezone comes from context instead, which is the app's established client-side source.
 - **Lane: B** · **Added:** 2026-09-16 · Lane A, from TN-44. **Lane B because the caller is a component.**
 - `syncHealthConnect(tz = DEFAULT_TZ)` and `enrichActivityLogs(candidates, tz = DEFAULT_TZ)` take the
   user's timezone as of 2026-09-16; `components/health-connect-provider.tsx` calls both without it,

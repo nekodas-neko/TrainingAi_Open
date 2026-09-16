@@ -26,8 +26,18 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.457.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.457.6 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-16.
+
+**Health Connect was syncing everyone into Brisbane (LB-113, v1.457.6).** `syncHealthConnect` and
+`enrichActivityLogs` took the user's timezone as of 2026-09-16 and nothing passed it, so both fell
+back to `DEFAULT_TZ` — right for the owner, silently wrong for anyone else, and enough to shift a
+day's steps, calories and sleep across a date boundary. The provider now reads `useUserTimezone()`,
+which `app/layout.tsx` feeds from the session. **The entry named the wrong second call site:** it
+said the provider called both functions, and the un-timezoned `enrichActivityLogs` was in fact
+*inside* `syncHealthConnect`, where `tz` was already in scope and being dropped — so fixing the
+component alone would have passed the entry's own test while enrichment kept bucketing in Brisbane.
+The sync is native-only and cannot run in the harness at all, so it carries `Verify: device`.
 
 **The stress-deload override is unwired, and the notification nobody had noticed went with it
 (TN-34, v1.457.1).** A deload was being recommended on **83% of days** off a daily stress figure
