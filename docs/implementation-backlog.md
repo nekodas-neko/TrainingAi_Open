@@ -759,6 +759,110 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
   the trailing 30 days — can only be measured after the owner fires it. Re-measure then; do not
   strike this entry before that.
 
+### [workouts][readiness] BF-171 — the session picker matches muscle names raw, so "Back" sore clamps nothing and `core` never finds its recovery
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-16 (BugFix intake). Owner, on a screenshot showing
+  **Upper recommended** with chest/shoulders/triceps listed as sore: *"How does this work? I did push
+  yesterday which was an upper- why would it reccomened upper?"*
+- **Lane: A** — `packages/shared/src/ai-periodization/ai-dynamic.ts:61-93` (`recoveryPct`,
+  `sessionRecoveryScore`).
+- **The recommendation he is asking about is CORRECT, and reproducing it is what found the defect.**
+  The engine does not think in Push/Pull/Upper/Lower labels — it scores muscle overlap. Fed his real
+  program, his real seven logged sessions and his real check-in, `computeAiDynamicNextSession`
+  returns (measured 2026-09-16, a scratch harness against production rows, matching his screenshot's
+  alternatives list to the point):
+
+  | session | overall | recovery | balance | freshness |
+  |---|---|---|---|---|
+  | **Upper** | **84** | 70 | 100 | 100 |
+  | Pull | 82 | 91 | 50 | 100 |
+  | Lower | 74 | 62 | 81 | 100 |
+  | Legs | 59 | 57 | 33 | 99 |
+  | Push | 37 | 43 | 16 | 48 |
+
+  Upper's chest, shoulders and triceps **are** penalised — every sore main-role muscle is clamped to
+  40. But five of Upper's nine weighted muscle-units are back and biceps, last trained Sunday and
+  sitting at 95%, and Upper itself has not run for six days, so balance and freshness both read 100.
+  70 × 0.55 + 100 × 0.25 + 100 × 0.20 = 84. Push, trained yesterday, scores 37. **The engine is
+  doing the thing he expected it to do; the answer is just that "Upper" is half a Pull session.**
+- **What is actually broken is the name matching inside `sessionRecoveryScore`, and it has two
+  limbs.** Both were measured on the same harness.
+
+  ```ts
+  function recoveryPct(muscle: string, recoveries: MuscleRecovery[]): number {
+    const r = recoveries.find(m => m.muscle.toLowerCase() === muscle.toLowerCase())
+    if (!r) return 100                                   // ← a miss reads as fully recovered
+  }
+  …
+  const soreSet = new Set(soreMuscles.map(m => m.toLowerCase()))
+  if (role === 'main' && soreSet.has(muscle.toLowerCase())) pct = Math.min(pct, 40)
+  ```
+
+  1. **Sore "Back" clamps nothing.** `SORE_MUSCLE_GROUPS` (`components/checkin/sore-muscle-picker.tsx:11`)
+     offers **Back** as a pill, and the exercise library has no muscle called `back` — it has `lats`,
+     `upper back` and `traps`. Exact lowercased equality therefore matches none of them. **Measured:
+     adding `Back` to his sore list moves every one of the five scores by zero** — Upper stays 84.
+     A lifter whose back is wrecked gets Pull and Upper recommended at full confidence.
+  2. **`core` never finds its own recovery.** `computeMuscleRecovery` keys its output through
+     `normalizeMuscle`, which folds `core` → **`abs`**; the assignments it is matched against say
+     `core` (Hanging Leg Raise in both Legs and Lower, Barbell Squat secondary). The lookup misses
+     and returns **100**, while the real value in the same payload is `{"muscle":"abs","pct":86}`.
+- **This is the only soreness/recovery consumer in the repo that matches raw.** `moodMuscleMatches`
+  exists in `packages/shared/src/muscles.ts:34` for exactly this job — a broad mood label against a
+  specific exercise muscle — and is used by `per-exercise-deload.ts:51`, `signals.ts:326,347`,
+  `soreness-volume.ts:46`, `suggested-soreness.ts:45` and `app/api/workout-data/route.ts:511,517`.
+  Six consumers normalise; the seventh — the one that **picks the session** — does not.
+- **Fix: route both sides through the shared helpers.** `recoveryPct` compares
+  `normalizeMuscle(r.muscle) === normalizeMuscle(muscle)`; the sore test becomes
+  `soreMuscles.some(label => moodMuscleMatches(muscle, label))`. Do not hand-roll a synonym list
+  here — that is the divergence `muscles.ts`'s own header comment records having already cleaned up
+  once.
+- **Expect the fix to move scores in BOTH directions, and check that before shipping.** The two
+  limbs currently cancel in one place: `core` matches the sore pill exactly (so today the clamp
+  fires) while missing the recovery lookup (so the 86% is thrown away). Normalising only the
+  recovery side **raises** Legs 59 → 62 and Lower 74 → 77, because `abs` then stops matching the
+  `core` pill. Normalising both is the coherent state; the entry is not done until the fix is
+  measured against a fixture carrying a `Back` pill and a `core` assignment together.
+- **Verification:** a unit test on `computeAiDynamicNextSession`, not a device run — this is pure
+  shared math and the harness settles it. Assert (a) a session whose only main muscles are `lats`
+  and `upper back` scores lower with `Back` sore than without, and (b) an assignment naming `core`
+  reads the `abs` recovery entry rather than 100.
+- **Not a defect, checked and cleared:** the ordering itself. Freshness, balance and the recovery
+  weights all behave as documented, and the 0.55/0.25/0.20 low-readiness weighting fired correctly
+  (his readiness was 37).
+
+### [workouts][app-shell] BF-172 — the explain screen calls the session-fit score "readiness", so it reads 84 HIGH directly above "readiness 37 · Low"
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-16 (BugFix intake). Found tracing BF-171; the owner's
+  screenshot is the evidence and he did not have to point at it.
+- **Lane: B** — `app/session-explain/session-explain-content.tsx:31`.
+- **One screen, one word, two different quantities.**
+
+  ```tsx
+  <ScoreRing score={overallScore} label="Overall readiness for this session" />
+  ```
+
+  `overallScore` is `recovery × w + balance × w + freshness × w` from
+  `computeAiDynamicNextSession` — **how well this session FITS today**, given what is recovered and
+  what is overdue. It is not readiness, and nothing about it is a measurement of the lifter. Below
+  it, `SignalSections` prints the real thing: **Oura readiness 37 · Low**, HRV *well below your
+  usual*, **Deload: strong deload advised**, energy *drained*.
+- **The band makes it worse, and it is the same mistake twice.** `ScoreRing` runs the value through
+  `scoreBand` (`packages/shared/src/health/score-band.ts`) — the **readiness** vocabulary — so the
+  fit score is stamped **HIGH** in green. A screen that exists to explain a "strong signal to back
+  off today" leads with a green 84 labelled readiness.
+- **Same class as BF-154:** a number that is correct in its own terms, printed under a caption
+  belonging to the quantity it replaced. Nothing here is miscomputed.
+- **Fix: rename the label and drop the readiness band.** *"How well this session fits today"* (or
+  *"Session match"*), and either no band word or a fit-specific one — `scoreBand`'s High/Moderate/Low
+  is the readiness ladder's vocabulary and carrying it here is what creates the contradiction. The
+  ring colour can stay; it reads as a fit gauge once the caption says fit.
+- **Sibling sweep required:** `ScoreRing` is also the component, and `scoreBand` is used ~15 places.
+  Change the caption and the band **at this call site**, not inside `ScoreRing` or `scoreBand` —
+  every other caller is scoring real readiness and is correct.
+- **Verification:** open **Why <session>?** on a day when readiness is low and confirm the ring no
+  longer says "readiness" or "HIGH" while the signals below say the opposite. Browser is enough.
+
 ### [nutrition] BF-170 — a lone saved meal shows its macros nowhere (fixed; the device look is what is left)
 
 - **Verify:** device — on the S25, a meal section collapsed shows P/C/F; expanded shows them once,

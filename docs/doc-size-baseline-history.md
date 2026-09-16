@@ -13054,3 +13054,17 @@ those words.
 Also recorded: the band returns 101–118 where the entry quotes 105–118 — the standard 0.60 lower edge
 against a rounded figure, 4 bpm apart. Naming a small discrepancy costs two lines; discovering later
 that a shipped constant silently disagreed with the entry it came from costs an investigation.
+
+## 2026-09-16 — `docs/implementation-backlog.md` 22853 → 22957 (+104)
+
+Two BugFix intake entries from the owner's *"I did push yesterday which was an upper- why would it
+reccomened upper?"*: **BF-171** (`sessionRecoveryScore` is the only soreness/recovery consumer in the
+repo that matches muscle names raw — a sore `Back` pill clamps nothing, and a `core` assignment never
+finds its `abs` recovery entry) and **BF-172** (the explain screen labels the session-fit blend
+"Overall readiness for this session" and bands it with the readiness ladder, so it reads 84 HIGH
+above its own "readiness 37 · Low").
+
+BF-171 carries a five-row measured score table because the recommendation the owner queried turned
+out to be **correct** — the table is what shows that, and it is also what shows the defect is beside
+it rather than in it. The alternative was a journal-only table and an entry that asserts the numbers,
+which is the shape that gets re-measured by the implementer.
