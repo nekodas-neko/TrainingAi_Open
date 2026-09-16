@@ -759,6 +759,69 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
   the trailing 30 days — can only be measured after the owner fires it. Re-measure then; do not
   strike this entry before that.
 
+### [workouts][readiness] BF-174 — every muscle recovers on the same 24 h base constant, so abs and quads are modelled identically
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-16 (BugFix intake). Owner: *"there should be
+  different scoring recovery for smaller muscle groups like abs vs quads. Abs and accessory muscles
+  should recover quicker than the larger muscles."*
+- **Lane: A** to implement — `packages/shared/src/ai-periodization/muscle-recovery.ts:42-44`. **The
+  constants themselves are Tuning's to fit and the owner's to sign off**, per the standing rule that
+  Tuning proposes and never ships a scoring change.
+- **He is describing something real. The current model has exactly one knob and it is not size:**
+
+  ```ts
+  const ratio = typical > 0 ? latest.volumeKg / typical : 1
+  const tau = Math.min(48, Math.max(16, 24 * ratio))
+  ```
+
+  `tau` — the recovery time constant — starts at **24 h for every muscle in the catalogue**, and is
+  then scaled by how this bout compared to *that muscle's own median bout*. So the model already
+  normalises a muscle against itself, which is why it is not obviously wrong, but it has no notion
+  that a set of hanging leg raises and a heavy squat session leave different amounts of damage.
+- **Measured sensitivity (2026-09-16). ⚠ The multipliers below are a PROBE, not a proposal** — they
+  were invented to see whether the idea moves anything, and nothing has been fitted to data:
+  abs/calves/forearms ×0.75, biceps/triceps/shoulders ×0.85, chest/lats/upper back ×1.0,
+  quads/hamstrings/glutes ×1.25, applied to the 24 h base.
+
+  | muscle | shipped | probe |
+  |---|---|---|
+  | abs | 86 | **93** |
+  | biceps | 95 | 97 |
+  | triceps | 58 | 64 |
+  | shoulders | 45 | 51 |
+  | quads | 69 | **63** |
+  | glutes | 73 | **64** |
+  | hamstrings | 63 | 63 |
+
+  **The `Math.min(48, …)` ceiling is already binding on the large muscles**, which is why hamstrings
+  do not move at all and quads and glutes move less than the multiplier implies. Anyone fitting this
+  has to decide whether the ceiling rises with the tier or stays at 48 — that decision matters more
+  than the multipliers do.
+- **⚠ On its own it does not change the recommendation, and combined with the 24 h auto-tick window
+  (BF-173) it CANCELS it.** Measured on the owner's 2026-09-16 data:
+
+  | variant | picks |
+  |---|---|
+  | shipped | Upper 84 · Pull 82 · Lower 77 |
+  | 24 h auto-tick window alone | **Lower 84** · Upper 84 · Pull 82 |
+  | per-muscle base alone | Upper 84 · Pull 83 · Lower 77 |
+  | both together | Upper 84 · Lower 84 · Pull 83 |
+
+  Making large muscles recover *slower* lowers the leg sessions, which undoes what narrowing the
+  window did for them. **The owner's two ideas pull in opposite directions on this day** — that is
+  the finding, and it is the argument for fitting this properly rather than shipping a plausible
+  table.
+- **Gate: owner** — and the proposal is incomplete until it states **how many other days it moves**,
+  per the standing Tuning rule. One day cannot settle it: every margin in the table above is inside
+  two points, and a calibration fitted to a single snapshot that silently re-scores months of history
+  is a rewrite, not a tuning.
+- **Needs: BF-173** — that entry decides whether soreness double-counts at all. Fitting recovery
+  constants underneath a scorer that then overrides them with a flat 40 would be fitting the wrong
+  function.
+- **Where to look for the data:** `oura_raw_samples` and the workout log both go back far enough to
+  fit against something observable (next-session performance, RPE against expected RPE) rather than
+  against intuition about muscle size.
+
 ### [workouts][readiness] BF-173 — the app pre-ticks soreness FROM the recovery model, then penalises the same muscle a second time for it
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-16 (BugFix intake). Owner, after BF-171 was explained
@@ -828,6 +891,21 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
 - **Verification:** a unit test on `computeAiDynamicNextSession` asserting that a muscle whose
   recovery pct is already under `RECOVERED_PCT` is not additionally clamped by a tick that
   `suggestedSoreMuscles` would itself have produced. No device run — pure shared math.
+- **⚠ The owner proposed a third option — narrow the auto-tick window from 48 h to 24 h
+  (*"look for a muscle group trained within the past 24 hours instead"*). Measured 2026-09-16: it
+  does flip the pick to Lower, by 0.4 points.** Auto-ticked drops to Chest/Shoulders/Triceps and the
+  board reads Lower **84.4** · Upper **84.0** · Pull 82 · Legs 71 · Push 37.
+  **Two reasons it is not the recommendation despite landing right today:**
+  1. **It decides the pick by less than half a point**, which is a nudge, not a fix. The double
+     count is still live inside 24 h — chest at 49 is still clamped to 40 — so the same defect
+     simply moves to the freshly-trained muscles.
+  2. **The 48 h window is doing a second job that this would break.** Soreness also drives the
+     per-exercise deload (`soreMusclesInSession`), and `suggested-soreness.ts` chose 48 h because
+     *DOMS peaks ~24-48h*; its own header calls back-to-back leg days at 46-47 h *"exactly the case
+     worth deloading"*. Narrowing to 24 h stops auto-flagging at the DOMS peak.
+  **The separation worth keeping is: 48 h for the DELOAD question, no double count for the
+  SELECTION question.** Fixing the double count makes the window choice stop being load-bearing,
+  which is why it is fixed here and the window is left alone.
 
 ### [workouts][readiness] BF-171 — the session picker matches muscle names raw, so "Back" sore clamps nothing and `core` never finds its recovery
 

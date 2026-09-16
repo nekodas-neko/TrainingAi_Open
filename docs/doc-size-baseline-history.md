@@ -13091,3 +13091,14 @@ the rejected multiplier variant with its numbers because `pct × 0.6` is the obv
 does not work, and it carries the `mood_logs` column list because the absence of a provenance column
 is what turns the clean fix into a migration and is the entire reason for its `Gate: owner`. Each of
 those is an experiment an implementer would otherwise run again.
+
+## 2026-09-16 (same PR, fourth raise) — `docs/implementation-backlog.md` 23047 → 23125
+
+**BF-174** (per-muscle recovery time constants — the model has one 24 h base for every muscle,
+scaled only by bout volume) plus the owner's 24 h auto-tick-window proposal measured into BF-173.
+
+Both carry their numbers because both are *rejected or deferred* proposals, and a rejected proposal
+with no measurement attached gets proposed again. The 24 h window flips the pick by 0.4 points, which
+is the reason it is not the fix; the per-muscle constants do not change the pick alone and **cancel
+the window change when combined**, which is the reason BF-174 has to be fitted rather than guessed.
+Recording an interaction that surprised the session is worth more than the lines it costs.

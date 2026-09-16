@@ -108,3 +108,27 @@ accepted suggestion. That is what makes the clean fix a schema change, and it is
 
 **Filing order matters:** fixing BF-171 makes BF-173 worse, because normalising `core` → `abs` adds
 another correctly-matched muscle to the double count.
+
+## Third follow-up — the owner's two proposed fixes, measured
+
+*"I think an option would be to look for a muscle group trained within the past 24 hours instead.
+And also there should be different scoring recovery for smaller muscle groups like abs vs quads."*
+
+**The 24 h auto-tick window** does flip the pick to Lower — by **0.4 points** (Lower 84.4, Upper
+84.0). Recorded in BF-173 and not recommended: it decides the pick by less than half a point while
+the double count stays live inside 24 h, and the 48 h window is separately load-bearing for the
+per-exercise deload, whose own source comment calls back-to-back leg days at 46-47 h *"exactly the
+case worth deloading"*. The separation worth keeping is 48 h for the deload question, no double
+count for the selection question.
+
+**Per-muscle recovery constants** are filed as BF-174. The model has one base `tau` of 24 h for
+every muscle, scaled only by bout volume against that muscle's own median — no notion of size. A
+probe (abs/calves ×0.75 … quads/glutes/hams ×1.25, invented, not fitted) moves abs 86 → 93 and
+quads 69 → 63, and the `Math.min(48, …)` ceiling is already binding on the large muscles, so
+hamstrings do not move at all.
+
+**The interaction is the finding:** on its own the per-muscle base does not change the pick, and
+**combined with the 24 h window it cancels it** — slower large muscles lower the leg sessions,
+undoing what the narrower window gave them. Both of the owner's ideas land on Upper together and
+Lower separately. That is the argument for fitting BF-174 against data rather than shipping a
+plausible table, and for BF-173 landing first.
