@@ -12838,3 +12838,19 @@ shape has bitten (BF-46 was the first). Lane B's READY was two items long while 
 Two rules got written down because both were nearly broken in this sitting: an ask-grouping is **not**
 a `Batch:` when its members are migrations, and a `Batch:` cannot span lanes at all — the sitting is
 shared, the PRs are not.
+
+## 2026-09-16 — backlog → 22303: unparking the work the reorder was supposed to surface
+
++2 lines, which is the whole point: the change is almost entirely substitutions, not additions.
+`⛔` → `⚠` in five entries and `Reference:` → `Review:` in nine, plus three lines recording why
+TN-34's `Needs:` was wrong.
+
+The reorder the day before moved three entries to the top of the file and **changed nothing about
+what Lane A sees**, because three separate mechanisms were holding them back: any `⛔` parks an
+entry, a `Needs:` field outranks the sentence disclaiming it, and `Reference:` means *"never build
+this"* rather than *"here is the supporting doc"*. READY went 11 → 19 and REFERENCE 18 → 10 for two
+lines of net growth.
+
+Worth the history note rather than a silent fix because the third cause was self-inflicted across
+every entry this agent filed, and the lesson generalises: a queue position is not a work assignment,
+and the file does not show which of the three is in play.
