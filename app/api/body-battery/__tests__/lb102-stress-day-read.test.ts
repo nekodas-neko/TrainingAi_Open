@@ -55,7 +55,7 @@ describe.skipIf(!canRun)('GET /api/body-battery/stress-day', () => {
   const seed = async (day: string, levels: number[]) => {
     for (let i = 0; i < levels.length; i++) {
       await pool.query(
-        `INSERT INTO oura_daytime_stress_buckets (user_id, day, bucket_start, level)
+        `INSERT INTO oura_daytime_stress_buckets (user_id, day, bucket_mid, level)
          VALUES ($1, $2::date,
                  (($3::date + time '09:00') AT TIME ZONE $4) + make_interval(mins => $5::int),
                  $6)`,

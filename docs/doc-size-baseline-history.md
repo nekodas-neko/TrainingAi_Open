@@ -12941,3 +12941,12 @@ owner check is owed here.
 
 −30, and the ratchet is what noticed. Lowering it is not bookkeeping: left at 22711 the file could
 regrow thirty lines into the slack a shipped entry vacated, without the check ever saying anything.
+
+## 2026-09-16 — backlog → 22664, projectOverview → 11566: LA-114 shipped
+
+−17 and +1. LA-114 left the queue (migrations 275/276 renamed `bucket_start` → `bucket_mid` and
+regenerated the `claude_ro` views), and the one line added says so where the sibling finding is
+already recorded, rather than opening a second entry for a defect that is closed.
+
+The backlog ratchet is lowered rather than left slack, same reason as this morning: a shipped entry
+vacates lines, and left at the old number the file can regrow into them silently.

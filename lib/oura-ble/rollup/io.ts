@@ -96,7 +96,7 @@ export interface RollupIO {
   upsertDailyDerived(day: string, patch: OuraDailyDerivedPatch): Promise<void>
   /** TN-3a — replace one local day's 30-minute stress buckets. Whole-day replace: the series is
    *  recomputed as a unit, so a re-run producing fewer buckets must shrink the stored day. */
-  replaceStressBuckets(day: string, buckets: { bucketStart: Date; level: number }[]): Promise<void>
+  replaceStressBuckets(day: string, buckets: { bucketMid: Date; level: number }[]): Promise<void>
 
   // ── models / downstream derivations ──────────────────────────────────────────────────────────
   readDaytimeHrvModel(): Promise<DaytimeHrvModelRow | null>

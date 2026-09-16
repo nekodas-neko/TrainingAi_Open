@@ -5710,16 +5710,16 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
 
   /** The stored daytime-stress buckets, for the device-comparison endpoint (PS-15). Read-only, and
    *  the only reader — everything else writes this table or reads it through the rollup. */
-  async getOuraDaytimeStressBuckets(userId: string, from: Date, to: Date): Promise<{ bucketStart: Date; level: number }[]> {
+  async getOuraDaytimeStressBuckets(userId: string, from: Date, to: Date): Promise<{ bucketMid: Date; level: number }[]> {
     return this.db
-      .select({ bucketStart: s.ouraDaytimeStressBuckets.bucketStart, level: s.ouraDaytimeStressBuckets.level })
+      .select({ bucketMid: s.ouraDaytimeStressBuckets.bucketMid, level: s.ouraDaytimeStressBuckets.level })
       .from(s.ouraDaytimeStressBuckets)
       .where(and(
         eq(s.ouraDaytimeStressBuckets.userId, userId),
-        gte(s.ouraDaytimeStressBuckets.bucketStart, from),
-        lte(s.ouraDaytimeStressBuckets.bucketStart, to),
+        gte(s.ouraDaytimeStressBuckets.bucketMid, from),
+        lte(s.ouraDaytimeStressBuckets.bucketMid, to),
       ))
-      .orderBy(asc(s.ouraDaytimeStressBuckets.bucketStart))
+      .orderBy(asc(s.ouraDaytimeStressBuckets.bucketMid))
   }
 
   async getOuraDaytimeSignals(userId: string, from: Date, to: Date): Promise<{

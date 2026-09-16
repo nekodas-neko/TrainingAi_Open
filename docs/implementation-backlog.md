@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **275** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **277** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v38** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -1316,23 +1316,6 @@ not from the harness.
   the same window the ring streams its own HRV events, so ring RMSSD and strap RMSSD are comparable on
   the same minutes. Until that exists the level gap has two live explanations and no measurement
   separates them.
-
-### [readiness][platform] LA-114 — `oura_daytime_stress_buckets.bucket_start` stores the bucket MIDPOINT
-
-- **Lane: A** · **Added:** 2026-09-16 · Lane A, from TN-39's validation.
-- `daytimeHrvEstimatesPerBucket` returns `t = bStart + bucketMs / 2`
-  (`packages/shared/src/health/daytime-hrv-model.ts:190`), and `run.ts:1108` writes that value straight
-  into a column named `bucket_start`. Stored timestamps therefore sit on a `:15`/`:45` grid.
-- **It already cost something.** Joining `rr_intervals` to these buckets on the obvious grid returned
-  **zero rows**, which reads as "no overlapping data" rather than "the join is 15 minutes out". That is
-  a silent wrong answer, not an error.
-- **Cheapest correct fix is the name, not the data** — a rename plus its migration, leaving every
-  stored value alone, so nothing has to be re-derived and no reader changes meaning. Renaming it
-  `bucket_mid` also makes the `:15` grid self-explaining at the next join.
-- **⚠ Whatever is done, do it in one PR with every reader** — `getDaytimeStressBuckets`, the
-  `/api/body-battery/stress-day` route and its client. A migration ships alone and never batched.
-- **Pass test:** the column's name matches what it holds, and a join written the obvious way lands on
-  the right bucket.
 
 ### [devices][heart-rate] TN-40 — the strap's 136,440 beats produce exactly one number, while three models that could use them run on the ring alone
 

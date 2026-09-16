@@ -125,6 +125,13 @@ Found while trying to join: the stored timestamps sit on a `:15`/`:45` grid, not
 into a column called `bucket_start`. The name is wrong, and a naive join on it is silently 15 minutes
 out — which is exactly what happened here, producing a zero-row overlap that looked like missing data.
 
+> **Resolved the same day (LA-114, migrations 275/276).** The column is `bucket_mid`, and the
+> `claude_ro` views were regenerated so the read surface says so too — a base-table `RENAME COLUMN`
+> does not rename a dependent view's output column. The stored VALUES are unchanged: a midpoint is a
+> legitimate representative of a 30-minute bucket and the chart plots it as a point in time, so only
+> the name was wrong. Note for anyone re-running the joins above: they were written against the old
+> name and need `bucket_mid` now.
+
 ## Verdict
 
 The imputation **has the right form and an unverified level**, and the series it feeds **covers the
@@ -142,10 +149,10 @@ comparable — only bucket-to-bucket.
 ## Filed
 
 - **LA-112** — the series includes sleep and misses the active morning (Finding 1). The only one of
-  the three that this evidence supports acting on.
+  the three that this evidence supports acting on. **Shipped 2026-09-16**, v1.457.2.
 - **LA-113** — the level and slope gap (Findings 2 and 3). Owner-gated: it is a scoring change, and it
   needs the controlled same-instrument comparison before anyone touches a coefficient.
-- **LA-114** — the mislabelled `bucket_start` column (Finding 4).
+- **LA-114** — the mislabelled `bucket_start` column (Finding 4). **Shipped 2026-09-16**, migrations 275/276.
 
 All three carry `LA-` because Lane A found them; the letter records the finder, not who ships. LA-113
 is a scoring proposal that Lane A must not implement on its own authority.

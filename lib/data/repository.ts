@@ -1044,7 +1044,7 @@ export interface WorkoutRepository {
    *  Polar H10). D6 comparison-harness read — both sources already land in this one table. */
   getOuraHeartrateBySource(userId: string, source: string, from: Date, to: Date): Promise<{ timestamp: Date; bpm: number }[]>
   /** Stored daytime-stress buckets, for the device-comparison endpoint (PS-15). */
-  getOuraDaytimeStressBuckets(userId: string, from: Date, to: Date): Promise<{ bucketStart: Date; level: number }[]>
+  getOuraDaytimeStressBuckets(userId: string, from: Date, to: Date): Promise<{ bucketMid: Date; level: number }[]>
   /** Daytime skin-temperature (0x46/0x69 → temps_c) and MET (0x50 → met) samples in a wall-clock
    *  window, for the daytime-stress engine. Empty when the ring has no clock anchor. */
   getOuraDaytimeSignals(userId: string, from: Date, to: Date): Promise<{
