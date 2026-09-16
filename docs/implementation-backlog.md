@@ -627,6 +627,28 @@ true mean on night 2 rather than converging for fifty.
 - ✅ **SEED FIXED 2026-08-25** (`fix/baseline-zero-seed`) — see BF-13 for the full note, including
   the ⚠ Keep: the stored baselines are still zero-folded and one **Redecode** run re-derives them,
   which could not be done from a sandbox. This entry's pass tests stay unmeasured until it runs.
+
+- ⚙️ **RE-DERIVATION SHIPPED, NOT RUN 2026-09-16** (`lane-a/bf13-tn6-baseline-seed`) —
+  `POST /api/admin/rederive-baselines` replays the fold cold (`seed = null`) over the nights already
+  in `oura_daily_summary` and rewrites the temperature baseline and `temp_dev_c`. It restates no
+  formula: it folds through `computeDailySummaries`, the same function the rollup folds with, so what
+  it writes is by construction what a fresh fold would have written. `dryRun` is the default; only
+  `?dryRun=false` commits.
+  - **Only temperature is written**, per the second half of the owner's 2026-08-24 decision. The
+    other five baselines are recomputed and **reported** so a later measurement has the number in
+    front of it, and are written back unchanged. A test asserts that on every written row.
+  - **Why a route rather than the Redecode this entry's old `Keep:` named.** A full-history Redecode
+    also re-derives — post-seed-fix it folds `seed = null` and replaces the table — but it re-decodes
+    every stored sample and rewrites the nightly VALUES too, and it has no dry run. The owner's
+    decision turns on the re-derivation touching a corrupted *intermediate* and leaving the raw
+    nightly values alone; this route is that act exactly.
+  - **Recommended run order, because the two mechanisms are complementary:** dry-run this route first
+    to read the size of the change, then commit with `?dryRun=false`. Fire the async full-history
+    Redecode instead **only** if the illness re-stamp matters in the same pass — see Q-506's `Keep:`,
+    which is the one thing this route deliberately does not do.
+- **Keep:** the run is owed and is the owner's to fire. It is a production data write, so it was
+  deliberately not executed from the sandbox. **TN-6's and Q-506's pass tests, and this entry's, stay
+  unmeasured until it runs.**
 ### [readiness][devices] TN-6 — the temperature baseline is 0.36 °C too low, so readiness carries a −16 pt penalty on 89% of days
 - **Lane:** A — engine only: lib/health.
 
@@ -730,6 +752,12 @@ real.
 permanently-positive deviation cannot tell illness from baseline error.
 
 Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/2026-08-24-readiness-temperature-penalty.md).
+
+- ⚙️ **The re-derivation this entry waits on now has a mechanism, unrun (BF-13, 2026-09-16)** —
+  `POST /api/admin/rederive-baselines`, `dryRun` by default.
+- **Keep:** the pass tests here — the −16 pt penalty gone, and the mean morning anchor above 75 over
+  the trailing 30 days — can only be measured after the owner fires it. Re-measure then; do not
+  strike this entry before that.
 
 ### [nutrition] BF-170 — a lone saved meal shows its macros nowhere (fixed; the device look is what is left)
 
@@ -10339,6 +10367,23 @@ Review: [`docs/reviews/2026-08-25-threshold-sweep.md`](reviews/2026-08-25-thresh
   removed). Until it runs every pass test here is unmeasured: deviation mean within ±0.05 °C with
   ~half the nights negative; `temp_dev_c > 1.0` on 0 nights (TN-8); biomarker table re-measured,
   since every z moves ~19× and the radar may then fire too often (Q-506).
+
+- ⚙️ **Half of this entry's pass test is now a check (BF-13, 2026-09-16).**
+  `lib/__tests__/rederive-baselines-route.test.ts` asserts the mask premise directly: against a
+  zero-seed baseline **every** scored night's deviation is positive, and after the cold re-fold the
+  deviations straddle zero with **none** above `TEMP_DEV_FEVER_LIMIT_C`. So the comment's premise is
+  a test rather than a comment, as this entry asked.
+- **Keep:** the other half is still owed and the fixture cannot supply it. The test's nightly series
+  is realistic (its zero-seed baseline lands on **35.464**, the same value BF-13 measured in
+  production) but its deviations peak at **0.671**, not the **1.33** the owner's history reaches — so
+  it reproduces the sign bias, not the six nights that actually cross 1.0. *"`temp_dev_c > 1.0` on 0
+  nights of the owner's stored history"* is measurable only after the re-derivation runs.
+- **Correction to the note above:** the Redecode's blocker was the **sandbox**, not production.
+  `lib/oura-models/constants/` is delivered at boot in production (`scripts/private-paths.json`), so
+  a Redecode is runnable there. `POST /api/admin/rederive-baselines` needs no decoder at all — it
+  folds the stored nightly values — which is why it is also the one path that works where those
+  constants are absent.
+
 ### [readiness] TN-9 — readiness moves when the check-in is logged; the owner wants it final on first open
 - **Lane:** A — engine only: packages/shared.
 
@@ -15632,6 +15677,18 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - ✅ **SEED FIXED 2026-08-25** (`fix/baseline-zero-seed`) — see BF-13 for the full note, including
   the ⛔ Keep: the stored baselines are still zero-folded and one **Redecode** run re-derives them,
   which could not be done from a sandbox. This entry's pass tests stay unmeasured until it runs.
+
+- ⚙️ **A re-derivation mechanism now exists and has NOT been run (BF-13, 2026-09-16).**
+  `POST /api/admin/rederive-baselines` rewrites the temperature baseline's mean **and its deviation**
+  from a cold fold, and the deviation is the 18.7× sd this entry measures.
+- **Keep:** two things are owed, and the second is easy to miss. (1) The run itself, which is the
+  owner's to fire. (2) **The re-derivation does not re-stamp this entry's own metric.**
+  `illness_score` / `illness_flag` live on `oura_daily_derived` and are written by the rollup's
+  `illness_radar` step alone — nothing reads `illnessFromSummaries` live, despite a comment in
+  `rollup/run.ts` saying the readiness route does. So a stored illness score keeps the z it was
+  computed with until a rollup pass rewrites that night, and the incremental rollup only covers the
+  recent window. Whether the score crosses `ILLNESS_WATCH_SCORE` is unmeasured until both happen.
+
 ### [readiness][activity] Q-507 — the stress override fires on the best days: high-stress minutes correlate +0.40 with readiness
 
 - **Branch:** `fix/stress-override-input`

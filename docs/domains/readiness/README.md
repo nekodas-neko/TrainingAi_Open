@@ -103,6 +103,18 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
   drain ignores exercise and there is no recharge at all — owner-signed-off redesign). **Activity's
   100 is not reachable by behaviour** while `zoneMinutes` is floored on 53/59 days, `activeEnergy` is
   present on 8/51, and `moveHours` qualifies 99.8% of hours.
+- [`docs/overview/entries/2026-09-16-lane-a-bf13-rederive-baselines.md`](../../overview/entries/2026-09-16-lane-a-bf13-rederive-baselines.md)
+  — **a re-derivation for the zero-seeded baselines, 2026-09-16 (BF-13 / TN-6 / Q-506 / TN-8).**
+  `POST /api/admin/rederive-baselines` replays the fold cold over the stored nights and rewrites the
+  temperature baseline and `temp_dev_c`; `dryRun` is the default and **the run has not been fired** —
+  it is a production data write and the owner's to trigger, so every pass test in the
+  `temperature-baseline` batch is still unmeasured. **The point the batch had been missing for three
+  weeks:** the seed fix that shipped 2026-08-25 cannot reach stored state, because
+  `computeDailySummaries` resumes from the previous night's persisted checkpoint — so the zero-folded
+  baselines are inherited forward nightly. Measured 2026-09-16: still **35.658 °C at n=72** and
+  climbing. **Two corrections carried:** re-deriving does **not** move `illness_score` (written by
+  the rollup's `illness_radar` step alone, so Q-506's own metric waits on a rollup pass too), and a
+  Redecode's missing vendored constants were a **sandbox** limitation, not a production one.
 - [`docs/reviews/2026-08-25-threshold-sweep.md`](../../reviews/2026-08-25-threshold-sweep.md)
   — **the threshold sweep, 2026-08-25.** 246 constants → 27 that decide a user-visible branch, each
   checked against its input's real distribution. **One new finding: TN-8**, the chronic-stress fever
