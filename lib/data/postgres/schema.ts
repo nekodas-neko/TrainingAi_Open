@@ -1431,15 +1431,29 @@ export const rrIntervals = pgTable('rr_intervals', {
 // reduces this series to three daily scalars on `oura_daily_derived`; those are too compressed to
 // answer "which hours run hottest" (measured span −0.14 … +0.23 on a [−1,+1] scale), so the series
 // itself is kept. Rows rather than a JSONB array because the read aggregates ACROSS days by hour.
-// `bucketStart` is the instant, not a local hour — the hour is derived in the user's timezone at
+// `bucketMid` is the instant, not a local hour — the hour is derived in the user's timezone at
 // read time, so a timezone change does not strand rows keyed to the old one.
 export const ouraDaytimeStressBuckets = pgTable('oura_daytime_stress_buckets', {
   userId:      uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   day:         text('day').notNull(),
-  bucketStart: timestamp('bucket_start', { withTimezone: true }).notNull(),
+  /**
+   * The bucket's MIDPOINT, not its start — `daytimeHrvEstimatesPerBucket` emits
+   * `t = bStart + bucketMs / 2` and that is what is written here.
+   *
+   * **The SQL column is still `bucket_start` and cannot be renamed** (LA-114). Every historical
+   * `claude_ro` view migration selects `t.bucket_start`, and they are replayed against the final
+   * schema by Migration Check's idempotency step, so a rename fails all of them — and editing an
+   * already-applied migration is forbidden because `ensureSchema` tracks by filename. Migration 275
+   * carries the full reasoning and a `COMMENT ON COLUMN` so the database says so too.
+   *
+   * The property is named for what it holds so TypeScript, at least, does not lie. A join on the
+   * :00/:30 grid against the raw column returns zero rows, which reads as missing data rather than
+   * a 15-minute offset — that is the defect, and it survives in `claude_ro`.
+   */
+  bucketMid:   timestamp('bucket_start', { withTimezone: true }).notNull(),
   level:       doublePrecision('level').notNull(),
   updatedAt:   timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-}, t => [primaryKey({ columns: [t.userId, t.bucketStart] })])
+}, t => [primaryKey({ columns: [t.userId, t.bucketMid] })])
 
 // D5 — own daytime-HRV: per-user regression replacing Oura's dhrv_imputation ONNX model
 // (migration 149). One row per user, upserted on refit. See lib/health/daytime-hrv-model.ts.

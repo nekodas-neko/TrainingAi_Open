@@ -48,9 +48,9 @@ describe.skipIf(!canRun)('daytime stress buckets (TN-3a)', () => {
 
   it('round-trips a day of buckets in bucket order', async () => {
     await oura.replaceDaytimeStressBuckets(db, TEST_USER_ID, '2026-08-20', [
-      { bucketStart: at('2026-08-20T01:00:00Z'), level: -0.4 },
-      { bucketStart: at('2026-08-20T00:00:00Z'), level: 0.2 },
-      { bucketStart: at('2026-08-20T00:30:00Z'), level: -0.9 },
+      { bucketMid: at('2026-08-20T01:00:00Z'), level: -0.4 },
+      { bucketMid: at('2026-08-20T00:00:00Z'), level: 0.2 },
+      { bucketMid: at('2026-08-20T00:30:00Z'), level: -0.9 },
     ])
     const rows = await oura.listDaytimeStressBuckets(db, TEST_USER_ID, '2026-08-20', '2026-08-20')
     // Ordered by instant, not by insertion.
@@ -63,12 +63,12 @@ describe.skipIf(!canRun)('daytime stress buckets (TN-3a)', () => {
     // waking window or a frame that failed to decode must remove the stale buckets rather than
     // leave them merged in beside the new ones — where they would read as real stress.
     await oura.replaceDaytimeStressBuckets(db, TEST_USER_ID, '2026-08-21', [
-      { bucketStart: at('2026-08-21T00:00:00Z'), level: -0.1 },
-      { bucketStart: at('2026-08-21T00:30:00Z'), level: -0.2 },
-      { bucketStart: at('2026-08-21T01:00:00Z'), level: -0.3 },
+      { bucketMid: at('2026-08-21T00:00:00Z'), level: -0.1 },
+      { bucketMid: at('2026-08-21T00:30:00Z'), level: -0.2 },
+      { bucketMid: at('2026-08-21T01:00:00Z'), level: -0.3 },
     ])
     await oura.replaceDaytimeStressBuckets(db, TEST_USER_ID, '2026-08-21', [
-      { bucketStart: at('2026-08-21T00:00:00Z'), level: -0.15 },
+      { bucketMid: at('2026-08-21T00:00:00Z'), level: -0.15 },
     ])
     const rows = await oura.listDaytimeStressBuckets(db, TEST_USER_ID, '2026-08-21', '2026-08-21')
     expect(rows).toHaveLength(1)
@@ -77,7 +77,7 @@ describe.skipIf(!canRun)('daytime stress buckets (TN-3a)', () => {
 
   it('an empty series clears the day rather than leaving the previous pass behind', async () => {
     await oura.replaceDaytimeStressBuckets(db, TEST_USER_ID, '2026-08-22', [
-      { bucketStart: at('2026-08-22T00:00:00Z'), level: -0.5 },
+      { bucketMid: at('2026-08-22T00:00:00Z'), level: -0.5 },
     ])
     await oura.replaceDaytimeStressBuckets(db, TEST_USER_ID, '2026-08-22', [])
     expect(await oura.listDaytimeStressBuckets(db, TEST_USER_ID, '2026-08-22', '2026-08-22')).toHaveLength(0)
@@ -85,13 +85,13 @@ describe.skipIf(!canRun)('daytime stress buckets (TN-3a)', () => {
 
   it('replacing one day leaves the neighbouring days untouched', async () => {
     await oura.replaceDaytimeStressBuckets(db, TEST_USER_ID, '2026-08-25', [
-      { bucketStart: at('2026-08-25T00:00:00Z'), level: -0.6 },
+      { bucketMid: at('2026-08-25T00:00:00Z'), level: -0.6 },
     ])
     await oura.replaceDaytimeStressBuckets(db, TEST_USER_ID, '2026-08-26', [
-      { bucketStart: at('2026-08-26T00:00:00Z'), level: -0.7 },
+      { bucketMid: at('2026-08-26T00:00:00Z'), level: -0.7 },
     ])
     await oura.replaceDaytimeStressBuckets(db, TEST_USER_ID, '2026-08-25', [
-      { bucketStart: at('2026-08-25T00:00:00Z'), level: -0.65 },
+      { bucketMid: at('2026-08-25T00:00:00Z'), level: -0.65 },
     ])
     const both = await oura.listDaytimeStressBuckets(db, TEST_USER_ID, '2026-08-25', '2026-08-26')
     expect(both.map(r => r.level)).toEqual([-0.65, -0.7])
@@ -99,10 +99,10 @@ describe.skipIf(!canRun)('daytime stress buckets (TN-3a)', () => {
 
   it('keeps two users\' same-instant buckets separate', async () => {
     await oura.replaceDaytimeStressBuckets(db, OTHER_USER_ID, '2026-08-27', [
-      { bucketStart: at('2026-08-27T00:00:00Z'), level: -0.8 },
+      { bucketMid: at('2026-08-27T00:00:00Z'), level: -0.8 },
     ])
     await oura.replaceDaytimeStressBuckets(db, TEST_USER_ID, '2026-08-27', [
-      { bucketStart: at('2026-08-27T00:00:00Z'), level: -0.2 },
+      { bucketMid: at('2026-08-27T00:00:00Z'), level: -0.2 },
     ])
     const mine = await oura.listDaytimeStressBuckets(db, TEST_USER_ID, '2026-08-27', '2026-08-27')
     const theirs = await oura.listDaytimeStressBuckets(db, OTHER_USER_ID, '2026-08-27', '2026-08-27')
@@ -120,7 +120,7 @@ describe.skipIf(!canRun)('daytime stress buckets (TN-3a)', () => {
   it('reads a range inclusively and stays within it', async () => {
     for (const [day, level] of [['2026-09-01', -0.1], ['2026-09-02', -0.2], ['2026-09-03', -0.3]] as const) {
       await oura.replaceDaytimeStressBuckets(db, TEST_USER_ID, day, [
-        { bucketStart: at(`${day}T00:00:00Z`), level },
+        { bucketMid: at(`${day}T00:00:00Z`), level },
       ])
     }
     const mid = await oura.listDaytimeStressBuckets(db, TEST_USER_ID, '2026-09-01', '2026-09-02')

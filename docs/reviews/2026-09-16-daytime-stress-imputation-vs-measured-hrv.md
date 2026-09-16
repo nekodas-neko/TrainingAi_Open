@@ -125,6 +125,13 @@ Found while trying to join: the stored timestamps sit on a `:15`/`:45` grid, not
 into a column called `bucket_start`. The name is wrong, and a naive join on it is silently 15 minutes
 out — which is exactly what happened here, producing a zero-row overlap that looked like missing data.
 
+> **Partly addressed the same day (LA-114), and the rename was REVERTED.** The Drizzle property is
+> `bucketMid` and migration 275 is a `COMMENT ON COLUMN`, but **the SQL column is still
+> `bucket_start` and `claude_ro` still exposes it that way** — so every join above still needs the
+> 15 minutes added. The `ALTER TABLE ... RENAME COLUMN` was written, applied and reverted: CI's
+> Migration Check replays every migration against the final schema, and each historical `claude_ro`
+> view migration selects `t.bucket_start`, so a rename fails all of them. See LA-114's entry.
+
 ## Verdict
 
 The imputation **has the right form and an unverified level**, and the series it feeds **covers the
@@ -142,10 +149,11 @@ comparable — only bucket-to-bucket.
 ## Filed
 
 - **LA-112** — the series includes sleep and misses the active morning (Finding 1). The only one of
-  the three that this evidence supports acting on.
+  the three that this evidence supports acting on. **Shipped 2026-09-16**, v1.457.2.
 - **LA-113** — the level and slope gap (Findings 2 and 3). Owner-gated: it is a scoring change, and it
   needs the controlled same-instrument comparison before anyone touches a coefficient.
-- **LA-114** — the mislabelled `bucket_start` column (Finding 4).
+- **LA-114** — the mislabelled `bucket_start` column (Finding 4). **Documented, not fixed** — the
+  rename is blocked by the migration-replay contract; the entry is back in the queue.
 
 All three carry `LA-` because Lane A found them; the letter records the finder, not who ships. LA-113
 is a scoring proposal that Lane A must not implement on its own authority.

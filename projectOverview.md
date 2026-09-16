@@ -3606,7 +3606,10 @@ sleep. Joined against `sleep_sessions` directly — no clock-hour inference:
   carries little signal — **not** a reason to re-wire the override.
 - **Two further findings from the same measurement are queued, not open issues:** **LA-113** (the
   imputation reads ~⅓ of measured HRV — real but confounded, owner-gated) and **LA-114**
-  (`bucket_start` stores the bucket midpoint).
+  (`bucket_start` stores the bucket midpoint — **documented, not fixed**: the rename was attempted
+  and reverted because every historical `claude_ro` view migration names the old column and CI
+  replays them all. `claude_ro` still says `bucket_start`, so a join on the :00/:30 grid needs 15
+  minutes added).
 - **What shipped (v1.457.2).** `buildDaytimeStressSeriesFromModel` drops sleeping buckets **before**
   `scoreStressPoints`, so they reach neither the levels nor the day-median baseline. The ordering is
   the fix: filtering only the summary would drop them from the count and leave the waking buckets

@@ -1119,7 +1119,7 @@ export async function runOuraRollup(
         // Failure is contained: a bucket write must never abort the readiness/resilience writes
         // below it, which are what the user actually sees.
         try {
-          await io.replaceStressBuckets(day, series.map(p => ({ bucketStart: new Date(p.tMs), level: p.level })))
+          await io.replaceStressBuckets(day, series.map(p => ({ bucketMid: new Date(p.tMs), level: p.level })))
           // Deleting the route's write without adding this one would have left the three columns
           // with no writer at all — the rollup only ever persisted the buckets — and
           // `weekly-digest` reads `stressHighMinutes`.

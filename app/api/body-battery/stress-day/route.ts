@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
 
     // Ascending by query, but mapped without re-sorting on purpose: `toSegments` in the chart sorts
     // anyway, precisely because a day assembled from stored rows carries no ordering guarantee.
-    const series = rows.map(r => ({ t: r.bucketStart.getTime(), level: r.level }))
+    const series = rows.map(r => ({ t: r.bucketMid.getTime(), level: r.level }))
     const body: StressDayResponse = {
       date,
       series,

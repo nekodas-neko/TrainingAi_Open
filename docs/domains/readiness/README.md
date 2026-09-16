@@ -113,7 +113,7 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
   (`corr(HR, ln rmssd)` = −0.78 over 30–37 days) and its **level is ×0.30 of measured** — real, but
   confounded by chest-ECG vs ring-PPG and by the strap being worn while walking, so **not actionable
   without a controlled same-instrument capture**. Filed LA-112 (the defect), LA-113 (owner-gated
-  scoring), LA-114 (`bucket_start` stores the bucket midpoint).
+  scoring), LA-114 (`bucket_start` stores the bucket midpoint). **LA-112 shipped the same day.** LA-113 remains owner-gated, and **LA-114's rename was attempted and reverted** — `claude_ro` still says `bucket_start`, so a join on the :00/:30 grid still needs 15 minutes added.
 - [`docs/overview/entries/2026-09-16-lane-a-bf13-rederive-baselines.md`](../../overview/entries/2026-09-16-lane-a-bf13-rederive-baselines.md)
   — **a re-derivation for the zero-seeded baselines, 2026-09-16 (BF-13 / TN-6 / Q-506 / TN-8).**
   `POST /api/admin/rederive-baselines` replays the fold cold over the stored nights and rewrites the

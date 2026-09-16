@@ -32,7 +32,7 @@ vi.mock('@/lib/admin', () => ({
 }))
 vi.mock('@/lib/data', () => ({
   getRepository: vi.fn(async () => ({
-    getOuraDaytimeStressBuckets: vi.fn(async () => ouraStress.map(r => ({ bucketStart: r.at, level: r.value }))),
+    getOuraDaytimeStressBuckets: vi.fn(async () => ouraStress.map(r => ({ bucketMid: r.at, level: r.value }))),
     getColmiReadings: vi.fn(async () => colmiStress.map(r => ({ measuredAt: r.at, value: r.value }))),
     getOuraHeartrateBySource: vi.fn(async () => []),
   })),

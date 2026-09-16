@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **275** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **276** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v38** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -1290,6 +1290,40 @@ not from the harness.
   details, press the system back gesture — arrive on **More** with the More tab active. The harness
   cannot speak for the Android back gesture or the WebView's history handling.
 
+### [readiness][platform] LA-114 — the stress bucket column is named `bucket_start` and holds the MIDPOINT; renaming it is blocked
+
+- **Lane: A** · **Added:** 2026-09-16 · Lane A, from TN-39's validation. **Re-filed the same day**
+  after the rename was attempted and reverted — read the ⛔ below before touching this.
+- **Journal:** [`the attempt and why it failed`](overview/entries/2026-09-16-lane-a-la114-bucket-mid.md).
+- **Half-done, deliberately.** `daytimeHrvEstimatesPerBucket` emits `t = bStart + bucketMs / 2` and
+  `run.ts` writes it straight into `bucket_start`, so stored timestamps sit on a :15/:45 grid.
+  **Shipped:** migration 275 (a `COMMENT ON COLUMN`) and the Drizzle property renamed to `bucketMid`,
+  so TypeScript no longer lies. **Not fixed:** `claude_ro` still exposes `bucket_start`, and that is
+  the surface where the defect actually bit.
+- **⛔ DO NOT RE-ATTEMPT THE `ALTER TABLE ... RENAME COLUMN`.** It was written, applied, pushed, and
+  reverted on 2026-09-16; CI's Migration Check rejected it and was right to. The job replays every
+  migration against a schema that already has everything (LA-13), and **every historical `claude_ro`
+  view migration — 213, 215, 218, 221 … 274 — selects `t.bucket_start`**, because each regenerates
+  the full view set. All of them fail after a rename. Editing them is not available: `ensureSchema`
+  tracks by FILENAME, so an edited already-applied migration is skipped forever.
+  - `migrate.js` has a `REPLAY_EXEMPT` map whose single entry is a rename (*"002 renamed the column
+    its `cardio_sessions` FK references"*), so the hatch exists — but using it here means exempting
+    **a dozen** view migrations from the check that caught this, to land a cosmetic fix. That is not
+    a trade worth making, and it is why this entry is not simply "rename it properly".
+  - **The general constraint, which is the reusable part:** a column an earlier migration names by
+    hand cannot be renamed in this repo without exempting every such migration from the replay check.
+- **The one live idea that would reach the surface that matters:** teach
+  `scripts/generate-claude-ro-views.js` an alias map so the view emits `t.bucket_start AS bucket_mid`.
+  Replay-safe — the base table keeps its name, so no historical migration breaks. **Cost:** `public`
+  and `claude_ro` would disagree about the column's name, which is a second naming confusion bought
+  to fix the first. Not obviously right; that is the decision this entry is waiting on, and it is
+  small enough to prototype before proposing.
+- **Until then, the caller adds 15 minutes.** A join against another 30-minute series on the epoch
+  grid returns ZERO rows, which reads as "no overlapping data" rather than "the join is 15 minutes
+  out". It cost an hour on 2026-09-16.
+- **Pass test:** a join written the obvious way against `claude_ro` lands on the right bucket, or the
+  read surface names the column for what it holds.
+
 ### [readiness][devices] LA-113 — the daytime-HRV imputation reads ~⅓ of measured HRV, and its heart-rate slope is ~2× too steep
 
 - **Lane: A** · **Added:** 2026-09-16 · Lane A, from TN-39's validation.
@@ -1316,23 +1350,6 @@ not from the harness.
   the same window the ring streams its own HRV events, so ring RMSSD and strap RMSSD are comparable on
   the same minutes. Until that exists the level gap has two live explanations and no measurement
   separates them.
-
-### [readiness][platform] LA-114 — `oura_daytime_stress_buckets.bucket_start` stores the bucket MIDPOINT
-
-- **Lane: A** · **Added:** 2026-09-16 · Lane A, from TN-39's validation.
-- `daytimeHrvEstimatesPerBucket` returns `t = bStart + bucketMs / 2`
-  (`packages/shared/src/health/daytime-hrv-model.ts:190`), and `run.ts:1108` writes that value straight
-  into a column named `bucket_start`. Stored timestamps therefore sit on a `:15`/`:45` grid.
-- **It already cost something.** Joining `rr_intervals` to these buckets on the obvious grid returned
-  **zero rows**, which reads as "no overlapping data" rather than "the join is 15 minutes out". That is
-  a silent wrong answer, not an error.
-- **Cheapest correct fix is the name, not the data** — a rename plus its migration, leaving every
-  stored value alone, so nothing has to be re-derived and no reader changes meaning. Renaming it
-  `bucket_mid` also makes the `:15` grid self-explaining at the next join.
-- **⚠ Whatever is done, do it in one PR with every reader** — `getDaytimeStressBuckets`, the
-  `/api/body-battery/stress-day` route and its client. A migration ships alone and never batched.
-- **Pass test:** the column's name matches what it holds, and a join written the obvious way lands on
-  the right bucket.
 
 ### [devices][heart-rate] TN-40 — the strap's 136,440 beats produce exactly one number, while three models that could use them run on the ring alone
 
