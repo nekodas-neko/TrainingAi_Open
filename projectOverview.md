@@ -3165,6 +3165,32 @@ first because a confirm that removes anyway passes every happy-path assertion; i
 **NOT verified on device**, and the outstanding half is structurally out of reach of a browser:
 whether the undo toast is still reachable by a thumb before it dismisses.
 
+### [body][devices] ⚠️ A declined weigh-in can be claimed back; before this it was irreversible (LA-108, 2026-09-14)
+
+**Both halves shipped — engine 2026-09-14, list in v1.456.21. Device check owed.**
+
+**The band anchors on the last CONFIRMED weight, and only a confirmed reading moves it.** So an
+accidental *Not me* tap was irreversible: a genuine change beyond `SCALE_WEIGHT_ANOMALY_PCT` — a long
+gap plus an illness or an injury — put you outside your own band with nothing able to move it, and
+**every** reading after that was outside too. Silent and self-sustaining. This predates BF-58; BF-58
+made the state reachable without a tap, which is what made it worth finding.
+
+A **Declined weigh-ins** list now sits under the pending section in scale pairing, each row claimable
+through **the same confirm route the pending rows use** — the engine widened `confirmScaleSample` to
+accept `pending` or `dismissed` (never `confirmed`, so claiming twice cannot double-apply), so there
+is no second write path. Rows keep the server's newest-first order (in this lockout the top rows are
+the wrongly-declined ones), a null weight still lists, and there is no dismiss action because these
+are already dismissed. Each row shows its time in **your** timezone — a pending reading is "just now",
+a declined one can be days old.
+
+**⚠ It had been printing under KEEP as "not new work" since 2026-09-14** while its residue —
+*"the list, and only the list"* — was a buildable task with a lane, a file and three implementation
+notes. Found by reading the Keeps whole rather than trusting the section header.
+
+**NOT verified on device.** The BLE scale is unreachable from the sandbox, so the list was driven from
+the route's shape rather than a real declined reading. On the S25: decline a weigh-in, confirm it
+appears with its time, claim it back, confirm the weight files and the band re-anchors.
+
 ### [activity][cardio] 🟠 "Other activity" is a dead tap on device — and my harness "reproduction" was RETRACTED (BF-165, 2026-09-15)
 
 **Open, device-gated, cause unknown. Three candidates still open.** Owner, on the APK: *"when I try

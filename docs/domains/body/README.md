@@ -132,6 +132,15 @@ BF-58's device answers are the open items. Re-run the greps rather than trusting
 
 ## History
 
+- [`2026-09-15-la108-declined-weigh-in-list`](../../overview/entries/2026-09-15-la108-declined-weigh-in-list.md)
+  — **LA-108 (2026-09-15): a declined weigh-in can be claimed back.** The band anchors on the last
+  **confirmed** weight and only a confirmed reading moves it, so an accidental *Not me* tap was
+  irreversible — a real change beyond the anomaly threshold left you outside your own band with
+  nothing able to move it, and every reading after that too. The new **Declined weigh-ins** list
+  claims through **the same confirm route** the pending rows use (`confirmScaleSample` accepts
+  `pending` or `dismissed`, never `confirmed`), so there is no second write path. **It had printed
+  under KEEP as "not new work" while its residue was the work** — read Keeps whole. Device check owed.
+
 - Handoffs: `ls docs/handoff-*-body-*.md` — plus
   [`docs/handoff-2026-08-03-cross-owner-bug-batch-triage.md`](../../handoff-2026-08-03-cross-owner-bug-batch-triage.md)
   (Q-69 — scale weight trend should use the day's lowest confirmed reading, not the first), filed

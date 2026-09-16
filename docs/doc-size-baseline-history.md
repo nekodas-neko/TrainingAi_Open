@@ -12737,6 +12737,16 @@ carry what replaced it: three further eliminations, and the defect the second re
 confirm dialog is cleared only by Stay/Leave and never on navigation, so a prompt raised correctly on
 one screen reappears over a screen where it is absurd.
 
+## 2026-09-15 — `projectOverview.md` → 11476, `docs/implementation-backlog.md` → 22229 (LA-108)
+
+The index grew for a fix that had been sitting in plain sight, filed as done.
+
+LA-108 printed under KEEP — *"shipped; only the stated residue is owed, not new work"* — for a day,
+while its residue was a buildable UI task with a lane, a file and three implementation notes. The
+lines that matter are the ones saying **why an accidental *Not me* tap was irreversible**: the band
+anchors on the last confirmed weight, so one declined reading could lock every later one outside the
+range. That is not obvious from the diff, which is a list and a button.
+
 ## 2026-09-11 — `docs/implementation-backlog.md` → 21535 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
