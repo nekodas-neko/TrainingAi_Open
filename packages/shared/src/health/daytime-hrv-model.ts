@@ -46,7 +46,9 @@ function numArr(decoded: Record<string, unknown> | null, key: string): number[] 
   return Array.isArray(v) ? v.filter((n): n is number => typeof n === 'number') : []
 }
 
-function inSleepWindow(tsMs: number, windows: SleepWindow[]): boolean {
+/** Is this instant inside any recorded sleep window? Exported because the daytime-stress series
+ *  needs exactly this test (LA-112) and a second copy of it is how the two surfaces drift. */
+export function inSleepWindow(tsMs: number, windows: SleepWindow[]): boolean {
   return windows.some(w => tsMs >= w.sleepStart.getTime() && tsMs < w.sleepEnd.getTime())
 }
 

@@ -1043,6 +1043,15 @@ export async function runOuraRollup(
       // then overlay each freshly computed day so later days in the loop see earlier ones.
       const indexByDay = new Map<string, DailyIndices>()
       const persisted = await io.readDailyDerived(dayMinus(summaryRows[startI].date, 13), summaryRows[summaryRows.length - 1].date)
+      // LA-112 — the stress series drops sleeping buckets, so it needs every night overlapping the
+      // span. Read rather than taken from `sleepRows`: those cover only the nights THIS pass
+      // reconstructed, which would make a day's stress depend on how wide the pass was. One day of
+      // margin each side because a night is keyed by its WAKE date, so the night that starts on the
+      // last day is filed under the next one.
+      const sleepSpan = await io.readSleepWindows(
+        dayMinus(summaryRows[startI].date, 1),
+        dayMinus(summaryRows[summaryRows.length - 1].date, -1),
+      )
       for (const r of persisted) {
         if (r.resilienceDailyStress != null && r.resilienceDailyRestorativeTime != null && r.resilienceDailySleepRecovery != null) {
           indexByDay.set(r.day, {
@@ -1085,6 +1094,11 @@ export async function runOuraRollup(
             allMet.filter(s => s.tsMs >= dayStartMs && s.tsMs < dayEndMs),
             allHr.filter(s => s.tsMs >= dayStartMs && s.tsMs < dayEndMs),
             dhrvModel, baselines, dayStartMs, dayEndMs,
+            // Both nights that can touch this day: the one that ENDED this morning and the one that
+            // STARTS tonight. Measured 2026-09-16, the owner's stored buckets ran densest in Brisbane
+            // 00:00–06:59 (289 of 672) and 22:00–23:59 — the evening tail is the second night, and
+            // filtering only on the wake-keyed row for `day` would leave it in.
+            sleepSpan.filter(w => w.sleepEnd.getTime() > dayStartMs && w.sleepStart.getTime() < dayEndMs),
           )
           series = pts.map(p => ({ tMs: p.t, level: p.stressLevel }))
           stressSummary = summarizeStressDay(pts)

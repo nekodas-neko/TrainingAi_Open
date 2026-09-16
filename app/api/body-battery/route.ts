@@ -264,6 +264,12 @@ async function buildBodyBattery(userId: string, tz: string) {
         daytimeSignals.temp, daytimeSignals.met,
         hrRows.map(r => ({ tsMs: r.timestamp.getTime(), bpm: r.bpm })),
         dhrvModel, baselines, wakeTime, now.getTime(),
+        // This window already starts at wake, so it is mostly belt-and-braces — but `wakeTime` falls
+        // back to the first HR reading, and to 07:00, when the night has no recorded end, and either
+        // fallback can open the window before the owner actually woke. Passing the nights makes the
+        // two surfaces agree on what counts (LA-112) rather than agreeing by coincidence of window.
+        nights.filter(n => n.sleepEnd != null && n.sleepEnd.getTime() > wakeTime)
+          .map(n => ({ sleepStart: n.sleepStart, sleepEnd: n.sleepEnd! })),
       )
     } catch (err) {
       // 2. A stress-model failure must not take Body Battery down with it — the same guard, and the

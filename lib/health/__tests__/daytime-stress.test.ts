@@ -109,14 +109,14 @@ describe('buildDaytimeStressSeriesFromModel — D5 own-model sibling', () => {
   const H = 3_600_000
 
   it('returns [] with no data', () => {
-    expect(buildDaytimeStressSeriesFromModel([], [], [], model, b, 0, H)).toEqual([])
+    expect(buildDaytimeStressSeriesFromModel([], [], [], model, b, 0, H, [])).toEqual([])
   })
 
   it('scores a resting bucket and skips an active (high-MET) one', () => {
     const temp = [{ tsMs: 5 * 60_000, valueC: 33.5 }, { tsMs: 35 * 60_000, valueC: 33.5 }]
     const met = [{ tsMs: 5 * 60_000, value: 1.1 }, { tsMs: 35 * 60_000, value: 3.0 }] // 2nd bucket active
     const hr = [{ tsMs: 5 * 60_000, bpm: 58 }, { tsMs: 35 * 60_000, bpm: 90 }]
-    const series = buildDaytimeStressSeriesFromModel(temp, met, hr, model, b, 0, H)
+    const series = buildDaytimeStressSeriesFromModel(temp, met, hr, model, b, 0, H, [])
     expect(series.length).toBe(1)
     expect(series[0].t).toBe(15 * 60_000) // first bucket's midpoint
   })
@@ -125,7 +125,76 @@ describe('buildDaytimeStressSeriesFromModel — D5 own-model sibling', () => {
     const temp = [{ tsMs: 5 * 60_000, valueC: 33.5 }]
     const met: { tsMs: number; value: number }[] = [] // no met data at all
     const hr = [{ tsMs: 5 * 60_000, bpm: 58 }]
-    expect(buildDaytimeStressSeriesFromModel(temp, met, hr, model, b, 0, H)).toEqual([])
+    expect(buildDaytimeStressSeriesFromModel(temp, met, hr, model, b, 0, H, [])).toEqual([])
+  })
+})
+
+describe('LA-112 — sleeping buckets reach neither the levels nor the baseline median', () => {
+  const b: DhrvBaselines = { dhrvBaseline: 45, hrBaseline: 60, tempBaseline: 33.5 }
+  const model: DaytimeHrvModel = { intercept: 4.5, hrCoef: -0.02, tempCoef: 0, residualStd: 0.1, nSamples: 100 }
+  const DAY = 6 * 3_600_000
+  const at = (min: number) => min * 60_000
+
+  /** Six half-hour buckets. The first three are asleep at a low heart rate — which, `hrCoef` being
+   *  negative, is exactly what makes their imputed dhrv HIGH and drags the day-median up. */
+  const asleepThenAwake = () => {
+    const mins = [5, 35, 65, 95, 125, 155]
+    const bpm = [48, 47, 49, 70, 72, 71]
+    return {
+      temp: mins.map(m => ({ tsMs: at(m), valueC: 33.5 })),
+      met: mins.map(m => ({ tsMs: at(m), value: 1.1 })),
+      hr: mins.map((m, i) => ({ tsMs: at(m), bpm: bpm[i] })),
+    }
+  }
+  const night = [{ sleepStart: new Date(0), sleepEnd: new Date(at(90)) }]
+
+
+  it('drops the sleeping buckets from the series', () => {
+    const { temp, met, hr } = asleepThenAwake()
+    const series = buildDaytimeStressSeriesFromModel(temp, met, hr, model, b, 0, DAY, night)
+    expect(series.map(p => p.t)).toEqual([at(105), at(135), at(165)])
+  })
+
+  it('re-scores the WAKING buckets, because the median they are measured against moves', () => {
+    // The whole point, and the half a summary-level filter would miss: with sleep left in, the
+    // day-median dhrv is a sleeping value, so every waking bucket sits below it and reads stressed.
+    const { temp, met, hr } = asleepThenAwake()
+    const withSleep = buildDaytimeStressSeriesFromModel(temp, met, hr, model, b, 0, DAY, [])
+    const without = buildDaytimeStressSeriesFromModel(temp, met, hr, model, b, 0, DAY, night)
+
+    const waking = (s: typeof withSleep) => s.filter(p => p.t > at(90))
+    expect(waking(withSleep).every(p => p.stressLevel < 0)).toBe(true)
+    expect(waking(withSleep).map(p => p.stressLevel))
+      .not.toEqual(waking(without).map(p => p.stressLevel))
+    // Freed of the sleeping median, the waking buckets straddle their own.
+    expect(waking(without).some(p => p.stressLevel >= 0)).toBe(true)
+  })
+
+  it('stops counting a restless night as daytime high stress', () => {
+    // The other half, and the one measured in production: 28 of the owner's 140 high-stress buckets
+    // were inside a recorded sleep session. A night at an elevated heart rate scores BELOW the day
+    // median, so the sleeping buckets themselves cross STRESS_HIGH_LEVEL and are counted as daytime
+    // stress. Deliberately extreme (a sleeping 100 bpm) because the level saturates: at 95 bpm the
+    // same shape scores −0.187 and never reaches the −0.5 threshold at all.
+    const mins = [5, 35, 65, 95, 125, 155]
+    const bpm = [100, 100, 100, 45, 45, 45]
+    const temp = mins.map(m => ({ tsMs: at(m), valueC: 33.5 }))
+    const met = mins.map(m => ({ tsMs: at(m), value: 1.1 }))
+    const hr = mins.map((m, i) => ({ tsMs: at(m), bpm: bpm[i] }))
+
+    const before = summarizeStressDay(buildDaytimeStressSeriesFromModel(temp, met, hr, model, b, 0, DAY, []))
+    const after = summarizeStressDay(buildDaytimeStressSeriesFromModel(temp, met, hr, model, b, 0, DAY, night))
+    expect(before!.stressHighMinutes).toBeGreaterThan(0)
+    expect(after!.stressHighMinutes).toBe(0)
+  })
+
+  it('leaves a day with no recorded sleep exactly as it was', () => {
+    // The control. A change that simply lowered every level would pass the three above.
+    const { temp, met, hr } = asleepThenAwake()
+    const none = buildDaytimeStressSeriesFromModel(temp, met, hr, model, b, 0, DAY, [])
+    const disjoint = buildDaytimeStressSeriesFromModel(temp, met, hr, model, b, 0, DAY,
+      [{ sleepStart: new Date(at(600)), sleepEnd: new Date(at(700)) }])
+    expect(disjoint).toEqual(none)
   })
 })
 
