@@ -12873,6 +12873,18 @@ sandbox did not.
 A `Keep:` that says "still owed" without saying what would leave the next session to re-derive it
 from the entry body, which is how the batch lost three weeks after the seed was fixed.
 
+## 2026-09-16 — `docs/implementation-backlog.md` 22378 → 22559
+
+`docs/lb111-movement-pattern-window` (LB-111 filed, OR-118 corrected and parked).
+
+Most of the growth is LB-111, a new entry. The rest is the table of routes checked on OR-118, and
+that table is the point: it says *"no route serves sets by muscle over any window but the current
+one"* with the four things that were looked at and what each returns. Without it the next session
+reads *"every number it renders already exists"*, believes it — it is a plausible sentence — and
+either builds a lane-violating route or ships a card that renders one week under a label claiming
+sixty days. The claim took one grep to falsify and would have taken an afternoon to discover halfway
+through a build.
+
 ## 2026-09-16 — projectOverview → 11554: a live metric counts sleep as daytime stress
 
 +22, one Known-Issues entry (LA-112). TN-39's validation found that **41.2%** of the daytime-stress
@@ -12888,7 +12900,7 @@ number is broken" without that sentence would plausibly undo today's other chang
 Trimmed once before raising: the two sibling findings (LA-113, LA-114) are queued work rather than
 open issues, so they are one pointer line here and full entries in the backlog.
 
-## 2026-09-16 — backlog → 22668: one validation entry out, three findings in
+## 2026-09-16 — backlog → 22711: one validation entry out, three findings in
 
 +36 net. TN-39 asked for a measurement and got one, so it left the queue; what it found did not fit
 back into one entry, because the three findings need opposite handling and batching them would hide
@@ -12904,3 +12916,9 @@ answer — a zero-row join that read as "no data".
 The length is mostly those ⛔/⚠ lines. An entry saying "the model is 3× off" without the sentence
 saying why that must not be acted on is an invitation to change a coefficient, which is the one
 outcome TN-39 wrote itself to prevent.
+
+The baseline reads 22711 rather than the +36 this branch added, because LB-111 landed on `main`
+between the branch being cut and this merge — the note above it is that change's. Two entries raising
+the same baseline on the same day is the one case where the per-document `.size` files still conflict,
+and correctly so: they genuinely disagree about one number. Resolved main's integer first, then
+`pnpm fix:baselines`, per the recipe — the fixer throws on a conflict marker, so the order matters.
