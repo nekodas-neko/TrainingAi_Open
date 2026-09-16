@@ -275,6 +275,15 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- [`2026-09-15-la108-declined-weigh-in-list`](../../overview/entries/2026-09-15-la108-declined-weigh-in-list.md)
+  — **LA-108 (2026-09-15): a declined weigh-in can be claimed back.** The band anchors on the last
+  **confirmed** weight and only a confirmed reading moves it, so an accidental *Not me* tap was
+  irreversible — a real change beyond the anomaly threshold left you outside your own band with
+  nothing able to move it, and every reading after that too. The new **Declined weigh-ins** list
+  claims through **the same confirm route** the pending rows use (`confirmScaleSample` accepts
+  `pending` or `dismissed`, never `confirmed`), so there is no second write path. **It had printed
+  under KEEP as "not new work" while its residue was the work** — read Keeps whole. Device check owed.
+
 
 
 

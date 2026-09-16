@@ -8859,42 +8859,40 @@ revocation, a Play Store health-data implication — and D needs none of it.
   and the answer to (1) is recorded either way, because the design of any future work here depends
   on it.
 
-### [body][devices] LA-108 — a declined weigh-in has no screen, so the recovery path built for it cannot be reached
+### [body][devices] LA-108 — a declined weigh-in had no screen, so the recovery path could not be reached (both halves shipped; device check owed)
 
-- **Lane:** B — the list. `components/settings/scale-pairing.tsx`, beside the pending one it already
-  renders.
+- **Lane:** B — `components/settings/scale-pairing.tsx`. Engine half 2026-09-14 (Lane A), list half
+  2026-09-15.
 - **Added:** 2026-09-14 · Lane A, found while shipping BF-58's band split.
-- **Keep:** the list, and only the list. **The engine half shipped 2026-09-14** and is the half that
-  was actually locked: `confirmScaleSample` matched `status='pending'` only, so no declined reading
-  could ever be filed. It now accepts `pending` **or** `dismissed` (never `confirmed`, so claiming
-  twice cannot double-apply a reading), `listRecentDismissedScaleSamples` exists, and
-  `GET /api/scale-ble/pending` returns a bounded `dismissed[]` shaped exactly like `pending[]`.
-  **`POST /api/scale-ble/pending/<id>/confirm` already accepts one of these ids and needed no
-  change** — it files the weight against the reading's own `measuredAt` and re-anchors the band.
-
-**Why it matters, which is more than "a lost reading".** The band anchors on the last CONFIRMED
-weight and only a confirmed reading moves it. So a genuine change of more than
-`SCALE_WEIGHT_ANOMALY_PCT` between two weigh-ins — a long gap plus an illness or an injury — puts
-the owner outside his own band with nothing to move it, and **every** reading after that is outside
-too. Silent and self-sustaining.
-
-**This predates BF-58 rather than being caused by it**, which is the correction worth carrying: an
-accidental *Not me* tap has always been irreversible and has always failed to re-anchor. BF-58 made
-the state reachable without a tap, and that is what made it worth finding.
-
-**What is left is one list.** `GET /api/scale-ble/pending` now returns `{ pending, dismissed }`, both
-arrays of `{ id, measuredAt, weightKg }`. Render `dismissed` under the pending section with a
-claim action that POSTs to the same confirm route the pending rows use. Notes for whoever builds it:
-- **Newest first is deliberate and should be preserved in the render.** In the lockout this exists
-  for, the readings at the top ARE the locked-out user's — the scale is mostly his, so the most
-  recent declines are the wrongly-declined ones.
-- **A declined row may have `weightKg: null`** (a frame that would not decode is archived too), same
-  as a pending row. It still lists; do not hide it.
-- **Do not add a dismiss action to this list.** These are already dismissed; the only move is to
-  claim one back.
-- **Do not fix the underlying hazard by widening the band** — the 8% was measured against the two
-  real clusters and widening it is the thing BF-58 was filed to stop.
-
+- **⚠ It printed under KEEP — *"shipped; only the stated residue is owed, not new work"* — while the
+  residue WAS the work.** The `Keep:` read *"the list, and only the list"*, which is a buildable UI
+  task with a lane, a file and three implementation notes, not a check owed. Found by reading the
+  Keeps whole rather than trusting the section header.
+- **Why it mattered, which is more than a lost reading.** The band anchors on the last CONFIRMED
+  weight and only a confirmed reading moves it. So a genuine change beyond
+  `SCALE_WEIGHT_ANOMALY_PCT` — a long gap plus an illness or an injury — put the owner outside his own
+  band with nothing able to move it, and **every** reading after that was outside too. Silent and
+  self-sustaining. An accidental *Not me* tap was irreversible.
+- **Shipped:** a **Declined weigh-ins** list under the pending section, each row claimable through
+  **the same `POST /api/scale-ble/pending/<id>/confirm`** the pending rows use — the engine widened
+  `confirmScaleSample` to match `pending` **or** `dismissed` (never `confirmed`, so claiming twice
+  cannot double-apply), so there is deliberately no second write path. Claiming fires the Q-126
+  invalidation pair before the refetch.
+- **The three notes the entry left were followed and are pinned by tests:** server order preserved
+  (newest-first is deliberate — in the lockout this exists for, the top rows ARE the wrongly-declined
+  ones), a `weightKg: null` row still lists, and **no dismiss action** — these are already dismissed.
+- **One addition beyond the spec, with a reason:** each row shows its time via `formatTimeOfDay(…,
+  userTz)`. A pending reading is "just now"; a declined one can be days old, so the time is what
+  tells you which row you are claiming. The user's timezone, never the device's, per the standing rule.
+- **Proven load-bearing:** `components/settings/__tests__/la108-declined-weigh-in-list.test.ts` —
+  **5 of 5 fail against `main`**. One of them initially passed unfixed: a `.not.toMatch` over a
+  `slice` from an `indexOf` that returns −1 reads the tail of the file, so a negative assertion on an
+  absent section passes for the wrong reason. It now asserts the section exists first.
+- **Verify: device**
+- **Keep:** the look, and only that. On the S25: decline a weigh-in, confirm it appears under
+  **Declined weigh-ins** with its time, claim it back, and confirm the weight files and the band
+  re-anchors. The BLE scale is not reachable from the sandbox, so the list was driven from the route's
+  shape rather than from a real declined reading.
 
 ### [nutrition] BF-47 — the deleted food comes back: the loader calls the server authoritative while the delete is still in the outbox
 
