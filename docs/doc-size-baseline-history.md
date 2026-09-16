@@ -12854,3 +12854,15 @@ lines of net growth.
 Worth the history note rather than a silent fix because the third cause was self-inflicted across
 every entry this agent filed, and the lesson generalises: a queue position is not a work assignment,
 and the file does not show which of the three is in play.
+
+## 2026-09-16 — `docs/implementation-backlog.md` 22378 → 22559
+
+`docs/lb111-movement-pattern-window` (LB-111 filed, OR-118 corrected and parked).
+
+Most of the growth is LB-111, a new entry. The rest is the table of routes checked on OR-118, and
+that table is the point: it says *"no route serves sets by muscle over any window but the current
+one"* with the four things that were looked at and what each returns. Without it the next session
+reads *"every number it renders already exists"*, believes it — it is a plausible sentence — and
+either builds a lane-violating route or ships a card that renders one week under a label claiming
+sixty days. The claim took one grep to falsify and would have taken an afternoon to discover halfway
+through a build.
