@@ -12748,3 +12748,10 @@ while its residue was a buildable UI task with a lane, a file and three implemen
 lines that matter are the ones saying **why an accidental *Not me* tap was irreversible**: the band
 anchors on the last confirmed weight, so one declined reading could lock every later one outside the
 range. That is not obvious from the diff, which is a list and a button.
+
+## 2026-09-16 — `docs/implementation-backlog.md` (BF-170)
+
+Twenty-eight lines. The quoted premise from `mealFooter` is the entry — "a group row states its own
+macros AND calories" is the sentence that makes the suppression look correct, and it is only true
+when the group is expanded. Without that quote an implementer fixes the footer, which double-prints
+the moment the meal is opened.

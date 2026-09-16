@@ -437,6 +437,47 @@ below threshold and left in place for next time.
 
 
 
+### [nutrition] BF-170 — a lone saved meal shows its macros nowhere, because the footer is suppressed on a promise the collapsed row does not keep
+
+- **Lane:** B — `components/nutrition/diary-meal-group.tsx:70-81` is where to fix it;
+  `components/nutrition/meal-card-footer.ts` is the decision that depends on it and should be left
+  alone once the promise is true.
+- **Added:** 2026-09-16 (BugFix intake). Owner, on his Nutrition diary: *"Same issue here where the
+  singular meal doesnt show macro below it."* **PRE WORKOUT** holds one saved meal (*Protein Shake +
+  Cruskit*, 5 ingredients) and shows **no P/C/F**; **POST WORKOUT** directly below holds one loose
+  food and shows **P 17g · C 17g · F 10g**.
+- **`mealFooter` suppresses the section footer for a lone meal on an explicit premise:**
+
+  ```ts
+  // A group row states its own macros AND calories; a loose row states neither.
+  return kinds[0] === 'meal'
+    ? { show: false, showCalories: false }
+    : { show: true,  showCalories: false }
+  ```
+
+- **The group row does not state its own macros while collapsed, which is its default.**
+  `diary-meal-group.tsx` renders the name, the ingredient count, the **calories** and a chevron in
+  the always-visible header; the P/C/F line sits **inside `{open && (…)}`**, under the ingredient
+  rows. Collapsed — as in his screenshot, chevron down — the row states calories only. So the
+  footer is withheld for a claim that is half true, and the macros appear nowhere.
+- **This is BF-120's own defect wearing the other kind.** That entry fixed exactly this shape for
+  loose rows and its reasoning is in `meal-card-footer.ts`: *"a section holding one loose food showed
+  protein, carbs and fat **nowhere**, while the section above it showed all three."* His screenshot
+  is that sentence again with the kinds swapped — the section showing nothing is the meal, and the
+  one below showing all three is the food.
+- **Fix at the group, not at the footer.** Move the P/C/F line out of the `{open && …}` block so a
+  collapsed meal states its macros beside its calories. That makes `mealFooter`'s comment true,
+  needs no change to the decision table, and fixes every meal group rather than only the case where
+  one is alone in a section. Fixing it in `mealFooter` instead would print the macros twice as soon
+  as the group is expanded.
+- **Check when fixing:** the header is already a five-element row (thumb, name + count, calories,
+  chevron) at 14 px minimum height. The macro line belongs under the name, not squeezed into that
+  row — `meal-card.tsx`'s `MealTotals` is the established look and sits full-width below.
+- **Not in scope:** whether a loose row should show per-item macros in the diary. Q-406 deliberately
+  moved those into the detail sheet, and BF-120 settled the section-level answer that followed.
+- **Verification:** on device, a meal section collapsed shows P/C/F; expanded shows them once, not
+  twice; a section holding a meal plus a loose food still shows its combined footer with calories.
+
 ### [workouts] BF-169 — the COMPLETED stamp is gated on the exercise library loading, so it vanishes on a slow or failed load
 
 - **Lane:** B — `app/workout-select/workout-select-content.tsx:111-114` and `:437`.
