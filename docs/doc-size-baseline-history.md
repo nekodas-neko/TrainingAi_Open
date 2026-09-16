@@ -12805,3 +12805,17 @@ what shipped**, which the diff cannot show:
   instruction that names a surface which no longer exists does not fail loudly; it sends the owner
   looking and comes back "can't reproduce". Its TTL note is also marked NOT triggered: BF-5 mounts
   `WeekTrendsSection` in a second place, not a second call site, and the two are easy to confuse.
+
+## 2026-09-16 — `docs/implementation-backlog.md` → 22301 (OR-117, the owner-gate triage)
+
+Q-283 closed on its own re-measurement (an 11 MB headline that was 800 kB two weeks ago), against
+eight `NOT OWNER-READY` markers and five batch lines. Net −77.
+
+**The markers are the point and they are worth their lines.** Eight scoring entries carried
+`Gate: owner` while their own text said no Tuning proposal exists — so they counted as owner debt in
+every sweep while being un-answerable by the owner, who would have been signing a blank page. The
+marker is what stops the next sweep counting them.
+
+The batch lines pair entries by **the sitting they need**, not the subject: LA-68, TN-1 and LA-56 are
+one admin login, and LB-52 with Q-297's second residue are one branch-protection page. Five entries,
+two trips.
