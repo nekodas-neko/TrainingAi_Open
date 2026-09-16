@@ -12776,3 +12776,14 @@ something else, and neither is recoverable from the diff, which shows only what 
 
 Recording a refuted recommendation beside the entry it belongs to is the only place it gets read
 before someone acts on the entry again.
+
+## 2026-09-16 — `docs/implementation-backlog.md` 22330 → 22346, `projectOverview.md` 11492 → 11504
+
+`fix/bf170-collapsed-meal-macros` (BF-170).
+
+Sixteen lines, and the half worth the space is not the fix — it is that **four e2e tests covered
+this component and none of them could fail on the defect**. `diary-nested-meal.spec.ts` asserts
+`P 24g`, which is exactly the missing figure, but it taps the group open first, so it passed
+throughout. A file that reads like coverage and is not is worth naming on the entry, because the
+next person to touch `DiaryMealGroup` will check whether it is tested before checking what the tests
+actually assert.
