@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.456.22",
+    date: "2026-09-16",
+    changes: [
+      "The COMPLETED stamp on a session card no longer comes and goes. It was waiting on the exercise list to load before it would draw, so on a slow connection \u2014 or for a session whose exercises have no muscle diagram \u2014 the card told you three other ways that you had trained (the green ring, the Start Again button) while the stamp itself never appeared.",
+      "\"Leave workout?\" no longer appears after you have finished. Pressing back on the session list could raise the prompt on a screen with no workout to leave, and a prompt raised legitimately during a workout could follow you onto the next screen instead of closing with the workout it was asking about.",
+      "The intensity control now says Deload whenever today's loads have actually been reduced. A deload applied for illness or soreness cuts each exercise without marking the session as a deload week, so the control read \"Full \u2014 as prescribed\" above a session prescribed at half your usual weights.",
+    ],
+  },
+  {
     version: "1.456.21",
     date: "2026-09-15",
     changes: [

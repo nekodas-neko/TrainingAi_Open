@@ -428,13 +428,21 @@ export default function WorkoutSelectContent() {
                 went from a one-line marquee to a wrapping row. Clipping trims equal slivers of the
                 figures' empty margin instead, which is invisible. */}
             <div className="flex-1 min-h-0 flex items-center overflow-hidden">
-              <div className="relative w-full">
+              {/* The stamp is laid OVER the diagram but is not a layer of it (BF-169). It used to
+                  share the diagram's `muscleActivations.length > 0` guard, which is right for the
+                  heatmap — a silhouette with no assignments is nothing — and wrong for the stamp,
+                  which needs no assignments to be meaningful. `library` is a separate fetch, so on
+                  a slow or failed load the card said "complete" three other ways (the green ring,
+                  the screen-reader text, and Start Again) while the one visual the owner looks for
+                  was absent. The min-height keeps it legible when there is no diagram behind it to
+                  give the container height. */}
+              <div className={cn("relative w-full", trainedToday && muscleActivations.length === 0 && "min-h-24")}>
                 {muscleActivations.length > 0 ? (
                   <MuscleHeatmap assignments={muscleActivations} className="w-full" />
                 ) : exCount > 0 ? (
                   <div className="w-full h-24 rounded-xl bg-muted/30 animate-pulse" />
                 ) : null}
-                {trainedToday && muscleActivations.length > 0 && <CompletedStamp />}
+                {trainedToday && <CompletedStamp />}
               </div>
             </div>
             <MuscleRecoveryCard muscles={sessionRecoveryMuscles} />
