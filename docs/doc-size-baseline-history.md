@@ -12971,3 +12971,16 @@ valuable — that the platform *does* define skin temperature, which retires a c
 The ⛔ on TN-44 is what the lines are for. Without it the next session adds ten types to the list,
 ships ten more silent `undefined`s, and the defect that took a source read to find gets reproduced
 tenfold by an entry that reads like a chore.
+
+## 2026-09-16 — backlog → 22769: TN-37 step 2 became a ⛔ instead of a task
+
++14, and they are the cheapest fourteen lines in the file. TN-37 said to drop two "dead" Oura Cloud
+reads from the readiness payload. Re-verifying — which the entry's own ⚠ demanded — showed both are
+load-bearing: `oura_daily`'s scored columns are all NULL, but `non_wear_time_sec` is written on every
+row by the BLE rollup and feeds `excludeLowWearDays` for the HRV and RHR baselines, and
+`getLatestOuraCloudVitals` is a deliberate stale surface for VO₂ max and vascular age.
+
+Deleting the step would have left the next session to rediscover this; leaving it as written would
+have cost a scoring regression no test covers. So it stays, inverted, with the measurement attached
+and the generalisable form stated: **"every scored column is NULL" is not "the table is dead" —
+check for a live writer.**
