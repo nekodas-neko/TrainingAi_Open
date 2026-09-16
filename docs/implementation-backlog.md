@@ -437,6 +437,222 @@ below threshold and left in place for next time.
 
 
 
+> **Queue note, 2026-09-16 (BugFix).** BF-173 and BF-171 sit at the top because the owner approved
+> BF-173's direction the same day and it changes **every** recommendation the app makes, not one
+> screen. They are **sequenced, not batched** — BF-173 carries a migration and a migration never
+> batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
+> temperature-baseline cluster under it keep their order relative to each other.
+
+### [workouts][readiness] BF-173 — the app pre-ticks soreness FROM the recovery model, then penalises the same muscle a second time for it
+
+- **⚠ Ships ALONE — do not batch it, and the first attempt to did.** This entry was briefly batched
+  with BF-171 as `session-recovery-scoring` on the reasoning that both edit `sessionRecoveryScore`
+  and both are settled by the same unit tests. **`next-item.js` rejected it correctly:** the
+  provenance fix carries a migration, and this file's rule is that a migration never batches,
+  because its revert is a corrective migration. The two are **sequenced** instead — this one first,
+  BF-171 behind it — which gets the same ordering guarantee at no revert risk.
+- **✅ OWNER DECIDED 2026-09-16 — build the provenance option; the gate is cleared.** Asked to choose
+  between recording where each sore tick came from (needs a migration) and suppressing the second
+  penalty whenever the model already knows the muscle is under-recovered (no schema change), the
+  owner took the recommendation: **provenance**. The reasoning on the record is that a check-in only
+  earns its place by carrying information the model does not already have, and the cheap option
+  removes exactly that.
+- **✅ OWNER CONFIRMED the premise 2026-09-16** — *"It auto picked muscles for me i didnt choose them
+  manually."* **This entry was filed with that as an inference from `suggestedSoreMuscles`'s
+  thresholds; it is now a statement from the lifter.** It also makes the defect the normal path
+  rather than an edge case: if he does not hand-tick, then every tick in `mood_logs` is a suggestion
+  echo, and the clamp has been double counting on every single check-in.
+- **⚠ Expect the clamp to go DORMANT after this fix, and do not "repair" it.** With provenance in
+  place and an owner who accepts the pre-selection, no tick is lifter-added, so
+  `Math.min(pct, 40)` stops firing — which is the correct outcome, because the recovery pct already
+  encodes the same fact. **The soreness-driven deload is unaffected and this was verified, not
+  assumed:** `computePerExerciseDeload` (`per-exercise-deload.ts:30-51`) takes `soreMusclesInSession`
+  straight from the mood log and matches it with `moodMuscleMatches`; it never reads
+  `sessionRecoveryScore` or the clamp. So the 48 h auto-suggest keeps driving deload exactly as it
+  does today while selection stops double counting — the separation this entry argues for.
+- **Branch:** _unassigned_ · **Added:** 2026-09-16 (BugFix intake). Owner, after BF-171 was explained
+  to him: *"I trained push/upper body yesterday and legs the day before. Surely it would see that I
+  trained the muscles it wants to use today - yesterday. Legs would be more recovered?"* **He is
+  right, the model agrees with him, and the score throws the agreement away.**
+- **Lane: A** — `packages/shared/src/ai-periodization/ai-dynamic.ts:80-85` (the clamp) and
+  `packages/shared/src/checkin/suggested-soreness.ts` (the source of the tick).
+- **The loop, and every number in it is measured (2026-09-16, production rows):**
+
+  1. `computeMuscleRecovery` returns **quads 69 · hamstrings 63 · glutes 73** (47 h since Legs) and
+     **chest 49 · shoulders 45 · triceps 59** (23 h since Push). The owner's reading of his own
+     training is exactly what the model says.
+  2. `suggestedSoreMuscles` **auto-ticks any muscle trained within 48 h and under `RECOVERED_PCT`
+     (85)** — so it reads *that same recovery output* and pre-selects Quads, Hamstrings, Glutes,
+     Chest, Shoulders, Triceps in the check-in.
+  3. The lifter accepts the pre-ticked list. His stored row for 2026-09-17 is
+     `["Chest","Shoulders","Triceps","Quads","Hamstrings","Glutes","Core"]`.
+  4. `sessionRecoveryScore` then reads **both** the recovery pct **and** the tick, and applies
+     `pct = Math.min(pct, 40)` for a sore main muscle.
+
+  **The same single fact — "you trained legs 47 hours ago" — is counted twice, and the second pass
+  overwrites the first with a harsher fixed number.** Quads the model scored 69 are scored 40.
+- **The clamp is a flat floor, so it also destroys the ordering the model just computed.** Quads at
+  69 and chest at 49 both become exactly **40**. The information the owner is asking about — that
+  his legs are fresher than his push muscles — exists in the recovery feed and is deleted before it
+  reaches the score.
+- **Measured consequence: it changes the recommendation.** Same day, same everything, with the leg
+  ticks removed:
+
+  | session | shipped | legs not ticked |
+  |---|---|---|
+  | **Lower** | 74 | **85 — wins** |
+  | **Upper** | **84 — wins** | 84 |
+  | Pull | 82 | 82 |
+  | Legs | 59 | 72 |
+  | Push | 37 | 37 |
+
+  Lower wins by 1.6 points once its muscles are scored at the value the model already assigned them.
+  **The leg soreness ticks are the whole reason the owner got Upper.**
+- **⚠ Replacing the clamp with a multiplier is NOT the fix — measured, and it does not work.**
+  `pct × 0.6` instead of `min(pct, 40)` preserves the ordering but leaves the winner unchanged
+  (Upper 82.0, Pull 81.7, Lower 75.8). The defect is the **double count**, not the clamp's shape.
+  Do not spend the entry on tuning the 40.
+- **`mood_logs` cannot tell the two cases apart, and that is the blocker for any fix.** The table
+  stores `sore_muscles` as a bare string array — id, user_id, log_date, energy_level, sleep_quality,
+  body_state, sore_muscles, created_at, updated_at, deleted_at. **There is no provenance column**, so
+  the scorer cannot distinguish *"the lifter volunteered that this is sore"* — real information the
+  model does not have, and which should absolutely override it — from *"the lifter accepted what the
+  model itself suggested"*, which is the model marking its own homework.
+- **Fix direction (owner decision, see below):** the coherent version needs provenance on the tick —
+  store whether each muscle was suggested or lifter-added, and apply the clamp only to lifter-added
+  ones, letting an accepted suggestion fall through to its computed recovery pct (which already
+  encodes the same fact). **This needs a migration and a local SQLite version, so it is Lane A's
+  alone.** A cheaper interim exists — suppress the clamp when the muscle's own recovery pct is
+  already below `RECOVERED_PCT`, i.e. when the tick cannot be carrying information the model lacks —
+  and it requires no schema change, but it also silently discards a genuine report in exactly the
+  case where the lifter is telling you the model is wrong.
+- **The owner gate this entry carried is CLEARED — decided 2026-09-16, see above.** The alternative it was weighed against
+  (suppress the clamp whenever the muscle's recovery pct is already under `RECOVERED_PCT`, no schema
+  change) is recorded here because it remains the correct fallback if the migration turns out to be
+  the expensive part: it fixes the same selection bug and costs only the lifter's ability to
+  contradict the model for an already-under-recovered muscle.
+- **Relationship to BF-171:** independent, and both are in `sessionRecoveryScore`. BF-171 is about
+  names not matching; this is about a matched name being penalised twice. **Fixing BF-171 makes this
+  one worse**, because normalising `core` → `abs` adds one more correctly-matched sore muscle to the
+  double count. Ship them together or ship this one first.
+- **Verification:** a unit test on `computeAiDynamicNextSession` asserting that a muscle whose
+  recovery pct is already under `RECOVERED_PCT` is not additionally clamped by a tick that
+  `suggestedSoreMuscles` would itself have produced. No device run — pure shared math.
+- **⚠ The owner proposed a third option — narrow the auto-tick window from 48 h to 24 h
+  (*"look for a muscle group trained within the past 24 hours instead"*). Measured 2026-09-16: it
+  does flip the pick to Lower, by 0.4 points.** Auto-ticked drops to Chest/Shoulders/Triceps and the
+  board reads Lower **84.4** · Upper **84.0** · Pull 82 · Legs 71 · Push 37.
+  **Two reasons it is not the recommendation despite landing right today:**
+  1. **It decides the pick by less than half a point**, which is a nudge, not a fix. The double
+     count is still live inside 24 h — chest at 49 is still clamped to 40 — so the same defect
+     simply moves to the freshly-trained muscles.
+  2. **The 48 h window is doing a second job that this would break.** Soreness also drives the
+     per-exercise deload (`soreMusclesInSession`), and `suggested-soreness.ts` chose 48 h because
+     *DOMS peaks ~24-48h*; its own header calls back-to-back leg days at 46-47 h *"exactly the case
+     worth deloading"*. Narrowing to 24 h stops auto-flagging at the DOMS peak.
+  **The separation worth keeping is: 48 h for the DELOAD question, no double count for the
+  SELECTION question.** Fixing the double count makes the window choice stop being load-bearing,
+  which is why it is fixed here and the window is left alone.
+
+### [workouts][readiness] BF-171 — the session picker matches muscle names raw, so "Back" sore clamps nothing and `core` never finds its recovery
+
+- **Needs: BF-173**
+- **⚠ The `Needs:` above is load-bearing and is not a nicety — shipping this entry first makes the
+  recommendation WORSE.** Normalising `core` → `abs` and matching the `Back` pill both feed *more*
+  correctly-matched sore muscles into BF-173's double count, so every muscle this entry newly
+  matches is a muscle that then gets clamped to 40 on top of its own recovery figure. These two were
+  briefly batched to force the ordering; a migration cannot be batched, so the dependency field
+  carries it instead.
+- **Branch:** _unassigned_ · **Added:** 2026-09-16 (BugFix intake). Owner, on a screenshot showing
+  **Upper recommended** with chest/shoulders/triceps listed as sore: *"How does this work? I did push
+  yesterday which was an upper- why would it reccomened upper?"*
+- **Lane: A** — `packages/shared/src/ai-periodization/ai-dynamic.ts:61-93` (`recoveryPct`,
+  `sessionRecoveryScore`).
+- **The recommendation he is asking about is CORRECT, and reproducing it is what found the defect.**
+  The engine does not think in Push/Pull/Upper/Lower labels — it scores muscle overlap. Fed his real
+  program, his real seven logged sessions and his real check-in, `computeAiDynamicNextSession`
+  returns (measured 2026-09-16, a scratch harness against production rows, matching his screenshot's
+  alternatives list to the point):
+
+  | session | overall | recovery | balance | freshness |
+  |---|---|---|---|---|
+  | **Upper** | **84** | 70 | 100 | 100 |
+  | Pull | 82 | 91 | 50 | 100 |
+  | Lower | 74 | 62 | 81 | 100 |
+  | Legs | 59 | 57 | 33 | 99 |
+  | Push | 37 | 43 | 16 | 48 |
+
+  Upper's chest, shoulders and triceps **are** penalised — every sore main-role muscle is clamped to
+  40. But five of Upper's nine weighted muscle-units are back and biceps, last trained Sunday and
+  sitting at 95%, and Upper itself has not run for six days, so balance and freshness both read 100.
+  70 × 0.55 + 100 × 0.25 + 100 × 0.20 = 84. Push, trained yesterday, scores 37. **The engine is
+  doing the thing he expected it to do; the answer is just that "Upper" is half a Pull session.**
+- **What is actually broken is the name matching inside `sessionRecoveryScore`, and it has two
+  limbs.** Both were measured on the same harness.
+
+  ```ts
+  function recoveryPct(muscle: string, recoveries: MuscleRecovery[]): number {
+    const r = recoveries.find(m => m.muscle.toLowerCase() === muscle.toLowerCase())
+    if (!r) return 100                                   // ← a miss reads as fully recovered
+  }
+  …
+  const soreSet = new Set(soreMuscles.map(m => m.toLowerCase()))
+  if (role === 'main' && soreSet.has(muscle.toLowerCase())) pct = Math.min(pct, 40)
+  ```
+
+  1. **Sore "Back" clamps nothing.** `SORE_MUSCLE_GROUPS` (`components/checkin/sore-muscle-picker.tsx:11`)
+     offers **Back** as a pill, and the exercise library has no muscle called `back` — it has `lats`,
+     `upper back` and `traps`. Exact lowercased equality therefore matches none of them. **Measured:
+     adding `Back` to his sore list moves every one of the five scores by zero** — Upper stays 84.
+     A lifter whose back is wrecked gets Pull and Upper recommended at full confidence.
+  2. **`core` never finds its own recovery.** `computeMuscleRecovery` keys its output through
+     `normalizeMuscle`, which folds `core` → **`abs`**; the assignments it is matched against say
+     `core` (Hanging Leg Raise in both Legs and Lower, Barbell Squat secondary). The lookup misses
+     and returns **100**, while the real value in the same payload is `{"muscle":"abs","pct":86}`.
+- **This is the only soreness/recovery consumer in the repo that matches raw.** `moodMuscleMatches`
+  exists in `packages/shared/src/muscles.ts:34` for exactly this job — a broad mood label against a
+  specific exercise muscle — and is used by `per-exercise-deload.ts:51`, `signals.ts:326,347`,
+  `soreness-volume.ts:46`, `suggested-soreness.ts:45` and `app/api/workout-data/route.ts:511,517`.
+  Six consumers normalise; the seventh — the one that **picks the session** — does not.
+- **Fix: route both sides through the shared helpers.** `recoveryPct` compares
+  `normalizeMuscle(r.muscle) === normalizeMuscle(muscle)`; the sore test becomes
+  `soreMuscles.some(label => moodMuscleMatches(muscle, label))`. Do not hand-roll a synonym list
+  here — that is the divergence `muscles.ts`'s own header comment records having already cleaned up
+  once.
+- **Expect the fix to move scores in BOTH directions, and check that before shipping.** The two
+  limbs currently cancel in one place: `core` matches the sore pill exactly (so today the clamp
+  fires) while missing the recovery lookup (so the 86% is thrown away). Normalising only the
+  recovery side **raises** Legs 59 → 62 and Lower 74 → 77, because `abs` then stops matching the
+  `core` pill. Normalising both is the coherent state; the entry is not done until the fix is
+  measured against a fixture carrying a `Back` pill and a `core` assignment together.
+- **Verification:** a unit test on `computeAiDynamicNextSession`, not a device run — this is pure
+  shared math and the harness settles it. Assert (a) a session whose only main muscles are `lats`
+  and `upper back` scores lower with `Back` sore than without, and (b) an assignment naming `core`
+  reads the `abs` recovery entry rather than 100.
+- **Not a defect, checked and cleared:** the ordering itself. Freshness, balance and the recovery
+  weights all behave as documented, and the 0.55/0.25/0.20 low-readiness weighting fired correctly
+  (his readiness was 37).
+- **⚠ Two further hypotheses were measured and BOTH cleared — do not re-open them (2026-09-16).**
+  The owner's follow-up was *"is this correct or should it have been lower?"*, so the ground is
+  written down rather than left to be re-covered.
+
+  1. **"Freshness and balance are keyed on session NAME while recovery is keyed on MUSCLE, so an
+     overlapping session gets credit for rest half its muscles did not get."** True as a
+     description — **44.4%** of Upper's weighted muscle work was trained in the previous 24 h, and
+     it still scores freshness 100 — but it changes nothing here. Upper's muscle-weighted age is
+     **49.7 h**, which is past `sessionFreshnessScore`'s 48 h cap, so a muscle-derived freshness
+     saturates at 100 too and Upper lands at **83.5 instead of 84**. Push is the only session the
+     change moves (37.2 → 40.8, i.e. further from selection). **Do not rebuild freshness on muscle
+     age expecting it to separate overlapping sessions — the 48 h cap is what makes it not.**
+  2. **"The overlap with yesterday is invisible to the score."** It is not — it is already priced
+     in as Upper's recovery **70** against Pull's **91**.
+- **What the numbers DO say, and it is a presentation question rather than a scoring one:** Upper
+  **84** and Pull **82** is a near-tie decided by under a point. Pull is the better-recovered option
+  and loses only on being less overdue (balance 50 vs 100). The home card presents the winner as a
+  definite recommendation with no indication the runner-up is within noise. Filed nowhere yet
+  deliberately — it is a design call for the owner, not a defect, and BF-172 fixes the part of this
+  frame that IS wrong.
+
 ### [readiness] TN-34 — the stress-deload override fires on 83% of days, off the one number measured to carry no signal
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-10 · found answering the owner's *"is stress a real usable value?"*
@@ -821,183 +1037,6 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
 - **Where to look for the data:** `oura_raw_samples` and the workout log both go back far enough to
   fit against something observable (next-session performance, RPE against expected RPE) rather than
   against intuition about muscle size.
-
-### [workouts][readiness] BF-173 — the app pre-ticks soreness FROM the recovery model, then penalises the same muscle a second time for it
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-16 (BugFix intake). Owner, after BF-171 was explained
-  to him: *"I trained push/upper body yesterday and legs the day before. Surely it would see that I
-  trained the muscles it wants to use today - yesterday. Legs would be more recovered?"* **He is
-  right, the model agrees with him, and the score throws the agreement away.**
-- **Lane: A** — `packages/shared/src/ai-periodization/ai-dynamic.ts:80-85` (the clamp) and
-  `packages/shared/src/checkin/suggested-soreness.ts` (the source of the tick).
-- **The loop, and every number in it is measured (2026-09-16, production rows):**
-
-  1. `computeMuscleRecovery` returns **quads 69 · hamstrings 63 · glutes 73** (47 h since Legs) and
-     **chest 49 · shoulders 45 · triceps 59** (23 h since Push). The owner's reading of his own
-     training is exactly what the model says.
-  2. `suggestedSoreMuscles` **auto-ticks any muscle trained within 48 h and under `RECOVERED_PCT`
-     (85)** — so it reads *that same recovery output* and pre-selects Quads, Hamstrings, Glutes,
-     Chest, Shoulders, Triceps in the check-in.
-  3. The lifter accepts the pre-ticked list. His stored row for 2026-09-17 is
-     `["Chest","Shoulders","Triceps","Quads","Hamstrings","Glutes","Core"]`.
-  4. `sessionRecoveryScore` then reads **both** the recovery pct **and** the tick, and applies
-     `pct = Math.min(pct, 40)` for a sore main muscle.
-
-  **The same single fact — "you trained legs 47 hours ago" — is counted twice, and the second pass
-  overwrites the first with a harsher fixed number.** Quads the model scored 69 are scored 40.
-- **The clamp is a flat floor, so it also destroys the ordering the model just computed.** Quads at
-  69 and chest at 49 both become exactly **40**. The information the owner is asking about — that
-  his legs are fresher than his push muscles — exists in the recovery feed and is deleted before it
-  reaches the score.
-- **Measured consequence: it changes the recommendation.** Same day, same everything, with the leg
-  ticks removed:
-
-  | session | shipped | legs not ticked |
-  |---|---|---|
-  | **Lower** | 74 | **85 — wins** |
-  | **Upper** | **84 — wins** | 84 |
-  | Pull | 82 | 82 |
-  | Legs | 59 | 72 |
-  | Push | 37 | 37 |
-
-  Lower wins by 1.6 points once its muscles are scored at the value the model already assigned them.
-  **The leg soreness ticks are the whole reason the owner got Upper.**
-- **⚠ Replacing the clamp with a multiplier is NOT the fix — measured, and it does not work.**
-  `pct × 0.6` instead of `min(pct, 40)` preserves the ordering but leaves the winner unchanged
-  (Upper 82.0, Pull 81.7, Lower 75.8). The defect is the **double count**, not the clamp's shape.
-  Do not spend the entry on tuning the 40.
-- **`mood_logs` cannot tell the two cases apart, and that is the blocker for any fix.** The table
-  stores `sore_muscles` as a bare string array — id, user_id, log_date, energy_level, sleep_quality,
-  body_state, sore_muscles, created_at, updated_at, deleted_at. **There is no provenance column**, so
-  the scorer cannot distinguish *"the lifter volunteered that this is sore"* — real information the
-  model does not have, and which should absolutely override it — from *"the lifter accepted what the
-  model itself suggested"*, which is the model marking its own homework.
-- **Fix direction (owner decision, see below):** the coherent version needs provenance on the tick —
-  store whether each muscle was suggested or lifter-added, and apply the clamp only to lifter-added
-  ones, letting an accepted suggestion fall through to its computed recovery pct (which already
-  encodes the same fact). **This needs a migration and a local SQLite version, so it is Lane A's
-  alone.** A cheaper interim exists — suppress the clamp when the muscle's own recovery pct is
-  already below `RECOVERED_PCT`, i.e. when the tick cannot be carrying information the model lacks —
-  and it requires no schema change, but it also silently discards a genuine report in exactly the
-  case where the lifter is telling you the model is wrong.
-- **Gate: owner** — the two directions differ in what they cost and in what they lose, so the owner
-  picks. Present it as: provenance (durable, needs a migration, keeps every real report) versus the
-  interim suppression (ships this week, no schema, loses the lifter's ability to contradict the model
-  for an already-under-recovered muscle).
-- **Relationship to BF-171:** independent, and both are in `sessionRecoveryScore`. BF-171 is about
-  names not matching; this is about a matched name being penalised twice. **Fixing BF-171 makes this
-  one worse**, because normalising `core` → `abs` adds one more correctly-matched sore muscle to the
-  double count. Ship them together or ship this one first.
-- **Verification:** a unit test on `computeAiDynamicNextSession` asserting that a muscle whose
-  recovery pct is already under `RECOVERED_PCT` is not additionally clamped by a tick that
-  `suggestedSoreMuscles` would itself have produced. No device run — pure shared math.
-- **⚠ The owner proposed a third option — narrow the auto-tick window from 48 h to 24 h
-  (*"look for a muscle group trained within the past 24 hours instead"*). Measured 2026-09-16: it
-  does flip the pick to Lower, by 0.4 points.** Auto-ticked drops to Chest/Shoulders/Triceps and the
-  board reads Lower **84.4** · Upper **84.0** · Pull 82 · Legs 71 · Push 37.
-  **Two reasons it is not the recommendation despite landing right today:**
-  1. **It decides the pick by less than half a point**, which is a nudge, not a fix. The double
-     count is still live inside 24 h — chest at 49 is still clamped to 40 — so the same defect
-     simply moves to the freshly-trained muscles.
-  2. **The 48 h window is doing a second job that this would break.** Soreness also drives the
-     per-exercise deload (`soreMusclesInSession`), and `suggested-soreness.ts` chose 48 h because
-     *DOMS peaks ~24-48h*; its own header calls back-to-back leg days at 46-47 h *"exactly the case
-     worth deloading"*. Narrowing to 24 h stops auto-flagging at the DOMS peak.
-  **The separation worth keeping is: 48 h for the DELOAD question, no double count for the
-  SELECTION question.** Fixing the double count makes the window choice stop being load-bearing,
-  which is why it is fixed here and the window is left alone.
-
-### [workouts][readiness] BF-171 — the session picker matches muscle names raw, so "Back" sore clamps nothing and `core` never finds its recovery
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-16 (BugFix intake). Owner, on a screenshot showing
-  **Upper recommended** with chest/shoulders/triceps listed as sore: *"How does this work? I did push
-  yesterday which was an upper- why would it reccomened upper?"*
-- **Lane: A** — `packages/shared/src/ai-periodization/ai-dynamic.ts:61-93` (`recoveryPct`,
-  `sessionRecoveryScore`).
-- **The recommendation he is asking about is CORRECT, and reproducing it is what found the defect.**
-  The engine does not think in Push/Pull/Upper/Lower labels — it scores muscle overlap. Fed his real
-  program, his real seven logged sessions and his real check-in, `computeAiDynamicNextSession`
-  returns (measured 2026-09-16, a scratch harness against production rows, matching his screenshot's
-  alternatives list to the point):
-
-  | session | overall | recovery | balance | freshness |
-  |---|---|---|---|---|
-  | **Upper** | **84** | 70 | 100 | 100 |
-  | Pull | 82 | 91 | 50 | 100 |
-  | Lower | 74 | 62 | 81 | 100 |
-  | Legs | 59 | 57 | 33 | 99 |
-  | Push | 37 | 43 | 16 | 48 |
-
-  Upper's chest, shoulders and triceps **are** penalised — every sore main-role muscle is clamped to
-  40. But five of Upper's nine weighted muscle-units are back and biceps, last trained Sunday and
-  sitting at 95%, and Upper itself has not run for six days, so balance and freshness both read 100.
-  70 × 0.55 + 100 × 0.25 + 100 × 0.20 = 84. Push, trained yesterday, scores 37. **The engine is
-  doing the thing he expected it to do; the answer is just that "Upper" is half a Pull session.**
-- **What is actually broken is the name matching inside `sessionRecoveryScore`, and it has two
-  limbs.** Both were measured on the same harness.
-
-  ```ts
-  function recoveryPct(muscle: string, recoveries: MuscleRecovery[]): number {
-    const r = recoveries.find(m => m.muscle.toLowerCase() === muscle.toLowerCase())
-    if (!r) return 100                                   // ← a miss reads as fully recovered
-  }
-  …
-  const soreSet = new Set(soreMuscles.map(m => m.toLowerCase()))
-  if (role === 'main' && soreSet.has(muscle.toLowerCase())) pct = Math.min(pct, 40)
-  ```
-
-  1. **Sore "Back" clamps nothing.** `SORE_MUSCLE_GROUPS` (`components/checkin/sore-muscle-picker.tsx:11`)
-     offers **Back** as a pill, and the exercise library has no muscle called `back` — it has `lats`,
-     `upper back` and `traps`. Exact lowercased equality therefore matches none of them. **Measured:
-     adding `Back` to his sore list moves every one of the five scores by zero** — Upper stays 84.
-     A lifter whose back is wrecked gets Pull and Upper recommended at full confidence.
-  2. **`core` never finds its own recovery.** `computeMuscleRecovery` keys its output through
-     `normalizeMuscle`, which folds `core` → **`abs`**; the assignments it is matched against say
-     `core` (Hanging Leg Raise in both Legs and Lower, Barbell Squat secondary). The lookup misses
-     and returns **100**, while the real value in the same payload is `{"muscle":"abs","pct":86}`.
-- **This is the only soreness/recovery consumer in the repo that matches raw.** `moodMuscleMatches`
-  exists in `packages/shared/src/muscles.ts:34` for exactly this job — a broad mood label against a
-  specific exercise muscle — and is used by `per-exercise-deload.ts:51`, `signals.ts:326,347`,
-  `soreness-volume.ts:46`, `suggested-soreness.ts:45` and `app/api/workout-data/route.ts:511,517`.
-  Six consumers normalise; the seventh — the one that **picks the session** — does not.
-- **Fix: route both sides through the shared helpers.** `recoveryPct` compares
-  `normalizeMuscle(r.muscle) === normalizeMuscle(muscle)`; the sore test becomes
-  `soreMuscles.some(label => moodMuscleMatches(muscle, label))`. Do not hand-roll a synonym list
-  here — that is the divergence `muscles.ts`'s own header comment records having already cleaned up
-  once.
-- **Expect the fix to move scores in BOTH directions, and check that before shipping.** The two
-  limbs currently cancel in one place: `core` matches the sore pill exactly (so today the clamp
-  fires) while missing the recovery lookup (so the 86% is thrown away). Normalising only the
-  recovery side **raises** Legs 59 → 62 and Lower 74 → 77, because `abs` then stops matching the
-  `core` pill. Normalising both is the coherent state; the entry is not done until the fix is
-  measured against a fixture carrying a `Back` pill and a `core` assignment together.
-- **Verification:** a unit test on `computeAiDynamicNextSession`, not a device run — this is pure
-  shared math and the harness settles it. Assert (a) a session whose only main muscles are `lats`
-  and `upper back` scores lower with `Back` sore than without, and (b) an assignment naming `core`
-  reads the `abs` recovery entry rather than 100.
-- **Not a defect, checked and cleared:** the ordering itself. Freshness, balance and the recovery
-  weights all behave as documented, and the 0.55/0.25/0.20 low-readiness weighting fired correctly
-  (his readiness was 37).
-- **⚠ Two further hypotheses were measured and BOTH cleared — do not re-open them (2026-09-16).**
-  The owner's follow-up was *"is this correct or should it have been lower?"*, so the ground is
-  written down rather than left to be re-covered.
-
-  1. **"Freshness and balance are keyed on session NAME while recovery is keyed on MUSCLE, so an
-     overlapping session gets credit for rest half its muscles did not get."** True as a
-     description — **44.4%** of Upper's weighted muscle work was trained in the previous 24 h, and
-     it still scores freshness 100 — but it changes nothing here. Upper's muscle-weighted age is
-     **49.7 h**, which is past `sessionFreshnessScore`'s 48 h cap, so a muscle-derived freshness
-     saturates at 100 too and Upper lands at **83.5 instead of 84**. Push is the only session the
-     change moves (37.2 → 40.8, i.e. further from selection). **Do not rebuild freshness on muscle
-     age expecting it to separate overlapping sessions — the 48 h cap is what makes it not.**
-  2. **"The overlap with yesterday is invisible to the score."** It is not — it is already priced
-     in as Upper's recovery **70** against Pull's **91**.
-- **What the numbers DO say, and it is a presentation question rather than a scoring one:** Upper
-  **84** and Pull **82** is a near-tie decided by under a point. Pull is the better-recovered option
-  and loses only on being less overdue (balance 50 vs 100). The home card presents the winner as a
-  definite recommendation with no indication the runner-up is within noise. Filed nowhere yet
-  deliberately — it is a design call for the owner, not a defect, and BF-172 fixes the part of this
-  frame that IS wrong.
 
 ### [workouts][app-shell] BF-172 — the explain screen calls the session-fit score "readiness", so it reads 84 HIGH directly above "readiness 37 · Low"
 

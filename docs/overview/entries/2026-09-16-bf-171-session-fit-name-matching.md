@@ -132,3 +132,34 @@ hamstrings do not move at all.
 undoing what the narrower window gave them. Both of the owner's ideas land on Upper together and
 Lower separately. That is the argument for fitting BF-174 against data rather than shipping a
 plausible table, and for BF-173 landing first.
+
+## Owner decision — provenance, and the premise confirmed
+
+*"It auto picked muscles for me i didnt choose them manually."* — **BF-173 was filed with that as an
+inference from `suggestedSoreMuscles`'s thresholds; it is now a statement from the lifter.** It also
+promotes the defect from an edge case to the normal path: if he does not hand-tick, every tick in
+`mood_logs` is a suggestion echo and the clamp has double counted on every check-in.
+
+*"Happy to go with your recommendation."* — **provenance**, over the cheaper no-schema suppression.
+The gate on BF-173 is cleared and the alternative stays recorded as the fallback if the migration
+proves to be the expensive half.
+
+**Two consequences written into the entry so they are not re-litigated:**
+
+- **The clamp will go dormant**, because with provenance and an owner who accepts the pre-selection
+  no tick is lifter-added. That is the correct outcome — the recovery pct already carries the fact —
+  and the entry says so, because an implementer who finds `Math.min(pct, 40)` never firing will
+  otherwise "fix" it back.
+- **The deload is unaffected, and this was verified rather than assumed.**
+  `computePerExerciseDeload` (`per-exercise-deload.ts:30-51`) reads `soreMusclesInSession` from the
+  mood log through `moodMuscleMatches` and never touches `sessionRecoveryScore`. So the 48 h
+  auto-suggest keeps driving deload while selection stops double counting — which is exactly the
+  separation the entry argued for, now confirmed in code.
+
+BF-173 and BF-171 move to the top of the queue, **sequenced rather than batched**. The first attempt
+batched them — both edit `sessionRecoveryScore`, both settle on the same unit tests — and
+`next-item.js` rejected it correctly: the provenance fix carries a migration, and a migration never
+batches because its revert is a corrective migration. `Needs: BF-173` on BF-171 gets the same
+ordering guarantee at no revert risk, and the ordering genuinely matters — BF-171 landing first
+would make the recommendation worse, since every muscle it newly matches is a muscle BF-173's double
+count then clamps to 40.

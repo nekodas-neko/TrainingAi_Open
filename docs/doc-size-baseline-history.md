@@ -13102,3 +13102,14 @@ with no measurement attached gets proposed again. The 24 h window flips the pick
 is the reason it is not the fix; the per-muscle constants do not change the pick alone and **cancel
 the window change when combined**, which is the reason BF-174 has to be fitted rather than guessed.
 Recording an interaction that surprised the session is worth more than the lines it costs.
+
+## 2026-09-16 (same PR, fifth raise) — `docs/implementation-backlog.md` 23125 → 23164
+
+The owner confirmed BF-173's premise outright (*"It auto picked muscles for me i didnt choose them
+manually"*) and approved the provenance direction, so the entry gains the decision, the cleared gate,
+the batch with BF-171, and a queue note for the move to the top.
+
+The two lines that will look like padding to a later reader and are not: **the clamp goes dormant
+after this fix**, and **the deload path is independent of it** (verified in
+`per-exercise-deload.ts`, not assumed). Both describe a fix that correctly makes code stop firing,
+which is the shape a future session reliably mistakes for a regression and undoes.
