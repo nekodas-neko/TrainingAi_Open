@@ -13025,3 +13025,18 @@ inside the window — a filter that does not filter.
 Those lines exist so the next session does not build it and believe it worked. The alternative was a
 `Gate: owner` with no explanation, which is the shape that gets cleared by someone who cannot see why
 it was set.
+
+## 2026-09-16 — backlog → 22841: TN-25's engine half shipped, and the band left open on purpose
+
++26. The selector landed; the entry now records what shipped, what did not, and one open design
+question stated as a decision rather than left implicit.
+
+The lines that matter are the ⚠ pair. **The engine half does not fix the reported defect** — the
+pacer still says "push" on every fast interval, because that comes from the band in `walk-active.tsx`
+and nothing here touched it. An entry reading "✅ shipped" without that would be read as done.
+
+And the band is a real fork: TN-25 says target 105–118 bpm *directly*, which taken literally is a
+constant true of one 33-year-old. The entry now carries the recommendation (derive from % of HRmax,
+not % of reserve — same numbers for this owner, stays per-user, and breaks the coupling the entry
+actually names), what the literal reading is better at, and the reversal cost. Picking it silently
+inside an engine PR would have seeded how every HR target in the app is expressed.
