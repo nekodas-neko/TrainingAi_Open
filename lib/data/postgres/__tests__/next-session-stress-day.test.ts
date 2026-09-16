@@ -1,9 +1,19 @@
-// Regression: the ai_dynamic deload override must read TODAY's daytime-stress from
-// oura_daily_derived, not the earliest row in the [yesterday, today] range. The bug
-// (adapter read `derivedRows[0]`, which is yesterday under an ASC-sorted range) let a
-// stale prior-day stress spike trip today's Deload/Rest prompt on a day the user felt
-// fine. This seeds yesterday=high / today=low and asserts NO deload, plus a today=high
-// control. Runs only against a real local dev Postgres — skips cleanly in CI.
+// TN-34 (2026-09-16): daytime stress no longer drives the deload override AT ALL, so this file's
+// original subject is gone and its assertions are inverted rather than deleted.
+//
+// It was a regression test for the adapter reading `derivedRows[0]` — yesterday, under an ASC-sorted
+// range — so a stale prior-day stress spike tripped today's Deload/Rest prompt. **That day-selection
+// is now unreachable through the recommendation:** `todayDerived` still picks today correctly, but
+// its only consumer is `stressHighMinutes`, which the engine now ignores. There is no longer a way
+// to observe the yesterday/today bug through `deloadOrRestRecommended`.
+//
+// So both cases now pin the UNWIRING at the integration layer, which is the level that catches a
+// re-wire in the adapter rather than in the shared function. **Do not "restore" the old
+// today=high → true assertion**: it would not be fixing a broken day-selection, it would be
+// re-introducing a deload flag that fired on 83% of the owner's days off a number correlating
+// +0.072 with readiness. See TN-34.
+//
+// Runs only against a real local dev Postgres — skips cleanly in CI.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { todayInTz, toAestDay } from '@trainingai/shared/date-utils'
 
@@ -73,17 +83,26 @@ describe.skipIf(!canRun)('getNextSession — deload stress override reads today,
     )
   }
 
-  it('does NOT recommend a deload when yesterday was high-stress but today is not', async () => {
-    await setDerived(yesterday, 180) // stale prior-day spike — the old bug read this
+  it('does NOT recommend a deload when yesterday was high-stress', async () => {
+    await setDerived(yesterday, 180)
     await setDerived(today, 0)
     const rec = await repo.getNextSession(TEST_USER_ID, TZ)
     expect(rec.deloadOrRestRecommended ?? false).toBe(false)
   })
 
-  it('DOES recommend a deload when today itself is high-stress', async () => {
+  it('does NOT recommend a deload when TODAY is high-stress either (TN-34 unwired it)', async () => {
     await setDerived(yesterday, 0)
     await setDerived(today, 180)
     const rec = await repo.getNextSession(TEST_USER_ID, TZ)
-    expect(rec.deloadOrRestRecommended).toBe(true)
+    expect(rec.deloadOrRestRecommended ?? false).toBe(false)
+  })
+
+  it('stays unrecommended at an extreme value — unwired, not re-thresholded', async () => {
+    // The entry warns that raising STRESS_HIGH_DAY_THRESHOLD_MIN would be the fifth
+    // "the threshold is right, the input is wrong" in this pillar. 1000 minutes clears any
+    // plausible raised constant, so this fails if someone re-thresholds instead of unwiring.
+    await setDerived(today, 1000)
+    const rec = await repo.getNextSession(TEST_USER_ID, TZ)
+    expect(rec.deloadOrRestRecommended ?? false).toBe(false)
   })
 })
