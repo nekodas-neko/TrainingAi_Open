@@ -74,11 +74,17 @@ describe('the real queue classifies exactly as it did before', () => {
 
   // Measured 2026-09-13, after BF-46's sentence was reworded to clear red `main`. Pinned by ID so a
   // future parser change that un-parks or newly parks an entry names it instead of moving a count.
-  it('yields the same eighteen gates, by id', () => {
+  //
+  // **Q-305 dropped 2026-09-16, and this is the mechanism working rather than failing.** OR-118
+  // (#1247) split the push:pull build out of Q-305 and freed it from that `Keep:` on purpose — its
+  // own title says so — which is exactly the "un-parks an entry" case this list exists to surface.
+  // The entry is named here rather than the count being edited, so the next reader can tell an
+  // intended change from a parser regression.
+  it('yields the same seventeen gates, by id', () => {
     expect(gated).toEqual([
       'BF-80:device', 'LB-53:owner', 'BF-10:device', 'Q-486:device', 'Q-499:device', 'Q-477:device',
       'Q-467:device', 'LB-5:device', 'Q-317:device', 'Q-318:device', 'Q-316:device', 'Q-544:device',
-      'Q-538:device', 'Q-461:device', 'Q-319:device', 'Q-305:device', 'Q-513:owner', 'Q-281:device',
+      'Q-538:device', 'Q-461:device', 'Q-319:device', 'Q-513:owner', 'Q-281:device',
     ])
   })
 })
