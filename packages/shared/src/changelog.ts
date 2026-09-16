@@ -6,6 +6,35 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.457.5",
+    date: "2026-09-16",
+    changes: [
+      "The guided walk stops telling you to push on every single fast block. Its fast target was 70% of your heart-rate reserve \u2014 133 bpm \u2014 which you have never once reached in 44 attempts, averaging 98.5, because that target is not reachable by walking for someone your age. It is now a band of 101\u2013118, which is 60\u201370% of your max and where \"conversational aerobic\" actually sits. The cue can also tell you to ease off now, which it never could before: a fast block only had a floor, so the only thing it could ever say was push.",
+    ],
+  },
+  {
+    version: "1.457.4",
+    date: "2026-09-16",
+    changes: [
+      "Your maintenance calories are now checked against how much you actually move. The app works out two of them on every screen \u2014 one from what you eat and what the scale does, one from your resting burn plus your measured movement \u2014 and it never compared them. The first had drifted to a figure implying hard training six or seven days a week, against roughly 3,500 steps a day. It is refused now rather than quietly nudged into range, and the app falls back to the estimate your movement supports.",
+    ],
+  },
+  {
+    version: "1.457.3",
+    date: "2026-09-16",
+    changes: [
+      "Health data synced from your phone is filed against your own day now, not the phone's. If you travelled, readings taken overnight could land on the wrong date \u2014 and the overnight HRV and blood-oxygen windows, which only count midnight to 8am, could miss the night entirely. Both now use the timezone in your profile.",
+    ],
+  },
+  {
+    version: "1.457.2",
+    date: "2026-09-16",
+    changes: [
+      "Your daytime stress figure no longer counts the hours you were asleep. It was measuring the whole calendar day, so more than four in ten of the half-hours behind it were recorded while you were in bed \u2014 and one in five of the minutes it called high stress. Worse, your sleeping hours were also setting the bar the rest of the day was judged against: because your heart rate is low asleep, leaving those hours in raised the baseline, and your waking hours were then scored as stressed for falling below it. Both are fixed, so the number now describes your day.",
+      "A restless night at a high heart rate also used to be counted as daytime stress. It no longer is \u2014 it belongs to your sleep and readiness, which already read it.",
+    ],
+  },
+  {
     version: "1.457.1",
     date: "2026-09-16",
     changes: [

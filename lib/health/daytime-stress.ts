@@ -11,7 +11,7 @@
  * (`runDhrvImputation`). Deterministic given its inputs. See the P3 plan doc.
  */
 import type { DaytimeStressConstants } from '@/lib/oura-models/constants'
-import { daytimeHrvEstimatesPerBucket, type DaytimeHrvModel } from '@trainingai/shared/health/daytime-hrv-model'
+import { daytimeHrvEstimatesPerBucket, inSleepWindow, type DaytimeHrvModel, type SleepWindow } from '@trainingai/shared/health/daytime-hrv-model'
 
 export interface DhrvBaselines {
   /** baseline daytime HRV (ms) — recent overnight HRV is a reasonable proxy at cold start */
@@ -233,10 +233,26 @@ export function buildDaytimeStressSeriesFromModel(
   b: DhrvBaselines,
   fromMs: number,
   toMs: number,
+  /**
+   * Sleep windows overlapping `[fromMs, toMs)`. Buckets inside one are dropped BEFORE scoring, so
+   * they reach neither the levels nor `scoreStressPoints`' day-median baseline (LA-112).
+   *
+   * **Required, with no default, deliberately.** A `= []` here would read as "no sleep to exclude"
+   * at a call site that simply forgot, which is the silent-omission shape CLAUDE.md's day-window
+   * rule already names — the compiler refusing a new caller is the whole safety net. Pass `[]` only
+   * when the window provably cannot contain sleep.
+   */
+  sleepWindows: SleepWindow[],
   bucketMs = STRESS_BUCKET_MS,
 ): StressPoint[] {
   if (hr.length === 0 || temp.length === 0 || met.length === 0) return []
+  // Dropped before `scoreStressPoints`, not after, and that ordering is the fix. Its baseline is the
+  // day-MEDIAN dhrv across whatever it is handed, and a sleeping bucket has a low heart rate, so
+  // (hr_coef being negative) a high imputed dhrv. Leaving sleep in raises the median, and every
+  // waking bucket is then scored as below-baseline — i.e. stressed. Filtering only the SUMMARY would
+  // drop the sleeping buckets from the count and leave the waking ones still mis-scored.
   const raw = daytimeHrvEstimatesPerBucket(model, temp, met, hr, fromMs, toMs, bucketMs)
+    .filter(p => !inSleepWindow(p.t, sleepWindows))
   return scoreStressPoints(raw, b)
 }
 

@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **275** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **276** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v38** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -627,6 +627,28 @@ true mean on night 2 rather than converging for fifty.
 - ✅ **SEED FIXED 2026-08-25** (`fix/baseline-zero-seed`) — see BF-13 for the full note, including
   the ⚠ Keep: the stored baselines are still zero-folded and one **Redecode** run re-derives them,
   which could not be done from a sandbox. This entry's pass tests stay unmeasured until it runs.
+
+- ⚙️ **RE-DERIVATION SHIPPED, NOT RUN 2026-09-16** (`lane-a/bf13-tn6-baseline-seed`) —
+  `POST /api/admin/rederive-baselines` replays the fold cold (`seed = null`) over the nights already
+  in `oura_daily_summary` and rewrites the temperature baseline and `temp_dev_c`. It restates no
+  formula: it folds through `computeDailySummaries`, the same function the rollup folds with, so what
+  it writes is by construction what a fresh fold would have written. `dryRun` is the default; only
+  `?dryRun=false` commits.
+  - **Only temperature is written**, per the second half of the owner's 2026-08-24 decision. The
+    other five baselines are recomputed and **reported** so a later measurement has the number in
+    front of it, and are written back unchanged. A test asserts that on every written row.
+  - **Why a route rather than the Redecode this entry's old `Keep:` named.** A full-history Redecode
+    also re-derives — post-seed-fix it folds `seed = null` and replaces the table — but it re-decodes
+    every stored sample and rewrites the nightly VALUES too, and it has no dry run. The owner's
+    decision turns on the re-derivation touching a corrupted *intermediate* and leaving the raw
+    nightly values alone; this route is that act exactly.
+  - **Recommended run order, because the two mechanisms are complementary:** dry-run this route first
+    to read the size of the change, then commit with `?dryRun=false`. Fire the async full-history
+    Redecode instead **only** if the illness re-stamp matters in the same pass — see Q-506's `Keep:`,
+    which is the one thing this route deliberately does not do.
+- **Keep:** the run is owed and is the owner's to fire. It is a production data write, so it was
+  deliberately not executed from the sandbox. **TN-6's and Q-506's pass tests, and this entry's, stay
+  unmeasured until it runs.**
 ### [readiness][devices] TN-6 — the temperature baseline is 0.36 °C too low, so readiness carries a −16 pt penalty on 89% of days
 - **Lane:** A — engine only: lib/health.
 
@@ -730,6 +752,12 @@ real.
 permanently-positive deviation cannot tell illness from baseline error.
 
 Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/2026-08-24-readiness-temperature-penalty.md).
+
+- ⚙️ **The re-derivation this entry waits on now has a mechanism, unrun (BF-13, 2026-09-16)** —
+  `POST /api/admin/rederive-baselines`, `dryRun` by default.
+- **Keep:** the pass tests here — the −16 pt penalty gone, and the mean morning anchor above 75 over
+  the trailing 30 days — can only be measured after the owner fires it. Re-measure then; do not
+  strike this entry before that.
 
 ### [nutrition] BF-170 — a lone saved meal shows its macros nowhere (fixed; the device look is what is left)
 
@@ -1262,43 +1290,66 @@ not from the harness.
   details, press the system back gesture — arrive on **More** with the More tab active. The harness
   cannot speak for the Android back gesture or the WebView's history handling.
 
-### [readiness][heart-rate] TN-39 — the daytime-stress model is an imputation that has never been checked against the measured HRV sitting in the database 🔴 LIVE
+### [readiness][platform] LA-114 — the stress bucket column is named `bucket_start` and holds the MIDPOINT; renaming it is blocked
 
-- **Branch:** _unassigned_ · **Added:** 2026-09-15 · owner: *"this might be a good opportunity to investigate other metrics we can calculate from our data too."*
-- **Lane: A** — `packages/shared/src/health/daytime-hrv-model.ts` · `packages/shared/src/health/rmssd.ts` · reads `rr_intervals` via `getRrForWindow`.
-- **Review:** [`audit`](reviews/2026-09-15-what-else-our-data-could-tell-us.md).
-- **Sibling of TN-33** (which measured the stress signal) and **TN-34** (the override). **This is the validation both of those had to assume.**
+- **Lane: A** · **Added:** 2026-09-16 · Lane A, from TN-39's validation. **Re-filed the same day**
+  after the rename was attempted and reverted — read the ⛔ below before touching this.
+- **Journal:** [`the attempt and why it failed`](overview/entries/2026-09-16-lane-a-la114-bucket-mid.md).
+- **Half-done, deliberately.** `daytimeHrvEstimatesPerBucket` emits `t = bStart + bucketMs / 2` and
+  `run.ts` writes it straight into `bucket_start`, so stored timestamps sit on a :15/:45 grid.
+  **Shipped:** migration 275 (a `COMMENT ON COLUMN`) and the Drizzle property renamed to `bucketMid`,
+  so TypeScript no longer lies. **Not fixed:** `claude_ro` still exposes `bucket_start`, and that is
+  the surface where the defect actually bit.
+- **⛔ DO NOT RE-ATTEMPT THE `ALTER TABLE ... RENAME COLUMN`.** It was written, applied, pushed, and
+  reverted on 2026-09-16; CI's Migration Check rejected it and was right to. The job replays every
+  migration against a schema that already has everything (LA-13), and **every historical `claude_ro`
+  view migration — 213, 215, 218, 221 … 274 — selects `t.bucket_start`**, because each regenerates
+  the full view set. All of them fail after a rename. Editing them is not available: `ensureSchema`
+  tracks by FILENAME, so an edited already-applied migration is skipped forever.
+  - `migrate.js` has a `REPLAY_EXEMPT` map whose single entry is a rename (*"002 renamed the column
+    its `cardio_sessions` FK references"*), so the hatch exists — but using it here means exempting
+    **a dozen** view migrations from the check that caught this, to land a cosmetic fix. That is not
+    a trade worth making, and it is why this entry is not simply "rename it properly".
+  - **The general constraint, which is the reusable part:** a column an earlier migration names by
+    hand cannot be renamed in this repo without exempting every such migration from the replay check.
+- **The one live idea that would reach the surface that matters:** teach
+  `scripts/generate-claude-ro-views.js` an alias map so the view emits `t.bucket_start AS bucket_mid`.
+  Replay-safe — the base table keeps its name, so no historical migration breaks. **Cost:** `public`
+  and `claude_ro` would disagree about the column's name, which is a second naming confusion bought
+  to fix the first. Not obviously right; that is the decision this entry is waiting on, and it is
+  small enough to prototype before proposing.
+- **Until then, the caller adds 15 minutes.** A join against another 30-minute series on the epoch
+  grid returns ZERO rows, which reads as "no overlapping data" rather than "the join is 15 minutes
+  out". It cost an hour on 2026-09-16.
+- **Pass test:** a join written the obvious way against `claude_ro` lands on the right bucket, or the
+  read surface names the column for what it holds.
 
-**Daytime stress is imputed, not measured.** The ring streams HRV events for ~7% of waking hours, so
-the model fits `ln(rmssd) = a + b·hr + c·temp` on NIGHT data and applies it to daytime HR and temp.
-That imputation produces `stress_high_minutes`, which drives the deload override that fired on **10
-of the owner's last 22 days** (TN-36).
+### [readiness][devices] LA-113 — the daytime-HRV imputation reads ~⅓ of measured HRV, and its heart-rate slope is ~2× too steep
 
-**Ground truth exists and nobody has looked at it.** The Polar H10 writes raw beat intervals to
-`rr_intervals` — measured 2026-09-15: **136,440 beats across 48 days**, worn **07:00–13:00, peaking
-at 08:00**. That is exactly the window the model is guessing about. Twelve of the last fourteen
-strap days carry thousands of beats on days the stress model also ran:
-
-| day | strap beats | stress_high_minutes |
-|---|---:|---:|
-| 2026-09-14 | 5,559 | 150 |
-| 2026-09-08 | 5,993 | 90 |
-| 2026-09-01 | 5,843 | 270 |
-| 2026-09-06 | 4,369 | 150 |
-
-**The work:** compute `rmssdFromRr` over the overlapping 30-minute buckets, compare against the
-imputed dHRV for the same buckets, and report agreement. `rmssdFromRr` already exists, is
-artifact-filtered, and already runs on this exact data for workout windows — so this is a
-measurement, not an integration.
-
-**⚠ Do NOT change the model on the strength of this before the owner sees the result** — scoring
-changes are Tuning-proposes/owner-signs-off. The output is a number and a verdict, not a patch.
-
-**⚠ The comparison is only valid on overlapping buckets** — the strap covers ~6 waking hours, not
-the whole day, so a day's `stress_high_minutes` cannot be compared as a total.
-
-**Pass test:** a written agreement figure between imputed and measured daytime HRV over at least
-ten days, with the disagreement characterised (bias, spread) rather than summarised as good or bad.
+- **Lane: A** · **Added:** 2026-09-16 · Lane A, from TN-39's validation.
+- **Review:** [`the measurement`](reviews/2026-09-16-daytime-stress-imputation-vs-measured-hrv.md).
+- **Gate: owner** — this is a scoring change. Tuning proposes, the owner signs off, Lane A implements.
+  TN-39 said so outright: *"Do NOT change the model on the strength of this before the owner sees the
+  result. The output is a number and a verdict, not a patch."*
+- **Measured**, model vs `rmssdFromRr` over the app's own 30-minute grid: **×0.30 of measured over 84
+  buckets / 37 days**, ×0.32 over the 54 densest / 30 days, ×0.31 on the 14 buckets that join a scored
+  stress bucket. The spread (sd of log-ratio 0.40) is far smaller than the bias, so it is a level
+  error, not noise. Slope: measured **−0.026 … −0.028** per bpm against the model's **−0.0555**.
+- **The assumed temperature does not explain it** — swept 28–36 °C the ratio moves only 0.30 → 0.36,
+  and inverting per bucket for the temperature that would make the model exact gives **67–87 °C**.
+- **✅ What IS validated, and should not be re-investigated:** the functional form. `corr(HR, ln rmssd)`
+  is **−0.78** on measured daytime data across 30–37 days. `ln(rmssd) = a + b·hr + c·temp` is the right
+  shape; only its level and slope are in question.
+- **⛔ Do not change a coefficient on this evidence.** Three confounds, none resolvable from stored
+  data: the strap is chest ECG and the model was fit on the ring's PPG night RMSSD, so it predicts
+  ring-scale values by construction; the measured daytime values (76–93 ms) sit **above** the owner's
+  ring night baseline (~55.8 ms), which is backwards for daytime resting HRV and points at the
+  instrument rather than the fit; and the strap is worn while walking, where movement genuinely raises
+  RMSSD.
+- **First action, and it is not a code change:** a controlled capture — the strap worn **at rest**, in
+  the same window the ring streams its own HRV events, so ring RMSSD and strap RMSSD are comparable on
+  the same minutes. Until that exists the level gap has two live explanations and no measurement
+  separates them.
 
 ### [devices][heart-rate] TN-40 — the strap's 136,440 beats produce exactly one number, while three models that could use them run on the ring alone
 
@@ -1415,43 +1466,100 @@ is the easiest place to launder an estimate into something that looks measured.
 **Pass test:** load-vs-readiness is computable for a user with no wearable at all, and every
 composite reports which of its inputs were inferred.
 
-### [devices] TN-44 — Health Connect defines ten record types our pillars want and we do not read, including skin temperature
+### [devices] LA-115 — Health Connect reads three record types the plugin cannot parse, and fails silently on all three
+
+- **Lane: A** · **Added:** 2026-09-16 · Lane A, from TN-44's investigation.
+- **Gate: device** — needs a new APK and an on-device Health Connect permission grant.
+- **Review:** [`the source read`](reviews/2026-09-16-health-connect-record-converter-gap.md).
+- **⚠ This supersedes TN-44's framing.** That entry files the work as "add ten types to
+  `HC_SYNC_READ_TYPES`". The list is not the wall — see TN-44 as re-scoped below.
+- **Measured from the pinned plugin's own source** (`@devmaxime/capacitor-health-connect@1.1.0`,
+  patched locally). `RecordConverter` has exactly **seven** `is XRecord ->` branches —
+  `ExerciseSession`, `Steps`, `Weight`, `SleepSession`, `RestingHeartRate`, `BodyFat`, `Nutrition` —
+  and its fallback is `else -> record.toString()`. An unhandled record comes back as a **Kotlin
+  string blob**, so every field access is `undefined`.
+- **Three types we already ask for land there:**
+
+  | type | read at | result |
+  |---|---|---|
+  | `HeartRateVariabilityRmssd` | `health-connect-sync.ts:343` | `heartRateVariabilityMillis` undefined |
+  | `OxygenSaturation` | `:365` | `percentage` undefined |
+  | `HeartRateSeries` | `:154` (enrich path) | `samples` undefined |
+
+  Each is inside `try { … } catch { /* ignore */ }` and feeds a date filter that drops everything:
+  `new Date(undefined)` → Invalid Date → `NaN` hour → the window test is false. **No error, no log.**
+- **`TotalCaloriesBurned` and `Distance` are fine** — they go through `aggregateRecords`, which has
+  its own `when (type)` in the Kotlin and never reaches `RecordConverter`.
+- **The greppable tell:** every broken call carries `as any` on its `type`. That cast is what let a
+  type past the plugin's `RecordType` union. `BodyFat` and `Nutrition` also carry it and are FINE,
+  because the repo's patch added them to **both** the union and the Kotlin — the patch added
+  `HeartRateVariabilitySdnn`/`OxygenSaturation` to the union **only**. So `as any` marks the boundary
+  where the type list outran the converter.
+- **⚠ The production numbers corroborate but do not prove it.** The owner's `body_metrics` rows that
+  HC touched (n = 17) credit `health_connect` with steps 15 and weight 11, and **HRV 0, SpO₂ 0** — but
+  also **resting heart rate 0**, whose converter branch *does* exist. `source_map` records only the
+  winning source under the ranked merge and the ring outranks HC for those fields, so a zero is
+  equally consistent with "HC produced a value and lost". **Do not quote the zeros as proof.**
+- **The fix is Kotlin, in `patches/@devmaxime__capacitor-health-connect.patch`:** a `RecordConverter`
+  branch per type, plus widening the TS `RecordType` union to match. **Do the union and the Kotlin in
+  the same change** — splitting them is what produced this.
+- **Pass test:** a non-null HRV and SpO₂ value from a Health-Connect source lands in `body_metrics`,
+  observed on the device. Per the external-API rule, the integration is not done until a value is in
+  the column.
+
+### [platform][devices] LB-113 — the Health Connect sync takes the user's timezone; nothing passes it yet
+
+- **Lane: B** · **Added:** 2026-09-16 · Lane A, from TN-44. **Lane B because the caller is a component.**
+- `syncHealthConnect(tz = DEFAULT_TZ)` and `enrichActivityLogs(candidates, tz = DEFAULT_TZ)` take the
+  user's timezone as of 2026-09-16; `components/health-connect-provider.tsx` calls both without it,
+  so both fall back to `DEFAULT_TZ`.
+- **Correct for the owner, wrong for anyone else**, and silent either way — the default is the safety
+  net CLAUDE.md warns makes forgetting invisible. The provider has the session and can pass
+  `session.user.timezone`.
+- **Small and local:** two call sites in one component.
+- **Pass test:** neither entry point is called without a timezone.
+
+### [devices] TN-44 — Health Connect record types the pillars want, and what it would actually take to read them
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-15 · owner supplied the Health Connect type list.
-- **Lane: A** — `lib/health-connect-sync.ts` (`HC_SYNC_READ_TYPES`).
-- **Review:** [`review`](reviews/2026-09-15-base-data-reachability-and-composites.md).
+- **Lane: A**
+- **Gate: device** — every new type needs a plugin patch and a new APK.
+- **Review:** [`review`](reviews/2026-09-15-base-data-reachability-and-composites.md), and
+  [`the plugin source read`](reviews/2026-09-16-health-connect-record-converter-gap.md) which
+  **re-scoped this entry on 2026-09-16**.
 - **Sibling of PS-41** (normalising HC's HR series) and **TN-38** (the tier model this feeds).
+- **✅ Still true, and it is the valuable half:** this retires the connector guide's §5.6 claim that
+  skin temperature is a hardware dependency with no second source. **Health Connect defines
+  `SkinTemperatureRecord`**, and `HeartRateVariabilityRmssdRecord` for HRV. The ring-only list is a
+  claim about *our read list and the user's device*, not about the platform.
+- **⛔ CORRECTED: this is NOT an addition to `HC_SYNC_READ_TYPES`.** The pinned plugin's
+  `RecordConverter` handles **seven** record types and falls back to `else -> record.toString()`; the
+  read path is generic (it resolves through the SDK's `RECORDS_TYPE_NAME_MAP`), so **conversion is
+  the wall, not permission**. Adding a type to the list without a converter branch yields a Kotlin
+  string blob whose every field reads `undefined` — which is already happening to three types we ask
+  for today. **Fix LA-115 first**, or this repeats its defect ten more times.
+- **The ten types and what they feed** (unchanged, and still what makes the work worth doing):
 
-**⚠ This retires a claim the connector guide makes.** §5.6 classifies skin temperature as a hardware
-dependency with no second source, costing readiness 0.10 and the illness radar 0.40. **Health
-Connect defines `SkinTemperatureRecord`**, and `HeartRateVariabilityRmssdRecord` for HRV. The
-ring-only list is a claim about *our read list and the user's device*, not about the platform:
-**Health Connect can carry every input our pillars need except beat-to-beat intervals.**
+  | record | feeds |
+  |---|---|
+  | `SkinTemperatureRecord` | readiness .10 · illness radar .40 — **the largest gap** |
+  | `RespiratoryRateRecord` | illness radar .25 |
+  | `ActiveCaloriesBurnedRecord` | activity 15/100 — we read *Total*, not *Active* |
+  | `Vo2MaxRecord` | cardio, progress markers |
+  | `DistanceRecord` · `HydrationRecord` | activity · nutrition |
+  | `BasalMetabolicRateRecord` | energy balance |
+  | `LeanBodyMassRecord` · `BoneMassRecord` · `BodyWaterMassRecord` | body composition |
 
-We read 11 types. Ten more exist that the pillars would use:
-
-| record | feeds |
-|---|---|
-| `SkinTemperatureRecord` | readiness .10 · illness radar .40 — **the largest gap** |
-| `RespiratoryRateRecord` | illness radar .25 |
-| `ActiveCaloriesBurnedRecord` | activity 15/100 — we read *Total*, not *Active* |
-| `Vo2MaxRecord` | cardio, progress markers |
-| `DistanceRecord` · `HydrationRecord` | activity · nutrition |
-| `BasalMetabolicRateRecord` | energy balance |
-| `LeanBodyMassRecord` · `BoneMassRecord` · `BodyWaterMassRecord` | body composition — the scale covers the owner, a HC user has no other route |
-
-**⚠ Two defects on the same path, found while reading the file — both hit the Health-Connect user
-specifically:** the overnight HRV and SpO₂ windows filter on `d.getHours()` (lines 347, 369) and
-`toLocalDate` resolves the **device** timezone, which is the class CLAUDE.md bans — invisible until
-the device leaves the user's zone, then a night's HRV lands on the wrong day. And line 51 documents
-`hrvMs` as *"SDNN"* while the code reads rMSSD; the code is right, and the comment is worth fixing
-because this repo has already shipped that exact mix-up once.
-
-**⚠ Reading a type is not receiving it** — not all devices write all records, which is the owner's
-own caveat and the argument for TN-38's inferred contributors rather than against reading the type.
-
-**Pass test:** `HC_SYNC_READ_TYPES` covers skin temperature and respiratory rate, the overnight
-windows use the user's timezone, and a Health-Connect-only account can populate the illness radar.
+  **`ActiveCaloriesBurned` and `Distance` are the cheap two** — both are already in the plugin's
+  `AggregateRecordType` with Kotlin behind them, so they need no converter work. Start there.
+- **✅ Shipped from this entry 2026-09-16** (`lane-a/tn44-hc-timezone-and-converter`): the overnight
+  HRV/SpO₂ windows now bucket in the **user's** timezone rather than the device's — the class
+  CLAUDE.md bans — and `toLocalDate` delegates to `toAestDay` instead of being a second
+  implementation of it. The stale `hrvMs` *"SDNN"* comment is corrected; the code reads RMSSD.
+- **Keep:** the record types themselves, all of which now wait on **LA-115**.
+- **⚠ Reading a type is not receiving it** — not all devices write all records, which is the owner's
+  own caveat and the argument for TN-38's inferred contributors rather than against reading the type.
+- **Pass test:** a Health-Connect-only account can populate the illness radar, observed on a device.
 
 ### [platform][devices] TN-38 — normalisation is implemented three different ways and nothing names them as one concept
 
@@ -1630,12 +1738,26 @@ Connect's discarded `HeartRateSeries` (**PS-41**) and calls it *"the concrete, f
 general rule"* — singular. This is a second, larger instance.
 
 **Three steps, rising cost:**
-1. **Amend §5.4 to say what is true**, naming the readiness read list. **A written invariant the code
-   does not hold is worse than none** — the next connector author will trust it. Docs-only; do not
-   make it wait on 2 or 3.
-2. **Drop the two dead Cloud reads** — `getOuraDaily` and `getLatestOuraCloudVitals` return nothing
-   usable and are half the violation. **⚠ Re-verify the NULL-on-recent-rows finding at the time of the
-   change** rather than trusting this snapshot.
+1. ✅ **DONE 2026-09-16** (`lane-a/tn37-connector-guide-invariant`). §5.4 names the readiness read
+   list and what each store contributes; §5.5's *"the concrete, fixable instance"* is corrected to
+   *"a"*, since it asserted PS-41 was the only one.
+2. **⛔ CORRECTED — DO NOT DROP THESE READS. Both are load-bearing; this step as originally written
+   would have caused a regression.** The entry's own ⚠ said to re-verify rather than trust the
+   snapshot, and doing so is what caught it (2026-09-16):
+   - **`getOuraDaily` is NOT dead.** Every *Cloud-scored* column is NULL — 35 of 35 rows since
+     2026-08-14 — which is what the original snapshot saw. But **`non_wear_time_sec` is populated on
+     35 of 35**, written by the BLE rollup's wear step, and `readiness-payload.ts:329,341` passes it
+     through `excludeLowWearDays` for the **HRV and RHR baselines**. Dropping the read silently
+     disables wear filtering on two baselines — a scoring change, and a bad one.
+   - **`getLatestOuraCloudVitals` is a deliberate stale surface**, not a dead read: it supplies
+     `vo2Max`, `vascularAge` and `cloudVitalsDate`, and the UI renders them *"as of
+     `cloudVitalsDate`"* (`readiness-payload.ts:154`). Dropping it removes those fields outright.
+   - **What is actually available here:** narrowing `getOuraDaily` to the columns still written, so
+     the read stops *looking* like a Cloud dependency. That is cosmetic, and it is not worth a
+     scoring risk — fold it into step 3 rather than doing it alone.
+   - **The lesson, since this is the second entry this week whose conclusion outran its
+     measurement:** "every scored column is NULL" is not "the table is dead". Check for a *live
+     writer* before calling a read dead — `oura_daily` has one.
 3. **Then decide what the derived layer IS** — app-computed and source-neutral (the rename plan
    applies, any source should contribute), or genuinely Oura-only (then §4's table should mark which
    pillars degrade without a ring). **⚠ Do not start 3 without its own plan** — `2026-08-02-de-oura-naming.md`
@@ -3123,10 +3245,19 @@ from it; and a test asserts the walk's fast target equals the Zone-2 floor **bec
 anchor, not by arithmetic coincidence.
 
 ### [cardio] TN-31 — split the interval JOG out of Guided Walk into a Run type; a walk and a jog are two sessions, not two speeds
-- **Lane:** A — both (2 engine, 3 surface) → A, engine half first.
-
+- **Lane: A** — both halves (2 engine, 3 surface) → A, engine half first. The surface half is
+  `components/cardio/modality-picker.tsx` (the three-way picker), `components/guided-walk/**` and
+  `app/running/**`; the engine half is `packages/shared/src/running/hr-targets.ts` and
+  `running/types.ts`. **One `Lane:` declaration, deliberately** — this entry carried two (an `A` field
+  and a `B` bullet) until 2026-09-16, and the tooling reads the first while a human reads the last.
+- **Needs: TN-30**
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · owner: *"these should be 2 different options then… if we are doing jogging it should fall under the Run category in cardio… Run could consist of that interval Jog as a style; whereas the walk is more a walk."*
-- **Lane: B** — `components/cardio/modality-picker.tsx` (the three-way picker), `components/guided-walk/**`, `app/running/**`. **Lane A** for `packages/shared/src/running/hr-targets.ts` if a new run type is added.
+- **⚠ The `Needs:` above was PROSE until 2026-09-16, so this entry sat at the TOP of READY while it
+  was blocked.** Its own text says *"which run type this maps to depends on TN-30's outcome. Sequence
+  TN-30 first, or the new session type gets built against an anchor that then moves."* — which
+  `next-item.js` cannot see. The real chain is **TN-25 → TN-30 → TN-31** (TN-30 is itself parked on
+  `Needs: TN-25`). A dependency written as a sentence is not a dependency as far as the queue is
+  concerned.
 - **✅ OWNER DECISION, 2026-09-09 — yes, move it to Run, as an ASSIGNED run type among several.** *"Move into run; and have it be a run type that gets assigned. Interval sprints / Interval Jog / Consistent run / Slow Jog — these + more should be on the cards for variation — also decided scientifically based on my week/day."* Gate cleared.
 - **Review:** [`review`](reviews/2026-09-08-walk-intensity-calibration.md) addenda 4–6. **Resolves TN-25's owner question** by splitting it rather than answering it.
 
@@ -3258,6 +3389,28 @@ the right shape and the wrong scope: it explains the macro-vs-calorie gap only.
 - **Lane:** A — `packages/shared/src/nutrition/adaptive-tdee.ts`, alongside **TN-29** and best built with it.
 - **Added:** 2026-09-10 · owner, after his budget rose 651 kcal: *"I thought discussed 1650 was like the maint? with 200 minus for recomp? how did we go up?"* — he was right, and checking him is what found this.
 - **Needs:** — nothing. **Cross-reference TN-29**, which catches this *instance* through a different mechanism; the cause below is not the one TN-29 names, and will recur on every new vial.
+- **Gate: owner** — added 2026-09-16, and it is a DATA correction rather than a decision. See below.
+- ⚙️ **STATUS 2026-09-16 — the general guard shipped; this entry's specific fix is blocked on one
+  date the owner has to set.**
+  - **TN-29's ceiling is in** (v1.457.4), and it catches *this instance*: the 2,245 that prompted
+    this entry is now rejected because the owner's measured movement cannot account for it. **That is
+    the instance, not the cause** — exactly as this entry says.
+  - **The prerequisite is half-cleared. BF-136 SHIPPED** (v1.446.2, 2026-09-10): `opened_on` has a
+    user-settable "Opened on" date now, bounded 180 days back and correctable in place. So the
+    mechanism this entry wants is buildable.
+  - **⚠ But the owner's data was never corrected, so the marker is still wrong for the one vial that
+    matters.** Measured 2026-09-16: one vial, **Retatrutide, `opened_on` = 2026-09-10, identical to
+    its `created_at`** — the auto-set date BF-136 was filed about. This entry's own measurement puts
+    the first dose around **2026-09-04** (23 pre-drug days + 6 on-drug within 2026-08-12 → 09-10).
+    **A drug-start exclusion keyed on 09-10 would leave the six confounded days inside the window** —
+    the exact span driving the 2,245. Building it now would ship a filter that does not filter.
+  - **The owner action, and it is one edit:** correct the Retatrutide vial's *Opened on* date to the
+    actual first dose. Then this entry is unblocked and the exclusion can be built and verified
+    against a window that is really the drug's.
+- **⚠ This entry's `Needs:` says "nothing" while its body calls BF-136 "a prerequisite in fact if not
+  in form".** That is the same prose-dependency shape TN-31 carried (fixed 2026-09-16) — invisible to
+  `next-item.js`. BF-136 has since shipped so no `Needs:` is owed, but the owner data correction is,
+  hence the `Gate:` above.
 
 **Measured across 29 weigh-ins, 2026-08-12 → 09-10, by linear fit rather than endpoints:**
 
@@ -3327,7 +3480,22 @@ moving, which is the failure mode BF-134 was filed about on the same screen.
 - **Reversal cost:** low — a window filter plus a status string. No stored value changes.
 
 ### [nutrition] TN-29 — the app measures this owner's activity factor at 1.41 and then accepts a maintenance implying 1.67, because nothing cross-checks the two estimates it already computes
-- **Lane:** A — engine only: packages/shared, lib/health.
+- **Lane: A** — engine only: `packages/shared/src/nutrition/adaptive-tdee.ts`, `lib/health/energy-balance-service.ts`.
+- ✅ **THE GATE SHIPPED 2026-09-16** (`lane-a/tn29-maintenance-ceiling`, v1.457.4).
+  `estimateMaintenance` takes a `measuredMovementKcal` ceiling and rejects — never clamps — an
+  estimate more than `MAX_MEASURED_MOVEMENT_RATIO` (**1.15**) above it, with its own
+  `above_measured_movement` exclusion and message. `energy-balance-service` hoists the window-average
+  movement above `resolveMaintenance` (it used to sit below it, gated on the very result it now
+  bounds) and passes `formulaBaseline + avgActiveOverWindow`.
+  - **1.15 is the number this entry deliberately did not settle**, and it still wants fitting against
+    more than one owner-month. It rejects the owner's 2,245 at a ceiling of 2,179 and allows ~15% for
+    movement the step count cannot see. It is one exported constant; change it there.
+  - **The ceiling TRACKS the measurement**, which is what keeps it from rejecting a genuine training
+    block — a real block raises the measured-movement estimate and the ceiling with it. A test pins
+    that: the same window refused at 1,895 is accepted at 2,400.
+- **Keep:** the SECOND half — *"stop asking the user to grade themselves"*, showing the measured
+  activity factor and offering it instead of `users.activity_level`. Not started; its blast radius is
+  the VO₂max crosscheck, the water goal and the AI context, and it is a surface change.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · owner: *"I wonder if we could estimate the activity level value or tune how we do ours."*
 - **Lane: A** — `packages/shared/src/nutrition/adaptive-tdee.ts` (`estimateMaintenance`, the `minMaintenanceKcal` floor), fed from `lib/health/energy-balance-service.ts:236-260` where both estimates already sit in scope.
@@ -3548,7 +3716,45 @@ reports fast-block compliance and interval contrast for the session, and both nu
 between a treadmill walk and an outdoor walk without any surface-specific adjustment.
 
 ### [cardio][heart-rate] TN-25 — the guided walk's fast target has never been met in 44 attempts, and the live pacer says "push" every time
-- **Lane:** A — both (1 engine, 1 surface) → A, engine half first.
+- **Lane: A** — both (1 engine, 1 surface) → A, engine half first.
+- ✅ **ENGINE HALF SHIPPED 2026-09-16** (`lane-a/tn25-walk-pattern-selector`), unversioned — it is not
+  wired to a surface yet, so nothing user-visible changed.
+  `packages/shared/src/walking/recommend-walk-pattern.ts`: `WALK_PATTERNS` (the owner-approved
+  four-row table) and `recommendWalkPattern(quota, opts)`, deterministic, mirroring
+  `recommendRunType`'s shape and its no-LLM rule.
+  - **Zone 2 alone drives it, deliberately** — a walk is the mode this owner cannot push past Zone 2
+    in (0 of 44), so grading it against higher zones would prescribe work the mode cannot deliver.
+    Zones 3+ are what `recommendRunType` is for. A test pins that a huge open Zone 4/5 gap changes
+    nothing.
+  - **It picks a PATTERN and never an HR band**, keeping the separation `recommendRunType` already
+    keeps. That is what stops an anchor change moving the walk — and it means the band below is
+    still entirely outstanding.
+- ✅ **THE BAND SHIPPED 2026-09-16** (`lane-a/tn25-walk-band`, v1.457.5) — the half that fixes the
+  reported defect. `walkFastBandBpm(hrMax)` in `hr-zones.ts` returns **[101, 118]** at this owner's
+  168 max, `walk-active.tsx` uses it instead of `hrReserveTarget(0.70, …)` = 133, and `ZoneTargets`
+  gained an optional `fastMax` so `classifyZone` can return **`'ease'`** on a fast block — the half a
+  floor could never say, and why the cue could only ever read *push*.
+  - **The band question is decided and the reasoning is in the code**: % of **max HR**, not % of
+    reserve. Same numbers today, stays per-user, and decoupled from the reserve anchor TN-30 moves.
+  - **⚠ It returns 101–118 where this entry quotes 105–118** — the standard 0.60 lower edge against
+    the entry's rounded figure, 4 bpm apart. Named in the source rather than silently reconciled;
+    `WALK_FAST_BAND_PCT_OF_MAX[0]` → 0.625 matches the quote exactly.
+  - **The slow ceiling is untouched** (0.40 of reserve): met on 78% of blocks, so nothing in the data
+    says it is wrong.
+- **⚠ Keep: WIRING THE SELECTOR.** `recommendWalkPattern` shipped in #1262 and **still has no
+  caller** — so the pattern is not actually assigned yet, which is the owner's *"I'd like that to be
+  determined for me"*. The band fixes the cue; the selector fixes the prescription, and it is inert
+  until something calls it.
+- **⚠ The band is an open DESIGN question, and the entry's instruction and good practice pull apart.**
+  This entry says *"the band, not the fraction: target **105–118 bpm** directly."* Taken literally
+  that is a hardcoded constant true of a 33-year-old with a 168 max and wrong for anyone else.
+  - **Recommendation: derive it from % of HRmax (0.60–0.70), not % of reserve.** That yields exactly
+    105–118 for this owner, is the model the session's own copy is written in (*"conversational
+    aerobic"*), stays per-user, and breaks the coupling this entry actually names — which is to
+    **reserve**, since `0.70 × reserve` is what re-anchoring at 178 would move from 133 to 140.
+  - **What the literal reading is better at:** it cannot move at all, under any anchor change. If
+    the owner wants the walk frozen against TN-30 entirely, hardcode it and say so.
+  - **Reversal cost: low** — one expression either way, no stored value.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-08 · owner: *"what makes it effective is the 2 speeds — should I be walking faster or slower during any phases?"*
 - **Lane: A** — `components/guided-walk/walk-active.tsx:67-68` sets the targets; `classifyZone` in `hr-zones.ts` renders the verdict.
@@ -10314,6 +10520,23 @@ Review: [`docs/reviews/2026-08-25-threshold-sweep.md`](reviews/2026-08-25-thresh
   removed). Until it runs every pass test here is unmeasured: deviation mean within ±0.05 °C with
   ~half the nights negative; `temp_dev_c > 1.0` on 0 nights (TN-8); biomarker table re-measured,
   since every z moves ~19× and the radar may then fire too often (Q-506).
+
+- ⚙️ **Half of this entry's pass test is now a check (BF-13, 2026-09-16).**
+  `lib/__tests__/rederive-baselines-route.test.ts` asserts the mask premise directly: against a
+  zero-seed baseline **every** scored night's deviation is positive, and after the cold re-fold the
+  deviations straddle zero with **none** above `TEMP_DEV_FEVER_LIMIT_C`. So the comment's premise is
+  a test rather than a comment, as this entry asked.
+- **Keep:** the other half is still owed and the fixture cannot supply it. The test's nightly series
+  is realistic (its zero-seed baseline lands on **35.464**, the same value BF-13 measured in
+  production) but its deviations peak at **0.671**, not the **1.33** the owner's history reaches — so
+  it reproduces the sign bias, not the six nights that actually cross 1.0. *"`temp_dev_c > 1.0` on 0
+  nights of the owner's stored history"* is measurable only after the re-derivation runs.
+- **Correction to the note above:** the Redecode's blocker was the **sandbox**, not production.
+  `lib/oura-models/constants/` is delivered at boot in production (`scripts/private-paths.json`), so
+  a Redecode is runnable there. `POST /api/admin/rederive-baselines` needs no decoder at all — it
+  folds the stored nightly values — which is why it is also the one path that works where those
+  constants are absent.
+
 ### [readiness] TN-9 — readiness moves when the check-in is logged; the owner wants it final on first open
 - **Lane:** A — engine only: packages/shared.
 
@@ -14585,10 +14808,53 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   is the second time an inline gate inside a Keep has done it (the first was BF-46).
 
 
-### [workouts] OR-118 — the push:pull balance card, split out of Q-305 and startable now
+### [workouts][platform] LB-111 — expose per-muscle sets over a window, so a movement-balance card can be built
 
-- **Lane:** B — `components/health/` (the Training surface), reading shared helpers only. No storage,
-  no derivation change: every number it renders already exists.
+- **Lane:** A — `app/api/**`. The engine half of **OR-118**, which is parked on it. Filed by Lane B
+  on 2026-09-16 after checking: the number OR-118 renders cannot be fetched by any client today.
+- **What is missing is an exposure, not a derivation.**
+  `getWeeklySetsByMuscleGroup(userId, programId, weekStart, weekEnd, tz)` already takes **arbitrary**
+  start and end dates in spite of its name (`lib/data/postgres/slices/periodization.ts:518`, and on
+  the repository interface). Every route that calls it throws that away and computes the current week
+  server-side: `weekly-muscle-sets` (`GET()`, no params), `ai-periodization/weekly-volume`
+  (`startOfWeekInTz(tz)` + 6), and nothing else reaches it.
+- **The ask:** a windowed read — a `from`/`to` (or `days`) param on `weekly-muscle-sets`, or its own
+  route. Lane A's call which; the shape OR-118 needs is `{ muscle, sets }[]` for a span, with the
+  same main/secondary 1.0/0.5 weighting the three existing surfaces already agree on.
+- **⚠ Decide `programId` explicitly — it is the reason this is not a one-liner.** The method scopes
+  to a single program and a 60-day window can span a programme change, so sets logged under a
+  previous programme either count or vanish. **Recommendation: count them**, because the card's claim
+  is about the lifter's training balance, not about one programme's adherence — but it is a real
+  choice and the answer belongs in the route's own comment, not in the card.
+- **Date params:** `normalizeDateParam` at the handler and a `[-/]` regex in the Zod schema, per
+  CLAUDE.md — the client's `localDateString()` emits slashes.
+- **Verification:** a non-null row count for a span that crosses a programme change, which is the
+  case the `programId` decision turns on.
+
+### [workouts] OR-118 — the push:pull balance card, split out of Q-305 (engine half missing; see below)
+
+- **Needs:** LB-111
+- **⛔ THE "EVERY NUMBER ALREADY EXISTS" PREMISE IS FALSE, checked 2026-09-16 before building.** The
+  *grouping* exists — `movementPattern()` shipped as LB-103 and has **no callers yet**, so this card
+  would be its first. The *numbers* do not: *"legs 481 · push 433 · pull 333 · other 168 over 60
+  days"* came from a direct query, and **no client-reachable route serves sets by muscle over any
+  window but the current one.** Verified, not assumed:
+  - `GET /api/weekly-muscle-sets` — `GET()`, no params, computes this Monday server-side.
+  - `GET /api/ai-periodization/weekly-volume` — same, `startOfWeekInTz(tz)` + 6 days, hardcoded.
+  - `GET /api/muscle-tonnage-trend` — 6 weeks, but **tonnage, not sets**. Not a substitute: legs move
+    far heavier loads, so a tonnage share overstates them and would hide the pull-set deficit this
+    card exists to show. Rendering it under a set-balance label would be a false claim.
+  - `grep -rn '60.*day' app/api/*/route.ts` — nothing.
+- **The derivation is already there and windowed, which is why the engine half is small.**
+  `getWeeklySetsByMuscleGroup(userId, programId, weekStart, weekEnd, tz)` takes **arbitrary** start
+  and end dates despite its name (`lib/data/postgres/slices/periodization.ts:518`, on the repository
+  interface). What is missing is the **exposure**, and a route under `app/api/**` is Lane A's by the
+  path rule — *both halves → Lane A, engine half first*. Filed as **LB-111**.
+- **⚠ Its `programId` argument is the one real design question**, and it is the engine half's to
+  answer: the method scopes to one program, and a 60-day window can span a programme change. Whether
+  the card counts sets across programmes or only the active one changes the number on screen.
+- **Lane:** B — `components/health/` (the Training surface), reading shared helpers only. No storage
+  and no derivation change **in this half**; the window it reads has to come from LB-111 first.
 - **Added:** 2026-09-16, Orchestrator — split from **Q-305**, whose `Keep:` had been describing this
   as *"Lane B's and now unblocked"* since 2026-09-13 while parking it. See Q-305 for why that
   happened; the lesson is the entry's, the work is this one's.
@@ -15607,6 +15873,18 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - ✅ **SEED FIXED 2026-08-25** (`fix/baseline-zero-seed`) — see BF-13 for the full note, including
   the ⛔ Keep: the stored baselines are still zero-folded and one **Redecode** run re-derives them,
   which could not be done from a sandbox. This entry's pass tests stay unmeasured until it runs.
+
+- ⚙️ **A re-derivation mechanism now exists and has NOT been run (BF-13, 2026-09-16).**
+  `POST /api/admin/rederive-baselines` rewrites the temperature baseline's mean **and its deviation**
+  from a cold fold, and the deviation is the 18.7× sd this entry measures.
+- **Keep:** two things are owed, and the second is easy to miss. (1) The run itself, which is the
+  owner's to fire. (2) **The re-derivation does not re-stamp this entry's own metric.**
+  `illness_score` / `illness_flag` live on `oura_daily_derived` and are written by the rollup's
+  `illness_radar` step alone — nothing reads `illnessFromSummaries` live, despite a comment in
+  `rollup/run.ts` saying the readiness route does. So a stored illness score keeps the z it was
+  computed with until a rollup pass rewrites that night, and the incremental rollup only covers the
+  recent window. Whether the score crosses `ILLNESS_WATCH_SCORE` is unmeasured until both happen.
+
 ### [readiness][activity] Q-507 — the stress override fires on the best days: high-stress minutes correlate +0.40 with readiness
 
 - **Branch:** `fix/stress-override-input`

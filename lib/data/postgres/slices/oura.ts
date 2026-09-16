@@ -1954,7 +1954,8 @@ export async function getOuraRollupWatermark(db: Db, userId: string, currentEpoc
 // ── TN-3a: the 30-minute daytime-stress buckets ────────────────────────────────────────────────
 
 export interface StressBucketRow {
-  bucketStart: Date
+  /** The bucket's MIDPOINT — see the `bucket_mid` column comment in schema.ts (LA-114). */
+  bucketMid: Date
   level: number
 }
 
@@ -1981,11 +1982,11 @@ export async function replaceDaytimeStressBuckets(
     // One repeated bucket instant would reject the whole day's insert (21000). Bare excluded.* arm.
     await tx.insert(s.ouraDaytimeStressBuckets).values(
       collapseOnConflict(
-        buckets.map(b => ({ userId, day, bucketStart: b.bucketStart, level: b.level, updatedAt: new Date() })),
-        b => b.bucketStart.getTime(),
+        buckets.map(b => ({ userId, day, bucketMid: b.bucketMid, level: b.level, updatedAt: new Date() })),
+        b => b.bucketMid.getTime(),
       ),
     ).onConflictDoUpdate({
-      target: [s.ouraDaytimeStressBuckets.userId, s.ouraDaytimeStressBuckets.bucketStart],
+      target: [s.ouraDaytimeStressBuckets.userId, s.ouraDaytimeStressBuckets.bucketMid],
       set: { level: sql`excluded.level`, day: sql`excluded.day`, updatedAt: new Date() },
       // The conflict arm exists because a bucket INSTANT can land in a different local day than
       // the pass that wrote it last (a timezone change, or a wake window shifting across midnight):
@@ -2005,11 +2006,11 @@ export async function replaceDaytimeStressBuckets(
 /** One user's buckets over an inclusive local-day range, oldest first. */
 export async function listDaytimeStressBuckets(
   db: Db, userId: string, from: string, to: string,
-): Promise<{ day: string; bucketStart: Date; level: number }[]> {
+): Promise<{ day: string; bucketMid: Date; level: number }[]> {
   const rows = await db
     .select({
       day: s.ouraDaytimeStressBuckets.day,
-      bucketStart: s.ouraDaytimeStressBuckets.bucketStart,
+      bucketMid: s.ouraDaytimeStressBuckets.bucketMid,
       level: s.ouraDaytimeStressBuckets.level,
     })
     .from(s.ouraDaytimeStressBuckets)
@@ -2018,6 +2019,6 @@ export async function listDaytimeStressBuckets(
       gte(s.ouraDaytimeStressBuckets.day, from),
       lte(s.ouraDaytimeStressBuckets.day, to),
     ))
-    .orderBy(asc(s.ouraDaytimeStressBuckets.bucketStart))
-  return rows.map(r => ({ day: r.day, bucketStart: r.bucketStart, level: Number(r.level) }))
+    .orderBy(asc(s.ouraDaytimeStressBuckets.bucketMid))
+  return rows.map(r => ({ day: r.day, bucketMid: r.bucketMid, level: Number(r.level) }))
 }

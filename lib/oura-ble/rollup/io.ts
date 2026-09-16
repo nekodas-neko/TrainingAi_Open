@@ -67,6 +67,11 @@ export interface RollupIO {
    *  rows of its previous shape. Must not touch rows from any other source. */
   deleteBleSleepSessionsForDates(dates: string[]): Promise<void>
   upsertSleepSessions(rows: OuraSleepUpsertRow[]): Promise<void>
+  /** Recorded sleep windows over `[from, to]` (wake-date keyed, inclusive). LA-112: the stress
+   *  series must drop sleeping buckets, and it cannot read that off `sleepRows` — those only cover
+   *  the nights THIS pass reconstructed, while the series is recomputed over a fixed trailing
+   *  window. Deriving it from the pass would make a day's stress depend on how wide the pass was. */
+  readSleepWindows(from: string, to: string): Promise<{ sleepStart: Date; sleepEnd: Date }[]>
 
   // ── steps / body metrics ─────────────────────────────────────────────────────────────────────
   readStepLiveWindows(): Promise<RollupStepLiveWindow[]>
@@ -91,7 +96,7 @@ export interface RollupIO {
   upsertDailyDerived(day: string, patch: OuraDailyDerivedPatch): Promise<void>
   /** TN-3a — replace one local day's 30-minute stress buckets. Whole-day replace: the series is
    *  recomputed as a unit, so a re-run producing fewer buckets must shrink the stored day. */
-  replaceStressBuckets(day: string, buckets: { bucketStart: Date; level: number }[]): Promise<void>
+  replaceStressBuckets(day: string, buckets: { bucketMid: Date; level: number }[]): Promise<void>
 
   // ── models / downstream derivations ──────────────────────────────────────────────────────────
   readDaytimeHrvModel(): Promise<DaytimeHrvModelRow | null>

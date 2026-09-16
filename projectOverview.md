@@ -2487,6 +2487,20 @@ the owner is 158 cm, so Mifflin BMR is **1,527** and the card calls **2,150** hi
 numbers differ, so the harness proves the sentence renders and its parts add up, not that it reads
 true to the person it is for.
 
+**⚙️ Update 2026-09-16 (TN-29, v1.457.4) — the inflated maintenance behind this is now REFUSED, and
+its cause is not.** `estimateMaintenance` gained the mirror of its BMR floor: a ceiling built from the
+user's own measured movement (resting base + their average daily movement), rejecting — never
+clamping — anything more than 15% above it. The owner's **2,245** against a measured-movement
+**1,895** is refused, and the app falls back to the estimate his movement supports.
+- **That catches the instance, not the cause.** BF-137's cause is the estimator fitting a GLP-1
+  weight drop as metabolic rate, and it recurs on every new vial.
+- **BF-137 now carries `Gate: owner`, and it is a DATA correction rather than a decision.** Its fix
+  keys on `supplement_vials.opened_on`; BF-136 made that field user-settable (v1.446.2) but the
+  owner's one vial still reads **2026-09-10, identical to its recorded date**, while the drug started
+  near **2026-09-04**. An exclusion keyed on 09-10 would leave the six confounded days inside the
+  window. **One edit unblocks it:** set that vial's *Opened on* to the real first dose.
+- [`journal`](docs/overview/entries/2026-09-16-lane-a-tn29-maintenance-ceiling.md)
+
 ### [app-shell] ⚠️ Home's three header chips fit now, and the fit has only been measured, not seen (BF-139, 2026-09-12, v1.447.0) · needs: browser
 
 Owner, with a screenshot: *"the pills in the top are a little cutoff. can we make them smaller to
@@ -3586,6 +3600,43 @@ Lane B's, tracked on BF-84, and the storage shipping first is what makes it safe
 - **Both halves of the broken baseline are visible in one frame.** The contributor reads `tempZ` = **0.303** (fine); the banner reads **0.519 °C** (deload). The z is small **because `temp_baseline_dev_x8` = 1.714 °C** against a true nightly sd of ~0.14 — `0.519/1.714 = 0.303`, matching the stored input to three decimals. **Q-506's inflated sd and TN-6's low mean failing in opposite directions.**
 - **⛔ Do not raise `TEMP_ALERT_THRESHOLD_C`** — Q-504's mistake. Pass the same `tempLadderTrusted` condition into the deload evaluation.
 - **This is the surface the owner actually reads** — the one behind *"its often triggering deload days"*. The protection landed on the path they never see.
+- **⚙️ The root fix now has a mechanism and has NOT been run (BF-13, 2026-09-16, unversioned — admin-only, no user-visible change).** `POST /api/admin/rederive-baselines` replays the baseline fold cold over the stored nights and rewrites the temperature baseline and `temp_dev_c`; `dryRun` is the default. Both halves visible in this frame — the low mean and the 1.714 °C sd — come out of the same cold fold, so re-deriving is the fix *underneath* the suspension rather than beside it. **The run is the owner's to fire; it is a production data write and was deliberately not executed from the sandbox, so nothing here has changed yet.** Gating the banner on `tempLadderTrusted` is still worth doing and is still TN-18's own work — a re-derivation makes the suspension unnecessary, it does not make the ungated consumer correct. [journal](docs/overview/entries/2026-09-16-lane-a-bf13-rederive-baselines.md)
+
+### [readiness][devices] ⚠️ Daytime stress stopped counting the night — shipped, and the size of the change is unmeasured (LA-112, 2026-09-16, v1.457.2)
+
+**Fixed forward; nobody has seen the new numbers yet.** The daytime-stress series window is the whole local calendar day
+(`lib/oura-ble/rollup/run.ts:1060`) and nothing restricts it to waking hours, so the metric counts
+sleep. Joined against `sleep_sessions` directly — no clock-hour inference:
+- **277 of 672** stress buckets (41.2%) fall inside a recorded sleep session, and **28 of the 140**
+  buckets counted as high-stress (20.0%) — so **20% of the `stress_high_minutes` the app reports as
+  daytime stress happened while the owner was asleep.**
+- **The mirror problem is worse.** Buckets by Brisbane hour: 00–06 → **289**, **07–08 → 11**, 09–12 →
+  73, 13–23 → 299. Eleven buckets across 24 days land in the owner's most active waking window, where
+  the chest strap recorded **98**. That is `evaluateDaytimeHrvModel`'s MET gate working correctly — a
+  model should not impute HRV from an activity heart rate — but the series ends up densest asleep and
+  nearly empty while moving.
+- **Bears on TN-34**, unwired the same day for firing a deload override on 83% of days off a
+  `stress_high_minutes` figure uncorrelated with readiness. Independent account of why that number
+  carries little signal — **not** a reason to re-wire the override.
+- **Two further findings from the same measurement are queued, not open issues:** **LA-113** (the
+  imputation reads ~⅓ of measured HRV — real but confounded, owner-gated) and **LA-114**
+  (`bucket_start` stores the bucket midpoint — **documented, not fixed**: the rename was attempted
+  and reverted because every historical `claude_ro` view migration names the old column and CI
+  replays them all. `claude_ro` still says `bucket_start`, so a join on the :00/:30 grid needs 15
+  minutes added).
+- **What shipped (v1.457.2).** `buildDaytimeStressSeriesFromModel` drops sleeping buckets **before**
+  `scoreStressPoints`, so they reach neither the levels nor the day-median baseline. The ordering is
+  the fix: filtering only the summary would drop them from the count and leave the waking buckets
+  still scored against a sleeping median. The live `/api/body-battery` route already windowed from
+  wake and now passes its windows too, so the two surfaces agree by construction.
+- **⚠ Why this stays here rather than moving to resolved.** History self-heals only within the
+  trailing **21 days** the rollup recomputes; older stored days keep their old values. And the size
+  of the change **could not be predicted before shipping** — only `level` is persisted, never `dhrv`,
+  so corrected levels cannot be recomputed from stored data. The direction is certain, the magnitude
+  is not. **Owner check owed: do the stress numbers and deload frequency look right after the next
+  rollup?**
+- [`measurement`](docs/reviews/2026-09-16-daytime-stress-imputation-vs-measured-hrv.md) ·
+  [`journal`](docs/overview/entries/2026-09-16-lane-a-la112-stress-excludes-sleep.md)
 
 ### [readiness][sleep][activity][heart-rate] 🟢 "Everything is 55" — the clustering is coincidence; today's score is correct (2026-08-31)
 

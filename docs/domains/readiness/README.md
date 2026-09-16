@@ -103,6 +103,29 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
   drain ignores exercise and there is no recharge at all — owner-signed-off redesign). **Activity's
   100 is not reachable by behaviour** while `zoneMinutes` is floored on 53/59 days, `activeEnergy` is
   present on 8/51, and `moveHours` qualifies 99.8% of hours.
+- [`docs/reviews/2026-09-16-daytime-stress-imputation-vs-measured-hrv.md`](../../reviews/2026-09-16-daytime-stress-imputation-vs-measured-hrv.md)
+  — **the daytime-stress imputation checked against measured HRV, 2026-09-16 (TN-39).** The Polar H10's
+  141,745 beats vs the night-fit `ln(rmssd) = a + b·hr + c·temp`. **The strongest finding is not about
+  accuracy:** **41.2%** of the stress buckets fall inside a recorded sleep session and **20%** of the
+  high-stress ones do, because the series window is the whole local day with no waking filter — while
+  only **11 buckets across 24 days** land in Brisbane 07:00–08:59, where the strap recorded 98
+  (the MET gate, working correctly, emptying the active morning). **The model's FORM is validated**
+  (`corr(HR, ln rmssd)` = −0.78 over 30–37 days) and its **level is ×0.30 of measured** — real, but
+  confounded by chest-ECG vs ring-PPG and by the strap being worn while walking, so **not actionable
+  without a controlled same-instrument capture**. Filed LA-112 (the defect), LA-113 (owner-gated
+  scoring), LA-114 (`bucket_start` stores the bucket midpoint). **LA-112 shipped the same day.** LA-113 remains owner-gated, and **LA-114's rename was attempted and reverted** — `claude_ro` still says `bucket_start`, so a join on the :00/:30 grid still needs 15 minutes added.
+- [`docs/overview/entries/2026-09-16-lane-a-bf13-rederive-baselines.md`](../../overview/entries/2026-09-16-lane-a-bf13-rederive-baselines.md)
+  — **a re-derivation for the zero-seeded baselines, 2026-09-16 (BF-13 / TN-6 / Q-506 / TN-8).**
+  `POST /api/admin/rederive-baselines` replays the fold cold over the stored nights and rewrites the
+  temperature baseline and `temp_dev_c`; `dryRun` is the default and **the run has not been fired** —
+  it is a production data write and the owner's to trigger, so every pass test in the
+  `temperature-baseline` batch is still unmeasured. **The point the batch had been missing for three
+  weeks:** the seed fix that shipped 2026-08-25 cannot reach stored state, because
+  `computeDailySummaries` resumes from the previous night's persisted checkpoint — so the zero-folded
+  baselines are inherited forward nightly. Measured 2026-09-16: still **35.658 °C at n=72** and
+  climbing. **Two corrections carried:** re-deriving does **not** move `illness_score` (written by
+  the rollup's `illness_radar` step alone, so Q-506's own metric waits on a rollup pass too), and a
+  Redecode's missing vendored constants were a **sandbox** limitation, not a production one.
 - [`docs/reviews/2026-08-25-threshold-sweep.md`](../../reviews/2026-08-25-threshold-sweep.md)
   — **the threshold sweep, 2026-08-25.** 246 constants → 27 that decide a user-visible branch, each
   checked against its input's real distribution. **One new finding: TN-8**, the chronic-stress fever

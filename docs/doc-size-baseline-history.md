@@ -12853,6 +12853,205 @@ Worth the history note rather than a silent fix because the third cause was self
 every entry this agent filed, and the lesson generalises: a queue position is not a work assignment,
 and the file does not show which of the three is in play.
 
+## 2026-09-16 — backlog → 22632, projectOverview → 11532: four `Keep:` lines a run has to clear
+
++57 and +1. All of it is state that had nowhere else to live: the `temperature-baseline` batch
+(BF-13, TN-6, Q-506, TN-8) now has a re-derivation mechanism —
+`POST /api/admin/rederive-baselines` — and **no run**, so none of the four entries can leave the
+queue and each needed a `Keep:` saying precisely what it is still owed.
+
+The length is doing work in two of them. Q-506's records that the re-derivation does **not** move
+its own metric: stored `illness_score` is written by the rollup's `illness_radar` step alone, so it
+keeps the z it was computed with until a rollup pass rewrites that night. TN-8's records that the
+new test converts **half** its pass test — the fixture reproduces the deviation's sign bias but
+peaks at 0.671 against the owner's 1.33, so "0 nights above 1.0" still needs the run — and corrects
+that entry's claim that a Redecode needs constants production does not have. It has them; the
+sandbox did not.
+
+A `Keep:` that says "still owed" without saying what would leave the next session to re-derive it
+from the entry body, which is how the batch lost three weeks after the seed was fixed.
+
+## 2026-09-16 — `docs/implementation-backlog.md` 22378 → 22559
+
+`docs/lb111-movement-pattern-window` (LB-111 filed, OR-118 corrected and parked).
+
+Most of the growth is LB-111, a new entry. The rest is the table of routes checked on OR-118, and
+that table is the point: it says *"no route serves sets by muscle over any window but the current
+one"* with the four things that were looked at and what each returns. Without it the next session
+reads *"every number it renders already exists"*, believes it — it is a plausible sentence — and
+either builds a lane-violating route or ships a card that renders one week under a label claiming
+sixty days. The claim took one grep to falsify and would have taken an afternoon to discover halfway
+through a build.
+
+## 2026-09-16 — projectOverview → 11554: a live metric counts sleep as daytime stress
+
++22, one Known-Issues entry (LA-112). TN-39's validation found that **41.2%** of the daytime-stress
+buckets fall inside a recorded sleep session and **20%** of the ones counted as high-stress do — so a
+fifth of the `stress_high_minutes` the app reports as daytime stress was recorded while the owner was
+asleep, and only **11 buckets across 24 days** land in their most active waking window.
+
+It earns the lines because the number it corrupts drives a recommendation the owner sees, and because
+the entry has to carry the counter-instruction: this is **not** a reason to re-wire TN-34's override,
+which was unwired the same day on its own separate measurement. A future session reading "the stress
+number is broken" without that sentence would plausibly undo today's other change.
+
+Trimmed once before raising: the two sibling findings (LA-113, LA-114) are queued work rather than
+open issues, so they are one pointer line here and full entries in the backlog.
+
+## 2026-09-16 — backlog → 22711: one validation entry out, three findings in
+
++36 net. TN-39 asked for a measurement and got one, so it left the queue; what it found did not fit
+back into one entry, because the three findings need opposite handling and batching them would hide
+that.
+
+**LA-112** (the series counts sleep) is a plain defect — no coefficient moves, and excluding buckets
+the metric's own name excludes needs no sign-off. **LA-113** (the imputation reads ~⅓ of measured HRV)
+is owner-gated and carries a ⛔: the strap is chest ECG against a ring-PPG-fitted model and is worn
+while walking, so the level gap has two live explanations and the first action is a controlled
+capture, not a coefficient. **LA-114** is a mislabelled column that already produced a silent wrong
+answer — a zero-row join that read as "no data".
+
+The length is mostly those ⛔/⚠ lines. An entry saying "the model is 3× off" without the sentence
+saying why that must not be acted on is an invitation to change a coefficient, which is the one
+outcome TN-39 wrote itself to prevent.
+
+The baseline reads 22711 rather than the +36 this branch added, because LB-111 landed on `main`
+between the branch being cut and this merge — the note above it is that change's. Two entries raising
+the same baseline on the same day is the one case where the per-document `.size` files still conflict,
+and correctly so: they genuinely disagree about one number. Resolved main's integer first, then
+`pnpm fix:baselines`, per the recipe — the fixer throws on a conflict marker, so the order matters.
+
+## 2026-09-16 — projectOverview → 11565: LA-112 shipped, and why its entry does not move to resolved
+
++11. The Known Issue filed this morning became a shipped fix this afternoon, and the entry grew
+rather than leaving, because two things are still owed and both are easy to forget.
+
+History self-heals only across the trailing **21 days** the rollup recomputes, so older stored days
+keep their old stress numbers. And the size of the change **could not be predicted before shipping**:
+only `level` is persisted, never `dhrv`, so the corrected levels cannot be recomputed from stored
+data — the day-median has to be rebuilt from raw inputs. The direction is certain, the magnitude is
+not, which is exactly the shape of thing that gets written up as done and then quietly isn't.
+
+Per the striking rule, an entry only moves to `known-issues-resolved.md` when nothing is owed. An
+owner check is owed here.
+
+## 2026-09-16 — backlog → 22681: LA-112 shipped and left the queue
+
+−30, and the ratchet is what noticed. Lowering it is not bookkeeping: left at 22711 the file could
+regrow thirty lines into the slack a shipped entry vacated, without the check ever saying anything.
+
+## 2026-09-16 — backlog → 22698, projectOverview → 11568: LA-114's rename was reverted
+
++34 and +2, and the growth is the point. LA-114 briefly left the queue when the rename looked
+shipped; CI's Migration Check rejected it, so the entry is back — and longer than it was, because
+what it now has to carry is a ⛔ against re-attempting it.
+
+Every historical `claude_ro` view migration (213 … 274) selects `t.bucket_start`, and Migration
+Check replays them all against the final schema, so a rename fails a dozen files at once. Editing
+them is not available — `ensureSchema` tracks by filename. `migrate.js` has a `REPLAY_EXEMPT` hatch
+whose single existing entry is itself a rename, so the option exists and using it would mean
+exempting a dozen files from the check that just caught this.
+
+An entry that said only "rename it" would get re-attempted, cost another CI cycle, and arrive at the
+same wall. The lines are the wall, written down.
+
+## 2026-09-16 — backlog → 22755: TN-44 re-scoped, and two entries split out of it
+
++57. TN-44 asked for ten Health Connect record types to be added to a list. Reading the pinned
+plugin's source — which CLAUDE.md's external-API rule requires before using any external field name —
+showed the list is not the wall: `RecordConverter` handles seven types and falls back to
+`record.toString()`, so an unconverted type returns a string blob whose fields are `undefined`.
+
+Three types we already read are in that hole (**LA-115**, device-gated), the caller half of the
+timezone fix belongs to Lane B (**LB-113**), and TN-44 keeps the half that is still true and
+valuable — that the platform *does* define skin temperature, which retires a connector-guide claim.
+
+The ⛔ on TN-44 is what the lines are for. Without it the next session adds ten types to the list,
+ships ten more silent `undefined`s, and the defect that took a source read to find gets reproduced
+tenfold by an entry that reads like a chore.
+
+## 2026-09-16 — backlog → 22769: TN-37 step 2 became a ⛔ instead of a task
+
++14, and they are the cheapest fourteen lines in the file. TN-37 said to drop two "dead" Oura Cloud
+reads from the readiness payload. Re-verifying — which the entry's own ⚠ demanded — showed both are
+load-bearing: `oura_daily`'s scored columns are all NULL, but `non_wear_time_sec` is written on every
+row by the BLE rollup and feeds `excludeLowWearDays` for the HRV and RHR baselines, and
+`getLatestOuraCloudVitals` is a deliberate stale surface for VO₂ max and vascular age.
+
+Deleting the step would have left the next session to rediscover this; leaving it as written would
+have cost a scoring regression no test covers. So it stays, inverted, with the measurement attached
+and the generalisable form stated: **"every scored column is NULL" is not "the table is dead" —
+check for a live writer.**
+
+## 2026-09-16 — Lane A baton → 184, backlog → 22778: a prose dependency, and six PRs of state
+
+**Baton +34.** Six PRs merged this session and the baton still described the state before them; a
+baton that is half last week's is worse than none, because it gets trusted. What it gained is not a
+changelog — it is the three things that would otherwise be re-learned at cost:
+
+- **A column rename is not available in this repo**, and finding that out cost a CI cycle (LA-114).
+  Migration Check replays every migration against the final schema and the `claude_ro` view
+  migrations each name every column.
+- **A migration is not tested until it has been applied twice to the same database** — with the
+  throwaway-DB recipe that reproduces CI locally.
+- **Four entries this session had true measurements and wrong conclusions**, with the reusable form
+  of each. That table is the highest-value thing in the file: it is why the session re-verified
+  before implementing, four times, and was right to each time.
+
+Cut to pay for it: the old per-entry "why it is not startable" table, which was stale on arrival and
+which the runner answers better.
+
+**Backlog +9.** TN-31's dependency on TN-30 was written as a SENTENCE — *"Sequence TN-30 first"* —
+so `next-item.js` could not see it and the entry sat at the **top of READY** while blocked behind two
+others. It now carries `Needs: TN-30` and READY drops 14 → 13. The entry also had two conflicting
+`Lane:` declarations (an `A` field and a `B` bullet); the tooling reads the first and a human reads
+the last. Both collapsed into one.
+
+## 2026-09-16 — backlog → 22815, projectOverview → 11582: TN-29's gate shipped, BF-137 gated on one date
+
++37 and +14. TN-29's ceiling landed (v1.457.4) and the entry keeps its second half, so it records
+what shipped and what is still owed rather than leaving.
+
+The length is mostly BF-137, and it is the useful kind. That entry's `Needs:` says "nothing" while
+its body calls BF-136 "a prerequisite in fact if not in form" — the same prose-dependency shape TN-31
+carried, found the same day. BF-136 has since **shipped**, so no `Needs:` is owed; what is owed is a
+**data** correction the entry could not have known about: the owner's one Retatrutide vial still
+reads `opened_on = 2026-09-10`, identical to its recorded date, while BF-137's own measurement puts
+the first dose near 09-04. An exclusion keyed on the stored date would leave the six confounded days
+inside the window — a filter that does not filter.
+
+Those lines exist so the next session does not build it and believe it worked. The alternative was a
+`Gate: owner` with no explanation, which is the shape that gets cleared by someone who cannot see why
+it was set.
+
+## 2026-09-16 — backlog → 22841: TN-25's engine half shipped, and the band left open on purpose
+
++26. The selector landed; the entry now records what shipped, what did not, and one open design
+question stated as a decision rather than left implicit.
+
+The lines that matter are the ⚠ pair. **The engine half does not fix the reported defect** — the
+pacer still says "push" on every fast interval, because that comes from the band in `walk-active.tsx`
+and nothing here touched it. An entry reading "✅ shipped" without that would be read as done.
+
+And the band is a real fork: TN-25 says target 105–118 bpm *directly*, which taken literally is a
+constant true of one 33-year-old. The entry now carries the recommendation (derive from % of HRmax,
+not % of reserve — same numbers for this owner, stays per-user, and breaks the coupling the entry
+actually names), what the literal reading is better at, and the reversal cost. Picking it silently
+inside an engine PR would have seeded how every HR target in the app is expressed.
+
+## 2026-09-16 — backlog → 22853: TN-25's band shipped, and the selector is still inert
+
++12. The half that fixes the reported defect landed (v1.457.5), so the entry records it — and, more
+usefully, records what did NOT: `recommendWalkPattern` shipped in #1262 and **still has no caller**,
+so the pattern the owner asked to have assigned is not assigned yet.
+
+An entry showing two ✅ halves would read as done. The band fixes the cue; the selector fixes the
+prescription, and an engine with no caller changes nothing anyone can see. The `Keep:` says so in
+those words.
+
+Also recorded: the band returns 101–118 where the entry quotes 105–118 — the standard 0.60 lower edge
+against a rounded figure, 4 bpm apart. Naming a small discrepancy costs two lines; discovering later
+that a shipped constant silently disagreed with the entry it came from costs an investigation.
 ## 2026-09-11 — `docs/implementation-backlog.md` → 21535 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
@@ -12882,3 +13081,13 @@ What can be measured cleanly is the rewrite count itself, which does not depend 
 **34** first-parent commits on this branch touch this file, and this is the thirty-fifth. That is the
 one number here worth trusting — the headline figure is the live one, and the two counts above are a
 floor.
+
+**Recomputed again 2026-09-16** (→ 22828), after #1263 landed on `main`. The rewrite count is
+re-derived rather than incremented, and the derivation itself is changed: `--first-parent HEAD` was
+measured on a *shallow* clone, so it silently counted only as far back as the clone reached — it
+reads 157 once the history is deepened, against the 34 recorded above. `git rev-list --count
+origin/main..HEAD -- <the .size file>` does not depend on clone depth, because it counts only what
+this branch has that `main` does not: **46**, and this is the forty-seventh. The 34 is not wrong so
+much as unreproducible, which is the same failure as the hand-kept tally one paragraph up, arrived at
+from the opposite direction — a derivation is only better than a tally if it returns the same answer
+twice.

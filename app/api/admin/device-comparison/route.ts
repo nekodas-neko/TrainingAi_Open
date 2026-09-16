@@ -121,7 +121,7 @@ export async function GET(req: NextRequest) {
           // Two different units, declared rather than assumed — which is what makes the summaries
           // below suppress a mean bias in mixed units and report rank agreement instead.
           return [
-            { device: OURA,  unit: 'normalised_-1..1', rows: oura.map(r => ({ timestamp: r.bucketStart, value: r.level })) },
+            { device: OURA,  unit: 'normalised_-1..1', rows: oura.map(r => ({ timestamp: r.bucketMid, value: r.level })) },
             { device: COLMI, unit: 'raw_0..100',       rows: colmi.map(r => ({ timestamp: r.measuredAt, value: r.value })) },
           ]
         })()
