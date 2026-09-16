@@ -108,7 +108,7 @@ describe('BF-5 — a permanent entry point that outlives the banner', () => {
   it('sits in the Health tab beside the calendar', () => {
     // The banner is dismissible and fires once a week, so a page reachable only from it is
     // unreachable for the rest of the week — and for anyone who dismissed it.
-    const order = read('app/health/health-content.tsx').match(/const TRAINING_ORDER = \[(.*?)\]/s)?.[1] ?? ''
+    const order = read('app/health/health-content.tsx').match(/const TRAINING_ORDER = \[([\s\S]*?)\]/)?.[1] ?? ''
     expect(order).toContain('"weekInReview"')
     expect(order.indexOf('"weekInReview"'), 'beside the calendar the owner compared it to')
       .toBeGreaterThan(order.indexOf('"calendar"'))

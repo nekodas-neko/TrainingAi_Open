@@ -28,9 +28,14 @@ const exists = (p: string) => fs.existsSync(path.join(root, p))
  * failure restated — `/` was wrong because it opens a tab and leaves the user to find a banner, and
  * so would `/nutrition` be.
  */
-type Row =
-  | { file: string; route: string; readBy: string; page?: never }
-  | { file: string; route: string; page: string; readBy?: never }
+interface Row {
+  file: string
+  route: string
+  /** A query-bearing route: the screen that reads its param. Exactly one of these two is set. */
+  readBy?: string
+  /** A query-less route: the `page.tsx` it must resolve to. */
+  page?: string
+}
 
 const ROUTES: Row[] = [
   { file: 'lib/day-review-reminders.ts', route: '/nutrition?review=day', readBy: 'app/nutrition/nutrition-content.tsx' },
@@ -46,25 +51,31 @@ describe('reminder deep links reach something that reads them', () => {
       expect(read(file)).toContain(`route: '${route}'`)
     })
 
-    if (row.readBy) {
+    const { readBy, page } = row
+    if (readBy) {
       const [, query] = route.split('?')
       const [key, value] = query.split('=')
-      it(`${row.readBy} reads ${key}=${value}`, () => {
+      it(`${readBy} reads ${key}=${value}`, () => {
         // The get AND the comparison, in one pattern. Asserting the key alone would pass while the
         // screen ignored what it said; asserting the value alone passes on any string in the file.
         // Deliberately not anchored to a `searchParams` variable — one caller stores it, the other
         // calls `useSearchParams().get(…)` inline, and neither is the thing under test.
-        expect(read(row.readBy)).toMatch(
+        expect(read(readBy)).toMatch(
           new RegExp(`\\.get\\(["']${key}["']\\)\\s*===\\s*["']${value}["']`),
         )
       })
-    } else {
+    } else if (page) {
       it(`${route} is a page of its own, not a tab`, () => {
         expect(route, 'a query-less route must carry no query').not.toContain('?')
-        expect(exists(row.page), `${row.page} must exist`).toBe(true)
+        expect(exists(page), `${page} must exist`).toBe(true)
         // The tab hrefs come from the shell rather than a list written here, so adding a tab cannot
         // leave this check quietly approving a reminder that lands on it.
         expect(TABS.map(t => t.href), 'a tab leaves the user to find the content').not.toContain(route)
+      })
+    } else {
+      // A row with neither would otherwise register no assertion at all and read as passing.
+      it(`${route} declares how it is reached`, () => {
+        expect.fail('a ROUTES row needs either readBy (a param) or page (a route of its own)')
       })
     }
   }
