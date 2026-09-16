@@ -1,7 +1,6 @@
 import { toAestDay } from '@trainingai/shared/date-utils'
 import type { ProgramSession, MuscleAssignment, NextSessionRecommendation } from '@trainingai/shared/types/program'
 import type { IllnessFlag } from '@trainingai/shared/health/illness-radar'
-import { STRESS_HIGH_DAY_THRESHOLD_MIN } from '@/lib/health/daytime-stress'
 
 export interface MuscleRecovery {
   muscle: string
@@ -214,11 +213,22 @@ function computeDeloadStrength(
   const tempAlert = temperatureTrusted
     && temperatureDeviation != null && temperatureDeviation > TEMP_ALERT_THRESHOLD_C
     && temperatureBaselineDays >= TEMP_BASELINE_MIN_DAYS
-  // Derived-first: a non-null derived value means the ring measured today, and it decides.
-  // Only with no derived stress at all does the frozen Cloud day_summary still count (S5).
-  const stressOverride = stressHighMinutes != null
-    ? stressHighMinutes >= STRESS_HIGH_DAY_THRESHOLD_MIN
-    : daySummary === 'very_stressful'
+  // TN-34: the derived arm is UNWIRED (owner-approved 2026-09-10, *"yes lets do all that"*).
+  // `stressHighMinutes >= STRESS_HIGH_DAY_THRESHOLD_MIN` recommended a deload on **83% of the
+  // owner's days** (15 of 18 recomputed; 7 of 10 on stored values since the 2026-08-31 fix). A flag
+  // that fires four days in five carries no information, and the input is the number TN-33 measured
+  // as carrying none: the daily scalar is 57% NIGHT buckets, night runs systematically positive
+  // (+0.266 against the day's −0.405), and its correlation with readiness is +0.072 over 18 days
+  // with the two halves pointing opposite ways.
+  //
+  // **Do NOT restore this by raising STRESS_HIGH_DAY_THRESHOLD_MIN.** That is the mistake the
+  // TEMP_ALERT_THRESHOLD_C comment above warns about — it would be the fifth "the threshold is
+  // right, the input is wrong" in this pillar. The threshold is a documented ~2 h judgement; the
+  // input is a sleep-weighted average wearing a daytime label. Re-wire it when TN-33's level-2 test
+  // passes, ideally against this user's own distribution (a percentile, not a constant).
+  //
+  // The frozen Cloud `day_summary` arm stays, and temperature and illness still override.
+  const stressOverride = daySummary === 'very_stressful'
 
   if (tempAlert || stressOverride || illnessFlag === 'elevated') {
     return { recommended: true, strength: 'recommended', temperatureAlert: tempAlert }

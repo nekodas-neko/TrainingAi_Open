@@ -441,6 +441,17 @@ below threshold and left in place for next time.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-10 · found answering the owner's *"is stress a real usable value?"*
 - **Lane: A** — `packages/shared/src/ai-periodization/ai-dynamic.ts:219-225`.
+- **✅ OPTION 1 SHIPPED 2026-09-16.** `stressOverride` is now `daySummary === 'very_stressful'` alone
+  (`ai-dynamic.ts`); the derived `stressHighMinutes >= STRESS_HIGH_DAY_THRESHOLD_MIN` arm is gone.
+  **The sibling surface went with it, and it was the worse of the two:** `lib/health-alerts.ts:59`
+  fired the SAME condition on the same input as a **push notification** ("High stress day") — so at
+  83% of days the owner was notified four days in five — **and a fired stress alert sets
+  `moreSpecificFired`, which SUPPRESSES the readiness-low alert**. The noise flag was masking the
+  real one. `stressCurrent` is kept on that path deliberately: TN-33 §8 measures strong episode
+  structure in the series, and it is the daily aggregate that carries none.
+- **Keep:** the RE-WIRE. Options 2 and 3 below are unchanged and both wait on TN-33's level-2 test —
+  when the series is validated, re-anchor to this user's own distribution (a percentile, not a
+  constant) rather than restoring the 120-minute constant.
 - **✅ OWNER-APPROVED 2026-09-10** — *"yes lets do all that."* **Option 1: unwire `stressOverride`.** Not gated; one line, reversible.
 - **Related: TN-33** — only for the later question of what replaces the override. **This is NOT a
   `Needs:`** and was one until 2026-09-16: the field parked the entry while its own sentence said the
@@ -21289,6 +21300,54 @@ the symptom.** `listRecent1rm`'s own doc comment records the other two: Q-298 (a
 gain) and PS-26 (the same sentinel read as a *current* value, rendering "−<the whole 1RM> kg" on 16
 of 34 exercises). Both were fixed by excluding rows. **This one cannot be — the rows are real
 estimates from real work.**
+
+**⚠ RE-MEASURED AGAINST PRODUCTION 2026-09-16, AND THE CAUSE IS NOT WHAT THIS ENTRY SAYS. Read this
+before building any of the fixes below — three of them would hide a data defect rather than fix it.**
+
+The entry's reading is that a 1RM estimated from a high-rep set is systematically lower, so the
+comparison needs to be keyed like-for-like. **That mechanism is real but it is not what produced the
+measured table.** `calculate1RM` already divides a *prescribed* set's load back up:
+`prescriptionFactor(pct, targetReps) = 1 / ((pct/100) × repFactor(targetReps))`. When the lifter hits
+the prescription, the estimate reduces to `weight ÷ pct` — **phase-independent by construction**. A
+move into accumulation therefore should NOT move the estimate, and where the prescription is
+recorded, it does not:
+
+| session | set | planned_pct | stored `estimated_1rm` | arithmetic |
+|---|---|---|---|---|
+| 2026-08-24 (Realisation) | 90 kg × 3 | **88** | 103.75 | prescription applied ✓ |
+| 2026-09-15 (Accumulation) | 65 kg × 7, 65 × 11 | **76** | 91.25 | prescription applied ✓ |
+| 2026-09-07 | 60 kg × 15 | **NULL** | 82.75 | falls back to `amrapScaleFactor(15) = 0.88` ✓ |
+
+**The defect is a missing prescription, not a rep band.** With `planned_pct` NULL,
+`prescriptionFactor` returns null and `amrapScaleFactor` treats a submaximal working set as a maximal
+AMRAP, so the estimate is under-scaled. The 2026-09-07 bench row is the entry's own "−20.2%" point.
+
+**It is a dated, bounded window, which is the strongest evidence it is not a formula property.**
+Counting logs with `estimated_1rm > 0` over 60 days:
+
+- **2026-09-06 → 2026-09-12: every log and every set affected** — 5 of 5 logs with `style_name` NULL,
+  5 of 5 sets with `planned_pct` NULL, and **one set per exercise** instead of the usual two.
+- **2026-09-13: partial** — 2 of 10 sets lack a pct, no log lacks a style.
+- **2026-09-15: clean** — 0 of 10.
+- Before the window, a scattering of no-pct sets (0–3 a day) which are consistent with legitimate
+  extra/AMRAP sets, not with this.
+
+Six compounds "declined at once" because six compounds were logged inside that one week.
+
+**Two further corrections:**
+1. **`workout_sessions.phase_type` is NULL on every production row**, so the first fix below —
+   *"restrict the pair to the same phase"* — is **not implementable as written**. The phase is only
+   recoverable from `exercise_logs.style_name` (`AI · Accumulation`, `AI · Realisation`, …), which is
+   itself NULL across the affected window.
+2. **The entry's table is already stale.** A session landed on 2026-09-15; Barbell Bench Press's last
+   two real estimates are now **91.25 (9 reps) → previous 82.75 (15 reps), i.e. +10.3%**, not −20.2%.
+
+**What is actually owed, and it is not this entry's fix:** find why seven sessions were written with
+no prescription, and decide whether those stored `estimated_1rm` values are recomputed. **The second
+half is an owner call** — it rewrites stored history, and the app's PRs and `target_80` read the same
+column, so it is not confined to a trend line. **Do not add a comparability rule to paper over it:**
+this entry's own warning against widening the trend thresholds — *"that hides a real decline as
+readily as a false one"* — applies with equal force to hiding one behind a rep band.
 
 **Shape of a fix, not yet decided:**
 - **Compare like-for-like.** Either restrict the pair to the same phase, or to a comparable rep band,

@@ -358,22 +358,29 @@ describe('computeAiDynamicNextSession', () => {
     expect(computeAiDynamicNextSession({ ...baseInput, history, illnessFlag: 'learning' }).deloadOrRestRecommended).toBe(false)
   })
 
-  it('flags recommended deload when derived stress-high minutes cross the threshold', () => {
+  // TN-34: derived stress-high minutes no longer recommend a deload. The condition fired on 83% of
+  // the owner's days off a number whose correlation with readiness is +0.072. These three pin the
+  // UNWIRING — if someone re-wires it, or "fixes" the firing rate by raising the threshold, the
+  // first of them fails.
+  it('does NOT recommend a deload on derived stress-high minutes, however high', () => {
     const history = makeHistory(['Push'], [1])
     const result = computeAiDynamicNextSession({ ...baseInput, history, stressHighMinutes: 150 })
-    expect(result.deloadOrRestRecommended).toBe(true)
-    expect(result.deloadStrength).toBe('recommended')
+    expect(result.deloadOrRestRecommended).toBe(false)
+    // 1000 as well as 150: this is unwired, not re-thresholded.
+    const extreme = computeAiDynamicNextSession({ ...baseInput, history, stressHighMinutes: 1000 })
+    expect(extreme.deloadOrRestRecommended).toBe(false)
   })
 
-  it('derived stress below threshold suppresses the frozen very_stressful fallback', () => {
+  it('the frozen very_stressful summary still fires, and derived stress no longer suppresses it', () => {
     const history = makeHistory(['Push'], [1])
     const result = computeAiDynamicNextSession({
       ...baseInput, history, stressHighMinutes: 30, daySummary: 'very_stressful',
     })
-    expect(result.deloadOrRestRecommended).toBe(false)
+    expect(result.deloadOrRestRecommended).toBe(true)
+    expect(result.deloadStrength).toBe('recommended')
   })
 
-  it('falls back to very_stressful only when no derived stress exists', () => {
+  it('very_stressful fires with no derived stress at all', () => {
     const history = makeHistory(['Push'], [1])
     const result = computeAiDynamicNextSession({
       ...baseInput, history, stressHighMinutes: null, daySummary: 'very_stressful',

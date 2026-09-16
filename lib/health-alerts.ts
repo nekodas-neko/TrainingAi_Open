@@ -2,7 +2,7 @@ import { Capacitor } from '@capacitor/core'
 import { todayInTz } from '@trainingai/shared/date-utils'
 // Import from the dependency-free thresholds leaf, NOT './health/daytime-stress' — the latter
 // pulls in ONNX-backed dHRV imputation, which must not enter the client bundle.
-import { STRESS_HIGH_DAY_THRESHOLD_MIN, STRESS_HIGH_LEVEL } from '@trainingai/shared/health/daytime-stress-thresholds'
+import { STRESS_HIGH_LEVEL } from '@trainingai/shared/health/daytime-stress-thresholds'
 import type { IllnessFlag } from '@trainingai/shared/health/illness-radar'
 
 export const HEALTH_ALERTS_CHANNEL = 'health-alerts'
@@ -54,12 +54,21 @@ export function computeHealthAlertActions(
     ? (() => { const c = illnessCopy(input.illnessFlag as IllnessFlag, input.illnessAdvisory); return fire('illness', c.title, c.body) })()
     : skip('illness')
 
-  // ── Stress: prefer highMinutes vs the shared deload threshold, else fall back to current level ──
-  const stressTriggered = input.stressHighMinutes != null
-    ? input.stressHighMinutes >= STRESS_HIGH_DAY_THRESHOLD_MIN
-    : input.stressCurrent != null
-      ? input.stressCurrent <= STRESS_HIGH_LEVEL
-      : false
+  // ── Stress: the CURRENT level only. ──
+  // TN-34 unwired the daily `stressHighMinutes >= STRESS_HIGH_DAY_THRESHOLD_MIN` arm from the deload
+  // recommendation; this was the same condition on the same input, so it is unwired here too — the
+  // sibling-surface rule, and it matters more here than there. This path fires a PUSH NOTIFICATION
+  // ("High stress day"), so at TN-34's measured 83% of days the owner was notified four days in five
+  // off a number with a +0.072 correlation to readiness. Worse, a fired stress alert sets
+  // `moreSpecificFired` and SUPPRESSES the readiness-low alert below — so the noise flag was also
+  // masking the real one.
+  //
+  // `stressCurrent` is kept deliberately: TN-33 §8 measures strong episode structure in the SERIES
+  // (lag-1 +0.637, residual +0.372 after removing day/night means). It is the daily aggregate that
+  // carries no signal, not the instantaneous level.
+  const stressTriggered = input.stressCurrent != null
+    ? input.stressCurrent <= STRESS_HIGH_LEVEL
+    : false
   const stress = stressTriggered
     ? fire('stress', 'High stress day', 'Daytime stress has run high today. A lighter session or some recovery time may help.')
     : skip('stress')
