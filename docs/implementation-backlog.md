@@ -4521,6 +4521,11 @@ July's early-deload consumed live ACWR while the card said "baselining".
 
 ### [devices][readiness] LA-68 — restore the 22 wear-time days PS-30 overwrote
 
+- **Batch:** `owner-admin-sitting` — **LA-68, TN-1 and LA-56 are one trip to the same screen**
+  (marked 2026-09-16, OR-117). All three need a **fullHistory redecode/rollup triggered by hand from
+  an admin session**, which is the owner's to run and nobody else's. Asking for them separately costs
+  three sittings for one login. Whoever picks any of them up presents all three together.
+
 - **Lane:** A — `oura_daily.non_wear_time_sec`, production data only. No code change.
 - **Gate:** owner — only a **fullHistory** Redecode rewrites those days, and it needs an admin session.
 - **Added:** 2026-09-07, Lane A — [journal](overview/history-2026-09-10-folded-6.md#2026-09-07-fix-oura-nonwear-overwrite).
@@ -11418,6 +11423,11 @@ without a queue entry is a dropped finding.*
 
 ### [platform] LB-52 — GitHub's auto-merge API does not see a Ruleset, so every PR is a hand-caught race
 
+- **Batch:** `owner-branch-protection` — **LB-52 and Q-297's second residue are the same settings
+  page** (marked 2026-09-16, OR-117). LB-52 wants a classic branch-protection rule added beside the
+  Ruleset so auto-merge works; Q-297 asks whether **E2E becomes a required check**. One trip, two
+  toggles. Do not put them to the owner separately.
+
 - **⏸ ACKNOWLEDGED AND DEFERRED BY THE OWNER, 2026-09-15:** *"Keep this as a task to complete
   later."* So the remedy is accepted and the timing is theirs. **The `Gate: owner` stays** — nothing
   here is buildable by any agent; it is a repository setting.
@@ -15065,6 +15075,12 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [readiness][workouts] Q-275 — readiness is structurally blind to training load, and every incumbent treats load as primary
 
+- **⚠ NOT OWNER-READY — `Gate: owner` is premature here (marked 2026-09-16, OR-117 triage).** This is
+  a scoring change, so the route is **Tuning proposes → the owner signs → Lane A implements**, and
+  **no proposal exists**. The entry's own text says so. Until a proposal with numbers is written,
+  putting this in front of the owner asks them to sign a blank page — and it has been counting as
+  owner debt in every sweep meanwhile. **The next action is Tuning's, not theirs.**
+
 - **Gate:** owner — adding an input to the readiness composite re-scores every day, so it is a
   scoring change: the owner signs off before Lane A implements. No proposal is written yet.
 
@@ -15148,6 +15164,12 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   (Q-500 was on this list and is retired — shipped 2026-08-18, follow-up answered 2026-08-26.)
 
 ### [readiness][body] Q-272 — Body Battery v5 drains 5× faster than it charges and ends at its daily low on 10 of 12 days
+
+- **⚠ NOT OWNER-READY — `Gate: owner` is premature here (marked 2026-09-16, OR-117 triage).** This is
+  a scoring change, so the route is **Tuning proposes → the owner signs → Lane A implements**, and
+  **no proposal exists**. The entry's own text says so. Until a proposal with numbers is written,
+  putting this in front of the owner asks them to sign a blank page — and it has been counting as
+  owner debt in every sweep meanwhile. **The next action is Tuning's, not theirs.**
 
 - **Gate:** owner — changing the Body Battery model re-scores every day, so it is a scoring change
   and wants an owner-signed proposal first. No proposal is written yet.
@@ -15490,6 +15512,12 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [readiness] Q-508 — resilience has emitted exactly one value in its lifetime (level 5, granular pinned at the 5.99 clamp)
 
+- **⚠ NOT OWNER-READY — `Gate: owner` is premature here (marked 2026-09-16, OR-117 triage).** This is
+  a scoring change, so the route is **Tuning proposes → the owner signs → Lane A implements**, and
+  **no proposal exists**. The entry's own text says so. Until a proposal with numbers is written,
+  putting this in front of the owner asks them to sign a blank page — and it has been counting as
+  owner debt in every sweep meanwhile. **The next action is Tuning's, not theirs.**
+
 - **Gate:** owner — the first action needs a decision *"this repo cannot settle"*: whether the
   vendor sum is faithful. The vendor source is in the private archive, and that answer gates
   everything else in the entry.
@@ -15547,6 +15575,11 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   the term that is currently saturating. See Q-501 for why stored rows have not moved yet.
 
 ### [platform][devices] LA-56 — the full-history redecode has never once completed, and "abandoned" is a guess
+
+- **Batch:** `owner-admin-sitting` — **LA-68, TN-1 and LA-56 are one trip to the same screen**
+  (marked 2026-09-16, OR-117). All three need a **fullHistory redecode/rollup triggered by hand from
+  an admin session**, which is the owner's to run and nobody else's. Asking for them separately costs
+  three sittings for one login. Whoever picks any of them up presents all three together.
 
 > **⚠ MEASURED 2026-09-03 — "abandoned" is NO LONGER a guess, and the workaround does not work
 > either.** The entry hedged because `reapStaleRedecodeJobs` is a pure `started_at` age check with no
@@ -16114,6 +16147,12 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [heart-rate][body] Q-515 — the rest/active boundary shrank 3× because the owner got fitter
 
+- **⚠ NOT OWNER-READY — `Gate: owner` is premature here (marked 2026-09-16, OR-117 triage).** This is
+  a scoring change, so the route is **Tuning proposes → the owner signs → Lane A implements**, and
+  **no proposal exists**. The entry's own text says so. Until a proposal with numbers is written,
+  putting this in front of the owner asks them to sign a blank page — and it has been counting as
+  owner debt in every sweep meanwhile. **The next action is Tuning's, not theirs.**
+
 - **Branch:** `fix/hr-rest-threshold-anchor`
 - **⚠ THE RECOMMENDED FIX DOES NOT FIX (a) ALONE — MEASURED 2026-09-02, DO NOT IMPLEMENT IT AS
   WRITTEN.** [`review`](reviews/2026-09-02-hr-rest-anchor-level-shift.md). Swapping the 28-day
@@ -16181,6 +16220,12 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   is an empirical claim nobody has measured) and the Karvonen zone boundaries (0.6/0.7/0.8/0.9).
 
 ### [heart-rate] Q-516 — `PEAK_BANDS` is calibrated for a heart-rate range strength training never reaches
+
+- **⚠ NOT OWNER-READY — `Gate: owner` is premature here (marked 2026-09-16, OR-117 triage).** This is
+  a scoring change, so the route is **Tuning proposes → the owner signs → Lane A implements**, and
+  **no proposal exists**. The entry's own text says so. Until a proposal with numbers is written,
+  putting this in front of the owner asks them to sign a blank page — and it has been counting as
+  owner debt in every sweep meanwhile. **The next action is Tuning's, not theirs.**
 
 - **Branch:** `fix/hr-recovery-peak-bands`
 - **⚑ SHIPPED 2026-09-02, BUT NOT AS THE ENTRY WROTE IT — the proposed `<90 · 90–104 · 105–119 ·
@@ -16824,6 +16869,11 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [devices][readiness] TN-1 — chronic stress refuses inside the granular layer, and records no reason why
 
+- **Batch:** `owner-admin-sitting` — **LA-68, TN-1 and LA-56 are one trip to the same screen**
+  (marked 2026-09-16, OR-117). All three need a **fullHistory redecode/rollup triggered by hand from
+  an admin session**, which is the owner's to run and nobody else's. Asking for them separately costs
+  three sittings for one login. Whoever picks any of them up presents all three together.
+
 - **Branch:** `feat/chronic-stress-null-reason` · **Lane:** A
 - **⚑ SHIPPED 2026-09-02** — migrations **258** (column) + **259** (regenerated `claude_ro` views,
   without which the number is invisible to the audit endpoint that motivates it), local SQLite
@@ -16945,6 +16995,12 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [activity][heart-rate] Q-522 — the movement-per-hour contributor is saturated: it measures ring wear, not movement
 
+- **⚠ NOT OWNER-READY — `Gate: owner` is premature here (marked 2026-09-16, OR-117 triage).** This is
+  a scoring change, so the route is **Tuning proposes → the owner signs → Lane A implements**, and
+  **no proposal exists**. The entry's own text says so. Until a proposal with numbers is written,
+  putting this in front of the owner asks them to sign a blank page — and it has been counting as
+  owner debt in every sweep meanwhile. **The next action is Tuning's, not theirs.**
+
 - **Branch:** `fix/move-hours-rest-boundary`
 - **Needs:** Q-515
 - **Gate:** owner
@@ -17001,6 +17057,12 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   and must be re-checked before any second user relies on the Activity Score.
 
 ### [activity][heart-rate] Q-523 — zone minutes read 0 on 90% of days: the Zone 2 floor sits above where strength training lives
+
+- **⚠ NOT OWNER-READY — `Gate: owner` is premature here (marked 2026-09-16, OR-117 triage).** This is
+  a scoring change, so the route is **Tuning proposes → the owner signs → Lane A implements**, and
+  **no proposal exists**. The entry's own text says so. Until a proposal with numbers is written,
+  putting this in front of the owner asks them to sign a blank page — and it has been counting as
+  owner debt in every sweep meanwhile. **The next action is Tuning's, not theirs.**
 
 - **Branch:** `fix/zone-minutes-floor-and-gap-cap`
 - **Gate:** owner
@@ -17466,167 +17528,17 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   own recommendation: **trend is the missing dimension, not contributors** (contributors are
   genuinely inapplicable to a chip or a timeline row; a 7-day sparkline is not).
 
-### [platform] Q-283 — ~11 MB of indexes have never served a scan, on a DB where index bloat already caused an incident
-
-- **Branch:** `chore/drop-unused-indexes`
-- **Gate:** owner
-- **⚠ RE-MEASURED 2026-09-02 — THE HEADLINE IS STALE BY ~14×, AND THIS SHOULD PROBABLY BE CLOSED
-  RATHER THAN IMPLEMENTED.** [review](reviews/2026-09-02-db-growth-archive-attribution.md).
-  1. **Its one real candidate is gone.** `oura_heartrate_user_updated` (5.7 MB) was dropped by
-     BF-55's index half in **migration 249** on 2026-09-01. `oura_heartrate` now carries exactly two
-     indexes: the `(user_id, timestamp)` unique key (84,909 scans) and its primary key.
-  2. **What is left is 800 kB, not 11 MB.** Zero-scan indexes total **117 / 7,528 kB**, but
-     excluding primary keys and unique constraints — which this entry already says must never be
-     dropped — the droppable remainder is **30 indexes totalling 800 kB**, the largest a 128 kB
-     `db_query_log_created_at_idx`. That is **0.4% of a 200 MB database**, for a destructive
-     migration.
-  3. **One reading strengthens the existing caveat rather than weakening it:**
-     `pg_stat_database.stats_reset` is **NULL**, so the counters cover the database's lifetime. That
-     makes "never scanned" a stronger claim and still does not make a constraint index droppable —
-     BF-55's counter-example holds today, `rr_intervals_pkey` read 0 on 08-30 and **10,930** now.
-  **Closing it is a queue decision, so it is gated rather than struck.**
-- **Plan:** none needed
-- **Added:** 2026-08-15 · from the comprehensive review §4
-- **Lane:** A — derived 2026-08-31 by the path rule while selecting Lane B's next item: dropping an index is a migration, and Postgres migration numbers belong to Lane A alone.
-- **Measured** (`pg_stat_user_indexes WHERE idx_scan = 0`, largest first):
-
-  | table | index | size |
-  |---|---|---|
-  | `oura_heartrate` | `oura_heartrate_user_updated` | **5.7 MB** |
-  | `oura_heartrate` | `oura_heartrate_pkey` | 4.3 MB |
-  | `error_events` | `error_events_pkey` | 576 kB |
-  | `set_logs` | `set_logs_exercise_log_id_set_number_key` | 80 kB |
-  | `set_hr_stats` | `set_hr_stats_user_exercise_idx` | 72 kB |
-  | `ai_call_log` | `ai_call_log_fingerprint_idx` | 56 kB |
-- **Read the numbers carefully before dropping anything.** `idx_scan = 0` counts since the last
-  stats reset, **not since creation** — and a `REINDEX` resets it. Primary keys and unique
-  constraints (`*_pkey`, `set_logs_exercise_log_id_set_number_key`) enforce correctness and must
-  **not** be dropped regardless of scan count; they are listed only so the next reader does not
-  re-derive that.
-- **The real candidate is `oura_heartrate_user_updated` (5.7 MB, zero scans).** It was added for the
-  Track-B timeseries sync delta. Check whether that query path still exists and still uses it before
-  dropping — Q-180 recently decided to keep the timeseries delta, so this may be a genuinely-used
-  index whose stats were reset by the 2026-08-13 REINDEX work.
-- **Context, not scope:** `error_events` sits at **49 MB for 13,203 rows** (~3.8 KB/row) at
-  steady state under a 30-day prune, of which 5,771 rows were the single now-fixed `[pg 21000]`
-  fault. Worth a glance at what is stored per row. `oura_raw_samples` at **341 MB** is the
-  deliberate archival policy and is explicitly **out of scope** here (see
-  `docs/db-volume-cleanup-handover.md`).
-
-> **⚑ Q-232 … Q-244 are one cluster** — the 2026-08-14 UI/flow/IA + caching review, requested by the
-> owner ("a good review on the ui and flow/location mainly … alongside that have a look at caching
-> and cache busting"). Full evidence, the navigation map and the proposed target structure:
-> [`docs/reviews/2026-08-14-app-ui-flow-ia-review.md`](reviews/2026-08-14-app-ui-flow-ia-review.md).
-> **Q-240 and Q-241 are done (2026-08-14, v1.307.1)** — shipped together, as their entries said to,
-> because they shared a root: the goal caches were never invalidated on write *and* the goals
-> themselves lived in two copies that could not agree. Entries removed. The sweep found the
-> invalidation missing on two Coach surfaces the entry did not name, and exposed a third bug —
-> clearing a goal never worked, in the editor and in the route — which had to be fixed in the same
-> PR because making the server authoritative is what would have made it visible. Journal:
-> [`docs/overview/overview/history-2026-08-12.md`](overview/history-2026-08-12.md).
-> **Q-238 is done (2026-08-14, v1.307.2)** — resolved by deleting the mechanism, not by building the
-> customiser. Git history the entry did not carry decided it: the UI existed (`0376da61`, toggles in
-> More → Settings), was removed on purpose the next day (`4e9ecffd`), and the orphaned file was swept
-> as dead on 2026-06-28 (`73d6d0c3`) while the helpers and every reader stayed. Deleting the readers
-> too also fixes a hidden half — a card hidden during that one-day window could never be un-hidden.
-> Journal:
-> [`docs/overview/overview/history-2026-08-12.md`](overview/history-2026-08-12.md).
-> **Q-242 is done (2026-08-15, v1.307.3)** — and it was not the one-line item it was filed as. The
-> whole-repo scan its own text asked for found `day-log:` at **three** sites (not two) and two more
-> divergent keys, one of them with **unequal values**: `hr-profile` was `HR_PROFILE_TTL` (6 h) at
-> seven sites and a raw `TTL_MEDIUM` (30 min) at the eighth. Three divergences under a rule that has
-> a constants file built for it is the finding, so the scan shipped as
-> `scripts/check-cache-ttl-divergence.js` in the Custom Rules job (34 steps now). Journal:
-> [`docs/overview/overview/history-2026-08-15.md`](overview/history-2026-08-15.md).
-> **Q-236 is done (2026-08-15, no version bump)** — `/overview`, `components/overview-screen.tsx`
-> and the now-orphaned `components/readiness-card.tsx` are gone, along with the `'overview'`
-> background palette the entry did not mention (`dynamic-background.tsx`, the `ScreenPaletteKey`
-> union, and both light and dark `--screen-palette-overview` blocks). **The three `/sheet/[id]/*`
-> shims were NOT deleted** — the owner decided to keep them on 2026-08-10 (Q-136), and that decision
-> is theirs to revisit; the overview shim is repointed at `/` instead of a route that no longer
-> exists. Why the shims' stated rationale has expired is filed as **Q-255**. Journal:
-> [`docs/overview/overview/history-2026-08-15.md`](overview/history-2026-08-15.md).
-> **Q-244 is done (2026-08-15, no version bump)** — `scripts/check-hex-literals.js` in the Custom
-> Rules job (35 steps now): a **per-file** shrink-only baseline, not a single total, because a total
-> lets one file grow while another shrinks — which is what "the trend looks fine" looked like on
-> 2026-08-09. A row for a file that reaches zero must be deleted, or the baseline decays into an
-> allowlist. The existing 471 are **not** swept, per the entry. Mutation-verified three ways.
-> CLAUDE.md's count is corrected to 471 and now records the reversal itself. Journal:
-> [`docs/overview/overview/history-2026-08-15.md`](overview/history-2026-08-15.md).
-> **Q-233 is done (2026-08-15, v1.309.0)** — `/more/devices`, step 1 of the plan's build order. Three
-> things the plan did not anticipate: all four cards already render their own heading (so the wrapper
-> section headers were a heading above a heading and are gone), `BackgroundLocationCard` returns null
-> off-device (so a "Permissions" heading sat above nothing), and the size ratchet fired at 850 lines
-> — fixed by extracting `components/more/more-row.tsx` rather than raising the number, which is the
-> grouped-list primitive the rest of the plan needs. Journal:
-> [`docs/overview/overview/history-2026-08-15.md`](overview/history-2026-08-15.md).
-> **Q-232 step 2 of 3 shipped (2026-08-15, v1.310.0)** — `/more/data` and `/more/about`, splitting
-> the block where Sync now / Restore from cloud / Export my data sat under an *About* heading beside
-> the version string. `profile-tab.tsx` is **697** lines, down from 845 at the start of the cluster,
-> and `components/more/sub-screen.tsx` now owns the navless takeover shell (extracted at its second
-> copy). **Settings is deliberately step 3 rather than part of this one** — it is an independent
-> block, and About/Data had to split from each other in one commit because they were one block.
-> Journal:
-> [`docs/overview/overview/history-2026-08-12.md`](overview/history-2026-08-12.md).
-> **Q-232 step 3 shipped, and the umbrella's own restructure is done (2026-08-15, v1.311.0)** —
-> `/more/settings`. `components/more/profile-tab.tsx` is **465 lines**, from 845, and **its
-> `check-component-size.js` BASELINE row is deleted** (5 hotspots left) — no artificial split, four
-> screens carved along the seams the IA already implied. Journal:
-> [`docs/overview/overview/history-2026-08-15.md`](overview/history-2026-08-15.md).
-> **What remains under Q-232 is the rows the other items own** — Program (Q-235), Admin (Q-234) —
-> plus the optional `/more/achievements` + `/more/goals` split, which is now cosmetic rather than
-> load-bearing since the file is under the limit. Q-234 is unblocked: `/more/settings` exists.
-> **Q-235 and Q-256 are done (2026-08-15, v1.312.0)** — `/program`, reachable from the Workout tab's
-> header and More → Program; More has two tabs left. **Q-256 was fixed by changing the shape, not the
-> string**: the new-program flag is a prop resolved from `/program`'s `searchParams`, because a param
-> read from `window.location.search` can be dropped by anything in between without a call site
-> changing. The Q-223 regression test was **rewritten rather than deleted** — its specifics were gone
-> but its invariant survives — and one of its assertions **did not discriminate** until mutation
-> testing caught it (it checked that `searchParams`/`URLSearchParams` *appear*, which a mutation
-> setting the suffix to `''` passed while dropping every param); it now calls the route and reads the
-> `NEXT_REDIRECT` digest. Journal:
-> [`docs/overview/overview/history-2026-08-15.md`](overview/history-2026-08-15.md).
-> **Q-234 is done (2026-08-15, v1.313.0)** — `/admin` keeps user administration (9 tabs → 5,
-> 476 → 395 lines); diagnostics are **Settings → Developer**, with the three device consoles as rows
-> rather than buttons inside a tab inside a console. `exercises`/`activities` stayed on `/admin`
-> deliberately — the plan names neither, and they are content administration, not device
-> diagnostics. Both sides of the admin gate were exercised by flipping the local user's `is_admin`
-> and re-logging in (note `isAdminUser(id, flag)` returns the **JWT** flag when it is a boolean, so
-> a DB flip alone changes nothing). Journal:
-> [`docs/overview/overview/history-2026-08-12.md`](overview/history-2026-08-12.md).
-> **Q-237 is done (2026-08-15, v1.314.0)** — Water and Saved Meals moved to a row directly under the
-> macro ring, above every meal card, so their position no longer depends on how many meals the day
-> has. **End of Day deliberately stayed put** (Q-112 owns merging it with Home's Day in Review) and
-> **"Log Food" was not added** — the plan's row names it, but no global log-food action exists and
-> creating one needs a meal-type rule this placement change should not invent; filed as **Q-257**.
-> Journal:
-> [`docs/overview/overview/history-2026-08-15.md`](overview/history-2026-08-15.md).
-> **That closes the 2026-08-14 review cluster's implementation items.** Q-243 (the remaining caching
-> item) is still open, and Q-239 stays until Q-234's promotion is confirmed on device. The five IA
-> items (Q-232 … Q-237) share one target structure and **must not be worked one-at-a-time from
-> these entries**: Q-232 is the umbrella and needs a written plan covering the whole set, or the app
-> ends up half-reorganised in two incompatible directions.
-
-> **⚑ Q-249 … Q-254 are one cluster — agent testing capability, owner-directed 2026-08-14, and the
-> owner asked for it "before the github migration" (Q-49).** They are placed here, above the IA
-> cluster, deliberately: **Q-249 is one PR and de-risks everything below it**, including Q-232's
-> restructure, which is the largest UI refactor in the queue and currently has no way to prove it
-> did not break a screen. Move the cluster down if you disagree — but do not let Q-49 land first.
-> **Why the Q-49 deadline is real and not just a preference:** that migration's owner decisions
-> (2026-08-10) commit to *"CI stays offline and holds no credential"*. Q-252 wants a device-farm API
-> key in CI and Q-251 an error-tracking DSN. Those are a straightforward conversation **now**, on a
-> private repo, and a much more awkward one after the cut. Decide the testing surface before the
-> repo becomes public, not after.
+> **✅ Q-283 CLOSED and removed, 2026-09-16 (OR-117) — its own re-measurement retired it and nobody
+> acted on that for two weeks.** The entry's headline was *"~11 MB of indexes have never served a
+> scan"*. Re-measured 2026-09-02: **stale by ~14×.** Its one real candidate,
+> `oura_heartrate_user_updated` (5.7 MB), was already dropped by BF-55's index half in migration 249
+> on 2026-09-01; what remained was **800 kB**, not 11 MB.
 >
-> **The measurement that produced this cluster** (2026-08-14, in the review session that filed
-> Q-232…Q-244): `projectOverview.md` carries **81 rows** marked "NOT verified on device", and they
-> are not one gate. Bucketed by what each actually needs — **~25** need nothing but somebody running
-> the app in a browser, **17** need an Android runtime (local SQLite, offline, notifications, back
-> button, deep links, PiP), **~10** need real data, **25** need real hardware, ~4 are perceived
-> performance. The largest bucket needs **no new access at all**. Full working in
-> [`docs/reviews/2026-08-14-app-ui-flow-ia-review.md`](reviews/2026-08-14-app-ui-flow-ia-review.md)
-> §7. **The per-row bucketing was done from headings, not by reading each row** — re-check a row
-> before claiming a capability closes it.
+> **Closed rather than implemented, and it should not have sat on `Gate: owner` in the meantime** —
+> dropping 800 kB of indexes is not a decision worth an owner's attention, and the gate is what kept
+> it alive. **The standing caution survives:** `idx_scan` counts reads, not constraint enforcement,
+> so a zero-scan unique index is still doing its job — `rr_intervals_pkey` read 0 in August and 5,034
+> in September. Never drop an index on `idx_scan` alone.
 
 ### [app-shell] Q-354 — the date-swipe `useDrag` swallows MOUSE clicks on Nutrition (touch is fine)
 
@@ -17683,6 +17595,11 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   rendered geometry from the DOM and never clicks, so it does not revive this.)
 
 ### [platform] Q-297 — cover Nutrition's day navigation (done; two residues, one of them owner's)
+
+- **Batch:** `owner-branch-protection` — **LB-52 and Q-297's second residue are the same settings
+  page** (marked 2026-09-16, OR-117). LB-52 wants a classic branch-protection rule added beside the
+  Ruleset so auto-merge works; Q-297 asks whether **E2E becomes a required check**. One trip, two
+  toggles. Do not put them to the owner separately.
 
 - **Lane:** A — e2e specs and CI wiring, which is platform work and sits with the engine lane by convention. (Assigned 2026-09-15, OR-116 lane sweep.)
 
@@ -21257,6 +21174,12 @@ not more holding) is part of scope, not a nice-to-have — without it the featur
 indefinitely.
 
 ### [heart-rate][workouts] Q-149 — is 15 bpm the right HRR bar for this user?
+
+- **⚠ NOT OWNER-READY — `Gate: owner` is premature here (marked 2026-09-16, OR-117 triage).** This is
+  a scoring change, so the route is **Tuning proposes → the owner signs → Lane A implements**, and
+  **no proposal exists**. The entry's own text says so. Until a proposal with numbers is written,
+  putting this in front of the owner asks them to sign a blank page — and it has been counting as
+  owner debt in every sweep meanwhile. **The next action is Tuning's, not theirs.**
 
 - **✅ THE OWNER GATE IS CLEARED, 2026-09-01 — and the answer is "fit it to me".** Owner: *"I mostly
   wear the chest strap while training. Let's have it specific to the user."* So the bar is
