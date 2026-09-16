@@ -759,6 +759,76 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
   the trailing 30 days — can only be measured after the owner fires it. Re-measure then; do not
   strike this entry before that.
 
+### [workouts][readiness] BF-173 — the app pre-ticks soreness FROM the recovery model, then penalises the same muscle a second time for it
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-16 (BugFix intake). Owner, after BF-171 was explained
+  to him: *"I trained push/upper body yesterday and legs the day before. Surely it would see that I
+  trained the muscles it wants to use today - yesterday. Legs would be more recovered?"* **He is
+  right, the model agrees with him, and the score throws the agreement away.**
+- **Lane: A** — `packages/shared/src/ai-periodization/ai-dynamic.ts:80-85` (the clamp) and
+  `packages/shared/src/checkin/suggested-soreness.ts` (the source of the tick).
+- **The loop, and every number in it is measured (2026-09-16, production rows):**
+
+  1. `computeMuscleRecovery` returns **quads 69 · hamstrings 63 · glutes 73** (47 h since Legs) and
+     **chest 49 · shoulders 45 · triceps 59** (23 h since Push). The owner's reading of his own
+     training is exactly what the model says.
+  2. `suggestedSoreMuscles` **auto-ticks any muscle trained within 48 h and under `RECOVERED_PCT`
+     (85)** — so it reads *that same recovery output* and pre-selects Quads, Hamstrings, Glutes,
+     Chest, Shoulders, Triceps in the check-in.
+  3. The lifter accepts the pre-ticked list. His stored row for 2026-09-17 is
+     `["Chest","Shoulders","Triceps","Quads","Hamstrings","Glutes","Core"]`.
+  4. `sessionRecoveryScore` then reads **both** the recovery pct **and** the tick, and applies
+     `pct = Math.min(pct, 40)` for a sore main muscle.
+
+  **The same single fact — "you trained legs 47 hours ago" — is counted twice, and the second pass
+  overwrites the first with a harsher fixed number.** Quads the model scored 69 are scored 40.
+- **The clamp is a flat floor, so it also destroys the ordering the model just computed.** Quads at
+  69 and chest at 49 both become exactly **40**. The information the owner is asking about — that
+  his legs are fresher than his push muscles — exists in the recovery feed and is deleted before it
+  reaches the score.
+- **Measured consequence: it changes the recommendation.** Same day, same everything, with the leg
+  ticks removed:
+
+  | session | shipped | legs not ticked |
+  |---|---|---|
+  | **Lower** | 74 | **85 — wins** |
+  | **Upper** | **84 — wins** | 84 |
+  | Pull | 82 | 82 |
+  | Legs | 59 | 72 |
+  | Push | 37 | 37 |
+
+  Lower wins by 1.6 points once its muscles are scored at the value the model already assigned them.
+  **The leg soreness ticks are the whole reason the owner got Upper.**
+- **⚠ Replacing the clamp with a multiplier is NOT the fix — measured, and it does not work.**
+  `pct × 0.6` instead of `min(pct, 40)` preserves the ordering but leaves the winner unchanged
+  (Upper 82.0, Pull 81.7, Lower 75.8). The defect is the **double count**, not the clamp's shape.
+  Do not spend the entry on tuning the 40.
+- **`mood_logs` cannot tell the two cases apart, and that is the blocker for any fix.** The table
+  stores `sore_muscles` as a bare string array — id, user_id, log_date, energy_level, sleep_quality,
+  body_state, sore_muscles, created_at, updated_at, deleted_at. **There is no provenance column**, so
+  the scorer cannot distinguish *"the lifter volunteered that this is sore"* — real information the
+  model does not have, and which should absolutely override it — from *"the lifter accepted what the
+  model itself suggested"*, which is the model marking its own homework.
+- **Fix direction (owner decision, see below):** the coherent version needs provenance on the tick —
+  store whether each muscle was suggested or lifter-added, and apply the clamp only to lifter-added
+  ones, letting an accepted suggestion fall through to its computed recovery pct (which already
+  encodes the same fact). **This needs a migration and a local SQLite version, so it is Lane A's
+  alone.** A cheaper interim exists — suppress the clamp when the muscle's own recovery pct is
+  already below `RECOVERED_PCT`, i.e. when the tick cannot be carrying information the model lacks —
+  and it requires no schema change, but it also silently discards a genuine report in exactly the
+  case where the lifter is telling you the model is wrong.
+- **Gate: owner** — the two directions differ in what they cost and in what they lose, so the owner
+  picks. Present it as: provenance (durable, needs a migration, keeps every real report) versus the
+  interim suppression (ships this week, no schema, loses the lifter's ability to contradict the model
+  for an already-under-recovered muscle).
+- **Relationship to BF-171:** independent, and both are in `sessionRecoveryScore`. BF-171 is about
+  names not matching; this is about a matched name being penalised twice. **Fixing BF-171 makes this
+  one worse**, because normalising `core` → `abs` adds one more correctly-matched sore muscle to the
+  double count. Ship them together or ship this one first.
+- **Verification:** a unit test on `computeAiDynamicNextSession` asserting that a muscle whose
+  recovery pct is already under `RECOVERED_PCT` is not additionally clamped by a tick that
+  `suggestedSoreMuscles` would itself have produced. No device run — pure shared math.
+
 ### [workouts][readiness] BF-171 — the session picker matches muscle names raw, so "Back" sore clamps nothing and `core` never finds its recovery
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-16 (BugFix intake). Owner, on a screenshot showing

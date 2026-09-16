@@ -13077,3 +13077,17 @@ into the entry rather than only into the journal, because both are the kind of h
 implementer forms from reading the code alone: that name-keyed freshness overstates an overlapping
 session (it does, and the 48 h cap makes it not matter), and that the overlap is missing from the
 score (it is already in the recovery component). Fourteen lines here save re-deriving them.
+
+## 2026-09-16 (same PR, third raise) — `docs/implementation-backlog.md` 22977 → 23047 (+70)
+
+**BF-173**, from the owner's *"Legs would be more recovered?"* — which is correct, and the score
+discards it. `suggestedSoreMuscles` auto-ticks a muscle off the recovery model's own output, and
+`sessionRecoveryScore` then clamps that same muscle to `min(pct, 40)`: one fact counted twice, the
+second pass overwriting the first with a harsher number.
+
+The entry is long for a reason that is not padding. It carries the measured before/after table
+because removing the leg ticks **changes the recommendation** (Lower 85 beats Upper 84), it carries
+the rejected multiplier variant with its numbers because `pct × 0.6` is the obvious first idea and
+does not work, and it carries the `mood_logs` column list because the absence of a provenance column
+is what turns the clean fix into a migration and is the entire reason for its `Gate: owner`. Each of
+those is an experiment an implementer would otherwise run again.

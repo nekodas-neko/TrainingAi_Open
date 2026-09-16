@@ -79,3 +79,32 @@ strong deload advised, offered Rest, and showed readiness 37. What remains true 
 Pull 82 is a near-tie decided by under a point, with the better-recovered session losing only on
 being less overdue. That is a design call for the owner rather than a defect, and it is noted in
 BF-171 without a separate entry.
+
+## Second follow-up — the owner was right, and BF-173 is the reason
+
+*"I trained push/upper body yesterday and legs the day before. Surely it would see that I trained
+the muscles it wants to use today - yesterday. Legs would be more recovered?"*
+
+The model agrees with him and the score discards the agreement. `computeMuscleRecovery` has his
+quads at **69**, hamstrings **63**, glutes **73** against chest **49**, shoulders **45**, triceps
+**59**. But `suggestedSoreMuscles` auto-ticks anything trained within 48 h and under 85% recovered —
+reading *that same output* — and `sessionRecoveryScore` then clamps every ticked main muscle to
+`min(pct, 40)`. Quads scored 69 by the model are scored 40 by the picker. One fact, counted twice,
+the second time harder.
+
+Because the clamp is a flat floor it also flattens the ordering: quads at 69 and chest at 49 both
+land on exactly 40, so the very comparison he is making is deleted before it reaches the score.
+
+**It changes the answer.** Same day, leg ticks removed: **Lower 85 wins**, Upper 84, Pull 82, Legs 72,
+Push 37. The leg soreness ticks are the entire reason he got Upper.
+
+Measured and rejected as the fix: replacing the clamp with `pct × 0.6` preserves the ordering and
+leaves the winner unchanged (Upper 82.0, Pull 81.7, Lower 75.8). The defect is the double count, not
+the clamp's shape — the entry says so, so it is not re-tried.
+
+`mood_logs` has no provenance column, so nothing downstream can tell a volunteered report from an
+accepted suggestion. That is what makes the clean fix a schema change, and it is why BF-173 carries
+`Gate: owner` rather than a chosen direction.
+
+**Filing order matters:** fixing BF-171 makes BF-173 worse, because normalising `core` → `abs` adds
+another correctly-matched muscle to the double count.
