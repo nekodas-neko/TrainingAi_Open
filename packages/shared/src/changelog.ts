@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.457.1",
+    date: "2026-09-16",
+    changes: [
+      "A high-stress day no longer recommends a deload on its own, and no longer sends you a High stress day notification. The daily stress figure behind both was running high on four days in five — it is built mostly from your night, which reads as stressed even when the day was not — so it was telling you to back off almost every day, which is the same as telling you nothing. A genuinely stressful day still counts through the other signals, and elevated temperature and illness still recommend a deload as before.",
+      "When that notification did fire it was also hiding your low-readiness alert, because only the most specific alert of the day is sent. Low readiness now reaches you on those days.",
+    ],
+  },
+  {
     version: "1.457.0",
     date: "2026-09-16",
     changes: [

@@ -26,8 +26,20 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.457.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.457.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-16.
+
+**The stress-deload override is unwired, and the notification nobody had noticed went with it
+(TN-34, v1.457.1).** A deload was being recommended on **83% of days** off a daily stress figure
+that is 57% night buckets and correlates **+0.072** with readiness — a flag that fires four days in
+five carries no information. The owner approved unwiring it on 2026-09-10; what the entry did not
+say is that `lib/health-alerts.ts` ran the **same condition on the same input** as a **push
+notification**, and that a fired stress alert **suppresses the readiness-low alert** — so the
+signal-less flag was also masking the real one. Both are unwired; temperature and illness still
+override, and the instantaneous `stressCurrent` level still fires, because TN-33 measured real
+episode structure in the series and none in the daily aggregate. **The re-wire is still owed** and
+waits on TN-33's level-2 test — re-anchored to this user's own distribution, not the 120-minute
+constant.
 
 **The week in review is a page now, and BF-5 is closed after both halves (v1.457.0).** `/health/week`
 sits beside `/health/day` and draws what the paragraph describes: tonnage day by day, readiness,
