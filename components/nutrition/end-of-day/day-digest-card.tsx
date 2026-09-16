@@ -70,7 +70,11 @@ export function DayDigestCard({ active }: Props) {
       <p className="mb-1.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest text-brand">
         <Sparkles className="h-3 w-3" /> Your day
       </p>
-      <Response className="text-sm leading-relaxed">{digest}</Response>
+      {/* `parseIncompleteMarkdown` is a STREAMING repair — it appends a closing `*` when it counts an
+          odd number of single asterisks. This string is finished, so an unterminated `*` is text the
+          model wrote and completing it invents one (BF-5 found the weekly twin of this on screen).
+          The coach's transcript keeps the default, because that one genuinely streams. */}
+      <Response className="text-sm leading-relaxed" parseIncompleteMarkdown={false}>{digest}</Response>
     </div>
   )
 }

@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.457.0",
+    date: "2026-09-16",
+    changes: [
+      "Your week in review is its own page now, instead of a banner that expands. It opens from the weekly notification, from the banner on Home, and from a permanent Week in review entry in Health beside the calendar \u2014 so it is still there after you have dismissed the banner. As well as the written summary it draws the week: tonnage day by day, readiness, sleep, HRV and high-stress minutes each against the week before with their seven daily readings, your personal records, muscle volume, and the month around the week.",
+      "A stray asterisk no longer appears at the end of your weekly and daily summaries. The text was being repaired as though it were still arriving, which added a closing mark to writing that was already finished.",
+    ],
+  },
+  {
     version: "1.456.23",
     date: "2026-09-16",
     changes: [

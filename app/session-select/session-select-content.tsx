@@ -6,7 +6,6 @@ import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { useDayRolloverRefresh, useLocalDay } from '@/components/shell/local-day-provider';
 import { getGreeting } from './greeting';
 import { isMorningCheckinPromptDone, markMorningCheckinPromptDone } from '@/app/session-select/morning-checkin-marker';
-import { useSearchParams } from "next/navigation";
 import { useTransitionRouter } from "@/lib/view-transition";
 import type { ProgramSession, Program, NextSessionRecommendation } from "@trainingai/shared/types/program";
 import { getScheduledSessionsPerWeek } from "@trainingai/shared/schedule-utils";
@@ -97,7 +96,6 @@ type HomeSleepRow = Pick<SleepRow,
 export default function SessionSelectContent({ userId, isAdmin }: { userId?: string; isAdmin?: boolean }) {
   const router = useTransitionRouter();
   // Q-112a: the weekly reminder deep-links straight to the recap instead of landing on bare Home.
-  const weekReviewRequested = useSearchParams().get("review") === "week";
   const { epoch: tabEpoch } = useTabVisibility();
 
   const [metaToday, setMetaToday]           = useState<BodyMetaRow | null>(null);
@@ -1186,7 +1184,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
         )}
 
         {/* ── Weekly recap notification (self-hides once dismissed or generated) ── */}
-        <WeeklyRecapBanner forceOpen={weekReviewRequested} />
+        <WeeklyRecapBanner />
 
         {/* ── Sections ── */}
         {!showHomeSkeleton && <div className="content-fade-in">

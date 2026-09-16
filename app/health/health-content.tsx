@@ -58,7 +58,7 @@ const BODY_GROUPS: BodyGroup[] = [
 // "Muscle Volume This Week" card and, being scoped to the active program, reads 0.0 on a
 // freshly-created program. The seeded per-muscle targets still drive the AI engine; the
 // visualisation is deferred until it's merged into a single volume card.
-const TRAINING_ORDER = ["calendar","weeklyStats","aiPeriodization","muscleSets","activityHistory","workoutDensity"];
+const TRAINING_ORDER = ["calendar","weekInReview","weeklyStats","aiPeriodization","muscleSets","activityHistory","workoutDensity"];
 const PROGRESS_ORDER = ["strengthTrend","trends","strengthProgress","goalsProgress","weightTrendProgress"];
 
 interface SleepRow {

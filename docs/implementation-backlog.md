@@ -19569,10 +19569,17 @@ per-field merge where an AI write has no honest source rank to claim.
 ### [nutrition][app-shell] Q-112e — the weekly recap gets the same treatment (SHIPPED; device check owed)
 
 - **Branch:** `feat/weekly-recap-uplift` → shipped as `feat/q112e-weekly-recap-trends` · **Lane: B**
-- **Keep:** the device check, and only that. On the S25: open the weekly recap from the banner (or
-  the reminder's `/?review=week` deep link) and confirm the four trend rows read at 412 dp under the
-  prose, that a week with no reading says so rather than drawing a gap as zero, and that the
-  sparklines line up week-for-week with each other.
+- **Keep:** the device check, and only that — **but its surface moved on 2026-09-16 and the
+  instruction below is rewritten to match (BF-5 PR 2b).** The banner no longer expands and
+  `/?review=week` no longer exists: `WeekTrendsSection` renders at the foot of **`/health/week`**,
+  reached from the banner, the weekly notification, or the permanent Health entry. On the S25: open
+  that page and confirm the four trend rows read at 412 dp under the week's own charts, that a week
+  with no reading says so rather than drawing a gap as zero, and that the sparklines line up
+  week-for-week with each other. **The component is unchanged** — only where it is mounted.
+- **The TTL note below has NOT triggered.** BF-5 mounts `WeekTrendsSection` in a second *place*, not
+  a second *call site*: there is still exactly one `useCachedValue` for
+  `weekly-review-month-window:`, inside that component. Promote the constant when a second file
+  reads the key, which has not happened.
 - **✅ SHIPPED 2026-09-12 (v1.451.0)** — `components/week-trends-section.tsx`, rendered inside the
   expanded banner. Journal: `docs/overview/entries/2026-09-12-q112e-weekly-recap-trends.md`.
   - The banner's silent-vanish error state shipped 2026-09-08; the trends half was unblocked by
@@ -22063,15 +22070,40 @@ enum with more members would mean inventing a label per rung and re-deciding the
 is still what the control defaults to, the picked length is what the plan is trimmed against *and*
 what the warm-up countdown shows, and dragging the control does not fire a prescription per step.
 
-### [app-shell][platform] 🔵 BF-5 — the week in review should be a page, not a banner that expands
+### [app-shell][platform] 🔵 BF-5 — the week in review is a page (both PRs shipped; the device look is what is left)
 
 - **Lane:** B — **reclassified 2026-09-15 when the engine half shipped.** It was A while the route
   was the blocker (*touches storage or `app/api/**` → A; both halves → A, engine first*). The route
   now returns its numbers, so what is left is reached only from `app/**` and `components/**`, which
   is Lane B by the same path rule. `lib/day-review-reminders.ts` is in neither lane's path list; it
   is scheduled from client code and reaches no storage, so it follows the surface half.
-- **Keep:** PR 2b, the surface. The page, its permanent Health entry point, the banner becoming
-  navigation, the notification retarget, and the stray trailing `*`.
+- **Verify:** device — on the S25: the weekly notification lands on `/health/week`; the Home banner
+  opens it rather than expanding; **Health → Training → Week in review** opens it after the banner
+  has been dismissed; the charts read at 412 dp; and the trailing `*` is gone from the paragraph.
+  The harness covers the render, the failure state and the Health entry (`bf5-week-in-review-page.spec.ts`)
+  but **cannot fire a notification**, which is the half only the device settles.
+- **✅ PR 2b SHIPPED 2026-09-16 (v1.457.0)** (`feat/bf5-week-in-review-page`).
+  [Journal](overview/entries/2026-09-16-feat-bf5-week-in-review-page.md). `app/health/week/` as
+  `page.tsx` + `week-detail-content.tsx` beside `app/health/day/`; `WeekVolumeChart` and
+  `WeekMetricCard` drawn with `react-chartjs-2`; `WeeklyMuscleSetsCard` and `WeekTrendsSection`
+  reused rather than rebuilt; the banner navigates; a permanent `weekInReview` card sits beside the
+  calendar in `TRAINING_ORDER`; the reminder points at `/health/week`.
+- **⚠ Two of this plan's own PR-2b instructions did not survive contact, both for the same reason —
+  the route takes no week.** `/api/weekly-digest` computes the recap week itself and reads nothing
+  from the body but `force`.
+  - The plan suggested **keeping a query param so `reminder-deep-links.test.ts` could stay as-is**.
+    That param would have been a control the route cannot honour — the exact "valid link that does
+    nothing" the test exists to catch. The reminder is query-less and **the test was generalised**:
+    a query-less row asserts the route has its own `page.tsx` **and is not a tab href** (from
+    `TABS`, so adding a tab cannot quietly approve a reminder landing on it). Proven load-bearing by
+    pointing the reminder at `/nutrition`.
+  - The page therefore takes **no `?week=`**, which also keeps §6's "an arbitrary past week is its
+    own entry" true rather than half-implemented.
+- **The stray `*` was not a metrics problem and not this page's either.** `Response`'s
+  `parseIncompleteMarkdown` is a STREAMING repair that appends a closing `*` when it counts an odd
+  number of single asterisks; on a finished string an unterminated `*` is text the model wrote. The
+  prop already existed — passing `false` at the two finished-string surfaces (this page and the
+  daily digest card) is the whole fix. The coach's transcript keeps the default, because it streams.
 
 **✅ PR 2a SHIPPED 2026-09-15 — the route returns the metrics it used to throw away.**
 `packages/shared/src/health/weekly-digest-metrics.ts` owns `WeeklyDigestMetrics` and

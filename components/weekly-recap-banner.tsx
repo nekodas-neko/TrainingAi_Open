@@ -2,12 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SparklesIcon } from "lucide-react";
-import dynamic from "next/dynamic";
 import { startOfWeekInTz, shiftDateStr } from "@trainingai/shared/date-utils";
 import { DismissibleBanner } from "@/components/ui/dismissible-banner";
-import { WeekTrendsSection } from "@/components/week-trends-section";
-
-const Response = dynamic(() => import("@/components/ai/response").then(m => m.Response), { ssr: false });
+import { useTransitionRouter } from "@/lib/view-transition";
 
 const DISMISSED_KEY_PREFIX = "ta_weekly_recap_dismissed_";
 const CONTENT_CACHE_PREFIX = "ta_weekly_recap_v1_";
@@ -20,25 +17,27 @@ interface CachedRecap {
 // A one-time notification for the week that just ended — not an always-there card.
 // Fetches at most once per completed week (cached in localStorage) and stays gone
 // once dismissed, mirroring the early-deload/APK-download banners on this screen.
-interface Props {
-  /**
-   * Opened from the weekly reminder's deep link (`/?review=week`, Q-112a).
-   *
-   * It overrides `dismissed` deliberately: tapping the notification is a clearer request to see the
-   * recap than an earlier dismissal was a request never to. It cannot override `error` or an empty
-   * recap — there would be nothing to show.
-   */
-  forceOpen?: boolean
-}
-
-export function WeeklyRecapBanner({ forceOpen = false }: Props) {
+//
+// **The banner is the ENTRY POINT, not the content (BF-5).** It used to expand into the prose and
+// the month-at-a-glance; the owner asked for the opposite — *"rather than chevron type display; id
+// rathee its own page that you can get to from a banner notifcation"* — so a tap now opens
+// `/health/week`, which holds the paragraph, the charts and the trends together.
+//
+// **The fetch stays, and it is not wasted.** It is what makes "is ready" a true statement rather
+// than a guess, it distinguishes a quiet week from a broken one, and it warms the route's per-week
+// server cache so the page opens on the cached path. `tabs-instant-paint.spec.ts` records that this
+// POST fires on every Home mount.
+//
+// `forceOpen` is gone with the expansion: the weekly reminder now deep-links to `/health/week`
+// itself, so there is no longer a banner state for it to override.
+export function WeeklyRecapBanner() {
+  const router = useTransitionRouter();
   const weekStart = shiftDateStr(startOfWeekInTz(), -7);
   const dismissKey = DISMISSED_KEY_PREFIX + weekStart;
   const cacheKey = CONTENT_CACHE_PREFIX + weekStart;
 
   const [dismissed, setDismissed] = useState(true);
   const [content, setContent] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState(forceOpen);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(false);
   const hasFetched = useRef(false);
@@ -62,13 +61,8 @@ export function WeeklyRecapBanner({ forceOpen = false }: Props) {
   }, []);
 
   useEffect(() => {
-    const alreadyDismissed = !forceOpen && !!localStorage.getItem(dismissKey);
+    const alreadyDismissed = !!localStorage.getItem(dismissKey);
     setDismissed(alreadyDismissed);
-    // Not only the `useState(forceOpen)` initializer: Home is statically imported and the tab shell
-    // never unmounts it, so a notification arriving while the app is open re-renders this with
-    // `forceOpen` true against an `expanded` that was initialised false and will never re-run. The
-    // banner would appear collapsed — the state the user already had before tapping.
-    if (forceOpen) setExpanded(true);
     if (alreadyDismissed || hasFetched.current) return;
     hasFetched.current = true;
 
@@ -85,7 +79,7 @@ export function WeeklyRecapBanner({ forceOpen = false }: Props) {
 
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [weekStart, forceOpen]);
+  }, [weekStart]);
 
   function handleDismiss() {
     localStorage.setItem(dismissKey, "1");
@@ -115,16 +109,11 @@ export function WeeklyRecapBanner({ forceOpen = false }: Props) {
     <DismissibleBanner
       icon={<SparklesIcon className="h-4 w-4 text-brand" />}
       title={isLoading ? "Preparing your week in review…" : "Your week in review is ready"}
-      expandable={!!content}
-      expanded={expanded}
-      onActivate={() => setExpanded(e => !e)}
+      subtitle={content ? "Tap to open" : undefined}
+      // `router.push`, not the component's `href`: that renders a bare anchor, and a document
+      // navigation inside the WebView reloads the app and discards every mounted tab.
+      onActivate={content ? () => router.push("/health/week") : undefined}
       onDismiss={handleDismiss}
-    >
-      {content && <Response className="text-sm leading-relaxed">{content}</Response>}
-      {/* Q-112e — the recap gets the daily review's treatment: the prose, then the numbers it is
-          talking about. Rendered inside the expanded body so the request only fires when the banner
-          is actually opened, and after the prose because the paragraph is what the owner came for. */}
-      {content && <WeekTrendsSection weekStart={weekStart} />}
-    </DismissibleBanner>
+    />
   );
 }

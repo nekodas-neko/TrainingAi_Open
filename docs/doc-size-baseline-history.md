@@ -12787,3 +12787,21 @@ this component and none of them could fail on the defect**. `diary-nested-meal.s
 throughout. A file that reads like coverage and is not is worth naming on the entry, because the
 next person to touch `DiaryMealGroup` will check whether it is tested before checking what the tests
 actually assert.
+
+## 2026-09-16 — `docs/implementation-backlog.md` 22346 → 22378, `projectOverview.md` 11504 → 11519
+
+`feat/bf5-week-in-review-page` (BF-5 PR 2b, closing the entry).
+
+Thirty-two lines across two entries, and most of them record **where the plan was wrong rather than
+what shipped**, which the diff cannot show:
+
+- BF-5's plan told PR 2b to keep a query param *"the cheaper option that keeps the test as-is"*.
+  `/api/weekly-digest` computes the recap week itself and takes none, so that param would have been
+  a control the route cannot honour — the exact failure `reminder-deep-links.test.ts` exists to
+  catch. The entry records the generalisation that replaced it, because the next person to read the
+  plan will read that sentence and not the test.
+- **Q-112e's `Keep:` was rewritten, not just ticked.** It instructed a device check *"open the
+  weekly recap from the banner (or the reminder's `/?review=week` deep link)"* — both gone. A device
+  instruction that names a surface which no longer exists does not fail loudly; it sends the owner
+  looking and comes back "can't reproduce". Its TTL note is also marked NOT triggered: BF-5 mounts
+  `WeekTrendsSection` in a second place, not a second call site, and the two are easy to confuse.

@@ -26,8 +26,23 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.456.23 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.457.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-16.
+
+**The week in review is a page now, and BF-5 is closed after both halves (v1.457.0).** `/health/week`
+sits beside `/health/day` and draws what the paragraph describes: tonnage day by day, readiness,
+sleep, HRV and high-stress minutes each against the week before with the seven daily readings behind
+them, personal records, muscle volume, and Q-112e's month-at-a-glance reused rather than rebuilt. The
+banner becomes the entry point rather than the content, there is a permanent **Week in review** entry
+in Health beside the calendar — the banner is dismissible, so a page reachable only from it is
+unreachable for the rest of the week — and the weekly reminder lands on the page instead of Home.
+**Two of the plan's own instructions did not survive contact**, both because `/api/weekly-digest`
+computes the recap week itself and takes none: the suggested query param would have been a control
+the route cannot honour, so the page takes no `?week=` and `reminder-deep-links.test.ts` was
+generalised instead — a query-less route must have its own `page.tsx` **and not be a tab href**,
+which is the original failure (`/` opens a tab and leaves the user hunting a banner) restated rather
+than weakened. The stray trailing `*` was `Response` repairing a finished string as though it were
+still streaming; fixed at both finished-string surfaces, left on for the coach, which streams.
 
 **A meal in the diary showed its macros nowhere, and the four e2e tests over that component could
 not see it (BF-170, v1.456.23).** `mealFooter` withholds a lone meal's section footer on a premise
