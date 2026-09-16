@@ -13113,3 +13113,30 @@ The two lines that will look like padding to a later reader and are not: **the c
 after this fix**, and **the deload path is independent of it** (verified in
 `per-exercise-deload.ts`, not assumed). Both describe a fix that correctly makes code stop firing,
 which is the shape a future session reliably mistakes for a regression and undoes.
+
+## 2026-09-16 — `docs/implementation-backlog.md` 22675 → 22873, `projectOverview.md` 11532 → 11592
+
+`fix/lb113-health-connect-timezone` (LB-113), and LB-111's merge folded in.
+
+LB-113's own growth is two ⚠ paragraphs, and both record a thing the entry got wrong that the diff
+cannot show:
+
+- It said *"two call sites in one component"*. The component had **one**; the other was inside
+  `syncHealthConnect`, where `tz` was already in scope and being dropped. Fixing only the component
+  would have satisfied the entry's own stated pass test while enrichment kept bucketing in Brisbane.
+- It said *"the provider has the session"*. It is a bare client component with no props; the
+  timezone came from `useUserTimezone()` instead.
+
+Both are the kind of claim that reads as settled fact and takes one grep to check. Writing them on
+the entry is what stops the next reader inheriting them.
+
+## 2026-09-16 — `docs/implementation-backlog.md` 22873 → 22915
+
+LB-114, filed from an unrelated PR's CI failure.
+
+Forty-two lines for one entry, and the payload capture is most of it. It is there because the
+finding is invisible outside a one-hour window: `rv38-body-battery-no-data-badge` is red between
+07:00 and 08:00 Brisbane and green the rest of the day, so anyone who re-runs it at a normal hour
+concludes flake and moves on. The entry carries the captured JSON, the exact clause, and an explicit
+instruction to verify **inside** that window — because verifying outside it proves nothing and looks
+like proof.

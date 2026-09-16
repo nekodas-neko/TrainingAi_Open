@@ -468,7 +468,10 @@ export async function syncHealthConnect(tz: string = DEFAULT_TZ): Promise<{ metr
 
   const { enrichmentCandidates } = await res.json() as { enrichmentCandidates?: EnrichmentCandidate[] };
   if (enrichmentCandidates?.length) {
-    try { await enrichActivityLogs(enrichmentCandidates); } catch { /* ignore */ }
+    // `tz`, not the default — this call is INSIDE `syncHealthConnect`, so the timezone the caller
+    // passed is already in scope and dropping it here would leave enrichment bucketing in Brisbane
+    // however carefully the component threaded it (LB-113).
+    try { await enrichActivityLogs(enrichmentCandidates, tz); } catch { /* ignore */ }
   }
 
   return { metrics: dailyMetrics.length, sessions: exerciseSessions.length, sleep: sleepRecords.length };
