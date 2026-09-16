@@ -74,11 +74,21 @@ describe('the real queue classifies exactly as it did before', () => {
 
   // Measured 2026-09-13, after BF-46's sentence was reworded to clear red `main`. Pinned by ID so a
   // future parser change that un-parks or newly parks an entry names it instead of moving a count.
-  it('yields the same eighteen gates, by id', () => {
+  //
+  // **Updated 2026-09-16: `Q-305:device` removed, and the update is the test working rather than
+  // failing.** #1247 split the push:pull card out of Q-305 as OR-118 and deleted the `Keep:` block
+  // its gate lived in, so the gate left with it — a deliberate restructure whose own commit message
+  // says it "freed a build from a Keep". The pin named the entry rather than moving a count, which
+  // is exactly what let that be checked instead of guessed.
+  //
+  // **It also left `main` red for every lane until someone noticed**, which is the second time this
+  // pin has done that (the 2026-09-13 line above records the first). An entry-restructuring PR has
+  // to re-run this test; it is the only thing that sees a gate leave.
+  it('yields the same seventeen gates, by id', () => {
     expect(gated).toEqual([
       'BF-80:device', 'LB-53:owner', 'BF-10:device', 'Q-486:device', 'Q-499:device', 'Q-477:device',
       'Q-467:device', 'LB-5:device', 'Q-317:device', 'Q-318:device', 'Q-316:device', 'Q-544:device',
-      'Q-538:device', 'Q-461:device', 'Q-319:device', 'Q-305:device', 'Q-513:owner', 'Q-281:device',
+      'Q-538:device', 'Q-461:device', 'Q-319:device', 'Q-513:owner', 'Q-281:device',
     ])
   })
 })
