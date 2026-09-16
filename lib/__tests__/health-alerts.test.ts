@@ -41,9 +41,18 @@ describe('computeHealthAlertActions', () => {
     expect(a.type).toBe('skip')
   })
 
-  it('fires a stress alert when highMinutes crosses the shared deload threshold', () => {
-    expect(forType({ stressHighMinutes: 150 })('stress').type).toBe('fire')
+  // TN-34: the daily-aggregate arm is unwired here too — same condition, same input, and this path
+  // fires a PUSH NOTIFICATION, so at 83% of days it notified four days in five off a signal-less
+  // number AND suppressed the readiness-low alert below.
+  it('does NOT fire a stress alert on highMinutes, however high', () => {
+    expect(forType({ stressHighMinutes: 150 })('stress').type).toBe('skip')
+    expect(forType({ stressHighMinutes: 1000 })('stress').type).toBe('skip')
     expect(forType({ stressHighMinutes: 60 })('stress').type).toBe('skip')
+  })
+
+  it('still fires on the CURRENT level even when highMinutes is high', () => {
+    // The series keeps episode structure (TN-33 §8); it is the daily aggregate that carries none.
+    expect(forType({ stressHighMinutes: 1000, stressCurrent: -0.8 })('stress').type).toBe('fire')
   })
 
   it('falls back to stressCurrent when highMinutes is null (pre-daytime-stress-wiring response)', () => {
@@ -64,9 +73,17 @@ describe('computeHealthAlertActions', () => {
   })
 
   it('suppresses readiness-low when a stress alert fires the same reconcile (precedence)', () => {
-    const get = forType({ readinessLabel: 'Low', stressHighMinutes: 150 })
+    // Triggered off stressCurrent now — highMinutes no longer fires at all (TN-34).
+    const get = forType({ readinessLabel: 'Low', stressCurrent: -0.8 })
     expect(get('stress').type).toBe('fire')
     expect(get('readiness').type).toBe('skip')
+  })
+
+  it('a high-minutes day no longer masks the readiness-low alert', () => {
+    // The point of unwiring here: the noise flag was suppressing the real one.
+    const get = forType({ readinessLabel: 'Low', stressHighMinutes: 1000 })
+    expect(get('stress').type).toBe('skip')
+    expect(get('readiness').type).toBe('fire')
   })
 
   it('never fires readiness-low without sufficient data (chip would be hidden)', () => {

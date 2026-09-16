@@ -441,6 +441,17 @@ below threshold and left in place for next time.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-10 · found answering the owner's *"is stress a real usable value?"*
 - **Lane: A** — `packages/shared/src/ai-periodization/ai-dynamic.ts:219-225`.
+- **✅ OPTION 1 SHIPPED 2026-09-16.** `stressOverride` is now `daySummary === 'very_stressful'` alone
+  (`ai-dynamic.ts`); the derived `stressHighMinutes >= STRESS_HIGH_DAY_THRESHOLD_MIN` arm is gone.
+  **The sibling surface went with it, and it was the worse of the two:** `lib/health-alerts.ts:59`
+  fired the SAME condition on the same input as a **push notification** ("High stress day") — so at
+  83% of days the owner was notified four days in five — **and a fired stress alert sets
+  `moreSpecificFired`, which SUPPRESSES the readiness-low alert**. The noise flag was masking the
+  real one. `stressCurrent` is kept on that path deliberately: TN-33 §8 measures strong episode
+  structure in the series, and it is the daily aggregate that carries none.
+- **Keep:** the RE-WIRE. Options 2 and 3 below are unchanged and both wait on TN-33's level-2 test —
+  when the series is validated, re-anchor to this user's own distribution (a percentile, not a
+  constant) rather than restoring the 120-minute constant.
 - **✅ OWNER-APPROVED 2026-09-10** — *"yes lets do all that."* **Option 1: unwire `stressOverride`.** Not gated; one line, reversible.
 - **Related: TN-33** — only for the later question of what replaces the override. **This is NOT a
   `Needs:`** and was one until 2026-09-16: the field parked the entry while its own sentence said the
