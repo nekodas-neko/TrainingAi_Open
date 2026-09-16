@@ -67,16 +67,26 @@ export const DiaryMealGroup = memo(function DiaryMealGroup({
         <ChevronDown className={`h-4 w-4 flex-none text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
       </div>
 
+      {/* The macro split of the meal — OUTSIDE the expansion, which is where it used to sit (BF-170).
+          `mealFooter` withholds a section's totals footer for a lone meal because "a group row states
+          its own macros AND calories", and collapsed — the default — this row stated only calories,
+          so the P/C/F appeared nowhere. That is BF-120's own defect with the kinds swapped: the
+          owner's screenshot has the meal section showing nothing above a loose-food section showing
+          all three. Fixed here rather than in `mealFooter`, so the premise becomes true for EVERY
+          meal group instead of only a lone one, and so an expanded group does not print it twice.
+
+          Outside the header's `role="button"` as well: it is not part of what toggles, and the row
+          is already a four-element flex line the entry asked not to squeeze a fifth thing into.
+          Colour paired with the letter, which keeps it off being state carried by colour alone. */}
+      <div className="flex items-center gap-3 px-4 pb-2.5">
+        <span className="text-xs font-semibold" style={{ color: MACRO_COLORS.protein }}>P {Math.round(proteinG)}g</span>
+        <span className="text-xs font-semibold" style={{ color: MACRO_COLORS.carbs }}>C {Math.round(carbsG)}g</span>
+        <span className="text-xs font-semibold" style={{ color: MACRO_COLORS.fat }}>F {Math.round(fatG)}g</span>
+      </div>
+
       {open && (
         <div className="border-t border-border/20 bg-muted/20">
           {children}
-          {/* The macro split of the meal, under its own rows. Colour paired with the letter, which
-              is what keeps it off being state carried by colour alone. */}
-          <div className="flex items-center gap-3 px-4 py-2">
-            <span className="text-xs font-semibold" style={{ color: MACRO_COLORS.protein }}>P {Math.round(proteinG)}g</span>
-            <span className="text-xs font-semibold" style={{ color: MACRO_COLORS.carbs }}>C {Math.round(carbsG)}g</span>
-            <span className="text-xs font-semibold" style={{ color: MACRO_COLORS.fat }}>F {Math.round(fatG)}g</span>
-          </div>
         </div>
       )}
     </div>

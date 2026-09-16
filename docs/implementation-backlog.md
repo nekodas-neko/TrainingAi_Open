@@ -437,7 +437,81 @@ below threshold and left in place for next time.
 
 
 
-### [workouts] BF-169 — the COMPLETED stamp is gated on the exercise library loading, so it vanishes on a slow or failed load
+### [nutrition] BF-170 — a lone saved meal shows its macros nowhere (fixed; the device look is what is left)
+
+- **Verify:** device — on the S25, a meal section collapsed shows P/C/F; expanded shows them once,
+  not twice; a section holding a meal plus a loose food still shows its combined footer with
+  calories. **The harness now covers all three in the browser** (below), so what the device adds is
+  the S25's own width: the macro line sits under a header row already carrying a thumbnail, a name,
+  an ingredient count, a calorie figure and a chevron.
+- **✅ SHIPPED 2026-09-16** (`fix/bf170-collapsed-meal-macros`).
+  [Journal](overview/entries/2026-09-16-fix-bf170-collapsed-meal-macros.md). Fixed at the group, as
+  the entry directed: the P/C/F line moved out of `{open && …}` to sit full-width under the header,
+  outside the `role="button"` that toggles. `mealFooter` untouched — its premise is now true, and
+  for every meal group rather than only a lone one.
+- **The entry's own e2e observation was right and is worth keeping:** `diary-nested-meal.spec.ts`
+  covered this component in four tests and **none of them could see the defect** — the one that
+  asserts `P 24g` taps the row open first, so it passed throughout. A fifth case now asserts before
+  any tap, and it fails against the unfixed component with `Expected: 1, Received: 0`, which is the
+  owner's screenshot reproduced in the harness.
+
+- **Lane:** B — `components/nutrition/diary-meal-group.tsx:70-81` is where to fix it;
+  `components/nutrition/meal-card-footer.ts` is the decision that depends on it and should be left
+  alone once the promise is true.
+- **Added:** 2026-09-16 (BugFix intake). Owner, on his Nutrition diary: *"Same issue here where the
+  singular meal doesnt show macro below it."* **PRE WORKOUT** holds one saved meal (*Protein Shake +
+  Cruskit*, 5 ingredients) and shows **no P/C/F**; **POST WORKOUT** directly below holds one loose
+  food and shows **P 17g · C 17g · F 10g**.
+- **`mealFooter` suppresses the section footer for a lone meal on an explicit premise:**
+
+  ```ts
+  // A group row states its own macros AND calories; a loose row states neither.
+  return kinds[0] === 'meal'
+    ? { show: false, showCalories: false }
+    : { show: true,  showCalories: false }
+  ```
+
+- **The group row does not state its own macros while collapsed, which is its default.**
+  `diary-meal-group.tsx` renders the name, the ingredient count, the **calories** and a chevron in
+  the always-visible header; the P/C/F line sits **inside `{open && (…)}`**, under the ingredient
+  rows. Collapsed — as in his screenshot, chevron down — the row states calories only. So the
+  footer is withheld for a claim that is half true, and the macros appear nowhere.
+- **This is BF-120's own defect wearing the other kind.** That entry fixed exactly this shape for
+  loose rows and its reasoning is in `meal-card-footer.ts`: *"a section holding one loose food showed
+  protein, carbs and fat **nowhere**, while the section above it showed all three."* His screenshot
+  is that sentence again with the kinds swapped — the section showing nothing is the meal, and the
+  one below showing all three is the food.
+- **Fix at the group, not at the footer.** Move the P/C/F line out of the `{open && …}` block so a
+  collapsed meal states its macros beside its calories. That makes `mealFooter`'s comment true,
+  needs no change to the decision table, and fixes every meal group rather than only the case where
+  one is alone in a section. Fixing it in `mealFooter` instead would print the macros twice as soon
+  as the group is expanded.
+- **Check when fixing:** the header is already a five-element row (thumb, name + count, calories,
+  chevron) at 14 px minimum height. The macro line belongs under the name, not squeezed into that
+  row — `meal-card.tsx`'s `MealTotals` is the established look and sits full-width below.
+- **Not in scope:** whether a loose row should show per-item macros in the diary. Q-406 deliberately
+  moved those into the detail sheet, and BF-120 settled the section-level answer that followed.
+- **Verification:** on device, a meal section collapsed shows P/C/F; expanded shows them once, not
+  twice; a section holding a meal plus a loose food still shows its combined footer with calories.
+
+### [workouts] BF-169 — the COMPLETED stamp is gated on the exercise library loading (fixed; the device look is what is left)
+
+- **Batch:** `workout-completion-surface` — shipped with **BF-168** and **BF-167**. Batched on the
+  VERIFICATION, per this file's rule: all three are settled by one device run — complete a session,
+  press back, land on the select tab — and each costs the same workout to reach.
+- **Verify:** device — on the S25, complete a session and confirm the stamp appears on the card;
+  then reopen the tab with the exercise-library cache cleared (or offline) and confirm the stamp is
+  still there while the diagram is not. **The harness cannot settle this half**: `trainedToday` is
+  read from the client cache via `readCacheSync('workout-card:<id>')`, whose web and device paths
+  differ, so a seeded web reproduction would prove the wrong runtime. What the browser did confirm
+  (2026-09-16) is that the card paints with no uncaught error both with the library present and with
+  `/api/exercise-library` aborted — the empty-diagram case the entry asked to be checked.
+- **✅ SHIPPED 2026-09-16** (`fix/workout-completion-surface`).
+  [Journal](overview/entries/2026-09-16-fix-workout-completion-surface.md). The stamp now renders on
+  `trainedToday` alone; the heatmap keeps its own `muscleActivations.length > 0` guard, which was
+  always correct for the diagram. `CompletedStamp` is `absolute inset-0`, so the container gains a
+  `min-h-24` when there is no diagram behind it to give it height — applied only in that case, so
+  the working card keeps exactly the height the heatmap gives it.
 
 - **Lane:** B — `app/workout-select/workout-select-content.tsx:111-114` and `:437`.
 - **Added:** 2026-09-16 (BugFix intake). Owner: *"some workouts show the completed sign straight after
@@ -478,7 +552,29 @@ below threshold and left in place for next time.
   with the library cache cleared (or offline) and confirm the stamp is still there while the diagram
   is not.
 
-### [workouts] BF-168 — "Leave workout?" fires on the session-select tab after the workout is finished
+### [workouts] BF-168 — "Leave workout?" fires on the session-select tab after the workout is finished (fixed; device look owed)
+
+- **Batch:** `workout-completion-surface` — shipped with **BF-169** and **BF-167**.
+- **Verify:** device — on the S25, complete a session, return to the tab **without** tapping Start
+  Again, press back, and confirm no dialog. Then mid-workout, confirm the dialog still appears —
+  BF-166 records that this guard is the only thing between a back press and a discarded session.
+  Android's hardware back is a Capacitor channel Playwright cannot fire, so **no harness run can
+  exercise this**; the unit tests pin the predicate and the dismissal, not the gesture.
+- **✅ SHIPPED 2026-09-16** (`fix/workout-completion-surface`).
+  [Journal](overview/entries/2026-09-16-fix-workout-completion-surface.md). **Both halves, and the
+  entry's own proposal for the second half would not have worked.**
+  - **The path term.** `/workout` is both routes — `app/workout/page.tsx` renders `WorkoutScreen`
+    when `?session=<id>` is present and the tab shell otherwise, which is the same distinction
+    `tabKeyForHref` already encodes. `pathname` drops the query, so the old
+    `startsWith("/workout")` could not tell them apart (and matched `/workout-select` besides). Now
+    `pathname === "/workout" && searchParams.has("session")`. `isWorkoutActive` untouched.
+  - **The undismissed dialog**, which is the defect the entry found while looking. The three confirm
+    flags are cleared when their own subject ends, **not on `pathname` change as proposed** — the
+    reported navigation does not change the pathname at all (`/workout?session=<id>` → `/workout` is
+    the same path), so a `usePathname` effect would not have fired for the case this was filed on.
+- **Keep:** nothing beyond the look. The stale-state mechanism the entry could not find is no longer
+  load-bearing either way: whatever leaves the pair set, the prompt can now only be raised on the
+  screen that has a workout to leave, and is cleared the moment that workout ends.
 
 - **Lane:** B — `components/mobile-auth-handler.tsx:46-49`, against
   `isWorkoutActive` in `lib/stores/workout-store.ts:457`.
@@ -540,7 +636,28 @@ below threshold and left in place for next time.
   entry records that this guard is the only thing standing between a back press and a discarded
   session.
 
-### [workouts] BF-167 — one prescription says `deload: false` at the top and `deloaded: true` on every exercise, so the toggle claims "Full" over a deloaded session
+### [workouts] BF-167 — the deload toggle read the phase flag, not the loads (fixed; device look owed)
+
+- **Batch:** `workout-completion-surface` — shipped with **BF-169** and **BF-168**.
+- **Verify:** device — on the S25, open a session whose prescription has any `deloaded: true`
+  exercise and confirm the toggle reads *Deload — As prescribed* with Full offered as *Override*;
+  then a normal session and confirm the labels are unchanged from today.
+- **✅ SHIPPED 2026-09-16** (`fix/workout-completion-surface`).
+  [Journal](overview/entries/2026-09-16-fix-workout-completion-surface.md).
+- **⚠ SHIPPED AS A UNION, NOT THE REPLACEMENT THIS ENTRY RECOMMENDED — and the difference is a
+  regression this entry would have caused.** The recommendation was to swap `prescription.deload`
+  for `exercises.some(e => e.deloaded)`. `e2e/deload-visible.spec.ts` — BF-8's own guard — seeds a
+  prescription with `deload: true` and `exercises: []`, which a `.some()` alone reads as *Full*, so
+  the swap turns BF-8's regression test red. Shipped as `deload || exercises.some(deloaded)`:
+  the defect here is a false NEGATIVE, and the phase flag is never a false positive — when it is set
+  the session genuinely is a deload — so keeping it costs nothing and drops nothing. BF-8's spec
+  passes unchanged (7 of 7, 2026-09-16). `deload-toggle.tsx` untouched, as the entry required.
+- **Keep:** the second contradiction, which this does NOT fix and which is not this lane's — the
+  rationale prose still names the **preDeload** band (*"72.5-80%"*) against rows showing 52%,
+  because it was written before the radar cut the loads and nothing regenerated it. That is the
+  BF-99 class and it needs either a regeneration after the deload pass or a line stating the loads
+  below were reduced afterwards. **It belongs to the engine lane**, not this one: the defect is in
+  the prescription's own generated text, not in the screen that renders it.
 
 - **Lane:** B — `components/workout/pre-workout-screen.tsx:233-239` is the wrong read.
   `components/workout/deload-toggle.tsx` is already correct and needs no change; see below.

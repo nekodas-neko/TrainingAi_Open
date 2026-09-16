@@ -26,8 +26,36 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.456.20 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-09-15.
+**Version:** v1.456.23 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-09-16.
+
+**A meal in the diary showed its macros nowhere, and the four e2e tests over that component could
+not see it (BF-170, v1.456.23).** `mealFooter` withholds a lone meal's section footer on a premise
+written in its own source — *"a group row states its own macros AND calories"* — and the group row
+stated only calories, because the P/C/F line sat inside `{open && …}` and collapsed is the default.
+So the footer was withheld for a claim that was half true. It is **BF-120's defect with the kinds
+swapped**: the owner's screenshot has a meal section showing nothing directly above a loose-food
+section showing all three. Fixed at the group, which makes the premise true for every meal group
+rather than only a lone one; `mealFooter` untouched. **The coverage lesson is the durable half** —
+`diary-nested-meal.spec.ts` had four tests over this component and the one asserting `P 24g` taps
+the row open first, so it passed throughout the defect. A fifth case now asserts before any tap and
+fails against the unfixed component with `Expected: 1, Received: 0`.
+
+**Three defects either side of finishing a workout, shipped as one PR (BF-169 · BF-168 · BF-167,
+v1.456.22) — and two of the three entries recommended a fix that would have broken something.**
+The COMPLETED stamp was gated on the exercise **library** arriving, a fetch it has nothing to do
+with, so on a slow load the card said "complete" three other ways with no stamp — the owner's *"some
+days dont… it may be some specific excercises or how long it takes"*, where both guesses were right
+and were one cause. "Leave workout?" could fire on the session-select **tab**, because `/workout` is
+both the workout screen (`?session=<id>`) and the tab, and `pathname` drops the query; separately, a
+prompt raised legitimately was cleared only by Stay/Leave, so it outlived its screen. And the
+intensity toggle read the prescription's phase flag, which an illness- or soreness-driven deload
+never sets, so it said *Full — as prescribed* over a session cut to 52% of 1RM. **Both corrections
+came from checking the recommendation rather than implementing it:** BF-168's proposed `pathname`
+dismissal would not have fired for the case it was filed on (`/workout?session=x` → `/workout` is
+the same path), and BF-167's proposed replacement of the phase flag turns BF-8's own e2e guard red —
+it seeds `deload: true` with no exercises — so that one shipped as a union instead. **All three are
+`Verify: device`**; BF-168's gesture is a Capacitor channel no harness run can fire at all.
 
 **The trainer role has a plan, and the plan's main job is stopping it rebuilding a bug we already
 have open (BF-9 — docs only, no code).** `saveProgram` is already parameterised by user id, so a

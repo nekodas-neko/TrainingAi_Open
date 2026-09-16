@@ -76,7 +76,12 @@ describe('BF-166 — the back listener consults the surface stack it already has
     // the exact guard that listener was added for.
     const handler = code('components/mobile-auth-handler.tsx')
     const guard = handler.indexOf('hasOpenSurface()')
-    for (const mode of ['setConfirmLeaveOpen', 'setConfirmLeaveWalkOpen', 'setConfirmLeaveActivityOpen']) {
+    // `(true)` — the RAISE, which only the listener does. BF-168 added effects that clear the same
+    // three flags with `(false)`, and they sit at the top of the component, so a bare
+    // `indexOf('setConfirmLeaveOpen')` matches those instead and this ordering check would pass on
+    // a file where the listener's guards had moved below the overlay check. Same trap as the
+    // import-vs-call-site one in the test above.
+    for (const mode of ['setConfirmLeaveOpen(true)', 'setConfirmLeaveWalkOpen(true)', 'setConfirmLeaveActivityOpen(true)']) {
       expect(handler.indexOf(mode), `${mode} must be checked before the overlay stack`).toBeLessThan(guard)
     }
   })
