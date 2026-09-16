@@ -3588,6 +3588,28 @@ Lane B's, tracked on BF-84, and the storage shipping first is what makes it safe
 - **This is the surface the owner actually reads** — the one behind *"its often triggering deload days"*. The protection landed on the path they never see.
 - **⚙️ The root fix now has a mechanism and has NOT been run (BF-13, 2026-09-16, unversioned — admin-only, no user-visible change).** `POST /api/admin/rederive-baselines` replays the baseline fold cold over the stored nights and rewrites the temperature baseline and `temp_dev_c`; `dryRun` is the default. Both halves visible in this frame — the low mean and the 1.714 °C sd — come out of the same cold fold, so re-deriving is the fix *underneath* the suspension rather than beside it. **The run is the owner's to fire; it is a production data write and was deliberately not executed from the sandbox, so nothing here has changed yet.** Gating the banner on `tempLadderTrusted` is still worth doing and is still TN-18's own work — a re-derivation makes the suspension unnecessary, it does not make the ungated consumer correct. [journal](docs/overview/entries/2026-09-16-lane-a-bf13-rederive-baselines.md)
 
+### [readiness][devices] 🔴 One minute in five of "daytime stress" was recorded while the owner was asleep (LA-112, 2026-09-16)
+
+**Measured, not fixed.** The daytime-stress series window is the whole local calendar day
+(`lib/oura-ble/rollup/run.ts:1060`) and nothing restricts it to waking hours, so the metric counts
+sleep. Joined against `sleep_sessions` directly — no clock-hour inference:
+- **277 of 672** stress buckets (41.2%) fall inside a recorded sleep session, and **28 of the 140**
+  buckets counted as high-stress (20.0%) — so **20% of the `stress_high_minutes` the app reports as
+  daytime stress happened while the owner was asleep.**
+- **The mirror problem is worse.** Buckets by Brisbane hour: 00–06 → **289**, **07–08 → 11**, 09–12 →
+  73, 13–23 → 299. Eleven buckets across 24 days land in the owner's most active waking window, where
+  the chest strap recorded **98**. That is `evaluateDaytimeHrvModel`'s MET gate working correctly — a
+  model should not impute HRV from an activity heart rate — but the series ends up densest asleep and
+  nearly empty while moving.
+- **Bears on TN-34**, unwired the same day for firing a deload override on 83% of days off a
+  `stress_high_minutes` figure uncorrelated with readiness. Independent account of why that number
+  carries little signal — **not** a reason to re-wire the override.
+- **Two further findings from the same measurement are queued, not open issues:** **LA-113** (the
+  imputation reads ~⅓ of measured HRV — real but confounded, owner-gated) and **LA-114**
+  (`bucket_start` stores the bucket midpoint).
+- [`measurement`](docs/reviews/2026-09-16-daytime-stress-imputation-vs-measured-hrv.md) ·
+  [`journal`](docs/overview/entries/2026-09-16-lane-a-tn39-stress-validation.md)
+
 ### [readiness][sleep][activity][heart-rate] 🟢 "Everything is 55" — the clustering is coincidence; today's score is correct (2026-08-31)
 
 **Measured, nothing to fix in the scores themselves.** [`review`](docs/reviews/2026-08-31-four-tiles-at-55.md).
