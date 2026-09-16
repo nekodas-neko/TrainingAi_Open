@@ -437,7 +437,23 @@ below threshold and left in place for next time.
 
 
 
-### [nutrition] BF-170 — a lone saved meal shows its macros nowhere, because the footer is suppressed on a promise the collapsed row does not keep
+### [nutrition] BF-170 — a lone saved meal shows its macros nowhere (fixed; the device look is what is left)
+
+- **Verify:** device — on the S25, a meal section collapsed shows P/C/F; expanded shows them once,
+  not twice; a section holding a meal plus a loose food still shows its combined footer with
+  calories. **The harness now covers all three in the browser** (below), so what the device adds is
+  the S25's own width: the macro line sits under a header row already carrying a thumbnail, a name,
+  an ingredient count, a calorie figure and a chevron.
+- **✅ SHIPPED 2026-09-16** (`fix/bf170-collapsed-meal-macros`).
+  [Journal](overview/entries/2026-09-16-fix-bf170-collapsed-meal-macros.md). Fixed at the group, as
+  the entry directed: the P/C/F line moved out of `{open && …}` to sit full-width under the header,
+  outside the `role="button"` that toggles. `mealFooter` untouched — its premise is now true, and
+  for every meal group rather than only a lone one.
+- **The entry's own e2e observation was right and is worth keeping:** `diary-nested-meal.spec.ts`
+  covered this component in four tests and **none of them could see the defect** — the one that
+  asserts `P 24g` taps the row open first, so it passed throughout. A fifth case now asserts before
+  any tap, and it fails against the unfixed component with `Expected: 1, Received: 0`, which is the
+  owner's screenshot reproduced in the harness.
 
 - **Lane:** B — `components/nutrition/diary-meal-group.tsx:70-81` is where to fix it;
   `components/nutrition/meal-card-footer.ts` is the decision that depends on it and should be left

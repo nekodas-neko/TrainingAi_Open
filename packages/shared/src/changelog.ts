@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.456.23",
+    date: "2026-09-16",
+    changes: [
+      "A meal in your diary now shows its protein, carbs and fat without being opened. The breakdown was only drawn once you tapped the meal to see its ingredients, and because a section holding a single meal leaves its totals to that meal's own row, the macros were nowhere to be seen \u2014 while a section holding one loose food right below it showed all three.",
+    ],
+  },
+  {
     version: "1.456.22",
     date: "2026-09-16",
     changes: [

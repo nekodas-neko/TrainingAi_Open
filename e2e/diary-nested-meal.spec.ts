@@ -160,6 +160,40 @@ test('a logged meal is ONE row that opens to its ingredients', async ({ page }) 
   await expect(group.getByText('C 60g', { exact: true })).toBeVisible()
 })
 
+/**
+ * BF-170 — owner: *"Same issue here where the singular meal doesnt show macro below it."*
+ *
+ * `mealFooter` withholds a lone meal's section footer because *"a group row states its own macros
+ * AND calories"*. It stated only calories: the P/C/F line sat inside the expansion, and collapsed is
+ * the default. So the footer was withheld for a claim that was half true and the macros appeared
+ * nowhere — BF-120's defect with the kinds swapped.
+ *
+ * **This asserts BEFORE any tap**, which is what the first test in this file does not: it expands
+ * the group and only then looks for `P 24g`, so it passed throughout the defect.
+ */
+test('a collapsed meal group states its macros, with no tap and no section footer', async ({ page }) => {
+  await withDb(db => seed(db, [GROUP_A]))
+  await openDiary(page)
+
+  const row = groupRow(page).first()
+  await expect(row).toBeVisible({ timeout: 30_000 })
+  // Still shut — the flood BF-39 was filed on must stay hidden while the macros are readable.
+  await expect(row).toHaveAttribute('aria-expanded', 'false')
+  for (const f of FOODS) await expect(page.getByText(f.name, { exact: true })).toHaveCount(0)
+
+  // Counted rather than scoped, the stronger form BF-120's own case uses: `toHaveCount(1)` fails on
+  // 0 (this defect) AND on 2 (a duplicate, which fixing it in `mealFooter` instead would have
+  // produced the moment the group opened). The fixture leaves every other section empty.
+  await expect(page.getByText('P 24g', { exact: true })).toHaveCount(1)
+  await expect(page.getByText('C 60g', { exact: true })).toHaveCount(1)
+
+  // And opening it does not print them a second time.
+  await row.evaluate(el => el.scrollIntoView({ block: 'center' }))
+  await tapCentre(page, row)
+  await expect(row).toHaveAttribute('aria-expanded', 'true')
+  await expect(page.getByText('P 24g', { exact: true })).toHaveCount(1)
+})
+
 test('two servings of the same meal on one day stay two rows', async ({ page }) => {
   await withDb(db => seed(db, [GROUP_A, GROUP_B]))
   await openDiary(page)
