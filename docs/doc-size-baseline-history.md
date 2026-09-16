@@ -12872,3 +12872,15 @@ sandbox did not.
 
 A `Keep:` that says "still owed" without saying what would leave the next session to re-derive it
 from the entry body, which is how the batch lost three weeks after the seed was fixed.
+
+## 2026-09-16 — `docs/implementation-backlog.md` 22378 → 22559
+
+`docs/lb111-movement-pattern-window` (LB-111 filed, OR-118 corrected and parked).
+
+Most of the growth is LB-111, a new entry. The rest is the table of routes checked on OR-118, and
+that table is the point: it says *"no route serves sets by muscle over any window but the current
+one"* with the four things that were looked at and what each returns. Without it the next session
+reads *"every number it renders already exists"*, believes it — it is a plausible sentence — and
+either builds a lane-violating route or ships a card that renders one week under a label claiming
+sixty days. The claim took one grep to falsify and would have taken an afternoon to discover halfway
+through a build.

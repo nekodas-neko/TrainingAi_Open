@@ -14655,10 +14655,53 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   is the second time an inline gate inside a Keep has done it (the first was BF-46).
 
 
-### [workouts] OR-118 — the push:pull balance card, split out of Q-305 and startable now
+### [workouts][platform] LB-111 — expose per-muscle sets over a window, so a movement-balance card can be built
 
-- **Lane:** B — `components/health/` (the Training surface), reading shared helpers only. No storage,
-  no derivation change: every number it renders already exists.
+- **Lane:** A — `app/api/**`. The engine half of **OR-118**, which is parked on it. Filed by Lane B
+  on 2026-09-16 after checking: the number OR-118 renders cannot be fetched by any client today.
+- **What is missing is an exposure, not a derivation.**
+  `getWeeklySetsByMuscleGroup(userId, programId, weekStart, weekEnd, tz)` already takes **arbitrary**
+  start and end dates in spite of its name (`lib/data/postgres/slices/periodization.ts:518`, and on
+  the repository interface). Every route that calls it throws that away and computes the current week
+  server-side: `weekly-muscle-sets` (`GET()`, no params), `ai-periodization/weekly-volume`
+  (`startOfWeekInTz(tz)` + 6), and nothing else reaches it.
+- **The ask:** a windowed read — a `from`/`to` (or `days`) param on `weekly-muscle-sets`, or its own
+  route. Lane A's call which; the shape OR-118 needs is `{ muscle, sets }[]` for a span, with the
+  same main/secondary 1.0/0.5 weighting the three existing surfaces already agree on.
+- **⚠ Decide `programId` explicitly — it is the reason this is not a one-liner.** The method scopes
+  to a single program and a 60-day window can span a programme change, so sets logged under a
+  previous programme either count or vanish. **Recommendation: count them**, because the card's claim
+  is about the lifter's training balance, not about one programme's adherence — but it is a real
+  choice and the answer belongs in the route's own comment, not in the card.
+- **Date params:** `normalizeDateParam` at the handler and a `[-/]` regex in the Zod schema, per
+  CLAUDE.md — the client's `localDateString()` emits slashes.
+- **Verification:** a non-null row count for a span that crosses a programme change, which is the
+  case the `programId` decision turns on.
+
+### [workouts] OR-118 — the push:pull balance card, split out of Q-305 (engine half missing; see below)
+
+- **Needs:** LB-111
+- **⛔ THE "EVERY NUMBER ALREADY EXISTS" PREMISE IS FALSE, checked 2026-09-16 before building.** The
+  *grouping* exists — `movementPattern()` shipped as LB-103 and has **no callers yet**, so this card
+  would be its first. The *numbers* do not: *"legs 481 · push 433 · pull 333 · other 168 over 60
+  days"* came from a direct query, and **no client-reachable route serves sets by muscle over any
+  window but the current one.** Verified, not assumed:
+  - `GET /api/weekly-muscle-sets` — `GET()`, no params, computes this Monday server-side.
+  - `GET /api/ai-periodization/weekly-volume` — same, `startOfWeekInTz(tz)` + 6 days, hardcoded.
+  - `GET /api/muscle-tonnage-trend` — 6 weeks, but **tonnage, not sets**. Not a substitute: legs move
+    far heavier loads, so a tonnage share overstates them and would hide the pull-set deficit this
+    card exists to show. Rendering it under a set-balance label would be a false claim.
+  - `grep -rn '60.*day' app/api/*/route.ts` — nothing.
+- **The derivation is already there and windowed, which is why the engine half is small.**
+  `getWeeklySetsByMuscleGroup(userId, programId, weekStart, weekEnd, tz)` takes **arbitrary** start
+  and end dates despite its name (`lib/data/postgres/slices/periodization.ts:518`, on the repository
+  interface). What is missing is the **exposure**, and a route under `app/api/**` is Lane A's by the
+  path rule — *both halves → Lane A, engine half first*. Filed as **LB-111**.
+- **⚠ Its `programId` argument is the one real design question**, and it is the engine half's to
+  answer: the method scopes to one program, and a 60-day window can span a programme change. Whether
+  the card counts sets across programmes or only the active one changes the number on screen.
+- **Lane:** B — `components/health/` (the Training surface), reading shared helpers only. No storage
+  and no derivation change **in this half**; the window it reads has to come from LB-111 first.
 - **Added:** 2026-09-16, Orchestrator — split from **Q-305**, whose `Keep:` had been describing this
   as *"Lane B's and now unblocked"* since 2026-09-13 while parking it. See Q-305 for why that
   happened; the lesson is the entry's, the work is this one's.
