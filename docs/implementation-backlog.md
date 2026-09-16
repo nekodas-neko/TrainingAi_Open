@@ -3729,10 +3729,22 @@ between a treadmill walk and an outdoor walk without any surface-specific adjust
   - **It picks a PATTERN and never an HR band**, keeping the separation `recommendRunType` already
     keeps. That is what stops an anchor change moving the walk — and it means the band below is
     still entirely outstanding.
-- **⚠ Keep: THE SURFACE HALF, AND IT IS THE HALF THAT FIXES THE REPORTED DEFECT.** The selector does
-  not change what the pacer says. `walk-active.tsx:67-68` still sets fast ≥ 0.70 of reserve (133 bpm
-  for this owner) and `classifyZone` still returns `'push'` for every fast block under it — so the
-  live cue still reads *push* on 100% of fast intervals. Nothing in this PR touches that.
+- ✅ **THE BAND SHIPPED 2026-09-16** (`lane-a/tn25-walk-band`, v1.457.5) — the half that fixes the
+  reported defect. `walkFastBandBpm(hrMax)` in `hr-zones.ts` returns **[101, 118]** at this owner's
+  168 max, `walk-active.tsx` uses it instead of `hrReserveTarget(0.70, …)` = 133, and `ZoneTargets`
+  gained an optional `fastMax` so `classifyZone` can return **`'ease'`** on a fast block — the half a
+  floor could never say, and why the cue could only ever read *push*.
+  - **The band question is decided and the reasoning is in the code**: % of **max HR**, not % of
+    reserve. Same numbers today, stays per-user, and decoupled from the reserve anchor TN-30 moves.
+  - **⚠ It returns 101–118 where this entry quotes 105–118** — the standard 0.60 lower edge against
+    the entry's rounded figure, 4 bpm apart. Named in the source rather than silently reconciled;
+    `WALK_FAST_BAND_PCT_OF_MAX[0]` → 0.625 matches the quote exactly.
+  - **The slow ceiling is untouched** (0.40 of reserve): met on 78% of blocks, so nothing in the data
+    says it is wrong.
+- **⚠ Keep: WIRING THE SELECTOR.** `recommendWalkPattern` shipped in #1262 and **still has no
+  caller** — so the pattern is not actually assigned yet, which is the owner's *"I'd like that to be
+  determined for me"*. The band fixes the cue; the selector fixes the prescription, and it is inert
+  until something calls it.
 - **⚠ The band is an open DESIGN question, and the entry's instruction and good practice pull apart.**
   This entry says *"the band, not the fraction: target **105–118 bpm** directly."* Taken literally
   that is a hardcoded constant true of a 33-year-old with a 168 max and wrong for anyone else.

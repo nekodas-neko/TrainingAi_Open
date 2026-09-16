@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.457.5",
+    date: "2026-09-16",
+    changes: [
+      "The guided walk stops telling you to push on every single fast block. Its fast target was 70% of your heart-rate reserve \u2014 133 bpm \u2014 which you have never once reached in 44 attempts, averaging 98.5, because that target is not reachable by walking for someone your age. It is now a band of 101\u2013118, which is 60\u201370% of your max and where \"conversational aerobic\" actually sits. The cue can also tell you to ease off now, which it never could before: a fast block only had a floor, so the only thing it could ever say was push.",
+    ],
+  },
+  {
     version: "1.457.4",
     date: "2026-09-16",
     changes: [

@@ -8,7 +8,7 @@ import { useGuidedWalkStore } from '@/lib/stores/guided-walk-store'
 import { buildIntervalPlan, segmentAt } from '@/lib/walk/interval-plan'
 import { scheduleWalkCues, cancelWalkCues } from '@/lib/walk/walk-cues'
 import { getLiveHrManager } from '@/lib/live-hr/manager'
-import { hrReserveTarget } from '@trainingai/shared/health/hr-zones'
+import { hrReserveTarget, walkFastBandBpm } from '@trainingai/shared/health/hr-zones'
 import { hapticSuccess, hapticLight } from '@/lib/haptics'
 import type { LiveHrSample } from '@/lib/live-hr/types'
 import { LeaveWalkDialog } from './leave-walk-dialog'
@@ -63,10 +63,14 @@ export function WalkActive({ userProfile, onFinish }: {
   const reducedMotion = useReducedMotion()
 
   const hrMax = userProfile.hrMax
-  const targets = useMemo(() => ({
-    fast: hrReserveTarget(0.70, userProfile.restingHr, hrMax),
-    slow: hrReserveTarget(0.40, userProfile.restingHr, hrMax),
-  }), [userProfile.restingHr, hrMax])
+  // TN-25 — the fast block is a BAND off max HR, not a reserve floor. `0.70 × reserve` was 133 bpm
+  // here and was met on 0 of 44 blocks against a measured mean of 98.5, so the pacer read "push" on
+  // every fast interval. The slow ceiling keeps its reserve fraction: it was met on 78% of blocks,
+  // so nothing in the data says it is wrong.
+  const targets = useMemo(() => {
+    const [fast, fastMax] = walkFastBandBpm(hrMax)
+    return { fast, fastMax, slow: hrReserveTarget(0.40, userProfile.restingHr, hrMax) }
+  }, [userProfile.restingHr, hrMax])
   const cadenceTargets = useMemo(() => resolveCadenceTargets(config), [config])
 
   // The speed rung's targets are the walker's own past fast/slow blocks, not a third thing to

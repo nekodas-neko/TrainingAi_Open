@@ -79,7 +79,43 @@ export function zoneForBpm(bpm: number, zones: HrZone[]): HrZone {
 
 export type ZoneSegmentKind = 'fast' | 'slow'
 export type ZoneVerdict = 'in' | 'push' | 'ease'
-export interface ZoneTargets { fast: number; slow: number }
+export interface ZoneTargets {
+  fast: number
+  slow: number
+  /** Upper edge of the fast block's band, when it has one (TN-25). Optional because a fast target
+   *  was a floor for its whole history; without it `classifyZone` behaves exactly as before. */
+  fastMax?: number
+}
+
+/**
+ * The fast block's HR band for a guided interval WALK, as a fraction of max HR (TN-25).
+ *
+ * **Why % of HRmax and not % of reserve, which every other target here uses.** The walk's fast
+ * target was `0.70 × reserve` — 133 bpm for this owner — and it was met on **0 of 44** blocks, with
+ * a measured fast-block mean of 98.5. Closing that gap needs a cadence far outside anything ever
+ * recorded. The 0.70 reserve fraction is right for the protocol and wrong for this mode: guided
+ * interval walking is validated largely in older adults, for whom brisk walking does reach 70% of
+ * reserve; a 33-year-old with a 168 max cannot on flat ground.
+ *
+ * 60–70% of **max** is where *"conversational aerobic"* — the words the session's own copy uses —
+ * actually comes from, so this aligns the threshold with the model the prescription is written in.
+ * It also decouples the walk from the reserve anchor, which is the coupling TN-30 would otherwise
+ * move: `0.70 × reserve` goes 133 → 140 on re-anchoring at 178.
+ *
+ * **⚠ TN-25 quotes the band as 105–118 bpm.** This returns **101–118** at a 168 max, because it
+ * states the standard 0.60 lower edge rather than the entry's rounded figure — 4 bpm apart, and
+ * named here rather than silently reconciled. Tighten `WALK_FAST_BAND_PCT_OF_MAX[0]` to 0.625 to
+ * match the quote exactly.
+ */
+export const WALK_FAST_BAND_PCT_OF_MAX: readonly [number, number] = [0.60, 0.70]
+
+/** The fast band in bpm for this user's max HR — `[lower, upper]`, rounded. */
+export function walkFastBandBpm(hrMax: number): readonly [number, number] {
+  return [
+    Math.round(WALK_FAST_BAND_PCT_OF_MAX[0] * hrMax),
+    Math.round(WALK_FAST_BAND_PCT_OF_MAX[1] * hrMax),
+  ]
+}
 
 // `estimateHrMax({age, observed})` used to live here. It returned ANY positive `observed`
 // verbatim — no plausibility band, no corroboration — and its callers fed it a bare
@@ -93,9 +129,19 @@ export function hrReserveTarget(pct: number, restingHr: number, hrMax: number): 
   return Math.round(restingHr + pct * hrReserve(hrMax, restingHr))
 }
 
-/** Verdict for a live bpm on a fast/slow block: 'in' when meeting the block's target,
- *  else 'push' (fast, too low) or 'ease' (slow, too high). */
+/**
+ * Verdict for a live bpm on a fast/slow block: 'in' when meeting the block's target, else 'push'
+ * (too low) or 'ease' (too high).
+ *
+ * TN-25 — a fast block can now be too HOT as well as too cold, when `targets.fastMax` is set. Until
+ * it was, the fast verdict was a floor with no ceiling, so the cue could only ever read *push*: it
+ * did so on 100% of fast intervals across ten sessions, which is a cue carrying no information.
+ * `fastMax` is optional, so a caller that does not set one keeps the old floor-only behaviour.
+ */
 export function classifyZone(bpm: number, kind: ZoneSegmentKind, targets: ZoneTargets): ZoneVerdict {
-  if (kind === 'fast') return bpm >= targets.fast ? 'in' : 'push'
+  if (kind === 'fast') {
+    if (bpm < targets.fast) return 'push'
+    return targets.fastMax != null && bpm > targets.fastMax ? 'ease' : 'in'
+  }
   return bpm <= targets.slow ? 'in' : 'ease'
 }
