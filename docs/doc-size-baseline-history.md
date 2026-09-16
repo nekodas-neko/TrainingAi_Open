@@ -12731,3 +12731,10 @@ most of its length on what was RULED OUT — resetSession, the completion path, 
 rolloverDay — because the trigger was not found by reading, and an entry that implied otherwise would
 send an implementer looking in the four places already checked. It also asks the owner one question
 that would change the fix entirely.
+
+## 2026-09-16 — `docs/implementation-backlog.md` (BF-168 amended)
+
+Twenty-three lines. The owner's answer killed the entry's leading theory, so the amendment has to
+carry what replaced it: three further eliminations, and the defect the second read did find — the
+confirm dialog is cleared only by Stay/Leave and never on navigation, so a prompt raised correctly on
+one screen reappears over a screen where it is absurd.
