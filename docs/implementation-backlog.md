@@ -1792,7 +1792,7 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
   from saved meals is a snapshot. Editing the source meal afterwards does not change it. Nothing on
   screen should imply otherwise — no "from <meal name>" provenance chip that reads as a live link.
 - **✅ SHIPPED 2026-09-14** (`fix/bf161-meal-builder-add-saved-meals`, v1.456.8).
-  [Journal](overview/entries/2026-09-14-bf161-builder-adds-saved-meals.md). `savedMealToEntries`
+  [Journal](overview/history-2026-09-16-folded-1.md#2026-09-14-bf161-builder-adds-saved-meals). `savedMealToEntries`
   (`components/nutrition/saved-meal-flatten.ts`) is the one mapping; the source list is
   `saved-meal-results.tsx`, a child rather than an addition to `saved-meals-sheet.tsx`, which was
   788 lines against the hard 800 ceiling. **No schema change and no new fetch** — `SavedMeal`
@@ -2684,7 +2684,7 @@ the rest of that day; and `perceived_recovery` carries at least three distinct v
   request and no cache key. `e2e/rest-vs-plan-card.spec.ts` is the first run of that rendering path
   anywhere but the S25; mutation-proven, and it stubs the response deliberately because the parent
   gates everything behind the CORRELATION's `hasSufficientData` — a condition about the bars, not the
-  card. [Journal](overview/entries/2026-09-13-lb98-rest-card-server-fallback.md).
+  card. [Journal](overview/history-2026-09-16-folded-1.md#2026-09-13-lb98-rest-card-server-fallback).
 - **Keep: the `body_metadata` half, which is LB-96**, still parked on `Needs: OR-102b`.
 - **Measured in production while building this, and worth keeping:** of 1,189 set logs, **462** carry
   `planned_rest_sec` and **838** carry `rest_time_sec`; **442** carry both, all inside the route's
@@ -11088,7 +11088,7 @@ record explicitly why not.
   Geometry is in `stress-day.ts` with 9 node tests (timezone, the measured 06:45 → 13:15 hole, the
   one-dropped-reading tolerance, coverage excluding gaps); `e2e/stress-by-hour.spec.ts` proves it
   draws as **two** polylines rather than one joined line.
-  [Journal](overview/entries/2026-09-13-tn-3b-stress-by-hour.md).
+  [Journal](overview/history-2026-09-16-folded-1.md#2026-09-13-tn-3b-stress-by-hour).
 - **✅ THE PAST-DAY READ IS NOT BLOCKED — corrected 2026-09-16.** This said it was blocked on
   `LB-102`, then on `LB-110`; **both were chasing work that had already shipped.**
   `app/api/body-battery/stress-day/route.ts` serves the stored buckets for any day and

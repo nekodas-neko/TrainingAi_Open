@@ -42,7 +42,7 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   rendered as the first. `responseState()` separates them; undecided now reads "Not called yet".
   **The entry keeps a wrong first diagnosis on the record**: a card reporting "no data" is not
   evidence that no data reached it.
-- [`docs/overview/entries/2026-09-14-bf161-builder-adds-saved-meals.md`](../../overview/entries/2026-09-14-bf161-builder-adds-saved-meals.md)
+- [`2026-09-14-bf161-builder-adds-saved-meals`](../../overview/history-2026-09-16-folded-1.md#2026-09-14-bf161-builder-adds-saved-meals)
   — **The meal builder can add a saved meal, flattened (BF-161), 2026-09-14.** `saved_meal_items
   .food_item_id` is NOT NULL, so a meal item **is** a food item and there is no column a nested meal
   could occupy — real nesting means a migration, recursive macro computation in every consumer, and
@@ -51,13 +51,13 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   live link. `savedMealToEntries` (`saved-meal-flatten.ts`) is the single mapping — the edit-load
   path had been doing it inline, which is what settled the whole-recipe-vs-portion question. Device
   check owed.
-- [`docs/overview/entries/2026-09-13-lane-a-bf152-resting-rate-anchored-budget.md`](../../overview/entries/2026-09-13-lane-a-bf152-resting-rate-anchored-budget.md)
+- [`2026-09-13-lane-a-bf152-resting-rate-anchored-budget`](../../overview/history-2026-09-16-folded-1.md#2026-09-13-lane-a-bf152-resting-rate-anchored-budget)
   — **the calorie budget anchors to a rule, not a number (BF-152), 2026-09-13.** `budgetProvenance`'s
   zero-movement base was the user's stored calorie target for one day (BF-150); it is now their
   resting rate — the measured RMR re-scaled onto today's fat-free mass (1,342), the predicted BMR
   otherwise. **`restingBaseKcal` is NOT that number and is the mutant to watch for**: on the
   calibrated path it is `maintenance − avgActive`, so it carries the estimator inflation BF-150 was
-  escaping. Read with [`the BF-150 entry`](../../overview/entries/2026-09-12-lane-a-bf150-goal-anchored-budget.md),
+  escaping. Read with [`the BF-150 entry`](../../overview/history-2026-09-16-folded-1.md#2026-09-12-lane-a-bf150-goal-anchored-budget),
   which it changes one line of. The residual it deliberately does not model — the thermic effect of
   food and non-step NEAT, together about the `bmr × 1.2` the owner's *"1600"* implies — is copy owed
   under **LA-102**, not arithmetic.

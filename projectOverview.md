@@ -125,7 +125,7 @@ early**, and those point at different files. `handleResume` now logs the viewpor
 **500 ms into the same resume**, riding the first row's budget so a reported resume costs two rows
 and an unreported one costs none. Next: one blank resume in normal use, then read
 `bf110 resume recheck%` — **`stuck` means native, `resized` means render timing.** No fix before that
-row exists ([journal](docs/overview/entries/2026-09-14-bf110-second-viewport-log.md)).
+row exists ([journal](docs/overview/history-2026-09-16-folded-1.md#2026-09-14-bf110-second-viewport-log)).
 
 **BF-100 is failing on the S25, not awaiting a check — and it read as the latter for a day.** Owner,
 2026-09-13: *"Checked on more - and still doesnt work"*, its **second** failure. That was recorded
@@ -208,7 +208,7 @@ the buttons was never a usable signal: `transition_recommended` and `deload_reco
 `session_swap_recommended`. One `ConsequenceLine` now reads `prescriptionDrivesLoad` in both blocks
 — no second copy of the split — muted on the driving half, bold amber on the opt-in half. ⚠️ **Not
 device-verified**, and the owner has a live `session_swap_recommended` to check it against
-([journal](docs/overview/entries/2026-09-14-bf156-accept-consequence.md)).
+([journal](docs/overview/history-2026-09-16-folded-1.md#2026-09-14-bf156-accept-consequence)).
 
 **The bodyweight ready screen has a clock again (BF-157).** Owner, on the Pull-Up ready screen with
 the session clock at **8:42**: *"The body weight screens have no warmup timer or load time so its
@@ -222,7 +222,7 @@ on-screen ready bar uses"* and was wrong for every one of them. It matters past 
 `handleStart` submits the ready-screen elapsed as `prepTimeSec`, so an unbounded ready screen was
 measuring whatever distraction occurred and feeding it to the session card's time budget. ⚠️ **Not
 device-verified**
-([journal](docs/overview/entries/2026-09-14-bf157-bodyweight-get-ready-clock.md)).
+([journal](docs/overview/history-2026-09-16-folded-1.md#2026-09-14-bf157-bodyweight-get-ready-clock)).
 
 **Cardio Baselines moved to the Cardio tab (BF-159).** Owner, after having to be told where the
 Cooper test lives: *"That section should be moved to cardio hub."* The card sat in the Health tab's
@@ -234,7 +234,7 @@ now renders under `HeartProfileCard` and above `ModalityPicker`. **Moved, not du
 destination is how a stale copy starts. `e2e/cardio-baselines-placement.spec.ts` asserts both halves
 and **each was proven to fail without the change** (the Cardio half against clean `main`, the Health
 half against a deliberately duplicated build). ⚠️ **Not device-verified**
-([journal](docs/overview/entries/2026-09-14-bf159-cardio-baselines-placement.md)).
+([journal](docs/overview/history-2026-09-16-folded-1.md#2026-09-14-bf159-cardio-baselines-placement)).
 
 **The stress chart reads one baseline, and now reaches past days (LA-104).** TN-3b shipped the chart
 reading `/api/body-battery`'s **live** series while LB-102's route served every stored day — and the
