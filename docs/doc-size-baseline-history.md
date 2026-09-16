@@ -12786,6 +12786,73 @@ throughout. A file that reads like coverage and is not is worth naming on the en
 next person to touch `DiaryMealGroup` will check whether it is tested before checking what the tests
 actually assert.
 
+## 2026-09-16 — `docs/implementation-backlog.md` 22346 → 22378, `projectOverview.md` 11504 → 11519
+
+`feat/bf5-week-in-review-page` (BF-5 PR 2b, closing the entry).
+
+Thirty-two lines across two entries, and most of them record **where the plan was wrong rather than
+what shipped**, which the diff cannot show:
+
+- BF-5's plan told PR 2b to keep a query param *"the cheaper option that keeps the test as-is"*.
+  `/api/weekly-digest` computes the recap week itself and takes none, so that param would have been
+  a control the route cannot honour — the exact failure `reminder-deep-links.test.ts` exists to
+  catch. The entry records the generalisation that replaced it, because the next person to read the
+  plan will read that sentence and not the test.
+- **Q-112e's `Keep:` was rewritten, not just ticked.** It instructed a device check *"open the
+  weekly recap from the banner (or the reminder's `/?review=week` deep link)"* — both gone. A device
+  instruction that names a surface which no longer exists does not fail loudly; it sends the owner
+  looking and comes back "can't reproduce". Its TTL note is also marked NOT triggered: BF-5 mounts
+  `WeekTrendsSection` in a second place, not a second call site, and the two are easy to confuse.
+
+## 2026-09-16 — `docs/implementation-backlog.md` → 22301 (OR-117, the owner-gate triage)
+
+Q-283 closed on its own re-measurement (an 11 MB headline that was 800 kB two weeks ago), against
+eight `NOT OWNER-READY` markers and five batch lines. Net −77.
+
+**The markers are the point and they are worth their lines.** Eight scoring entries carried
+`Gate: owner` while their own text said no Tuning proposal exists — so they counted as owner debt in
+every sweep while being un-answerable by the owner, who would have been signing a blank page. The
+marker is what stops the next sweep counting them.
+
+The batch lines pair entries by **the sitting they need**, not the subject: LA-68, TN-1 and LA-56 are
+one admin login, and LB-52 with Q-297's second residue are one branch-protection page. Five entries,
+two trips.
+
+## 2026-09-16 — `docs/implementation-backlog.md` → 22514 (OR-118, the aggregation pass)
+
++213, and this one is a raise rather than a ratchet, so it needs the better argument.
+
+**Most of it is the same paragraph written onto several entries at once**, which is deliberate: a
+batch line has to be readable from whichever entry someone opens, and a session that opens BF-144
+alone must learn there that two other data-losing migrations are waiting on the same conversation.
+Four groupings: `back-gesture-sitting` (4), `admin-console-sitting` (7), `history-row-policy` (3) and
+`destructive-migration` (3). Seventeen entries, four asks.
+
+**The rest is OR-118 itself, split out of Q-305's `Keep:`,** where an unblocked Lane B build had been
+sitting since 2026-09-13 under a heading reading *"shipped; only the stated residue is owed. Not new
+work"* — with an inline `Gate: device` in the Keep parking the whole entry, the second time that
+shape has bitten (BF-46 was the first). Lane B's READY was two items long while it sat there.
+
+Two rules got written down because both were nearly broken in this sitting: an ask-grouping is **not**
+a `Batch:` when its members are migrations, and a `Batch:` cannot span lanes at all — the sitting is
+shared, the PRs are not.
+
+## 2026-09-16 — backlog → 22303: unparking the work the reorder was supposed to surface
+
++2 lines, which is the whole point: the change is almost entirely substitutions, not additions.
+`⛔` → `⚠` in five entries and `Reference:` → `Review:` in nine, plus three lines recording why
+TN-34's `Needs:` was wrong.
+
+The reorder the day before moved three entries to the top of the file and **changed nothing about
+what Lane A sees**, because three separate mechanisms were holding them back: any `⛔` parks an
+entry, a `Needs:` field outranks the sentence disclaiming it, and `Reference:` means *"never build
+this"* rather than *"here is the supporting doc"*. READY went 11 → 19 and REFERENCE 18 → 10 for two
+lines of net growth.
+
+Worth the history note rather than a silent fix because the third cause was self-inflicted across
+every entry this agent filed, and the lesson generalises: a queue position is not a work assignment,
+and the file does not show which of the three is in play.
+
 ## 2026-09-11 — `docs/implementation-backlog.md` → 21535 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.

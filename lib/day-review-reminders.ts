@@ -101,8 +101,10 @@ export async function scheduleWeeklyRecapReminder(): Promise<void> {
         body: 'See how your week went and what to focus on next.',
         schedule: { at: action.at },
         channelId: DAY_REVIEW_CHANNEL,
-        // The recap lives on Home, so this stays on '/' — but with the param that opens it.
-        extra: { route: '/?review=week' },
+        // The recap is its own page now (BF-5), so the notification lands ON it rather than on Home
+        // with a param that opens a banner. No query: `/api/weekly-digest` computes the recap week
+        // itself and takes no week, so there is nothing for one to say.
+        extra: { route: '/health/week' },
       }],
     })
     localStorage.setItem(WEEKLY_RECAP_REMINDER_KEY, action.sundayIso)

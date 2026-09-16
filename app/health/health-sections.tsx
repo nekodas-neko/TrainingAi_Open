@@ -15,6 +15,7 @@ import { CalendarWidget } from "@/components/calendar-widget";
 import { ActivityHistoryCard } from "@/components/health/activity-history-card";
 import { AiPeriodizationStatusCard } from "@/components/health/ai-periodization-status-card";
 import { WeeklyMuscleSetsCard } from "@/components/health/weekly-muscle-sets-card";
+import { WeekInReviewCard } from "@/components/health/week/week-in-review-card";
 import { BodyMuscleCard } from "@/components/health/body-muscle-card";
 import { EnergyBudgetPrompt } from "@/components/health/energy-budget-prompt";
 import { CalorieBalanceBar } from "@/components/nutrition/calorie-balance-bar";
@@ -680,6 +681,10 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
           <CalendarWidget onDayClick={handleDayClick} userId={userId} />
         </div>
       );
+      // Beside the calendar deliberately: the owner described the page as *"kinda like the training
+      // calendar entry; but for the whole week"*, and this is the entry point that outlives the
+      // dismissible banner (BF-5).
+      case "weekInReview":    return <WeekInReviewCard key="weekInReview" />;
       case "weeklyStats":     return <WeeklyStatsHub key="weeklyStats" data={weeklyStats} loading={weeklyStats === null} sessions={activeSessions} />;
       case "timeInZone":      return <TimeInZoneCard key="timeInZone" />;
       case "aiPeriodization": return <AiPeriodizationStatusCard key="aiPeriodization" />;

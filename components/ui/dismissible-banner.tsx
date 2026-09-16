@@ -9,7 +9,12 @@ interface DismissibleBannerProps {
   subtitle?: React.ReactNode;
   /** Body tap action (open a sheet, toggle expand). Omit for a purely informational banner. */
   onActivate?: () => void;
-  /** Alternative to onActivate: body is a link. Mutually exclusive with onActivate. */
+  /** Alternative to onActivate: body is a link. Mutually exclusive with onActivate.
+   *
+   *  **Renders a bare `<a href>`, so it is a document navigation** — inside the Capacitor WebView
+   *  that reloads the app and throws away every mounted tab. For an in-app destination use
+   *  `onActivate` with the transition router instead; this is for a genuinely external target.
+   *  Unused as of 2026-09-16 (BF-5 reached for it and did not use it, for this reason). */
   href?: string;
   /** Show a chevron + set aria-expanded on the body. */
   expandable?: boolean;
