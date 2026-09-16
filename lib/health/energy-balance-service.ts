@@ -278,16 +278,32 @@ export async function computeEnergyBalance(
   // This is not the floor two lines below on `restingBaseKcal`. That one protects what the balance
   // DISPLAYS; this protects the maintenance itself — the number `targetFromMaintenance` turns into
   // the recommendation, and that `TdeeAdaptationCard` writes into the user's calorie goal.
-  const { maintenanceKcal, source, estimate } = resolveMaintenance(windowDays, formulaBaseline, bmr)
+  // The user's habitual daily movement, averaged over every window day INCLUDING zero-movement ones,
+  // because the calibration averages over those days too.
+  //
+  // **Hoisted above `resolveMaintenance` for TN-29**, where it used to sit below and be gated on
+  // `source === 'calibrated'`. It has two jobs now and the second one has to happen first: the
+  // ceiling the calibration is judged against is built from it, so it cannot depend on whether the
+  // calibration was accepted.
+  const avgActiveOverWindow = windowDays.length > 0
+    ? windowDays.reduce((sum, d) => sum + activeEnergyFor(d.date).total, 0) / windowDays.length
+    : 0
+
+  // TN-29 — the app computes two independent maintenance estimates on every request and compared
+  // them never. This is the second one: resting base plus the movement actually measured. It fails
+  // in unrelated ways to the intake/weight calibration, which is exactly what makes it a usable
+  // check on it. For the owner on 2026-09-09 it read 1,895 against a calibrated 2,245.
+  const measuredMovementMaintenance = Math.round(formulaBaseline + avgActiveOverWindow)
+
+  const { maintenanceKcal, source, estimate } =
+    resolveMaintenance(windowDays, formulaBaseline, bmr, measuredMovementMaintenance)
 
   // A calibrated maintenance measures TOTAL expenditure, so it already contains however much the
   // user habitually moves. Expenditure is "resting base + today's measured movement", so habitual
   // movement has to come out of the base first — otherwise a typical day reads as a surplus purely
-  // from being counted twice. Averaged over every window day (including zero-movement ones),
-  // because the calibration averages over those days too.
-  const avgActiveKcal = source === 'calibrated' && windowDays.length > 0
-    ? windowDays.reduce((sum, d) => sum + activeEnergyFor(d.date).total, 0) / windowDays.length
-    : 0
+  // from being counted twice. Zero on the formula path, where the base is not a measurement and has
+  // nothing double-counted in it.
+  const avgActiveKcal = source === 'calibrated' ? avgActiveOverWindow : 0
 
   // Resting burn can never fall below BMR, whatever the arithmetic says — and BF-42 is about WHICH
   // number that floor uses. It was the prediction even when a measurement existed, so for this

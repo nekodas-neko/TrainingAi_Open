@@ -49,6 +49,28 @@ export const MIN_LOGGED_FRACTION = 0.7
 export const MIN_PLAUSIBLE_MAINTENANCE = 1000
 export const MAX_PLAUSIBLE_MAINTENANCE = 6000
 
+/**
+ * How far above the MEASURED-MOVEMENT maintenance a calibrated estimate may land before it is
+ * rejected (TN-29). The mirror of `minMaintenanceKcal`: that floor says *a maintenance below resting
+ * burn is impossible by definition*; this ceiling says *a maintenance implying training the user
+ * demonstrably did not do is impossible by measurement.*
+ *
+ * The app already computes both numbers on every request and, until now, compared them never. For
+ * the owner on 2026-09-09 they read: calibrated **2,245** against a measured-movement **1,895** —
+ * activity factors of **1.67** and **1.41**. 1.67 is "hard exercise 6–7 days a week" for someone
+ * averaging 3,572 steps a day.
+ *
+ * **The ceiling TRACKS the measurement rather than being a constant**, which is what keeps it from
+ * rejecting a genuine training block: the measured-movement estimate already contains that training,
+ * so a real block raises the ceiling with it. The headroom is for expenditure the step count cannot
+ * see — NEAT, thermogenesis, unlogged activity — not for training.
+ *
+ * **⚠ 1.15 is the one number TN-29 deliberately did not settle, and it wants fitting against more
+ * than one owner-month.** At the owner's 1,895 it rejects at 2,179, so it rejects the 2,245 that
+ * prompted the entry and accepts anything up to ~15% of unmeasured movement. Change it here, once.
+ */
+export const MAX_MEASURED_MOVEMENT_RATIO = 1.15
+
 export interface MaintenanceDay {
   date: string
   /** kcal eaten that day; null when nothing was logged (NOT zero — a zero would poison the mean). */
@@ -85,6 +107,10 @@ export type MaintenanceExclusion =
   /** Below the caller's own BMR floor. Separate from `implausible_result` on purpose: this one
    *  says the intake log is incomplete, not that the arithmetic went out of human range. */
   | 'below_bmr'
+  /** Above what the user's own measured movement can account for (TN-29). Separate from
+   *  `implausible_result` because the number is perfectly plausible for *a* human — it is just not
+   *  plausible for THIS one, whose movement the app has measured. */
+  | 'above_measured_movement'
 
 export interface MaintenanceEstimate {
   /** Calibrated maintenance kcal/day, or null when the window did not clear the gates. */
@@ -114,6 +140,10 @@ export function estimateMaintenance(
   /** The user's own BMR, when the caller knows it. Raises the floor from the universal
    *  `MIN_PLAUSIBLE_MAINTENANCE` to something true of this person — see Q-517. */
   minMaintenanceKcal?: number | null,
+  /** The user's measured-movement maintenance (resting base + their own average daily movement),
+   *  when the caller knows it. Rejects an estimate more than `MAX_MEASURED_MOVEMENT_RATIO` above
+   *  it — see TN-29. Omitted, the estimate is bounded only by `MAX_PLAUSIBLE_MAINTENANCE`. */
+  measuredMovementKcal?: number | null,
 ): MaintenanceEstimate {
   const sorted = [...days].sort((a, b) => a.date.localeCompare(b.date)).slice(-windowDays)
 
@@ -172,6 +202,13 @@ export function estimateMaintenance(
   if (maintenanceKcal < floorKcal) {
     return fail(floorKcal > MIN_PLAUSIBLE_MAINTENANCE ? 'below_bmr' : 'implausible_result')
   }
+  // TN-29 — the ceiling, and the same rejection-not-clamping rule as the floor above: clamping
+  // would report a number the data never supported, so `resolveMaintenance` falls back to the
+  // formula baseline instead.
+  if (measuredMovementKcal != null && measuredMovementKcal > 0
+      && maintenanceKcal > measuredMovementKcal * MAX_MEASURED_MOVEMENT_RATIO) {
+    return fail('above_measured_movement')
+  }
 
   const coverage = logged.length / sorted.length
   const confidence = sorted.length >= MAX_WINDOW_DAYS && coverage >= 0.9 ? 'high'
@@ -191,12 +228,14 @@ export function resolveMaintenance(
   formulaBaselineKcal: number,
   /** The user's own BMR — see `estimateMaintenance`. */
   minMaintenanceKcal?: number | null,
+  /** The user's measured-movement maintenance — see `estimateMaintenance`. */
+  measuredMovementKcal?: number | null,
 ): { maintenanceKcal: number; source: 'calibrated' | 'formula'; estimate: MaintenanceEstimate } {
-  const long = estimateMaintenance(days, MAX_WINDOW_DAYS, minMaintenanceKcal)
+  const long = estimateMaintenance(days, MAX_WINDOW_DAYS, minMaintenanceKcal, measuredMovementKcal)
   if (long.maintenanceKcal != null) {
     return { maintenanceKcal: long.maintenanceKcal, source: 'calibrated', estimate: long }
   }
-  const short = estimateMaintenance(days, DEFAULT_WINDOW_DAYS, minMaintenanceKcal)
+  const short = estimateMaintenance(days, DEFAULT_WINDOW_DAYS, minMaintenanceKcal, measuredMovementKcal)
   if (short.maintenanceKcal != null) {
     return { maintenanceKcal: short.maintenanceKcal, source: 'calibrated', estimate: short }
   }
@@ -219,6 +258,8 @@ export function maintenanceGapMessage(e: MaintenanceEstimate): string {
       return 'Calibration produced an implausible number — check for unlogged days'
     case 'below_bmr':
       return 'Calibration came out below your resting burn — some days are only part-logged'
+    case 'above_measured_movement':
+      return 'Calibration came out higher than your measured movement supports — using the formula estimate'
     default:
       return 'Using the formula estimate'
   }

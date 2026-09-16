@@ -3389,6 +3389,28 @@ the right shape and the wrong scope: it explains the macro-vs-calorie gap only.
 - **Lane:** A — `packages/shared/src/nutrition/adaptive-tdee.ts`, alongside **TN-29** and best built with it.
 - **Added:** 2026-09-10 · owner, after his budget rose 651 kcal: *"I thought discussed 1650 was like the maint? with 200 minus for recomp? how did we go up?"* — he was right, and checking him is what found this.
 - **Needs:** — nothing. **Cross-reference TN-29**, which catches this *instance* through a different mechanism; the cause below is not the one TN-29 names, and will recur on every new vial.
+- **Gate: owner** — added 2026-09-16, and it is a DATA correction rather than a decision. See below.
+- ⚙️ **STATUS 2026-09-16 — the general guard shipped; this entry's specific fix is blocked on one
+  date the owner has to set.**
+  - **TN-29's ceiling is in** (v1.457.4), and it catches *this instance*: the 2,245 that prompted
+    this entry is now rejected because the owner's measured movement cannot account for it. **That is
+    the instance, not the cause** — exactly as this entry says.
+  - **The prerequisite is half-cleared. BF-136 SHIPPED** (v1.446.2, 2026-09-10): `opened_on` has a
+    user-settable "Opened on" date now, bounded 180 days back and correctable in place. So the
+    mechanism this entry wants is buildable.
+  - **⚠ But the owner's data was never corrected, so the marker is still wrong for the one vial that
+    matters.** Measured 2026-09-16: one vial, **Retatrutide, `opened_on` = 2026-09-10, identical to
+    its `created_at`** — the auto-set date BF-136 was filed about. This entry's own measurement puts
+    the first dose around **2026-09-04** (23 pre-drug days + 6 on-drug within 2026-08-12 → 09-10).
+    **A drug-start exclusion keyed on 09-10 would leave the six confounded days inside the window** —
+    the exact span driving the 2,245. Building it now would ship a filter that does not filter.
+  - **The owner action, and it is one edit:** correct the Retatrutide vial's *Opened on* date to the
+    actual first dose. Then this entry is unblocked and the exclusion can be built and verified
+    against a window that is really the drug's.
+- **⚠ This entry's `Needs:` says "nothing" while its body calls BF-136 "a prerequisite in fact if not
+  in form".** That is the same prose-dependency shape TN-31 carried (fixed 2026-09-16) — invisible to
+  `next-item.js`. BF-136 has since shipped so no `Needs:` is owed, but the owner data correction is,
+  hence the `Gate:` above.
 
 **Measured across 29 weigh-ins, 2026-08-12 → 09-10, by linear fit rather than endpoints:**
 
@@ -3458,7 +3480,22 @@ moving, which is the failure mode BF-134 was filed about on the same screen.
 - **Reversal cost:** low — a window filter plus a status string. No stored value changes.
 
 ### [nutrition] TN-29 — the app measures this owner's activity factor at 1.41 and then accepts a maintenance implying 1.67, because nothing cross-checks the two estimates it already computes
-- **Lane:** A — engine only: packages/shared, lib/health.
+- **Lane: A** — engine only: `packages/shared/src/nutrition/adaptive-tdee.ts`, `lib/health/energy-balance-service.ts`.
+- ✅ **THE GATE SHIPPED 2026-09-16** (`lane-a/tn29-maintenance-ceiling`, v1.457.4).
+  `estimateMaintenance` takes a `measuredMovementKcal` ceiling and rejects — never clamps — an
+  estimate more than `MAX_MEASURED_MOVEMENT_RATIO` (**1.15**) above it, with its own
+  `above_measured_movement` exclusion and message. `energy-balance-service` hoists the window-average
+  movement above `resolveMaintenance` (it used to sit below it, gated on the very result it now
+  bounds) and passes `formulaBaseline + avgActiveOverWindow`.
+  - **1.15 is the number this entry deliberately did not settle**, and it still wants fitting against
+    more than one owner-month. It rejects the owner's 2,245 at a ceiling of 2,179 and allows ~15% for
+    movement the step count cannot see. It is one exported constant; change it there.
+  - **The ceiling TRACKS the measurement**, which is what keeps it from rejecting a genuine training
+    block — a real block raises the measured-movement estimate and the ceiling with it. A test pins
+    that: the same window refused at 1,895 is accepted at 2,400.
+- **Keep:** the SECOND half — *"stop asking the user to grade themselves"*, showing the measured
+  activity factor and offering it instead of `users.activity_level`. Not started; its blast radius is
+  the VO₂max crosscheck, the water goal and the AI context, and it is a surface change.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · owner: *"I wonder if we could estimate the activity level value or tune how we do ours."*
 - **Lane: A** — `packages/shared/src/nutrition/adaptive-tdee.ts` (`estimateMaintenance`, the `minMaintenanceKcal` floor), fed from `lib/health/energy-balance-service.ts:236-260` where both estimates already sit in scope.
