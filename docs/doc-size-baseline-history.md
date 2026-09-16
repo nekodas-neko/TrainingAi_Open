@@ -12984,3 +12984,27 @@ Deleting the step would have left the next session to rediscover this; leaving i
 have cost a scoring regression no test covers. So it stays, inverted, with the measurement attached
 and the generalisable form stated: **"every scored column is NULL" is not "the table is dead" —
 check for a live writer.**
+
+## 2026-09-16 — Lane A baton → 184, backlog → 22778: a prose dependency, and six PRs of state
+
+**Baton +34.** Six PRs merged this session and the baton still described the state before them; a
+baton that is half last week's is worse than none, because it gets trusted. What it gained is not a
+changelog — it is the three things that would otherwise be re-learned at cost:
+
+- **A column rename is not available in this repo**, and finding that out cost a CI cycle (LA-114).
+  Migration Check replays every migration against the final schema and the `claude_ro` view
+  migrations each name every column.
+- **A migration is not tested until it has been applied twice to the same database** — with the
+  throwaway-DB recipe that reproduces CI locally.
+- **Four entries this session had true measurements and wrong conclusions**, with the reusable form
+  of each. That table is the highest-value thing in the file: it is why the session re-verified
+  before implementing, four times, and was right to each time.
+
+Cut to pay for it: the old per-entry "why it is not startable" table, which was stale on arrival and
+which the runner answers better.
+
+**Backlog +9.** TN-31's dependency on TN-30 was written as a SENTENCE — *"Sequence TN-30 first"* —
+so `next-item.js` could not see it and the entry sat at the **top of READY** while blocked behind two
+others. It now carries `Needs: TN-30` and READY drops 14 → 13. The entry also had two conflicting
+`Lane:` declarations (an `A` field and a `B` bullet); the tooling reads the first and a human reads
+the last. Both collapsed into one.

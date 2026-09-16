@@ -4,37 +4,71 @@
 > is how six concurrent sessions stay tellable apart; a renamed successor is a lost thread even with a
 > perfect baton.
 
-**Updated:** 2026-09-15 · **Next ID:** `LA-111`
+**Updated:** 2026-09-16 · **Next ID:** `LA-116`
 (`grep -rhoE '\bLA-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1` is the authority, not this line.
 `LA-54` was allocated and withdrawn, so it is used rather than free.)
-**Migrations:** directory head **274**, so the next free number is **275** — claim against open PRs
+**Migrations:** directory head **275**, so the next free number is **276** — claim against open PRs
 too, not just the directory. Local SQLite **v38**.
 
-## Now — READY is 9 and none of it is startable
+**⛔ A COLUMN RENAME IS NOT AVAILABLE IN THIS REPO. Learned the hard way 2026-09-16 (LA-114), one
+CI cycle.** Migration Check's second step replays every migration against a schema that already has
+everything, and the `claude_ro` view migrations (213, 215, 218, 221 … 274) each regenerate the FULL
+view set — so every one of them names every column. Rename a column and a dozen historical
+migrations fail on replay. Editing them is not available: `ensureSchema` tracks by FILENAME.
+`migrate.js` has a `REPLAY_EXEMPT` hatch whose single entry is itself a rename, so the escape exists
+and using it means exempting a dozen files from the check that caught you. **And: a migration is not
+tested until it has been applied TWICE to the same database.** `pnpm test` and `check:rules` both
+pass against a DB where the migration already ran. Reproduce CI locally on a throwaway DB:
+`CREATE DATABASE ci_replay` → `migrate.js` → `TRUNCATE schema_migrations` → `migrate.js --replay`.
 
-**⚠ The previous baton said "READY is 14 and six are startable" and named BF-164, PS-41, PS-42,
-LA-76, Q-52, Q-28. That is stale in both directions and is corrected here:** BF-164 and PS-42
-shipped (2026-09-15, PRs #1201 and #1204) and are out of the queue; PS-41 carries `Gate: owner`;
-Q-52 is PARKED on `Needs: LA-110`, which is itself unanswered; Q-28's own entry says not to build on
-the measured number. **A stale "six are startable" misleads exactly as badly as a stale "nothing
-startable" — re-run the runner, do not trust this section's list.**
+## Now — re-run the runner; this section is a snapshot and goes stale within hours
 
-Start with `node scripts/next-item.js --lane A --all`. **`--all` is not optional** — the display
-truncates READY at 10 and a startable item has sat unnoticed at position 12.
+**⚠ Every previous baton's "N are startable" list has been wrong in both directions.** Start with
+`node scripts/next-item.js --lane A --all`. **`--all` is not optional** — the display truncates READY
+at 10 and a startable item has sat unnoticed at position 12. As of 2026-09-16 READY is 13; top four
+were TN-29, TN-25, LA-76, RV-42.
 
-The nine, each with why it is not startable — **re-check against the entry, never widen the list:**
+**⚠ READY does not mean startable, and the runner cannot tell you so.** A dependency written as a
+SENTENCE is invisible to it. TN-31 sat at the **top of READY** while blocked behind two entries,
+because its own text said *"Sequence TN-30 first"* rather than carrying `Needs: TN-30`. Fixed
+2026-09-16. **Before starting anything, read the entry for a prose dependency** — and if you find
+one, convert it to a field in that PR rather than just obeying it.
+
+### The pattern that decided most of this session's work
+
+**Four entries this session had true measurements and wrong conclusions.** In each case the
+correction came from re-verifying against current state rather than re-reading the entry:
+
+| entry | its claim | what was true |
+|---|---|---|
+| LB-110 | work outstanding | shipped three days earlier under another path |
+| LA-110 | cause identified | real cause was a dated window of logs with no `planned_pct` |
+| TN-44 | "add ten types to a list" | the plugin's converter, not the list, is the wall |
+| TN-37 | "drop two dead Cloud reads" | both load-bearing; one feeds the HRV/RHR wear filter |
+
+**The reusable forms:** absence from a queue that removes completed entries is the signature of
+*finished*, not lost. *"Every scored column is NULL"* is not *"the table is dead"* — check for a live
+writer. And **read the pinned dependency's source, not its docs**, before believing a claim about an
+external API.
+
+### Owner-gated, unchanged
 
 | entry | blocked by |
 |---|---|
 | LA-76 | owner decision: does a deload span become first-class stored state? Its own entry says ask before writing the migration. The *session* half is already true — `listTrainedDayKeys` has no `phase_type` filter. |
-| RV-42 | is PR #1098 below — built, green, owner-gated |
-| Q-220 | Orchestrator's; Lever 2 is a bulk docs move — reasoning recorded in the entry 2026-09-15, do not re-derive it |
-| Q-1a | bearer auth — same confirm-first carve-out |
-| Q-29 | Task 5 is device-paired; `rollup-device.ts` and the bridge are unverifiable in a sandbox |
-| LA-110 | its own question ("what is a like-for-like 1RM comparison?") is unanswered; all three shortcuts were ruled out |
-| Q-28 | entry says the measured 3,544-row restore is the low end — **do not build the batching on it** |
-| BF-9 | planned 2026-09-15; **every PR is owner-gated, migration included** |
-| BF-7 | PR 2a shipped; the remaining PR 2b is Lane B's |
+| RV-42 | is PR #1098 — built, green, owner-gated. **Keep it rebased and mergeable; never merge it.** |
+| LA-113 | the daytime-HRV level gap. Needs a controlled same-instrument capture (strap at rest, in the ring's own HRV window), not a coefficient change. |
+| Q-220 · Q-1a · Q-29 · Q-28 · BF-9 | unchanged — re-check each entry, do not widen |
+
+### Owed to the owner, and none of it is yours to fire
+
+- **BF-13's re-derivation run.** `POST /api/admin/rederive-baselines` shipped 2026-09-16 (#1254),
+  `dryRun` by default. It is a production data write. All four `temperature-baseline` entries
+  (BF-13, TN-6, Q-506, TN-8) stay queued until it runs — their pass tests are unmeasurable before it.
+- **LA-112's effect size.** The sleep-exclusion fix shipped (#1256, v1.457.2) and history self-heals
+  across the trailing 21 days, but only `level` is persisted, never `dhrv`, so the magnitude could
+  not be predicted. Owner check owed.
+- **LA-115** needs an APK and a Health Connect permission grant.
 
 **LA-91 sits inside the original do-not-take band LA-84..LA-92.** That band was widened three times
 without the owner asking. Do not widen it again.

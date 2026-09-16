@@ -3245,10 +3245,19 @@ from it; and a test asserts the walk's fast target equals the Zone-2 floor **bec
 anchor, not by arithmetic coincidence.
 
 ### [cardio] TN-31 — split the interval JOG out of Guided Walk into a Run type; a walk and a jog are two sessions, not two speeds
-- **Lane:** A — both (2 engine, 3 surface) → A, engine half first.
-
+- **Lane: A** — both halves (2 engine, 3 surface) → A, engine half first. The surface half is
+  `components/cardio/modality-picker.tsx` (the three-way picker), `components/guided-walk/**` and
+  `app/running/**`; the engine half is `packages/shared/src/running/hr-targets.ts` and
+  `running/types.ts`. **One `Lane:` declaration, deliberately** — this entry carried two (an `A` field
+  and a `B` bullet) until 2026-09-16, and the tooling reads the first while a human reads the last.
+- **Needs: TN-30**
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · owner: *"these should be 2 different options then… if we are doing jogging it should fall under the Run category in cardio… Run could consist of that interval Jog as a style; whereas the walk is more a walk."*
-- **Lane: B** — `components/cardio/modality-picker.tsx` (the three-way picker), `components/guided-walk/**`, `app/running/**`. **Lane A** for `packages/shared/src/running/hr-targets.ts` if a new run type is added.
+- **⚠ The `Needs:` above was PROSE until 2026-09-16, so this entry sat at the TOP of READY while it
+  was blocked.** Its own text says *"which run type this maps to depends on TN-30's outcome. Sequence
+  TN-30 first, or the new session type gets built against an anchor that then moves."* — which
+  `next-item.js` cannot see. The real chain is **TN-25 → TN-30 → TN-31** (TN-30 is itself parked on
+  `Needs: TN-25`). A dependency written as a sentence is not a dependency as far as the queue is
+  concerned.
 - **✅ OWNER DECISION, 2026-09-09 — yes, move it to Run, as an ASSIGNED run type among several.** *"Move into run; and have it be a run type that gets assigned. Interval sprints / Interval Jog / Consistent run / Slow Jog — these + more should be on the cards for variation — also decided scientifically based on my week/day."* Gate cleared.
 - **Review:** [`review`](reviews/2026-09-08-walk-intensity-calibration.md) addenda 4–6. **Resolves TN-25's owner question** by splitting it rather than answering it.
 
