@@ -18,6 +18,20 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-16 — `docs/implementation-backlog.md` → 22208 (LB-110 removed)
+
+A removal that grew the file, which is the shape worth explaining.
+
+LB-110 was a 20-line entry and its removal note is longer than it was. The note has to carry three
+things the deletion would otherwise destroy: that the work is already shipped under another path, so
+nobody re-files it; that the route which shipped it rejects LB-110's design in writing, so the
+rejection is not re-litigated; and two hazards found while implementing the entry before the
+duplicate surfaced — `/api/body-battery` has two write side-effects on a GET, and the entry named a
+date helper that returns the wrong separator for a dash-keyed route.
+
+Those last two are facts about the live route rather than about the entry, so deleting them with it
+would have thrown away the only part of the work that outlives the mistake.
+
 ## 2026-09-15 — `docs/implementation-backlog.md` → 21641, `projectOverview.md` → 11423 (BF-9 plan)
 
 Both grew, and for once the growth is a correction rather than a record.
