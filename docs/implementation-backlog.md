@@ -1738,12 +1738,26 @@ Connect's discarded `HeartRateSeries` (**PS-41**) and calls it *"the concrete, f
 general rule"* — singular. This is a second, larger instance.
 
 **Three steps, rising cost:**
-1. **Amend §5.4 to say what is true**, naming the readiness read list. **A written invariant the code
-   does not hold is worse than none** — the next connector author will trust it. Docs-only; do not
-   make it wait on 2 or 3.
-2. **Drop the two dead Cloud reads** — `getOuraDaily` and `getLatestOuraCloudVitals` return nothing
-   usable and are half the violation. **⚠ Re-verify the NULL-on-recent-rows finding at the time of the
-   change** rather than trusting this snapshot.
+1. ✅ **DONE 2026-09-16** (`lane-a/tn37-connector-guide-invariant`). §5.4 names the readiness read
+   list and what each store contributes; §5.5's *"the concrete, fixable instance"* is corrected to
+   *"a"*, since it asserted PS-41 was the only one.
+2. **⛔ CORRECTED — DO NOT DROP THESE READS. Both are load-bearing; this step as originally written
+   would have caused a regression.** The entry's own ⚠ said to re-verify rather than trust the
+   snapshot, and doing so is what caught it (2026-09-16):
+   - **`getOuraDaily` is NOT dead.** Every *Cloud-scored* column is NULL — 35 of 35 rows since
+     2026-08-14 — which is what the original snapshot saw. But **`non_wear_time_sec` is populated on
+     35 of 35**, written by the BLE rollup's wear step, and `readiness-payload.ts:329,341` passes it
+     through `excludeLowWearDays` for the **HRV and RHR baselines**. Dropping the read silently
+     disables wear filtering on two baselines — a scoring change, and a bad one.
+   - **`getLatestOuraCloudVitals` is a deliberate stale surface**, not a dead read: it supplies
+     `vo2Max`, `vascularAge` and `cloudVitalsDate`, and the UI renders them *"as of
+     `cloudVitalsDate`"* (`readiness-payload.ts:154`). Dropping it removes those fields outright.
+   - **What is actually available here:** narrowing `getOuraDaily` to the columns still written, so
+     the read stops *looking* like a Cloud dependency. That is cosmetic, and it is not worth a
+     scoring risk — fold it into step 3 rather than doing it alone.
+   - **The lesson, since this is the second entry this week whose conclusion outran its
+     measurement:** "every scored column is NULL" is not "the table is dead". Check for a *live
+     writer* before calling a read dead — `oura_daily` has one.
 3. **Then decide what the derived layer IS** — app-computed and source-neutral (the rename plan
    applies, any source should contribute), or genuinely Oura-only (then §4's table should mark which
    pillars degrade without a ring). **⚠ Do not start 3 without its own plan** — `2026-08-02-de-oura-naming.md`

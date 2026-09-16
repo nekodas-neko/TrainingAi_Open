@@ -300,11 +300,57 @@ code from the normalize step onward.
 
 ### 5.4 What this buys: a formula never needs to know which device produced its input
 
-Every calculation in §4 reads generic tables, never a device-specific one. `computeReadinessComposite`
-doesn't know whether `body_metrics.hrv_ms` came from a ring's rollup or Health Connect's
-`HeartRateVariabilityRmssd` — by the time it's a row in the table, the provenance is a `source`
-column, not a code branch the formula has to handle. This is the entire value of doing §5.1–5.3 as
-three separate stages instead of one device-specific pipeline per source.
+**The FORMULAS hold this. The ASSEMBLY that feeds them does not, and this section used to claim
+otherwise (TN-37, corrected 2026-09-16).**
+
+`computeReadinessComposite` doesn't know whether `body_metrics.hrv_ms` came from a ring's rollup or
+Health Connect's `HeartRateVariabilityRmssd` — by the time it's a row in the table, the provenance is
+a `source` column, not a code branch the formula has to handle. That is real, and it is the value of
+doing §5.1–5.3 as three separate stages instead of one device-specific pipeline per source. The input
+layer holds too: `body_metrics` carries a per-field `source_map` resolved by `SOURCE_RANK`, measured
+over 30 days as 16 fields across two live sources.
+
+**What this section said before, and what is actually true.** It read *"Every calculation in §4 reads
+generic tables, never a device-specific one."* `lib/health/readiness-payload.ts` — which assembles
+the payload those calculations are given — reads seven stores in one `Promise.all`, and four of them
+are device-specific:
+
+| read | layer |
+|---|---|
+| `listBodyMetrics`, `listSleepSessions` | ✅ normalised |
+| `getOuraDaily` | ❌ Oura-specific (but **live** — see below) |
+| `getLatestOuraCloudVitals` | ❌ Oura **Cloud** |
+| `getOuraDailySummary`, `getOuraDailyDerived` | ❌ Oura-specific |
+| `getHrForWindow` | ❌ raw HR series |
+
+About twenty payload fields come from those stores rather than the normalised layer —
+`daySummary`, `temperatureDeviation`, `stressHigh`/`recoveryHigh`, `recommendedBedtime*`, `vo2Max`,
+`vascularAge`, `readinessScore`, `sleepScore`, `activityScore`, `steps`, `zoneMinutes` and every
+contributor block. **For those fields a non-Oura source is structurally invisible**, and no amount of
+`source_map` discipline at the input layer changes that.
+
+**A written invariant the code does not hold is worse than none**, because the next connector author
+trusts it. So this section now describes the read list rather than the intention.
+
+**⚠ Do not "fix" this by deleting the device-specific reads — measured 2026-09-16, two of them are
+load-bearing:**
+
+- **`getOuraDaily` is NOT dead.** Every *Cloud-scored* column has been NULL since the Cloud retired
+  (35 of 35 rows from 2026-08-14 on: readiness, sleep, activity, temperature deviation, VO₂ max,
+  vascular age, stress/recovery high, day summary, bedtime — all zero non-null). But
+  `non_wear_time_sec` is populated on **35 of 35**, written by the BLE rollup's wear step, and
+  `readiness-payload.ts` passes it to `excludeLowWearDays` for the **HRV and RHR baselines**.
+  Dropping the read silently disables wear filtering on two baselines.
+- **`getLatestOuraCloudVitals` is a deliberate stale surface**, not a live read: it supplies
+  `vo2Max`, `vascularAge` and `cloudVitalsDate`, which the UI must render *"as of
+  `cloudVitalsDate`"*. Dropping it removes those fields outright.
+
+**What closing the gap actually requires** is deciding what the derived layer *is* — app-computed and
+source-neutral, or genuinely Oura-only, in which case §4's table should mark which pillars degrade
+without a ring. That is TN-37 step 3, and it needs its own plan.
+
+**The nearest concrete instance is still §5.5's** discarded Health Connect `HeartRateSeries` (PS-41) —
+but it is **not** the only one, which is how §5.5 used to describe it.
 
 ### 5.5 Where the pattern is currently violated — the HR-series gap
 
@@ -314,8 +360,19 @@ never runs it through a normalize step that writes into that table. It's read, b
 inline to enrich `activity_logs.avgHr`/`maxHr` for individual sessions
 (`enrichActivityLogs`), then discarded. The data needed to compute Activity Score's zone-minutes and
 move-hours contributors for a Health-Connect-only user already arrives in the sync payload; it's
-just never normalized into the table those contributors read. This is the concrete, fixable instance
+just never normalized into the table those contributors read. This is **a** concrete, fixable instance
 of the general rule this section states — filed as **PS-41** in `docs/implementation-backlog.md`.
+
+**It is not the only one, and this paragraph used to say it was** (*"the concrete, fixable
+instance"*, singular). §5.4 now names the larger one: the readiness payload assembles ~20 fields from
+four device-specific stores. **PS-41 is the cheap instance, not the whole of it.**
+
+**A second Health Connect instance, measured 2026-09-16 (LA-115):** `HeartRateSeries` is not merely
+discarded after enrichment — the pinned plugin has no `RecordConverter` branch for it, so it arrives
+as a `record.toString()` blob whose fields read `undefined`, inside a `catch` that ignores. The same
+is true of `HeartRateVariabilityRmssd` and `OxygenSaturation`. So for those three, "arrives in the
+sync payload" is **not** currently true — see
+[`docs/reviews/2026-09-16-health-connect-record-converter-gap.md`](reviews/2026-09-16-health-connect-record-converter-gap.md).
 
 ### 5.6 Ring-computed vs. our-own-model — the precise portability classification, per metric
 
