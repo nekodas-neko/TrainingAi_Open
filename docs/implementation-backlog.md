@@ -1507,6 +1507,48 @@ composite reports which of its inputs were inferred.
   observed on the device. Per the external-API rule, the integration is not done until a value is in
   the column.
 
+### [readiness][platform] LB-114 — a zero-data account reads `sufficient: true`, so RV-38's badge is gone and its spec is red for one hour a day
+
+- **Lane:** A — `packages/shared/src/health/body-battery-inputs.ts:125`. Filed by Lane B on
+  2026-09-16 after `e2e/rv38-body-battery-no-data-badge.spec.ts` failed CI on an unrelated PR.
+- **⚠ RED ON `main`, and it fires on a CLOCK — 07:00–08:00 Brisbane (21:00–22:00 UTC), every day, on
+  every branch.** That is why it reads as a flake and is not one. It is the hour-dependence class
+  CLAUDE.md documents at length, in its nastiest form: the test is CORRECT and the payload is wrong.
+- **Measured, not inferred.** `GET /api/body-battery` for the `zero@local.dev` fixture, captured
+  2026-09-17 07:55 Brisbane:
+  ```json
+  { "current": 50, "label": "Good", "hasData": false, "anchorSource": "default",
+    "confidence": { "sampleCount": 0, "wakingMinutes": 55, "samplesPerHour": 0, "sufficient": true } }
+  ```
+  **Zero samples, zero per hour, `sufficient: true`.**
+- **The clause that does it:**
+  ```ts
+  sufficient: mins < MIN_WAKING_MINUTES_TO_JUDGE || samplesPerHour >= MIN_SAMPLES_PER_WAKING_HOUR
+  ```
+  `MIN_WAKING_MINUTES_TO_JUDGE` is 60. The fixture's wake time falls back to **07:00 local**, so
+  `wakingMinutes` is under 60 for exactly the first hour of the day and the grace clause short-circuits
+  to true. After 08:00 it goes false, the badge returns, and the spec passes again.
+- **Cause: #1256** (*"Stop counting sleep as daytime stress"*, LA-112) narrowed the route's waking
+  window. Before it, the window was effectively the whole calendar day, so `mins` cleared 60 at any
+  hour and zero samples always read as insufficient. Nothing is wrong with that change; it exposed a
+  clause that was only ever correct by accident of a wide window.
+- **The grace clause is right for a day that is young and wrong for an account that has never had
+  data**, and the two are not the same state — `hasData: false` and `anchorSource: "default"` both say
+  so in the same payload. **Recommended:** `sufficient` is false when `sampleCount === 0`, whatever
+  the window; keep the grace for a genuinely young day that has *some* readings. One condition.
+- **⛔ Do NOT fix this by loosening the spec.** RV-38's assertion is the correct one — an account with
+  nothing must qualify the 50 it prints — and it is the whole point of the entry. The card
+  (`components/body-battery-card.tsx`) is also correct and unchanged since #1214: its guard is
+  `conf != null && !conf.sufficient`, which is right; it is being told `true`.
+- **Secondary observation from the same CI run**, recorded so it is not lost rather than diagnosed:
+  three specs went flaky-but-passed (`bf5-week-in-review-page.spec.ts:106`,
+  `nutrition-day-navigation.spec.ts:92`, `one-calorie-budget.spec.ts:135`) and the log carries a
+  `chrome-headless-shell` crash stack. One runner, three retries and a browser crash reads as runner
+  instability rather than three spec defects; worth a second look only if it repeats.
+- **Verification:** run `e2e/rv38-body-battery-no-data-badge.spec.ts` between 07:00 and 08:00
+  Brisbane — it must pass. **Do not verify outside that window**, where it passes regardless and
+  proves nothing.
+
 ### [platform][devices] LB-113 — the Health Connect sync took the user's timezone and nothing passed it (fixed; device look owed)
 
 - **Verify:** device — Health Connect only runs natively (`syncHealthConnect` returns immediately off

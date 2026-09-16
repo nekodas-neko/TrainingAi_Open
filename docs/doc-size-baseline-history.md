@@ -13070,3 +13070,14 @@ cannot show:
 
 Both are the kind of claim that reads as settled fact and takes one grep to check. Writing them on
 the entry is what stops the next reader inheriting them.
+
+## 2026-09-16 — `docs/implementation-backlog.md` 22873 → 22915
+
+LB-114, filed from an unrelated PR's CI failure.
+
+Forty-two lines for one entry, and the payload capture is most of it. It is there because the
+finding is invisible outside a one-hour window: `rv38-body-battery-no-data-badge` is red between
+07:00 and 08:00 Brisbane and green the rest of the day, so anyone who re-runs it at a normal hour
+concludes flake and moves on. The entry carries the captured JSON, the exact clause, and an explicit
+instruction to verify **inside** that window — because verifying outside it proves nothing and looks
+like proof.
