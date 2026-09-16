@@ -12820,6 +12820,25 @@ The batch lines pair entries by **the sitting they need**, not the subject: LA-6
 one admin login, and LB-52 with Q-297's second residue are one branch-protection page. Five entries,
 two trips.
 
+## 2026-09-16 — `docs/implementation-backlog.md` → 22514 (OR-118, the aggregation pass)
+
++213, and this one is a raise rather than a ratchet, so it needs the better argument.
+
+**Most of it is the same paragraph written onto several entries at once**, which is deliberate: a
+batch line has to be readable from whichever entry someone opens, and a session that opens BF-144
+alone must learn there that two other data-losing migrations are waiting on the same conversation.
+Four groupings: `back-gesture-sitting` (4), `admin-console-sitting` (7), `history-row-policy` (3) and
+`destructive-migration` (3). Seventeen entries, four asks.
+
+**The rest is OR-118 itself, split out of Q-305's `Keep:`,** where an unblocked Lane B build had been
+sitting since 2026-09-13 under a heading reading *"shipped; only the stated residue is owed. Not new
+work"* — with an inline `Gate: device` in the Keep parking the whole entry, the second time that
+shape has bitten (BF-46 was the first). Lane B's READY was two items long while it sat there.
+
+Two rules got written down because both were nearly broken in this sitting: an ask-grouping is **not**
+a `Batch:` when its members are migrations, and a `Batch:` cannot span lanes at all — the sitting is
+shared, the PRs are not.
+
 ## 2026-09-16 — backlog → 22303: unparking the work the reorder was supposed to surface
 
 +2 lines, which is the whole point: the change is almost entirely substitutions, not additions.
