@@ -235,8 +235,22 @@ export function PreWorkoutScreen({
               // label is a statement ABOUT that prescription, so reading it from anywhere else is
               // how the two came to disagree (BF-8). A consumed one describes a session that has
               // already run.
+              //
+              // EITHER source counts (BF-167). The two fields answer different questions:
+              // `prescription.deload` means "this is a deload PRESCRIPTION" — a phase decision —
+              // while `exercises[].deloaded` means "this exercise's load was cut", which is what
+              // the illness radar and the soreness quadrant set AFTER the model has produced its
+              // plan. A safety deload therefore leaves the phase flag false, and the toggle read
+              // "Full — as prescribed" over a session prescribed at 52% of 1RM.
+              //
+              // A union rather than a replacement, which is what BF-167 proposed. The defect is a
+              // false NEGATIVE, and the phase flag is never a false positive — when it is set the
+              // session genuinely is a deload, so keeping it costs nothing and drops nothing. The
+              // replacement would have regressed BF-8's guard (`e2e/deload-visible.spec.ts` seeds
+              // `deload: true` with no exercises, which a `.some()` alone reads as Full).
               periodization?.state.prescriptionStatus !== 'consumed'
-              && !!periodization?.state.prescription?.deload
+              && (!!periodization?.state.prescription?.deload
+                  || !!periodization?.state.prescription?.exercises.some(e => e.deloaded))
             }
             onChange={onDeloadChange}
           />

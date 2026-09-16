@@ -12755,3 +12755,24 @@ Twenty-eight lines. The quoted premise from `mealFooter` is the entry — "a gro
 macros AND calories" is the sentence that makes the suppression look correct, and it is only true
 when the group is expanded. Without that quote an implementer fixes the footer, which double-prints
 the moment the meal is opened.
+
+## 2026-09-16 — `docs/implementation-backlog.md` 22229 → 22289, `projectOverview.md` 11476 → 11492
+
+`fix/workout-completion-surface` (BF-169 · BF-168 · BF-167).
+
+Sixty lines for three entries moving to `Verify: device`, and most of them are not the fix — they
+are **what was wrong with the entry**. Two of the three recommended something that would have broken
+something else, and neither is recoverable from the diff, which shows only what shipped:
+
+- **BF-168** proposed dismissing a stale confirm dialog on `pathname` change. That would not have
+  fired for the case it was filed on — `/workout?session=<id>` → `/workout` is the *same pathname*,
+  because `/workout` is both the workout screen and the session-select tab. A future reader who
+  trusts the entry over the code repeats it.
+- **BF-167** proposed replacing `prescription.deload` with `exercises.some(e => e.deloaded)`. That
+  turns BF-8's own e2e guard red: `deload-visible.spec.ts` seeds `deload: true` with an empty
+  exercises array. Shipped as a union, and the reason the flag is kept — the defect is a false
+  negative and the flag is never a false positive — is the line that stops it being "simplified"
+  back to the recommendation later.
+
+Recording a refuted recommendation beside the entry it belongs to is the only place it gets read
+before someone acts on the entry again.

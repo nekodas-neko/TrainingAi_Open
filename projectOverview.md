@@ -26,8 +26,24 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.456.20 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-09-15.
+**Version:** v1.456.22 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-09-16.
+
+**Three defects either side of finishing a workout, shipped as one PR (BF-169 · BF-168 · BF-167,
+v1.456.22) — and two of the three entries recommended a fix that would have broken something.**
+The COMPLETED stamp was gated on the exercise **library** arriving, a fetch it has nothing to do
+with, so on a slow load the card said "complete" three other ways with no stamp — the owner's *"some
+days dont… it may be some specific excercises or how long it takes"*, where both guesses were right
+and were one cause. "Leave workout?" could fire on the session-select **tab**, because `/workout` is
+both the workout screen (`?session=<id>`) and the tab, and `pathname` drops the query; separately, a
+prompt raised legitimately was cleared only by Stay/Leave, so it outlived its screen. And the
+intensity toggle read the prescription's phase flag, which an illness- or soreness-driven deload
+never sets, so it said *Full — as prescribed* over a session cut to 52% of 1RM. **Both corrections
+came from checking the recommendation rather than implementing it:** BF-168's proposed `pathname`
+dismissal would not have fired for the case it was filed on (`/workout?session=x` → `/workout` is
+the same path), and BF-167's proposed replacement of the phase flag turns BF-8's own e2e guard red —
+it seeds `deload: true` with no exercises — so that one shipped as a union instead. **All three are
+`Verify: device`**; BF-168's gesture is a Capacitor channel no harness run can fire at all.
 
 **The trainer role has a plan, and the plan's main job is stopping it rebuilding a bug we already
 have open (BF-9 — docs only, no code).** `saveProgram` is already parameterised by user id, so a

@@ -20,6 +20,24 @@ export function MobileAuthHandler({ hasSession }: { hasSession: boolean }) {
   const [confirmLeaveOpen, setConfirmLeaveOpen] = useState(false);
   const [confirmLeaveWalkOpen, setConfirmLeaveWalkOpen] = useState(false);
   const [confirmLeaveActivityOpen, setConfirmLeaveActivityOpen] = useState(false);
+
+  // A confirm dialog is cleared ONLY by the user tapping Stay or Leave, so one raised
+  // legitimately outlives whatever raised it and reappears over whatever is on screen next
+  // (BF-168): press back while the last exercise's summary is up and the prompt is CORRECT at
+  // that instant; the session then reaches `done` and navigates to the session-select tab with
+  // the prompt still up, over a card reading COMPLETED.
+  //
+  // Keyed on the subject rather than the URL, because the reported navigation does not change
+  // the pathname at all — `/workout?session=<id>` → `/workout` is the same path, so a
+  // `usePathname` effect would not fire for the case this was filed on. Each of these is a
+  // boolean selector, so the store only re-renders this handler when the answer flips.
+  const workoutActive = useWorkoutStore(isWorkoutActive);
+  const walkActive = useGuidedWalkStore(isGuidedWalkActive);
+  const activityActive = useActivityStore(isActivityActive);
+  useEffect(() => { if (!workoutActive) setConfirmLeaveOpen(false); }, [workoutActive]);
+  useEffect(() => { if (!walkActive) setConfirmLeaveWalkOpen(false); }, [walkActive]);
+  useEffect(() => { if (!activityActive) setConfirmLeaveActivityOpen(false); }, [activityActive]);
+
   // Held in a ref rather than an effect dependency: adding the router to the deps below would
   // re-run the whole listener setup, and that effect also replays the cold-launch deep link.
   const router = useRouter();
@@ -43,8 +61,20 @@ export function MobileAuthHandler({ hasSession }: { hasSession: boolean }) {
       // "leave workout?" guard (the in-screen back arrow and the bottom-nav
       // tabs both confirm, but this global listener didn't) — confirm here too
       // instead of silently discarding the workout screen.
+      // `/workout` is BOTH the full-screen workout route and the session-select TAB —
+      // `app/workout/page.tsx` renders the screen when `?session=<id>` is present and the tab
+      // shell otherwise, and `tabKeyForHref` encodes the same distinction. `pathname` drops the
+      // query, so a `startsWith("/workout")` test cannot tell them apart (and matched
+      // `/workout-select` besides): it raised "Leave workout?" on the session-select tab, a
+      // screen with nothing to leave (BF-168). Narrowed here rather than in `isWorkoutActive` —
+      // both of that predicate's terms are load-bearing for the `beforeunload` warning and for
+      // the guided-walk and activity guards below.
+      const onWorkoutScreen = () =>
+        window.location.pathname === "/workout"
+        && new URLSearchParams(window.location.search).has("session");
+
       const backHandle = await App.addListener("backButton", () => {
-        if (isWorkoutActive(useWorkoutStore.getState()) && window.location.pathname.startsWith("/workout")) {
+        if (isWorkoutActive(useWorkoutStore.getState()) && onWorkoutScreen()) {
           setConfirmLeaveOpen(true);
           return;
         }
