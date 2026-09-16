@@ -2487,6 +2487,20 @@ the owner is 158 cm, so Mifflin BMR is **1,527** and the card calls **2,150** hi
 numbers differ, so the harness proves the sentence renders and its parts add up, not that it reads
 true to the person it is for.
 
+**⚙️ Update 2026-09-16 (TN-29, v1.457.4) — the inflated maintenance behind this is now REFUSED, and
+its cause is not.** `estimateMaintenance` gained the mirror of its BMR floor: a ceiling built from the
+user's own measured movement (resting base + their average daily movement), rejecting — never
+clamping — anything more than 15% above it. The owner's **2,245** against a measured-movement
+**1,895** is refused, and the app falls back to the estimate his movement supports.
+- **That catches the instance, not the cause.** BF-137's cause is the estimator fitting a GLP-1
+  weight drop as metabolic rate, and it recurs on every new vial.
+- **BF-137 now carries `Gate: owner`, and it is a DATA correction rather than a decision.** Its fix
+  keys on `supplement_vials.opened_on`; BF-136 made that field user-settable (v1.446.2) but the
+  owner's one vial still reads **2026-09-10, identical to its recorded date**, while the drug started
+  near **2026-09-04**. An exclusion keyed on 09-10 would leave the six confounded days inside the
+  window. **One edit unblocks it:** set that vial's *Opened on* to the real first dose.
+- [`journal`](docs/overview/entries/2026-09-16-lane-a-tn29-maintenance-ceiling.md)
+
 ### [app-shell] ⚠️ Home's three header chips fit now, and the fit has only been measured, not seen (BF-139, 2026-09-12, v1.447.0) · needs: browser
 
 Owner, with a screenshot: *"the pills in the top are a little cutoff. can we make them smaller to

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  estimateMaintenance, resolveMaintenance, maintenanceGapMessage,
+  estimateMaintenance, resolveMaintenance, maintenanceGapMessage, MAX_MEASURED_MOVEMENT_RATIO,
   MIN_LOGGED_DAYS, MIN_WEIGH_INS, DEFAULT_WINDOW_DAYS, MAX_WINDOW_DAYS, MIN_PLAUSIBLE_MAINTENANCE,
   type MaintenanceDay,
 } from '../adaptive-tdee'
@@ -303,5 +303,67 @@ describe('the BMR floor', () => {
   it('explains itself to the user without naming the internal gate', () => {
     const e = estimateMaintenance(artefact(), 14, 1547)
     expect(maintenanceGapMessage(e)).toMatch(/resting burn/i)
+  })
+})
+
+
+// TN-29: the mirror of the BMR floor above. The app computes a measured-movement maintenance on
+// every request and never compared it to the calibration. The owner's numbers on 2026-09-09:
+// calibrated 2,245 against a measured-movement 1,895 — activity factors 1.67 and 1.41, where 1.67
+// is "hard exercise 6-7 days a week" for someone averaging 3,572 steps a day.
+describe('the measured-movement ceiling (TN-29)', () => {
+  const MEASURED_MOVEMENT = 1895
+
+  /** A window computing ~2,245: logging 2,000/day while losing weight faster than that explains. */
+  const inflated = () => window({ days: 14, intake: 2000, kgTotal: -0.45 })
+
+  it('reproduces the artefact when no measured movement is supplied — the shipped behaviour', () => {
+    const e = estimateMaintenance(inflated(), 14, 1345)
+    expect(e.maintenanceKcal).not.toBeNull()
+    expect(e.maintenanceKcal!).toBeGreaterThan(MEASURED_MOVEMENT * MAX_MEASURED_MOVEMENT_RATIO)
+  })
+
+  it('refuses the same window once the measured movement is the ceiling', () => {
+    const e = estimateMaintenance(inflated(), 14, 1345, MEASURED_MOVEMENT)
+    expect(e.maintenanceKcal).toBeNull()
+    expect(e.excludedReason).toBe('above_measured_movement')
+  })
+
+  it('rejects rather than clamps — resolveMaintenance falls back to the formula baseline', () => {
+    const r = resolveMaintenance(inflated(), 1614, 1345, MEASURED_MOVEMENT)
+    expect(r.source).toBe('formula')
+    expect(r.maintenanceKcal).toBe(1614)
+  })
+
+  it('is not `implausible_result` — 2,245 is a fine maintenance for SOMEONE', () => {
+    // The distinction is the entry's: plausible for a human, not for this one, whose movement the
+    // app has measured. A caller that lumped them together could not word the message honestly.
+    const e = estimateMaintenance(inflated(), 14, 1345, MEASURED_MOVEMENT)
+    expect(e.excludedReason).not.toBe('implausible_result')
+    expect(maintenanceGapMessage(e)).toContain('measured movement')
+  })
+
+  it('leaves an estimate inside the band alone', () => {
+    // The control: the ceiling must not reject a calibration the measurement DOES support, or it
+    // would simply replace one wrong number with another.
+    const ok = window({ days: 14, intake: 1900 })
+    expect(estimateMaintenance(ok, 14, 1345, MEASURED_MOVEMENT).maintenanceKcal)
+      .toBe(estimateMaintenance(ok, 14, 1345).maintenanceKcal)
+  })
+
+  it('TRACKS the measurement — a real training block raises the ceiling with it', () => {
+    // The reason this is a ratio against a measured number rather than a constant. The same window
+    // that is refused at a sedentary 1,895 is accepted once the movement itself says the person is
+    // training, because the measured-movement estimate already contains that training.
+    const w = inflated()
+    expect(estimateMaintenance(w, 14, 1345, MEASURED_MOVEMENT).maintenanceKcal).toBeNull()
+    expect(estimateMaintenance(w, 14, 1345, 2400).maintenanceKcal).not.toBeNull()
+  })
+
+  it('ignores a non-positive or absent measurement rather than rejecting everything', () => {
+    const w = inflated()
+    for (const m of [null, undefined, 0]) {
+      expect(estimateMaintenance(w, 14, 1345, m).maintenanceKcal).not.toBeNull()
+    }
   })
 })

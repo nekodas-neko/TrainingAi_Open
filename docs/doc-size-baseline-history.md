@@ -13008,3 +13008,20 @@ so `next-item.js` could not see it and the entry sat at the **top of READY** whi
 others. It now carries `Needs: TN-30` and READY drops 14 → 13. The entry also had two conflicting
 `Lane:` declarations (an `A` field and a `B` bullet); the tooling reads the first and a human reads
 the last. Both collapsed into one.
+
+## 2026-09-16 — backlog → 22815, projectOverview → 11582: TN-29's gate shipped, BF-137 gated on one date
+
++37 and +14. TN-29's ceiling landed (v1.457.4) and the entry keeps its second half, so it records
+what shipped and what is still owed rather than leaving.
+
+The length is mostly BF-137, and it is the useful kind. That entry's `Needs:` says "nothing" while
+its body calls BF-136 "a prerequisite in fact if not in form" — the same prose-dependency shape TN-31
+carried, found the same day. BF-136 has since **shipped**, so no `Needs:` is owed; what is owed is a
+**data** correction the entry could not have known about: the owner's one Retatrutide vial still
+reads `opened_on = 2026-09-10`, identical to its recorded date, while BF-137's own measurement puts
+the first dose near 09-04. An exclusion keyed on the stored date would leave the six confounded days
+inside the window — a filter that does not filter.
+
+Those lines exist so the next session does not build it and believe it worked. The alternative was a
+`Gate: owner` with no explanation, which is the shape that gets cleared by someone who cannot see why
+it was set.

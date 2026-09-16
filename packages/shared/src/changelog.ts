@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.457.4",
+    date: "2026-09-16",
+    changes: [
+      "Your maintenance calories are now checked against how much you actually move. The app works out two of them on every screen \u2014 one from what you eat and what the scale does, one from your resting burn plus your measured movement \u2014 and it never compared them. The first had drifted to a figure implying hard training six or seven days a week, against roughly 3,500 steps a day. It is refused now rather than quietly nudged into range, and the app falls back to the estimate your movement supports.",
+    ],
+  },
+  {
     version: "1.457.3",
     date: "2026-09-16",
     changes: [
