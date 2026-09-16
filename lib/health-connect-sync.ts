@@ -7,7 +7,8 @@
 
 import type { HealthConnectPlugin } from '@devmaxime/capacitor-health-connect';
 import { intervalsToPhase5Min, type SleepStage, type StageInterval } from '@trainingai/shared/health/hypnogram';
-import { msToHHMMInTz } from '@trainingai/shared/date-utils';
+import { msToHHMMInTz, toAestDay, DEFAULT_TZ } from '@trainingai/shared/date-utils';
+import { formatInTimeZone } from 'date-fns-tz';
 
 // Verified against the pinned plugin source (RecordConverter.kt:390-400, v1.1.0) — those seven
 // strings are the complete set it can emit. SLEEPING and UNKNOWN are deliberately absent: they
@@ -48,7 +49,8 @@ interface DailyMetric {
   carbsG?: number;
   fatG?: number;
   restingHeartRate?: number; // overnight min BPM (midnight–8am)
-  hrvMs?: number;            // mean overnight SDNN HRV in ms
+  hrvMs?: number;            // mean overnight RMSSD HRV in ms — the read is `HeartRateVariabilityRmssd`
+                             // (TN-44: the comment said SDNN; this repo has shipped that mix-up once)
   spo2Pct?: number;          // mean overnight SpO2 %
 }
 
@@ -106,18 +108,24 @@ export interface SyncPayload {
   sleepRecords: SleepRecord[];
 }
 
-function toLocalDate(iso: string): string {
-  const d = new Date(iso);
-  // Use Intl to get local date parts in the device timezone — avoids UTC-day
-  // misalignment for UTC+ users where `getDate()` on a UTC midnight is the prior day
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    year: 'numeric', month: '2-digit', day: '2-digit',
-  }).formatToParts(d);
-  const y = parts.find(p => p.type === 'year')!.value;
-  const m = parts.find(p => p.type === 'month')!.value;
-  const day = parts.find(p => p.type === 'day')!.value;
-  return `${y}-${m}-${day}`;
+/**
+ * "YYYY-MM-DD" for `iso` in the USER's timezone.
+ *
+ * TN-44. This used to resolve `Intl.DateTimeFormat().resolvedOptions().timeZone` — the DEVICE's
+ * zone — which is the class CLAUDE.md bans, and it is invisible until the phone leaves the zone the
+ * data was recorded in. On a phone set to New York a Brisbane night's readings land on the previous
+ * day, silently, for every record this module buckets.
+ *
+ * It was also a second implementation of `toAestDay`, which has taken a `tz` since it was written.
+ * Delegating rather than keeping a local copy is the point.
+ */
+export function toLocalDate(iso: string, tz: string): string {
+  return toAestDay(new Date(iso), tz);
+}
+
+/** Hour-of-day (0–23) for `iso` in the user's timezone — `getHours()` reads the DEVICE's. */
+export function hourInTz(iso: string, tz: string): number {
+  return Number(formatInTimeZone(new Date(iso), tz, 'H'));
 }
 
 
@@ -183,7 +191,7 @@ function localDateTimeToIso(date: string, time: string, dayOffset = 0): string {
 
 // Backfills HR/distance/calories on activity logs that were saved without
 // them (e.g. manually logged before Health Connect's session data synced).
-export async function enrichActivityLogs(candidates: EnrichmentCandidate[]): Promise<void> {
+export async function enrichActivityLogs(candidates: EnrichmentCandidate[], tz: string = DEFAULT_TZ): Promise<void> {
   if (!candidates.length) return;
 
   const { Capacitor } = await import('@capacitor/core');
@@ -218,7 +226,7 @@ export async function enrichActivityLogs(candidates: EnrichmentCandidate[]): Pro
   }
 }
 
-export async function syncHealthConnect(): Promise<{ metrics: number; sessions: number; sleep: number; note?: string } | null> {
+export async function syncHealthConnect(tz: string = DEFAULT_TZ): Promise<{ metrics: number; sessions: number; sleep: number; note?: string } | null> {
   const { Capacitor } = await import('@capacitor/core');
   if (!Capacitor.isNativePlatform()) return null;
 
@@ -242,7 +250,7 @@ export async function syncHealthConnect(): Promise<{ metrics: number; sessions: 
   // windows straddle two calendar days and aggregate steps from both into one
   // bucket. Using new Date(y, m-1, d, 0, 0, 0) creates midnight in the device's
   // own timezone, so every bucket maps to exactly one local calendar day.
-  const todayStr      = toLocalDate(new Date().toISOString());
+  const todayStr      = toLocalDate(new Date().toISOString(), tz);
   const [ty, tm, td]  = todayStr.split('-').map(Number);
   const start         = new Date(ty, tm - 1, td - (daysBack - 1), 0, 0, 0);
   const end           = new Date(ty, tm - 1, td + 1, 0, 0, 0);
@@ -263,7 +271,7 @@ export async function syncHealthConnect(): Promise<{ metrics: number; sessions: 
       });
       for (const a of aggregates) {
         const v = Math.round(a.value);
-        if (v > 0) bucket(toLocalDate(a.startTime)).steps = v;
+        if (v > 0) bucket(toLocalDate(a.startTime, tz)).steps = v;
       }
     } catch { /* permission denied */ }
   }
@@ -275,7 +283,7 @@ export async function syncHealthConnect(): Promise<{ metrics: number; sessions: 
         start: startIso, end: endIso, type: 'Distance', groupBy: 'day',
       });
       for (const a of aggregates)
-        bucket(toLocalDate(a.startTime)).distanceKm = Math.round((a.value / 1000) * 10) / 10;
+        bucket(toLocalDate(a.startTime, tz)).distanceKm = Math.round((a.value / 1000) * 10) / 10;
     } catch { /* ignore */ }
   }
 
@@ -285,7 +293,7 @@ export async function syncHealthConnect(): Promise<{ metrics: number; sessions: 
       const { aggregates } = await HealthConnect.aggregateRecords({
         start: startIso, end: endIso, type: 'TotalCaloriesBurned', groupBy: 'day',
       });
-      for (const a of aggregates) bucket(toLocalDate(a.startTime)).caloriesBurned = Math.round(a.value);
+      for (const a of aggregates) bucket(toLocalDate(a.startTime, tz)).caloriesBurned = Math.round(a.value);
     } catch { /* ignore */ }
   }
 
@@ -294,7 +302,7 @@ export async function syncHealthConnect(): Promise<{ metrics: number; sessions: 
     try {
       const { records } = await HealthConnect.readRecords({ start: startIso, end: endIso, type: 'Weight' });
       for (const r of records as Array<{ time: string; value: number }>)
-        bucket(toLocalDate(r.time)).weightKg = Math.round(r.value * 100) / 100;
+        bucket(toLocalDate(r.time, tz)).weightKg = Math.round(r.value * 100) / 100;
     } catch { /* ignore */ }
   }
 
@@ -304,7 +312,7 @@ export async function syncHealthConnect(): Promise<{ metrics: number; sessions: 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { records } = await HealthConnect.readRecords({ start: startIso, end: endIso, type: 'BodyFat' } as any);
       for (const r of records as Array<{ time: string; percentage: number }>)
-        bucket(toLocalDate(r.time)).bodyFatPct = Math.round(r.percentage * 10) / 10;
+        bucket(toLocalDate(r.time, tz)).bodyFatPct = Math.round(r.percentage * 10) / 10;
     } catch { /* ignore */ }
   }
 
@@ -317,7 +325,7 @@ export async function syncHealthConnect(): Promise<{ metrics: number; sessions: 
         startTime: string; calories?: number;
         proteinG?: number; carbsG?: number; fatG?: number;
       }>) {
-        const b = bucket(toLocalDate(r.startTime));
+        const b = bucket(toLocalDate(r.startTime, tz));
         if (r.calories  != null) b.calories  = (b.calories  ?? 0) + Math.round(r.calories);
         if (r.proteinG  != null) b.proteinG  = (b.proteinG  ?? 0) + Math.round(r.proteinG  * 10) / 10;
         if (r.carbsG    != null) b.carbsG    = (b.carbsG    ?? 0) + Math.round(r.carbsG    * 10) / 10;
@@ -331,7 +339,7 @@ export async function syncHealthConnect(): Promise<{ metrics: number; sessions: 
     try {
       const { records } = await HealthConnect.readRecords({ start: startIso, end: endIso, type: 'RestingHeartRate' });
       for (const r of records as Array<{ time: string; beatsPerMinute: number }>) {
-        bucket(toLocalDate(r.time)).restingHeartRate = Math.round(r.beatsPerMinute);
+        bucket(toLocalDate(r.time, tz)).restingHeartRate = Math.round(r.beatsPerMinute);
       }
     } catch { /* ignore */ }
   }
@@ -343,10 +351,9 @@ export async function syncHealthConnect(): Promise<{ metrics: number; sessions: 
       const { records } = await HealthConnect.readRecords({ start: startIso, end: endIso, type: 'HeartRateVariabilityRmssd' } as any);
       const overnightHrv: Record<string, number[]> = {};
       for (const r of records as Array<{ time: string; heartRateVariabilityMillis: number }>) {
-        const d = new Date(r.time);
-        const h = d.getHours();
+        const h = hourInTz(r.time, tz);
         if (h >= 0 && h < 8) {
-          const date = toLocalDate(r.time);
+          const date = toLocalDate(r.time, tz);
           if (!overnightHrv[date]) overnightHrv[date] = [];
           overnightHrv[date].push(r.heartRateVariabilityMillis);
         }
@@ -365,10 +372,9 @@ export async function syncHealthConnect(): Promise<{ metrics: number; sessions: 
       const { records } = await HealthConnect.readRecords({ start: startIso, end: endIso, type: 'OxygenSaturation' } as any);
       const overnightSpo2: Record<string, number[]> = {};
       for (const r of records as Array<{ time: string; percentage: number }>) {
-        const d = new Date(r.time);
-        const h = d.getHours();
+        const h = hourInTz(r.time, tz);
         if (h >= 0 && h < 8) {
-          const date = toLocalDate(r.time);
+          const date = toLocalDate(r.time, tz);
           if (!overnightSpo2[date]) overnightSpo2[date] = [];
           overnightSpo2[date].push(r.percentage);
         }
@@ -389,7 +395,7 @@ export async function syncHealthConnect(): Promise<{ metrics: number; sessions: 
         const durationMin = (new Date(r.endTime).getTime() - new Date(r.startTime).getTime()) / 60000;
         const metrics = await getSessionMetrics(HealthConnect, canRead, r.startTime, r.endTime);
         exerciseSessions.push({
-          date:         toLocalDate(r.startTime),
+          date:         toLocalDate(r.startTime, tz),
           title:        r.title || r.exerciseType || 'Workout',
           activityType: mapExerciseTypeToActivityType(r.exerciseType),
           startTime:    msToHHMMInTz(r.startTime),
@@ -430,7 +436,7 @@ export async function syncHealthConnect(): Promise<{ metrics: number; sessions: 
         }
         const round = (n: number) => Math.round(n * 100) / 100;
         sleepRecords.push({
-          date:            toLocalDate(r.endTime),
+          date:            toLocalDate(r.endTime, tz),
           sleepStart:      r.startTime,
           sleepEnd:        r.endTime,
           durationHours:   round(durationHours),

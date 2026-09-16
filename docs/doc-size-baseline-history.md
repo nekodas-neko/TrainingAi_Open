@@ -12956,3 +12956,18 @@ exempting a dozen files from the check that just caught this.
 
 An entry that said only "rename it" would get re-attempted, cost another CI cycle, and arrive at the
 same wall. The lines are the wall, written down.
+
+## 2026-09-16 — backlog → 22755: TN-44 re-scoped, and two entries split out of it
+
++57. TN-44 asked for ten Health Connect record types to be added to a list. Reading the pinned
+plugin's source — which CLAUDE.md's external-API rule requires before using any external field name —
+showed the list is not the wall: `RecordConverter` handles seven types and falls back to
+`record.toString()`, so an unconverted type returns a string blob whose fields are `undefined`.
+
+Three types we already read are in that hole (**LA-115**, device-gated), the caller half of the
+timezone fix belongs to Lane B (**LB-113**), and TN-44 keeps the half that is still true and
+valuable — that the platform *does* define skin temperature, which retires a connector-guide claim.
+
+The ⛔ on TN-44 is what the lines are for. Without it the next session adds ten types to the list,
+ships ten more silent `undefined`s, and the defect that took a source read to find gets reproduced
+tenfold by an entry that reads like a chore.
