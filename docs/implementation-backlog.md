@@ -437,6 +437,179 @@ below threshold and left in place for next time.
 
 
 
+### [workouts] BF-169 — the COMPLETED stamp is gated on the exercise library loading, so it vanishes on a slow or failed load
+
+- **Lane:** B — `app/workout-select/workout-select-content.tsx:111-114` and `:437`.
+- **Added:** 2026-09-16 (BugFix intake). Owner: *"some workouts show the completed sign straight after
+  the workout. But some days dont. I dont know the pattern. It may be some specific excercises or how
+  long it takes to leave the last screen."* Both of his guesses are right, and they are the same
+  cause.
+- **The stamp needs two things true, and only one of them is about having trained:**
+
+  ```tsx
+  {trainedToday && muscleActivations.length > 0 && <CompletedStamp />}
+  ```
+
+  ```tsx
+  const muscleActivations = useMemo(
+    () => (library.length > 0 && currentSession ? buildMuscleActivations(currentSession, library) : []),
+    [currentSession, library],
+  )
+  ```
+
+  **`library` is the exercise library — a separate fetch.** Until it arrives, `muscleActivations` is
+  `[]` and the stamp does not render, however completed the session is. That is the *"how long it
+  takes"* half. A session whose exercises produce no assignments yields the same empty array, which
+  is the *"specific exercises"* half.
+- **Every other completion signal on the card is driven by `trainedToday` alone** — the green ring
+  (`:357`), the screen-reader text (`:420`), and the button reading **Start Again** instead of Start
+  Workout (`:457`). So the card knows it is complete and says so three ways while the one visual the
+  owner looks for is absent. His own screenshot shows *Start Again* on a card with no stamp.
+- **How it got here, since it is not a careless line.** `:432` reads
+  `muscleActivations.length > 0 ? <MuscleHeatmap …/> : …` — a correct guard, because a heatmap with
+  no assignments is nothing. The stamp is laid **over** that diagram and was written inside the same
+  condition. The guard is right for the diagram and wrong for the stamp.
+- **Fix: gate the stamp on `trainedToday` alone.** It is a rubber stamp over the card, not a layer of
+  the heatmap; it needs no assignments to be meaningful. Keep `:432`'s guard exactly as it is.
+- **Check the empty-diagram case when fixing**, because it is the reason the two were entangled: with
+  the library absent the card renders whatever `:432`'s else-branch is, and the stamp must sit
+  legibly over that too rather than over a blank area.
+- **Verification:** on device, complete a session and confirm the stamp appears; then open the tab
+  with the library cache cleared (or offline) and confirm the stamp is still there while the diagram
+  is not.
+
+### [workouts] BF-168 — "Leave workout?" fires on the session-select tab after the workout is finished
+
+- **Lane:** B — `components/mobile-auth-handler.tsx:46-49`, against
+  `isWorkoutActive` in `lib/stores/workout-store.ts:457`.
+- **Added:** 2026-09-16 (BugFix intake). Owner: *"After excercise is conplete it still asks for
+  confirmation to leave."* His screenshot shows the dialog over the **session-select** screen, with
+  the card reading COMPLETED and **Start Again** behind it.
+- **The guard is a two-term predicate and both terms are looser than they read:**
+
+  ```ts
+  if (isWorkoutActive(useWorkoutStore.getState()) && window.location.pathname.startsWith("/workout"))
+  ```
+  ```ts
+  isWorkoutActive = !!state.workoutStartMs && state.mode !== 'done'
+  ```
+
+  **`/workout` is the session-select TAB as well as the workout screen**, so the path term does not
+  distinguish "in a workout" from "looking at the list". Anything that leaves `workoutStartMs` set
+  with `mode` not `'done'` raises the dialog on a screen where there is nothing to leave.
+- **⚠ The exact state was NOT reproduced, and the entry says so rather than guessing.** Read in the
+  source: `resetSession()` restores `INITIAL_STATE` (both `workoutStartMs: null` and `mode: 'pre'`),
+  and the completion path sets `mode = 'done'` — either of which makes the predicate false. The
+  mount-time reset at `workout-screen.tsx:624` depends only on `[sessionType]`, so it does not run
+  when the user simply returns to the tab. `rolloverDay` touches neither field. **Something leaves
+  the pair in `startMs != null, mode !== 'done'` and reading did not find it.**
+- **One observation narrows it and should be tested first:** the card behind the dialog offers
+  **Start Again**. If that was tapped, a new session legitimately begins (`workoutStartMs` set, mode
+  not yet `'done'`) and the dialog is then *correct* — while the card still says COMPLETED, which is
+  why it reads as a bug. **Ask the owner whether Start Again was pressed before the back press.** If
+  yes this is a labelling problem, not a stale-state one, and the fix is different.
+- **✅ THE OWNER ANSWERED 2026-09-16 AND IT KILLS THE Start-Again THEORY.** *"No; it was straight
+  after finishing the workout and pressing the back button."* So no new session had begun, and this
+  is not a labelling problem.
+- **Three more eliminations from a second read, none of them the cause:** the store's `persist` has
+  **no `partialize`**, so `mode` is persisted and cannot fall back to `'pre'` on rehydrate;
+  `isWorkoutActive`'s own comment confirms `'done'` is the deliberate and only safe exit (*"'pre' is
+  also the hub screen shown during a workout … so it must NOT be excluded here"*); and **no site
+  re-arms `workoutStartMs`** — the only write outside the start handler is the clear at
+  `workout-screen.tsx:1698`.
+- **⚑ A REAL DEFECT FOUND WHILE LOOKING, AND IT FITS THE SCREENSHOT: the dialog is never dismissed on
+  navigation.** `confirmLeaveOpen` is set at `mobile-auth-handler.tsx:48` and cleared **only** by the
+  user tapping Stay (`:147`) or Leave (`:149`). There is no effect on `pathname`. So a dialog raised
+  legitimately on one screen **survives any navigation** and reappears over whatever is now on
+  screen — which is exactly a "Leave workout?" prompt sitting over the session-select tab, a screen
+  with no workout to leave.
+- **That makes the likeliest sequence testable.** If back was pressed while the last exercise's
+  summary was still up (`mode === 'exercise-summary'`, `workoutStartMs` set) the dialog is
+  **correct** at that instant; the app then reaches `done` and navigates to session-select, and the
+  undismissed dialog rides along. The owner's *"straight after finishing"* is consistent with that
+  moment — finishing the last set reads as finishing the workout.
+- **The no-dismissal defect is worth fixing on its own merits regardless**, because it is not
+  specific to this path: any of the three guards in that listener can raise a prompt that then
+  outlives its screen. One effect clearing all three confirm flags on `pathname` change.
+- **Do not "fix" it by widening `isWorkoutActive`.** Its two terms are each load-bearing elsewhere —
+  the same predicate guards the guided-walk and activity equivalents in the same listener, and the
+  `beforeunload` warning at `workout-screen.tsx:641` uses the same pair. A fix belongs in the path
+  term (distinguish the workout screen from the tab) or in whatever leaves the state set.
+- **Verification:** on device, complete a session, return to the tab **without** tapping Start Again,
+  press back, and confirm no dialog. Then mid-workout, confirm the dialog still appears — BF-166's
+  entry records that this guard is the only thing standing between a back press and a discarded
+  session.
+
+### [workouts] BF-167 — one prescription says `deload: false` at the top and `deloaded: true` on every exercise, so the toggle claims "Full" over a deloaded session
+
+- **Lane:** B — `components/workout/pre-workout-screen.tsx:233-239` is the wrong read.
+  `components/workout/deload-toggle.tsx` is already correct and needs no change; see below.
+- **Added:** 2026-09-16 (BugFix intake). Owner: *"I dont know if its triggered deload or not. I
+  accepted the ai reccomensatuon."* He could not tell from the screen, and the screen is the reason.
+- **The deload IS applied. Measured on his accepted 2026-09-16 Push prescription:**
+
+  | exercise | prescribed | `preDeload` | |
+  |---|---|---|---|
+  | Barbell Bench Press | **52%** | 76% | `deloaded: true` |
+  | Barbell Overhead Press | **52%** | 72.5% | `deloaded: true` |
+  | Cable Chest Dips | **52%** | 70.5% | `deloaded: true` |
+  | Dumbbell Fly | **52%** | 76% | `deloaded: true` |
+  | Tricep Cable Combo | **52%** | 76% | `deloaded: true` |
+
+  Every row carries `deloadNote: "Deload — illness radar: elevated"`, and every row renders it.
+- **And the SAME stored object has `prescription.deload = false`.** Verified against
+  `session_periodization` — the top-level flag reads **false** on this row and on the three before
+  it, while the exercises inside read `deloaded: true`. The disagreement is inside one JSON blob.
+- **That flag is what the toggle reads, which is why it says the wrong thing:**
+
+  ```tsx
+  prescribedDeload={
+    periodization?.state.prescriptionStatus !== 'consumed'
+    && !!periodization?.state.prescription?.deload     // ← false here
+  }
+  ```
+
+  With `prescribedDeload` false, `DeloadToggle` renders *Full — **As prescribed*** and *Deload —
+  Lighter loads*. That is exactly his screenshot, over a session where every exercise is cut to 52%.
+- **`deload-toggle.tsx` is not the defect and must not be "fixed".** BF-8 already made it label
+  correctly, and its comment names this precise failure: *"When the engine has already applied a
+  deload, Full is an OVERRIDE of it — and saying 'as prescribed' there is how the screen came to
+  contradict the card below it (BF-8)."* The component does the right thing **when told the truth**.
+- **The root is that the two fields answer different questions.** `prescription.deload` means *this
+  is a deload prescription* — a phase decision. `exercises[].deloaded` means *this exercise's load
+  was cut*, here by the illness radar **after** the model produced its plan. BF-8 wired the label to
+  the phase flag, and a per-exercise safety deload does not set it.
+- **Recommended: derive the label from the exercises, not the flag** —
+  `prescription.exercises.some(e => e.deloaded)` — because that is the question the label asks
+  ("are the loads in front of you reduced?"). Keep the `!== 'consumed'` guard. Leaving
+  `prescription.deload` alone is deliberate: it is correct for what it means, and a phase deload
+  sets `deloaded` on its exercises too, so one read covers both.
+- **Checked for existing infrastructure before proposing the read, because BF-166's entry did not
+  and was wrong for it.** That entry claimed no overlay registry existed and proposed building one;
+  `lib/hooks/sheet-back-stack.ts` already had it under different names, and building the proposal
+  would have left two stacks disagreeing. So, for this one: `grep -rn 'export function .*[Dd]eload'`
+  across `packages/shared/src` and `lib` returns `isDeloadActive`, `isEarlyDeloadWeek`,
+  `deloadAwareStylePhase`, `deloadOverrideForGoal`, `deloadStyleForGoal`, `computePerExerciseDeload`
+  and `shouldTriggerEmergencyDeload` — **none of which answers "is any exercise in this prescription
+  deloaded?"**. `computePerExerciseDeload` is the *producer* of the flag (the soreness quadrant;
+  the illness radar writes the same shape), not a predicate over a stored prescription. The
+  `.some()` read is genuinely new, and it is one line.
+- **Second contradiction from the same cause, same screen.** The rationale paragraph reads *"focus on
+  volume within the **72.5-80%** intensity band for the primary compound"* against rows showing
+  **52%**. Those figures describe the **preDeload** numbers (bench 76%, inside that band) — the prose
+  was written before the radar cut the loads and nothing regenerated it. This is the BF-99 class:
+  prose naming numbers that are not on screen. Fixing the toggle does not fix this; the rationale
+  needs either a regeneration after the deload pass or a line saying the loads below were reduced
+  afterwards.
+- **NOT a defect, checked and cleared so it is not refiled:** the rationale's *"50-min working
+  budget"* against a picker showing **Normal 60 min**. `effectiveTimeBudgetMin` is
+  `workingBudgetMin(total)` — the budget minus the warm-up carve-out — so ~48–50 of a 60-minute
+  session is correct, and the model says *"working budget"* precisely. Both numbers are right and
+  they measure different things. His `program_sessions.time_budget_minutes` is **60** on all 23 rows.
+- **Verification:** on device, open a session whose prescription has any `deloaded: true` exercise and
+  confirm the toggle reads *Deload — As prescribed* with Full offered as *Override*; then a normal
+  session and confirm the labels are unchanged from today.
+
 ### [app-shell] BF-166 — the back listener ignored the overlay stack the app already had (fixed; device check owed)
 
 - **Lane:** B — `lib/hooks/sheet-back-stack.ts` and `components/mobile-auth-handler.tsx`. Shipped
@@ -10760,29 +10933,34 @@ record explicitly why not.
      belongs with TN-3b, which is the thing that needs a consistent read across days.
   3. **TN-3b is still blocked on a back-fill existing**, not merely on the table existing.
 
-### [readiness][platform] LB-110 — `/api/body-battery` takes no date, so TN-3b's past-day half waits on an entry that does not exist
-
-- **Lane:** A — `app/api/body-battery/route.ts`. Filed by Lane B (found while scanning the queue,
-  2026-09-15); the letter records who found it, not who ships it.
-- **This is an ORPHANED DEPENDENCY, which is why it is worth an entry of its own.** TN-3b's `Keep:`
-  says its past-day half is *"blocked on `LB-102` (Lane A)"*. **`LB-102` is not in the backlog** —
-  `grep '^### .*LB-102'` returns nothing, and the only mention in the whole file is TN-3b's own line
-  pointing at it. So the work TN-3b waits on is tracked nowhere and nobody will ever pick it up.
-- **The blocker itself is real, and was verified in source rather than taken from the entry:**
-  `app/api/body-battery/route.ts:94` is `export async function GET()` — **no parameters**. Only today
-  is reachable.
-- **Everything downstream of it is already built.** The buckets are persisted (TN-3a,
-  `oura_daytime_stress_buckets`, 478 buckets over 18 days as of 2026-09-10), and `stress-day-chart.tsx`
-  takes a plain `buckets` array, so the surface accepts any day it is handed. **What is missing is
-  only the read.**
-- **It blocks two named pieces of TN-3b:** the past-day chart (*"the owner opens a past day, reads a
-  stressed window off the axis"* — TN-33's level-2 test, and the first test in that ladder that can
-  actually fail), and the stress-by-hour aggregate across days.
-- **Scope:** accept a `date` param, normalise it through `normalizeDateParam` per the repo's
-  date-param rule, default to `todayInTz(session.user.timezone)`, and keep the existing rate limit.
-  The response shape does not change.
-- **Not started, and not Lane B's to start.** Filed so the dependency is tracked; TN-3b's `Keep:` now
-  points here instead of at a missing entry.
+> **LB-110 removed 2026-09-16 — the work was already shipped, and the route that shipped it argues
+> against LB-110's approach by name.** The entry proposed a `?date=` param on `/api/body-battery`.
+> `app/api/body-battery/stress-day/route.ts` already serves the stored buckets for **any** day,
+> takes `?date=` with both separators, and `components/body-battery/stress-day-chart.tsx:78` fetches
+> it — rendered from `app/health/day/day-detail-content.tsx:260` with `date={selectedDate}`. So
+> TN-3b's past-day half is not blocked and never was after 2026-09-13.
+>
+> **Its source claims were all TRUE and its conclusion was still wrong**, which is the failure worth
+> recording. `/api/body-battery` really is `export async function GET()` with no parameters at line
+> 94; `LB-102` really has no heading in this file. What the entry did not do was look for the work
+> under another path — LB-102 was not untracked, it was **done**, which is why it left the backlog,
+> and the route and its test both carry its name.
+>
+> **Do not re-file this.** The sibling route's own doc comment records the decision: *"A sibling
+> route rather than a `?date=` on the battery route, and the reason is not tidiness. The battery
+> response is a live model anchored to `now` — the HR walk, the reserve, the label — and none of it
+> can be computed for a finished day. A parameter that changed the response's SHAPE is the kind of
+> thing that reads as one endpoint and behaves as two."*
+>
+> **Two hazards found while implementing it before the duplicate surfaced, kept because they are
+> facts about the live route rather than about this entry.** `/api/body-battery` has two write
+> side-effects on a GET: it upserts the day's `body_battery_daily` snapshot, and it calls
+> `buildReadinessPayload(userId, tz)`, which takes no date and persists TODAY. Anyone who ever does
+> add a date to that route must make a dated read strictly read-only — the snapshot is the
+> accumulated end-of-day record, and its `hrMaxObserved` feeds `resolveBatteryHrMax` across the peak
+> window, so a retrospective write would propagate forward into later days' batteries. Also: the
+> entry's scope line said to normalise with `normalizeDateParam`, which returns the **slash** form
+> while that route is dash-keyed throughout — the J-8/J-9 silent-feature-death shape.
 
 ### [readiness] TN-3b — surface stress by hour, and on the HR charts
 - **Lane:** B — surface only: components/body-battery.
@@ -10794,9 +10972,11 @@ record explicitly why not.
   one-dropped-reading tolerance, coverage excluding gaps); `e2e/stress-by-hour.spec.ts` proves it
   draws as **two** polylines rather than one joined line.
   [Journal](overview/entries/2026-09-13-tn-3b-stress-by-hour.md).
-- **Keep: the PAST-DAY half, which is blocked on `LB-110` (Lane A) — re-pointed 2026-09-15.** It
-  said `LB-102`, and **that entry does not exist anywhere in this file**, so the dependency was
-  untracked; `LB-110` is the same work, filed. The pass test — *"the owner
+- **✅ THE PAST-DAY READ IS NOT BLOCKED — corrected 2026-09-16.** This said it was blocked on
+  `LB-102`, then on `LB-110`; **both were chasing work that had already shipped.**
+  `app/api/body-battery/stress-day/route.ts` serves the stored buckets for any day and
+  `stress-day-chart.tsx` fetches it with `?date=`, rendered from `day-detail-content.tsx:260` with
+  `date={selectedDate}`. LB-110 is removed; do not re-file it. The pass test — *"the owner
   opens a past day, reads a stressed window off the axis"* — cannot be met yet: `/api/body-battery`
   is `export async function GET()` with **no parameters**, so only today is reachable. The buckets are
   persisted (TN-3a, `oura_daytime_stress_buckets`, from 2026-08-24), and the chart takes a plain

@@ -18,6 +18,20 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-16 — `docs/implementation-backlog.md` → 22208 (LB-110 removed)
+
+A removal that grew the file, which is the shape worth explaining.
+
+LB-110 was a 20-line entry and its removal note is longer than it was. The note has to carry three
+things the deletion would otherwise destroy: that the work is already shipped under another path, so
+nobody re-files it; that the route which shipped it rejects LB-110's design in writing, so the
+rejection is not re-litigated; and two hazards found while implementing the entry before the
+duplicate surfaced — `/api/body-battery` has two write side-effects on a GET, and the entry named a
+date helper that returns the wrong separator for a dash-keyed route.
+
+Those last two are facts about the live route rather than about the entry, so deleting them with it
+would have thrown away the only part of the work that outlives the mistake.
+
 ## 2026-09-15 — `docs/implementation-backlog.md` → 21641, `projectOverview.md` → 11423 (BF-9 plan)
 
 Both grew, and for once the growth is a correction rather than a record.
@@ -12703,7 +12717,29 @@ only mention of it anywhere is the line pointing at it. So a real blocker (verif
 `Needs:`-style "an absent target counts as shipped" rule does not rescue it, because this was prose
 in a `Keep:` rather than a field the checker reads.
 
-## 2026-09-15 — `projectOverview.md` → 11476, `docs/implementation-backlog.md` → 22049 (LA-108)
+## 2026-09-16 — `docs/implementation-backlog.md` (BF-167)
+
+Forty-six lines. The table earns its space because "is the deload on?" is answered by the data and
+contradicted by the screen, and an implementer needs both halves side by side. The rest is two
+guardrails: deload-toggle.tsx is ALREADY correct and must not be "fixed", and the rationale's
+"50-min working budget" is right rather than a hallucination — I nearly filed that one.
+
+## 2026-09-16 — `docs/implementation-backlog.md` (BF-168, BF-169)
+
+Fifty-eight lines for two reports. BF-169 is short because the cause is one condition. BF-168 spends
+most of its length on what was RULED OUT — resetSession, the completion path, the mount-time reset,
+rolloverDay — because the trigger was not found by reading, and an entry that implied otherwise would
+send an implementer looking in the four places already checked. It also asks the owner one question
+that would change the fix entirely.
+
+## 2026-09-16 — `docs/implementation-backlog.md` (BF-168 amended)
+
+Twenty-three lines. The owner's answer killed the entry's leading theory, so the amendment has to
+carry what replaced it: three further eliminations, and the defect the second read did find — the
+confirm dialog is cleared only by Stay/Leave and never on navigation, so a prompt raised correctly on
+one screen reappears over a screen where it is absurd.
+
+## 2026-09-15 — `projectOverview.md` → 11476, `docs/implementation-backlog.md` → 22229 (LA-108)
 
 The index grew for a fix that had been sitting in plain sight, filed as done.
 
