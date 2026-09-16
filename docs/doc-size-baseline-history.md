@@ -13040,3 +13040,17 @@ constant true of one 33-year-old. The entry now carries the recommendation (deri
 not % of reserve — same numbers for this owner, stays per-user, and breaks the coupling the entry
 actually names), what the literal reading is better at, and the reversal cost. Picking it silently
 inside an engine PR would have seeded how every HR target in the app is expressed.
+
+## 2026-09-16 — backlog → 22853: TN-25's band shipped, and the selector is still inert
+
++12. The half that fixes the reported defect landed (v1.457.5), so the entry records it — and, more
+usefully, records what did NOT: `recommendWalkPattern` shipped in #1262 and **still has no caller**,
+so the pattern the owner asked to have assigned is not assigned yet.
+
+An entry showing two ✅ halves would read as done. The band fixes the cue; the selector fixes the
+prescription, and an engine with no caller changes nothing anyone can see. The `Keep:` says so in
+those words.
+
+Also recorded: the band returns 101–118 where the entry quotes 105–118 — the standard 0.60 lower edge
+against a rounded figure, 4 bpm apart. Naming a small discrepancy costs two lines; discovering later
+that a shipped constant silently disagreed with the entry it came from costs an investigation.
