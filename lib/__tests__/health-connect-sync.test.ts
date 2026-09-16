@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mapExerciseTypeToActivityType, HC_SYNC_READ_TYPES, HC_ENRICH_READ_TYPES } from '../health-connect-sync'
+import { mapExerciseTypeToActivityType, HC_SYNC_READ_TYPES, HC_ENRICH_READ_TYPES, toLocalDate, hourInTz } from '../health-connect-sync'
 
 describe('mapExerciseTypeToActivityType', () => {
   it('maps known Health Connect exercise types to activity_types slugs', () => {
@@ -51,5 +51,41 @@ describe('HC_READ_TYPES parity', () => {
     for (const t of checkedTypes) {
       expect(syncSet.has(t), `canRead.has('${t}') but it's not in HC_SYNC_READ_TYPES — add it or remove the check`).toBe(true)
     }
+  })
+})
+
+
+describe('TN-44 — Health Connect buckets in the USER\'s timezone, not the device\'s', () => {
+  // Both helpers used to resolve the DEVICE zone (`Intl...resolvedOptions().timeZone`,
+  // `Date.getHours()`), which is invisible until the phone leaves the zone the data was recorded in.
+  //
+  // These cases use FIXED-OFFSET zones and an explicit instant, so they fire on every CI run rather
+  // than only inside the window where the bug shows — the shape CLAUDE.md's date-arithmetic rule
+  // asks for. `Etc/GMT-10` is UTC+10 (the sign is inverted in that namespace, deliberately used
+  // here rather than `Australia/Brisbane` so the assertion cannot move with a tz-database update).
+  const BRISBANE = 'Etc/GMT-10'   // UTC+10
+  const NEW_YORK = 'Etc/GMT+5'    // UTC−5
+
+  it('puts a reading on the day it happened in the user\'s zone', () => {
+    // 2026-03-01T18:00Z = 2026-03-02 04:00 at UTC+10, still 2026-03-01 13:00 at UTC−5.
+    const iso = '2026-03-01T18:00:00.000Z'
+    expect(toLocalDate(iso, BRISBANE)).toBe('2026-03-02')
+    expect(toLocalDate(iso, NEW_YORK)).toBe('2026-03-01')
+  })
+
+  it('reads the overnight hour in the user\'s zone, so the 00:00–08:00 window keeps its meaning', () => {
+    // 2026-03-01T18:00Z is 04:00 for a UTC+10 user — inside the overnight window the HRV and SpO2
+    // loops filter on — and 13:00 for a UTC−5 one, which is outside it. Reading the device's clock
+    // is what silently empties that window when the phone travels.
+    const iso = '2026-03-01T18:00:00.000Z'
+    expect(hourInTz(iso, BRISBANE)).toBe(4)
+    expect(hourInTz(iso, NEW_YORK)).toBe(13)
+  })
+
+  it('keeps midnight on the right side of the boundary', () => {
+    // Exactly 00:00 at UTC+10. An off-by-one here is the whole defect class.
+    const iso = '2026-03-01T14:00:00.000Z'
+    expect(hourInTz(iso, BRISBANE)).toBe(0)
+    expect(toLocalDate(iso, BRISBANE)).toBe('2026-03-02')
   })
 })

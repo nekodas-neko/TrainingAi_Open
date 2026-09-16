@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.457.3",
+    date: "2026-09-16",
+    changes: [
+      "Health data synced from your phone is filed against your own day now, not the phone's. If you travelled, readings taken overnight could land on the wrong date \u2014 and the overnight HRV and blood-oxygen windows, which only count midnight to 8am, could miss the night entirely. Both now use the timezone in your profile.",
+    ],
+  },
+  {
     version: "1.457.2",
     date: "2026-09-16",
     changes: [

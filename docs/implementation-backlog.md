@@ -1466,43 +1466,100 @@ is the easiest place to launder an estimate into something that looks measured.
 **Pass test:** load-vs-readiness is computable for a user with no wearable at all, and every
 composite reports which of its inputs were inferred.
 
-### [devices] TN-44 — Health Connect defines ten record types our pillars want and we do not read, including skin temperature
+### [devices] LA-115 — Health Connect reads three record types the plugin cannot parse, and fails silently on all three
+
+- **Lane: A** · **Added:** 2026-09-16 · Lane A, from TN-44's investigation.
+- **Gate: device** — needs a new APK and an on-device Health Connect permission grant.
+- **Review:** [`the source read`](reviews/2026-09-16-health-connect-record-converter-gap.md).
+- **⚠ This supersedes TN-44's framing.** That entry files the work as "add ten types to
+  `HC_SYNC_READ_TYPES`". The list is not the wall — see TN-44 as re-scoped below.
+- **Measured from the pinned plugin's own source** (`@devmaxime/capacitor-health-connect@1.1.0`,
+  patched locally). `RecordConverter` has exactly **seven** `is XRecord ->` branches —
+  `ExerciseSession`, `Steps`, `Weight`, `SleepSession`, `RestingHeartRate`, `BodyFat`, `Nutrition` —
+  and its fallback is `else -> record.toString()`. An unhandled record comes back as a **Kotlin
+  string blob**, so every field access is `undefined`.
+- **Three types we already ask for land there:**
+
+  | type | read at | result |
+  |---|---|---|
+  | `HeartRateVariabilityRmssd` | `health-connect-sync.ts:343` | `heartRateVariabilityMillis` undefined |
+  | `OxygenSaturation` | `:365` | `percentage` undefined |
+  | `HeartRateSeries` | `:154` (enrich path) | `samples` undefined |
+
+  Each is inside `try { … } catch { /* ignore */ }` and feeds a date filter that drops everything:
+  `new Date(undefined)` → Invalid Date → `NaN` hour → the window test is false. **No error, no log.**
+- **`TotalCaloriesBurned` and `Distance` are fine** — they go through `aggregateRecords`, which has
+  its own `when (type)` in the Kotlin and never reaches `RecordConverter`.
+- **The greppable tell:** every broken call carries `as any` on its `type`. That cast is what let a
+  type past the plugin's `RecordType` union. `BodyFat` and `Nutrition` also carry it and are FINE,
+  because the repo's patch added them to **both** the union and the Kotlin — the patch added
+  `HeartRateVariabilitySdnn`/`OxygenSaturation` to the union **only**. So `as any` marks the boundary
+  where the type list outran the converter.
+- **⚠ The production numbers corroborate but do not prove it.** The owner's `body_metrics` rows that
+  HC touched (n = 17) credit `health_connect` with steps 15 and weight 11, and **HRV 0, SpO₂ 0** — but
+  also **resting heart rate 0**, whose converter branch *does* exist. `source_map` records only the
+  winning source under the ranked merge and the ring outranks HC for those fields, so a zero is
+  equally consistent with "HC produced a value and lost". **Do not quote the zeros as proof.**
+- **The fix is Kotlin, in `patches/@devmaxime__capacitor-health-connect.patch`:** a `RecordConverter`
+  branch per type, plus widening the TS `RecordType` union to match. **Do the union and the Kotlin in
+  the same change** — splitting them is what produced this.
+- **Pass test:** a non-null HRV and SpO₂ value from a Health-Connect source lands in `body_metrics`,
+  observed on the device. Per the external-API rule, the integration is not done until a value is in
+  the column.
+
+### [platform][devices] LB-113 — the Health Connect sync takes the user's timezone; nothing passes it yet
+
+- **Lane: B** · **Added:** 2026-09-16 · Lane A, from TN-44. **Lane B because the caller is a component.**
+- `syncHealthConnect(tz = DEFAULT_TZ)` and `enrichActivityLogs(candidates, tz = DEFAULT_TZ)` take the
+  user's timezone as of 2026-09-16; `components/health-connect-provider.tsx` calls both without it,
+  so both fall back to `DEFAULT_TZ`.
+- **Correct for the owner, wrong for anyone else**, and silent either way — the default is the safety
+  net CLAUDE.md warns makes forgetting invisible. The provider has the session and can pass
+  `session.user.timezone`.
+- **Small and local:** two call sites in one component.
+- **Pass test:** neither entry point is called without a timezone.
+
+### [devices] TN-44 — Health Connect record types the pillars want, and what it would actually take to read them
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-15 · owner supplied the Health Connect type list.
-- **Lane: A** — `lib/health-connect-sync.ts` (`HC_SYNC_READ_TYPES`).
-- **Review:** [`review`](reviews/2026-09-15-base-data-reachability-and-composites.md).
+- **Lane: A**
+- **Gate: device** — every new type needs a plugin patch and a new APK.
+- **Review:** [`review`](reviews/2026-09-15-base-data-reachability-and-composites.md), and
+  [`the plugin source read`](reviews/2026-09-16-health-connect-record-converter-gap.md) which
+  **re-scoped this entry on 2026-09-16**.
 - **Sibling of PS-41** (normalising HC's HR series) and **TN-38** (the tier model this feeds).
+- **✅ Still true, and it is the valuable half:** this retires the connector guide's §5.6 claim that
+  skin temperature is a hardware dependency with no second source. **Health Connect defines
+  `SkinTemperatureRecord`**, and `HeartRateVariabilityRmssdRecord` for HRV. The ring-only list is a
+  claim about *our read list and the user's device*, not about the platform.
+- **⛔ CORRECTED: this is NOT an addition to `HC_SYNC_READ_TYPES`.** The pinned plugin's
+  `RecordConverter` handles **seven** record types and falls back to `else -> record.toString()`; the
+  read path is generic (it resolves through the SDK's `RECORDS_TYPE_NAME_MAP`), so **conversion is
+  the wall, not permission**. Adding a type to the list without a converter branch yields a Kotlin
+  string blob whose every field reads `undefined` — which is already happening to three types we ask
+  for today. **Fix LA-115 first**, or this repeats its defect ten more times.
+- **The ten types and what they feed** (unchanged, and still what makes the work worth doing):
 
-**⚠ This retires a claim the connector guide makes.** §5.6 classifies skin temperature as a hardware
-dependency with no second source, costing readiness 0.10 and the illness radar 0.40. **Health
-Connect defines `SkinTemperatureRecord`**, and `HeartRateVariabilityRmssdRecord` for HRV. The
-ring-only list is a claim about *our read list and the user's device*, not about the platform:
-**Health Connect can carry every input our pillars need except beat-to-beat intervals.**
+  | record | feeds |
+  |---|---|
+  | `SkinTemperatureRecord` | readiness .10 · illness radar .40 — **the largest gap** |
+  | `RespiratoryRateRecord` | illness radar .25 |
+  | `ActiveCaloriesBurnedRecord` | activity 15/100 — we read *Total*, not *Active* |
+  | `Vo2MaxRecord` | cardio, progress markers |
+  | `DistanceRecord` · `HydrationRecord` | activity · nutrition |
+  | `BasalMetabolicRateRecord` | energy balance |
+  | `LeanBodyMassRecord` · `BoneMassRecord` · `BodyWaterMassRecord` | body composition |
 
-We read 11 types. Ten more exist that the pillars would use:
-
-| record | feeds |
-|---|---|
-| `SkinTemperatureRecord` | readiness .10 · illness radar .40 — **the largest gap** |
-| `RespiratoryRateRecord` | illness radar .25 |
-| `ActiveCaloriesBurnedRecord` | activity 15/100 — we read *Total*, not *Active* |
-| `Vo2MaxRecord` | cardio, progress markers |
-| `DistanceRecord` · `HydrationRecord` | activity · nutrition |
-| `BasalMetabolicRateRecord` | energy balance |
-| `LeanBodyMassRecord` · `BoneMassRecord` · `BodyWaterMassRecord` | body composition — the scale covers the owner, a HC user has no other route |
-
-**⚠ Two defects on the same path, found while reading the file — both hit the Health-Connect user
-specifically:** the overnight HRV and SpO₂ windows filter on `d.getHours()` (lines 347, 369) and
-`toLocalDate` resolves the **device** timezone, which is the class CLAUDE.md bans — invisible until
-the device leaves the user's zone, then a night's HRV lands on the wrong day. And line 51 documents
-`hrvMs` as *"SDNN"* while the code reads rMSSD; the code is right, and the comment is worth fixing
-because this repo has already shipped that exact mix-up once.
-
-**⚠ Reading a type is not receiving it** — not all devices write all records, which is the owner's
-own caveat and the argument for TN-38's inferred contributors rather than against reading the type.
-
-**Pass test:** `HC_SYNC_READ_TYPES` covers skin temperature and respiratory rate, the overnight
-windows use the user's timezone, and a Health-Connect-only account can populate the illness radar.
+  **`ActiveCaloriesBurned` and `Distance` are the cheap two** — both are already in the plugin's
+  `AggregateRecordType` with Kotlin behind them, so they need no converter work. Start there.
+- **✅ Shipped from this entry 2026-09-16** (`lane-a/tn44-hc-timezone-and-converter`): the overnight
+  HRV/SpO₂ windows now bucket in the **user's** timezone rather than the device's — the class
+  CLAUDE.md bans — and `toLocalDate` delegates to `toAestDay` instead of being a second
+  implementation of it. The stale `hrvMs` *"SDNN"* comment is corrected; the code reads RMSSD.
+- **Keep:** the record types themselves, all of which now wait on **LA-115**.
+- **⚠ Reading a type is not receiving it** — not all devices write all records, which is the owner's
+  own caveat and the argument for TN-38's inferred contributors rather than against reading the type.
+- **Pass test:** a Health-Connect-only account can populate the illness radar, observed on a device.
 
 ### [platform][devices] TN-38 — normalisation is implemented three different ways and nothing names them as one concept
 
