@@ -3716,7 +3716,33 @@ reports fast-block compliance and interval contrast for the session, and both nu
 between a treadmill walk and an outdoor walk without any surface-specific adjustment.
 
 ### [cardio][heart-rate] TN-25 — the guided walk's fast target has never been met in 44 attempts, and the live pacer says "push" every time
-- **Lane:** A — both (1 engine, 1 surface) → A, engine half first.
+- **Lane: A** — both (1 engine, 1 surface) → A, engine half first.
+- ✅ **ENGINE HALF SHIPPED 2026-09-16** (`lane-a/tn25-walk-pattern-selector`), unversioned — it is not
+  wired to a surface yet, so nothing user-visible changed.
+  `packages/shared/src/walking/recommend-walk-pattern.ts`: `WALK_PATTERNS` (the owner-approved
+  four-row table) and `recommendWalkPattern(quota, opts)`, deterministic, mirroring
+  `recommendRunType`'s shape and its no-LLM rule.
+  - **Zone 2 alone drives it, deliberately** — a walk is the mode this owner cannot push past Zone 2
+    in (0 of 44), so grading it against higher zones would prescribe work the mode cannot deliver.
+    Zones 3+ are what `recommendRunType` is for. A test pins that a huge open Zone 4/5 gap changes
+    nothing.
+  - **It picks a PATTERN and never an HR band**, keeping the separation `recommendRunType` already
+    keeps. That is what stops an anchor change moving the walk — and it means the band below is
+    still entirely outstanding.
+- **⚠ Keep: THE SURFACE HALF, AND IT IS THE HALF THAT FIXES THE REPORTED DEFECT.** The selector does
+  not change what the pacer says. `walk-active.tsx:67-68` still sets fast ≥ 0.70 of reserve (133 bpm
+  for this owner) and `classifyZone` still returns `'push'` for every fast block under it — so the
+  live cue still reads *push* on 100% of fast intervals. Nothing in this PR touches that.
+- **⚠ The band is an open DESIGN question, and the entry's instruction and good practice pull apart.**
+  This entry says *"the band, not the fraction: target **105–118 bpm** directly."* Taken literally
+  that is a hardcoded constant true of a 33-year-old with a 168 max and wrong for anyone else.
+  - **Recommendation: derive it from % of HRmax (0.60–0.70), not % of reserve.** That yields exactly
+    105–118 for this owner, is the model the session's own copy is written in (*"conversational
+    aerobic"*), stays per-user, and breaks the coupling this entry actually names — which is to
+    **reserve**, since `0.70 × reserve` is what re-anchoring at 178 would move from 133 to 140.
+  - **What the literal reading is better at:** it cannot move at all, under any anchor change. If
+    the owner wants the walk frozen against TN-30 entirely, hardcode it and say so.
+  - **Reversal cost: low** — one expression either way, no stored value.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-08 · owner: *"what makes it effective is the 2 speeds — should I be walking faster or slower during any phases?"*
 - **Lane: A** — `components/guided-walk/walk-active.tsx:67-68` sets the targets; `classifyZone` in `hr-zones.ts` renders the verdict.
