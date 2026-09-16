@@ -3588,9 +3588,9 @@ Lane B's, tracked on BF-84, and the storage shipping first is what makes it safe
 - **This is the surface the owner actually reads** — the one behind *"its often triggering deload days"*. The protection landed on the path they never see.
 - **⚙️ The root fix now has a mechanism and has NOT been run (BF-13, 2026-09-16, unversioned — admin-only, no user-visible change).** `POST /api/admin/rederive-baselines` replays the baseline fold cold over the stored nights and rewrites the temperature baseline and `temp_dev_c`; `dryRun` is the default. Both halves visible in this frame — the low mean and the 1.714 °C sd — come out of the same cold fold, so re-deriving is the fix *underneath* the suspension rather than beside it. **The run is the owner's to fire; it is a production data write and was deliberately not executed from the sandbox, so nothing here has changed yet.** Gating the banner on `tempLadderTrusted` is still worth doing and is still TN-18's own work — a re-derivation makes the suspension unnecessary, it does not make the ungated consumer correct. [journal](docs/overview/entries/2026-09-16-lane-a-bf13-rederive-baselines.md)
 
-### [readiness][devices] 🔴 One minute in five of "daytime stress" was recorded while the owner was asleep (LA-112, 2026-09-16)
+### [readiness][devices] ⚠️ Daytime stress stopped counting the night — shipped, and the size of the change is unmeasured (LA-112, 2026-09-16, v1.457.2)
 
-**Measured, not fixed.** The daytime-stress series window is the whole local calendar day
+**Fixed forward; nobody has seen the new numbers yet.** The daytime-stress series window is the whole local calendar day
 (`lib/oura-ble/rollup/run.ts:1060`) and nothing restricts it to waking hours, so the metric counts
 sleep. Joined against `sleep_sessions` directly — no clock-hour inference:
 - **277 of 672** stress buckets (41.2%) fall inside a recorded sleep session, and **28 of the 140**
@@ -3607,8 +3607,19 @@ sleep. Joined against `sleep_sessions` directly — no clock-hour inference:
 - **Two further findings from the same measurement are queued, not open issues:** **LA-113** (the
   imputation reads ~⅓ of measured HRV — real but confounded, owner-gated) and **LA-114**
   (`bucket_start` stores the bucket midpoint).
+- **What shipped (v1.457.2).** `buildDaytimeStressSeriesFromModel` drops sleeping buckets **before**
+  `scoreStressPoints`, so they reach neither the levels nor the day-median baseline. The ordering is
+  the fix: filtering only the summary would drop them from the count and leave the waking buckets
+  still scored against a sleeping median. The live `/api/body-battery` route already windowed from
+  wake and now passes its windows too, so the two surfaces agree by construction.
+- **⚠ Why this stays here rather than moving to resolved.** History self-heals only within the
+  trailing **21 days** the rollup recomputes; older stored days keep their old values. And the size
+  of the change **could not be predicted before shipping** — only `level` is persisted, never `dhrv`,
+  so corrected levels cannot be recomputed from stored data. The direction is certain, the magnitude
+  is not. **Owner check owed: do the stress numbers and deload frequency look right after the next
+  rollup?**
 - [`measurement`](docs/reviews/2026-09-16-daytime-stress-imputation-vs-measured-hrv.md) ·
-  [`journal`](docs/overview/entries/2026-09-16-lane-a-tn39-stress-validation.md)
+  [`journal`](docs/overview/entries/2026-09-16-lane-a-la112-stress-excludes-sleep.md)
 
 ### [readiness][sleep][activity][heart-rate] 🟢 "Everything is 55" — the clustering is coincidence; today's score is correct (2026-08-31)
 

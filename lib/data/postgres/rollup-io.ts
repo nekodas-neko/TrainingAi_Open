@@ -24,6 +24,7 @@ export interface PostgresRollupIODeps {
   upsertBodyMetrics(userId: string, rows: Omit<BodyMetrics, 'id' | 'userId' | 'createdAt'>[], source: HealthSource): Promise<void>
   getBodyFatCalibration(userId: string): Promise<BodyFatCalibration | null>
   refitDaytimeHrvModel(userId: string, timezone: string): Promise<void>
+  listSleepSessions(userId: string, from: string, to: string): Promise<{ sleepStart: Date; sleepEnd: Date }[]>
 }
 
 /** The server-side `RollupIO`: what `aggregateOuraRawSamples` did inline before D2 Task 2. */
@@ -77,6 +78,8 @@ export function createPostgresRollupIO(deps: PostgresRollupIODeps): RollupIO {
 
     upsertOuraDaily: rows => oura.upsertOuraDaily(db, userId, rows, 'oura_ble'),
     readLatestDailySummaryBefore: date => oura.getLatestOuraDailySummaryBefore(db, userId, date),
+    readSleepWindows: async (from, to) => (await deps.listSleepSessions(userId, from, to))
+      .map(r => ({ sleepStart: r.sleepStart, sleepEnd: r.sleepEnd })),
     replaceDailySummary: rows => oura.replaceOuraDailySummary(db, userId, rows),
     upsertDailySummary: rows => oura.upsertOuraDailySummary(db, userId, rows),
     readDailyDerived: (from, to) => oura.getOuraDailyDerived(db, userId, from, to),

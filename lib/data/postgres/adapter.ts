@@ -6020,6 +6020,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       upsertBodyMetrics: (id, rows, source) => this.upsertBodyMetrics(id, rows, source),
       getBodyFatCalibration: id => this.getBodyFatCalibration(id),
       refitDaytimeHrvModel: (id, tz) => this.maybeRefitDaytimeHrvModel(id, tz),
+      listSleepSessions: (id, from, to) => this.listSleepSessions(id, from, to),
     }), nodeModelRuntime, timezone, opts)
   }
 

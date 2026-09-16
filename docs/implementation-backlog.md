@@ -1290,36 +1290,6 @@ not from the harness.
   details, press the system back gesture — arrive on **More** with the More tab active. The harness
   cannot speak for the Android back gesture or the WebView's history handling.
 
-### [readiness][devices] LA-112 — the "daytime" stress series counts sleep, and misses the hours the owner is actually moving
-
-- **Lane: A** · **Added:** 2026-09-16 · Lane A, from TN-39's validation.
-- **Review:** [`the measurement`](reviews/2026-09-16-daytime-stress-imputation-vs-measured-hrv.md).
-- **Measured against production, joined to `sleep_sessions` directly — no clock-hour inference:**
-  **277 of 672** stress buckets (41.2%) fall inside a recorded sleep session, and **28 of the 140**
-  buckets counted as high-stress (20.0%). So **one minute in five of the `stress_high_minutes` the
-  app reports as daytime stress was recorded while the owner was asleep.**
-- **Two causes, both in code, neither a calibration question.** The series window is
-  `aestMidnight(d)` → `aestMidnight(d+1)` (`lib/oura-ble/rollup/run.ts:1060`) — the whole local day,
-  with nothing restricting it to waking hours — and `summarizeStressDay`
-  (`lib/health/daytime-stress.ts:245`) counts every bucket at or below `STRESS_HIGH_LEVEL` with no
-  waking filter of its own.
-- **The gap is worst where the day is busiest.** Buckets by Brisbane hour: 00–06 → **289**;
-  07–08 → **11**; 09–12 → 73; 13–23 → 299. Eleven buckets across 24 days land in the owner's most
-  active waking window, where the chest strap recorded 98. The mechanism is
-  `evaluateDaytimeHrvModel`'s MET gate, which is **correct in itself** — the model has no business
-  imputing HRV from an elevated activity heart rate — so the fix is not to remove the gate. It is
-  that the series is densest asleep and nearly empty while moving, and nothing downstream knows that.
-- **⚠ This is a defect, not a scoring change, and it is separable from LA-113.** Excluding sleep
-  buckets does not touch a coefficient or a threshold; it removes inputs the metric's own name says
-  do not belong. Do not batch it with LA-113, which is owner-gated for the opposite reason.
-- **Bears on TN-34**, unwired 2026-09-16 for firing a deload override on 83% of days off a
-  `stress_high_minutes` figure measured uncorrelated with readiness. This is an independent account
-  of why that number carries little signal. **Do not read it as a reason to re-wire the override** —
-  TN-34's own measurement stands on its own.
-- **Pass test:** no bucket inside a recorded sleep session contributes to `stress_high_minutes` or to
-  `daytime_stress_scaled`, and the re-derived daily figures are reported for the owner's stored days
-  so the size of the change is visible before it lands.
-
 ### [readiness][devices] LA-113 — the daytime-HRV imputation reads ~⅓ of measured HRV, and its heart-rate slope is ~2× too steep
 
 - **Lane: A** · **Added:** 2026-09-16 · Lane A, from TN-39's validation.

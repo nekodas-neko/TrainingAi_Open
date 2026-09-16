@@ -12922,3 +12922,22 @@ between the branch being cut and this merge — the note above it is that change
 the same baseline on the same day is the one case where the per-document `.size` files still conflict,
 and correctly so: they genuinely disagree about one number. Resolved main's integer first, then
 `pnpm fix:baselines`, per the recipe — the fixer throws on a conflict marker, so the order matters.
+
+## 2026-09-16 — projectOverview → 11565: LA-112 shipped, and why its entry does not move to resolved
+
++11. The Known Issue filed this morning became a shipped fix this afternoon, and the entry grew
+rather than leaving, because two things are still owed and both are easy to forget.
+
+History self-heals only across the trailing **21 days** the rollup recomputes, so older stored days
+keep their old stress numbers. And the size of the change **could not be predicted before shipping**:
+only `level` is persisted, never `dhrv`, so the corrected levels cannot be recomputed from stored
+data — the day-median has to be rebuilt from raw inputs. The direction is certain, the magnitude is
+not, which is exactly the shape of thing that gets written up as done and then quietly isn't.
+
+Per the striking rule, an entry only moves to `known-issues-resolved.md` when nothing is owed. An
+owner check is owed here.
+
+## 2026-09-16 — backlog → 22681: LA-112 shipped and left the queue
+
+−30, and the ratchet is what noticed. Lowering it is not bookkeeping: left at 22711 the file could
+regrow thirty lines into the slack a shipped entry vacated, without the check ever saying anything.

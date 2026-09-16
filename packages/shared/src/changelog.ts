@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.457.2",
+    date: "2026-09-16",
+    changes: [
+      "Your daytime stress figure no longer counts the hours you were asleep. It was measuring the whole calendar day, so more than four in ten of the half-hours behind it were recorded while you were in bed \u2014 and one in five of the minutes it called high stress. Worse, your sleeping hours were also setting the bar the rest of the day was judged against: because your heart rate is low asleep, leaving those hours in raised the baseline, and your waking hours were then scored as stressed for falling below it. Both are fixed, so the number now describes your day.",
+      "A restless night at a high heart rate also used to be counted as daytime stress. It no longer is \u2014 it belongs to your sleep and readiness, which already read it.",
+    ],
+  },
+  {
     version: "1.457.1",
     date: "2026-09-16",
     changes: [
