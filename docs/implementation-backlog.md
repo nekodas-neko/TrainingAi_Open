@@ -508,6 +508,29 @@ below threshold and left in place for next time.
   not yet `'done'`) and the dialog is then *correct* — while the card still says COMPLETED, which is
   why it reads as a bug. **Ask the owner whether Start Again was pressed before the back press.** If
   yes this is a labelling problem, not a stale-state one, and the fix is different.
+- **✅ THE OWNER ANSWERED 2026-09-16 AND IT KILLS THE Start-Again THEORY.** *"No; it was straight
+  after finishing the workout and pressing the back button."* So no new session had begun, and this
+  is not a labelling problem.
+- **Three more eliminations from a second read, none of them the cause:** the store's `persist` has
+  **no `partialize`**, so `mode` is persisted and cannot fall back to `'pre'` on rehydrate;
+  `isWorkoutActive`'s own comment confirms `'done'` is the deliberate and only safe exit (*"'pre' is
+  also the hub screen shown during a workout … so it must NOT be excluded here"*); and **no site
+  re-arms `workoutStartMs`** — the only write outside the start handler is the clear at
+  `workout-screen.tsx:1698`.
+- **⚑ A REAL DEFECT FOUND WHILE LOOKING, AND IT FITS THE SCREENSHOT: the dialog is never dismissed on
+  navigation.** `confirmLeaveOpen` is set at `mobile-auth-handler.tsx:48` and cleared **only** by the
+  user tapping Stay (`:147`) or Leave (`:149`). There is no effect on `pathname`. So a dialog raised
+  legitimately on one screen **survives any navigation** and reappears over whatever is now on
+  screen — which is exactly a "Leave workout?" prompt sitting over the session-select tab, a screen
+  with no workout to leave.
+- **That makes the likeliest sequence testable.** If back was pressed while the last exercise's
+  summary was still up (`mode === 'exercise-summary'`, `workoutStartMs` set) the dialog is
+  **correct** at that instant; the app then reaches `done` and navigates to session-select, and the
+  undismissed dialog rides along. The owner's *"straight after finishing"* is consistent with that
+  moment — finishing the last set reads as finishing the workout.
+- **The no-dismissal defect is worth fixing on its own merits regardless**, because it is not
+  specific to this path: any of the three guards in that listener can raise a prompt that then
+  outlives its screen. One effect clearing all three confirm flags on `pathname` change.
 - **Do not "fix" it by widening `isWorkoutActive`.** Its two terms are each load-bearing elsewhere —
   the same predicate guards the guided-walk and activity equivalents in the same listener, and the
   `beforeunload` warning at `workout-screen.tsx:641` uses the same pair. A fix belongs in the path
