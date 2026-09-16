@@ -12942,11 +12942,17 @@ owner check is owed here.
 −30, and the ratchet is what noticed. Lowering it is not bookkeeping: left at 22711 the file could
 regrow thirty lines into the slack a shipped entry vacated, without the check ever saying anything.
 
-## 2026-09-16 — backlog → 22664, projectOverview → 11566: LA-114 shipped
+## 2026-09-16 — backlog → 22698, projectOverview → 11568: LA-114's rename was reverted
 
-−17 and +1. LA-114 left the queue (migrations 275/276 renamed `bucket_start` → `bucket_mid` and
-regenerated the `claude_ro` views), and the one line added says so where the sibling finding is
-already recorded, rather than opening a second entry for a defect that is closed.
++34 and +2, and the growth is the point. LA-114 briefly left the queue when the rename looked
+shipped; CI's Migration Check rejected it, so the entry is back — and longer than it was, because
+what it now has to carry is a ⛔ against re-attempting it.
 
-The backlog ratchet is lowered rather than left slack, same reason as this morning: a shipped entry
-vacates lines, and left at the old number the file can regrow into them silently.
+Every historical `claude_ro` view migration (213 … 274) selects `t.bucket_start`, and Migration
+Check replays them all against the final schema, so a rename fails a dozen files at once. Editing
+them is not available — `ensureSchema` tracks by filename. `migrate.js` has a `REPLAY_EXEMPT` hatch
+whose single existing entry is itself a rename, so the option exists and using it would mean
+exempting a dozen files from the check that just caught this.
+
+An entry that said only "rename it" would get re-attempted, cost another CI cycle, and arrive at the
+same wall. The lines are the wall, written down.

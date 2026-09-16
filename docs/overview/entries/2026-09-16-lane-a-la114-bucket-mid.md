@@ -1,76 +1,94 @@
-# 2026-09-16 — Lane A · LA-114: the stress bucket column never held a bucket start
+# 2026-09-16 — Lane A · LA-114: the rename that cannot happen, and what was done instead
 
-**Branch:** `lane-a/la114-stress-bucket-mid` · **Migrations 275 + 276** · no version bump (nothing
-user-visible changes; the chart renders the same points)
+**Branch:** `lane-a/la114-stress-bucket-mid` · **Migration 275 (a column comment)** · no version bump
 
 `oura_daytime_stress_buckets.bucket_start` holds the bucket's **midpoint**, and has since the table
 was created. `daytimeHrvEstimatesPerBucket` returns `t = bStart + bucketMs / 2`, `scoreStressPoints`
-carries `t` through, and `run.ts` writes `new Date(p.tMs)` straight into the column — so stored
-timestamps sit on a `:15`/`:45` grid.
+carries `t` through, and `run.ts` writes `new Date(p.tMs)` straight into the column, so stored
+timestamps sit on a `:15`/`:45` grid. Migration 212's own header is where the mistake is written
+down — *"the bucket's own start instant, from the series' `t`"*.
 
-**Migration 212's own header is where the mistake is written down:** *"`bucket_start` is stored as
-timestamptz (the bucket's own start instant, from the series' `t`)"*. The series' `t` is not the
-start. The column was named for what its author believed `t` was.
+## The rename was written, applied, pushed, and reverted
 
-## Rename, not re-stamp
+CI's **Migration Check** rejected it, and it was right to. The job's second step replays every
+migration against a schema that already has everything (LA-13). A rename fails that twice over:
 
-The stored value is **not wrong**. A midpoint is a legitimate representative of a 30-minute bucket,
-and the one consumer — the stress-day chart — plots it as a point in time, which is correct either
-way. Only the name lies. Shifting 672 rows back by 15 minutes would move a chart that is currently
-right in order to fix a string, and would be a data migration rather than a reversible rename.
+1. **`ALTER TABLE ... RENAME COLUMN` is not idempotent** — on replay the old name is gone. Fixable
+   with an `information_schema` guard.
+2. **The one that is not fixable:** every historical `claude_ro` view migration — 213, 215, 218,
+   221 … 274 — contains `SELECT ... t.bucket_start ... FROM public.oura_daytime_stress_buckets`,
+   because each regenerates the **full** view set. After a rename, all of them fail on replay.
 
-The harm being removed is specific and already realised: a join written the obvious way, matching
-these timestamps against another 30-minute series on the epoch grid, returns **zero rows** — which
-reads as "no overlapping data" rather than "the join is 15 minutes out". It cost an hour during
-TN-39's validation earlier the same day. A comment would not have prevented it; a name is what a
-query gets written from.
+Making them pass would mean editing already-applied migrations, which `ensureSchema` makes
+meaningless — it tracks by **filename**, so an edited file is skipped forever and the change never
+lands.
 
-## Two migrations, because a rename does not reach the view
+**There is an escape hatch, and taking it would have been wrong.** `migrate.js` has a
+`REPLAY_EXEMPT` map, and its single entry exists for exactly this: *"002 renamed the column its
+`cardio_sessions` FK references"*. So the repo has done one rename, and it cost an exemption. Doing
+it here would mean exempting **a dozen** generated view migrations from the check that just caught
+this — hollowing out the check to land a cosmetic fix.
 
-**275** renames the column. **276** regenerates the `claude_ro` views, because a base-table
-`RENAME COLUMN` does **not** rename a dependent view's output column — Postgres re-resolves the
-reference and keeps the view's original alias. Without 276 the table would say `bucket_mid` while
-`claude_ro` still said `bucket_start`, which is the same lie with an extra step, and every analysis
-query runs against the view.
+**The general rule, which is the finding worth keeping:** in this repo, a column an earlier migration
+names by hand cannot be renamed without exempting every such migration from the replay check. That is
+a property of the migration model, not of this column.
 
-276 was generated, not hand-written (`scripts/generate-claude-ro-views.js`, which reads the live
-local schema — so 275 had to be applied locally first). Verified the way 274's header prescribes:
-diffed against 274, and the two differ by **exactly one line**. `oura_bucket.bucket_start_ms` /
-`bucket_start_ds` are a different table and were deliberately untouched.
+## What shipped instead
 
-## What the rename did and did not sweep
+- **Migration 275 is a `COMMENT ON COLUMN`** — idempotent, names no column a historical migration
+  would stop finding, and makes the database self-describing to `\d+` and `pg_description`. It
+  carries the full reasoning above so the next person does not re-attempt the rename.
+- **The Drizzle property is `bucketMid`**, mapped to the `bucket_start` column, and every TypeScript
+  reader now says `bucketMid` — the slice, the adapter, the repository interface, `RollupIO`, the
+  rollup, the stress-day route and the admin device-comparison route.
+- Nothing is re-stamped. The stored value is not wrong: a midpoint is a legitimate representative of
+  a 30-minute bucket and the chart plots it as a point in time.
 
-`bucketStart` is a legitimate name elsewhere and was left alone: the device-comparison harness
+## ⚠ The gap this leaves, stated plainly
+
+**`claude_ro.oura_daytime_stress_buckets` still exposes `bucket_start`, and that read surface is
+where the defect actually bit.** A join written the obvious way, against another 30-minute series on
+the epoch grid, returns **zero rows** — which reads as "no overlapping data" rather than "the join is
+15 minutes out". It cost an hour during TN-39's validation earlier the same day, and a TypeScript
+property name does nothing for a SQL query. **Adding the 15 minutes is the caller's job.**
+
+So **LA-114 goes back in the queue**, re-scoped: the naming defect is documented, not fixed, and the
+entry now names the constraint so nobody re-attempts the rename.
+
+**One option deliberately not taken:** teaching `generate-claude-ro-views.js` to alias the column
+(`t.bucket_start AS bucket_mid`) would fix the read surface and be replay-safe, since the base table
+keeps its name. It was rejected because it makes `public` and `claude_ro` disagree about a column's
+name — introducing a second naming confusion to fix the first. Recorded in the entry as a live
+option rather than dismissed, because it is the only idea so far that reaches the surface that
+matters.
+
+## What the rename attempt did leave behind, correctly
+
+`bucketStart` is accurate elsewhere and was left alone: the device-comparison harness
 (`lib/health/device-comparison.ts`, `lib/oura-comparison-harness*.ts`) buckets at
-`floor(t / width) * width`, so its `bucketStart` really is a start.
-
-**One place already knew.** `lib/oura-comparison-harness-adapters.ts:82` converts a dHRV estimate
-back with `new Date(e.t - HRV_BUCKET_MS / 2)` — the harness had the semantics right the whole time;
-it was the persistence path that got them wrong.
-
-**The one reference a typecheck cannot see** was a raw `INSERT` in
-`app/api/body-battery/__tests__/lb102-stress-day-read.test.ts`, naming the column in SQL text. That
-is the shape that passes `tsc` and fails in CI. Found by grepping for the string rather than
-trusting the compiler.
+`floor(t / width) * width`. **One place already knew** —
+`lib/oura-comparison-harness-adapters.ts:82` converts a dHRV estimate back with
+`new Date(e.t - HRV_BUCKET_MS / 2)`. The harness had the semantics right the whole time; the
+persistence path did not.
 
 ## Verification
 
-- Migration applied to the local dev Postgres and the column confirmed renamed, primary key
-  included (`(user_id, bucket_mid)`).
-- **The DB-backed tests really ran**, not skipped: `daytime-stress-buckets.test.ts` and
-  `lb102-stress-day-read.test.ts` — **14 tests** against the migrated local Postgres through real
-  SQL, which is what actually exercises the renamed column and the fixed raw `INSERT`.
-- `pnpm test` **924 files / 8770 tests** green. `pnpm check:rules` **75 of 75** — it caught the
-  backlog's "next free migration" pointer still reading 275. Typecheck and lint clean.
-- `pnpm dev`: `/api/body-battery/stress-day` and `/api/body-battery` compile and 401 unauthenticated.
+- **The failure was reproduced and the fix shown passing**, on a throwaway database built the way CI
+  builds one: apply all migrations (275 applied, 0 failed), `TRUNCATE schema_migrations`, replay
+  (274 applied, 001 replay-exempt, **0 failed, exit 0**). That is Migration Check's two steps.
+- `pnpm test` **924 files / 8770 tests** green. The DB-backed stress tests
+  (`daytime-stress-buckets.test.ts`, `lb102-stress-day-read.test.ts`, **14 tests**) ran against real
+  Postgres, exercising the Drizzle property against the unchanged column.
+- `pnpm check:rules` **75 of 75** — it caught the backlog's migration pointer twice, first at 275
+  when two migrations were added and again at 277 when they were withdrawn. Typecheck and lint clean.
 
-**Not exercised.** No authenticated request and no rollup pass — the sandbox cannot mint a session,
-and the rollup's stress step needs vendored constants it does not have. `db-snapshot-integration.test.ts`,
-which is what would catch a stale `claude_ro` view, **skips locally even with `DATABASE_URL`** (it
-needs the `claude_readonly` role, which the local setup does not create), so CI is the only place
-migration 276 gets checked. No device, no APK.
+**Not exercised:** no authenticated request, no rollup pass, no device. `db-snapshot-integration.test.ts`
+skips locally, but with no view migration in this PR there is nothing for it to check.
 
-**Deploy note:** a rename is not backwards-compatible with code already running. Railway applies
-migrations on cold start, so there is a brief window where an old replica querying `bucket_start`
-would error. It is reversible (`RENAME COLUMN bucket_mid TO bucket_start`) and drops nothing, and
-the only writer is the rollup, which rewrites a failed day on its next pass.
+## The lesson worth carrying
+
+The first version of this was written, validated locally, and pushed — and the local validation
+never replayed the migrations. `pnpm test` and `check:rules` both passed on a database where the
+rename had already been applied once. **A migration is not tested until it has been applied twice to
+the same database**, and this repo's CI does exactly that, which is why it caught it and the sandbox
+did not.

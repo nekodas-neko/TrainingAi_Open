@@ -1436,11 +1436,21 @@ export const rrIntervals = pgTable('rr_intervals', {
 export const ouraDaytimeStressBuckets = pgTable('oura_daytime_stress_buckets', {
   userId:      uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   day:         text('day').notNull(),
-  /** The bucket's MIDPOINT, not its start — `daytimeHrvEstimatesPerBucket` emits
-   *  `t = bStart + bucketMs / 2` and that is what is written here. Named `bucket_start` until
-   *  migration 275; a join on the :00/:30 grid against the old name returned zero rows, which reads
-   *  as missing data rather than a 15-minute offset (LA-114). */
-  bucketMid:   timestamp('bucket_mid', { withTimezone: true }).notNull(),
+  /**
+   * The bucket's MIDPOINT, not its start — `daytimeHrvEstimatesPerBucket` emits
+   * `t = bStart + bucketMs / 2` and that is what is written here.
+   *
+   * **The SQL column is still `bucket_start` and cannot be renamed** (LA-114). Every historical
+   * `claude_ro` view migration selects `t.bucket_start`, and they are replayed against the final
+   * schema by Migration Check's idempotency step, so a rename fails all of them — and editing an
+   * already-applied migration is forbidden because `ensureSchema` tracks by filename. Migration 275
+   * carries the full reasoning and a `COMMENT ON COLUMN` so the database says so too.
+   *
+   * The property is named for what it holds so TypeScript, at least, does not lie. A join on the
+   * :00/:30 grid against the raw column returns zero rows, which reads as missing data rather than
+   * a 15-minute offset — that is the defect, and it survives in `claude_ro`.
+   */
+  bucketMid:   timestamp('bucket_start', { withTimezone: true }).notNull(),
   level:       doublePrecision('level').notNull(),
   updatedAt:   timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [primaryKey({ columns: [t.userId, t.bucketMid] })])

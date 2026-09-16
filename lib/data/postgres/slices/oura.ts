@@ -1995,7 +1995,7 @@ export async function replaceDaytimeStressBuckets(
       //
       // `setWhere` is scoped to the user per CLAUDE.md's standing rule for `onConflictDoUpdate`
       // arms. **It is redundant here, and that is recorded rather than left to look load-bearing**
-      // — the primary key is `(user_id, bucket_mid)`, so one user's insert cannot conflict with
+      // — the primary key is `(user_id, bucket_start)`, so one user's insert cannot conflict with
       // another user's row. Verified by deleting this line and re-running the suite: nothing
       // changed. It stays as cheap insurance against the key ever narrowing.
       setWhere: eq(s.ouraDaytimeStressBuckets.userId, userId),

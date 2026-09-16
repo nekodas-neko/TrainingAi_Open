@@ -111,9 +111,9 @@ describe.skipIf(!canRun)('daytime stress buckets (TN-3a)', () => {
   })
 
   // Deliberately NOT claimed as proof that the write's `setWhere` user-scope is load-bearing.
-  // It is not: the primary key is `(user_id, bucket_mid)`, so a cross-user conflict cannot
+  // It is not: the primary key is `(user_id, bucket_start)`, so a cross-user conflict cannot
   // arise and removing `setWhere` leaves every test here green — confirmed by removing it. What
-  // the case above DOES catch is the key ever narrowing to `bucket_mid` alone, which would make
+  // the case above DOES catch is the key ever narrowing to `bucket_start` alone, which would make
   // one user's rollup silently overwrite another's. The first draft of this test asserted the
   // stronger claim and would have shipped a comment the code did not support.
 
