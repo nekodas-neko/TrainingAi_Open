@@ -12854,3 +12854,21 @@ lines of net growth.
 Worth the history note rather than a silent fix because the third cause was self-inflicted across
 every entry this agent filed, and the lesson generalises: a queue position is not a work assignment,
 and the file does not show which of the three is in play.
+
+## 2026-09-16 — backlog → 22632, projectOverview → 11532: four `Keep:` lines a run has to clear
+
++57 and +1. All of it is state that had nowhere else to live: the `temperature-baseline` batch
+(BF-13, TN-6, Q-506, TN-8) now has a re-derivation mechanism —
+`POST /api/admin/rederive-baselines` — and **no run**, so none of the four entries can leave the
+queue and each needed a `Keep:` saying precisely what it is still owed.
+
+The length is doing work in two of them. Q-506's records that the re-derivation does **not** move
+its own metric: stored `illness_score` is written by the rollup's `illness_radar` step alone, so it
+keeps the z it was computed with until a rollup pass rewrites that night. TN-8's records that the
+new test converts **half** its pass test — the fixture reproduces the deviation's sign bias but
+peaks at 0.671 against the owner's 1.33, so "0 nights above 1.0" still needs the run — and corrects
+that entry's claim that a Redecode needs constants production does not have. It has them; the
+sandbox did not.
+
+A `Keep:` that says "still owed" without saying what would leave the next session to re-derive it
+from the entry body, which is how the batch lost three weeks after the seed was fixed.
