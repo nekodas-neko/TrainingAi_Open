@@ -442,8 +442,10 @@ below threshold and left in place for next time.
 - **Branch:** _unassigned_ · **Added:** 2026-09-10 · found answering the owner's *"is stress a real usable value?"*
 - **Lane: A** — `packages/shared/src/ai-periodization/ai-dynamic.ts:219-225`.
 - **✅ OWNER-APPROVED 2026-09-10** — *"yes lets do all that."* **Option 1: unwire `stressOverride`.** Not gated; one line, reversible.
-- **Needs: TN-33** — only for the later question of what replaces it; the unwiring does not wait.
-- **Reference:** [`review`](reviews/2026-09-10-stress-status.md) §8.
+- **Related: TN-33** — only for the later question of what replaces the override. **This is NOT a
+  `Needs:`** and was one until 2026-09-16: the field parked the entry while its own sentence said the
+  unwiring does not wait, and `next-item.js` believes the field.
+- **Review:** [`review`](reviews/2026-09-10-stress-status.md) §8.
 
 `ai-dynamic.ts:219` gates a **deload recommendation** on `stressHighMinutes >= 120`
 (`STRESS_HIGH_DAY_THRESHOLD_MIN`), returning `{ recommended: true, strength: 'recommended' }`.
@@ -463,7 +465,7 @@ class, live, in the surface that tells the owner whether to train.
 night** buckets with night systematically positive (+0.266 against the day's −0.405), and its
 correlation with readiness is **+0.072 over 18 days**, with the two halves pointing opposite ways.
 
-**⛔ Do NOT fix this by raising the 120-minute threshold.** That is the mistake the file's own comment
+**⚠ Do NOT fix this by raising the 120-minute threshold.** That is the mistake the file's own comment
 warns about eleven lines above this condition, about `TEMP_ALERT_THRESHOLD_C` — *"the fourth 'the
 threshold is right, the input is wrong' in this pillar"*. **This is the fifth.** The threshold is a
 documented judgement call at ~2 h; the input is a sleep-weighted average wearing a daytime label.
@@ -612,7 +614,7 @@ true mean on night 2 rather than converging for fifty.
   apart in `daily-summary.ts`; read them.
 
 - ✅ **SEED FIXED 2026-08-25** (`fix/baseline-zero-seed`) — see BF-13 for the full note, including
-  the ⛔ Keep: the stored baselines are still zero-folded and one **Redecode** run re-derives them,
+  the ⚠ Keep: the stored baselines are still zero-folded and one **Redecode** run re-derives them,
   which could not be done from a sandbox. This entry's pass tests stay unmeasured until it runs.
 ### [readiness][devices] TN-6 — the temperature baseline is 0.36 °C too low, so readiness carries a −16 pt penalty on 89% of days
 - **Lane:** A — engine only: lib/health.
@@ -676,7 +678,7 @@ not the proposed design** — it shows the offset is an estimator artefact rathe
 it would absorb a genuine multi-day fever into the baseline within a week. Re-seed or correct the
 existing baseline instead.
 
-**⛔ Do not touch the 0.3/0.5/1.0 ladder.** Against a true nightly sd of 0.140 °C it sits at
+**⚠ Do not touch the 0.3/0.5/1.0 ladder.** Against a true nightly sd of 0.140 °C it sits at
 2.1/3.6/7.1 sd, which is defensible. **Fourth instance of "the threshold is right, the input is
 wrong"** in this pillar after Q-506, Q-512 and Q-514; adjusting the ladder would hide a broken
 baseline behind a plausible firing rate, which is the Q-504 mistake.
@@ -1237,7 +1239,7 @@ not from the harness.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-15 · owner: *"this might be a good opportunity to investigate other metrics we can calculate from our data too."*
 - **Lane: A** — `packages/shared/src/health/daytime-hrv-model.ts` · `packages/shared/src/health/rmssd.ts` · reads `rr_intervals` via `getRrForWindow`.
-- **Reference:** [`audit`](reviews/2026-09-15-what-else-our-data-could-tell-us.md).
+- **Review:** [`audit`](reviews/2026-09-15-what-else-our-data-could-tell-us.md).
 - **Sibling of TN-33** (which measured the stress signal) and **TN-34** (the override). **This is the validation both of those had to assume.**
 
 **Daytime stress is imputed, not measured.** The ring streams HRV events for ~7% of waking hours, so
@@ -1390,7 +1392,7 @@ composite reports which of its inputs were inferred.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-15 · owner supplied the Health Connect type list.
 - **Lane: A** — `lib/health-connect-sync.ts` (`HC_SYNC_READ_TYPES`).
-- **Reference:** [`review`](reviews/2026-09-15-base-data-reachability-and-composites.md).
+- **Review:** [`review`](reviews/2026-09-15-base-data-reachability-and-composites.md).
 - **Sibling of PS-41** (normalising HC's HR series) and **TN-38** (the tier model this feeds).
 
 **⚠ This retires a claim the connector guide makes.** §5.6 classifies skin temperature as a hardware
@@ -1564,8 +1566,8 @@ supply; and a rendered score can say what it was computed without.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-15 · owner: *"we get data from Oura; then we normalise/calculate it into usable fields… then we use those fields to calculate our pillars. Can we make sure we are doing this correctly?"*
 - **Lane: A** for steps 2–3 (`lib/health/readiness-payload.ts:278-291`); **step 1 is docs-only and should not wait.**
-- **Reference:** [`review`](reviews/2026-09-15-pillars-against-the-connector-guide.md) · the contract is [`docs/data-source-connector-guide.md`](data-source-connector-guide.md) §5.4.
-- **⛔ Not a redesign.** The architecture the owner describes is already written down and already built at the input layer. This entry closes the gap between the guide and the code.
+- **Review:** [`review`](reviews/2026-09-15-pillars-against-the-connector-guide.md) · the contract is [`docs/data-source-connector-guide.md`](data-source-connector-guide.md) §5.4.
+- **⚠ Not a redesign.** The architecture the owner describes is already written down and already built at the input layer. This entry closes the gap between the guide and the code.
 
 **✅ The input layer holds.** `body_metrics` carries a per-field `source_map` resolved by
 `SOURCE_RANK` (`manual > scale_ble > oura_ble > oura_cloud > health_connect`). Measured over 30 days:
@@ -1609,10 +1611,10 @@ general rule"* — singular. This is a second, larger instance.
    change** rather than trusting this snapshot.
 3. **Then decide what the derived layer IS** — app-computed and source-neutral (the rename plan
    applies, any source should contribute), or genuinely Oura-only (then §4's table should mark which
-   pillars degrade without a ring). **⛔ Do not start 3 without its own plan** — `2026-08-02-de-oura-naming.md`
+   pillars degrade without a ring). **⚠ Do not start 3 without its own plan** — `2026-08-02-de-oura-naming.md`
    already says so, and `oura_daily_derived` is one of six tables a rename touches.
 
-**⛔ Not a reason to delay the connector registry** (PS-40, `2026-09-14-data-source-connector-interface.md`).
+**⚠ Not a reason to delay the connector registry** (PS-40, `2026-09-14-data-source-connector-interface.md`).
 That plan is metadata over existing ingest routes and is unaffected — a `supplies` declaration is
 exactly what would have surfaced this without an audit.
 
@@ -1635,7 +1637,7 @@ pillars degrade for a Health-Connect-only user" from the guide rather than by gr
   returns `recommended: true` — but it is **not** what the owner is feeling, and it only starts
   mattering once readiness runs higher than it does now. Sequencing them separately is what makes
   the re-measure readable.
-- **Reference:** [`metric inventory`](reviews/2026-09-15-every-metric-and-the-core-line.md) is a
+- **Review:** [`metric inventory`](reviews/2026-09-15-every-metric-and-the-core-line.md) is a
   sibling of this entry only in that both came out of the same session; no dependency.
 - **Sibling of TN-34**, which covers the stress override alone. **This entry is the cause; TN-34 is what made it visible.**
 - **Reference:** [`review`](reviews/2026-09-14-what-triggers-a-deload.md).
@@ -1690,7 +1692,7 @@ buckets, r = +0.072 with readiness over 18 days.
    current 22 days because readiness only clears 70 on three of them, so it is a cleanup rather
    than the cure it was filed as.
 
-**⛔ Do not raise the 120-minute threshold and do not raise the streak from 3.** Both are the
+**⚠ Do not raise the 120-minute threshold and do not raise the streak from 3.** Both are the
 "threshold is right, the input is wrong" mistake, which this pillar has now made five times — the
 same file names four of them eleven lines above the stress condition. **The streak is not a recovery
 signal; it is a proxy standing in for one.**
@@ -3082,7 +3084,7 @@ anchor, not by arithmetic coincidence.
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · owner: *"these should be 2 different options then… if we are doing jogging it should fall under the Run category in cardio… Run could consist of that interval Jog as a style; whereas the walk is more a walk."*
 - **Lane: B** — `components/cardio/modality-picker.tsx` (the three-way picker), `components/guided-walk/**`, `app/running/**`. **Lane A** for `packages/shared/src/running/hr-targets.ts` if a new run type is added.
 - **✅ OWNER DECISION, 2026-09-09 — yes, move it to Run, as an ASSIGNED run type among several.** *"Move into run; and have it be a run type that gets assigned. Interval sprints / Interval Jog / Consistent run / Slow Jog — these + more should be on the cards for variation — also decided scientifically based on my week/day."* Gate cleared.
-- **Reference:** [`review`](reviews/2026-09-08-walk-intensity-calibration.md) addenda 4–6. **Resolves TN-25's owner question** by splitting it rather than answering it.
+- **Review:** [`review`](reviews/2026-09-08-walk-intensity-calibration.md) addenda 4–6. **Resolves TN-25's owner question** by splitting it rather than answering it.
 
 **The cardio section is already `Run · Guided Walk · Other Activity`, and `RunType` already includes
 `'interval'`** (`packages/shared/src/running/types.ts:3`), targeting zones **[4, 5]** via
@@ -3289,7 +3291,7 @@ moving, which is the failure mode BF-134 was filed about on the same screen.
 - **⚑ Cross-reference BF-137 (filed 2026-09-10, the day after this entry) — and read it FIRST.** It names a cause this entry does not: **the estimator is fitting a GLP-1 (retatrutide) weight drop and reading it as metabolic rate.** `maintenance = intake − Δweight × 7700` assumes weight change reflects energy balance; under a GLP-1 it does not, so the drug's loss is booked as a higher metabolism. **This gate catches the instance through a different mechanism and does not remove the cause** — BF-137 says it will recur on every new vial. Build the two together.
 - **⚠ The urgency dropped on 2026-09-12 and the entry did not.** PR #1128 anchored the daily budget to the owner's **stored goal** rather than to this estimate, so the number is now informational rather than what he eats to. Still worth fixing — BF-137's commit says outright that TN-29 is *"about making it true"* and the estimate "still needs somewhere to show it" — but it is no longer load-bearing.
 - **Recommended over TN-27's three options, and independent of them** — this gate holds whichever window wins. Build this before TN-27.
-- **Reference:** [`review`](reviews/2026-09-09-maintenance-2245-is-too-high.md) §7.
+- **Review:** [`review`](reviews/2026-09-09-maintenance-2245-is-too-high.md) §7.
 
 **`computeEnergyBalance` computes two independent maintenance estimates on every request and
 compares them never.** The calibrated one comes from intake and scale weight; the formula one comes
@@ -3506,7 +3508,7 @@ between a treadmill walk and an outdoor walk without any surface-specific adjust
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-08 · owner: *"what makes it effective is the 2 speeds — should I be walking faster or slower during any phases?"*
 - **Lane: A** — `components/guided-walk/walk-active.tsx:67-68` sets the targets; `classifyZone` in `hr-zones.ts` renders the verdict.
-- **Reference:** [`review`](reviews/2026-09-08-walk-intensity-calibration.md) (**addendum 4** carries the amendment below). Sibling of **TN-24**; fix together or in either order.
+- **Review:** [`review`](reviews/2026-09-08-walk-intensity-calibration.md) (**addendum 4** carries the amendment below). Sibling of **TN-24**; fix together or in either order.
 - **✅ OWNER DECISION, 2026-09-09 — keep the fast/slow structure, VARY it, and have the app assign it.** *"No jog; but I'd like the fast/slow rates to be varying and assigned to me. I.e. one day could be 5min fast with 1min rest… It could in fact all be slow or all be fast as well — but I'd like that to be determined for me. If we need more zone 2 maybe it's more fast? If we have zone 2 done maybe it's just light interval for steps."* Gate cleared. **Options 1–4 are all superseded: the walk stays a walk, the jog moves to Run (TN-31), and the block pattern becomes prescribed.**
 - **⚠ This entry does NOT wait on TN-30, and the dependency runs the other way.** The band is stated in absolute bpm (**105–118**) precisely so it is independent of the anchor — that is what breaks the coupling. TN-30 carries the `Needs:` because unifying at 178 would raise the walk's `0.70` target to 140 if this entry had not already retired the fraction.
 
@@ -10706,7 +10708,7 @@ samples, and no day whose raw HR count is non-zero stores `hr_sample_count = 0`.
 - **Branch:** _unassigned_ · **Added:** 2026-09-01 · owner: *"does this mean stress will work properly soon?"*
 - **Lane: A** — the writer of the daily scalar, not the stress model.
 - **⚠ AMENDED 2026-09-10 — the DEFECT half shipped and the SIGN half did not survive.** The fix landed in `7c428a7f` on **2026-08-31**, the day *before* this entry was filed, and 10 of 10 days since 2026-09-01 now match exactly. **But the claim below that recomputing from buckets *"flips the sign to correct"* rested on eight days; the next ten gave +0.427 and the pooled 18 give +0.072.** See **TN-33**. Keep this entry for its measurement of the defect; do not quote its correlations.
-- **Reference:** [`review`](reviews/2026-09-01-stress-sign-explained.md), amended by [`review`](reviews/2026-09-10-stress-status.md).
+- **Review:** [`review`](reviews/2026-09-01-stress-sign-explained.md), amended by [`review`](reviews/2026-09-10-stress-status.md).
 - **Likely the same defect as TN-20** — a later pass recomputing a completed day from an impoverished input. Stated as *likely*: the mechanism is identified in neither.
 
 `stress_high_minutes` is bucket-minutes below `STRESS_HIGH_LEVEL = -0.5`, so with TN-3a's buckets

@@ -12819,3 +12819,19 @@ marker is what stops the next sweep counting them.
 The batch lines pair entries by **the sitting they need**, not the subject: LA-68, TN-1 and LA-56 are
 one admin login, and LB-52 with Q-297's second residue are one branch-protection page. Five entries,
 two trips.
+
+## 2026-09-16 — backlog → 22303: unparking the work the reorder was supposed to surface
+
++2 lines, which is the whole point: the change is almost entirely substitutions, not additions.
+`⛔` → `⚠` in five entries and `Reference:` → `Review:` in nine, plus three lines recording why
+TN-34's `Needs:` was wrong.
+
+The reorder the day before moved three entries to the top of the file and **changed nothing about
+what Lane A sees**, because three separate mechanisms were holding them back: any `⛔` parks an
+entry, a `Needs:` field outranks the sentence disclaiming it, and `Reference:` means *"never build
+this"* rather than *"here is the supporting doc"*. READY went 11 → 19 and REFERENCE 18 → 10 for two
+lines of net growth.
+
+Worth the history note rather than a silent fix because the third cause was self-inflicted across
+every entry this agent filed, and the lesson generalises: a queue position is not a work assignment,
+and the file does not show which of the three is in play.
