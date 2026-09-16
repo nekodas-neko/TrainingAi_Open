@@ -12872,3 +12872,35 @@ sandbox did not.
 
 A `Keep:` that says "still owed" without saying what would leave the next session to re-derive it
 from the entry body, which is how the batch lost three weeks after the seed was fixed.
+
+## 2026-09-16 — projectOverview → 11554: a live metric counts sleep as daytime stress
+
++22, one Known-Issues entry (LA-112). TN-39's validation found that **41.2%** of the daytime-stress
+buckets fall inside a recorded sleep session and **20%** of the ones counted as high-stress do — so a
+fifth of the `stress_high_minutes` the app reports as daytime stress was recorded while the owner was
+asleep, and only **11 buckets across 24 days** land in their most active waking window.
+
+It earns the lines because the number it corrupts drives a recommendation the owner sees, and because
+the entry has to carry the counter-instruction: this is **not** a reason to re-wire TN-34's override,
+which was unwired the same day on its own separate measurement. A future session reading "the stress
+number is broken" without that sentence would plausibly undo today's other change.
+
+Trimmed once before raising: the two sibling findings (LA-113, LA-114) are queued work rather than
+open issues, so they are one pointer line here and full entries in the backlog.
+
+## 2026-09-16 — backlog → 22668: one validation entry out, three findings in
+
++36 net. TN-39 asked for a measurement and got one, so it left the queue; what it found did not fit
+back into one entry, because the three findings need opposite handling and batching them would hide
+that.
+
+**LA-112** (the series counts sleep) is a plain defect — no coefficient moves, and excluding buckets
+the metric's own name excludes needs no sign-off. **LA-113** (the imputation reads ~⅓ of measured HRV)
+is owner-gated and carries a ⛔: the strap is chest ECG against a ring-PPG-fitted model and is worn
+while walking, so the level gap has two live explanations and the first action is a controlled
+capture, not a coefficient. **LA-114** is a mislabelled column that already produced a silent wrong
+answer — a zero-row join that read as "no data".
+
+The length is mostly those ⛔/⚠ lines. An entry saying "the model is 3× off" without the sentence
+saying why that must not be acted on is an invitation to change a coefficient, which is the one
+outcome TN-39 wrote itself to prevent.

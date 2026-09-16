@@ -1290,43 +1290,79 @@ not from the harness.
   details, press the system back gesture — arrive on **More** with the More tab active. The harness
   cannot speak for the Android back gesture or the WebView's history handling.
 
-### [readiness][heart-rate] TN-39 — the daytime-stress model is an imputation that has never been checked against the measured HRV sitting in the database 🔴 LIVE
+### [readiness][devices] LA-112 — the "daytime" stress series counts sleep, and misses the hours the owner is actually moving
 
-- **Branch:** _unassigned_ · **Added:** 2026-09-15 · owner: *"this might be a good opportunity to investigate other metrics we can calculate from our data too."*
-- **Lane: A** — `packages/shared/src/health/daytime-hrv-model.ts` · `packages/shared/src/health/rmssd.ts` · reads `rr_intervals` via `getRrForWindow`.
-- **Review:** [`audit`](reviews/2026-09-15-what-else-our-data-could-tell-us.md).
-- **Sibling of TN-33** (which measured the stress signal) and **TN-34** (the override). **This is the validation both of those had to assume.**
+- **Lane: A** · **Added:** 2026-09-16 · Lane A, from TN-39's validation.
+- **Review:** [`the measurement`](reviews/2026-09-16-daytime-stress-imputation-vs-measured-hrv.md).
+- **Measured against production, joined to `sleep_sessions` directly — no clock-hour inference:**
+  **277 of 672** stress buckets (41.2%) fall inside a recorded sleep session, and **28 of the 140**
+  buckets counted as high-stress (20.0%). So **one minute in five of the `stress_high_minutes` the
+  app reports as daytime stress was recorded while the owner was asleep.**
+- **Two causes, both in code, neither a calibration question.** The series window is
+  `aestMidnight(d)` → `aestMidnight(d+1)` (`lib/oura-ble/rollup/run.ts:1060`) — the whole local day,
+  with nothing restricting it to waking hours — and `summarizeStressDay`
+  (`lib/health/daytime-stress.ts:245`) counts every bucket at or below `STRESS_HIGH_LEVEL` with no
+  waking filter of its own.
+- **The gap is worst where the day is busiest.** Buckets by Brisbane hour: 00–06 → **289**;
+  07–08 → **11**; 09–12 → 73; 13–23 → 299. Eleven buckets across 24 days land in the owner's most
+  active waking window, where the chest strap recorded 98. The mechanism is
+  `evaluateDaytimeHrvModel`'s MET gate, which is **correct in itself** — the model has no business
+  imputing HRV from an elevated activity heart rate — so the fix is not to remove the gate. It is
+  that the series is densest asleep and nearly empty while moving, and nothing downstream knows that.
+- **⚠ This is a defect, not a scoring change, and it is separable from LA-113.** Excluding sleep
+  buckets does not touch a coefficient or a threshold; it removes inputs the metric's own name says
+  do not belong. Do not batch it with LA-113, which is owner-gated for the opposite reason.
+- **Bears on TN-34**, unwired 2026-09-16 for firing a deload override on 83% of days off a
+  `stress_high_minutes` figure measured uncorrelated with readiness. This is an independent account
+  of why that number carries little signal. **Do not read it as a reason to re-wire the override** —
+  TN-34's own measurement stands on its own.
+- **Pass test:** no bucket inside a recorded sleep session contributes to `stress_high_minutes` or to
+  `daytime_stress_scaled`, and the re-derived daily figures are reported for the owner's stored days
+  so the size of the change is visible before it lands.
 
-**Daytime stress is imputed, not measured.** The ring streams HRV events for ~7% of waking hours, so
-the model fits `ln(rmssd) = a + b·hr + c·temp` on NIGHT data and applies it to daytime HR and temp.
-That imputation produces `stress_high_minutes`, which drives the deload override that fired on **10
-of the owner's last 22 days** (TN-36).
+### [readiness][devices] LA-113 — the daytime-HRV imputation reads ~⅓ of measured HRV, and its heart-rate slope is ~2× too steep
 
-**Ground truth exists and nobody has looked at it.** The Polar H10 writes raw beat intervals to
-`rr_intervals` — measured 2026-09-15: **136,440 beats across 48 days**, worn **07:00–13:00, peaking
-at 08:00**. That is exactly the window the model is guessing about. Twelve of the last fourteen
-strap days carry thousands of beats on days the stress model also ran:
+- **Lane: A** · **Added:** 2026-09-16 · Lane A, from TN-39's validation.
+- **Review:** [`the measurement`](reviews/2026-09-16-daytime-stress-imputation-vs-measured-hrv.md).
+- **Gate: owner** — this is a scoring change. Tuning proposes, the owner signs off, Lane A implements.
+  TN-39 said so outright: *"Do NOT change the model on the strength of this before the owner sees the
+  result. The output is a number and a verdict, not a patch."*
+- **Measured**, model vs `rmssdFromRr` over the app's own 30-minute grid: **×0.30 of measured over 84
+  buckets / 37 days**, ×0.32 over the 54 densest / 30 days, ×0.31 on the 14 buckets that join a scored
+  stress bucket. The spread (sd of log-ratio 0.40) is far smaller than the bias, so it is a level
+  error, not noise. Slope: measured **−0.026 … −0.028** per bpm against the model's **−0.0555**.
+- **The assumed temperature does not explain it** — swept 28–36 °C the ratio moves only 0.30 → 0.36,
+  and inverting per bucket for the temperature that would make the model exact gives **67–87 °C**.
+- **✅ What IS validated, and should not be re-investigated:** the functional form. `corr(HR, ln rmssd)`
+  is **−0.78** on measured daytime data across 30–37 days. `ln(rmssd) = a + b·hr + c·temp` is the right
+  shape; only its level and slope are in question.
+- **⛔ Do not change a coefficient on this evidence.** Three confounds, none resolvable from stored
+  data: the strap is chest ECG and the model was fit on the ring's PPG night RMSSD, so it predicts
+  ring-scale values by construction; the measured daytime values (76–93 ms) sit **above** the owner's
+  ring night baseline (~55.8 ms), which is backwards for daytime resting HRV and points at the
+  instrument rather than the fit; and the strap is worn while walking, where movement genuinely raises
+  RMSSD.
+- **First action, and it is not a code change:** a controlled capture — the strap worn **at rest**, in
+  the same window the ring streams its own HRV events, so ring RMSSD and strap RMSSD are comparable on
+  the same minutes. Until that exists the level gap has two live explanations and no measurement
+  separates them.
 
-| day | strap beats | stress_high_minutes |
-|---|---:|---:|
-| 2026-09-14 | 5,559 | 150 |
-| 2026-09-08 | 5,993 | 90 |
-| 2026-09-01 | 5,843 | 270 |
-| 2026-09-06 | 4,369 | 150 |
+### [readiness][platform] LA-114 — `oura_daytime_stress_buckets.bucket_start` stores the bucket MIDPOINT
 
-**The work:** compute `rmssdFromRr` over the overlapping 30-minute buckets, compare against the
-imputed dHRV for the same buckets, and report agreement. `rmssdFromRr` already exists, is
-artifact-filtered, and already runs on this exact data for workout windows — so this is a
-measurement, not an integration.
-
-**⚠ Do NOT change the model on the strength of this before the owner sees the result** — scoring
-changes are Tuning-proposes/owner-signs-off. The output is a number and a verdict, not a patch.
-
-**⚠ The comparison is only valid on overlapping buckets** — the strap covers ~6 waking hours, not
-the whole day, so a day's `stress_high_minutes` cannot be compared as a total.
-
-**Pass test:** a written agreement figure between imputed and measured daytime HRV over at least
-ten days, with the disagreement characterised (bias, spread) rather than summarised as good or bad.
+- **Lane: A** · **Added:** 2026-09-16 · Lane A, from TN-39's validation.
+- `daytimeHrvEstimatesPerBucket` returns `t = bStart + bucketMs / 2`
+  (`packages/shared/src/health/daytime-hrv-model.ts:190`), and `run.ts:1108` writes that value straight
+  into a column named `bucket_start`. Stored timestamps therefore sit on a `:15`/`:45` grid.
+- **It already cost something.** Joining `rr_intervals` to these buckets on the obvious grid returned
+  **zero rows**, which reads as "no overlapping data" rather than "the join is 15 minutes out". That is
+  a silent wrong answer, not an error.
+- **Cheapest correct fix is the name, not the data** — a rename plus its migration, leaving every
+  stored value alone, so nothing has to be re-derived and no reader changes meaning. Renaming it
+  `bucket_mid` also makes the `:15` grid self-explaining at the next join.
+- **⚠ Whatever is done, do it in one PR with every reader** — `getDaytimeStressBuckets`, the
+  `/api/body-battery/stress-day` route and its client. A migration ships alone and never batched.
+- **Pass test:** the column's name matches what it holds, and a join written the obvious way lands on
+  the right bucket.
 
 ### [devices][heart-rate] TN-40 — the strap's 136,440 beats produce exactly one number, while three models that could use them run on the ring alone
 
