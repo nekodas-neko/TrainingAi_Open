@@ -437,6 +437,287 @@ below threshold and left in place for next time.
 
 
 
+### [readiness] TN-34 — the stress-deload override fires on 83% of days, off the one number measured to carry no signal
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-10 · found answering the owner's *"is stress a real usable value?"*
+- **Lane: A** — `packages/shared/src/ai-periodization/ai-dynamic.ts:219-225`.
+- **✅ OWNER-APPROVED 2026-09-10** — *"yes lets do all that."* **Option 1: unwire `stressOverride`.** Not gated; one line, reversible.
+- **Needs: TN-33** — only for the later question of what replaces it; the unwiring does not wait.
+- **Reference:** [`review`](reviews/2026-09-10-stress-status.md) §8.
+
+`ai-dynamic.ts:219` gates a **deload recommendation** on `stressHighMinutes >= 120`
+(`STRESS_HIGH_DAY_THRESHOLD_MIN`), returning `{ recommended: true, strength: 'recommended' }`.
+
+**Measured against the owner's actual data:**
+
+| basis | days over 120 min | share |
+|---|---|---|
+| recomputed from buckets, all hours | 15 of 18 | **83%** |
+| recomputed, waking only | 14 of 18 | 78% |
+| **stored values since the 2026-08-31 fix** | **7 of 10** | **70%** |
+
+**A deload flag that fires on four days in five carries no information** — it is the Q-504 failure
+class, live, in the surface that tells the owner whether to train.
+
+**And the input is the number TN-33 measured as carrying no signal**: the daily scalar is **57%
+night** buckets with night systematically positive (+0.266 against the day's −0.405), and its
+correlation with readiness is **+0.072 over 18 days**, with the two halves pointing opposite ways.
+
+**⛔ Do NOT fix this by raising the 120-minute threshold.** That is the mistake the file's own comment
+warns about eleven lines above this condition, about `TEMP_ALERT_THRESHOLD_C` — *"the fourth 'the
+threshold is right, the input is wrong' in this pillar"*. **This is the fifth.** The threshold is a
+documented judgement call at ~2 h; the input is a sleep-weighted average wearing a daytime label.
+
+**⚠ Two things this entry deliberately does not claim.** It does not say the *series* is worthless —
+TN-33 §8 measures strong episode structure in it (lag-1 **+0.637**, residual **+0.372** after removing
+day/night means). And it does not say a waking-only aggregate would be better: at 78% it barely moves,
+and its correlation flips just as hard.
+
+**The options, cheapest first:**
+1. **Unwire `stressOverride` until TN-33's level-2 test passes.** The condition already falls through
+   to `daySummary === 'very_stressful'` when derived stress is null, and the other two overrides
+   (temperature, illness) still fire. One line, reversible.
+2. **Restrict the input to waking hours** — correct in itself (a "daytime" number should not be 57%
+   night) but it only moves 83% → 78%, so it does not fix the firing rate.
+3. **Re-anchor the threshold to this user's own distribution** once the series is validated — a
+   percentile rather than a constant, which is what makes a flag informative.
+
+**Pass test:** the stress-deload override fires on a minority of days, and a day it fires on is one
+the owner recognises as unusually stressful.
+
+### [readiness][devices] BF-13 — the baseline EMA seeds at ZERO: the line under TN-6 and Q-506, and it is shared by all six baselines
+
+- **Lane: A**
+- **Batch:** temperature-baseline — ships with **TN-6** and **Q-506**, which are the two
+  *consumers* of the object this entry's line corrupts. Same PR or none: fixing the seed without
+  re-deriving the stored baselines leaves both of them still reading wrong.
+- **Added:** 2026-08-24 · BugFix, from the owner — *"body temperature elevation could we look to see
+  what its at? as its done this a few times but I have not been sick in the last 50+ days. so might
+  need to raise the safe range"*.
+- **⚑ Read TN-6 and Q-506 first. This entry does NOT re-measure what they measured** — it was
+  investigated independently and every shared number agrees exactly (deviation mean **+0.662 °C**,
+  **0 of 34** nights negative, range +0.14…+1.33, baseline **35.464** vs true **35.827**). Treat that
+  agreement as corroboration from a second route, and do not re-litigate it. **What follows is only
+  what those two entries do not have.**
+
+**1. The line. `updateBaseline` seeds the mean at literal zero.**
+
+`packages/shared/src/health/personal-baseline.ts:30` — `let meanX8 = baseline?.meanX8 ?? 0` — then
+anneals its gain by age (`:35-44`): **1/2** under 4 nights, **1/8** from 4–14, **1/32** after 14. The
+step size collapses long before the mean has climbed from 0 °C to ~35.8 °C, so it is still short at
+`n_history = 50`.
+
+**The proof it is a zero seed and not merely a low first reading — night 2:**
+
+```
+n_history   nightly °C   baseline °C
+    2         35.81        17.905      <- exactly 35.81 / 2  =  (0 + sample) / 2, gain 1/2 from zero
+    4         35.96        31.919
+   14         35.86        34.696      <- where TN-6's "cold-started at 34.696" begins
+   50         35.95        35.464
+```
+
+TN-6 measures from n=14 because that is where `temp_dev_c` becomes non-null, and reasonably reads it
+as a low cold start. **It starts at 0.** That distinction changes the fix: a low-but-plausible seed
+wants a longer warm-up; a zero seed wants a *correct seed*. Set `meanX8 = sampleX8` (and `devX8 = 0`)
+on the first-ever sample — which is also the likely origin of **Q-506's 18.7× sd**, since a deviation
+accumulated against a mean sweeping up from zero is measuring the sweep, not the spread. **That makes
+one line the plausible cause of both entries.**
+
+- **⚠ Check the vendor port before changing the shared maths.** This file is a faithful port of
+  `baseline_update_lt_mean_and_dev` and its header says do not "improve" the algorithm. Establish
+  whether ecore seeds from the first sample (or simply never exposes a baseline this young) — if the
+  port is faithful, the fix belongs at the **seed / call site**, not in the ported update.
+
+**2. Blast radius: this is a baseline-engine defect, not a temperature one.**
+
+`updateBaseline` is the shared updater for **all six** BLE baselines — HRV, RHR, temperature, sleep,
+MET, breathing (its own header says so). Every one seeds from zero. It is *visible* in temperature
+because temperature has a large non-zero mean and a tight spread. **Check MET and sleep before
+assuming they are clean.**
+
+- **Checked and NOT broken — recorded so nobody re-investigates:** the **RHR** baseline tracks
+  `rhr_low_bpm` (53.0 vs 50.7 at n=50), **not** `rhr_avg_bpm` (60.9); comparing it against the
+  average makes a healthy baseline look 8 bpm wrong. **HRV** (55.4 against a noisy 51–66) is
+  plausible.
+
+**3. A third consumer neither TN-6 nor Q-506 names: the deload recommendation.**
+
+TN-6 covers the readiness *penalty ladder* (`readiness-payload.ts:169`). Separately,
+`TEMP_ALERT_THRESHOLD_C = 0.5` (`packages/shared/src/ai-periodization/deload-constants.ts:75`) is
+read by `ai-dynamic.ts:184` and drives the **"Body temp elevated → Recovery recommended"** card the
+owner screenshotted. **23 of 34 nights (68%) cross it.** So one broken object is failing **three**
+consumers, not two — and TN-6's *"fix both or neither"* should read **all three**.
+
+- **`TEMP_BASELINE_MIN_DAYS = 30` was written to prevent exactly this and is insufficient.** Its own
+  comment says a green baseline "produced spurious body temp elevated deloads". At n=30 the deviation
+  was still **+0.68**; at n=50 it is **+0.50**. The guard picked a number when the algorithm needed a
+  seed.
+- **Raising `TEMP_ALERT_THRESHOLD_C` is the wrong fix**, for the same reason TN-6 gives for the
+  readiness ladder: it hides a broken input behind a plausible firing rate, and it would
+  *permanently desensitise* a real fever once the baseline converges. At 0.8 °C it still fires on 10
+  of 34 nights. **This is the owner's own suggested fix, and the answer to it is no** — recorded here
+  because they asked directly.
+
+**What would count as fixed** (in addition to TN-6's pass test): the deload card stops firing on the
+owner's healthy nights, and a fresh baseline for any metric is within one sample-noise unit of the
+true mean on night 2 rather than converging for fifty.
+
+- **Surface: server/shared, web-reproducible.** Pure function over data already in Postgres; no
+  device needed to fix or verify.
+
+- **✅ OWNER DECISION 2026-08-24 — asked plainly, both halves answered. The owner gate is CLEARED
+  and its field removed** (worded without the literal field name, so a grep for gated entries does
+  not report this one).
+  1. **Re-derive the stored baselines** (not seed-fix-only). The reasoning the owner accepted: a
+     baseline is a corrupted *intermediate*, not a record of what the app told them, so re-deriving it
+     is a different act from re-scoring history and does not contradict the "leave stored days alone,
+     stamp the new model" policy set the same day. The raw nightly values are untouched, so the
+     re-derivation is re-runnable and reversible.
+  2. **Fix the seed for all six baselines; re-derive only the ones measurably wrong.** One line
+     protects every metric; data changes stay evidence-led.
+
+- **📏 Which ones are measurably wrong — MEASURED 2026-08-24 (Tuning), so this needs no TODO.**
+  Baselines converted to native units with the factors at their call sites
+  (`daily-summary.ts:102-112`: hrv ×1 ms · rhr ×1 bpm · temp ×100 · sleep ×60 · met ×10 · breath ×10),
+  compared against the true mean of the same nightly column over 50 summary rows:
+
+  | metric | true mean | stored baseline | gap | **gap / nightly sd** | % nights above | verdict |
+  |---|---|---|---|---|---|---|
+  | **temp** | 35.842 °C | 35.464 | +0.378 | **+2.80** | **100.0%** | **RE-DERIVE** |
+  | breath | 9.400 rpm | 9.250 | +0.150 | +0.27 | 77.6% | leave |
+  | rhr | 53.871 bpm | 53.000 | +0.871 | +0.28 | 36.7% | leave |
+  | sleep | 8.010 h | 7.946 | +0.064 | +0.06 | 57.1% | leave |
+  | hrv | 55.765 ms | 55.375 | +0.390 | +0.04 | 87.8% | leave |
+  | met | 1.365 MET | 1.375 | −0.010 | −0.09 | 44.0% | leave |
+
+  **Temperature is the only one to re-derive.** That is this entry's own hypothesis — *"visible in
+  temperature because temperature has a large non-zero mean and a tight spread"* — now measured
+  rather than assumed: the zero seed leaves a similar absolute gap in fixed-point units across all
+  six, and only temperature's nightly sd (0.140 °C) is small enough for that gap to be 2.8 sd out.
+  **Still fix the seed for all six** — a metric that is within noise today is one input change away
+  from not being.
+
+  **`% nights above` is the diagnostic to reuse**, not the raw gap: it is 100% for temperature and
+  near 50 for a centred baseline. Read it alongside `gap/sd` — hrv reads 87.8% on a gap of only
+  0.04 sd, which is an EMA lagging a genuinely rising metric (overnight HRV has climbed for months),
+  not this defect.
+
+- **⚠️ Near-miss worth copying: get the fixed-point factor from the CALL SITE, never by inference.**
+  The first pass here inferred each scale by choosing the power of ten that best fit the newest row.
+  That is right for temp (×100) and **wrong for sleep, which is ×60** — it produced a "baseline
+  4.768 h against a true 8.010 h, 98% of nights above, gap +3.24 h" that read exactly like a second
+  severe defect. Acting on it would have meant an **unnecessary data change to the sleep baselines**,
+  which is the one category of mistake the owner gate exists to prevent. The factors are four lines
+  apart in `daily-summary.ts`; read them.
+
+- ✅ **SEED FIXED 2026-08-25** (`fix/baseline-zero-seed`) — see BF-13 for the full note, including
+  the ⛔ Keep: the stored baselines are still zero-folded and one **Redecode** run re-derives them,
+  which could not be done from a sandbox. This entry's pass tests stay unmeasured until it runs.
+### [readiness][devices] TN-6 — the temperature baseline is 0.36 °C too low, so readiness carries a −16 pt penalty on 89% of days
+- **Lane:** A — engine only: lib/health.
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-24 · owner report with screenshot — *"its often triggering deload days. its not trustable yet."*
+- **Lane: A** — `lib/health/readiness-payload.ts`, `lib/health/temperature-baseline.ts`
+- **Batch:** temperature-baseline — ships with **Q-506**, the same baseline object's other half (its *sd* is ~13× too wide, so the illness radar can never fire), and **BF-13**, which names the line that makes the object wrong.
+- **⚑ The cause is one line, found independently and filed as BF-13 — read it before implementing.**
+  `updateBaseline` seeds the mean at **literal zero** (`personal-baseline.ts:30`), then anneals its
+  gain to 1/32 after night 14. This entry's *"cold-started at 34.696 °C"* is measured from n=14,
+  where `temp_dev_c` first becomes non-null; the true start is **17.905 °C at n=2** — exactly
+  `35.81 / 2`, a first update from zero at gain 1/2. **That changes the fix**: a low-but-plausible
+  seed wants a longer warm-up, a zero seed wants a correct seed. BF-13 also finds a **third**
+  consumer (the deload card's `TEMP_ALERT_THRESHOLD_C`, firing on 23/34 nights), so this entry's
+  *"fix both or neither"* is really **all three**.
+- **Owner sign-off: RECEIVED 2026-08-24** for the baseline fix — given before BF-13 surfaced, and it
+  stands: BF-13 changes *how* to fix the seed, not whether to. The owner also asked for the penalty
+  **suspended in the meantime** — that is **TN-6a**, which ships on its own and is deliberately NOT
+  in this batch. **TN-6a must cover all three consumers**, including the deload card BF-13 found;
+  that card is the surface the owner actually reported.
+- **History policy (owner, 2026-08-24): leave stored history alone and stamp the new model.** Do not
+  re-score past days.
+
+Home shows *"Body temp elevated · +0.5°C above your baseline (threshold 0.5°C)"* and a Recovery
+recommendation with readiness 52. `computeBlendedScore` (`readiness-payload.ts:169`) applies an
+**absolute °C** ladder to the blended score — **−10** past 0.3 °C, **−20** past 0.5 °C, **capped at
+40** past 1.0 °C. This is *not* the `tempZ` path Q-506 covers; it is a hard subtraction, and nothing
+was queued against it.
+
+**Measured over the 34 nights holding a stored deviation:**
+
+| | |
+|---|---|
+| deviation mean | **+0.662 °C**, range +0.14 … +1.33 |
+| nights with a **negative** deviation | **0 of 34** |
+| −10 arm fires | **31/34 (91.2%)** |
+| −20 arm fires | **23/34 (67.6%)** |
+| cap-at-40 arm fires | **6/34 (17.6%)** |
+| nights with **no** penalty | **3/34 (8.8%)** |
+
+A deviation that is positive on every night is not a deviation.
+
+**Root cause — the baseline mean never converged.** `temp_baseline_mean_x8` is ×8 of centi-degrees
+(degrees = `raw/800`; confirmed against the stored deviation: 35.950 − 35.464 = +0.486 vs stored
++0.503). True measured nightly temp over 34 nights is **35.827 °C (sd 0.140)**; the stored baseline
+is **35.464 °C** — **0.363 °C low, which exceeds the 0.3 °C threshold on its own.** The EMA
+cold-started at 34.696 °C and has climbed +0.767 over 36 nights: converging, still short at
+`n_history = 50`.
+
+**⚠️ The same object's SD is also ~13× too wide** — 1.82 °C against a true 0.140 °C, which is
+**Q-506's finding reproduced from a different table**. One baseline is failing two consumers in
+opposite directions: the **wide sd** divides `tempZ` to nothing so the illness radar can never fire
+(Q-506), the **low mean** makes the absolute deviation permanently positive so readiness is penalised
+daily (this entry). **Fix both or neither** — correcting one leaves the other looking addressed.
+
+**Counterfactual** (baseline = trailing mean of prior nights, min 7; 27 comparable nights): deviation
+mean **+0.557 → −0.040 °C**, negative nights **0/27 → 16/27**, −10 arm **88.9% → 3.7%**, −20 arm
+**59.3% → 0%**, mean readiness penalty **−16.3 → −0.4 pts/day**. The trailing mean is a **diagnostic,
+not the proposed design** — it shows the offset is an estimator artefact rather than physiology, but
+it would absorb a genuine multi-day fever into the baseline within a week. Re-seed or correct the
+existing baseline instead.
+
+**⛔ Do not touch the 0.3/0.5/1.0 ladder.** Against a true nightly sd of 0.140 °C it sits at
+2.1/3.6/7.1 sd, which is defensible. **Fourth instance of "the threshold is right, the input is
+wrong"** in this pillar after Q-506, Q-512 and Q-514; adjusting the ladder would hide a broken
+baseline behind a plausible firing rate, which is the Q-504 mistake.
+
+**Check Q-2 first** (nightly temperature treats one frame's simultaneous probes as consecutive
+samples) — it is already queued and is a plausible contributor to why the EMA seeded ~1.1 °C low.
+
+**Pass test:** stored deviation mean within ±0.05 °C of zero over the trailing 30 nights; at least
+40% of nights negative; the −10 arm firing on under 20% of nights; and the illness radar able to
+reach its `watch` threshold on at least one historical night (the Q-506 half).
+
+**➕ Add one more pass test — the Body Battery morning anchor (measured 2026-08-26).** The owner
+reported the battery starting low on waking: *"battery starts at 57? I figured it should be much
+higher when waking up."* **The battery does not charge overnight** — `walkBodyBattery` filters to
+`tsMs >= wakeTime`, so the anchor *is* the whole overnight story, and `resolveAnchor` sets it to the
+readiness score. A readiness score carrying a −10/−20 temperature penalty therefore lands directly on
+the number the owner reads at 7 am.
+
+Measured over the 35 days where both a battery row and a temperature deviation exist:
+
+| | now | with the penalty removed |
+|---|---|---|
+| mean morning anchor | **64.8** | **76.8** |
+| mornings waking "Charged" (≥75) | **7/35 (20%)** | **21/35 (60%)** |
+
+**Conservative** — the 6 days whose deviation exceeded 1.0 °C were *clamped* to 40 rather than
+subtracted from, and a clamp cannot be reversed by adding the penalty back, so those days are counted
+as unchanged. The real improvement is larger.
+
+So **fixing the baseline is also the fix for "the battery never wakes up full"**, and the pass test
+gains a line: after the re-derivation, the mean morning anchor sits **above 75** over the trailing 30
+days. **Do not redesign the anchor or add overnight charging to chase this** — that would be a large
+change to a value Q-511 shows is load-bearing, aimed at a symptom this fix already removes.
+Re-measure after it lands; if the anchor still reads low then, *that* is when the design question is
+real.
+
+**Not established:** whether the owner was actually ill on any flagged night. The finding is that a
+permanently-positive deviation cannot tell illness from baseline error.
+
+Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/2026-08-24-readiness-temperature-penalty.md).
+
 ### [nutrition] BF-170 — a lone saved meal shows its macros nowhere (fixed; the device look is what is left)
 
 - **Verify:** device — on the S25, a meal section collapsed shows P/C/F; expanded shows them once,
@@ -2442,54 +2723,6 @@ stress reading beside them at all. Render that as absent, never as calm.
 and walks plus anything they marked, and can name the cause of a stressed window — or can say the
 window does not match anything, which is an equally valid result and the one that would retire the
 metric.
-
-### [readiness] TN-34 — the stress-deload override fires on 83% of days, off the one number measured to carry no signal
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-10 · found answering the owner's *"is stress a real usable value?"*
-- **Lane: A** — `packages/shared/src/ai-periodization/ai-dynamic.ts:219-225`.
-- **✅ OWNER-APPROVED 2026-09-10** — *"yes lets do all that."* **Option 1: unwire `stressOverride`.** Not gated; one line, reversible.
-- **Needs: TN-33** — only for the later question of what replaces it; the unwiring does not wait.
-- **Reference:** [`review`](reviews/2026-09-10-stress-status.md) §8.
-
-`ai-dynamic.ts:219` gates a **deload recommendation** on `stressHighMinutes >= 120`
-(`STRESS_HIGH_DAY_THRESHOLD_MIN`), returning `{ recommended: true, strength: 'recommended' }`.
-
-**Measured against the owner's actual data:**
-
-| basis | days over 120 min | share |
-|---|---|---|
-| recomputed from buckets, all hours | 15 of 18 | **83%** |
-| recomputed, waking only | 14 of 18 | 78% |
-| **stored values since the 2026-08-31 fix** | **7 of 10** | **70%** |
-
-**A deload flag that fires on four days in five carries no information** — it is the Q-504 failure
-class, live, in the surface that tells the owner whether to train.
-
-**And the input is the number TN-33 measured as carrying no signal**: the daily scalar is **57%
-night** buckets with night systematically positive (+0.266 against the day's −0.405), and its
-correlation with readiness is **+0.072 over 18 days**, with the two halves pointing opposite ways.
-
-**⛔ Do NOT fix this by raising the 120-minute threshold.** That is the mistake the file's own comment
-warns about eleven lines above this condition, about `TEMP_ALERT_THRESHOLD_C` — *"the fourth 'the
-threshold is right, the input is wrong' in this pillar"*. **This is the fifth.** The threshold is a
-documented judgement call at ~2 h; the input is a sleep-weighted average wearing a daytime label.
-
-**⚠ Two things this entry deliberately does not claim.** It does not say the *series* is worthless —
-TN-33 §8 measures strong episode structure in it (lag-1 **+0.637**, residual **+0.372** after removing
-day/night means). And it does not say a waking-only aggregate would be better: at 78% it barely moves,
-and its correlation flips just as hard.
-
-**The options, cheapest first:**
-1. **Unwire `stressOverride` until TN-33's level-2 test passes.** The condition already falls through
-   to `daySummary === 'very_stressful'` when derived stress is null, and the other two overrides
-   (temperature, illness) still fire. One line, reversible.
-2. **Restrict the input to waking hours** — correct in itself (a "daytime" number should not be 57%
-   night) but it only moves 83% → 78%, so it does not fix the firing rate.
-3. **Re-anchor the threshold to this user's own distribution** once the series is validated — a
-   percentile rather than a constant, which is what makes a flag informative.
-
-**Pass test:** the stress-deload override fires on a minority of days, and a day it fires on is one
-the owner recognises as unusually stressful.
 
 ### [readiness] TN-33 — the stress storage defect is fixed and the SIGN is not; TN-22's reversal was an eight-day artefact
 
@@ -10750,110 +10983,6 @@ behaviour, and TN-6's own pass test (deviation mean within ±0.05 °C of zero) i
   re-derivation lifts it with **no deploy**. Thresholds untouched.
 - **Keep:** a **suppression, not a fix** — TN-6 retires it (its ±0.05 °C pass test is what does), and
   nothing was observed in production.
-### [readiness][devices] TN-6 — the temperature baseline is 0.36 °C too low, so readiness carries a −16 pt penalty on 89% of days
-- **Lane:** A — engine only: lib/health.
-
-- **Branch:** _unassigned_
-- **Added:** 2026-08-24 · owner report with screenshot — *"its often triggering deload days. its not trustable yet."*
-- **Lane: A** — `lib/health/readiness-payload.ts`, `lib/health/temperature-baseline.ts`
-- **Batch:** temperature-baseline — ships with **Q-506**, the same baseline object's other half (its *sd* is ~13× too wide, so the illness radar can never fire), and **BF-13**, which names the line that makes the object wrong.
-- **⚑ The cause is one line, found independently and filed as BF-13 — read it before implementing.**
-  `updateBaseline` seeds the mean at **literal zero** (`personal-baseline.ts:30`), then anneals its
-  gain to 1/32 after night 14. This entry's *"cold-started at 34.696 °C"* is measured from n=14,
-  where `temp_dev_c` first becomes non-null; the true start is **17.905 °C at n=2** — exactly
-  `35.81 / 2`, a first update from zero at gain 1/2. **That changes the fix**: a low-but-plausible
-  seed wants a longer warm-up, a zero seed wants a correct seed. BF-13 also finds a **third**
-  consumer (the deload card's `TEMP_ALERT_THRESHOLD_C`, firing on 23/34 nights), so this entry's
-  *"fix both or neither"* is really **all three**.
-- **Owner sign-off: RECEIVED 2026-08-24** for the baseline fix — given before BF-13 surfaced, and it
-  stands: BF-13 changes *how* to fix the seed, not whether to. The owner also asked for the penalty
-  **suspended in the meantime** — that is **TN-6a**, which ships on its own and is deliberately NOT
-  in this batch. **TN-6a must cover all three consumers**, including the deload card BF-13 found;
-  that card is the surface the owner actually reported.
-- **History policy (owner, 2026-08-24): leave stored history alone and stamp the new model.** Do not
-  re-score past days.
-
-Home shows *"Body temp elevated · +0.5°C above your baseline (threshold 0.5°C)"* and a Recovery
-recommendation with readiness 52. `computeBlendedScore` (`readiness-payload.ts:169`) applies an
-**absolute °C** ladder to the blended score — **−10** past 0.3 °C, **−20** past 0.5 °C, **capped at
-40** past 1.0 °C. This is *not* the `tempZ` path Q-506 covers; it is a hard subtraction, and nothing
-was queued against it.
-
-**Measured over the 34 nights holding a stored deviation:**
-
-| | |
-|---|---|
-| deviation mean | **+0.662 °C**, range +0.14 … +1.33 |
-| nights with a **negative** deviation | **0 of 34** |
-| −10 arm fires | **31/34 (91.2%)** |
-| −20 arm fires | **23/34 (67.6%)** |
-| cap-at-40 arm fires | **6/34 (17.6%)** |
-| nights with **no** penalty | **3/34 (8.8%)** |
-
-A deviation that is positive on every night is not a deviation.
-
-**Root cause — the baseline mean never converged.** `temp_baseline_mean_x8` is ×8 of centi-degrees
-(degrees = `raw/800`; confirmed against the stored deviation: 35.950 − 35.464 = +0.486 vs stored
-+0.503). True measured nightly temp over 34 nights is **35.827 °C (sd 0.140)**; the stored baseline
-is **35.464 °C** — **0.363 °C low, which exceeds the 0.3 °C threshold on its own.** The EMA
-cold-started at 34.696 °C and has climbed +0.767 over 36 nights: converging, still short at
-`n_history = 50`.
-
-**⚠️ The same object's SD is also ~13× too wide** — 1.82 °C against a true 0.140 °C, which is
-**Q-506's finding reproduced from a different table**. One baseline is failing two consumers in
-opposite directions: the **wide sd** divides `tempZ` to nothing so the illness radar can never fire
-(Q-506), the **low mean** makes the absolute deviation permanently positive so readiness is penalised
-daily (this entry). **Fix both or neither** — correcting one leaves the other looking addressed.
-
-**Counterfactual** (baseline = trailing mean of prior nights, min 7; 27 comparable nights): deviation
-mean **+0.557 → −0.040 °C**, negative nights **0/27 → 16/27**, −10 arm **88.9% → 3.7%**, −20 arm
-**59.3% → 0%**, mean readiness penalty **−16.3 → −0.4 pts/day**. The trailing mean is a **diagnostic,
-not the proposed design** — it shows the offset is an estimator artefact rather than physiology, but
-it would absorb a genuine multi-day fever into the baseline within a week. Re-seed or correct the
-existing baseline instead.
-
-**⛔ Do not touch the 0.3/0.5/1.0 ladder.** Against a true nightly sd of 0.140 °C it sits at
-2.1/3.6/7.1 sd, which is defensible. **Fourth instance of "the threshold is right, the input is
-wrong"** in this pillar after Q-506, Q-512 and Q-514; adjusting the ladder would hide a broken
-baseline behind a plausible firing rate, which is the Q-504 mistake.
-
-**Check Q-2 first** (nightly temperature treats one frame's simultaneous probes as consecutive
-samples) — it is already queued and is a plausible contributor to why the EMA seeded ~1.1 °C low.
-
-**Pass test:** stored deviation mean within ±0.05 °C of zero over the trailing 30 nights; at least
-40% of nights negative; the −10 arm firing on under 20% of nights; and the illness radar able to
-reach its `watch` threshold on at least one historical night (the Q-506 half).
-
-**➕ Add one more pass test — the Body Battery morning anchor (measured 2026-08-26).** The owner
-reported the battery starting low on waking: *"battery starts at 57? I figured it should be much
-higher when waking up."* **The battery does not charge overnight** — `walkBodyBattery` filters to
-`tsMs >= wakeTime`, so the anchor *is* the whole overnight story, and `resolveAnchor` sets it to the
-readiness score. A readiness score carrying a −10/−20 temperature penalty therefore lands directly on
-the number the owner reads at 7 am.
-
-Measured over the 35 days where both a battery row and a temperature deviation exist:
-
-| | now | with the penalty removed |
-|---|---|---|
-| mean morning anchor | **64.8** | **76.8** |
-| mornings waking "Charged" (≥75) | **7/35 (20%)** | **21/35 (60%)** |
-
-**Conservative** — the 6 days whose deviation exceeded 1.0 °C were *clamped* to 40 rather than
-subtracted from, and a clamp cannot be reversed by adding the penalty back, so those days are counted
-as unchanged. The real improvement is larger.
-
-So **fixing the baseline is also the fix for "the battery never wakes up full"**, and the pass test
-gains a line: after the re-derivation, the mean morning anchor sits **above 75** over the trailing 30
-days. **Do not redesign the anchor or add overnight charging to chase this** — that would be a large
-change to a value Q-511 shows is load-bearing, aimed at a symptom this fix already removes.
-Re-measure after it lands; if the anchor still reads low then, *that* is when the design question is
-real.
-
-**Not established:** whether the owner was actually ill on any flagged night. The finding is that a
-permanently-positive deviation cannot tell illness from baseline error.
-
-Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/2026-08-24-readiness-temperature-penalty.md).
-
 ### [readiness][heart-rate] TN-2 — the Body Battery charge window has closed, so the tank only drains
 - **Lane:** A — engine only: packages/shared, app/api.
 
@@ -11538,135 +11667,6 @@ work is to bring them down, and **it is not a separate task**: a baton is rewrit
 handoff, so each role compacts its own on its next one, moving narrative to a dated handoff doc.
 Close this when all five are under ~150 lines.
 
-### [readiness][devices] BF-13 — the baseline EMA seeds at ZERO: the line under TN-6 and Q-506, and it is shared by all six baselines
-
-- **Lane: A**
-- **Batch:** temperature-baseline — ships with **TN-6** and **Q-506**, which are the two
-  *consumers* of the object this entry's line corrupts. Same PR or none: fixing the seed without
-  re-deriving the stored baselines leaves both of them still reading wrong.
-- **Added:** 2026-08-24 · BugFix, from the owner — *"body temperature elevation could we look to see
-  what its at? as its done this a few times but I have not been sick in the last 50+ days. so might
-  need to raise the safe range"*.
-- **⚑ Read TN-6 and Q-506 first. This entry does NOT re-measure what they measured** — it was
-  investigated independently and every shared number agrees exactly (deviation mean **+0.662 °C**,
-  **0 of 34** nights negative, range +0.14…+1.33, baseline **35.464** vs true **35.827**). Treat that
-  agreement as corroboration from a second route, and do not re-litigate it. **What follows is only
-  what those two entries do not have.**
-
-**1. The line. `updateBaseline` seeds the mean at literal zero.**
-
-`packages/shared/src/health/personal-baseline.ts:30` — `let meanX8 = baseline?.meanX8 ?? 0` — then
-anneals its gain by age (`:35-44`): **1/2** under 4 nights, **1/8** from 4–14, **1/32** after 14. The
-step size collapses long before the mean has climbed from 0 °C to ~35.8 °C, so it is still short at
-`n_history = 50`.
-
-**The proof it is a zero seed and not merely a low first reading — night 2:**
-
-```
-n_history   nightly °C   baseline °C
-    2         35.81        17.905      <- exactly 35.81 / 2  =  (0 + sample) / 2, gain 1/2 from zero
-    4         35.96        31.919
-   14         35.86        34.696      <- where TN-6's "cold-started at 34.696" begins
-   50         35.95        35.464
-```
-
-TN-6 measures from n=14 because that is where `temp_dev_c` becomes non-null, and reasonably reads it
-as a low cold start. **It starts at 0.** That distinction changes the fix: a low-but-plausible seed
-wants a longer warm-up; a zero seed wants a *correct seed*. Set `meanX8 = sampleX8` (and `devX8 = 0`)
-on the first-ever sample — which is also the likely origin of **Q-506's 18.7× sd**, since a deviation
-accumulated against a mean sweeping up from zero is measuring the sweep, not the spread. **That makes
-one line the plausible cause of both entries.**
-
-- **⚠ Check the vendor port before changing the shared maths.** This file is a faithful port of
-  `baseline_update_lt_mean_and_dev` and its header says do not "improve" the algorithm. Establish
-  whether ecore seeds from the first sample (or simply never exposes a baseline this young) — if the
-  port is faithful, the fix belongs at the **seed / call site**, not in the ported update.
-
-**2. Blast radius: this is a baseline-engine defect, not a temperature one.**
-
-`updateBaseline` is the shared updater for **all six** BLE baselines — HRV, RHR, temperature, sleep,
-MET, breathing (its own header says so). Every one seeds from zero. It is *visible* in temperature
-because temperature has a large non-zero mean and a tight spread. **Check MET and sleep before
-assuming they are clean.**
-
-- **Checked and NOT broken — recorded so nobody re-investigates:** the **RHR** baseline tracks
-  `rhr_low_bpm` (53.0 vs 50.7 at n=50), **not** `rhr_avg_bpm` (60.9); comparing it against the
-  average makes a healthy baseline look 8 bpm wrong. **HRV** (55.4 against a noisy 51–66) is
-  plausible.
-
-**3. A third consumer neither TN-6 nor Q-506 names: the deload recommendation.**
-
-TN-6 covers the readiness *penalty ladder* (`readiness-payload.ts:169`). Separately,
-`TEMP_ALERT_THRESHOLD_C = 0.5` (`packages/shared/src/ai-periodization/deload-constants.ts:75`) is
-read by `ai-dynamic.ts:184` and drives the **"Body temp elevated → Recovery recommended"** card the
-owner screenshotted. **23 of 34 nights (68%) cross it.** So one broken object is failing **three**
-consumers, not two — and TN-6's *"fix both or neither"* should read **all three**.
-
-- **`TEMP_BASELINE_MIN_DAYS = 30` was written to prevent exactly this and is insufficient.** Its own
-  comment says a green baseline "produced spurious body temp elevated deloads". At n=30 the deviation
-  was still **+0.68**; at n=50 it is **+0.50**. The guard picked a number when the algorithm needed a
-  seed.
-- **Raising `TEMP_ALERT_THRESHOLD_C` is the wrong fix**, for the same reason TN-6 gives for the
-  readiness ladder: it hides a broken input behind a plausible firing rate, and it would
-  *permanently desensitise* a real fever once the baseline converges. At 0.8 °C it still fires on 10
-  of 34 nights. **This is the owner's own suggested fix, and the answer to it is no** — recorded here
-  because they asked directly.
-
-**What would count as fixed** (in addition to TN-6's pass test): the deload card stops firing on the
-owner's healthy nights, and a fresh baseline for any metric is within one sample-noise unit of the
-true mean on night 2 rather than converging for fifty.
-
-- **Surface: server/shared, web-reproducible.** Pure function over data already in Postgres; no
-  device needed to fix or verify.
-
-- **✅ OWNER DECISION 2026-08-24 — asked plainly, both halves answered. The owner gate is CLEARED
-  and its field removed** (worded without the literal field name, so a grep for gated entries does
-  not report this one).
-  1. **Re-derive the stored baselines** (not seed-fix-only). The reasoning the owner accepted: a
-     baseline is a corrupted *intermediate*, not a record of what the app told them, so re-deriving it
-     is a different act from re-scoring history and does not contradict the "leave stored days alone,
-     stamp the new model" policy set the same day. The raw nightly values are untouched, so the
-     re-derivation is re-runnable and reversible.
-  2. **Fix the seed for all six baselines; re-derive only the ones measurably wrong.** One line
-     protects every metric; data changes stay evidence-led.
-
-- **📏 Which ones are measurably wrong — MEASURED 2026-08-24 (Tuning), so this needs no TODO.**
-  Baselines converted to native units with the factors at their call sites
-  (`daily-summary.ts:102-112`: hrv ×1 ms · rhr ×1 bpm · temp ×100 · sleep ×60 · met ×10 · breath ×10),
-  compared against the true mean of the same nightly column over 50 summary rows:
-
-  | metric | true mean | stored baseline | gap | **gap / nightly sd** | % nights above | verdict |
-  |---|---|---|---|---|---|---|
-  | **temp** | 35.842 °C | 35.464 | +0.378 | **+2.80** | **100.0%** | **RE-DERIVE** |
-  | breath | 9.400 rpm | 9.250 | +0.150 | +0.27 | 77.6% | leave |
-  | rhr | 53.871 bpm | 53.000 | +0.871 | +0.28 | 36.7% | leave |
-  | sleep | 8.010 h | 7.946 | +0.064 | +0.06 | 57.1% | leave |
-  | hrv | 55.765 ms | 55.375 | +0.390 | +0.04 | 87.8% | leave |
-  | met | 1.365 MET | 1.375 | −0.010 | −0.09 | 44.0% | leave |
-
-  **Temperature is the only one to re-derive.** That is this entry's own hypothesis — *"visible in
-  temperature because temperature has a large non-zero mean and a tight spread"* — now measured
-  rather than assumed: the zero seed leaves a similar absolute gap in fixed-point units across all
-  six, and only temperature's nightly sd (0.140 °C) is small enough for that gap to be 2.8 sd out.
-  **Still fix the seed for all six** — a metric that is within noise today is one input change away
-  from not being.
-
-  **`% nights above` is the diagnostic to reuse**, not the raw gap: it is 100% for temperature and
-  near 50 for a centred baseline. Read it alongside `gap/sd` — hrv reads 87.8% on a gap of only
-  0.04 sd, which is an EMA lagging a genuinely rising metric (overnight HRV has climbed for months),
-  not this defect.
-
-- **⚠️ Near-miss worth copying: get the fixed-point factor from the CALL SITE, never by inference.**
-  The first pass here inferred each scale by choosing the power of ten that best fit the newest row.
-  That is right for temp (×100) and **wrong for sleep, which is ×60** — it produced a "baseline
-  4.768 h against a true 8.010 h, 98% of nights above, gap +3.24 h" that read exactly like a second
-  severe defect. Acting on it would have meant an **unnecessary data change to the sleep baselines**,
-  which is the one category of mistake the owner gate exists to prevent. The factors are four lines
-  apart in `daily-summary.ts`; read them.
-
-- ✅ **SEED FIXED 2026-08-25** (`fix/baseline-zero-seed`) — see BF-13 for the full note, including
-  the ⛔ Keep: the stored baselines are still zero-folded and one **Redecode** run re-derives them,
-  which could not be done from a sandbox. This entry's pass tests stay unmeasured until it runs.
 ### [devices][readiness] BF-14 — ❌ REFUTED 2026-08-24: the breathing baseline is fed rpm×10 on purpose; it is correct
 
 > **⛔ REFUTED by measurement (Tuning, 2026-08-24). Do not implement this. It is kept, not deleted,
