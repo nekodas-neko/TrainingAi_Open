@@ -1026,6 +1026,10 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
 
 ### [nutrition] BF-175 — the log-food sheet prints the stored GOAL as today's budget, so it reads 1660 beside the card's 1506
 
+- **Lane:** B — `components/nutrition/assign-step.tsx`, `components/nutrition/food-logger-sheet.tsx`,
+  `app/nutrition/nutrition-content.tsx`, `components/nutrition/end-of-day/day-summary-card.tsx`.
+  Restored 2026-09-17: cutting the entry down to its residue dropped this line, and `next-item.js`
+  printed it `⟨lane unstated⟩`, which puts an entry in BOTH implementer lanes' lists.
 - **Shipped 2026-09-17** on `fix/bf175-assign-step-day-budget`. The sheet reads no targets at all
   now: `nutrition-content.tsx` passes `effectiveCalorieGoal` into `FoodLoggerSheet` →
   `AssignStep dayBudgetKcal`, and both the denominator and the green/orange flip read that prop.
@@ -1453,6 +1457,13 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
   elimination list.
 - **Added:** 2026-09-15 (BugFix intake). Owner: *"when I try click the treadmill; or any 'Other
   activity' nothing actually happens."* Reported on the APK.
+- **Gate: device** — added 2026-09-17, once the root cause below was measured. **This is a gate on
+  the FIX, not on the diagnosis**, and the distinction is why it was absent for two days: the cause
+  is now reproducible in the harness (recipe below), so the investigation never needed the device and
+  the entry correctly headed READY while that was the open work. What is left does need it — a fix
+  here rewrites history handling for every sheet that navigates, and the Android back gesture is a
+  Capacitor channel Playwright cannot fire. Ungate it the moment the fix lands in a branch needing
+  only the S25 look.
 - **This blocks a path the owner was told to use yesterday.** BF-160 established that a fitness test
   earns no calories, and "Other activity → Treadmill" is the recommended way to log a steady
   treadmill walk (the guided walk is interval-only, minimum 1 fast + 1 slow block). That

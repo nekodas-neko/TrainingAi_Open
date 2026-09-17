@@ -13409,3 +13409,11 @@ saves an attempt: the obvious reading of the trace is "a self-pop is in flight, 
 drain", the module already tracks exactly that, and the premise is false — the sheet's close is
 415 ms late because the view transition holds React's commit, so nothing is pending when the
 navigation is issued. Without that measurement written down, the next session builds the same thing.
+
+## 2026-09-17 — `docs/implementation-backlog.md` 23684 → 23695 (Lane B, two entry fields)
+
++15 for two field corrections on entries this lane touched today. BF-175 lost its `Lane:` line when
+the entry was cut to its `Keep:` residue — `next-item.js` then printed it `⟨lane unstated⟩`, which
+puts an entry in *both* implementer lanes' lists. BF-165 gains `Gate: device`, with the reason
+written out rather than just the field: the gate is on the FIX, not on the diagnosis, which is why
+it was correctly absent while the investigation was the open work.
