@@ -1863,13 +1863,65 @@ composite reports which of its inputs were inferred.
   observed on the device. Per the external-API rule, the integration is not done until a value is in
   the column.
 
-### [readiness][platform] LB-114 — a zero-data account reads `sufficient: true`, so RV-38's badge is gone and its spec is red for one hour a day
+### [platform] LB-119 — chromium SIGSEGVs mid-suite in CI, so an E2E result has to be read twice before it means anything
+
+- **Lane:** O — the Orchestrator owns CI config (`.github/workflows/ci.yml` and the Playwright
+  config). Filed by Lane B on 2026-09-17 after it cost a merge cycle on PR #1280.
+- **The signature is identical across runs, which is what makes it one defect rather than N flaky
+  specs.** `chrome-headless-shell` takes `Received signal 11 SEGV_MAPERR`, faulting address
+  **`0x1b0`**, same stack, in `chromium_headless_shell-1234`. Whatever was on that worker then fails
+  with `browser.newContext: Target page, context or browser has been closed` — **no test body runs**,
+  so the report names a spec that was never executed.
+- **Observed three times, on two different days:**
+
+  | run | lost to it | outcome elsewhere |
+  |---|---|---|
+  | #1264, 2026-09-16 | `bf5-week-in-review-page:106`, `nutrition-day-navigation:92`, `one-calorie-budget:135` | all passed on retry |
+  | #1280 run 1, 14:01 UTC | `diary-nested-meal:231`, `:207` | both passed in run 2 |
+  | #1280 run 2, 14:40 UTC | `forced-dark-theme:67`, `preferences-survive-reinstall:37`, `recent-all-buckets:17` | all passed on retry |
+
+- **⚠ It also produces failures that do NOT look like a crash, which is the expensive part.**
+  `la109-back-from-subroute.spec.ts:87` failed run 1 on a real 30-second `toBeVisible` timeout with a
+  screenshot — the shape of a genuine regression, on a PR that had touched UI. It passed run 2
+  untouched, and passed **four** consecutive local runs. Diagnosing that as a code defect is the
+  cost this entry is about; the only thing that separated it from a real failure was a second run.
+- **Not "flake, ignore it".** CLAUDE.md forbids treating a flake as a root cause, and the repo's one
+  sanctioned re-run gets spent on this rather than on a real question. The practical rule today —
+  worth carrying until this is fixed — is that a red E2E here is not evidence until the crash stack
+  has been checked for and the spec re-run.
+- **Where to start:** `--disable-dev-shm-usage` is already passed, so the classic `/dev/shm`
+  exhaustion is not it, or not all of it. Worth measuring before changing anything: worker count
+  against runner memory (the suite runs ~213 tests in ~25–32 min), and whether the crash correlates
+  with a particular spec's page rather than with elapsed time. Pinning the Playwright/chromium
+  revision is the other obvious lever — the revision string is the same across all three runs, so a
+  bad pin is consistent with the evidence and has not been ruled out.
+- **Do NOT fix this by raising `retries`.** That hides it, and the run-1 `la109` case shows why the
+  hiding is expensive: the failures it produces are indistinguishable from real ones until re-run.
+
+### [readiness][platform] LB-114 — a zero-data account reads `sufficient: true`, so RV-38's badge is gone and its spec is red for TWO hours a day
 
 - **Lane:** A — `packages/shared/src/health/body-battery-inputs.ts:125`. Filed by Lane B on
   2026-09-16 after `e2e/rv38-body-battery-no-data-badge.spec.ts` failed CI on an unrelated PR.
-- **⚠ RED ON `main`, and it fires on a CLOCK — 07:00–08:00 Brisbane (21:00–22:00 UTC), every day, on
-  every branch.** That is why it reads as a flake and is not one. It is the hour-dependence class
-  CLAUDE.md documents at length, in its nastiest form: the test is CORRECT and the payload is wrong.
+- **⚠ RED ON `main`, and it fires on a CLOCK — TWO separate hours: 00:00–01:00 AND 07:00–08:00
+  Brisbane (14:00–15:00 and 21:00–22:00 UTC), every day, on every branch.** That is why it reads as
+  a flake and is not one. It is the hour-dependence class CLAUDE.md documents at length, in its
+  nastiest form: the test is CORRECT and the payload is wrong.
+- **✏️ CORRECTED 2026-09-17 by Lane B, and the correction is the point: this entry said ONE hour and
+  named the wrong mechanism for half of it.** It was filed from a single 07:55 observation and the
+  clause was then read backwards from that one data point — which is the "an entry's numbers are
+  prose until something checks them" trap, committed by the entry's own author. There is a SECOND
+  window with a SECOND cause, in `app/api/body-battery/route.ts:172` rather than the clause:
+  ```ts
+  const rawWakeTime = todaySleep?.sleepEnd?.getTime() ?? firstHrTime
+    ?? (todayMid.getTime() + 7 * 3_600_000)   // default 07:00
+  const wakeTime = rawWakeTime > now.getTime() ? (firstHrTime ?? todayMid.getTime()) : rawWakeTime
+  ```
+  Before 07:00 local the 07:00 default is **in the future**, so the future-wake guard fires and
+  `wakeTime` falls back to `firstHrTime ?? todayMid` — and a zero-data account has no HR rows, so it
+  lands on **local midnight**. `wakingMinutes` is then minutes-since-midnight, which is under 60 for
+  the first hour of the day. So the grace clause short-circuits at 00:00–01:00 for that reason and
+  again at 07:00–08:00 for the reason already filed. Between 01:00 and 07:00 it is over 60 and the
+  spec passes.
 - **Measured, not inferred.** `GET /api/body-battery` for the `zero@local.dev` fixture, captured
   2026-09-17 07:55 Brisbane:
   ```json
@@ -1881,9 +1933,13 @@ composite reports which of its inputs were inferred.
   ```ts
   sufficient: mins < MIN_WAKING_MINUTES_TO_JUDGE || samplesPerHour >= MIN_SAMPLES_PER_WAKING_HOUR
   ```
-  `MIN_WAKING_MINUTES_TO_JUDGE` is 60. The fixture's wake time falls back to **07:00 local**, so
-  `wakingMinutes` is under 60 for exactly the first hour of the day and the grace clause short-circuits
-  to true. After 08:00 it goes false, the badge returns, and the spec passes again.
+  `MIN_WAKING_MINUTES_TO_JUDGE` is 60, and `mins` is `Math.max(0, wakingMinutes)`. The fixture's wake
+  anchor is **07:00 local** after 07:00 and **local midnight** before it (see the correction above),
+  so `wakingMinutes` is under 60 in each of the two windows and the grace clause short-circuits to
+  true. Outside them it goes false, the badge returns, and the spec passes again.
+  **The recommended one-condition fix below closes BOTH windows**, because it keys on
+  `sampleCount === 0` rather than on the window — which is why the correction changes the entry's
+  scope and urgency without changing its fix.
 - **✅ CONFIRMED BY NATURAL EXPERIMENT, not just by reading the clause.** The same commit
   (`1bc4332afa`, PR #1264) ran E2E twice: the run starting **21:15 UTC failed** on this spec, and the
   run starting **22:00 UTC passed**. Identical code, identical fixture, different side of 22:00 UTC —
@@ -1905,10 +1961,29 @@ composite reports which of its inputs were inferred.
   three specs went flaky-but-passed (`bf5-week-in-review-page.spec.ts:106`,
   `nutrition-day-navigation.spec.ts:92`, `one-calorie-budget.spec.ts:135`) and the log carries a
   `chrome-headless-shell` crash stack. One runner, three retries and a browser crash reads as runner
-  instability rather than three spec defects; worth a second look only if it repeats.
-- **Verification:** run `e2e/rv38-body-battery-no-data-badge.spec.ts` between 07:00 and 08:00
-  Brisbane — it must pass. **Do not verify outside that window**, where it passes regardless and
-  proves nothing.
+  instability rather than three spec defects.
+- **⚠ IT REPEATED — twice on 2026-09-17, on PR #1280's two E2E runs, so it is no longer "worth a
+  second look".** Both runs carry a `chrome-headless-shell` **SIGSEGV** (`Received signal 11
+  SEGV_MAPERR`, faulting address `0x1b0` both times, identical stack). Run 1 lost two specs to
+  `browser.newContext: Target page, context or browser has been closed` — no test body ran —
+  including `diary-nested-meal.spec.ts:231`; run 2 lost three more to retries. **Every one of them
+  passed on the other run or on retry**, and `la109-back-from-subroute.spec.ts:87`, which failed run
+  1 on a real 30 s timeout, passed run 2 and passed four times locally. So the pattern is a browser
+  that dies mid-suite and takes whatever was on that worker with it. **Filed as its own item is the
+  right next step rather than more notes here** — the practical cost today is that an E2E result has
+  to be read twice before it means anything, which is exactly the "flake is not a root cause" reading
+  this repo forbids relying on.
+- **Verification:** run `e2e/rv38-body-battery-no-data-badge.spec.ts` inside EITHER red window —
+  **00:00–01:00 or 07:00–08:00 Brisbane** — and it must pass. Outside both it passes regardless and
+  proves nothing. **Verify in both**, not one: they have different causes (the clause, and the
+  future-wake fallback to midnight), and the recommended one-condition fix is what makes passing in
+  one predict passing in the other. A fix verified only at 07:30 has not been shown to close the
+  midnight window at all.
+- **The control that establishes this is NOT this PR's, for whoever hits it next:** check the wall
+  clock in Brisbane before reading anything into a red run here. PR #1280 is the worked example —
+  its first E2E run (23:36–00:01 Brisbane) passed this spec and its re-run (00:06–00:40) failed it,
+  same commit, and a local run at 00:41 on a checkout differing from `main` only in four nutrition
+  files reproduced it. Same shape as the 21:15/22:00 experiment above, at the other window.
 
 ### [platform][devices] LB-113 — the Health Connect sync took the user's timezone and nothing passed it (fixed; device look owed)
 

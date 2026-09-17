@@ -13364,3 +13364,24 @@ would otherwise reach for the `GET /api/mood` workaround the note exists to rule
 not-device-verified marker, which the Canonical Runtime rule requires to live in this file until the
 S25 look happens — it is index material, not journal material. The prose was cut from 12 lines to 6
 first; the measurement, the two-surface finding and the control runs are in the journal entry.
+
+## 2026-09-17 — `docs/implementation-backlog.md` 23484 → 23559 (Lane B, LB-114 correction + LB-119)
+
++40, raising the number this same PR had just lowered. The cause is worth the line: LB-114 said the
+RV-38 spec is red for **one** hour a day and it is red for **two**, with a second cause in a
+different file — the future-wake guard in `app/api/body-battery/route.ts:172` falling back to local
+midnight for an account with no HR rows. Its "do not verify outside that window" instruction was
+therefore telling the next session to verify a fix in the one window that cannot show the other half
+working.
+
+A correction that only struck the wrong sentence would have been shorter and would have left the
+entry unable to say why it was wrong; the two-cause account is what stops the same reading being
+made a third time. Also folds in that the entry's "worth a second look only if it repeats"
+browser-crash note has now repeated twice in one day.
+
+The same PR then added **LB-119** (+35): chromium SIGSEGVs mid-suite in CI with an identical
+faulting address across three runs on two days, and the specs on that worker report as
+`browser.newContext: ... has been closed` having never run. It is filed rather than noted because
+the expensive case is the one that does NOT look like a crash — `la109-back-from-subroute` failed
+once on a real 30-second timeout and passed on re-run and four times locally, which is
+indistinguishable from a regression until someone spends the re-run finding out.
