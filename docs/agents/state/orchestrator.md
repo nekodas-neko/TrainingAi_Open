@@ -8,17 +8,15 @@
 
 ## Now
 
-**Five rounds of owner device-checks are finished and filed** (OR-111→116, PRs #1167/1169/1171 and
-this one). 81 answers via the checklist artifact; **30 entries left the queue**. Queue **326**,
-`Verify: device` **31 → 20**.
+**Five rounds of owner device-checks are done** (OR-111→118); 81 answers, 30 entries left the queue.
 
-**The checklist is a published artifact with a `db` capability** — read the answers back with
-`Artifact action:read_db`, collection `checks`, rather than asking for an export. Round five is the
-live version: 5 items, all answered. Its ids `CHK-*`/`R5-*` are composites covering several entries.
+**The checklist is a published artifact with a `db` capability** — read answers back with
+`Artifact action:read_db`, collection `checks`, never by asking for an export. Its `CHK-*`/`R5-*`
+ids are composites covering several entries.
 
-**Ask the owner nothing that is not genuinely theirs.** ~48 entries carry `Gate: owner`; most are
-engineering calls, Tuning's calibration, or measurements to take first. That re-triage is the next
-real Orchestrator job and is NOT done.
+**Ask the owner nothing that is not genuinely theirs.** ~35 entries still carry an unchecked
+`Gate: owner`; most are engineering calls, Tuning's calibration, or measurements to take first.
+**Eight are marked NOT OWNER-READY** (OR-117) — finish that pass.
 
 ## Next — in this order
 
@@ -27,8 +25,7 @@ real Orchestrator job and is NOT done.
 2. **Two owner actions are accepted and deferred, not done** — `BF-106` (`VACUUM FULL`;
    `oura_raw_samples` is 74 MB, 44 MB of it index) and `LB-52` (classic branch protection beside the
    Ruleset, so auto-merge stops being hand-caught). Re-offer them, do not re-argue them.
-3. **`LB-94`/`LA-100` — the journal ceiling.** `fold-journal-entries.js` rewrites citations and took
-   345 → 60; unrun since. 4. **`OR-115`** — inventory the admin surface before deleting from it.
+3. **`OR-115`** — inventory the admin surface before deleting anything from it.
 
 ## Do not re-litigate
 
@@ -46,15 +43,18 @@ real Orchestrator job and is NOT done.
   you work*: three re-merges in one morning on 2026-09-14. Attempting the merge is the reliable
   green check; `get_check_runs` lags by up to 35 minutes.
 - **The two conflict files resolve in OPPOSITE directions and look identical.** History is
-  append-only (keep both sides, main's first); backlog conflicts are two *deletions*, where keeping
+  append-only (keep both sides, main's first); a backlog conflict is two *deletions*, where keeping
   both resurrects shipped entries. **`.size` files are recomputed after the merge, never spliced.**
 - **A finished entry that still advertises is as bad as a blocked one mislabelled.** `keepIsSettled`
   checks both — and **a look that came back FAILED counts as settled**, which the first version
   missed, hiding TN-13 and BF-74 as "shipped, a look owed" while they held live work.
-- **A failing device check can move the lane** — TN-13 went A→B: the defect was in the render
-  condition, not the shared helper the entry named.
+- **A failing device check can move the lane** — TN-13 went A→B: the defect was in the render condition, not the helper the entry named.
 - **Your own prose can defeat `next-item.js`** — a `⛔` anywhere parks the entry, and a bullet merely
   *quoting* a `Verify:` field fails the parser.
 - **Confirm a completion claim against a merged diff or a production read**, never the entry's own
   text — ten of seventeen failed that in sweep 1.
-- **`pnpm check:rules` is the only custom-rules gate**; quote its `Ran N of N` (**75 of 75** here).
+- **`check:rules` is the custom-rules gate, NOT the pre-push gate — `pnpm ci:local` is** (it adds
+  lint, typecheck and **test**). Running only `check:rules` on a backlog-only PR turned `main` red
+  for every lane (#1247, 2026-09-16): restructuring Q-305's `Keep:` removed a gate that
+  `keep-gate-set-off.test.ts` pins **by name**. **A queue restructure is a code change to those
+  tests.**

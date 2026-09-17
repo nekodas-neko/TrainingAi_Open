@@ -2425,7 +2425,7 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
   stored (BF-151 is already about reading it rather than inverting). Showing *"2×12"* with the
   percent and no kg is complete on its own; a rep target is a further improvement, not part of this.
 - **✅ SHIPPED 2026-09-15** (`fix/bf162-bodyweight-no-kg`).
-  [Journal](overview/entries/2026-09-15-bf162-bodyweight-no-kg.md). One guard on `weightKg`, using
+  [Journal](overview/history-2026-09-17-folded-1.md#2026-09-15-bf162-bodyweight-no-kg). One guard on `weightKg`, using
   the **shared** `isBodyweightType` from `packages/shared/src/1rm.ts` rather than a ninth inline
   `=== 'bodyweight'` — there were eight. A bodyweight exercise falls through to the `@ ${ex.pct}%`
   branch the card already rendered when a 1RM was missing.
@@ -22477,14 +22477,31 @@ adopted.
 
 ### [platform] LA-100 — the entries compaction sweep has no target file, and the ceiling now blocks every lane
 
+- **✅ THE PREMISE WAS STALE AND THE SWEEP HAS RUN — 2026-09-17 (OR-119). `Gate: owner` removed.**
+  This entry says there is *"nowhere obvious to fold them TO"* because the batched files are
+  *"era-based, not date-based"*. **Measured: 28 of the 32 history files are dated** —
+  `history-2026-07-16.md` through `history-2026-09-10-folded-6.md`. Only four carry the era names
+  (`-newest`, `-recent`, `-newer`, `-past`), and this entry already calls those *frozen*.
+- **So its option 1 — a dated batch — is not a decision to take; it is what the repo has been doing
+  for two months**, and `scripts/fold-journal-entries.js` has implemented it since LA-80: it writes
+  `history-<date>-folded-<part>.md` and rolls a new part at ~250 KB. **The owner was being asked to
+  choose a convention that precedent and the tooling had already chosen.**
+- **The sweep ran on that basis:** 91 entries → 51, forty folded into
+  `history-2026-09-17-folded-1.md` (163 KB, inside the roll threshold), five held back because an
+  agent baton cites them, citations rewritten across nine files, `check-doc-links` clean on 823.
+- **What stays open is smaller than the entry and is not the owner's:** whether the four era-named
+  files are ever renamed. They are frozen and nothing cites them by scheme, so the answer is
+  probably never — but that is a judgement for whoever next touches them, not a blocker on folding.
+- **⚠ The ceiling claim is also stale.** This entry was upgraded to *"BLOCKING, not blocking-ish"*
+  when the ceiling was a hard failure that every lane's next PR would hit. It is an **advisory note**
+  now (*"Not a failure; sweep it when convenient"*), so the treadmill it describes cannot happen.
+
 - **Branch:** _unassigned_ · **Added:** 2026-09-10, when the ceiling fired and the sweep turned out
   not to be mechanical.
 - **Lane: A** — the sweep touches `docs/` only, but the naming decision below is the blocker.
-- **Gate:** owner — the open question is a documentation-structure decision, not an implementation
-  one, and the answer changes what every future session's journal entry does. (Filed inline on the
-  Lane bullet first; `check-backlog-pointers` caught it, because an inline field is ignored and the
-  entry would have printed READY. Second field-shaped filing mistake this session — the first was
-  `⛔` on LA-97.)
+- **The `Gate: owner` is removed** (2026-09-17) — see above: precedent and the fold tool had already
+  made the choice it was waiting on. The note about it being filed inline first, and
+  `check-backlog-pointers` catching that, still stands as the reason fields beat prose.
 - **⚑ BLOCKING, not "blocking-ish" — upgraded 2026-09-10 after it fired twice in one hour.** #1077
   raised the ceiling 360 → 361 to unblock and recorded that this contradicts #1052's intent. The
   very next PR (LA-99) hit **362**, so it shipped with **no journal entry at all** rather than raise

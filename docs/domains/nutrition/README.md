@@ -322,7 +322,7 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
-- [`2026-09-15-bf74-photo-remove-confirm`](../../overview/entries/2026-09-15-bf74-photo-remove-confirm.md)
+- [`2026-09-15-bf74-photo-remove-confirm`](../../overview/history-2026-09-17-folded-1.md#2026-09-15-bf74-photo-remove-confirm)
   — **BF-74 round two (2026-09-15): removing a meal photo asks first.** Round one moved the ✕ out of
   the dismiss corner and made it a bin; the device pass still found it destroyed the photo on one
   tap. **The component's comment argued against a confirm on the grounds that re-picking is one tap —

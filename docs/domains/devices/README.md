@@ -278,12 +278,12 @@ Live at the time of writing (2026-07-30):
   up on its next connect. The command is in the code and its own comment says it is speculative and
   borrowed from a different firmware generation. Weight-band attribution shipped 2026-09-14 without
   either answer —
-  [journal](../../overview/entries/2026-09-14-lane-a-bf58-weight-band-attribution.md); the band
+  [journal](../../overview/history-2026-09-17-folded-1.md#2026-09-14-lane-a-bf58-weight-band-attribution); the band
   hazard it left is LA-108.
 
 ## History
 
-- [`2026-09-15-la108-declined-weigh-in-list`](../../overview/entries/2026-09-15-la108-declined-weigh-in-list.md)
+- [`2026-09-15-la108-declined-weigh-in-list`](../../overview/history-2026-09-17-folded-1.md#2026-09-15-la108-declined-weigh-in-list)
   — **LA-108 (2026-09-15): a declined weigh-in can be claimed back.** The band anchors on the last
   **confirmed** weight and only a confirmed reading moves it, so an accidental *Not me* tap was
   irreversible — a real change beyond the anomaly threshold left you outside your own band with

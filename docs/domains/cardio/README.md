@@ -101,7 +101,7 @@ Live at the time of writing (2026-07-30):
   `stepsFromCadenceSeries` (`packages/shared/src/health/cadence.ts`), **never** `avgCadenceSpm ×
   duration`, which counts pauses at the walking rate. It is the same arithmetic as the walk's own
   total, so the two cannot drift.
-  [Journal](../../overview/entries/2026-09-14-lane-a-la48-walk-segment-steps.md). **Open:** adherence
+  [Journal](../../overview/history-2026-09-17-folded-1.md#2026-09-14-lane-a-la48-walk-segment-steps). **Open:** adherence
   and the pacing signal, which a post-hoc reconstruction cannot produce faithfully — the live bar
   bands an instantaneous reading, the saved series holds 10-second medians.
 - Guided walk GPS/pace, per-segment stats, the elevation profile, the run execution screen, the

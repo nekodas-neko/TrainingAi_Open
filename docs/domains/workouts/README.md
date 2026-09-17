@@ -243,7 +243,7 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
-- [`2026-09-15-bf163-intensity-chip-load-only`](../../overview/entries/2026-09-15-bf163-intensity-chip-load-only.md)
+- [`2026-09-15-bf163-intensity-chip-load-only`](../../overview/history-2026-09-17-folded-1.md#2026-09-15-bf163-intensity-chip-load-only)
   — **BF-163 (2026-09-15): the intensity chip was correct and still had to change.**
   `intensityZoneForPct` reads %1RM only, so 72.5% → Hypertrophy is right by the band's own
   definition — while the chip's tooltip claimed `typically 8–12 reps` one line above a prescribed
