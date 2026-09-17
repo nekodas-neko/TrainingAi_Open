@@ -443,6 +443,44 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [readiness][devices] TN-45 — the only illness band that has ever fired is the one with no penalty and no UI 🔴 LIVE
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-17 · found on a routine production read after TN-34/BF-13/TN-39 shipped.
+- **Lane: B** — `components/home/illness-advisory-banner.tsx:15` is the whole surface. The thresholds in `packages/shared/src/health/illness-radar.ts` are **not** in scope (see the ⚠ below).
+- **Gate: owner** — this adds something to the owner's Home screen about his own health; the wording is his call, not an implementation detail.
+- **Review:** [`the app saw it and said nothing`](reviews/2026-09-17-the-app-saw-it-and-said-nothing.md).
+
+**Measured over 72 days of the owner's own rows:**
+
+| flag | days | mean illness score | mean readiness | last |
+|---|---:|---:|---:|---|
+| `normal` | 58 | 10 | **64** | 2026-09-17 |
+| `watch` | **2** | 49 | **32** | **2026-09-16** |
+| `elevated` | **0** | — | — | never |
+| `fever` | **0** | — | — | never |
+
+**`watch` is rare and highly discriminating — readiness averages 32 on those days against 64 on
+normal days, half — and it is inert in two places at once:** `ILLNESS_READINESS_PENALTY.watch = 0`
+(deliberate, "advisory-only") and the Home banner returns `null` for anything that is not
+`elevated`/`fever`. **So the band is named advisory-only and there is no advisory.**
+
+**⚑ The two bands that DO produce UI have never fired in 72 days.** As far as this data goes the
+illness banner has never rendered. The only band that fires is the silent one.
+
+**It fired on a real event.** 2026-09-16 scored 41, one point over the threshold, on a day when the
+owner's HRV had halved (62 → 32 ms over two weeks) and resting HR had risen ~9 bpm — with the
+sleep-capture confound tested and ruled out (HRV is *not* lower on short-record days: 50 ms on
+fragments vs 45 ms on real nights).
+
+**⚠ Do NOT raise the readiness penalty.** `watch = 0` is plausibly correct — readiness fell to 31 on
+its own, so penalising it again double-counts the same physiology. **The gap is visibility, not
+weight**, and conflating them is how a signal ends up counted twice.
+
+**⚠ Do NOT re-tune the thresholds on n=2.** Two firings in 72 days cannot support moving 40 or 65.
+
+**Pass test:** a `watch` day produces something the owner can see on Home, and a normal day does not.
+
+
 ### [workouts][app-shell] LB-116 — the check-in sheet knows which sore ticks it suggested and throws it away
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-17 (Lane A, shipping BF-173's engine half).
@@ -490,105 +528,6 @@ below threshold and left in place for next time.
 - **Not urgent and deliberately not batched with BF-172:** that entry is about a label on a
   different number (session fit called readiness). Same screen, different defect.
 
-
-### [workouts][readiness] BF-171 — the session picker matches muscle names raw, so "Back" sore clamps nothing and `core` never finds its recovery
-
-- **Needs: BF-173**
-- **⚠ The `Needs:` above is load-bearing and is not a nicety — shipping this entry first makes the
-  recommendation WORSE.** Normalising `core` → `abs` and matching the `Back` pill both feed *more*
-  correctly-matched sore muscles into BF-173's double count, so every muscle this entry newly
-  matches is a muscle that then gets clamped to 40 on top of its own recovery figure. These two were
-  briefly batched to force the ordering; a migration cannot be batched, so the dependency field
-  carries it instead.
-- **Branch:** _unassigned_ · **Added:** 2026-09-16 (BugFix intake). Owner, on a screenshot showing
-  **Upper recommended** with chest/shoulders/triceps listed as sore: *"How does this work? I did push
-  yesterday which was an upper- why would it reccomened upper?"*
-- **Lane: A** — `packages/shared/src/ai-periodization/ai-dynamic.ts:61-93` (`recoveryPct`,
-  `sessionRecoveryScore`).
-- **The recommendation he is asking about is CORRECT, and reproducing it is what found the defect.**
-  The engine does not think in Push/Pull/Upper/Lower labels — it scores muscle overlap. Fed his real
-  program, his real seven logged sessions and his real check-in, `computeAiDynamicNextSession`
-  returns (measured 2026-09-16, a scratch harness against production rows, matching his screenshot's
-  alternatives list to the point):
-
-  | session | overall | recovery | balance | freshness |
-  |---|---|---|---|---|
-  | **Upper** | **84** | 70 | 100 | 100 |
-  | Pull | 82 | 91 | 50 | 100 |
-  | Lower | 74 | 62 | 81 | 100 |
-  | Legs | 59 | 57 | 33 | 99 |
-  | Push | 37 | 43 | 16 | 48 |
-
-  Upper's chest, shoulders and triceps **are** penalised — every sore main-role muscle is clamped to
-  40. But five of Upper's nine weighted muscle-units are back and biceps, last trained Sunday and
-  sitting at 95%, and Upper itself has not run for six days, so balance and freshness both read 100.
-  70 × 0.55 + 100 × 0.25 + 100 × 0.20 = 84. Push, trained yesterday, scores 37. **The engine is
-  doing the thing he expected it to do; the answer is just that "Upper" is half a Pull session.**
-- **What is actually broken is the name matching inside `sessionRecoveryScore`, and it has two
-  limbs.** Both were measured on the same harness.
-
-  ```ts
-  function recoveryPct(muscle: string, recoveries: MuscleRecovery[]): number {
-    const r = recoveries.find(m => m.muscle.toLowerCase() === muscle.toLowerCase())
-    if (!r) return 100                                   // ← a miss reads as fully recovered
-  }
-  …
-  const soreSet = new Set(soreMuscles.map(m => m.toLowerCase()))
-  if (role === 'main' && soreSet.has(muscle.toLowerCase())) pct = Math.min(pct, 40)
-  ```
-
-  1. **Sore "Back" clamps nothing.** `SORE_MUSCLE_GROUPS` (`components/checkin/sore-muscle-picker.tsx:11`)
-     offers **Back** as a pill, and the exercise library has no muscle called `back` — it has `lats`,
-     `upper back` and `traps`. Exact lowercased equality therefore matches none of them. **Measured:
-     adding `Back` to his sore list moves every one of the five scores by zero** — Upper stays 84.
-     A lifter whose back is wrecked gets Pull and Upper recommended at full confidence.
-  2. **`core` never finds its own recovery.** `computeMuscleRecovery` keys its output through
-     `normalizeMuscle`, which folds `core` → **`abs`**; the assignments it is matched against say
-     `core` (Hanging Leg Raise in both Legs and Lower, Barbell Squat secondary). The lookup misses
-     and returns **100**, while the real value in the same payload is `{"muscle":"abs","pct":86}`.
-- **This is the only soreness/recovery consumer in the repo that matches raw.** `moodMuscleMatches`
-  exists in `packages/shared/src/muscles.ts:34` for exactly this job — a broad mood label against a
-  specific exercise muscle — and is used by `per-exercise-deload.ts:51`, `signals.ts:326,347`,
-  `soreness-volume.ts:46`, `suggested-soreness.ts:45` and `app/api/workout-data/route.ts:511,517`.
-  Six consumers normalise; the seventh — the one that **picks the session** — does not.
-- **Fix: route both sides through the shared helpers.** `recoveryPct` compares
-  `normalizeMuscle(r.muscle) === normalizeMuscle(muscle)`; the sore test becomes
-  `soreMuscles.some(label => moodMuscleMatches(muscle, label))`. Do not hand-roll a synonym list
-  here — that is the divergence `muscles.ts`'s own header comment records having already cleaned up
-  once.
-- **Expect the fix to move scores in BOTH directions, and check that before shipping.** The two
-  limbs currently cancel in one place: `core` matches the sore pill exactly (so today the clamp
-  fires) while missing the recovery lookup (so the 86% is thrown away). Normalising only the
-  recovery side **raises** Legs 59 → 62 and Lower 74 → 77, because `abs` then stops matching the
-  `core` pill. Normalising both is the coherent state; the entry is not done until the fix is
-  measured against a fixture carrying a `Back` pill and a `core` assignment together.
-- **Verification:** a unit test on `computeAiDynamicNextSession`, not a device run — this is pure
-  shared math and the harness settles it. Assert (a) a session whose only main muscles are `lats`
-  and `upper back` scores lower with `Back` sore than without, and (b) an assignment naming `core`
-  reads the `abs` recovery entry rather than 100.
-- **Not a defect, checked and cleared:** the ordering itself. Freshness, balance and the recovery
-  weights all behave as documented, and the 0.55/0.25/0.20 low-readiness weighting fired correctly
-  (his readiness was 37).
-- **⚠ Two further hypotheses were measured and BOTH cleared — do not re-open them (2026-09-16).**
-  The owner's follow-up was *"is this correct or should it have been lower?"*, so the ground is
-  written down rather than left to be re-covered.
-
-  1. **"Freshness and balance are keyed on session NAME while recovery is keyed on MUSCLE, so an
-     overlapping session gets credit for rest half its muscles did not get."** True as a
-     description — **44.4%** of Upper's weighted muscle work was trained in the previous 24 h, and
-     it still scores freshness 100 — but it changes nothing here. Upper's muscle-weighted age is
-     **49.7 h**, which is past `sessionFreshnessScore`'s 48 h cap, so a muscle-derived freshness
-     saturates at 100 too and Upper lands at **83.5 instead of 84**. Push is the only session the
-     change moves (37.2 → 40.8, i.e. further from selection). **Do not rebuild freshness on muscle
-     age expecting it to separate overlapping sessions — the 48 h cap is what makes it not.**
-  2. **"The overlap with yesterday is invisible to the score."** It is not — it is already priced
-     in as Upper's recovery **70** against Pull's **91**.
-- **What the numbers DO say, and it is a presentation question rather than a scoring one:** Upper
-  **84** and Pull **82** is a near-tie decided by under a point. Pull is the better-recovered option
-  and loses only on being less overdue (balance 50 vs 100). The home card presents the winner as a
-  definite recommendation with no indication the runner-up is within noise. Filed nowhere yet
-  deliberately — it is a design call for the owner, not a defect, and BF-172 fixes the part of this
-  frame that IS wrong.
 
 ### [readiness] TN-34 — the stress-deload override fires on 83% of days, off the one number measured to carry no signal
 
@@ -1666,6 +1605,15 @@ re-test this.
 | Sleep | 97 | 73 | 63 | 19 |
 | Activity | 91 | 73 | 50 | 1 |
 | **Readiness** | **87** | 64 | 62 | **0** |
+
+**⚠ AMENDED 2026-09-17 — temperature is the STRUCTURAL cap, not what is holding the score down
+now.** Re-measured by week: temperature has recovered to **84–96** and is currently the *healthiest*
+contributor. The recent lows are `hrvBalance` (87 → 0 over six weeks) and `restingHeartRate`
+(70 → 12), and **those are tracking a real physiological event, not a scoring defect** — raw HRV
+halved and resting HR rose ~9 bpm, with the sleep-capture confound tested and ruled out
+([`review`](reviews/2026-09-17-the-app-saw-it-and-said-nothing.md) §1). Both things are true: the
+temperature term still cannot reach its own optimum, *and* it is not the reason readiness reads 31
+this week. The original framing invited the wrong fix.
 
 **`temperature` (weight .10) has never reached 100 in 62 days** — max 96, mean 76. It is scored
 *closer-better*, 100 exactly at the personal baseline, so **a miscentred baseline makes 100
@@ -3458,6 +3406,50 @@ the rest of that day; and `perceived_recovery` carries at least three distinct v
 - **Lane: A** — `packages/shared/src/health/observed-hr.ts:110` (`resolveMaxHr`), `health/hr-profile.ts:86` (`targetAnchorMax`), `health/body-battery-inputs.ts:51` (`resolveBatteryHrMax`), `health/hr-zones.ts:9` (`hrMaxFromAge`), plus `lib/health/readiness-payload.ts:397`.
 - **✅ OWNER DECISION, 2026-09-09 — blend the two at 50/50 and PIN it: `(168 + 187) / 2 = 177.5 → 178`.** *"Just because my HR got up to 168 doesn't mean it's the MAX… then when the Cooper 12-minute run is done and a new max is gotten, we can assess what's better."* Gate cleared; build to the spec below.
 - **Needs: TN-25** — unifying the anchor at 178 raises the walk's 0.70 target from **133 to 140**, so it must not land before the walk stops using 0.70. Sequencing, not a blocker on the anchor itself.
+- **✅ THE PINNED 178 IS NOW SUPPORTED BY EVIDENCE — measured 2026-09-17.** The owner pinned 178 as a
+  50/50 blend and parked the question: *"when the cooper 12 minute run is done and a new max is
+  gotten; we can assess whats better."* **A run on 2026-09-14 reached 175 bpm** — and it is
+  corroborated, not a spike: **212 samples at ≥ 165 bpm across a nine-minute span** (11:05–11:14
+  Brisbane), with 5 at 175, 13 at 174, 6 at 173. The old observed max of 168 is superseded.
+
+  | anchor | Zone 2 floor (RHR 52) | error vs the 175 observation |
+  |---|---:|---:|
+  | observed 168 (the option rejected) | 122 bpm | **−4 bpm** |
+  | **pinned 178** | 128 bpm | **+2 bpm** |
+  | age-predicted 187 | 133 bpm | +7 bpm |
+
+  **The blend was the right call and the rejected option would have been twice as wrong.** A true max
+  of at least 175 means 168 was never a ceiling — it was the highest he had happened to reach.
+
+  **⚠ This does not close TN-30.** The four anchors still disagree; what changed is the spread, from
+  168-vs-187 to **175-vs-178-vs-187**.
+
+  **⛔ VERIFIED 2026-09-17 — `targetAnchorMax` HAS ALREADY MOVED, and it took the walk target with
+  it.** `computeObservedHr` takes the **5th-highest** reading (`CORROBORATION = 5`) over
+  `OBSERVED_WINDOW_DAYS = 90`. Measured against production: the top twelve readings are
+  **175, 175, 175, 175, 175, 174, 174, 174, 174, 174, 174, 174** — so the 5th highest is **175** and
+  `targetAnchorMax` resolves to 175 today, not 168.
+
+  **The guided walk's fast target moved with it** (28-day mean resting HR = 54):
+
+  | anchor | walk's 0.70 fast target |
+  |---|---:|
+  | 168 — what the entry assumed | 134 bpm |
+  | **175 — what is live NOW** | **139 bpm** |
+  | 178 — the pinned anchor | 141 bpm |
+
+  **⚠ This bypasses the guardrail above.** `Needs: TN-25` exists because unifying the anchor "raises
+  the walk's 0.70 target from 133 to 140, so it must not land before the walk stops using it" — and
+  **5 of those 7 bpm have already landed**, with no code change and no announcement, because
+  `targetAnchorMax` is derived from data rather than set in source. **Sequencing a code change does
+  not sequence a data-derived constant.**
+
+  **⚠ And it makes TN-25 worse, not better.** That entry's complaint is that the fast target has never
+  been met in 44 attempts; the target just rose from 134 to 139 while the owner's measured fast-block
+  HR on the 35-minute walk ran **97 → 116**. The gap widened by 5 bpm without anyone touching it.
+
+  **⚠ The Cooper test is still worth doing.** 175 is the highest observed in a 21-minute run that was
+  not a maximal effort; it is a floor on the true max, not a measurement of it.
 - **Reference:** [`review`](reviews/2026-09-08-walk-intensity-calibration.md) §addendum 6.
 
 **The zone MODEL is genuinely single-sourced and that is not the problem.** `ZONE_DEFS`
@@ -5182,6 +5174,17 @@ call rather than a queue pass. Alternative: leave lookups as they are and add th
 `upsertUser`'s write only, which stops new divergence without touching matching.
 
 ### [sleep][platform] PS-17 — a phantom afternoon "sleep" replaced a real night in the daily summary, and it is scoring 🔴 LIVE
+
+- **⚑ STILL LIVE 2026-09-17, with current numbers and a consequence the entry does not state.**
+  **5 of the last 13 days recorded a midday Brisbane fragment as the day's ONLY sleep session** —
+  starts at 11:54, 12:10, 13:06, 12:25 and 14:25 local, 0.0–1.7 h, efficiency 0–48 — so the real
+  night is missing entirely on those days. **The shape has changed rather than stopped:** on 16 and
+  17 September *two* sessions were captured, a genuine ~7 h night **and** a ~10:30 nap.
+  **⚠ The consequence worth acting on: ANY multi-day sleep average is unusable while this is live**,
+  because it averages naps with nights. A Tuning session made exactly that mistake on 2026-09-16,
+  reporting the owner's sleep as having "collapsed to 3.1 h" when the figure was naps dragging the
+  mean down — see [`review`](reviews/2026-09-17-the-app-saw-it-and-said-nothing.md) §2. Anything
+  reading `sleep_sessions` in aggregate needs a night-vs-nap filter first, or it will repeat it.
 
 - **Lane:** A (the rollup and the summary write)
 - **Added:** 2026-08-30, from the Colmi comparison — found by accident while validating a different device
@@ -11334,8 +11337,40 @@ it to **−0.383 / −0.699** (n = 8). The finding is *masked* by the corrupt da
 **not the app's definition**. The buckets are written by the same pipeline as the scalar, so *"the
 buckets are right"* rests on their producing the correct sign, not on independent verification.
 
-**Pass test:** for every stored day, `stress_high_minutes` equals the bucket-derived count; and on a
-re-test at **n ≥ 30** the metric correlates negatively with readiness at |r| ≥ 0.3.
+**⚠ RE-TEST RUN 2026-09-17 — the sign half FAILS, and not for the reason anyone expected.**
+
+| window | n | corr(`stress_high_minutes`, readiness) |
+|---|---:|---:|
+| since 2026-09-01 (post storage fix) | 17 | **+0.562** |
+| since 2026-08-20 (wider) | 29 | **+0.134** |
+| TN-33's original, 18 days | 18 | +0.072 |
+
+**The pass test wants ≤ −0.3 and every window is POSITIVE.** More "high stress" minutes go with
+*higher* readiness, and the size of the effect swings with the window — which is the signature of a
+metric carrying little signal rather than one with an inverted sign.
+
+**⛔ The obvious explanation was tested and is FALSE.** LA-112 (#1256, 2026-09-16) found 41% of stress
+buckets were recorded during sleep, so sleep contamination looked like the cause. It is not:
+**corr(`stress_high_minutes`, hours slept) = −0.133** over the same 29 days. Stress minutes do not
+rise with sleep, so removing sleep buckets will not flip this on its own.
+
+**⚠ Do NOT read this as contradicting TN-33's autocorrelation result.** Those are different claims and
+both stand: the stress *series* has real temporal structure (lag-1 +0.637 against a night-preserving
+null of +0.454), while the daily *scalar* does not predict readiness. A signal can be real and still
+not be about recovery.
+
+**⚠ This vindicates TN-34.** The override was unwired on 2026-09-16 for firing off a number measured
+as carrying no signal; this is that measurement, re-run on more data and still failing.
+
+**Keep:** the sign half, and only that. The storage defect is fixed and verified (10/10 days match
+since 2026-09-01). What is owed is one re-test **after ≈ 30 days of post-LA-112 data (≈ 2026-10-16)**,
+because LA-112 changed what the metric counts — every window above is almost entirely pre-LA-112, so
+it prices the *old* metric. If that re-test is still positive, the honest next step is retiring the
+scalar rather than re-tuning it.
+
+**Pass test:** for every stored day, `stress_high_minutes` equals the bucket-derived count (✅ done);
+and on a re-test at **n ≥ 30 of post-LA-112 days** the metric correlates negatively with readiness at
+|r| ≥ 0.3.
 
 ### [readiness] TN-21 — "daytime stress" is 55% night buckets, and night and day carry opposite signs
 

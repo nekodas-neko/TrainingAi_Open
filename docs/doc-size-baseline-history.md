@@ -18,6 +18,17 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-17 — backlog → 23203, `projectOverview.md` → 11625 (BF-171 shipped)
+
+**−99 and +14.** BF-171's entry leaves the queue with the fix and files nothing behind it, so this
+one is a straight shrink — the first in a while where a shipped entry owed no follow-up at all. Its
+two limbs were both closed, not half-closed.
+
+The `projectOverview` growth is one paragraph, and the sentence earning most of it is the one saying
+what was **not** re-measured: the entry's production deltas came from a scratch harness against the
+owner's rows, and the fixtures that replaced it are synthetic. A later reader comparing those numbers
+against a live screen would otherwise have no way to know they were never re-checked.
+
 ## 2026-09-17 — backlog → 23168, `projectOverview.md` → 11611 (BF-173 shipped)
 
 **−63 and +19** (against the base this landed on; the headline is the live figure after re-merging `main`, which moved twice while this PR ran CI). BF-173's 111-line entry leaves the queue with the fix, and two entries replace it:
@@ -13161,6 +13172,77 @@ PR #1264 ran E2E twice on the same commit: 21:15 UTC failed on
 08:00 Brisbane. The entry already carried the payload and the clause; what it lacked was the thing
 that stops a reader concluding "flake" — two runs of one commit disagreeing on the hour. Worth five
 lines because without it the next person re-runs the spec, sees green, and closes the entry.
+
+## 2026-09-17 — backlog → 23226: a signal the app detected and never showed
+
++58 lines across three edits, from a routine production read rather than a queued item.
+
+**TN-45 is the finding and earns its table.** The illness radar's `watch` band has fired twice in 72
+days, and on those days readiness averages **32 against 64** — half. It is inert in two places at
+once (`penalty = 0` and a banner that returns null below `elevated`), so the band named
+*advisory-only* has no advisory. **The two bands that would produce UI have never fired**, which
+means the banner has, as far as this data shows, never rendered. Two ⚠ lines guard the fixes a
+reader reaches for first — raising the penalty (double-counts physiology readiness already caught)
+and moving the thresholds (n=2).
+
+**PS-17 gains current numbers rather than a duplicate entry.** It was already 🔴 LIVE; what it did
+not say is the consequence: five of thirteen days record a midday nap as the day's only sleep, so
+**any multi-day sleep average is unusable**. Worth the lines because a Tuning session made exactly
+that mistake the day before, and the entry now names it.
+
+**TN-42 is amended, not rewritten.** Its "temperature is the binding constraint" framing was true
+structurally and wrong about the present — temperature has recovered to 84–96 while `hrvBalance` fell
+to 0 on a real physiological event. Leaving it would have pointed an implementer at the wrong term.
+
+## 2026-09-17 — backlog → 23258: TN-22's re-test, which its own pass test asked for
+
++32 lines, replacing a two-line pass test with the measurement it demanded. TN-22 sat at #5 in Lane
+A's ready list with half of it already shipped, so the cheapest thing Tuning could do was run the
+re-test rather than let an implementer open it and find out.
+
+**The result earns the table: every window is positive where the test wants −0.3 or lower** — +0.562
+at n=17, +0.134 at n=29, +0.072 in TN-33's original. The swing across windows is the finding, not
+the sign: that is what a metric with little signal looks like.
+
+The ⛔ line costs four lines and saves the next reader a day. LA-112 had just found 41% of stress
+buckets recorded during sleep, which makes contamination the obvious culprit — and
+`corr(stress_high_minutes, hours slept) = −0.133` says it is not. Without that test the entry would
+have been closed on a plausible story.
+
+The `Keep:` is narrowed to the sign half with a date attached (≈ 2026-10-16, thirty post-LA-112
+days), because every window measured prices the *old* metric.
+
+## 2026-09-17 — backlog → 23249: a new observed max settles the anchor the owner parked
+
++23 lines to close a question the owner left open by name. He pinned 178 as a 50/50 blend and said
+the assessment waits for a new max; **a run on 2026-09-14 reached 175 with 212 samples above 165 bpm
+across nine minutes**, so the answer exists and the entry should carry it rather than wait for a
+Cooper test.
+
+The three-row error table is the point: the rejected option (observed 168) would have put Zone 2's
+floor **4 bpm low** where the pinned 178 puts it **2 bpm high**. That is the difference between a
+decision being lucky and being right, and it is the kind of thing that gets re-litigated in six
+months without the numbers beside it.
+
+Two ⚠ lines keep the entry honest about what did *not* change: the four anchors still disagree — the
+spread moved from 168-vs-187 to 175-vs-178-vs-187 — and 175 is a floor from a non-maximal run rather
+than a measured max, so the Cooper test still earns its place.
+
+## 2026-09-17 — backlog → 23302: the anchor moved itself, and the guardrail did not notice
+
++21 lines discharging a claim this agent had filed the same day as "not verified here". Verifying it
+found something worth more than the verification: **`targetAnchorMax` has already gone 168 → 175**,
+because `computeObservedHr` takes the 5th-highest reading over 90 days and the top five are all 175.
+
+The two-table shape is deliberate. The first establishes the resolver's value from production
+readings; the second turns it into the number the owner actually meets — **the walk's fast target has
+already moved 134 → 139 bpm**. Without the second, a reader has a constant; with it, they have the
+consequence.
+
+**The line worth carrying out of this entry is general:** `Needs: TN-25` was sequencing a *code*
+change, and 5 of its 7 bpm arrived anyway because the constant is derived from data. Sequencing a
+code change does not sequence a data-derived constant — and nothing in the queue's vocabulary
+expresses that today.
 ## 2026-09-11 — `docs/implementation-backlog.md` → 21535 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
@@ -13201,7 +13283,7 @@ much as unreproducible, which is the same failure as the hand-kept tally one par
 from the opposite direction — a derivation is only better than a tally if it returns the same answer
 twice.
 
-**Recomputed again 2026-09-17** (→ 23143 after BF-173 merged; 23201 at the previous reading), after #1264 and #1265 landed, with `main` having moved
+**Recomputed again 2026-09-17** (→ 23178 after BF-171 merged; 23143 after BF-173, 23201 before that), after #1264 and #1265 landed, with `main` having moved
 twice more while this PR waits on its owner decision — now in its seventh day.
 
 **And the correction the entry above earned: `origin/main..HEAD` is NOT clone-depth independent

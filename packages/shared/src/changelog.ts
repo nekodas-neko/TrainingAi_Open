@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.457.8",
+    date: "2026-09-17",
+    changes: [
+      "Telling the app your back is sore now actually changes what it recommends. The session picker compared muscle names letter for letter, and \"Back\" is not a muscle the exercise list contains \u2014 it has lats, upper back and traps \u2014 so ticking it moved every score by exactly zero. You could report a wrecked back and still be recommended a pull session at full confidence. The same mismatch meant a core exercise never found its own recovery figure and was treated as fully rested, throwing away a real 86%.",
+    ],
+  },
+  {
     version: "1.457.7",
     date: "2026-09-17",
     changes: [

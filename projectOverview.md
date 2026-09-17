@@ -26,8 +26,22 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.457.7 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.457.8 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-17.
+
+**A sore "Back" moved nothing, and `core` never found its recovery (BF-171, v1.457.8).**
+`sessionRecoveryScore` compared muscle names with exact lowercased equality on both sides — the only
+one of seven soreness/recovery consumers in the repo that matched raw. The check-in offers **Back**
+as a pill and the exercise library has no muscle of that name (`lats`, `upper back`, `traps`), so
+ticking it moved **every** session score by zero: a wrecked back still got Pull recommended at full
+confidence. Separately `computeMuscleRecovery` emits `abs` where an assignment says `core`, and a
+missed lookup returns **100**, so a synonym mismatch was indistinguishable from a rested muscle while
+the real 86% sat in the same payload. Both sides now go through `normalizeMuscle` /
+`moodMuscleMatches`; no synonym list was hand-rolled. **It composes with BF-173 and that was
+tested, not assumed** — shipped before it, this would have fed every newly-matched muscle into a live
+double count, which is what its `Needs:` was protecting. The entry's production deltas (Legs 59 → 62,
+Lower 74 → 77) were **not re-measured**; the fixtures are synthetic, so what is proved is the
+behaviour rather than the new numbers on the owner's screen.
 
 **The session picker counted your soreness twice (BF-173, v1.457.7).** `suggestedSoreMuscles`
 pre-ticks any muscle trained within 48 h and under 85% recovered — reading the recovery model — and
