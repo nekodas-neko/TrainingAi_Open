@@ -18,7 +18,7 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
-## 2026-09-17 — backlog → 23361 (four owner decisions + the Q-506 re-measurement)
+## 2026-09-17 — backlog → 23362 (four owner decisions + the Q-506 re-measurement)
 
 **+127 on a 23234 base after merging BF-175's +46.** Four owner rulings came back in one sitting and each is recorded on the entry it settles:
 TN-45 (surface the illness `watch` band as a quiet line, gate lifted), TN-30 (re-pin max HR at 181
