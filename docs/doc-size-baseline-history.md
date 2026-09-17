@@ -13218,3 +13218,19 @@ months without the numbers beside it.
 Two ⚠ lines keep the entry honest about what did *not* change: the four anchors still disagree — the
 spread moved from 168-vs-187 to 175-vs-178-vs-187 — and 175 is a floor from a non-maximal run rather
 than a measured max, so the Cooper test still earns its place.
+
+## 2026-09-17 — backlog → 23302: the anchor moved itself, and the guardrail did not notice
+
++21 lines discharging a claim this agent had filed the same day as "not verified here". Verifying it
+found something worth more than the verification: **`targetAnchorMax` has already gone 168 → 175**,
+because `computeObservedHr` takes the 5th-highest reading over 90 days and the top five are all 175.
+
+The two-table shape is deliberate. The first establishes the resolver's value from production
+readings; the second turns it into the number the owner actually meets — **the walk's fast target has
+already moved 134 → 139 bpm**. Without the second, a reader has a constant; with it, they have the
+consequence.
+
+**The line worth carrying out of this entry is general:** `Needs: TN-25` was sequencing a *code*
+change, and 5 of its 7 bpm arrived anyway because the constant is derived from data. Sequencing a
+code change does not sequence a data-derived constant — and nothing in the queue's vocabulary
+expresses that today.
