@@ -1,4 +1,5 @@
 import { toAestDay } from '@trainingai/shared/date-utils'
+import { normalizeMuscle, moodMuscleMatches } from '@trainingai/shared/muscles'
 import type { ProgramSession, MuscleAssignment, NextSessionRecommendation } from '@trainingai/shared/types/program'
 import type { IllnessFlag } from '@trainingai/shared/health/illness-radar'
 
@@ -63,8 +64,15 @@ export interface AiDynamicInput {
 
 // ── Muscle recovery helpers ───────────────────────────────────────────────────
 
+/**
+ * BF-171. Both sides go through `normalizeMuscle`, because a miss here returns 100 — "fully
+ * recovered" — and a synonym mismatch is therefore indistinguishable from a rested muscle.
+ * `computeMuscleRecovery` keys its output through the same normaliser, so it emits `abs` where an
+ * assignment says `core`; raw comparison missed and threw away a real 86%.
+ */
 function recoveryPct(muscle: string, recoveries: MuscleRecovery[]): number {
-  const r = recoveries.find(m => m.muscle.toLowerCase() === muscle.toLowerCase())
+  const target = normalizeMuscle(muscle)
+  const r = recoveries.find(m => normalizeMuscle(m.muscle) === target)
   if (!r) return 100
   return r.pct
 }
@@ -87,12 +95,21 @@ function sessionRecoveryScore(
   soreMuscles: string[],
   suggestedSoreMuscles: string[] | null | undefined,
 ): number {
-  const suggestedSet = new Set((suggestedSoreMuscles ?? []).map(m => m.toLowerCase()))
+  const suggestedSet = new Set((suggestedSoreMuscles ?? []).map(normalizeMuscle))
   // A tick penalises only if the lifter added it. On `null` (unknown provenance) nothing is
   // treated as suggested, so the pre-BF-173 behaviour is preserved rather than guessed at.
-  const soreSet = new Set(
-    soreMuscles.map(m => m.toLowerCase()).filter(m => !suggestedSet.has(m)),
-  )
+  //
+  // BF-171: kept as a LIST of labels rather than a set of muscle names. A pill is a broad region
+  // ("Back") that covers several catalogue muscles, so membership is not the question —
+  // `moodMuscleMatches` is. Both sides of the provenance filter are pill labels from one
+  // vocabulary, so they still compare directly, through the normaliser for the same reason
+  // everything else here does.
+  const lifterAdded = soreMuscles.filter(m => !suggestedSet.has(normalizeMuscle(m)))
+  // BF-171. This is the only soreness consumer in the repo that matched raw; the other six go
+  // through `moodMuscleMatches`. "Back" is a pill the picker offers and the exercise library has no
+  // muscle of that name — it has `lats`, `upper back` and `traps` — so exact equality clamped
+  // nothing, and a lifter with a wrecked back was recommended Pull at full confidence.
+  const isSore = (muscle: string) => lifterAdded.some(label => moodMuscleMatches(muscle, label))
   let weightedSum = 0
   let totalWeight = 0
 
@@ -101,9 +118,10 @@ function sessionRecoveryScore(
     for (const { muscle, role } of assignments) {
       const weight = role === 'main' ? 1.0 : 0.5
       let pct = recoveryPct(muscle, recoveries)
-      if (role === 'main' && soreSet.has(muscle.toLowerCase())) {
+      const sore = isSore(muscle)
+      if (role === 'main' && sore) {
         pct = Math.min(pct, 40)
-      } else if (role === 'secondary' && soreSet.has(muscle.toLowerCase())) {
+      } else if (role === 'secondary' && sore) {
         pct = pct * 0.75
       }
       weightedSum += pct * weight
