@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.457.11",
+    date: "2026-09-17",
+    changes: [
+      "The log-food sheet counts against today's real budget, so the app stops showing two different calorie goals two taps apart. The sheet was reading your stored rest-day goal \u2014 a different number from the day's budget, not a stale copy of it \u2014 so it said 1660 while the nutrition card said 1506, and its progress bar stayed green at 1361 when you actually had 151 kcal left. The end-of-day review had the same fault, and also fell back to a flat 2000 when no goal was set; it now shows the day's budget with your earned movement in it, or no ratio at all when there is nothing to measure against.",
+    ],
+  },
+  {
     version: "1.457.10",
     date: "2026-09-17",
     changes: [

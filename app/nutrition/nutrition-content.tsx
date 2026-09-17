@@ -685,6 +685,9 @@ export default function NutritionContent({ userId }: { userId?: string }) {
       {/* My Foods opens the logger onto its list rather than opening the list alone: the list now
           shows foods as well as meals, and a food's tap needs the assign step this sheet owns. */}
       <FoodLoggerSheet
+        // The day's budget, resolved here rather than re-read in the sheet (BF-175): the sheet used
+        // `nutrition_targets.calories`, the rest-day floor, and printed 1660 beside this page's 1506.
+        dayBudgetKcal={effectiveCalorieGoal}
         open={loggerOpen || savedMealsOpen}
         openLibrary={savedMealsOpen}
         preselectedMealTypeId={loggerMealTypeId}
@@ -763,7 +766,11 @@ export default function NutritionContent({ userId }: { userId?: string }) {
         logs={logs}
         date={selectedDate}
         userId={userId}
-        targets={targets}
+        // The day's budget and earned-scaled grams, not the stored row (BF-175). Its summary card
+        // prints `eaten / target kcal` for ONE day, so the rest-day floor is the wrong quantity
+        // here for the same reason it was in the log-food sheet — `energy-card` above already
+        // takes this value.
+        targets={effectiveTargets}
         onLogged={handleFoodLogged}
       />
     </div>

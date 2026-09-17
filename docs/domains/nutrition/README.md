@@ -313,6 +313,13 @@ Live at the time of writing (2026-07-30):
   floor** — plus a separately-sourced burn. Follow-up **LB-4** (food logs invalidate before their
   push) and **not device-verified** —
   [`journal`](../../overview/history-2026-09-10-folded-2.md#2026-08-23-one-calorie-budget).
+- ⚠️ **The same rest-day-floor mistake survived in two more surfaces until BF-175** (fixed
+  2026-09-17, v1.457.11): the log-food sheet fetched `nutrition_targets.calories` itself and printed
+  1,660 beside the card's 1,506, and the end-of-day review took the stored row as a **prop** with a
+  `?? 2000` fallback under it. Both now receive the page's one resolved value. **The lesson for the
+  next sweep of this class: a cache-key grep cannot see a budget passed as a prop** — follow
+  `targets` down the render tree as well. **Not device-verified** (the bar's green/orange flip at
+  S25 width) — [`journal`](../../overview/entries/2026-09-17-bf175-assign-step-day-budget.md).
 
 - **Offline saved-meal create/edit/delete** is a new sync domain and is **not device-verified**.
 - **Offline food search** is APK-only and unverified on device.

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import type { MealType, NutritionTargets, FoodLogWithItem } from '@trainingai/shared/types/nutrition'
+import type { MealType, FoodLogWithItem } from '@trainingai/shared/types/nutrition'
 import type { EditableNutrition } from './review-step'
 import { todayInTz } from '@trainingai/shared/date-utils'
 import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
@@ -17,11 +17,25 @@ interface Props {
   onBack: () => void
   onConfirm: (mealTypeId: string, quantity: number) => Promise<void>
   logDate?: string
+  /**
+   * The day's real budget, resolved by the page that owns it (BF-175).
+   *
+   * **Not `nutrition_targets.calories`, which this sheet used to read for itself.** That column is
+   * the REST-DAY FLOOR, not `restingBase + targetNet` — the rule `nutrition-content.tsx` and
+   * `home-nutrition-card.tsx` both state outright after three budgets once appeared on one screen.
+   * Reading it here printed 1660 beside the card's 1506 two taps away, and coloured the bar green
+   * at 1361 on a day that had 151 kcal left.
+   *
+   * Passed down rather than recomputed: calling `budgetProvenance` here would make this a second
+   * independent number the moment its inputs differed, which is what `energy-card.tsx` records.
+   * Null when no budget is known — the bar then draws nothing rather than inventing a denominator.
+   */
+  dayBudgetKcal?: number | null
 }
 
 const QTY_PRESETS = [0.5, 1, 1.5, 2] as const
 
-export function AssignStep({ nutrition, preselectedMealTypeId, onBack, onConfirm, logDate }: Props) {
+export function AssignStep({ nutrition, preselectedMealTypeId, onBack, onConfirm, logDate, dayBudgetKcal = null }: Props) {
   const tz = useUserTimezone();
   const [mealTypes, setMealTypes] = useState<MealType[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(preselectedMealTypeId)
@@ -29,7 +43,6 @@ export function AssignStep({ nutrition, preselectedMealTypeId, onBack, onConfirm
   const [saving, setSaving] = useState(false)
   const [loadingTypes, setLoadingTypes] = useState(true)
   const [todayCalories, setTodayCalories] = useState<number | null>(null)
-  const [calorieTarget, setCalorieTarget] = useState<number | null>(null)
 
   useEffect(() => {
     const seededTypes = readCacheSync<MealType[]>('nutrition-meal-types')
@@ -40,7 +53,6 @@ export function AssignStep({ nutrition, preselectedMealTypeId, onBack, onConfirm
       setSelectedId(prev => prev ?? (match?.id ?? seededTypes[0]?.id ?? null))
       setLoadingTypes(false)
     }
-    setCalorieTarget(readCacheSync<NutritionTargets>('nutrition-targets')?.calories ?? null)
     cachedFetch<MealType[]>('nutrition-meal-types', '/api/nutrition/meal-types', TTL_LONG, (data) => {
       setMealTypes(data)
       const hour = new Date().getHours()
@@ -52,9 +64,6 @@ export function AssignStep({ nutrition, preselectedMealTypeId, onBack, onConfirm
     cachedFetch<FoodLogWithItem[]>(
       `nutrition-food-logs-${targetDate}`, `/api/nutrition/food-logs?date=${targetDate}`, NUTRITION_FOOD_LOGS_TTL,
       logs => setTodayCalories(Array.isArray(logs) ? logs.reduce((sum, l) => sum + l.calories, 0) : 0),
-    ).catch(() => {})
-    cachedFetch<NutritionTargets>('nutrition-targets', '/api/nutrition/targets', TTL_LONG,
-      t => setCalorieTarget(t?.calories ?? null),
     ).catch(() => {})
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [logDate])
@@ -147,20 +156,20 @@ export function AssignStep({ nutrition, preselectedMealTypeId, onBack, onConfirm
         </div>
       </div>
 
-      {todayCalories !== null && calorieTarget !== null && (!logDate || logDate === todayInTz(tz)) && (
+      {todayCalories !== null && dayBudgetKcal !== null && (!logDate || logDate === todayInTz(tz)) && (
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">Today after logging</span>
             <span className="tabular-nums font-medium">
-              {todayCalories + effectiveCals} <span className="text-muted-foreground">/ {calorieTarget} kcal</span>
+              {todayCalories + effectiveCals} <span className="text-muted-foreground">/ {dayBudgetKcal} kcal</span>
             </span>
           </div>
           <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
             <div
               className={`h-full w-full rounded-full origin-left transition-transform duration-300 motion-reduce:transition-none ${
-                (todayCalories + effectiveCals) > calorieTarget ? 'bg-orange-500' : 'bg-green-500'
+                (todayCalories + effectiveCals) > dayBudgetKcal ? 'bg-orange-500' : 'bg-green-500'
               }`}
-              style={{ transform: `scaleX(${Math.min(100, Math.round(((todayCalories + effectiveCals) / calorieTarget) * 100)) / 100})` }}
+              style={{ transform: `scaleX(${Math.min(100, Math.round(((todayCalories + effectiveCals) / dayBudgetKcal) * 100)) / 100})` }}
             />
           </div>
         </div>
