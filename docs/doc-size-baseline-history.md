@@ -13346,3 +13346,21 @@ gate did, and is worth it — the next reader would otherwise re-open the same q
 `docs/overview/entries/` went 91 → 51 files in the same PR (40 folded into
 `history-2026-09-17-folded-1.md`, 163 KB), which is not tracked by a `.size` baseline but is the
 larger change by far.
+
+## 2026-09-17 — `docs/implementation-backlog.md` 23512 → 23484 (Lane B, BF-175)
+
+Net −28. BF-175's 47-line entry came down to 20: it shipped, so the source traces, the two-number
+table and the sweep instructions are now in the diff and the journal rather than the queue. It keeps
+a `Keep:` line rather than being deleted, because the device look at the bar's green/orange flip is
+still owed.
+
+Against that, the LB-118 filing and the LB-117 parking note in the same PR add back most of what was
+freed — parking an entry costs more lines than leaving it, and is worth it here: the next reader
+would otherwise reach for the `GET /api/mood` workaround the note exists to rule out.
+
+## 2026-09-17 — `projectOverview.md` 11654 → 11661 (Lane B, BF-175)
+
++7, the shipped entry for BF-175. Raised rather than absorbed because the entry carries a ⚠️
+not-device-verified marker, which the Canonical Runtime rule requires to live in this file until the
+S25 look happens — it is index material, not journal material. The prose was cut from 12 lines to 6
+first; the measurement, the two-surface finding and the control runs are in the journal entry.

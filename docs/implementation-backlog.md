@@ -648,6 +648,31 @@ line must name **what moved** (resting HR and HRV off baseline), never imply inf
   (`packages/shared/src/ai-periodization/__tests__/sore-muscle-provenance.test.ts`) already pin what
   the scorer does with each case.
 
+### [workouts][platform] LB-118 — the explain page's `signals` omits sore-tick provenance, so LB-117 cannot be built in its lane
+
+- **Lane:** A — `lib/data/postgres/adapter.ts:1912` and `packages/shared/src/types/program.ts:127`.
+  Filed by Lane B on 2026-09-17 after checking LB-117's premise.
+- **Two one-line changes, and the value is already in scope.** The explain `signals` block is built
+  at `adapter.ts:1912` with `soreMuscles: moodLog?.soreMuscles ?? []` and no provenance;
+  `moodLog.suggestedSoreMuscles` is read twenty lines above it (line 1892, where the SCORER is fed).
+  Add it to the `signals` object and to the `signals` type.
+- **⛔ LB-117 says the adapter is *"deliberately unchanged"* and that *"the data is there"*. Both are
+  true of the repository and false of the payload the page renders.** `getMoodLog` and `listMoodLogs`
+  do return the field — it just never reaches `signals`, which is what the explain surface is given.
+  Same shape as OR-118: a derivation that exists and an exposure that does not.
+- **⚠ A Lane-B-only workaround EXISTS and is the wrong answer — this is the part worth reading.**
+  `GET /api/mood?date=…` returns the whole `MoodLog`, provenance included, so the page could fetch
+  it client-side with no Lane A change at all. **Do not.** Q-105's rule for this screen is that it
+  shows the numbers the recommendation was *actually computed from*, and `next-session` is cached
+  (`NEXT_SESSION_TTL` = `TTL_SHORT`) while the check-in can be edited after it was computed. A
+  separately-fetched mood log can therefore be a *different* check-in from the one behind the score,
+  and the page would explain a recommendation with inputs it never used — a subtler version of
+  exactly the defect LB-117 is about.
+- **Verification:** an explain payload for a day whose check-in carried a suggested tick shows the
+  field; one from before provenance existed shows `null`, not `[]` — the scorer reads null as
+  "unknown" and scores the old way, and the page must be able to say "not recorded" rather than
+  "none were suggestions".
+
 ### [workouts][app-shell] LB-117 — the explain screen lists sore muscles that no longer penalise anything
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-17 (Lane A, found while shipping BF-173).
@@ -664,6 +689,17 @@ line must name **what moved** (resting HR and HRV off baseline), never imply inf
   there: `moodLog.suggestedSoreMuscles` is read back by `getMoodLog` and `listMoodLogs`.
 - **Not urgent and deliberately not batched with BF-172:** that entry is about a label on a
   different number (session fit called readiness). Same screen, different defect.
+- **Needs:** LB-118
+- **⛔ CHECKED 2026-09-17 AND THIS IS NOT BUILDABLE IN THIS LANE YET.** *"The data is there"* is true
+  of the repository and false of what the page is given: the explain `signals` block
+  (`adapter.ts:1912`) carries `soreMuscles` and no provenance, and `signals` is the payload this
+  surface renders. Exposing it is two one-line edits in Lane A files — filed as **LB-118**, with the
+  value already in scope at `adapter.ts:1892`.
+- **⚠ And the obvious Lane B workaround is wrong, which is why this is parked rather than improvised.**
+  `GET /api/mood` returns the provenance, so the page could fetch it itself — but `next-session` is
+  cached and the check-in can change after the recommendation was computed, so that fetch can
+  describe a *different* check-in from the one behind the score. Q-105 exists to stop this page
+  explaining a recommendation with inputs it did not use.
 
 
 ### [readiness] TN-34 — the stress-deload override fires on 83% of days, off the one number measured to carry no signal
@@ -990,50 +1026,22 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
 
 ### [nutrition] BF-175 — the log-food sheet prints the stored GOAL as today's budget, so it reads 1660 beside the card's 1506
 
-- **Branch:** _unassigned_ · **Added:** 2026-09-17 (BugFix intake). Owner, with two screenshots taken
-  at the same minute: *"2 different calorie goals here"*.
-- **Lane: B** — `components/nutrition/assign-step.tsx:43`, `:56` and `:153-157`.
-- **Both numbers on his screen, traced to source and confirmed against production rows:**
-
-  | surface | shows | what it is |
-  |---|---|---|
-  | Nutrition card | `1,355 OF 1,506` · *"1,291 resting rate + 215 earned from movement"* | `budgetProvenance(balance).total` |
-  | Assign-to-Meal sheet | `Today after logging 1361 / 1660` | `nutrition_targets.calories`, raw |
-
-  `nutrition_targets.calories` is **1660** in production (updated 2026-08-31). The intake halves
-  agree — 1355 + the 6 kcal item = 1361 — so **the only thing that diverges is the denominator**,
-  and it diverges by 154 kcal, which is his entire earned-from-movement figure plus the gap between
-  the stored goal and his measured resting rate.
-- **⚠ This is a MISSED SURFACE of an already-fixed bug, not a new one.** `nutrition-content.tsx:423-441`
-  carries the fix and the measurement: three budgets once appeared on one screen (zone bar 2,180,
-  Home 2,451, ring 2,001) and the comment states the rule outright — ***"`nutrition_targets.calories`
-  is the rest-day floor, not `restingBase + targetNet`"***. `home-nutrition-card.tsx:34` repeats it:
-  ***"The budget is `budgetProvenance(...).total`, not `calorieGoal + activeEnergyKcalToday`."***
-  The sweep that fixed the page did not reach the sheet that logs into it.
-- **Fix: pass the resolved budget down rather than re-reading targets in the sheet.**
-  `nutrition-content.tsx` already computes `effectiveCalorieGoal` (`:446`) as
-  `budget?.total ?? targets?.calories`, with a deliberate fallback that does **not** compose an
-  addend. Thread that value into the log-food flow and delete `assign-step`'s own
-  `nutrition-targets` read (`:43` seed and `:56` fetch). **Do not call `budgetProvenance` inside the
-  sheet** — `energy-card.tsx:50` records why a second call site is the wrong shape: it becomes
-  another independent number the moment its inputs differ.
-- **The progress bar is wrong in the same breath and is the visible half.** `:159-163` colours green
-  under target and orange over, against the 1660 denominator — so a day that has already passed the
-  real 1506 budget still paints green and reads as headroom. His screenshot shows exactly that: a
-  full green bar at 1361/1660 while the card two taps away says **151 kcal left**.
-- **Checked and NOT a defect — do not "fix" it in the same PR:** `WeeklyNutritionChart`
-  (`day-tools-section.tsx:72` → `weekly-nutrition-chart.tsx:70`, `:134`) also takes
-  `targets?.calories`. There it is a constant reference line across seven days and the over/under
-  bar colouring for the current day. A weekly chart has no single day's earned movement to add, so
-  the stored goal is the right quantity — the same reason `effectiveCalorieGoal` falls back to it
-  rather than inventing an addend.
-- **Sibling sweep when fixing:** grep every `readCacheSync<NutritionTargets>` / `cachedFetch<NutritionTargets>`
-  of `'nutrition-targets'` and classify each as *goal* or *today's budget*. Four surfaces read it
-  today — `assign-step.tsx`, `nutrition-content.tsx`, `macro-targets-pane.tsx` (Profile, editing the
-  goal itself, correct) and the sync-provider warm list. Only the first is misclassified.
-- **Verification:** browser is enough for the arithmetic — open the log sheet on a day with earned
-  movement and confirm the denominator matches the card. **The device look is still owed** for the
-  bar colour at the S25 width, because the green/orange flip is what makes the number believable.
+- **Shipped 2026-09-17** on `fix/bf175-assign-step-day-budget`. The sheet reads no targets at all
+  now: `nutrition-content.tsx` passes `effectiveCalorieGoal` into `FoodLoggerSheet` →
+  `AssignStep dayBudgetKcal`, and both the denominator and the green/orange flip read that prop.
+  Null draws nothing rather than inventing a denominator.
+- **Two surfaces, not one.** The prop-chain sweep the entry's cache-key sweep could not see found
+  the end-of-day review taking raw `targets` and printing `eaten / target kcal` for ONE day, with a
+  `?? 2000` fallback underneath it. It now takes `effectiveTargets`, the same value `energy-card`
+  already had, and hides the ratio when no target is known.
+- **`WeeklyNutritionChart` was left alone**, as this entry instructed — a seven-day reference line
+  has no single day's earned movement to add.
+- **Keep:** the **device look is still owed** — the bar colour at the S25 width. The arithmetic is
+  pinned by `e2e/bf175-one-day-budget.spec.ts` (run against unfixed `main`: printed 1964 against a
+  budget of 1810, the injected 154 offset exactly) and by
+  `components/nutrition/__tests__/bf175-day-budget-single-source.test.ts` (9 of its 10 assertions
+  red on `main`). Neither says what green-at-1361 looks like on the phone, which is the half that
+  made the number believable.
 
 ### [workouts][readiness] BF-174 — every muscle recovers on the same 24 h base constant, so abs and quads are modelled identically
 

@@ -89,9 +89,11 @@ interface Props {
    * sheet, so the button is a deep link into one screen rather than a second way in.
    */
   openLibrary?: boolean
+  /** The day's real budget, threaded to `AssignStep`'s "Today after logging" bar (BF-175). */
+  dayBudgetKcal?: number | null
 }
 
-export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, onLogged, userId, logDate, openLibrary }: Props) {
+export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, onLogged, userId, logDate, openLibrary, dayBudgetKcal = null }: Props) {
   // Q-413: the eaten-at resolution happens in the USER's zone, not the device's.
   const tz = useUserTimezone()
   const [stepStack, setStepStack] = useState<Step[]>(['capture'])
@@ -362,6 +364,7 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
             )}
             {step === 'assign' && (
               <AssignStep
+                dayBudgetKcal={dayBudgetKcal}
                 nutrition={form}
                 preselectedMealTypeId={preselectedMealTypeId}
                 onBack={() => popStep()}
