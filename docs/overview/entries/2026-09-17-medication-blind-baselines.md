@@ -42,6 +42,23 @@ the delta stays computable after the live baseline has moved on. `supplement_log
 score audit and advisory so a flagged day names the medication and the most recent dose. The overlay
 is plotted **with a lag** — a same-day correlation finds nothing on data that plainly shows an effect.
 
+> **⚠ CORRECTED 2026-09-18 — the paragraph below is WRONG, and it was this agent's error.** Lane A
+> checked before building and found the pre-intervention baseline is **already on disk**:
+> `oura_daily_summary` stores the baselines **per night, per row**, so the 2026-09-06 row still
+> carries `rhr_base 52.875 / hrv_base 56.125` and later drift cannot reach back to it. Verified
+> independently — 74 rows back to 2026-07-07 and nothing prunes the table. The EMA arithmetic was
+> right; the conclusion did not follow, because drift only moves the *latest* baseline. There is no
+> erasure, no deadline and no schema change. The sting is that this agent had the evidence in hand —
+> it read historical baselines via `lag(rhr_baseline_mean_x8)` to compute the z-scores and still
+> argued they were being lost. **The general rule, now in the readiness domain index: a rolling
+> aggregate checkpointed per period has no erasure problem however fast it adapts — before adding
+> storage to preserve a value, check whether it is already written down with a date on it.** See
+> [`lane-a: the baseline was already retained`](2026-09-17-lane-a-tn46-baseline-already-retained.md).
+>
+> **Also superseded:** the dose-response table ends at 09-17. The 09-18 row reads **RHR 59.4** (from
+> 64.9) and **HRV 47** (from 19) — the 1 mg excursion turned at day 5, matching the 0.5 mg washout.
+> *"Still falling at day 4"* was true when written and is not current.
+
 **Why the snapshot is urgent.** `updateBaseline` moves ~1/32 per night, so the resting-HR baseline is
 being dragged toward 65 and HRV toward 20. Within 30–60 nights every z returns to ~0 — `watch` stops
 firing, readiness recovers, nothing physiological has changed, and the recovery reads as progress.
