@@ -1038,9 +1038,28 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
   fit against something observable (next-session performance, RPE against expected RPE) rather than
   against intuition about muscle size.
 
-### [workouts][app-shell] BF-172 — the explain screen calls the session-fit score "readiness", so it reads 84 HIGH directly above "readiness 37 · Low"
+### [workouts][app-shell] BF-172 — the explain screen called the session-fit score "readiness" (fixed)
 
-- **Branch:** _unassigned_ · **Added:** 2026-09-16 (BugFix intake). Found tracing BF-171; the owner's
+- **✅ SHIPPED 2026-09-17 (v1.457.7)** (`fix/bf172-session-fit-not-readiness`).
+  [Journal](overview/entries/2026-09-17-fix-bf172-session-fit-not-readiness.md). Caption is now
+  *"How well this session fits today"*, and the ring prints **Strong fit / Fair fit / Poor fit**.
+  **No `Verify:` field — the entry said browser is enough and the browser has it**
+  (`e2e/bf172-session-fit-not-readiness.spec.ts` stubs the owner's screenshot: fit 84 over readiness
+  37, deload advised; it fails against the unfixed screen).
+- **⚠ TWO OF THIS ENTRY'S INSTRUCTIONS WERE ADJUSTED, both for rules it did not check against.**
+  - It said *"either no band word or a fit-specific one"*. **No band word is not available here:** the
+    ring and the number are band-coloured, and `score-ring.tsx`'s own comment records that the label
+    exists precisely so the band is not carried by colour alone. Shipped with a fit-specific word.
+  - It said change the band *"at this call site, not inside `ScoreRing`"*. The caution was aimed at
+    the ~15 `scoreBand` callers, which is right — but **`ScoreRing` is session-explain's OWN
+    component with exactly one caller** (`app/session-explain/components/score-ring.tsx`; the
+    `ScoreRing*` symbols in `components/more/` and `oura-score-chip-row.tsx` are an unrelated home
+    preference type). The vocabulary lives in the component, which cannot leak.
+- **And the fit words are MAPPED from `scoreBand`, not derived from the score.** CLAUDE.md bans
+  re-deriving the 70/50 thresholds with local label strings — two divergent copies were found that
+  way — so `scoreBand(score)` still owns the thresholds and the colour, and only the vocabulary is
+  remapped: `High → Strong fit`, `Moderate → Fair fit`, `Low → Poor fit`. `scoreBand` is untouched.
+- **Branch:** `fix/bf172-session-fit-not-readiness` · **Added:** 2026-09-16 (BugFix intake). Found tracing BF-171; the owner's
   screenshot is the evidence and he did not have to point at it.
 - **Lane: B** — `app/session-explain/session-explain-content.tsx:31`.
 - **One screen, one word, two different quantities.**

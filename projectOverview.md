@@ -26,8 +26,19 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.457.6 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-09-16.
+**Version:** v1.457.7 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-09-17.
+
+**The explain screen called the session-fit score "readiness" (BF-172, v1.457.7).** `overallScore`
+is `recovery·w + balance·w + freshness·w` — how well a session fits today — and the ring captioned it
+*"Overall readiness for this session"* and graded it on the readiness ladder, so it read **84 HIGH**
+in green directly above *Oura readiness 37 · Low* and *strong deload advised*. BF-154's class: a
+number correct in its own terms under a caption belonging to the quantity it replaced. The caption
+now names fit and the ring prints Strong/Fair/Poor fit, **mapped from `scoreBand` rather than derived
+from the score**, so the 70/50 thresholds stay in the one module that owns them. Two of the entry's
+instructions were adjusted: "no band word" was not available (the ring is band-coloured, so the word
+is what keeps the band off colour-only), and the band could live in `ScoreRing` after all — it is
+session-explain's own component with one caller, not the shared thing a bare grep suggests.
 
 **Health Connect was syncing everyone into Brisbane (LB-113, v1.457.6).** `syncHealthConnect` and
 `enrichActivityLogs` took the user's timezone as of 2026-09-16 and nothing passed it, so both fell

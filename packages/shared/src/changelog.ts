@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.457.7",
+    date: "2026-09-17",
+    changes: [
+      "The \u201cWhy this session?\u201d screen no longer calls its match score your readiness. The big ring shows how well the session fits today \u2014 what is recovered and what is overdue \u2014 and it was captioned \u201creadiness\u201d and graded on the readiness scale, so it could read 84 HIGH in green directly above your actual readiness of 37 and a strong deload warning. It now says how well the session fits, with fit wording to match.",
+    ],
+  },
+  {
     version: "1.457.6",
     date: "2026-09-16",
     changes: [
