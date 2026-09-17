@@ -1776,6 +1776,11 @@ composite reports which of its inputs were inferred.
   `MIN_WAKING_MINUTES_TO_JUDGE` is 60. The fixture's wake time falls back to **07:00 local**, so
   `wakingMinutes` is under 60 for exactly the first hour of the day and the grace clause short-circuits
   to true. After 08:00 it goes false, the badge returns, and the spec passes again.
+- **✅ CONFIRMED BY NATURAL EXPERIMENT, not just by reading the clause.** The same commit
+  (`1bc4332afa`, PR #1264) ran E2E twice: the run starting **21:15 UTC failed** on this spec, and the
+  run starting **22:00 UTC passed**. Identical code, identical fixture, different side of 22:00 UTC —
+  which is 08:00 Brisbane, the minute `wakingMinutes` crosses 60. That forecloses the "it is just
+  flaky" reading, which is the reading this defect otherwise invites.
 - **Cause: #1256** (*"Stop counting sleep as daytime stress"*, LA-112) narrowed the route's waking
   window. Before it, the window was effectively the whole calendar day, so `mins` cleared 60 at any
   hour and zero samples always read as insufficient. Nothing is wrong with that change; it exposed a

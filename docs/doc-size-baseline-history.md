@@ -18,9 +18,9 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
-## 2026-09-17 — backlog → 23163, `projectOverview.md` → 11611 (BF-173 shipped)
+## 2026-09-17 — backlog → 23168, `projectOverview.md` → 11611 (BF-173 shipped)
 
-**−63 and +19.** BF-173's 111-line entry leaves the queue with the fix, and two entries replace it:
+**−63 and +19** (against the base this landed on; the headline is the live figure after re-merging `main`, which moved twice while this PR ran CI). BF-173's 111-line entry leaves the queue with the fix, and two entries replace it:
 **LB-116** (the check-in sheet sends the list of sore ticks it actually displayed) and **LB-117**
 (the explain screen will now list sore muscles that no longer lower the score). Net shrink even so,
 which is the shape to want — a shipped entry should cost more lines than the follow-ups it honestly
@@ -13153,3 +13153,13 @@ finding is invisible outside a one-hour window: `rv38-body-battery-no-data-badge
 concludes flake and moves on. The entry carries the captured JSON, the exact clause, and an explicit
 instruction to verify **inside** that window — because verifying outside it proves nothing and looks
 like proof.
+
+## 2026-09-16 — `docs/implementation-backlog.md` 23226 → 23231
+
+Five lines on LB-114, recording the confirmation rather than the finding.
+
+PR #1264 ran E2E twice on the same commit: 21:15 UTC failed on
+`rv38-body-battery-no-data-badge`, 22:00 UTC passed. Same code, same fixture, opposite sides of
+08:00 Brisbane. The entry already carried the payload and the clause; what it lacked was the thing
+that stops a reader concluding "flake" — two runs of one commit disagreeing on the hour. Worth five
+lines because without it the next person re-runs the spec, sees green, and closes the entry.
