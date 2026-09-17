@@ -13243,6 +13243,25 @@ consequence.
 change, and 5 of its 7 bpm arrived anyway because the constant is derived from data. Sequencing a
 code change does not sequence a data-derived constant — and nothing in the queue's vocabulary
 expresses that today.
+
+## 2026-09-17 — `docs/implementation-backlog.md` 23231 → 23250, `projectOverview.md` 11592 → 11603
+
+`fix/bf172-session-fit-not-readiness` (BF-172).
+
+Nineteen lines, and they record why the entry's two instructions were not followed literally — which
+the diff shows as an unexplained deviation:
+
+- *"either no band word or a fit-specific one"* — no band word was not available. The ring and the
+  number are band-coloured, so the word is the only thing keeping the band off colour-only, and
+  `score-ring.tsx`'s own comment says it was added for exactly that.
+- *"change it at this call site, not inside `ScoreRing`"* — right about `scoreBand`'s ~15 callers,
+  wrong about `ScoreRing`, which is session-explain's own component with one caller. A bare grep for
+  "ScoreRing" hits an unrelated `ScoreRingStyle` home preference, which is what makes it read as
+  shared. Worth writing down: the next person greps the same string.
+
+Also recorded: the fit words map from `scoreBand`'s label rather than being derived from the score,
+so the 70/50 thresholds stay in one module. Without that line the mapping looks like indirection
+someone would helpfully "simplify" into local thresholds — the exact pattern CLAUDE.md bans.
 ## 2026-09-11 — `docs/implementation-backlog.md` → 21535 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
@@ -13283,7 +13302,7 @@ much as unreproducible, which is the same failure as the hand-kept tally one par
 from the opposite direction — a derivation is only better than a tally if it returns the same answer
 twice.
 
-**Recomputed again 2026-09-17** (→ 23178 after BF-171 merged; 23143 after BF-173, 23201 before that), after #1264 and #1265 landed, with `main` having moved
+**Recomputed again 2026-09-17** (→ 23197; 23178 after BF-171, 23143 after BF-173, 23201 before that — four readings in one day, which is the churn this note exists to record rather than smooth), after #1264 and #1265 landed, with `main` having moved
 twice more while this PR waits on its owner decision — now in its seventh day.
 
 **And the correction the entry above earned: `origin/main..HEAD` is NOT clone-depth independent

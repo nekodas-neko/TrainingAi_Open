@@ -28,7 +28,9 @@ export function SessionExplainContent({ data }: { data: SessionExplainData }) {
         {/* Narrative first — the readable "why", seeded from cache for instant paint. */}
         <AiInsightCard sessionId={session.id} />
 
-        <ScoreRing score={overallScore} label="Overall readiness for this session" />
+        {/* Not "readiness" (BF-172): `overallScore` is the session-FIT score, and the screen printed
+            it as readiness directly above the real one reading 37 · Low. */}
+        <ScoreRing score={overallScore} label="How well this session fits today" />
 
         {/* Raw signals grouped + demoted behind a collapsible. */}
         <SignalSections data={data} />
