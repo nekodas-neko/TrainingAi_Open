@@ -13052,6 +13052,92 @@ those words.
 Also recorded: the band returns 101–118 where the entry quotes 105–118 — the standard 0.60 lower edge
 against a rounded figure, 4 bpm apart. Naming a small discrepancy costs two lines; discovering later
 that a shipped constant silently disagreed with the entry it came from costs an investigation.
+
+## 2026-09-16 — `docs/implementation-backlog.md` 22853 → 22957 (+104)
+
+Two BugFix intake entries from the owner's *"I did push yesterday which was an upper- why would it
+reccomened upper?"*: **BF-171** (`sessionRecoveryScore` is the only soreness/recovery consumer in the
+repo that matches muscle names raw — a sore `Back` pill clamps nothing, and a `core` assignment never
+finds its `abs` recovery entry) and **BF-172** (the explain screen labels the session-fit blend
+"Overall readiness for this session" and bands it with the readiness ladder, so it reads 84 HIGH
+above its own "readiness 37 · Low").
+
+BF-171 carries a five-row measured score table because the recommendation the owner queried turned
+out to be **correct** — the table is what shows that, and it is also what shows the defect is beside
+it rather than in it. The alternative was a journal-only table and an entry that asserts the numbers,
+which is the shape that gets re-measured by the implementer.
+
+## 2026-09-16 (same PR) — `docs/implementation-backlog.md` 22957 → 22977
+
+The owner's follow-up to BF-171 — *"is this correct or should it have been lower?"* — was answered by
+measuring two further hypotheses about the score, and both cleared. The cleared ground is written
+into the entry rather than only into the journal, because both are the kind of hypothesis an
+implementer forms from reading the code alone: that name-keyed freshness overstates an overlapping
+session (it does, and the 48 h cap makes it not matter), and that the overlap is missing from the
+score (it is already in the recovery component). Fourteen lines here save re-deriving them.
+
+## 2026-09-16 (same PR, third raise) — `docs/implementation-backlog.md` 22977 → 23047 (+70)
+
+**BF-173**, from the owner's *"Legs would be more recovered?"* — which is correct, and the score
+discards it. `suggestedSoreMuscles` auto-ticks a muscle off the recovery model's own output, and
+`sessionRecoveryScore` then clamps that same muscle to `min(pct, 40)`: one fact counted twice, the
+second pass overwriting the first with a harsher number.
+
+The entry is long for a reason that is not padding. It carries the measured before/after table
+because removing the leg ticks **changes the recommendation** (Lower 85 beats Upper 84), it carries
+the rejected multiplier variant with its numbers because `pct × 0.6` is the obvious first idea and
+does not work, and it carries the `mood_logs` column list because the absence of a provenance column
+is what turns the clean fix into a migration and is the entire reason for its `Gate: owner`. Each of
+those is an experiment an implementer would otherwise run again.
+
+## 2026-09-16 (same PR, fourth raise) — `docs/implementation-backlog.md` 23047 → 23125
+
+**BF-174** (per-muscle recovery time constants — the model has one 24 h base for every muscle,
+scaled only by bout volume) plus the owner's 24 h auto-tick-window proposal measured into BF-173.
+
+Both carry their numbers because both are *rejected or deferred* proposals, and a rejected proposal
+with no measurement attached gets proposed again. The 24 h window flips the pick by 0.4 points, which
+is the reason it is not the fix; the per-muscle constants do not change the pick alone and **cancel
+the window change when combined**, which is the reason BF-174 has to be fitted rather than guessed.
+Recording an interaction that surprised the session is worth more than the lines it costs.
+
+## 2026-09-16 (same PR, fifth raise) — `docs/implementation-backlog.md` 23125 → 23164
+
+The owner confirmed BF-173's premise outright (*"It auto picked muscles for me i didnt choose them
+manually"*) and approved the provenance direction, so the entry gains the decision, the cleared gate,
+the batch with BF-171, and a queue note for the move to the top.
+
+The two lines that will look like padding to a later reader and are not: **the clamp goes dormant
+after this fix**, and **the deload path is independent of it** (verified in
+`per-exercise-deload.ts`, not assumed). Both describe a fix that correctly makes code stop firing,
+which is the shape a future session reliably mistakes for a regression and undoes.
+
+## 2026-09-16 — `docs/implementation-backlog.md` 22675 → 22873, `projectOverview.md` 11532 → 11592
+
+`fix/lb113-health-connect-timezone` (LB-113), and LB-111's merge folded in.
+
+LB-113's own growth is two ⚠ paragraphs, and both record a thing the entry got wrong that the diff
+cannot show:
+
+- It said *"two call sites in one component"*. The component had **one**; the other was inside
+  `syncHealthConnect`, where `tz` was already in scope and being dropped. Fixing only the component
+  would have satisfied the entry's own stated pass test while enrichment kept bucketing in Brisbane.
+- It said *"the provider has the session"*. It is a bare client component with no props; the
+  timezone came from `useUserTimezone()` instead.
+
+Both are the kind of claim that reads as settled fact and takes one grep to check. Writing them on
+the entry is what stops the next reader inheriting them.
+
+## 2026-09-16 — `docs/implementation-backlog.md` 22873 → 22915
+
+LB-114, filed from an unrelated PR's CI failure.
+
+Forty-two lines for one entry, and the payload capture is most of it. It is there because the
+finding is invisible outside a one-hour window: `rv38-body-battery-no-data-badge` is red between
+07:00 and 08:00 Brisbane and green the rest of the day, so anyone who re-runs it at a normal hour
+concludes flake and moves on. The entry carries the captured JSON, the exact clause, and an explicit
+instruction to verify **inside** that window — because verifying outside it proves nothing and looks
+like proof.
 ## 2026-09-11 — `docs/implementation-backlog.md` → 21535 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
@@ -13091,3 +13177,16 @@ this branch has that `main` does not: **46**, and this is the forty-seventh. The
 much as unreproducible, which is the same failure as the hand-kept tally one paragraph up, arrived at
 from the opposite direction — a derivation is only better than a tally if it returns the same answer
 twice.
+
+**Recomputed again 2026-09-17** (→ 23201), after #1264 and #1265 landed, with `main` having moved
+twice more while this PR waits on its owner decision — now in its seventh day.
+
+**And the correction the entry above earned: `origin/main..HEAD` is NOT clone-depth independent
+either, so that claim was wrong.** It read **46** yesterday and **295** today, across two commits on
+`main` — the difference is not work, it is a `git fetch` that deepened the clone and revealed graft
+points the shallow view had hidden. Every count of this branch's own commits is a reading of how much
+history this container happens to hold. Three derivations have now been tried and all three were
+depth-dependent; the honest statement is that **the rewrite count is not measurable from a shallow
+clone at all**, and a number quoted without its depth means nothing. The live baseline figure is the
+only thing in this note worth trusting. That is the third time a count here has been asserted before
+it was checked — twice by hand, once by a derivation that looked rigorous and was not.

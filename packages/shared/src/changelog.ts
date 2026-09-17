@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.457.6",
+    date: "2026-09-16",
+    changes: [
+      "Health Connect data now lands on the right day when your profile timezone is not Brisbane. The sync could take your timezone but was never given it, so it fell back to Brisbane \u2014 correct for the owner and silently wrong for anyone else, shifting a day's steps, calories and sleep across a date boundary.",
+    ],
+  },
+  {
     version: "1.457.5",
     date: "2026-09-16",
     changes: [
