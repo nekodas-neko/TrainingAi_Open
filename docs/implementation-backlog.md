@@ -14,8 +14,8 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **276** | `lib/data/postgres/migrations/` |
-| Local SQLite schema version | **v38** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
+| Next free Postgres migration | **278** | `lib/data/postgres/migrations/` |
+| Local SQLite schema version | **v39** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
 > never were safely: a next-free pointer is a *floor*, not an authority, because it cannot see an
@@ -443,116 +443,53 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
-### [workouts][readiness] BF-173 — the app pre-ticks soreness FROM the recovery model, then penalises the same muscle a second time for it
+### [workouts][app-shell] LB-116 — the check-in sheet knows which sore ticks it suggested and throws it away
 
-- **⚠ Ships ALONE — do not batch it, and the first attempt to did.** This entry was briefly batched
-  with BF-171 as `session-recovery-scoring` on the reasoning that both edit `sessionRecoveryScore`
-  and both are settled by the same unit tests. **`next-item.js` rejected it correctly:** the
-  provenance fix carries a migration, and this file's rule is that a migration never batches,
-  because its revert is a corrective migration. The two are **sequenced** instead — this one first,
-  BF-171 behind it — which gets the same ordering guarantee at no revert risk.
-- **✅ OWNER DECIDED 2026-09-16 — build the provenance option; the gate is cleared.** Asked to choose
-  between recording where each sore tick came from (needs a migration) and suppressing the second
-  penalty whenever the model already knows the muscle is under-recovered (no schema change), the
-  owner took the recommendation: **provenance**. The reasoning on the record is that a check-in only
-  earns its place by carrying information the model does not already have, and the cheap option
-  removes exactly that.
-- **✅ OWNER CONFIRMED the premise 2026-09-16** — *"It auto picked muscles for me i didnt choose them
-  manually."* **This entry was filed with that as an inference from `suggestedSoreMuscles`'s
-  thresholds; it is now a statement from the lifter.** It also makes the defect the normal path
-  rather than an edge case: if he does not hand-tick, then every tick in `mood_logs` is a suggestion
-  echo, and the clamp has been double counting on every single check-in.
-- **⚠ Expect the clamp to go DORMANT after this fix, and do not "repair" it.** With provenance in
-  place and an owner who accepts the pre-selection, no tick is lifter-added, so
-  `Math.min(pct, 40)` stops firing — which is the correct outcome, because the recovery pct already
-  encodes the same fact. **The soreness-driven deload is unaffected and this was verified, not
-  assumed:** `computePerExerciseDeload` (`per-exercise-deload.ts:30-51`) takes `soreMusclesInSession`
-  straight from the mood log and matches it with `moodMuscleMatches`; it never reads
-  `sessionRecoveryScore` or the clamp. So the 48 h auto-suggest keeps driving deload exactly as it
-  does today while selection stops double counting — the separation this entry argues for.
-- **Branch:** _unassigned_ · **Added:** 2026-09-16 (BugFix intake). Owner, after BF-171 was explained
-  to him: *"I trained push/upper body yesterday and legs the day before. Surely it would see that I
-  trained the muscles it wants to use today - yesterday. Legs would be more recovered?"* **He is
-  right, the model agrees with him, and the score throws the agreement away.**
-- **Lane: A** — `packages/shared/src/ai-periodization/ai-dynamic.ts:80-85` (the clamp) and
-  `packages/shared/src/checkin/suggested-soreness.ts` (the source of the tick).
-- **The loop, and every number in it is measured (2026-09-16, production rows):**
+- **Branch:** _unassigned_ · **Added:** 2026-09-17 (Lane A, shipping BF-173's engine half).
+- **Lane: B** — `components/mood-checkin-sheet.tsx`. Reached only from a component, touches no
+  storage schema and no API contract: the column, the repository write and the scorer all shipped
+  with BF-173.
+- **What is already true, so this is a wiring change and not a design one.** `mood_logs` carries
+  `suggested_sore_muscles` (migration 276), `saveMoodLog` stores it, and `sessionRecoveryScore`
+  clamps only ticks that are NOT in it. The sheet already computes the list — it is the `suggested`
+  state at `mood-checkin-sheet.tsx:90`, the same value it renders the pills from. It just never
+  sends it.
+- **What to do:** include `suggestedSoreMuscles: suggested` in the `handleSave` payload (the POST
+  body and the local-store write), and add it to `MoodFieldsSchema` in
+  `packages/shared/src/validation/mood-log.ts` so the route and the outbox's mood branch accept it.
+  `LocalMoodLog.suggestedSoreMuscles` already exists and is optional.
+- **Why it is worth doing when a server fallback already covers it.** `saveMoodLog` derives the list
+  when the caller sends none, so BF-173 is not inert — but the derivation has two limits the sheet
+  does not:
+  1. **It cannot tell a volunteered muscle from an accepted suggestion when both would qualify.** A
+     muscle the lifter ticked himself that also happens to be within 48 h and under 85% recovered is
+     recorded as a suggestion, and stops penalising. The sheet knows the difference exactly, because
+     it knows what it drew.
+  2. **It is wrong for an offline check-in.** The fallback runs when the mutation reaches the server,
+     which for a queued write can be hours or a day later, against a recovery feed that has moved
+     on. The sheet would record provenance at the moment of the check-in, where it is true.
+- **Verification:** tick a muscle the sheet did NOT pre-select and confirm the stored
+  `suggested_sore_muscles` excludes it while `sore_muscles` includes it. The engine half's tests
+  (`packages/shared/src/ai-periodization/__tests__/sore-muscle-provenance.test.ts`) already pin what
+  the scorer does with each case.
 
-  1. `computeMuscleRecovery` returns **quads 69 · hamstrings 63 · glutes 73** (47 h since Legs) and
-     **chest 49 · shoulders 45 · triceps 59** (23 h since Push). The owner's reading of his own
-     training is exactly what the model says.
-  2. `suggestedSoreMuscles` **auto-ticks any muscle trained within 48 h and under `RECOVERED_PCT`
-     (85)** — so it reads *that same recovery output* and pre-selects Quads, Hamstrings, Glutes,
-     Chest, Shoulders, Triceps in the check-in.
-  3. The lifter accepts the pre-ticked list. His stored row for 2026-09-17 is
-     `["Chest","Shoulders","Triceps","Quads","Hamstrings","Glutes","Core"]`.
-  4. `sessionRecoveryScore` then reads **both** the recovery pct **and** the tick, and applies
-     `pct = Math.min(pct, 40)` for a sore main muscle.
+### [workouts][app-shell] LB-117 — the explain screen lists sore muscles that no longer penalise anything
 
-  **The same single fact — "you trained legs 47 hours ago" — is counted twice, and the second pass
-  overwrites the first with a harsher fixed number.** Quads the model scored 69 are scored 40.
-- **The clamp is a flat floor, so it also destroys the ordering the model just computed.** Quads at
-  69 and chest at 49 both become exactly **40**. The information the owner is asking about — that
-  his legs are fresher than his push muscles — exists in the recovery feed and is deleted before it
-  reaches the score.
-- **Measured consequence: it changes the recommendation.** Same day, same everything, with the leg
-  ticks removed:
+- **Branch:** _unassigned_ · **Added:** 2026-09-17 (Lane A, found while shipping BF-173).
+- **Lane: B** — the "Why this?" explain surface. The `signals.soreMuscles` block in
+  `lib/data/postgres/adapter.ts` is what feeds it and is deliberately unchanged: it still reports
+  the ticks truthfully.
+- **This is a consequence of BF-173, filed rather than left to be discovered.** The explain page's
+  rule (Q-105) is that it shows the numbers the recommendation was actually computed from. After
+  BF-173 an accepted suggestion is listed as sore and does **not** lower the score, so the page can
+  show a muscle under "sore" beside a recovery figure that ignored it — the same
+  reads-as-broken shape Q-105 was written about, and adjacent to BF-172's mislabelling.
+- **What to do:** distinguish the two in the signals block the page renders — a suggested tick is
+  "the model already counted this", a lifter-added one is "this lowered the score". The data is
+  there: `moodLog.suggestedSoreMuscles` is read back by `getMoodLog` and `listMoodLogs`.
+- **Not urgent and deliberately not batched with BF-172:** that entry is about a label on a
+  different number (session fit called readiness). Same screen, different defect.
 
-  | session | shipped | legs not ticked |
-  |---|---|---|
-  | **Lower** | 74 | **85 — wins** |
-  | **Upper** | **84 — wins** | 84 |
-  | Pull | 82 | 82 |
-  | Legs | 59 | 72 |
-  | Push | 37 | 37 |
-
-  Lower wins by 1.6 points once its muscles are scored at the value the model already assigned them.
-  **The leg soreness ticks are the whole reason the owner got Upper.**
-- **⚠ Replacing the clamp with a multiplier is NOT the fix — measured, and it does not work.**
-  `pct × 0.6` instead of `min(pct, 40)` preserves the ordering but leaves the winner unchanged
-  (Upper 82.0, Pull 81.7, Lower 75.8). The defect is the **double count**, not the clamp's shape.
-  Do not spend the entry on tuning the 40.
-- **`mood_logs` cannot tell the two cases apart, and that is the blocker for any fix.** The table
-  stores `sore_muscles` as a bare string array — id, user_id, log_date, energy_level, sleep_quality,
-  body_state, sore_muscles, created_at, updated_at, deleted_at. **There is no provenance column**, so
-  the scorer cannot distinguish *"the lifter volunteered that this is sore"* — real information the
-  model does not have, and which should absolutely override it — from *"the lifter accepted what the
-  model itself suggested"*, which is the model marking its own homework.
-- **Fix direction (owner decision, see below):** the coherent version needs provenance on the tick —
-  store whether each muscle was suggested or lifter-added, and apply the clamp only to lifter-added
-  ones, letting an accepted suggestion fall through to its computed recovery pct (which already
-  encodes the same fact). **This needs a migration and a local SQLite version, so it is Lane A's
-  alone.** A cheaper interim exists — suppress the clamp when the muscle's own recovery pct is
-  already below `RECOVERED_PCT`, i.e. when the tick cannot be carrying information the model lacks —
-  and it requires no schema change, but it also silently discards a genuine report in exactly the
-  case where the lifter is telling you the model is wrong.
-- **The owner gate this entry carried is CLEARED — decided 2026-09-16, see above.** The alternative it was weighed against
-  (suppress the clamp whenever the muscle's recovery pct is already under `RECOVERED_PCT`, no schema
-  change) is recorded here because it remains the correct fallback if the migration turns out to be
-  the expensive part: it fixes the same selection bug and costs only the lifter's ability to
-  contradict the model for an already-under-recovered muscle.
-- **Relationship to BF-171:** independent, and both are in `sessionRecoveryScore`. BF-171 is about
-  names not matching; this is about a matched name being penalised twice. **Fixing BF-171 makes this
-  one worse**, because normalising `core` → `abs` adds one more correctly-matched sore muscle to the
-  double count. Ship them together or ship this one first.
-- **Verification:** a unit test on `computeAiDynamicNextSession` asserting that a muscle whose
-  recovery pct is already under `RECOVERED_PCT` is not additionally clamped by a tick that
-  `suggestedSoreMuscles` would itself have produced. No device run — pure shared math.
-- **⚠ The owner proposed a third option — narrow the auto-tick window from 48 h to 24 h
-  (*"look for a muscle group trained within the past 24 hours instead"*). Measured 2026-09-16: it
-  does flip the pick to Lower, by 0.4 points.** Auto-ticked drops to Chest/Shoulders/Triceps and the
-  board reads Lower **84.4** · Upper **84.0** · Pull 82 · Legs 71 · Push 37.
-  **Two reasons it is not the recommendation despite landing right today:**
-  1. **It decides the pick by less than half a point**, which is a nudge, not a fix. The double
-     count is still live inside 24 h — chest at 49 is still clamped to 40 — so the same defect
-     simply moves to the freshly-trained muscles.
-  2. **The 48 h window is doing a second job that this would break.** Soreness also drives the
-     per-exercise deload (`soreMusclesInSession`), and `suggested-soreness.ts` chose 48 h because
-     *DOMS peaks ~24-48h*; its own header calls back-to-back leg days at 46-47 h *"exactly the case
-     worth deloading"*. Narrowing to 24 h stops auto-flagging at the DOMS peak.
-  **The separation worth keeping is: 48 h for the DELOAD question, no double count for the
-  SELECTION question.** Fixing the double count makes the window choice stop being load-bearing,
-  which is why it is fixed here and the window is left alone.
 
 ### [workouts][readiness] BF-171 — the session picker matches muscle names raw, so "Back" sore clamps nothing and `core` never finds its recovery
 
@@ -1839,6 +1776,11 @@ composite reports which of its inputs were inferred.
   `MIN_WAKING_MINUTES_TO_JUDGE` is 60. The fixture's wake time falls back to **07:00 local**, so
   `wakingMinutes` is under 60 for exactly the first hour of the day and the grace clause short-circuits
   to true. After 08:00 it goes false, the badge returns, and the spec passes again.
+- **✅ CONFIRMED BY NATURAL EXPERIMENT, not just by reading the clause.** The same commit
+  (`1bc4332afa`, PR #1264) ran E2E twice: the run starting **21:15 UTC failed** on this spec, and the
+  run starting **22:00 UTC passed**. Identical code, identical fixture, different side of 22:00 UTC —
+  which is 08:00 Brisbane, the minute `wakingMinutes` crosses 60. That forecloses the "it is just
+  flaky" reading, which is the reading this defect otherwise invites.
 - **Cause: #1256** (*"Stop counting sleep as daytime stress"*, LA-112) narrowed the route's waking
   window. Before it, the window was effectively the whole calendar day, so `mins` cleared 60 at any
   hour and zero samples always read as insufficient. Nothing is wrong with that change; it exposed a

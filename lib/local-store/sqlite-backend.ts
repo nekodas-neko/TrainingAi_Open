@@ -121,6 +121,11 @@ export class SQLiteLocalStore implements LocalStore {
       sleepQuality: String(r.sleep_quality),
       bodyState:    JSON.parse(String(r.body_state ?? '[]')),
       soreMuscles:  JSON.parse(String(r.sore_muscles ?? '[]')),
+      // BF-173. Null stays null — it is "unknown", and defaulting it to [] would silently claim
+      // every historical tick was lifter-added.
+      suggestedSoreMuscles: r.suggested_sore_muscles == null
+        ? null
+        : JSON.parse(String(r.suggested_sore_muscles)),
       updatedAt:    String(r.updated_at),
       deletedAt:    r.deleted_at ? String(r.deleted_at) : null,
       syncStatus:   (r.sync_status as 'pending' | 'synced'),
@@ -1149,16 +1154,18 @@ export class SQLiteLocalStore implements LocalStore {
     await runSQL(
       `INSERT INTO mood_logs
          (log_date, energy_level, sleep_quality, body_state, sore_muscles,
-          updated_at, deleted_at, sync_status)
-       VALUES (?,?,?,?,?,?,?,?)
+          suggested_sore_muscles, updated_at, deleted_at, sync_status)
+       VALUES (?,?,?,?,?,?,?,?,?)
        ON CONFLICT(log_date) DO UPDATE SET
          energy_level=excluded.energy_level, sleep_quality=excluded.sleep_quality,
          body_state=excluded.body_state, sore_muscles=excluded.sore_muscles,
+         suggested_sore_muscles=excluded.suggested_sore_muscles,
          updated_at=excluded.updated_at, deleted_at=excluded.deleted_at,
          sync_status=excluded.sync_status`,
       [
         record.logDate, record.energyLevel, record.sleepQuality,
         JSON.stringify(record.bodyState), JSON.stringify(record.soreMuscles),
+        record.suggestedSoreMuscles == null ? null : JSON.stringify(record.suggestedSoreMuscles),
         record.updatedAt, record.deletedAt, record.syncStatus,
       ],
     );

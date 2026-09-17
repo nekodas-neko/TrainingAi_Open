@@ -122,6 +122,7 @@ import { isTemperatureBaselineCentred } from '@trainingai/shared/health/temperat
 import { clampWindowStart } from '@trainingai/shared/workout/time-audit'
 import { computeAiDynamicNextSession, TEMP_ALERT_THRESHOLD_C, type AiDynamicInput } from '@trainingai/shared/ai-periodization/ai-dynamic'
 import { computeMuscleRecovery } from '@trainingai/shared/ai-periodization/muscle-recovery'
+import { suggestedSoreMuscles } from '@trainingai/shared/checkin/suggested-soreness'
 import { resolveSelfReportedSick } from '@trainingai/shared/ai-periodization/signals'
 import { mround } from '@trainingai/shared/1rm'
 import { computeSetAggregates, computeIntensityPct } from '@trainingai/shared/workout/set-aggregates'
@@ -1886,6 +1887,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         muscleRecovery,
         history,
         soreMuscles: moodLog?.soreMuscles ?? [],
+        // BF-173. Absent on a log written before provenance existed, which the scorer reads as
+        // "unknown" and scores the old way — never as "none were suggestions".
+        suggestedSoreMuscles: moodLog?.suggestedSoreMuscles ?? null,
         // Live BLE-derived readiness, never the frozen Cloud column (dead since the 2026-07-07
         // re-key — the readiness-graded deloads were unreachable, E2-12).
         readinessScore: liveReadiness,
@@ -2915,6 +2919,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       sleepQuality: r.sleepQuality as import('@trainingai/shared/types/mood').SleepQuality,
       bodyState: (r.bodyState ?? []) as import('@trainingai/shared/types/mood').BodyState[],
       soreMuscles: r.soreMuscles ?? [],
+      // BF-173. Null stays null: "unknown", not "none were suggestions".
+      suggestedSoreMuscles: r.suggestedSoreMuscles ?? null,
       createdAt: r.createdAt,
     }))
   }
@@ -3060,11 +3066,27 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       sleepQuality: r.sleepQuality as import('@trainingai/shared/types/mood').SleepQuality,
       bodyState: (r.bodyState ?? []) as import('@trainingai/shared/types/mood').BodyState[],
       soreMuscles: r.soreMuscles ?? [],
+      // BF-173. Null stays null: "unknown", not "none were suggestions".
+      suggestedSoreMuscles: r.suggestedSoreMuscles ?? null,
       createdAt: r.createdAt,
     }
   }
 
   async saveMoodLog(userId: string, log: Omit<import('@trainingai/shared/types/mood').MoodLog, 'id' | 'userId' | 'createdAt'>): Promise<import('@trainingai/shared/types/mood').MoodLog> {
+    // BF-173. Provenance is recorded at WRITE time, never re-derived at score time. Re-deriving is
+    // the option the owner weighed and rejected: it suppresses the clamp whenever a muscle happens
+    // to be under-recovered, which discards exactly the case the check-in exists for — the lifter
+    // saying the model is wrong. Recorded once, a muscle the lifter volunteered keeps clamping even
+    // after its own recovery later falls below the suggestion threshold.
+    //
+    // The caller may supply the list it actually displayed; when it does not, the server derives
+    // what it would itself have suggested. Without that fallback the column stays empty until the
+    // check-in sheet is taught to send it, and the defect goes on shipping meanwhile. The
+    // fallback's limit is why the caller's list wins when present: a muscle the lifter volunteered
+    // that ALSO meets the suggestion conditions is indistinguishable from an accepted one here.
+    const provenance = log.suggestedSoreMuscles
+      ?? await this.deriveSuggestedSoreMuscles(userId, log.soreMuscles)
+
     const [r] = await this.db.insert(s.moodLogs)
       .values({
         userId, logDate: log.logDate,
@@ -3072,6 +3094,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         sleepQuality: log.sleepQuality,
         bodyState: log.bodyState,
         soreMuscles: log.soreMuscles,
+        suggestedSoreMuscles: provenance,
       })
       .onConflictDoUpdate({
         target: [s.moodLogs.userId, s.moodLogs.logDate],
@@ -3080,6 +3103,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           sleepQuality: sql`EXCLUDED.sleep_quality`,
           bodyState:    sql`EXCLUDED.body_state`,
           soreMuscles:  sql`EXCLUDED.sore_muscles`,
+          suggestedSoreMuscles: sql`EXCLUDED.suggested_sore_muscles`,
         },
       })
       .returning()
@@ -3089,7 +3113,31 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       sleepQuality: r.sleepQuality as import('@trainingai/shared/types/mood').SleepQuality,
       bodyState: (r.bodyState ?? []) as import('@trainingai/shared/types/mood').BodyState[],
       soreMuscles: r.soreMuscles ?? [],
+      suggestedSoreMuscles: r.suggestedSoreMuscles ?? null,
       createdAt: r.createdAt,
+    }
+  }
+
+  /**
+   * BF-173. Which of these ticks would `suggestedSoreMuscles` itself have produced right now? Goes
+   * through the same shared function the check-in sheet calls, so the two cannot drift into two
+   * answers for one question.
+   *
+   * Returns `[]` rather than throwing if the recovery feed cannot be built: `[]` means "none were
+   * suggestions", which scores every tick the pre-BF-173 way. A check-in must never fail to save
+   * because provenance could not be worked out.
+   */
+  private async deriveSuggestedSoreMuscles(userId: string, sore: string[]): Promise<string[]> {
+    if (sore.length === 0) return []
+    try {
+      const from7d = new Date(Date.now() - 7 * 86_400_000)
+      const [recentWorkouts, exerciseLibrary] = await Promise.all([
+        this.getWorkoutSessionsFrom(userId, from7d),
+        this.listExerciseLibrary(),
+      ])
+      return suggestedSoreMuscles(computeMuscleRecovery(recentWorkouts, exerciseLibrary), sore)
+    } catch {
+      return []
     }
   }
 

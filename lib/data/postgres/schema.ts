@@ -501,6 +501,10 @@ export const moodLogs = pgTable('mood_logs', {
   sleepQuality: text('sleep_quality').notNull(),
   bodyState:    text('body_state').array().notNull().default([]),
   soreMuscles:  text('sore_muscles').array().notNull().default([]),
+  // BF-173. Nullable on purpose: NULL means "written before provenance existed", which is not the
+  // same as "none were suggestions" (an empty array). The scorer clamps every tick on NULL,
+  // preserving pre-BF-173 behaviour for rows that cannot answer the question.
+  suggestedSoreMuscles: text('suggested_sore_muscles').array(),
   createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:    timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt:    timestamp('deleted_at', { withTimezone: true }),
