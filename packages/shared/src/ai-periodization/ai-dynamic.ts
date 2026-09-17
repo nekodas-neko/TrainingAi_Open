@@ -20,6 +20,11 @@ export interface AiDynamicInput {
   muscleRecovery: MuscleRecovery[]
   history: SessionHistory[]
   soreMuscles: string[]
+  /**
+   * BF-173. The subset of `soreMuscles` the model itself pre-ticked. Absent or `null` means the
+   * log predates provenance, and every tick clamps as it did before — never assume "none".
+   */
+  suggestedSoreMuscles?: string[] | null
   readinessScore: number | null
   temperatureDeviation: number | null
   // Nights of accrued temperature baseline. The elevated-temp deload only fires once this is
@@ -64,13 +69,30 @@ function recoveryPct(muscle: string, recoveries: MuscleRecovery[]): number {
   return r.pct
 }
 
+/**
+ * BF-173. A sore tick only carries information the recovery model does not already have when the
+ * lifter put it there. `suggestedSoreMuscles` pre-ticks any muscle trained within 48 h and under
+ * 85% recovered — reading the very recovery feed this function is about to score — so clamping an
+ * accepted suggestion counts one fact twice, and the clamp is a flat floor, so the second count
+ * also destroys the ordering the first one computed (quads 69 and chest 49 both become 40).
+ *
+ * `suggested` is `null` for a log written before provenance was stored: unknown, so every tick
+ * clamps, exactly as before. An accepted suggestion falls through to its own recovery pct, which
+ * already encodes "you trained this recently and it is not recovered".
+ */
 function sessionRecoveryScore(
   session: ProgramSession,
   muscleAssignments: Record<string, MuscleAssignment[]>,
   recoveries: MuscleRecovery[],
   soreMuscles: string[],
+  suggestedSoreMuscles: string[] | null | undefined,
 ): number {
-  const soreSet = new Set(soreMuscles.map(m => m.toLowerCase()))
+  const suggestedSet = new Set((suggestedSoreMuscles ?? []).map(m => m.toLowerCase()))
+  // A tick penalises only if the lifter added it. On `null` (unknown provenance) nothing is
+  // treated as suggested, so the pre-BF-173 behaviour is preserved rather than guessed at.
+  const soreSet = new Set(
+    soreMuscles.map(m => m.toLowerCase()).filter(m => !suggestedSet.has(m)),
+  )
   let weightedSum = 0
   let totalWeight = 0
 
@@ -248,7 +270,7 @@ function computeDeloadStrength(
 
 export function computeAiDynamicNextSession(input: AiDynamicInput): NextSessionRecommendation {
   const {
-    sessions, muscleAssignments, muscleRecovery, history, soreMuscles,
+    sessions, muscleAssignments, muscleRecovery, history, soreMuscles, suggestedSoreMuscles,
     readinessScore, temperatureDeviation, temperatureBaselineDays, daySummary, timezone,
     reminderEnabled, reminderTime, sleepTrend, energyLevel, selfReportedSick, hrvTrend, illnessFlag, stressHighMinutes,
     temperatureTrusted,
@@ -278,7 +300,7 @@ export function computeAiDynamicNextSession(input: AiDynamicInput): NextSessionR
 
   // Score every session and capture component scores for the explain page
   const scoredRaw = sessions.map(s => {
-    const recoveryScore  = sessionRecoveryScore(s, muscleAssignments, muscleRecovery, soreMuscles)
+    const recoveryScore  = sessionRecoveryScore(s, muscleAssignments, muscleRecovery, soreMuscles, suggestedSoreMuscles)
     const balanceScore   = sessionBalanceScore(s, sessions, history, now)
     const freshnessScore = sessionFreshnessScore(s, history, now)
     return {

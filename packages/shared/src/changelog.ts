@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.457.7",
+    version: "1.457.8",
     date: "2026-09-17",
     changes: [
       "The \u201cWhy this session?\u201d screen no longer calls its match score your readiness. The big ring shows how well the session fits today \u2014 what is recovered and what is overdue \u2014 and it was captioned \u201creadiness\u201d and graded on the readiness scale, so it could read 84 HIGH in green directly above your actual readiness of 37 and a strong deload warning. It now says how well the session fits, with fit wording to match.",
+    ],
+  },
+  {
+    version: "1.457.7",
+    date: "2026-09-17",
+    changes: [
+      "The session picker stops counting your soreness twice. It was pre-ticking sore muscles for you off its own recovery model, then penalising those same muscles a second time for being ticked \u2014 so the fact that you trained legs 47 hours ago got counted once as \"69% recovered\" and again as a flat 40. That flat number also erased the ordering the model had just worked out: quads at 69 and chest at 49 both became 40, hiding that your legs were fresher than your push muscles. On your own numbers it changed the pick \u2014 Upper won at 84 to Lower's 74, where without the double count Lower wins at 85. A muscle you tick yourself still counts in full; that is real information the model does not have, and it now stays that way even after the muscle's recovery catches up.",
     ],
   },
   {

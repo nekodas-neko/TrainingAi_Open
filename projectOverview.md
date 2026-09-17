@@ -26,10 +26,10 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.457.7 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.457.8 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-17.
 
-**The explain screen called the session-fit score "readiness" (BF-172, v1.457.7).** `overallScore`
+**The explain screen called the session-fit score "readiness" (BF-172, v1.457.8).** `overallScore`
 is `recovery·w + balance·w + freshness·w` — how well a session fits today — and the ring captioned it
 *"Overall readiness for this session"* and graded it on the readiness ladder, so it read **84 HIGH**
 in green directly above *Oura readiness 37 · Low* and *strong deload advised*. BF-154's class: a
@@ -39,6 +39,25 @@ from the score**, so the 70/50 thresholds stay in the one module that owns them.
 instructions were adjusted: "no band word" was not available (the ring is band-coloured, so the word
 is what keeps the band off colour-only), and the band could live in `ScoreRing` after all — it is
 session-explain's own component with one caller, not the shared thing a bare grep suggests.
+
+**The session picker counted your soreness twice (BF-173, v1.457.7).** `suggestedSoreMuscles`
+pre-ticks any muscle trained within 48 h and under 85% recovered — reading the recovery model — and
+`sessionRecoveryScore` then read both that feed *and* the resulting tick and clamped the muscle to
+`min(pct, 40)`. One fact counted twice, with the second pass overwriting the model's own figure with
+a harsher flat one. The owner confirmed the premise rather than it being inferred (*"It auto picked
+muscles for me i didnt choose them manually"*), which makes it the normal path, not an edge case.
+Measured on his rows: quads 69 → 40, chest 49 → 40, and the flat floor erased the ordering he was
+actually asking about — it flipped the pick, Lower 74/Upper 84 as shipped against Lower **85**/Upper
+84 without the leg ticks. `mood_logs.suggested_sore_muscles` (migration 276, `claude_ro` twin 277,
+local SQLite v39) now records where each tick came from, and only lifter-added ticks clamp.
+**Provenance is recorded at write time, never re-derived at score time** — re-deriving was the option
+the owner weighed and rejected, because it discards the one case the check-in exists for. **Expect
+the clamp to go dormant and do not repair it:** with the owner accepting the pre-selection nothing is
+lifter-added, which is correct, and the soreness-driven deload is untouched (verified —
+`computePerExerciseDeload` never reads the clamp). **The check-in sheet still does not send the list
+it displayed** (LB-116), so provenance comes from a server-side derivation that cannot separate a
+volunteered muscle from an accepted one when both qualify, and is stale for an offline check-in.
+Not device-verified.
 
 **Health Connect was syncing everyone into Brisbane (LB-113, v1.457.6).** `syncHealthConnect` and
 `enrichActivityLogs` took the user's timezone as of 2026-09-16 and nothing passed it, so both fell
