@@ -1602,6 +1602,120 @@ defect.
 the source-path elimination table at the top of this entry are unaffected — those came from reading,
 not from the harness.
 
+---
+
+## ✅ ROOT CAUSE FOUND, 2026-09-17 (Lane B) — CANDIDATE 3, and the retraction above was right to leave it UNPROVEN rather than refuted
+
+**It IS reproducible in the harness.** Two conditions have to hold at once, and every previous
+attempt — including the retraction's — had one of them wrong:
+
+1. **Warm the destination** with a direct `goto` first (the retraction's rule, and it stands).
+2. **Make the tap actually land.** This is the new one, and it is what produced three rounds of
+   wrong answers. `tapCentre` does **no scrolling**: it reads a bounding box and calls
+   `page.touchscreen.tap(x, y)`, which is a raw coordinate dispatch with **no actionability check**.
+   On `/cardio` at a 412×915 viewport the three modality controls sit at **y=852, 924 and 997** — so
+   *Run* is on screen and *Guided walk* and *Other activity* are **below the fold**, and their taps
+   hit nothing at all. `document.elementFromPoint` returns **null** for both, which is exactly what a
+   tap outside the viewport does.
+   **That manufactured a perfect false differential**: Run "worked" and the two `/activity*` controls
+   "did nothing", which reads as *"both failures share the `/activity` prefix"* — the very claim the
+   retraction struck. It is a coordinate artifact, not an href one. **Scroll with
+   `scrollIntoView({ block: 'center' })` and assert `elementFromPoint` hit-tests to the control
+   before dispatching**; `tapInView` does not help here, it filters on **x** only.
+
+**With both conditions met, measured 2026-09-17:**
+
+| tap | result |
+|---|---|
+| **Run** → `/running` | navigates ✓ |
+| **Guided walk** → `/activity/guided-walk` | **navigates ✓** — the retraction is confirmed, this is NOT a second dead button |
+| **Other activity → Treadmill** → `/activity` | **pushes, then comes back to `/cardio`** ✗ |
+
+**The push is not the thing that fails — it happens, and is then undone.** Instrumented trace,
+`history` patched from the page (times from the start of the run):
+
+```
++6301ms startViewTransition          ← the tap: push('/activity') begins
++6729ms history.back()               ← 428 ms later
++6745ms replaceState(/cardio)
++6745ms popstate -> /cardio          ← back where it started
+```
+
+**The `history.back()` is `closeSurface`'s** (`lib/hooks/sheet-back-stack.ts:50-59`): a sheet that
+pushed its own entry pops it on close. Correct in isolation. But `selectType`
+(`components/workout/log-activity-sheet.tsx:27-31`) runs
+
+```ts
+startActivity(...)        // store
+onOpenChange(false)       // → closeSurface → history.back()
+router.push('/activity')  // → animate() → startViewTransition → push
+```
+
+so the sheet's undo-pop is in flight across the navigation and **eats the entry the push just
+added**. That is candidate 3 in the entry above, whose earlier "refuted" verdict rested on a
+deferred-close experiment run against a **cold** route — which is why the retraction downgraded it to
+UNPROVEN rather than striking it. It is now the survivor, on evidence.
+
+**Why this matches the owner's report exactly.** He said *"it just scrolls to the top of cardio
+hub"*. The sheet closes, the view transition completes, the navigation is popped, and `/cardio`
+re-renders — and `cardio-content.tsx:87` scrolls in a **nested** `overflow-y-auto` div that no
+scroll-restoration covers, so it lands at the top. Sheet closed, same screen, scrolled to top.
+
+**Guided walk is unaffected because no sheet is involved** — it is a direct `router.push` from
+`modality-picker.tsx` with nothing to pop. That is the cleanest confirmation that the sheet is the
+variable, and it is the opposite of what the pre-retraction table claimed.
+
+- **Scope correction:** the defect is **any navigation issued from inside a closing sheet**, not
+  anything `/activity`-prefixed. Other `onOpenChange(false)` + `router.push` call sites need the same
+  sweep before a fix is called complete.
+- **⛔ Still do NOT lengthen `NAVIGATION_TIMEOUT_MS`** and do not touch `animate()`: the push is
+  fine, and app-wide navigation must not change for a call-site ordering bug.
+- **Device check is still owed** — this is measured in the harness at one viewport, and the report
+  was on the APK.
+
+- **⛔ THE OBVIOUS FIX DOES NOT WORK, and this was measured rather than reasoned (2026-09-17).
+  Do not spend the attempt again.** The natural reading of the trace is *"a self-pop is in flight
+when we navigate, so wait for it to drain"* — the module already tracks exactly that
+(`pendingSelfPops`, module-level since BF-34). It was built (an `afterSelfPops(navigate)` that parks
+the push until `handlePop` drains) and it **does not fix it**, because its premise is false:
+
+```
++3973 startViewTransition        ← the Treadmill tap
++4388 history.back()             ← the sheet's close, 415 ms LATER
++4392 popstate -> /cardio
+```
+
+**`pendingSelfPops` is still 0 at the moment the navigation is issued**, so the parked callback runs
+inline and is then eaten by a pop that had not happened yet. Waiting for a pending pop cannot help
+when the pop is not yet pending.
+
+**Why the close is 415 ms late, which is the part that makes this hard.** `closeSurface` runs in the
+`useSheetBackDismiss` effect **cleanup** (`lib/hooks/use-sheet-back-dismiss.ts:44`), so it needs a
+React commit. `router.push` runs inside `document.startViewTransition`, which **suspends frame
+production and holds the commit** until the transition settles. So the navigation itself is what
+delays the sheet's close past it. The two are not independent, which is why reordering the three
+statements in `selectType` does not help either — any order still has the push inside a transition
+that defers the close behind it.
+
+**What a real fix has to do:** make the sheet's entry not be popped at all once a navigation has
+superseded it, tied to **the surface's identity** rather than to a flag. A bare module-level "a
+navigation is happening" flag is the known-bad pattern here — `sheet-back-stack.ts:27-32` records
+BF-34, where *"a state that is not mine is indistinguishable from a real back gesture"*. The surface
+handle lives in the hook, not at the call site, so the mechanism probably belongs on
+`useSheetBackDismiss`/`SheetContent` (e.g. the close is told it was superseded) rather than in a
+helper the call site calls.
+  Worth checking as part of that design: `router.replace` in place of `push` would overwrite the
+  sheet's own entry rather than stacking on it, which keeps back from the destination a single
+  press — but it is only correct **together** with suppressing the pop, never on its own.
+- **A reproduction spec is deliberately NOT shipped with this finding.** It would be a test asserting
+  a behaviour the app does not have, and marking it skipped to keep CI green is the shape this repo
+  forbids. Its recipe is written above and is the whole of what it needs: warm the destinations, then
+  `scrollIntoView({ block: 'center' })` and assert `elementFromPoint` hit-tests to the control before
+  each `touchscreen.tap`, then poll `location.pathname` for `/activity`. Ship it with the fix.
+- **Keep the `Guided walk` control in that spec as the discriminator.** It navigates correctly today
+  (no sheet is involved), so a fix that broke navigation generally would otherwise pass.
+
+
 ### [app-shell][platform] LA-109 — a tab flip leaves the PREVIOUS tab's route tree on the history entry (fixed; device check owed)
 
 - **Batch:** `back-gesture-sitting` — **four entries, one gesture** (2026-09-16, OR-118). BF-166,
