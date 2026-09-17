@@ -45,6 +45,14 @@ entry is what Lane A reads before running it. The working is in a review doc, no
 
 ---
 
+## 2026-09-17 — backlog → 23694 (TN-46 corrected: the snapshot it called urgent was already on disk)
+
+**+24 net.** The entry's schema-change half is struck and replaced with the measurement that retires
+it — `oura_daily_summary` checkpoints every baseline per night, so the pre-intervention reference the
+entry wanted a migration to capture is already on the 2026-09-06 row. A correction that *removes*
+work costs lines rather than saving them, because the reasoning has to survive: without it the next
+reader re-derives the same urgency from the same true arithmetic.
+
 ## 2026-09-17 — backlog → 23203, `projectOverview.md` → 11625 (BF-171 shipped)
 
 **−99 and +14.** BF-171's entry leaves the queue with the fix and files nothing behind it, so this

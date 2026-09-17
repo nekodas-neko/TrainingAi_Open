@@ -488,23 +488,47 @@ way that avoids the downside of each.
 - **The live baseline keeps adapting.** Do not freeze it. Freezing means a permanently depressed
   readiness score and a radar crying wolf every night for as long as the medication runs — the
   reason option 2 lost on its own.
-- **Snapshot the baseline at the intervention date and keep it as a REPORTING reference.** This is
-  the load-bearing half. Scoring stays useful day to day; the delta stays computable forever. Without
-  it the comparison is destroyed by the mechanism below, and destroyed *silently*.
+- **~~Snapshot the baseline at the intervention date~~ — STRUCK. The snapshot already exists and no
+  migration is needed.** See the correction immediately below; this was the entry's load-bearing
+  half and it solved a problem the storage layout does not have.
 - **Join `supplement_logs` (date, `amount`, `unit`) into the score audit and the advisory**, so a
   flagged day reads *"resting HR and HRV are off your baseline; Retatrutide 1 mg, 3 days ago"*
-  instead of implying infection, and so a dose-vs-vitals overlay has something to plot.
+  instead of implying infection, and so a dose-vs-vitals overlay has something to plot. **This is now
+  the whole entry**, and it needs no schema change.
 - **Plot it with a lag.** The peak is 2–4 days after a dose, so a same-day correlation finds nothing
   and would read as "no effect" on data that plainly shows one.
 
-**⚠ WHY THE REFERENCE SNAPSHOT IS URGENT — the comparison is being erased right now.**
-`updateBaseline` moves ~1/32 per night once mature, so the resting-HR baseline (~53) is being dragged
-toward 65 and the HRV baseline (~57) toward 20. **Within roughly 30–60 nights every z returns to ~0**:
-`watch` stops firing, the readiness contributors recover, the score climbs back — with no
-physiological change at all. A baseline-relative system cannot see a sustained shift; it redefines
-normal and goes quiet, and **the recovery reads as progress**. Once absorbed, "what did Retatrutide
-do to my vitals" is no longer answerable from the baselines, only from raw history. Capture the
-pre-intervention snapshot before that happens.
+**⛔ CORRECTION 2026-09-17 (Lane A, verified against production before any code was written) — THE
+SNAPSHOT IS UNNECESSARY AND THERE IS NO DEADLINE. The entry's arithmetic is right and its conclusion
+does not follow.**
+
+`updateBaseline` does move ~1/32 per night once mature (`ageDays > 14` → `ashrRound(delta + bias, 5)`),
+so the **live** baseline is genuinely dragged toward the new values. All of that holds. What does not
+follow is that the comparison is destroyed: **baselines are stored per night, per row** on
+`oura_daily_summary` (`rhr_baseline_mean_x8`, `hrv_baseline_mean_x8`, … alongside `n_history`). Every
+historical night keeps the baseline as of that night, so the pre-intervention reference is already
+persisted and later drift cannot reach it.
+
+Measured on the owner's production rows:
+
+| row | stored RHR baseline | stored HRV baseline |
+|---|---:|---:|
+| **2026-09-06** (night before dose 1) | **52.875** | **56.125** |
+| 2026-09-18 | 54.250 | 51.750 |
+
+The 09-06 row is what a snapshot would have captured, and it is already there. The table holds **74
+rows back to 2026-07-07** (the BLE re-key), **73 carrying baselines**, and nothing prunes it — the
+`shouldPrune` path is `error_events`, not this table. So *"what did Retatrutide do to my vitals"* stays
+answerable from the baselines indefinitely, by reading the row before the intervention date.
+
+**The generalisable form:** a rolling aggregate that is *checkpointed per period* has no erasure
+problem, however fast it adapts. Before adding storage to preserve a value, check whether the value is
+already written down somewhere with a date on it.
+
+**What the correction does NOT touch:** the dose-response table above is unchanged and was not
+re-measured, except to note the 09-18 row, which the entry predates — RHR **59.4** (from 64.9) and HRV
+**47** (from 19). The 1 mg excursion has begun to turn at day 5, matching the 0.5 mg pattern, so the
+entry's *"still falling at day 4"* was accurate when written and is no longer the latest picture.
 
 **Why this generalises past one drug.** GLP-1 class agonists raise heart rate as a documented class
 effect; stimulants, beta-blockers and thyroid medication all move tracked vitals. The app has a
