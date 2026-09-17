@@ -13283,3 +13283,16 @@ LB-116's own growth is two ⚠ paragraphs, both recording a judgement the diff c
   derives the list when none is sent, so the stored column is non-null either way. That is worth a
   paragraph precisely because the next person will have the same idea, write the same test, see it
   green, and believe it.
+
+## 2026-09-17 — `projectOverview.md` 11646 → 11654 (+8)
+
+BF-173's paragraph claimed the fix *"flipped the pick"*. The numbers behind that were correct and
+were **pre-BF-171**, so re-measuring against the shipped engine changed the conclusion: Lower gains
+12 points from the fix and still loses to Upper by 3, because BF-171's normalisation lifts the
+sore-but-recovering muscles on both sides rather than reordering them.
+
+Eight lines, and they are the kind worth spending: a shipped-fix paragraph that overstates its own
+outcome is read by every session at orientation, and the next one to touch this pillar would have
+started from "the picker chooses Lower now" and debugged the wrong thing. The counterfactual is kept
+rather than deleted — it is still the clearest statement of what the double count did — and marked as
+a counterfactual instead.
