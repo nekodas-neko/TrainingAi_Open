@@ -26,8 +26,18 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.457.9 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.457.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-17.
+
+**The check-in now records which sore ticks were its own suggestions (LB-116, v1.457.10).** BF-173
+stopped a suggested tick penalising recovery twice; the sheet already computed that list and never
+sent it, so the server fell back to deriving it — which cannot tell a muscle the lifter volunteered
+from one it would have suggested anyway, and for a queued offline check-in runs hours later against
+a recovery feed that has moved on. **It required one optional field in `MoodFieldsSchema`, a Lane A
+path:** that schema has no `.strict()`, so Zod drops unknown keys, and without the edit the value
+would have been stripped silently and the fix shipped inert. **An e2e was written and deleted rather
+than shipped green** — it passed against unfixed `main`, because the server's fallback makes the
+stored column non-null either way, and a vacuous test is worse than none.
 
 **The explain screen called the session-fit score "readiness" (BF-172, v1.457.9).** `overallScore`
 is `recovery·w + balance·w + freshness·w` — how well a session fits today — and the ring captioned it

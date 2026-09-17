@@ -481,9 +481,26 @@ weight**, and conflating them is how a signal ends up counted twice.
 **Pass test:** a `watch` day produces something the owner can see on Home, and a normal day does not.
 
 
-### [workouts][app-shell] LB-116 — the check-in sheet knows which sore ticks it suggested and throws it away
+### [workouts][app-shell] LB-116 — the check-in sheet knows which sore ticks it suggested and throws it away (fixed)
 
-- **Branch:** _unassigned_ · **Added:** 2026-09-17 (Lane A, shipping BF-173's engine half).
+- **✅ SHIPPED 2026-09-17 (v1.457.10)** (`fix/lb116-checkin-sends-suggested-sore`).
+  [Journal](overview/entries/2026-09-17-fix-lb116-checkin-sends-suggested-sore.md).
+  `suggestedSoreMuscles: suggested` on `leanPayload`, which is what reaches all three writes — the
+  local store, the outbox mutation and the `/api/mood` fallback — plus the optimistic `MoodLog`.
+- **⚠ IT TOUCHED A LANE A PATH, deliberately and narrowly.** `MoodFieldsSchema`
+  (`packages/shared/src/validation/mood-log.ts`) had to gain the field: the schema has **no
+  `.strict()`**, so Zod DROPS an unknown key rather than rejecting it — without the edit the sheet's
+  value would have been silently stripped on both the route and the outbox branch and this entry
+  would have shipped inert. One optional field, bounded like its sibling, specified by this entry
+  and delegated by the lane that owns the file. Flagged rather than done quietly.
+- **⛔ NO E2E, and one was written and DELETED rather than shipped green.** A browser test that saves
+  a check-in and reads `mood_logs.suggested_sore_muscles` back **passes against unfixed `main`**: the
+  column is non-null either way, because `saveMoodLog` derives the list when the caller sends none.
+  Distinguishing the sheet's value from the server's derivation needs control of the recovery feed
+  the harness does not have. A vacuous test that answers is worse than none. The unit test carries
+  the proof instead — **4 of its 6 assertions fail against `main`**, including a real
+  `MoodFieldsSchema.parse` round-trip, which is exactly the strip this fix is about.
+- **Branch:** `fix/lb116-checkin-sends-suggested-sore` · **Added:** 2026-09-17 (Lane A, shipping BF-173's engine half).
 - **Lane: B** — `components/mood-checkin-sheet.tsx`. Reached only from a component, touches no
   storage schema and no API contract: the column, the repository write and the scorer all shipped
   with BF-173.
@@ -913,57 +930,6 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
 - **Where to look for the data:** `oura_raw_samples` and the workout log both go back far enough to
   fit against something observable (next-session performance, RPE against expected RPE) rather than
   against intuition about muscle size.
-
-### [workouts][app-shell] BF-172 — the explain screen called the session-fit score "readiness" (fixed)
-
-- **✅ SHIPPED 2026-09-17 (v1.457.9)** (`fix/bf172-session-fit-not-readiness`).
-  [Journal](overview/entries/2026-09-17-fix-bf172-session-fit-not-readiness.md). Caption is now
-  *"How well this session fits today"*, and the ring prints **Strong fit / Fair fit / Poor fit**.
-  **No `Verify:` field — the entry said browser is enough and the browser has it**
-  (`e2e/bf172-session-fit-not-readiness.spec.ts` stubs the owner's screenshot: fit 84 over readiness
-  37, deload advised; it fails against the unfixed screen).
-- **⚠ TWO OF THIS ENTRY'S INSTRUCTIONS WERE ADJUSTED, both for rules it did not check against.**
-  - It said *"either no band word or a fit-specific one"*. **No band word is not available here:** the
-    ring and the number are band-coloured, and `score-ring.tsx`'s own comment records that the label
-    exists precisely so the band is not carried by colour alone. Shipped with a fit-specific word.
-  - It said change the band *"at this call site, not inside `ScoreRing`"*. The caution was aimed at
-    the ~15 `scoreBand` callers, which is right — but **`ScoreRing` is session-explain's OWN
-    component with exactly one caller** (`app/session-explain/components/score-ring.tsx`; the
-    `ScoreRing*` symbols in `components/more/` and `oura-score-chip-row.tsx` are an unrelated home
-    preference type). The vocabulary lives in the component, which cannot leak.
-- **And the fit words are MAPPED from `scoreBand`, not derived from the score.** CLAUDE.md bans
-  re-deriving the 70/50 thresholds with local label strings — two divergent copies were found that
-  way — so `scoreBand(score)` still owns the thresholds and the colour, and only the vocabulary is
-  remapped: `High → Strong fit`, `Moderate → Fair fit`, `Low → Poor fit`. `scoreBand` is untouched.
-- **Branch:** `fix/bf172-session-fit-not-readiness` · **Added:** 2026-09-16 (BugFix intake). Found tracing BF-171; the owner's
-  screenshot is the evidence and he did not have to point at it.
-- **Lane: B** — `app/session-explain/session-explain-content.tsx:31`.
-- **One screen, one word, two different quantities.**
-
-  ```tsx
-  <ScoreRing score={overallScore} label="Overall readiness for this session" />
-  ```
-
-  `overallScore` is `recovery × w + balance × w + freshness × w` from
-  `computeAiDynamicNextSession` — **how well this session FITS today**, given what is recovered and
-  what is overdue. It is not readiness, and nothing about it is a measurement of the lifter. Below
-  it, `SignalSections` prints the real thing: **Oura readiness 37 · Low**, HRV *well below your
-  usual*, **Deload: strong deload advised**, energy *drained*.
-- **The band makes it worse, and it is the same mistake twice.** `ScoreRing` runs the value through
-  `scoreBand` (`packages/shared/src/health/score-band.ts`) — the **readiness** vocabulary — so the
-  fit score is stamped **HIGH** in green. A screen that exists to explain a "strong signal to back
-  off today" leads with a green 84 labelled readiness.
-- **Same class as BF-154:** a number that is correct in its own terms, printed under a caption
-  belonging to the quantity it replaced. Nothing here is miscomputed.
-- **Fix: rename the label and drop the readiness band.** *"How well this session fits today"* (or
-  *"Session match"*), and either no band word or a fit-specific one — `scoreBand`'s High/Moderate/Low
-  is the readiness ladder's vocabulary and carrying it here is what creates the contradiction. The
-  ring colour can stay; it reads as a fit gauge once the caption says fit.
-- **Sibling sweep required:** `ScoreRing` is also the component, and `scoreBand` is used ~15 places.
-  Change the caption and the band **at this call site**, not inside `ScoreRing` or `scoreBand` —
-  every other caller is scoring real readiness and is correct.
-- **Verification:** open **Why <session>?** on a day when readiness is low and confirm the ring no
-  longer says "readiness" or "HIGH" while the signals below say the opposite. Browser is enough.
 
 ### [nutrition] BF-170 — a lone saved meal shows its macros nowhere (fixed; the device look is what is left)
 

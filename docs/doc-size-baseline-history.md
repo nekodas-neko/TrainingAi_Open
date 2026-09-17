@@ -13264,3 +13264,22 @@ the diff shows as an unexplained deviation:
 Also recorded: the fit words map from `scoreBand`'s label rather than being derived from the score,
 so the 70/50 thresholds stay in one module. Without that line the mapping looks like indirection
 someone would helpfully "simplify" into local thresholds — the exact pattern CLAUDE.md bans.
+
+## 2026-09-17 — `docs/implementation-backlog.md` 23222 → 23188 (net −34), `projectOverview.md` 11636 → 11646
+
+`fix/lb116-checkin-sends-suggested-sore` (LB-116), which also removes BF-172.
+
+The backlog SHRANK: BF-172 finished with nothing owed and #1268 left it sitting with a ✅ instead of
+removing it, which is what the "a finished entry must not still be in the queue" rule exists to stop.
+It kept printing as READY until this PR. The heading said "(fixed)" in lowercase, which is why
+`check-backlog-pointers` did not catch it — the check looks for the uppercase forms.
+
+LB-116's own growth is two ⚠ paragraphs, both recording a judgement the diff cannot show:
+
+- It touched `packages/shared/src/validation/mood-log.ts`, a Lane A path, because the schema has no
+  `.strict()` and Zod silently drops unknown keys — the fix would otherwise have shipped inert.
+  Written down so the lane touch is visible rather than discovered later in a blame.
+- **An e2e was written, run against `main`, and deleted.** It passed unfixed, because `saveMoodLog`
+  derives the list when none is sent, so the stored column is non-null either way. That is worth a
+  paragraph precisely because the next person will have the same idea, write the same test, see it
+  green, and believe it.

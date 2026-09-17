@@ -23,6 +23,14 @@ export const MoodFieldsSchema = z.object({
     'joint_pain', 'tight_back', 'low_motivation',
   ])).max(20).optional(),
   soreMuscles: z.array(z.string().max(40)).max(30).optional(),
+  /** Which of `soreMuscles` the check-in sheet pre-selected, as opposed to the lifter ticking it
+   *  himself (BF-173 / LB-116). Optional: `saveMoodLog` derives it when a caller omits it, so an
+   *  older client keeps working — the derivation is a fallback, not the source of truth, because it
+   *  cannot distinguish a volunteered muscle that would also have qualified, and for a queued
+   *  offline write it runs against a recovery feed from hours later. Without this key here the
+   *  field is silently stripped: the schema has no `.strict()`, so Zod drops unknowns rather than
+   *  rejecting them, and the sheet's value would never reach the route or the outbox. */
+  suggestedSoreMuscles: z.array(z.string().max(40)).max(30).optional(),
 })
 
 export type MoodFields = z.infer<typeof MoodFieldsSchema>
