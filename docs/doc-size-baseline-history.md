@@ -13185,6 +13185,24 @@ that mistake the day before, and the entry now names it.
 structurally and wrong about the present — temperature has recovered to 84–96 while `hrvBalance` fell
 to 0 on a real physiological event. Leaving it would have pointed an implementer at the wrong term.
 
+## 2026-09-17 — backlog → 23258: TN-22's re-test, which its own pass test asked for
+
++32 lines, replacing a two-line pass test with the measurement it demanded. TN-22 sat at #5 in Lane
+A's ready list with half of it already shipped, so the cheapest thing Tuning could do was run the
+re-test rather than let an implementer open it and find out.
+
+**The result earns the table: every window is positive where the test wants −0.3 or lower** — +0.562
+at n=17, +0.134 at n=29, +0.072 in TN-33's original. The swing across windows is the finding, not
+the sign: that is what a metric with little signal looks like.
+
+The ⛔ line costs four lines and saves the next reader a day. LA-112 had just found 41% of stress
+buckets recorded during sleep, which makes contamination the obvious culprit — and
+`corr(stress_high_minutes, hours slept) = −0.133` says it is not. Without that test the entry would
+have been closed on a plausible story.
+
+The `Keep:` is narrowed to the sign half with a date attached (≈ 2026-10-16, thirty post-LA-112
+days), because every window measured prices the *old* metric.
+
 ## 2026-09-17 — backlog → 23249: a new observed max settles the anchor the owner parked
 
 +23 lines to close a question the owner left open by name. He pinned 178 as a 50/50 blend and said

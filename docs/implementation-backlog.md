@@ -11440,8 +11440,40 @@ it to **−0.383 / −0.699** (n = 8). The finding is *masked* by the corrupt da
 **not the app's definition**. The buckets are written by the same pipeline as the scalar, so *"the
 buckets are right"* rests on their producing the correct sign, not on independent verification.
 
-**Pass test:** for every stored day, `stress_high_minutes` equals the bucket-derived count; and on a
-re-test at **n ≥ 30** the metric correlates negatively with readiness at |r| ≥ 0.3.
+**⚠ RE-TEST RUN 2026-09-17 — the sign half FAILS, and not for the reason anyone expected.**
+
+| window | n | corr(`stress_high_minutes`, readiness) |
+|---|---:|---:|
+| since 2026-09-01 (post storage fix) | 17 | **+0.562** |
+| since 2026-08-20 (wider) | 29 | **+0.134** |
+| TN-33's original, 18 days | 18 | +0.072 |
+
+**The pass test wants ≤ −0.3 and every window is POSITIVE.** More "high stress" minutes go with
+*higher* readiness, and the size of the effect swings with the window — which is the signature of a
+metric carrying little signal rather than one with an inverted sign.
+
+**⛔ The obvious explanation was tested and is FALSE.** LA-112 (#1256, 2026-09-16) found 41% of stress
+buckets were recorded during sleep, so sleep contamination looked like the cause. It is not:
+**corr(`stress_high_minutes`, hours slept) = −0.133** over the same 29 days. Stress minutes do not
+rise with sleep, so removing sleep buckets will not flip this on its own.
+
+**⚠ Do NOT read this as contradicting TN-33's autocorrelation result.** Those are different claims and
+both stand: the stress *series* has real temporal structure (lag-1 +0.637 against a night-preserving
+null of +0.454), while the daily *scalar* does not predict readiness. A signal can be real and still
+not be about recovery.
+
+**⚠ This vindicates TN-34.** The override was unwired on 2026-09-16 for firing off a number measured
+as carrying no signal; this is that measurement, re-run on more data and still failing.
+
+**Keep:** the sign half, and only that. The storage defect is fixed and verified (10/10 days match
+since 2026-09-01). What is owed is one re-test **after ≈ 30 days of post-LA-112 data (≈ 2026-10-16)**,
+because LA-112 changed what the metric counts — every window above is almost entirely pre-LA-112, so
+it prices the *old* metric. If that re-test is still positive, the honest next step is retiring the
+scalar rather than re-tuning it.
+
+**Pass test:** for every stored day, `stress_high_minutes` equals the bucket-derived count (✅ done);
+and on a re-test at **n ≥ 30 of post-LA-112 days** the metric correlates negatively with readiness at
+|r| ≥ 0.3.
 
 ### [readiness] TN-21 — "daytime stress" is 55% night buckets, and night and day carry opposite signs
 
