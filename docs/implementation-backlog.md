@@ -648,6 +648,31 @@ line must name **what moved** (resting HR and HRV off baseline), never imply inf
   (`packages/shared/src/ai-periodization/__tests__/sore-muscle-provenance.test.ts`) already pin what
   the scorer does with each case.
 
+### [workouts][platform] LB-118 — the explain page's `signals` omits sore-tick provenance, so LB-117 cannot be built in its lane
+
+- **Lane:** A — `lib/data/postgres/adapter.ts:1912` and `packages/shared/src/types/program.ts:127`.
+  Filed by Lane B on 2026-09-17 after checking LB-117's premise.
+- **Two one-line changes, and the value is already in scope.** The explain `signals` block is built
+  at `adapter.ts:1912` with `soreMuscles: moodLog?.soreMuscles ?? []` and no provenance;
+  `moodLog.suggestedSoreMuscles` is read twenty lines above it (line 1892, where the SCORER is fed).
+  Add it to the `signals` object and to the `signals` type.
+- **⛔ LB-117 says the adapter is *"deliberately unchanged"* and that *"the data is there"*. Both are
+  true of the repository and false of the payload the page renders.** `getMoodLog` and `listMoodLogs`
+  do return the field — it just never reaches `signals`, which is what the explain surface is given.
+  Same shape as OR-118: a derivation that exists and an exposure that does not.
+- **⚠ A Lane-B-only workaround EXISTS and is the wrong answer — this is the part worth reading.**
+  `GET /api/mood?date=…` returns the whole `MoodLog`, provenance included, so the page could fetch
+  it client-side with no Lane A change at all. **Do not.** Q-105's rule for this screen is that it
+  shows the numbers the recommendation was *actually computed from*, and `next-session` is cached
+  (`NEXT_SESSION_TTL` = `TTL_SHORT`) while the check-in can be edited after it was computed. A
+  separately-fetched mood log can therefore be a *different* check-in from the one behind the score,
+  and the page would explain a recommendation with inputs it never used — a subtler version of
+  exactly the defect LB-117 is about.
+- **Verification:** an explain payload for a day whose check-in carried a suggested tick shows the
+  field; one from before provenance existed shows `null`, not `[]` — the scorer reads null as
+  "unknown" and scores the old way, and the page must be able to say "not recorded" rather than
+  "none were suggestions".
+
 ### [workouts][app-shell] LB-117 — the explain screen lists sore muscles that no longer penalise anything
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-17 (Lane A, found while shipping BF-173).
@@ -664,6 +689,17 @@ line must name **what moved** (resting HR and HRV off baseline), never imply inf
   there: `moodLog.suggestedSoreMuscles` is read back by `getMoodLog` and `listMoodLogs`.
 - **Not urgent and deliberately not batched with BF-172:** that entry is about a label on a
   different number (session fit called readiness). Same screen, different defect.
+- **Needs:** LB-118
+- **⛔ CHECKED 2026-09-17 AND THIS IS NOT BUILDABLE IN THIS LANE YET.** *"The data is there"* is true
+  of the repository and false of what the page is given: the explain `signals` block
+  (`adapter.ts:1912`) carries `soreMuscles` and no provenance, and `signals` is the payload this
+  surface renders. Exposing it is two one-line edits in Lane A files — filed as **LB-118**, with the
+  value already in scope at `adapter.ts:1892`.
+- **⚠ And the obvious Lane B workaround is wrong, which is why this is parked rather than improvised.**
+  `GET /api/mood` returns the provenance, so the page could fetch it itself — but `next-session` is
+  cached and the check-in can change after the recommendation was computed, so that fetch can
+  describe a *different* check-in from the one behind the score. Q-105 exists to stop this page
+  explaining a recommendation with inputs it did not use.
 
 
 ### [readiness] TN-34 — the stress-deload override fires on 83% of days, off the one number measured to carry no signal
@@ -990,50 +1026,26 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
 
 ### [nutrition] BF-175 — the log-food sheet prints the stored GOAL as today's budget, so it reads 1660 beside the card's 1506
 
-- **Branch:** _unassigned_ · **Added:** 2026-09-17 (BugFix intake). Owner, with two screenshots taken
-  at the same minute: *"2 different calorie goals here"*.
-- **Lane: B** — `components/nutrition/assign-step.tsx:43`, `:56` and `:153-157`.
-- **Both numbers on his screen, traced to source and confirmed against production rows:**
-
-  | surface | shows | what it is |
-  |---|---|---|
-  | Nutrition card | `1,355 OF 1,506` · *"1,291 resting rate + 215 earned from movement"* | `budgetProvenance(balance).total` |
-  | Assign-to-Meal sheet | `Today after logging 1361 / 1660` | `nutrition_targets.calories`, raw |
-
-  `nutrition_targets.calories` is **1660** in production (updated 2026-08-31). The intake halves
-  agree — 1355 + the 6 kcal item = 1361 — so **the only thing that diverges is the denominator**,
-  and it diverges by 154 kcal, which is his entire earned-from-movement figure plus the gap between
-  the stored goal and his measured resting rate.
-- **⚠ This is a MISSED SURFACE of an already-fixed bug, not a new one.** `nutrition-content.tsx:423-441`
-  carries the fix and the measurement: three budgets once appeared on one screen (zone bar 2,180,
-  Home 2,451, ring 2,001) and the comment states the rule outright — ***"`nutrition_targets.calories`
-  is the rest-day floor, not `restingBase + targetNet`"***. `home-nutrition-card.tsx:34` repeats it:
-  ***"The budget is `budgetProvenance(...).total`, not `calorieGoal + activeEnergyKcalToday`."***
-  The sweep that fixed the page did not reach the sheet that logs into it.
-- **Fix: pass the resolved budget down rather than re-reading targets in the sheet.**
-  `nutrition-content.tsx` already computes `effectiveCalorieGoal` (`:446`) as
-  `budget?.total ?? targets?.calories`, with a deliberate fallback that does **not** compose an
-  addend. Thread that value into the log-food flow and delete `assign-step`'s own
-  `nutrition-targets` read (`:43` seed and `:56` fetch). **Do not call `budgetProvenance` inside the
-  sheet** — `energy-card.tsx:50` records why a second call site is the wrong shape: it becomes
-  another independent number the moment its inputs differ.
-- **The progress bar is wrong in the same breath and is the visible half.** `:159-163` colours green
-  under target and orange over, against the 1660 denominator — so a day that has already passed the
-  real 1506 budget still paints green and reads as headroom. His screenshot shows exactly that: a
-  full green bar at 1361/1660 while the card two taps away says **151 kcal left**.
-- **Checked and NOT a defect — do not "fix" it in the same PR:** `WeeklyNutritionChart`
-  (`day-tools-section.tsx:72` → `weekly-nutrition-chart.tsx:70`, `:134`) also takes
-  `targets?.calories`. There it is a constant reference line across seven days and the over/under
-  bar colouring for the current day. A weekly chart has no single day's earned movement to add, so
-  the stored goal is the right quantity — the same reason `effectiveCalorieGoal` falls back to it
-  rather than inventing an addend.
-- **Sibling sweep when fixing:** grep every `readCacheSync<NutritionTargets>` / `cachedFetch<NutritionTargets>`
-  of `'nutrition-targets'` and classify each as *goal* or *today's budget*. Four surfaces read it
-  today — `assign-step.tsx`, `nutrition-content.tsx`, `macro-targets-pane.tsx` (Profile, editing the
-  goal itself, correct) and the sync-provider warm list. Only the first is misclassified.
-- **Verification:** browser is enough for the arithmetic — open the log sheet on a day with earned
-  movement and confirm the denominator matches the card. **The device look is still owed** for the
-  bar colour at the S25 width, because the green/orange flip is what makes the number believable.
+- **Lane:** B — `components/nutrition/assign-step.tsx`, `components/nutrition/food-logger-sheet.tsx`,
+  `app/nutrition/nutrition-content.tsx`, `components/nutrition/end-of-day/day-summary-card.tsx`.
+  Restored 2026-09-17: cutting the entry down to its residue dropped this line, and `next-item.js`
+  printed it `⟨lane unstated⟩`, which puts an entry in BOTH implementer lanes' lists.
+- **Shipped 2026-09-17** on `fix/bf175-assign-step-day-budget`. The sheet reads no targets at all
+  now: `nutrition-content.tsx` passes `effectiveCalorieGoal` into `FoodLoggerSheet` →
+  `AssignStep dayBudgetKcal`, and both the denominator and the green/orange flip read that prop.
+  Null draws nothing rather than inventing a denominator.
+- **Two surfaces, not one.** The prop-chain sweep the entry's cache-key sweep could not see found
+  the end-of-day review taking raw `targets` and printing `eaten / target kcal` for ONE day, with a
+  `?? 2000` fallback underneath it. It now takes `effectiveTargets`, the same value `energy-card`
+  already had, and hides the ratio when no target is known.
+- **`WeeklyNutritionChart` was left alone**, as this entry instructed — a seven-day reference line
+  has no single day's earned movement to add.
+- **Keep:** the **device look is still owed** — the bar colour at the S25 width. The arithmetic is
+  pinned by `e2e/bf175-one-day-budget.spec.ts` (run against unfixed `main`: printed 1964 against a
+  budget of 1810, the injected 154 offset exactly) and by
+  `components/nutrition/__tests__/bf175-day-budget-single-source.test.ts` (9 of its 10 assertions
+  red on `main`). Neither says what green-at-1361 looks like on the phone, which is the half that
+  made the number believable.
 
 ### [workouts][readiness] BF-174 — every muscle recovers on the same 24 h base constant, so abs and quads are modelled identically
 
@@ -1445,6 +1457,13 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
   elimination list.
 - **Added:** 2026-09-15 (BugFix intake). Owner: *"when I try click the treadmill; or any 'Other
   activity' nothing actually happens."* Reported on the APK.
+- **Gate: device** — added 2026-09-17, once the root cause below was measured. **This is a gate on
+  the FIX, not on the diagnosis**, and the distinction is why it was absent for two days: the cause
+  is now reproducible in the harness (recipe below), so the investigation never needed the device and
+  the entry correctly headed READY while that was the open work. What is left does need it — a fix
+  here rewrites history handling for every sheet that navigates, and the Android back gesture is a
+  Capacitor channel Playwright cannot fire. Ungate it the moment the fix lands in a branch needing
+  only the S25 look.
 - **This blocks a path the owner was told to use yesterday.** BF-160 established that a fitness test
   earns no calories, and "Other activity → Treadmill" is the recommended way to log a steady
   treadmill walk (the guided walk is interval-only, minimum 1 fast + 1 slow block). That
@@ -1593,6 +1612,120 @@ defect.
 **BF-165 is back to what it was:** device-gated, cause unknown, three candidates open. The `Lane:` and
 the source-path elimination table at the top of this entry are unaffected — those came from reading,
 not from the harness.
+
+---
+
+## ✅ ROOT CAUSE FOUND, 2026-09-17 (Lane B) — CANDIDATE 3, and the retraction above was right to leave it UNPROVEN rather than refuted
+
+**It IS reproducible in the harness.** Two conditions have to hold at once, and every previous
+attempt — including the retraction's — had one of them wrong:
+
+1. **Warm the destination** with a direct `goto` first (the retraction's rule, and it stands).
+2. **Make the tap actually land.** This is the new one, and it is what produced three rounds of
+   wrong answers. `tapCentre` does **no scrolling**: it reads a bounding box and calls
+   `page.touchscreen.tap(x, y)`, which is a raw coordinate dispatch with **no actionability check**.
+   On `/cardio` at a 412×915 viewport the three modality controls sit at **y=852, 924 and 997** — so
+   *Run* is on screen and *Guided walk* and *Other activity* are **below the fold**, and their taps
+   hit nothing at all. `document.elementFromPoint` returns **null** for both, which is exactly what a
+   tap outside the viewport does.
+   **That manufactured a perfect false differential**: Run "worked" and the two `/activity*` controls
+   "did nothing", which reads as *"both failures share the `/activity` prefix"* — the very claim the
+   retraction struck. It is a coordinate artifact, not an href one. **Scroll with
+   `scrollIntoView({ block: 'center' })` and assert `elementFromPoint` hit-tests to the control
+   before dispatching**; `tapInView` does not help here, it filters on **x** only.
+
+**With both conditions met, measured 2026-09-17:**
+
+| tap | result |
+|---|---|
+| **Run** → `/running` | navigates ✓ |
+| **Guided walk** → `/activity/guided-walk` | **navigates ✓** — the retraction is confirmed, this is NOT a second dead button |
+| **Other activity → Treadmill** → `/activity` | **pushes, then comes back to `/cardio`** ✗ |
+
+**The push is not the thing that fails — it happens, and is then undone.** Instrumented trace,
+`history` patched from the page (times from the start of the run):
+
+```
++6301ms startViewTransition          ← the tap: push('/activity') begins
++6729ms history.back()               ← 428 ms later
++6745ms replaceState(/cardio)
++6745ms popstate -> /cardio          ← back where it started
+```
+
+**The `history.back()` is `closeSurface`'s** (`lib/hooks/sheet-back-stack.ts:50-59`): a sheet that
+pushed its own entry pops it on close. Correct in isolation. But `selectType`
+(`components/workout/log-activity-sheet.tsx:27-31`) runs
+
+```ts
+startActivity(...)        // store
+onOpenChange(false)       // → closeSurface → history.back()
+router.push('/activity')  // → animate() → startViewTransition → push
+```
+
+so the sheet's undo-pop is in flight across the navigation and **eats the entry the push just
+added**. That is candidate 3 in the entry above, whose earlier "refuted" verdict rested on a
+deferred-close experiment run against a **cold** route — which is why the retraction downgraded it to
+UNPROVEN rather than striking it. It is now the survivor, on evidence.
+
+**Why this matches the owner's report exactly.** He said *"it just scrolls to the top of cardio
+hub"*. The sheet closes, the view transition completes, the navigation is popped, and `/cardio`
+re-renders — and `cardio-content.tsx:87` scrolls in a **nested** `overflow-y-auto` div that no
+scroll-restoration covers, so it lands at the top. Sheet closed, same screen, scrolled to top.
+
+**Guided walk is unaffected because no sheet is involved** — it is a direct `router.push` from
+`modality-picker.tsx` with nothing to pop. That is the cleanest confirmation that the sheet is the
+variable, and it is the opposite of what the pre-retraction table claimed.
+
+- **Scope correction:** the defect is **any navigation issued from inside a closing sheet**, not
+  anything `/activity`-prefixed. Other `onOpenChange(false)` + `router.push` call sites need the same
+  sweep before a fix is called complete.
+- **⛔ Still do NOT lengthen `NAVIGATION_TIMEOUT_MS`** and do not touch `animate()`: the push is
+  fine, and app-wide navigation must not change for a call-site ordering bug.
+- **Device check is still owed** — this is measured in the harness at one viewport, and the report
+  was on the APK.
+
+- **⛔ THE OBVIOUS FIX DOES NOT WORK, and this was measured rather than reasoned (2026-09-17).
+  Do not spend the attempt again.** The natural reading of the trace is *"a self-pop is in flight
+when we navigate, so wait for it to drain"* — the module already tracks exactly that
+(`pendingSelfPops`, module-level since BF-34). It was built (an `afterSelfPops(navigate)` that parks
+the push until `handlePop` drains) and it **does not fix it**, because its premise is false:
+
+```
++3973 startViewTransition        ← the Treadmill tap
++4388 history.back()             ← the sheet's close, 415 ms LATER
++4392 popstate -> /cardio
+```
+
+**`pendingSelfPops` is still 0 at the moment the navigation is issued**, so the parked callback runs
+inline and is then eaten by a pop that had not happened yet. Waiting for a pending pop cannot help
+when the pop is not yet pending.
+
+**Why the close is 415 ms late, which is the part that makes this hard.** `closeSurface` runs in the
+`useSheetBackDismiss` effect **cleanup** (`lib/hooks/use-sheet-back-dismiss.ts:44`), so it needs a
+React commit. `router.push` runs inside `document.startViewTransition`, which **suspends frame
+production and holds the commit** until the transition settles. So the navigation itself is what
+delays the sheet's close past it. The two are not independent, which is why reordering the three
+statements in `selectType` does not help either — any order still has the push inside a transition
+that defers the close behind it.
+
+**What a real fix has to do:** make the sheet's entry not be popped at all once a navigation has
+superseded it, tied to **the surface's identity** rather than to a flag. A bare module-level "a
+navigation is happening" flag is the known-bad pattern here — `sheet-back-stack.ts:27-32` records
+BF-34, where *"a state that is not mine is indistinguishable from a real back gesture"*. The surface
+handle lives in the hook, not at the call site, so the mechanism probably belongs on
+`useSheetBackDismiss`/`SheetContent` (e.g. the close is told it was superseded) rather than in a
+helper the call site calls.
+  Worth checking as part of that design: `router.replace` in place of `push` would overwrite the
+  sheet's own entry rather than stacking on it, which keeps back from the destination a single
+  press — but it is only correct **together** with suppressing the pop, never on its own.
+- **A reproduction spec is deliberately NOT shipped with this finding.** It would be a test asserting
+  a behaviour the app does not have, and marking it skipped to keep CI green is the shape this repo
+  forbids. Its recipe is written above and is the whole of what it needs: warm the destinations, then
+  `scrollIntoView({ block: 'center' })` and assert `elementFromPoint` hit-tests to the control before
+  each `touchscreen.tap`, then poll `location.pathname` for `/activity`. Ship it with the fix.
+- **Keep the `Guided walk` control in that spec as the discriminator.** It navigates correctly today
+  (no sheet is involved), so a fix that broke navigation generally would otherwise pass.
+
 
 ### [app-shell][platform] LA-109 — a tab flip leaves the PREVIOUS tab's route tree on the history entry (fixed; device check owed)
 
@@ -1855,13 +1988,65 @@ composite reports which of its inputs were inferred.
   observed on the device. Per the external-API rule, the integration is not done until a value is in
   the column.
 
-### [readiness][platform] LB-114 — a zero-data account reads `sufficient: true`, so RV-38's badge is gone and its spec is red for one hour a day
+### [platform] LB-119 — chromium SIGSEGVs mid-suite in CI, so an E2E result has to be read twice before it means anything
+
+- **Lane:** O — the Orchestrator owns CI config (`.github/workflows/ci.yml` and the Playwright
+  config). Filed by Lane B on 2026-09-17 after it cost a merge cycle on PR #1280.
+- **The signature is identical across runs, which is what makes it one defect rather than N flaky
+  specs.** `chrome-headless-shell` takes `Received signal 11 SEGV_MAPERR`, faulting address
+  **`0x1b0`**, same stack, in `chromium_headless_shell-1234`. Whatever was on that worker then fails
+  with `browser.newContext: Target page, context or browser has been closed` — **no test body runs**,
+  so the report names a spec that was never executed.
+- **Observed three times, on two different days:**
+
+  | run | lost to it | outcome elsewhere |
+  |---|---|---|
+  | #1264, 2026-09-16 | `bf5-week-in-review-page:106`, `nutrition-day-navigation:92`, `one-calorie-budget:135` | all passed on retry |
+  | #1280 run 1, 14:01 UTC | `diary-nested-meal:231`, `:207` | both passed in run 2 |
+  | #1280 run 2, 14:40 UTC | `forced-dark-theme:67`, `preferences-survive-reinstall:37`, `recent-all-buckets:17` | all passed on retry |
+
+- **⚠ It also produces failures that do NOT look like a crash, which is the expensive part.**
+  `la109-back-from-subroute.spec.ts:87` failed run 1 on a real 30-second `toBeVisible` timeout with a
+  screenshot — the shape of a genuine regression, on a PR that had touched UI. It passed run 2
+  untouched, and passed **four** consecutive local runs. Diagnosing that as a code defect is the
+  cost this entry is about; the only thing that separated it from a real failure was a second run.
+- **Not "flake, ignore it".** CLAUDE.md forbids treating a flake as a root cause, and the repo's one
+  sanctioned re-run gets spent on this rather than on a real question. The practical rule today —
+  worth carrying until this is fixed — is that a red E2E here is not evidence until the crash stack
+  has been checked for and the spec re-run.
+- **Where to start:** `--disable-dev-shm-usage` is already passed, so the classic `/dev/shm`
+  exhaustion is not it, or not all of it. Worth measuring before changing anything: worker count
+  against runner memory (the suite runs ~213 tests in ~25–32 min), and whether the crash correlates
+  with a particular spec's page rather than with elapsed time. Pinning the Playwright/chromium
+  revision is the other obvious lever — the revision string is the same across all three runs, so a
+  bad pin is consistent with the evidence and has not been ruled out.
+- **Do NOT fix this by raising `retries`.** That hides it, and the run-1 `la109` case shows why the
+  hiding is expensive: the failures it produces are indistinguishable from real ones until re-run.
+
+### [readiness][platform] LB-114 — a zero-data account reads `sufficient: true`, so RV-38's badge is gone and its spec is red for TWO hours a day
 
 - **Lane:** A — `packages/shared/src/health/body-battery-inputs.ts:125`. Filed by Lane B on
   2026-09-16 after `e2e/rv38-body-battery-no-data-badge.spec.ts` failed CI on an unrelated PR.
-- **⚠ RED ON `main`, and it fires on a CLOCK — 07:00–08:00 Brisbane (21:00–22:00 UTC), every day, on
-  every branch.** That is why it reads as a flake and is not one. It is the hour-dependence class
-  CLAUDE.md documents at length, in its nastiest form: the test is CORRECT and the payload is wrong.
+- **⚠ RED ON `main`, and it fires on a CLOCK — TWO separate hours: 00:00–01:00 AND 07:00–08:00
+  Brisbane (14:00–15:00 and 21:00–22:00 UTC), every day, on every branch.** That is why it reads as
+  a flake and is not one. It is the hour-dependence class CLAUDE.md documents at length, in its
+  nastiest form: the test is CORRECT and the payload is wrong.
+- **✏️ CORRECTED 2026-09-17 by Lane B, and the correction is the point: this entry said ONE hour and
+  named the wrong mechanism for half of it.** It was filed from a single 07:55 observation and the
+  clause was then read backwards from that one data point — which is the "an entry's numbers are
+  prose until something checks them" trap, committed by the entry's own author. There is a SECOND
+  window with a SECOND cause, in `app/api/body-battery/route.ts:172` rather than the clause:
+  ```ts
+  const rawWakeTime = todaySleep?.sleepEnd?.getTime() ?? firstHrTime
+    ?? (todayMid.getTime() + 7 * 3_600_000)   // default 07:00
+  const wakeTime = rawWakeTime > now.getTime() ? (firstHrTime ?? todayMid.getTime()) : rawWakeTime
+  ```
+  Before 07:00 local the 07:00 default is **in the future**, so the future-wake guard fires and
+  `wakeTime` falls back to `firstHrTime ?? todayMid` — and a zero-data account has no HR rows, so it
+  lands on **local midnight**. `wakingMinutes` is then minutes-since-midnight, which is under 60 for
+  the first hour of the day. So the grace clause short-circuits at 00:00–01:00 for that reason and
+  again at 07:00–08:00 for the reason already filed. Between 01:00 and 07:00 it is over 60 and the
+  spec passes.
 - **Measured, not inferred.** `GET /api/body-battery` for the `zero@local.dev` fixture, captured
   2026-09-17 07:55 Brisbane:
   ```json
@@ -1873,9 +2058,13 @@ composite reports which of its inputs were inferred.
   ```ts
   sufficient: mins < MIN_WAKING_MINUTES_TO_JUDGE || samplesPerHour >= MIN_SAMPLES_PER_WAKING_HOUR
   ```
-  `MIN_WAKING_MINUTES_TO_JUDGE` is 60. The fixture's wake time falls back to **07:00 local**, so
-  `wakingMinutes` is under 60 for exactly the first hour of the day and the grace clause short-circuits
-  to true. After 08:00 it goes false, the badge returns, and the spec passes again.
+  `MIN_WAKING_MINUTES_TO_JUDGE` is 60, and `mins` is `Math.max(0, wakingMinutes)`. The fixture's wake
+  anchor is **07:00 local** after 07:00 and **local midnight** before it (see the correction above),
+  so `wakingMinutes` is under 60 in each of the two windows and the grace clause short-circuits to
+  true. Outside them it goes false, the badge returns, and the spec passes again.
+  **The recommended one-condition fix below closes BOTH windows**, because it keys on
+  `sampleCount === 0` rather than on the window — which is why the correction changes the entry's
+  scope and urgency without changing its fix.
 - **✅ CONFIRMED BY NATURAL EXPERIMENT, not just by reading the clause.** The same commit
   (`1bc4332afa`, PR #1264) ran E2E twice: the run starting **21:15 UTC failed** on this spec, and the
   run starting **22:00 UTC passed**. Identical code, identical fixture, different side of 22:00 UTC —
@@ -1897,10 +2086,40 @@ composite reports which of its inputs were inferred.
   three specs went flaky-but-passed (`bf5-week-in-review-page.spec.ts:106`,
   `nutrition-day-navigation.spec.ts:92`, `one-calorie-budget.spec.ts:135`) and the log carries a
   `chrome-headless-shell` crash stack. One runner, three retries and a browser crash reads as runner
-  instability rather than three spec defects; worth a second look only if it repeats.
-- **Verification:** run `e2e/rv38-body-battery-no-data-badge.spec.ts` between 07:00 and 08:00
-  Brisbane — it must pass. **Do not verify outside that window**, where it passes regardless and
-  proves nothing.
+  instability rather than three spec defects.
+- **⚠ IT REPEATED — twice on 2026-09-17, on PR #1280's two E2E runs, so it is no longer "worth a
+  second look".** Both runs carry a `chrome-headless-shell` **SIGSEGV** (`Received signal 11
+  SEGV_MAPERR`, faulting address `0x1b0` both times, identical stack). Run 1 lost two specs to
+  `browser.newContext: Target page, context or browser has been closed` — no test body ran —
+  including `diary-nested-meal.spec.ts:231`; run 2 lost three more to retries. **Every one of them
+  passed on the other run or on retry**, and `la109-back-from-subroute.spec.ts:87`, which failed run
+  1 on a real 30 s timeout, passed run 2 and passed four times locally. So the pattern is a browser
+  that dies mid-suite and takes whatever was on that worker with it. **Filed as its own item is the
+  right next step rather than more notes here** — the practical cost today is that an E2E result has
+  to be read twice before it means anything, which is exactly the "flake is not a root cause" reading
+  this repo forbids relying on.
+- **Verification:** run `e2e/rv38-body-battery-no-data-badge.spec.ts` inside EITHER red window —
+  **00:00–01:00 or 07:00–08:00 Brisbane** — and it must pass. Outside both it passes regardless and
+  proves nothing. **Verify in both**, not one: they have different causes (the clause, and the
+  future-wake fallback to midnight), and the recommended one-condition fix is what makes passing in
+  one predict passing in the other. A fix verified only at 07:30 has not been shown to close the
+  midnight window at all.
+- **✅ THE MIDNIGHT WINDOW IS CONFIRMED BY NATURAL EXPERIMENT TOO, not only by reading the guard**
+  (2026-09-17, PR #1280, one checkout, no code change between runs):
+
+  | Brisbane local | result |
+  |---|---|
+  | 00:41 · 00:46 · 00:50 | **failed**, three for three |
+  | 01:06 | **passed** |
+
+  Opposite sides of 01:00, so the boundary is where the guard says it is. The CI runs bracket it
+  from the other side: #1280's first E2E run (23:36–00:01) passed this spec and its re-run
+  (00:06–00:40) failed it on the identical commit. Same shape as the 21:15/22:00 experiment above,
+  at the other window.
+- **The control that establishes a red run here is NOT the PR's, for whoever hits it next:** check
+  the wall clock in Brisbane first. A local repro at 00:41 on a checkout differing from `main` only
+  in four nutrition files is what settled ownership on #1280; it took minutes, where reading the
+  spec's assertion would have suggested a real regression.
 
 ### [platform][devices] LB-113 — the Health Connect sync took the user's timezone and nothing passed it (fixed; device look owed)
 

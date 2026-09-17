@@ -26,8 +26,15 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.457.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.457.11 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-17.
+
+**Two calorie budgets, two taps apart, are now one (BF-175, v1.457.11).** The card said 1,506 and
+the log-food sheet said 1,660 — not a stale cache: the sheet fetched `nutrition_targets.calories`
+for itself, the **rest-day floor**, and coloured its bar against it, so a day with 151 kcal left
+painted full green. The page resolves the budget once and hands it down. **A cache-key sweep could
+not have found the second surface** — the end-of-day review took the same stored row as a *prop*
+(with a `?? 2000` fallback under it). ⚠️ **Not device-verified:** the green/orange flip at S25 width.
 
 **The check-in now records which sore ticks were its own suggestions (LB-116, v1.457.10).** BF-173
 stopped a suggested tick penalising recovery twice; the sheet already computed that list and never

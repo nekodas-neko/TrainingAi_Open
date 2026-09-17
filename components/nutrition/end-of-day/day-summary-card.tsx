@@ -12,9 +12,11 @@ interface Props {
 }
 
 export function DaySummaryCard({ totals, targets, battery }: Props) {
-  const calTarget = targets?.calories ?? 2000
-  const remaining = Math.max(0, calTarget - totals.calories)
-  const calPct = Math.min(100, Math.round((totals.calories / calTarget) * 100))
+  // Null rather than a stand-in (BF-175): a denominator nobody set is not the day's budget, and
+  // `2000` printed as one read exactly like a target the user had chosen.
+  const calTarget = targets?.calories ?? null
+  const remaining = calTarget != null ? Math.max(0, calTarget - totals.calories) : null
+  const calPct = calTarget != null ? Math.min(100, Math.round((totals.calories / calTarget) * 100)) : 0
 
   return (
     <div className="rounded-2xl bg-muted/40 border border-border px-4 py-4 flex flex-col gap-3.5">
@@ -23,18 +25,23 @@ export function DaySummaryCard({ totals, targets, battery }: Props) {
         <div className="flex items-baseline justify-between">
           <span className="text-sm font-semibold tabular-nums">
             {Math.round(totals.calories)}
-            <span className="text-muted-foreground font-normal"> / {Math.round(calTarget)} kcal</span>
+            {calTarget != null && <span className="text-muted-foreground font-normal"> / {Math.round(calTarget)} kcal</span>}
+            {calTarget == null && <span className="text-muted-foreground font-normal"> kcal</span>}
           </span>
-          <span className="text-xs font-semibold tabular-nums text-muted-foreground">
-            {remaining > 0 ? `${remaining} left` : 'Goal reached'}
-          </span>
+          {remaining != null && (
+            <span className="text-xs font-semibold tabular-nums text-muted-foreground">
+              {remaining > 0 ? `${remaining} left` : 'Goal reached'}
+            </span>
+          )}
         </div>
-        <div className="h-2.5 rounded-full bg-muted/60 overflow-hidden">
-          <div
-            className="h-full w-full rounded-full origin-left transition-transform duration-300 motion-reduce:transition-none"
-            style={{ transform: `scaleX(${calPct / 100})`, background: 'var(--color-brand)' }}
-          />
-        </div>
+        {calTarget != null && (
+          <div className="h-2.5 rounded-full bg-muted/60 overflow-hidden">
+            <div
+              className="h-full w-full rounded-full origin-left transition-transform duration-300 motion-reduce:transition-none"
+              style={{ transform: `scaleX(${calPct / 100})`, background: 'var(--color-brand)' }}
+            />
+          </div>
+        )}
       </div>
 
       {/* Macro totals */}

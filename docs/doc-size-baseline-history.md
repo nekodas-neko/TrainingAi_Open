@@ -13344,6 +13344,77 @@ gate did, and is worth it — the next reader would otherwise re-open the same q
 `docs/overview/entries/` went 91 → 51 files in the same PR (40 folded into
 `history-2026-09-17-folded-1.md`, 163 KB), which is not tracked by a `.size` baseline but is the
 larger change by far.
+
+## 2026-09-17 — `docs/implementation-backlog.md` 23512 → 23484 (Lane B, BF-175)
+
+Net −28. BF-175's 47-line entry came down to 20: it shipped, so the source traces, the two-number
+table and the sweep instructions are now in the diff and the journal rather than the queue. It keeps
+a `Keep:` line rather than being deleted, because the device look at the bar's green/orange flip is
+still owed.
+
+Against that, the LB-118 filing and the LB-117 parking note in the same PR add back most of what was
+freed — parking an entry costs more lines than leaving it, and is worth it here: the next reader
+would otherwise reach for the `GET /api/mood` workaround the note exists to rule out.
+
+## 2026-09-17 — `projectOverview.md` 11654 → 11661 (Lane B, BF-175)
+
++7, the shipped entry for BF-175. Raised rather than absorbed because the entry carries a ⚠️
+not-device-verified marker, which the Canonical Runtime rule requires to live in this file until the
+S25 look happens — it is index material, not journal material. The prose was cut from 12 lines to 6
+first; the measurement, the two-surface finding and the control runs are in the journal entry.
+
+## 2026-09-17 — `docs/implementation-backlog.md` 23484 → 23570 (Lane B, LB-114 correction + LB-119)
+
++40, raising the number this same PR had just lowered. The cause is worth the line: LB-114 said the
+RV-38 spec is red for **one** hour a day and it is red for **two**, with a second cause in a
+different file — the future-wake guard in `app/api/body-battery/route.ts:172` falling back to local
+midnight for an account with no HR rows. Its "do not verify outside that window" instruction was
+therefore telling the next session to verify a fix in the one window that cannot show the other half
+working.
+
+A correction that only struck the wrong sentence would have been shorter and would have left the
+entry unable to say why it was wrong; the two-cause account is what stops the same reading being
+made a third time. Also folds in that the entry's "worth a second look only if it repeats"
+browser-crash note has now repeated twice in one day.
+
+The same PR then added **LB-119** (+35): chromium SIGSEGVs mid-suite in CI with an identical
+faulting address across three runs on two days, and the specs on that worker report as
+`browser.newContext: ... has been closed` having never run. It is filed rather than noted because
+the expensive case is the one that does NOT look like a crash — `la109-back-from-subroute` failed
+once on a real 30-second timeout and passed on re-run and four times locally, which is
+indistinguishable from a regression until someone spends the re-run finding out.
+
+A further +11 for the measured boundary: the midnight window was first derived by reading the
+future-wake guard, and a claim derived that way is what put the wrong window in this entry to begin
+with. Three local runs inside it (00:41, 00:46, 00:50, all red) against one outside it (01:06,
+green) turn the reading into a measurement, and the table is shorter than the paragraph that would
+otherwise have to explain why the reading should be believed.
+
+## 2026-09-17 — `docs/implementation-backlog.md` 23570 → 23684 (Lane B, BF-165 root cause)
+
++70 for a root cause that has been wrong three times and retracted once, so the evidence is written
+out rather than summarised: the measured trace, the two conditions a harness probe must meet, and
+the specific false differential that a below-the-fold tap manufactures.
+
+The harness half is the part worth the lines. `tapCentre` does no scrolling and
+`page.touchscreen.tap` has no actionability check, so the two controls at y=924 and y=997 on a
+915-tall viewport were never tapped at all — and "Run works, the two /activity ones do not" reads as
+a routing defect when it is a coordinate one. Recording the y-values and the `elementFromPoint`
+check is what stops the next session re-deriving it from the same three wrong turns.
+
+A further +43 for the fix that was built and does NOT work. Recording a refuted fix costs lines and
+saves an attempt: the obvious reading of the trace is "a self-pop is in flight, wait for it to
+drain", the module already tracks exactly that, and the premise is false — the sheet's close is
+415 ms late because the view transition holds React's commit, so nothing is pending when the
+navigation is issued. Without that measurement written down, the next session builds the same thing.
+
+## 2026-09-17 — `docs/implementation-backlog.md` 23684 → 23695 (Lane B, two entry fields)
+
++15 for two field corrections on entries this lane touched today. BF-175 lost its `Lane:` line when
+the entry was cut to its `Keep:` residue — `next-item.js` then printed it `⟨lane unstated⟩`, which
+puts an entry in *both* implementer lanes' lists. BF-165 gains `Gate: device`, with the reason
+written out rather than just the field: the gate is on the FIX, not on the diagnosis, which is why
+it was correctly absent while the investigation was the open work.
 ## 2026-09-11 — `docs/implementation-backlog.md` → 21535 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
@@ -13384,7 +13455,7 @@ much as unreproducible, which is the same failure as the hand-kept tally one par
 from the opposite direction — a derivation is only better than a tally if it returns the same answer
 twice.
 
-**Recomputed again 2026-09-17** (→ 23451; then 23197, 23178 after BF-171, 23143 after BF-173, 23201 before that — FIVE readings in one day, which is the churn this note exists to record rather than smooth). The jump to 23451 is not this branch: #1279 folded 40 journal entries and dropped an owner gate, which moved the backlog under it., after #1264 and #1265 landed, with `main` having moved
+**Recomputed again 2026-09-17** (→ see the live figure in the .size file — SIX readings this day and the count is no longer worth quoting, which is itself the finding; 23451, then 23197, 23178 after BF-171, 23143 after BF-173, 23201 before that — FIVE readings in one day, which is the churn this note exists to record rather than smooth). The jump to 23451 is not this branch: #1279 folded 40 journal entries and dropped an owner gate, which moved the backlog under it., after #1264 and #1265 landed, with `main` having moved
 twice more while this PR waits on its owner decision — now in its seventh day.
 
 **And the correction the entry above earned: `origin/main..HEAD` is NOT clone-depth independent
