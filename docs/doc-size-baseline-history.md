@@ -13184,3 +13184,19 @@ that mistake the day before, and the entry now names it.
 **TN-42 is amended, not rewritten.** Its "temperature is the binding constraint" framing was true
 structurally and wrong about the present — temperature has recovered to 84–96 while `hrvBalance` fell
 to 0 on a real physiological event. Leaving it would have pointed an implementer at the wrong term.
+
+## 2026-09-17 — backlog → 23249: a new observed max settles the anchor the owner parked
+
++23 lines to close a question the owner left open by name. He pinned 178 as a 50/50 blend and said
+the assessment waits for a new max; **a run on 2026-09-14 reached 175 with 212 samples above 165 bpm
+across nine minutes**, so the answer exists and the entry should carry it rather than wait for a
+Cooper test.
+
+The three-row error table is the point: the rejected option (observed 168) would have put Zone 2's
+floor **4 bpm low** where the pinned 178 puts it **2 bpm high**. That is the difference between a
+decision being lucky and being right, and it is the kind of thing that gets re-litigated in six
+months without the numbers beside it.
+
+Two ⚠ lines keep the entry honest about what did *not* change: the four anchors still disagree — the
+spread moved from 168-vs-187 to 175-vs-178-vs-187 — and 175 is a floor from a non-maximal run rather
+than a measured max, so the Cooper test still earns its place.
