@@ -1020,6 +1020,67 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
   the trailing 30 days — can only be measured after the owner fires it. Re-measure then; do not
   strike this entry before that.
 
+### [workouts][app-shell] BF-176 — the streak counts the API's 90-day window, not your training, so it goes DOWN on days you train
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-17 (BugFix intake). Owner: *"My streak went from
+  90 -> 89? Can we check to see what it should be and why it went down"*.
+- **Lane: A** — `app/api/streak-data/route.ts:5` is the fix site. The consuming loop is
+  `app/session-select/session-select-content.tsx:1008-1030` (Lane B) and needs no change.
+- **His real streak is 102 days, not 89.** It starts **2026-06-08** and is unbroken under the app's
+  own rule (two rest days allowed, the third breaks). The number on his card is clipped.
+- **The two halves disagree about how far back to look, and nothing connects them:**
+
+  ```ts
+  const WINDOW_DAYS = 90                                  // app/api/streak-data/route.ts:5
+  ```
+  ```ts
+  for (let ago = 1; ago < 365; ago++) {                    // session-select-content.tsx:1019
+    const trained = (trainedDays[dayKey(ago)] ?? []).length > 0
+  ```
+
+  The client walks back a **year**. The route sends **90 days**. Past day 90 every lookup returns
+  `undefined`, which the loop reads as a rest day — so after three of them it breaks, and the count
+  is pinned to the window edge rather than to his training.
+- **That is why it went DOWN, and the mechanism is worth stating because it is counter-intuitive:
+  the boundary moves every day.** Once the real streak exceeds the window, the count tracks *where
+  the 90-day edge lands*, not what he did. Measured on his rows, replicating the loop exactly:
+
+  | Brisbane day | streak shown | trained that day |
+  |---|---|---|
+  | 2026-09-14 | 90 | yes |
+  | 2026-09-15 | 90 | yes |
+  | 2026-09-16 | 90 | yes |
+  | **2026-09-17** | **89** | **yes** |
+  | 2026-09-18 | 89 | not yet |
+
+  **He trained on the day it dropped.** The edge slid from 2026-06-20 (a rest day) onto
+  2026-06-21, and the day that fell out of the payload was a trained one. The count will keep
+  oscillating between roughly 88 and 90 indefinitely, because it is now a property of the window.
+- **Fix: make the route's window and the loop's horizon the same number, and make that fact
+  explicit.** Two shapes, and the second is the durable one:
+  1. **Raise `WINDOW_DAYS` to 365** to match the loop. One constant, reversible, fixes it today.
+     The payload grows from ~90 to ~365 date keys of short string arrays — negligible — but the
+     mismatch stays implicit and a streak past a year hits the same wall.
+  2. **Return the computed streak from the route** beside `trainedDays`, derived server-side with
+     no horizon, and have the card render it. The window then bounds only the *dots*, which is what
+     it was for. **Recommended** — it removes the class rather than moving it, and it puts the
+     streak next to the data instead of in a component.
+- **⚠ Sibling, same class, already mis-named:** `app/api/friends/leaderboard/route.ts:16,35,136`
+  computes **`allTimeStreak`** from `computeStreak(days, …).best` over its own
+  `STREAK_WINDOW_DAYS = 90`. A field called all-time that can only ever report 90 is the same defect
+  with a louder name. Fix it in the same PR or file it forward — do not leave it uncatalogued.
+- **⚠ There are TWO streak implementations and they are different quantities — do not "unify" them
+  blindly.** `computeStreak` (`lib/achievements.ts:32`) counts **training days** with a
+  `maxRestGap`; the home loop counts **calendar days spanned**, adding `1 + consecutiveRest` so rest
+  days inside the streak are included. Both are defensible and they are not interchangeable. If the
+  fix moves the home streak server-side, give it its own named helper rather than reaching for
+  `computeStreak` and silently changing what the owner's 102 means.
+- **Verification:** replicate the loop against a fixture whose trained days run past the window and
+  assert the count does not change when the window slides a day. Browser is enough — this is a
+  number, not a rendering. **The `trainedDays` payload is also cached (`streak-data`, `TTL_LONG`)
+  and stamped optimistically on workout completion** (`workout-screen.tsx:1504-1508`), so clear the
+  cache when testing or a stale seed will mask the change.
+
 ### [nutrition] BF-175 — the log-food sheet prints the stored GOAL as today's budget, so it reads 1660 beside the card's 1506
 
 - **Lane:** B — `components/nutrition/assign-step.tsx`, `components/nutrition/food-logger-sheet.tsx`,
