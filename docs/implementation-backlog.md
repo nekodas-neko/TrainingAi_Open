@@ -3521,10 +3521,31 @@ the rest of that day; and `perceived_recovery` carries at least three distinct v
   of at least 175 means 168 was never a ceiling — it was the highest he had happened to reach.
 
   **⚠ This does not close TN-30.** The four anchors still disagree; what changed is the spread, from
-  168-vs-187 to **175-vs-178-vs-187**. `targetAnchorMax` and `resolveBatteryHrMax` should now resolve
-  to 175 rather than 168 once the new peak ages into their windows — **not verified here**, and worth
-  checking before anything is unified, because it moves the walk targets and the Body Battery reserve
-  on its own without any code change.
+  168-vs-187 to **175-vs-178-vs-187**.
+
+  **⛔ VERIFIED 2026-09-17 — `targetAnchorMax` HAS ALREADY MOVED, and it took the walk target with
+  it.** `computeObservedHr` takes the **5th-highest** reading (`CORROBORATION = 5`) over
+  `OBSERVED_WINDOW_DAYS = 90`. Measured against production: the top twelve readings are
+  **175, 175, 175, 175, 175, 174, 174, 174, 174, 174, 174, 174** — so the 5th highest is **175** and
+  `targetAnchorMax` resolves to 175 today, not 168.
+
+  **The guided walk's fast target moved with it** (28-day mean resting HR = 54):
+
+  | anchor | walk's 0.70 fast target |
+  |---|---:|
+  | 168 — what the entry assumed | 134 bpm |
+  | **175 — what is live NOW** | **139 bpm** |
+  | 178 — the pinned anchor | 141 bpm |
+
+  **⚠ This bypasses the guardrail above.** `Needs: TN-25` exists because unifying the anchor "raises
+  the walk's 0.70 target from 133 to 140, so it must not land before the walk stops using it" — and
+  **5 of those 7 bpm have already landed**, with no code change and no announcement, because
+  `targetAnchorMax` is derived from data rather than set in source. **Sequencing a code change does
+  not sequence a data-derived constant.**
+
+  **⚠ And it makes TN-25 worse, not better.** That entry's complaint is that the fast target has never
+  been met in 44 attempts; the target just rose from 134 to 139 while the owner's measured fast-block
+  HR on the 35-minute walk ran **97 → 116**. The gap widened by 5 bpm without anyone touching it.
 
   **⚠ The Cooper test is still worth doing.** 175 is the highest observed in a 21-minute run that was
   not a maximal effort; it is a floor on the true max, not a measurement of it.
