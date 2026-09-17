@@ -13391,3 +13391,15 @@ future-wake guard, and a claim derived that way is what put the wrong window in 
 with. Three local runs inside it (00:41, 00:46, 00:50, all red) against one outside it (01:06,
 green) turn the reading into a measurement, and the table is shorter than the paragraph that would
 otherwise have to explain why the reading should be believed.
+
+## 2026-09-17 — `docs/implementation-backlog.md` 23570 → 23642 (Lane B, BF-165 root cause)
+
++70 for a root cause that has been wrong three times and retracted once, so the evidence is written
+out rather than summarised: the measured trace, the two conditions a harness probe must meet, and
+the specific false differential that a below-the-fold tap manufactures.
+
+The harness half is the part worth the lines. `tapCentre` does no scrolling and
+`page.touchscreen.tap` has no actionability check, so the two controls at y=924 and y=997 on a
+915-tall viewport were never tapped at all — and "Run works, the two /activity ones do not" reads as
+a routing defect when it is a coordinate one. Recording the y-values and the `elementFromPoint`
+check is what stops the next session re-deriving it from the same three wrong turns.
