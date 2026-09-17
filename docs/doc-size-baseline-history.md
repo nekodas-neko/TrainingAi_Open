@@ -18,6 +18,18 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-17 — backlog → 23459 (TN-46, the medication the scorers cannot see)
+
+**+93.** One new entry and two cross-links. The owner named Retatrutide as the likely cause of the
+HRV collapse TN-45 surfaced, and the app turned out to hold the start date all along —
+`supplements.started_on = 2026-09-06`, with the nightly vitals diverging from 09-09. The entry is
+long because the finding is not "a drug moved his vitals" but that the baseline will absorb the
+shift within 30–60 nights and then report normal, which is the part that needs the mechanism spelled
+out or it reads as alarmism. The four options carry their own trade-offs per **Decisions That Come
+Back To Me**, and that section does not compress well.
+
+---
+
 ## 2026-09-17 — backlog → 23365 (four owner decisions + the Q-506 re-measurement)
 
 **+127 on a 23234 base after merging BF-175's +46.** Four owner rulings came back in one sitting and each is recorded on the entry it settles:
