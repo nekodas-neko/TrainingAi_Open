@@ -18,6 +18,21 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-17 — backlog → 23365 (four owner decisions + the Q-506 re-measurement)
+
+**+127 on a 23234 base after merging BF-175's +46.** Four owner rulings came back in one sitting and each is recorded on the entry it settles:
+TN-45 (surface the illness `watch` band as a quiet line, gate lifted), TN-30 (re-pin max HR at 181
+off the Cooper test), PS-44 (the overnight chest-strap window is on) and TN-44/PS-41 (proceed
+without a Health Connect tester, with the untested surface written down rather than assumed). A
+decision recorded anywhere but on its own entry is a decision the next implementer will not see.
+
+The bulk of the growth is Q-506. Its remedy — `POST /api/admin/rederive-baselines` — shipped a month
+ago and has never been run, and replaying the fold shows that running it as-is would flag **fever on
+six of sixty nights**, four with healthy HRV. That warning has to sit on the entry, because the
+entry is what Lane A reads before running it. The working is in a review doc, not here.
+
+---
+
 ## 2026-09-17 — backlog → 23203, `projectOverview.md` → 11625 (BF-171 shipped)
 
 **−99 and +14.** BF-171's entry leaves the queue with the fix and files nothing behind it, so this

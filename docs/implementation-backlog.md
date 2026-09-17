@@ -446,8 +446,23 @@ below threshold and left in place for next time.
 ### [readiness][devices] TN-45 — the only illness band that has ever fired is the one with no penalty and no UI 🔴 LIVE
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-17 · found on a routine production read after TN-34/BF-13/TN-39 shipped.
-- **Lane: B** — `components/home/illness-advisory-banner.tsx:15` is the whole surface. The thresholds in `packages/shared/src/health/illness-radar.ts` are **not** in scope (see the ⚠ below).
-- **Gate: owner** — this adds something to the owner's Home screen about his own health; the wording is his call, not an implementation detail.
+- **Lane: A, then B** — the copy lives in `illnessAdvisory()`
+  (`packages/shared/src/health/illness-radar.ts`), which is Lane A; the render guard is
+  `components/home/illness-advisory-banner.tsx:15`, which is Lane B. Both → Lane A, engine half
+  first, per the lane rule. The *thresholds* in that same file stay out of scope (see the ⚠ below).
+- **✅ OWNER DECISION, 2026-09-17 — surface it, quietly.** Asked whether `watch` should get a visible
+  expression on Home, the owner chose **a quiet line, not a banner**: one calm sentence under the
+  readiness score, no colour, no icon. Gate cleared; build to the spec below.
+- **The copy already exists and already covers `watch`** — `illnessAdvisory('watch')` returns
+  *"Some biomarkers are drifting from your baseline — worth keeping an eye on."* So the render guard
+  is genuinely the only blocker. But that sentence names nothing, and the owner's choice was a line
+  that says **what moved**. `IllnessResult.biomarkers` already carries `{ z, contribution }` per
+  biomarker — commented in the source as *"the 'why', for the advisory"* — so naming the top one or
+  two contributors is a read of data that is already computed, not a new derivation. That read is
+  the Lane A half.
+- **Do not reuse the amber advisory banner.** `watch` is the weakest of three bands; the loudest UI
+  on the quietest signal is how a banner gets ignored, and it would make `elevated` indistinguishable
+  from `watch` when that finally fires.
 - **Review:** [`the app saw it and said nothing`](reviews/2026-09-17-the-app-saw-it-and-said-nothing.md).
 
 **Measured over 72 days of the owner's own rows:**
@@ -477,6 +492,22 @@ its own, so penalising it again double-counts the same physiology. **The gap is 
 weight**, and conflating them is how a signal ends up counted twice.
 
 **⚠ Do NOT re-tune the thresholds on n=2.** Two firings in 72 days cannot support moving 40 or 65.
+
+**⚑ Why only the penalty-free band has ever fired — it is Q-506, and it is arithmetic.** With
+temperature's baseline deviation 15.4× too wide, that biomarker's z never leaves 0.06–0.28 while
+holding 40% of the renormalised weight. Running the real `computeIllnessRadar`: resting HR and HRV
+**both maximally bad score 39**, one point under `watch`; all three non-temperature biomarkers maxed
+reach **64**, one point under `elevated`. 2026-09-16 tripped at 41 only because breathing drifted
++0.45. So the table above is not a tuning accident, it is a dead 40% weight.
+
+**⚑ Q-506's fix does NOT invalidate this entry — it strengthens it.** Replaying the fold with a
+corrected temperature baseline, the two real `watch` days score **61 and 60** rather than 41 and 36.
+The band the owner asked to surface fires more decisively, not less, so the two are independent and
+neither blocks the other
+([`working`](reviews/2026-09-17-what-the-temperature-rederive-would-do.md)). **One ordering note:**
+Q-506's re-derive would start firing the *existing* `elevated`/`fever` banner on ordinary nights
+unless `FEVER_TEMP_Z` is re-scaled with it — that risk lives in Q-506 and exists whether or not this
+entry ships.
 
 **Pass test:** a `watch` day produces something the owner can see on Home, and a normal day does not.
 
@@ -1823,11 +1854,21 @@ composite reports which of its inputs were inferred.
   [`the plugin source read`](reviews/2026-09-16-health-connect-record-converter-gap.md) which
   **re-scoped this entry on 2026-09-16**.
 - **Sibling of PS-41** (normalising HC's HR series) and **TN-38** (the tier model this feeds).
+- **✅ OWNER DECISION, 2026-09-17 — do NOT block on recruiting a Health Connect tester.** Asked
+  whether to find a friend on a phone-only setup now, the owner chose to **defer and build against
+  synthetic data**, finding a tester later if problems surface. So this entry and PS-41 proceed
+  without one.
+- **⚠ What that knowingly leaves untested, stated so it is not mistaken for coverage.** Synthetic
+  data exercises the conversion and the scoring maths; it cannot show **which record types a real
+  mid-range phone actually populates**, which is the entry's own central unknown — not every device
+  writes every type to Health Connect. Treat any "works" claim from this work as *the maths is right*,
+  never *the coverage is right*. The first real non-ring account is still the only thing that closes
+  that, and per **No orphaned findings** this line is the record that it is open.
 - **✅ Still true, and it is the valuable half:** this retires the connector guide's §5.6 claim that
   skin temperature is a hardware dependency with no second source. **Health Connect defines
   `SkinTemperatureRecord`**, and `HeartRateVariabilityRmssdRecord` for HRV. The ring-only list is a
   claim about *our read list and the user's device*, not about the platform.
-- **⛔ CORRECTED: this is NOT an addition to `HC_SYNC_READ_TYPES`.** The pinned plugin's
+- **⚠ CORRECTED: this is NOT an addition to `HC_SYNC_READ_TYPES`.** The pinned plugin's
   `RecordConverter` handles **seven** record types and falls back to `else -> record.toString()`; the
   read path is generic (it resolves through the SDK's `RECORDS_TYPE_NAME_MAP`), so **conversion is
   the wall, not permission**. Adding a type to the list without a converter branch yields a Kotlin
@@ -2172,6 +2213,10 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
 - **Lane:** A — `lib/health-connect-sync.ts` (client sync payload), `app/api/sync-health/route.ts`
   (write path), `lib/data/repository.ts`/`adapter.ts` (`upsertOuraHeartrate` bulk-write, already
   exists — this is a new caller, not new storage).
+- **✅ OWNER DECISION, 2026-09-17 — proceed without a Health Connect tester** (the same ruling
+  recorded on TN-44; recruiting one was deferred). Build against synthetic data. **The untested
+  surface is real-device field coverage** — which types a phone-only setup actually writes — so a
+  green result here means the normalisation is right, not that the data will be there.
 - **Added:** 2026-09-14 (one-off session; found while tracing every scoring formula's real inputs —
   see [`docs/data-source-connector-guide.md`](data-source-connector-guide.md) §3a and §4's Activity
   Score row / §5.5).
@@ -2290,6 +2335,22 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
 - **Gate:** owner. This changes an input to a live health score, not a UI/infra change — same class
   of decision `CLAUDE.md`'s Standing Agents rules reserve for Tuning-style validation and sign-off,
   never a silent swap.
+- **✅ OWNER DECISION, 2026-09-17 — the overnight validation window is ON.** Offered the choice
+  between shipping on workout-window agreement alone and a week of strap-plus-ring overlap
+  *at night*, the owner chose **to wear the chest strap to bed for a week**. That closes the
+  ⚠ correction below: the ingredient does not stream at night *today*, and this is the deliberate
+  act that makes it stream.
+- **⚠ Do not start the clock until the first night is actually in the table.** The window is seven
+  nights with **both** a ring `0x5d rmssd_ms` and Polar `rr_intervals` covering the same sleep span —
+  not seven calendar days from the decision. Confirm night one landed before counting.
+- **What the window is FOR, stated now so it is not re-derived later.** Two questions, and the second
+  is the one that matters this week: **(a)** does `rmssdFromRr` over the strap's intervals agree with
+  the ring's own figure, which is what this entry proposes to replace; and **(b)** *is the ring
+  telling the truth right now* — the owner's nightly HRV has fallen **62 → 19 ms** over two weeks
+  with resting HR up ~9 bpm (see TN-45), and nothing in the app can currently separate real
+  physiology from sensor drift. A second instrument is the only thing that can. **Design the
+  comparison per-night and paired**, not as two averages: a mean over a window where one device is
+  drifting hides exactly the thing being looked for.
 - **Added:** 2026-09-14 (one-off session; owner asked directly whether any Oura-computed value could
   be calculated by the app itself for future device-consistency — see
   [`docs/data-source-connector-guide.md`](data-source-connector-guide.md) §5.7).
@@ -3438,7 +3499,42 @@ the rest of that day; and `perceived_recovery` carries at least three distinct v
 - **Lane: A** — `packages/shared/src/health/observed-hr.ts:110` (`resolveMaxHr`), `health/hr-profile.ts:86` (`targetAnchorMax`), `health/body-battery-inputs.ts:51` (`resolveBatteryHrMax`), `health/hr-zones.ts:9` (`hrMaxFromAge`), plus `lib/health/readiness-payload.ts:397`.
 - **✅ OWNER DECISION, 2026-09-09 — blend the two at 50/50 and PIN it: `(168 + 187) / 2 = 177.5 → 178`.** *"Just because my HR got up to 168 doesn't mean it's the MAX… then when the Cooper 12-minute run is done and a new max is gotten, we can assess what's better."* Gate cleared; build to the spec below.
 - **Needs: TN-25** — unifying the anchor at 178 raises the walk's 0.70 target from **133 to 140**, so it must not land before the walk stops using 0.70. Sequencing, not a blocker on the anchor itself.
-- **✅ THE PINNED 178 IS NOW SUPPORTED BY EVIDENCE — measured 2026-09-17.** The owner pinned 178 as a
+- **✅ OWNER DECISION, 2026-09-17 — RE-PIN AT 181, superseding the 178 below.** The owner parked the
+  question as *"when the cooper 12 minute run is done and a new max is gotten, we can assess what's
+  better."* **It is done.** `fitness_tests` holds a `cooper12` on **2026-09-14**: 720 s, **1975 m**,
+  avg HR **156**, peak **175**. His ruling: treat **175 as the floor** of the band and the
+  age-calculated **187 as the top**, and choose in between.
+
+  **181 is that choice, and it is the owner's own 50/50 rule re-run on corrected data** — the 178 pin
+  blended 168 with 187, and 168 has been superseded by the Cooper's 175. `(175 + 187) / 2 = 181`. No
+  new method, just the same one on a better floor. **Nothing has shipped at 178** (Branch still
+  _unassigned_), so re-specifying costs nothing.
+
+  **Two independent checks land in the same place** (RHR 54, the 28-day mean; Karvonen zones):
+
+  | anchor | Zone 4 floor | where the Cooper's **156 avg** lands | peak 175 as % of max |
+  |---|---:|---|---:|
+  | 178 (old pin) | 153 | Zone 4 | 98.3% |
+  | **181** | **156** | **Zone 4, at the floor** | **96.7%** |
+  | 187 (age) | 160 | **Zone 3 "Aerobic"** ✗ | 93.6% |
+
+  An all-out 12-minute time trial averaging in *Aerobic* is self-evidently wrong, which rules out 187
+  on this user's own data. And 96.7% is the textbook expectation for a maximal 12-minute effort —
+  93.6% would mean he left 12 bpm on the table in a test he clearly emptied himself in
+  (Cooper VO2max = (1975 − 504.9) / 44.73 = **32.9 ml/kg/min**).
+
+  **Why not Tanaka (208 − 0.7 × 33 = 185), the modern replacement for 220 − age.** It is a population
+  mean with a ~10 bpm individual sd, and we have this person's own maximal test. Individual data beats
+  a population formula. It also sits above the 181 ceiling the Cooper average implies.
+
+  **⚠ 175 is a floor, not a max, and nothing above it exists.** The 90-day distribution stops dead at
+  175 — 5 readings at 175, 13 at 174, 6 at 173, nothing higher — and `CORROBORATION = 5` means the
+  observed max is exactly 175 with no margin. A second maximal effort could move this again.
+- **⚠ Re-anchoring UP makes TN-25 worse by 4 bpm, and that is the cost of this decision.**
+  `targetAnchorMax` is 175 today, so `walkFastBandBpm` returns **[105, 123]**; at 181 it becomes
+  **[109, 127]**. The owner's measured fast-block HR runs **97–116**. The `Needs: TN-25` below is
+  therefore load-bearing, not bookkeeping — this must not land before the walk stops anchoring on it.
+- **✅ THE PINNED 178 WAS SUPPORTED BY EVIDENCE — measured 2026-09-17, now superseded by the 181 ruling above.** The owner pinned 178 as a
   50/50 blend and parked the question: *"when the cooper 12 minute run is done and a new max is
   gotten; we can assess whats better."* **A run on 2026-09-14 reached 175 bpm** — and it is
   corroborated, not a spike: **212 samples at ≥ 165 bpm across a nine-minute span** (11:05–11:14
@@ -16265,6 +16361,40 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Do NOT lower the thresholds.** `watch = 40`, `elevated = 65` and `FEVER_TEMP_Z = 2.5` are all
   defensible *given a correct z*; moving them fits the threshold to a broken input — the mistake this
   session made once on readiness and reverted (Q-504).
+- **⚠ RE-MEASURED 2026-09-17 — the remedy is built, owner-gated, and still unfired.** `POST
+  /api/admin/rederive-baselines` shipped for this exact defect on 2026-08-24 and writes temperature
+  alone. **This is not a dropped ball — BF-13's `Keep:` records it as owed and *the owner's to
+  fire*, deliberately not executed from the sandbox because it is a production data write.** What is
+  new here is that it has now sat unfired for a month, and that firing it as-is would misbehave (see
+  the next bullet). The stored baseline confirms it has not run: deviation **166**
+  centi-°C against a true nightly sd of **10.8** (still **15.4×**, down from 18.7×), mean **35.34 °C**
+  against a true **35.87**. Thirty nights moved the deviation 196 → 166, which extrapolates to
+  **~450 more nights — about fifteen months** before the EMA gets there on its own. Waiting is not a
+  plan, and TN-6's readiness penalty is charged daily until it is run.
+- **⚠ DO NOT RUN IT WITHOUT RE-SCALING `FEVER_TEMP_Z` IN THE SAME PR.** Replaying the fold cold with
+  `seedOrUpdateBaseline` over all 67 nights and re-running the real `computeIllnessRadar` per night:
+  the corrected baseline is **mean 35.86 °C, dev 0.077 °C**, and the 60 mature nights come out
+  `normal` 51 · `watch` 3 · **`fever` 6**. **Four of the six fever nights have healthy or neutral
+  HRV** (+2.42, +0.73, +1.62, −0.09) and unremarkable resting HR — they are temperature artefacts. A
+  dev of 0.077 °C puts `FEVER_TEMP_Z = 2.5` at **0.19 °C above baseline** when the real night-to-night
+  spread is **0.128 °C**, so a 1.5-sd night lands at z = 2.49 and fever fires inside normal variation.
+  Full working:
+  [`what the temperature re-derive would do`](reviews/2026-09-17-what-the-temperature-rederive-would-do.md).
+- **⚠ The denominator is the defect, not the threshold.** The EMA's dev is a *mean absolute
+  deviation* (~0.8σ for normal data) and this one converges to ~0.6σ, so temperature z's stay
+  inflated ~1.7× even after a correct re-derive — the replayed range over 55 nights is **−5.92 to
+  +3.92**, which is not a z-score's range. Scale the threshold and `ILLNESS_Z_FULL`, or divide by a
+  true sd. Threshold-only leaves readiness's `temperature` contributor (same z, 10% weight,
+  `closer-better`) reading hot.
+- **⚠ `isFever` short-circuits the score, and that is separately wrong.** It is tested before the
+  thresholds, so **2026-08-22 scores 37 — below `watch` — and is still flagged `fever`** with the
+  full 25-point readiness penalty. Requiring the composite to clear `watch` before the fever branch
+  applies would have caught it and cost nothing on 2026-07-26 (score 72).
+- **The "cannot fire" claim is now arithmetic, not observation.** Running `computeIllnessRadar` with
+  temperature at its observed ceiling (z = 0.28): resting HR and HRV **both maximally bad score 39**,
+  one point under `watch`, and stay 39 at absurd z = ±10 because both saturate; add maximally bad
+  breathing and it reaches **64**, one point under `elevated`. 2026-09-16 tripped at 41 only because
+  breathing drifted +0.45 that night.
 - **First action**, in preference order: (1) re-seed the temperature baseline from the observed
   distribution (mean 3584, sd 13.5 over 40 nights) rather than waiting out the EMA — cheapest, fixes
   both consumers; (2) the durable fix — seed a first observation and a sane prior dev instead of zero,
