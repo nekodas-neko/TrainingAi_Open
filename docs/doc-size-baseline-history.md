@@ -13296,3 +13296,15 @@ outcome is read by every session at orientation, and the next one to touch this 
 started from "the picker chooses Lower now" and debugged the wrong thing. The counterfactual is kept
 rather than deleted — it is still the clearest statement of what the double count did — and marked as
 a counterfactual instead.
+
+## 2026-09-17 — `docs/implementation-backlog.md` 23188 → 23235
+
+**BF-175** — the log-food sheet prints `nutrition_targets.calories` (1660) as today's budget while
+the card beside it shows `budgetProvenance(...).total` (1506).
+
+The entry spends lines on two things deliberately. It quotes the **two existing code comments that
+already state the rule** it violates, because this is a missed surface of a fix that has been made
+once, and an entry that reads as a fresh discovery invites a fresh fix rather than a sweep. And it
+records `WeeklyNutritionChart` as **checked and correct** — it reads the same field, and an
+implementer sweeping for call sites would otherwise "fix" a seven-day reference line into a fourth
+budget.
