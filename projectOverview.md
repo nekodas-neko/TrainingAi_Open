@@ -71,8 +71,16 @@ pre-ticks any muscle trained within 48 h and under 85% recovered — reading the
 a harsher flat one. The owner confirmed the premise rather than it being inferred (*"It auto picked
 muscles for me i didnt choose them manually"*), which makes it the normal path, not an edge case.
 Measured on his rows: quads 69 → 40, chest 49 → 40, and the flat floor erased the ordering he was
-actually asking about — it flipped the pick, Lower 74/Upper 84 as shipped against Lower **85**/Upper
-84 without the leg ticks. `mood_logs.suggested_sore_muscles` (migration 276, `claude_ro` twin 277,
+actually asking about — Lower 74/Upper 84 with the double count live, against Lower **85**/Upper 84
+with the leg ticks removed. **⚠ That second pair is the pre-BF-171 counterfactual, NOT the shipped
+state, and re-measuring after both landed is what makes the difference visible (BugFix, 2026-09-17).**
+Against the SHIPPED engine on the same rows, with every tick recorded as a suggestion:
+**Upper 91 · Lower 88 · Pull 85 · Legs 76 · Push 59 — Upper still wins.** The double count is gone
+and Lower gained 12 points from its removal, but the gap narrowed from 9 to 3 rather than reversing,
+because BF-171's normalisation lifts the sore-but-recovering muscles on *both* sides. **So the entry
+fixed the defect it described and did not change this particular answer** — Upper wins on merit now,
+being half back work at 95% and six days overdue. Do not read "it flipped the pick" as a claim about
+the current app. `mood_logs.suggested_sore_muscles` (migration 276, `claude_ro` twin 277,
 local SQLite v39) now records where each tick came from, and only lifter-added ticks clamp.
 **Provenance is recorded at write time, never re-derived at score time** — re-deriving was the option
 the owner weighed and rejected, because it discards the one case the check-in exists for. **Expect
