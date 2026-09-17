@@ -23,6 +23,41 @@ import { test, expect } from '@playwright/test'
 const SCROLL_TOP = `Math.max(0, ...[...document.querySelectorAll('*')]
   .filter(e => e.scrollTop > 0).map(e => e.scrollTop))`
 
+/**
+ * Assert the screen came back to roughly where it was, NOT to an exact offset.
+ *
+ * **An equality assertion cannot tell a cancelled restore from an imprecise one, and that is the
+ * distinction BF-100 turns on** — its whole open question is whether the restore is being
+ * *cancelled* on the S25. Measured locally against clean `main`: saved **718**, restored **1019**,
+ * and the test went red while restoration was working perfectly. These screens seed from cache and
+ * revalidate, so the content keeps growing between the save and the restore; the offset that was
+ * correct when saved is not the offset that shows the same content a second later.
+ *
+ * The lower bound is what carries the meaning. A cancelled restore leaves the container at **0** (a
+ * fresh arrival starts at the top by construction — the third test below pins that), so 0 against a
+ * saved 718 still fails loudly. What it no longer does is fail because the page grew.
+ *
+ * No upper bound, deliberately: capping it would re-introduce the same flake from the other side,
+ * and overshooting because content grew above the anchor is not a defect this file is about.
+ */
+async function expectRestoredNear(
+  page: import('@playwright/test').Page,
+  // `page.evaluate` with a string expression is typed `unknown`, which is why the callers read it
+  // straight into an assertion rather than a number.
+  beforeRaw: unknown,
+  what: string,
+) {
+  const before = Number(beforeRaw)
+  const floor = Math.round(before * 0.9)
+  await expect(async () => {
+    const after = Number(await page.evaluate(SCROLL_TOP))
+    expect(
+      after,
+      `${what}: restored to ${after} against a saved ${before} — at or near 0 means the restore was CANCELLED, which is the BF-100 failure; a value above the floor means it landed, even if the content grew`,
+    ).toBeGreaterThanOrEqual(floor)
+  }).toPass({ timeout: 30_000 })
+}
+
 async function scrollDown(page: import('@playwright/test').Page, steps = 7) {
   await page.mouse.move(200, 400)
   for (let i = 0; i < steps; i++) { await page.mouse.wheel(0, 120); await page.waitForTimeout(80) }
@@ -50,9 +85,7 @@ test.describe('scroll position survives a push to a sub-route and back', () => {
     await expect(page).toHaveURL(/\/more$/, { timeout: 30_000 })
     // `toPass` rather than a fixed wait: the restore fires when the content reaches the saved
     // height, which is whenever the revalidation lands — seconds, on a cold server.
-    await expect(async () => {
-      expect(await page.evaluate(SCROLL_TOP)).toBe(before)
-    }).toPass({ timeout: 30_000 })
+    await expectRestoredNear(page, before, '/more')
   })
 
   /**
@@ -83,9 +116,7 @@ test.describe('scroll position survives a push to a sub-route and back', () => {
 
     await page.goBack()
     await expect(page).toHaveURL(/\/nutrition$/, { timeout: 30_000 })
-    await expect(async () => {
-      expect(await page.evaluate(SCROLL_TOP)).toBe(before)
-    }).toPass({ timeout: 30_000 })
+    await expectRestoredNear(page, before, '/nutrition')
   })
 
   test('a fresh forward arrival still starts at the top', async ({ page }) => {

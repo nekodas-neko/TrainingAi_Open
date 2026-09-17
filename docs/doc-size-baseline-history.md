@@ -13427,3 +13427,14 @@ protocol forbids — the same omission corrected for BF-172 earlier the same day
 It also gains `Gate: device`, which is both accurate and what unparks it: `next-item.js` treats a
 `⛔` in ANY line as the legacy prose blocker, so the entry's "do not re-litigate the missing e2e"
 emphasis was parking it as an *unmigrated marker*. A structured field is authoritative there.
+
+## 2026-09-17 — Lane B baton 67 → 65, `docs/implementation-backlog.md` 23684 → 23670
+
+The baton was rewritten in full (the Routine requires it on every ship) and came out two lines
+shorter, so the ratchet takes the slack. What was cut is narrative that has been overtaken: BF-165's
+retraction no longer needs its blow-by-blow now that the root cause is measured and recorded in the
+entry, and the pre-today PR list moves to the journal. What was added is denser than what it
+replaced — the three corrections to my own entries, and the two conditions a navigation probe needs.
+
+The backlog loses 14: BF-100's second finding is struck because it shipped in this PR, replaced by
+the measurement and the proof that it now fails on a cancelled restore.
