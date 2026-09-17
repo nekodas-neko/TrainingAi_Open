@@ -7232,14 +7232,17 @@ feature and not a deletion like LB-41:
   **The next attempt must instrument, not guess:** confirm which element carries the listener and
   that the event arrives *inside* the restore window, before reading anything into the outcome.
   `__scrollRestorationInternals` exports `RESTORE_WINDOW_MS`, which is where that timing comes from.
-- **⚠ A SECOND finding from the same run, about the existing spec rather than the bug.**
-  `scroll-restoration.spec.ts` asserts `toBe(before)` — an **exact** offset. Measured locally against
-  clean `main`: it restored to **1019** against a saved **778** and went red, because the content
-  grows on revalidation between save and restore. **Restoration was working; the assertion was not.**
-  It survives in CI, so this is a local/CI divergence rather than a live regression — but an
-  exact-offset assertion cannot tell *cancelled* from *imprecise*, which is precisely the distinction
-  BF-100 turns on. A probe for this class needs a coarse measure (*did it move off the top at all*),
-  not equality.
+- **✅ THE SECOND FINDING FROM THAT RUN IS FIXED (2026-09-17).** `scroll-restoration.spec.ts`
+  asserted `toBe(before)` — an **exact** offset — and an exact assertion cannot tell *cancelled* from
+  *imprecise*, which is the distinction this entry turns on. Reproduced before changing it: saved
+  **718**, restored **1019**, red while restoration was working, because these screens seed from
+  cache and revalidate so the content grows between the save and the restore.
+  Both assertions now go through `expectRestoredNear`, a **floor** at 90% of the saved offset with no
+  upper bound (capping would re-introduce the same flake from the other side). Proven both ways: it
+  passes on content growth, and with the restore neutered (`el.scrollTop = 0`) both cases fail
+  naming the cancellation — *"restored to 0 against a saved 879"*. **So this file can now answer the
+  device question when the S25 pass happens**, which it could not before: a red here means cancelled,
+  not merely imprecise.
 - **⚠ A CANDIDATE CAUSE, found 2026-09-14 by reading the hook rather than the screens — and it
   explains the harness/device split outright, which no previous hypothesis did.**
   `use-scroll-restoration.ts:158` attaches `stop` to **`touchstart`** on the scroll container, and
