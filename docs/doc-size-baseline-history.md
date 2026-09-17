@@ -13446,3 +13446,15 @@ replaced — the three corrections to my own entries, and the two conditions a n
 
 The backlog loses 14: BF-100's second finding is struck because it shipped in this PR, replaced by
 the measurement and the proof that it now fails on a cancelled restore.
+
+## 2026-09-17 — `docs/implementation-backlog.md` 23235 → 23755
+
+**BF-176** — the home streak counts the API's 90-day window rather than the owner's training, so it
+reads 89 against a real 102 and goes *down* on days he trains.
+
+The measured day-by-day table earns its lines: "the streak decreased while he trained" is the part
+that sounds like a data-loss bug and is not, and the table is what shows the count tracking the
+window edge instead. Two further notes are recorded against a plausible wrong fix — the leaderboard's
+`allTimeStreak` has the same 90-day clip, and the repo's two streak implementations count
+different quantities, so unifying them while moving this server-side would silently redefine what
+102 means.
