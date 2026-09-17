@@ -13417,3 +13417,13 @@ the entry was cut to its `Keep:` residue — `next-item.js` then printed it `⟨
 puts an entry in *both* implementer lanes' lists. BF-165 gains `Gate: device`, with the reason
 written out rather than just the field: the gate is on the FIX, not on the diagnosis, which is why
 it was correctly absent while the investigation was the open work.
+
+## 2026-09-17 — `docs/implementation-backlog.md` 23695 → 23667 (Lane B, LB-116 residue)
+
+Net −17. LB-116 shipped in #1274 this morning and its full entry was left in the queue, which the
+protocol forbids — the same omission corrected for BF-172 earlier the same day, repeated. Cut to its
+`Keep:` residue with the reasoning left in the journal.
+
+It also gains `Gate: device`, which is both accurate and what unparks it: `next-item.js` treats a
+`⛔` in ANY line as the legacy prose blocker, so the entry's "do not re-litigate the missing e2e"
+emphasis was parking it as an *unmigrated marker*. A structured field is authoritative there.
