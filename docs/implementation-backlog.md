@@ -16361,9 +16361,12 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Do NOT lower the thresholds.** `watch = 40`, `elevated = 65` and `FEVER_TEMP_Z = 2.5` are all
   defensible *given a correct z*; moving them fits the threshold to a broken input — the mistake this
   session made once on readiness and reverted (Q-504).
-- **⚠ RE-MEASURED 2026-09-17, and the remedy has never been run — Tuning.** `POST
+- **⚠ RE-MEASURED 2026-09-17 — the remedy is built, owner-gated, and still unfired.** `POST
   /api/admin/rederive-baselines` shipped for this exact defect on 2026-08-24 and writes temperature
-  alone. The stored baseline says it was never executed against production: deviation **166**
+  alone. **This is not a dropped ball — BF-13's `Keep:` records it as owed and *the owner's to
+  fire*, deliberately not executed from the sandbox because it is a production data write.** What is
+  new here is that it has now sat unfired for a month, and that firing it as-is would misbehave (see
+  the next bullet). The stored baseline confirms it has not run: deviation **166**
   centi-°C against a true nightly sd of **10.8** (still **15.4×**, down from 18.7×), mean **35.34 °C**
   against a true **35.87**. Thirty nights moved the deviation 196 → 166, which extrapolates to
   **~450 more nights — about fifteen months** before the EMA gets there on its own. Waiting is not a

@@ -16,10 +16,12 @@ finding of the run.
 - **TN-44 / PS-41 — do not block on a Health Connect tester.** Build against synthetic data; the
   untested surface is recorded as open rather than silently assumed.
 
-## The finding: Q-506's remedy shipped a month ago and has never been run
+## The finding: Q-506's remedy is built, owner-gated, and would misbehave if fired today
 
-`POST /api/admin/rederive-baselines` was built for exactly this defect on 2026-08-24. The stored
-baseline says it was never executed: temperature's deviation is **166** centi-°C against a true
+`POST /api/admin/rederive-baselines` was built for exactly this defect on 2026-08-24 and has never
+been fired. That is deliberate — BF-13's `Keep:` records the run as the owner's to fire, since it
+writes production data. What is new is that it has sat a month, and what it would do. The stored
+baseline confirms it has not run: temperature's deviation is **166** centi-°C against a true
 nightly spread of **10.8** — still **15.4×** too wide, down from 18.7× when Q-506 filed it. Thirty
 nights moved it 196 → 166, which extrapolates to about **fifteen more months** of waiting.
 Temperature is the only one of five baselines that is wrong; the other four sit inside the normal

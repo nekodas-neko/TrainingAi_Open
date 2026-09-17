@@ -6,7 +6,9 @@ Q-506 established that the illness radar cannot fire because the temperature bas
 deviation is far too wide. The remedy shipped a month ago — `POST /api/admin/rederive-baselines`,
 built for this exact defect, writing back temperature alone per the owner's 2026-08-24 decision.
 
-Nobody has run it.
+It has never been fired. That is by design, not neglect: BF-13's `Keep:` records the run as owed and
+**the owner's to fire**, deliberately not executed from the sandbox because it writes to production
+data. What is new is that it has sat for a month — and that firing it as it stands would misbehave.
 
 This review measures two things nobody had: **how far the defect has decayed on its own**, and
 **what the radar does on the far side of the fix**. The second answer is the reason to read this:
