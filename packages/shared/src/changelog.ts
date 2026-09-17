@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.457.8",
+    version: "1.457.9",
     date: "2026-09-17",
     changes: [
       "The \u201cWhy this session?\u201d screen no longer calls its match score your readiness. The big ring shows how well the session fits today \u2014 what is recovered and what is overdue \u2014 and it was captioned \u201creadiness\u201d and graded on the readiness scale, so it could read 84 HIGH in green directly above your actual readiness of 37 and a strong deload warning. It now says how well the session fits, with fit wording to match.",
+    ],
+  },
+  {
+    version: "1.457.8",
+    date: "2026-09-17",
+    changes: [
+      "Telling the app your back is sore now actually changes what it recommends. The session picker compared muscle names letter for letter, and \"Back\" is not a muscle the exercise list contains \u2014 it has lats, upper back and traps \u2014 so ticking it moved every score by exactly zero. You could report a wrecked back and still be recommended a pull session at full confidence. The same mismatch meant a core exercise never found its own recovery figure and was treated as fully rested, throwing away a real 86%.",
     ],
   },
   {

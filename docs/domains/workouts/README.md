@@ -351,6 +351,16 @@ Live at the time of writing (2026-07-30):
 
 ## Gotchas specific to this domain
 
+- **Muscle names are matched through `muscles.ts`, never compared raw (BF-171).** `normalizeMuscle`
+  folds synonyms (`core` → `abs`, `quadriceps` → `quads`) and `moodMuscleMatches` expands a broad
+  check-in pill to the catalogue muscles it covers — **`Back` is a pill and is not a muscle**; the
+  library has `lats`, `upper back` and `traps`. `sessionRecoveryScore` was the one consumer of seven
+  matching raw, so a sore `Back` moved every score by zero and a `core` assignment missed its own
+  recovery entry. **A miss in `recoveryPct` returns 100**, which is what makes this class expensive:
+  a synonym mismatch is indistinguishable from a fully rested muscle. Before adding a seventh
+  comparison, check `muscles.ts` — its own header records cleaning up a hand-rolled synonym list once
+  already.
+  ([`2026-09-17-lane-a-bf171-muscle-name-matching.md`](../../overview/entries/2026-09-17-lane-a-bf171-muscle-name-matching.md))
 - **A pre-selected check-in answer is not evidence, and the scorer must not treat it as such
   (BF-173).** `suggestedSoreMuscles` pre-ticks any muscle trained within 48 h and under
   `RECOVERED_PCT` — it reads the recovery model. `sessionRecoveryScore` reads that same model, so

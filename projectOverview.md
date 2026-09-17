@@ -26,10 +26,10 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.457.8 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.457.9 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-17.
 
-**The explain screen called the session-fit score "readiness" (BF-172, v1.457.8).** `overallScore`
+**The explain screen called the session-fit score "readiness" (BF-172, v1.457.9).** `overallScore`
 is `recovery·w + balance·w + freshness·w` — how well a session fits today — and the ring captioned it
 *"Overall readiness for this session"* and graded it on the readiness ladder, so it read **84 HIGH**
 in green directly above *Oura readiness 37 · Low* and *strong deload advised*. BF-154's class: a
@@ -39,6 +39,20 @@ from the score**, so the 70/50 thresholds stay in the one module that owns them.
 instructions were adjusted: "no band word" was not available (the ring is band-coloured, so the word
 is what keeps the band off colour-only), and the band could live in `ScoreRing` after all — it is
 session-explain's own component with one caller, not the shared thing a bare grep suggests.
+
+**A sore "Back" moved nothing, and `core` never found its recovery (BF-171, v1.457.8).**
+`sessionRecoveryScore` compared muscle names with exact lowercased equality on both sides — the only
+one of seven soreness/recovery consumers in the repo that matched raw. The check-in offers **Back**
+as a pill and the exercise library has no muscle of that name (`lats`, `upper back`, `traps`), so
+ticking it moved **every** session score by zero: a wrecked back still got Pull recommended at full
+confidence. Separately `computeMuscleRecovery` emits `abs` where an assignment says `core`, and a
+missed lookup returns **100**, so a synonym mismatch was indistinguishable from a rested muscle while
+the real 86% sat in the same payload. Both sides now go through `normalizeMuscle` /
+`moodMuscleMatches`; no synonym list was hand-rolled. **It composes with BF-173 and that was
+tested, not assumed** — shipped before it, this would have fed every newly-matched muscle into a live
+double count, which is what its `Needs:` was protecting. The entry's production deltas (Legs 59 → 62,
+Lower 74 → 77) were **not re-measured**; the fixtures are synthetic, so what is proved is the
+behaviour rather than the new numbers on the owner's screen.
 
 **The session picker counted your soreness twice (BF-173, v1.457.7).** `suggestedSoreMuscles`
 pre-ticks any muscle trained within 48 h and under 85% recovered — reading the recovery model — and

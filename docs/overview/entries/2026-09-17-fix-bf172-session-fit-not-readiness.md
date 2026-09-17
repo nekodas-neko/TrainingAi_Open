@@ -1,6 +1,6 @@
 # 2026-09-17 — `fix/bf172-session-fit-not-readiness`
 
-**BF-172** — the "Why <session>?" screen called the session-**fit** score "readiness". v1.457.8.
+**BF-172** — the "Why <session>?" screen called the session-**fit** score "readiness". v1.457.9.
 
 `overallScore` is `recovery·w + balance·w + freshness·w` from `computeAiDynamicNextSession`: how well
 this session fits today, given what is recovered and what is overdue. Nothing about it measures the
