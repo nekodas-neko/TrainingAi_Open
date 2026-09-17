@@ -231,6 +231,14 @@ export function MoodCheckInSheet({
         energyLevel:  energy,
         bodyState,
         soreMuscles,
+        // Which of these ticks the SHEET put there (LB-116). BF-173 stops a suggested tick
+        // penalising recovery twice, and `saveMoodLog` derives this list when a caller sends none —
+        // but the derivation cannot tell a muscle the lifter volunteered from one it would have
+        // suggested anyway, and for a queued offline check-in it runs hours later against a
+        // recovery feed that has moved on. The sheet knows exactly what it drew, at the moment it
+        // drew it. One field on `leanPayload` reaches all three writes below: the local store, the
+        // outbox mutation and the web-fallback POST.
+        suggestedSoreMuscles: suggested,
       }
       const log: MoodLog = {
         id:           '',
@@ -240,6 +248,7 @@ export function MoodCheckInSheet({
         sleepQuality: 'ok',
         bodyState,
         soreMuscles,
+        suggestedSoreMuscles: suggested,
         createdAt:    new Date(),
       }
       const store = userId ? getLocalStore(userId) : null
