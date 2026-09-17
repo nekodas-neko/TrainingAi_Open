@@ -443,6 +443,44 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [readiness][devices] TN-45 — the only illness band that has ever fired is the one with no penalty and no UI 🔴 LIVE
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-17 · found on a routine production read after TN-34/BF-13/TN-39 shipped.
+- **Lane: B** — `components/home/illness-advisory-banner.tsx:15` is the whole surface. The thresholds in `packages/shared/src/health/illness-radar.ts` are **not** in scope (see the ⚠ below).
+- **Gate: owner** — this adds something to the owner's Home screen about his own health; the wording is his call, not an implementation detail.
+- **Review:** [`the app saw it and said nothing`](reviews/2026-09-17-the-app-saw-it-and-said-nothing.md).
+
+**Measured over 72 days of the owner's own rows:**
+
+| flag | days | mean illness score | mean readiness | last |
+|---|---:|---:|---:|---|
+| `normal` | 58 | 10 | **64** | 2026-09-17 |
+| `watch` | **2** | 49 | **32** | **2026-09-16** |
+| `elevated` | **0** | — | — | never |
+| `fever` | **0** | — | — | never |
+
+**`watch` is rare and highly discriminating — readiness averages 32 on those days against 64 on
+normal days, half — and it is inert in two places at once:** `ILLNESS_READINESS_PENALTY.watch = 0`
+(deliberate, "advisory-only") and the Home banner returns `null` for anything that is not
+`elevated`/`fever`. **So the band is named advisory-only and there is no advisory.**
+
+**⚑ The two bands that DO produce UI have never fired in 72 days.** As far as this data goes the
+illness banner has never rendered. The only band that fires is the silent one.
+
+**It fired on a real event.** 2026-09-16 scored 41, one point over the threshold, on a day when the
+owner's HRV had halved (62 → 32 ms over two weeks) and resting HR had risen ~9 bpm — with the
+sleep-capture confound tested and ruled out (HRV is *not* lower on short-record days: 50 ms on
+fragments vs 45 ms on real nights).
+
+**⚠ Do NOT raise the readiness penalty.** `watch = 0` is plausibly correct — readiness fell to 31 on
+its own, so penalising it again double-counts the same physiology. **The gap is visibility, not
+weight**, and conflating them is how a signal ends up counted twice.
+
+**⚠ Do NOT re-tune the thresholds on n=2.** Two firings in 72 days cannot support moving 40 or 65.
+
+**Pass test:** a `watch` day produces something the owner can see on Home, and a normal day does not.
+
+
 ### [workouts][app-shell] LB-116 — the check-in sheet knows which sore ticks it suggested and throws it away
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-17 (Lane A, shipping BF-173's engine half).
@@ -1666,6 +1704,15 @@ re-test this.
 | Sleep | 97 | 73 | 63 | 19 |
 | Activity | 91 | 73 | 50 | 1 |
 | **Readiness** | **87** | 64 | 62 | **0** |
+
+**⚠ AMENDED 2026-09-17 — temperature is the STRUCTURAL cap, not what is holding the score down
+now.** Re-measured by week: temperature has recovered to **84–96** and is currently the *healthiest*
+contributor. The recent lows are `hrvBalance` (87 → 0 over six weeks) and `restingHeartRate`
+(70 → 12), and **those are tracking a real physiological event, not a scoring defect** — raw HRV
+halved and resting HR rose ~9 bpm, with the sleep-capture confound tested and ruled out
+([`review`](reviews/2026-09-17-the-app-saw-it-and-said-nothing.md) §1). Both things are true: the
+temperature term still cannot reach its own optimum, *and* it is not the reason readiness reads 31
+this week. The original framing invited the wrong fix.
 
 **`temperature` (weight .10) has never reached 100 in 62 days** — max 96, mean 76. It is scored
 *closer-better*, 100 exactly at the personal baseline, so **a miscentred baseline makes 100
@@ -5175,6 +5222,17 @@ call rather than a queue pass. Alternative: leave lookups as they are and add th
 `upsertUser`'s write only, which stops new divergence without touching matching.
 
 ### [sleep][platform] PS-17 — a phantom afternoon "sleep" replaced a real night in the daily summary, and it is scoring 🔴 LIVE
+
+- **⚑ STILL LIVE 2026-09-17, with current numbers and a consequence the entry does not state.**
+  **5 of the last 13 days recorded a midday Brisbane fragment as the day's ONLY sleep session** —
+  starts at 11:54, 12:10, 13:06, 12:25 and 14:25 local, 0.0–1.7 h, efficiency 0–48 — so the real
+  night is missing entirely on those days. **The shape has changed rather than stopped:** on 16 and
+  17 September *two* sessions were captured, a genuine ~7 h night **and** a ~10:30 nap.
+  **⚠ The consequence worth acting on: ANY multi-day sleep average is unusable while this is live**,
+  because it averages naps with nights. A Tuning session made exactly that mistake on 2026-09-16,
+  reporting the owner's sleep as having "collapsed to 3.1 h" when the figure was naps dragging the
+  mean down — see [`review`](reviews/2026-09-17-the-app-saw-it-and-said-nothing.md) §2. Anything
+  reading `sleep_sessions` in aggregate needs a night-vs-nap filter first, or it will repeat it.
 
 - **Lane:** A (the rollup and the summary write)
 - **Added:** 2026-08-30, from the Colmi comparison — found by accident while validating a different device

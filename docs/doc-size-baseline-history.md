@@ -13163,3 +13163,24 @@ PR #1264 ran E2E twice on the same commit: 21:15 UTC failed on
 08:00 Brisbane. The entry already carried the payload and the clause; what it lacked was the thing
 that stops a reader concluding "flake" — two runs of one commit disagreeing on the hour. Worth five
 lines because without it the next person re-runs the spec, sees green, and closes the entry.
+
+## 2026-09-17 — backlog → 23226: a signal the app detected and never showed
+
++58 lines across three edits, from a routine production read rather than a queued item.
+
+**TN-45 is the finding and earns its table.** The illness radar's `watch` band has fired twice in 72
+days, and on those days readiness averages **32 against 64** — half. It is inert in two places at
+once (`penalty = 0` and a banner that returns null below `elevated`), so the band named
+*advisory-only* has no advisory. **The two bands that would produce UI have never fired**, which
+means the banner has, as far as this data shows, never rendered. Two ⚠ lines guard the fixes a
+reader reaches for first — raising the penalty (double-counts physiology readiness already caught)
+and moving the thresholds (n=2).
+
+**PS-17 gains current numbers rather than a duplicate entry.** It was already 🔴 LIVE; what it did
+not say is the consequence: five of thirteen days record a midday nap as the day's only sleep, so
+**any multi-day sleep average is unusable**. Worth the lines because a Tuning session made exactly
+that mistake the day before, and the entry now names it.
+
+**TN-42 is amended, not rewritten.** Its "temperature is the binding constraint" framing was true
+structurally and wrong about the present — temperature has recovered to 84–96 while `hrvBalance` fell
+to 0 on a real physiological event. Leaving it would have pointed an implementer at the wrong term.
