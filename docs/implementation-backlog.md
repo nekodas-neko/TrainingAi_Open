@@ -3505,6 +3505,29 @@ the rest of that day; and `perceived_recovery` carries at least three distinct v
 - **Lane: A** — `packages/shared/src/health/observed-hr.ts:110` (`resolveMaxHr`), `health/hr-profile.ts:86` (`targetAnchorMax`), `health/body-battery-inputs.ts:51` (`resolveBatteryHrMax`), `health/hr-zones.ts:9` (`hrMaxFromAge`), plus `lib/health/readiness-payload.ts:397`.
 - **✅ OWNER DECISION, 2026-09-09 — blend the two at 50/50 and PIN it: `(168 + 187) / 2 = 177.5 → 178`.** *"Just because my HR got up to 168 doesn't mean it's the MAX… then when the Cooper 12-minute run is done and a new max is gotten, we can assess what's better."* Gate cleared; build to the spec below.
 - **Needs: TN-25** — unifying the anchor at 178 raises the walk's 0.70 target from **133 to 140**, so it must not land before the walk stops using 0.70. Sequencing, not a blocker on the anchor itself.
+- **✅ THE PINNED 178 IS NOW SUPPORTED BY EVIDENCE — measured 2026-09-17.** The owner pinned 178 as a
+  50/50 blend and parked the question: *"when the cooper 12 minute run is done and a new max is
+  gotten; we can assess whats better."* **A run on 2026-09-14 reached 175 bpm** — and it is
+  corroborated, not a spike: **212 samples at ≥ 165 bpm across a nine-minute span** (11:05–11:14
+  Brisbane), with 5 at 175, 13 at 174, 6 at 173. The old observed max of 168 is superseded.
+
+  | anchor | Zone 2 floor (RHR 52) | error vs the 175 observation |
+  |---|---:|---:|
+  | observed 168 (the option rejected) | 122 bpm | **−4 bpm** |
+  | **pinned 178** | 128 bpm | **+2 bpm** |
+  | age-predicted 187 | 133 bpm | +7 bpm |
+
+  **The blend was the right call and the rejected option would have been twice as wrong.** A true max
+  of at least 175 means 168 was never a ceiling — it was the highest he had happened to reach.
+
+  **⚠ This does not close TN-30.** The four anchors still disagree; what changed is the spread, from
+  168-vs-187 to **175-vs-178-vs-187**. `targetAnchorMax` and `resolveBatteryHrMax` should now resolve
+  to 175 rather than 168 once the new peak ages into their windows — **not verified here**, and worth
+  checking before anything is unified, because it moves the walk targets and the Body Battery reserve
+  on its own without any code change.
+
+  **⚠ The Cooper test is still worth doing.** 175 is the highest observed in a 21-minute run that was
+  not a maximal effort; it is a floor on the true max, not a measurement of it.
 - **Reference:** [`review`](reviews/2026-09-08-walk-intensity-calibration.md) §addendum 6.
 
 **The zone MODEL is genuinely single-sourced and that is not the problem.** `ZONE_DEFS`
