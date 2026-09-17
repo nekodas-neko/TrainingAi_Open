@@ -1,39 +1,57 @@
-# The medication the scorers cannot see
+# Correlating vitals against dose, and the baseline that is erasing the chance
 
 **Tuning agent · 2026-09-17 · branch `tuning/tn46-medication-blind-baselines` · docs-only**
 
-Following the HRV collapse TN-45 surfaced, the owner offered a cause: *"Id imagine its due to the
-retatrutide"*. He is right, and the app had the evidence the whole time.
+Following the HRV collapse TN-45 surfaced, the owner named the cause — *"Id imagine its due to the
+retatrutide"* — and then the actual ask: *"The idea was to be able to correlate change in vitals
+with reta"*.
 
-`supplements` holds **Retatrutide, 10 mg, `started_on` 2026-09-06, active**. Nightly vitals:
-resting HR **52.3 → 57.7** and HRV **58.9 → 39.1**, comparing the 27 nights before with the 9 after.
-Per night the divergence begins **2026-09-09**, three days after the first dose, and accelerates to
-`rhr 64.9 / hrv 19` by 09-17.
+## A correction this agent had to make first
 
-**The finding is not that a drug moved his vitals. It is that the system cannot tell**, in two ways:
+An earlier draft read `supplements.dose = '10mg'` as the administered dose and remarked that it
+looked high against the trial protocols. **That was wrong. 10 mg is the vial strength** —
+`supplement_logs` carries `vial_strength_mg 10, vial_water_ml 3, vial_units_per_ml 100`. The real
+doses are **0.5 mg on 2026-09-07 and 1 mg on 2026-09-13**, a titration that starts *below* the
+published protocols rather than above them. The remark is withdrawn. The trap stays on the entry:
+anything reading `supplements.dose` for a dose gets a 20× overstatement, and
+`supplement_logs.amount` is the real one.
 
-1. **No scorer reads `started_on`.** The illness radar, readiness's HRV-balance and resting-HR
-   contributors and all six baselines are blind to the row that explains the move. The `watch` band
-   fired on 09-16 and the app's own wording for it is *"may be fighting something"* — an infection
-   framing for a pharmacological effect whose start date it stores.
-2. **The baseline will absorb it and then report normal.** `updateBaseline` moves ~1/32 per night
-   once mature, so the resting-HR baseline is being dragged toward 65 and HRV toward 20. Within
-   **30–60 nights every z returns to ~0** — `watch` stops firing, readiness recovers, nothing
-   physiological has improved. A baseline-relative system cannot see a sustained shift; it redefines
-   normal and goes quiet, and the recovery looks like progress.
+## The dose-response was already in the data
 
-Filed as **TN-46**, `Gate: owner`, with four options and a recommendation: annotate the period from
-the medication table rather than correct for it. Cross-linked from TN-45 (which constrains the copy
-— name what moved, never imply infection) and PS-44 (whose strap week now discriminates between two
-live hypotheses: if both instruments show the drop it is physiology, if only the ring does it is
-drift).
+| date | resting HR | HRV | dose |
+|---|---:|---:|---|
+| 09-04 → 09-06 | 52.6 / 52.5 / 51.7 | 59 / 50 / 56 | pre-dose |
+| **09-07** | 48.4 | 63.5 | **0.5 mg** |
+| **09-09** | **56.3** | **39** | peak, 2 days after |
+| 09-10 → 09-12 | 53.8 / 55.0 / 54.5 | 43.5 / 49 / 45 | partial washout |
+| **09-13** | 55.4 | 48 | **1 mg** |
+| **09-16 → 09-17** | **65.1 / 64.9** | **28 / 19** | still falling at day 4 |
 
-**The window closes.** The before/after contrast is measurable only while the baseline still
-remembers the old normal.
+Doubling the dose roughly tripled the resting-HR excursion (+4 bpm, then +13) and took HRV from ~55
+to 19. A 2–4 day lag to peak, partial washout after the smaller dose, no turn yet after the larger.
+**The app holds the doses, holds the vitals, and plots neither against the other.**
+
+## The decision, taken under delegation
+
+Filed as **TN-46**, no gate. Retain a **pre-intervention reference baseline**; annotate, do not
+correct.
+
+The live baseline keeps adapting, because freezing it means a permanently depressed score and a radar
+crying wolf nightly. But a **snapshot at the intervention date is kept as a reporting reference**, so
+the delta stays computable after the live baseline has moved on. `supplement_logs` joins into the
+score audit and advisory so a flagged day names the medication and the most recent dose. The overlay
+is plotted **with a lag** — a same-day correlation finds nothing on data that plainly shows an effect.
+
+**Why the snapshot is urgent.** `updateBaseline` moves ~1/32 per night, so the resting-HR baseline is
+being dragged toward 65 and HRV toward 20. Within 30–60 nights every z returns to ~0 — `watch` stops
+firing, readiness recovers, nothing physiological has changed, and the recovery reads as progress.
+After that, *"what did this do to my vitals"* is no longer answerable from the baselines at all.
+
+Cross-linked from TN-45 (copy must name what moved, never imply infection) and PS-44 (the strap week
+now separates real physiology from ring drift).
 
 ## What was not exercised
 
 Read-only queries against stored production rows, row-scoped to the owner. No code changed, no
-scoring touched, nothing run on device. The physiological reading is an observation about data in
-the app, not a clinical judgement — noted in the entry alongside the suggestion that a sustained
-resting-HR rise is worth raising with whoever prescribes and monitors it.
+scoring touched, nothing run on device. The physiological reading is an observation about data in the
+app, not a clinical judgement.

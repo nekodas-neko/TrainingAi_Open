@@ -443,86 +443,86 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
-### [readiness][devices][platform] TN-46 — a medication started on 2026-09-06 moved every vital, and no scorer can see it 🔴 LIVE
+### [readiness][devices][platform] TN-46 — correlate vitals against dose: the app holds both halves and joins neither 🔴 LIVE
 
-- **Branch:** _unassigned_ · **Added:** 2026-09-17 · owner, on the HRV collapse TN-45 surfaced:
-  *"Id imagine its due to the retatrutide"*. He is right, and the app already holds the date.
-- **Lane: A** — `packages/shared/src/health/*` (the baseline and radar consumers) plus whichever
-  read path joins `supplements`. Storage-reaching, so Lane A by the rule.
-- **Gate: owner** — how a medication period should affect scoring is a product decision about his own
-  health data, not an implementation detail. Options are laid out at the bottom; nothing ships first.
+- **Branch:** _unassigned_ · **Added:** 2026-09-17 · owner: *"The idea was to be able to correlate
+  change in vitals with reta"*, and *"go with whatever option you think is best"*.
+- **Lane: A** — `packages/shared/src/health/*` plus the read path that joins `supplement_logs`.
+  Storage-reaching, so Lane A by the rule.
+- **No gate.** The owner delegated the choice (*"go with whatever option you think is best"*); the
+  decision is recorded below and is built to without a further round-trip.
 - **Review:** [`what the temperature re-derive would do`](reviews/2026-09-17-what-the-temperature-rederive-would-do.md)
-  for the radar mechanics this sits on top of.
+  for the radar mechanics underneath.
 
-**The data is unambiguous, and the app supplied both halves.** `supplements` holds
-**`Retatrutide, 10 mg, started_on 2026-09-06, active`**. The nightly vitals:
+**⚠ CORRECTION, and it was this agent's error.** An earlier draft read `supplements.dose = '10mg'`
+as the administered dose. **It is the VIAL STRENGTH** — `supplement_logs` carries
+`vial_strength_mg 10, vial_water_ml 3, vial_units_per_ml 100`. The real doses are **0.5 mg on
+2026-09-07 and 1 mg on 2026-09-13**, a conservative titration that starts *below* the published
+trial protocols rather than above them. The remark that the dose looked high was wrong and is
+withdrawn. **The trap is worth keeping:** anything that reads `supplements.dose` for a dose gets a
+20× overstatement. `supplement_logs.amount` + `unit` is the administered dose; the `supplements` row
+describes the vial.
 
-| window | resting HR | HRV | nights |
-|---|---:|---:|---:|
-| 2026-08-10 → 09-05 (before) | **52.3** | **58.9** | 27 |
-| 2026-09-09 → 09-17 (after) | **57.7** | **39.1** | 9 |
+**The dose-response is already in the data, and it is clean.** Nightly vitals against the two doses:
 
-Per night, the divergence starts on **09-09**, three days after the first dose, and accelerates:
-09-06 `rhr 51.7 / hrv 56` · 09-07 `48.4 / 63.5` · 09-08 `52.0 / 51` · **09-09 `56.3 / 39`** · 09-14
-`56.9 / 38.5` · 09-16 `65.1 / 28` · **09-17 `64.9 / 19`**. A three-day onset then progressive
-accumulation is the expected shape for a long-half-life agonist, not a coincidence.
+| date | resting HR | HRV | dose |
+|---|---:|---:|---|
+| 09-04 → 09-06 | 52.6 / 52.5 / 51.7 | 59 / 50 / 56 | — (pre-dose baseline) |
+| **09-07** | 48.4 | 63.5 | **0.5 mg** |
+| 09-08 | 52.0 | 51 | |
+| **09-09** | **56.3** | **39** | ← peak, 2 days after |
+| 09-10 → 09-12 | 53.8 / 55.0 / 54.5 | 43.5 / 49 / 45 | partial washout |
+| **09-13** | 55.4 | 48 | **1 mg** |
+| 09-14 → 09-15 | 56.9 / 57.2 | 38.5 / 42 | |
+| **09-16 → 09-17** | **65.1 / 64.9** | **28 / 19** | ← still falling at day 4 |
 
-**⚑ THE FINDING IS NOT "the drug moved his vitals" — it is that the system cannot tell.** Two
-separate blindnesses, and the second is the expensive one.
+**Doubling the dose roughly tripled the resting-HR excursion** (+4 bpm after 0.5 mg, +13 after 1 mg)
+and drove HRV from ~55 to 19. The 0.5 mg dose partially washed out by day 5; the 1 mg dose has not
+turned yet. That is a lagged dose-response with a 2–4 day peak, and it is exactly the thing the
+owner wants to see — **the app has the doses, has the vitals, and plots neither against the other.**
 
-1. **Nothing reads `started_on`.** The illness radar, readiness's HRV-balance and resting-HR
-   contributors, and all six baselines are blind to the one row that explains the move. TN-45's
-   `watch` band fired on 09-16 and the app's own reading of it is *"may be fighting something"* —
-   an infection framing for a pharmacological effect it has the date of.
-2. **The baseline will absorb it, and then the app will call it normal.** This is the part nobody
-   would notice. `updateBaseline` moves ~1/32 per night once mature, so the resting-HR baseline
-   (~53) is being dragged toward 65 and the HRV baseline (~57) toward 20. Within roughly **30–60
-   nights every z-score returns to ~0**: `watch` stops firing, the readiness contributors recover,
-   and the score climbs back — **with no physiological improvement whatsoever.** A baseline-relative
-   system cannot see a sustained shift; it redefines normal and goes quiet. The recovery will look
-   like progress.
+**⚑ THE DECISION — retain a pre-intervention reference baseline; annotate, do not correct.** Taken
+under the owner's delegation, and it is options 1 and 2 of the earlier draft combined in the only
+way that avoids the downside of each.
 
-**⚠ This is the window. It closes.** The contrast above is only measurable while the baseline still
-remembers the old normal. Whatever is going to be learned from this period has to be captured in the
-next few weeks, or the evidence dissolves into the baseline.
+- **The live baseline keeps adapting.** Do not freeze it. Freezing means a permanently depressed
+  readiness score and a radar crying wolf every night for as long as the medication runs — the
+  reason option 2 lost on its own.
+- **Snapshot the baseline at the intervention date and keep it as a REPORTING reference.** This is
+  the load-bearing half. Scoring stays useful day to day; the delta stays computable forever. Without
+  it the comparison is destroyed by the mechanism below, and destroyed *silently*.
+- **Join `supplement_logs` (date, `amount`, `unit`) into the score audit and the advisory**, so a
+  flagged day reads *"resting HR and HRV are off your baseline; Retatrutide 1 mg, 3 days ago"*
+  instead of implying infection, and so a dose-vs-vitals overlay has something to plot.
+- **Plot it with a lag.** The peak is 2–4 days after a dose, so a same-day correlation finds nothing
+  and would read as "no effect" on data that plainly shows one.
 
-**Why it matters beyond this one user.** Any user on any medication that shifts a tracked vital —
-GLP-1 class agonists raise heart rate as a documented class effect, and stimulants, beta-blockers and
-thyroid medication all move these numbers — gets the same silent re-baselining. The app has a
-medication table with start and stop dates and does not consult it anywhere in scoring.
+**⚠ WHY THE REFERENCE SNAPSHOT IS URGENT — the comparison is being erased right now.**
+`updateBaseline` moves ~1/32 per night once mature, so the resting-HR baseline (~53) is being dragged
+toward 65 and the HRV baseline (~57) toward 20. **Within roughly 30–60 nights every z returns to ~0**:
+`watch` stops firing, the readiness contributors recover, the score climbs back — with no
+physiological change at all. A baseline-relative system cannot see a sustained shift; it redefines
+normal and goes quiet, and **the recovery reads as progress**. Once absorbed, "what did Retatrutide
+do to my vitals" is no longer answerable from the baselines, only from raw history. Capture the
+pre-intervention snapshot before that happens.
 
-**Options for the owner, recommendation first.**
+**Why this generalises past one drug.** GLP-1 class agonists raise heart rate as a documented class
+effect; stimulants, beta-blockers and thyroid medication all move tracked vitals. The app has a
+medication table with per-administration doses and start/stop dates and consults it nowhere in
+scoring. The same machinery answers "what did X do to me" for anything logged.
 
-1. **Recommended — an intervention marker that annotates, and does not correct.** Join
-   `supplements.started_on`/`stopped_on` into the score-audit and the illness advisory, so a flagged
-   day can say *"resting HR and HRV are off your baseline; Retatrutide started 11 days ago"* instead
-   of implying infection. A year out this is the durable shape: it is honest, it needs no judgement
-   about how much of a move a drug "should" cause, and it degrades gracefully for any future
-   medication. Reversal cost: near zero, it is a read and a sentence.
-2. **Freeze or re-seed the baselines at the intervention date.** Better at keeping the *pre-drug*
-   normal as the reference, so the shift stays visible indefinitely rather than being absorbed. Lost
-   because it is a much bigger change with a real failure mode — if the shift is permanent, a frozen
-   baseline means a permanently depressed readiness score and a radar that cries wolf every night.
-3. **Suppress the illness radar during an active medication period.** Better at stopping the wrong
-   advisory immediately, and it is the smallest possible change. Lost because it throws away signal:
-   he could genuinely get ill while on it, and this is the one option that would hide that.
-4. **Do nothing and let the baseline absorb it.** Better in exactly one way — it is self-correcting
-   and costs nothing. Lost because the score silently becomes uninterpretable for a month and then
-   lies quietly afterwards.
+**⚠ Do NOT re-tune any threshold against this period.** Eleven nights inside a pharmacological
+transient, spanning a dose change, is the worst possible calibration sample. It is evidence about
+the system's blindness, not about where `ILLNESS_WATCH_SCORE` or the readiness weights belong.
 
-**⚠ Not a scoring matter, stated once because no one else will.** A sustained resting-HR rise of
-~+5 bpm on the nightly mean (and ~+13 bpm on the last two nights) with HRV down roughly two thirds
-is worth mentioning to whoever is prescribing and monitoring this — the published trials titrate up
-from 2 mg rather than starting at 10. This entry records the observation because the data is in the
-app; it is not medical advice and nothing here should be treated as a clinical judgement.
+**⚠ Not a scoring matter, and the dose framing is corrected above.** A resting HR ~+13 bpm and HRV
+down roughly two thirds at **1 mg**, with titration presumably continuing, is worth mentioning to
+whoever prescribes and monitors this — the more so because the dose is low. This entry records what
+is in the app; it is not medical advice and nothing here is a clinical judgement.
 
-**⚠ Do NOT re-tune any threshold against this period.** Nine nights inside a pharmacological
-transient is the worst possible calibration sample. It is evidence about the *system's blindness*,
-not about where `ILLNESS_WATCH_SCORE` or the readiness weights belong.
-
-**Pass test:** a day flagged during an active medication period names the medication and its start
-date rather than implying illness, and the pre-medication baseline is still recoverable after 60
-nights.
+**Pass test:** the pre-intervention baseline is still recoverable after 60 nights, a flagged day
+during an active medication period names the medication and the most recent dose rather than implying
+illness, and dose-vs-vitals can be read off one surface with a selectable lag.
 
 
 ### [readiness][devices] TN-45 — the only illness band that has ever fired is the one with no penalty and no UI 🔴 LIVE
@@ -592,7 +592,8 @@ unless `FEVER_TEMP_Z` is re-scaled with it — that risk lives in Q-506 and exis
 entry ships.
 
 **⚑ The cause of the 2026-09-16 firing is now known, and it is not illness — see TN-46.** The owner
-started **Retatrutide on 2026-09-06**; resting HR and HRV diverge from 09-09 onward. That does not
+began Retatrutide on **2026-09-07 at 0.5 mg**, moving to **1 mg on 09-13**; resting HR and HRV track
+both doses with a 2–4 day lag. That does not
 change this entry's ask — the band still needs to be visible — but it does constrain the copy: the
 line must name **what moved** (resting HR and HRV off baseline), never imply infection.
 `illnessAdvisory('watch')`'s existing wording is already neutral and should stay that way.
@@ -2428,8 +2429,8 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
   *at night*, the owner chose **to wear the chest strap to bed for a week**. That closes the
   ⚠ correction below: the ingredient does not stream at night *today*, and this is the deliberate
   act that makes it stream.
-- **⚑ TN-46 sharpens what this window decides.** The HRV fall now has a named candidate cause — the
-  owner started Retatrutide on 2026-09-06 — so the strap week is no longer just ring-vs-strap
+- **⚑ TN-46 sharpens what this window decides.** The HRV fall now has a named candidate cause —
+  Retatrutide, 0.5 mg on 2026-09-07 and 1 mg on 09-13 — so the strap week is no longer just ring-vs-strap
   agreement. **Paired per night, it separates the two live hypotheses outright:** if both instruments
   show the drop it is real physiology, and if only the ring does it is sensor drift. That is a clean
   discriminator and it exists only while the baseline still remembers the pre-drug normal.

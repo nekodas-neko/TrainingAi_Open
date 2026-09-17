@@ -18,7 +18,7 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
-## 2026-09-17 — backlog → 23458 (TN-46, the medication the scorers cannot see)
+## 2026-09-17 — backlog → 23459 (TN-46, the medication the scorers cannot see)
 
 **+93.** One new entry and two cross-links. The owner named Retatrutide as the likely cause of the
 HRV collapse TN-45 surfaced, and the app turned out to hold the start date all along —
