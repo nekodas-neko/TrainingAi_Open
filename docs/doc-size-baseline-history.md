@@ -18,6 +18,17 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-17 — backlog → 23203, `projectOverview.md` → 11625 (BF-171 shipped)
+
+**−99 and +14.** BF-171's entry leaves the queue with the fix and files nothing behind it, so this
+one is a straight shrink — the first in a while where a shipped entry owed no follow-up at all. Its
+two limbs were both closed, not half-closed.
+
+The `projectOverview` growth is one paragraph, and the sentence earning most of it is the one saying
+what was **not** re-measured: the entry's production deltas came from a scratch harness against the
+owner's rows, and the fixtures that replaced it are synthetic. A later reader comparing those numbers
+against a live screen would otherwise have no way to know they were never re-checked.
+
 ## 2026-09-17 — backlog → 23168, `projectOverview.md` → 11611 (BF-173 shipped)
 
 **−63 and +19** (against the base this landed on; the headline is the live figure after re-merging `main`, which moved twice while this PR ran CI). BF-173's 111-line entry leaves the queue with the fix, and two entries replace it:
