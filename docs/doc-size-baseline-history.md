@@ -13392,7 +13392,7 @@ with. Three local runs inside it (00:41, 00:46, 00:50, all red) against one outs
 green) turn the reading into a measurement, and the table is shorter than the paragraph that would
 otherwise have to explain why the reading should be believed.
 
-## 2026-09-17 — `docs/implementation-backlog.md` 23570 → 23642 (Lane B, BF-165 root cause)
+## 2026-09-17 — `docs/implementation-backlog.md` 23570 → 23684 (Lane B, BF-165 root cause)
 
 +70 for a root cause that has been wrong three times and retracted once, so the evidence is written
 out rather than summarised: the measured trace, the two conditions a harness probe must meet, and
@@ -13403,3 +13403,9 @@ The harness half is the part worth the lines. `tapCentre` does no scrolling and
 915-tall viewport were never tapped at all — and "Run works, the two /activity ones do not" reads as
 a routing defect when it is a coordinate one. Recording the y-values and the `elementFromPoint`
 check is what stops the next session re-deriving it from the same three wrong turns.
+
+A further +43 for the fix that was built and does NOT work. Recording a refuted fix costs lines and
+saves an attempt: the obvious reading of the trace is "a self-pop is in flight, wait for it to
+drain", the module already tracks exactly that, and the premise is false — the sheet's close is
+415 ms late because the view transition holds React's commit, so nothing is pending when the
+navigation is issued. Without that measurement written down, the next session builds the same thing.
