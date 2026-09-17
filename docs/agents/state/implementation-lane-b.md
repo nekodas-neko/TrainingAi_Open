@@ -40,7 +40,7 @@ None held. #265 and #608 are abandoned Lane B PRs whose work is on `main`; closi
 
 - **`packages/shared/**`, `app/api/**`, `lib/data/**`, `lib/sqlite/**`, `lib/local-store/**`, `lib/cache-groups.ts`, `lib/coach/**` are Lane A** — the **path**, not the nature of the edit. `scripts/**` is the Orchestrator's, bar a shrink-only baseline the check demands. **Clearing a completed entry is the Orchestrator's sweep too — file it, do not do it.**
 - **A Lane B half needing a Lane A argument is TWO entries.** `workout-screen.tsx` is shrink-only at 1833 lines. **`saved-meals-sheet.tsx` is 791 against a HARD 800** — a new feature there goes in an extracted child.
-- **E2E is ADVISORY** — but wait on it for app-code or new-spec PRs. **Batons are shrink-only**; cut narrative before adding.
+- **E2E is ADVISORY** — but wait on it for app-code or new-spec PRs. **Batons are shrink-only**; cut narrative before adding. **⛔ IN ANY LINE OF AN ENTRY PARKS IT:** `next-item.js` reads a `⛔` as the legacy prose blocker unless a structured `Gate:`/`Needs:` overrides, so a `⛔` used for EMPHASIS — which this repo does constantly — silently hides the entry. LB-116 sat in PARKED as an *"unmigrated marker"* for exactly that. Give it the real field, or drop the symbol.
 
 ## The lessons that cost real time
 
