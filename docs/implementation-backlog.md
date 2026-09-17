@@ -488,23 +488,47 @@ way that avoids the downside of each.
 - **The live baseline keeps adapting.** Do not freeze it. Freezing means a permanently depressed
   readiness score and a radar crying wolf every night for as long as the medication runs — the
   reason option 2 lost on its own.
-- **Snapshot the baseline at the intervention date and keep it as a REPORTING reference.** This is
-  the load-bearing half. Scoring stays useful day to day; the delta stays computable forever. Without
-  it the comparison is destroyed by the mechanism below, and destroyed *silently*.
+- **~~Snapshot the baseline at the intervention date~~ — STRUCK. The snapshot already exists and no
+  migration is needed.** See the correction immediately below; this was the entry's load-bearing
+  half and it solved a problem the storage layout does not have.
 - **Join `supplement_logs` (date, `amount`, `unit`) into the score audit and the advisory**, so a
   flagged day reads *"resting HR and HRV are off your baseline; Retatrutide 1 mg, 3 days ago"*
-  instead of implying infection, and so a dose-vs-vitals overlay has something to plot.
+  instead of implying infection, and so a dose-vs-vitals overlay has something to plot. **This is now
+  the whole entry**, and it needs no schema change.
 - **Plot it with a lag.** The peak is 2–4 days after a dose, so a same-day correlation finds nothing
   and would read as "no effect" on data that plainly shows one.
 
-**⚠ WHY THE REFERENCE SNAPSHOT IS URGENT — the comparison is being erased right now.**
-`updateBaseline` moves ~1/32 per night once mature, so the resting-HR baseline (~53) is being dragged
-toward 65 and the HRV baseline (~57) toward 20. **Within roughly 30–60 nights every z returns to ~0**:
-`watch` stops firing, the readiness contributors recover, the score climbs back — with no
-physiological change at all. A baseline-relative system cannot see a sustained shift; it redefines
-normal and goes quiet, and **the recovery reads as progress**. Once absorbed, "what did Retatrutide
-do to my vitals" is no longer answerable from the baselines, only from raw history. Capture the
-pre-intervention snapshot before that happens.
+**⛔ CORRECTION 2026-09-17 (Lane A, verified against production before any code was written) — THE
+SNAPSHOT IS UNNECESSARY AND THERE IS NO DEADLINE. The entry's arithmetic is right and its conclusion
+does not follow.**
+
+`updateBaseline` does move ~1/32 per night once mature (`ageDays > 14` → `ashrRound(delta + bias, 5)`),
+so the **live** baseline is genuinely dragged toward the new values. All of that holds. What does not
+follow is that the comparison is destroyed: **baselines are stored per night, per row** on
+`oura_daily_summary` (`rhr_baseline_mean_x8`, `hrv_baseline_mean_x8`, … alongside `n_history`). Every
+historical night keeps the baseline as of that night, so the pre-intervention reference is already
+persisted and later drift cannot reach it.
+
+Measured on the owner's production rows:
+
+| row | stored RHR baseline | stored HRV baseline |
+|---|---:|---:|
+| **2026-09-06** (night before dose 1) | **52.875** | **56.125** |
+| 2026-09-18 | 54.250 | 51.750 |
+
+The 09-06 row is what a snapshot would have captured, and it is already there. The table holds **74
+rows back to 2026-07-07** (the BLE re-key), **73 carrying baselines**, and nothing prunes it — the
+`shouldPrune` path is `error_events`, not this table. So *"what did Retatrutide do to my vitals"* stays
+answerable from the baselines indefinitely, by reading the row before the intervention date.
+
+**The generalisable form:** a rolling aggregate that is *checkpointed per period* has no erasure
+problem, however fast it adapts. Before adding storage to preserve a value, check whether the value is
+already written down somewhere with a date on it.
+
+**What the correction does NOT touch:** the dose-response table above is unchanged and was not
+re-measured, except to note the 09-18 row, which the entry predates — RHR **59.4** (from 64.9) and HRV
+**47** (from 19). The 1 mg excursion has begun to turn at day 5, matching the 0.5 mg pattern, so the
+entry's *"still falling at day 4"* was accurate when written and is no longer the latest picture.
 
 **Why this generalises past one drug.** GLP-1 class agonists raise heart rate as a documented class
 effect; stimulants, beta-blockers and thyroid medication all move tracked vitals. The app has a
@@ -601,52 +625,24 @@ line must name **what moved** (resting HR and HRV off baseline), never imply inf
 **Pass test:** a `watch` day produces something the owner can see on Home, and a normal day does not.
 
 
-### [workouts][app-shell] LB-116 — the check-in sheet knows which sore ticks it suggested and throws it away (fixed)
+### [workouts][app-shell] LB-116 — the check-in sheet knows which sore ticks it suggested and throws it away (fixed; device check owed)
 
-- **✅ SHIPPED 2026-09-17 (v1.457.10)** (`fix/lb116-checkin-sends-suggested-sore`).
-  [Journal](overview/entries/2026-09-17-fix-lb116-checkin-sends-suggested-sore.md).
-  `suggestedSoreMuscles: suggested` on `leanPayload`, which is what reaches all three writes — the
-  local store, the outbox mutation and the `/api/mood` fallback — plus the optimistic `MoodLog`.
-- **⚠ IT TOUCHED A LANE A PATH, deliberately and narrowly.** `MoodFieldsSchema`
-  (`packages/shared/src/validation/mood-log.ts`) had to gain the field: the schema has **no
-  `.strict()`**, so Zod DROPS an unknown key rather than rejecting it — without the edit the sheet's
-  value would have been silently stripped on both the route and the outbox branch and this entry
-  would have shipped inert. One optional field, bounded like its sibling, specified by this entry
-  and delegated by the lane that owns the file. Flagged rather than done quietly.
-- **⛔ NO E2E, and one was written and DELETED rather than shipped green.** A browser test that saves
-  a check-in and reads `mood_logs.suggested_sore_muscles` back **passes against unfixed `main`**: the
-  column is non-null either way, because `saveMoodLog` derives the list when the caller sends none.
-  Distinguishing the sheet's value from the server's derivation needs control of the recovery feed
-  the harness does not have. A vacuous test that answers is worse than none. The unit test carries
-  the proof instead — **4 of its 6 assertions fail against `main`**, including a real
-  `MoodFieldsSchema.parse` round-trip, which is exactly the strip this fix is about.
-- **Branch:** `fix/lb116-checkin-sends-suggested-sore` · **Added:** 2026-09-17 (Lane A, shipping BF-173's engine half).
-- **Lane: B** — `components/mood-checkin-sheet.tsx`. Reached only from a component, touches no
-  storage schema and no API contract: the column, the repository write and the scorer all shipped
-  with BF-173.
-- **What is already true, so this is a wiring change and not a design one.** `mood_logs` carries
-  `suggested_sore_muscles` (migration 276), `saveMoodLog` stores it, and `sessionRecoveryScore`
-  clamps only ticks that are NOT in it. The sheet already computes the list — it is the `suggested`
-  state at `mood-checkin-sheet.tsx:90`, the same value it renders the pills from. It just never
-  sends it.
-- **What to do:** include `suggestedSoreMuscles: suggested` in the `handleSave` payload (the POST
-  body and the local-store write), and add it to `MoodFieldsSchema` in
-  `packages/shared/src/validation/mood-log.ts` so the route and the outbox's mood branch accept it.
-  `LocalMoodLog.suggestedSoreMuscles` already exists and is optional.
-- **Why it is worth doing when a server fallback already covers it.** `saveMoodLog` derives the list
-  when the caller sends none, so BF-173 is not inert — but the derivation has two limits the sheet
-  does not:
-  1. **It cannot tell a volunteered muscle from an accepted suggestion when both would qualify.** A
-     muscle the lifter ticked himself that also happens to be within 48 h and under 85% recovered is
-     recorded as a suggestion, and stops penalising. The sheet knows the difference exactly, because
-     it knows what it drew.
-  2. **It is wrong for an offline check-in.** The fallback runs when the mutation reaches the server,
-     which for a queued write can be hours or a day later, against a recovery feed that has moved
-     on. The sheet would record provenance at the moment of the check-in, where it is true.
-- **Verification:** tick a muscle the sheet did NOT pre-select and confirm the stored
-  `suggested_sore_muscles` excludes it while `sore_muscles` includes it. The engine half's tests
-  (`packages/shared/src/ai-periodization/__tests__/sore-muscle-provenance.test.ts`) already pin what
-  the scorer does with each case.
+- **✅ SHIPPED 2026-09-17 (v1.457.10)** (`fix/lb116-checkin-sends-suggested-sore`, #1274).
+  [Journal](overview/entries/2026-09-17-fix-lb116-checkin-sends-suggested-sore.md), which carries the
+  reasoning, the Lane A schema edit it needed, and why its e2e was deleted rather than shipped green.
+- **Lane:** B — `components/mood-checkin-sheet.tsx`
+- **Gate: device** — the residue below is the gate: the offline path cannot be staged off the APK.
+- **Keep:** the **offline check-in case, which needs the device** — queue a check-in with no network
+  and confirm the stored `suggested_sore_muscles` is what the sheet drew at the time, not what the
+  server would derive hours later when the mutation lands. That divergence is half of why this entry
+  exists and the sandbox cannot stage it: `getLocalStore` returns null off the APK, so the outbox
+  path never runs. The in-session check is the other half and is cheap: tick a muscle the sheet did
+  NOT pre-select, and confirm `suggested_sore_muscles` excludes it while `sore_muscles` includes it.
+- **⛔ Do not re-litigate the missing e2e.** One was written and deleted deliberately: it passes
+  against unfixed `main`, because `saveMoodLog` derives the list when the caller sends none, so the
+  column is non-null either way. The unit test carries the proof instead — 4 of its 6 assertions fail
+  against `main`, including a real `MoodFieldsSchema.parse` round-trip, which is the silent strip the
+  fix is about.
 
 ### [workouts][platform] LB-118 — the explain page's `signals` omits sore-tick provenance, so LB-117 cannot be built in its lane
 
@@ -7235,14 +7231,17 @@ feature and not a deletion like LB-41:
   **The next attempt must instrument, not guess:** confirm which element carries the listener and
   that the event arrives *inside* the restore window, before reading anything into the outcome.
   `__scrollRestorationInternals` exports `RESTORE_WINDOW_MS`, which is where that timing comes from.
-- **⚠ A SECOND finding from the same run, about the existing spec rather than the bug.**
-  `scroll-restoration.spec.ts` asserts `toBe(before)` — an **exact** offset. Measured locally against
-  clean `main`: it restored to **1019** against a saved **778** and went red, because the content
-  grows on revalidation between save and restore. **Restoration was working; the assertion was not.**
-  It survives in CI, so this is a local/CI divergence rather than a live regression — but an
-  exact-offset assertion cannot tell *cancelled* from *imprecise*, which is precisely the distinction
-  BF-100 turns on. A probe for this class needs a coarse measure (*did it move off the top at all*),
-  not equality.
+- **✅ THE SECOND FINDING FROM THAT RUN IS FIXED (2026-09-17).** `scroll-restoration.spec.ts`
+  asserted `toBe(before)` — an **exact** offset — and an exact assertion cannot tell *cancelled* from
+  *imprecise*, which is the distinction this entry turns on. Reproduced before changing it: saved
+  **718**, restored **1019**, red while restoration was working, because these screens seed from
+  cache and revalidate so the content grows between the save and the restore.
+  Both assertions now go through `expectRestoredNear`, a **floor** at 90% of the saved offset with no
+  upper bound (capping would re-introduce the same flake from the other side). Proven both ways: it
+  passes on content growth, and with the restore neutered (`el.scrollTop = 0`) both cases fail
+  naming the cancellation — *"restored to 0 against a saved 879"*. **So this file can now answer the
+  device question when the S25 pass happens**, which it could not before: a red here means cancelled,
+  not merely imprecise.
 - **⚠ A CANDIDATE CAUSE, found 2026-09-14 by reading the hook rather than the screens — and it
   explains the harness/device split outright, which no previous hypothesis did.**
   `use-scroll-restoration.ts:158` attaches `stop` to **`touchstart`** on the scroll container, and
