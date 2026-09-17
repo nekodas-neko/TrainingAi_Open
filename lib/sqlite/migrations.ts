@@ -262,6 +262,9 @@ export const RECONCILE_COLUMNS: { table: string; column: string; ddl: string }[]
   { table: 'supplements',      column: 'started_on', ddl: `ALTER TABLE supplements ADD COLUMN started_on TEXT` },
   { table: 'supplements',      column: 'stopped_on', ddl: `ALTER TABLE supplements ADD COLUMN stopped_on TEXT` },
   { table: 'supplements',      column: 'dose_prompt', ddl: `ALTER TABLE supplements ADD COLUMN dose_prompt INTEGER NOT NULL DEFAULT 0` },
+  // BF-173 (v39). No DEFAULT: the null is load-bearing here, meaning "this row predates provenance"
+  // rather than "none of its ticks were suggestions".
+  { table: 'mood_logs',        column: 'suggested_sore_muscles', ddl: `ALTER TABLE mood_logs ADD COLUMN suggested_sore_muscles TEXT` },
   // Columns the local-store / sync inserts write but earlier migrations never added.
   { table: 'exercise_logs',    column: 'muscle_groups',          ddl: `ALTER TABLE exercise_logs ADD COLUMN muscle_groups TEXT` },
   { table: 'exercise_logs',    column: 'inter_exercise_rest_sec', ddl: `ALTER TABLE exercise_logs ADD COLUMN inter_exercise_rest_sec INTEGER` },
@@ -568,6 +571,10 @@ const CREATE_MOOD_LOGS = `CREATE TABLE IF NOT EXISTS mood_logs (
   sleep_quality TEXT NOT NULL,
   body_state    TEXT NOT NULL DEFAULT '[]',
   sore_muscles  TEXT NOT NULL DEFAULT '[]',
+  -- BF-173, mirroring Postgres migration 276. JSON text like sore_muscles. NULLABLE and the null
+  -- means "unknown", never "none": a row written before provenance existed cannot say which of its
+  -- ticks the model suggested, and is scored the pre-BF-173 way rather than reinterpreted.
+  suggested_sore_muscles TEXT,
   updated_at    TEXT NOT NULL,
   deleted_at    TEXT,
   sync_status   TEXT NOT NULL DEFAULT 'synced'
@@ -1551,6 +1558,15 @@ export const MIGRATIONS: UpgradeStatement[] = [
       `ALTER TABLE supplement_logs ADD COLUMN vial_units_per_ml REAL`,
       CREATE_SUPPLEMENT_VIALS,
       `CREATE INDEX IF NOT EXISTS idx_supplement_vials_current ON supplement_vials (supplement_id, opened_on DESC)`,
+    ],
+  },
+  {
+    toVersion: 39,
+    statements: [
+      // BF-173, mirroring Postgres migration 276. Same shape as v35-v38: the column is in
+      // CREATE_MOOD_LOGS above so fresh installs already have it, this ALTER reaches every upgraded
+      // device, and the RECONCILE_COLUMNS row is the authority if it half-applies.
+      `ALTER TABLE mood_logs ADD COLUMN suggested_sore_muscles TEXT`,
     ],
   },
 ];

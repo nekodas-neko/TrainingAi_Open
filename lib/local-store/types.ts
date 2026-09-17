@@ -42,6 +42,15 @@ export interface LocalMoodLog {
   sleepQuality: string;
   bodyState:    string[];
   soreMuscles:  string[];
+  /**
+   * BF-173. `null`/absent = unknown (written before provenance existed, or by a caller that does
+   * not yet supply it) — never "none were suggestions".
+   *
+   * Optional rather than required so the engine half lands without editing the check-in sheet,
+   * which is the surface lane's file. Until that sheet sends the list it actually displayed, this
+   * stays null locally and the server derives provenance at write time instead.
+   */
+  suggestedSoreMuscles?: string[] | null;
   updatedAt:    string;
   deletedAt:    string | null;
   syncStatus:   'pending' | 'synced';

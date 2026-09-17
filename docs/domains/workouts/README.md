@@ -351,6 +351,18 @@ Live at the time of writing (2026-07-30):
 
 ## Gotchas specific to this domain
 
+- **A pre-selected check-in answer is not evidence, and the scorer must not treat it as such
+  (BF-173).** `suggestedSoreMuscles` pre-ticks any muscle trained within 48 h and under
+  `RECOVERED_PCT` — it reads the recovery model. `sessionRecoveryScore` reads that same model, so
+  clamping an accepted suggestion counts one fact twice, and because the clamp is a flat
+  `min(pct, 40)` the second count also deletes the ordering the first one computed. Ticks now carry
+  provenance (`mood_logs.suggested_sore_muscles`, migration 276) and only lifter-added ones clamp.
+  Two things to keep straight: **NULL is "unknown", not "none"** (a pre-276 row scores the old way),
+  and **the clamp being dormant is the correct end state**, not a regression to repair — an owner who
+  accepts the pre-selection produces no lifter-added ticks, and the recovery pct already carries the
+  fact. The soreness-driven deload is a separate path: `computePerExerciseDeload` reads
+  `soreMusclesInSession` straight from the mood log and never touches the clamp.
+  ([`2026-09-17-lane-a-bf173-sore-provenance.md`](../../overview/entries/2026-09-17-lane-a-bf173-sore-provenance.md))
 - **Bodyweight exercises have bitten repeatedly** — two incommensurable 1RM eras produced a
   phantom +40% Pull-Up PR; sets counted as zero volume; a prescription was recorded that was never
   given. Any load maths must ask whether the exercise is bodyweight.

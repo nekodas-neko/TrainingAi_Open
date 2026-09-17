@@ -26,8 +26,27 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.457.6 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-09-16.
+**Version:** v1.457.7 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-09-17.
+
+**The session picker counted your soreness twice (BF-173, v1.457.7).** `suggestedSoreMuscles`
+pre-ticks any muscle trained within 48 h and under 85% recovered — reading the recovery model — and
+`sessionRecoveryScore` then read both that feed *and* the resulting tick and clamped the muscle to
+`min(pct, 40)`. One fact counted twice, with the second pass overwriting the model's own figure with
+a harsher flat one. The owner confirmed the premise rather than it being inferred (*"It auto picked
+muscles for me i didnt choose them manually"*), which makes it the normal path, not an edge case.
+Measured on his rows: quads 69 → 40, chest 49 → 40, and the flat floor erased the ordering he was
+actually asking about — it flipped the pick, Lower 74/Upper 84 as shipped against Lower **85**/Upper
+84 without the leg ticks. `mood_logs.suggested_sore_muscles` (migration 276, `claude_ro` twin 277,
+local SQLite v39) now records where each tick came from, and only lifter-added ticks clamp.
+**Provenance is recorded at write time, never re-derived at score time** — re-deriving was the option
+the owner weighed and rejected, because it discards the one case the check-in exists for. **Expect
+the clamp to go dormant and do not repair it:** with the owner accepting the pre-selection nothing is
+lifter-added, which is correct, and the soreness-driven deload is untouched (verified —
+`computePerExerciseDeload` never reads the clamp). **The check-in sheet still does not send the list
+it displayed** (LB-116), so provenance comes from a server-side derivation that cannot separate a
+volunteered muscle from an accepted one when both qualify, and is stale for an offline check-in.
+Not device-verified.
 
 **Health Connect was syncing everyone into Brisbane (LB-113, v1.457.6).** `syncHealthConnect` and
 `enrichActivityLogs` took the user's timezone as of 2026-09-16 and nothing passed it, so both fell
