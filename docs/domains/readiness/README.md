@@ -359,6 +359,17 @@ Live at the time of writing (2026-07-30):
 
 ## Gotchas specific to this domain
 
+- **The personal baselines are CHECKPOINTED PER NIGHT, so they cannot be erased by drift (TN-46).**
+  `oura_daily_summary` stores `hrv_baseline_mean_x8`, `rhr_baseline_mean_x8` and the other four
+  alongside `n_history`, **one set per row**. The live baseline does adapt fast — `updateBaseline`
+  moves ~1/32 of the delta per night once `ageDays > 14` — so a sustained shift (a medication, an
+  altitude move, a new job) genuinely does get absorbed and the z-scores return to ~0 with no
+  physiological change. That is real and worth knowing. What does **not** follow is that the
+  comparison is lost: the row for the night before the change keeps its own baseline permanently.
+  To ask "what did X do to me", read the baseline off the row before X started; do not add storage to
+  snapshot a value the table already writes down with a date on it. Nothing prunes this table —
+  `shouldPrune` is `error_events`.
+  ([`2026-09-17-lane-a-tn46-baseline-already-retained.md`](../../overview/entries/2026-09-17-lane-a-tn46-baseline-already-retained.md))
 - **The Body Battery anchor is frozen once readiness-derived** (`app/api/body-battery/anchor.ts`).
   Re-picking it on every read is what made the whole day's curve jump mid-morning; a later
   readiness *recompute* must not move it either, or the same bug returns through a smaller door.
