@@ -13245,3 +13245,22 @@ consequence.
 change, and 5 of its 7 bpm arrived anyway because the constant is derived from data. Sequencing a
 code change does not sequence a data-derived constant — and nothing in the queue's vocabulary
 expresses that today.
+
+## 2026-09-17 — `docs/implementation-backlog.md` 23231 → 23250, `projectOverview.md` 11592 → 11603
+
+`fix/bf172-session-fit-not-readiness` (BF-172).
+
+Nineteen lines, and they record why the entry's two instructions were not followed literally — which
+the diff shows as an unexplained deviation:
+
+- *"either no band word or a fit-specific one"* — no band word was not available. The ring and the
+  number are band-coloured, so the word is the only thing keeping the band off colour-only, and
+  `score-ring.tsx`'s own comment says it was added for exactly that.
+- *"change it at this call site, not inside `ScoreRing`"* — right about `scoreBand`'s ~15 callers,
+  wrong about `ScoreRing`, which is session-explain's own component with one caller. A bare grep for
+  "ScoreRing" hits an unrelated `ScoreRingStyle` home preference, which is what makes it read as
+  shared. Worth writing down: the next person greps the same string.
+
+Also recorded: the fit words map from `scoreBand`'s label rather than being derived from the score,
+so the 70/50 thresholds stay in one module. Without that line the mapping looks like indirection
+someone would helpfully "simplify" into local thresholds — the exact pattern CLAUDE.md bans.
