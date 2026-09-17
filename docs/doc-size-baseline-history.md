@@ -18,9 +18,9 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
-## 2026-09-17 — backlog → 23315 (four owner decisions + the Q-506 re-measurement)
+## 2026-09-17 — backlog → 23361 (four owner decisions + the Q-506 re-measurement)
 
-**+127.** Four owner rulings came back in one sitting and each is recorded on the entry it settles:
+**+127 on a 23234 base after merging BF-175's +46.** Four owner rulings came back in one sitting and each is recorded on the entry it settles:
 TN-45 (surface the illness `watch` band as a quiet line, gate lifted), TN-30 (re-pin max HR at 181
 off the Cooper test), PS-44 (the overnight chest-strap window is on) and TN-44/PS-41 (proceed
 without a Health Connect tester, with the untested surface written down rather than assumed). A
@@ -13311,3 +13311,15 @@ outcome is read by every session at orientation, and the next one to touch this 
 started from "the picker chooses Lower now" and debugged the wrong thing. The counterfactual is kept
 rather than deleted — it is still the clearest statement of what the double count did — and marked as
 a counterfactual instead.
+
+## 2026-09-17 — `docs/implementation-backlog.md` 23188 → 23235
+
+**BF-175** — the log-food sheet prints `nutrition_targets.calories` (1660) as today's budget while
+the card beside it shows `budgetProvenance(...).total` (1506).
+
+The entry spends lines on two things deliberately. It quotes the **two existing code comments that
+already state the rule** it violates, because this is a missed surface of a fix that has been made
+once, and an entry that reads as a fresh discovery invites a fresh fix rather than a sweep. And it
+records `WeeklyNutritionChart` as **checked and correct** — it reads the same field, and an
+implementer sweeping for call sites would otherwise "fix" a seven-day reference line into a fourth
+budget.

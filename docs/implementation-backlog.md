@@ -899,6 +899,53 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
   the trailing 30 days — can only be measured after the owner fires it. Re-measure then; do not
   strike this entry before that.
 
+### [nutrition] BF-175 — the log-food sheet prints the stored GOAL as today's budget, so it reads 1660 beside the card's 1506
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-17 (BugFix intake). Owner, with two screenshots taken
+  at the same minute: *"2 different calorie goals here"*.
+- **Lane: B** — `components/nutrition/assign-step.tsx:43`, `:56` and `:153-157`.
+- **Both numbers on his screen, traced to source and confirmed against production rows:**
+
+  | surface | shows | what it is |
+  |---|---|---|
+  | Nutrition card | `1,355 OF 1,506` · *"1,291 resting rate + 215 earned from movement"* | `budgetProvenance(balance).total` |
+  | Assign-to-Meal sheet | `Today after logging 1361 / 1660` | `nutrition_targets.calories`, raw |
+
+  `nutrition_targets.calories` is **1660** in production (updated 2026-08-31). The intake halves
+  agree — 1355 + the 6 kcal item = 1361 — so **the only thing that diverges is the denominator**,
+  and it diverges by 154 kcal, which is his entire earned-from-movement figure plus the gap between
+  the stored goal and his measured resting rate.
+- **⚠ This is a MISSED SURFACE of an already-fixed bug, not a new one.** `nutrition-content.tsx:423-441`
+  carries the fix and the measurement: three budgets once appeared on one screen (zone bar 2,180,
+  Home 2,451, ring 2,001) and the comment states the rule outright — ***"`nutrition_targets.calories`
+  is the rest-day floor, not `restingBase + targetNet`"***. `home-nutrition-card.tsx:34` repeats it:
+  ***"The budget is `budgetProvenance(...).total`, not `calorieGoal + activeEnergyKcalToday`."***
+  The sweep that fixed the page did not reach the sheet that logs into it.
+- **Fix: pass the resolved budget down rather than re-reading targets in the sheet.**
+  `nutrition-content.tsx` already computes `effectiveCalorieGoal` (`:446`) as
+  `budget?.total ?? targets?.calories`, with a deliberate fallback that does **not** compose an
+  addend. Thread that value into the log-food flow and delete `assign-step`'s own
+  `nutrition-targets` read (`:43` seed and `:56` fetch). **Do not call `budgetProvenance` inside the
+  sheet** — `energy-card.tsx:50` records why a second call site is the wrong shape: it becomes
+  another independent number the moment its inputs differ.
+- **The progress bar is wrong in the same breath and is the visible half.** `:159-163` colours green
+  under target and orange over, against the 1660 denominator — so a day that has already passed the
+  real 1506 budget still paints green and reads as headroom. His screenshot shows exactly that: a
+  full green bar at 1361/1660 while the card two taps away says **151 kcal left**.
+- **Checked and NOT a defect — do not "fix" it in the same PR:** `WeeklyNutritionChart`
+  (`day-tools-section.tsx:72` → `weekly-nutrition-chart.tsx:70`, `:134`) also takes
+  `targets?.calories`. There it is a constant reference line across seven days and the over/under
+  bar colouring for the current day. A weekly chart has no single day's earned movement to add, so
+  the stored goal is the right quantity — the same reason `effectiveCalorieGoal` falls back to it
+  rather than inventing an addend.
+- **Sibling sweep when fixing:** grep every `readCacheSync<NutritionTargets>` / `cachedFetch<NutritionTargets>`
+  of `'nutrition-targets'` and classify each as *goal* or *today's budget*. Four surfaces read it
+  today — `assign-step.tsx`, `nutrition-content.tsx`, `macro-targets-pane.tsx` (Profile, editing the
+  goal itself, correct) and the sync-provider warm list. Only the first is misclassified.
+- **Verification:** browser is enough for the arithmetic — open the log sheet on a day with earned
+  movement and confirm the denominator matches the card. **The device look is still owed** for the
+  bar colour at the S25 width, because the green/orange flip is what makes the number believable.
+
 ### [workouts][readiness] BF-174 — every muscle recovers on the same 24 h base constant, so abs and quads are modelled identically
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-16 (BugFix intake). Owner: *"there should be
