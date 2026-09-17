@@ -18,6 +18,19 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-17 — backlog → 23163, `projectOverview.md` → 11611 (BF-173 shipped)
+
+**−63 and +19.** BF-173's 111-line entry leaves the queue with the fix, and two entries replace it:
+**LB-116** (the check-in sheet sends the list of sore ticks it actually displayed) and **LB-117**
+(the explain screen will now list sore muscles that no longer lower the score). Net shrink even so,
+which is the shape to want — a shipped entry should cost more lines than the follow-ups it honestly
+owes.
+
+The `projectOverview` growth is one Current Status paragraph, and most of it is the two sentences
+that are **not** about what shipped: that the clamp going dormant afterwards is correct and must not
+be "repaired", and that provenance currently comes from a server-side derivation with two named
+limits. Both are things a later session would otherwise re-discover as bugs and try to fix.
+
 ## 2026-09-16 — `docs/implementation-backlog.md` → 22208 (LB-110 removed)
 
 A removal that grew the file, which is the shape worth explaining.
