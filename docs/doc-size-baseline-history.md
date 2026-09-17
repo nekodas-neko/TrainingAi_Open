@@ -13140,3 +13140,13 @@ finding is invisible outside a one-hour window: `rv38-body-battery-no-data-badge
 concludes flake and moves on. The entry carries the captured JSON, the exact clause, and an explicit
 instruction to verify **inside** that window — because verifying outside it proves nothing and looks
 like proof.
+
+## 2026-09-16 — `docs/implementation-backlog.md` 23226 → 23231
+
+Five lines on LB-114, recording the confirmation rather than the finding.
+
+PR #1264 ran E2E twice on the same commit: 21:15 UTC failed on
+`rv38-body-battery-no-data-badge`, 22:00 UTC passed. Same code, same fixture, opposite sides of
+08:00 Brisbane. The entry already carried the payload and the clause; what it lacked was the thing
+that stops a reader concluding "flake" — two runs of one commit disagreeing on the hour. Worth five
+lines because without it the next person re-runs the spec, sees green, and closes the entry.
