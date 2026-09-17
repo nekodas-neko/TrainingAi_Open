@@ -47,7 +47,7 @@ split is "does it feel slow" vs "is it actually slow at the source".
   the entry, and is now gone from both. **A screen that scrolls its own container gets no restoration
   from being inside the shell — check the call, not the layout.** `/health/day`'s scroller had no
   bottom padding at all. Both owe **one** device pass; RV-37 has still never been observed.
-- [`docs/overview/entries/2026-09-15-bf100-touchstart-probe-inconclusive.md`](../../overview/entries/2026-09-15-bf100-touchstart-probe-inconclusive.md)
+- [`2026-09-15-bf100-touchstart-probe-inconclusive`](../../overview/history-2026-09-17-folded-1.md#2026-09-15-bf100-touchstart-probe-inconclusive)
   — **BF-100's `touchstart` candidate probed in the harness, INCONCLUSIVE (2026-09-15).** The
   mechanism is real in source (`stop()` latches `done`, no re-arm, registered for
   `wheel`/`touchstart`/`keydown`), but a synthetic `touchstart` on the scroll container after
@@ -56,7 +56,7 @@ split is "does it feel slow" vs "is it actually slow at the source".
   `RESTORE_WINDOW_MS`. **Instrument before re-running.** Also here: the spec's `toBe(before)` is an
   exact-offset assertion that went red locally at 1019-against-778 while restoration was working —
   it cannot tell *cancelled* from *imprecise*, which is the distinction BF-100 turns on.
-- [`docs/overview/entries/2026-09-15-bf166-back-closes-overlay.md`](../../overview/entries/2026-09-15-bf166-back-closes-overlay.md)
+- [`2026-09-15-bf166-back-closes-overlay`](../../overview/history-2026-09-17-folded-1.md#2026-09-15-bf166-back-closes-overlay)
   — **The back listener ignored the overlay stack the app already had (BF-166), 2026-09-15.**
   **Read this before adding any overlay/back machinery:** the registry exists — `sheet-back-stack.ts`
   via `BackDismiss`, rendered by BOTH `SheetContent` and `DialogContent` (BF-27). A grep for
@@ -66,7 +66,7 @@ split is "does it feel slow" vs "is it actually slow at the source".
   pushed entry was never consumed. Only `"pop"` worked, coincidentally. Fixed by querying
   `hasOpenSurface()` and popping, **after** the three mode guards (each raises a dialog that is
   itself on the stack). No harness can test it — Capacitor channel. Device pass owed.
-- [`docs/overview/entries/2026-09-15-la109-tab-flip-stale-tree.md`](../../overview/entries/2026-09-15-la109-tab-flip-stale-tree.md)
+- [`2026-09-15-la109-tab-flip-stale-tree`](../../overview/history-2026-09-17-folded-1.md#2026-09-15-la109-tab-flip-stale-tree)
   — **A tab flip left the previous tab's Next route tree on the history entry (LA-109), 2026-09-15.**
   `show()` uses `replaceState`, and Next's patched `replaceState` re-injects its **own** current
   tree, so the `/more` entry carried the tree for `/`: right URL, wrong screen on back. Fixed by
@@ -76,7 +76,7 @@ split is "does it feel slow" vs "is it actually slow at the source".
   vacuously. **The BF-49 link is REFUTED here** — its sequence passes unfixed even with the stale
   tree supplied on purpose, so BF-49 still needs its device repro. BF-100 is unblocked. Device pass
   owed.
-- [`docs/overview/entries/2026-09-14-lb107-back-on-tab-goes-home.md`](../../overview/entries/2026-09-14-lb107-back-on-tab-goes-home.md)
+- [`2026-09-14-lb107-back-on-tab-goes-home`](../../overview/history-2026-09-17-folded-1.md#2026-09-14-lb107-back-on-tab-goes-home)
   — **Back on a tab was a silent no-op, on all four non-home tabs (LB-107), 2026-09-14.** Registering
   a Capacitor `backButton` listener **suppresses the Android default**, so the app was never going to
   exit; the listener then called `history.back()`, and the shell flips tabs with `replaceState`, so

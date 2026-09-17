@@ -13335,3 +13335,14 @@ once, and an entry that reads as a fresh discovery invites a fresh fix rather th
 records `WeeklyNutritionChart` as **checked and correct** — it reads the same field, and an
 implementer sweeping for call sites would otherwise "fix" a seven-day reference line into a fourth
 budget.
+
+## 2026-09-17 — `docs/implementation-backlog.md` → 23252 (OR-119, the journal fold)
+
++17 for the LA-100 re-scope, and the raise buys the removal of an owner gate that should never have
+existed: the entry asked the owner to choose a naming convention that **28 of the 32 history files
+and the fold tool itself had already chosen**. Recording why it was stale costs more lines than the
+gate did, and is worth it — the next reader would otherwise re-open the same question.
+
+`docs/overview/entries/` went 91 → 51 files in the same PR (40 folded into
+`history-2026-09-17-folded-1.md`, 163 KB), which is not tracked by a `.size` baseline but is the
+larger change by far.
