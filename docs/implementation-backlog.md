@@ -1979,11 +1979,22 @@ composite reports which of its inputs were inferred.
   future-wake fallback to midnight), and the recommended one-condition fix is what makes passing in
   one predict passing in the other. A fix verified only at 07:30 has not been shown to close the
   midnight window at all.
-- **The control that establishes this is NOT this PR's, for whoever hits it next:** check the wall
-  clock in Brisbane before reading anything into a red run here. PR #1280 is the worked example —
-  its first E2E run (23:36–00:01 Brisbane) passed this spec and its re-run (00:06–00:40) failed it,
-  same commit, and a local run at 00:41 on a checkout differing from `main` only in four nutrition
-  files reproduced it. Same shape as the 21:15/22:00 experiment above, at the other window.
+- **✅ THE MIDNIGHT WINDOW IS CONFIRMED BY NATURAL EXPERIMENT TOO, not only by reading the guard**
+  (2026-09-17, PR #1280, one checkout, no code change between runs):
+
+  | Brisbane local | result |
+  |---|---|
+  | 00:41 · 00:46 · 00:50 | **failed**, three for three |
+  | 01:06 | **passed** |
+
+  Opposite sides of 01:00, so the boundary is where the guard says it is. The CI runs bracket it
+  from the other side: #1280's first E2E run (23:36–00:01) passed this spec and its re-run
+  (00:06–00:40) failed it on the identical commit. Same shape as the 21:15/22:00 experiment above,
+  at the other window.
+- **The control that establishes a red run here is NOT the PR's, for whoever hits it next:** check
+  the wall clock in Brisbane first. A local repro at 00:41 on a checkout differing from `main` only
+  in four nutrition files is what settled ownership on #1280; it took minutes, where reading the
+  spec's assertion would have suggested a real regression.
 
 ### [platform][devices] LB-113 — the Health Connect sync took the user's timezone and nothing passed it (fixed; device look owed)
 

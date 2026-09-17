@@ -84,6 +84,38 @@ stays in the queue with a `Keep:` line rather than being removed, and carries a 
 Also untouched here: native SQLite / Capacitor paths, safe-area insets, drifted production data
 (the local seed is fresh), Samsung WebView rendering.
 
+## What the CI run cost, and what it was worth
+
+E2E went red twice and neither failure was this PR's. Getting to that took two runs, four local
+runs of one spec and three of another, and it turned up two things worth more than the merge.
+
+**Run 1** lost `diary-nested-meal:231` and `:207` to `browser.newContext: Target page, context or
+browser has been closed` — chromium had taken SIGSEGV, so no test body ran — and
+`la109-back-from-subroute:87` to a real 30-second `toBeVisible` timeout on Home's greeting. That
+last one has the shape of a genuine regression on a PR that touched UI. It passed the re-run
+untouched and passed **four** consecutive local runs, and its path (`/health` → Home →
+`/health?tab=training` → back) never visits `/nutrition`.
+
+**Run 2** failed on something else entirely: `rv38-body-battery-no-data-badge:30` — the spec I filed
+**LB-114** about yesterday, as red 07:00–08:00 Brisbane. This run was 00:06–00:40 Brisbane, outside
+that window, so the entry did not excuse it.
+
+**My own entry was wrong, and checking rather than citing it is the whole lesson.** `batteryConfidence`
+clamps with `Math.max(0, wakingMinutes)`, and before 07:00 local the 07:00 default wake time is *in
+the future* — so the future-wake guard at `app/api/body-battery/route.ts:172` falls back to
+`firstHrTime ?? todayMid`, and an account with no data has no HR rows. It lands on **local
+midnight**. There is a second red window at **00:00–01:00**, with a different cause in a different
+file. Confirmed by natural experiment on one checkout: red at 00:41, 00:46 and 00:50, green at
+01:06; and CI's own split, 23:36–00:01 green against 00:06–00:40 red on the identical commit.
+
+LB-114 had told the next session *"Do not verify outside that window"* — which would have sent them
+to verify a fix in the one window that cannot show the other half working. Corrected, with the
+verification step now naming both.
+
+The browser crash is filed as **LB-119**: it has now appeared three times across two days with an
+identical faulting address, and the expensive half is not the obvious crashes but `la109`, which was
+indistinguishable from a real regression until the one permitted re-run was spent finding out.
+
 ## Filed, not fixed
 
 `LB-118` (Lane A) — the explain page's `signals` block omits sore-tick provenance, which is what

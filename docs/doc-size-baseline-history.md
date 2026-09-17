@@ -13365,7 +13365,7 @@ not-device-verified marker, which the Canonical Runtime rule requires to live in
 S25 look happens — it is index material, not journal material. The prose was cut from 12 lines to 6
 first; the measurement, the two-surface finding and the control runs are in the journal entry.
 
-## 2026-09-17 — `docs/implementation-backlog.md` 23484 → 23559 (Lane B, LB-114 correction + LB-119)
+## 2026-09-17 — `docs/implementation-backlog.md` 23484 → 23570 (Lane B, LB-114 correction + LB-119)
 
 +40, raising the number this same PR had just lowered. The cause is worth the line: LB-114 said the
 RV-38 spec is red for **one** hour a day and it is red for **two**, with a second cause in a
@@ -13385,3 +13385,9 @@ faulting address across three runs on two days, and the specs on that worker rep
 the expensive case is the one that does NOT look like a crash — `la109-back-from-subroute` failed
 once on a real 30-second timeout and passed on re-run and four times locally, which is
 indistinguishable from a regression until someone spends the re-run finding out.
+
+A further +11 for the measured boundary: the midnight window was first derived by reading the
+future-wake guard, and a claim derived that way is what put the wrong window in this entry to begin
+with. Three local runs inside it (00:41, 00:46, 00:50, all red) against one outside it (01:06,
+green) turn the reading into a measurement, and the table is shorter than the paragraph that would
+otherwise have to explain why the reading should be believed.
