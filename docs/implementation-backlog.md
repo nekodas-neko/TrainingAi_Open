@@ -443,11 +443,108 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [readiness][devices][platform] TN-46 — correlate vitals against dose: the app holds both halves and joins neither 🔴 LIVE
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-17 · owner: *"The idea was to be able to correlate
+  change in vitals with reta"*, and *"go with whatever option you think is best"*.
+- **Lane: A** — `packages/shared/src/health/*` plus the read path that joins `supplement_logs`.
+  Storage-reaching, so Lane A by the rule.
+- **No gate.** The owner delegated the choice (*"go with whatever option you think is best"*); the
+  decision is recorded below and is built to without a further round-trip.
+- **Review:** [`what the temperature re-derive would do`](reviews/2026-09-17-what-the-temperature-rederive-would-do.md)
+  for the radar mechanics underneath.
+
+**⚠ CORRECTION, and it was this agent's error.** An earlier draft read `supplements.dose = '10mg'`
+as the administered dose. **It is the VIAL STRENGTH** — `supplement_logs` carries
+`vial_strength_mg 10, vial_water_ml 3, vial_units_per_ml 100`. The real doses are **0.5 mg on
+2026-09-07 and 1 mg on 2026-09-13**, a conservative titration that starts *below* the published
+trial protocols rather than above them. The remark that the dose looked high was wrong and is
+withdrawn. **The trap is worth keeping:** anything that reads `supplements.dose` for a dose gets a
+20× overstatement. `supplement_logs.amount` + `unit` is the administered dose; the `supplements` row
+describes the vial.
+
+**The dose-response is already in the data, and it is clean.** Nightly vitals against the two doses:
+
+| date | resting HR | HRV | dose |
+|---|---:|---:|---|
+| 09-04 → 09-06 | 52.6 / 52.5 / 51.7 | 59 / 50 / 56 | — (pre-dose baseline) |
+| **09-07** | 48.4 | 63.5 | **0.5 mg** |
+| 09-08 | 52.0 | 51 | |
+| **09-09** | **56.3** | **39** | ← peak, 2 days after |
+| 09-10 → 09-12 | 53.8 / 55.0 / 54.5 | 43.5 / 49 / 45 | partial washout |
+| **09-13** | 55.4 | 48 | **1 mg** |
+| 09-14 → 09-15 | 56.9 / 57.2 | 38.5 / 42 | |
+| **09-16 → 09-17** | **65.1 / 64.9** | **28 / 19** | ← still falling at day 4 |
+
+**Doubling the dose roughly tripled the resting-HR excursion** (+4 bpm after 0.5 mg, +13 after 1 mg)
+and drove HRV from ~55 to 19. The 0.5 mg dose partially washed out by day 5; the 1 mg dose has not
+turned yet. That is a lagged dose-response with a 2–4 day peak, and it is exactly the thing the
+owner wants to see — **the app has the doses, has the vitals, and plots neither against the other.**
+
+**⚑ THE DECISION — retain a pre-intervention reference baseline; annotate, do not correct.** Taken
+under the owner's delegation, and it is options 1 and 2 of the earlier draft combined in the only
+way that avoids the downside of each.
+
+- **The live baseline keeps adapting.** Do not freeze it. Freezing means a permanently depressed
+  readiness score and a radar crying wolf every night for as long as the medication runs — the
+  reason option 2 lost on its own.
+- **Snapshot the baseline at the intervention date and keep it as a REPORTING reference.** This is
+  the load-bearing half. Scoring stays useful day to day; the delta stays computable forever. Without
+  it the comparison is destroyed by the mechanism below, and destroyed *silently*.
+- **Join `supplement_logs` (date, `amount`, `unit`) into the score audit and the advisory**, so a
+  flagged day reads *"resting HR and HRV are off your baseline; Retatrutide 1 mg, 3 days ago"*
+  instead of implying infection, and so a dose-vs-vitals overlay has something to plot.
+- **Plot it with a lag.** The peak is 2–4 days after a dose, so a same-day correlation finds nothing
+  and would read as "no effect" on data that plainly shows one.
+
+**⚠ WHY THE REFERENCE SNAPSHOT IS URGENT — the comparison is being erased right now.**
+`updateBaseline` moves ~1/32 per night once mature, so the resting-HR baseline (~53) is being dragged
+toward 65 and the HRV baseline (~57) toward 20. **Within roughly 30–60 nights every z returns to ~0**:
+`watch` stops firing, the readiness contributors recover, the score climbs back — with no
+physiological change at all. A baseline-relative system cannot see a sustained shift; it redefines
+normal and goes quiet, and **the recovery reads as progress**. Once absorbed, "what did Retatrutide
+do to my vitals" is no longer answerable from the baselines, only from raw history. Capture the
+pre-intervention snapshot before that happens.
+
+**Why this generalises past one drug.** GLP-1 class agonists raise heart rate as a documented class
+effect; stimulants, beta-blockers and thyroid medication all move tracked vitals. The app has a
+medication table with per-administration doses and start/stop dates and consults it nowhere in
+scoring. The same machinery answers "what did X do to me" for anything logged.
+
+**⚠ Do NOT re-tune any threshold against this period.** Eleven nights inside a pharmacological
+transient, spanning a dose change, is the worst possible calibration sample. It is evidence about
+the system's blindness, not about where `ILLNESS_WATCH_SCORE` or the readiness weights belong.
+
+**⚠ Not a scoring matter, and the dose framing is corrected above.** A resting HR ~+13 bpm and HRV
+down roughly two thirds at **1 mg**, with titration presumably continuing, is worth mentioning to
+whoever prescribes and monitors this — the more so because the dose is low. This entry records what
+is in the app; it is not medical advice and nothing here is a clinical judgement.
+
+**Pass test:** the pre-intervention baseline is still recoverable after 60 nights, a flagged day
+during an active medication period names the medication and the most recent dose rather than implying
+illness, and dose-vs-vitals can be read off one surface with a selectable lag.
+
+
 ### [readiness][devices] TN-45 — the only illness band that has ever fired is the one with no penalty and no UI 🔴 LIVE
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-17 · found on a routine production read after TN-34/BF-13/TN-39 shipped.
-- **Lane: B** — `components/home/illness-advisory-banner.tsx:15` is the whole surface. The thresholds in `packages/shared/src/health/illness-radar.ts` are **not** in scope (see the ⚠ below).
-- **Gate: owner** — this adds something to the owner's Home screen about his own health; the wording is his call, not an implementation detail.
+- **Lane: A, then B** — the copy lives in `illnessAdvisory()`
+  (`packages/shared/src/health/illness-radar.ts`), which is Lane A; the render guard is
+  `components/home/illness-advisory-banner.tsx:15`, which is Lane B. Both → Lane A, engine half
+  first, per the lane rule. The *thresholds* in that same file stay out of scope (see the ⚠ below).
+- **✅ OWNER DECISION, 2026-09-17 — surface it, quietly.** Asked whether `watch` should get a visible
+  expression on Home, the owner chose **a quiet line, not a banner**: one calm sentence under the
+  readiness score, no colour, no icon. Gate cleared; build to the spec below.
+- **The copy already exists and already covers `watch`** — `illnessAdvisory('watch')` returns
+  *"Some biomarkers are drifting from your baseline — worth keeping an eye on."* So the render guard
+  is genuinely the only blocker. But that sentence names nothing, and the owner's choice was a line
+  that says **what moved**. `IllnessResult.biomarkers` already carries `{ z, contribution }` per
+  biomarker — commented in the source as *"the 'why', for the advisory"* — so naming the top one or
+  two contributors is a read of data that is already computed, not a new derivation. That read is
+  the Lane A half.
+- **Do not reuse the amber advisory banner.** `watch` is the weakest of three bands; the loudest UI
+  on the quietest signal is how a banner gets ignored, and it would make `elevated` indistinguishable
+  from `watch` when that finally fires.
 - **Review:** [`the app saw it and said nothing`](reviews/2026-09-17-the-app-saw-it-and-said-nothing.md).
 
 **Measured over 72 days of the owner's own rows:**
@@ -478,12 +575,52 @@ weight**, and conflating them is how a signal ends up counted twice.
 
 **⚠ Do NOT re-tune the thresholds on n=2.** Two firings in 72 days cannot support moving 40 or 65.
 
+**⚑ Why only the penalty-free band has ever fired — it is Q-506, and it is arithmetic.** With
+temperature's baseline deviation 15.4× too wide, that biomarker's z never leaves 0.06–0.28 while
+holding 40% of the renormalised weight. Running the real `computeIllnessRadar`: resting HR and HRV
+**both maximally bad score 39**, one point under `watch`; all three non-temperature biomarkers maxed
+reach **64**, one point under `elevated`. 2026-09-16 tripped at 41 only because breathing drifted
++0.45. So the table above is not a tuning accident, it is a dead 40% weight.
+
+**⚑ Q-506's fix does NOT invalidate this entry — it strengthens it.** Replaying the fold with a
+corrected temperature baseline, the two real `watch` days score **61 and 60** rather than 41 and 36.
+The band the owner asked to surface fires more decisively, not less, so the two are independent and
+neither blocks the other
+([`working`](reviews/2026-09-17-what-the-temperature-rederive-would-do.md)). **One ordering note:**
+Q-506's re-derive would start firing the *existing* `elevated`/`fever` banner on ordinary nights
+unless `FEVER_TEMP_Z` is re-scaled with it — that risk lives in Q-506 and exists whether or not this
+entry ships.
+
+**⚑ The cause of the 2026-09-16 firing is now known, and it is not illness — see TN-46.** The owner
+began Retatrutide on **2026-09-07 at 0.5 mg**, moving to **1 mg on 09-13**; resting HR and HRV track
+both doses with a 2–4 day lag. That does not
+change this entry's ask — the band still needs to be visible — but it does constrain the copy: the
+line must name **what moved** (resting HR and HRV off baseline), never imply infection.
+`illnessAdvisory('watch')`'s existing wording is already neutral and should stay that way.
+
 **Pass test:** a `watch` day produces something the owner can see on Home, and a normal day does not.
 
 
-### [workouts][app-shell] LB-116 — the check-in sheet knows which sore ticks it suggested and throws it away
+### [workouts][app-shell] LB-116 — the check-in sheet knows which sore ticks it suggested and throws it away (fixed)
 
-- **Branch:** _unassigned_ · **Added:** 2026-09-17 (Lane A, shipping BF-173's engine half).
+- **✅ SHIPPED 2026-09-17 (v1.457.10)** (`fix/lb116-checkin-sends-suggested-sore`).
+  [Journal](overview/entries/2026-09-17-fix-lb116-checkin-sends-suggested-sore.md).
+  `suggestedSoreMuscles: suggested` on `leanPayload`, which is what reaches all three writes — the
+  local store, the outbox mutation and the `/api/mood` fallback — plus the optimistic `MoodLog`.
+- **⚠ IT TOUCHED A LANE A PATH, deliberately and narrowly.** `MoodFieldsSchema`
+  (`packages/shared/src/validation/mood-log.ts`) had to gain the field: the schema has **no
+  `.strict()`**, so Zod DROPS an unknown key rather than rejecting it — without the edit the sheet's
+  value would have been silently stripped on both the route and the outbox branch and this entry
+  would have shipped inert. One optional field, bounded like its sibling, specified by this entry
+  and delegated by the lane that owns the file. Flagged rather than done quietly.
+- **⛔ NO E2E, and one was written and DELETED rather than shipped green.** A browser test that saves
+  a check-in and reads `mood_logs.suggested_sore_muscles` back **passes against unfixed `main`**: the
+  column is non-null either way, because `saveMoodLog` derives the list when the caller sends none.
+  Distinguishing the sheet's value from the server's derivation needs control of the recovery feed
+  the harness does not have. A vacuous test that answers is worse than none. The unit test carries
+  the proof instead — **4 of its 6 assertions fail against `main`**, including a real
+  `MoodFieldsSchema.parse` round-trip, which is exactly the strip this fix is about.
+- **Branch:** `fix/lb116-checkin-sends-suggested-sore` · **Added:** 2026-09-17 (Lane A, shipping BF-173's engine half).
 - **Lane: B** — `components/mood-checkin-sheet.tsx`. Reached only from a component, touches no
   storage schema and no API contract: the column, the repository write and the scorer all shipped
   with BF-173.
@@ -851,6 +988,53 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
   the trailing 30 days — can only be measured after the owner fires it. Re-measure then; do not
   strike this entry before that.
 
+### [nutrition] BF-175 — the log-food sheet prints the stored GOAL as today's budget, so it reads 1660 beside the card's 1506
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-17 (BugFix intake). Owner, with two screenshots taken
+  at the same minute: *"2 different calorie goals here"*.
+- **Lane: B** — `components/nutrition/assign-step.tsx:43`, `:56` and `:153-157`.
+- **Both numbers on his screen, traced to source and confirmed against production rows:**
+
+  | surface | shows | what it is |
+  |---|---|---|
+  | Nutrition card | `1,355 OF 1,506` · *"1,291 resting rate + 215 earned from movement"* | `budgetProvenance(balance).total` |
+  | Assign-to-Meal sheet | `Today after logging 1361 / 1660` | `nutrition_targets.calories`, raw |
+
+  `nutrition_targets.calories` is **1660** in production (updated 2026-08-31). The intake halves
+  agree — 1355 + the 6 kcal item = 1361 — so **the only thing that diverges is the denominator**,
+  and it diverges by 154 kcal, which is his entire earned-from-movement figure plus the gap between
+  the stored goal and his measured resting rate.
+- **⚠ This is a MISSED SURFACE of an already-fixed bug, not a new one.** `nutrition-content.tsx:423-441`
+  carries the fix and the measurement: three budgets once appeared on one screen (zone bar 2,180,
+  Home 2,451, ring 2,001) and the comment states the rule outright — ***"`nutrition_targets.calories`
+  is the rest-day floor, not `restingBase + targetNet`"***. `home-nutrition-card.tsx:34` repeats it:
+  ***"The budget is `budgetProvenance(...).total`, not `calorieGoal + activeEnergyKcalToday`."***
+  The sweep that fixed the page did not reach the sheet that logs into it.
+- **Fix: pass the resolved budget down rather than re-reading targets in the sheet.**
+  `nutrition-content.tsx` already computes `effectiveCalorieGoal` (`:446`) as
+  `budget?.total ?? targets?.calories`, with a deliberate fallback that does **not** compose an
+  addend. Thread that value into the log-food flow and delete `assign-step`'s own
+  `nutrition-targets` read (`:43` seed and `:56` fetch). **Do not call `budgetProvenance` inside the
+  sheet** — `energy-card.tsx:50` records why a second call site is the wrong shape: it becomes
+  another independent number the moment its inputs differ.
+- **The progress bar is wrong in the same breath and is the visible half.** `:159-163` colours green
+  under target and orange over, against the 1660 denominator — so a day that has already passed the
+  real 1506 budget still paints green and reads as headroom. His screenshot shows exactly that: a
+  full green bar at 1361/1660 while the card two taps away says **151 kcal left**.
+- **Checked and NOT a defect — do not "fix" it in the same PR:** `WeeklyNutritionChart`
+  (`day-tools-section.tsx:72` → `weekly-nutrition-chart.tsx:70`, `:134`) also takes
+  `targets?.calories`. There it is a constant reference line across seven days and the over/under
+  bar colouring for the current day. A weekly chart has no single day's earned movement to add, so
+  the stored goal is the right quantity — the same reason `effectiveCalorieGoal` falls back to it
+  rather than inventing an addend.
+- **Sibling sweep when fixing:** grep every `readCacheSync<NutritionTargets>` / `cachedFetch<NutritionTargets>`
+  of `'nutrition-targets'` and classify each as *goal* or *today's budget*. Four surfaces read it
+  today — `assign-step.tsx`, `nutrition-content.tsx`, `macro-targets-pane.tsx` (Profile, editing the
+  goal itself, correct) and the sync-provider warm list. Only the first is misclassified.
+- **Verification:** browser is enough for the arithmetic — open the log sheet on a day with earned
+  movement and confirm the denominator matches the card. **The device look is still owed** for the
+  bar colour at the S25 width, because the green/orange flip is what makes the number believable.
+
 ### [workouts][readiness] BF-174 — every muscle recovers on the same 24 h base constant, so abs and quads are modelled identically
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-16 (BugFix intake). Owner: *"there should be
@@ -913,57 +1097,6 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
 - **Where to look for the data:** `oura_raw_samples` and the workout log both go back far enough to
   fit against something observable (next-session performance, RPE against expected RPE) rather than
   against intuition about muscle size.
-
-### [workouts][app-shell] BF-172 — the explain screen called the session-fit score "readiness" (fixed)
-
-- **✅ SHIPPED 2026-09-17 (v1.457.9)** (`fix/bf172-session-fit-not-readiness`).
-  [Journal](overview/entries/2026-09-17-fix-bf172-session-fit-not-readiness.md). Caption is now
-  *"How well this session fits today"*, and the ring prints **Strong fit / Fair fit / Poor fit**.
-  **No `Verify:` field — the entry said browser is enough and the browser has it**
-  (`e2e/bf172-session-fit-not-readiness.spec.ts` stubs the owner's screenshot: fit 84 over readiness
-  37, deload advised; it fails against the unfixed screen).
-- **⚠ TWO OF THIS ENTRY'S INSTRUCTIONS WERE ADJUSTED, both for rules it did not check against.**
-  - It said *"either no band word or a fit-specific one"*. **No band word is not available here:** the
-    ring and the number are band-coloured, and `score-ring.tsx`'s own comment records that the label
-    exists precisely so the band is not carried by colour alone. Shipped with a fit-specific word.
-  - It said change the band *"at this call site, not inside `ScoreRing`"*. The caution was aimed at
-    the ~15 `scoreBand` callers, which is right — but **`ScoreRing` is session-explain's OWN
-    component with exactly one caller** (`app/session-explain/components/score-ring.tsx`; the
-    `ScoreRing*` symbols in `components/more/` and `oura-score-chip-row.tsx` are an unrelated home
-    preference type). The vocabulary lives in the component, which cannot leak.
-- **And the fit words are MAPPED from `scoreBand`, not derived from the score.** CLAUDE.md bans
-  re-deriving the 70/50 thresholds with local label strings — two divergent copies were found that
-  way — so `scoreBand(score)` still owns the thresholds and the colour, and only the vocabulary is
-  remapped: `High → Strong fit`, `Moderate → Fair fit`, `Low → Poor fit`. `scoreBand` is untouched.
-- **Branch:** `fix/bf172-session-fit-not-readiness` · **Added:** 2026-09-16 (BugFix intake). Found tracing BF-171; the owner's
-  screenshot is the evidence and he did not have to point at it.
-- **Lane: B** — `app/session-explain/session-explain-content.tsx:31`.
-- **One screen, one word, two different quantities.**
-
-  ```tsx
-  <ScoreRing score={overallScore} label="Overall readiness for this session" />
-  ```
-
-  `overallScore` is `recovery × w + balance × w + freshness × w` from
-  `computeAiDynamicNextSession` — **how well this session FITS today**, given what is recovered and
-  what is overdue. It is not readiness, and nothing about it is a measurement of the lifter. Below
-  it, `SignalSections` prints the real thing: **Oura readiness 37 · Low**, HRV *well below your
-  usual*, **Deload: strong deload advised**, energy *drained*.
-- **The band makes it worse, and it is the same mistake twice.** `ScoreRing` runs the value through
-  `scoreBand` (`packages/shared/src/health/score-band.ts`) — the **readiness** vocabulary — so the
-  fit score is stamped **HIGH** in green. A screen that exists to explain a "strong signal to back
-  off today" leads with a green 84 labelled readiness.
-- **Same class as BF-154:** a number that is correct in its own terms, printed under a caption
-  belonging to the quantity it replaced. Nothing here is miscomputed.
-- **Fix: rename the label and drop the readiness band.** *"How well this session fits today"* (or
-  *"Session match"*), and either no band word or a fit-specific one — `scoreBand`'s High/Moderate/Low
-  is the readiness ladder's vocabulary and carrying it here is what creates the contradiction. The
-  ring colour can stay; it reads as a fit gauge once the caption says fit.
-- **Sibling sweep required:** `ScoreRing` is also the component, and `scoreBand` is used ~15 places.
-  Change the caption and the band **at this call site**, not inside `ScoreRing` or `scoreBand` —
-  every other caller is scoring real readiness and is correct.
-- **Verification:** open **Why <session>?** on a day when readiness is low and confirm the ring no
-  longer says "readiness" or "HIGH" while the signals below say the opposite. Browser is enough.
 
 ### [nutrition] BF-170 — a lone saved meal shows its macros nowhere (fixed; the device look is what is left)
 
@@ -1810,11 +1943,21 @@ composite reports which of its inputs were inferred.
   [`the plugin source read`](reviews/2026-09-16-health-connect-record-converter-gap.md) which
   **re-scoped this entry on 2026-09-16**.
 - **Sibling of PS-41** (normalising HC's HR series) and **TN-38** (the tier model this feeds).
+- **✅ OWNER DECISION, 2026-09-17 — do NOT block on recruiting a Health Connect tester.** Asked
+  whether to find a friend on a phone-only setup now, the owner chose to **defer and build against
+  synthetic data**, finding a tester later if problems surface. So this entry and PS-41 proceed
+  without one.
+- **⚠ What that knowingly leaves untested, stated so it is not mistaken for coverage.** Synthetic
+  data exercises the conversion and the scoring maths; it cannot show **which record types a real
+  mid-range phone actually populates**, which is the entry's own central unknown — not every device
+  writes every type to Health Connect. Treat any "works" claim from this work as *the maths is right*,
+  never *the coverage is right*. The first real non-ring account is still the only thing that closes
+  that, and per **No orphaned findings** this line is the record that it is open.
 - **✅ Still true, and it is the valuable half:** this retires the connector guide's §5.6 claim that
   skin temperature is a hardware dependency with no second source. **Health Connect defines
   `SkinTemperatureRecord`**, and `HeartRateVariabilityRmssdRecord` for HRV. The ring-only list is a
   claim about *our read list and the user's device*, not about the platform.
-- **⛔ CORRECTED: this is NOT an addition to `HC_SYNC_READ_TYPES`.** The pinned plugin's
+- **⚠ CORRECTED: this is NOT an addition to `HC_SYNC_READ_TYPES`.** The pinned plugin's
   `RecordConverter` handles **seven** record types and falls back to `else -> record.toString()`; the
   read path is generic (it resolves through the SDK's `RECORDS_TYPE_NAME_MAP`), so **conversion is
   the wall, not permission**. Adding a type to the list without a converter branch yields a Kotlin
@@ -2159,6 +2302,10 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
 - **Lane:** A — `lib/health-connect-sync.ts` (client sync payload), `app/api/sync-health/route.ts`
   (write path), `lib/data/repository.ts`/`adapter.ts` (`upsertOuraHeartrate` bulk-write, already
   exists — this is a new caller, not new storage).
+- **✅ OWNER DECISION, 2026-09-17 — proceed without a Health Connect tester** (the same ruling
+  recorded on TN-44; recruiting one was deferred). Build against synthetic data. **The untested
+  surface is real-device field coverage** — which types a phone-only setup actually writes — so a
+  green result here means the normalisation is right, not that the data will be there.
 - **Added:** 2026-09-14 (one-off session; found while tracing every scoring formula's real inputs —
   see [`docs/data-source-connector-guide.md`](data-source-connector-guide.md) §3a and §4's Activity
   Score row / §5.5).
@@ -2277,6 +2424,27 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
 - **Gate:** owner. This changes an input to a live health score, not a UI/infra change — same class
   of decision `CLAUDE.md`'s Standing Agents rules reserve for Tuning-style validation and sign-off,
   never a silent swap.
+- **✅ OWNER DECISION, 2026-09-17 — the overnight validation window is ON.** Offered the choice
+  between shipping on workout-window agreement alone and a week of strap-plus-ring overlap
+  *at night*, the owner chose **to wear the chest strap to bed for a week**. That closes the
+  ⚠ correction below: the ingredient does not stream at night *today*, and this is the deliberate
+  act that makes it stream.
+- **⚑ TN-46 sharpens what this window decides.** The HRV fall now has a named candidate cause —
+  Retatrutide, 0.5 mg on 2026-09-07 and 1 mg on 09-13 — so the strap week is no longer just ring-vs-strap
+  agreement. **Paired per night, it separates the two live hypotheses outright:** if both instruments
+  show the drop it is real physiology, and if only the ring does it is sensor drift. That is a clean
+  discriminator and it exists only while the baseline still remembers the pre-drug normal.
+- **⚠ Do not start the clock until the first night is actually in the table.** The window is seven
+  nights with **both** a ring `0x5d rmssd_ms` and Polar `rr_intervals` covering the same sleep span —
+  not seven calendar days from the decision. Confirm night one landed before counting.
+- **What the window is FOR, stated now so it is not re-derived later.** Two questions, and the second
+  is the one that matters this week: **(a)** does `rmssdFromRr` over the strap's intervals agree with
+  the ring's own figure, which is what this entry proposes to replace; and **(b)** *is the ring
+  telling the truth right now* — the owner's nightly HRV has fallen **62 → 19 ms** over two weeks
+  with resting HR up ~9 bpm (see TN-45), and nothing in the app can currently separate real
+  physiology from sensor drift. A second instrument is the only thing that can. **Design the
+  comparison per-night and paired**, not as two averages: a mean over a window where one device is
+  drifting hides exactly the thing being looked for.
 - **Added:** 2026-09-14 (one-off session; owner asked directly whether any Oura-computed value could
   be calculated by the app itself for future device-consistency — see
   [`docs/data-source-connector-guide.md`](data-source-connector-guide.md) §5.7).
@@ -2412,7 +2580,7 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
   stored (BF-151 is already about reading it rather than inverting). Showing *"2×12"* with the
   percent and no kg is complete on its own; a rep target is a further improvement, not part of this.
 - **✅ SHIPPED 2026-09-15** (`fix/bf162-bodyweight-no-kg`).
-  [Journal](overview/entries/2026-09-15-bf162-bodyweight-no-kg.md). One guard on `weightKg`, using
+  [Journal](overview/history-2026-09-17-folded-1.md#2026-09-15-bf162-bodyweight-no-kg). One guard on `weightKg`, using
   the **shared** `isBodyweightType` from `packages/shared/src/1rm.ts` rather than a ninth inline
   `=== 'bodyweight'` — there were eight. A bodyweight exercise falls through to the `@ ${ex.pct}%`
   branch the card already rendered when a 1RM was missing.
@@ -3425,7 +3593,42 @@ the rest of that day; and `perceived_recovery` carries at least three distinct v
 - **Lane: A** — `packages/shared/src/health/observed-hr.ts:110` (`resolveMaxHr`), `health/hr-profile.ts:86` (`targetAnchorMax`), `health/body-battery-inputs.ts:51` (`resolveBatteryHrMax`), `health/hr-zones.ts:9` (`hrMaxFromAge`), plus `lib/health/readiness-payload.ts:397`.
 - **✅ OWNER DECISION, 2026-09-09 — blend the two at 50/50 and PIN it: `(168 + 187) / 2 = 177.5 → 178`.** *"Just because my HR got up to 168 doesn't mean it's the MAX… then when the Cooper 12-minute run is done and a new max is gotten, we can assess what's better."* Gate cleared; build to the spec below.
 - **Needs: TN-25** — unifying the anchor at 178 raises the walk's 0.70 target from **133 to 140**, so it must not land before the walk stops using 0.70. Sequencing, not a blocker on the anchor itself.
-- **✅ THE PINNED 178 IS NOW SUPPORTED BY EVIDENCE — measured 2026-09-17.** The owner pinned 178 as a
+- **✅ OWNER DECISION, 2026-09-17 — RE-PIN AT 181, superseding the 178 below.** The owner parked the
+  question as *"when the cooper 12 minute run is done and a new max is gotten, we can assess what's
+  better."* **It is done.** `fitness_tests` holds a `cooper12` on **2026-09-14**: 720 s, **1975 m**,
+  avg HR **156**, peak **175**. His ruling: treat **175 as the floor** of the band and the
+  age-calculated **187 as the top**, and choose in between.
+
+  **181 is that choice, and it is the owner's own 50/50 rule re-run on corrected data** — the 178 pin
+  blended 168 with 187, and 168 has been superseded by the Cooper's 175. `(175 + 187) / 2 = 181`. No
+  new method, just the same one on a better floor. **Nothing has shipped at 178** (Branch still
+  _unassigned_), so re-specifying costs nothing.
+
+  **Two independent checks land in the same place** (RHR 54, the 28-day mean; Karvonen zones):
+
+  | anchor | Zone 4 floor | where the Cooper's **156 avg** lands | peak 175 as % of max |
+  |---|---:|---|---:|
+  | 178 (old pin) | 153 | Zone 4 | 98.3% |
+  | **181** | **156** | **Zone 4, at the floor** | **96.7%** |
+  | 187 (age) | 160 | **Zone 3 "Aerobic"** ✗ | 93.6% |
+
+  An all-out 12-minute time trial averaging in *Aerobic* is self-evidently wrong, which rules out 187
+  on this user's own data. And 96.7% is the textbook expectation for a maximal 12-minute effort —
+  93.6% would mean he left 12 bpm on the table in a test he clearly emptied himself in
+  (Cooper VO2max = (1975 − 504.9) / 44.73 = **32.9 ml/kg/min**).
+
+  **Why not Tanaka (208 − 0.7 × 33 = 185), the modern replacement for 220 − age.** It is a population
+  mean with a ~10 bpm individual sd, and we have this person's own maximal test. Individual data beats
+  a population formula. It also sits above the 181 ceiling the Cooper average implies.
+
+  **⚠ 175 is a floor, not a max, and nothing above it exists.** The 90-day distribution stops dead at
+  175 — 5 readings at 175, 13 at 174, 6 at 173, nothing higher — and `CORROBORATION = 5` means the
+  observed max is exactly 175 with no margin. A second maximal effort could move this again.
+- **⚠ Re-anchoring UP makes TN-25 worse by 4 bpm, and that is the cost of this decision.**
+  `targetAnchorMax` is 175 today, so `walkFastBandBpm` returns **[105, 123]**; at 181 it becomes
+  **[109, 127]**. The owner's measured fast-block HR runs **97–116**. The `Needs: TN-25` below is
+  therefore load-bearing, not bookkeeping — this must not land before the walk stops anchoring on it.
+- **✅ THE PINNED 178 WAS SUPPORTED BY EVIDENCE — measured 2026-09-17, now superseded by the 181 ruling above.** The owner pinned 178 as a
   50/50 blend and parked the question: *"when the cooper 12 minute run is done and a new max is
   gotten; we can assess whats better."* **A run on 2026-09-14 reached 175 bpm** — and it is
   corroborated, not a spike: **212 samples at ≥ 165 bpm across a nine-minute span** (11:05–11:14
@@ -16227,6 +16430,40 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Do NOT lower the thresholds.** `watch = 40`, `elevated = 65` and `FEVER_TEMP_Z = 2.5` are all
   defensible *given a correct z*; moving them fits the threshold to a broken input — the mistake this
   session made once on readiness and reverted (Q-504).
+- **⚠ RE-MEASURED 2026-09-17 — the remedy is built, owner-gated, and still unfired.** `POST
+  /api/admin/rederive-baselines` shipped for this exact defect on 2026-08-24 and writes temperature
+  alone. **This is not a dropped ball — BF-13's `Keep:` records it as owed and *the owner's to
+  fire*, deliberately not executed from the sandbox because it is a production data write.** What is
+  new here is that it has now sat unfired for a month, and that firing it as-is would misbehave (see
+  the next bullet). The stored baseline confirms it has not run: deviation **166**
+  centi-°C against a true nightly sd of **10.8** (still **15.4×**, down from 18.7×), mean **35.34 °C**
+  against a true **35.87**. Thirty nights moved the deviation 196 → 166, which extrapolates to
+  **~450 more nights — about fifteen months** before the EMA gets there on its own. Waiting is not a
+  plan, and TN-6's readiness penalty is charged daily until it is run.
+- **⚠ DO NOT RUN IT WITHOUT RE-SCALING `FEVER_TEMP_Z` IN THE SAME PR.** Replaying the fold cold with
+  `seedOrUpdateBaseline` over all 67 nights and re-running the real `computeIllnessRadar` per night:
+  the corrected baseline is **mean 35.86 °C, dev 0.077 °C**, and the 60 mature nights come out
+  `normal` 51 · `watch` 3 · **`fever` 6**. **Four of the six fever nights have healthy or neutral
+  HRV** (+2.42, +0.73, +1.62, −0.09) and unremarkable resting HR — they are temperature artefacts. A
+  dev of 0.077 °C puts `FEVER_TEMP_Z = 2.5` at **0.19 °C above baseline** when the real night-to-night
+  spread is **0.128 °C**, so a 1.5-sd night lands at z = 2.49 and fever fires inside normal variation.
+  Full working:
+  [`what the temperature re-derive would do`](reviews/2026-09-17-what-the-temperature-rederive-would-do.md).
+- **⚠ The denominator is the defect, not the threshold.** The EMA's dev is a *mean absolute
+  deviation* (~0.8σ for normal data) and this one converges to ~0.6σ, so temperature z's stay
+  inflated ~1.7× even after a correct re-derive — the replayed range over 55 nights is **−5.92 to
+  +3.92**, which is not a z-score's range. Scale the threshold and `ILLNESS_Z_FULL`, or divide by a
+  true sd. Threshold-only leaves readiness's `temperature` contributor (same z, 10% weight,
+  `closer-better`) reading hot.
+- **⚠ `isFever` short-circuits the score, and that is separately wrong.** It is tested before the
+  thresholds, so **2026-08-22 scores 37 — below `watch` — and is still flagged `fever`** with the
+  full 25-point readiness penalty. Requiring the composite to clear `watch` before the fever branch
+  applies would have caught it and cost nothing on 2026-07-26 (score 72).
+- **The "cannot fire" claim is now arithmetic, not observation.** Running `computeIllnessRadar` with
+  temperature at its observed ceiling (z = 0.28): resting HR and HRV **both maximally bad score 39**,
+  one point under `watch`, and stay 39 at absurd z = ±10 because both saturate; add maximally bad
+  breathing and it reaches **64**, one point under `elevated`. 2026-09-16 tripped at 41 only because
+  breathing drifted +0.45 that night.
 - **First action**, in preference order: (1) re-seed the temperature baseline from the observed
   distribution (mean 3584, sd 13.5 over 40 nights) rather than waiting out the EMA — cheapest, fixes
   both consumers; (2) the durable fix — seed a first observation and a sane prior dev instead of zero,
@@ -22439,14 +22676,31 @@ adopted.
 
 ### [platform] LA-100 — the entries compaction sweep has no target file, and the ceiling now blocks every lane
 
+- **✅ THE PREMISE WAS STALE AND THE SWEEP HAS RUN — 2026-09-17 (OR-119). `Gate: owner` removed.**
+  This entry says there is *"nowhere obvious to fold them TO"* because the batched files are
+  *"era-based, not date-based"*. **Measured: 28 of the 32 history files are dated** —
+  `history-2026-07-16.md` through `history-2026-09-10-folded-6.md`. Only four carry the era names
+  (`-newest`, `-recent`, `-newer`, `-past`), and this entry already calls those *frozen*.
+- **So its option 1 — a dated batch — is not a decision to take; it is what the repo has been doing
+  for two months**, and `scripts/fold-journal-entries.js` has implemented it since LA-80: it writes
+  `history-<date>-folded-<part>.md` and rolls a new part at ~250 KB. **The owner was being asked to
+  choose a convention that precedent and the tooling had already chosen.**
+- **The sweep ran on that basis:** 91 entries → 51, forty folded into
+  `history-2026-09-17-folded-1.md` (163 KB, inside the roll threshold), five held back because an
+  agent baton cites them, citations rewritten across nine files, `check-doc-links` clean on 823.
+- **What stays open is smaller than the entry and is not the owner's:** whether the four era-named
+  files are ever renamed. They are frozen and nothing cites them by scheme, so the answer is
+  probably never — but that is a judgement for whoever next touches them, not a blocker on folding.
+- **⚠ The ceiling claim is also stale.** This entry was upgraded to *"BLOCKING, not blocking-ish"*
+  when the ceiling was a hard failure that every lane's next PR would hit. It is an **advisory note**
+  now (*"Not a failure; sweep it when convenient"*), so the treadmill it describes cannot happen.
+
 - **Branch:** _unassigned_ · **Added:** 2026-09-10, when the ceiling fired and the sweep turned out
   not to be mechanical.
 - **Lane: A** — the sweep touches `docs/` only, but the naming decision below is the blocker.
-- **Gate:** owner — the open question is a documentation-structure decision, not an implementation
-  one, and the answer changes what every future session's journal entry does. (Filed inline on the
-  Lane bullet first; `check-backlog-pointers` caught it, because an inline field is ignored and the
-  entry would have printed READY. Second field-shaped filing mistake this session — the first was
-  `⛔` on LA-97.)
+- **The `Gate: owner` is removed** (2026-09-17) — see above: precedent and the fold tool had already
+  made the choice it was waiting on. The note about it being filed inline first, and
+  `check-backlog-pointers` catching that, still stands as the reason fields beat prose.
 - **⚑ BLOCKING, not "blocking-ish" — upgraded 2026-09-10 after it fired twice in one hour.** #1077
   raised the ceiling 360 → 361 to unblock and recorded that this contradicts #1052's intent. The
   very next PR (LA-99) hit **362**, so it shipped with **no journal entry at all** rather than raise

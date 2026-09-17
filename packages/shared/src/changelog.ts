@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.457.10",
+    date: "2026-09-17",
+    changes: [
+      "Soreness you tick yourself keeps counting in full. The check-in pre-selects muscles it already knows are sore, and those no longer count twice against your session \u2014 but a muscle you add yourself is information the app does not otherwise have. The check-in now records which ticks were its own suggestions at the moment you save, so one you volunteered still lowers the score even when the app would have guessed it anyway, and an offline check-in is recorded against what was true when you made it rather than whenever it reaches the server.",
+    ],
+  },
+  {
     version: "1.457.9",
     date: "2026-09-17",
     changes: [

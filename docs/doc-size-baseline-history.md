@@ -18,6 +18,33 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-17 — backlog → 23459 (TN-46, the medication the scorers cannot see)
+
+**+93.** One new entry and two cross-links. The owner named Retatrutide as the likely cause of the
+HRV collapse TN-45 surfaced, and the app turned out to hold the start date all along —
+`supplements.started_on = 2026-09-06`, with the nightly vitals diverging from 09-09. The entry is
+long because the finding is not "a drug moved his vitals" but that the baseline will absorb the
+shift within 30–60 nights and then report normal, which is the part that needs the mechanism spelled
+out or it reads as alarmism. The four options carry their own trade-offs per **Decisions That Come
+Back To Me**, and that section does not compress well.
+
+---
+
+## 2026-09-17 — backlog → 23365 (four owner decisions + the Q-506 re-measurement)
+
+**+127 on a 23234 base after merging BF-175's +46.** Four owner rulings came back in one sitting and each is recorded on the entry it settles:
+TN-45 (surface the illness `watch` band as a quiet line, gate lifted), TN-30 (re-pin max HR at 181
+off the Cooper test), PS-44 (the overnight chest-strap window is on) and TN-44/PS-41 (proceed
+without a Health Connect tester, with the untested surface written down rather than assumed). A
+decision recorded anywhere but on its own entry is a decision the next implementer will not see.
+
+The bulk of the growth is Q-506. Its remedy — `POST /api/admin/rederive-baselines` — shipped a month
+ago and has never been run, and replaying the fold shows that running it as-is would flag **fever on
+six of sixty nights**, four with healthy HRV. That warning has to sit on the entry, because the
+entry is what Lane A reads before running it. The working is in a review doc, not here.
+
+---
+
 ## 2026-09-17 — backlog → 23203, `projectOverview.md` → 11625 (BF-171 shipped)
 
 **−99 and +14.** BF-171's entry leaves the queue with the fix and files nothing behind it, so this
@@ -13262,6 +13289,61 @@ the diff shows as an unexplained deviation:
 Also recorded: the fit words map from `scoreBand`'s label rather than being derived from the score,
 so the 70/50 thresholds stay in one module. Without that line the mapping looks like indirection
 someone would helpfully "simplify" into local thresholds — the exact pattern CLAUDE.md bans.
+
+## 2026-09-17 — `docs/implementation-backlog.md` 23222 → 23188 (net −34), `projectOverview.md` 11636 → 11646
+
+`fix/lb116-checkin-sends-suggested-sore` (LB-116), which also removes BF-172.
+
+The backlog SHRANK: BF-172 finished with nothing owed and #1268 left it sitting with a ✅ instead of
+removing it, which is what the "a finished entry must not still be in the queue" rule exists to stop.
+It kept printing as READY until this PR. The heading said "(fixed)" in lowercase, which is why
+`check-backlog-pointers` did not catch it — the check looks for the uppercase forms.
+
+LB-116's own growth is two ⚠ paragraphs, both recording a judgement the diff cannot show:
+
+- It touched `packages/shared/src/validation/mood-log.ts`, a Lane A path, because the schema has no
+  `.strict()` and Zod silently drops unknown keys — the fix would otherwise have shipped inert.
+  Written down so the lane touch is visible rather than discovered later in a blame.
+- **An e2e was written, run against `main`, and deleted.** It passed unfixed, because `saveMoodLog`
+  derives the list when none is sent, so the stored column is non-null either way. That is worth a
+  paragraph precisely because the next person will have the same idea, write the same test, see it
+  green, and believe it.
+
+## 2026-09-17 — `projectOverview.md` 11646 → 11654 (+8)
+
+BF-173's paragraph claimed the fix *"flipped the pick"*. The numbers behind that were correct and
+were **pre-BF-171**, so re-measuring against the shipped engine changed the conclusion: Lower gains
+12 points from the fix and still loses to Upper by 3, because BF-171's normalisation lifts the
+sore-but-recovering muscles on both sides rather than reordering them.
+
+Eight lines, and they are the kind worth spending: a shipped-fix paragraph that overstates its own
+outcome is read by every session at orientation, and the next one to touch this pillar would have
+started from "the picker chooses Lower now" and debugged the wrong thing. The counterfactual is kept
+rather than deleted — it is still the clearest statement of what the double count did — and marked as
+a counterfactual instead.
+
+## 2026-09-17 — `docs/implementation-backlog.md` 23188 → 23235
+
+**BF-175** — the log-food sheet prints `nutrition_targets.calories` (1660) as today's budget while
+the card beside it shows `budgetProvenance(...).total` (1506).
+
+The entry spends lines on two things deliberately. It quotes the **two existing code comments that
+already state the rule** it violates, because this is a missed surface of a fix that has been made
+once, and an entry that reads as a fresh discovery invites a fresh fix rather than a sweep. And it
+records `WeeklyNutritionChart` as **checked and correct** — it reads the same field, and an
+implementer sweeping for call sites would otherwise "fix" a seven-day reference line into a fourth
+budget.
+
+## 2026-09-17 — `docs/implementation-backlog.md` → 23252 (OR-119, the journal fold)
+
++17 for the LA-100 re-scope, and the raise buys the removal of an owner gate that should never have
+existed: the entry asked the owner to choose a naming convention that **28 of the 32 history files
+and the fold tool itself had already chosen**. Recording why it was stale costs more lines than the
+gate did, and is worth it — the next reader would otherwise re-open the same question.
+
+`docs/overview/entries/` went 91 → 51 files in the same PR (40 folded into
+`history-2026-09-17-folded-1.md`, 163 KB), which is not tracked by a `.size` baseline but is the
+larger change by far.
 ## 2026-09-11 — `docs/implementation-backlog.md` → 21535 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
@@ -13302,7 +13384,7 @@ much as unreproducible, which is the same failure as the hand-kept tally one par
 from the opposite direction — a derivation is only better than a tally if it returns the same answer
 twice.
 
-**Recomputed again 2026-09-17** (→ 23197; 23178 after BF-171, 23143 after BF-173, 23201 before that — four readings in one day, which is the churn this note exists to record rather than smooth), after #1264 and #1265 landed, with `main` having moved
+**Recomputed again 2026-09-17** (→ 23451; then 23197, 23178 after BF-171, 23143 after BF-173, 23201 before that — FIVE readings in one day, which is the churn this note exists to record rather than smooth). The jump to 23451 is not this branch: #1279 folded 40 journal entries and dropped an owner gate, which moved the backlog under it., after #1264 and #1265 landed, with `main` having moved
 twice more while this PR waits on its owner decision — now in its seventh day.
 
 **And the correction the entry above earned: `origin/main..HEAD` is NOT clone-depth independent

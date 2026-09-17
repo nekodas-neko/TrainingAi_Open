@@ -26,8 +26,18 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.457.9 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.457.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-17.
+
+**The check-in now records which sore ticks were its own suggestions (LB-116, v1.457.10).** BF-173
+stopped a suggested tick penalising recovery twice; the sheet already computed that list and never
+sent it, so the server fell back to deriving it — which cannot tell a muscle the lifter volunteered
+from one it would have suggested anyway, and for a queued offline check-in runs hours later against
+a recovery feed that has moved on. **It required one optional field in `MoodFieldsSchema`, a Lane A
+path:** that schema has no `.strict()`, so Zod drops unknown keys, and without the edit the value
+would have been stripped silently and the fix shipped inert. **An e2e was written and deleted rather
+than shipped green** — it passed against unfixed `main`, because the server's fallback makes the
+stored column non-null either way, and a vacuous test is worse than none.
 
 **The explain screen called the session-fit score "readiness" (BF-172, v1.457.9).** `overallScore`
 is `recovery·w + balance·w + freshness·w` — how well a session fits today — and the ring captioned it
@@ -61,8 +71,16 @@ pre-ticks any muscle trained within 48 h and under 85% recovered — reading the
 a harsher flat one. The owner confirmed the premise rather than it being inferred (*"It auto picked
 muscles for me i didnt choose them manually"*), which makes it the normal path, not an edge case.
 Measured on his rows: quads 69 → 40, chest 49 → 40, and the flat floor erased the ordering he was
-actually asking about — it flipped the pick, Lower 74/Upper 84 as shipped against Lower **85**/Upper
-84 without the leg ticks. `mood_logs.suggested_sore_muscles` (migration 276, `claude_ro` twin 277,
+actually asking about — Lower 74/Upper 84 with the double count live, against Lower **85**/Upper 84
+with the leg ticks removed. **⚠ That second pair is the pre-BF-171 counterfactual, NOT the shipped
+state, and re-measuring after both landed is what makes the difference visible (BugFix, 2026-09-17).**
+Against the SHIPPED engine on the same rows, with every tick recorded as a suggestion:
+**Upper 91 · Lower 88 · Pull 85 · Legs 76 · Push 59 — Upper still wins.** The double count is gone
+and Lower gained 12 points from its removal, but the gap narrowed from 9 to 3 rather than reversing,
+because BF-171's normalisation lifts the sore-but-recovering muscles on *both* sides. **So the entry
+fixed the defect it described and did not change this particular answer** — Upper wins on merit now,
+being half back work at 95% and six days overdue. Do not read "it flipped the pick" as a claim about
+the current app. `mood_logs.suggested_sore_muscles` (migration 276, `claude_ro` twin 277,
 local SQLite v39) now records where each tick came from, and only lifter-added ticks clamp.
 **Provenance is recorded at write time, never re-derived at score time** — re-deriving was the option
 the owner weighed and rejected, because it discards the one case the check-in exists for. **Expect
@@ -179,7 +197,7 @@ is an undecided client heuristic), PS-44 (a working rMSSD-from-raw-beats calcula
 wired only to workout summaries — nightly HRV could use it too, pending validation), PS-45 (no
 per-user API key for external device integration), PS-46 (the HealthKit connector itself — needs a
 real Apple Developer account, hence owner-gated)
-([journal](docs/overview/entries/2026-09-14-generic-datasource-connector.md)).
+([journal](docs/overview/history-2026-09-17-folded-1.md#2026-09-14-generic-datasource-connector)).
 
 **BF-110's blank resume now gets a second look, and the next move is the owner's (no version bump —
 instrumentation only).** Sixteen `error_events` samples separate perfectly on viewport height: every
@@ -229,12 +247,12 @@ Restoration was working; the assertion was not. It survives in CI, so this is a 
 rather than a live regression, but **an exact-offset assertion cannot tell _cancelled_ from
 _imprecise_** — which is the exact distinction BF-100 turns on. A probe for this class needs a coarse
 measure (*did it move off the top at all*), not equality.
-([journal](docs/overview/entries/2026-09-15-bf100-touchstart-probe-inconclusive.md))
+([journal](docs/overview/history-2026-09-17-folded-1.md#2026-09-15-bf100-touchstart-probe-inconclusive))
 
 A second owner request found in
 the same body had **no entry anywhere** and is now **LB-107**: back on a tab with nothing to pop
 should land on Home rather than leave the app
-([journal](docs/overview/entries/2026-09-14-refile-shipped-rv36.md)).
+([journal](docs/overview/history-2026-09-17-folded-1.md#2026-09-14-refile-shipped-rv36)).
 
 **`day-review-read-through` was broken in both directions, and only one of them was visible
 (LB-105).** Its wrap-up test failed in the sandbox and passed on CI — every section of
@@ -247,7 +265,7 @@ was wrong too — the component renders **`Body composition`**, which `^Body$` n
 now records an activity for today and removes it, and both halves scope to a
 `data-testid="day-read-through"`. Proven rather than assumed: with the seed suppressed, the
 `/health/day` test **now fails where it used to pass**. No product behaviour changed
-([journal](docs/overview/entries/2026-09-14-lb105-day-review-seed-independence.md)).
+([journal](docs/overview/history-2026-09-17-folded-1.md#2026-09-14-lb105-day-review-seed-independence)).
 
 **The nutrition surface says two things it knew and withheld (LA-102 + TN-28, batched).** LA-102 —
 the owner on the anchored budget: *"1350 doesnt count some basic metabolic needs".* He is right; the
@@ -260,7 +278,7 @@ without its confidence; it now prints the siblings' exact qualifier.
 resting-burn paragraph and the bar never got it. Both now render one
 `components/nutrition/energy-explainer.tsx`, and `movement-breakdown.test.ts`'s two-file loop is
 repointed at it plus a new check that neither host re-states the copy. ⚠️ **Not device-verified**
-([journal](docs/overview/entries/2026-09-14-la102-tn28-nutrition-budget-honesty.md)).
+([journal](docs/overview/history-2026-09-17-folded-1.md#2026-09-14-la102-tn28-nutrition-budget-honesty)).
 
 **The AI card says what skipping Accept costs (BF-156).** Owner: *"what happens if I dont select to
 apply the session? Its pretty easy to miss that button."* There are two answers.
@@ -312,7 +330,7 @@ is also **mounted on `/health/day`**, which is what makes that test runnable at 
 there was no past-day surface, so the claim was unobservable. The honest cost is printed on the
 chart: *"Measured through HH:MM — the last reading stored, not the end of your day."* ⚠️ **Not
 device-verified** — the Home card and the day screen were exercised on `pnpm dev` at 412 dp only
-([journal](docs/overview/entries/2026-09-14-la104-stress-chart-one-baseline.md)).
+([journal](docs/overview/history-2026-09-17-folded-1.md#2026-09-14-la104-stress-chart-one-baseline)).
 
 **The AMRAP baseline session was never consumed (BF-131).** Owner: *"even though the session was
 done it's saying baseline needed"*. He ran both baseline sessions as instructed and
@@ -3339,7 +3357,7 @@ time scales with the tree behind the route. **There is no second dead button; Gu
 **What survives:** `/activity` serves 200 and renders on a direct visit, and the entry's source-path
 elimination table (which came from reading, not the harness). **The sheet's `history.back()` theory is
 back to unproven** — that experiment also ran cold.
-([retraction](docs/overview/entries/2026-09-15-bf165-retraction-cold-route.md))
+([retraction](docs/overview/history-2026-09-17-folded-1.md#2026-09-15-bf165-retraction-cold-route))
 
 ### [app-shell] ⚠️ The Android back button ignored the overlay stack the app already had (BF-166, 2026-09-15)
 

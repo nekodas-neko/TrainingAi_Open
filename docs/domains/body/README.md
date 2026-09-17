@@ -119,20 +119,20 @@ Live at the time of writing (2026-07-30):
   the raw frame in all three branches. **The 8% is measured** off the owner's 70.0–72.8 kg cluster
   against the 57.5–58.0 kg one he has dismissed — do not widen it without re-measuring. **Open:**
   LA-108's list (Lane B) and BF-58's two hardware questions. Shared with `devices`.
-  [Journal](../../overview/entries/2026-09-14-lane-a-bf58-weight-band-attribution.md).
+  [Journal](../../overview/history-2026-09-17-folded-1.md#2026-09-14-lane-a-bf58-weight-band-attribution).
 - **Claiming a declined weigh-in back (LA-108, 2026-09-14)** — `confirmScaleSample` accepts
   `pending` **or** `dismissed` (never `confirmed`), and `GET /api/scale-ble/pending` returns a
   bounded `dismissed[]`. **The lockout it fixes predates BF-58**: the old `status='pending'`
   predicate made an accidental *Not me* tap irreversible, and only a confirmed reading re-anchors
   the band. The list that reaches this is still owed (Lane B).
-  [Journal](../../overview/entries/2026-09-14-lane-a-la108-claim-a-declined-weighin.md).
+  [Journal](../../overview/history-2026-09-17-folded-1.md#2026-09-14-lane-a-la108-claim-a-declined-weighin).
 
 The scale-sync and Renpho entries above are shipped and device-confirmed; Q-56 (above), LA-108 and
 BF-58's device answers are the open items. Re-run the greps rather than trusting this list.
 
 ## History
 
-- [`2026-09-15-la108-declined-weigh-in-list`](../../overview/entries/2026-09-15-la108-declined-weigh-in-list.md)
+- [`2026-09-15-la108-declined-weigh-in-list`](../../overview/history-2026-09-17-folded-1.md#2026-09-15-la108-declined-weigh-in-list)
   — **LA-108 (2026-09-15): a declined weigh-in can be claimed back.** The band anchors on the last
   **confirmed** weight and only a confirmed reading moves it, so an accidental *Not me* tap was
   irreversible — a real change beyond the anomaly threshold left you outside your own band with

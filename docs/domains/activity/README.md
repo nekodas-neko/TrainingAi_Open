@@ -159,7 +159,7 @@ cause of one class was a posted step window coming from a *different stream* tha
 
 ## History
 
-- [`2026-09-15-bf165-retraction-cold-route`](../../overview/entries/2026-09-15-bf165-retraction-cold-route.md)
+- [`2026-09-15-bf165-retraction-cold-route`](../../overview/history-2026-09-17-folded-1.md#2026-09-15-bf165-retraction-cold-route)
   — **⛔ RETRACTS the two BF-165 entries below it (2026-09-15).** BF-165 does **not** reproduce in the
   harness; there is **no** second dead button; the `/activity`-prefix narrowing is void. The cause was
   **`next dev` compiling the route on demand** — a client push issues an RSC fetch that hangs until
@@ -167,7 +167,7 @@ cause of one class was a posted step window coming from a *different stream* tha
   throw, no 4xx/5xx and no console error. **Warm the destination with a direct `goto` before measuring
   any client-side push**; without it, "the navigation did not happen" carries no information.
 
-- [`2026-09-15-bf165-activity-prefix-narrowing`](../../overview/entries/2026-09-15-bf165-activity-prefix-narrowing.md)
+- [`2026-09-15-bf165-activity-prefix-narrowing`](../../overview/history-2026-09-17-folded-1.md#2026-09-15-bf165-activity-prefix-narrowing)
   — **BF-165 narrowed to the `/activity` PREFIX, and a second dead button found (2026-09-15).**
   On `/cardio`, through the identical `useTransitionRouter`/`animate()` path with no sheet involved:
   **Running → `/running` navigates; Guided walk → `/activity/guided-walk` does not.** So `animate()`
@@ -177,7 +177,7 @@ cause of one class was a posted step window coming from a *different stream* tha
   plain, no `layout.tsx`, no middleware). **Next:** bisect what `app/activity/page.tsx`'s tree does on
   a client commit that `app/running/page.tsx` does not.
 
-- [`2026-09-15-bf165-reproduced-in-harness`](../../overview/entries/2026-09-15-bf165-reproduced-in-harness.md)
+- [`2026-09-15-bf165-reproduced-in-harness`](../../overview/history-2026-09-17-folded-1.md#2026-09-15-bf165-reproduced-in-harness)
   — **BF-165 (2026-09-15): "Other activity" is a dead tap, and it is NOT device-only.** It reproduces
   in Playwright — `/cardio` → Other activity → Treadmill leaves the URL on `/cardio`. **Two candidates
   refuted by experiment:** `/activity` loads fine directly (200, no page errors), and the sheet's
