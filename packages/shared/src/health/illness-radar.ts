@@ -170,15 +170,75 @@ export function illnessFromSummaries(prior: IllnessSummaryInput | null, current:
   return computeIllnessRadar({ tempZ, rhrZ, hrvZ, breathZ, nHistory: current.nHistory })
 }
 
-/** Short human advisory for the readiness surface, or null when nothing to say. */
-export function illnessAdvisory(flag: IllnessFlag): string | null {
+/**
+ * TN-45. How a biomarker is named to the reader. Deliberately the plain-English name of the
+ * measurement and nothing about what it might mean — `watch` fires on drift, and on the owner's
+ * own two firings the cause was a medication rather than an infection (TN-46), so wording that
+ * hints at illness would have been wrong both times it has ever appeared.
+ */
+const BIOMARKER_LABEL: Record<IllnessBiomarkerKey, string> = {
+  temperature:      'skin temperature',
+  breathing:        'breathing rate',
+  restingHeartRate: 'resting HR',
+  hrvBalance:       'HRV',
+}
+
+/**
+ * TN-45. The one or two biomarkers actually driving the score, most first.
+ *
+ * Ranked by `contribution` (the weighted share that built the score) rather than by raw `z`,
+ * because that is what the number in front of the reader was made of. A biomarker contributing
+ * nothing is never named — on a `watch` day most of them are at zero, and listing them would
+ * describe the metric set rather than the event.
+ *
+ * Two is the cap: the owner asked for one calm sentence, and a third name turns a sentence into a
+ * readout.
+ */
+function topContributors(biomarkers: IllnessResult['biomarkers']): IllnessBiomarkerKey[] {
+  return (Object.entries(biomarkers) as [IllnessBiomarkerKey, IllnessBiomarker][])
+    .filter(([, b]) => b.contribution > 0)
+    .sort((a, b) => b[1].contribution - a[1].contribution)
+    .slice(0, 2)
+    .map(([key]) => key)
+}
+
+/**
+ * "Resting HR is", or "Resting HR and HRV are" — never a three-item list.
+ *
+ * Sentence-cased here rather than at the call site because this phrase always opens the sentence,
+ * and the verb agrees with the count, which is the sort of thing that reads as a bug when it is
+ * wrong ("Resting HR and HRV is drifting").
+ */
+function subjectAndVerb(keys: IllnessBiomarkerKey[]): string {
+  const names = keys.map(k => BIOMARKER_LABEL[k])
+  const subject = names.length === 2 ? `${names[0]} and ${names[1]}` : names[0]
+  return `${subject[0].toUpperCase()}${subject.slice(1)} ${names.length === 2 ? 'are' : 'is'}`
+}
+
+/**
+ * Short human advisory for the readiness surface, or null when nothing to say.
+ *
+ * `biomarkers` is optional and only `watch` reads it. TN-45: that band is the ONLY one that has
+ * ever fired — 2 days in 72, against 0 for `elevated` and `fever` — and its line named nothing, so
+ * the one signal the owner actually gets said less than the data behind it already knew. Passing
+ * the biomarkers names what moved; omitting them keeps the previous wording, so no existing caller
+ * changes meaning.
+ */
+export function illnessAdvisory(
+  flag: IllnessFlag,
+  biomarkers?: IllnessResult['biomarkers'],
+): string | null {
   switch (flag) {
     case 'fever':
       return 'Skin temperature is well above your baseline — possible fever. Readiness lowered; rest and hydrate.'
     case 'elevated':
       return 'Signs your body may be fighting something (temperature, resting HR, HRV, breathing rate moving together) — readiness lowered.'
-    case 'watch':
-      return 'Some biomarkers are drifting from your baseline — worth keeping an eye on.'
+    case 'watch': {
+      const driving = biomarkers ? topContributors(biomarkers) : []
+      return driving.length > 0
+        ? `${subjectAndVerb(driving)} drifting from your baseline — worth keeping an eye on.`
+        : 'Some biomarkers are drifting from your baseline — worth keeping an eye on.'
+    }
     default:
       return null
   }

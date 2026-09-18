@@ -624,6 +624,24 @@ line must name **what moved** (resting HR and HRV off baseline), never imply inf
 
 **Pass test:** a `watch` day produces something the owner can see on Home, and a normal day does not.
 
+- **Keep:** the RENDER, which is the Lane B half and the whole remaining ask. The engine half shipped
+  2026-09-18: `illnessAdvisory(flag, biomarkers?)` now names the one or two biomarkers actually
+  driving the score, so `watch` reads *"Resting HR and HRV are drifting from your baseline — worth
+  keeping an eye on."* rather than naming nothing. Verified against the biomarker maps **as persisted
+  in production** for both real firings (2026-09-16 score 41, 2026-08-27 score 57) — both name
+  resting HR and HRV. **Nothing renders it yet**, so the pass test is not met: the render guard at
+  `components/home/illness-advisory-banner.tsx:15` still returns `null` for `watch`, and the owner's
+  choice was a quiet line under the readiness score rather than that banner. Until Lane B ships that
+  line, this entry's defect is unchanged from the owner's side.
+- **⚠ What the engine half deliberately did NOT do:** no threshold moved, no readiness penalty
+  changed (`watch = 0` stays), and the second parameter is OPTIONAL so every existing caller keeps
+  the previous wording. The entry's two "do not" warnings are intact.
+- **One thing the production read turned up that the entry did not state:** the other `watch` day is
+  **2026-08-27**, which PREDATES the first Retatrutide dose (2026-09-07) and carries an HRV z of
+  **−4.26**. The entry's *"the cause is now known, and it is not illness — see TN-46"* covers 09-16
+  and cannot cover 08-27. That day has no explanation on file. Not this entry's scope; recorded so it
+  is not assumed settled.
+
 
 ### [workouts][app-shell] LB-116 — the check-in sheet knows which sore ticks it suggested and throws it away (fixed; device check owed)
 
