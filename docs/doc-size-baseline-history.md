@@ -18,6 +18,17 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-18 — backlog → 23915 (TN-47/48/49, the tuning calibration sweep)
+
+**+144 from 23771.** Three entries off one review. TN-48 is the long one and earns it: the
+body-composition decomposition has to carry its guardrails inline, because the finding is that the
+undecomposed lean-mass number is *misleading in exactly the situation a user most wants it*, and an
+implementer who reads the table without the water column repeats the error the entry exists to stop.
+TN-47 carries the measured "moves 0.4 points" line for the same reason — without it the entry reads
+as a re-score, which it is not.
+
+---
+
 ## 2026-09-18 — backlog → 23771 (LA-118's heading corrected)
 
 **+3**, for one word and a sentence saying why it was wrong. The entry filed hours earlier was
@@ -80,6 +91,7 @@ out or it reads as alarmism. The four options carry their own trade-offs per **D
 Back To Me**, and that section does not compress well.
 
 ---
+
 
 ## 2026-09-17 — backlog → 23365 (four owner decisions + the Q-506 re-measurement)
 
@@ -13533,14 +13545,15 @@ window edge instead. Two further notes are recorded against a plausible wrong fi
 different quantities, so unifying them while moving this server-side would silently redefine what
 102 means.
 
-## 2026-09-18 — `docs/implementation-backlog.md` 23771 → 24032 (Review sweep 50)
+## 2026-09-18 — `docs/implementation-backlog.md` 23915 → 24175 (Review sweep 50)
 
 Thirteen new queue entries (**RV-51…RV-63**) from the owner's twelve-day catch-up review — 50
 commits, 671 changed code files, swept across safety/logic/performance/efficiency — plus a reading
 recorded on the existing **BF-110** entry.
 
-The growth is queue, not prose, and it is at the ratio this file is meant to carry: 261 lines for 13
-entries is ~20 lines each, against a file whose entries average that. **One entry is deliberately
+The growth is queue, not prose, and it is at the ratio this file is meant to carry: 260 lines for 13
+entries is ~20 lines each, against a file whose entries average that. (The 23915 floor is `main`
+after TN-47/48/49 landed mid-sweep; those three are theirs, not counted here.) **One entry is deliberately
 longer than its defect**: RV-51 is a two-row data fix, and most of its length is the question the
 data raises rather than the fix — `exercise_library` has no `created_at`, so whether migration 269
 *missed* those two rows or something *wrote* them afterwards is unestablished, and if it is the

@@ -443,6 +443,149 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [body][nutrition] TN-48 — the body-composition suite is collected daily, interpreted nowhere, and the one reading that frightens is the one the app can already defuse 🔴 LIVE
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-18 · Tuning agent, from the owner's ask: *"we want the
+  results to be very personal to the user — so its a real value that depicts their health. Use all
+  available metrics/data."*
+- **Lane: A** — a derivation over `body_metrics`, then a surface. Engine half first.
+- **Review:** [`what the score can and cannot say`](reviews/2026-09-18-what-the-score-can-and-cannot-say.md) §4.
+- **Needs: TN-46** for the medication overlay only — the decomposition below stands alone and should
+  not wait for it.
+
+**What is already on disk, every day, unused.** `body_metrics` carries `skeletal_muscle_pct`,
+`muscle_mass_kg`, `fat_free_mass_kg`, `visceral_fat_index`, `body_water_pct`, `bone_mass_kg`,
+`bmr_kcal` and `metabolic_age` on **49 of the last 90 days**. Grepped across the repo: those columns
+appear in 18 files and **zero scoring or analysis modules**. They are stored, rendered as bare
+numbers, and never interpreted.
+
+**Why it matters this month.** The owner started Retatrutide on 2026-09-07 (TN-46). The question a
+person on a GLP-1 actually has is *am I losing fat or muscle*, and it is answerable from columns
+already being written nightly.
+
+**⚠ The raw numbers say something alarming and mostly untrue — this is the case for building it.**
+
+| | weight | fat mass | lean mass |
+|---|---:|---:|---:|
+| pre-dose (n=37) | 71.26 kg | 17.59 kg | 53.67 kg |
+| on Retatrutide (n=12) | 70.16 kg | 17.92 kg | 52.24 kg |
+| **change** | **−1.10 kg** | **+0.33 kg** | **−1.43 kg** |
+
+Read alone: *every kilo lost was lean, and then some.* That is what the card shows today.
+
+**The app holds the column that corrects it.** Bioimpedance lean mass includes body water, and body
+water fell **1.04 kg** across the same window — so **lean minus water is −0.38 kg**, inside scale
+noise. **Water explains 73% of the apparent lean loss.** The last eight readings move the right way:
+body fat **25.7% → 25.2%**, muscle **39.4% → 39.6%**, water **54.3% → 54.6%**.
+
+**What to build — decomposition, not another number.** Split a weight change over a chosen window
+into **fat / water / non-water lean**, with the window's reading count shown, and state the noise
+floor rather than implying precision. The headline sentence is the deliverable: *"down 1.1 kg —
+0.3 kg of it fat, 1.0 kg water; lean mass is flat once water is taken out."*
+
+**⚠ Guardrails, because this is body-image-adjacent and bioimpedance is noisy.**
+- **Never report a lean-mass change without the water decomposition beside it.** That is the entire
+  finding — the undecomposed number is misleading in the one situation where a user most wants it.
+- **n is part of the answer.** 12 readings is not 37; show the count, and suppress the panel below
+  a stated minimum rather than rendering a confident number from four weigh-ins.
+- **State the noise floor.** A ±0.4 kg move over two weeks is not a finding, and the surface must
+  say so rather than drawing an arrow.
+- **Scale readings are not a clinical measurement.** Q-527 already records one corrupt
+  body-composition row; a single outlier must not move the window.
+
+**Pass test:** a weight change over a window is shown split into fat, water and non-water lean, with
+the reading count and noise floor visible, and the current 12-day window reads as *water-dominant,
+lean effectively flat* rather than as a lean-mass loss.
+
+
+### [readiness] TN-47 — half the readiness weight is measured against four differently-stretched rulers, and the breakdown rails on 46% of days 🔴 LIVE
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-18 · Tuning agent.
+- **Lane: A** — `packages/shared/src/health/personal-baseline.ts` (the denominator) and
+  `readiness-composite.ts` (the slope).
+- **Gate: owner** — it changes what the readiness breakdown says about his own health, and the
+  honest framing of the change is a judgement call (see the ⚠ below).
+- **Review:** [`what the score can and cannot say`](reviews/2026-09-18-what-the-score-can-and-cannot-say.md) §1–2.
+- **Needs: Q-506** for temperature specifically — that baseline is broken separately and much worse.
+
+**The four baseline-relative contributors are 50% of the readiness weight and each divides by a
+differently-wrong denominator.** The EMA maintains `devX8` as a **mean absolute deviation**, not a
+standard deviation — for normal data MAD ≈ 0.798σ, so even a perfect baseline inflates every z by
+~1.25×. Measured against the true night-to-night spread of the same rows:
+
+| metric | EMA dev | true sd | ratio (ideal 0.80) | its z runs |
+|---|---:|---:|---:|---|
+| **HRV** | 6.39 ms | 11.02 ms | **0.58** | **1.7× too hot** |
+| **sleep** | 39.50 min | 63.63 min | **0.62** | **1.6× too hot** |
+| resting HR | 4.19 bpm | 3.68 bpm | 1.14 | 0.9× — roughly right |
+| **temperature** | 216 centi-°C | 12.5 centi-°C | **17.3** | **0.06×** — Q-506 |
+
+**Not the medication transient.** Split at the first Retatrutide dose the ratios hold either side:
+HRV 0.67 pre / 0.65 during, sleep 0.61 / 0.56.
+
+**The consequence is saturation.** `Z_POINTS_PER_UNIT = 50/1.5` rails a contributor at ±1.5σ, and a
+z running 1.7× hot reaches that constantly: **hrvBalance is 0 or 100 on 46% of days**, sleepBalance
+on 29%. A rail cannot distinguish "a bit low" from "catastrophically low", which is exactly the
+gradation a personal score exists to show.
+
+**⚠ THIS IS AN EXPLAINABILITY FIX, NOT A RE-SCORE — and it must not be sold as one.** Recomputing
+all 65 days on a true sd moves the composite by a **mean of 0.4 points, max 4, with zero days moving
+more than 5**. The nine weights average the distortion away. What changes is the breakdown: HRV's
+rail rate **46% → 33%**, sleep's **29% → 17%**, and resting HR — currently *under*-reacting — rises
+17% → 25%, the correction working the other way. Per the standing rule that a proposal states how
+many days it moves: **65 days re-derive, none materially.**
+
+**First action, in preference order.** (1) Divide by an sd estimate rather than the MAD — either
+`σ̂ = 1.2533 × devX8/8` (one constant, fixes the systematic part everywhere at once) or a trailing
+true sd computed from the per-night baselines already on disk, which also fixes the per-metric
+residual. (2) Only then revisit `Z_POINTS_PER_UNIT`; moving the slope first fits the threshold to a
+broken input, which is the mistake Q-504 already made and reverted.
+
+**⚠ Do NOT touch the weights for this.** The weights are fine — the denominators are not.
+
+**Two things measured alongside, worth their own look and NOT folded into the fix above.**
+- **The two activity terms carry 15% of the weight and supply 7.4% of the score's movement.**
+  `prevDayActivity` has never scored below 57 in 65 days and `activityBalance` never below 51. They
+  are a floor with a label rather than a reading of this person's day.
+- **`checkin` has never exceeded 88 of 100**, so the 2026-07-22 rebalance's stated goal — that a
+  genuinely great day can reach a true 100 — is unreachable in practice on this user's logging.
+
+**Pass test:** no contributor rails on more than ~a third of days, and the composite over the
+existing 65 days moves by less than 5 points on every one of them.
+
+
+### [readiness][platform] TN-49 — seven days show a readiness score that contradicts its own stored breakdown
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-18 · Tuning agent.
+- **Lane: A** — a back-fill over `oura_daily_derived`.
+- **Review:** [`what the score can and cannot say`](reviews/2026-09-18-what-the-score-can-and-cannot-say.md) §3.
+- **This is a follow-on to Q-501, not a regression of it.** Q-501 shipped on 2026-08-26 and persists
+  the input behind every contributor, which is precisely what makes this checkable — and visible.
+
+**Measured 2026-09-18.** Recomputing the weighted composite from each row's own stored contributors:
+**7 of 65 rows disagree with their stored `readiness_score`**, all consecutive (2026-07-16 → 07-22),
+all by −4 to −6 points. They predate the 2026-07-22 weight rebalance: their contributors were
+re-derived under the new model and their score was not.
+
+**Separately, 40 of 65 rows carry no `model_versions.readiness` stamp at all** (2026-07-16 →
+08-25), and the stamped and unstamped ranges **overlap** (08-22 → 08-25) — so some rows were
+re-derived and some were not, and the row cannot say which it is.
+
+**Why it is worth fixing rather than tolerating.** A user opening one of those days sees a score and
+a breakdown that disagree by up to 6 points, with nothing on the card to explain it. The whole reason
+Q-501 stored the inputs was so a score could be re-derived from its own row; on these seven it can
+be, and the answer is different.
+
+**First action:** recompute and rewrite the seven rows from their stored contributors, stamping the
+current model version, and back-stamp the 33 unstamped rows that already reproduce. **Do not rewrite
+the contributors** — they are the newer, correct half.
+
+**⚠ Scope it as a back-fill, not a re-derive.** Re-deriving the contributors from today's summaries
+would inherit whatever the baselines say now, which is a different number again.
+
+**Pass test:** every stored `readiness_score` reproduces from its own stored contributors, and every
+row carries a model stamp.
+
 ### [workouts] RV-51 — two real exercises are excluded from every generated program, in production, today
 
 - **Lane:** A — catalogue data (a migration) plus a decision about
