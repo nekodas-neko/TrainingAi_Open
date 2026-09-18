@@ -63,8 +63,37 @@ export function summariseSupplementDay(
       acc.loggedToday = true
       acc.loggedDose = { amount: l.amount ?? null, unit: l.unit ?? null, doseText: l.doseText ?? null }
     }
-    if (l.amount != null) acc.loggedAmount.amount = (acc.loggedAmount.amount ?? 0) + l.amount
-    acc.loggedAmount.unit ??= l.unit ?? null
+    // RV-59 — sum only within ONE unit. This used to add the numbers regardless and take the first
+    // non-null unit as the label, so `1 mg + 2 g` reported `3 mg` or `3 g` depending on row order.
+    // Refusing is the only option that cannot be wrong: `unit` is free text, and the vocabulary in
+    // use includes `ml` and "1 scoop" beside `mg`/`mcg`, so there is no canonical unit to convert
+    // to. A refused day reports no number and says why via `mixedUnits`.
+    if (l.amount != null) {
+      const incoming = l.unit ?? null
+      // "First NUMBERED contribution", not "first contribution" — a tick with no amount still
+      // increments `contributions`, so counting those would compare the next real number against a
+      // unit nobody set and call an ordinary day mixed.
+      const firstNumbered = acc.loggedAmount.amount == null && !acc.loggedAmount.mixedUnits
+      // Two DIFFERENT NAMED units is the mixed case. A null unit inherits instead, because that is
+      // a deliberate prior decision this change has no evidence to overturn:
+      // `components/nutrition/__tests__/supplement-day-totals.test.ts` pins "takes the unit from the
+      // first contribution that HAS one", and a substance logged once without a unit is far more
+      // likely to be unrecorded than to be a different unit. RV-59's measurement is about `mg`
+      // against `g`; it says nothing about null.
+      const conflict = acc.loggedAmount.unit != null && incoming != null
+        && acc.loggedAmount.unit !== incoming
+      if (firstNumbered) {
+        acc.loggedAmount.amount = l.amount
+        acc.loggedAmount.unit = incoming
+      } else if (acc.loggedAmount.mixedUnits || conflict) {
+        acc.loggedAmount.mixedUnits = true
+        acc.loggedAmount.amount = null
+        acc.loggedAmount.unit = null
+      } else {
+        acc.loggedAmount.amount = (acc.loggedAmount.amount ?? 0) + l.amount
+        acc.loggedAmount.unit ??= incoming
+      }
+    }
     acc.loggedAmount.contributions += 1
     out.set(l.supplementId, acc)
   }

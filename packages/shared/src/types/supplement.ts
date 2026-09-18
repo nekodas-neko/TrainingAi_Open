@@ -80,9 +80,25 @@ export interface SupplementDayAmount {
   /** Null when no contribution on the day carried a number — a tick means "taken", not "took none
    *  of it", and 0 would be the "unknown coerced to zero" mistake one level down. */
   amount: number | null
-  /** The unit of the first contribution carrying one. Contributions of one substance are recorded
-   *  in one unit in practice; a mixed-unit day would need converting, which is not this stage. */
+  /** The unit the amount is in, or null. Contributions of one substance are recorded in one unit in
+   *  practice; a mixed-unit day would need converting, which is not this stage — so it is REFUSED
+   *  rather than guessed (RV-59). See `mixedUnits`. */
   unit: string | null
+  /**
+   * RV-59 — the day carried contributions in more than one unit, so no total is reported.
+   *
+   * `summariseSupplementDay` used to add the numbers regardless and label the sum with whichever
+   * unit the loop saw first, so `1 mg + 2 g` reported `3 mg` or `3 g` depending only on row order.
+   * Converting is not possible in general: `unit` is free text and the vocabulary in use includes
+   * `ml` and "1 scoop" alongside `mg`/`mcg`, which have no conversion to a mass.
+   *
+   * When this is true, `amount` and `unit` are both null. **That is the second reason `amount` can
+   * be null**, and this field is what tells the two apart — the other is "no contribution carried a
+   * number at all", which is a tick meaning "taken", not "took none of it".
+   *
+   * Optional so that adding it did not change any existing constructor's type.
+   */
+  mixedUnits?: boolean
   /** How many separate acts of taking it the amount came from. A day with two is not a bug. */
   contributions: number
 }
