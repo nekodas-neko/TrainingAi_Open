@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.457.14",
+    date: "2026-09-18",
+    changes: [
+      "The friends leaderboard's all-time streak is now actually all-time. It was computed over the last 90 days only, so it could never print a number above 90 no matter how long you had really trained \u2014 yours is 102. The best-weeks column had the same ceiling and is lifted too. Nobody's training changed; the board was only ever allowed to see a quarter of it.",
+    ],
+  },
+  {
     version: "1.457.13",
     date: "2026-09-18",
     changes: [

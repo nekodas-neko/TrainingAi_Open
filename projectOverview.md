@@ -26,7 +26,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.457.13 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.457.14 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-18.
 
 **The streak counted the API's window, not the training (BF-176, v1.457.13).** The owner asked why it
@@ -39,9 +39,18 @@ where the edge lands, not what the lifter did.** It dropped because the edge sli
 a trained one. `STREAK_LOOKBACK_DAYS` (`packages/shared/src/workout/streak-window.ts`) is now shared
 by both sides, because they have to agree and nothing made them. **The card may show the old number
 until the `streak-data` cache turns over** (`TTL_LONG`, also stamped optimistically on workout
-completion). **Filed not fixed: LA-117** — the leaderboard's `allTimeStreak` has the same defect over
-its own 90-day window, and the two streak implementations count *different quantities* (training days
-vs calendar days spanned), so they must not be unified to make them agree.
+completion).
+
+**And the same defect on the leaderboard, now fixed (LA-117, v1.457.14).** `allTimeStreak` was
+computed over a 90-day query bound, so a field promising *all-time* structurally could not exceed 90
+against a real 102. The bound is gone — chosen over the cheaper "rename it `recentStreak`" only
+after measuring that the unbounded scan is free (`workout_sessions` is **133 rows / 96 kB** across
+the whole database, indexed on `(user_id, started_at)`). **`weeklyStreak` on the same route read the
+same clipped day list** and was capped at ~14 weeks; the entry named only `allTimeStreak`, and
+reading the route rather than the entry is what found the sibling. **The two streak implementations
+are still deliberately NOT unified** — `computeStreak` counts *training days* with a rest allowance,
+the home loop counts *calendar days spanned* — so `streak-window.ts` now says outright that the
+leaderboard does not read `STREAK_LOOKBACK_DAYS`: 365 would cap an all-time field just as 90 did.
 
 **The only illness band that ever fires now says what moved (TN-45, v1.457.12 — engine half only).**
 `watch` has fired **2 days in 72**; `elevated` and `fever` have fired **zero** times, so the illness

@@ -18,6 +18,19 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-18 — backlog → 23712, `projectOverview.md` → 11702 (LA-117 shipped)
+
+**Backlog −32, overview +9.** LA-117's 31-line entry leaves the queue with the leaderboard fix. The
+overview barely moves because the entry it replaces was already there: BF-176's status paragraph
+ended with a *"filed not fixed: LA-117"* pointer, and that pointer becomes the fix's own paragraph
+rather than being added alongside it. A cross-reference that turns into its own record, rather than
+accumulating next to one, is the shape worth copying — the alternative leaves two paragraphs where
+the second silently contradicts the first.
+
+The workouts domain index gains a gotcha saying the leaderboard's streak query is deliberately
+unbounded, which is the sort of line that only earns its space because the obvious "fix" for it
+(give it `STREAK_LOOKBACK_DAYS`, like every other streak surface) is wrong.
+
 ## 2026-09-17 — backlog → 23459 (TN-46, the medication the scorers cannot see)
 
 **+93.** One new entry and two cross-links. The owner named Retatrutide as the likely cause of the

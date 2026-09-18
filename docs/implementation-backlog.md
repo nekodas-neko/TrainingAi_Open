@@ -1038,38 +1038,6 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
   the trailing 30 days — can only be measured after the owner fires it. Re-measure then; do not
   strike this entry before that.
 
-### [workouts][platform] LA-117 — `allTimeStreak` on the leaderboard can only ever report 90
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-18 (Lane A, found while shipping BF-176).
-- **Lane: A** — `app/api/friends/leaderboard/route.ts:16,35,74,136`. Reached by `app/api/**`, so
-  Lane A by the rule; the leaderboard card that renders it needs no change.
-- **Same defect as BF-176, with a louder name.** `allTimeStreak` is
-  `computeStreak(days, tz, maxCompliantRestGapFor(...)).best` over a `days` list the query bounds at
-  `STREAK_WINDOW_DAYS = 90` (`gte(workoutSessions.startedAt, streakFrom)`). A field called *all-time*
-  that structurally cannot exceed 90 is wrong in the same way the home streak was, and it will read
-  as a plateau to anyone whose real best is longer — the owner's is **102**.
-- **Filed rather than fixed in BF-176's PR, deliberately.** It is one line, and the entry invited
-  batching it. It was kept out because it is a different surface nobody reported, it changes a
-  number other people see on a shared board, and BF-176's value was a one-constant fix whose
-  verification surface should stay one screen. Minimal PRs beat convenient ones.
-- **Two ways to fix it, and they are not equivalent:**
-  1. **Drop the window** so the name becomes true. `workout_sessions` is indexed on
-    `(user_id, started_at)` and this is a personal app with a handful of friends, so the scan is
-    cheap — but it is a scan over every friend's whole history on every leaderboard load, and that
-    cost was never measured. **Measure before choosing this.**
-  2. **Rename the field** to what it computes (`recentStreak`, 90-day). Honest, cheaper, and loses
-    the thing the name promised. This is the fallback if (1) measures badly.
-- **⚠ Do NOT reach for the home streak's number to "make them agree".** They are different
-  quantities: `computeStreak` counts **training days** with a `maxRestGap`, while the home loop
-  counts **calendar days spanned** (`1 + consecutiveRest`, so rest days inside the streak are
-  included). Both are defensible. Unifying them silently changes what the owner's 102 means — see
-  BF-176's own warning, which this entry inherits.
-- **Verification:** a fixture whose training history runs past 90 days, asserting the reported
-  streak exceeds 90. The BF-176 test file
-  (`packages/shared/src/workout/__tests__/streak-window.test.ts`) has the shape to copy — its
-  `at a %i-day window the count tracks the WINDOW` case is the same experiment.
-
-
 ### [nutrition] BF-175 — the log-food sheet prints the stored GOAL as today's budget, so it reads 1660 beside the card's 1506
 
 - **Lane:** B — `components/nutrition/assign-step.tsx`, `components/nutrition/food-logger-sheet.tsx`,
