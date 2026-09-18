@@ -352,6 +352,14 @@ Live at the time of writing (2026-07-30):
 
 ## Gotchas specific to this domain
 
+- **Every exercise PICKER filters `mergedInto` itself (RV-51).** `listExerciseLibrary` is
+  deliberately unfiltered — the catalogue is global and other consumers resolve metadata for rows
+  another user still has logged — so a picker that forgets offers duplicates. `generate-program`,
+  `builder-chat` and `builder-review.tsx` all filter it now. **Do not rely on an empty equipment list
+  to hide a merged row**: that was excluding only two of production's four merged rows, and the other
+  two were being offered beside the canonical rows they were merged into. A merged row with equipment
+  is the shape a test fixture needs; an unlabelled one passes against a broken filter.
+  ([`2026-09-18-lane-a-rv51-merged-duplicate-exclusion.md`](../../overview/entries/2026-09-18-lane-a-rv51-merged-duplicate-exclusion.md))
 - **A missing day in `trainedDays` reads as a REST day, not as missing data (BF-176).** The streak
   loop walks back 365 days; if the supplier sends fewer, every day past its window looks like rest
   and three of them break the streak. The failure is not an under-count by the difference — **the
