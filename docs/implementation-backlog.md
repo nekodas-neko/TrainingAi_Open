@@ -443,6 +443,37 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [platform] LB-121 — the queue parser's "blocked" marker is the same glyph the repo uses for emphasis
+
+- **Lane: O** — `scripts/next-item.js:97` (and `lib/queue-buckets.js` for the ordering).
+  Filed by Lane B, not built by it: `scripts/**` is the Orchestrator's.
+- **Added:** 2026-09-18 · found by re-reading PARKED, which is where the damage hides.
+- **`if (!current.legacyBlocked && line.includes('⛔'))` treats a `⛔` ANYWHERE in an entry as the
+  legacy prose blocker.** That is right for the marker it was written for and wrong for the same
+  character used as emphasis — which this repo does constantly, CLAUDE.md included.
+- **The damage is not the bucket, it is the LOST RESIDUE.** A parked entry prints
+  `unmigrated marker — <first 90 chars of whatever line held the glyph>`, so an entry with a real
+  `Keep:` shows a prose fragment instead of what is owed. TN-25 printed
+  *"length the app already uses (30 min) deliberately…"* where its residue is a device walk and a
+  month of compliance data. A reader scanning PARKED cannot see the obligation at all.
+- **It has fired at least four times: LB-116, TN-3b, and — the same day the baton warned about it —
+  TN-25 and OR-116, both from my own edits.** One of the two was a `⛔` *inside backticks, quoting
+  the name of another warning*. Knowing the rule is demonstrably not enough to follow it, which is
+  the argument for a code fix over a prose one.
+- **A `Gate:` or `Needs:` already overrides the marker; a `Keep:` does not**, and that asymmetry is
+  the whole bug. The script's own comment says *"a structured field is authoritative"* — `Keep:` is
+  a structured field.
+- **Recommendation: let `Keep:` override the legacy marker, exactly as `Gate:` and `Needs:` do.**
+  One clause at `next-item.js:135`. It cannot hide a genuine block, because an entry whose residue
+  really is gated states `Gate:` in the `Keep:` line and that path already parks it.
+  - **Alternative considered — require the marker at line start.** Cheaper to reason about, but it
+    silently un-parks any legacy entry whose marker is mid-line, which is the population the field
+    exists to keep visible. Worse.
+  - **Alternative — ban `⛔` from the backlog and lint for it.** Honest, and it fights the house
+    style everywhere else in the repo for no gain once `Keep:` is authoritative.
+- **Reversal cost: low.** One conditional; the buckets are unit-tested in `lib/queue-buckets.js`.
+- **Branch:** _unassigned_
+
 ### [platform] LB-120 — the backlog's doc-size baseline collides on every pair of concurrent implementer PRs
 
 - **Lane: O** — `scripts/check-doc-index-size.js` and `docs/doc-size/docs/implementation-backlog.md.size`.
@@ -4703,8 +4734,8 @@ between a treadmill walk and an outdoor walk without any surface-specific adjust
   then, so the pattern was never actually assigned.
 - **The two things the selector could not supply are answered in `walk-pattern-config.ts`**: how
   many sets, and how to express a pattern with no alternation. Total duration is pinned at the
-  length the app already uses (30 min) **deliberately** — this entry's own `⛔ One session, three
-  variables` warning is that 2026-09-09 moved block length, recovery and total at once, so a
+  length the app already uses (30 min) **deliberately** — this entry's own *One session, three
+  variables* warning is that 2026-09-09 moved block length, recovery and total at once, so a
   prescription that also moved duration would repeat the confound.
 - **The pre-set-vs-suggest question this entry delegated to Lane B was decided: pre-set.** The owner
   asked to have it *"determined for me"*. The hazard the entry named is handled rather than
@@ -11731,7 +11762,7 @@ the day's move-hours total is below the goal.
   `hrMin` reaching `HrFactorsCard`'s `restingHr` prop was a deliberate proxy or an oversight. It is
   neither: the card prints **`Lowest recorded today: {restingHr} bpm`**, and `hrMin` is exactly
   today's lowest. The value, the sentence and the data always agreed — **only the prop NAME lied.**
-  **⛔ So the obvious fix was the dangerous one:** passing a real resting HR would have left the card
+  **⚠ So the obvious fix was the dangerous one:** passing a real resting HR would have left the card
   printing a true number under a false sentence, a worse bug and an invisible one, because the name
   would finally match while the output stopped being true. Renamed to `lowestHrToday` in
   `fix/or116-lowest-hr-prop-name`, one caller, no rendered output changed, with the finding written
