@@ -52,6 +52,21 @@ are still deliberately NOT unified** — `computeStreak` counts *training days* 
 the home loop counts *calendar days spanned* — so `streak-window.ts` now says outright that the
 leaderboard does not read `STREAK_LOOKBACK_DAYS`: 365 would cap an all-time field just as 90 did.
 
+**The queue tool called four shipped entries unstarted, and the entry it offered as next was
+owner-blocked (LA-120, 2026-09-18).** `keepFromLines` did not match `- **⚠ Keep:`, so TN-49's three
+residues and LA-118's one were invisible and those entries kept their original high priority — the
+third time `scripts/lib/keep.js` has been narrow in a way nobody noticed until a shipped entry was
+offered as buildable. Widened to a **non-word** prefix only, after measuring that 140 of 144 Keep
+bullets already matched and all four misses were that one shape; the two documented false positives
+(`**Keep the stored field on 1–10**`, prose `The Keep:`) still refuse, and both are asserted.
+Separately, **two entries got the gate their own text already implied.** LA-76's `Gate: owner` was
+removed in September when the owner settled the deload *rule*, leaving the different question it
+actually waits on (does a deload span become first-class stored state?) with nothing marking it.
+Q-220 carried a ⚠ written *"so the next implementer does not defer it again silently"* — and three
+days later it was offered as next-up and re-derived, because prose cannot reach a tool that reads
+fields; its Lever 2 needs a quiet window and a structural decision, both the owner's. Lane A's READY
+list went **12 → 9**.
+
 **Three shared modules whose contract and behaviour had drifted (RV-58/59/60, 2026-09-18 — one PR,
 the last sweep-50 batch).** **RV-58** — `equipmentEligible` folded case on the exercise side and
 `buildEquipmentSet` on neither, so `equipmentEligible(['Barbell'], buildEquipmentSet(['barbell']))`

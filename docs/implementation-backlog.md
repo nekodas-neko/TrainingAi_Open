@@ -6124,7 +6124,14 @@ unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge
 
 - **Lane:** A — `app/api/collection/route.ts`, plus a migration.
 - **Added:** 2026-09-07, Lane A — the half of LB-60's `pausedDays` that did not ship with the route.
-- **The old `Gate: owner` is removed** — the decision above is the one it was waiting for.
+- **Gate: owner** — and it is a DIFFERENT question from the one already answered. The old gate was
+  removed on 2026-09-14 because the owner had settled the RULE (a deload must not cost cats), and
+  that was right. What it did not settle is the ⚠ above: whether a deload span becomes **first-class
+  stored state**, which is what a dated `program_phases` interval means and what the migration would
+  commit to. Re-gated 2026-09-18 by Lane A, which reached this entry as next-up and could not start
+  it: with no gate the queue tool called it READY, while the first instruction inside it is *"put
+  that to the owner before writing the migration"*. An entry whose own text blocks it has to say so
+  in the field the tool reads.
 
 **The early-deload half SHIPPED 2026-09-07**: `pausedDays` now carries `earlyDeloadWeekDays(program)`
 beside the chosen rest days, so a confirmed early deload decays nothing. That span is the only DATED
@@ -19671,6 +19678,16 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   Nothing else in the entry is disturbed by this; the plan and the "archiving the fixed ones only
   removes 17%" caveat still stand.
 - **Lane:** A
+- **Gate: owner** — added 2026-09-18, because the ⚠ at the bottom of this entry did not hold. It was
+  written on 2026-09-15 *"so the next implementer does not re-derive the reasoning and defer it
+  again silently"*, and three days later Lane A reached this entry again, re-derived it and would
+  have deferred it again: with no field to read, `next-item.js` kept printing it at the top of
+  READY. What blocks Lever 2 is not effort — it is **a quiet window and a structural decision**, and
+  both are the owner's: the quiet window because only he decides whether five agents are appending
+  to `projectOverview.md` while 207 entries move out of it, and the decision because where the open
+  Known Issues live changes what **every** session reads at orientation, with the multi-tag
+  visibility risk this entry already names. **What lifts it:** the owner saying the move should
+  happen, and when — after which it is the Orchestrator's sweep, not an implementer's.
 - **Branch:** none yet · **Added:** 2026-08-10, raised by the owner during the public-repo migration.
 - **Plan:** [`2026-08-10-orientation-cost.md`](superpowers/plans/2026-08-10-orientation-cost.md)
 - **The measurement:** `CLAUDE.md` is 918 lines (~27k tokens) and loads automatically; its first
