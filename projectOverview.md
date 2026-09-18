@@ -52,6 +52,20 @@ are still deliberately NOT unified** — `computeStreak` counts *training days* 
 the home loop counts *calendar days spanned* — so `streak-window.ts` now says outright that the
 leaderboard does not read `STREAK_LOOKBACK_DAYS`: 365 would cap an all-time field just as 90 did.
 
+**The muscle-attribution query was four copies; three are now one (LA-118, 2026-09-18 —
+unversioned).** `weightedSetsByMuscle` in `periodization.ts` is the single set-counting query;
+`getWeeklySetsByMuscleGroup`, `getSetsByMuscleInWindow` and `/api/weekly-muscle-sets` call it. The
+two things the copies disagreed about — **which timestamp attributes a set to a day**, and **whether
+a previous programme counts** — are parameters now, so a caller states its answer instead of
+inheriting whichever copy it started from. **One behaviour change, and it is the defect:**
+`weekly-muscle-sets` had no upper bound at all, so a log dated in the future counted toward this week
+forever; it has one now. **The date column had no test holding it in either direction** — every
+fixture in the repo set `started_at` and `logged_at` to the same instant — so there is one now, a
+session started 22:00 yesterday with its sets logged 00:30 today, where the two reads deliberately
+disagree. **`muscle-tonnage-trend` is still its own copy**, as LA-118 instructed for a first pass: it
+sums tonnage and buckets by week, so folding it in changes the shared function's shape. LA-118 stays
+queued for that, and the honest count is two implementations rather than one.
+
 **Sets per muscle over any window, so the balance card can finally be built (LB-111, 2026-09-18 —
 engine half, unversioned).** `GET /api/muscle-sets?from=&to=` is new: nothing served this number
 before, because every muscle-set route computed the current week server-side and took no parameters.
@@ -2119,6 +2133,36 @@ Last swept **2026-09-03**.
 > An entry only leaves when **nothing is still owed**: no open work, no pending owner or device
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
+
+### [workouts] 🟠 Two real exercises are excluded from every generated program (RV-51, 2026-09-18) · found, not fixed
+
+**Open.** `equipmentEligible` (BF-129) excludes an exercise that declares no equipment, justified in
+its header with *"Migration 269 labelled the 22 rows that had drifted … so an empty list should not
+occur"*. **It occurs.** Production `claude_ro.exercise_library` holds **2 of 156** rows with
+`equipment = []` — `Dumbbell Lunges` and `Cable Lat Pulldown`, both verified 2026-09-18.
+
+Because the implementation is `exerciseEquipment.some(...)`, an empty array is false against **every**
+selection including `full_gym`. Both exercises are therefore invisible to `generate-program`,
+`builder-chat` and the builder review filter, for every user, at every equipment setting — and for
+these two rows excluding is not the safe direction the comment claims, since a full-gym lifter can
+perform both.
+
+**Fix the data, not the rule** — the exclude-on-empty rule is what stopped a home gym being offered
+Machine Chest Press. **But answer the question the data raises first:** `exercise_library` has no
+`created_at`, so it could not be established whether migration 269 *missed* these two or something
+*wrote* them afterwards. If it is the latter, the `POST /api/exercises` guard has a hole and
+labelling two rows fixes nothing.
+
+### [platform][workouts] ⚠️ A banned ms-offset window landed on the mood write path (RV-62, 2026-09-18)
+
+`deriveSuggestedSoreMuscles` (`adapter.ts:3133`, new in this window — `fdcee2d4`) builds its recovery
+window as `new Date(Date.now() - 7 * 86_400_000)`, the pattern CLAUDE.md's Date Arithmetic section
+bans by name. **Whether the day-boundary skew flips a provenance verdict was NOT established** — the
+window feeds `computeMuscleRecovery`, and a workout landing in or out of it at the edge is exactly
+the case that decides whether a sore tick reads as "suggested". Construct that case rather than
+assuming; it decides whether this is hygiene or a live scoring defect. Same function also selects the
+**whole exercise catalogue on every check-in save**.
+
 
 ### [workouts][platform] 🟠 A phase change makes every compound read as a strength decline (LA-110, 2026-09-15) · found, not fixed
 
