@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.457.12",
+    date: "2026-09-18",
+    changes: [
+      "When your biomarkers drift far enough for the app to notice, it now tells you WHICH ones \u2014 \"Resting HR and HRV are drifting from your baseline\" instead of \"some biomarkers are drifting\". It names the one or two actually driving the reading, and it deliberately says nothing about what the drift might mean: the only two times this has ever triggered, the cause was not illness. Note this line is not on screen yet \u2014 the wording is ready, the place to show it is not.",
+    ],
+  },
+  {
     version: "1.457.11",
     date: "2026-09-17",
     changes: [

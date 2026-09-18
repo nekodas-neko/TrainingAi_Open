@@ -26,8 +26,26 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.457.11 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-09-17.
+**Version:** v1.457.12 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-09-18.
+
+**The only illness band that ever fires now says what moved (TN-45, v1.457.12 — engine half only).**
+`watch` has fired **2 days in 72**; `elevated` and `fever` have fired **zero** times, so the illness
+banner has never rendered at all. And `watch` is inert twice over — no readiness penalty (deliberate,
+"advisory-only") and no UI, so the band is named advisory-only and there is no advisory. Its copy also
+named nothing, while `IllnessResult.biomarkers` already carried the per-biomarker `{ z, contribution }`
+the source comments call *"the 'why', for the advisory"*. `illnessAdvisory(flag, biomarkers?)` now reads
+it: *"Resting HR and HRV are drifting from your baseline — worth keeping an eye on."* Ranked by
+**contribution** rather than raw z, capped at two, zero-contribution biomarkers never named, and the
+parameter is optional so no existing caller changes. **The wording deliberately implies nothing about
+cause** — both real firings were driven by a medication rather than illness (TN-46), so an
+infection-flavoured line would have been wrong on 100% of the occasions this feature has ever appeared.
+**⚠ NOTHING RENDERS IT YET** — the guard at `components/home/illness-advisory-banner.tsx:15` still
+returns `null` for `watch`, and the owner chose a quiet line under the readiness score rather than the
+amber banner. Until Lane B ships that line the defect is unchanged from the owner's side, and TN-45
+stays queued with a `Keep:` saying so. **Also unexplained:** the other `watch` day, **2026-08-27**,
+predates the first dose by eleven days and carries an HRV z of **−4.26** — TN-46's "the cause is now
+known" covers 09-16 and cannot cover it.
 
 **Two calorie budgets, two taps apart, are now one (BF-175, v1.457.11).** The card said 1,506 and
 the log-food sheet said 1,660 — not a stale cache: the sheet fetched `nutrition_targets.calories`
