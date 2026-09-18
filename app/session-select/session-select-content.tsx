@@ -83,6 +83,7 @@ import {
 } from "@/lib/home/home-prefs";
 import { chooseRestDay, withRestDayOverride } from "@/lib/home/rest-day";
 import { fetchWithRetry } from "@trainingai/shared/fetch-with-retry";
+import { STREAK_LOOKBACK_DAYS } from "@trainingai/shared/workout/streak-window";
 import type { SleepRow } from "@/app/health/health-sections";
 import type { HrSleepWindow } from "@trainingai/shared/health/hr-sleep-band";
 
@@ -529,9 +530,11 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
             }
           },
         ),
-        // streak-data (90 days) is a strict superset of what home needs — the calendar
-        // screen's own calendar-data:<month> fetch is what serves /calendar; home no
-        // longer fetches it redundantly (activityDays is never read here).
+        // streak-data (STREAK_LOOKBACK_DAYS) is a strict superset of what home needs — the
+        // calendar screen's own calendar-data:<month> fetch is what serves /calendar; home no
+        // longer fetches it redundantly (activityDays is never read here). The parenthetical
+        // said "90 days" until RV-57: that is the pre-BF-176 window, and BF-176 is the bug where
+        // the route sent 90 while this file walked 365.
         cachedFetch<{ trainedDays: Record<string, string[]> }>(
           'streak-data',
           '/api/streak-data',
@@ -1017,7 +1020,11 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     // for a day that hasn't ended yet.
     if ((trainedDays[dayKey(0)] ?? []).length > 0) count = 1;
     // Walk back from yesterday so an untrained today doesn't break the streak.
-    for (let ago = 1; ago < 365; ago++) {
+    // The bound is the SHARED constant, not a literal (RV-57): its module calls itself a contract
+    // between the route that decides how many days to send and this loop that decides how far to
+    // walk, and a literal here cannot be held to it. The value is unchanged — 365 either way — so
+    // this changes nothing today and makes BF-176 unrepeatable tomorrow.
+    for (let ago = 1; ago < STREAK_LOOKBACK_DAYS; ago++) {
       const trained = (trainedDays[dayKey(ago)] ?? []).length > 0;
       if (trained) {
         count += 1 + consecutiveRest;

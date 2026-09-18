@@ -18,6 +18,29 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-18 — backlog → 24070, `projectOverview.md` → 11841 (RV-63 shipped)
+
+**Backlog −21.** The overview paragraph is long for a route change because two of the three things
+in it are decisions NOT to do what the entry said: no date floor (it would change what the ladder
+reports), and a rate-limit norm derived from the one property that actually separates the siblings
+rather than from the nearest one read first. A future session that sees only "added a rate limit and
+narrowed two selects" would re-propose the floor within a month.
+
+---
+
+## 2026-09-18 — backlog → 24091, `projectOverview.md` → 11826 (RV-55/56, the route-input batch)
+
+**Backlog −36 for two entries**, the second batch of the day to leave whole. Both were Q-496-shaped,
+so they shared a test file and a single mutation pass — which is the axis `Batch:` asks about
+(what has to be VERIFIED), not the subject.
+
+The overview paragraph spends its length on RV-55's open decision rather than on the diff, because
+the diff is a deleted field: the entry offered *scope the conflict* or *drop it*, and which one is
+right is answerable only by reading the callers. Recording that the local vial mirror is read-only
+is what stops the next reader assuming an outbox replay needs to choose an id.
+
+---
+
 ## 2026-09-18 — backlog → 24127, `projectOverview.md` → 11815 (RV-52/53/54, the sweep-50 cache batch)
 
 **Backlog −41 for three entries, which is what a batch should look like**: they shared a file, a
@@ -13672,6 +13695,7 @@ live scoring defect. The row says so explicitly rather than implying either.
 
 Both carry their `[domain]` tags, and both say "found, not fixed" / name what was not established,
 so neither can be mistaken for a closed item on a later sweep.
+
 ## 2026-09-18 — `docs/implementation-backlog.md` 23670 → 24199 (Lane B, TN-3b pass test)
 
 +19 to correct a stale blocker that was parking real work. TN-3b said its pass test could not be met
@@ -13686,3 +13710,20 @@ The lines are worth it because of what the claim was holding: TN-35's `Needs: TN
 buildable Lane B overlay parked, and the entry's remaining promises (HR-chart overlay, cross-day
 aggregate) are pre-reshape prose that the owner-approved plan replaced with TN-35a. Recording which
 half is done and which is a scope question is what lets the Orchestrator clear it in one pass.
+
+## 2026-09-18 — `docs/implementation-backlog.md` 24070 → 23888 (ratchet down, TN-25)
+
+**−182.** TN-25's wiring shipped (`feat/tn25-wire-walk-pattern-selector`, v1.458.0), which was the
+last buildable half — the engine and the band had landed 2026-09-16. The entry ran 212 lines because
+it carried the whole 2026-09-08 calibration argument: the measured 0-of-44 table, the four
+superseded options kept "for the record", the band-vs-fraction recommendation, and the reshaped
+owner decision. All of that is settled and lives in the review it cites, in the shipped code's own
+comments, and now in a journal entry.
+
+What survives is 31 lines: which halves shipped where, the two questions the selector could not
+answer and why `walk-pattern-config.ts` answers them the way it does, the pre-set-vs-suggest decision
+this entry had delegated to Lane B, and a `Keep:` for the two things genuinely still owed — the S25
+check (GPS, cadence and the strap are not reachable from the web harness) and this entry's own pass
+test, *"fast-block compliance over a month is neither 0% nor 100%"*, which needs a month of wearing
+rather than a sitting. **Not struck**, because that second one is unmeasured.
+
