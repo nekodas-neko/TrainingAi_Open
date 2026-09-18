@@ -18,13 +18,15 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
-## 2026-09-18 — backlog → 23987, `docs/agents/state/tuning.md` → 685 (TN-50 + two method traps)
+## 2026-09-18 — backlog → 24017, `docs/agents/state/tuning.md` → 685 (TN-50 + two method traps)
 
-**+58 and +21.** TN-50 records that the owner has not logged better than "ok" in seven weeks and
-`pumped` has never been chosen in the app's life — a seven-week slide in the one signal he reports
-himself, invisible because the contributor consumes today's value and nothing reads the series. It
-carries two ⚠ guards inline because the obvious "fix" (re-map the energy scale so 100 is reachable)
-would hide the finding rather than address it.
+**+88 and +21.** TN-50 went through two drafts in one sitting and the entry carries both, because
+the correction is the finding. The first read the stored `energy_level` column as a self-report and
+concluded a seven-week slide; the owner replied that he never chooses the value. The sheet seeds it
+from `readinessToEnergy(readiness)` and the same day's mood scores into the same day's readiness, so
+~10% of the readiness weight is a re-reading of readiness on 73% of days. The wrong draft stays
+visible in the entry because anything else reading that column will make the same mistake. Three
+other owner decisions land in the same PR (TN-47's gate, Q-506's sequencing, PS-44's start).
 
 The baton grows for the first time with a **Method** section rather than state. Two traps cost this
 agent a finding each in one session, and both are one mistake: rebuilding the app's logic in an

@@ -5,26 +5,36 @@
 Following the calibration sweep, the owner asked for whatever was learned to go into the backlog.
 Two things did: one finding about him, one about how this agent works.
 
-## TN-50 — the subjective signal has been sliding for seven weeks, unremarked
+## TN-50 — the "self-report" is auto-filled from the score it feeds
 
-Chasing why the `checkin` contributor under-delivers (TN-47 measured it supplying 6.5% of the score's
-movement against a 10% weight), the cause turned out to be the data rather than the mapping.
+Chasing why the `checkin` contributor under-delivers (TN-47 measured 6.5% of the score's movement
+against a 10% weight), the first read of the stored `energy_level` column looked like a seven-week
+slide: no `good` since 2026-07-30, `pumped` never logged, `low` the modal answer over 30 days.
 
-`pumped` has **never** been logged in the app's history. `good` has not been logged since
-**2026-07-30**. Over the last 30 days: `low` 13, `ok` 11, `drained` 4 — and `low` is now the modal
-answer.
+**The owner corrected it before that reached a conclusion:** *"I dont really choose them; I let it
+auto select … It should choose neutral by default. This was more a way to tune based on my response.
+Not infer."*
 
-The UI is not the constraint; `mood-checkin-sheet.tsx` offers Pumped ⚡ and renders it in three
-surfaces. It has simply never been chosen.
+He is right, and the code says so plainly. `mood-checkin-sheet.tsx:86` seeds the energy state from
+`readinessToEnergy(readiness)` — its own prop comment reads *"Oura readiness score — sets energy
+default"* — and `readiness-payload.ts:492` scores **today's** mood into **today's** readiness. The
+loop closes inside a single day. Measured over the 62 days carrying both, the saved level is exactly
+what the auto-select would have produced on **45 of them, 73%**, against roughly 20–25% by chance.
+**So about 10% of the readiness weight is a re-reading of readiness on three days in four.**
 
-Two consequences. Readiness cannot reach 100, because `pumped` → 100 is the only path to it and the
-observed ceiling is 87 across 65 days. More usefully: a seven-week slide in **the one signal the
-owner reports himself** is invisible, because the contributor consumes today's value and nothing
-reads the series. It corroborates the objective picture — HRV 62 → 19 ms, resting HR +13 — from a
-completely independent source.
+`pumped` has never been logged because `readinessToEnergy` has **no branch that returns it** — not
+because he never feels good. And `CHECKIN_ENERGY_SCORE.pumped = 100` is the only route to a readiness
+of 100, which is why the ceiling is 87 across 65 days.
 
-The entry carries a guard against the obvious "fix": re-mapping the energy scale so 100 is reachable
-would compress an honestly-used scale and hide the finding.
+The 27% he *did* override is the only genuine signal in the column, and it disagrees in both
+directions — readiness 37 saved as `good`, readiness 65 saved as `drained`. Exactly the independent
+subjective reading the term is for, drowned out on the rest.
+
+**The first draft of this entry drew the wrong conclusion from the same column**, and TN-50 keeps that
+visible rather than quietly fixing it: anything else reading `energy_level` as a self-report will make
+the same mistake. It also means TN-47's 6.5% figure is not independent and needs re-measuring.
+
+Owner decision recorded: **default to neutral, do not infer.**
 
 ## PS-44 — the overnight window has not started, and the strap has never recorded at night
 
