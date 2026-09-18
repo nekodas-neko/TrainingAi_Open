@@ -45,6 +45,17 @@ entry is what Lane A reads before running it. The working is in a review doc, no
 
 ---
 
+## 2026-09-18 — backlog → 23744, `projectOverview.md` → 11693 (BF-176 shipped)
+
+**−29 and +14.** BF-176's entry leaves with the fix; **LA-117** replaces it, carrying the sibling
+defect (`allTimeStreak` over its own 90-day window) that this PR deliberately did not batch. A net
+shrink even so, which is the shape to want when a shipped entry owes exactly one follow-up.
+
+The `projectOverview` growth is one paragraph, and the sentence earning most of it is the mechanism
+rather than the fix: **once the real streak exceeds the window the number tracks where the edge
+lands, not what the lifter did**. Without that, the next reader sees a constant raised from 90 to 365
+and files it as a limit that was too low, which is not what happened.
+
 ## 2026-09-18 — backlog → 23773, `projectOverview.md` → 11679 (TN-45 engine half)
 
 **+18 and +18.** TN-45 is an A-then-B entry and only the engine half shipped, so it stays queued with
