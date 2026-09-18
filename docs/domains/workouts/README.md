@@ -362,6 +362,15 @@ Live at the time of writing (2026-07-30):
   **calendar days spanned** (`1 + consecutiveRest`). Do not unify them to make them agree — it
   silently changes what the number means.
   ([`2026-09-18-lane-a-bf176-streak-window.md`](../../overview/entries/2026-09-18-lane-a-bf176-streak-window.md))
+- **The leaderboard's streaks are deliberately UNBOUNDED, and must stay that way (LA-117).**
+  `app/api/friends/leaderboard/route.ts` reads every trained day with no day filter, because
+  `allTimeStreak` promises all-time and any window caps it — 365 would cap it just as the old 90
+  did. `weeklyStreak` on the same route reads the same day list, so a bound there silently caps two
+  fields, not one. Chosen over renaming the field only after measuring the scan (`workout_sessions`:
+  133 rows / 96 kB whole-database, indexed on `(user_id, started_at)`). If the app ever grows a real
+  user base, bound it on **rows** and rename the field rather than reinstating a day window under a
+  name that promises all-time.
+  ([`2026-09-18-lane-a-la117-leaderboard-all-time-streak.md`](../../overview/entries/2026-09-18-lane-a-la117-leaderboard-all-time-streak.md))
 - **Muscle names are matched through `muscles.ts`, never compared raw (BF-171).** `normalizeMuscle`
   folds synonyms (`core` → `abs`, `quadriceps` → `quads`) and `moodMuscleMatches` expands a broad
   check-in pill to the catalogue muscles it covers — **`Back` is a pill and is not a muscle**; the

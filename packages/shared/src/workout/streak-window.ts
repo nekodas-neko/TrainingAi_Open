@@ -16,5 +16,11 @@
  *
  * So a supplier that sends less than the consumer walks does not under-report by the difference —
  * it reports a property of the window. Any new streak surface reads this constant.
+ *
+ * **One surface deliberately does NOT**: the friends leaderboard (`app/api/friends/leaderboard`)
+ * reads every trained day with no bound at all, because its field is named `allTimeStreak` and 365
+ * would cap it just as 90 did (LA-117). That is a different question from this one — this constant
+ * answers "how far back does a lookback surface look", and the leaderboard answers "what is the
+ * best streak ever". Do not unify them by giving the leaderboard this number.
  */
 export const STREAK_LOOKBACK_DAYS = 365

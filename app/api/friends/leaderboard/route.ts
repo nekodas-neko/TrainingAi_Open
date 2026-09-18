@@ -13,8 +13,6 @@ import { longestWeeklyStreak } from '@trainingai/shared/workout/year-review'
 import { startOfWeek, format } from 'date-fns'
 import { toZonedTime } from 'date-fns-tz'
 
-const STREAK_WINDOW_DAYS = 90
-
 function getMondayUtc(tz: string): Date {
   const nowInTz = toZonedTime(new Date(), tz)
   const monday = startOfWeek(nowInTz, { weekStartsOn: 1 })
@@ -32,7 +30,6 @@ export async function GET(req: Request) {
 
   const db = getDb()
   const monday = getMondayUtc(tz)
-  const streakFrom = new Date(Date.now() - STREAK_WINDOW_DAYS * 24 * 60 * 60 * 1000)
 
   const [userRows, weeklyRows, allTimeRows, streakRows, scheduleRows] = await Promise.all([
     db.select({
@@ -63,15 +60,24 @@ export async function GET(req: Request) {
       .where(and(inArray(s.workoutSessions.userId, allIds), isNull(s.workoutSessions.deletedAt)))
       .groupBy(s.workoutSessions.userId),
 
-    // Distinct trained days per user over the streak window (a "trained day" = a session with a
-    // non-deleted exercise log, matching getRecentTrainedDays / the user's own streak card), as
-    // 'YYYY-MM-DD' in the user's tz. Streaks are computed from these via the canonical helpers.
+    // Every trained day per user, unbounded (a "trained day" = a session with a non-deleted
+    // exercise log, matching getRecentTrainedDays / the user's own streak card), as 'YYYY-MM-DD' in
+    // the user's tz. Streaks are computed from these via the canonical helpers.
+    //
+    // LA-117 — this used to stop at 90 days, which capped BOTH streaks below at a property of the
+    // window rather than of the lifter: `allTimeStreak` could not exceed 90 against a real 102, and
+    // `weeklyStreak` could not exceed ~12. Dropping the bound is what makes the names true. It was
+    // measured before it was chosen, because it turns a bounded read into a scan of every friend's
+    // whole history on each load: `workout_sessions` holds 133 rows in 96 kB across the whole
+    // database (2026-09-18, `pg_stat_user_tables`), and the table is indexed on
+    // (user_id, started_at). If this app ever grows a real user base, bound it again on rows and
+    // rename the field — do not quietly reinstate a day window under a name that promises all-time.
     db.selectDistinct({
       userId: s.workoutSessions.userId,
       day: sql<string>`to_char(${s.workoutSessions.startedAt} AT TIME ZONE ${tz}, 'YYYY-MM-DD')`,
     }).from(s.workoutSessions)
       .innerJoin(s.exerciseLogs, and(eq(s.exerciseLogs.workoutSessionId, s.workoutSessions.id), isNull(s.exerciseLogs.deletedAt)))
-      .where(and(inArray(s.workoutSessions.userId, allIds), gte(s.workoutSessions.startedAt, streakFrom), isNull(s.workoutSessions.deletedAt))),
+      .where(and(inArray(s.workoutSessions.userId, allIds), isNull(s.workoutSessions.deletedAt))),
 
     // BF-122a — every user's active schedule in ONE query, so the streak's rest-day allowance is
     // read off their plan rather than hardcoded. Batched with `inArray` like every other query in
