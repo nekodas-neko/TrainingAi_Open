@@ -114,8 +114,20 @@ test('back from a push off Home returns to Home, not the tab whose tree is stale
   await settleRouteBoundary(page)
 
   expect(new URL(page.url()).pathname, 'the URL half was never the bug').toBe('/')
+  // Home's h1, whichever greeting it is carrying.
+  //
+  // This used to spell the list out as `morning|afternoon|evening`. `getGreeting` has **four**
+  // periods — `night` from 21:00 — so the assertion was red for three hours of every day and green
+  // for the other twenty-one, which is the hour-dependent trap CLAUDE.md's date rule names and
+  // that `app/session-select/greeting.ts` warns about in its own comment. It first bit on
+  // 2026-09-18, when CI ran at 12:34 UTC: 22:34 in the seed user's Brisbane.
+  //
+  // Matched by SHAPE rather than re-transcribed with a fourth alternative. Listing the periods puts
+  // the same trap back the moment a fifth is added, and pinning one would need the seed user's
+  // timezone, which would re-open it from the other direction. All this has to prove is that Home's
+  // own tree rendered rather than the tab whose tree was stale — not which greeting it chose.
   await expect(
-    page.getByRole('heading', { name: /Good (morning|afternoon|evening)/ }).first(),
+    page.getByRole('heading', { name: /^Good \w+, / }).first(),
     'back from a push off Home rendered the stale tab instead of Home (regression guard, not a BF-49 repro)',
   ).toBeVisible({ timeout: 30_000 })
 })
