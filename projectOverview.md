@@ -52,6 +52,18 @@ are still deliberately NOT unified** — `computeStreak` counts *training days* 
 the home loop counts *calendar days spanned* — so `streak-window.ts` now says outright that the
 leaderboard does not read `STREAK_LOOKBACK_DAYS`: 365 would cap an all-time field just as 90 did.
 
+**Three cache keys that no write evicted (RV-52/53/54, 2026-09-18 — one PR, the sweep-50 batch).**
+`weekly-review-month-window:` was in **zero** invalidation groups while its sibling
+`day-review-week-window:` — rendered by the same surface from the same writes — was in three;
+`stress-day:` was in zero while `body-battery`, on the same card, was in four; and
+`invalidatePrescriptionChanged()` did not clear `collection`, though `/api/collection` computes
+`pausedDays` from the deload confirmation that group exists to fan out, and the deload handler calls
+only that group. **One claim of mine was wrong and was corrected before it shipped:** the first
+comment said the collection ladder "kept decaying across a week", but per Q-262 both readers use
+`useCachedValue` without `freshWithinTtl` and neither is seed-only, so `cachedFetchCore` always
+revalidates — the real symptom was a briefly-stale first paint. Registered anyway, because an inert
+key becomes load-bearing the moment someone adds `freshWithinTtl` to it.
+
 **The soreness-provenance window used the banned ms-offset form, and it is not hygiene (RV-62,
 2026-09-18).** `deriveSuggestedSoreMuscles` built its seven-day window as `Date.now() - 7 *
 86_400_000` — the exact pattern the Date Arithmetic rule names — shipped in BF-173 that morning and

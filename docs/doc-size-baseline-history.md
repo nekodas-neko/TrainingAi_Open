@@ -18,6 +18,20 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-18 — backlog → 24127, `projectOverview.md` → 11815 (RV-52/53/54, the sweep-50 cache batch)
+
+**Backlog −41 for three entries, which is what a batch should look like**: they shared a file, a
+verification surface and a single test suite, so they cost one PR and one gate rather than three of
+each. `Batch:` means one PR, and the batch slug leaves the queue whole.
+
+The overview's +12 spends most of its words on a claim I got wrong and caught before shipping — the
+first RV-54 comment asserted a week of decaying data where Q-262 says to check first, and the check
+said a briefly-stale first paint. The key is registered either way; the difference is whether the
+comment beside it is true. That is worth the lines because the wrong version is the more memorable
+story, and it would have been the one a future reader inherited.
+
+---
+
 ## 2026-09-18 — backlog → 24168, `projectOverview.md` → 11803 (RV-62 shipped)
 
 **Backlog −23.** An entry left the queue with both halves done and its open question answered rather
