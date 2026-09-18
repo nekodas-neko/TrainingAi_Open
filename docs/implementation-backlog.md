@@ -4478,7 +4478,20 @@ reports fast-block compliance and interval contrast for the session, and both nu
 between a treadmill walk and an outdoor walk without any surface-specific adjustment.
 
 ### [cardio][heart-rate] TN-25 — the guided walk's fast target has never been met in 44 attempts, and the live pacer says "push" every time
-- **Lane: A** — both (1 engine, 1 surface) → A, engine half first.
+- **Lane: B now — CORRECTED 2026-09-18 by Lane A.** It was filed `A` for the right reason (both
+  halves, engine first) and that reason has expired: **both engine halves have shipped**, and the
+  only residue is the wiring below, which touches no `app/api/**` route and no storage. By the rule
+  in `docs/agents/README.md` §3 — *reached only from `app/**` or `components/**` → Lane B* — the
+  residue is Lane B's. Checked rather than assumed, because a mis-laned entry is invisible to the
+  lane that can actually build it while sitting at the top of the other lane's READY list:
+  - `recommendRunType`, the selector this one deliberately mirrors, has exactly one caller and it is
+    a **client component** — `components/running/running-plan-content.tsx:133`, reading the quota
+    from the existing `/api/cardio-week` via `cachedFetchToday`. The walk's wiring is that same
+    shape against that same route, so there is no exposure for Lane A to build.
+  - The walk's block structure lives in `useGuidedWalkStore`'s config and `walk-config.tsx`
+    (`lib/stores/**`, `components/**`) — both Lane B by the path list.
+  - `recommendWalkPattern`'s `hadHardDayYesterday` / `shortOnTime` are **optional** and the selector
+    is correct without them, so they cannot drag an engine half back in.
 - ✅ **ENGINE HALF SHIPPED 2026-09-16** (`lane-a/tn25-walk-pattern-selector`), unversioned — it is not
   wired to a surface yet, so nothing user-visible changed.
   `packages/shared/src/walking/recommend-walk-pattern.ts`: `WALK_PATTERNS` (the owner-approved
@@ -4503,10 +4516,20 @@ between a treadmill walk and an outdoor walk without any surface-specific adjust
     `WALK_FAST_BAND_PCT_OF_MAX[0]` → 0.625 matches the quote exactly.
   - **The slow ceiling is untouched** (0.40 of reserve): met on 78% of blocks, so nothing in the data
     says it is wrong.
-- **⚠ Keep: WIRING THE SELECTOR.** `recommendWalkPattern` shipped in #1262 and **still has no
-  caller** — so the pattern is not actually assigned yet, which is the owner's *"I'd like that to be
-  determined for me"*. The band fixes the cue; the selector fixes the prescription, and it is inert
-  until something calls it.
+- **⚠ Keep: WIRING THE SELECTOR — and it is the WHOLE remaining ask.** `recommendWalkPattern`
+  shipped in #1262 and **still has no caller**, so the pattern is not actually assigned yet, which is
+  the owner's *"I'd like that to be determined for me"*. The band fixes the cue; the selector fixes
+  the prescription, and it is inert until something calls it.
+  - **The shape to copy is `running-plan-content.tsx:113-133`**: seed from `readTodayCacheSync`,
+    revalidate with `cachedFetchToday('cardio-week', '/api/cardio-week', CARDIO_WEEK_TTL, …)`, then
+    `recommendWalkPattern(quota)`. **Reuse the `cardio-week` key** — the running plan's own comment
+    says why (a second key for the same payload is a drifting cache entry), and that rule is in
+    CLAUDE.md as *grep for an existing key before adding one*.
+  - **Open, and Lane B's to decide:** whether the recommendation **pre-sets** the walk config or is
+    shown as a suggestion the owner accepts. The owner asked to have it *"determined for me"*, which
+    argues for pre-setting — but `walk-config.tsx` already persists a custom config on every edit
+    (`setCustomConfig(config)`), so silently overwriting it needs care that the running plan, which
+    only displays its recommendation, never had to take.
 - **⚠ The band is an open DESIGN question, and the entry's instruction and good practice pull apart.**
   This entry says *"the band, not the fraction: target **105–118 bpm** directly."* Taken literally
   that is a hardcoded constant true of a 33-year-old with a 168 max and wrong for anyone else.
