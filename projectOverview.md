@@ -2120,6 +2120,36 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [workouts] 🟠 Two real exercises are excluded from every generated program (RV-51, 2026-09-18) · found, not fixed
+
+**Open.** `equipmentEligible` (BF-129) excludes an exercise that declares no equipment, justified in
+its header with *"Migration 269 labelled the 22 rows that had drifted … so an empty list should not
+occur"*. **It occurs.** Production `claude_ro.exercise_library` holds **2 of 156** rows with
+`equipment = []` — `Dumbbell Lunges` and `Cable Lat Pulldown`, both verified 2026-09-18.
+
+Because the implementation is `exerciseEquipment.some(...)`, an empty array is false against **every**
+selection including `full_gym`. Both exercises are therefore invisible to `generate-program`,
+`builder-chat` and the builder review filter, for every user, at every equipment setting — and for
+these two rows excluding is not the safe direction the comment claims, since a full-gym lifter can
+perform both.
+
+**Fix the data, not the rule** — the exclude-on-empty rule is what stopped a home gym being offered
+Machine Chest Press. **But answer the question the data raises first:** `exercise_library` has no
+`created_at`, so it could not be established whether migration 269 *missed* these two or something
+*wrote* them afterwards. If it is the latter, the `POST /api/exercises` guard has a hole and
+labelling two rows fixes nothing.
+
+### [platform][workouts] ⚠️ A banned ms-offset window landed on the mood write path (RV-62, 2026-09-18)
+
+`deriveSuggestedSoreMuscles` (`adapter.ts:3133`, new in this window — `fdcee2d4`) builds its recovery
+window as `new Date(Date.now() - 7 * 86_400_000)`, the pattern CLAUDE.md's Date Arithmetic section
+bans by name. **Whether the day-boundary skew flips a provenance verdict was NOT established** — the
+window feeds `computeMuscleRecovery`, and a workout landing in or out of it at the edge is exactly
+the case that decides whether a sore tick reads as "suggested". Construct that case rather than
+assuming; it decides whether this is hygiene or a live scoring defect. Same function also selects the
+**whole exercise catalogue on every check-in save**.
+
+
 ### [workouts][platform] 🟠 A phase change makes every compound read as a strength decline (LA-110, 2026-09-15) · found, not fixed
 
 **Open.** `listRecent1rm` returns the two most recent real 1RM estimates for an exercise **from any
