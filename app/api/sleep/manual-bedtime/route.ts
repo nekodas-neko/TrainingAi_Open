@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
+import { isCalendarDate } from "@trainingai/shared/date-utils"
 import { auth } from "@/auth"
 import { getRepositoryAsync } from "@/lib/data"
 import { readJsonLimited } from "@trainingai/shared/http/request-guards"
@@ -12,7 +13,11 @@ const MAX_BODY_BYTES = 1024
 // rejects every real request with a Zod error before the handler runs — the ai-chat `localDate`
 // shipped that way for a full release.
 const ManualBedtimeSchema = z.object({
-  date: z.string().regex(/^\d{4}[-/]\d{2}[-/]\d{2}$/),
+  // RV-56 — the regex bounds the SHAPE only, so `2026-02-31` and `2026-13-45` passed it and
+  // reached the driver as [pg 22008]: a 500 with an empty body plus an `error_events` row, for
+  // what is a client error. `isCalendarDate` is the Q-496 complement and normalises separators
+  // itself.
+  date: z.string().regex(/^\d{4}[-/]\d{2}[-/]\d{2}$/).refine(isCalendarDate, 'Not a real calendar date'),
   /** ISO timestamp of the remembered bedtime, or null to clear it. */
   at: z.string().datetime({ offset: true }).nullable(),
 }).strict()

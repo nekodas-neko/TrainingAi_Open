@@ -6775,7 +6775,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
 
   async createSupplementVial(
     userId: string,
-    data: Omit<SupplementVial, 'id' | 'userId' | 'createdAt'> & { id?: string },
+    data: Omit<SupplementVial, 'id' | 'userId' | 'createdAt'>,
   ): Promise<SupplementVial> {
     // Ownership of the parent is checked rather than assumed: `supplementId` arrives from the
     // client, and the table has its own `user_id`, so an unchecked insert would file a vial under
@@ -6785,8 +6785,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       .limit(1)
     if (!owns) throw new NotFoundError('Supplement')
 
+    // RV-55 — the id is the database's to choose. It was previously accepted from the request and
+    // inserted unguarded, which made a duplicate UUID a 500 rather than a refusal.
     const [row] = await this.db.insert(s.supplementVials).values({
-      ...(data.id ? { id: data.id } : {}),
       userId,
       supplementId: data.supplementId,
       strengthMg: data.strengthMg,

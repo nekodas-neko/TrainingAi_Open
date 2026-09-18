@@ -18,6 +18,19 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-18 — backlog → 24091, `projectOverview.md` → 11826 (RV-55/56, the route-input batch)
+
+**Backlog −36 for two entries**, the second batch of the day to leave whole. Both were Q-496-shaped,
+so they shared a test file and a single mutation pass — which is the axis `Batch:` asks about
+(what has to be VERIFIED), not the subject.
+
+The overview paragraph spends its length on RV-55's open decision rather than on the diff, because
+the diff is a deleted field: the entry offered *scope the conflict* or *drop it*, and which one is
+right is answerable only by reading the callers. Recording that the local vial mirror is read-only
+is what stops the next reader assuming an outbox replay needs to choose an id.
+
+---
+
 ## 2026-09-18 — backlog → 24127, `projectOverview.md` → 11815 (RV-52/53/54, the sweep-50 cache batch)
 
 **Backlog −41 for three entries, which is what a batch should look like**: they shared a file, a

@@ -52,6 +52,17 @@ are still deliberately NOT unified** — `computeStreak` counts *training days* 
 the home loop counts *calendar days spanned* — so `streak-window.ts` now says outright that the
 leaderboard does not read `STREAK_LOOKBACK_DAYS`: 365 would cap an all-time field just as 90 did.
 
+**Two ways a client error became a server fault (RV-55/56, 2026-09-18 — one PR, the sweep-50
+route-input batch).** Both are the Q-496 shape: input the route should refuse reaches the driver,
+which answers **500 with an empty body** and writes an `error_events` row. **RV-55** — the vial POST
+accepted a client-supplied `id` and inserted it unguarded (the parent was ownership-checked, the id
+was not), so re-posting another user's vial UUID raised `23505`: an existence oracle plus fault-table
+noise, though no cross-user write occurred. The entry left the fix open; reading the callers settled
+it — nothing sends `id` (the only client posts three numbers and a date, and the local vial mirror is
+read-only with no outbox push), so the field is **dropped** rather than conflict-scoped, which
+removes the oracle instead of renaming its status code. **RV-56** — three routes carried the correct
+separator regex and no calendar check, so `2026-02-31` 500'd; all three now `.refine(isCalendarDate)`.
+
 **Three cache keys that no write evicted (RV-52/53/54, 2026-09-18 — one PR, the sweep-50 batch).**
 `weekly-review-month-window:` was in **zero** invalidation groups while its sibling
 `day-review-week-window:` — rendered by the same surface from the same writes — was in three;
