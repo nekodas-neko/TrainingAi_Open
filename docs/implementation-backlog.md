@@ -15728,15 +15728,37 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [workouts][platform] LA-118 — the muscle-attribution query exists FOUR times and the copies disagree
 
-- **Branch:** _unassigned_ · **Added:** 2026-09-18 (Lane A, found while shipping LB-111).
+- **Branch:** `lane-a/la118-muscle-attribution-extract` · **Added:** 2026-09-18 (Lane A, found while
+  shipping LB-111).
 - **Lane: A** — `app/api/weekly-muscle-sets/route.ts`, `app/api/muscle-tonnage-trend/route.ts`,
   `lib/data/postgres/slices/periodization.ts`. Reached by `app/api/**` and storage, so Lane A.
-- **This is a One-Formula violation that has already produced divergence, not a tidiness item.**
-  The same "weighted sets per muscle, library rows by role and non-library rows by tag" SQL is
-  written out four times, and the four do not agree. **The heading said THREE when this was filed on
-  2026-09-18 and that was my own miscount** — three existed before LB-111 and the fourth was the one
-  I had just written, which is the easiest copy in the table to overlook and the reason the entry
-  exists:
+- **✅ THE SET-COUNTING THREE ARE ONE, SHIPPED 2026-09-18**, unversioned — the numbers are unchanged
+  except for the future-dated-log fix below, so nothing user-visible moved.
+  `weightedSetsByMuscle(db, { userId, from, toExclusive, dateColumn, programId? })` is private to
+  `periodization.ts`; `getWeeklySetsByMuscleGroup`, `getSetsByMuscleInWindow` and the
+  `weekly-muscle-sets` route are now callers rather than copies.
+  - **Both disagreements are PARAMETERS now**, which is the point — a caller has to state its date
+    column and its programme scope rather than inherit whichever one it copied.
+  - **`getWeeklySetsByMuscleGroup` keeps `ws.started_at`**, per this entry's recommendation. Its
+    unit is a programme session and its two callers grade a week against that programme's targets.
+  - **`weekly-muscle-sets` gained the upper bound it never had.** That is the one behaviour change
+    in the diff, and it is the defect this entry named.
+  - **The date column had NO test pinning it, in either direction**, because every fixture in the
+    repo set `started_at` and `logged_at` to the same instant. There is one now: a session started
+    22:00 yesterday with its sets logged 00:30 today, where the two reads deliberately disagree.
+- **⚠ Keep: `muscle-tonnage-trend` is still its own copy**, exactly as this entry instructed for the
+  first pass. It sums `weight_kg * reps` and buckets by week, so it shares the attribution half and
+  nothing else, and folding it in means `weightedSetsByMuscle` returns rows for the caller to
+  aggregate instead of a finished total. That is a real change to the shared function's shape, so it
+  wants its own diff and its own gate. Until it lands, the count in this entry's heading is **two
+  implementations, not one** — the shared query and the tonnage copy.
+  - When it is done: the tonnage route also buckets by a local-date string rather than by an
+    instant, so the fold has to preserve that or its week boundaries move.
+- **The original finding, kept because it is the argument for not adding a fifth copy.** The same
+  "weighted sets per muscle, library rows by role and non-library rows by tag" SQL was written out
+  four times, and the four did not agree. **The heading said THREE when this was filed on 2026-09-18
+  and that was my own miscount** — three existed before LB-111 and the fourth was the one I had just
+  written, which is the easiest copy in the table to overlook and the reason the entry exists:
 
   | | date column | upper bound | programme scope |
   |---|---|---|---|
@@ -15745,27 +15767,10 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   | `muscle-tonnage-trend` (inline) | `el.logged_at`, local-date string | yes | none |
   | `getSetsByMuscleInWindow` (LB-111, new) | `el.logged_at` | yes, user-local | none |
 
-- **The divergence is invisible from any one file**, which is how it lasted: each copy carries a
-  comment saying it uses the *"same main/secondary role weighting as"* one of the others, and that
-  much is true — the 1.0/0.5 is identical everywhere. What differs is which timestamp a set is
-  attributed to and whether a previous programme counts, and no comment mentions either.
-- **`weekly-muscle-sets` having no upper bound is the one that could bite today.** It reads
-  `el.logged_at >= weekStart` and nothing else, so a log dated in the future counts toward this
-  week forever. Nothing writes future logs today; the sync path accepts a client-supplied
-  `logged_at`, so nothing structurally prevents one.
-- **The fix is an extraction, and the date column is the decision inside it.** Three of the four use
-  `el.logged_at`; `getWeeklySetsByMuscleGroup` uses `ws.started_at` because its unit is a programme
-  session. **Recommendation: extract the two-branch attribution SQL once, parameterised on
-  window + optional `programId`, and keep `ws.started_at` only for the programme-scoped caller** —
-  changing that one's date column would move the numbers its two callers already grade weeks
-  against, which is a behaviour change dressed as a refactor.
-- **⚠ Do not fold `muscle-tonnage-trend` in on the first pass.** It sums `weight_kg * reps` rather
-  than counting sets and buckets by week, so it shares the attribution half and nothing else. Folding
-  it means the helper returns rows to be aggregated by the caller — worth doing, but it is the step
-  that makes this a refactor of three routes instead of two.
-- **Verification:** the existing suites for all three routes must pass unchanged — that is the whole
-  point, and a test that has to be edited to go green is the signal the extraction changed behaviour.
-  Add one case pinning `weekly-muscle-sets` against a future-dated log.
+- **The divergence was invisible from any one file**, which is how it lasted: each copy carried a
+  comment saying it used the *"same main/secondary role weighting as"* one of the others, and that
+  much was true — the 1.0/0.5 was identical everywhere. What differed was which timestamp a set is
+  attributed to and whether a previous programme counts, and no comment mentioned either.
 
 
 ### [workouts] Q-300 — 37% of sets are taken with materially less rest than prescribed, and the RPE model has no rest term

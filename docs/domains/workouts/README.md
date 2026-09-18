@@ -371,13 +371,17 @@ Live at the time of writing (2026-07-30):
   user base, bound it on **rows** and rename the field rather than reinstating a day window under a
   name that promises all-time.
   ([`2026-09-18-lane-a-la117-leaderboard-all-time-streak.md`](../../overview/entries/2026-09-18-lane-a-la117-leaderboard-all-time-streak.md))
-- **Four copies of the muscle-attribution query, disagreeing (LA-118).** "Weighted sets per muscle,
-  library rows by role at 1.0/0.5 and non-library rows by tag" is written out in
-  `getWeeklySetsByMuscleGroup`, `weekly-muscle-sets`, `muscle-tonnage-trend` and
-  `getSetsByMuscleInWindow`. The **weighting** is identical in all four, and every copy's comment
-  says so — what differs is the **date column** (`ws.started_at` vs `el.logged_at`) and whether a
-  **previous programme counts**, and no comment mentions either. Before writing a fifth, read LA-118.
-  For a windowed per-muscle set count, the answer already exists: `GET /api/muscle-sets?from=&to=`.
+- **One query counts sets per muscle — go through it (LA-118).** `weightedSetsByMuscle` in
+  `lib/data/postgres/slices/periodization.ts` takes `{ from, toExclusive, dateColumn, programId? }`,
+  and those last two are parameters because they are what four separate copies used to disagree
+  about while every one of their comments claimed they matched. **State both at the call site:**
+  `started_at` only when the unit being measured is a programme session (that is
+  `getWeeklySetsByMuscleGroup`, whose callers grade a week against that programme's targets),
+  `logged_at` for anything per-day; and a `programId` only when a previous programme's sets should
+  vanish. For a windowed per-muscle set count from a client, the route already exists:
+  `GET /api/muscle-sets?from=&to=`. **`muscle-tonnage-trend` is still a separate copy** — it sums
+  tonnage and buckets by a local-date string, so it shares the attribution half and nothing else;
+  LA-118 is queued for it.
   ([`2026-09-18-lane-a-lb111-muscle-sets-window.md`](../../overview/entries/2026-09-18-lane-a-lb111-muscle-sets-window.md))
 - **Muscle names are matched through `muscles.ts`, never compared raw (BF-171).** `normalizeMuscle`
   folds synonyms (`core` → `abs`, `quadriceps` → `quads`) and `moodMuscleMatches` expands a broad

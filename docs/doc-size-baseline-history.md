@@ -18,6 +18,19 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-18 — backlog → 23776, `projectOverview.md` → 11729 (LA-118, the set-counting three)
+
+**Backlog +5 on an entry that SHIPPED**, which is the shape worth noting rather than the number. The
+entry did not leave the queue: `muscle-tonnage-trend` was deliberately out of scope for the first
+pass, so LA-118 stays with a `Keep:` and is rewritten around what shipped instead of being deleted.
+What it loses in problem statement it gains in the record of which decisions are now parameters and
+what the tonnage fold will have to preserve.
+
+The overview's +14 is a paragraph on a change with no user-visible effect, which normally would not
+earn one. It earns it here because the extraction made a silent failure mode **easier**: changing a
+date column used to mean editing one query in one file and now it is a one-word argument at a call
+site. The paragraph exists to say that out loud, along with the test that now holds it.
+
 ## 2026-09-18 — backlog → 23771 (LA-118's heading corrected)
 
 **+3**, for one word and a sentence saying why it was wrong. The entry filed hours earlier was
