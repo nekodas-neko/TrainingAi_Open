@@ -28,6 +28,7 @@
  *     a pending recovery decision is advisory and must not change what the card counts.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { STREAK_LOOKBACK_DAYS } from '@trainingai/shared/workout/streak-window'
 import { todayInTz, shiftDateStr } from '@trainingai/shared/date-utils'
 import { formatInTimeZone } from 'date-fns-tz'
 
@@ -437,10 +438,15 @@ describe('/api/streak-data', () => {
     expect((await getStreak()).status).toBe(401)
   })
 
-  it('reads ninety days in the caller\'s timezone, uncacheable', async () => {
+  // BF-176: was `90`, which is the number that produced the defect. The route must send at least
+  // as far back as the consuming loop walks (365), or every day past the window reads as a REST day
+  // and the streak is pinned to the window edge rather than to the training. Asserted against the
+  // shared constant rather than a fresh literal, so the two cannot drift apart again here either.
+  it('reads the shared lookback in the caller\'s timezone, uncacheable', async () => {
     freshUser({ timezone: 'Etc/GMT-14' })
     const res = await getStreak()
-    expect(getRecentTrainedDays).toHaveBeenCalledWith(sessionUser!.id, 90, 'Etc/GMT-14')
+    expect(getRecentTrainedDays).toHaveBeenCalledWith(sessionUser!.id, STREAK_LOOKBACK_DAYS, 'Etc/GMT-14')
+    expect(STREAK_LOOKBACK_DAYS).toBeGreaterThanOrEqual(365)
     expect(res.headers.get('Cache-Control')).toBe('private, no-store')
   })
 
