@@ -45,6 +45,18 @@ entry is what Lane A reads before running it. The working is in a review doc, no
 
 ---
 
+## 2026-09-18 — backlog → 23773, `projectOverview.md` → 11679 (TN-45 engine half)
+
+**+18 and +18.** TN-45 is an A-then-B entry and only the engine half shipped, so it stays queued with
+a `Keep:` rather than leaving — the entry grows instead of shrinking, which is the honest shape for a
+half-done item. Most of the added lines are the two things a later reader would otherwise get wrong:
+that **nothing renders this yet** (so the owner sees no change and the pass test is unmet), and that
+the copy must not imply illness, because both real firings were a medication rather than an infection.
+
+The `projectOverview` paragraph carries a third: the other `watch` day, 2026-08-27, predates the first
+dose by eleven days and has no explanation on file. Left unrecorded, the TN-46 write-up would read as
+having explained both.
+
 ## 2026-09-17 — backlog → 23694 (TN-46 corrected: the snapshot it called urgent was already on disk)
 
 **+24 net.** The entry's schema-change half is struck and replaced with the measurement that retires
