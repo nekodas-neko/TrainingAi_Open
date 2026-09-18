@@ -195,6 +195,20 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
         'model that wrote them, only against today\'s summary.',
       )
     }
+    if (rederived.missing.length > 0) {
+      // TN-49 — this branch exists because its absence produced a false finding. A key absent from
+      // the stored map used to have its WEIGHT dropped from a sum defined to total 1, so `score`
+      // came out low by about `weight × 50` and the row below then announced that the score "IS
+      // reproducible" while printing a number that was not the stored one. Seven production rows
+      // (2026-07-16 → 07-22) are missing `checkin` and read 4–6 points low for that reason alone.
+      notes.push(
+        `The stored contributors do not include ${rederived.missing.join(', ')} at all, so this row ` +
+        'cannot be checked against its own inputs in full. The re-derivation assumes the neutral 50 ' +
+        'the model itself uses for a contributor with no input, which is the closest the row ' +
+        `supports — it gives ${rederived.score} against a stored ${storedScore}. Treat any ` +
+        'difference here as unexplained rather than as the model having moved.',
+      )
+    }
     if (rederived.drifted.length > 0) {
       notes.push(
         `The stored score is NOT reproducible from its own stored inputs: ` +
@@ -202,7 +216,10 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
         `. The current model rebuilds this row's inputs into ${rederived.score} against a stored ` +
         `${storedScore} — so the MODEL moved since this day was scored, not the inputs.`,
       )
-    } else if (rederived.uncheckable.length === 0 && storedScore !== compositeScore && compositeScore != null) {
+    } else if (
+      rederived.uncheckable.length === 0 && rederived.missing.length === 0 &&
+      storedScore !== compositeScore && compositeScore != null
+    ) {
       notes.push(
         `The stored score IS reproducible from its own stored inputs (${rederived.score}), so the ` +
         `model has not moved — the ${storedScore} → ${compositeScore} difference against this ` +
