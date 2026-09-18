@@ -19657,6 +19657,16 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   Nothing else in the entry is disturbed by this; the plan and the "archiving the fixed ones only
   removes 17%" caveat still stand.
 - **Lane:** A
+- **Gate: owner** — added 2026-09-18, because the ⚠ at the bottom of this entry did not hold. It was
+  written on 2026-09-15 *"so the next implementer does not re-derive the reasoning and defer it
+  again silently"*, and three days later Lane A reached this entry again, re-derived it and would
+  have deferred it again: with no field to read, `next-item.js` kept printing it at the top of
+  READY. What blocks Lever 2 is not effort — it is **a quiet window and a structural decision**, and
+  both are the owner's: the quiet window because only he decides whether five agents are appending
+  to `projectOverview.md` while 207 entries move out of it, and the decision because where the open
+  Known Issues live changes what **every** session reads at orientation, with the multi-tag
+  visibility risk this entry already names. **What lifts it:** the owner saying the move should
+  happen, and when — after which it is the Orchestrator's sweep, not an implementer's.
 - **Branch:** none yet · **Added:** 2026-08-10, raised by the owner during the public-repo migration.
 - **Plan:** [`2026-08-10-orientation-cost.md`](superpowers/plans/2026-08-10-orientation-cost.md)
 - **The measurement:** `CLAUDE.md` is 918 lines (~27k tokens) and loads automatically; its first

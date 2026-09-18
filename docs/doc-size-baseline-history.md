@@ -18,12 +18,14 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
-## 2026-09-18 — backlog → 23862, `projectOverview.md` → 11866 (LA-120: the queue tool's two blind spots)
+## 2026-09-18 — backlog → 23872, `projectOverview.md` → 11870 (LA-120: the queue tool's three blind spots)
 
-**Backlog +7, and it is the only entry here that GREW the file on purpose.** LA-76's `Gate: owner`
-came back with eight lines saying which question it waits on, because the bare field was what got
-removed in September and re-adding it bare would invite the same removal. A gate that does not say
-what would lift it is a gate someone deletes.
+**Backlog +17, and it is the only entry here that GREW the file on purpose.** Two gates came back
+with the paragraph that says which question each one waits on, because in both cases the *bare* field
+is what went missing — LA-76's was removed in September once the owner answered a different question,
+and Q-220 never had one at all while carrying a prose warning that failed within three days. A gate
+that does not say what would lift it is a gate the next session deletes, and both of these are the
+receipt for that.
 
 The overview paragraph spends its length on the **measurement**, not the regex: 140 of 144 Keep
 bullets already matched and all four misses were one shape. That number is the whole argument for

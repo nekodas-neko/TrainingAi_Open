@@ -1,9 +1,10 @@
-# 2026-09-18 — LA-120: the queue tool called four shipped entries unstarted, and LA-76 lost the gate that blocks it
+# 2026-09-18 — LA-120: the queue tool offered three entries it should not have
 
 **Branch:** `lane-a/keep-parser-warning-prefix` · **Lane A** · one PR · no migration · unversioned
 
-Two defects in the same surface — what `node scripts/next-item.js --lane A` says you can start —
-found by using it rather than by reading it.
+Three defects in the same surface — what `node scripts/next-item.js --lane A` says you can start —
+found by using it rather than by reading it. They share one shape: **an entry whose own text blocks
+it, with nothing saying so in a field the tool reads.**
 
 ## How they were found
 
@@ -53,6 +54,35 @@ field and are not parsed as one: mine, and a *continuation* line in BF-80 which 
 reads correctly (BF-80 parks). One instance is not a population, so the bullet was rewritten to the
 form the parser expects instead of loosening a second matcher on a single example.
 
+## Defect 3 — Q-220 was deferred with a written warning, and the warning did not work
+
+Q-220 (*every session pays ~194,000 tokens of orientation*) carries a ⚠ added on 2026-09-15 by Lane A,
+recording a deliberate deferral **specifically** *"so the next implementer does not re-derive the
+reasoning and defer it again silently"*. Three days later Lane A reached it again — this session — and
+re-derived exactly that reasoning, because prose at the bottom of an entry cannot reach a tool that
+reads fields. It was #3 of READY with LA-76 parked, and #4 before that.
+
+The deferral itself is sound and is not disturbed: what is queued there is Lever 2, a bulk move of
+~207 open entries out of the one file five concurrent agents append to every session. Its failure
+mode is not a merge marker but a silently dropped entry — the shape that put LB-4, Q-454, Q-455 and
+Q-465 back into the queue three times — and Lever 1 already showed the specific hazard, with **19 of
+72 ✅-marked entries still owing something**.
+
+So it has `Gate: owner` now, with what would lift it. That is the honest field rather than a stretch:
+the blocker is **a quiet window** (only the owner decides whether five agents are writing to
+`projectOverview.md` while 207 entries move out of it) and **a structural decision** (where the open
+Known Issues live changes what every session reads at orientation, with the multi-tag visibility risk
+the entry already names). Neither is an implementer's to take. After the owner says yes it is the
+Orchestrator's sweep, not this lane's.
+
+**No new vocabulary was invented for it.** "Wants the Orchestrator" has no field — `Gate:` takes only
+`owner` or `device`, `Reference:` means read-not-build, and `Needs:` names an entry that does not
+exist. Adding a lane value would have meant changing `next-item.js`, `check-backlog-pointers.js` and
+the six-agent contract in `docs/agents/README.md` from inside one lane, mid-flight, which is a
+contract change rather than a fix. `Gate: owner` is true on the merits and costs nothing to revisit.
+
+READY 11 → 10 with LA-76, and 10 → 9 with this.
+
 ## Verification
 
 `scripts/__tests__/backlog-keep-residue.test.ts`, three new cases. Against `keep.js` as it stands on
@@ -60,7 +90,7 @@ form the parser expects instead of loosening a second matcher on a single exampl
 original was stricter, so a test that only asserted refusals would prove nothing about this change.
 
 The real check is the tool's own output, which is in the diff's effect rather than in an assertion:
-READY 12 → 10, KEEP 74 → 75, one entry parked.
+**READY 12 → 9, KEEP 74 → 75** — one entry reclassified as shipped-with-residue and two parked.
 
 ## Not exercised
 
@@ -68,4 +98,8 @@ READY 12 → 10, KEEP 74 → 75, one entry parked.
 - **Whether the other 140 Keeps still classify identically.** The widening can only match *more*, and
   what it newly matches is bounded by the non-word prefix — but no before/after diff of all 359
   entries' buckets was taken, only the READY and KEEP counts.
-- **LA-76 itself**, which is now the owner's call and is the reason this exists.
+- **LA-76 and Q-220 themselves**, both now the owner's call and between them the reason this exists.
+- **Whether `Gate: owner` is the right long-term field for "this is the Orchestrator's".** It is
+  accurate for Q-220 on its own merits, but if a third entry wants the same thing, the answer is
+  probably a lane value rather than a third stretched gate — and that is a contract change for the
+  Orchestrator to make, not a lane.
