@@ -13767,3 +13767,12 @@ general and could not reach the one file where "two PRs, same document" describe
 PR. Filed for the Orchestrator (`scripts/**` is theirs) with two options, neither picked, and with
 the argument against the tempting non-fix written down — telling implementers to skip the recompute
 just converts the conflict into a red check, because the ratchet fails on slack.
+
+## 2026-09-18 — `docs/implementation-backlog.md` ratchet down (RV-57 removed)
+
+**−20.** RV-57 shipped in #1299 and its entry was left in the queue — the third such omission in one
+session, after LB-116 and BF-172. Removed rather than cut to a `Keep:` line, because the one thing it
+was still carrying is now answered: the supplier returns 366 day-keys and the consumer reads 365,
+they differ by one, and the direction is the safe one (the loop never asks for a day the payload
+lacks, which is BF-176 inverted). Reasoning in the journal entry; deliberately not "fixed", since
+widening the loop would make a constant named `STREAK_LOOKBACK_DAYS = 365` drive a 366-day walk.
