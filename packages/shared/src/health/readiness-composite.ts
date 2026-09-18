@@ -268,6 +268,22 @@ export interface ReadinessRederivation {
   /** Contributors with no stored input: rows written before Q-501, which cannot be checked either
    *  way. Reported rather than silently counted as agreeing. */
   uncheckable: (keyof typeof READINESS_WEIGHTS)[]
+  /**
+   * Contributor keys ABSENT from the stored map entirely — a different thing from `uncheckable`,
+   * which is a key that is present but carries no input (TN-49).
+   *
+   * These used to be skipped, which dropped their WEIGHT from the sum and made `score` come out
+   * low by roughly `weight × 50` — indistinguishable, from outside, from a real disagreement.
+   * Measured on production 2026-09-18: seven rows (2026-07-16 → 07-22) store eight of the nine
+   * contributors, missing `checkin` (weight 0.10), and read 4 to 6 points below their stored score
+   * for that reason alone. Every other row stores nine and reproduces exactly.
+   *
+   * A missing key now contributes the model's own NEUTRAL 50, which is what
+   * `computeReadinessComposite` uses for a contributor with no input — so `score` is the closest
+   * the stored row can support. It is still an ASSUMPTION, which is why the key is reported: a
+   * caller must not claim a row reproduces cleanly while this is non-empty.
+   */
+  missing: (keyof typeof READINESS_WEIGHTS)[]
 }
 
 /** Re-derive one persisted contributor's score from the input stored beside it, under the current
@@ -305,14 +321,21 @@ export function rederiveReadinessFromStored(stored: unknown): ReadinessRederivat
 
   const drifted: ReadinessRederivation['drifted'] = []
   const uncheckable: ReadinessRederivation['uncheckable'] = []
+  const missing: ReadinessRederivation['missing'] = []
   let weighted = 0
   let matched = 0
 
   for (const key of Object.keys(READINESS_WEIGHTS) as (keyof typeof READINESS_WEIGHTS)[]) {
     const entry = map[key]
-    if (entry == null || typeof entry !== 'object') continue
-    const c = entry as StoredReadinessContributor
-    if (typeof c.score !== 'number' || !Number.isFinite(c.score)) continue
+    const c = entry != null && typeof entry === 'object' ? entry as StoredReadinessContributor : null
+    if (c == null || typeof c.score !== 'number' || !Number.isFinite(c.score)) {
+      // TN-49 — carry the model's NEUTRAL rather than skipping. Skipping dropped this key's WEIGHT
+      // from a sum whose weights are defined to total 1, so the result came out low by about
+      // `weight × 50` and read as a disagreement the row did not have.
+      missing.push(key)
+      weighted += NEUTRAL.score * READINESS_WEIGHTS[key]
+      continue
+    }
     matched++
 
     const rederived = rederiveContributor(key, c)
@@ -323,5 +346,5 @@ export function rederiveReadinessFromStored(stored: unknown): ReadinessRederivat
   }
 
   if (matched === 0) return null
-  return { score: Math.round(weighted), drifted, uncheckable }
+  return { score: Math.round(weighted), drifted, uncheckable, missing }
 }

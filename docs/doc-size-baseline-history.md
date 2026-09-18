@@ -18,6 +18,21 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-18 — backlog → 23933, `projectOverview.md` → 11745 (TN-49, the rederivation gap)
+
+**Backlog +13 on an entry that shipped its fix and stayed queued.** The growth is a retraction: the
+entry's prescribed first action would have overwritten seven correct production scores with values
+4–6 points too low, so the correction has to be at the top of the entry rather than folded into a
+tick, and the three residues it leaves have to be separable from the one that was fixed.
+
+The overview's +16 is the largest single-item paragraph in a while and it is not about the code. It
+is about a **surface that asserted the opposite of its own evidence** — the audit printed "the stored
+score IS reproducible from its own stored inputs (42)" against a stored 48 — because that sentence is
+what generated the false entry, and a later session reading the fix without it would not know why the
+entry was believed.
+
+---
+
 ## 2026-09-18 — backlog → 23915 (TN-47/48/49, the tuning calibration sweep)
 
 **+144 from 23771.** Three entries off one review. TN-48 is the long one and earns it: the

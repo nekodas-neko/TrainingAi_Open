@@ -359,6 +359,17 @@ Live at the time of writing (2026-07-30):
 
 ## Gotchas specific to this domain
 
+- **An absent contributor key is not a score disagreement (TN-49).** `READINESS_WEIGHTS` has nine
+  members summing to exactly **1.00**, so anything that walks the stored contributor map and skips a
+  key it does not find drops that key's weight and reads low by about `weight × 50`. That is a
+  4–6 point hole with nothing on the row to explain it, and it looks exactly like a model drift.
+  `rederiveReadinessFromStored` reports such keys in **`missing`** — distinct from **`uncheckable`**,
+  which is a key that is *present* with no `input` (a pre-Q-501 row) — and stands the model's own
+  neutral 50 in for them. **Never claim a row reproduces from its own inputs while `missing` is
+  non-empty**; the audit used to, printing a reproducibility claim beside a number that contradicted
+  it, and an entry was filed from that sentence proposing a production rewrite that would have
+  corrupted seven rows. Seven production rows (2026-07-16 → 07-22) are missing `checkin`.
+  ([`2026-09-18-lane-a-tn49-rederivation-missing-key.md`](../../overview/entries/2026-09-18-lane-a-tn49-rederivation-missing-key.md))
 - **`watch` is the only illness band that has ever fired, and it is advisory-only by design
   (TN-45).** 2 days in 72; `elevated` and `fever` are at **zero**, so the illness banner has never
   rendered. Two consequences worth knowing before touching this area. **(1) Do not "fix" it by

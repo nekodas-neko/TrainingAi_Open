@@ -52,6 +52,22 @@ are still deliberately NOT unified** — `computeStreak` counts *training days* 
 the home loop counts *calendar days spanned* — so `streak-window.ts` now says outright that the
 leaderboard does not read `STREAK_LOOKBACK_DAYS`: 365 would cap an all-time field just as 90 did.
 
+**A readiness audit was contradicting its own evidence, and an entry was written from it (TN-49,
+2026-09-18 — no data write).** Seven `oura_daily_derived` rows read 4–6 points below their own
+stored breakdown. The entry prescribed rewriting those seven scores; doing so would have written the
+error into production. **The cause:** `rederiveReadinessFromStored` skipped any contributor key
+absent from the stored map, dropping its weight from a sum defined to total exactly 1.00. The seven
+disagreeing rows are **exactly** the seven storing eight contributors instead of nine, missing
+`checkin` (weight 0.10); all 58 nine-key rows reproduce exactly. **The audit then printed "the
+stored score IS reproducible from its own stored inputs (42)" against a stored 48** — a
+reproducibility claim contradicted by the number in the same sentence — and concluded the inputs had
+moved. An absent key now contributes the model's own neutral 50 and is reported as `missing`, and the
+audit refuses to claim reproducibility while it is non-empty. **Four of the seven then reproduce
+exactly; three keep a 1-point residual that is recorded as unexplained rather than fitted.** Two
+owner-gated production writes stay on the entry: back-filling the missing `checkin` key (only the
+four reconstructable rows), and back-stamping `model_versions.readiness`, still absent on 40 of 65
+rows.
+
 **The muscle-attribution query was four copies; three are now one (LA-118, 2026-09-18 —
 unversioned).** `weightedSetsByMuscle` in `periodization.ts` is the single set-counting query;
 `getWeeklySetsByMuscleGroup`, `getSetsByMuscleInWindow` and `/api/weekly-muscle-sets` call it. The

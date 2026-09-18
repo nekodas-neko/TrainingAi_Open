@@ -556,36 +556,49 @@ existing 65 days moves by less than 5 points on every one of them.
 
 ### [readiness][platform] TN-49 — seven days show a readiness score that contradicts its own stored breakdown
 
-- **Branch:** _unassigned_ · **Added:** 2026-09-18 · Tuning agent.
-- **Lane: A** — a back-fill over `oura_daily_derived`.
+- **Branch:** `lane-a/tn49-rederivation-missing-key` · **Added:** 2026-09-18 · Tuning agent.
+- **Lane: A** — `packages/shared/src/health/**`, plus a possible back-fill over `oura_daily_derived`.
 - **Review:** [`what the score can and cannot say`](reviews/2026-09-18-what-the-score-can-and-cannot-say.md) §3.
-- **This is a follow-on to Q-501, not a regression of it.** Q-501 shipped on 2026-08-26 and persists
-  the input behind every contributor, which is precisely what makes this checkable — and visible.
-
-**Measured 2026-09-18.** Recomputing the weighted composite from each row's own stored contributors:
-**7 of 65 rows disagree with their stored `readiness_score`**, all consecutive (2026-07-16 → 07-22),
-all by −4 to −6 points. They predate the 2026-07-22 weight rebalance: their contributors were
-re-derived under the new model and their score was not.
-
-**Separately, 40 of 65 rows carry no `model_versions.readiness` stamp at all** (2026-07-16 →
-08-25), and the stamped and unstamped ranges **overlap** (08-22 → 08-25) — so some rows were
-re-derived and some were not, and the row cannot say which it is.
-
-**Why it is worth fixing rather than tolerating.** A user opening one of those days sees a score and
-a breakdown that disagree by up to 6 points, with nothing on the card to explain it. The whole reason
-Q-501 stored the inputs was so a score could be re-derived from its own row; on these seven it can
-be, and the answer is different.
-
-**First action:** recompute and rewrite the seven rows from their stored contributors, stamping the
-current model version, and back-stamp the 33 unstamped rows that already reproduce. **Do not rewrite
-the contributors** — they are the newer, correct half.
-
-**⚠ Scope it as a back-fill, not a re-derive.** Re-deriving the contributors from today's summaries
-would inherit whatever the baselines say now, which is a different number again.
-
-**Pass test:** every stored `readiness_score` reproduces from its own stored contributors, and every
-row carries a model stamp.
-
+- **⛔ THE PRESCRIBED FIRST ACTION WAS WRONG AND WOULD HAVE CORRUPTED PRODUCTION.** This entry said
+  *"recompute and rewrite the seven rows from their stored contributors"*. Doing that would have
+  overwritten seven **correct** scores with values **4 to 6 points too low** — writing into the
+  database exactly the defect the entry exists to remove. The measurement was right; the diagnosis
+  was not, and it was the audit surface that produced it.
+- **✅ THE REAL CAUSE, measured on production 2026-09-18 and FIXED the same day** (no data write):
+  `rederiveReadinessFromStored` **skipped a contributor key absent from the stored map**, dropping
+  its weight from a sum whose weights are defined to total exactly 1.00. The result came out low by
+  about `weight × 50`.
+  - The 7 disagreeing rows are **exactly** the 7 rows storing **eight** contributors instead of nine.
+    The missing key is **`checkin`** (weight 0.10) on every one. All **58** nine-key rows reproduce
+    exactly. The key-count histogram is `{8: 7, 9: 58}` — a 1:1 match with the disagreements.
+  - An absent key now contributes the model's own NEUTRAL 50 (what `computeReadinessComposite`
+    itself uses for a contributor with no input) and is reported in a new `missing` field.
+  - **The audit surface was asserting the opposite of its own evidence.** With `drifted` and
+    `uncheckable` both empty it took the branch that prints *"The stored score IS reproducible from
+    its own stored inputs (42)"* against a stored 48, and concluded *"the model has not moved — the
+    difference is an INPUT change"*. That sentence is what this entry was written from. It now
+    refuses to make a reproducibility claim while `missing` is non-empty.
+- **⚠ Keep: a 1-point residual on THREE of the seven is still unexplained.** With the neutral 50
+  standing in, 07-18/19/20/22 reproduce **exactly** and **07-16, 07-17 and 07-21 remain 1 point
+  low**. No value in `CHECKIN_ENERGY_SCORE` (30/50/72/88/100) reproduces those three, so it is not
+  simply a logged check-in. Recorded as unexplained rather than fitted. It is 1 point on three days
+  and nothing on screen depends on it, which is why it is a `Keep:` and not a blocker.
+- **⚠ Keep: the missing `checkin` KEY is still absent from those seven contributor blobs.** The
+  score is right and the audit no longer lies about it, but the breakdown is still short one row.
+  Back-filling it is a **production data write and the owner's to fire**, per the confirm-first
+  carve-out — and only the four exactly-reproducing rows can be reconstructed with confidence
+  (`checkin = 50`); the other three cannot, because of the residual above. **Do not write a value to
+  the three.**
+- **⚠ Keep: 40 of 65 rows carry no `model_versions.readiness` stamp** (2026-07-16 → 08-25), and the
+  stamped and unstamped ranges **overlap** (08-22 → 08-25), so the row cannot say which it is. This
+  half of the original finding is **confirmed and untouched** — verified 2026-09-18, the count is
+  exactly 40. Back-stamping is the same owner-gated production write as above.
+- **⚠ Scope any back-fill as a back-fill, not a re-derive.** Re-deriving the contributors from
+  today's summaries would inherit whatever the baselines say now, which is a different number again.
+  **Do not rewrite the contributors** — they are the newer, correct half.
+- **Pass test:** every stored `readiness_score` reproduces from its own stored contributors, and
+  every row carries a model stamp. **Currently: 62 of 65 reproduce** (58 nine-key + 4 of the seven),
+  three are 1 point out, and 25 of 65 are stamped.
 
 ### [readiness][devices][platform] TN-46 — correlate vitals against dose: the app holds both halves and joins neither 🔴 LIVE
 
