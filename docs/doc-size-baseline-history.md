@@ -18,6 +18,24 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-18 — backlog → 23865, `projectOverview.md` → 11889 (LA-100 closed, 40 entries folded)
+
+**Backlog −62: an entry removed, not amended.** LA-100's two claims — no target file for the sweep,
+and a hard ceiling every lane would hit — were both recorded stale by OR-119 on 09-17. The step left
+undone was deleting it, so every lane kept being offered finished work.
+
+**The ratchet failed on the way and that is worth recording**, because the failure name misleads:
+removing 62 lines tripped *"Orientation docs stay within their baselines"*. It is shrink-only, so a
+document getting SMALLER moves its baseline down and a stale one fails — the instinct on reading that
+check's name is that something grew.
+
+The `projectOverview.md` paragraph leads with the measurement that retired the entry (28 of 32
+history files are dated) rather than with the sweep, because the sweep is a chore that recurs and the
+measurement is the thing a future reader would otherwise re-derive before daring to run it.
+
+---
+
+
 ## 2026-09-18 — backlog → 23927, `projectOverview.md` → 11879 (LA-110 re-measured)
 
 **Backlog +32, nothing removed, and no fix shipped** — which is the right trade for this entry
