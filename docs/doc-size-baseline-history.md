@@ -18,6 +18,21 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-18 — backlog → 23898, `projectOverview.md` → 11900 (LA-110: two refutations)
+
+**Backlog +33 for two NEGATIVE results and no fix**, which is the unusual trade and the one worth
+defending. A refuted candidate is normally deleted; both of these are kept because each is what the
+next reader will reach for first. The baseline hypothesis produces the observed fingerprint by
+design, and BF-148 lands inside the window and touches the same flag — someone will find them, and
+finding them a second time costs the same hour it cost here.
+
+The ⛔ line is the highest-value part: `session_periodization` keeps no history, so the window cannot
+be reconstructed by query at all. Without it the next session runs the same SQL and reaches the same
+dead end before realising the table cannot answer.
+
+---
+
+
 ## 2026-09-18 — backlog → 23865, `projectOverview.md` → 11889 (LA-100 closed, 40 entries folded)
 
 **Backlog −62: an entry removed, not amended.** LA-100's two claims — no target file for the sweep,
@@ -67,7 +82,7 @@ widening rather than rewriting, and `keep.js`'s own comments argue the opposite 
 enough that a future session will re-open it. Without the count it would have to re-measure.
 ---
 
-## 2026-09-18 — backlog → 23848, `projectOverview.md` → 11899 (RV-61 shipped)
+## 2026-09-18 — backlog → 23881, `projectOverview.md` → 11910 (RV-61 shipped)
 
 **Backlog −17** for one small entry. The overview paragraph is longer than the diff because two of
 the three things worth remembering are **refusals**: the check calls a fifteen-query function on

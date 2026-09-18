@@ -22588,12 +22588,45 @@ same `ex.progressionStyle` on the client (`components/workout-screen.tsx:1270`,
 `style_name` is present and 8 of 10 sets have a pct. So a null style id is ordinary here (RV-32 drops
 an unowned one) and cannot be the signature.
 
-**Deliberately NOT concluded:** whether the program's session exercises actually lost their styles
-for that week, whether those five sessions came through the outbox replay path (`sync-helpers.ts:113`
-omits `progressionStyle` unless *every* set has planned fields, which is self-consistent with the
-data and proves nothing about cause), or whether something else presented the workout unprescribed.
-Each is testable and none was tested. **Writing a cause in here on this evidence would repeat the
-mistake this entry already documents twice.**
+**⚠ TWO CANDIDATES TESTED AND REFUTED, AND THE MECHANISM NAMED — 2026-09-18 (Lane A), following
+the re-measure above.** Still no cause. What changed is that the search space is smaller and two
+plausible-looking answers are off it.
+
+**REFUTED — it was not a baseline block.** This was the strongest candidate, because a baseline
+phase produces *exactly* this signature by design:
+`app/api/workout-data/route.ts:265` reads
+`aiPrescription = isAiDynamic && !isBaselinePhase && state?.prescription ? … : null`, so
+`isBaselinePhase` forces the prescription to null, and an AMRAP baseline is one set with no pct.
+**Production says it did not happen:** every `session_periodization` row carries
+`baseline_complete = true`, and no row is in a `baseline` phase — the phases across the window are
+`deload`, `realisation` and `accumulation`. `isAiDynamicBaseline` was false throughout.
+
+**REFUTED — it was not BF-148 (#1117).** It lands inside the window (2026-09-12 10:31 AEST) and is
+about the same flag, which makes it look decisive. It runs **the wrong way**: it *removed* a
+name-keyed term that had been **vetoing** the baseline, so its effect is to turn one-set/no-pct
+behaviour **on**, not off — and the data has that behaviour *ending* around then.
+
+**The mechanism, which is now specific:** the pct, the style and the set count all descend from
+`aiPrescription`, which is null whenever `session_periodization.prescription` is absent;
+`buildWorkoutExercises` is what turns it into what the screen shows. **All five sessions transitioned
+into `accumulation` between 09-09 22:24 and 09-12 00:50 UTC, and their replacement prescriptions were
+generated 09-13 → 09-16** (`prescription_generated_at`) — which brackets the broken/clean boundary at
+the *end* of the window exactly.
+
+**What that does NOT explain, and it is the remaining question: 09-07 and 09-08.** Both precede every
+one of those transitions. Whatever left those two days unprescribed either started earlier or is a
+second cause.
+
+**⛔ A HARD LIMIT, so nobody repeats the hour: `session_periodization` stores only CURRENT state.**
+There is no history of `prescription`, `prescription_status` or `phase`, so the window cannot be
+reconstructed by query — `prescription_generated_at` and `phase_started_at` are the only dated
+columns, and they describe the row's latest values. Confirming the mechanism needs either a
+reproduction or a log, not SQL.
+
+**Still deliberately NOT concluded:** whether the outbox replay path was involved
+(`sync-helpers.ts:113` omits `progressionStyle` unless *every* set has planned fields — consistent
+with the data, causally silent). **Writing a cause in here on this evidence would repeat the mistake
+this entry already documents twice.**
 
 **What is actually owed, and it is not this entry's fix:** find why those five sessions were written
 with no prescription, and decide whether those stored `estimated_1rm` values are recomputed. **The second

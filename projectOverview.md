@@ -67,6 +67,17 @@ days later it was offered as next-up and re-derived, because prose cannot reach 
 fields; its Lever 2 needs a quiet window and a structural decision, both the owner's. Lane A's READY
 list went **12 → 9**.
 
+**LA-110: two candidates tested and refuted, mechanism named, cause still open (2026-09-18).** A
+**baseline block** would produce the exact fingerprint — `isBaselinePhase` forces `aiPrescription` to
+null and an AMRAP baseline is one set with no pct — but every `session_periodization` row reads
+`baseline_complete = true` and none is in a `baseline` phase. **BF-148** lands inside the window and
+touches the same flag, but runs the wrong way: it turns that behaviour *on*. What is established is
+the path — pct, style and set count all descend from `aiPrescription`, null whenever the stored
+`prescription` is absent — and that all five sessions entered `accumulation` 09-09 → 09-12 with
+replacements generated 09-13 → 09-16, bracketing the *end* of the window. **09-07 and 09-08 remain
+unexplained.** ⛔ `session_periodization` keeps only current state, so the window cannot be
+reconstructed by query — this needs a reproduction, not more SQL.
+
 **LA-100 closed, and 40 journal entries folded (2026-09-18).** The entry said the sweep had nowhere
 to fold to because the batched history files are era-named; **28 of 32 are dated** and the fold script
 has written `history-<date>-folded-N.md` since LA-80, so the convention it asked the owner to choose
