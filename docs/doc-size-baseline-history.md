@@ -18,6 +18,17 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-18 — backlog → 23915 (TN-47/48/49, the tuning calibration sweep)
+
+**+144 from 23771.** Three entries off one review. TN-48 is the long one and earns it: the
+body-composition decomposition has to carry its guardrails inline, because the finding is that the
+undecomposed lean-mass number is *misleading in exactly the situation a user most wants it*, and an
+implementer who reads the table without the water column repeats the error the entry exists to stop.
+TN-47 carries the measured "moves 0.4 points" line for the same reason — without it the entry reads
+as a re-score, which it is not.
+
+---
+
 ## 2026-09-18 — backlog → 23771 (LA-118's heading corrected)
 
 **+3**, for one word and a sentence saying why it was wrong. The entry filed hours earlier was
@@ -80,6 +91,7 @@ out or it reads as alarmism. The four options carry their own trade-offs per **D
 Back To Me**, and that section does not compress well.
 
 ---
+
 
 ## 2026-09-17 — backlog → 23365 (four owner decisions + the Q-506 re-measurement)
 
@@ -13533,12 +13545,15 @@ window edge instead. Two further notes are recorded against a plausible wrong fi
 different quantities, so unifying them while moving this server-side would silently redefine what
 102 means.
 
-## 2026-09-18 — `docs/implementation-backlog.md` 23670 → 23790 (Lane B, TN-3b pass test)
+## 2026-09-18 — `docs/implementation-backlog.md` 23670 → 23934 (Lane B, TN-3b pass test)
 
 +19 to correct a stale blocker that was parking real work. TN-3b said its pass test could not be met
 because `/api/body-battery` takes no parameters — but that route is not in the stress chart's path at
 all; it fetches `/api/body-battery/stress-day?date=` and says so in its own header. The past-day case
 is not merely reachable, it is spec-covered and green (6 of 6).
+
+The number also absorbs a re-merge of `origin/main` before merging, which landed three more
+entries from Lane A and Tuning — recomputed rather than spliced, as the ratchet requires.
 
 The lines are worth it because of what the claim was holding: TN-35's `Needs: TN-3b` keeps a
 buildable Lane B overlay parked, and the entry's remaining promises (HR-chart overlay, cross-day
