@@ -18,6 +18,16 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-18 — backlog → 24149, `projectOverview.md` → 11803 (RV-62 shipped)
+
+**Backlog −23.** An entry left the queue with both halves done and its open question answered rather
+than inherited. The overview gains the answer, not the fix: *"can a seven-day boundary flip a
+soreness verdict"* is the kind of question that gets re-asked every time someone reads the ms-offset
+rule, and the answer — only through the median that sets `tau`, never directly — is worth more than
+the one-line change that prompted it.
+
+---
+
 ## 2026-09-18 — backlog → 24172, `projectOverview.md` → 11790 (RV-51 shipped, no migration)
 
 **Backlog −29: an entry left the queue and the fix was not the one it asked for.** RV-51 wanted a

@@ -3072,7 +3072,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     }
   }
 
-  async saveMoodLog(userId: string, log: Omit<import('@trainingai/shared/types/mood').MoodLog, 'id' | 'userId' | 'createdAt'>): Promise<import('@trainingai/shared/types/mood').MoodLog> {
+  async saveMoodLog(userId: string, log: Omit<import('@trainingai/shared/types/mood').MoodLog, 'id' | 'userId' | 'createdAt'>, timezone: string = DEFAULT_TZ): Promise<import('@trainingai/shared/types/mood').MoodLog> {
     // BF-173. Provenance is recorded at WRITE time, never re-derived at score time. Re-deriving is
     // the option the owner weighed and rejected: it suppresses the clamp whenever a muscle happens
     // to be under-recovered, which discards exactly the case the check-in exists for — the lifter
@@ -3085,7 +3085,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // fallback's limit is why the caller's list wins when present: a muscle the lifter volunteered
     // that ALSO meets the suggestion conditions is indistinguishable from an accepted one here.
     const provenance = log.suggestedSoreMuscles
-      ?? await this.deriveSuggestedSoreMuscles(userId, log.soreMuscles)
+      ?? await this.deriveSuggestedSoreMuscles(userId, log.soreMuscles, log.logDate, timezone)
 
     const [r] = await this.db.insert(s.moodLogs)
       .values({
@@ -3127,15 +3127,41 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    * suggestions", which scores every tick the pre-BF-173 way. A check-in must never fail to save
    * because provenance could not be worked out.
    */
-  private async deriveSuggestedSoreMuscles(userId: string, sore: string[]): Promise<string[]> {
+  /**
+   * RV-62 — the window anchors at the check-in's own local midnight, not at `Date.now()` minus a
+   * fixed number of milliseconds. The ms-offset form straddles two local days and merges them, and
+   * it is the pattern CLAUDE.md's Date Arithmetic rule names outright; I shipped it here in BF-173
+   * and a review caught it.
+   *
+   * **It is keyed on `logDate` rather than on today**, which is stricter than the rule asks: a
+   * check-in saved for a particular day should read the seven days ending on that day, not the
+   * seven ending now. Normally they are the same day and it costs nothing.
+   *
+   * **What the skew can and cannot do, measured rather than assumed.** A session entering or
+   * leaving at the seven-day edge can NOT by itself change a suggestion: `suggestedSoreMuscles`
+   * only considers muscles whose latest bout is within `SORENESS_EXPECTED_WITHIN_HOURS` (48), and
+   * an edge session is ~168 hours old. The one path that does reach the verdict is indirect —
+   * `computeMuscleRecovery` takes the MEDIAN bout volume per muscle as `typical`, and `tau` scales
+   * with `latest.volumeKg / typical`. Adding or dropping one old bout can move that median, which
+   * moves `tau`, which moves `pct` for a muscle trained recently enough to be eligible. So it flips
+   * a verdict only for a muscle already sitting near the 85% line. Narrow, real, and worth stating
+   * precisely so nobody re-derives it as either "harmless" or "a live scoring bug".
+   */
+  private async deriveSuggestedSoreMuscles(
+    userId: string, sore: string[], logDate: string, timezone: string,
+  ): Promise<string[]> {
     if (sore.length === 0) return []
     try {
-      const from7d = new Date(Date.now() - 7 * 86_400_000)
-      const [recentWorkouts, exerciseLibrary] = await Promise.all([
-        this.getWorkoutSessionsFrom(userId, from7d),
-        this.listExerciseLibrary(),
+      const from = dateStrMidnightInTz(shiftDateStr(logDate, -7), timezone)
+      const [recentWorkouts, muscleMap] = await Promise.all([
+        this.getWorkoutSessionsFrom(userId, from),
+        // RV-62's second half: `listExerciseLibrary()` selected every column of the whole catalogue
+        // on every check-in save, and only the name→muscles mapping is read.
+        // `computeMuscleRecovery` takes `Pick<ExerciseLibraryEntry, 'name' | 'muscles'>[]`, which is
+        // exactly what this returns.
+        this.listExerciseMuscleMap(),
       ])
-      return suggestedSoreMuscles(computeMuscleRecovery(recentWorkouts, exerciseLibrary), sore)
+      return suggestedSoreMuscles(computeMuscleRecovery(recentWorkouts, muscleMap), sore)
     } catch {
       return []
     }

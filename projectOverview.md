@@ -52,6 +52,19 @@ are still deliberately NOT unified** — `computeStreak` counts *training days* 
 the home loop counts *calendar days spanned* — so `streak-window.ts` now says outright that the
 leaderboard does not read `STREAK_LOOKBACK_DAYS`: 365 would cap an all-time field just as 90 did.
 
+**The soreness-provenance window used the banned ms-offset form, and it is not hygiene (RV-62,
+2026-09-18).** `deriveSuggestedSoreMuscles` built its seven-day window as `Date.now() - 7 *
+86_400_000` — the exact pattern the Date Arithmetic rule names — shipped in BF-173 that morning and
+caught by review sweep 50 the same day. It now anchors at `dateStrMidnightInTz`, keyed on the
+**check-in's own `logDate`** rather than on today, and `saveMoodLog` takes the session timezone.
+**The entry left open whether the skew can flip a verdict; it can, but only one way.** A session at
+the seven-day edge is ~168 h old and `suggestedSoreMuscles` only looks within 48 h, so it can never
+be eligible itself — but `computeMuscleRecovery` takes the MEDIAN bout volume as `typical` and
+scales `tau` by `latest/typical`, so an old heavy bout entering the window raises a recent bout's
+recovery percentage. Pinned: **81 → 92**, flipping suggested to not-suggested. Narrow, real, and
+only near the 85 line. The entry's second half shipped too — the check-in write path was selecting
+the whole exercise catalogue on every save and now reads the name→muscles map alone.
+
 **Two merged duplicates were being offered in generated programs, and the entry that found the area
 pointed the other way (RV-51, 2026-09-18 — no migration).** `listExerciseLibrary` is deliberately
 unfiltered, so every **picker** filters `mergedInto` itself; `builder-review.tsx` did,

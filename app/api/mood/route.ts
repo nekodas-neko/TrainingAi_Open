@@ -62,6 +62,6 @@ export async function POST(req: NextRequest) {
     sleepQuality: sleepQuality ?? 'ok',
     bodyState: bodyState ?? [],
     soreMuscles: soreMuscles ?? [],
-  })
+  }, tz)
   return NextResponse.json(log)
 }
