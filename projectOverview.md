@@ -52,6 +52,37 @@ are still deliberately NOT unified** — `computeStreak` counts *training days* 
 the home loop counts *calendar days spanned* — so `streak-window.ts` now says outright that the
 leaderboard does not read `STREAK_LOOKBACK_DAYS`: 365 would cap an all-time field just as 90 did.
 
+**Two merged duplicates were being offered in generated programs, and the entry that found the area
+pointed the other way (RV-51, 2026-09-18 — no migration).** `listExerciseLibrary` is deliberately
+unfiltered, so every **picker** filters `mergedInto` itself; `builder-review.tsx` did,
+`generate-program` and `builder-chat` did not. They looked correct only because two of the four
+merged rows carry an empty equipment list, which `equipmentEligible` rejects — `Cable Crunch` and
+`Straight Arm Pulldown` carry `['cable']` and were being offered beside the canonical rows they were
+merged into. **RV-51 reported the opposite**: it found the two *harmless* rows (`Cable Lat Pulldown`,
+`Dumbbell Lunges`), read them as real exercises hidden from every program, and prescribed a migration
+to label them — which would have un-hidden two duplicates, and whose pass test (*"a full-gym program
+can offer both names"*) is the outcome to avoid. Both are merged, to `Cable Pulldown` and `Dumbbell
+Lunge`. The `POST /api/exercises` guard the entry suspected is sound: it exempts merge requests from
+requiring equipment, which is exactly what those rows are. `equipmentEligible`'s header — which
+claimed *"an empty list should not occur"* and is what aimed the review at the wrong target — is
+corrected in place.
+
+**A readiness audit was contradicting its own evidence, and an entry was written from it (TN-49,
+2026-09-18 — no data write).** Seven `oura_daily_derived` rows read 4–6 points below their own
+stored breakdown. The entry prescribed rewriting those seven scores; doing so would have written the
+error into production. **The cause:** `rederiveReadinessFromStored` skipped any contributor key
+absent from the stored map, dropping its weight from a sum defined to total exactly 1.00. The seven
+disagreeing rows are **exactly** the seven storing eight contributors instead of nine, missing
+`checkin` (weight 0.10); all 58 nine-key rows reproduce exactly. **The audit then printed "the
+stored score IS reproducible from its own stored inputs (42)" against a stored 48** — a
+reproducibility claim contradicted by the number in the same sentence — and concluded the inputs had
+moved. An absent key now contributes the model's own neutral 50 and is reported as `missing`, and the
+audit refuses to claim reproducibility while it is non-empty. **Four of the seven then reproduce
+exactly; three keep a 1-point residual that is recorded as unexplained rather than fitted.** Two
+owner-gated production writes stay on the entry: back-filling the missing `checkin` key (only the
+four reconstructable rows), and back-stamping `model_versions.readiness`, still absent on 40 of 65
+rows.
+
 **The muscle-attribution query was four copies; three are now one (LA-118, 2026-09-18 —
 unversioned).** `weightedSetsByMuscle` in `periodization.ts` is the single set-counting query;
 `getWeeklySetsByMuscleGroup`, `getSetsByMuscleInWindow` and `/api/weekly-muscle-sets` call it. The

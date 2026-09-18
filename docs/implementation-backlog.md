@@ -556,64 +556,56 @@ existing 65 days moves by less than 5 points on every one of them.
 
 ### [readiness][platform] TN-49 — seven days show a readiness score that contradicts its own stored breakdown
 
-- **Branch:** _unassigned_ · **Added:** 2026-09-18 · Tuning agent.
-- **Lane: A** — a back-fill over `oura_daily_derived`.
+- **Branch:** `lane-a/tn49-rederivation-missing-key` · **Added:** 2026-09-18 · Tuning agent.
+- **Lane: A** — `packages/shared/src/health/**`, plus a possible back-fill over `oura_daily_derived`.
 - **Review:** [`what the score can and cannot say`](reviews/2026-09-18-what-the-score-can-and-cannot-say.md) §3.
-- **This is a follow-on to Q-501, not a regression of it.** Q-501 shipped on 2026-08-26 and persists
-  the input behind every contributor, which is precisely what makes this checkable — and visible.
-
-**Measured 2026-09-18.** Recomputing the weighted composite from each row's own stored contributors:
-**7 of 65 rows disagree with their stored `readiness_score`**, all consecutive (2026-07-16 → 07-22),
-all by −4 to −6 points. They predate the 2026-07-22 weight rebalance: their contributors were
-re-derived under the new model and their score was not.
-
-**Separately, 40 of 65 rows carry no `model_versions.readiness` stamp at all** (2026-07-16 →
-08-25), and the stamped and unstamped ranges **overlap** (08-22 → 08-25) — so some rows were
-re-derived and some were not, and the row cannot say which it is.
-
-**Why it is worth fixing rather than tolerating.** A user opening one of those days sees a score and
-a breakdown that disagree by up to 6 points, with nothing on the card to explain it. The whole reason
-Q-501 stored the inputs was so a score could be re-derived from its own row; on these seven it can
-be, and the answer is different.
-
-**First action:** recompute and rewrite the seven rows from their stored contributors, stamping the
-current model version, and back-stamp the 33 unstamped rows that already reproduce. **Do not rewrite
-the contributors** — they are the newer, correct half.
-
-**⚠ Scope it as a back-fill, not a re-derive.** Re-deriving the contributors from today's summaries
-would inherit whatever the baselines say now, which is a different number again.
-
-**Pass test:** every stored `readiness_score` reproduces from its own stored contributors, and every
-row carries a model stamp.
-
-### [workouts] RV-51 — two real exercises are excluded from every generated program, in production, today
-
-- **Lane:** A — catalogue data (a migration) plus a decision about
-  `packages/shared/src/workout/equipment.ts:38`. **Added:** 2026-09-18 · Review sweep 50.
-- **The premise the rule rests on is false right now.** `equipmentEligible`'s header justifies
-  excluding an exercise that declares no equipment with *"Migration 269 labelled the 22 rows that
-  had drifted and `POST /api/exercises` now refuses to create another, **so an empty list should not
-  occur**"*. Production holds **2 of 156** rows with `equipment = []`: `Dumbbell Lunges`
-  (`4d747449-e936-4ed2-93f8-0986407fa08a`) and `Cable Lat Pulldown`
-  (`aed11054-1d0d-49ee-b81f-ae3a336a2197`). Verified against `claude_ro.exercise_library` on
-  2026-09-18.
-- **The implementation is `exerciseEquipment.some(...)`, so an empty array is false against every
-  selection including `full_gym`** — `.some()` on `[]` is always false. Both exercises are therefore
-  invisible to `app/api/generate-program/route.ts:136`, `app/api/builder-chat/route.ts:103` and
-  `components/workout-builder/builder-review.tsx:180`, for every user, at every equipment setting.
-  For these two rows excluding is not the safe direction the comment claims: a full-gym lifter can
-  perform both.
-- **Fix the data, not the rule.** Label the two rows (`dumbbell`; `cable`) in a migration. The
-  exclude-on-empty rule is correct and is what stopped a home gym being offered Machine Chest Press
-  — do not soften it back to `length === 0 || …`.
-- **Then answer the question the data raises**, which is the part worth a moment: `exercise_library`
-  has no `created_at`, so it could not be established whether migration 269 **missed** these two or
-  something **wrote** them afterwards. If it is the latter, the `POST /api/exercises` guard has a
-  hole and labelling two rows fixes nothing. Check the guard against the insert paths before
-  closing.
-- **Verification:** after the migration, `SELECT count(*) FROM exercise_library WHERE equipment IS
-  NULL OR array_length(equipment,1) IS NULL` returns 0, and a generated full-gym program can offer
-  both names.
+- **⛔ THE PRESCRIBED FIRST ACTION WAS WRONG AND WOULD HAVE CORRUPTED PRODUCTION.** This entry said
+  *"recompute and rewrite the seven rows from their stored contributors"*. Doing that would have
+  overwritten seven **correct** scores with values **4 to 6 points too low** — writing into the
+  database exactly the defect the entry exists to remove. The measurement was right; the diagnosis
+  was not, and it was the audit surface that produced it.
+- **✅ THE REAL CAUSE, measured on production 2026-09-18 and FIXED the same day** (no data write):
+  `rederiveReadinessFromStored` **skipped a contributor key absent from the stored map**, dropping
+  its weight from a sum whose weights are defined to total exactly 1.00. The result came out low by
+  about `weight × 50`.
+  - The 7 disagreeing rows are **exactly** the 7 rows storing **eight** contributors instead of nine.
+    The missing key is **`checkin`** (weight 0.10) on every one. All **58** nine-key rows reproduce
+    exactly. The key-count histogram is `{8: 7, 9: 58}` — a 1:1 match with the disagreements.
+  - An absent key now contributes the model's own NEUTRAL 50 (what `computeReadinessComposite`
+    itself uses for a contributor with no input) and is reported in a new `missing` field.
+  - **⚠ A key PRESENT with an unusable score is deliberately NOT treated the same way**, and the
+    asymmetry is pinned by its own test. An absent key has no score, so the neutral reproduces the
+    composite; a corrupt one is a value that cannot be read, and inventing 50 asserts something the
+    row does not say — which is what `readiness-stored-inputs.test.ts`'s *"it refuses to invent a
+    verdict"* block exists to prevent. That path stays skipped and therefore **keeps** the
+    low-by-`weight × score` trap. Accepted: no production row has ever been in that state. The
+    first version of the fix collapsed the two cases and turned that pre-existing test red.
+  - **The audit surface was asserting the opposite of its own evidence.** With `drifted` and
+    `uncheckable` both empty it took the branch that prints *"The stored score IS reproducible from
+    its own stored inputs (42)"* against a stored 48, and concluded *"the model has not moved — the
+    difference is an INPUT change"*. That sentence is what this entry was written from. It now
+    refuses to make a reproducibility claim while `missing` is non-empty.
+- **⚠ Keep: a 1-point residual on THREE of the seven is still unexplained.** With the neutral 50
+  standing in, 07-18/19/20/22 reproduce **exactly** and **07-16, 07-17 and 07-21 remain 1 point
+  low**. No value in `CHECKIN_ENERGY_SCORE` (30/50/72/88/100) reproduces those three, so it is not
+  simply a logged check-in. Recorded as unexplained rather than fitted. It is 1 point on three days
+  and nothing on screen depends on it, which is why it is a `Keep:` and not a blocker.
+- **⚠ Keep: the missing `checkin` KEY is still absent from those seven contributor blobs.** The
+  score is right and the audit no longer lies about it, but the breakdown is still short one row.
+  Back-filling it is a **production data write and the owner's to fire**, per the confirm-first
+  carve-out — and only the four exactly-reproducing rows can be reconstructed with confidence
+  (`checkin = 50`); the other three cannot, because of the residual above. **Do not write a value to
+  the three.**
+- **⚠ Keep: 40 of 65 rows carry no `model_versions.readiness` stamp** (2026-07-16 → 08-25), and the
+  stamped and unstamped ranges **overlap** (08-22 → 08-25), so the row cannot say which it is. This
+  half of the original finding is **confirmed and untouched** — verified 2026-09-18, the count is
+  exactly 40. Back-stamping is the same owner-gated production write as above.
+- **⚠ Scope any back-fill as a back-fill, not a re-derive.** Re-deriving the contributors from
+  today's summaries would inherit whatever the baselines say now, which is a different number again.
+  **Do not rewrite the contributors** — they are the newer, correct half.
+- **Pass test:** every stored `readiness_score` reproduces from its own stored contributors, and
+  every row carries a model stamp. **Currently: 62 of 65 reproduce** (58 nine-key + 4 of the seven),
+  three are 1 point out, and 25 of 65 are stamped.
 
 ### [platform][workouts] RV-62 — a banned ms-offset window landed on the mood check-in write path
 
@@ -12763,13 +12755,32 @@ record explicitly why not.
 - **✅ THE PAST-DAY READ IS NOT BLOCKED — corrected 2026-09-16.** This said it was blocked on
   `LB-102`, then on `LB-110`; **both were chasing work that had already shipped.**
   `app/api/body-battery/stress-day/route.ts` serves the stored buckets for any day and
-  `stress-day-chart.tsx` fetches it with `?date=`, rendered from `day-detail-content.tsx:260` with
-  `date={selectedDate}`. LB-110 is removed; do not re-file it. The pass test — *"the owner
-  opens a past day, reads a stressed window off the axis"* — cannot be met yet: `/api/body-battery`
-  is `export async function GET()` with **no parameters**, so only today is reachable. The buckets are
-  persisted (TN-3a, `oura_daytime_stress_buckets`, from 2026-08-24), and the chart takes a plain
-  `buckets` array, so the surface work is done — what is missing is the read. Also still owed:
-  overlaying stress on the HR charts, and the **stress-by-hour aggregate across days**.
+  `stress-day-chart.tsx` fetches it with `?date=`, rendered from `day-detail-content.tsx:259` with
+  `date={selectedDate}`. LB-110 is removed; do not re-file it. The buckets are persisted (TN-3a,
+  `oura_daytime_stress_buckets`, from 2026-08-24).
+- **✅ AND THE PASS TEST IS MET — corrected 2026-09-18 (Lane B), this entry said it was not.** It read
+  *"cannot be met yet: `/api/body-battery` is `export async function GET()` with no parameters, so
+  only today is reachable."* **That route is not in this chart's path.** `stress-day-chart.tsx:76`
+  fetches `/api/body-battery/stress-day?date=${day}` and nothing else — its own header says so
+  outright: *"every day comes from `/api/body-battery/stress-day`, one baseline."*
+  **And it is already spec-covered, not merely reachable:** `e2e/stress-by-hour.spec.ts` carries
+  *"a past day carries the same chart, which is what makes the comparison possible"*, driving
+  `/health/day?date=2026-09-08`. Re-run on `fdcee2d4e1`: **6 of 6 passed.** So *"open a past day,
+  read a stressed window off the axis"* is done and proven.
+- **⚠ WHAT IS LEFT IN THIS ENTRY IS PRE-RESHAPE PROSE, and it is the Orchestrator's call, not this
+  lane's.** The heading and the old body still promise *"overlaying stress on the HR charts"* and a
+  *"stress-by-hour aggregate across days"*. **Neither is in the plan the owner approved.** The
+  2026-09-10 conversation reshaped this entry — the entry says so itself: *"the chart is the first
+  half, not the deliverable. See TN-35 for the second"* — and the review's ordered plan (§9) lists
+  TN-3b as *"the chart — local-time axis, gaps as gaps, night shaded"*, with step 3 being **TN-35a,
+  overlay the series on the DAY TIMELINE**, not on the HR charts. The HR-chart overlay was checked
+  and is genuinely absent (`hr-day-chart.tsx` draws sleep and workout bands and no stress), so this
+  is a scope question rather than a missed build.
+- **⇒ TN-35 is what this parks.** Its `Needs: TN-3b` clears when this entry leaves the queue, and its
+  overlay half is Lane B and buildable today: `app/api/day-timeline/route.ts` already emits typed,
+  timestamped events and `components/health/day-detail/**` renders them, so the join needs no new
+  route. Its marker half is Lane A (a migration). **Clearing a completed entry is the Orchestrator's
+  sweep, which is why this is filed rather than struck.**
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner request

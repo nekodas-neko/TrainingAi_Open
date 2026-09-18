@@ -18,6 +18,50 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-18 — backlog → 24172, `projectOverview.md` → 11790 (RV-51 shipped, no migration)
+
+**Backlog −29: an entry left the queue and the fix was not the one it asked for.** RV-51 wanted a
+migration labelling two unlabelled catalogue rows; both turned out to be merged duplicates, so the
+migration would have un-hidden them. What shipped is two one-line filters, and the entry is removed
+rather than kept — nothing is owed.
+
+The overview's +15 records the inversion rather than the fix, and that is the part worth the lines:
+the review found the two rows that were harmless and missed the two that were live, because its query
+was one column short of `merged_into`. A future reader who sees only "two filters added" would have
+no way to know the entry pointed the other way.
+
+---
+
+## 2026-09-18 — backlog → 24201, `projectOverview.md` → 11775 (TN-49, the rederivation gap)
+
+**Backlog +13 on an entry that shipped its fix and stayed queued.** The growth is a retraction: the
+entry's prescribed first action would have overwritten seven correct production scores with values
+4–6 points too low, so the correction has to be at the top of the entry rather than folded into a
+tick, and the three residues it leaves have to be separable from the one that was fixed.
+
+The overview's +16 is the largest single-item paragraph in a while and it is not about the code. It
+is about a **surface that asserted the opposite of its own evidence** — the audit printed "the stored
+score IS reproducible from its own stored inputs (42)" against a stored 48 — because that sentence is
+what generated the false entry, and a later session reading the fix without it would not know why the
+entry was believed.
+
+**Re-read as 24194 / 11775 on the re-merge**, against the 23933 / 11745 this note was drafted with —
+review sweep 50 (#1297) landed thirteen RV entries in between. The deltas are unchanged; the
+absolutes are a reading of whatever `main` was at merge time, which is never the `main` the note was
+written against.
+
+**That re-merge is also where the backlog conflict took a THIRD shape**, and it is worth recording
+because neither existing rule covered it. The documented cases are two deletions (keep neither) and
+two additions on an append-only file (keep both). This was an **edit against an append**: `main`
+carried the ORIGINAL TN-49 text plus the new RV entries, while this branch carried the rewritten
+TN-49. "Keep both" would have restored the retracted prescription — the one that would have
+corrupted seven production rows — sitting directly above its own correction, and "keep neither"
+would have dropped thirteen new entries. The resolution is per-heading: this side's TN-49, then
+`main`'s RV-51…RV-63. Reading the headings is what the rule actually asks for; the deletion/addition
+dichotomy is a shortcut that does not always apply.
+
+---
+
 ## 2026-09-18 — backlog → 23915 (TN-47/48/49, the tuning calibration sweep)
 
 **+144 from 23771.** Three entries off one review. TN-48 is the long one and earns it: the
@@ -13599,3 +13643,17 @@ live scoring defect. The row says so explicitly rather than implying either.
 
 Both carry their `[domain]` tags, and both say "found, not fixed" / name what was not established,
 so neither can be mistaken for a closed item on a later sweep.
+## 2026-09-18 — `docs/implementation-backlog.md` 23670 → 24199 (Lane B, TN-3b pass test)
+
++19 to correct a stale blocker that was parking real work. TN-3b said its pass test could not be met
+because `/api/body-battery` takes no parameters — but that route is not in the stress chart's path at
+all; it fetches `/api/body-battery/stress-day?date=` and says so in its own header. The past-day case
+is not merely reachable, it is spec-covered and green (6 of 6).
+
+The number also absorbs a re-merge of `origin/main` before merging, which landed three more
+entries from Lane A and Tuning — recomputed rather than spliced, as the ratchet requires.
+
+The lines are worth it because of what the claim was holding: TN-35's `Needs: TN-3b` keeps a
+buildable Lane B overlay parked, and the entry's remaining promises (HR-chart overlay, cross-day
+aggregate) are pre-reshape prose that the owner-approved plan replaced with TN-35a. Recording which
+half is done and which is a scope question is what lets the Orchestrator clear it in one pass.
