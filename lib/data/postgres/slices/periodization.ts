@@ -515,13 +515,46 @@ export async function getExercise1rmHistory(db: Db, userId: string, exerciseName
   return byExercise
 }
 
-export async function getWeeklySetsByMuscleGroup(db: Db, userId: string, programId: string, weekStart: string, weekEnd: string, tz: string): Promise<Record<string, number>> {
-  const weekEndNextStr = shiftDateStr(weekEnd, 1)
-  // User-local midnight boundaries (Date Arithmetic rule) — matches the dateStrMidnightInTz
-  // pattern already used at :302 in this file, instead of a bare ::date cast which compares
-  // against UTC midnight and can straddle two user-local weeks.
-  const weekStartTz = dateStrMidnightInTz(weekStart, tz)
-  const weekEndNextTz = dateStrMidnightInTz(weekEndNextStr, tz)
+/**
+ * LA-118 — the ONE weighted-sets-per-muscle query. Every set-counting caller goes through this.
+ *
+ * It was written out four times before this existed and the copies disagreed. Not on the weighting:
+ * the 1.0 main / 0.5 secondary split was identical everywhere and every copy's comment said so.
+ * They disagreed on **which timestamp a set is attributed to** and **whether a previous programme
+ * counts** — and no comment mentioned either, which is why the divergence survived being described
+ * four times over. Both are parameters here, so a caller now has to state its answer.
+ *
+ * **The two branches are not a fallback for missing data.** They read different columns:
+ * `exercise_library.muscles` carries a role per muscle, `exercise_logs.muscle_groups` is a bare
+ * text array. An exercise absent from the library has no role to weight by, so each tagged muscle
+ * counts whole — the behaviour every copy already had, preserved deliberately rather than
+ * normalised away.
+ *
+ * `muscle-tonnage-trend` is deliberately NOT a caller: it sums `weight_kg * reps` and buckets by
+ * week, so it shares the attribution half and nothing else. Folding it in means returning rows for
+ * the caller to aggregate, which is a bigger change than this one.
+ */
+async function weightedSetsByMuscle(db: Db, opts: {
+  userId: string
+  /** Inclusive lower bound, already resolved to an instant. */
+  from: Date
+  /** Exclusive upper bound. Every caller has one — the absence of one is the LA-118 defect. */
+  toExclusive: Date
+  /**
+   * Which timestamp attributes a set to a day.
+   *
+   * `logged_at` is the set's own — a session started before midnight whose later exercises were
+   * logged after it contributes to both days, which is what a per-day card means. `started_at` is
+   * the session's, and is right only when the unit being measured is a programme session.
+   */
+  dateColumn: 'logged_at' | 'started_at'
+  /** Scope to one programme's sessions. Omit to count across programme changes. */
+  programId?: string
+}): Promise<Record<string, number>> {
+  const dateExpr = opts.dateColumn === 'logged_at' ? sql`el.logged_at` : sql`ws.started_at`
+  const programFilter = opts.programId
+    ? sql`AND ws.session_id IN (SELECT id FROM program_sessions WHERE program_id = ${opts.programId})`
+    : sql``
 
   const libRows = await db.execute(sql`
     SELECT
@@ -533,10 +566,10 @@ export async function getWeeklySetsByMuscleGroup(db: Db, userId: string, program
     CROSS JOIN LATERAL jsonb_array_elements(
       (SELECT muscles FROM exercise_library WHERE name = el.exercise_name)
     ) AS muscle_entry
-    WHERE ws.user_id = ${userId}
-      AND ws.started_at >= ${weekStartTz}
-      AND ws.started_at < ${weekEndNextTz}
-      AND ws.session_id IN (SELECT id FROM program_sessions WHERE program_id = ${programId})
+    WHERE ws.user_id = ${opts.userId}
+      AND ${dateExpr} >= ${opts.from}
+      AND ${dateExpr} < ${opts.toExclusive}
+      ${programFilter}
       AND EXISTS (SELECT 1 FROM exercise_library WHERE name = el.exercise_name)
       AND sl.deleted_at IS NULL AND el.deleted_at IS NULL AND ws.deleted_at IS NULL
     GROUP BY LOWER(muscle_entry->>'muscle')
@@ -550,19 +583,19 @@ export async function getWeeklySetsByMuscleGroup(db: Db, userId: string, program
     JOIN exercise_logs el ON sl.exercise_log_id = el.id
     JOIN workout_sessions ws ON el.workout_session_id = ws.id
     CROSS JOIN LATERAL UNNEST(el.muscle_groups) AS mg
-    WHERE ws.user_id = ${userId}
-      AND ws.started_at >= ${weekStartTz}
-      AND ws.started_at < ${weekEndNextTz}
-      AND ws.session_id IN (SELECT id FROM program_sessions WHERE program_id = ${programId})
+    WHERE ws.user_id = ${opts.userId}
+      AND ${dateExpr} >= ${opts.from}
+      AND ${dateExpr} < ${opts.toExclusive}
+      ${programFilter}
       AND NOT EXISTS (SELECT 1 FROM exercise_library WHERE name = el.exercise_name)
       AND sl.deleted_at IS NULL AND el.deleted_at IS NULL AND ws.deleted_at IS NULL
     GROUP BY LOWER(mg)
   `)
 
-  // Keys are canonical (normalizeMuscle), matching what computeDefaultVolumeTargets writes into
-  // program_volume_targets. The exercise library ships both spellings of several muscles ("core"
-  // in 14 seeded rows, "quadriceps", "pecs", …), so returning raw labels split one muscle across
-  // two keys and no caller could line logged sets up against its own target.
+  // Canonical keys, matching what computeDefaultVolumeTargets writes into program_volume_targets.
+  // The exercise library ships both spellings of several muscles ("core" in 14 seeded rows,
+  // "quadriceps", "pecs", …), so returning raw labels split one muscle across two keys and no
+  // caller could line logged sets up against its own target.
   const result: Record<string, number> = {}
   for (const row of [...libRows.rows, ...nonLibRows.rows] as { muscle_group: string; weighted_sets: string | number }[]) {
     if (!row.muscle_group) continue
@@ -573,79 +606,47 @@ export async function getWeeklySetsByMuscleGroup(db: Db, userId: string, program
 }
 
 /**
+ * Weighted sets per muscle for ONE programme over a span.
+ *
+ * Keyed on `ws.started_at` rather than `el.logged_at`, and that stays as it is: its unit is a
+ * programme session, and its two callers — `/api/ai-periodization/weekly-volume` and
+ * `signals.ts` — grade a week against that programme's own targets. Changing the date column here
+ * would move numbers they already compare against, which is a behaviour change dressed as a
+ * refactor. For a span that should cross programme changes, use `getSetsByMuscleInWindow`.
+ */
+export async function getWeeklySetsByMuscleGroup(db: Db, userId: string, programId: string, weekStart: string, weekEnd: string, tz: string): Promise<Record<string, number>> {
+  // User-local midnight boundaries (Date Arithmetic rule) — matches the dateStrMidnightInTz
+  // pattern already used at :302 in this file, instead of a bare ::date cast which compares
+  // against UTC midnight and can straddle two user-local weeks.
+  return weightedSetsByMuscle(db, {
+    userId,
+    from: dateStrMidnightInTz(weekStart, tz),
+    toExclusive: dateStrMidnightInTz(shiftDateStr(weekEnd, 1), tz),
+    dateColumn: 'started_at',
+    programId,
+  })
+}
+
+/**
  * LB-111 — weighted sets per muscle over an ARBITRARY span, across every programme.
  *
  * `getWeeklySetsByMuscleGroup` above cannot serve this, and the difference is not the date range:
  * it scopes to **one** `programId`, so a 60-day window spanning a programme change would silently
- * drop the sets logged under the previous one. That is the right answer for its two callers, which
- * compare a week against *that programme's* targets, and the wrong answer for a movement-balance
- * card, whose claim is about the lifter's training rather than one programme's adherence. Widening
- * the existing method would have changed what those two callers mean, so this is a second question,
- * not a second implementation of the first.
- *
- * **Bounds on `el.logged_at`, not `ws.started_at`**, matching `weekly-muscle-sets` and
- * `muscle-tonnage-trend` — the card surfaces. A session started before midnight whose later
- * exercises were logged after it belongs to both days, and attributing each set to when it was
- * logged is what those two routes already do. `getWeeklySetsByMuscleGroup` keys on the session
- * instead because its unit is a programme session, and that stays as it is.
+ * drop the sets logged under the previous one. That is the right answer for its two callers and the
+ * wrong answer for a movement-balance card, whose claim is about the lifter's training rather than
+ * one programme's adherence.
  *
  * `to` is INCLUSIVE — the caller names two calendar days and means both of them.
  */
 export async function getSetsByMuscleInWindow(
   db: Db, userId: string, from: string, to: string, tz: string,
 ): Promise<Record<string, number>> {
-  const fromTz = dateStrMidnightInTz(from, tz)
-  const toNextTz = dateStrMidnightInTz(shiftDateStr(to, 1), tz)
-
-  // Secondary muscles count at half weight, matching every other muscle-attribution query in the
-  // app. The library/non-library split is not a fallback for missing data — the two branches read
-  // different columns (`exercise_library.muscles` carries roles, `exercise_logs.muscle_groups` does
-  // not), so a non-library exercise has no role to weight by and each tagged muscle counts whole.
-  const libRows = await db.execute(sql`
-    SELECT
-      LOWER(muscle_entry->>'muscle') AS muscle_group,
-      SUM(CASE WHEN muscle_entry->>'role' = 'main' THEN 1.0 ELSE 0.5 END) AS weighted_sets
-    FROM set_logs sl
-    JOIN exercise_logs el ON sl.exercise_log_id = el.id
-    JOIN workout_sessions ws ON el.workout_session_id = ws.id
-    CROSS JOIN LATERAL jsonb_array_elements(
-      (SELECT muscles FROM exercise_library WHERE name = el.exercise_name)
-    ) AS muscle_entry
-    WHERE ws.user_id = ${userId}
-      AND el.logged_at >= ${fromTz}
-      AND el.logged_at < ${toNextTz}
-      AND EXISTS (SELECT 1 FROM exercise_library WHERE name = el.exercise_name)
-      AND sl.deleted_at IS NULL AND el.deleted_at IS NULL AND ws.deleted_at IS NULL
-    GROUP BY LOWER(muscle_entry->>'muscle')
-  `)
-
-  const nonLibRows = await db.execute(sql`
-    SELECT
-      LOWER(mg) AS muscle_group,
-      COUNT(*)::float AS weighted_sets
-    FROM set_logs sl
-    JOIN exercise_logs el ON sl.exercise_log_id = el.id
-    JOIN workout_sessions ws ON el.workout_session_id = ws.id
-    CROSS JOIN LATERAL UNNEST(el.muscle_groups) AS mg
-    WHERE ws.user_id = ${userId}
-      AND el.logged_at >= ${fromTz}
-      AND el.logged_at < ${toNextTz}
-      AND el.muscle_groups IS NOT NULL
-      AND array_length(el.muscle_groups, 1) > 0
-      AND NOT EXISTS (SELECT 1 FROM exercise_library WHERE name = el.exercise_name)
-      AND sl.deleted_at IS NULL AND el.deleted_at IS NULL AND ws.deleted_at IS NULL
-    GROUP BY LOWER(mg)
-  `)
-
-  // Canonical keys, so "core" and "abs" are one row rather than two — the same fold every other
-  // muscle aggregate applies, and the reason is the library ships both spellings.
-  const result: Record<string, number> = {}
-  for (const row of [...libRows.rows, ...nonLibRows.rows] as { muscle_group: string; weighted_sets: string | number }[]) {
-    if (!row.muscle_group) continue
-    const mg = normalizeMuscle(row.muscle_group)
-    result[mg] = (result[mg] ?? 0) + Number(row.weighted_sets)
-  }
-  return result
+  return weightedSetsByMuscle(db, {
+    userId,
+    from: dateStrMidnightInTz(from, tz),
+    toExclusive: dateStrMidnightInTz(shiftDateStr(to, 1), tz),
+    dateColumn: 'logged_at',
+  })
 }
 
 /**

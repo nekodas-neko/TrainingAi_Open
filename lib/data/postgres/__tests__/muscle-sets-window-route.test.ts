@@ -137,6 +137,41 @@ describe.skipIf(!canRun)('muscle-sets window — sets per muscle over an arbitra
     expect(unscoped.lats).toBe(7)
   })
 
+  /**
+   * LA-118 — the two reads attribute a set to DIFFERENT days, and nothing pinned that before.
+   *
+   * Every fixture in the repo set `started_at` and `logged_at` to the same instant, so the date
+   * column could have been switched in either direction and no test would have moved. This one
+   * separates them: a session that STARTED at 22:00 yesterday with its sets LOGGED at 00:30 today.
+   *
+   * `getSetsByMuscleInWindow` keys on the set's own timestamp, so a window covering only today sees
+   * it. `getWeeklySetsByMuscleGroup` keys on the session's, so the same window does not — which is
+   * correct for it, because its unit is a programme session. The point of the case is that the two
+   * answers differ and are each deliberate.
+   */
+  it('attributes a set by logged_at, where the programme-scoped read uses started_at', async () => {
+    const { programId, sessionId } = await programSession('LA118 Split')
+    const startedAt = new Date(`${shiftDateStr(today(), -1)}T22:00:00+10:00`)
+    const loggedAt = new Date(`${today()}T00:30:00+10:00`)
+
+    const { rows: [ws] } = await pool.query(
+      `INSERT INTO workout_sessions (user_id, session_name, started_at, session_id)
+       VALUES ($1, 'LA118', $2, $3) RETURNING id`, [ME, startedAt, sessionId])
+    const { rows: [el] } = await pool.query(
+      `INSERT INTO exercise_logs (workout_session_id, exercise_name, muscle_groups, logged_at)
+       VALUES ($1, 'LB111 Row', ARRAY[]::text[], $2) RETURNING id`, [ws.id, loggedAt])
+    await pool.query(
+      `INSERT INTO set_logs (exercise_log_id, set_number, weight_kg, reps) VALUES ($1, 1, 60, 10)`,
+      [el.id])
+
+    const repo = await (await import('@/lib/data')).getRepositoryAsync()
+    const byLoggedAt = await repo.getSetsByMuscleInWindow(ME, today(), today(), TZ)
+    const byStartedAt = await repo.getWeeklySetsByMuscleGroup(ME, programId, today(), today(), TZ)
+
+    expect(byLoggedAt.lats).toBe(1)
+    expect(byStartedAt.lats).toBeUndefined()
+  })
+
   it('weights a secondary muscle at half a set', async () => {
     await logged(today(), 'LB111 Bench', 4)
 

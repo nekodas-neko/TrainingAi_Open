@@ -29,6 +29,24 @@ as a re-score, which it is not.
 
 ---
 
+## 2026-09-18 — backlog → 23920, `projectOverview.md` → 11729 (LA-118, the set-counting three)
+
+**Backlog +5 on an entry that SHIPPED**, which is the shape worth noting rather than the number. The
+entry did not leave the queue: `muscle-tonnage-trend` was deliberately out of scope for the first
+pass, so LA-118 stays with a `Keep:` and is rewritten around what shipped instead of being deleted.
+What it loses in problem statement it gains in the record of which decisions are now parameters and
+what the tonnage fold will have to preserve.
+
+**Re-read as 23920 on the re-merge**, +5 on TN-47/48/49's 23915 rather than on the 23771 this note
+was first written against. The delta is the measurement; the absolute is a reading of whatever
+`main` happened to be when the branch was re-merged, which on this repo is never the number the note
+was drafted with.
+
+The overview's +14 is a paragraph on a change with no user-visible effect, which normally would not
+earn one. It earns it here because the extraction made a silent failure mode **easier**: changing a
+date column used to mean editing one query in one file and now it is a one-word argument at a call
+site. The paragraph exists to say that out loud, along with the test that now holds it.
+
 ## 2026-09-18 — backlog → 23771 (LA-118's heading corrected)
 
 **+3**, for one word and a sentence saying why it was wrong. The entry filed hours earlier was
@@ -13545,15 +13563,17 @@ window edge instead. Two further notes are recorded against a plausible wrong fi
 different quantities, so unifying them while moving this server-side would silently redefine what
 102 means.
 
-## 2026-09-18 — `docs/implementation-backlog.md` 23915 → 24175 (Review sweep 50)
+## 2026-09-18 — `docs/implementation-backlog.md` +260 (23920 → 24180) (Review sweep 50)
 
 Thirteen new queue entries (**RV-51…RV-63**) from the owner's twelve-day catch-up review — 50
 commits, 671 changed code files, swept across safety/logic/performance/efficiency — plus a reading
 recorded on the existing **BF-110** entry.
 
 The growth is queue, not prose, and it is at the ratio this file is meant to carry: 260 lines for 13
-entries is ~20 lines each, against a file whose entries average that. (The 23915 floor is `main`
-after TN-47/48/49 landed mid-sweep; those three are theirs, not counted here.) **One entry is deliberately
+entries is ~20 lines each, against a file whose entries average that. (**The floor moved twice
+while this sweep was open** — TN-47/48/49 and then another PR landed on `main` mid-review. The
+figure that matters is the delta: +260 is this sweep's thirteen entries and nothing else, on
+whatever base it merges onto.) **One entry is deliberately
 longer than its defect**: RV-51 is a two-row data fix, and most of its length is the question the
 data raises rather than the fix — `exercise_library` has no `created_at`, so whether migration 269
 *missed* those two rows or something *wrote* them afterwards is unestablished, and if it is the
@@ -13564,7 +13584,7 @@ already declared which reading meant which fix, the reading arrived, and nobody 
 also corrects two ways the telemetry misleads — `stuck` fires on healthy resumes, and `w=384`
 appears on every row — so the next reader does not re-derive the same wrong signature.
 
-## 2026-09-18 — `projectOverview.md` 11715 → 11745 (Review sweep 50)
+## 2026-09-18 — `projectOverview.md` +30 (11729 → 11759) (Review sweep 50)
 
 Two Known-Issues rows from sweep 50, and only two: thirteen findings were filed and eleven of them
 went to the backlog alone, because the queue is where work that is *understood* belongs. These two
