@@ -607,27 +607,6 @@ existing 65 days moves by less than 5 points on every one of them.
   every row carries a model stamp. **Currently: 62 of 65 reproduce** (58 nine-key + 4 of the seven),
   three are 1 point out, and 25 of 65 are stamped.
 
-### [platform] RV-63 — `/api/collection` is the only new route that is both unbounded and rate-limit-free
-
-- **Lane:** A — `app/api/collection/route.ts`. **Added:** 2026-09-18 · Review sweep 50.
-- It pins `HISTORY_START = '2000-01-01'` and issues **five parallel all-history repo reads** with no
-  rate limit (`grep -c 'rateLimit('` → **0**; `stress-day`, `weekly-review/month-window` and
-  `oura-ble/rollup-state` each have one). Ten statements per warm request.
-- **Two of those ten are full-width reads used for one field each** — 36 columns of `body_metrics`
-  and 25 of `sleep_sessions`, immediately projected to `.map(m => m.date)` / `.map(sl => sl.date)`.
-  Measured row widths: 176 and 144 bytes.
-- **The card re-runs it on every home paint.** `components/home/collection-card.tsx` uses
-  `COLLECTION_TTL = TTL_SHORT`, and per Q-262 `cachedFetch` revalidates over the network regardless
-  of TTL — so the all-history replay is not once per five minutes, it is once per render.
-- **Nothing is slow today** and this is filed as unbounded-growth plus a missing guard, not a latency
-  defect: at the owner's ~130 step-days the payload is negligible, and the 0.364 s warm timing is
-  dominated by fixed dev-server overhead (a 3-statement route cost 0.405 s in the same run). The
-  fix is a date floor and two projected selects, not an optimisation pass.
-- **⚠ Rate limiting across the five new reads has no sibling norm to appeal to** — `collection` and
-  `muscle-sets` have none, the other three do, and their nearest siblings split the same way
-  (`weekly-muscle-sets`, `streak-data`, `muscle-tonnage-trend` have none; `health-trends` does).
-  Decide the norm once rather than matching whichever sibling is read first.
-
 ### [workouts] RV-57 — `STREAK_LOOKBACK_DAYS` is read by one of the two files it calls a contract
 
 - **Lane:** B — `app/session-select/session-select-content.tsx:1020`. **Added:** 2026-09-18 · Review
