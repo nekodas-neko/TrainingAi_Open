@@ -6112,7 +6112,14 @@ unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge
 
 - **Lane:** A — `app/api/collection/route.ts`, plus a migration.
 - **Added:** 2026-09-07, Lane A — the half of LB-60's `pausedDays` that did not ship with the route.
-- **The old `Gate: owner` is removed** — the decision above is the one it was waiting for.
+- **Gate: owner** — and it is a DIFFERENT question from the one already answered. The old gate was
+  removed on 2026-09-14 because the owner had settled the RULE (a deload must not cost cats), and
+  that was right. What it did not settle is the ⚠ above: whether a deload span becomes **first-class
+  stored state**, which is what a dated `program_phases` interval means and what the migration would
+  commit to. Re-gated 2026-09-18 by Lane A, which reached this entry as next-up and could not start
+  it: with no gate the queue tool called it READY, while the first instruction inside it is *"put
+  that to the owner before writing the migration"*. An entry whose own text blocks it has to say so
+  in the field the tool reads.
 
 **The early-deload half SHIPPED 2026-09-07**: `pausedDays` now carries `earlyDeloadWeekDays(program)`
 beside the chosen rest days, so a confirmed early deload decays nothing. That span is the only DATED

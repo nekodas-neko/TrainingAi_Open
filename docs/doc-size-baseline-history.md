@@ -18,6 +18,20 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-18 — backlog → 23862, `projectOverview.md` → 11866 (LA-120: the queue tool's two blind spots)
+
+**Backlog +7, and it is the only entry here that GREW the file on purpose.** LA-76's `Gate: owner`
+came back with eight lines saying which question it waits on, because the bare field was what got
+removed in September and re-adding it bare would invite the same removal. A gate that does not say
+what would lift it is a gate someone deletes.
+
+The overview paragraph spends its length on the **measurement**, not the regex: 140 of 144 Keep
+bullets already matched and all four misses were one shape. That number is the whole argument for
+widening rather than rewriting, and `keep.js`'s own comments argue the opposite case convincingly
+enough that a future session will re-open it. Without the count it would have to re-measure.
+
+---
+
 ## 2026-09-18 — backlog → 23855, `projectOverview.md` → 11855 (RV-58/59/60, the last sweep-50 batch)
 
 **Backlog −33, which is −55 for the three entries and +22 for one new one.** All three sweep-50
