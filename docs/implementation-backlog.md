@@ -639,26 +639,6 @@ existing 65 days moves by less than 5 points on every one of them.
   every row carries a model stamp. **Currently: 62 of 65 reproduce** (58 nine-key + 4 of the seven),
   three are 1 point out, and 25 of 65 are stamped.
 
-### [workouts] RV-57 — `STREAK_LOOKBACK_DAYS` is read by one of the two files it calls a contract
-
-- **Lane:** B — `app/session-select/session-select-content.tsx:1020`. **Added:** 2026-09-18 · Review
-  sweep 50.
-- **Not batched** — the change lands in a Lane B file (`app/session-select/**`) while the rest of
-  this sweep's shared-module drift is Lane A, and a batch is one lane's PR.
-- The module header (`packages/shared/src/workout/streak-window.ts:4-24`) states: *"This number is a
-  CONTRACT between two files that used to disagree silently… Any new streak surface reads this
-  constant."* The supplier does (`app/api/streak-data/route.ts:4`). The consumer still reads
-  `for (let ago = 1; ago < 365; ago++)` with no import — `grep -rn STREAK_LOOKBACK_DAYS` finds it in
-  the route, the module and two test files, never in `session-select-content.tsx`.
-- **No live bug: 365 and `< 365` happen to cover the same span.** The defect is that the constant
-  cannot enforce the agreement it exists for — changing it reintroduces BF-176's window-edge
-  oscillation verbatim, silently, which is exactly the failure it was created to prevent.
-- Also stale in the same file: line 532's comment still reads *"streak-data (90 days) is a strict
-  superset of what home needs"*, the pre-BF-176 number.
-- **Not established:** whether `getRecentTrainedDays(userId, 365, tz)` returns 365 or 366 calendar
-  keys — the off-by-one at the far edge is unverified in either direction, and importing the
-  constant does not settle it.
-
 ### [app-shell] RV-61 — any signed-in user can equip an achievement title they have not unlocked
 
 - **Lane:** A — `app/api/user/equipped-title/route.ts:26-29`. **Added:** 2026-09-18 · Review sweep 50.
