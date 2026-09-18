@@ -18,6 +18,35 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-18 — backlog → 24127, `projectOverview.md` → 11815 (RV-52/53/54, the sweep-50 cache batch)
+
+**Backlog −41 for three entries, which is what a batch should look like**: they shared a file, a
+verification surface and a single test suite, so they cost one PR and one gate rather than three of
+each. `Batch:` means one PR, and the batch slug leaves the queue whole.
+
+The overview's +12 spends most of its words on a claim I got wrong and caught before shipping — the
+first RV-54 comment asserted a week of decaying data where Q-262 says to check first, and the check
+said a briefly-stale first paint. The key is registered either way; the difference is whether the
+comment beside it is true. That is worth the lines because the wrong version is the more memorable
+story, and it would have been the one a future reader inherited.
+
+---
+
+## 2026-09-18 — backlog → 24168, `projectOverview.md` → 11803 (RV-62 shipped)
+
+**Backlog −23.** An entry left the queue with both halves done and its open question answered rather
+than inherited. The overview gains the answer, not the fix: *"can a seven-day boundary flip a
+soreness verdict"* is the kind of question that gets re-asked every time someone reads the ms-offset
+rule, and the answer — only through the median that sets `tau`, never directly — is worth more than
+the one-line change that prompted it.
+
+**Re-read as 24168 on the re-merge**, against the 24149 this note was drafted with — TN-3b (#1295)
+landed in between and took its own entry out. The delta is the measurement; the absolute is whatever
+`main` was at merge time, which is the fourth time today it has not been the `main` a note was
+written against.
+
+---
+
 ## 2026-09-18 — backlog → 24172, `projectOverview.md` → 11790 (RV-51 shipped, no migration)
 
 **Backlog −29: an entry left the queue and the fix was not the one it asked for.** RV-51 wanted a
