@@ -67,6 +67,14 @@ and `check-index-doc-paths` both clean.
 but it means one lane writing into another's live state file, which races whatever that lane is doing.
 Batons are rewritten wholesale at handover anyway, so those few entries wait.
 
+**The four era-named history files are frozen, and renaming them is nobody's task** — `history-newest.md`,
+`-recent`, `-newer`, `-past`, headed by session ranges rather than dates. LA-100 was filed on the belief
+that the batched files were era-based and so the sweep had nowhere to fold to; **28 of 32 are dated**,
+the script has written `history-<date>-folded-N.md` since LA-80, and only these four carry the old
+scheme. Nothing cites them by scheme and nothing new lands in them, so the answer to "rename them?" is
+probably never. Recorded here rather than left in the queue (LA-100 removed 2026-09-18) because it is a
+judgement for whoever next touches those files, not work anyone is owed.
+
 > **When `docs/overview/entries/` holds ≥ ~20 note files (excluding this README) OR ~100 KB of
 > notes**, a session compacts them: append every entry (oldest-first) into the newest
 > `docs/overview/history-*.md` — starting a **new** `history-*.md` when it nears ~250 KB, per the

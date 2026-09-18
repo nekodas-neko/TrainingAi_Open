@@ -1345,7 +1345,7 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
   the S25's own width: the macro line sits under a header row already carrying a thumbnail, a name,
   an ingredient count, a calorie figure and a chevron.
 - **✅ SHIPPED 2026-09-16** (`fix/bf170-collapsed-meal-macros`).
-  [Journal](overview/entries/2026-09-16-fix-bf170-collapsed-meal-macros.md). Fixed at the group, as
+  [Journal](overview/history-2026-09-18-folded-1.md#2026-09-16-fix-bf170-collapsed-meal-macros). Fixed at the group, as
   the entry directed: the P/C/F line moved out of `{open && …}` to sit full-width under the header,
   outside the `role="button"` that toggles. `mealFooter` untouched — its premise is now true, and
   for every meal group rather than only a lone one.
@@ -1407,7 +1407,7 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
   (2026-09-16) is that the card paints with no uncaught error both with the library present and with
   `/api/exercise-library` aborted — the empty-diagram case the entry asked to be checked.
 - **✅ SHIPPED 2026-09-16** (`fix/workout-completion-surface`).
-  [Journal](overview/entries/2026-09-16-fix-workout-completion-surface.md). The stamp now renders on
+  [Journal](overview/history-2026-09-18-folded-1.md#2026-09-16-fix-workout-completion-surface). The stamp now renders on
   `trainedToday` alone; the heatmap keeps its own `muscleActivations.length > 0` guard, which was
   always correct for the diagram. `CompletedStamp` is `absolute inset-0`, so the container gains a
   `min-h-24` when there is no diagram behind it to give it height — applied only in that case, so
@@ -1461,7 +1461,7 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
   Android's hardware back is a Capacitor channel Playwright cannot fire, so **no harness run can
   exercise this**; the unit tests pin the predicate and the dismissal, not the gesture.
 - **✅ SHIPPED 2026-09-16** (`fix/workout-completion-surface`).
-  [Journal](overview/entries/2026-09-16-fix-workout-completion-surface.md). **Both halves, and the
+  [Journal](overview/history-2026-09-18-folded-1.md#2026-09-16-fix-workout-completion-surface). **Both halves, and the
   entry's own proposal for the second half would not have worked.**
   - **The path term.** `/workout` is both routes — `app/workout/page.tsx` renders `WorkoutScreen`
     when `?session=<id>` is present and the tab shell otherwise, which is the same distinction
@@ -1543,7 +1543,7 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
   exercise and confirm the toggle reads *Deload — As prescribed* with Full offered as *Override*;
   then a normal session and confirm the labels are unchanged from today.
 - **✅ SHIPPED 2026-09-16** (`fix/workout-completion-surface`).
-  [Journal](overview/entries/2026-09-16-fix-workout-completion-surface.md).
+  [Journal](overview/history-2026-09-18-folded-1.md#2026-09-16-fix-workout-completion-surface).
 - **⚠ SHIPPED AS A UNION, NOT THE REPLACEMENT THIS ENTRY RECOMMENDED — and the difference is a
   regression this entry would have caused.** The recommendation was to swap `prescription.deload`
   for `exercises.some(e => e.deloaded)`. `e2e/deload-visible.spec.ts` — BF-8's own guard — seeds a
@@ -1993,7 +1993,7 @@ helper the call site calls.
 
 - **Lane: A** · **Added:** 2026-09-16 · Lane A, from TN-39's validation. **Re-filed the same day**
   after the rename was attempted and reverted — read the ⛔ below before touching this.
-- **Journal:** [`the attempt and why it failed`](overview/entries/2026-09-16-lane-a-la114-bucket-mid.md).
+- **Journal:** [`the attempt and why it failed`](overview/history-2026-09-18-folded-1.md#2026-09-16-lane-a-la114-bucket-mid).
 - **Half-done, deliberately.** `daytimeHrvEstimatesPerBucket` emits `t = bStart + bucketMs / 2` and
   `run.ts` writes it straight into `bucket_start`, so stored timestamps sit on a :15/:45 grid.
   **Shipped:** migration 275 (a `COMMENT ON COLUMN`) and the Drizzle property renamed to `bucketMid`,
@@ -2356,7 +2356,7 @@ composite reports which of its inputs were inferred.
   What the harness did confirm (2026-09-16) is that the root layout still paints — the provider is
   mounted in `app/layout.tsx`, so a fault there takes every tab with it (`tabs-instant-paint`, 7 passed).
 - **✅ SHIPPED 2026-09-16** (`fix/lb113-health-connect-timezone`).
-  [Journal](overview/entries/2026-09-16-fix-lb113-health-connect-timezone.md). The provider reads
+  [Journal](overview/history-2026-09-18-folded-1.md#2026-09-16-fix-lb113-health-connect-timezone). The provider reads
   `useUserTimezone()` — it is mounted inside `UserTimezoneProvider`, which `app/layout.tsx` feeds
   `session?.user?.timezone`, so the real value is there on the first render and there is no
   placeholder flip to double-sync on. The effect depends on `tz` rather than `[]`, so changing the
@@ -23128,68 +23128,6 @@ adopted.
 - **Keep:** do not close this on "it has not happened again" — an intermittent lock-ordering bug is
   precisely the thing that looks fixed for weeks.
 
-### [platform] LA-100 — the entries compaction sweep has no target file, and the ceiling now blocks every lane
-
-- **✅ THE PREMISE WAS STALE AND THE SWEEP HAS RUN — 2026-09-17 (OR-119). `Gate: owner` removed.**
-  This entry says there is *"nowhere obvious to fold them TO"* because the batched files are
-  *"era-based, not date-based"*. **Measured: 28 of the 32 history files are dated** —
-  `history-2026-07-16.md` through `history-2026-09-10-folded-6.md`. Only four carry the era names
-  (`-newest`, `-recent`, `-newer`, `-past`), and this entry already calls those *frozen*.
-- **So its option 1 — a dated batch — is not a decision to take; it is what the repo has been doing
-  for two months**, and `scripts/fold-journal-entries.js` has implemented it since LA-80: it writes
-  `history-<date>-folded-<part>.md` and rolls a new part at ~250 KB. **The owner was being asked to
-  choose a convention that precedent and the tooling had already chosen.**
-- **The sweep ran on that basis:** 91 entries → 51, forty folded into
-  `history-2026-09-17-folded-1.md` (163 KB, inside the roll threshold), five held back because an
-  agent baton cites them, citations rewritten across nine files, `check-doc-links` clean on 823.
-- **What stays open is smaller than the entry and is not the owner's:** whether the four era-named
-  files are ever renamed. They are frozen and nothing cites them by scheme, so the answer is
-  probably never — but that is a judgement for whoever next touches them, not a blocker on folding.
-- **⚠ The ceiling claim is also stale.** This entry was upgraded to *"BLOCKING, not blocking-ish"*
-  when the ceiling was a hard failure that every lane's next PR would hit. It is an **advisory note**
-  now (*"Not a failure; sweep it when convenient"*), so the treadmill it describes cannot happen.
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-10, when the ceiling fired and the sweep turned out
-  not to be mechanical.
-- **Lane: A** — the sweep touches `docs/` only, but the naming decision below is the blocker.
-- **The `Gate: owner` is removed** (2026-09-17) — see above: precedent and the fold tool had already
-  made the choice it was waiting on. The note about it being filed inline first, and
-  `check-backlog-pointers` catching that, still stands as the reason fields beat prose.
-- **⚑ BLOCKING, not "blocking-ish" — upgraded 2026-09-10 after it fired twice in one hour.** #1077
-  raised the ceiling 360 → 361 to unblock and recorded that this contradicts #1052's intent. The
-  very next PR (LA-99) hit **362**, so it shipped with **no journal entry at all** rather than raise
-  a second time — which is the "+1-per-PR treadmill" #1052 ended. Every feature PR carries an entry
-  by standing rule, so **every agent's next PR now fails CI or treadmills the ceiling again.**
-
-**The sweep is overdue on the repo's own numbers** — 56 foldable against a chore threshold of 20 and
-a runaway limit of 60, oldest dating to 2026-08-16 — and
-[`docs/overview/entries/README.md`](overview/entries/README.md) says *"the next PR adding an entry
-runs the sweep"*. It was not run, for a reason that is the entry:
-
-**There is nowhere obvious to fold them TO.** The batched history files are **era-based, not
-date-based**: `history-newest.md` is headed *"recent: Sessions ~105–176"*, and its siblings
-(`-recent`, `-newer`, `-past`) follow the same session-era scheme. The per-entry convention that
-replaced it is dated (`YYYY-MM-DD-<slug>.md`). Nothing bridges the two.
-
-**The owner's call, and it is genuinely a preference:**
-1. **A dated batch per month** — `history-2026-08.md`, `history-2026-09.md` — alongside the frozen
-   session-era files. Simplest, and `ls` stays chronological. Costs a second naming scheme in one
-   directory, permanently.
-2. **Extend the era scheme** — one more `history-*.md` whose header names a date range instead of
-   sessions. Keeps one scheme; the names stop being meaningful ("newest" already is not).
-3. **Fold into `history-newest.md` regardless** and re-title it by date range. One file, one scheme;
-   rewrites a header 200+ entries already cite.
-
-**Recommendation: (1).** Dates are what the entries are named by, `ls` sorts correctly with no
-convention to remember, and the frozen era files stay untouched — the citations pointing at them
-keep working. The second scheme is a real cost, but it is the one that already exists in the
-directory being compacted.
-
-**Not just a sweep — check the citations.** `linkedEntryNames` walks the **repo root**, so an entry
-is "linked" if `projectOverview.md` or `CLAUDE.md` names it, not only `docs/`. A `docs/`-only measure
-reports 235 foldable where the real number is 56; sweeping on that would delete entries durable docs
-still cite. Whatever the sweep does, it must repoint citations rather than break them.
-
 ### [platform] LA-89 — `oura/hr-sync` has no callers, and its name says something that is not true
 
 - **Lane:** A — `app/api/oura/hr-sync/route.ts`.
@@ -23610,7 +23548,7 @@ what the warm-up countdown shows, and dragging the control does not fire a presc
   The harness covers the render, the failure state and the Health entry (`bf5-week-in-review-page.spec.ts`)
   but **cannot fire a notification**, which is the half only the device settles.
 - **✅ PR 2b SHIPPED 2026-09-16 (v1.457.0)** (`feat/bf5-week-in-review-page`).
-  [Journal](overview/entries/2026-09-16-feat-bf5-week-in-review-page.md). `app/health/week/` as
+  [Journal](overview/history-2026-09-18-folded-1.md#2026-09-16-feat-bf5-week-in-review-page). `app/health/week/` as
   `page.tsx` + `week-detail-content.tsx` beside `app/health/day/`; `WeekVolumeChart` and
   `WeekMetricCard` drawn with `react-chartjs-2`; `WeeklyMuscleSetsCard` and `WeekTrendsSection`
   reused rather than rebuilt; the banner navigates; a permanent `weekInReview` card sits beside the
