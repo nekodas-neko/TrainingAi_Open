@@ -18,6 +18,20 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-18 — backlog → 24172, `projectOverview.md` → 11790 (RV-51 shipped, no migration)
+
+**Backlog −29: an entry left the queue and the fix was not the one it asked for.** RV-51 wanted a
+migration labelling two unlabelled catalogue rows; both turned out to be merged duplicates, so the
+migration would have un-hidden them. What shipped is two one-line filters, and the entry is removed
+rather than kept — nothing is owed.
+
+The overview's +15 records the inversion rather than the fix, and that is the part worth the lines:
+the review found the two rows that were harmless and missed the two that were live, because its query
+was one column short of `merged_into`. A future reader who sees only "two filters added" would have
+no way to know the entry pointed the other way.
+
+---
+
 ## 2026-09-18 — backlog → 24201, `projectOverview.md` → 11775 (TN-49, the rederivation gap)
 
 **Backlog +13 on an entry that shipped its fix and stayed queued.** The growth is a retraction: the

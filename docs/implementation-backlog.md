@@ -607,35 +607,6 @@ existing 65 days moves by less than 5 points on every one of them.
   every row carries a model stamp. **Currently: 62 of 65 reproduce** (58 nine-key + 4 of the seven),
   three are 1 point out, and 25 of 65 are stamped.
 
-### [workouts] RV-51 — two real exercises are excluded from every generated program, in production, today
-
-- **Lane:** A — catalogue data (a migration) plus a decision about
-  `packages/shared/src/workout/equipment.ts:38`. **Added:** 2026-09-18 · Review sweep 50.
-- **The premise the rule rests on is false right now.** `equipmentEligible`'s header justifies
-  excluding an exercise that declares no equipment with *"Migration 269 labelled the 22 rows that
-  had drifted and `POST /api/exercises` now refuses to create another, **so an empty list should not
-  occur**"*. Production holds **2 of 156** rows with `equipment = []`: `Dumbbell Lunges`
-  (`4d747449-e936-4ed2-93f8-0986407fa08a`) and `Cable Lat Pulldown`
-  (`aed11054-1d0d-49ee-b81f-ae3a336a2197`). Verified against `claude_ro.exercise_library` on
-  2026-09-18.
-- **The implementation is `exerciseEquipment.some(...)`, so an empty array is false against every
-  selection including `full_gym`** — `.some()` on `[]` is always false. Both exercises are therefore
-  invisible to `app/api/generate-program/route.ts:136`, `app/api/builder-chat/route.ts:103` and
-  `components/workout-builder/builder-review.tsx:180`, for every user, at every equipment setting.
-  For these two rows excluding is not the safe direction the comment claims: a full-gym lifter can
-  perform both.
-- **Fix the data, not the rule.** Label the two rows (`dumbbell`; `cable`) in a migration. The
-  exclude-on-empty rule is correct and is what stopped a home gym being offered Machine Chest Press
-  — do not soften it back to `length === 0 || …`.
-- **Then answer the question the data raises**, which is the part worth a moment: `exercise_library`
-  has no `created_at`, so it could not be established whether migration 269 **missed** these two or
-  something **wrote** them afterwards. If it is the latter, the `POST /api/exercises` guard has a
-  hole and labelling two rows fixes nothing. Check the guard against the insert paths before
-  closing.
-- **Verification:** after the migration, `SELECT count(*) FROM exercise_library WHERE equipment IS
-  NULL OR array_length(equipment,1) IS NULL` returns 0, and a generated full-gym program can offer
-  both names.
-
 ### [platform][workouts] RV-62 — a banned ms-offset window landed on the mood check-in write path
 
 - **Lane:** A — `lib/data/postgres/adapter.ts:3133`. **Added:** 2026-09-18 · Review sweep 50.
