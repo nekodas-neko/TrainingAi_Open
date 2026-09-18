@@ -15726,14 +15726,17 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   under *"shipped; a look is owed, nothing is blocked"*, which is the OR-105 trap. Unbuilt work gets
   this line; the field goes on when the code lands.
 
-### [workouts][platform] LA-118 — the muscle-attribution query exists THREE times and the copies disagree
+### [workouts][platform] LA-118 — the muscle-attribution query exists FOUR times and the copies disagree
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-18 (Lane A, found while shipping LB-111).
 - **Lane: A** — `app/api/weekly-muscle-sets/route.ts`, `app/api/muscle-tonnage-trend/route.ts`,
   `lib/data/postgres/slices/periodization.ts`. Reached by `app/api/**` and storage, so Lane A.
 - **This is a One-Formula violation that has already produced divergence, not a tidiness item.**
   The same "weighted sets per muscle, library rows by role and non-library rows by tag" SQL is
-  written out four times, and the four do not agree:
+  written out four times, and the four do not agree. **The heading said THREE when this was filed on
+  2026-09-18 and that was my own miscount** — three existed before LB-111 and the fourth was the one
+  I had just written, which is the easiest copy in the table to overlook and the reason the entry
+  exists:
 
   | | date column | upper bound | programme scope |
   |---|---|---|---|

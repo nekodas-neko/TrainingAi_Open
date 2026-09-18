@@ -18,6 +18,17 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-18 — backlog → 23771 (LA-118's heading corrected)
+
+**+3**, for one word and a sentence saying why it was wrong. The entry filed hours earlier was
+headed *"exists THREE times"* while its own table listed four — three existed before LB-111, and the
+fourth was the copy I had just written and did not count. Left alone it would be read as the table
+having an extra row rather than the heading being stale, and the heading is what `next-item.js`
+prints.
+
+The correction is recorded in the entry rather than silently applied, because the miscount is itself
+evidence for the entry: the copy easiest to overlook is the one you just added.
+
 ## 2026-09-18 — backlog → 23768, `projectOverview.md` → 11715 (LB-111 shipped)
 
 **Backlog +33 net, and the shape is the interesting part:** LB-111's 23-line entry left the queue,
