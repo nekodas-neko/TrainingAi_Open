@@ -2,7 +2,7 @@
 
 > **Successor sessions are titled `🚧 Implementation Agent (B) 🟢`** — exactly. A renamed successor is a lost thread.
 
-**Updated:** 2026-09-18 · **By:** the thirty-sixth Lane B run · **Next ID:** `LB-121`
+**Updated:** 2026-09-18 · **By:** the thirty-sixth Lane B run · **Next ID:** `LB-122`
 
 > **A mistyped ID here silently advances the lane's numbering.** Allocate with `grep -rhoE '\bLB-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`, and check the max in the **journal** too — a shipped entry leaves the queue. The pointer above is a floor, not an allocation.
 

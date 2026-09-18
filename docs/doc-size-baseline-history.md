@@ -18,6 +18,21 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-18 — backlog → 23898, `projectOverview.md` → 11900 (LA-110: two refutations)
+
+**Backlog +33 for two NEGATIVE results and no fix**, which is the unusual trade and the one worth
+defending. A refuted candidate is normally deleted; both of these are kept because each is what the
+next reader will reach for first. The baseline hypothesis produces the observed fingerprint by
+design, and BF-148 lands inside the window and touches the same flag — someone will find them, and
+finding them a second time costs the same hour it cost here.
+
+The ⛔ line is the highest-value part: `session_periodization` keeps no history, so the window cannot
+be reconstructed by query at all. Without it the next session runs the same SQL and reaches the same
+dead end before realising the table cannot answer.
+
+---
+
+
 ## 2026-09-18 — backlog → 23865, `projectOverview.md` → 11889 (LA-100 closed, 40 entries folded)
 
 **Backlog −62: an entry removed, not amended.** LA-100's two claims — no target file for the sweep,
@@ -13823,7 +13838,28 @@ was still carrying is now answered: the supplier returns 366 day-keys and the co
 they differ by one, and the direction is the safe one (the loop never asks for a day the payload
 lacks, which is BF-176 inverted). Reasoning in the journal entry; deliberately not "fixed", since
 widening the loop would make a constant named `STREAK_LOOKBACK_DAYS = 365` drive a 366-day walk.
-## 2026-09-11 — `docs/implementation-backlog.md` → 23840 (RV-42 shipped)
+
+## 2026-09-18 — `docs/implementation-backlog.md` 23909 → 23929 (Lane B, LB-121 + two un-parked entries)
+
+**+20.** Two edits, and the smaller one is the repair.
+
+**−2 characters, TN-25 and OR-116.** Both entries I wrote earlier the same day gained a `⛔` used as
+*emphasis*, and `next-item.js:97` reads a `⛔` anywhere as the legacy prose blocker — so both fell
+out of KEEP into PARKED, printing `unmigrated marker — <90 chars of whatever line held the glyph>`
+in place of their `Keep:`. The bucket was not the damage; the **lost residue** was. TN-25's residue
+is a device walk and a month of compliance data, and none of it was visible. Removing the two
+markers restored both: PARKED 46 → 44, KEEP 28 → 30.
+
+**+LB-121** is the systemic half, filed for the Orchestrator because `scripts/**` is theirs. A
+`Gate:` or an unmet `Needs:` already overrides the legacy marker and a `Keep:` does not, though the
+script's own comment says a structured field is authoritative and `Keep:` is one. The entry is worth
+its lines because the trap has now fired four times (LB-116, TN-3b, TN-25, OR-116) — twice in one
+afternoon, by the same author, on the same day the baton warned about it, once inside backticks
+while quoting another warning's name. Knowing the rule is not enough to follow it, which is the
+argument for the one-clause code fix over more prose.
+---
+
+## 2026-09-11 — `docs/implementation-backlog.md` → 23904 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 
@@ -13844,8 +13880,8 @@ reading of a moving number, and a PR that waits will re-read it once per merge t
 Recomputed by `pnpm fix:baselines` after each merge, which is the only thing that makes the
 subtraction mean anything.
 
-**Recomputed again 2026-09-18** (→ 23840 — twice in one afternoon, the second after a 40-entry
-journal fold moved the file again), and the rewrite count derived the same way the note
+**Recomputed again 2026-09-18** (→ 23904 — four times in one day, as a journal fold and three
+other merges each moved the file), and the rewrite count derived the same way the note
 defines it — first-parent commits on this branch touching this file — now reads **55**. The *merge*
 count is deliberately NOT re-derived: `git merge-base` against `main` no longer finds the original
 branch point, because this branch has absorbed `main` dozens of times, so the figure it returns
