@@ -18,6 +18,17 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-18 — backlog → 23915 (TN-47/48/49, the tuning calibration sweep)
+
+**+144 from 23771.** Three entries off one review. TN-48 is the long one and earns it: the
+body-composition decomposition has to carry its guardrails inline, because the finding is that the
+undecomposed lean-mass number is *misleading in exactly the situation a user most wants it*, and an
+implementer who reads the table without the water column repeats the error the entry exists to stop.
+TN-47 carries the measured "moves 0.4 points" line for the same reason — without it the entry reads
+as a re-score, which it is not.
+
+---
+
 ## 2026-09-18 — backlog → 23771 (LA-118's heading corrected)
 
 **+3**, for one word and a sentence saying why it was wrong. The entry filed hours earlier was
@@ -80,6 +91,7 @@ out or it reads as alarmism. The four options carry their own trade-offs per **D
 Back To Me**, and that section does not compress well.
 
 ---
+
 
 ## 2026-09-17 — backlog → 23365 (four owner decisions + the Q-506 re-measurement)
 
