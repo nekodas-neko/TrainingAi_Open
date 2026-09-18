@@ -18,6 +18,36 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-18 — backlog → 24201, `projectOverview.md` → 11775 (TN-49, the rederivation gap)
+
+**Backlog +13 on an entry that shipped its fix and stayed queued.** The growth is a retraction: the
+entry's prescribed first action would have overwritten seven correct production scores with values
+4–6 points too low, so the correction has to be at the top of the entry rather than folded into a
+tick, and the three residues it leaves have to be separable from the one that was fixed.
+
+The overview's +16 is the largest single-item paragraph in a while and it is not about the code. It
+is about a **surface that asserted the opposite of its own evidence** — the audit printed "the stored
+score IS reproducible from its own stored inputs (42)" against a stored 48 — because that sentence is
+what generated the false entry, and a later session reading the fix without it would not know why the
+entry was believed.
+
+**Re-read as 24194 / 11775 on the re-merge**, against the 23933 / 11745 this note was drafted with —
+review sweep 50 (#1297) landed thirteen RV entries in between. The deltas are unchanged; the
+absolutes are a reading of whatever `main` was at merge time, which is never the `main` the note was
+written against.
+
+**That re-merge is also where the backlog conflict took a THIRD shape**, and it is worth recording
+because neither existing rule covered it. The documented cases are two deletions (keep neither) and
+two additions on an append-only file (keep both). This was an **edit against an append**: `main`
+carried the ORIGINAL TN-49 text plus the new RV entries, while this branch carried the rewritten
+TN-49. "Keep both" would have restored the retracted prescription — the one that would have
+corrupted seven production rows — sitting directly above its own correction, and "keep neither"
+would have dropped thirteen new entries. The resolution is per-heading: this side's TN-49, then
+`main`'s RV-51…RV-63. Reading the headings is what the rule actually asks for; the deletion/addition
+dichotomy is a shortcut that does not always apply.
+
+---
+
 ## 2026-09-18 — backlog → 23915 (TN-47/48/49, the tuning calibration sweep)
 
 **+144 from 23771.** Three entries off one review. TN-48 is the long one and earns it: the
