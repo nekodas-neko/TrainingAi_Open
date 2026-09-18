@@ -607,47 +607,6 @@ existing 65 days moves by less than 5 points on every one of them.
   every row carries a model stamp. **Currently: 62 of 65 reproduce** (58 nine-key + 4 of the seven),
   three are 1 point out, and 25 of 65 are stamped.
 
-### [platform] RV-52 — `weekly-review-month-window:` is in zero invalidation groups; its direct sibling is in three
-
-- **Lane:** A — `lib/cache-groups.ts`. **Added:** 2026-09-18 · Review sweep 50.
-- **Batch:** `cache-eviction-gaps-sweep50`
-- Key defined at `components/week-trends-section.tsx:36` as
-  `weekly-review-month-window:<weekStart>`. Counted with `grep -c` against `lib/cache-groups.ts`:
-  **0 groups**, against **3** for `day-review-week-window:` — the key rendered by the same surface
-  from the same writes.
-- **The sibling is the argument.** Nothing distinguishes the two payloads' write sensitivity; one was
-  registered and one was not. Add it wherever `day-review-week-window:` appears.
-- **Per Q-262 this may be inert today** — `cachedFetch` always revalidates, so an unregistered key
-  only settles stale where a read path is seed-only or passes `freshWithinTtl`, and neither was
-  established here. File and fix it anyway: a key that is inert today becomes load-bearing the moment
-  someone adds `freshWithinTtl` to it, and that is not a change anyone would think to check this
-  against.
-
-### [platform][readiness] RV-53 — `stress-day:` is in zero invalidation groups; `body-battery`, on the same card, is in four
-
-- **Lane:** A — `lib/cache-groups.ts`. **Added:** 2026-09-18 · Review sweep 50.
-- **Batch:** `cache-eviction-gaps-sweep50`
-- Key defined at `components/body-battery/stress-day-chart.tsx:77` as `stress-day:<date>`. `grep -c`:
-  **0 groups**, against **4** for `body-battery` — which the same card renders, from the same Oura
-  ingest.
-- Same reasoning and same Q-262 caveat as RV-52. Register it in the groups that already carry
-  `body-battery`.
-
-### [workouts][platform] RV-54 — the deload confirmation does not evict `collection`, though `/api/collection` computes its answer from it
-
-- **Lane:** A — `lib/cache-groups.ts:404-422`. **Added:** 2026-09-18 · Review sweep 50.
-- **Batch:** `cache-eviction-gaps-sweep50`
-- **This is the sharpest of the three, because the dependency is explicit in the route.**
-  `app/api/collection/route.ts:59` computes
-  `const pausedDays = [...restDays, ...earlyDeloadWeekDays(program ?? {})]` — i.e. directly from the
-  deload confirmation that `invalidatePrescriptionChanged()` exists to fan out. `collection` appears
-  in `cache-groups.ts` at lines 32, 148, 202 and 330 — **not** in that group's body.
-- RV-49 extended this same group correctly in this window (it now prefix-drops `workout-card:` and
-  `ai-periodization-session:` and includes `next-session`), which is what makes the omission worth
-  reading as an oversight rather than a decision.
-- **Verification:** confirm an early deload, then re-read `/api/collection` without waiting out the
-  TTL — `pausedDays` reflects the new deload week.
-
 ### [platform][nutrition] RV-55 — a client-supplied vial `id` turns a duplicate into an unhandled 500 and a server-fault row
 
 - **Lane:** A — `app/api/supplements/[id]/vials/route.ts:19` and
