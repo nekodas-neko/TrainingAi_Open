@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.458.0",
+    date: "2026-09-18",
+    changes: [
+      "The guided walk now picks today's fast/slow structure for you, instead of reopening whichever preset you used last. It reads how much Zone 2 your week still has open: a large gap gets the long 5-min work blocks, a moderate one the shorter 3/3 rhythm, and once the week's Zone 2 is done it stops prescribing intervals altogether and gives you one continuous easy block \u2014 that walk is for steps, not stimulus. The session stays about 30 minutes either way, so the only thing that changes is the shape. Today's choice is the first slide, with its reason written on it, and your own saved Custom setup is untouched \u2014 swipe to it and it is exactly as you left it.",
+    ],
+  },
+  {
     version: "1.457.14",
     date: "2026-09-18",
     changes: [
