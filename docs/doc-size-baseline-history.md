@@ -18,6 +18,40 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-18 — backlog → 23865, `projectOverview.md` → 11889 (LA-100 closed, 40 entries folded)
+
+**Backlog −62: an entry removed, not amended.** LA-100's two claims — no target file for the sweep,
+and a hard ceiling every lane would hit — were both recorded stale by OR-119 on 09-17. The step left
+undone was deleting it, so every lane kept being offered finished work.
+
+**The ratchet failed on the way and that is worth recording**, because the failure name misleads:
+removing 62 lines tripped *"Orientation docs stay within their baselines"*. It is shrink-only, so a
+document getting SMALLER moves its baseline down and a stale one fails — the instinct on reading that
+check's name is that something grew.
+
+The `projectOverview.md` paragraph leads with the measurement that retired the entry (28 of 32
+history files are dated) rather than with the sweep, because the sweep is a chore that recurs and the
+measurement is the thing a future reader would otherwise re-derive before daring to run it.
+
+---
+
+
+## 2026-09-18 — backlog → 23927, `projectOverview.md` → 11879 (LA-110 re-measured)
+
+**Backlog +32, nothing removed, and no fix shipped** — which is the right trade for this entry
+specifically. LA-110 has now been filed with a wrong diagnosis **twice**: a rep-band mechanism a later
+measurement refuted, and a first fix that is not implementable because `workout_sessions.phase_type`
+is NULL on every production row. The 32 lines buy a *bounded* window (five sessions, clean on both
+sides), the discriminating detail (one set per exercise instead of two), and one red herring closed
+(a null `style_id` is ordinary — a clean day has five of them).
+
+The section naming three untested hypotheses is deliberately *in* the entry rather than left out. A
+reader who finds only the measurement will re-derive them; a reader who finds them listed as untested
+will test one.
+
+---
+
+
 ## 2026-09-18 — backlog → 23893, `projectOverview.md` → 11870 (LA-120: the queue tool's three blind spots)
 
 **Backlog +17, and it is the only entry here that GREW the file on purpose.** Two gates came back
@@ -13789,7 +13823,7 @@ was still carrying is now answered: the supplier returns 366 day-keys and the co
 they differ by one, and the direction is the safe one (the loop never asks for a day the payload
 lacks, which is BF-176 inverted). Reasoning in the journal entry; deliberately not "fixed", since
 widening the loop would make a constant named `STREAK_LOOKBACK_DAYS = 365` drive a 366-day walk.
-## 2026-09-11 — `docs/implementation-backlog.md` → 23868 (RV-42 shipped)
+## 2026-09-11 — `docs/implementation-backlog.md` → 23840 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 
@@ -13810,7 +13844,8 @@ reading of a moving number, and a PR that waits will re-read it once per merge t
 Recomputed by `pnpm fix:baselines` after each merge, which is the only thing that makes the
 subtraction mean anything.
 
-**Recomputed again 2026-09-18** (→ 23868), and the rewrite count derived the same way the note
+**Recomputed again 2026-09-18** (→ 23840 — twice in one afternoon, the second after a 40-entry
+journal fold moved the file again), and the rewrite count derived the same way the note
 defines it — first-parent commits on this branch touching this file — now reads **55**. The *merge*
 count is deliberately NOT re-derived: `git merge-base` against `main` no longer finds the original
 branch point, because this branch has absorbed `main` dozens of times, so the figure it returns

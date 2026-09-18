@@ -67,6 +67,25 @@ days later it was offered as next-up and re-derived, because prose cannot reach 
 fields; its Lever 2 needs a quiet window and a structural decision, both the owner's. Lane A's READY
 list went **12 → 9**.
 
+**LA-100 closed, and 40 journal entries folded (2026-09-18).** The entry said the sweep had nowhere
+to fold to because the batched history files are era-named; **28 of 32 are dated** and the fold script
+has written `history-<date>-folded-N.md` since LA-80, so the convention it asked the owner to choose
+was already chosen. Its "BLOCKING" ceiling claim is also stale — that check is advisory now. OR-119
+recorded both on 09-17; what was missing was removing the entry, so every lane kept being offered it.
+The sweep ran: **80 → 40 entry files**, citations rewritten in four docs, 5 held back because an agent
+baton cites them, `check-doc-links` clean on 816. The one real residual — whether the four frozen
+era-named files are ever renamed — moved to the entries README, where whoever next touches them will
+see it.
+
+**LA-110's missing-prescription window re-measured: five sessions, and the set count is the tell
+(2026-09-18).** 09-07 → 09-12 logged **one set per exercise** with no `style_name` and no
+`planned_pct`; 09-06 and 09-14 are clean, with **two** sets each. Half the sets missing — not just
+null columns — says the exercises were presented with no resolved style at all, since the set count
+and the planned fields descend from the same `ex.progressionStyle`. **A null `style_id` is NOT the
+signature:** 09-17 is a clean day where all five logs have one. **No cause is recorded**, because
+three hypotheses fit and none was tested — the entry has already been filed with a wrong diagnosis
+twice, and a third is worse than none.
+
 **Three shared modules whose contract and behaviour had drifted (RV-58/59/60, 2026-09-18 — one PR,
 the last sweep-50 batch).** **RV-58** — `equipmentEligible` folded case on the exercise side and
 `buildEquipmentSet` on neither, so `equipmentEligible(['Barbell'], buildEquipmentSet(['barbell']))`
@@ -1559,7 +1578,7 @@ would have missed it ([journal](docs/overview/history-2026-09-10-folded-4.md#202
 
 **The accessibility scanner that would have passed a 12 px button (Q-282).** `@axe-core/playwright` was installed, measured and removed: WCAG 2.5.8 exempts a *spaced* undersized control, so a deliberately-shrunk **12×12** button (confirmed by `boundingBox`) came back a **pass**, and `color-contrast` cannot read this app at all — it fails to parse the `oklch` tokens (*"Could not parse color string oklab(…)"*) and **evaluated no nodes on Home**. `e2e/touch-target-size.spec.ts` ships instead: DOM geometry against **this repo's 48 dp bar**, covering the roles `globals.css`'s `button, [role="button"]` floor cannot (`<a>`, `role="tab"`, `role="radio"`). It fails on the mutation axe passed. One real finding, **LB-26**: Home's APK-banner link is 258×33 ([journal](docs/overview/history-2026-09-10-folded-4.md#2026-08-30-touch-target-gate)).
 
-**The Heart Rate tile shows last night, as a delta (TN-13).** It read the **7-day mean** and printed it as a bare bpm — in the signal that best predicts how you feel (r = +0.557 against your own check-in, best of nine). Re-measured over 71 production nights: the nightly value changes on **61 of 70** night-pairs, the rounded mean on **29**, so the tile stood still nearly six days in ten and discarded 77 % of the daily movement. And a bare number says nothing: expressing the reading as a deviation from your own baseline roughly **doubles** its correlation with felt state, which is why it now reads `50 · −7 vs usual`. Both halves shipped together because the entry required it — half a fix here is the one that looks like progress. **⚠ The delta was then never drawn, and TN-13 is now CLOSED on the owner's decision to leave it that way (2026-09-15).** `RING_GEOMETRY` sets `showDot: true` on **1 of 18** ring styles, and the cue renders only under it, so the comparison was invisible on seventeen styles including the default — for a fortnight. It failed on the one day it had something to say: `resting_heart_rate` **60** on 2026-09-15 against 57 · 55 · 54 · 55 before it, so it would have read about `+4 vs usual`. Offered four ways to restore it, the owner chose the bare number — *"which is fine as it makes it consistent with the rest"* — because the HR chip would otherwise be the only cell in the row with a second line, and cueing all four puts a cue under three numbers that already interpret themselves. **The engine half stays and still reaches the accessible name**, so the comparison is spoken even though it is not drawn; the legibility question is struck as moot ([journal](docs/overview/entries/2026-09-15-tn13-closed-bare-number.md)).
+**The Heart Rate tile shows last night, as a delta (TN-13).** It read the **7-day mean** and printed it as a bare bpm — in the signal that best predicts how you feel (r = +0.557 against your own check-in, best of nine). Re-measured over 71 production nights: the nightly value changes on **61 of 70** night-pairs, the rounded mean on **29**, so the tile stood still nearly six days in ten and discarded 77 % of the daily movement. And a bare number says nothing: expressing the reading as a deviation from your own baseline roughly **doubles** its correlation with felt state, which is why it now reads `50 · −7 vs usual`. Both halves shipped together because the entry required it — half a fix here is the one that looks like progress. **⚠ The delta was then never drawn, and TN-13 is now CLOSED on the owner's decision to leave it that way (2026-09-15).** `RING_GEOMETRY` sets `showDot: true` on **1 of 18** ring styles, and the cue renders only under it, so the comparison was invisible on seventeen styles including the default — for a fortnight. It failed on the one day it had something to say: `resting_heart_rate` **60** on 2026-09-15 against 57 · 55 · 54 · 55 before it, so it would have read about `+4 vs usual`. Offered four ways to restore it, the owner chose the bare number — *"which is fine as it makes it consistent with the rest"* — because the HR chip would otherwise be the only cell in the row with a second line, and cueing all four puts a cue under three numbers that already interpret themselves. **The engine half stays and still reaches the accessible name**, so the comparison is spoken even though it is not drawn; the legibility question is struck as moot ([journal](docs/overview/history-2026-09-18-folded-1.md#2026-09-15-tn13-closed-bare-number)).
 
 **Changing a supplement's dose no longer rewrites every log you already made (BF-3, gap 1).** The
 dose lived on the definition and not on the log, so raising retatrutide from 2 mg to 4 mg made last
@@ -2787,7 +2806,7 @@ clamping — anything more than 15% above it. The owner's **2,245** against a me
   owner's one vial still reads **2026-09-10, identical to its recorded date**, while the drug started
   near **2026-09-04**. An exclusion keyed on 09-10 would leave the six confounded days inside the
   window. **One edit unblocks it:** set that vial's *Opened on* to the real first dose.
-- [`journal`](docs/overview/entries/2026-09-16-lane-a-tn29-maintenance-ceiling.md)
+- [`journal`](docs/overview/history-2026-09-18-folded-1.md#2026-09-16-lane-a-tn29-maintenance-ceiling)
 
 ### [app-shell] ⚠️ Home's three header chips fit now, and the fit has only been measured, not seen (BF-139, 2026-09-12, v1.447.0) · needs: browser
 
@@ -3888,7 +3907,7 @@ Lane B's, tracked on BF-84, and the storage shipping first is what makes it safe
 - **Both halves of the broken baseline are visible in one frame.** The contributor reads `tempZ` = **0.303** (fine); the banner reads **0.519 °C** (deload). The z is small **because `temp_baseline_dev_x8` = 1.714 °C** against a true nightly sd of ~0.14 — `0.519/1.714 = 0.303`, matching the stored input to three decimals. **Q-506's inflated sd and TN-6's low mean failing in opposite directions.**
 - **⛔ Do not raise `TEMP_ALERT_THRESHOLD_C`** — Q-504's mistake. Pass the same `tempLadderTrusted` condition into the deload evaluation.
 - **This is the surface the owner actually reads** — the one behind *"its often triggering deload days"*. The protection landed on the path they never see.
-- **⚙️ The root fix now has a mechanism and has NOT been run (BF-13, 2026-09-16, unversioned — admin-only, no user-visible change).** `POST /api/admin/rederive-baselines` replays the baseline fold cold over the stored nights and rewrites the temperature baseline and `temp_dev_c`; `dryRun` is the default. Both halves visible in this frame — the low mean and the 1.714 °C sd — come out of the same cold fold, so re-deriving is the fix *underneath* the suspension rather than beside it. **The run is the owner's to fire; it is a production data write and was deliberately not executed from the sandbox, so nothing here has changed yet.** Gating the banner on `tempLadderTrusted` is still worth doing and is still TN-18's own work — a re-derivation makes the suspension unnecessary, it does not make the ungated consumer correct. [journal](docs/overview/entries/2026-09-16-lane-a-bf13-rederive-baselines.md)
+- **⚙️ The root fix now has a mechanism and has NOT been run (BF-13, 2026-09-16, unversioned — admin-only, no user-visible change).** `POST /api/admin/rederive-baselines` replays the baseline fold cold over the stored nights and rewrites the temperature baseline and `temp_dev_c`; `dryRun` is the default. Both halves visible in this frame — the low mean and the 1.714 °C sd — come out of the same cold fold, so re-deriving is the fix *underneath* the suspension rather than beside it. **The run is the owner's to fire; it is a production data write and was deliberately not executed from the sandbox, so nothing here has changed yet.** Gating the banner on `tempLadderTrusted` is still worth doing and is still TN-18's own work — a re-derivation makes the suspension unnecessary, it does not make the ungated consumer correct. [journal](docs/overview/history-2026-09-18-folded-1.md#2026-09-16-lane-a-bf13-rederive-baselines)
 
 ### [readiness][devices] ⚠️ Daytime stress stopped counting the night — shipped, and the size of the change is unmeasured (LA-112, 2026-09-16, v1.457.2)
 
@@ -3924,7 +3943,7 @@ sleep. Joined against `sleep_sessions` directly — no clock-hour inference:
   is not. **Owner check owed: do the stress numbers and deload frequency look right after the next
   rollup?**
 - [`measurement`](docs/reviews/2026-09-16-daytime-stress-imputation-vs-measured-hrv.md) ·
-  [`journal`](docs/overview/entries/2026-09-16-lane-a-la112-stress-excludes-sleep.md)
+  [`journal`](docs/overview/history-2026-09-18-folded-1.md#2026-09-16-lane-a-la112-stress-excludes-sleep)
 
 ### [readiness][sleep][activity][heart-rate] 🟢 "Everything is 55" — the clustering is coincidence; today's score is correct (2026-08-31)
 
