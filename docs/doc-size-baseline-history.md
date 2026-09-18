@@ -13746,3 +13746,24 @@ check (GPS, cadence and the strap are not reachable from the web harness) and th
 test, *"fast-block compliance over a month is neither 0% nor 100%"*, which needs a month of wearing
 rather than a sitting. **Not struck**, because that second one is unmeasured.
 
+
+## 2026-09-18 — `docs/implementation-backlog.md` 23855 → 23896 (Lane B, OR-116 ② + LB-120)
+
+**+41.** Two edits, both of which are the queue doing its job rather than accreting.
+
+**−6, OR-116 ②** is answered and struck from its `Keep:` line. The entry asked whether `hrMin`
+reaching `HrFactorsCard`'s `restingHr` prop was a deliberate proxy or an oversight; it is neither.
+The card prints *"Lowest recorded today"* and `hrMin` is exactly that, so only the name was wrong.
+The replacement lines are longer than the question they close because the **inverted** conclusion is
+the load-bearing part: passing a real resting HR would have printed a true number under a false
+sentence, which is the fix the old name invited and a worse bug than the one being chased. ① and ③
+stay open.
+
+**+47, LB-120** is new, and is the reason this sweep exists. `docs/doc-size/docs/implementation-backlog.md.size`
+conflicts on every pair of concurrent implementer PRs, because the protocol has each of them delete
+its own entry and therefore change the line count. Measured the same day: **five rebases of #1303,
+every one conflicting on that file and nothing else.** LA-33 removed this class for documents in
+general and could not reach the one file where "two PRs, same document" describes *every* implementer
+PR. Filed for the Orchestrator (`scripts/**` is theirs) with two options, neither picked, and with
+the argument against the tempting non-fix written down — telling implementers to skip the recompute
+just converts the conflict into a red check, because the ratchet fails on slack.
