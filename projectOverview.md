@@ -26,7 +26,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.457.13 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.457.14 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-18.
 
 **The streak counted the API's window, not the training (BF-176, v1.457.13).** The owner asked why it
@@ -39,9 +39,156 @@ where the edge lands, not what the lifter did.** It dropped because the edge sli
 a trained one. `STREAK_LOOKBACK_DAYS` (`packages/shared/src/workout/streak-window.ts`) is now shared
 by both sides, because they have to agree and nothing made them. **The card may show the old number
 until the `streak-data` cache turns over** (`TTL_LONG`, also stamped optimistically on workout
-completion). **Filed not fixed: LA-117** — the leaderboard's `allTimeStreak` has the same defect over
-its own 90-day window, and the two streak implementations count *different quantities* (training days
-vs calendar days spanned), so they must not be unified to make them agree.
+completion).
+
+**And the same defect on the leaderboard, now fixed (LA-117, v1.457.14).** `allTimeStreak` was
+computed over a 90-day query bound, so a field promising *all-time* structurally could not exceed 90
+against a real 102. The bound is gone — chosen over the cheaper "rename it `recentStreak`" only
+after measuring that the unbounded scan is free (`workout_sessions` is **133 rows / 96 kB** across
+the whole database, indexed on `(user_id, started_at)`). **`weeklyStreak` on the same route read the
+same clipped day list** and was capped at ~14 weeks; the entry named only `allTimeStreak`, and
+reading the route rather than the entry is what found the sibling. **The two streak implementations
+are still deliberately NOT unified** — `computeStreak` counts *training days* with a rest allowance,
+the home loop counts *calendar days spanned* — so `streak-window.ts` now says outright that the
+leaderboard does not read `STREAK_LOOKBACK_DAYS`: 365 would cap an all-time field just as 90 did.
+
+**The queue tool called four shipped entries unstarted, and the entry it offered as next was
+owner-blocked (LA-120, 2026-09-18).** `keepFromLines` did not match `- **⚠ Keep:`, so TN-49's three
+residues and LA-118's one were invisible and those entries kept their original high priority — the
+third time `scripts/lib/keep.js` has been narrow in a way nobody noticed until a shipped entry was
+offered as buildable. Widened to a **non-word** prefix only, after measuring that 140 of 144 Keep
+bullets already matched and all four misses were that one shape; the two documented false positives
+(`**Keep the stored field on 1–10**`, prose `The Keep:`) still refuse, and both are asserted.
+Separately, **two entries got the gate their own text already implied.** LA-76's `Gate: owner` was
+removed in September when the owner settled the deload *rule*, leaving the different question it
+actually waits on (does a deload span become first-class stored state?) with nothing marking it.
+Q-220 carried a ⚠ written *"so the next implementer does not defer it again silently"* — and three
+days later it was offered as next-up and re-derived, because prose cannot reach a tool that reads
+fields; its Lever 2 needs a quiet window and a structural decision, both the owner's. Lane A's READY
+list went **12 → 9**.
+
+**Three shared modules whose contract and behaviour had drifted (RV-58/59/60, 2026-09-18 — one PR,
+the last sweep-50 batch).** **RV-58** — `equipmentEligible` folded case on the exercise side and
+`buildEquipmentSet` on neither, so `equipmentEligible(['Barbell'], buildEquipmentSet(['barbell']))`
+was true and its mirror false, and `full_gym` in upper case went unexpanded. Unreachable today (the
+one producer emits lowercase, 0 of 156 rows are non-lowercase) but both API schemas take a bare
+`z.array(z.string())`. **RV-59** — `summariseSupplementDay` summed across units and labelled the
+total by row order, so `1 mg + 2 g` reported `3 mg` **or** `3 g` depending on which row came first.
+Converting is impossible in general — `unit` is free text and includes `ml` and "1 scoop" — so a
+mixed day now refuses to total, reporting `mixedUnits: true` and no number. **RV-60** — the walk
+recommender chose between *"Zone 2 is done"* and *"No Zone 2 target set"* on `zone2 == null`, but
+`computeZoneQuota` emits a **row** with `status: 'not-required'` for no-target, so the null branch
+never fired and a user with no target was told it was done. No production caller yet, so it is fixed
+before the first consumer rather than after.
+
+**The only unbounded route, narrowed and rate-limited — but not floored (RV-63, 2026-09-18).**
+`/api/collection` reads all history five ways with no rate limit, and the home card re-fetches it on
+every paint (`cachedFetch` revalidates regardless of TTL, Q-262). Two of those reads were full-width
+for one field each — **36 columns** of `body_metrics` and **25** of `sleep_sessions`, projected
+straight to `.map(x => x.date)`; they are one column wide now, with the `> 0` predicate pushed into
+SQL. **The entry's date floor is deliberately NOT taken:** `replayCollection` walks every recorded
+day from the beginning, so a floor changes what the ladder reports for anyone with history behind it
+— a behaviour change dressed as a performance fix, and the route's own comment already said there is
+no window to bound it with. **The rate-limit norm was decided rather than matched:** the entry was
+right that the siblings split on nothing (`weekly-muscle-sets` has five repo calls and no limit),
+but every other route is windowed and this is the only all-history one — so the rule is *an
+unbounded replay gets a limit, a windowed read does not*, at 30/60 s. **Two route tests moved rather
+than weakened:** they asserted a low day still spawns a cat, which the route can no longer see, so
+that guarantee is now asserted against a real Postgres.
+
+**Two ways a client error became a server fault (RV-55/56, 2026-09-18 — one PR, the sweep-50
+route-input batch).** Both are the Q-496 shape: input the route should refuse reaches the driver,
+which answers **500 with an empty body** and writes an `error_events` row. **RV-55** — the vial POST
+accepted a client-supplied `id` and inserted it unguarded (the parent was ownership-checked, the id
+was not), so re-posting another user's vial UUID raised `23505`: an existence oracle plus fault-table
+noise, though no cross-user write occurred. The entry left the fix open; reading the callers settled
+it — nothing sends `id` (the only client posts three numbers and a date, and the local vial mirror is
+read-only with no outbox push), so the field is **dropped** rather than conflict-scoped, which
+removes the oracle instead of renaming its status code. **RV-56** — three routes carried the correct
+separator regex and no calendar check, so `2026-02-31` 500'd; all three now `.refine(isCalendarDate)`.
+
+**Three cache keys that no write evicted (RV-52/53/54, 2026-09-18 — one PR, the sweep-50 batch).**
+`weekly-review-month-window:` was in **zero** invalidation groups while its sibling
+`day-review-week-window:` — rendered by the same surface from the same writes — was in three;
+`stress-day:` was in zero while `body-battery`, on the same card, was in four; and
+`invalidatePrescriptionChanged()` did not clear `collection`, though `/api/collection` computes
+`pausedDays` from the deload confirmation that group exists to fan out, and the deload handler calls
+only that group. **One claim of mine was wrong and was corrected before it shipped:** the first
+comment said the collection ladder "kept decaying across a week", but per Q-262 both readers use
+`useCachedValue` without `freshWithinTtl` and neither is seed-only, so `cachedFetchCore` always
+revalidates — the real symptom was a briefly-stale first paint. Registered anyway, because an inert
+key becomes load-bearing the moment someone adds `freshWithinTtl` to it.
+
+**The soreness-provenance window used the banned ms-offset form, and it is not hygiene (RV-62,
+2026-09-18).** `deriveSuggestedSoreMuscles` built its seven-day window as `Date.now() - 7 *
+86_400_000` — the exact pattern the Date Arithmetic rule names — shipped in BF-173 that morning and
+caught by review sweep 50 the same day. It now anchors at `dateStrMidnightInTz`, keyed on the
+**check-in's own `logDate`** rather than on today, and `saveMoodLog` takes the session timezone.
+**The entry left open whether the skew can flip a verdict; it can, but only one way.** A session at
+the seven-day edge is ~168 h old and `suggestedSoreMuscles` only looks within 48 h, so it can never
+be eligible itself — but `computeMuscleRecovery` takes the MEDIAN bout volume as `typical` and
+scales `tau` by `latest/typical`, so an old heavy bout entering the window raises a recent bout's
+recovery percentage. Pinned: **81 → 92**, flipping suggested to not-suggested. Narrow, real, and
+only near the 85 line. The entry's second half shipped too — the check-in write path was selecting
+the whole exercise catalogue on every save and now reads the name→muscles map alone.
+
+**Two merged duplicates were being offered in generated programs, and the entry that found the area
+pointed the other way (RV-51, 2026-09-18 — no migration).** `listExerciseLibrary` is deliberately
+unfiltered, so every **picker** filters `mergedInto` itself; `builder-review.tsx` did,
+`generate-program` and `builder-chat` did not. They looked correct only because two of the four
+merged rows carry an empty equipment list, which `equipmentEligible` rejects — `Cable Crunch` and
+`Straight Arm Pulldown` carry `['cable']` and were being offered beside the canonical rows they were
+merged into. **RV-51 reported the opposite**: it found the two *harmless* rows (`Cable Lat Pulldown`,
+`Dumbbell Lunges`), read them as real exercises hidden from every program, and prescribed a migration
+to label them — which would have un-hidden two duplicates, and whose pass test (*"a full-gym program
+can offer both names"*) is the outcome to avoid. Both are merged, to `Cable Pulldown` and `Dumbbell
+Lunge`. The `POST /api/exercises` guard the entry suspected is sound: it exempts merge requests from
+requiring equipment, which is exactly what those rows are. `equipmentEligible`'s header — which
+claimed *"an empty list should not occur"* and is what aimed the review at the wrong target — is
+corrected in place.
+
+**A readiness audit was contradicting its own evidence, and an entry was written from it (TN-49,
+2026-09-18 — no data write).** Seven `oura_daily_derived` rows read 4–6 points below their own
+stored breakdown. The entry prescribed rewriting those seven scores; doing so would have written the
+error into production. **The cause:** `rederiveReadinessFromStored` skipped any contributor key
+absent from the stored map, dropping its weight from a sum defined to total exactly 1.00. The seven
+disagreeing rows are **exactly** the seven storing eight contributors instead of nine, missing
+`checkin` (weight 0.10); all 58 nine-key rows reproduce exactly. **The audit then printed "the
+stored score IS reproducible from its own stored inputs (42)" against a stored 48** — a
+reproducibility claim contradicted by the number in the same sentence — and concluded the inputs had
+moved. An absent key now contributes the model's own neutral 50 and is reported as `missing`, and the
+audit refuses to claim reproducibility while it is non-empty. **Four of the seven then reproduce
+exactly; three keep a 1-point residual that is recorded as unexplained rather than fitted.** Two
+owner-gated production writes stay on the entry: back-filling the missing `checkin` key (only the
+four reconstructable rows), and back-stamping `model_versions.readiness`, still absent on 40 of 65
+rows.
+
+**The muscle-attribution query was four copies; three are now one (LA-118, 2026-09-18 —
+unversioned).** `weightedSetsByMuscle` in `periodization.ts` is the single set-counting query;
+`getWeeklySetsByMuscleGroup`, `getSetsByMuscleInWindow` and `/api/weekly-muscle-sets` call it. The
+two things the copies disagreed about — **which timestamp attributes a set to a day**, and **whether
+a previous programme counts** — are parameters now, so a caller states its answer instead of
+inheriting whichever copy it started from. **One behaviour change, and it is the defect:**
+`weekly-muscle-sets` had no upper bound at all, so a log dated in the future counted toward this week
+forever; it has one now. **The date column had no test holding it in either direction** — every
+fixture in the repo set `started_at` and `logged_at` to the same instant — so there is one now, a
+session started 22:00 yesterday with its sets logged 00:30 today, where the two reads deliberately
+disagree. **`muscle-tonnage-trend` is still its own copy**, as LA-118 instructed for a first pass: it
+sums tonnage and buckets by week, so folding it in changes the shared function's shape. LA-118 stays
+queued for that, and the honest count is two implementations rather than one.
+
+**Sets per muscle over any window, so the balance card can finally be built (LB-111, 2026-09-18 —
+engine half, unversioned).** `GET /api/muscle-sets?from=&to=` is new: nothing served this number
+before, because every muscle-set route computed the current week server-side and took no parameters.
+**LB-111's premise was wrong in the place that decided the shape** — it said `weekly-muscle-sets`
+calls `getWeeklySetsByMuscleGroup` and throws its date arguments away; it does not call it at all.
+That method scopes to **one programme**, so widening it would have changed what its two real callers
+mean, both of which grade a week against *that* programme's targets. The new read counts **across
+programme changes**, which is what a balance card's claim is about, and the difference is pinned by a
+test running one fixture through both reads: **3 sets against 7**. Checking the premise also found
+that the attribution SQL now exists **four times**, disagreeing on date column and programme scope —
+filed as **LA-118** rather than fixed here, since the extraction touches three live routes. Nothing
+renders it yet; OR-118 (Lane B) is now unblocked.
 
 **The only illness band that ever fires now says what moved (TN-45, v1.457.12 — engine half only).**
 `watch` has fired **2 days in 72**; `elevated` and `fever` have fired **zero** times, so the illness
@@ -2097,6 +2244,36 @@ Last swept **2026-09-03**.
 > An entry only leaves when **nothing is still owed**: no open work, no pending owner or device
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
+
+### [workouts] 🟠 Two real exercises are excluded from every generated program (RV-51, 2026-09-18) · found, not fixed
+
+**Open.** `equipmentEligible` (BF-129) excludes an exercise that declares no equipment, justified in
+its header with *"Migration 269 labelled the 22 rows that had drifted … so an empty list should not
+occur"*. **It occurs.** Production `claude_ro.exercise_library` holds **2 of 156** rows with
+`equipment = []` — `Dumbbell Lunges` and `Cable Lat Pulldown`, both verified 2026-09-18.
+
+Because the implementation is `exerciseEquipment.some(...)`, an empty array is false against **every**
+selection including `full_gym`. Both exercises are therefore invisible to `generate-program`,
+`builder-chat` and the builder review filter, for every user, at every equipment setting — and for
+these two rows excluding is not the safe direction the comment claims, since a full-gym lifter can
+perform both.
+
+**Fix the data, not the rule** — the exclude-on-empty rule is what stopped a home gym being offered
+Machine Chest Press. **But answer the question the data raises first:** `exercise_library` has no
+`created_at`, so it could not be established whether migration 269 *missed* these two or something
+*wrote* them afterwards. If it is the latter, the `POST /api/exercises` guard has a hole and
+labelling two rows fixes nothing.
+
+### [platform][workouts] ⚠️ A banned ms-offset window landed on the mood write path (RV-62, 2026-09-18)
+
+`deriveSuggestedSoreMuscles` (`adapter.ts:3133`, new in this window — `fdcee2d4`) builds its recovery
+window as `new Date(Date.now() - 7 * 86_400_000)`, the pattern CLAUDE.md's Date Arithmetic section
+bans by name. **Whether the day-boundary skew flips a provenance verdict was NOT established** — the
+window feeds `computeMuscleRecovery`, and a workout landing in or out of it at the edge is exactly
+the case that decides whether a sore tick reads as "suggested". Construct that case rather than
+assuming; it decides whether this is hygiene or a live scoring defect. Same function also selects the
+**whole exercise catalogue on every check-in save**.
+
 
 ### [workouts][platform] 🟠 A phase change makes every compound read as a strength decline (LA-110, 2026-09-15) · found, not fixed
 

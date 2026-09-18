@@ -33,6 +33,10 @@ export async function invalidateWorkoutSummaries(): Promise<void> {
     // session volume is one of the four stats the day review draws a week of (Q-112d), and a
     // completed workout changes today's point in that window
     invalidateCache('day-review-week-window:'),
+    // RV-52 — the week-trends surface renders this from the same writes as the key above, and it
+    // was in zero groups while its sibling was in three. Nothing distinguishes their write
+    // sensitivity; one was registered and one was not.
+    invalidateCache('weekly-review-month-window:'),
     // a lifting session's HR feeds the same whole-day zone series as any cardio activity
     invalidateCache('cardio-week'),
     invalidateCache('calendar-data:'),
@@ -73,6 +77,9 @@ export async function invalidateWorkoutSummaries(): Promise<void> {
     // B3/B4: a workout's HR/MET feeds OTS + body battery.
     invalidateCache('training-stress'),
     invalidateCache('body-battery'),
+    // RV-53 — the same card renders this from the same Oura ingest, and it was in zero groups
+    // while `body-battery` was in four.
+    invalidateCache('stress-day:'),
     // Done-screen per-session payloads (prefix — one entry per completed session). A new
     // completion changes which session is "latest" and produces the next prescription, so
     // the done screen must not repaint the previous workout's recap/timing/HR.
@@ -123,6 +130,9 @@ export async function invalidateReadinessInputs(): Promise<void> {
     invalidateCache('muscle-recovery'),
     // B4: body battery derives from readiness inputs (sleep/stress/HR).
     invalidateCache('body-battery'),
+    // RV-53 — the same card renders this from the same Oura ingest, and it was in zero groups
+    // while `body-battery` was in four.
+    invalidateCache('stress-day:'),
   ])
 }
 
@@ -203,6 +213,10 @@ export async function invalidateOuraSync(): Promise<void> {
     // a sync writes the resting heart rate and step count the day review's week window plots
     // (Q-112d) — three of its four stats come from `body_metrics`, which this path fills
     invalidateCache('day-review-week-window:'),
+    // RV-52 — the week-trends surface renders this from the same writes as the key above, and it
+    // was in zero groups while its sibling was in three. Nothing distinguishes their write
+    // sensitivity; one was registered and one was not.
+    invalidateCache('weekly-review-month-window:'),
     // A BLE sync drains new keepalive battery polls, so the latest-battery read is stale after
     // one. Read by both Ring Status cards (More/Profile and Health) on this single shared key.
     invalidateCache('oura-ble-battery-latest'),
@@ -226,6 +240,9 @@ export async function invalidateOuraSync(): Promise<void> {
     // B3/B4/B5: a drain brings new HR/MET/RHR → OTS, body battery, and the HR profile.
     invalidateCache('training-stress'),
     invalidateCache('body-battery'),
+    // RV-53 — the same card renders this from the same Oura ingest, and it was in zero groups
+    // while `body-battery` was in four.
+    invalidateCache('stress-day:'),
     invalidateCache('hr-profile'),
     // Per-activity HR traces (`hr-window:<query>`). The window is fixed, but the samples
     // inside it are exactly what a sync brings — an activity reviewed before its HR landed
@@ -283,6 +300,9 @@ export async function invalidateActivityWrites(): Promise<void> {
     // B3/B4: HR readings feed OTS + body battery.
     invalidateCache('training-stress'),
     invalidateCache('body-battery'),
+    // RV-53 — the same card renders this from the same Oura ingest, and it was in zero groups
+    // while `body-battery` was in four.
+    invalidateCache('stress-day:'),
     // Q-126: four stat caches read activity_logs directly and were all missing here. Each holds
     // 6 h, so setting a 5K PB left the All-Time Bests card showing the old number for the rest of
     // the morning.
@@ -331,6 +351,10 @@ export async function invalidateBodyMetricWrite(): Promise<void> {
     // weight, steps and resting heart rate are three of the day review's four trended stats
     // (Q-112d); the prefix clears every dated window, since a backdated entry moves an older one
     invalidateCache('day-review-week-window:'),
+    // RV-52 — the week-trends surface renders this from the same writes as the key above, and it
+    // was in zero groups while its sibling was in three. Nothing distinguishes their write
+    // sensitivity; one was registered and one was not.
+    invalidateCache('weekly-review-month-window:'),
   ])
 }
 
@@ -408,6 +432,18 @@ export async function invalidatePrescriptionChanged(programSessionId?: string): 
     invalidateCache('next-session-prescription'),
     // Home's recommendation card, and the seed `use-deload-choice` reads the deload flag from.
     invalidateCache('next-session'),
+    // RV-54 — `/api/collection` computes `pausedDays` as
+    // `[...restDays, ...earlyDeloadWeekDays(program)]`, so it reads the deload confirmation this
+    // group exists to fan out, and `handleEarlyDeloadConfirm` calls only this group.
+    //
+    // **Inert today, and registered anyway — checked rather than assumed (Q-262).** Both readers
+    // (`components/home/collection-card.tsx`, `app/collection/collection-content.tsx`) use
+    // `useCachedValue` with no `freshWithinTtl`, and neither is seed-only, so `cachedFetchCore`
+    // always revalidates: without this key the lifter saw a briefly-stale first paint, not a ladder
+    // that kept decaying for a week. The registration is what stops that becoming untrue the moment
+    // someone adds `freshWithinTtl` to a card reading a deload-sensitive number — which is not a
+    // change anyone would think to check this against.
+    invalidateCache('collection'),
     // With an id, evict precisely that session; without one the change is program-wide, so drop
     // the whole prefix — the shape invalidateInjuryWrites already uses for the same two keys.
     ...(programSessionId

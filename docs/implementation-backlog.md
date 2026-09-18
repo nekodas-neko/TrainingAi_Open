@@ -443,6 +443,219 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [platform] LB-120 — the backlog's doc-size baseline collides on every pair of concurrent implementer PRs
+
+- **Lane: O** — `scripts/check-doc-index-size.js` and `docs/doc-size/docs/implementation-backlog.md.size`.
+  Filed by Lane B, not built by it: `scripts/**` is the Orchestrator's.
+- **Added:** 2026-09-18 · measured, not estimated.
+- **The collision is STRUCTURAL, not bad luck.** The protocol has every implementer PR remove its own
+  backlog entry, so every implementer PR changes the backlog's line count, so every *pair* of
+  concurrent implementer PRs disagrees about the one number in
+  `docs/doc-size/docs/implementation-backlog.md.size`. There is no version of "land two PRs the same
+  afternoon" that avoids it.
+- **Measured 2026-09-18:** #1303 (TN-25) needed **five** rebases in one afternoon — #1295, #1302,
+  #1299, #1305 and #1307 each landed during its CI — and **every one** of them conflicted on that
+  file and nothing else in `docs/doc-size/`. Each cycle also required restating the entry's
+  ratchet-down note, because its stated endpoints move with the base even though its delta (−182)
+  does not.
+- **⚠ LA-33 already fixed this class and could not reach this file.** Splitting the shared size map
+  into one file per document took two PRs raising two *different* documents to zero conflicts. Two
+  PRs changing the *same* document still conflict, which LA-33 correctly calls the right behaviour —
+  they genuinely disagree about one number. The backlog is the case where "the same document" is
+  **every** implementer PR, so the general rule lands wrong on this one file.
+- **Two options, for the Orchestrator to judge — this entry does not pick one.**
+  ① **Derive it.** The check computes the backlog's line count instead of reading a stored number,
+  and enforces the ratchet against git rather than a file. Removes the conflict entirely; costs the
+  check a git read, which CI's depth-1 checkout may not support — establish that first.
+  ② **Exempt it.** Drop the backlog from the ratchet and keep the per-entry hygiene checks
+  (`check-backlog-pointers.js`) that actually catch regressions. Cheaper, and loses the only
+  automatic pressure against the file growing — which is real: it is ~24,000 lines.
+- **⛔ Do not "fix" it by telling implementers to skip the recompute.** The check FAILS ON SLACK, so a
+  stale number is a red CI, and splicing the conflict hunks produces a number matching neither side.
+  The recompute is correct; it is the conflict that should not exist.
+- **Branch:** _unassigned_
+
+### [body][nutrition] TN-48 — the body-composition suite is collected daily, interpreted nowhere, and the one reading that frightens is the one the app can already defuse 🔴 LIVE
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-18 · Tuning agent, from the owner's ask: *"we want the
+  results to be very personal to the user — so its a real value that depicts their health. Use all
+  available metrics/data."*
+- **Lane: A** — a derivation over `body_metrics`, then a surface. Engine half first.
+- **Review:** [`what the score can and cannot say`](reviews/2026-09-18-what-the-score-can-and-cannot-say.md) §4.
+- **Needs: TN-46** for the medication overlay only — the decomposition below stands alone and should
+  not wait for it.
+
+**What is already on disk, every day, unused.** `body_metrics` carries `skeletal_muscle_pct`,
+`muscle_mass_kg`, `fat_free_mass_kg`, `visceral_fat_index`, `body_water_pct`, `bone_mass_kg`,
+`bmr_kcal` and `metabolic_age` on **49 of the last 90 days**. Grepped across the repo: those columns
+appear in 18 files and **zero scoring or analysis modules**. They are stored, rendered as bare
+numbers, and never interpreted.
+
+**Why it matters this month.** The owner started Retatrutide on 2026-09-07 (TN-46). The question a
+person on a GLP-1 actually has is *am I losing fat or muscle*, and it is answerable from columns
+already being written nightly.
+
+**⚠ The raw numbers say something alarming and mostly untrue — this is the case for building it.**
+
+| | weight | fat mass | lean mass |
+|---|---:|---:|---:|
+| pre-dose (n=37) | 71.26 kg | 17.59 kg | 53.67 kg |
+| on Retatrutide (n=12) | 70.16 kg | 17.92 kg | 52.24 kg |
+| **change** | **−1.10 kg** | **+0.33 kg** | **−1.43 kg** |
+
+Read alone: *every kilo lost was lean, and then some.* That is what the card shows today.
+
+**The app holds the column that corrects it.** Bioimpedance lean mass includes body water, and body
+water fell **1.04 kg** across the same window — so **lean minus water is −0.38 kg**, inside scale
+noise. **Water explains 73% of the apparent lean loss.** The last eight readings move the right way:
+body fat **25.7% → 25.2%**, muscle **39.4% → 39.6%**, water **54.3% → 54.6%**.
+
+**What to build — decomposition, not another number.** Split a weight change over a chosen window
+into **fat / water / non-water lean**, with the window's reading count shown, and state the noise
+floor rather than implying precision. The headline sentence is the deliverable: *"down 1.1 kg —
+0.3 kg of it fat, 1.0 kg water; lean mass is flat once water is taken out."*
+
+**⚠ Guardrails, because this is body-image-adjacent and bioimpedance is noisy.**
+- **Never report a lean-mass change without the water decomposition beside it.** That is the entire
+  finding — the undecomposed number is misleading in the one situation where a user most wants it.
+- **n is part of the answer.** 12 readings is not 37; show the count, and suppress the panel below
+  a stated minimum rather than rendering a confident number from four weigh-ins.
+- **State the noise floor.** A ±0.4 kg move over two weeks is not a finding, and the surface must
+  say so rather than drawing an arrow.
+- **Scale readings are not a clinical measurement.** Q-527 already records one corrupt
+  body-composition row; a single outlier must not move the window.
+
+**Pass test:** a weight change over a window is shown split into fat, water and non-water lean, with
+the reading count and noise floor visible, and the current 12-day window reads as *water-dominant,
+lean effectively flat* rather than as a lean-mass loss.
+
+
+### [readiness] TN-47 — half the readiness weight is measured against four differently-stretched rulers, and the breakdown rails on 46% of days 🔴 LIVE
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-18 · Tuning agent.
+- **Lane: A** — `packages/shared/src/health/personal-baseline.ts` (the denominator) and
+  `readiness-composite.ts` (the slope).
+- **Gate: owner** — it changes what the readiness breakdown says about his own health, and the
+  honest framing of the change is a judgement call (see the ⚠ below).
+- **Review:** [`what the score can and cannot say`](reviews/2026-09-18-what-the-score-can-and-cannot-say.md) §1–2.
+- **Needs: Q-506** for temperature specifically — that baseline is broken separately and much worse.
+
+**The four baseline-relative contributors are 50% of the readiness weight and each divides by a
+differently-wrong denominator.** The EMA maintains `devX8` as a **mean absolute deviation**, not a
+standard deviation — for normal data MAD ≈ 0.798σ, so even a perfect baseline inflates every z by
+~1.25×. Measured against the true night-to-night spread of the same rows:
+
+| metric | EMA dev | true sd | ratio (ideal 0.80) | its z runs |
+|---|---:|---:|---:|---|
+| **HRV** | 6.39 ms | 11.02 ms | **0.58** | **1.7× too hot** |
+| **sleep** | 39.50 min | 63.63 min | **0.62** | **1.6× too hot** |
+| resting HR | 4.19 bpm | 3.68 bpm | 1.14 | 0.9× — roughly right |
+| **temperature** | 216 centi-°C | 12.5 centi-°C | **17.3** | **0.06×** — Q-506 |
+
+**Not the medication transient.** Split at the first Retatrutide dose the ratios hold either side:
+HRV 0.67 pre / 0.65 during, sleep 0.61 / 0.56.
+
+**The consequence is saturation.** `Z_POINTS_PER_UNIT = 50/1.5` rails a contributor at ±1.5σ, and a
+z running 1.7× hot reaches that constantly: **hrvBalance is 0 or 100 on 46% of days**, sleepBalance
+on 29%. A rail cannot distinguish "a bit low" from "catastrophically low", which is exactly the
+gradation a personal score exists to show.
+
+**⚠ THIS IS AN EXPLAINABILITY FIX, NOT A RE-SCORE — and it must not be sold as one.** Recomputing
+all 65 days on a true sd moves the composite by a **mean of 0.4 points, max 4, with zero days moving
+more than 5**. The nine weights average the distortion away. What changes is the breakdown: HRV's
+rail rate **46% → 33%**, sleep's **29% → 17%**, and resting HR — currently *under*-reacting — rises
+17% → 25%, the correction working the other way. Per the standing rule that a proposal states how
+many days it moves: **65 days re-derive, none materially.**
+
+**First action, in preference order.** (1) Divide by an sd estimate rather than the MAD — either
+`σ̂ = 1.2533 × devX8/8` (one constant, fixes the systematic part everywhere at once) or a trailing
+true sd computed from the per-night baselines already on disk, which also fixes the per-metric
+residual. (2) Only then revisit `Z_POINTS_PER_UNIT`; moving the slope first fits the threshold to a
+broken input, which is the mistake Q-504 already made and reverted.
+
+**⚠ Do NOT touch the weights for this.** The weights are fine — the denominators are not.
+
+**Two things measured alongside, worth their own look and NOT folded into the fix above.**
+- **The two activity terms carry 15% of the weight and supply 7.4% of the score's movement.**
+  `prevDayActivity` has never scored below 57 in 65 days and `activityBalance` never below 51. They
+  are a floor with a label rather than a reading of this person's day.
+- **`checkin` has never exceeded 88 of 100**, so the 2026-07-22 rebalance's stated goal — that a
+  genuinely great day can reach a true 100 — is unreachable in practice on this user's logging.
+
+**Pass test:** no contributor rails on more than ~a third of days, and the composite over the
+existing 65 days moves by less than 5 points on every one of them.
+
+
+### [readiness][platform] TN-49 — seven days show a readiness score that contradicts its own stored breakdown
+
+- **Branch:** `lane-a/tn49-rederivation-missing-key` · **Added:** 2026-09-18 · Tuning agent.
+- **Lane: A** — `packages/shared/src/health/**`, plus a possible back-fill over `oura_daily_derived`.
+- **Review:** [`what the score can and cannot say`](reviews/2026-09-18-what-the-score-can-and-cannot-say.md) §3.
+- **⛔ THE PRESCRIBED FIRST ACTION WAS WRONG AND WOULD HAVE CORRUPTED PRODUCTION.** This entry said
+  *"recompute and rewrite the seven rows from their stored contributors"*. Doing that would have
+  overwritten seven **correct** scores with values **4 to 6 points too low** — writing into the
+  database exactly the defect the entry exists to remove. The measurement was right; the diagnosis
+  was not, and it was the audit surface that produced it.
+- **✅ THE REAL CAUSE, measured on production 2026-09-18 and FIXED the same day** (no data write):
+  `rederiveReadinessFromStored` **skipped a contributor key absent from the stored map**, dropping
+  its weight from a sum whose weights are defined to total exactly 1.00. The result came out low by
+  about `weight × 50`.
+  - The 7 disagreeing rows are **exactly** the 7 rows storing **eight** contributors instead of nine.
+    The missing key is **`checkin`** (weight 0.10) on every one. All **58** nine-key rows reproduce
+    exactly. The key-count histogram is `{8: 7, 9: 58}` — a 1:1 match with the disagreements.
+  - An absent key now contributes the model's own NEUTRAL 50 (what `computeReadinessComposite`
+    itself uses for a contributor with no input) and is reported in a new `missing` field.
+  - **⚠ A key PRESENT with an unusable score is deliberately NOT treated the same way**, and the
+    asymmetry is pinned by its own test. An absent key has no score, so the neutral reproduces the
+    composite; a corrupt one is a value that cannot be read, and inventing 50 asserts something the
+    row does not say — which is what `readiness-stored-inputs.test.ts`'s *"it refuses to invent a
+    verdict"* block exists to prevent. That path stays skipped and therefore **keeps** the
+    low-by-`weight × score` trap. Accepted: no production row has ever been in that state. The
+    first version of the fix collapsed the two cases and turned that pre-existing test red.
+  - **The audit surface was asserting the opposite of its own evidence.** With `drifted` and
+    `uncheckable` both empty it took the branch that prints *"The stored score IS reproducible from
+    its own stored inputs (42)"* against a stored 48, and concluded *"the model has not moved — the
+    difference is an INPUT change"*. That sentence is what this entry was written from. It now
+    refuses to make a reproducibility claim while `missing` is non-empty.
+- **⚠ Keep: a 1-point residual on THREE of the seven is still unexplained.** With the neutral 50
+  standing in, 07-18/19/20/22 reproduce **exactly** and **07-16, 07-17 and 07-21 remain 1 point
+  low**. No value in `CHECKIN_ENERGY_SCORE` (30/50/72/88/100) reproduces those three, so it is not
+  simply a logged check-in. Recorded as unexplained rather than fitted. It is 1 point on three days
+  and nothing on screen depends on it, which is why it is a `Keep:` and not a blocker.
+- **⚠ Keep: the missing `checkin` KEY is still absent from those seven contributor blobs.** The
+  score is right and the audit no longer lies about it, but the breakdown is still short one row.
+  Back-filling it is a **production data write and the owner's to fire**, per the confirm-first
+  carve-out — and only the four exactly-reproducing rows can be reconstructed with confidence
+  (`checkin = 50`); the other three cannot, because of the residual above. **Do not write a value to
+  the three.**
+- **⚠ Keep: 40 of 65 rows carry no `model_versions.readiness` stamp** (2026-07-16 → 08-25), and the
+  stamped and unstamped ranges **overlap** (08-22 → 08-25), so the row cannot say which it is. This
+  half of the original finding is **confirmed and untouched** — verified 2026-09-18, the count is
+  exactly 40. Back-stamping is the same owner-gated production write as above.
+- **⚠ Scope any back-fill as a back-fill, not a re-derive.** Re-deriving the contributors from
+  today's summaries would inherit whatever the baselines say now, which is a different number again.
+  **Do not rewrite the contributors** — they are the newer, correct half.
+- **Pass test:** every stored `readiness_score` reproduces from its own stored contributors, and
+  every row carries a model stamp. **Currently: 62 of 65 reproduce** (58 nine-key + 4 of the seven),
+  three are 1 point out, and 25 of 65 are stamped.
+
+### [app-shell] RV-61 — any signed-in user can equip an achievement title they have not unlocked
+
+- **Lane:** A — `app/api/user/equipped-title/route.ts:26-29`. **Added:** 2026-09-18 · Review sweep 50.
+- The only gate is catalogue membership (`hasOwnProperty.call(TITLES, titleId)`); unlock state is
+  never consulted. The filter is **client-side only**
+  (`components/more/title-picker-sheet.tsx:17` takes `unlockedAchievementIds` and filters the list).
+  Live: a user at `bestStreak: 9` equipped `iron_will` (`unlockedBy: 'streak_60'`) → 200, read back
+  from Postgres as stored, and it renders on `friend-leaderboard.tsx:106`, `friend-feed.tsx:16` and
+  `app/profile/[userId]/page.tsx:34`. Control: `"iron_will_x"` → 400 with the stored value intact, so
+  the refusal tracks catalogue membership specifically.
+- **⚠ Pre-existing, not introduced in this window — and this diff *hardened* the same line**,
+  replacing a truthy `TITLES[titleId]` lookup that let `constructor`/`__proto__` through. It is filed
+  here because the sweep found it, not because it regressed.
+- **Low priority on its merits:** cosmetic, no data or permission is gained, and on a single-owner
+  deployment there may be no adversary. The reason to do it is that the server is the only place the
+  unlock rule can live, and the achievements payload the picker already reads is the input.
+
 ### [readiness][devices][platform] TN-46 — correlate vitals against dose: the app holds both halves and joins neither 🔴 LIVE
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-17 · owner: *"The idea was to be able to correlate
@@ -1037,38 +1250,6 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
 - **Keep:** the pass tests here — the −16 pt penalty gone, and the mean morning anchor above 75 over
   the trailing 30 days — can only be measured after the owner fires it. Re-measure then; do not
   strike this entry before that.
-
-### [workouts][platform] LA-117 — `allTimeStreak` on the leaderboard can only ever report 90
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-18 (Lane A, found while shipping BF-176).
-- **Lane: A** — `app/api/friends/leaderboard/route.ts:16,35,74,136`. Reached by `app/api/**`, so
-  Lane A by the rule; the leaderboard card that renders it needs no change.
-- **Same defect as BF-176, with a louder name.** `allTimeStreak` is
-  `computeStreak(days, tz, maxCompliantRestGapFor(...)).best` over a `days` list the query bounds at
-  `STREAK_WINDOW_DAYS = 90` (`gte(workoutSessions.startedAt, streakFrom)`). A field called *all-time*
-  that structurally cannot exceed 90 is wrong in the same way the home streak was, and it will read
-  as a plateau to anyone whose real best is longer — the owner's is **102**.
-- **Filed rather than fixed in BF-176's PR, deliberately.** It is one line, and the entry invited
-  batching it. It was kept out because it is a different surface nobody reported, it changes a
-  number other people see on a shared board, and BF-176's value was a one-constant fix whose
-  verification surface should stay one screen. Minimal PRs beat convenient ones.
-- **Two ways to fix it, and they are not equivalent:**
-  1. **Drop the window** so the name becomes true. `workout_sessions` is indexed on
-    `(user_id, started_at)` and this is a personal app with a handful of friends, so the scan is
-    cheap — but it is a scan over every friend's whole history on every leaderboard load, and that
-    cost was never measured. **Measure before choosing this.**
-  2. **Rename the field** to what it computes (`recentStreak`, 90-day). Honest, cheaper, and loses
-    the thing the name promised. This is the fallback if (1) measures badly.
-- **⚠ Do NOT reach for the home streak's number to "make them agree".** They are different
-  quantities: `computeStreak` counts **training days** with a `maxRestGap`, while the home loop
-  counts **calendar days spanned** (`1 + consecutiveRest`, so rest days inside the streak are
-  included). Both are defensible. Unifying them silently changes what the owner's 102 means — see
-  BF-176's own warning, which this entry inherits.
-- **Verification:** a fixture whose training history runs past 90 days, asserting the reported
-  streak exceeds 90. The BF-176 test file
-  (`packages/shared/src/workout/__tests__/streak-window.test.ts`) has the shape to copy — its
-  `at a %i-day window the count tracks the WINDOW` case is the same experiment.
-
 
 ### [nutrition] BF-175 — the log-food sheet prints the stored GOAL as today's budget, so it reads 1660 beside the card's 1506
 
@@ -4510,194 +4691,35 @@ reports fast-block compliance and interval contrast for the session, and both nu
 between a treadmill walk and an outdoor walk without any surface-specific adjustment.
 
 ### [cardio][heart-rate] TN-25 — the guided walk's fast target has never been met in 44 attempts, and the live pacer says "push" every time
-- **Lane: A** — both (1 engine, 1 surface) → A, engine half first.
-- ✅ **ENGINE HALF SHIPPED 2026-09-16** (`lane-a/tn25-walk-pattern-selector`), unversioned — it is not
-  wired to a surface yet, so nothing user-visible changed.
-  `packages/shared/src/walking/recommend-walk-pattern.ts`: `WALK_PATTERNS` (the owner-approved
-  four-row table) and `recommendWalkPattern(quota, opts)`, deterministic, mirroring
-  `recommendRunType`'s shape and its no-LLM rule.
-  - **Zone 2 alone drives it, deliberately** — a walk is the mode this owner cannot push past Zone 2
-    in (0 of 44), so grading it against higher zones would prescribe work the mode cannot deliver.
-    Zones 3+ are what `recommendRunType` is for. A test pins that a huge open Zone 4/5 gap changes
-    nothing.
-  - **It picks a PATTERN and never an HR band**, keeping the separation `recommendRunType` already
-    keeps. That is what stops an anchor change moving the walk — and it means the band below is
-    still entirely outstanding.
-- ✅ **THE BAND SHIPPED 2026-09-16** (`lane-a/tn25-walk-band`, v1.457.5) — the half that fixes the
-  reported defect. `walkFastBandBpm(hrMax)` in `hr-zones.ts` returns **[101, 118]** at this owner's
-  168 max, `walk-active.tsx` uses it instead of `hrReserveTarget(0.70, …)` = 133, and `ZoneTargets`
-  gained an optional `fastMax` so `classifyZone` can return **`'ease'`** on a fast block — the half a
-  floor could never say, and why the cue could only ever read *push*.
-  - **The band question is decided and the reasoning is in the code**: % of **max HR**, not % of
-    reserve. Same numbers today, stays per-user, and decoupled from the reserve anchor TN-30 moves.
-  - **⚠ It returns 101–118 where this entry quotes 105–118** — the standard 0.60 lower edge against
-    the entry's rounded figure, 4 bpm apart. Named in the source rather than silently reconciled;
-    `WALK_FAST_BAND_PCT_OF_MAX[0]` → 0.625 matches the quote exactly.
-  - **The slow ceiling is untouched** (0.40 of reserve): met on 78% of blocks, so nothing in the data
-    says it is wrong.
-- **⚠ Keep: WIRING THE SELECTOR.** `recommendWalkPattern` shipped in #1262 and **still has no
-  caller** — so the pattern is not actually assigned yet, which is the owner's *"I'd like that to be
-  determined for me"*. The band fixes the cue; the selector fixes the prescription, and it is inert
-  until something calls it.
-- **⚠ The band is an open DESIGN question, and the entry's instruction and good practice pull apart.**
-  This entry says *"the band, not the fraction: target **105–118 bpm** directly."* Taken literally
-  that is a hardcoded constant true of a 33-year-old with a 168 max and wrong for anyone else.
-  - **Recommendation: derive it from % of HRmax (0.60–0.70), not % of reserve.** That yields exactly
-    105–118 for this owner, is the model the session's own copy is written in (*"conversational
-    aerobic"*), stays per-user, and breaks the coupling this entry actually names — which is to
-    **reserve**, since `0.70 × reserve` is what re-anchoring at 178 would move from 133 to 140.
-  - **What the literal reading is better at:** it cannot move at all, under any anchor change. If
-    the owner wants the walk frozen against TN-30 entirely, hardcode it and say so.
-  - **Reversal cost: low** — one expression either way, no stored value.
 
-- **Branch:** _unassigned_ · **Added:** 2026-09-08 · owner: *"what makes it effective is the 2 speeds — should I be walking faster or slower during any phases?"*
-- **Lane: A** — `components/guided-walk/walk-active.tsx:67-68` sets the targets; `classifyZone` in `hr-zones.ts` renders the verdict.
-- **Review:** [`review`](reviews/2026-09-08-walk-intensity-calibration.md) (**addendum 4** carries the amendment below). Sibling of **TN-24**; fix together or in either order.
-- **✅ OWNER DECISION, 2026-09-09 — keep the fast/slow structure, VARY it, and have the app assign it.** *"No jog; but I'd like the fast/slow rates to be varying and assigned to me. I.e. one day could be 5min fast with 1min rest… It could in fact all be slow or all be fast as well — but I'd like that to be determined for me. If we need more zone 2 maybe it's more fast? If we have zone 2 done maybe it's just light interval for steps."* Gate cleared. **Options 1–4 are all superseded: the walk stays a walk, the jog moves to Run (TN-31), and the block pattern becomes prescribed.**
-- **⚠ This entry does NOT wait on TN-30, and the dependency runs the other way.** The band is stated in absolute bpm (**105–118**) precisely so it is independent of the anchor — that is what breaks the coupling. TN-30 carries the `Needs:` because unifying at 178 would raise the walk's `0.70` target to 140 if this entry had not already retired the fraction.
-
-`walk-active.tsx:67-68` sets the pacer from the app's own Karvonen helper: **fast ≥ 0.70 of reserve,
-slow ≤ 0.40**. For this owner that is **fast ≥ 133 bpm, slow ≤ 98**.
-
-| | measured |
-|---|---|
-| fast blocks | **98.5 bpm mean (40.1% reserve)**, best single **115** |
-| **fast blocks meeting the target** | **0 of 44 — 0%** |
-| slow blocks | 90.7 bpm (33.3%) |
-| slow blocks within the ceiling | 35 of 45 — **78%** |
-
-**The owner's FAST average (98.5) is the app's SLOW target (98).** The session runs one phase low
-throughout. And `classifyZone` returns `'push'` for any fast block under target, so **the live pacer
-has shown "push" on 100% of fast intervals across ten sessions** — a cue that can only ever say
-*push* is the Q-504 failure rendered live.
-
-**The target is not reachable by walking.** Closing **34.7 bpm** at the measured **0.288 bpm/spm**
-needs a cadence far outside the **76–132 spm** ever observed — **⚠ the point estimate of ≈238 spm is not quotable**, see TN-24; its 95% interval spans 176–369 and the model has no duration term. The 0.70 fraction is right for the protocol and wrong for this user's
-mode: guided interval walking is validated largely in older adults, for whom brisk walking does reach
-70% of reserve; a 33-year-old with a 168 max cannot on flat ground at a 0.739 m stride.
-
-## The decision: a prescribed, varying walk — and the engine for it already exists
-
-**⚑ SUPERSEDES EVERY OPTION BELOW.** The owner does not want a jog in this session and does not want to
-choose the pattern. They want **the block structure varied and assigned**, driven by what the week
-needs — which is a description of a function this repo already has.
-
-**`recommendRunType(quota)` (`packages/shared/src/running/recommend-run-type.ts:26`) already does
-exactly this for runs:** *"deterministically recommends whichever run type would put the most time
-toward the week's biggest OPEN zone gap… No LLM number gates this — pure math over the same
-`ZoneQuota` the Cardiovascular hub already shows."* **So this is extending an existing deterministic
-selector to walks, not inventing a prescription engine.**
-
-**The shape:** a small table of walk patterns, each with a block structure and an HR band, chosen by
-the same zone-gap arithmetic plus yesterday's load. The owner's own examples map onto it directly:
-
-| pattern | structure | when the selector picks it |
-|---|---|---|
-| Steady brisk | one continuous block | the Zone-2 gap is large and time is short |
-| Long intervals | 5 fast / 2 slow | the Zone-2 gap is large — **the 2026-09-09 structure that worked** |
-| Short intervals | 3 fast / 3 slow | moderate gap, or returning from a hard day |
-| Easy steps walk | all slow | Zone-2 quota already met; this is step volume, not stimulus |
-
-**⚠ Do NOT let an LLM choose the pattern.** `recommendRunType` is deliberately deterministic and its
-comment says why. A model picking today's workout is a self-reported number gating an automatic
-action, which the AI defaults forbid. Same rule here.
-
-**⚠ The band, not the fraction.** Target **105–118 bpm** directly; do not re-derive it as a fraction of
-reserve, or TN-30's anchor change silently moves the walk. This is the coupling TN-30's sequencing
-note names.
-
-**⛔ One session, three variables.** 2026-09-09 changed block length (3→5 min), recovery (3→2) and
-total (30→35) at once. **The pattern table is fine to ship; a claim about which pattern is best is
-not** — let the selector run and measure.
-
-**The four options as they stood before the decision, kept for the record:**
-
-**⚑ AMENDED 2026-09-09 — a FOURTH option, and it supersedes the three below.** The owner asked
-whether the session is working correctly and whether continuous brisk walking would beat it. Both
-questions have the same answer, and it is that **133 bpm is not Zone 2 for this owner under the model
-the session's own copy is written in.**
-
-| model | Zone 2 is | for this owner |
-|---|---|---|
-| **% of HRmax** — where *"conversational aerobic"* comes from | 60–70% of max | **101–118 bpm** |
-| **% of reserve** (Karvonen) — what `ZONE_DEFS` uses | 60–70% of reserve | **122–133 bpm** |
-
-**The prescription takes its words from one model and its thresholds from the other**, and for a
-resting HR of 52 they differ by **21 bpm**. Fast blocks average **98.5 bpm = 58.6% HRmax**, just under
-classic Zone 2; the best block reached **115 = 68.5% HRmax**, inside it. **17 of 44 fast blocks
-already reached 101+ bpm and `classifyZone` said "push" on every one.** That is the fourth
-contradiction in this prescription and the one that explains the other three.
-
-**Zone-2 minutes is the metric worth trending, and it is surface-independent** (no speed, no cadence).
-Across 318 minutes walked in 11 sessions:
-
-| | Z2 min/week |
-|---|---|
-| today, intervals as executed | **~13** |
-| intervals, if every fast block reached 105–115 | ~29 |
-| **30 min continuous at 105+ bpm** | **~60** |
-
-**4. ⚑ NOW THE BEST-EVIDENCED OPTION — a continuous brisk walk, 105–118 bpm.** On 2026-09-09 the
-owner ran the experiment: 35 min at 5 fast / 2 slow gave a session average of **104 bpm** against ~90
-across the previous ten, with fast blocks at **107**. The per-set contrast collapsed to **+24, +8,
-+10, +2, +9** because the slow blocks stopped recovering — by set 4 the "slow" block was at **108,
-above the historical FAST average**. **The session succeeded by becoming continuous, not by being
-better intervals.** Addendum 7. Roughly
-quadruples Z2 minutes for the same 30 minutes of the owner's time; one instruction instead of two
-speeds that cannot be separated enough for the structure to pay for itself. Contrast measures
-**7.7 bpm** (range 4.4–10.0), so the session is already a continuous walk with a wobble — and a
-genuinely hard fast half is far outside the observed cadence range (see TN-24's ⚠⚠ on why the ≈238 spm figure is not quotable). **Keep the intervals only if the owner
-will jog them.** Reversal cost is a target constant and a session label.
-
-**⛔ Continuous at the CURRENT fast pace gives ZERO Z2 minutes** — 98.5 bpm sits 3 bpm under the
-floor. The continuous option wins only at a genuinely brisker hold.
-
-**⛔ Do not read this as "Karvonen is wrong".** `hr-zones.ts` is internally consistent; the defect is
-one prescription drawing copy from one model and thresholds from another.
-
-**⚑ CORRECTED 2026-09-09, same day — option 1 is the recommendation and option 4 is the fallback.**
-The owner asked whether this contradicts the interval-walking research. It does not, and the first
-version of this amendment overstated the case for continuous walking.
-
-**The protocol (Nemoto/Masuki/Nose, Shinshu University) puts its fast phase at ~70% of peak aerobic
-capacity, and `hrReserveTarget(0.70, …)` renders that faithfully — 133 bpm is the RIGHT number.** The
-app is not misconfigured. What does not transfer is the population: those cohorts were ~60–70 years
-old, for whom brisk walking does reach 70% of peak. At 33 with a max of 168 it does not.
-
-**And the owner has already exceeded the fast-phase target on foot:**
-
-| | avg HR | % reserve | pace |
-|---|---|---|---|
-| **2026-07-24, a 9.2-min run** | **145** | **80.2%** | 6.4 min/km |
-| 2026-07-19, outdoor walk | 117 | 56.0% | 11.0 min/km |
-| treadmill fast blocks | 98.5 | 40.1% | — |
-
-Five bouts of three minutes at 133+ is inside what nine minutes at 145 already demonstrates. (The same
-table measures TN-26's surface effect: an outdoor walk at **117 bpm** against the treadmill's 89–91.)
-
-**⛔ Do not lower the 133 bpm target to match the copy — the target is right and the COPY is wrong.**
-*"A steady Zone-2 aerobic session — you should be able to hold a conversation"* describes neither the
-protocol nor its intensity. Saying what the session is — a hard interval session with easy recovery —
-also resolves TN-24's contradiction without touching a threshold.
-
-**The three original options, with 1 now recommended:**
-1. **✅ RECOMMENDED — make the fast block a jog** (incline is treadmill-only, see TN-26) — keeps the
-   70% target honest and the protocol intact, and the owner has already run 9 min at 145 bpm.
-2. **Re-anchor the fast target to what walking reaches** (~50–55% reserve = 110–116 bpm) **and rename
-   the session** so it stops claiming a stimulus it does not deliver.
-3. **Leave the target, stop rendering an always-"push" verdict** — weakest, but better than now.
-
-**⛔ Do not silently lower the target to make the cue turn green.** A target met by redefinition
-teaches nothing. Whichever option wins, the session's **name and its target must agree**.
-
-**Two metrics worth surfacing, both computable from `activity_logs.segments` today:** fast-block
-compliance (**currently 0%**) and interval contrast, fast minus slow %reserve (**currently 6.8 points
-against the protocol's 30**). **⚠ Do not ship a target for either from this review** — ten sessions
-cannot calibrate one, and compliance reads 0% because the target above is unreachable. Fix that
-first, then measure.
-
-**Pass test:** after the change, a fast block that the owner experiences as hard renders a non-`push`
-verdict; and fast-block compliance over a month is neither 0% nor 100%.
+- **Lane:** B — `lib/walk/walk-pattern-config.ts`, `components/guided-walk/walk-config.tsx`.
+  (Corrected from A on 2026-09-18 by Lane A once both engine halves had shipped; the letter records
+  who found it, not who ships it.)
+- **The engine, the band and the wiring have all shipped.** `recommendWalkPattern` +
+  `WALK_PATTERNS` landed 2026-09-16 (`lane-a/tn25-walk-pattern-selector`); `walkFastBandBpm` and
+  `classifyZone`'s `'ease'` verdict the same day (`lane-a/tn25-walk-band`, v1.457.5), which is the
+  half that fixes the reported *push*-every-time cue; the wiring landed 2026-09-18
+  (`feat/tn25-wire-walk-pattern-selector`, v1.458.0) — the selector had **no caller at all** until
+  then, so the pattern was never actually assigned.
+- **The two things the selector could not supply are answered in `walk-pattern-config.ts`**: how
+  many sets, and how to express a pattern with no alternation. Total duration is pinned at the
+  length the app already uses (30 min) **deliberately** — this entry's own `⛔ One session, three
+  variables` warning is that 2026-09-09 moved block length, recovery and total at once, so a
+  prescription that also moved duration would repeat the confound.
+- **The pre-set-vs-suggest question this entry delegated to Lane B was decided: pre-set.** The owner
+  asked to have it *"determined for me"*. The hazard the entry named is handled rather than
+  accepted — `Today` is a fixed carousel slot at index 0, so the autosave that writes `customConfig`
+  never fires for it, and the walker's saved Custom survives untouched. Pinned by
+  `e2e/tn25-walk-prescription.spec.ts`, which goes red under the naive version.
+- **Keep:** the device check, and the pass test — which needs lived data, not a sitting. ① On the
+  S25, open the guided walk and confirm the Today slide carries a pattern and its reason, that the
+  steppers match it, and that a continuous prescription (one 30-min block) runs and paces correctly
+  — the web harness cannot exercise GPS, cadence or the strap. ② This entry's pass test is
+  *"fast-block compliance over a month is neither 0% nor 100%"*; it can only be read after the band
+  and the prescription have been worn for a month. Do not strike this entry until ② is measured.
+- **Branch:** `feat/tn25-wire-walk-pattern-selector` · **Added:** 2026-09-08 · owner request
+- **Review:** [`review`](reviews/2026-09-08-walk-intensity-calibration.md) (addendum 4). Sibling of
+  **TN-24**.
 
 ### [cardio][activity][heart-rate] TN-24 — Zone 2 is unreachable on foot, so the walk's zone bar carries no information (and this is Q-523's mechanism)
 
@@ -6109,7 +6131,14 @@ unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge
 
 - **Lane:** A — `app/api/collection/route.ts`, plus a migration.
 - **Added:** 2026-09-07, Lane A — the half of LB-60's `pausedDays` that did not ship with the route.
-- **The old `Gate: owner` is removed** — the decision above is the one it was waiting for.
+- **Gate: owner** — and it is a DIFFERENT question from the one already answered. The old gate was
+  removed on 2026-09-14 because the owner had settled the RULE (a deload must not cost cats), and
+  that was right. What it did not settle is the ⚠ above: whether a deload span becomes **first-class
+  stored state**, which is what a dated `program_phases` interval means and what the migration would
+  commit to. Re-gated 2026-09-18 by Lane A, which reached this entry as next-up and could not start
+  it: with no gate the queue tool called it READY, while the first instruction inside it is *"put
+  that to the owner before writing the migration"*. An entry whose own text blocks it has to say so
+  in the field the tool reads.
 
 **The early-deload half SHIPPED 2026-09-07**: `pausedDays` now carries `earlyDeloadWeekDays(program)`
 beside the chosen rest days, so a confirmed early deload decays nothing. That span is the only DATED
@@ -6755,6 +6784,25 @@ stronger reason the measured one wins.
   its longest single session.**
 
 ### [app-shell][platform] BF-110 — the blank resume survives a scroll, which means the renderer never died
+
+- **✅ THE READING IS IN, and it says NATIVE — measured 2026-09-18 (Review sweep 50). This entry is
+  no longer waiting on data.** `error_events WHERE message LIKE 'bf110 resume recheck%'`:
+
+  | verdict | rows | dates |
+  |---|---|---|
+  | `stuck h1=667 h2=667 w2=384 children2=1` | **3** | 2026-09-15 → 09-16 |
+  | `stuck h1=826 h2=826` (healthy) | 12 | same span |
+  | `resized` | **0** | — |
+  | `dom-lost` | **0** | — |
+
+  By this entry's own criterion above — *"`stuck` → the viewport is genuinely held at 384×667 and the
+  fix is native"* — **the fix is in the native layer.** Separately, 22 first-readings at
+  `h=667 children≤2` put the blank resume itself at roughly twice a day.
+- **⚠ Two things about the telemetry to fix while you are in here, or the next reader is misled the
+  same way.** (1) The verdict word `stuck` fires on **healthy** resumes too — 12 of the 15 rows are
+  826→826, which is a viewport that was never wrong. `stuck` means "did not change", not "is broken".
+  (2) `w=384` appears on **every** row including the healthy ones, so this entry's "384×667"
+  signature is half right: **only the height discriminates.** Read `h1`, not the pair.
 
 - **Keep:** the READING, and only that. The second viewport log **shipped 2026-09-14**
   (`feat/bf110-second-viewport-log`), so nothing here is owed a build. What is owed is one blank
@@ -11654,11 +11702,20 @@ the day's move-hours total is below the goal.
   same number (the owner's own figures: min 50, resting 60). Not touched here because it changes what
   a card computes from rather than what it is called, and the entry's scope is the name. **Someone
   should establish whether `hrMin` is a deliberate proxy or an oversight before it is "fixed".**
+- **✅ ② IS ANSWERED, 2026-09-18 — and the answer INVERTS the suspicion.** This entry asked whether
+  `hrMin` reaching `HrFactorsCard`'s `restingHr` prop was a deliberate proxy or an oversight. It is
+  neither: the card prints **`Lowest recorded today: {restingHr} bpm`**, and `hrMin` is exactly
+  today's lowest. The value, the sentence and the data always agreed — **only the prop NAME lied.**
+  **⛔ So the obvious fix was the dangerous one:** passing a real resting HR would have left the card
+  printing a true number under a false sentence, a worse bug and an invisible one, because the name
+  would finally match while the output stopped being true. Renamed to `lowestHrToday` in
+  `fix/or116-lowest-hr-prop-name`, one caller, no rendered output changed, with the finding written
+  into the prop's own doc comment so the trap cannot be re-entered from the name alone.
 - **Keep:** ① the third-surface question the entry was filed on, which is **not** answered by
   labelling: Health's Resting HR tile shows the value bare, Home's shows it with a delta against
   baseline, and the detail screen shows neither. Three surfaces, one number, three amounts of
   context — **decide what each surface is for**. Labelling stopped the numbers reading as broken; it
-  did not decide that. ② the `hrMin`-as-resting question above. ③ the device check.
+  did not decide that. ③ the device check.
 - **TN-13 was the other half of the same owner report and is CLOSED** (2026-09-15, owner chose the
   bare number over restoring the delta cue — see the journal entry, not the queue; it has been
   removed). It was about a cue that does not render; this is about what the number is called. Its
@@ -12343,13 +12400,32 @@ record explicitly why not.
 - **✅ THE PAST-DAY READ IS NOT BLOCKED — corrected 2026-09-16.** This said it was blocked on
   `LB-102`, then on `LB-110`; **both were chasing work that had already shipped.**
   `app/api/body-battery/stress-day/route.ts` serves the stored buckets for any day and
-  `stress-day-chart.tsx` fetches it with `?date=`, rendered from `day-detail-content.tsx:260` with
-  `date={selectedDate}`. LB-110 is removed; do not re-file it. The pass test — *"the owner
-  opens a past day, reads a stressed window off the axis"* — cannot be met yet: `/api/body-battery`
-  is `export async function GET()` with **no parameters**, so only today is reachable. The buckets are
-  persisted (TN-3a, `oura_daytime_stress_buckets`, from 2026-08-24), and the chart takes a plain
-  `buckets` array, so the surface work is done — what is missing is the read. Also still owed:
-  overlaying stress on the HR charts, and the **stress-by-hour aggregate across days**.
+  `stress-day-chart.tsx` fetches it with `?date=`, rendered from `day-detail-content.tsx:259` with
+  `date={selectedDate}`. LB-110 is removed; do not re-file it. The buckets are persisted (TN-3a,
+  `oura_daytime_stress_buckets`, from 2026-08-24).
+- **✅ AND THE PASS TEST IS MET — corrected 2026-09-18 (Lane B), this entry said it was not.** It read
+  *"cannot be met yet: `/api/body-battery` is `export async function GET()` with no parameters, so
+  only today is reachable."* **That route is not in this chart's path.** `stress-day-chart.tsx:76`
+  fetches `/api/body-battery/stress-day?date=${day}` and nothing else — its own header says so
+  outright: *"every day comes from `/api/body-battery/stress-day`, one baseline."*
+  **And it is already spec-covered, not merely reachable:** `e2e/stress-by-hour.spec.ts` carries
+  *"a past day carries the same chart, which is what makes the comparison possible"*, driving
+  `/health/day?date=2026-09-08`. Re-run on `fdcee2d4e1`: **6 of 6 passed.** So *"open a past day,
+  read a stressed window off the axis"* is done and proven.
+- **⚠ WHAT IS LEFT IN THIS ENTRY IS PRE-RESHAPE PROSE, and it is the Orchestrator's call, not this
+  lane's.** The heading and the old body still promise *"overlaying stress on the HR charts"* and a
+  *"stress-by-hour aggregate across days"*. **Neither is in the plan the owner approved.** The
+  2026-09-10 conversation reshaped this entry — the entry says so itself: *"the chart is the first
+  half, not the deliverable. See TN-35 for the second"* — and the review's ordered plan (§9) lists
+  TN-3b as *"the chart — local-time axis, gaps as gaps, night shaded"*, with step 3 being **TN-35a,
+  overlay the series on the DAY TIMELINE**, not on the HR charts. The HR-chart overlay was checked
+  and is genuinely absent (`hr-day-chart.tsx` draws sleep and workout bands and no stress), so this
+  is a scope question rather than a missed build.
+- **⇒ TN-35 is what this parks.** Its `Needs: TN-3b` clears when this entry leaves the queue, and its
+  overlay half is Lane B and buildable today: `app/api/day-timeline/route.ts` already emits typed,
+  timestamped events and `components/health/day-detail/**` renders them, so the join needs no new
+  route. Its marker half is Lane A (a migration). **Clearing a completed entry is the Orchestrator's
+  sweep, which is why this is filed rather than struck.**
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner request
@@ -15648,32 +15724,24 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   is the second time an inline gate inside a Keep has done it (the first was BF-46).
 
 
-### [workouts][platform] LB-111 — expose per-muscle sets over a window, so a movement-balance card can be built
-
-- **Lane:** A — `app/api/**`. The engine half of **OR-118**, which is parked on it. Filed by Lane B
-  on 2026-09-16 after checking: the number OR-118 renders cannot be fetched by any client today.
-- **What is missing is an exposure, not a derivation.**
-  `getWeeklySetsByMuscleGroup(userId, programId, weekStart, weekEnd, tz)` already takes **arbitrary**
-  start and end dates in spite of its name (`lib/data/postgres/slices/periodization.ts:518`, and on
-  the repository interface). Every route that calls it throws that away and computes the current week
-  server-side: `weekly-muscle-sets` (`GET()`, no params), `ai-periodization/weekly-volume`
-  (`startOfWeekInTz(tz)` + 6), and nothing else reaches it.
-- **The ask:** a windowed read — a `from`/`to` (or `days`) param on `weekly-muscle-sets`, or its own
-  route. Lane A's call which; the shape OR-118 needs is `{ muscle, sets }[]` for a span, with the
-  same main/secondary 1.0/0.5 weighting the three existing surfaces already agree on.
-- **⚠ Decide `programId` explicitly — it is the reason this is not a one-liner.** The method scopes
-  to a single program and a 60-day window can span a programme change, so sets logged under a
-  previous programme either count or vanish. **Recommendation: count them**, because the card's claim
-  is about the lifter's training balance, not about one programme's adherence — but it is a real
-  choice and the answer belongs in the route's own comment, not in the card.
-- **Date params:** `normalizeDateParam` at the handler and a `[-/]` regex in the Zod schema, per
-  CLAUDE.md — the client's `localDateString()` emits slashes.
-- **Verification:** a non-null row count for a span that crosses a programme change, which is the
-  case the `programId` decision turns on.
-
 ### [workouts] OR-118 — the push:pull balance card, split out of Q-305 (engine half missing; see below)
 
-- **Needs:** LB-111
+- **✅ THE ENGINE HALF SHIPPED 2026-09-18** (`lane-a/lb111-muscle-sets-window`), unversioned — nothing
+  calls it yet, so nothing user-visible changed. **`GET /api/muscle-sets?from=&to=`** returns
+  `{ from, to, muscles: [{ muscle, sets }] }`, canonical muscle keys, secondary muscles at 0.5,
+  sorted by sets. Both params optional — the default is the trailing **90 days** ending today in the
+  user's timezone — both accept slashes or dashes, `to` is **inclusive**, and the cap is 400 days.
+  A date-shaped non-day (`2026-02-31`) answers **400**, not a driver 500.
+  - **The `programId` question below is ANSWERED: it counts across programme changes**, per this
+    entry's own recommendation and LB-111's. Pinned by a test that runs the same fixture through both
+    reads — `getWeeklySetsByMuscleGroup` returns **3**, the new one returns **7** — so the reason for
+    a separate method is measured rather than argued.
+  - **⚠ LB-111's premise was wrong in one place, and it is the place that decides the shape.** It
+    said `weekly-muscle-sets` *calls* `getWeeklySetsByMuscleGroup` and throws its date arguments
+    away. It does not call it at all: it carries its own inline SQL, and so does
+    `muscle-tonnage-trend`, so there were **three** copies of the muscle-attribution query
+    disagreeing on the date column and on programme scoping. That is why this is a new method rather
+    than a `from`/`to` on `weekly-muscle-sets` — see **LA-118** for the duplication itself.
 - **⛔ THE "EVERY NUMBER ALREADY EXISTS" PREMISE IS FALSE, checked 2026-09-16 before building.** The
   *grouping* exists — `movementPattern()` shipped as LB-103 and has **no callers yet**, so this card
   would be its first. The *numbers* do not: *"legs 481 · push 433 · pull 333 · other 168 over 60
@@ -15689,12 +15757,14 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   `getWeeklySetsByMuscleGroup(userId, programId, weekStart, weekEnd, tz)` takes **arbitrary** start
   and end dates despite its name (`lib/data/postgres/slices/periodization.ts:518`, on the repository
   interface). What is missing is the **exposure**, and a route under `app/api/**` is Lane A's by the
-  path rule — *both halves → Lane A, engine half first*. Filed as **LB-111**.
-- **⚠ Its `programId` argument is the one real design question**, and it is the engine half's to
-  answer: the method scopes to one program, and a 60-day window can span a programme change. Whether
-  the card counts sets across programmes or only the active one changes the number on screen.
+  path rule — *both halves → Lane A, engine half first*. Filed as **LB-111**, and **shipped
+  2026-09-18** — but not by widening that method, for the reason recorded at the top of this entry.
+- **⚠ Its `programId` argument was the one real design question and is now ANSWERED** (see the top of
+  this entry): the card counts sets across programmes. `getWeeklySetsByMuscleGroup` scopes to one and
+  stays that way for its own two callers, which grade a week against *that* programme's targets.
 - **Lane:** B — `components/health/` (the Training surface), reading shared helpers only. No storage
-  and no derivation change **in this half**; the window it reads has to come from LB-111 first.
+  and no derivation change **in this half**. The window it reads shipped on 2026-09-18, so this is
+  now startable: fetch `/api/muscle-sets?from=…&to=…` and group the rows with `movementPattern`.
 - **Added:** 2026-09-16, Orchestrator — split from **Q-305**, whose `Keep:` had been describing this
   as *"Lane B's and now unblocked"* since 2026-09-13 while parking it. See Q-305 for why that
   happened; the lesson is the entry's, the work is this one's.
@@ -15715,6 +15785,53 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   was written and corrected in the same sitting:** that field means SHIPPED, so it files unbuilt work
   under *"shipped; a look is owed, nothing is blocked"*, which is the OR-105 trap. Unbuilt work gets
   this line; the field goes on when the code lands.
+
+### [workouts][platform] LA-118 — the muscle-attribution query exists FOUR times and the copies disagree
+
+- **Branch:** `lane-a/la118-muscle-attribution-extract` · **Added:** 2026-09-18 (Lane A, found while
+  shipping LB-111).
+- **Lane: A** — `app/api/weekly-muscle-sets/route.ts`, `app/api/muscle-tonnage-trend/route.ts`,
+  `lib/data/postgres/slices/periodization.ts`. Reached by `app/api/**` and storage, so Lane A.
+- **✅ THE SET-COUNTING THREE ARE ONE, SHIPPED 2026-09-18**, unversioned — the numbers are unchanged
+  except for the future-dated-log fix below, so nothing user-visible moved.
+  `weightedSetsByMuscle(db, { userId, from, toExclusive, dateColumn, programId? })` is private to
+  `periodization.ts`; `getWeeklySetsByMuscleGroup`, `getSetsByMuscleInWindow` and the
+  `weekly-muscle-sets` route are now callers rather than copies.
+  - **Both disagreements are PARAMETERS now**, which is the point — a caller has to state its date
+    column and its programme scope rather than inherit whichever one it copied.
+  - **`getWeeklySetsByMuscleGroup` keeps `ws.started_at`**, per this entry's recommendation. Its
+    unit is a programme session and its two callers grade a week against that programme's targets.
+  - **`weekly-muscle-sets` gained the upper bound it never had.** That is the one behaviour change
+    in the diff, and it is the defect this entry named.
+  - **The date column had NO test pinning it, in either direction**, because every fixture in the
+    repo set `started_at` and `logged_at` to the same instant. There is one now: a session started
+    22:00 yesterday with its sets logged 00:30 today, where the two reads deliberately disagree.
+- **⚠ Keep: `muscle-tonnage-trend` is still its own copy**, exactly as this entry instructed for the
+  first pass. It sums `weight_kg * reps` and buckets by week, so it shares the attribution half and
+  nothing else, and folding it in means `weightedSetsByMuscle` returns rows for the caller to
+  aggregate instead of a finished total. That is a real change to the shared function's shape, so it
+  wants its own diff and its own gate. Until it lands, the count in this entry's heading is **two
+  implementations, not one** — the shared query and the tonnage copy.
+  - When it is done: the tonnage route also buckets by a local-date string rather than by an
+    instant, so the fold has to preserve that or its week boundaries move.
+- **The original finding, kept because it is the argument for not adding a fifth copy.** The same
+  "weighted sets per muscle, library rows by role and non-library rows by tag" SQL was written out
+  four times, and the four did not agree. **The heading said THREE when this was filed on 2026-09-18
+  and that was my own miscount** — three existed before LB-111 and the fourth was the one I had just
+  written, which is the easiest copy in the table to overlook and the reason the entry exists:
+
+  | | date column | upper bound | programme scope |
+  |---|---|---|---|
+  | `getWeeklySetsByMuscleGroup` | `ws.started_at` | yes, user-local | **one `programId`** |
+  | `weekly-muscle-sets` (inline) | `el.logged_at` | **none** | none |
+  | `muscle-tonnage-trend` (inline) | `el.logged_at`, local-date string | yes | none |
+  | `getSetsByMuscleInWindow` (LB-111, new) | `el.logged_at` | yes, user-local | none |
+
+- **The divergence was invisible from any one file**, which is how it lasted: each copy carried a
+  comment saying it used the *"same main/secondary role weighting as"* one of the others, and that
+  much was true — the 1.0/0.5 was identical everywhere. What differed was which timestamp a set is
+  attributed to and whether a previous programme counts, and no comment mentioned either.
+
 
 ### [workouts] Q-300 — 37% of sets are taken with materially less rest than prescribed, and the RPE model has no rest term
 
@@ -19536,6 +19653,16 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   Nothing else in the entry is disturbed by this; the plan and the "archiving the fixed ones only
   removes 17%" caveat still stand.
 - **Lane:** A
+- **Gate: owner** — added 2026-09-18, because the ⚠ at the bottom of this entry did not hold. It was
+  written on 2026-09-15 *"so the next implementer does not re-derive the reasoning and defer it
+  again silently"*, and three days later Lane A reached this entry again, re-derived it and would
+  have deferred it again: with no field to read, `next-item.js` kept printing it at the top of
+  READY. What blocks Lever 2 is not effort — it is **a quiet window and a structural decision**, and
+  both are the owner's: the quiet window because only he decides whether five agents are appending
+  to `projectOverview.md` while 207 entries move out of it, and the decision because where the open
+  Known Issues live changes what **every** session reads at orientation, with the multi-tag
+  visibility risk this entry already names. **What lifts it:** the owner saying the move should
+  happen, and when — after which it is the Orchestrator's sweep, not an implementer's.
 - **Branch:** none yet · **Added:** 2026-08-10, raised by the owner during the public-repo migration.
 - **Plan:** [`2026-08-10-orientation-cost.md`](superpowers/plans/2026-08-10-orientation-cost.md)
 - **The measurement:** `CLAUDE.md` is 918 lines (~27k tokens) and loads automatically; its first
@@ -23527,6 +23654,28 @@ intake traced it, it did not design it.
 **Done looks like:** a week-in-review page reachable from the notification and from a permanent
 Health entry point, drawing its charts from values the route returned rather than from parsed prose,
 with the recap week visibly compared against the one before it.
+
+### [nutrition] LA-119 — a mixed-unit supplement day renders as "no amount", which reads as "no number was logged"
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-18 · found by Lane A while shipping RV-59.
+- **Lane: B** — `components/nutrition/` only; the shared derivation already carries the flag.
+- **Reference:** [`2026-09-18-lane-a-rv58-60-shared-module-drift.md`](overview/entries/2026-09-18-lane-a-rv58-60-shared-module-drift.md).
+
+RV-59 made `summariseSupplementDay` refuse to total a day whose contributions name **different**
+units, because `unit` is free text (`ml`, "1 scoop") and there is no conversion. Such a day now
+returns `amount: null, unit: null, mixedUnits: true`.
+
+`supplementSubtitle` reads `loggedAmount` and branches on `amount == null`, so it renders that day
+identically to *"a tick with no number"* — which is the one thing it is not. The flag exists to tell
+those two apart and nothing reads it yet.
+
+**Not urgent, and deliberately not fixed in RV-59's PR:** the file is Lane B's, and there is no such
+day in production — `claude_ro.supplement_logs` holds 5 rows, all one unit, no day with more than one
+contribution (*the owner's rows only*). The render is honest today, just uninformative.
+
+**Done looks like:** a day with `mixedUnits: true` says so — "logged in mixed units" or the per-entry
+amounts — rather than showing the same subtitle as an amountless tick.
+
 
 ### [workouts][devices] 🔵 PS-7 — camera form capture, Phase 0 only: can the S25 WebView run a pose landmarker at all?
 

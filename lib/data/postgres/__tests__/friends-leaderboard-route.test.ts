@@ -221,6 +221,57 @@ describe.skipIf(!canRun)('friends leaderboard — who appears and what they are 
     expect(rotation).toBe(1)   // …and break into two
   })
 
+  /**
+   * LA-117 — a field called `allTimeStreak` could only ever report 90.
+   *
+   * The streak query was bounded at 90 days, so past that edge the number stopped describing the
+   * lifter and started describing the window — the same defect BF-176 fixed on the home streak,
+   * under a louder name. The fixture trains 121 consecutive days, which is longer than the old
+   * bound by a margin no weekday alignment can close: against the unfixed route both assertions
+   * below read the window (≈91 days, ≈14 weeks) rather than the history.
+   *
+   * `weeklyStreak` is asserted too because it reads the SAME clipped day list — the sibling surface
+   * the entry did not name, found by reading the route rather than the entry.
+   */
+  it('reports a streak longer than the old 90-day bound', async () => {
+    const DAYS = 121
+    for (let i = 0; i < DAYS; i++) await trained(ME, shiftDateStr(today(), -i))
+
+    const me = (await entryFor(ME))!
+
+    // Every day trained, so the streak is the whole span. 91 is what the old window could return.
+    expect(me.allTimeStreak).toBe(DAYS)
+
+    // 121 consecutive days cover at least 17 whole weeks; the old window covered at most 14.
+    // A floor rather than an equality, because the exact count depends on which weekday today is.
+    expect(me.weeklyStreak as number).toBeGreaterThanOrEqual(17)
+  })
+
+  /**
+   * The control, and it is meant to be equivalent: a history that fits entirely inside the old
+   * 90-day bound must report exactly what it always did. Removing a filter is only safe if it
+   * changes nothing for the rows the filter never excluded — without this case, a mutation that
+   * broke short histories would still pass the case above.
+   */
+  it('reports the same streak as before for a history inside the old bound', async () => {
+    for (let i = 0; i < 30; i++) await trained(ME, shiftDateStr(today(), -i))
+
+    expect((await entryFor(ME))!.allTimeStreak).toBe(30)
+  })
+
+  /**
+   * And the part dropping the bound must NOT do: a gap older than 90 days still breaks the streak.
+   * The unbounded read makes more history visible; it does not make history contiguous. Two blocks
+   * of 10 days sit 200 days apart, and the answer is 10 rather than 20 — a fix that returned the
+   * total count of trained days would pass both cases above and fail here.
+   */
+  it('does not join two blocks of training across an old gap', async () => {
+    for (let i = 0; i < 10; i++) await trained(ME, shiftDateStr(today(), -i))
+    for (let i = 0; i < 10; i++) await trained(ME, shiftDateStr(today(), -(200 + i)))
+
+    expect((await entryFor(ME))!.allTimeStreak).toBe(10)
+  })
+
   it('answers no-store', async () => {
     const res = await GET(new Request('http://localhost/api/friends/leaderboard'))
     expect(res.headers.get('Cache-Control')).toBe('private, no-store')

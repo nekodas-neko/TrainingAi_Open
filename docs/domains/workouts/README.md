@@ -47,6 +47,7 @@ Mode flow and the orchestrator pattern are documented in [`CLAUDE.md`](../../../
   feasibility spike is queued.
 - [`docs/reviews/2026-09-14-what-triggers-a-deload.md`](../../reviews/2026-09-14-what-triggers-a-deload.md) — **every deload trigger measured, 2026-09-14** (TN-36, sibling of TN-34). **Nine conditions can recommend a deload and exactly one can decline it** — past three training days every branch returns `recommended: true` and readiness only picks the strength, so a readiness of 100 still recommends one. **28 of 45 cleared days were cleared by the streak counter; none on merit.** And the step change has a date: deload went **19% in August to 79% in September** because `7c428a7f` fixed TN-22's storage defect and the stress override, which had never reached its 120 threshold, began firing — **0 times then 9 times**, on the number TN-33 measured as carrying no signal.
 - [`docs/reviews/2026-09-03-progression-exact-adherence-ratchet.md`](../../reviews/2026-09-03-progression-exact-adherence-ratchet.md) — **exact adherence is not 1RM-neutral, 2026-09-03** (sweep 46, RV-43/RV-44). `1rm.ts` claims — and the 2026-07-10 workout review repeated — that `prescriptionFactor` makes *"exact adherence 1RM-neutral"*. It is, for the exact prescribed weight; the plate **ceiling** round between formula and barbell breaks it, and `prescriptionFactor` amplifies that round-up by **1/pct** (1.43× at 70%). Measured over 1,201 starting 1RMs: **p50 +2.60%, p90 +7.12%, max +13.55%** on a barbell, settling in 3 sessions, and permanent because `upsertPersonalRecordIfBetter` is monotone. **It converges rather than running away**, which caps the severity; the fix is a scoring decision and is `Gate: owner`. Also clean: Home's `scoreBand` is a single source with no re-derived thresholds, and **AI-10 from the 2026-07-10 review is fixed** — `mround125Up` now has zero call sites, superseded by the equipment-aware `mroundStepUp`.
+- [`docs/reviews/2026-09-18-sweep-50-twelve-days.md`](../../reviews/2026-09-18-sweep-50-twelve-days.md) — **twelve days, 50 commits, 671 files, swept for safety/logic/performance/efficiency, 2026-09-18** (RV-51…RV-63). **The one live user-affecting defect is RV-51:** `equipmentEligible`'s exclude-on-empty rule rests on *"an empty list should not occur"*, and production holds **2 of 156** catalogue rows with `equipment = []` — `Dumbbell Lunges` and `Cable Lat Pulldown` — which `.some()` makes invisible to every equipment selection including `full_gym`. Everything else in the sweep is one shape: **a rule written down correctly and then half-applied** — a constant called a contract that one of its two files imports (RV-57), a case-insensitive comparison that lowercases one side (RV-58), three cache keys in zero invalidation groups beside siblings in three and four (RV-52/53/54), three date params that validate separator but not calendar (RV-56). Records **BF-110's reading as in and decisive — native-layer** — and corrects two stale session-start numbers in `CLAUDE.md` (`error_events`' 52 MB is TOAST bloat behind 115 rows, not retained payload; growth is 1.71 MB/day, not ~0.4, and bounded). Clean: zero N+1s in the added data layer, every new query pattern indexed, no new dependency, all four cache/render gate scripts exit 0.
 - [`docs/reviews/2026-09-10-q52-phase-hold-remeasure.md`](../../reviews/2026-09-10-q52-phase-hold-remeasure.md) — **Q-52's precondition cleared, and clearing it broke the measurement, 2026-09-10.** The entry asked for a re-measure *"once at least two sessions have cycled"*; eight transitions since 2026-08-03 satisfy that, but the active program (**Bankai**) was created 2026-09-06 and all eight belong to its predecessor, so every last-vs-previous 1RM pair straddles the rebuild. Reads 6 up · 10 down with five declining compounds — three mid-`baseline` re-anchoring, two just out of realisation. **A programmed drawdown and a stall are indistinguishable in that recipe once blocks actually cycle**, so the precondition and the recipe were mutually exclusive all along; the 2026-08-03 "one exercise would benefit" claim is now unsupported rather than refuted. Not answerable before mid-October, and deliberately **not** gated (`Gate:` resolves to a person or the S25; what is owed is elapsed training time). §5 records a checked-and-not-filed finding: ten `estimated_1rm = 0` logs with `exercise_deloaded = false` are **pre-Q-298 residue**, and both read paths already require the two markers together.
 - [`docs/reviews/2026-09-06-deload-confirm-eviction-gap.md`](../../reviews/2026-09-06-deload-confirm-eviction-gap.md) — **the owner's stale-screen report traced to cause, 2026-09-06** (RV-49 — the Home deload confirm calls `invalidatePrescriptionChanged()` id-less, which the group's own conditional turns into a no-op for every `workout-card:<id>`, and `next-session` is not in the group; RV-50 — three raw seed-only `readCacheSync('workout-card:<id>')` reads that can never revalidate). The nutrition add surface swept in the same pass is **clean at source** — all nine writers close the `onLogged` loop.
 - [`docs/reviews/2026-09-05-app-checkpoint.md`](../../reviews/2026-09-05-app-checkpoint.md) — **the whole-app checkpoint, 2026-09-05/06** (twenty-six lanes collated; PS-24…PS-39. For this pillar: see the report's pattern sections and per-lane table). **PS-26 fixed 2026-09-06** (v1.436.18) — `listRecent1rm` skips deloads on both ranks, so the strength card stops publishing a deload sentinel as a current 1RM.
@@ -351,6 +352,14 @@ Live at the time of writing (2026-07-30):
 
 ## Gotchas specific to this domain
 
+- **Every exercise PICKER filters `mergedInto` itself (RV-51).** `listExerciseLibrary` is
+  deliberately unfiltered — the catalogue is global and other consumers resolve metadata for rows
+  another user still has logged — so a picker that forgets offers duplicates. `generate-program`,
+  `builder-chat` and `builder-review.tsx` all filter it now. **Do not rely on an empty equipment list
+  to hide a merged row**: that was excluding only two of production's four merged rows, and the other
+  two were being offered beside the canonical rows they were merged into. A merged row with equipment
+  is the shape a test fixture needs; an unlabelled one passes against a broken filter.
+  ([`2026-09-18-lane-a-rv51-merged-duplicate-exclusion.md`](../../overview/entries/2026-09-18-lane-a-rv51-merged-duplicate-exclusion.md))
 - **A missing day in `trainedDays` reads as a REST day, not as missing data (BF-176).** The streak
   loop walks back 365 days; if the supplier sends fewer, every day past its window looks like rest
   and three of them break the streak. The failure is not an under-count by the difference — **the
@@ -362,6 +371,27 @@ Live at the time of writing (2026-07-30):
   **calendar days spanned** (`1 + consecutiveRest`). Do not unify them to make them agree — it
   silently changes what the number means.
   ([`2026-09-18-lane-a-bf176-streak-window.md`](../../overview/entries/2026-09-18-lane-a-bf176-streak-window.md))
+- **The leaderboard's streaks are deliberately UNBOUNDED, and must stay that way (LA-117).**
+  `app/api/friends/leaderboard/route.ts` reads every trained day with no day filter, because
+  `allTimeStreak` promises all-time and any window caps it — 365 would cap it just as the old 90
+  did. `weeklyStreak` on the same route reads the same day list, so a bound there silently caps two
+  fields, not one. Chosen over renaming the field only after measuring the scan (`workout_sessions`:
+  133 rows / 96 kB whole-database, indexed on `(user_id, started_at)`). If the app ever grows a real
+  user base, bound it on **rows** and rename the field rather than reinstating a day window under a
+  name that promises all-time.
+  ([`2026-09-18-lane-a-la117-leaderboard-all-time-streak.md`](../../overview/entries/2026-09-18-lane-a-la117-leaderboard-all-time-streak.md))
+- **One query counts sets per muscle — go through it (LA-118).** `weightedSetsByMuscle` in
+  `lib/data/postgres/slices/periodization.ts` takes `{ from, toExclusive, dateColumn, programId? }`,
+  and those last two are parameters because they are what four separate copies used to disagree
+  about while every one of their comments claimed they matched. **State both at the call site:**
+  `started_at` only when the unit being measured is a programme session (that is
+  `getWeeklySetsByMuscleGroup`, whose callers grade a week against that programme's targets),
+  `logged_at` for anything per-day; and a `programId` only when a previous programme's sets should
+  vanish. For a windowed per-muscle set count from a client, the route already exists:
+  `GET /api/muscle-sets?from=&to=`. **`muscle-tonnage-trend` is still a separate copy** — it sums
+  tonnage and buckets by a local-date string, so it shares the attribution half and nothing else;
+  LA-118 is queued for it.
+  ([`2026-09-18-lane-a-lb111-muscle-sets-window.md`](../../overview/entries/2026-09-18-lane-a-lb111-muscle-sets-window.md))
 - **Muscle names are matched through `muscles.ts`, never compared raw (BF-171).** `normalizeMuscle`
   folds synonyms (`core` → `abs`, `quadriceps` → `quads`) and `moodMuscleMatches` expands a broad
   check-in pill to the catalogue muscles it covers — **`Back` is a pill and is not a muscle**; the

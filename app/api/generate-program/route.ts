@@ -133,6 +133,14 @@ export async function POST(req: Request) {
   const focusSet = new Set(inputs.musclesToFocus.map(m => m.toLowerCase()))
 
   const eligibleExercises = allExercises.filter(ex => {
+    // RV-51 — a merged duplicate is not a separate exercise. `listExerciseLibrary` is deliberately
+    // unfiltered (the catalogue is global, and other consumers resolve metadata for rows another
+    // user still has logged), so every PICKER filters `mergedInto` itself — `builder-review.tsx`
+    // already did and this route did not. It was excluded here only by accident: the two merged
+    // rows a review noticed carry `equipment = []`, which `equipmentEligible` rejects. The two that
+    // carry equipment — `Cable Crunch` and `Straight Arm Pulldown` — were being offered beside the
+    // canonical rows they were merged into.
+    if (ex.mergedInto) return false
     const hasEquipment = equipmentEligible(ex.equipment, equipmentSet)
     const muscleNames = ex.muscles.map(m => m.muscle.toLowerCase())
     const relevant = muscleNames.some(m => focusSet.has(m)) || focusSet.has('full body')

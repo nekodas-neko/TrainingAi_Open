@@ -828,7 +828,8 @@ export interface WorkoutRepository {
 
   // ── Mood ──────────────────────────────────────────────────────────────────
   getMoodLog(userId: string, date: string): Promise<import('@trainingai/shared/types/mood').MoodLog | null>
-  saveMoodLog(userId: string, log: Omit<import('@trainingai/shared/types/mood').MoodLog, 'id' | 'userId' | 'createdAt'>): Promise<import('@trainingai/shared/types/mood').MoodLog>
+  /** `timezone` anchors the soreness-provenance window at local midnight (RV-62); callers pass the session tz. */
+  saveMoodLog(userId: string, log: Omit<import('@trainingai/shared/types/mood').MoodLog, 'id' | 'userId' | 'createdAt'>, timezone?: string): Promise<import('@trainingai/shared/types/mood').MoodLog>
 
   // ── Day check-in (End of Day review) ────────────────────────────────────────
   getDayCheckin(userId: string, logDate: string, phase: string): Promise<import('@trainingai/shared/types/day-checkin').DayCheckin | null>
@@ -860,6 +861,11 @@ export interface WorkoutRepository {
   setRestDay(userId: string, date: string, resting: boolean): Promise<void>
   /** Whether this user chose to rest on this date. */
   isRestDayChosen(userId: string, date: string): Promise<boolean>
+  /** RV-63 — dates with a recorded step count, for the collection replay. Dates only: the full-width
+   *  read was 36 columns for one field, over all history, on every home paint. */
+  listStepDayKeys(userId: string, from: string, to: string): Promise<string[]>
+  /** RV-63 — dates with a recorded sleep duration. See `listStepDayKeys`. */
+  listSleepDayKeys(userId: string, from: string, to: string): Promise<string[]>
   /** The chosen rest days in `[from, to]`, ascending — dates only, `YYYY-MM-DD`. */
   listRestDays(userId: string, from: string, to: string): Promise<string[]>
 
@@ -1135,7 +1141,7 @@ export interface WorkoutRepository {
   listSupplementVials(userId: string, supplementId: string): Promise<import('@trainingai/shared/types/supplement').SupplementVial[]>
   /** The sticky default the log screen offers — the newest un-deleted vial, or null. */
   currentSupplementVial(userId: string, supplementId: string): Promise<import('@trainingai/shared/types/supplement').SupplementVial | null>
-  createSupplementVial(userId: string, data: Omit<import('@trainingai/shared/types/supplement').SupplementVial, 'id' | 'userId' | 'createdAt'> & { id?: string }): Promise<import('@trainingai/shared/types/supplement').SupplementVial>
+  createSupplementVial(userId: string, data: Omit<import('@trainingai/shared/types/supplement').SupplementVial, 'id' | 'userId' | 'createdAt'>): Promise<import('@trainingai/shared/types/supplement').SupplementVial>
   updateSupplementVial(id: string, userId: string, patch: Partial<Omit<import('@trainingai/shared/types/supplement').SupplementVial, 'id' | 'userId' | 'supplementId' | 'createdAt'>>): Promise<import('@trainingai/shared/types/supplement').SupplementVial>
   /** True when a vial was removed. Editing or deleting a vial never touches logs stamped from it. */
   deleteSupplementVial(id: string, userId: string): Promise<boolean>
@@ -1181,6 +1187,8 @@ export interface WorkoutRepository {
   getSetTimingRows(userId: string, exerciseNames: string[]): Promise<import('@trainingai/shared/workout/time-profile').TimingRow[]>
   getExercise1rmHistory(userId: string, exerciseNames: string[], tz: string): Promise<Record<string, { date: string; rm: number }[]>>
   getWeeklySetsByMuscleGroup(userId: string, programId: string, weekStart: string, weekEnd: string, tz: string): Promise<Record<string, number>>
+  /** Weighted sets per muscle over an arbitrary span, across every programme (LB-111). `to` is inclusive. */
+  getSetsByMuscleInWindow(userId: string, from: string, to: string, tz: string): Promise<Record<string, number>>
   listSessionPeriodizationForProgram(userId: string, programId: string): Promise<SessionPeriodization[]>
   reconcileSessionsInPhase(userId: string, programId: string): Promise<void>
   reconcileUserStats(userId: string): Promise<void>

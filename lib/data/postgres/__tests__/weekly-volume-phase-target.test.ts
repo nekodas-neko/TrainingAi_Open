@@ -101,6 +101,58 @@ describe.skipIf(!canRun)('weekly volume targets are derived, and take the phase 
      ON CONFLICT (user_id, program_session_id) DO UPDATE SET phase = EXCLUDED.phase`,
     [USER, programSessionId, phase])
 
+  /**
+   * Sets on a day `dayOffset` from today in the user's zone. Midday, not midnight: a boundary is
+   * where an off-by-one stops being visible. The exercise name is deliberately absent from
+   * `exercise_library`, so this goes down the `muscle_groups` branch and every tagged muscle counts
+   * whole — no role weighting to reason about in a test that is about dates.
+   */
+  const logSets = async (dayOffset: number, sets: number) => {
+    const { fromZonedTime, toZonedTime } = await import('date-fns-tz')
+    const zoned = toZonedTime(new Date(), TZ)
+    zoned.setDate(zoned.getDate() + dayOffset)
+    zoned.setHours(12, 0, 0, 0)
+    const at = fromZonedTime(zoned, TZ).toISOString()
+    const { rows: [ws] } = await pool.query(
+      `INSERT INTO workout_sessions (user_id, session_name, started_at) VALUES ($1, 'LA118', $2)
+       RETURNING id`, [USER, at])
+    const { rows: [el] } = await pool.query(
+      `INSERT INTO exercise_logs (workout_session_id, exercise_name, muscle_groups, logged_at)
+       VALUES ($1, 'LA118 Unlisted Press', ARRAY['chest'], $2) RETURNING id`, [ws.id, at])
+    for (let i = 1; i <= sets; i++) {
+      await pool.query(
+        `INSERT INTO set_logs (exercise_log_id, set_number, weight_kg, reps) VALUES ($1, $2, 60, 10)`,
+        [el.id, i])
+    }
+  }
+
+  const setsFor = (body: Awaited<ReturnType<typeof call>>, muscle: string) =>
+    body.muscles.find(m => m.muscle === muscle)?.sets
+
+  /**
+   * LA-118 — this route had NO upper bound. It read `el.logged_at >= weekStart` and nothing else,
+   * so a log dated in the future counted toward this week forever. Nothing writes future logs
+   * today; the sync path takes a client-supplied `logged_at`, so nothing structurally stopped one.
+   *
+   * Tomorrow rather than a far future date on purpose: the bound is `todayInTz` **inclusive**, so
+   * +1 day is the first excluded day on every weekday, and it discriminates even when today is
+   * Monday and "tomorrow" is still inside the same week.
+   */
+  it('does not count a log dated in the future toward this week', async () => {
+    await logSets(0, 3)
+    await logSets(1, 40)
+
+    expect(setsFor(await call(), 'chest')).toBe(3)
+  })
+
+  /** The control, deliberately equivalent: today's own sets must still be counted. Without it, a
+   *  bound that excluded today as well would pass the case above. */
+  it('counts sets logged today', async () => {
+    await logSets(0, 5)
+
+    expect(setsFor(await call(), 'chest')).toBe(5)
+  })
+
   // THE assertion. 999 is in the table; if it reaches the response the route is still reading it.
   it('never returns the stored number', async () => {
     const body = await call()

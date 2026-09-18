@@ -2033,6 +2033,44 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       })
   }
 
+  /**
+   * RV-63 — the dates on which a faucet signal was RECORDED, for the collection replay.
+   *
+   * `/api/collection` used to read `listBodyMetrics` / `listSleepSessions` in full and immediately
+   * project to `.map(m => m.date)`: 36 columns of `body_metrics` and 25 of `sleep_sessions` (176
+   * and 144 bytes a row, measured) to take one field each, over ALL history, on every home paint —
+   * `cachedFetch` revalidates regardless of TTL (Q-262). These select the one column and apply the
+   * `> 0` predicate in SQL, so the width no longer grows with the schema.
+   *
+   * The predicate is "recorded", not "above a bar" — see `ladder.ts`, and the measurement behind it:
+   * only 35 of the owner's 130 step-days reach 8,000, so a threshold would decay the steps ladder
+   * most weeks.
+   */
+  async listStepDayKeys(userId: string, from: string, to: string): Promise<string[]> {
+    const rows = await this.db.select({ date: s.bodyMetrics.date }).from(s.bodyMetrics)
+      .where(and(
+        eq(s.bodyMetrics.userId, userId),
+        gte(s.bodyMetrics.date, from),
+        lte(s.bodyMetrics.date, to),
+        gt(s.bodyMetrics.steps, 0),
+      ))
+      .orderBy(desc(s.bodyMetrics.date))
+    return rows.map(r => r.date)
+  }
+
+  /** RV-63 — see `listStepDayKeys`. Nights with a recorded duration, dates only. */
+  async listSleepDayKeys(userId: string, from: string, to: string): Promise<string[]> {
+    const rows = await this.db.select({ date: s.sleepSessions.date }).from(s.sleepSessions)
+      .where(and(
+        eq(s.sleepSessions.userId, userId),
+        gte(s.sleepSessions.date, from),
+        lte(s.sleepSessions.date, to),
+        gt(s.sleepSessions.durationHours, 0),
+      ))
+      .orderBy(desc(s.sleepSessions.date))
+    return rows.map(r => r.date)
+  }
+
   async listBodyMetrics(userId: string, from: string, to: string): Promise<BodyMetrics[]> {
     const rows = await this.db.select().from(s.bodyMetrics)
       .where(and(
@@ -3072,7 +3110,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     }
   }
 
-  async saveMoodLog(userId: string, log: Omit<import('@trainingai/shared/types/mood').MoodLog, 'id' | 'userId' | 'createdAt'>): Promise<import('@trainingai/shared/types/mood').MoodLog> {
+  async saveMoodLog(userId: string, log: Omit<import('@trainingai/shared/types/mood').MoodLog, 'id' | 'userId' | 'createdAt'>, timezone: string = DEFAULT_TZ): Promise<import('@trainingai/shared/types/mood').MoodLog> {
     // BF-173. Provenance is recorded at WRITE time, never re-derived at score time. Re-deriving is
     // the option the owner weighed and rejected: it suppresses the clamp whenever a muscle happens
     // to be under-recovered, which discards exactly the case the check-in exists for — the lifter
@@ -3085,7 +3123,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // fallback's limit is why the caller's list wins when present: a muscle the lifter volunteered
     // that ALSO meets the suggestion conditions is indistinguishable from an accepted one here.
     const provenance = log.suggestedSoreMuscles
-      ?? await this.deriveSuggestedSoreMuscles(userId, log.soreMuscles)
+      ?? await this.deriveSuggestedSoreMuscles(userId, log.soreMuscles, log.logDate, timezone)
 
     const [r] = await this.db.insert(s.moodLogs)
       .values({
@@ -3127,15 +3165,41 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    * suggestions", which scores every tick the pre-BF-173 way. A check-in must never fail to save
    * because provenance could not be worked out.
    */
-  private async deriveSuggestedSoreMuscles(userId: string, sore: string[]): Promise<string[]> {
+  /**
+   * RV-62 — the window anchors at the check-in's own local midnight, not at `Date.now()` minus a
+   * fixed number of milliseconds. The ms-offset form straddles two local days and merges them, and
+   * it is the pattern CLAUDE.md's Date Arithmetic rule names outright; I shipped it here in BF-173
+   * and a review caught it.
+   *
+   * **It is keyed on `logDate` rather than on today**, which is stricter than the rule asks: a
+   * check-in saved for a particular day should read the seven days ending on that day, not the
+   * seven ending now. Normally they are the same day and it costs nothing.
+   *
+   * **What the skew can and cannot do, measured rather than assumed.** A session entering or
+   * leaving at the seven-day edge can NOT by itself change a suggestion: `suggestedSoreMuscles`
+   * only considers muscles whose latest bout is within `SORENESS_EXPECTED_WITHIN_HOURS` (48), and
+   * an edge session is ~168 hours old. The one path that does reach the verdict is indirect —
+   * `computeMuscleRecovery` takes the MEDIAN bout volume per muscle as `typical`, and `tau` scales
+   * with `latest.volumeKg / typical`. Adding or dropping one old bout can move that median, which
+   * moves `tau`, which moves `pct` for a muscle trained recently enough to be eligible. So it flips
+   * a verdict only for a muscle already sitting near the 85% line. Narrow, real, and worth stating
+   * precisely so nobody re-derives it as either "harmless" or "a live scoring bug".
+   */
+  private async deriveSuggestedSoreMuscles(
+    userId: string, sore: string[], logDate: string, timezone: string,
+  ): Promise<string[]> {
     if (sore.length === 0) return []
     try {
-      const from7d = new Date(Date.now() - 7 * 86_400_000)
-      const [recentWorkouts, exerciseLibrary] = await Promise.all([
-        this.getWorkoutSessionsFrom(userId, from7d),
-        this.listExerciseLibrary(),
+      const from = dateStrMidnightInTz(shiftDateStr(logDate, -7), timezone)
+      const [recentWorkouts, muscleMap] = await Promise.all([
+        this.getWorkoutSessionsFrom(userId, from),
+        // RV-62's second half: `listExerciseLibrary()` selected every column of the whole catalogue
+        // on every check-in save, and only the name→muscles mapping is read.
+        // `computeMuscleRecovery` takes `Pick<ExerciseLibraryEntry, 'name' | 'muscles'>[]`, which is
+        // exactly what this returns.
+        this.listExerciseMuscleMap(),
       ])
-      return suggestedSoreMuscles(computeMuscleRecovery(recentWorkouts, exerciseLibrary), sore)
+      return suggestedSoreMuscles(computeMuscleRecovery(recentWorkouts, muscleMap), sore)
     } catch {
       return []
     }
@@ -6749,7 +6813,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
 
   async createSupplementVial(
     userId: string,
-    data: Omit<SupplementVial, 'id' | 'userId' | 'createdAt'> & { id?: string },
+    data: Omit<SupplementVial, 'id' | 'userId' | 'createdAt'>,
   ): Promise<SupplementVial> {
     // Ownership of the parent is checked rather than assumed: `supplementId` arrives from the
     // client, and the table has its own `user_id`, so an unchecked insert would file a vial under
@@ -6759,8 +6823,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       .limit(1)
     if (!owns) throw new NotFoundError('Supplement')
 
+    // RV-55 — the id is the database's to choose. It was previously accepted from the request and
+    // inserted unguarded, which made a duplicate UUID a 500 rather than a refusal.
     const [row] = await this.db.insert(s.supplementVials).values({
-      ...(data.id ? { id: data.id } : {}),
       userId,
       supplementId: data.supplementId,
       strengthMg: data.strengthMg,
@@ -6875,6 +6940,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getSetTimingRows(userId: string, exerciseNames: string[]) { return period.getSetTimingRows(this.db, userId, exerciseNames) }
   async getExercise1rmHistory(userId: string, exerciseNames: string[], tz: string) { return period.getExercise1rmHistory(this.db, userId, exerciseNames, tz) }
   async getWeeklySetsByMuscleGroup(userId: string, programId: string, weekStart: string, weekEnd: string, tz: string) { return period.getWeeklySetsByMuscleGroup(this.db, userId, programId, weekStart, weekEnd, tz) }
+  async getSetsByMuscleInWindow(userId: string, from: string, to: string, tz: string) { return period.getSetsByMuscleInWindow(this.db, userId, from, to, tz) }
 
   // ── Oura Ring (delegated to slices/oura.ts) ───────────────────────────────
   async upsertOuraDaily(userId: string, rows: import('../repository').OuraDailyRow[], source: HealthSource) { return oura.upsertOuraDaily(this.db, userId, rows, source) }

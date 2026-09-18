@@ -18,6 +18,217 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-18 — backlog → 23893, `projectOverview.md` → 11870 (LA-120: the queue tool's three blind spots)
+
+**Backlog +17, and it is the only entry here that GREW the file on purpose.** Two gates came back
+with the paragraph that says which question each one waits on, because in both cases the *bare* field
+is what went missing — LA-76's was removed in September once the owner answered a different question,
+and Q-220 never had one at all while carrying a prose warning that failed within three days. A gate
+that does not say what would lift it is a gate the next session deletes, and both of these are the
+receipt for that.
+
+The overview paragraph spends its length on the **measurement**, not the regex: 140 of 144 Keep
+bullets already matched and all four misses were one shape. That number is the whole argument for
+widening rather than rewriting, and `keep.js`'s own comments argue the opposite case convincingly
+enough that a future session will re-open it. Without the count it would have to re-measure.
+
+---
+
+## 2026-09-18 — backlog → 23855, `projectOverview.md` → 11855 (RV-58/59/60, the last sweep-50 batch)
+
+**Backlog −33, which is −55 for the three entries and +22 for one new one.** All three sweep-50
+batches are now out of the batch list. −55 for three is the batching argument in one number: they
+shared a verification surface, so they cost one test file and one gate rather than three of each.
+
+The +22 is **LA-119**, filed rather than fixed: RV-59's refusal to total a mixed-unit day now renders
+identically to an amountless tick, in a `components/nutrition/` file that belongs to Lane B. A queue
+entry is the honest cost of a finding that lands outside the lane that found it — the alternative
+shapes are crossing the boundary or dropping the finding, and both are worse than 22 lines.
+
+The overview paragraph leads with what each defect *did* rather than what changed, because two of the
+three were unreachable today and the temptation on re-reading will be to wonder why they were worth a
+PR. The answer is in the reachability lines: nothing constrains the next producer, and
+`recommendWalkPattern` has no caller yet — which is the cheapest moment to fix it, not a reason to
+wait.
+
+---
+
+## 2026-09-18 — backlog → 24070, `projectOverview.md` → 11841 (RV-63 shipped)
+
+**Backlog −21.** The overview paragraph is long for a route change because two of the three things
+in it are decisions NOT to do what the entry said: no date floor (it would change what the ladder
+reports), and a rate-limit norm derived from the one property that actually separates the siblings
+rather than from the nearest one read first. A future session that sees only "added a rate limit and
+narrowed two selects" would re-propose the floor within a month.
+
+---
+
+## 2026-09-18 — backlog → 24091, `projectOverview.md` → 11826 (RV-55/56, the route-input batch)
+
+**Backlog −36 for two entries**, the second batch of the day to leave whole. Both were Q-496-shaped,
+so they shared a test file and a single mutation pass — which is the axis `Batch:` asks about
+(what has to be VERIFIED), not the subject.
+
+The overview paragraph spends its length on RV-55's open decision rather than on the diff, because
+the diff is a deleted field: the entry offered *scope the conflict* or *drop it*, and which one is
+right is answerable only by reading the callers. Recording that the local vial mirror is read-only
+is what stops the next reader assuming an outbox replay needs to choose an id.
+
+---
+
+## 2026-09-18 — backlog → 24127, `projectOverview.md` → 11815 (RV-52/53/54, the sweep-50 cache batch)
+
+**Backlog −41 for three entries, which is what a batch should look like**: they shared a file, a
+verification surface and a single test suite, so they cost one PR and one gate rather than three of
+each. `Batch:` means one PR, and the batch slug leaves the queue whole.
+
+The overview's +12 spends most of its words on a claim I got wrong and caught before shipping — the
+first RV-54 comment asserted a week of decaying data where Q-262 says to check first, and the check
+said a briefly-stale first paint. The key is registered either way; the difference is whether the
+comment beside it is true. That is worth the lines because the wrong version is the more memorable
+story, and it would have been the one a future reader inherited.
+
+---
+
+## 2026-09-18 — backlog → 24168, `projectOverview.md` → 11803 (RV-62 shipped)
+
+**Backlog −23.** An entry left the queue with both halves done and its open question answered rather
+than inherited. The overview gains the answer, not the fix: *"can a seven-day boundary flip a
+soreness verdict"* is the kind of question that gets re-asked every time someone reads the ms-offset
+rule, and the answer — only through the median that sets `tau`, never directly — is worth more than
+the one-line change that prompted it.
+
+**Re-read as 24168 on the re-merge**, against the 24149 this note was drafted with — TN-3b (#1295)
+landed in between and took its own entry out. The delta is the measurement; the absolute is whatever
+`main` was at merge time, which is the fourth time today it has not been the `main` a note was
+written against.
+
+---
+
+## 2026-09-18 — backlog → 24172, `projectOverview.md` → 11790 (RV-51 shipped, no migration)
+
+**Backlog −29: an entry left the queue and the fix was not the one it asked for.** RV-51 wanted a
+migration labelling two unlabelled catalogue rows; both turned out to be merged duplicates, so the
+migration would have un-hidden them. What shipped is two one-line filters, and the entry is removed
+rather than kept — nothing is owed.
+
+The overview's +15 records the inversion rather than the fix, and that is the part worth the lines:
+the review found the two rows that were harmless and missed the two that were live, because its query
+was one column short of `merged_into`. A future reader who sees only "two filters added" would have
+no way to know the entry pointed the other way.
+
+---
+
+## 2026-09-18 — backlog → 24201, `projectOverview.md` → 11775 (TN-49, the rederivation gap)
+
+**Backlog +13 on an entry that shipped its fix and stayed queued.** The growth is a retraction: the
+entry's prescribed first action would have overwritten seven correct production scores with values
+4–6 points too low, so the correction has to be at the top of the entry rather than folded into a
+tick, and the three residues it leaves have to be separable from the one that was fixed.
+
+The overview's +16 is the largest single-item paragraph in a while and it is not about the code. It
+is about a **surface that asserted the opposite of its own evidence** — the audit printed "the stored
+score IS reproducible from its own stored inputs (42)" against a stored 48 — because that sentence is
+what generated the false entry, and a later session reading the fix without it would not know why the
+entry was believed.
+
+**Re-read as 24194 / 11775 on the re-merge**, against the 23933 / 11745 this note was drafted with —
+review sweep 50 (#1297) landed thirteen RV entries in between. The deltas are unchanged; the
+absolutes are a reading of whatever `main` was at merge time, which is never the `main` the note was
+written against.
+
+**That re-merge is also where the backlog conflict took a THIRD shape**, and it is worth recording
+because neither existing rule covered it. The documented cases are two deletions (keep neither) and
+two additions on an append-only file (keep both). This was an **edit against an append**: `main`
+carried the ORIGINAL TN-49 text plus the new RV entries, while this branch carried the rewritten
+TN-49. "Keep both" would have restored the retracted prescription — the one that would have
+corrupted seven production rows — sitting directly above its own correction, and "keep neither"
+would have dropped thirteen new entries. The resolution is per-heading: this side's TN-49, then
+`main`'s RV-51…RV-63. Reading the headings is what the rule actually asks for; the deletion/addition
+dichotomy is a shortcut that does not always apply.
+
+---
+
+## 2026-09-18 — backlog → 23915 (TN-47/48/49, the tuning calibration sweep)
+
+**+144 from 23771.** Three entries off one review. TN-48 is the long one and earns it: the
+body-composition decomposition has to carry its guardrails inline, because the finding is that the
+undecomposed lean-mass number is *misleading in exactly the situation a user most wants it*, and an
+implementer who reads the table without the water column repeats the error the entry exists to stop.
+TN-47 carries the measured "moves 0.4 points" line for the same reason — without it the entry reads
+as a re-score, which it is not.
+
+---
+
+## 2026-09-18 — backlog → 23920, `projectOverview.md` → 11729 (LA-118, the set-counting three)
+
+**Backlog +5 on an entry that SHIPPED**, which is the shape worth noting rather than the number. The
+entry did not leave the queue: `muscle-tonnage-trend` was deliberately out of scope for the first
+pass, so LA-118 stays with a `Keep:` and is rewritten around what shipped instead of being deleted.
+What it loses in problem statement it gains in the record of which decisions are now parameters and
+what the tonnage fold will have to preserve.
+
+**Re-read as 23920 on the re-merge**, +5 on TN-47/48/49's 23915 rather than on the 23771 this note
+was first written against. The delta is the measurement; the absolute is a reading of whatever
+`main` happened to be when the branch was re-merged, which on this repo is never the number the note
+was drafted with.
+
+The overview's +14 is a paragraph on a change with no user-visible effect, which normally would not
+earn one. It earns it here because the extraction made a silent failure mode **easier**: changing a
+date column used to mean editing one query in one file and now it is a one-word argument at a call
+site. The paragraph exists to say that out loud, along with the test that now holds it.
+
+## 2026-09-18 — backlog → 23771 (LA-118's heading corrected)
+
+**+3**, for one word and a sentence saying why it was wrong. The entry filed hours earlier was
+headed *"exists THREE times"* while its own table listed four — three existed before LB-111, and the
+fourth was the copy I had just written and did not count. Left alone it would be read as the table
+having an extra row rather than the heading being stale, and the heading is what `next-item.js`
+prints.
+
+The correction is recorded in the entry rather than silently applied, because the miscount is itself
+evidence for the entry: the copy easiest to overlook is the one you just added.
+
+## 2026-09-18 — backlog → 23768, `projectOverview.md` → 11715 (LB-111 shipped)
+
+**Backlog +33 net, and the shape is the interesting part:** LB-111's 23-line entry left the queue,
+OR-118 gained a shipped-half block, and **LA-118 was filed** — so a single item cleared and the file
+grew. That is the correct outcome rather than a failure of the ratchet. Checking LB-111's premise
+found that the muscle-attribution SQL exists four times with the copies disagreeing on date column
+and programme scope, and a finding with no queue entry is a dropped finding.
+
+Most of LA-118's length is one table. It earns it: the four copies all *say* they share the
+weighting, and they do — the divergence is in two things no comment mentions, which is exactly why
+prose describing it would be re-derived by the next reader.
+
+The overview's +13 is one paragraph replacing nothing, which is rarer here than it should be.
+
+## 2026-09-18 — backlog → 23735 (TN-25 re-laned to B)
+
+**+23**, and it is a correction rather than new work: TN-25's `Lane: A` was right when written —
+both halves, engine first — and expired when both engine halves shipped, leaving a residue that
+touches no route and no storage. Nothing re-reads a lane line after a partial ship, which is the
+whole reason this cost lines rather than a one-word edit: the note has to say what was checked
+(`recommendRunType`'s single caller is a client component) so the next session does not re-open it.
+
+The other half of the growth is the `Keep:` line gaining the shape to copy and one open question
+left explicitly to Lane B. Writing the successor's first move into the entry is cheaper than the
+entry being re-derived, which is the same argument the backlog protocol already makes for
+`Reference:`.
+
+## 2026-09-18 — backlog → 23712, `projectOverview.md` → 11702 (LA-117 shipped)
+
+**Backlog −32, overview +9.** LA-117's 31-line entry leaves the queue with the leaderboard fix. The
+overview barely moves because the entry it replaces was already there: BF-176's status paragraph
+ended with a *"filed not fixed: LA-117"* pointer, and that pointer becomes the fix's own paragraph
+rather than being added alongside it. A cross-reference that turns into its own record, rather than
+accumulating next to one, is the shape worth copying — the alternative leaves two paragraphs where
+the second silently contradicts the first.
+
+The workouts domain index gains a gotcha saying the leaderboard's streak query is deliberately
+unbounded, which is the sort of line that only earns its space because the obvious "fix" for it
+(give it `STREAK_LOOKBACK_DAYS`, like every other streak surface) is wrong.
+
 ## 2026-09-17 — backlog → 23459 (TN-46, the medication the scorers cannot see)
 
 **+93.** One new entry and two cross-links. The owner named Retatrutide as the likely cause of the
@@ -29,6 +240,7 @@ out or it reads as alarmism. The four options carry their own trade-offs per **D
 Back To Me**, and that section does not compress well.
 
 ---
+
 
 ## 2026-09-17 — backlog → 23365 (four owner decisions + the Q-506 re-measurement)
 
@@ -13479,7 +13691,105 @@ window edge instead. Two further notes are recorded against a plausible wrong fi
 different quantities, so unifying them while moving this server-side would silently redefine what
 102 means.
 
-## 2026-09-11 — `docs/implementation-backlog.md` → 21535 (RV-42 shipped)
+## 2026-09-18 — `docs/implementation-backlog.md` +260 (23920 → 24180) (Review sweep 50)
+
+Thirteen new queue entries (**RV-51…RV-63**) from the owner's twelve-day catch-up review — 50
+commits, 671 changed code files, swept across safety/logic/performance/efficiency — plus a reading
+recorded on the existing **BF-110** entry.
+
+The growth is queue, not prose, and it is at the ratio this file is meant to carry: 260 lines for 13
+entries is ~20 lines each, against a file whose entries average that. (**The floor moved twice
+while this sweep was open** — TN-47/48/49 and then another PR landed on `main` mid-review. The
+figure that matters is the delta: +260 is this sweep's thirteen entries and nothing else, on
+whatever base it merges onto.) **One entry is deliberately
+longer than its defect**: RV-51 is a two-row data fix, and most of its length is the question the
+data raises rather than the fix — `exercise_library` has no `created_at`, so whether migration 269
+*missed* those two rows or something *wrote* them afterwards is unestablished, and if it is the
+latter then labelling the rows fixes nothing. An implementer who reads only the fix closes it wrong.
+
+BF-110's addition is the opposite case and is worth the lines for a different reason: the entry had
+already declared which reading meant which fix, the reading arrived, and nobody had gone to look. It
+also corrects two ways the telemetry misleads — `stuck` fires on healthy resumes, and `w=384`
+appears on every row — so the next reader does not re-derive the same wrong signature.
+
+## 2026-09-18 — `projectOverview.md` +30 (11729 → 11759) (Review sweep 50)
+
+Two Known-Issues rows from sweep 50, and only two: thirteen findings were filed and eleven of them
+went to the backlog alone, because the queue is where work that is *understood* belongs. These two
+earn a place in the orientation read for opposite reasons.
+
+**RV-51** is the sweep's only live user-affecting defect — two named exercises are absent from every
+generated program right now, for every user, at every equipment setting — so a session that orients
+and then touches program generation needs to know before it starts. **RV-62** is here because its
+impact is *unestablished* and cheap to establish wrongly: a banned ms-offset window on the mood write
+path, where whether the day-boundary skew flips a provenance verdict decides between hygiene and a
+live scoring defect. The row says so explicitly rather than implying either.
+
+Both carry their `[domain]` tags, and both say "found, not fixed" / name what was not established,
+so neither can be mistaken for a closed item on a later sweep.
+
+## 2026-09-18 — `docs/implementation-backlog.md` 23670 → 24199 (Lane B, TN-3b pass test)
+
++19 to correct a stale blocker that was parking real work. TN-3b said its pass test could not be met
+because `/api/body-battery` takes no parameters — but that route is not in the stress chart's path at
+all; it fetches `/api/body-battery/stress-day?date=` and says so in its own header. The past-day case
+is not merely reachable, it is spec-covered and green (6 of 6).
+
+The number also absorbs a re-merge of `origin/main` before merging, which landed three more
+entries from Lane A and Tuning — recomputed rather than spliced, as the ratchet requires.
+
+The lines are worth it because of what the claim was holding: TN-35's `Needs: TN-3b` keeps a
+buildable Lane B overlay parked, and the entry's remaining promises (HR-chart overlay, cross-day
+aggregate) are pre-reshape prose that the owner-approved plan replaced with TN-35a. Recording which
+half is done and which is a scope question is what lets the Orchestrator clear it in one pass.
+
+## 2026-09-18 — `docs/implementation-backlog.md` 24070 → 23888 (ratchet down, TN-25)
+
+**−182.** TN-25's wiring shipped (`feat/tn25-wire-walk-pattern-selector`, v1.458.0), which was the
+last buildable half — the engine and the band had landed 2026-09-16. The entry ran 212 lines because
+it carried the whole 2026-09-08 calibration argument: the measured 0-of-44 table, the four
+superseded options kept "for the record", the band-vs-fraction recommendation, and the reshaped
+owner decision. All of that is settled and lives in the review it cites, in the shipped code's own
+comments, and now in a journal entry.
+
+What survives is 31 lines: which halves shipped where, the two questions the selector could not
+answer and why `walk-pattern-config.ts` answers them the way it does, the pre-set-vs-suggest decision
+this entry had delegated to Lane B, and a `Keep:` for the two things genuinely still owed — the S25
+check (GPS, cadence and the strap are not reachable from the web harness) and this entry's own pass
+test, *"fast-block compliance over a month is neither 0% nor 100%"*, which needs a month of wearing
+rather than a sitting. **Not struck**, because that second one is unmeasured.
+
+
+## 2026-09-18 — `docs/implementation-backlog.md` 23855 → 23896 (Lane B, OR-116 ② + LB-120)
+
+**+41.** Two edits, both of which are the queue doing its job rather than accreting.
+
+**−6, OR-116 ②** is answered and struck from its `Keep:` line. The entry asked whether `hrMin`
+reaching `HrFactorsCard`'s `restingHr` prop was a deliberate proxy or an oversight; it is neither.
+The card prints *"Lowest recorded today"* and `hrMin` is exactly that, so only the name was wrong.
+The replacement lines are longer than the question they close because the **inverted** conclusion is
+the load-bearing part: passing a real resting HR would have printed a true number under a false
+sentence, which is the fix the old name invited and a worse bug than the one being chased. ① and ③
+stay open.
+
+**+47, LB-120** is new, and is the reason this sweep exists. `docs/doc-size/docs/implementation-backlog.md.size`
+conflicts on every pair of concurrent implementer PRs, because the protocol has each of them delete
+its own entry and therefore change the line count. Measured the same day: **five rebases of #1303,
+every one conflicting on that file and nothing else.** LA-33 removed this class for documents in
+general and could not reach the one file where "two PRs, same document" describes *every* implementer
+PR. Filed for the Orchestrator (`scripts/**` is theirs) with two options, neither picked, and with
+the argument against the tempting non-fix written down — telling implementers to skip the recompute
+just converts the conflict into a red check, because the ratchet fails on slack.
+
+## 2026-09-18 — `docs/implementation-backlog.md` ratchet down (RV-57 removed)
+
+**−20.** RV-57 shipped in #1299 and its entry was left in the queue — the third such omission in one
+session, after LB-116 and BF-172. Removed rather than cut to a `Keep:` line, because the one thing it
+was still carrying is now answered: the supplier returns 366 day-keys and the consumer reads 365,
+they differ by one, and the direction is the safe one (the loop never asks for a day the payload
+lacks, which is BF-176 inverted). Reasoning in the journal entry; deliberately not "fixed", since
+widening the loop would make a constant named `STREAK_LOOKBACK_DAYS = 365` drive a 366-day walk.
+## 2026-09-11 — `docs/implementation-backlog.md` → 23868 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 
@@ -13499,6 +13809,14 @@ correct against the `main` of its hour. Under six concurrent lanes plus an owner
 reading of a moving number, and a PR that waits will re-read it once per merge that overtakes it.
 Recomputed by `pnpm fix:baselines` after each merge, which is the only thing that makes the
 subtraction mean anything.
+
+**Recomputed again 2026-09-18** (→ 23868), and the rewrite count derived the same way the note
+defines it — first-parent commits on this branch touching this file — now reads **55**. The *merge*
+count is deliberately NOT re-derived: `git merge-base` against `main` no longer finds the original
+branch point, because this branch has absorbed `main` dozens of times, so the figure it returns
+(21) answers a different question. Quoting it as "merges that overtook this PR" would be the same
+hand-kept error in a new costume. The 2026-09-11 measurement stands as the last one taken against
+the real branch point.
 
 **Recomputed again 2026-09-15** (→ 21535). The two counts above are left at their 2026-09-11
 measurement rather than incremented, because incrementing by hand is the exact failure this note

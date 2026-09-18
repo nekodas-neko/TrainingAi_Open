@@ -5,8 +5,8 @@
 > 🔴 handed on) and is the only part that moves. A session self-titles 🟢 on its first instruction and
 > flips itself to 🔴 as the last step of its handoff, after the baton and every PR have landed.
 
-**Updated:** 2026-09-05 · **By:** forty-seven sweeps (2026-08-17 ×2, 2026-08-18 ×37, 2026-08-20 ×1,
-2026-09-03 ×6, 2026-09-05 ×2, 2026-09-06 ×1) · **Next ID: `RV-51`.**
+**Updated:** 2026-09-18 · **By:** forty-eight sweeps (2026-08-17 ×2, 2026-08-18 ×37, 2026-08-20 ×1,
+2026-09-03 ×6, 2026-09-05 ×2, 2026-09-06 ×1, 2026-09-18 ×1) · **Next ID: `RV-64`.**
 
 > **Sweep 40's run is closed and nothing is owed from it** — RV-32, RV-33, RV-34 all shipped, verified
 > in source rather than taken from the closure note, and their `projectOverview.md` row is in
@@ -37,47 +37,47 @@ From sweeps 29–39
 worker claims the page). **Q-556 was listed here and is CLOSED** — it shipped on
 `/api/activity-logs`, which now answers 404, verified live in sweep 47. From sweeps 41-42: **RV-37** and **RV-39**, both needing the device.
 
-**Those three unverified surfaces are CLOSED** — sweep 48 probed all three and all are correct. The
-rule that found them stands: **a 4xx is not evidence the guard fired** — read which field it names.
-Sweep 48 had five probes rejected on the wrong field before re-probing.
+## Now — sweep 50 filed (2026-09-18). **Next ID: `RV-64`.**
 
-## Now — sweep 49 filed (2026-09-06). **Next ID: `RV-51`.**
+**Sweep 50 was the owner's twelve-day catch-up** — base `3e47f03f`, 50 commits, 671 code files,
+across safety/logic/performance/efficiency; four read-only lanes, **every finding re-verified at
+source before filing**. [Write-up](../../reviews/2026-09-18-sweep-50-twelve-days.md) · filed
+**RV-51…RV-63**, with `projectOverview.md` rows for RV-51 and RV-62.
 
-| # | Lens | Write-up | Filed |
-|---|---|---|---|
-| 47 | does a caught refusal map to the RIGHT status | [delete-reports-success](../../reviews/2026-09-05-delete-reports-success-for-nothing.md) | RV-45/46 |
-| 48 | does a 2xx mean what it says, beyond DELETE | [body-supplied-ids](../../reviews/2026-09-05-body-supplied-ids-skip-the-guard.md) | RV-47/48 |
+**RV-51 is the only live user-affecting one** — production holds **2 of 156** `exercise_library`
+rows with `equipment = []`, which `equipmentEligible`'s `.some()` makes invisible to every selection
+including `full_gym`. Its header says an empty list "should not occur". It occurs.
 
-**Sweep 49 (owner-reported stale screens):** RV-49 — Home's id-less
-`invalidatePrescriptionChanged()` evicts no `workout-card:*` and never touches `next-session`;
-Q-117 fixed only the id-passing caller. RV-50 — three raw seed-only `workout-card` reads (`Needs:`
-RV-49). Nutrition add surface CLEAN at source — do not re-sweep without a fresh repro.
+**The transferable finding, and the lens for sweep 51:** every other defect is *a rule written down
+correctly and then half-applied* — a contract-constant imported by one of its two files, a
+case-insensitive compare that lowercases one side, cache keys in zero groups beside siblings in
+four. **A reader cannot catch this class: the comment says the right thing.** What does catch it —
+treat a module header's claim as a *hypothesis* and go find its counter-example in production data
+or at the other end of the contract.
 
-**Sweep 48:** RV-47 (`invalidUuidResponse` reaches 27/27 path-ids, 0 body-ids — three routes 500 on
-a malformed body id; `workout-entry` carries the fix) · RV-48 (three routes answer `200 {ok:true}`
-for an update that matched nothing, each with a positive control).
+**BF-110's reading is IN and DECISIVE — native-layer** (3 rows `stuck h1=667 h2=667`, 12 healthy at
+826, 0 `resized`/`dom-lost`, 09-15→09-16); on its entry, with two telemetry corrections — `stuck`
+fires on healthy resumes too, and **only the height discriminates** (`w=384` is on every row).
+**Two `CLAUDE.md` session-start numbers corrected**: `error_events`' 52 MB is TOAST bloat behind 115
+live rows, not payload; growth is 1.71 MB/day, not ~0.4 (bounded — watch the shape).
 
-**Sweep 47's finding is a DELETE finding** — all thirteen dynamic `PUT`/`PATCH` routes answer 404 for a ghost id and refuse the second account's row unchanged.
+**Clean, do not re-sweep:** admin auth on both new admin routes (proved by revocation), ownership
+rules (a)/(b)/(c) on vials, zero N+1s in the added data layer, every migration 267–277 query pattern
+indexed, no new dependency in 671 files, all four cache/render gate scripts exit 0. **Not exercised:**
+anything device; the new vials domain's offline-first half; `rederive-baselines`' write path;
+the ~33 *changed* formula files.
 
-**THREE previously-unverified surfaces are now VERIFIED:** `activity-logs/[id]/metrics` cross-user,
-and RV-40's `complete-workout` and `log-exercise`. **`CLAUDE.md` ownership rule (c)'s
-`ensureWorkoutSession` claim is verified live** — cross-account got 404, nothing written.
-
-**Closed clean:** the thirteen dynamic `PUT`/`PATCH` routes; `saved-meals/[id]` (a create at a client
-UUID is `writeSavedMeal`'s deliberate upsert, `setWhere` on the owner); `workout-entry`.
-
-**Still owed:** RV-37/RV-39 need the device; RV-38/RV-41/RV-43 need an owner decision.
-**2026-09-06: this session ran the whole-app checkpoint** (`PS-24…PS-39`,
-[report](../../reviews/2026-09-05-app-checkpoint.md)) — it CLOSED the workout/device FK half,
-`/api/coach/preview` and the tz midnight-band run, and ESCALATED PS-24/PS-25. Do not re-sweep lanes
-its table marks ✅; lane 23 and the POST surface stay open.
+**Sweeps 47/48/49 are closed** — see their write-ups; RV-49 landed and RV-50 resolved as
+not-a-defect (pinned in `lib/__tests__/cache-groups.test.ts:227-236`), both verified in source this
+sweep. **The rules they left:** a 4xx is not evidence the guard fired, so read which field it names
+(48 had five rejected on the wrong one); pair every refusal with a one-field control; `claude_ro` is
+**the owner's rows only**. **Owed:** RV-37/39 device; RV-38/41/43 owner decision.
 
 ## Carried from sweep 40 ([write-up](../../reviews/2026-08-20-non-workout-write-surface-ownership.md))
 
 - **✅ All three write-path ownership rules now have evidence.** (b) sweep 40, (c) RV-32, (a) sweep 43.
-- **A cheap contrast beats a long argument**, used eight times now — most recently *six routes say
-  200, three say 404*, on the same operation in the same tree. Find the surface that already does it
-  right, and the finding writes itself.
+- **A cheap contrast beats a long argument**, used nine times — *six routes say 200, three say 404*;
+  *this key is in 0 groups, its sibling in 4*. Find the surface that already does it right.
 
 ## Next — in the order they are worth doing
 

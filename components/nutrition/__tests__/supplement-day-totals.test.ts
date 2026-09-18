@@ -52,14 +52,17 @@ describe('summariseSupplementDay — the device half of what listSupplements der
     expect(day.has('a')).toBe(false);
   });
 
-  it('keeps the FIRST unit any contribution supplies, not the last', () => {
-    // The sum-and-count case above uses one unit on both rows, so first-wins and last-wins agree
-    // there and neither is tested by it. A day whose contributions disagree is what separates them.
+  it('refuses to total a day whose contributions name DIFFERENT units', () => {
+    // The sum-and-count case above uses one unit on both rows, so it never separates the options.
+    // A day whose contributions disagree is what does — and RV-59 is that neither first-wins nor
+    // last-wins is right there: `5 mg + 3 g` is 3.005 g under any label, so keeping either unit
+    // publishes a number that is wrong by three orders of magnitude. `unit` is free text (it holds
+    // 'ml' and '1 scoop'), so converting is not available. Report nothing rather than a wrong 8.
     const day = summariseSupplementDay([
       log({ supplementId: 'a', amount: 5, unit: 'mg', source: 'manual' }),
       log({ supplementId: 'a', amount: 3, unit: 'g', source: 'meal' }),
     ]);
-    expect(day.get('a')!.loggedAmount.unit).toBe('mg');
+    expect(day.get('a')!.loggedAmount).toMatchObject({ amount: null, unit: null, contributions: 2 });
   });
 
   it('takes the unit from the first contribution that HAS one', () => {

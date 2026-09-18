@@ -99,8 +99,11 @@ export async function POST(req: Request) {
   // rule. Note the swap can still be asked for explicitly and will now fail to find the exercise,
   // which is the correct outcome while the injury is unresolved.
   const injuredMuscles = activeInjuredMuscles(injuries)
+  // RV-51 — `mergedInto` first: a merged duplicate is not a separate exercise, and this route was
+  // relying on the same accident generate-program was. Handing the model both names invites a swap
+  // between two rows that are the same movement.
   const availableExercises = excludeInjuredExercises(
-    allExercises.filter(ex => equipmentEligible(ex.equipment, equipmentSet)),
+    allExercises.filter(ex => !ex.mergedInto && equipmentEligible(ex.equipment, equipmentSet)),
     injuredMuscles,
   )
     .map(ex =>

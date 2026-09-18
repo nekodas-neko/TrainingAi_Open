@@ -268,6 +268,22 @@ export interface ReadinessRederivation {
   /** Contributors with no stored input: rows written before Q-501, which cannot be checked either
    *  way. Reported rather than silently counted as agreeing. */
   uncheckable: (keyof typeof READINESS_WEIGHTS)[]
+  /**
+   * Contributor keys ABSENT from the stored map entirely — a different thing from `uncheckable`,
+   * which is a key that is present but carries no input (TN-49).
+   *
+   * These used to be skipped, which dropped their WEIGHT from the sum and made `score` come out
+   * low by roughly `weight × 50` — indistinguishable, from outside, from a real disagreement.
+   * Measured on production 2026-09-18: seven rows (2026-07-16 → 07-22) store eight of the nine
+   * contributors, missing `checkin` (weight 0.10), and read 4 to 6 points below their stored score
+   * for that reason alone. Every other row stores nine and reproduces exactly.
+   *
+   * A missing key now contributes the model's own NEUTRAL 50, which is what
+   * `computeReadinessComposite` uses for a contributor with no input — so `score` is the closest
+   * the stored row can support. It is still an ASSUMPTION, which is why the key is reported: a
+   * caller must not claim a row reproduces cleanly while this is non-empty.
+   */
+  missing: (keyof typeof READINESS_WEIGHTS)[]
 }
 
 /** Re-derive one persisted contributor's score from the input stored beside it, under the current
@@ -305,14 +321,32 @@ export function rederiveReadinessFromStored(stored: unknown): ReadinessRederivat
 
   const drifted: ReadinessRederivation['drifted'] = []
   const uncheckable: ReadinessRederivation['uncheckable'] = []
+  const missing: ReadinessRederivation['missing'] = []
   let weighted = 0
   let matched = 0
 
   for (const key of Object.keys(READINESS_WEIGHTS) as (keyof typeof READINESS_WEIGHTS)[]) {
     const entry = map[key]
-    if (entry == null || typeof entry !== 'object') continue
-    const c = entry as StoredReadinessContributor
-    if (typeof c.score !== 'number' || !Number.isFinite(c.score)) continue
+
+    // TN-49 — a key that is ABSENT carries the model's NEUTRAL rather than being skipped. Skipping
+    // dropped its WEIGHT from a sum defined to total 1, so the result came out low by about
+    // `weight × 50` and read as a disagreement the row did not have. Seven production rows are
+    // missing `checkin` for this reason.
+    if (entry === undefined) {
+      missing.push(key)
+      weighted += NEUTRAL.score * READINESS_WEIGHTS[key]
+      continue
+    }
+
+    // A key that is PRESENT but unusable is deliberately NOT treated the same way, and the asymmetry
+    // is the point. An absent key has no score, so standing the model's own neutral in for it
+    // reproduces what the composite did; a present key with a corrupt score is a value we cannot
+    // read, and inventing 50 for it would be asserting something the row does not say. This path is
+    // unchanged and stays skipped, which means it keeps the low-by-`weight × score` trap above —
+    // accepted, because no production row has ever been in this state, and the alternative is
+    // changing a behaviour an existing test pins on purpose.
+    const c = entry != null && typeof entry === 'object' ? entry as StoredReadinessContributor : null
+    if (c == null || typeof c.score !== 'number' || !Number.isFinite(c.score)) continue
     matched++
 
     const rederived = rederiveContributor(key, c)
@@ -323,5 +357,5 @@ export function rederiveReadinessFromStored(stored: unknown): ReadinessRederivat
   }
 
   if (matched === 0) return null
-  return { score: Math.round(weighted), drifted, uncheckable }
+  return { score: Math.round(weighted), drifted, uncheckable, missing }
 }

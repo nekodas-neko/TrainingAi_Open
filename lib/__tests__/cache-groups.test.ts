@@ -175,6 +175,53 @@ describe('cache group helpers', () => {
     ]))
   })
 
+  /**
+   * RV-54, and the sharpest of the sweep-50 cache gaps because the dependency is written out in the
+   * route: `/api/collection` computes `pausedDays` as `[...restDays, ...earlyDeloadWeekDays(program)]`,
+   * so it reads the very deload confirmation this group fans out. `handleEarlyDeloadConfirm` calls
+   * ONLY this group, so the collection ladder kept decaying across a week the lifter had just
+   * marked as a deload.
+   *
+   * Asserted with no session id, because that is how the deload path calls it — a deload is not
+   * scoped to one session, which is the same detail RV-49 turned on.
+   */
+  it('invalidatePrescriptionChanged clears collection, which reads the deload it fans out', async () => {
+    await invalidatePrescriptionChanged()
+    expect(invalidated).toContain('collection')
+  })
+
+  /**
+   * RV-52 and RV-53 — two keys that were in ZERO groups while a sibling rendered by the same
+   * surface from the same writes was in three and four respectively. The sibling is the argument:
+   * nothing distinguishes the two payloads' write sensitivity.
+   *
+   * Asserted as a PAIRING rather than as a list of group names, so the property survives a group
+   * being renamed or a fourth writer being added — what must hold is that the two keys travel
+   * together, which is the thing that was not true.
+   */
+  it.each([
+    ['weekly-review-month-window:', 'day-review-week-window:', [invalidateWorkoutSummaries, invalidateOuraSync, invalidateBodyMetricWrite]],
+    ['stress-day:', 'body-battery', [invalidateWorkoutSummaries, invalidateReadinessInputs, invalidateOuraSync, invalidateActivityWrites]],
+  ] as const)('%s is evicted wherever %s is', async (key, sibling, groups) => {
+    for (const group of groups) {
+      invalidated.length = 0
+      await group()
+      expect(invalidated, `${group.name} evicts ${sibling}`).toContain(sibling)
+      expect(invalidated, `${group.name} must also evict ${key}`).toContain(key)
+    }
+  })
+
+  /**
+   * The over-eviction guard, and the reason the two cases above are not simply "add the key
+   * everywhere": a group that does NOT carry the sibling must not gain the new key either.
+   * `invalidateFriends` touches neither surface.
+   */
+  it('does not evict the two new keys from an unrelated group', async () => {
+    await invalidateFriends()
+    expect(invalidated).not.toContain('weekly-review-month-window:')
+    expect(invalidated).not.toContain('stress-day:')
+  })
+
   it('invalidatePrescriptionChanged never builds a workout-card:undefined key', async () => {
     await invalidatePrescriptionChanged()
     expect(invalidated).not.toContain('workout-card:undefined')
