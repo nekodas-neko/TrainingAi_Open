@@ -607,42 +607,6 @@ existing 65 days moves by less than 5 points on every one of them.
   every row carries a model stamp. **Currently: 62 of 65 reproduce** (58 nine-key + 4 of the seven),
   three are 1 point out, and 25 of 65 are stamped.
 
-### [platform][nutrition] RV-55 — a client-supplied vial `id` turns a duplicate into an unhandled 500 and a server-fault row
-
-- **Lane:** A — `app/api/supplements/[id]/vials/route.ts:19` and
-  `lib/data/postgres/adapter.ts:6761`. **Added:** 2026-09-18 · Review sweep 50.
-- **Batch:** `route-input-500s-sweep50`
-- `POST` accepts `id: z.string().uuid().optional()` and the adapter inserts it unguarded — the
-  **parent** is ownership-checked at line 6756, the id is not. Re-posting another user's vial UUID
-  raises `23505`, answering **500 with an empty body** and writing a `[pg 23505]` row to
-  `error_events`. Control: the same request with a fresh UUID returns **201**, so the 500 tracks the
-  `id` field alone.
-- **No cross-user write occurs** — the victim row was read back unchanged (`user_id`, `strength_mg`,
-  `deleted_at` all as before), and no driver text reaches the client. What it is, is a "does this
-  UUID exist" oracle plus fault-table pollution for a client error.
-- **Decide first whether `id` should be accepted at all.** It was not established that any client
-  sends it; it may exist only for outbox replay. If it does, scope the conflict — an insert whose
-  `id` already exists under another user must answer 404/409, not 500. If it does not, drop the
-  field.
-
-### [platform][sleep][nutrition] RV-56 — three date params validate shape but not calendar, so `2026-02-31` is a 500
-
-- **Lane:** A — `app/api/sleep/manual-bedtime/route.ts:15`,
-  `app/api/supplements/[id]/vials/route.ts:18`, `app/api/supplements/[id]/vials/[vialId]/route.ts:16`.
-  **Added:** 2026-09-18 · Review sweep 50.
-- **Batch:** `route-input-500s-sweep50`
-- All three carry `/^\d{4}[-/]\d{2}[-/]\d{2}$/` — the correct **separator** regex — and then never
-  reach `normalizeDateParam`/`isCalendarDate` (verified: `grep -c` for either returns **0** in all
-  three files). A date-shaped non-day reaches the driver as `[pg 22008]`: `POST
-  /api/sleep/manual-bedtime` with `date: "2026-13-45"` → 500, empty body, `error_events` row.
-  Control: `"2026-09-10"` → 200 and the row read back correctly; `"2026-02-31"` also 500s, so the
-  refusal tracks calendar validity rather than the separator.
-- This is the Q-496 class `isCalendarDate` was added to stop. The other 68 changed routes were swept
-  for the same shape and only these three matched; `app/api/water-log/route.ts` has a bare regex but
-  clamps `localDate` to today/yesterday, verified by probe, so it is **not** affected.
-- **Verification:** each of the three answers 400 on `2026-02-31` and 200/201 on the adjacent real
-  day.
-
 ### [platform] RV-63 — `/api/collection` is the only new route that is both unbounded and rate-limit-free
 
 - **Lane:** A — `app/api/collection/route.ts`. **Added:** 2026-09-18 · Review sweep 50.

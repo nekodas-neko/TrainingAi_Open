@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { isCalendarDate } from '@trainingai/shared/date-utils'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
@@ -13,7 +14,9 @@ const VialPatch = z.object({
   strengthMg:        z.number().finite().positive().max(10_000).optional(),
   waterMl:           z.number().finite().positive().max(1_000).optional(),
   syringeUnitsPerMl: z.number().finite().positive().max(1_000).optional(),
-  openedOn:          z.string().regex(/^\d{4}[-/]\d{2}[-/]\d{2}$/).optional(),
+  // RV-56 — shape is not calendar validity; see the sibling routes. The refine sits BEFORE
+  // `.optional()` so an absent field stays absent rather than being validated as undefined.
+  openedOn:          z.string().regex(/^\d{4}[-/]\d{2}[-/]\d{2}$/).refine(isCalendarDate, 'Not a real calendar date').optional(),
 }).strict()
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ vialId: string }> }) {
