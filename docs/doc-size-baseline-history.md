@@ -18,6 +18,19 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-18 — backlog → 23735 (TN-25 re-laned to B)
+
+**+23**, and it is a correction rather than new work: TN-25's `Lane: A` was right when written —
+both halves, engine first — and expired when both engine halves shipped, leaving a residue that
+touches no route and no storage. Nothing re-reads a lane line after a partial ship, which is the
+whole reason this cost lines rather than a one-word edit: the note has to say what was checked
+(`recommendRunType`'s single caller is a client component) so the next session does not re-open it.
+
+The other half of the growth is the `Keep:` line gaining the shape to copy and one open question
+left explicitly to Lane B. Writing the successor's first move into the entry is cheaper than the
+entry being re-derived, which is the same argument the backlog protocol already makes for
+`Reference:`.
+
 ## 2026-09-18 — backlog → 23712, `projectOverview.md` → 11702 (LA-117 shipped)
 
 **Backlog −32, overview +9.** LA-117's 31-line entry leaves the queue with the leaderboard fix. The
