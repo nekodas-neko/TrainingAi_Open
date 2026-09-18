@@ -13643,3 +13643,19 @@ live scoring defect. The row says so explicitly rather than implying either.
 
 Both carry their `[domain]` tags, and both say "found, not fixed" / name what was not established,
 so neither can be mistaken for a closed item on a later sweep.
+
+## 2026-09-18 — `docs/implementation-backlog.md` 24172 → 23990 (ratchet down, TN-25)
+
+**−182.** TN-25's wiring shipped (`feat/tn25-wire-walk-pattern-selector`, v1.458.0), which was the
+last buildable half — the engine and the band had landed 2026-09-16. The entry ran 212 lines because
+it carried the whole 2026-09-08 calibration argument: the measured 0-of-44 table, the four
+superseded options kept "for the record", the band-vs-fraction recommendation, and the reshaped
+owner decision. All of that is settled and lives in the review it cites, in the shipped code's own
+comments, and now in a journal entry.
+
+What survives is 31 lines: which halves shipped where, the two questions the selector could not
+answer and why `walk-pattern-config.ts` answers them the way it does, the pre-set-vs-suggest decision
+this entry had delegated to Lane B, and a `Keep:` for the two things genuinely still owed — the S25
+check (GPS, cadence and the strap are not reachable from the web harness) and this entry's own pass
+test, *"fast-block compliance over a month is neither 0% nor 100%"*, which needs a month of wearing
+rather than a sitting. **Not struck**, because that second one is unmeasured.
