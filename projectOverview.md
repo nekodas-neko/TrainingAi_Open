@@ -52,6 +52,19 @@ are still deliberately NOT unified** — `computeStreak` counts *training days* 
 the home loop counts *calendar days spanned* — so `streak-window.ts` now says outright that the
 leaderboard does not read `STREAK_LOOKBACK_DAYS`: 365 would cap an all-time field just as 90 did.
 
+**Sets per muscle over any window, so the balance card can finally be built (LB-111, 2026-09-18 —
+engine half, unversioned).** `GET /api/muscle-sets?from=&to=` is new: nothing served this number
+before, because every muscle-set route computed the current week server-side and took no parameters.
+**LB-111's premise was wrong in the place that decided the shape** — it said `weekly-muscle-sets`
+calls `getWeeklySetsByMuscleGroup` and throws its date arguments away; it does not call it at all.
+That method scopes to **one programme**, so widening it would have changed what its two real callers
+mean, both of which grade a week against *that* programme's targets. The new read counts **across
+programme changes**, which is what a balance card's claim is about, and the difference is pinned by a
+test running one fixture through both reads: **3 sets against 7**. Checking the premise also found
+that the attribution SQL now exists **four times**, disagreeing on date column and programme scope —
+filed as **LA-118** rather than fixed here, since the extraction touches three live routes. Nothing
+renders it yet; OR-118 (Lane B) is now unblocked.
+
 **The only illness band that ever fires now says what moved (TN-45, v1.457.12 — engine half only).**
 `watch` has fired **2 days in 72**; `elevated` and `fever` have fired **zero** times, so the illness
 banner has never rendered at all. And `watch` is inert twice over — no readiness penalty (deliberate,

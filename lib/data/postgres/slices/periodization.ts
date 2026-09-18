@@ -573,6 +573,82 @@ export async function getWeeklySetsByMuscleGroup(db: Db, userId: string, program
 }
 
 /**
+ * LB-111 — weighted sets per muscle over an ARBITRARY span, across every programme.
+ *
+ * `getWeeklySetsByMuscleGroup` above cannot serve this, and the difference is not the date range:
+ * it scopes to **one** `programId`, so a 60-day window spanning a programme change would silently
+ * drop the sets logged under the previous one. That is the right answer for its two callers, which
+ * compare a week against *that programme's* targets, and the wrong answer for a movement-balance
+ * card, whose claim is about the lifter's training rather than one programme's adherence. Widening
+ * the existing method would have changed what those two callers mean, so this is a second question,
+ * not a second implementation of the first.
+ *
+ * **Bounds on `el.logged_at`, not `ws.started_at`**, matching `weekly-muscle-sets` and
+ * `muscle-tonnage-trend` — the card surfaces. A session started before midnight whose later
+ * exercises were logged after it belongs to both days, and attributing each set to when it was
+ * logged is what those two routes already do. `getWeeklySetsByMuscleGroup` keys on the session
+ * instead because its unit is a programme session, and that stays as it is.
+ *
+ * `to` is INCLUSIVE — the caller names two calendar days and means both of them.
+ */
+export async function getSetsByMuscleInWindow(
+  db: Db, userId: string, from: string, to: string, tz: string,
+): Promise<Record<string, number>> {
+  const fromTz = dateStrMidnightInTz(from, tz)
+  const toNextTz = dateStrMidnightInTz(shiftDateStr(to, 1), tz)
+
+  // Secondary muscles count at half weight, matching every other muscle-attribution query in the
+  // app. The library/non-library split is not a fallback for missing data — the two branches read
+  // different columns (`exercise_library.muscles` carries roles, `exercise_logs.muscle_groups` does
+  // not), so a non-library exercise has no role to weight by and each tagged muscle counts whole.
+  const libRows = await db.execute(sql`
+    SELECT
+      LOWER(muscle_entry->>'muscle') AS muscle_group,
+      SUM(CASE WHEN muscle_entry->>'role' = 'main' THEN 1.0 ELSE 0.5 END) AS weighted_sets
+    FROM set_logs sl
+    JOIN exercise_logs el ON sl.exercise_log_id = el.id
+    JOIN workout_sessions ws ON el.workout_session_id = ws.id
+    CROSS JOIN LATERAL jsonb_array_elements(
+      (SELECT muscles FROM exercise_library WHERE name = el.exercise_name)
+    ) AS muscle_entry
+    WHERE ws.user_id = ${userId}
+      AND el.logged_at >= ${fromTz}
+      AND el.logged_at < ${toNextTz}
+      AND EXISTS (SELECT 1 FROM exercise_library WHERE name = el.exercise_name)
+      AND sl.deleted_at IS NULL AND el.deleted_at IS NULL AND ws.deleted_at IS NULL
+    GROUP BY LOWER(muscle_entry->>'muscle')
+  `)
+
+  const nonLibRows = await db.execute(sql`
+    SELECT
+      LOWER(mg) AS muscle_group,
+      COUNT(*)::float AS weighted_sets
+    FROM set_logs sl
+    JOIN exercise_logs el ON sl.exercise_log_id = el.id
+    JOIN workout_sessions ws ON el.workout_session_id = ws.id
+    CROSS JOIN LATERAL UNNEST(el.muscle_groups) AS mg
+    WHERE ws.user_id = ${userId}
+      AND el.logged_at >= ${fromTz}
+      AND el.logged_at < ${toNextTz}
+      AND el.muscle_groups IS NOT NULL
+      AND array_length(el.muscle_groups, 1) > 0
+      AND NOT EXISTS (SELECT 1 FROM exercise_library WHERE name = el.exercise_name)
+      AND sl.deleted_at IS NULL AND el.deleted_at IS NULL AND ws.deleted_at IS NULL
+    GROUP BY LOWER(mg)
+  `)
+
+  // Canonical keys, so "core" and "abs" are one row rather than two — the same fold every other
+  // muscle aggregate applies, and the reason is the library ships both spellings.
+  const result: Record<string, number> = {}
+  for (const row of [...libRows.rows, ...nonLibRows.rows] as { muscle_group: string; weighted_sets: string | number }[]) {
+    if (!row.muscle_group) continue
+    const mg = normalizeMuscle(row.muscle_group)
+    result[mg] = (result[mg] ?? 0) + Number(row.weighted_sets)
+  }
+  return result
+}
+
+/**
  * Undo a baseline the auto-adopt path completed on borrowed personal records (BF-143).
  *
  * `source: 'personal_record'` is written in exactly one place — the auto-heal block in

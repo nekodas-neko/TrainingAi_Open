@@ -18,6 +18,20 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-18 — backlog → 23768, `projectOverview.md` → 11715 (LB-111 shipped)
+
+**Backlog +33 net, and the shape is the interesting part:** LB-111's 23-line entry left the queue,
+OR-118 gained a shipped-half block, and **LA-118 was filed** — so a single item cleared and the file
+grew. That is the correct outcome rather than a failure of the ratchet. Checking LB-111's premise
+found that the muscle-attribution SQL exists four times with the copies disagreeing on date column
+and programme scope, and a finding with no queue entry is a dropped finding.
+
+Most of LA-118's length is one table. It earns it: the four copies all *say* they share the
+weighting, and they do — the divergence is in two things no comment mentions, which is exactly why
+prose describing it would be re-derived by the next reader.
+
+The overview's +13 is one paragraph replacing nothing, which is rarer here than it should be.
+
 ## 2026-09-18 — backlog → 23735 (TN-25 re-laned to B)
 
 **+23**, and it is a correction rather than new work: TN-25's `Lane: A` was right when written —
