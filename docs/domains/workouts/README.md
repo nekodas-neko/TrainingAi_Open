@@ -351,6 +351,17 @@ Live at the time of writing (2026-07-30):
 
 ## Gotchas specific to this domain
 
+- **A missing day in `trainedDays` reads as a REST day, not as missing data (BF-176).** The streak
+  loop walks back 365 days; if the supplier sends fewer, every day past its window looks like rest
+  and three of them break the streak. The failure is not an under-count by the difference — **the
+  number becomes a property of the window**, sliding as the edge moves, so it can go DOWN on a day
+  the lifter trained. `STREAK_LOOKBACK_DAYS`
+  (`packages/shared/src/workout/streak-window.ts`) is shared by both sides for that reason. **Two
+  streak implementations exist and they are different quantities:** `computeStreak`
+  (`lib/achievements.ts`) counts **training days** with a `maxRestGap`; the home loop counts
+  **calendar days spanned** (`1 + consecutiveRest`). Do not unify them to make them agree — it
+  silently changes what the number means.
+  ([`2026-09-18-lane-a-bf176-streak-window.md`](../../overview/entries/2026-09-18-lane-a-bf176-streak-window.md))
 - **Muscle names are matched through `muscles.ts`, never compared raw (BF-171).** `normalizeMuscle`
   folds synonyms (`core` → `abs`, `quadriceps` → `quads`) and `moodMuscleMatches` expands a broad
   check-in pill to the catalogue muscles it covers — **`Back` is a pill and is not a muscle**; the

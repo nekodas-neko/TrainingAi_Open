@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.457.13",
+    date: "2026-09-18",
+    changes: [
+      "Your streak now counts your training instead of counting the window it was looked up through. It read 90 and then dropped to 89 on a day you trained \u2014 your real streak is 102 days, unbroken since 8 June. The screen walked back a year while the server only sent 90 days, and every day beyond that read as a rest day rather than as missing data, so the number was pinned to the edge of the window and slid around as that edge moved. Your card may show the old figure until its cache turns over.",
+    ],
+  },
+  {
     version: "1.457.12",
     date: "2026-09-18",
     changes: [
