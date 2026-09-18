@@ -18,7 +18,23 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
-## 2026-09-18 — backlog → 23908, `projectOverview.md` → 11866 (Q-1a server half)
+## 2026-09-18 — backlog → 23865, `projectOverview.md` → 11889 (LA-100 closed, 40 entries folded)
+
+**Backlog −62: an entry removed, not amended.** LA-100's two claims — no target file for the sweep,
+and a hard ceiling every lane would hit — were both recorded stale by OR-119 on 09-17. The step left
+undone was deleting it, so every lane kept being offered finished work.
+
+**The ratchet failed on the way and that is worth recording**, because the failure name misleads:
+removing 62 lines tripped *"Orientation docs stay within their baselines"*. It is shrink-only, so a
+document getting SMALLER moves its baseline down and a stale one fails — the instinct on reading that
+check's name is that something grew.
+
+The `projectOverview.md` paragraph leads with the measurement that retired the entry (28 of 32
+history files are dated) rather than with the sweep, because the sweep is a chore that recurs and the
+measurement is the thing a future reader would otherwise re-derive before daring to run it.
+---
+
+## 2026-09-18 — backlog → 23897, `projectOverview.md` → 11899 (Q-1a server half)
 
 **Backlog +32 and nothing removed**, which is the honest shape for a partial: Q-1a stays queued
 because most of its scope — the client — has not shipped, and the entry now carries what DID ship, the
@@ -31,6 +47,38 @@ before measuring. The overview paragraph carries the same two, for the same reas
 
 ---
 
+
+## 2026-09-18 — backlog → 23927, `projectOverview.md` → 11879 (LA-110 re-measured)
+
+**Backlog +32, nothing removed, and no fix shipped** — which is the right trade for this entry
+specifically. LA-110 has now been filed with a wrong diagnosis **twice**: a rep-band mechanism a later
+measurement refuted, and a first fix that is not implementable because `workout_sessions.phase_type`
+is NULL on every production row. The 32 lines buy a *bounded* window (five sessions, clean on both
+sides), the discriminating detail (one set per exercise instead of two), and one red herring closed
+(a null `style_id` is ordinary — a clean day has five of them).
+
+The section naming three untested hypotheses is deliberately *in* the entry rather than left out. A
+reader who finds only the measurement will re-derive them; a reader who finds them listed as untested
+will test one.
+
+---
+
+
+## 2026-09-18 — backlog → 23893, `projectOverview.md` → 11870 (LA-120: the queue tool's three blind spots)
+
+**Backlog +17, and it is the only entry here that GREW the file on purpose.** Two gates came back
+with the paragraph that says which question each one waits on, because in both cases the *bare* field
+is what went missing — LA-76's was removed in September once the owner answered a different question,
+and Q-220 never had one at all while carrying a prose warning that failed within three days. A gate
+that does not say what would lift it is a gate the next session deletes, and both of these are the
+receipt for that.
+
+The overview paragraph spends its length on the **measurement**, not the regex: 140 of 144 Keep
+bullets already matched and all four misses were one shape. That number is the whole argument for
+widening rather than rewriting, and `keep.js`'s own comments argue the opposite case convincingly
+enough that a future session will re-open it. Without the count it would have to re-measure.
+
+---
 
 ## 2026-09-18 — backlog → 23855, `projectOverview.md` → 11855 (RV-58/59/60, the last sweep-50 batch)
 
