@@ -125,7 +125,7 @@ export default function HeartRateDetailPage() {
         <ObservedHrCard />
 
         <HrFactorsCard
-          restingHr={data?.hrMin ?? null}
+          lowestHrToday={data?.hrMin ?? null}
           recentHrv={data?.recentHrv ?? null}
           baselineHrv={data?.baselineHrv ?? null}
         />
