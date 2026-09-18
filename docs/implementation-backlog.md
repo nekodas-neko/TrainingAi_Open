@@ -607,29 +607,6 @@ existing 65 days moves by less than 5 points on every one of them.
   every row carries a model stamp. **Currently: 62 of 65 reproduce** (58 nine-key + 4 of the seven),
   three are 1 point out, and 25 of 65 are stamped.
 
-### [platform][workouts] RV-62 — a banned ms-offset window landed on the mood check-in write path
-
-- **Lane:** A — `lib/data/postgres/adapter.ts:3133`. **Added:** 2026-09-18 · Review sweep 50.
-- **The exact pattern CLAUDE.md names.** `deriveSuggestedSoreMuscles` builds its recovery window as
-  `const from7d = new Date(Date.now() - 7 * 86_400_000)`. Date Arithmetic: *"Range/window starts
-  anchor at the user's **local midnight**, never `now − N×86400000` — ms-offset windows straddle two
-  AEST days and merge them (session 62)."* New in this range (`git log -S"7 * 86_400_000"` →
-  `fdcee2d4`), so it is not inherited debt.
-- **Anchor it at `todayMidnightUtc(tz)` minus seven days**, as the rule's siblings do. The caller has
-  the user, so the timezone is reachable.
-- **Second, cheaper half in the same function:** it calls `this.listExerciseLibrary()` unfiltered on
-  **every check-in save** — statement 3 of the 5 that `POST /api/mood` issues is a full-table select
-  of the catalogue. At ~150 rows this is small; it is also entirely avoidable, since only the
-  muscle-group mapping for the sore ticks is used.
-- **Not established:** whether the day-boundary skew actually flips a provenance verdict. The window
-  feeds `computeMuscleRecovery`, and a workout that lands in or out of a 7-day window at the edge is
-  precisely the case that decides whether a tick reads as "suggested". Worth constructing rather
-  than assuming — it changes whether this is hygiene or a live scoring defect.
-- **Verification:** a test user in a timezone whose local time is near 01:00 (an `Etc/GMT±N` computed
-  from the current UTC hour, as `local-day-fixture-anchoring.test.ts` does) gets the same suggested
-  list as the same data at midday. That shape fires on every CI run rather than waiting for the
-  window.
-
 ### [platform] RV-52 — `weekly-review-month-window:` is in zero invalidation groups; its direct sibling is in three
 
 - **Lane:** A — `lib/cache-groups.ts`. **Added:** 2026-09-18 · Review sweep 50.

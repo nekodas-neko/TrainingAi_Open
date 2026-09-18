@@ -828,7 +828,8 @@ export interface WorkoutRepository {
 
   // ── Mood ──────────────────────────────────────────────────────────────────
   getMoodLog(userId: string, date: string): Promise<import('@trainingai/shared/types/mood').MoodLog | null>
-  saveMoodLog(userId: string, log: Omit<import('@trainingai/shared/types/mood').MoodLog, 'id' | 'userId' | 'createdAt'>): Promise<import('@trainingai/shared/types/mood').MoodLog>
+  /** `timezone` anchors the soreness-provenance window at local midnight (RV-62); callers pass the session tz. */
+  saveMoodLog(userId: string, log: Omit<import('@trainingai/shared/types/mood').MoodLog, 'id' | 'userId' | 'createdAt'>, timezone?: string): Promise<import('@trainingai/shared/types/mood').MoodLog>
 
   // ── Day check-in (End of Day review) ────────────────────────────────────────
   getDayCheckin(userId: string, logDate: string, phase: string): Promise<import('@trainingai/shared/types/day-checkin').DayCheckin | null>
