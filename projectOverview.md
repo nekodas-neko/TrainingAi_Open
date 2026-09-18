@@ -52,6 +52,17 @@ are still deliberately NOT unified** — `computeStreak` counts *training days* 
 the home loop counts *calendar days spanned* — so `streak-window.ts` now says outright that the
 leaderboard does not read `STREAK_LOOKBACK_DAYS`: 365 would cap an all-time field just as 90 did.
 
+**The equipped title was gated on the catalogue, not on having earned it (RV-61, 2026-09-18).**
+`PATCH /api/user/equipped-title` checked only that the id existed in `TITLES`; the unlock filter lives
+in the picker sheet, which is the **client's** copy of a rule only the server can hold. A direct PATCH
+skipped it and the stored title renders on the friend leaderboard, the friend feed and the public
+profile. The route now resolves `unlockedBy` and asks `computeAchievements` — **the** implementation
+of unlock state, not a cheaper second one that could disagree — refusing with 403. Clearing a title is
+not gated and does not pay for it. **No rate limit added:** `/api/achievements` already runs the same
+fifteen queries on every profile paint and carries none, so gating the rarer PATCH alone would be
+theatre. Verified first that all 16 `unlockedBy` values resolve to real achievement ids — this fix's
+failure mode is locking someone out of a title they earned, not letting one through.
+
 **The only unbounded route, narrowed and rate-limited — but not floored (RV-63, 2026-09-18).**
 `/api/collection` reads all history five ways with no rate limit, and the home card re-fetches it on
 every paint (`cachedFetch` revalidates regardless of TTL, Q-262). Two of those reads were full-width

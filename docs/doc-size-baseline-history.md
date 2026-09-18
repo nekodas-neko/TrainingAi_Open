@@ -18,6 +18,20 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-18 — backlog → 23871, `projectOverview.md` → 11852 (RV-61 shipped)
+
+**Backlog −17** for one small entry. The overview paragraph is longer than the diff because two of
+the three things worth remembering are **refusals**: the check calls a fifteen-query function on
+purpose rather than re-deriving unlock state cheaply, and it adds no rate limit because the sibling
+GET running the same work has none. A future reader looking at a PATCH that runs `computeAchievements`
+will reasonably ask why, and the answer is not in the diff.
+
+The third is the pre-flight check — that all 16 `unlockedBy` values resolve — which is there because
+this fix's failure mode is locking a user out of a title they earned, and nothing in CI would catch a
+requirement that silently does not resolve.
+
+---
+
 ## 2026-09-18 — backlog → 24070, `projectOverview.md` → 11841 (RV-63 shipped)
 
 **Backlog −21.** The overview paragraph is long for a route change because two of the three things
