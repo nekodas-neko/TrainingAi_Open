@@ -600,6 +600,248 @@ existing 65 days moves by less than 5 points on every one of them.
   every row carries a model stamp. **Currently: 62 of 65 reproduce** (58 nine-key + 4 of the seven),
   three are 1 point out, and 25 of 65 are stamped.
 
+### [workouts] RV-51 — two real exercises are excluded from every generated program, in production, today
+
+- **Lane:** A — catalogue data (a migration) plus a decision about
+  `packages/shared/src/workout/equipment.ts:38`. **Added:** 2026-09-18 · Review sweep 50.
+- **The premise the rule rests on is false right now.** `equipmentEligible`'s header justifies
+  excluding an exercise that declares no equipment with *"Migration 269 labelled the 22 rows that
+  had drifted and `POST /api/exercises` now refuses to create another, **so an empty list should not
+  occur**"*. Production holds **2 of 156** rows with `equipment = []`: `Dumbbell Lunges`
+  (`4d747449-e936-4ed2-93f8-0986407fa08a`) and `Cable Lat Pulldown`
+  (`aed11054-1d0d-49ee-b81f-ae3a336a2197`). Verified against `claude_ro.exercise_library` on
+  2026-09-18.
+- **The implementation is `exerciseEquipment.some(...)`, so an empty array is false against every
+  selection including `full_gym`** — `.some()` on `[]` is always false. Both exercises are therefore
+  invisible to `app/api/generate-program/route.ts:136`, `app/api/builder-chat/route.ts:103` and
+  `components/workout-builder/builder-review.tsx:180`, for every user, at every equipment setting.
+  For these two rows excluding is not the safe direction the comment claims: a full-gym lifter can
+  perform both.
+- **Fix the data, not the rule.** Label the two rows (`dumbbell`; `cable`) in a migration. The
+  exclude-on-empty rule is correct and is what stopped a home gym being offered Machine Chest Press
+  — do not soften it back to `length === 0 || …`.
+- **Then answer the question the data raises**, which is the part worth a moment: `exercise_library`
+  has no `created_at`, so it could not be established whether migration 269 **missed** these two or
+  something **wrote** them afterwards. If it is the latter, the `POST /api/exercises` guard has a
+  hole and labelling two rows fixes nothing. Check the guard against the insert paths before
+  closing.
+- **Verification:** after the migration, `SELECT count(*) FROM exercise_library WHERE equipment IS
+  NULL OR array_length(equipment,1) IS NULL` returns 0, and a generated full-gym program can offer
+  both names.
+
+### [platform][workouts] RV-62 — a banned ms-offset window landed on the mood check-in write path
+
+- **Lane:** A — `lib/data/postgres/adapter.ts:3133`. **Added:** 2026-09-18 · Review sweep 50.
+- **The exact pattern CLAUDE.md names.** `deriveSuggestedSoreMuscles` builds its recovery window as
+  `const from7d = new Date(Date.now() - 7 * 86_400_000)`. Date Arithmetic: *"Range/window starts
+  anchor at the user's **local midnight**, never `now − N×86400000` — ms-offset windows straddle two
+  AEST days and merge them (session 62)."* New in this range (`git log -S"7 * 86_400_000"` →
+  `fdcee2d4`), so it is not inherited debt.
+- **Anchor it at `todayMidnightUtc(tz)` minus seven days**, as the rule's siblings do. The caller has
+  the user, so the timezone is reachable.
+- **Second, cheaper half in the same function:** it calls `this.listExerciseLibrary()` unfiltered on
+  **every check-in save** — statement 3 of the 5 that `POST /api/mood` issues is a full-table select
+  of the catalogue. At ~150 rows this is small; it is also entirely avoidable, since only the
+  muscle-group mapping for the sore ticks is used.
+- **Not established:** whether the day-boundary skew actually flips a provenance verdict. The window
+  feeds `computeMuscleRecovery`, and a workout that lands in or out of a 7-day window at the edge is
+  precisely the case that decides whether a tick reads as "suggested". Worth constructing rather
+  than assuming — it changes whether this is hygiene or a live scoring defect.
+- **Verification:** a test user in a timezone whose local time is near 01:00 (an `Etc/GMT±N` computed
+  from the current UTC hour, as `local-day-fixture-anchoring.test.ts` does) gets the same suggested
+  list as the same data at midday. That shape fires on every CI run rather than waiting for the
+  window.
+
+### [platform] RV-52 — `weekly-review-month-window:` is in zero invalidation groups; its direct sibling is in three
+
+- **Lane:** A — `lib/cache-groups.ts`. **Added:** 2026-09-18 · Review sweep 50.
+- **Batch:** `cache-eviction-gaps-sweep50`
+- Key defined at `components/week-trends-section.tsx:36` as
+  `weekly-review-month-window:<weekStart>`. Counted with `grep -c` against `lib/cache-groups.ts`:
+  **0 groups**, against **3** for `day-review-week-window:` — the key rendered by the same surface
+  from the same writes.
+- **The sibling is the argument.** Nothing distinguishes the two payloads' write sensitivity; one was
+  registered and one was not. Add it wherever `day-review-week-window:` appears.
+- **Per Q-262 this may be inert today** — `cachedFetch` always revalidates, so an unregistered key
+  only settles stale where a read path is seed-only or passes `freshWithinTtl`, and neither was
+  established here. File and fix it anyway: a key that is inert today becomes load-bearing the moment
+  someone adds `freshWithinTtl` to it, and that is not a change anyone would think to check this
+  against.
+
+### [platform][readiness] RV-53 — `stress-day:` is in zero invalidation groups; `body-battery`, on the same card, is in four
+
+- **Lane:** A — `lib/cache-groups.ts`. **Added:** 2026-09-18 · Review sweep 50.
+- **Batch:** `cache-eviction-gaps-sweep50`
+- Key defined at `components/body-battery/stress-day-chart.tsx:77` as `stress-day:<date>`. `grep -c`:
+  **0 groups**, against **4** for `body-battery` — which the same card renders, from the same Oura
+  ingest.
+- Same reasoning and same Q-262 caveat as RV-52. Register it in the groups that already carry
+  `body-battery`.
+
+### [workouts][platform] RV-54 — the deload confirmation does not evict `collection`, though `/api/collection` computes its answer from it
+
+- **Lane:** A — `lib/cache-groups.ts:404-422`. **Added:** 2026-09-18 · Review sweep 50.
+- **Batch:** `cache-eviction-gaps-sweep50`
+- **This is the sharpest of the three, because the dependency is explicit in the route.**
+  `app/api/collection/route.ts:59` computes
+  `const pausedDays = [...restDays, ...earlyDeloadWeekDays(program ?? {})]` — i.e. directly from the
+  deload confirmation that `invalidatePrescriptionChanged()` exists to fan out. `collection` appears
+  in `cache-groups.ts` at lines 32, 148, 202 and 330 — **not** in that group's body.
+- RV-49 extended this same group correctly in this window (it now prefix-drops `workout-card:` and
+  `ai-periodization-session:` and includes `next-session`), which is what makes the omission worth
+  reading as an oversight rather than a decision.
+- **Verification:** confirm an early deload, then re-read `/api/collection` without waiting out the
+  TTL — `pausedDays` reflects the new deload week.
+
+### [platform][nutrition] RV-55 — a client-supplied vial `id` turns a duplicate into an unhandled 500 and a server-fault row
+
+- **Lane:** A — `app/api/supplements/[id]/vials/route.ts:19` and
+  `lib/data/postgres/adapter.ts:6761`. **Added:** 2026-09-18 · Review sweep 50.
+- **Batch:** `route-input-500s-sweep50`
+- `POST` accepts `id: z.string().uuid().optional()` and the adapter inserts it unguarded — the
+  **parent** is ownership-checked at line 6756, the id is not. Re-posting another user's vial UUID
+  raises `23505`, answering **500 with an empty body** and writing a `[pg 23505]` row to
+  `error_events`. Control: the same request with a fresh UUID returns **201**, so the 500 tracks the
+  `id` field alone.
+- **No cross-user write occurs** — the victim row was read back unchanged (`user_id`, `strength_mg`,
+  `deleted_at` all as before), and no driver text reaches the client. What it is, is a "does this
+  UUID exist" oracle plus fault-table pollution for a client error.
+- **Decide first whether `id` should be accepted at all.** It was not established that any client
+  sends it; it may exist only for outbox replay. If it does, scope the conflict — an insert whose
+  `id` already exists under another user must answer 404/409, not 500. If it does not, drop the
+  field.
+
+### [platform][sleep][nutrition] RV-56 — three date params validate shape but not calendar, so `2026-02-31` is a 500
+
+- **Lane:** A — `app/api/sleep/manual-bedtime/route.ts:15`,
+  `app/api/supplements/[id]/vials/route.ts:18`, `app/api/supplements/[id]/vials/[vialId]/route.ts:16`.
+  **Added:** 2026-09-18 · Review sweep 50.
+- **Batch:** `route-input-500s-sweep50`
+- All three carry `/^\d{4}[-/]\d{2}[-/]\d{2}$/` — the correct **separator** regex — and then never
+  reach `normalizeDateParam`/`isCalendarDate` (verified: `grep -c` for either returns **0** in all
+  three files). A date-shaped non-day reaches the driver as `[pg 22008]`: `POST
+  /api/sleep/manual-bedtime` with `date: "2026-13-45"` → 500, empty body, `error_events` row.
+  Control: `"2026-09-10"` → 200 and the row read back correctly; `"2026-02-31"` also 500s, so the
+  refusal tracks calendar validity rather than the separator.
+- This is the Q-496 class `isCalendarDate` was added to stop. The other 68 changed routes were swept
+  for the same shape and only these three matched; `app/api/water-log/route.ts` has a bare regex but
+  clamps `localDate` to today/yesterday, verified by probe, so it is **not** affected.
+- **Verification:** each of the three answers 400 on `2026-02-31` and 200/201 on the adjacent real
+  day.
+
+### [platform] RV-63 — `/api/collection` is the only new route that is both unbounded and rate-limit-free
+
+- **Lane:** A — `app/api/collection/route.ts`. **Added:** 2026-09-18 · Review sweep 50.
+- It pins `HISTORY_START = '2000-01-01'` and issues **five parallel all-history repo reads** with no
+  rate limit (`grep -c 'rateLimit('` → **0**; `stress-day`, `weekly-review/month-window` and
+  `oura-ble/rollup-state` each have one). Ten statements per warm request.
+- **Two of those ten are full-width reads used for one field each** — 36 columns of `body_metrics`
+  and 25 of `sleep_sessions`, immediately projected to `.map(m => m.date)` / `.map(sl => sl.date)`.
+  Measured row widths: 176 and 144 bytes.
+- **The card re-runs it on every home paint.** `components/home/collection-card.tsx` uses
+  `COLLECTION_TTL = TTL_SHORT`, and per Q-262 `cachedFetch` revalidates over the network regardless
+  of TTL — so the all-history replay is not once per five minutes, it is once per render.
+- **Nothing is slow today** and this is filed as unbounded-growth plus a missing guard, not a latency
+  defect: at the owner's ~130 step-days the payload is negligible, and the 0.364 s warm timing is
+  dominated by fixed dev-server overhead (a 3-statement route cost 0.405 s in the same run). The
+  fix is a date floor and two projected selects, not an optimisation pass.
+- **⚠ Rate limiting across the five new reads has no sibling norm to appeal to** — `collection` and
+  `muscle-sets` have none, the other three do, and their nearest siblings split the same way
+  (`weekly-muscle-sets`, `streak-data`, `muscle-tonnage-trend` have none; `health-trends` does).
+  Decide the norm once rather than matching whichever sibling is read first.
+
+### [workouts] RV-57 — `STREAK_LOOKBACK_DAYS` is read by one of the two files it calls a contract
+
+- **Lane:** B — `app/session-select/session-select-content.tsx:1020`. **Added:** 2026-09-18 · Review
+  sweep 50.
+- **Not batched** — the change lands in a Lane B file (`app/session-select/**`) while the rest of
+  this sweep's shared-module drift is Lane A, and a batch is one lane's PR.
+- The module header (`packages/shared/src/workout/streak-window.ts:4-24`) states: *"This number is a
+  CONTRACT between two files that used to disagree silently… Any new streak surface reads this
+  constant."* The supplier does (`app/api/streak-data/route.ts:4`). The consumer still reads
+  `for (let ago = 1; ago < 365; ago++)` with no import — `grep -rn STREAK_LOOKBACK_DAYS` finds it in
+  the route, the module and two test files, never in `session-select-content.tsx`.
+- **No live bug: 365 and `< 365` happen to cover the same span.** The defect is that the constant
+  cannot enforce the agreement it exists for — changing it reintroduces BF-176's window-edge
+  oscillation verbatim, silently, which is exactly the failure it was created to prevent.
+- Also stale in the same file: line 532's comment still reads *"streak-data (90 days) is a strict
+  superset of what home needs"*, the pre-BF-176 number.
+- **Not established:** whether `getRecentTrainedDays(userId, 365, tz)` returns 365 or 366 calendar
+  keys — the off-by-one at the far edge is unverified in either direction, and importing the
+  constant does not settle it.
+
+### [workouts] RV-58 — `equipmentEligible` lowercases one side of the comparison and `buildEquipmentSet` lowercases neither
+
+- **Lane:** A — `packages/shared/src/workout/equipment.ts:18-23` and `:40`. **Added:** 2026-09-18 ·
+  Review sweep 50.
+- **Batch:** `shared-module-drift-sweep50`
+- Probed against the shipped module: `equipmentEligible(['Barbell'], buildEquipmentSet(['barbell']))`
+  → **true**, but `equipmentEligible(['barbell'], buildEquipmentSet(['Barbell']))` → **false**, and
+  `buildEquipmentSet(['FULL_GYM'])` → `['bodyweight','FULL_GYM']` — the shorthand is not expanded.
+- **Not reachable today**, which is the reason it is low in the queue rather than the reason to skip
+  it: the only producer (`components/workout-builder/builder-wizard.tsx:21`) uses lowercase ids and
+  **0 of 156** catalogue rows carry a non-lowercase equipment value. Both API schemas accept a bare
+  `z.array(z.string())`, so a future producer is unconstrained.
+- **⚠ The shipped test reads as covering this and does not.**
+  `lib/__tests__/catalogue-equipment-guard.test.ts:129` exercises only the exercise side, which is
+  what makes the half-coverage look like case-insensitivity. Add the mirrored case in the same PR.
+
+### [nutrition] RV-59 — `summariseSupplementDay` sums mixed units and labels the total by row order
+
+- **Lane:** A — `packages/shared/src/nutrition/supplement-day-totals.ts:66-67`. **Added:**
+  2026-09-18 · Review sweep 50.
+- **Batch:** `shared-module-drift-sweep50`
+- `acc.loggedAmount.amount = (acc.loggedAmount.amount ?? 0) + l.amount` with
+  `acc.loggedAmount.unit ??= l.unit ?? null` — so `1 mg + 2 g` reports **`3 mg`** or **`3 g`**
+  depending only on which row the loop saw first. Confirmed by probing the shipped module in both
+  orders.
+- **The module's own header names this case as a reason it was hoisted** — *"a new `source` value
+  handled on one side, **or a mixed-unit day**, and the device silently disagrees with the server"* —
+  and its three "behaviours that must not drift" specify the unit rule while saying nothing about the
+  amounts, which are summed regardless.
+- **Latent, and more than latent: the multi-contribution path is unexercised by any real data.**
+  `claude_ro.supplement_logs` holds 5 rows, all `source='manual'`, units `mg`/null, and
+  `GROUP BY (log_date, supplement_id) HAVING count(*) > 1` returns **zero groups** — so no owner day
+  has more than one contribution at all. That is *the owner's rows only*.
+- **Decide the semantics before coding**: either convert to a canonical unit, or refuse to total
+  across units and report per-unit subtotals. Summing and picking a label is the one option that
+  cannot be right.
+
+### [cardio] RV-60 — the walk recommender's "no Zone 2 target" branch cannot fire, and nothing calls it yet
+
+- **Lane:** A — `packages/shared/src/walking/recommend-walk-pattern.ts:77-86`. **Added:** 2026-09-18
+  · Review sweep 50.
+- **Batch:** `shared-module-drift-sweep50`
+- The module ships two distinct user-facing strings — *"Zone 2 is done for the week"* vs *"No Zone 2
+  target set this week"* — which exist precisely to tell the user which case they are in. The only
+  producer of a `ZoneQuota` represents "no target" as a row with `status: 'not-required'`
+  (`health/zone-quota.ts:48-50`), not as a missing row, and `recommend-walk-pattern.ts:79` collapses
+  that to 0 remaining. So a user with no target is told the target is **done**, and the `zone2 ==
+  null` branch is unreachable from real data.
+- `zone-quota.test.ts:38` asserts the repo keeps that distinction deliberately ("marks a zero-target
+  zone as not-required, not complete"), so the two modules disagree about what the quota means.
+- **Impact is currently zero — `grep -rn recommendWalkPattern` finds no production call site**, tests
+  only. Fix it before the first consumer lands, not after.
+- Threshold behaviour itself is correct and was probed: 14→easy, 15→short, 44→short, 45→long,
+  46→long, matching `ZONE2_GAP_MET_MIN`/`ZONE2_GAP_LARGE_MIN`.
+
+### [app-shell] RV-61 — any signed-in user can equip an achievement title they have not unlocked
+
+- **Lane:** A — `app/api/user/equipped-title/route.ts:26-29`. **Added:** 2026-09-18 · Review sweep 50.
+- The only gate is catalogue membership (`hasOwnProperty.call(TITLES, titleId)`); unlock state is
+  never consulted. The filter is **client-side only**
+  (`components/more/title-picker-sheet.tsx:17` takes `unlockedAchievementIds` and filters the list).
+  Live: a user at `bestStreak: 9` equipped `iron_will` (`unlockedBy: 'streak_60'`) → 200, read back
+  from Postgres as stored, and it renders on `friend-leaderboard.tsx:106`, `friend-feed.tsx:16` and
+  `app/profile/[userId]/page.tsx:34`. Control: `"iron_will_x"` → 400 with the stored value intact, so
+  the refusal tracks catalogue membership specifically.
+- **⚠ Pre-existing, not introduced in this window — and this diff *hardened* the same line**,
+  replacing a truthy `TITLES[titleId]` lookup that let `constructor`/`__proto__` through. It is filed
+  here because the sweep found it, not because it regressed.
+- **Low priority on its merits:** cosmetic, no data or permission is gained, and on a single-owner
+  deployment there may be no adversary. The reason to do it is that the server is the only place the
+  unlock rule can live, and the achievements payload the picker already reads is the input.
+
 ### [readiness][devices][platform] TN-46 — correlate vitals against dose: the app holds both halves and joins neither 🔴 LIVE
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-17 · owner: *"The idea was to be able to correlate
@@ -6928,6 +7170,25 @@ stronger reason the measured one wins.
   its longest single session.**
 
 ### [app-shell][platform] BF-110 — the blank resume survives a scroll, which means the renderer never died
+
+- **✅ THE READING IS IN, and it says NATIVE — measured 2026-09-18 (Review sweep 50). This entry is
+  no longer waiting on data.** `error_events WHERE message LIKE 'bf110 resume recheck%'`:
+
+  | verdict | rows | dates |
+  |---|---|---|
+  | `stuck h1=667 h2=667 w2=384 children2=1` | **3** | 2026-09-15 → 09-16 |
+  | `stuck h1=826 h2=826` (healthy) | 12 | same span |
+  | `resized` | **0** | — |
+  | `dom-lost` | **0** | — |
+
+  By this entry's own criterion above — *"`stuck` → the viewport is genuinely held at 384×667 and the
+  fix is native"* — **the fix is in the native layer.** Separately, 22 first-readings at
+  `h=667 children≤2` put the blank resume itself at roughly twice a day.
+- **⚠ Two things about the telemetry to fix while you are in here, or the next reader is misled the
+  same way.** (1) The verdict word `stuck` fires on **healthy** resumes too — 12 of the 15 rows are
+  826→826, which is a viewport that was never wrong. `stuck` means "did not change", not "is broken".
+  (2) `w=384` appears on **every** row including the healthy ones, so this entry's "384×667"
+  signature is half right: **only the height discriminates.** Read `h1`, not the pair.
 
 - **Keep:** the READING, and only that. The second viewport log **shipped 2026-09-14**
   (`feat/bf110-second-viewport-log`), so nothing here is owed a build. What is owed is one blank

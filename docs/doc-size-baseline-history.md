@@ -18,7 +18,7 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
-## 2026-09-18 — backlog → 23933, `projectOverview.md` → 11745 (TN-49, the rederivation gap)
+## 2026-09-18 — backlog → 24194, `projectOverview.md` → 11775 (TN-49, the rederivation gap)
 
 **Backlog +13 on an entry that shipped its fix and stayed queued.** The growth is a retraction: the
 entry's prescribed first action would have overwritten seven correct production scores with values
@@ -30,6 +30,21 @@ is about a **surface that asserted the opposite of its own evidence** — the au
 score IS reproducible from its own stored inputs (42)" against a stored 48 — because that sentence is
 what generated the false entry, and a later session reading the fix without it would not know why the
 entry was believed.
+
+**Re-read as 24194 / 11775 on the re-merge**, against the 23933 / 11745 this note was drafted with —
+review sweep 50 (#1297) landed thirteen RV entries in between. The deltas are unchanged; the
+absolutes are a reading of whatever `main` was at merge time, which is never the `main` the note was
+written against.
+
+**That re-merge is also where the backlog conflict took a THIRD shape**, and it is worth recording
+because neither existing rule covered it. The documented cases are two deletions (keep neither) and
+two additions on an append-only file (keep both). This was an **edit against an append**: `main`
+carried the ORIGINAL TN-49 text plus the new RV entries, while this branch carried the rewritten
+TN-49. "Keep both" would have restored the retracted prescription — the one that would have
+corrupted seven production rows — sitting directly above its own correction, and "keep neither"
+would have dropped thirteen new entries. The resolution is per-heading: this side's TN-49, then
+`main`'s RV-51…RV-63. Reading the headings is what the rule actually asks for; the deletion/addition
+dichotomy is a shortcut that does not always apply.
 
 ---
 
@@ -13577,3 +13592,40 @@ window edge instead. Two further notes are recorded against a plausible wrong fi
 `allTimeStreak` has the same 90-day clip, and the repo's two streak implementations count
 different quantities, so unifying them while moving this server-side would silently redefine what
 102 means.
+
+## 2026-09-18 — `docs/implementation-backlog.md` +260 (23920 → 24180) (Review sweep 50)
+
+Thirteen new queue entries (**RV-51…RV-63**) from the owner's twelve-day catch-up review — 50
+commits, 671 changed code files, swept across safety/logic/performance/efficiency — plus a reading
+recorded on the existing **BF-110** entry.
+
+The growth is queue, not prose, and it is at the ratio this file is meant to carry: 260 lines for 13
+entries is ~20 lines each, against a file whose entries average that. (**The floor moved twice
+while this sweep was open** — TN-47/48/49 and then another PR landed on `main` mid-review. The
+figure that matters is the delta: +260 is this sweep's thirteen entries and nothing else, on
+whatever base it merges onto.) **One entry is deliberately
+longer than its defect**: RV-51 is a two-row data fix, and most of its length is the question the
+data raises rather than the fix — `exercise_library` has no `created_at`, so whether migration 269
+*missed* those two rows or something *wrote* them afterwards is unestablished, and if it is the
+latter then labelling the rows fixes nothing. An implementer who reads only the fix closes it wrong.
+
+BF-110's addition is the opposite case and is worth the lines for a different reason: the entry had
+already declared which reading meant which fix, the reading arrived, and nobody had gone to look. It
+also corrects two ways the telemetry misleads — `stuck` fires on healthy resumes, and `w=384`
+appears on every row — so the next reader does not re-derive the same wrong signature.
+
+## 2026-09-18 — `projectOverview.md` +30 (11729 → 11759) (Review sweep 50)
+
+Two Known-Issues rows from sweep 50, and only two: thirteen findings were filed and eleven of them
+went to the backlog alone, because the queue is where work that is *understood* belongs. These two
+earn a place in the orientation read for opposite reasons.
+
+**RV-51** is the sweep's only live user-affecting defect — two named exercises are absent from every
+generated program right now, for every user, at every equipment setting — so a session that orients
+and then touches program generation needs to know before it starts. **RV-62** is here because its
+impact is *unestablished* and cheap to establish wrongly: a banned ms-offset window on the mood write
+path, where whether the day-boundary skew flips a provenance verdict decides between hygiene and a
+live scoring defect. The row says so explicitly rather than implying either.
+
+Both carry their `[domain]` tags, and both say "found, not fixed" / name what was not established,
+so neither can be mistaken for a closed item on a later sweep.
