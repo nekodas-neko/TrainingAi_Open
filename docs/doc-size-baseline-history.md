@@ -45,6 +45,29 @@ entry is what Lane A reads before running it. The working is in a review doc, no
 
 ---
 
+## 2026-09-18 — backlog → 23744, `projectOverview.md` → 11693 (BF-176 shipped)
+
+**−29 and +14.** BF-176's entry leaves with the fix; **LA-117** replaces it, carrying the sibling
+defect (`allTimeStreak` over its own 90-day window) that this PR deliberately did not batch. A net
+shrink even so, which is the shape to want when a shipped entry owes exactly one follow-up.
+
+The `projectOverview` growth is one paragraph, and the sentence earning most of it is the mechanism
+rather than the fix: **once the real streak exceeds the window the number tracks where the edge
+lands, not what the lifter did**. Without that, the next reader sees a constant raised from 90 to 365
+and files it as a limit that was too low, which is not what happened.
+
+## 2026-09-18 — backlog → 23773, `projectOverview.md` → 11679 (TN-45 engine half)
+
+**+18 and +18.** TN-45 is an A-then-B entry and only the engine half shipped, so it stays queued with
+a `Keep:` rather than leaving — the entry grows instead of shrinking, which is the honest shape for a
+half-done item. Most of the added lines are the two things a later reader would otherwise get wrong:
+that **nothing renders this yet** (so the owner sees no change and the pass test is unmet), and that
+the copy must not imply illness, because both real firings were a medication rather than an infection.
+
+The `projectOverview` paragraph carries a third: the other `watch` day, 2026-08-27, predates the first
+dose by eleven days and has no explanation on file. Left unrecorded, the TN-46 write-up would read as
+having explained both.
+
 ## 2026-09-17 — backlog → 23694 (TN-46 corrected: the snapshot it called urgent was already on disk)
 
 **+24 net.** The entry's schema-change half is struck and replaced with the measurement that retires
@@ -13444,6 +13467,18 @@ replaced — the three corrections to my own entries, and the two conditions a n
 
 The backlog loses 14: BF-100's second finding is struck because it shipped in this PR, replaced by
 the measurement and the proof that it now fails on a cancelled restore.
+## 2026-09-17 — `docs/implementation-backlog.md` 23235 → 23755
+
+**BF-176** — the home streak counts the API's 90-day window rather than the owner's training, so it
+reads 89 against a real 102 and goes *down* on days he trains.
+
+The measured day-by-day table earns its lines: "the streak decreased while he trained" is the part
+that sounds like a data-loss bug and is not, and the table is what shows the count tracking the
+window edge instead. Two further notes are recorded against a plausible wrong fix — the leaderboard's
+`allTimeStreak` has the same 90-day clip, and the repo's two streak implementations count
+different quantities, so unifying them while moving this server-side would silently redefine what
+102 means.
+
 ## 2026-09-11 — `docs/implementation-backlog.md` → 21535 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
@@ -13496,3 +13531,9 @@ depth-dependent; the honest statement is that **the rewrite count is not measura
 clone at all**, and a number quoted without its depth means nothing. The live baseline figure is the
 only thing in this note worth trusting. That is the third time a count here has been asserted before
 it was checked — twice by hand, once by a derivation that looked rigorous and was not.
+
+**Recomputed again 2026-09-18** (→ 23719), after #1285, #1288 and #1289 landed and #1289's BF-176
+note was added to this file — the eighth day this PR has waited on its owner decision. No rewrite
+count is quoted, per the paragraph above: the clone was deepened again this morning to reconnect the
+histories for this very merge, which is exactly the operation that moved the last three derivations.
+The figure is `pnpm fix:baselines` on the merged tree and nothing else.

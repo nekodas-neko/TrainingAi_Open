@@ -624,6 +624,24 @@ line must name **what moved** (resting HR and HRV off baseline), never imply inf
 
 **Pass test:** a `watch` day produces something the owner can see on Home, and a normal day does not.
 
+- **Keep:** the RENDER, which is the Lane B half and the whole remaining ask. The engine half shipped
+  2026-09-18: `illnessAdvisory(flag, biomarkers?)` now names the one or two biomarkers actually
+  driving the score, so `watch` reads *"Resting HR and HRV are drifting from your baseline — worth
+  keeping an eye on."* rather than naming nothing. Verified against the biomarker maps **as persisted
+  in production** for both real firings (2026-09-16 score 41, 2026-08-27 score 57) — both name
+  resting HR and HRV. **Nothing renders it yet**, so the pass test is not met: the render guard at
+  `components/home/illness-advisory-banner.tsx:15` still returns `null` for `watch`, and the owner's
+  choice was a quiet line under the readiness score rather than that banner. Until Lane B ships that
+  line, this entry's defect is unchanged from the owner's side.
+- **⚠ What the engine half deliberately did NOT do:** no threshold moved, no readiness penalty
+  changed (`watch = 0` stays), and the second parameter is OPTIONAL so every existing caller keeps
+  the previous wording. The entry's two "do not" warnings are intact.
+- **One thing the production read turned up that the entry did not state:** the other `watch` day is
+  **2026-08-27**, which PREDATES the first Retatrutide dose (2026-09-07) and carries an HRV z of
+  **−4.26**. The entry's *"the cause is now known, and it is not illness — see TN-46"* covers 09-16
+  and cannot cover 08-27. That day has no explanation on file. Not this entry's scope; recorded so it
+  is not assumed settled.
+
 
 ### [workouts][app-shell] LB-116 — the check-in sheet knows which sore ticks it suggested and throws it away (fixed; device check owed)
 
@@ -1019,6 +1037,38 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
 - **Keep:** the pass tests here — the −16 pt penalty gone, and the mean morning anchor above 75 over
   the trailing 30 days — can only be measured after the owner fires it. Re-measure then; do not
   strike this entry before that.
+
+### [workouts][platform] LA-117 — `allTimeStreak` on the leaderboard can only ever report 90
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-18 (Lane A, found while shipping BF-176).
+- **Lane: A** — `app/api/friends/leaderboard/route.ts:16,35,74,136`. Reached by `app/api/**`, so
+  Lane A by the rule; the leaderboard card that renders it needs no change.
+- **Same defect as BF-176, with a louder name.** `allTimeStreak` is
+  `computeStreak(days, tz, maxCompliantRestGapFor(...)).best` over a `days` list the query bounds at
+  `STREAK_WINDOW_DAYS = 90` (`gte(workoutSessions.startedAt, streakFrom)`). A field called *all-time*
+  that structurally cannot exceed 90 is wrong in the same way the home streak was, and it will read
+  as a plateau to anyone whose real best is longer — the owner's is **102**.
+- **Filed rather than fixed in BF-176's PR, deliberately.** It is one line, and the entry invited
+  batching it. It was kept out because it is a different surface nobody reported, it changes a
+  number other people see on a shared board, and BF-176's value was a one-constant fix whose
+  verification surface should stay one screen. Minimal PRs beat convenient ones.
+- **Two ways to fix it, and they are not equivalent:**
+  1. **Drop the window** so the name becomes true. `workout_sessions` is indexed on
+    `(user_id, started_at)` and this is a personal app with a handful of friends, so the scan is
+    cheap — but it is a scan over every friend's whole history on every leaderboard load, and that
+    cost was never measured. **Measure before choosing this.**
+  2. **Rename the field** to what it computes (`recentStreak`, 90-day). Honest, cheaper, and loses
+    the thing the name promised. This is the fallback if (1) measures badly.
+- **⚠ Do NOT reach for the home streak's number to "make them agree".** They are different
+  quantities: `computeStreak` counts **training days** with a `maxRestGap`, while the home loop
+  counts **calendar days spanned** (`1 + consecutiveRest`, so rest days inside the streak are
+  included). Both are defensible. Unifying them silently changes what the owner's 102 means — see
+  BF-176's own warning, which this entry inherits.
+- **Verification:** a fixture whose training history runs past 90 days, asserting the reported
+  streak exceeds 90. The BF-176 test file
+  (`packages/shared/src/workout/__tests__/streak-window.test.ts`) has the shape to copy — its
+  `at a %i-day window the count tracks the WINDOW` case is the same experiment.
+
 
 ### [nutrition] BF-175 — the log-food sheet prints the stored GOAL as today's budget, so it reads 1660 beside the card's 1506
 

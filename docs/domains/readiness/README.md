@@ -359,6 +359,17 @@ Live at the time of writing (2026-07-30):
 
 ## Gotchas specific to this domain
 
+- **`watch` is the only illness band that has ever fired, and it is advisory-only by design
+  (TN-45).** 2 days in 72; `elevated` and `fever` are at **zero**, so the illness banner has never
+  rendered. Two consequences worth knowing before touching this area. **(1) Do not "fix" it by
+  raising `READINESS_SUPPRESSION.watch`** — readiness already fell to ~32 on those days on its own,
+  so a penalty double-counts the same physiology; the gap is *visibility*, not weight. **(2) The
+  copy must not imply illness.** Both real firings were driven by a medication, not an infection
+  (TN-46), so an infection-flavoured line would have been wrong every time this feature has ever
+  appeared. `illnessAdvisory(flag, biomarkers?)` names the top one or two contributors by
+  **contribution**, not raw z — temperature holds 40% of the weight, so a small z can out-rank a
+  larger one.
+  ([`2026-09-18-lane-a-tn45-watch-names-what-moved.md`](../../overview/entries/2026-09-18-lane-a-tn45-watch-names-what-moved.md))
 - **The personal baselines are CHECKPOINTED PER NIGHT, so they cannot be erased by drift (TN-46).**
   `oura_daily_summary` stores `hrv_baseline_mean_x8`, `rhr_baseline_mean_x8` and the other four
   alongside `n_history`, **one set per row**. The live baseline does adapt fast — `updateBaseline`

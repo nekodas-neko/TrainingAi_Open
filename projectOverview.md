@@ -26,8 +26,40 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.457.11 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-09-17.
+**Version:** v1.457.13 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-09-18.
+
+**The streak counted the API's window, not the training (BF-176, v1.457.13).** The owner asked why it
+went **90 → 89 on a day he trained**; his real streak is **102 days**, unbroken since 2026-06-08.
+`app/api/streak-data/route.ts` sent 90 days of `trainedDays` while the consuming loop walked back
+365, and a missing day reads as a **rest day** rather than as missing data — so past day 90 three
+lookups broke the streak and the count was pinned to the window edge. **The mechanism is worth
+stating because it is counter-intuitive: once the real streak exceeds the window, the number tracks
+where the edge lands, not what the lifter did.** It dropped because the edge slid off a rest day onto
+a trained one. `STREAK_LOOKBACK_DAYS` (`packages/shared/src/workout/streak-window.ts`) is now shared
+by both sides, because they have to agree and nothing made them. **The card may show the old number
+until the `streak-data` cache turns over** (`TTL_LONG`, also stamped optimistically on workout
+completion). **Filed not fixed: LA-117** — the leaderboard's `allTimeStreak` has the same defect over
+its own 90-day window, and the two streak implementations count *different quantities* (training days
+vs calendar days spanned), so they must not be unified to make them agree.
+
+**The only illness band that ever fires now says what moved (TN-45, v1.457.12 — engine half only).**
+`watch` has fired **2 days in 72**; `elevated` and `fever` have fired **zero** times, so the illness
+banner has never rendered at all. And `watch` is inert twice over — no readiness penalty (deliberate,
+"advisory-only") and no UI, so the band is named advisory-only and there is no advisory. Its copy also
+named nothing, while `IllnessResult.biomarkers` already carried the per-biomarker `{ z, contribution }`
+the source comments call *"the 'why', for the advisory"*. `illnessAdvisory(flag, biomarkers?)` now reads
+it: *"Resting HR and HRV are drifting from your baseline — worth keeping an eye on."* Ranked by
+**contribution** rather than raw z, capped at two, zero-contribution biomarkers never named, and the
+parameter is optional so no existing caller changes. **The wording deliberately implies nothing about
+cause** — both real firings were driven by a medication rather than illness (TN-46), so an
+infection-flavoured line would have been wrong on 100% of the occasions this feature has ever appeared.
+**⚠ NOTHING RENDERS IT YET** — the guard at `components/home/illness-advisory-banner.tsx:15` still
+returns `null` for `watch`, and the owner chose a quiet line under the readiness score rather than the
+amber banner. Until Lane B ships that line the defect is unchanged from the owner's side, and TN-45
+stays queued with a `Keep:` saying so. **Also unexplained:** the other `watch` day, **2026-08-27**,
+predates the first dose by eleven days and carries an HRV z of **−4.26** — TN-46's "the cause is now
+known" covers 09-16 and cannot cover it.
 
 **Two calorie budgets, two taps apart, are now one (BF-175, v1.457.11).** The card said 1,506 and
 the log-food sheet said 1,660 — not a stale cache: the sheet fetched `nutrition_targets.calories`
