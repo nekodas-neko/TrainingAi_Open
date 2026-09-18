@@ -67,6 +67,15 @@ days later it was offered as next-up and re-derived, because prose cannot reach 
 fields; its Lever 2 needs a quiet window and a structural decision, both the owner's. Lane A's READY
 list went **12 → 9**.
 
+**LA-110's missing-prescription window re-measured: five sessions, and the set count is the tell
+(2026-09-18).** 09-07 → 09-12 logged **one set per exercise** with no `style_name` and no
+`planned_pct`; 09-06 and 09-14 are clean, with **two** sets each. Half the sets missing — not just
+null columns — says the exercises were presented with no resolved style at all, since the set count
+and the planned fields descend from the same `ex.progressionStyle`. **A null `style_id` is NOT the
+signature:** 09-17 is a clean day where all five logs have one. **No cause is recorded**, because
+three hypotheses fit and none was tested — the entry has already been filed with a wrong diagnosis
+twice, and a third is worse than none.
+
 **Three shared modules whose contract and behaviour had drifted (RV-58/59/60, 2026-09-18 — one PR,
 the last sweep-50 batch).** **RV-58** — `equipmentEligible` folded case on the exercise side and
 `buildEquipmentSet` on neither, so `equipmentEligible(['Barbell'], buildEquipmentSet(['barbell']))`

@@ -18,6 +18,22 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-18 — backlog → 23927, `projectOverview.md` → 11879 (LA-110 re-measured)
+
+**Backlog +32, nothing removed, and no fix shipped** — which is the right trade for this entry
+specifically. LA-110 has now been filed with a wrong diagnosis **twice**: a rep-band mechanism a later
+measurement refuted, and a first fix that is not implementable because `workout_sessions.phase_type`
+is NULL on every production row. The 32 lines buy a *bounded* window (five sessions, clean on both
+sides), the discriminating detail (one set per exercise instead of two), and one red herring closed
+(a null `style_id` is ordinary — a clean day has five of them).
+
+The section naming three untested hypotheses is deliberately *in* the entry rather than left out. A
+reader who finds only the measurement will re-derive them; a reader who finds them listed as untested
+will test one.
+
+---
+
+
 ## 2026-09-18 — backlog → 23893, `projectOverview.md` → 11870 (LA-120: the queue tool's three blind spots)
 
 **Backlog +17, and it is the only entry here that GREW the file on purpose.** Two gates came back

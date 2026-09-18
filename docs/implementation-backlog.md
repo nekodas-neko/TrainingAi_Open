@@ -22578,8 +22578,42 @@ Six compounds "declined at once" because six compounds were logged inside that o
 2. **The entry's table is already stale.** A session landed on 2026-09-15; Barbell Bench Press's last
    two real estimates are now **91.25 (9 reps) → previous 82.75 (15 reps), i.e. +10.3%**, not −20.2%.
 
-**What is actually owed, and it is not this entry's fix:** find why seven sessions were written with
-no prescription, and decide whether those stored `estimated_1rm` values are recomputed. **The second
+**⚠ RE-MEASURED AGAIN 2026-09-18 (Lane A). The window is SHARPER than "seven sessions" and the shape
+rules out a drift — but the cause is still NOT established, and nothing below should be read as one.**
+Per user-local day over 30 days, counting live logs and live sets:
+
+| day | logs | logs with no `style_name` | sets | sets with no `planned_pct` |
+|---|---:|---:|---:|---:|
+| 09-04 · 09-05 · 09-06 | 5 each | **0** | **10** each | 0–2 |
+| **09-07** | 4 | **4** | **4** | **4** |
+| **09-08 · 09-10 · 09-11 · 09-12** | 5 each | **5** each | **5** each | **5** each |
+| 09-14 · 09-15 · 09-16 · 09-17 | 5 each | **0** | **10** each | 0–2 |
+
+**Five consecutive sessions, totally affected, bounded on both sides by clean days.** 09-06 is clean
+and 09-14 is clean, so it is not a gradual drift and not a formula property — it is a state that
+began and ended.
+
+**The discriminating detail is the SET COUNT, not the nulls.** Every affected day logged **one set
+per exercise** where every clean day logs **two**. A prescription that merely failed to save would
+leave two sets with null columns. Half the sets missing as well says the exercises were presented
+without a resolved style at all — `plannedPct`, `plannedReps` and the set count all come from the
+same `ex.progressionStyle` on the client (`components/workout-screen.tsx:1270`,
+`packages/shared/src/workout/log-exercise.ts:263`).
+
+**It is also not simply "no style", which is why the obvious next step is not the right one.** On
+**2026-09-17** — a clean day by the table above — all five logs carry `style_id` NULL while
+`style_name` is present and 8 of 10 sets have a pct. So a null style id is ordinary here (RV-32 drops
+an unowned one) and cannot be the signature.
+
+**Deliberately NOT concluded:** whether the program's session exercises actually lost their styles
+for that week, whether those five sessions came through the outbox replay path (`sync-helpers.ts:113`
+omits `progressionStyle` unless *every* set has planned fields, which is self-consistent with the
+data and proves nothing about cause), or whether something else presented the workout unprescribed.
+Each is testable and none was tested. **Writing a cause in here on this evidence would repeat the
+mistake this entry already documents twice.**
+
+**What is actually owed, and it is not this entry's fix:** find why those five sessions were written
+with no prescription, and decide whether those stored `estimated_1rm` values are recomputed. **The second
 half is an owner call** — it rewrites stored history, and the app's PRs and `target_80` read the same
 column, so it is not confined to a trend line. **Do not add a comparability rule to paper over it:**
 this entry's own warning against widening the trend thresholds — *"that hides a real decline as
