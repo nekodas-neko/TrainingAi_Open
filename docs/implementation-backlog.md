@@ -443,6 +443,38 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [platform] LB-120 — the backlog's doc-size baseline collides on every pair of concurrent implementer PRs
+
+- **Lane: O** — `scripts/check-doc-index-size.js` and `docs/doc-size/docs/implementation-backlog.md.size`.
+  Filed by Lane B, not built by it: `scripts/**` is the Orchestrator's.
+- **Added:** 2026-09-18 · measured, not estimated.
+- **The collision is STRUCTURAL, not bad luck.** The protocol has every implementer PR remove its own
+  backlog entry, so every implementer PR changes the backlog's line count, so every *pair* of
+  concurrent implementer PRs disagrees about the one number in
+  `docs/doc-size/docs/implementation-backlog.md.size`. There is no version of "land two PRs the same
+  afternoon" that avoids it.
+- **Measured 2026-09-18:** #1303 (TN-25) needed **five** rebases in one afternoon — #1295, #1302,
+  #1299, #1305 and #1307 each landed during its CI — and **every one** of them conflicted on that
+  file and nothing else in `docs/doc-size/`. Each cycle also required restating the entry's
+  ratchet-down note, because its stated endpoints move with the base even though its delta (−182)
+  does not.
+- **⚠ LA-33 already fixed this class and could not reach this file.** Splitting the shared size map
+  into one file per document took two PRs raising two *different* documents to zero conflicts. Two
+  PRs changing the *same* document still conflict, which LA-33 correctly calls the right behaviour —
+  they genuinely disagree about one number. The backlog is the case where "the same document" is
+  **every** implementer PR, so the general rule lands wrong on this one file.
+- **Two options, for the Orchestrator to judge — this entry does not pick one.**
+  ① **Derive it.** The check computes the backlog's line count instead of reading a stored number,
+  and enforces the ratchet against git rather than a file. Removes the conflict entirely; costs the
+  check a git read, which CI's depth-1 checkout may not support — establish that first.
+  ② **Exempt it.** Drop the backlog from the ratchet and keep the per-entry hygiene checks
+  (`check-backlog-pointers.js`) that actually catch regressions. Cheaper, and loses the only
+  automatic pressure against the file growing — which is real: it is ~24,000 lines.
+- **⛔ Do not "fix" it by telling implementers to skip the recompute.** The check FAILS ON SLACK, so a
+  stale number is a red CI, and splicing the conflict hunks produces a number matching neither side.
+  The recompute is correct; it is the conflict that should not exist.
+- **Branch:** _unassigned_
+
 ### [body][nutrition] TN-48 — the body-composition suite is collected daily, interpreted nowhere, and the one reading that frightens is the one the app can already defuse 🔴 LIVE
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-18 · Tuning agent, from the owner's ask: *"we want the
@@ -11715,11 +11747,20 @@ the day's move-hours total is below the goal.
   same number (the owner's own figures: min 50, resting 60). Not touched here because it changes what
   a card computes from rather than what it is called, and the entry's scope is the name. **Someone
   should establish whether `hrMin` is a deliberate proxy or an oversight before it is "fixed".**
+- **✅ ② IS ANSWERED, 2026-09-18 — and the answer INVERTS the suspicion.** This entry asked whether
+  `hrMin` reaching `HrFactorsCard`'s `restingHr` prop was a deliberate proxy or an oversight. It is
+  neither: the card prints **`Lowest recorded today: {restingHr} bpm`**, and `hrMin` is exactly
+  today's lowest. The value, the sentence and the data always agreed — **only the prop NAME lied.**
+  **⛔ So the obvious fix was the dangerous one:** passing a real resting HR would have left the card
+  printing a true number under a false sentence, a worse bug and an invisible one, because the name
+  would finally match while the output stopped being true. Renamed to `lowestHrToday` in
+  `fix/or116-lowest-hr-prop-name`, one caller, no rendered output changed, with the finding written
+  into the prop's own doc comment so the trap cannot be re-entered from the name alone.
 - **Keep:** ① the third-surface question the entry was filed on, which is **not** answered by
   labelling: Health's Resting HR tile shows the value bare, Home's shows it with a delta against
   baseline, and the detail screen shows neither. Three surfaces, one number, three amounts of
   context — **decide what each surface is for**. Labelling stopped the numbers reading as broken; it
-  did not decide that. ② the `hrMin`-as-resting question above. ③ the device check.
+  did not decide that. ③ the device check.
 - **TN-13 was the other half of the same owner report and is CLOSED** (2026-09-15, owner chose the
   bare number over restoring the delta cue — see the journal entry, not the queue; it has been
   removed). It was about a cue that does not render; this is about what the number is called. Its

@@ -9,11 +9,16 @@ import { ContributorDetails } from '@/components/health/contributor-details'
  * recent values, matching the always-visible detail sections on the other pillars.
  */
 export function HrFactorsCard({
-  restingHr,
+  lowestHrToday,
   recentHrv,
   baselineHrv,
 }: {
-  restingHr: number | null
+  /** Today's LOWEST recorded heart rate, which is what the line below prints — not resting HR.
+   *  It was called `restingHr` and the caller passes `data.hrMin`, which reads as a bug (50 against
+   *  a resting 60) and is not one: the sentence says "Lowest recorded today" and `hrMin` is exactly
+   *  that. Renamed because the old name invited the wrong fix — swapping in a real resting HR would
+   *  have left the card printing a true number under a false sentence (OR-116 ②). */
+  lowestHrToday: number | null
   recentHrv: number | null
   baselineHrv: number | null
 }) {
@@ -24,7 +29,7 @@ export function HrFactorsCard({
         {
           key: 'resting_heart_rate',
           label: 'Resting heart rate',
-          extra: restingHr != null ? <ValueLine>Lowest recorded today: {restingHr} bpm</ValueLine> : null,
+          extra: lowestHrToday != null ? <ValueLine>Lowest recorded today: {lowestHrToday} bpm</ValueLine> : null,
         },
         {
           key: 'hrv_balance',
