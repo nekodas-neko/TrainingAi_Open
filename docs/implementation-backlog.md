@@ -443,6 +443,38 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [platform] LB-120 — the backlog's doc-size baseline collides on every pair of concurrent implementer PRs
+
+- **Lane: O** — `scripts/check-doc-index-size.js` and `docs/doc-size/docs/implementation-backlog.md.size`.
+  Filed by Lane B, not built by it: `scripts/**` is the Orchestrator's.
+- **Added:** 2026-09-18 · measured, not estimated.
+- **The collision is STRUCTURAL, not bad luck.** The protocol has every implementer PR remove its own
+  backlog entry, so every implementer PR changes the backlog's line count, so every *pair* of
+  concurrent implementer PRs disagrees about the one number in
+  `docs/doc-size/docs/implementation-backlog.md.size`. There is no version of "land two PRs the same
+  afternoon" that avoids it.
+- **Measured 2026-09-18:** #1303 (TN-25) needed **five** rebases in one afternoon — #1295, #1302,
+  #1299, #1305 and #1307 each landed during its CI — and **every one** of them conflicted on that
+  file and nothing else in `docs/doc-size/`. Each cycle also required restating the entry's
+  ratchet-down note, because its stated endpoints move with the base even though its delta (−182)
+  does not.
+- **⚠ LA-33 already fixed this class and could not reach this file.** Splitting the shared size map
+  into one file per document took two PRs raising two *different* documents to zero conflicts. Two
+  PRs changing the *same* document still conflict, which LA-33 correctly calls the right behaviour —
+  they genuinely disagree about one number. The backlog is the case where "the same document" is
+  **every** implementer PR, so the general rule lands wrong on this one file.
+- **Two options, for the Orchestrator to judge — this entry does not pick one.**
+  ① **Derive it.** The check computes the backlog's line count instead of reading a stored number,
+  and enforces the ratchet against git rather than a file. Removes the conflict entirely; costs the
+  check a git read, which CI's depth-1 checkout may not support — establish that first.
+  ② **Exempt it.** Drop the backlog from the ratchet and keep the per-entry hygiene checks
+  (`check-backlog-pointers.js`) that actually catch regressions. Cheaper, and loses the only
+  automatic pressure against the file growing — which is real: it is ~24,000 lines.
+- **⛔ Do not "fix" it by telling implementers to skip the recompute.** The check FAILS ON SLACK, so a
+  stale number is a red CI, and splicing the conflict hunks produces a number matching neither side.
+  The recompute is correct; it is the conflict that should not exist.
+- **Branch:** _unassigned_
+
 ### [body][nutrition] TN-48 — the body-composition suite is collected daily, interpreted nowhere, and the one reading that frightens is the one the app can already defuse 🔴 LIVE
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-18 · Tuning agent, from the owner's ask: *"we want the
@@ -606,26 +638,6 @@ existing 65 days moves by less than 5 points on every one of them.
 - **Pass test:** every stored `readiness_score` reproduces from its own stored contributors, and
   every row carries a model stamp. **Currently: 62 of 65 reproduce** (58 nine-key + 4 of the seven),
   three are 1 point out, and 25 of 65 are stamped.
-
-### [workouts] RV-57 — `STREAK_LOOKBACK_DAYS` is read by one of the two files it calls a contract
-
-- **Lane:** B — `app/session-select/session-select-content.tsx:1020`. **Added:** 2026-09-18 · Review
-  sweep 50.
-- **Not batched** — the change lands in a Lane B file (`app/session-select/**`) while the rest of
-  this sweep's shared-module drift is Lane A, and a batch is one lane's PR.
-- The module header (`packages/shared/src/workout/streak-window.ts:4-24`) states: *"This number is a
-  CONTRACT between two files that used to disagree silently… Any new streak surface reads this
-  constant."* The supplier does (`app/api/streak-data/route.ts:4`). The consumer still reads
-  `for (let ago = 1; ago < 365; ago++)` with no import — `grep -rn STREAK_LOOKBACK_DAYS` finds it in
-  the route, the module and two test files, never in `session-select-content.tsx`.
-- **No live bug: 365 and `< 365` happen to cover the same span.** The defect is that the constant
-  cannot enforce the agreement it exists for — changing it reintroduces BF-176's window-edge
-  oscillation verbatim, silently, which is exactly the failure it was created to prevent.
-- Also stale in the same file: line 532's comment still reads *"streak-data (90 days) is a strict
-  superset of what home needs"*, the pre-BF-176 number.
-- **Not established:** whether `getRecentTrainedDays(userId, 365, tz)` returns 365 or 366 calendar
-  keys — the off-by-one at the far edge is unverified in either direction, and importing the
-  constant does not settle it.
 
 ### [readiness][devices][platform] TN-46 — correlate vitals against dose: the app holds both halves and joins neither 🔴 LIVE
 
@@ -1316,7 +1328,7 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
   the S25's own width: the macro line sits under a header row already carrying a thumbnail, a name,
   an ingredient count, a calorie figure and a chevron.
 - **✅ SHIPPED 2026-09-16** (`fix/bf170-collapsed-meal-macros`).
-  [Journal](overview/entries/2026-09-16-fix-bf170-collapsed-meal-macros.md). Fixed at the group, as
+  [Journal](overview/history-2026-09-18-folded-1.md#2026-09-16-fix-bf170-collapsed-meal-macros). Fixed at the group, as
   the entry directed: the P/C/F line moved out of `{open && …}` to sit full-width under the header,
   outside the `role="button"` that toggles. `mealFooter` untouched — its premise is now true, and
   for every meal group rather than only a lone one.
@@ -1378,7 +1390,7 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
   (2026-09-16) is that the card paints with no uncaught error both with the library present and with
   `/api/exercise-library` aborted — the empty-diagram case the entry asked to be checked.
 - **✅ SHIPPED 2026-09-16** (`fix/workout-completion-surface`).
-  [Journal](overview/entries/2026-09-16-fix-workout-completion-surface.md). The stamp now renders on
+  [Journal](overview/history-2026-09-18-folded-1.md#2026-09-16-fix-workout-completion-surface). The stamp now renders on
   `trainedToday` alone; the heatmap keeps its own `muscleActivations.length > 0` guard, which was
   always correct for the diagram. `CompletedStamp` is `absolute inset-0`, so the container gains a
   `min-h-24` when there is no diagram behind it to give it height — applied only in that case, so
@@ -1432,7 +1444,7 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
   Android's hardware back is a Capacitor channel Playwright cannot fire, so **no harness run can
   exercise this**; the unit tests pin the predicate and the dismissal, not the gesture.
 - **✅ SHIPPED 2026-09-16** (`fix/workout-completion-surface`).
-  [Journal](overview/entries/2026-09-16-fix-workout-completion-surface.md). **Both halves, and the
+  [Journal](overview/history-2026-09-18-folded-1.md#2026-09-16-fix-workout-completion-surface). **Both halves, and the
   entry's own proposal for the second half would not have worked.**
   - **The path term.** `/workout` is both routes — `app/workout/page.tsx` renders `WorkoutScreen`
     when `?session=<id>` is present and the tab shell otherwise, which is the same distinction
@@ -1514,7 +1526,7 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
   exercise and confirm the toggle reads *Deload — As prescribed* with Full offered as *Override*;
   then a normal session and confirm the labels are unchanged from today.
 - **✅ SHIPPED 2026-09-16** (`fix/workout-completion-surface`).
-  [Journal](overview/entries/2026-09-16-fix-workout-completion-surface.md).
+  [Journal](overview/history-2026-09-18-folded-1.md#2026-09-16-fix-workout-completion-surface).
 - **⚠ SHIPPED AS A UNION, NOT THE REPLACEMENT THIS ENTRY RECOMMENDED — and the difference is a
   regression this entry would have caused.** The recommendation was to swap `prescription.deload`
   for `exercises.some(e => e.deloaded)`. `e2e/deload-visible.spec.ts` — BF-8's own guard — seeds a
@@ -1964,7 +1976,7 @@ helper the call site calls.
 
 - **Lane: A** · **Added:** 2026-09-16 · Lane A, from TN-39's validation. **Re-filed the same day**
   after the rename was attempted and reverted — read the ⛔ below before touching this.
-- **Journal:** [`the attempt and why it failed`](overview/entries/2026-09-16-lane-a-la114-bucket-mid.md).
+- **Journal:** [`the attempt and why it failed`](overview/history-2026-09-18-folded-1.md#2026-09-16-lane-a-la114-bucket-mid).
 - **Half-done, deliberately.** `daytimeHrvEstimatesPerBucket` emits `t = bStart + bucketMs / 2` and
   `run.ts` writes it straight into `bucket_start`, so stored timestamps sit on a :15/:45 grid.
   **Shipped:** migration 275 (a `COMMENT ON COLUMN`) and the Drizzle property renamed to `bucketMid`,
@@ -2327,7 +2339,7 @@ composite reports which of its inputs were inferred.
   What the harness did confirm (2026-09-16) is that the root layout still paints — the provider is
   mounted in `app/layout.tsx`, so a fault there takes every tab with it (`tabs-instant-paint`, 7 passed).
 - **✅ SHIPPED 2026-09-16** (`fix/lb113-health-connect-timezone`).
-  [Journal](overview/entries/2026-09-16-fix-lb113-health-connect-timezone.md). The provider reads
+  [Journal](overview/history-2026-09-18-folded-1.md#2026-09-16-fix-lb113-health-connect-timezone). The provider reads
   `useUserTimezone()` — it is mounted inside `UserTimezoneProvider`, which `app/layout.tsx` feeds
   `session?.user?.timezone`, so the real value is there on the first render and there is no
   placeholder flip to double-sync on. The effect depends on `tz` rather than `[]`, so changing the
@@ -6095,7 +6107,14 @@ unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge
 
 - **Lane:** A — `app/api/collection/route.ts`, plus a migration.
 - **Added:** 2026-09-07, Lane A — the half of LB-60's `pausedDays` that did not ship with the route.
-- **The old `Gate: owner` is removed** — the decision above is the one it was waiting for.
+- **Gate: owner** — and it is a DIFFERENT question from the one already answered. The old gate was
+  removed on 2026-09-14 because the owner had settled the RULE (a deload must not cost cats), and
+  that was right. What it did not settle is the ⚠ above: whether a deload span becomes **first-class
+  stored state**, which is what a dated `program_phases` interval means and what the migration would
+  commit to. Re-gated 2026-09-18 by Lane A, which reached this entry as next-up and could not start
+  it: with no gate the queue tool called it READY, while the first instruction inside it is *"put
+  that to the owner before writing the migration"*. An entry whose own text blocks it has to say so
+  in the field the tool reads.
 
 **The early-deload half SHIPPED 2026-09-07**: `pausedDays` now carries `earlyDeloadWeekDays(program)`
 beside the chosen rest days, so a confirmed early deload decays nothing. That span is the only DATED
@@ -11691,11 +11710,20 @@ the day's move-hours total is below the goal.
   same number (the owner's own figures: min 50, resting 60). Not touched here because it changes what
   a card computes from rather than what it is called, and the entry's scope is the name. **Someone
   should establish whether `hrMin` is a deliberate proxy or an oversight before it is "fixed".**
+- **✅ ② IS ANSWERED, 2026-09-18 — and the answer INVERTS the suspicion.** This entry asked whether
+  `hrMin` reaching `HrFactorsCard`'s `restingHr` prop was a deliberate proxy or an oversight. It is
+  neither: the card prints **`Lowest recorded today: {restingHr} bpm`**, and `hrMin` is exactly
+  today's lowest. The value, the sentence and the data always agreed — **only the prop NAME lied.**
+  **⛔ So the obvious fix was the dangerous one:** passing a real resting HR would have left the card
+  printing a true number under a false sentence, a worse bug and an invisible one, because the name
+  would finally match while the output stopped being true. Renamed to `lowestHrToday` in
+  `fix/or116-lowest-hr-prop-name`, one caller, no rendered output changed, with the finding written
+  into the prop's own doc comment so the trap cannot be re-entered from the name alone.
 - **Keep:** ① the third-surface question the entry was filed on, which is **not** answered by
   labelling: Health's Resting HR tile shows the value bare, Home's shows it with a delta against
   baseline, and the detail screen shows neither. Three surfaces, one number, three amounts of
   context — **decide what each surface is for**. Labelling stopped the numbers reading as broken; it
-  did not decide that. ② the `hrMin`-as-resting question above. ③ the device check.
+  did not decide that. ③ the device check.
 - **TN-13 was the other half of the same owner report and is CLOSED** (2026-09-15, owner chose the
   bare number over restoring the delta cue — see the journal entry, not the queue; it has been
   removed). It was about a cue that does not render; this is about what the number is called. Its
@@ -19633,6 +19661,16 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   Nothing else in the entry is disturbed by this; the plan and the "archiving the fixed ones only
   removes 17%" caveat still stand.
 - **Lane:** A
+- **Gate: owner** — added 2026-09-18, because the ⚠ at the bottom of this entry did not hold. It was
+  written on 2026-09-15 *"so the next implementer does not re-derive the reasoning and defer it
+  again silently"*, and three days later Lane A reached this entry again, re-derived it and would
+  have deferred it again: with no field to read, `next-item.js` kept printing it at the top of
+  READY. What blocks Lever 2 is not effort — it is **a quiet window and a structural decision**, and
+  both are the owner's: the quiet window because only he decides whether five agents are appending
+  to `projectOverview.md` while 207 entries move out of it, and the decision because where the open
+  Known Issues live changes what **every** session reads at orientation, with the multi-tag
+  visibility risk this entry already names. **What lifts it:** the owner saying the move should
+  happen, and when — after which it is the Orchestrator's sweep, not an implementer's.
 - **Branch:** none yet · **Added:** 2026-08-10, raised by the owner during the public-repo migration.
 - **Plan:** [`2026-08-10-orientation-cost.md`](superpowers/plans/2026-08-10-orientation-cost.md)
 - **The measurement:** `CLAUDE.md` is 918 lines (~27k tokens) and loads automatically; its first
@@ -22523,8 +22561,42 @@ Six compounds "declined at once" because six compounds were logged inside that o
 2. **The entry's table is already stale.** A session landed on 2026-09-15; Barbell Bench Press's last
    two real estimates are now **91.25 (9 reps) → previous 82.75 (15 reps), i.e. +10.3%**, not −20.2%.
 
-**What is actually owed, and it is not this entry's fix:** find why seven sessions were written with
-no prescription, and decide whether those stored `estimated_1rm` values are recomputed. **The second
+**⚠ RE-MEASURED AGAIN 2026-09-18 (Lane A). The window is SHARPER than "seven sessions" and the shape
+rules out a drift — but the cause is still NOT established, and nothing below should be read as one.**
+Per user-local day over 30 days, counting live logs and live sets:
+
+| day | logs | logs with no `style_name` | sets | sets with no `planned_pct` |
+|---|---:|---:|---:|---:|
+| 09-04 · 09-05 · 09-06 | 5 each | **0** | **10** each | 0–2 |
+| **09-07** | 4 | **4** | **4** | **4** |
+| **09-08 · 09-10 · 09-11 · 09-12** | 5 each | **5** each | **5** each | **5** each |
+| 09-14 · 09-15 · 09-16 · 09-17 | 5 each | **0** | **10** each | 0–2 |
+
+**Five consecutive sessions, totally affected, bounded on both sides by clean days.** 09-06 is clean
+and 09-14 is clean, so it is not a gradual drift and not a formula property — it is a state that
+began and ended.
+
+**The discriminating detail is the SET COUNT, not the nulls.** Every affected day logged **one set
+per exercise** where every clean day logs **two**. A prescription that merely failed to save would
+leave two sets with null columns. Half the sets missing as well says the exercises were presented
+without a resolved style at all — `plannedPct`, `plannedReps` and the set count all come from the
+same `ex.progressionStyle` on the client (`components/workout-screen.tsx:1270`,
+`packages/shared/src/workout/log-exercise.ts:263`).
+
+**It is also not simply "no style", which is why the obvious next step is not the right one.** On
+**2026-09-17** — a clean day by the table above — all five logs carry `style_id` NULL while
+`style_name` is present and 8 of 10 sets have a pct. So a null style id is ordinary here (RV-32 drops
+an unowned one) and cannot be the signature.
+
+**Deliberately NOT concluded:** whether the program's session exercises actually lost their styles
+for that week, whether those five sessions came through the outbox replay path (`sync-helpers.ts:113`
+omits `progressionStyle` unless *every* set has planned fields, which is self-consistent with the
+data and proves nothing about cause), or whether something else presented the workout unprescribed.
+Each is testable and none was tested. **Writing a cause in here on this evidence would repeat the
+mistake this entry already documents twice.**
+
+**What is actually owed, and it is not this entry's fix:** find why those five sessions were written
+with no prescription, and decide whether those stored `estimated_1rm` values are recomputed. **The second
 half is an owner call** — it rewrites stored history, and the app's PRs and `target_80` read the same
 column, so it is not confined to a trend line. **Do not add a comparability rule to paper over it:**
 this entry's own warning against widening the trend thresholds — *"that hides a real decline as
@@ -23039,68 +23111,6 @@ adopted.
 - **Keep:** do not close this on "it has not happened again" — an intermittent lock-ordering bug is
   precisely the thing that looks fixed for weeks.
 
-### [platform] LA-100 — the entries compaction sweep has no target file, and the ceiling now blocks every lane
-
-- **✅ THE PREMISE WAS STALE AND THE SWEEP HAS RUN — 2026-09-17 (OR-119). `Gate: owner` removed.**
-  This entry says there is *"nowhere obvious to fold them TO"* because the batched files are
-  *"era-based, not date-based"*. **Measured: 28 of the 32 history files are dated** —
-  `history-2026-07-16.md` through `history-2026-09-10-folded-6.md`. Only four carry the era names
-  (`-newest`, `-recent`, `-newer`, `-past`), and this entry already calls those *frozen*.
-- **So its option 1 — a dated batch — is not a decision to take; it is what the repo has been doing
-  for two months**, and `scripts/fold-journal-entries.js` has implemented it since LA-80: it writes
-  `history-<date>-folded-<part>.md` and rolls a new part at ~250 KB. **The owner was being asked to
-  choose a convention that precedent and the tooling had already chosen.**
-- **The sweep ran on that basis:** 91 entries → 51, forty folded into
-  `history-2026-09-17-folded-1.md` (163 KB, inside the roll threshold), five held back because an
-  agent baton cites them, citations rewritten across nine files, `check-doc-links` clean on 823.
-- **What stays open is smaller than the entry and is not the owner's:** whether the four era-named
-  files are ever renamed. They are frozen and nothing cites them by scheme, so the answer is
-  probably never — but that is a judgement for whoever next touches them, not a blocker on folding.
-- **⚠ The ceiling claim is also stale.** This entry was upgraded to *"BLOCKING, not blocking-ish"*
-  when the ceiling was a hard failure that every lane's next PR would hit. It is an **advisory note**
-  now (*"Not a failure; sweep it when convenient"*), so the treadmill it describes cannot happen.
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-10, when the ceiling fired and the sweep turned out
-  not to be mechanical.
-- **Lane: A** — the sweep touches `docs/` only, but the naming decision below is the blocker.
-- **The `Gate: owner` is removed** (2026-09-17) — see above: precedent and the fold tool had already
-  made the choice it was waiting on. The note about it being filed inline first, and
-  `check-backlog-pointers` catching that, still stands as the reason fields beat prose.
-- **⚑ BLOCKING, not "blocking-ish" — upgraded 2026-09-10 after it fired twice in one hour.** #1077
-  raised the ceiling 360 → 361 to unblock and recorded that this contradicts #1052's intent. The
-  very next PR (LA-99) hit **362**, so it shipped with **no journal entry at all** rather than raise
-  a second time — which is the "+1-per-PR treadmill" #1052 ended. Every feature PR carries an entry
-  by standing rule, so **every agent's next PR now fails CI or treadmills the ceiling again.**
-
-**The sweep is overdue on the repo's own numbers** — 56 foldable against a chore threshold of 20 and
-a runaway limit of 60, oldest dating to 2026-08-16 — and
-[`docs/overview/entries/README.md`](overview/entries/README.md) says *"the next PR adding an entry
-runs the sweep"*. It was not run, for a reason that is the entry:
-
-**There is nowhere obvious to fold them TO.** The batched history files are **era-based, not
-date-based**: `history-newest.md` is headed *"recent: Sessions ~105–176"*, and its siblings
-(`-recent`, `-newer`, `-past`) follow the same session-era scheme. The per-entry convention that
-replaced it is dated (`YYYY-MM-DD-<slug>.md`). Nothing bridges the two.
-
-**The owner's call, and it is genuinely a preference:**
-1. **A dated batch per month** — `history-2026-08.md`, `history-2026-09.md` — alongside the frozen
-   session-era files. Simplest, and `ls` stays chronological. Costs a second naming scheme in one
-   directory, permanently.
-2. **Extend the era scheme** — one more `history-*.md` whose header names a date range instead of
-   sessions. Keeps one scheme; the names stop being meaningful ("newest" already is not).
-3. **Fold into `history-newest.md` regardless** and re-title it by date range. One file, one scheme;
-   rewrites a header 200+ entries already cite.
-
-**Recommendation: (1).** Dates are what the entries are named by, `ls` sorts correctly with no
-convention to remember, and the frozen era files stay untouched — the citations pointing at them
-keep working. The second scheme is a real cost, but it is the one that already exists in the
-directory being compacted.
-
-**Not just a sweep — check the citations.** `linkedEntryNames` walks the **repo root**, so an entry
-is "linked" if `projectOverview.md` or `CLAUDE.md` names it, not only `docs/`. A `docs/`-only measure
-reports 235 foldable where the real number is 56; sweeping on that would delete entries durable docs
-still cite. Whatever the sweep does, it must repoint citations rather than break them.
-
 ### [platform] LA-89 — `oura/hr-sync` has no callers, and its name says something that is not true
 
 - **Lane:** A — `app/api/oura/hr-sync/route.ts`.
@@ -23521,7 +23531,7 @@ what the warm-up countdown shows, and dragging the control does not fire a presc
   The harness covers the render, the failure state and the Health entry (`bf5-week-in-review-page.spec.ts`)
   but **cannot fire a notification**, which is the half only the device settles.
 - **✅ PR 2b SHIPPED 2026-09-16 (v1.457.0)** (`feat/bf5-week-in-review-page`).
-  [Journal](overview/entries/2026-09-16-feat-bf5-week-in-review-page.md). `app/health/week/` as
+  [Journal](overview/history-2026-09-18-folded-1.md#2026-09-16-feat-bf5-week-in-review-page). `app/health/week/` as
   `page.tsx` + `week-detail-content.tsx` beside `app/health/day/`; `WeekVolumeChart` and
   `WeekMetricCard` drawn with `react-chartjs-2`; `WeeklyMuscleSetsCard` and `WeekTrendsSection`
   reused rather than rebuilt; the banner navigates; a permanent `weekInReview` card sits beside the

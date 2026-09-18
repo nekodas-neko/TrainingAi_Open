@@ -99,7 +99,7 @@ Live at the time of writing (2026-08-05):
 
 ## History
 
-- [`2026-09-15-tn13-closed-bare-number`](../../overview/entries/2026-09-15-tn13-closed-bare-number.md)
+- [`2026-09-15-tn13-closed-bare-number`](../../overview/history-2026-09-18-folded-1.md#2026-09-15-tn13-closed-bare-number)
   — **TN-13 (2026-09-15): CLOSED on a decision, not a fix — the bare number stays.** The resting-HR
   delta shipped 2026-08-30 and **was never on screen**: `RING_GEOMETRY` sets `showDot: true` on 1 of
   18 ring styles and the cue renders only under it, so it was invisible on seventeen including the
@@ -109,7 +109,7 @@ Live at the time of writing (2026-08-05):
   (`resting-hr-cue.ts`) and still reaches the accessible name, so the comparison is spoken but not
   drawn. **Do not re-open this, and do not "fix" the render condition.**
 
-- [`2026-09-15-or116-resting-vs-intraday-hr`](../../overview/entries/2026-09-15-or116-resting-vs-intraday-hr.md)
+- [`2026-09-15-or116-resting-vs-intraday-hr`](../../overview/history-2026-09-18-folded-1.md#2026-09-15-or116-resting-vs-intraday-hr)
   — **OR-116 (2026-09-15): one metric name over two metrics.** Home's chip carries last night's
   **resting** rate; `/health/heart-rate` shows today's **intraday** current/min/average/max. Both
   were called "Heart Rate", so the owner compared 60 against 73/50/89/125 and reasonably concluded

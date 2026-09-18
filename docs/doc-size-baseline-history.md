@@ -18,7 +18,56 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
-## 2026-09-18 — backlog → 23838, `projectOverview.md` → 11866 (RV-61 shipped)
+## 2026-09-18 — backlog → 23865, `projectOverview.md` → 11889 (LA-100 closed, 40 entries folded)
+
+**Backlog −62: an entry removed, not amended.** LA-100's two claims — no target file for the sweep,
+and a hard ceiling every lane would hit — were both recorded stale by OR-119 on 09-17. The step left
+undone was deleting it, so every lane kept being offered finished work.
+
+**The ratchet failed on the way and that is worth recording**, because the failure name misleads:
+removing 62 lines tripped *"Orientation docs stay within their baselines"*. It is shrink-only, so a
+document getting SMALLER moves its baseline down and a stale one fails — the instinct on reading that
+check's name is that something grew.
+
+The `projectOverview.md` paragraph leads with the measurement that retired the entry (28 of 32
+history files are dated) rather than with the sweep, because the sweep is a chore that recurs and the
+measurement is the thing a future reader would otherwise re-derive before daring to run it.
+
+---
+
+
+## 2026-09-18 — backlog → 23927, `projectOverview.md` → 11879 (LA-110 re-measured)
+
+**Backlog +32, nothing removed, and no fix shipped** — which is the right trade for this entry
+specifically. LA-110 has now been filed with a wrong diagnosis **twice**: a rep-band mechanism a later
+measurement refuted, and a first fix that is not implementable because `workout_sessions.phase_type`
+is NULL on every production row. The 32 lines buy a *bounded* window (five sessions, clean on both
+sides), the discriminating detail (one set per exercise instead of two), and one red herring closed
+(a null `style_id` is ordinary — a clean day has five of them).
+
+The section naming three untested hypotheses is deliberately *in* the entry rather than left out. A
+reader who finds only the measurement will re-derive them; a reader who finds them listed as untested
+will test one.
+
+---
+
+
+## 2026-09-18 — backlog → 23893, `projectOverview.md` → 11870 (LA-120: the queue tool's three blind spots)
+
+**Backlog +17, and it is the only entry here that GREW the file on purpose.** Two gates came back
+with the paragraph that says which question each one waits on, because in both cases the *bare* field
+is what went missing — LA-76's was removed in September once the owner answered a different question,
+and Q-220 never had one at all while carrying a prose warning that failed within three days. A gate
+that does not say what would lift it is a gate the next session deletes, and both of these are the
+receipt for that.
+
+The overview paragraph spends its length on the **measurement**, not the regex: 140 of 144 Keep
+bullets already matched and all four misses were one shape. That number is the whole argument for
+widening rather than rewriting, and `keep.js`'s own comments argue the opposite case convincingly
+enough that a future session will re-open it. Without the count it would have to re-measure.
+---
+
+## 2026-09-18 — backlog → 23848, `projectOverview.md` → 11899 (RV-61 shipped)
 
 **Backlog −17** for one small entry. The overview paragraph is longer than the diff because two of
 the three things worth remembering are **refusals**: the check calls a fifteen-query function on
@@ -13760,3 +13809,33 @@ check (GPS, cadence and the strap are not reachable from the web harness) and th
 test, *"fast-block compliance over a month is neither 0% nor 100%"*, which needs a month of wearing
 rather than a sitting. **Not struck**, because that second one is unmeasured.
 
+
+## 2026-09-18 — `docs/implementation-backlog.md` 23855 → 23896 (Lane B, OR-116 ② + LB-120)
+
+**+41.** Two edits, both of which are the queue doing its job rather than accreting.
+
+**−6, OR-116 ②** is answered and struck from its `Keep:` line. The entry asked whether `hrMin`
+reaching `HrFactorsCard`'s `restingHr` prop was a deliberate proxy or an oversight; it is neither.
+The card prints *"Lowest recorded today"* and `hrMin` is exactly that, so only the name was wrong.
+The replacement lines are longer than the question they close because the **inverted** conclusion is
+the load-bearing part: passing a real resting HR would have printed a true number under a false
+sentence, which is the fix the old name invited and a worse bug than the one being chased. ① and ③
+stay open.
+
+**+47, LB-120** is new, and is the reason this sweep exists. `docs/doc-size/docs/implementation-backlog.md.size`
+conflicts on every pair of concurrent implementer PRs, because the protocol has each of them delete
+its own entry and therefore change the line count. Measured the same day: **five rebases of #1303,
+every one conflicting on that file and nothing else.** LA-33 removed this class for documents in
+general and could not reach the one file where "two PRs, same document" describes *every* implementer
+PR. Filed for the Orchestrator (`scripts/**` is theirs) with two options, neither picked, and with
+the argument against the tempting non-fix written down — telling implementers to skip the recompute
+just converts the conflict into a red check, because the ratchet fails on slack.
+
+## 2026-09-18 — `docs/implementation-backlog.md` ratchet down (RV-57 removed)
+
+**−20.** RV-57 shipped in #1299 and its entry was left in the queue — the third such omission in one
+session, after LB-116 and BF-172. Removed rather than cut to a `Keep:` line, because the one thing it
+was still carrying is now answered: the supplier returns 366 day-keys and the consumer reads 365,
+they differ by one, and the direction is the safe one (the loop never asks for a day the payload
+lacks, which is BF-176 inverted). Reasoning in the journal entry; deliberately not "fixed", since
+widening the loop would make a constant named `STREAK_LOOKBACK_DAYS = 365` drive a 366-day walk.

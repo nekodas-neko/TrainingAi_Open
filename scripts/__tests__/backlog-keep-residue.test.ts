@@ -68,6 +68,24 @@ describe('backlog keep residue', () => {
     expect(k?.text).toBe('what is NOT done: why the constants were unset.')
   })
 
+  // The same defect a third time, wearing a warning sign. Four real Keeps open `- **⚠ Keep:` —
+  // TN-49's three and LA-118's one — and none of them parsed, so four entries that had SHIPPED sat
+  // in READY as if unstarted. LA-118 was #4 of Lane A's READY list on 2026-09-18, which is how it
+  // was found: it was offered as the next thing to build, and its code was already on `main`.
+  it('reads a Keep prefixed with a warning marker', () => {
+    const k = keepFromLines(['- **⚠ Keep: `muscle-tonnage-trend` is still its own copy**, as instructed.'])
+    expect(k?.text).toBe('`muscle-tonnage-trend` is still its own copy, as instructed.')
+  })
+
+  // The prefix is non-word ONLY, which is what keeps the widening from undoing the two cases above.
+  // A letter before the word still means the sentence is talking about a Keep rather than being one.
+  it.each([
+    ['a prose mention mid-sentence', '- The Keep: line below is what this refers to.'],
+    ['a word-prefixed bold run', '- **Nearly Keep: this is not the field either.**'],
+  ])('still refuses %s', (_label, line) => {
+    expect(keepFromLines([line])).toBeNull()
+  })
+
   it('reads the en-dash and hyphen forms', () => {
     expect(keepFromLines(['- **Keep – three things are NOT done:** no back-fill has run.'])?.text)
       .toBe('three things are NOT done: no back-fill has run.')

@@ -68,7 +68,12 @@ function keepFromLines(lines) {
     // match read both as unstarted work and put them at the top of Lane A's READY list. Those two
     // and the eight prose false-positives are the whole population — measured 2026-08-25 over all
     // 196 entries, which is why this is punctuation and not a word list.
-    const m = lines[i].match(/^\s*(?:[-*]\s*)?\*{0,2}Keep(?::\*{0,2}|\s*[—–-])\s*(.+)$/i);
+    // `[^\w\n]{0,3}` after the asterisks: four real Keeps open `- **⚠ Keep:` and none of them
+    // parsed, so four shipped entries read as unstarted — the exact failure above, wearing a
+    // warning sign. Measured over all 144 Keep bullets in the file: 140 matched, and the 4 that did
+    // not were all that shape. Non-word only, so a prefix containing a letter (Q-420's
+    // "**Keep the stored field on 1–10**", or any "The Keep:" in prose) still cannot reach it.
+    const m = lines[i].match(/^\s*(?:[-*]\s*)?\*{0,2}[^\w\n]{0,3}Keep(?::\*{0,2}|\s*[—–-])\s*(.+)$/i);
     if (!m) continue;
     // A Keep wraps across lines; its gate can sit on any of them, up to the next bullet.
     let text = m[1];
