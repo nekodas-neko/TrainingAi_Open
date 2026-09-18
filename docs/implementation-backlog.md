@@ -15664,32 +15664,24 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   is the second time an inline gate inside a Keep has done it (the first was BF-46).
 
 
-### [workouts][platform] LB-111 — expose per-muscle sets over a window, so a movement-balance card can be built
-
-- **Lane:** A — `app/api/**`. The engine half of **OR-118**, which is parked on it. Filed by Lane B
-  on 2026-09-16 after checking: the number OR-118 renders cannot be fetched by any client today.
-- **What is missing is an exposure, not a derivation.**
-  `getWeeklySetsByMuscleGroup(userId, programId, weekStart, weekEnd, tz)` already takes **arbitrary**
-  start and end dates in spite of its name (`lib/data/postgres/slices/periodization.ts:518`, and on
-  the repository interface). Every route that calls it throws that away and computes the current week
-  server-side: `weekly-muscle-sets` (`GET()`, no params), `ai-periodization/weekly-volume`
-  (`startOfWeekInTz(tz)` + 6), and nothing else reaches it.
-- **The ask:** a windowed read — a `from`/`to` (or `days`) param on `weekly-muscle-sets`, or its own
-  route. Lane A's call which; the shape OR-118 needs is `{ muscle, sets }[]` for a span, with the
-  same main/secondary 1.0/0.5 weighting the three existing surfaces already agree on.
-- **⚠ Decide `programId` explicitly — it is the reason this is not a one-liner.** The method scopes
-  to a single program and a 60-day window can span a programme change, so sets logged under a
-  previous programme either count or vanish. **Recommendation: count them**, because the card's claim
-  is about the lifter's training balance, not about one programme's adherence — but it is a real
-  choice and the answer belongs in the route's own comment, not in the card.
-- **Date params:** `normalizeDateParam` at the handler and a `[-/]` regex in the Zod schema, per
-  CLAUDE.md — the client's `localDateString()` emits slashes.
-- **Verification:** a non-null row count for a span that crosses a programme change, which is the
-  case the `programId` decision turns on.
-
 ### [workouts] OR-118 — the push:pull balance card, split out of Q-305 (engine half missing; see below)
 
-- **Needs:** LB-111
+- **✅ THE ENGINE HALF SHIPPED 2026-09-18** (`lane-a/lb111-muscle-sets-window`), unversioned — nothing
+  calls it yet, so nothing user-visible changed. **`GET /api/muscle-sets?from=&to=`** returns
+  `{ from, to, muscles: [{ muscle, sets }] }`, canonical muscle keys, secondary muscles at 0.5,
+  sorted by sets. Both params optional — the default is the trailing **90 days** ending today in the
+  user's timezone — both accept slashes or dashes, `to` is **inclusive**, and the cap is 400 days.
+  A date-shaped non-day (`2026-02-31`) answers **400**, not a driver 500.
+  - **The `programId` question below is ANSWERED: it counts across programme changes**, per this
+    entry's own recommendation and LB-111's. Pinned by a test that runs the same fixture through both
+    reads — `getWeeklySetsByMuscleGroup` returns **3**, the new one returns **7** — so the reason for
+    a separate method is measured rather than argued.
+  - **⚠ LB-111's premise was wrong in one place, and it is the place that decides the shape.** It
+    said `weekly-muscle-sets` *calls* `getWeeklySetsByMuscleGroup` and throws its date arguments
+    away. It does not call it at all: it carries its own inline SQL, and so does
+    `muscle-tonnage-trend`, so there were **three** copies of the muscle-attribution query
+    disagreeing on the date column and on programme scoping. That is why this is a new method rather
+    than a `from`/`to` on `weekly-muscle-sets` — see **LA-118** for the duplication itself.
 - **⛔ THE "EVERY NUMBER ALREADY EXISTS" PREMISE IS FALSE, checked 2026-09-16 before building.** The
   *grouping* exists — `movementPattern()` shipped as LB-103 and has **no callers yet**, so this card
   would be its first. The *numbers* do not: *"legs 481 · push 433 · pull 333 · other 168 over 60
@@ -15705,12 +15697,14 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   `getWeeklySetsByMuscleGroup(userId, programId, weekStart, weekEnd, tz)` takes **arbitrary** start
   and end dates despite its name (`lib/data/postgres/slices/periodization.ts:518`, on the repository
   interface). What is missing is the **exposure**, and a route under `app/api/**` is Lane A's by the
-  path rule — *both halves → Lane A, engine half first*. Filed as **LB-111**.
-- **⚠ Its `programId` argument is the one real design question**, and it is the engine half's to
-  answer: the method scopes to one program, and a 60-day window can span a programme change. Whether
-  the card counts sets across programmes or only the active one changes the number on screen.
+  path rule — *both halves → Lane A, engine half first*. Filed as **LB-111**, and **shipped
+  2026-09-18** — but not by widening that method, for the reason recorded at the top of this entry.
+- **⚠ Its `programId` argument was the one real design question and is now ANSWERED** (see the top of
+  this entry): the card counts sets across programmes. `getWeeklySetsByMuscleGroup` scopes to one and
+  stays that way for its own two callers, which grade a week against *that* programme's targets.
 - **Lane:** B — `components/health/` (the Training surface), reading shared helpers only. No storage
-  and no derivation change **in this half**; the window it reads has to come from LB-111 first.
+  and no derivation change **in this half**. The window it reads shipped on 2026-09-18, so this is
+  now startable: fetch `/api/muscle-sets?from=…&to=…` and group the rows with `movementPattern`.
 - **Added:** 2026-09-16, Orchestrator — split from **Q-305**, whose `Keep:` had been describing this
   as *"Lane B's and now unblocked"* since 2026-09-13 while parking it. See Q-305 for why that
   happened; the lesson is the entry's, the work is this one's.
@@ -15731,6 +15725,45 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   was written and corrected in the same sitting:** that field means SHIPPED, so it files unbuilt work
   under *"shipped; a look is owed, nothing is blocked"*, which is the OR-105 trap. Unbuilt work gets
   this line; the field goes on when the code lands.
+
+### [workouts][platform] LA-118 — the muscle-attribution query exists THREE times and the copies disagree
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-18 (Lane A, found while shipping LB-111).
+- **Lane: A** — `app/api/weekly-muscle-sets/route.ts`, `app/api/muscle-tonnage-trend/route.ts`,
+  `lib/data/postgres/slices/periodization.ts`. Reached by `app/api/**` and storage, so Lane A.
+- **This is a One-Formula violation that has already produced divergence, not a tidiness item.**
+  The same "weighted sets per muscle, library rows by role and non-library rows by tag" SQL is
+  written out four times, and the four do not agree:
+
+  | | date column | upper bound | programme scope |
+  |---|---|---|---|
+  | `getWeeklySetsByMuscleGroup` | `ws.started_at` | yes, user-local | **one `programId`** |
+  | `weekly-muscle-sets` (inline) | `el.logged_at` | **none** | none |
+  | `muscle-tonnage-trend` (inline) | `el.logged_at`, local-date string | yes | none |
+  | `getSetsByMuscleInWindow` (LB-111, new) | `el.logged_at` | yes, user-local | none |
+
+- **The divergence is invisible from any one file**, which is how it lasted: each copy carries a
+  comment saying it uses the *"same main/secondary role weighting as"* one of the others, and that
+  much is true — the 1.0/0.5 is identical everywhere. What differs is which timestamp a set is
+  attributed to and whether a previous programme counts, and no comment mentions either.
+- **`weekly-muscle-sets` having no upper bound is the one that could bite today.** It reads
+  `el.logged_at >= weekStart` and nothing else, so a log dated in the future counts toward this
+  week forever. Nothing writes future logs today; the sync path accepts a client-supplied
+  `logged_at`, so nothing structurally prevents one.
+- **The fix is an extraction, and the date column is the decision inside it.** Three of the four use
+  `el.logged_at`; `getWeeklySetsByMuscleGroup` uses `ws.started_at` because its unit is a programme
+  session. **Recommendation: extract the two-branch attribution SQL once, parameterised on
+  window + optional `programId`, and keep `ws.started_at` only for the programme-scoped caller** —
+  changing that one's date column would move the numbers its two callers already grade weeks
+  against, which is a behaviour change dressed as a refactor.
+- **⚠ Do not fold `muscle-tonnage-trend` in on the first pass.** It sums `weight_kg * reps` rather
+  than counting sets and buckets by week, so it shares the attribution half and nothing else. Folding
+  it means the helper returns rows to be aggregated by the caller — worth doing, but it is the step
+  that makes this a refactor of three routes instead of two.
+- **Verification:** the existing suites for all three routes must pass unchanged — that is the whole
+  point, and a test that has to be edited to go green is the signal the extraction changed behaviour.
+  Add one case pinning `weekly-muscle-sets` against a future-dated log.
+
 
 ### [workouts] Q-300 — 37% of sets are taken with materially less rest than prescribed, and the RPE model has no rest term
 
