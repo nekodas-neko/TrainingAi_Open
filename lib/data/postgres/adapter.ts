@@ -2033,6 +2033,44 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       })
   }
 
+  /**
+   * RV-63 — the dates on which a faucet signal was RECORDED, for the collection replay.
+   *
+   * `/api/collection` used to read `listBodyMetrics` / `listSleepSessions` in full and immediately
+   * project to `.map(m => m.date)`: 36 columns of `body_metrics` and 25 of `sleep_sessions` (176
+   * and 144 bytes a row, measured) to take one field each, over ALL history, on every home paint —
+   * `cachedFetch` revalidates regardless of TTL (Q-262). These select the one column and apply the
+   * `> 0` predicate in SQL, so the width no longer grows with the schema.
+   *
+   * The predicate is "recorded", not "above a bar" — see `ladder.ts`, and the measurement behind it:
+   * only 35 of the owner's 130 step-days reach 8,000, so a threshold would decay the steps ladder
+   * most weeks.
+   */
+  async listStepDayKeys(userId: string, from: string, to: string): Promise<string[]> {
+    const rows = await this.db.select({ date: s.bodyMetrics.date }).from(s.bodyMetrics)
+      .where(and(
+        eq(s.bodyMetrics.userId, userId),
+        gte(s.bodyMetrics.date, from),
+        lte(s.bodyMetrics.date, to),
+        gt(s.bodyMetrics.steps, 0),
+      ))
+      .orderBy(desc(s.bodyMetrics.date))
+    return rows.map(r => r.date)
+  }
+
+  /** RV-63 — see `listStepDayKeys`. Nights with a recorded duration, dates only. */
+  async listSleepDayKeys(userId: string, from: string, to: string): Promise<string[]> {
+    const rows = await this.db.select({ date: s.sleepSessions.date }).from(s.sleepSessions)
+      .where(and(
+        eq(s.sleepSessions.userId, userId),
+        gte(s.sleepSessions.date, from),
+        lte(s.sleepSessions.date, to),
+        gt(s.sleepSessions.durationHours, 0),
+      ))
+      .orderBy(desc(s.sleepSessions.date))
+    return rows.map(r => r.date)
+  }
+
   async listBodyMetrics(userId: string, from: string, to: string): Promise<BodyMetrics[]> {
     const rows = await this.db.select().from(s.bodyMetrics)
       .where(and(

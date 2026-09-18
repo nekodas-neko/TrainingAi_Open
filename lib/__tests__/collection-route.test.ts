@@ -15,12 +15,16 @@ import { shiftDateStr } from '@trainingai/shared/date-utils'
 const listTrainedDayKeys = vi.fn(async () => [] as string[])
 const listRestDays = vi.fn(async () => [] as string[])
 const getActiveProgram = vi.fn(async () => null as unknown)
-const listBodyMetrics = vi.fn(async () => [] as Array<{ date: string; steps?: number | null }>)
-const listSleepSessions = vi.fn(async () => [] as Array<{ date: string; durationHours?: number | null }>)
+// RV-63 — these were `listBodyMetrics`/`listSleepSessions` read in full and projected to `.date`.
+// The `> 0` predicate moved into SQL with them, so the two cases below that used to prove it at
+// this layer now prove it in `lib/data/postgres/__tests__/rv63-collection-day-keys.test.ts`
+// against a real Postgres. The guarantee moved with the code rather than being dropped.
+const listStepDayKeys = vi.fn(async () => [] as string[])
+const listSleepDayKeys = vi.fn(async () => [] as string[])
 
 vi.mock('@/auth', () => ({ auth: async () => ({ user: { id: 'u-1', timezone: 'Australia/Brisbane' } }) }))
 vi.mock('@/lib/data', () => ({
-  getRepository: async () => ({ listTrainedDayKeys, listRestDays, getActiveProgram, listBodyMetrics, listSleepSessions }),
+  getRepository: async () => ({ listTrainedDayKeys, listRestDays, getActiveProgram, listStepDayKeys, listSleepDayKeys }),
 }))
 
 import { GET } from '@/app/api/collection/route'
@@ -49,12 +53,12 @@ const runTo = (endExclusiveOffset: number, n: number, today: string) => {
 }
 
 beforeEach(() => {
-  for (const m of [listTrainedDayKeys, listRestDays, getActiveProgram, listBodyMetrics, listSleepSessions]) m.mockClear()
+  for (const m of [listTrainedDayKeys, listRestDays, getActiveProgram, listStepDayKeys, listSleepDayKeys]) m.mockClear()
   listTrainedDayKeys.mockResolvedValue([])
   listRestDays.mockResolvedValue([])
   getActiveProgram.mockResolvedValue(null)
-  listBodyMetrics.mockResolvedValue([])
-  listSleepSessions.mockResolvedValue([])
+  listStepDayKeys.mockResolvedValue([])
+  listSleepDayKeys.mockResolvedValue([])
 })
 
 describe('GET /api/collection assembles what the fold needs', () => {
@@ -128,27 +132,30 @@ describe('GET /api/collection assembles what the fold needs', () => {
     expect((await body()).collections.workout.decayEvents).toBeGreaterThan(0)
   })
 
-  it('a recorded day is a faucet day, with no threshold above it', async () => {
-    // Measured before this was wired: only 35 of the owner's 130 step-days reach 8,000 (avg 5,646).
-    // A threshold there would decay the steps ladder most weeks, against `ladder.ts`'s own
-    // instruction that these two are the calm half by construction. A low day still spawns.
-    const json0 = await body()
-    const today = json0.today
+  /**
+   * RV-63 — this used to seed metric rows and assert the route spawned a cat for a LOW day
+   * (400 steps, 3.5 h), proving there is no threshold above "recorded". The predicate now lives in
+   * SQL, so what this layer can still prove is that the route spawns one cat per day it is GIVEN
+   * and invents no bar of its own. The threshold half is asserted against a real Postgres in
+   * `rv63-collection-day-keys.test.ts`.
+   *
+   * Measured before any of this was wired: only 35 of the owner's 130 step-days reach 8,000
+   * (avg 5,646), so a threshold would decay the steps ladder most weeks.
+   */
+  it('spawns one cat per day it is given, with no threshold of its own', async () => {
+    const today = (await body()).today
     const [d1, d2] = runTo(0, 2, today)
-    listBodyMetrics.mockResolvedValue([{ date: d1, steps: 12_000 }, { date: d2, steps: 400 }])
-    listSleepSessions.mockResolvedValue([{ date: d1, durationHours: 8 }, { date: d2, durationHours: 3.5 }])
+    listStepDayKeys.mockResolvedValue([d1, d2])
+    listSleepDayKeys.mockResolvedValue([d1, d2])
 
     const json = await body()
     expect(json.collections.steps.stock[0]).toBe(2)
     expect(json.collections.sleep.stock[0]).toBe(2)
   })
 
-  it('a missing or zero value is not a recorded day', async () => {
-    const json0 = await body()
-    const today = json0.today
-    const [d1, d2] = runTo(0, 2, today)
-    listBodyMetrics.mockResolvedValue([{ date: d1, steps: null }, { date: d2, steps: 0 }])
-    listSleepSessions.mockResolvedValue([{ date: d1, durationHours: undefined }, { date: d2, durationHours: 0 }])
+  it('spawns nothing when the reads return no recorded days', async () => {
+    listStepDayKeys.mockResolvedValue([])
+    listSleepDayKeys.mockResolvedValue([])
 
     const json = await body()
     expect(json.collections.steps.stock[0]).toBe(0)
@@ -163,7 +170,7 @@ describe('GET /api/collection assembles what the fold needs', () => {
     const today = json0.today
     // A gap one wider than the allowance decays exactly once.
     const days = [runTo(0, 1, today)[0], runTo(STEPS_MAX_REST_GAP + 2, 1, today)[0]].sort()
-    listBodyMetrics.mockResolvedValue(days.map(d => ({ date: d, steps: 5_000 })))
+    listStepDayKeys.mockResolvedValue(days)
 
     const json = await body()
     expect(json.collections.steps.decayEvents).toBe(1)

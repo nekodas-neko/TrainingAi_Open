@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
+import { rateLimit } from '@/lib/rate-limit'
 import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils'
 import { maxCompliantRestGap } from '@trainingai/shared/schedule-utils'
 import { earlyDeloadWeekDays } from '@trainingai/shared/phase-engine'
@@ -23,7 +24,15 @@ import {
  * between a rest day the app itself asked for and a missed one.
  */
 
-/** The collection is a replay over ALL history, so there is no window to bound the reads with. */
+/**
+ * The collection is a replay over ALL history, so there is no window to bound the reads with.
+ *
+ * **RV-63 proposed a date floor and it is deliberately NOT taken.** `replayCollection` walks every
+ * recorded day forward from the beginning; a floor would silently change what the ladder reports for
+ * anyone with history behind it, which is a behaviour change wearing a performance fix's clothes.
+ * The growth the entry is right to worry about is addressed by the reads being one column wide
+ * rather than by seeing less history — see `listStepDayKeys`.
+ */
 const HISTORY_START = '2000-01-01'
 
 export async function GET() {
@@ -31,16 +40,29 @@ export async function GET() {
   const userId = session?.user?.id
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  // RV-63 — the only route in `app/api` that reads ALL history, and the card re-fetches it on every
+  // home paint (`cachedFetch` revalidates regardless of TTL, Q-262). The entry noted there is no
+  // sibling norm to appeal to, and that is literally true: every other route is windowed, and the
+  // split among them tracks nothing. So the rule this establishes is about the read, not the folder
+  // — an unbounded replay gets a limit; a windowed read does not. 30/60s matches
+  // `weekly-review/month-window`, the nearest aggregate in shape.
+  if (!rateLimit(`${userId}:collection`, 30, 60_000)) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+
   const tz = session.user?.timezone ?? DEFAULT_TZ
   const today = todayInTz(tz)
   const repo = await getRepository()
 
-  const [trainedDays, restDays, program, bodyMetrics, sleepSessions] = await Promise.all([
+  const [trainedDays, restDays, program, stepDays, sleepDays] = await Promise.all([
     repo.listTrainedDayKeys(userId, tz),
     repo.listRestDays(userId, HISTORY_START, today),
     repo.getActiveProgram(userId),
-    repo.listBodyMetrics(userId, HISTORY_START, today),
-    repo.listSleepSessions(userId, HISTORY_START, today),
+    // RV-63 — dates only. These were `listBodyMetrics` / `listSleepSessions` in full, 36 and 25
+    // columns, immediately projected to `.map(x => x.date)`. The `> 0` predicate moved into SQL with
+    // them, so the filter below is gone rather than relocated.
+    repo.listStepDayKeys(userId, HISTORY_START, today),
+    repo.listSleepDayKeys(userId, HISTORY_START, today),
   ])
 
   // `pausedDays` is compliance the app itself asked for, so that following its instructions never
@@ -61,9 +83,7 @@ export async function GET() {
   // A faucet day for these two is a day that was RECORDED, not one above a bar — see the note in
   // `ladder.ts`. Measured before wiring this up: only 35 of the owner's 130 step-days reach 8,000,
   // so a threshold would decay the steps ladder most weeks, against the engine's own instruction
-  // not to manufacture tension there.
-  const stepDays = bodyMetrics.filter(m => (m.steps ?? 0) > 0).map(m => m.date)
-  const sleepDays = sleepSessions.filter(sl => (sl.durationHours ?? 0) > 0).map(sl => sl.date)
+  // not to manufacture tension there. The `> 0` predicate now lives in the two reads above.
 
   const collections: Record<'workout' | 'steps' | 'sleep', CollectionState> = {
     workout: replayCollection({

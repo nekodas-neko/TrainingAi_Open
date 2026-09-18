@@ -52,6 +52,21 @@ are still deliberately NOT unified** — `computeStreak` counts *training days* 
 the home loop counts *calendar days spanned* — so `streak-window.ts` now says outright that the
 leaderboard does not read `STREAK_LOOKBACK_DAYS`: 365 would cap an all-time field just as 90 did.
 
+**The only unbounded route, narrowed and rate-limited — but not floored (RV-63, 2026-09-18).**
+`/api/collection` reads all history five ways with no rate limit, and the home card re-fetches it on
+every paint (`cachedFetch` revalidates regardless of TTL, Q-262). Two of those reads were full-width
+for one field each — **36 columns** of `body_metrics` and **25** of `sleep_sessions`, projected
+straight to `.map(x => x.date)`; they are one column wide now, with the `> 0` predicate pushed into
+SQL. **The entry's date floor is deliberately NOT taken:** `replayCollection` walks every recorded
+day from the beginning, so a floor changes what the ladder reports for anyone with history behind it
+— a behaviour change dressed as a performance fix, and the route's own comment already said there is
+no window to bound it with. **The rate-limit norm was decided rather than matched:** the entry was
+right that the siblings split on nothing (`weekly-muscle-sets` has five repo calls and no limit),
+but every other route is windowed and this is the only all-history one — so the rule is *an
+unbounded replay gets a limit, a windowed read does not*, at 30/60 s. **Two route tests moved rather
+than weakened:** they asserted a low day still spawns a cat, which the route can no longer see, so
+that guarantee is now asserted against a real Postgres.
+
 **Two ways a client error became a server fault (RV-55/56, 2026-09-18 — one PR, the sweep-50
 route-input batch).** Both are the Q-496 shape: input the route should refuse reaches the driver,
 which answers **500 with an empty body** and writes an `error_events` row. **RV-55** — the vial POST

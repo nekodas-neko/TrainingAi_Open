@@ -18,6 +18,16 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-18 — backlog → 24070, `projectOverview.md` → 11841 (RV-63 shipped)
+
+**Backlog −21.** The overview paragraph is long for a route change because two of the three things
+in it are decisions NOT to do what the entry said: no date floor (it would change what the ladder
+reports), and a rate-limit norm derived from the one property that actually separates the siblings
+rather than from the nearest one read first. A future session that sees only "added a rate limit and
+narrowed two selects" would re-propose the floor within a month.
+
+---
+
 ## 2026-09-18 — backlog → 24091, `projectOverview.md` → 11826 (RV-55/56, the route-input batch)
 
 **Backlog −36 for two entries**, the second batch of the day to leave whole. Both were Q-496-shaped,
