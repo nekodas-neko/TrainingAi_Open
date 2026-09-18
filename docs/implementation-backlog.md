@@ -12732,13 +12732,32 @@ record explicitly why not.
 - **✅ THE PAST-DAY READ IS NOT BLOCKED — corrected 2026-09-16.** This said it was blocked on
   `LB-102`, then on `LB-110`; **both were chasing work that had already shipped.**
   `app/api/body-battery/stress-day/route.ts` serves the stored buckets for any day and
-  `stress-day-chart.tsx` fetches it with `?date=`, rendered from `day-detail-content.tsx:260` with
-  `date={selectedDate}`. LB-110 is removed; do not re-file it. The pass test — *"the owner
-  opens a past day, reads a stressed window off the axis"* — cannot be met yet: `/api/body-battery`
-  is `export async function GET()` with **no parameters**, so only today is reachable. The buckets are
-  persisted (TN-3a, `oura_daytime_stress_buckets`, from 2026-08-24), and the chart takes a plain
-  `buckets` array, so the surface work is done — what is missing is the read. Also still owed:
-  overlaying stress on the HR charts, and the **stress-by-hour aggregate across days**.
+  `stress-day-chart.tsx` fetches it with `?date=`, rendered from `day-detail-content.tsx:259` with
+  `date={selectedDate}`. LB-110 is removed; do not re-file it. The buckets are persisted (TN-3a,
+  `oura_daytime_stress_buckets`, from 2026-08-24).
+- **✅ AND THE PASS TEST IS MET — corrected 2026-09-18 (Lane B), this entry said it was not.** It read
+  *"cannot be met yet: `/api/body-battery` is `export async function GET()` with no parameters, so
+  only today is reachable."* **That route is not in this chart's path.** `stress-day-chart.tsx:76`
+  fetches `/api/body-battery/stress-day?date=${day}` and nothing else — its own header says so
+  outright: *"every day comes from `/api/body-battery/stress-day`, one baseline."*
+  **And it is already spec-covered, not merely reachable:** `e2e/stress-by-hour.spec.ts` carries
+  *"a past day carries the same chart, which is what makes the comparison possible"*, driving
+  `/health/day?date=2026-09-08`. Re-run on `fdcee2d4e1`: **6 of 6 passed.** So *"open a past day,
+  read a stressed window off the axis"* is done and proven.
+- **⚠ WHAT IS LEFT IN THIS ENTRY IS PRE-RESHAPE PROSE, and it is the Orchestrator's call, not this
+  lane's.** The heading and the old body still promise *"overlaying stress on the HR charts"* and a
+  *"stress-by-hour aggregate across days"*. **Neither is in the plan the owner approved.** The
+  2026-09-10 conversation reshaped this entry — the entry says so itself: *"the chart is the first
+  half, not the deliverable. See TN-35 for the second"* — and the review's ordered plan (§9) lists
+  TN-3b as *"the chart — local-time axis, gaps as gaps, night shaded"*, with step 3 being **TN-35a,
+  overlay the series on the DAY TIMELINE**, not on the HR charts. The HR-chart overlay was checked
+  and is genuinely absent (`hr-day-chart.tsx` draws sleep and workout bands and no stress), so this
+  is a scope question rather than a missed build.
+- **⇒ TN-35 is what this parks.** Its `Needs: TN-3b` clears when this entry leaves the queue, and its
+  overlay half is Lane B and buildable today: `app/api/day-timeline/route.ts` already emits typed,
+  timestamped events and `components/health/day-detail/**` renders them, so the join needs no new
+  route. Its marker half is Lane A (a migration). **Clearing a completed entry is the Orchestrator's
+  sweep, which is why this is filed rather than struck.**
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner request

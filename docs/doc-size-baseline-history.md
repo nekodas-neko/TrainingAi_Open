@@ -18,13 +18,18 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
-## 2026-09-18 — backlog → 24149, `projectOverview.md` → 11803 (RV-62 shipped)
+## 2026-09-18 — backlog → 24168, `projectOverview.md` → 11803 (RV-62 shipped)
 
 **Backlog −23.** An entry left the queue with both halves done and its open question answered rather
 than inherited. The overview gains the answer, not the fix: *"can a seven-day boundary flip a
 soreness verdict"* is the kind of question that gets re-asked every time someone reads the ms-offset
 rule, and the answer — only through the median that sets `tau`, never directly — is worth more than
 the one-line change that prompted it.
+
+**Re-read as 24168 on the re-merge**, against the 24149 this note was drafted with — TN-3b (#1295)
+landed in between and took its own entry out. The delta is the measurement; the absolute is whatever
+`main` was at merge time, which is the fourth time today it has not been the `main` a note was
+written against.
 
 ---
 
@@ -13653,3 +13658,17 @@ live scoring defect. The row says so explicitly rather than implying either.
 
 Both carry their `[domain]` tags, and both say "found, not fixed" / name what was not established,
 so neither can be mistaken for a closed item on a later sweep.
+## 2026-09-18 — `docs/implementation-backlog.md` 23670 → 24199 (Lane B, TN-3b pass test)
+
++19 to correct a stale blocker that was parking real work. TN-3b said its pass test could not be met
+because `/api/body-battery` takes no parameters — but that route is not in the stress chart's path at
+all; it fetches `/api/body-battery/stress-day?date=` and says so in its own header. The past-day case
+is not merely reachable, it is spec-covered and green (6 of 6).
+
+The number also absorbs a re-merge of `origin/main` before merging, which landed three more
+entries from Lane A and Tuning — recomputed rather than spliced, as the ratchet requires.
+
+The lines are worth it because of what the claim was holding: TN-35's `Needs: TN-3b` keeps a
+buildable Lane B overlay parked, and the entry's remaining promises (HR-chart overlay, cross-day
+aggregate) are pre-reshape prose that the owner-approved plan replaced with TN-35a. Recording which
+half is done and which is a scope question is what lets the Orchestrator clear it in one pass.
