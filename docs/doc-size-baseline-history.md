@@ -49,7 +49,7 @@ history files are dated) rather than with the sweep, because the sweep is a chor
 measurement is the thing a future reader would otherwise re-derive before daring to run it.
 ---
 
-## 2026-09-18 — backlog → 23930, `projectOverview.md` → 11910 (Q-1a server half)
+## 2026-09-18 — backlog → 23961, `projectOverview.md` → 11910 (Q-1a server half)
 
 **Backlog +32 and nothing removed**, which is the honest shape for a partial: Q-1a stays queued
 because most of its scope — the client — has not shipped, and the entry now carries what DID ship, the
@@ -13853,3 +13853,22 @@ was still carrying is now answered: the supplier returns 366 day-keys and the co
 they differ by one, and the direction is the safe one (the loop never asks for a day the payload
 lacks, which is BF-176 inverted). Reasoning in the journal entry; deliberately not "fixed", since
 widening the loop would make a constant named `STREAK_LOOKBACK_DAYS = 365` drive a 366-day walk.
+
+## 2026-09-18 — `docs/implementation-backlog.md` 23909 → 23929 (Lane B, LB-121 + two un-parked entries)
+
+**+20.** Two edits, and the smaller one is the repair.
+
+**−2 characters, TN-25 and OR-116.** Both entries I wrote earlier the same day gained a `⛔` used as
+*emphasis*, and `next-item.js:97` reads a `⛔` anywhere as the legacy prose blocker — so both fell
+out of KEEP into PARKED, printing `unmigrated marker — <90 chars of whatever line held the glyph>`
+in place of their `Keep:`. The bucket was not the damage; the **lost residue** was. TN-25's residue
+is a device walk and a month of compliance data, and none of it was visible. Removing the two
+markers restored both: PARKED 46 → 44, KEEP 28 → 30.
+
+**+LB-121** is the systemic half, filed for the Orchestrator because `scripts/**` is theirs. A
+`Gate:` or an unmet `Needs:` already overrides the legacy marker and a `Keep:` does not, though the
+script's own comment says a structured field is authoritative and `Keep:` is one. The entry is worth
+its lines because the trap has now fired four times (LB-116, TN-3b, TN-25, OR-116) — twice in one
+afternoon, by the same author, on the same day the baton warned about it, once inside backticks
+while quoting another warning's name. Knowing the rule is not enough to follow it, which is the
+argument for the one-clause code fix over more prose.
