@@ -18,6 +18,23 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-18 — backlog → 24017, `docs/agents/state/tuning.md` → 685 (TN-50 + two method traps)
+
+**+88 and +21.** TN-50 went through two drafts in one sitting and the entry carries both, because
+the correction is the finding. The first read the stored `energy_level` column as a self-report and
+concluded a seven-week slide; the owner replied that he never chooses the value. The sheet seeds it
+from `readinessToEnergy(readiness)` and the same day's mood scores into the same day's readiness, so
+~10% of the readiness weight is a re-reading of readiness on 73% of days. The wrong draft stays
+visible in the entry because anything else reading that column will make the same mistake. Three
+other owner decisions land in the same PR (TN-47's gate, Q-506's sequencing, PS-44's start).
+
+The baton grows for the first time with a **Method** section rather than state. Two traps cost this
+agent a finding each in one session, and both are one mistake: rebuilding the app's logic in an
+ad-hoc query instead of replaying the shipped function. A baton that carries only "where I got to"
+lets the next session repeat the how.
+
+---
+
 ## 2026-09-18 — backlog → 23898, `projectOverview.md` → 11900 (LA-110: two refutations)
 
 **Backlog +33 for two NEGATIVE results and no fix**, which is the unusual trade and the one worth

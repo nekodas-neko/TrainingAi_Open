@@ -60,12 +60,19 @@ each term delivers:
 | sleepBalance | 13.9% | 10% | over-delivers |
 | recoveryIndex | 10.3% | 9% | matched |
 | temperature | **7.0%** | 10% | under-delivers — the Q-506 baseline |
-| checkin | **6.5%** | 10% | under-delivers — never logged above 88 of 100 |
+| checkin | **6.5%** | 10% | under-delivers — **and not independent; see the ⚠ below** |
 | prevDayActivity | **4.6%** | 9% | near-constant: never below 57 |
 | activityBalance | **2.8%** | 6% | near-constant: never below 51 |
 
 **The two activity terms carry 15% of the weight and supply 7.4% of the movement.** Neither has ever
 scored below 51 in 65 days. They are a floor with a label, not a measurement of this person's day.
+
+**⚠ CORRECTION, 2026-09-18 — the `checkin` row above is not a clean measurement.** The owner does
+not choose that value: the check-in sheet seeds it from `readinessToEnergy(readiness)`, and the same
+day's mood then scores into the same day's readiness. Measured over the 62 days carrying both, the
+saved level is exactly what the auto-select would have produced on **45 — 73%**. So on about three
+days in four the `checkin` term is a re-reading of readiness, its 6.5% share is not independent of
+the score it feeds, and it must be re-measured after the seeding is fixed. Filed as **TN-50**.
 
 **`recoveryIndex` is flagged `provisional` on 100% of days and is the 5th-largest driver of
 movement** (sd 27.0, range 4–100). That is not a bug — `provisional` here means *the curve is an
