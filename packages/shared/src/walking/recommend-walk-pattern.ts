@@ -78,10 +78,18 @@ export function recommendWalkPattern(
   // a gap, so the selector degrades to step volume instead of prescribing intervals off no data.
   const openMin = zone2 != null && zone2.status === 'open' ? zone2.remainingMin : 0
 
+  // RV-60 — "no target" is a row with `status: 'not-required'`, not a MISSING row. `computeZoneQuota`
+  // emits one zone per target and sets that status when `targetMin === 0`
+  // (`health/zone-quota.ts`), and `zone-quota.test.ts` pins the distinction deliberately: "marks a
+  // zero-target zone as not-required, not complete". Testing `zone2 == null` therefore never fired
+  // against real data, and a user with no target was told their target was DONE — which is the one
+  // thing these two strings exist to tell apart.
+  const noTarget = zone2 == null || zone2.status === 'not-required'
+
   if (openMin < ZONE2_GAP_MET_MIN) {
     return {
       pattern: WALK_PATTERNS.easy_steps,
-      reason: zone2 == null
+      reason: noTarget
         ? 'No Zone 2 target set this week — walking for steps'
         : 'Zone 2 is done for the week — walking for steps',
     }

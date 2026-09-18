@@ -16,9 +16,19 @@ const ALL_EQUIPMENT = ['barbell', 'dumbbell', 'cable', 'kettlebell', 'machine', 
  * everyone can do a push-up, whatever they ticked.
  */
 export function buildEquipmentSet(selected: string[]): Set<string> {
+  // RV-58 — both sides of the comparison fold case, and they must fold it the SAME way.
+  // `equipmentEligible` lowercases the exercise's labels and this built the owned set raw, so
+  // `equipmentEligible(['Barbell'], buildEquipmentSet(['barbell']))` was true while the mirror was
+  // false, and `buildEquipmentSet(['FULL_GYM'])` returned the shorthand unexpanded rather than the
+  // whole catalogue.
+  //
+  // Not reachable today — the one producer (`builder-wizard.tsx`) emits lowercase ids and 0 of 156
+  // catalogue rows carry a non-lowercase value — but both API schemas take a bare
+  // `z.array(z.string())`, so nothing constrains the next producer.
+  const lower = selected.map(e => e.toLowerCase())
   const set = new Set<string>(['bodyweight'])
-  const grants = selected.includes('full_gym') ? ALL_EQUIPMENT : selected
-  grants.forEach(e => set.add(e))
+  const grants = lower.includes('full_gym') ? ALL_EQUIPMENT : lower
+  grants.forEach(e => set.add(e.toLowerCase()))
   return set
 }
 
