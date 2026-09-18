@@ -659,61 +659,6 @@ existing 65 days moves by less than 5 points on every one of them.
   keys — the off-by-one at the far edge is unverified in either direction, and importing the
   constant does not settle it.
 
-### [workouts] RV-58 — `equipmentEligible` lowercases one side of the comparison and `buildEquipmentSet` lowercases neither
-
-- **Lane:** A — `packages/shared/src/workout/equipment.ts:18-23` and `:40`. **Added:** 2026-09-18 ·
-  Review sweep 50.
-- **Batch:** `shared-module-drift-sweep50`
-- Probed against the shipped module: `equipmentEligible(['Barbell'], buildEquipmentSet(['barbell']))`
-  → **true**, but `equipmentEligible(['barbell'], buildEquipmentSet(['Barbell']))` → **false**, and
-  `buildEquipmentSet(['FULL_GYM'])` → `['bodyweight','FULL_GYM']` — the shorthand is not expanded.
-- **Not reachable today**, which is the reason it is low in the queue rather than the reason to skip
-  it: the only producer (`components/workout-builder/builder-wizard.tsx:21`) uses lowercase ids and
-  **0 of 156** catalogue rows carry a non-lowercase equipment value. Both API schemas accept a bare
-  `z.array(z.string())`, so a future producer is unconstrained.
-- **⚠ The shipped test reads as covering this and does not.**
-  `lib/__tests__/catalogue-equipment-guard.test.ts:129` exercises only the exercise side, which is
-  what makes the half-coverage look like case-insensitivity. Add the mirrored case in the same PR.
-
-### [nutrition] RV-59 — `summariseSupplementDay` sums mixed units and labels the total by row order
-
-- **Lane:** A — `packages/shared/src/nutrition/supplement-day-totals.ts:66-67`. **Added:**
-  2026-09-18 · Review sweep 50.
-- **Batch:** `shared-module-drift-sweep50`
-- `acc.loggedAmount.amount = (acc.loggedAmount.amount ?? 0) + l.amount` with
-  `acc.loggedAmount.unit ??= l.unit ?? null` — so `1 mg + 2 g` reports **`3 mg`** or **`3 g`**
-  depending only on which row the loop saw first. Confirmed by probing the shipped module in both
-  orders.
-- **The module's own header names this case as a reason it was hoisted** — *"a new `source` value
-  handled on one side, **or a mixed-unit day**, and the device silently disagrees with the server"* —
-  and its three "behaviours that must not drift" specify the unit rule while saying nothing about the
-  amounts, which are summed regardless.
-- **Latent, and more than latent: the multi-contribution path is unexercised by any real data.**
-  `claude_ro.supplement_logs` holds 5 rows, all `source='manual'`, units `mg`/null, and
-  `GROUP BY (log_date, supplement_id) HAVING count(*) > 1` returns **zero groups** — so no owner day
-  has more than one contribution at all. That is *the owner's rows only*.
-- **Decide the semantics before coding**: either convert to a canonical unit, or refuse to total
-  across units and report per-unit subtotals. Summing and picking a label is the one option that
-  cannot be right.
-
-### [cardio] RV-60 — the walk recommender's "no Zone 2 target" branch cannot fire, and nothing calls it yet
-
-- **Lane:** A — `packages/shared/src/walking/recommend-walk-pattern.ts:77-86`. **Added:** 2026-09-18
-  · Review sweep 50.
-- **Batch:** `shared-module-drift-sweep50`
-- The module ships two distinct user-facing strings — *"Zone 2 is done for the week"* vs *"No Zone 2
-  target set this week"* — which exist precisely to tell the user which case they are in. The only
-  producer of a `ZoneQuota` represents "no target" as a row with `status: 'not-required'`
-  (`health/zone-quota.ts:48-50`), not as a missing row, and `recommend-walk-pattern.ts:79` collapses
-  that to 0 remaining. So a user with no target is told the target is **done**, and the `zone2 ==
-  null` branch is unreachable from real data.
-- `zone-quota.test.ts:38` asserts the repo keeps that distinction deliberately ("marks a zero-target
-  zone as not-required, not complete"), so the two modules disagree about what the quota means.
-- **Impact is currently zero — `grep -rn recommendWalkPattern` finds no production call site**, tests
-  only. Fix it before the first consumer lands, not after.
-- Threshold behaviour itself is correct and was probed: 14→easy, 15→short, 44→short, 45→long,
-  46→long, matching `ZONE2_GAP_MET_MIN`/`ZONE2_GAP_LARGE_MIN`.
-
 ### [app-shell] RV-61 — any signed-in user can equip an achievement title they have not unlocked
 
 - **Lane:** A — `app/api/user/equipped-title/route.ts:26-29`. **Added:** 2026-09-18 · Review sweep 50.
@@ -23737,6 +23682,28 @@ intake traced it, it did not design it.
 **Done looks like:** a week-in-review page reachable from the notification and from a permanent
 Health entry point, drawing its charts from values the route returned rather than from parsed prose,
 with the recap week visibly compared against the one before it.
+
+### [nutrition] LA-119 — a mixed-unit supplement day renders as "no amount", which reads as "no number was logged"
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-18 · found by Lane A while shipping RV-59.
+- **Lane: B** — `components/nutrition/` only; the shared derivation already carries the flag.
+- **Reference:** [`2026-09-18-lane-a-rv58-60-shared-module-drift.md`](overview/entries/2026-09-18-lane-a-rv58-60-shared-module-drift.md).
+
+RV-59 made `summariseSupplementDay` refuse to total a day whose contributions name **different**
+units, because `unit` is free text (`ml`, "1 scoop") and there is no conversion. Such a day now
+returns `amount: null, unit: null, mixedUnits: true`.
+
+`supplementSubtitle` reads `loggedAmount` and branches on `amount == null`, so it renders that day
+identically to *"a tick with no number"* — which is the one thing it is not. The flag exists to tell
+those two apart and nothing reads it yet.
+
+**Not urgent, and deliberately not fixed in RV-59's PR:** the file is Lane B's, and there is no such
+day in production — `claude_ro.supplement_logs` holds 5 rows, all one unit, no day with more than one
+contribution (*the owner's rows only*). The render is honest today, just uninformative.
+
+**Done looks like:** a day with `mixedUnits: true` says so — "logged in mixed units" or the per-entry
+amounts — rather than showing the same subtitle as an amountless tick.
+
 
 ### [workouts][devices] 🔵 PS-7 — camera form capture, Phase 0 only: can the S25 WebView run a pose landmarker at all?
 

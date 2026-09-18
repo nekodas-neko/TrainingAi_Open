@@ -18,6 +18,25 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-18 — backlog → 23855, `projectOverview.md` → 11855 (RV-58/59/60, the last sweep-50 batch)
+
+**Backlog −33, which is −55 for the three entries and +22 for one new one.** All three sweep-50
+batches are now out of the batch list. −55 for three is the batching argument in one number: they
+shared a verification surface, so they cost one test file and one gate rather than three of each.
+
+The +22 is **LA-119**, filed rather than fixed: RV-59's refusal to total a mixed-unit day now renders
+identically to an amountless tick, in a `components/nutrition/` file that belongs to Lane B. A queue
+entry is the honest cost of a finding that lands outside the lane that found it — the alternative
+shapes are crossing the boundary or dropping the finding, and both are worse than 22 lines.
+
+The overview paragraph leads with what each defect *did* rather than what changed, because two of the
+three were unreachable today and the temptation on re-reading will be to wonder why they were worth a
+PR. The answer is in the reachability lines: nothing constrains the next producer, and
+`recommendWalkPattern` has no caller yet — which is the cheapest moment to fix it, not a reason to
+wait.
+
+---
+
 ## 2026-09-18 — backlog → 24070, `projectOverview.md` → 11841 (RV-63 shipped)
 
 **Backlog −21.** The overview paragraph is long for a route change because two of the three things
@@ -13728,7 +13747,7 @@ test, *"fast-block compliance over a month is neither 0% nor 100%"*, which needs
 rather than a sitting. **Not struck**, because that second one is unmeasured.
 
 
-## 2026-09-18 — `docs/implementation-backlog.md` 23888 → 23929 (Lane B, OR-116 ② + LB-120)
+## 2026-09-18 — `docs/implementation-backlog.md` 23855 → 23896 (Lane B, OR-116 ② + LB-120)
 
 **+41.** Two edits, both of which are the queue doing its job rather than accreting.
 

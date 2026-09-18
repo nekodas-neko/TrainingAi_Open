@@ -52,6 +52,20 @@ are still deliberately NOT unified** — `computeStreak` counts *training days* 
 the home loop counts *calendar days spanned* — so `streak-window.ts` now says outright that the
 leaderboard does not read `STREAK_LOOKBACK_DAYS`: 365 would cap an all-time field just as 90 did.
 
+**Three shared modules whose contract and behaviour had drifted (RV-58/59/60, 2026-09-18 — one PR,
+the last sweep-50 batch).** **RV-58** — `equipmentEligible` folded case on the exercise side and
+`buildEquipmentSet` on neither, so `equipmentEligible(['Barbell'], buildEquipmentSet(['barbell']))`
+was true and its mirror false, and `full_gym` in upper case went unexpanded. Unreachable today (the
+one producer emits lowercase, 0 of 156 rows are non-lowercase) but both API schemas take a bare
+`z.array(z.string())`. **RV-59** — `summariseSupplementDay` summed across units and labelled the
+total by row order, so `1 mg + 2 g` reported `3 mg` **or** `3 g` depending on which row came first.
+Converting is impossible in general — `unit` is free text and includes `ml` and "1 scoop" — so a
+mixed day now refuses to total, reporting `mixedUnits: true` and no number. **RV-60** — the walk
+recommender chose between *"Zone 2 is done"* and *"No Zone 2 target set"* on `zone2 == null`, but
+`computeZoneQuota` emits a **row** with `status: 'not-required'` for no-target, so the null branch
+never fired and a user with no target was told it was done. No production caller yet, so it is fixed
+before the first consumer rather than after.
+
 **The only unbounded route, narrowed and rate-limited — but not floored (RV-63, 2026-09-18).**
 `/api/collection` reads all history five ways with no rate limit, and the home card re-fetches it on
 every paint (`cachedFetch` revalidates regardless of TTL, Q-262). Two of those reads were full-width
