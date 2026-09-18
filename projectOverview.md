@@ -52,6 +52,20 @@ are still deliberately NOT unified** — `computeStreak` counts *training days* 
 the home loop counts *calendar days spanned* — so `streak-window.ts` now says outright that the
 leaderboard does not read `STREAK_LOOKBACK_DAYS`: 365 would cap an all-time field just as 90 did.
 
+**The muscle-attribution query was four copies; three are now one (LA-118, 2026-09-18 —
+unversioned).** `weightedSetsByMuscle` in `periodization.ts` is the single set-counting query;
+`getWeeklySetsByMuscleGroup`, `getSetsByMuscleInWindow` and `/api/weekly-muscle-sets` call it. The
+two things the copies disagreed about — **which timestamp attributes a set to a day**, and **whether
+a previous programme counts** — are parameters now, so a caller states its answer instead of
+inheriting whichever copy it started from. **One behaviour change, and it is the defect:**
+`weekly-muscle-sets` had no upper bound at all, so a log dated in the future counted toward this week
+forever; it has one now. **The date column had no test holding it in either direction** — every
+fixture in the repo set `started_at` and `logged_at` to the same instant — so there is one now, a
+session started 22:00 yesterday with its sets logged 00:30 today, where the two reads deliberately
+disagree. **`muscle-tonnage-trend` is still its own copy**, as LA-118 instructed for a first pass: it
+sums tonnage and buckets by week, so folding it in changes the shared function's shape. LA-118 stays
+queued for that, and the honest count is two implementations rather than one.
+
 **Sets per muscle over any window, so the balance card can finally be built (LB-111, 2026-09-18 —
 engine half, unversioned).** `GET /api/muscle-sets?from=&to=` is new: nothing served this number
 before, because every muscle-set route computed the current week server-side and took no parameters.
