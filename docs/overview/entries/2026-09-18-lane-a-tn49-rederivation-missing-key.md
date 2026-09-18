@@ -83,10 +83,46 @@ entry:
    of 65 rows carry no stamp, and the stamped and unstamped ranges overlap (08-22 → 08-25), so a row
    cannot say which it is.
 
+## The correction I nearly shipped
+
+The first version of this fix collapsed two different cases and **broke a pre-existing test**, which
+is the part of this worth carrying forward.
+
+`packages/shared/src/health/__tests__/readiness-stored-inputs.test.ts` — 19 tests I did not find,
+because I grepped `__tests__` for `rederiv|readiness-comp|score-audit` and the file is named for the
+stored *inputs* — contains *"skips a contributor whose stored score is not a finite number"*, whose
+comment states the intent outright: *"checkin carried 0.10 of the weight and is now absent from the
+sum entirely."* Someone decided that on purpose.
+
+My first pass treated **absent** and **present-but-unusable** as the same thing and stood the neutral
+50 in for both. It went green on my own new tests and turned that one red, on a full-suite run I
+started *after* committing.
+
+The two cases are genuinely different:
+
+- A key **absent** has no score. Standing the model's own neutral in reproduces what
+  `computeReadinessComposite` did, so it is not an invention.
+- A key **present with a corrupt score** is a value that cannot be read. Inventing 50 for it asserts
+  something the row does not say — which is what the enclosing describe block, *"it refuses to invent
+  a verdict"*, exists to prevent.
+
+So the present-but-unusable path is unchanged and still skipped, which means **it keeps the
+low-by-`weight × score` trap**. That is accepted rather than overlooked: no production row has ever
+been in that state, and the alternative is overturning a deliberate decision on no evidence. It is
+stated in the code and pinned by its own test so the asymmetry is visible rather than incidental.
+
+**The lesson is the grep, not the logic.** A test file named for the thing it tests rather than the
+function it calls is invisible to a search built from the function name. Running the full suite
+before committing, not after, is what would have caught it.
+
 ## Verification
 
-`packages/shared/src/health/__tests__/tn49-rederivation-missing-key.test.ts`, **9 passing**. Run
-against the pre-fix code, **5 fail and 4 pass** — and which four pass is the point:
+`packages/shared/src/health/__tests__/tn49-rederivation-missing-key.test.ts`, **10 passing**, and
+the 19 pre-existing tests in `readiness-stored-inputs.test.ts` still pass **unchanged** — 29 in
+total. Run against the original from `main`, **6 of the 10 new ones fail and all 19 old ones pass**,
+which is the result that matters: the change is additive and moves nothing that was already pinned.
+
+Which four of the new ones pass against the original is the other half:
 
 | Survives on both sides | Why it is there |
 |---|---|

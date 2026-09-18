@@ -327,15 +327,26 @@ export function rederiveReadinessFromStored(stored: unknown): ReadinessRederivat
 
   for (const key of Object.keys(READINESS_WEIGHTS) as (keyof typeof READINESS_WEIGHTS)[]) {
     const entry = map[key]
-    const c = entry != null && typeof entry === 'object' ? entry as StoredReadinessContributor : null
-    if (c == null || typeof c.score !== 'number' || !Number.isFinite(c.score)) {
-      // TN-49 — carry the model's NEUTRAL rather than skipping. Skipping dropped this key's WEIGHT
-      // from a sum whose weights are defined to total 1, so the result came out low by about
-      // `weight × 50` and read as a disagreement the row did not have.
+
+    // TN-49 — a key that is ABSENT carries the model's NEUTRAL rather than being skipped. Skipping
+    // dropped its WEIGHT from a sum defined to total 1, so the result came out low by about
+    // `weight × 50` and read as a disagreement the row did not have. Seven production rows are
+    // missing `checkin` for this reason.
+    if (entry === undefined) {
       missing.push(key)
       weighted += NEUTRAL.score * READINESS_WEIGHTS[key]
       continue
     }
+
+    // A key that is PRESENT but unusable is deliberately NOT treated the same way, and the asymmetry
+    // is the point. An absent key has no score, so standing the model's own neutral in for it
+    // reproduces what the composite did; a present key with a corrupt score is a value we cannot
+    // read, and inventing 50 for it would be asserting something the row does not say. This path is
+    // unchanged and stays skipped, which means it keeps the low-by-`weight × score` trap above —
+    // accepted, because no production row has ever been in this state, and the alternative is
+    // changing a behaviour an existing test pins on purpose.
+    const c = entry != null && typeof entry === 'object' ? entry as StoredReadinessContributor : null
+    if (c == null || typeof c.score !== 'number' || !Number.isFinite(c.score)) continue
     matched++
 
     const rederived = rederiveContributor(key, c)

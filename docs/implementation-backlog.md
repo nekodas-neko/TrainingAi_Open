@@ -573,6 +573,13 @@ existing 65 days moves by less than 5 points on every one of them.
     exactly. The key-count histogram is `{8: 7, 9: 58}` — a 1:1 match with the disagreements.
   - An absent key now contributes the model's own NEUTRAL 50 (what `computeReadinessComposite`
     itself uses for a contributor with no input) and is reported in a new `missing` field.
+  - **⚠ A key PRESENT with an unusable score is deliberately NOT treated the same way**, and the
+    asymmetry is pinned by its own test. An absent key has no score, so the neutral reproduces the
+    composite; a corrupt one is a value that cannot be read, and inventing 50 asserts something the
+    row does not say — which is what `readiness-stored-inputs.test.ts`'s *"it refuses to invent a
+    verdict"* block exists to prevent. That path stays skipped and therefore **keeps** the
+    low-by-`weight × score` trap. Accepted: no production row has ever been in that state. The
+    first version of the fix collapsed the two cases and turned that pre-existing test red.
   - **The audit surface was asserting the opposite of its own evidence.** With `drifted` and
     `uncheckable` both empty it took the branch that prints *"The stored score IS reproducible from
     its own stored inputs (42)"* against a stored 48, and concluded *"the model has not moved — the

@@ -18,7 +18,7 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
-## 2026-09-18 — backlog → 24194, `projectOverview.md` → 11775 (TN-49, the rederivation gap)
+## 2026-09-18 — backlog → 24201, `projectOverview.md` → 11775 (TN-49, the rederivation gap)
 
 **Backlog +13 on an entry that shipped its fix and stayed queued.** The growth is a retraction: the
 entry's prescribed first action would have overwritten seven correct production scores with values

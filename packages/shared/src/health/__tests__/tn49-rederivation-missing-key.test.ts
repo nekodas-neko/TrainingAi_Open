@@ -102,6 +102,32 @@ describe('TN-49 — a contributor key absent from the stored map', () => {
       .toEqual([{ key: 'previousNight', stored: 50, rederived: 90 }])
   })
 
+  /**
+   * The asymmetry, pinned deliberately. An ABSENT key gets the model's neutral; a key that is
+   * PRESENT with an unusable score stays skipped, which is what `readiness-stored-inputs.test.ts`
+   * has asserted since before this fix — *"checkin carried 0.10 of the weight and is now absent
+   * from the sum entirely."*
+   *
+   * The two look alike and are not. An absent key has no score, so standing the model's own neutral
+   * in reproduces what the composite did. A present key with a corrupt score is a value that cannot
+   * be read, and inventing 50 would assert something the row does not say. The present-but-unusable
+   * path therefore KEEPS the low-by-`weight × score` trap — accepted, because no production row has
+   * ever been in that state and the alternative is overturning a deliberate decision on no evidence.
+   */
+  it('treats a present-but-unusable score differently from an absent key', () => {
+    const present = completeMap(50) as Record<string, unknown>
+    present.checkin = { score: null, provisional: false }   // present, unreadable → skipped
+    const absent = completeMap(50)
+    delete absent.checkin                                   // absent → neutral 50 stands in
+
+    // Skipped: 0.90 of weight at 50 = 45. Stood in for: the full 1.00 at 50 = 50.
+    expect(rederiveReadinessFromStored(present)?.score).toBe(45)
+    expect(rederiveReadinessFromStored(absent)?.score).toBe(50)
+    // And only the absent one is reported as missing — the skipped one is not claimed either way.
+    expect(rederiveReadinessFromStored(present)?.missing).toEqual([])
+    expect(rederiveReadinessFromStored(absent)?.missing).toEqual(['checkin'])
+  })
+
   it('returns null when nothing in the map is a contributor at all', () => {
     expect(rederiveReadinessFromStored({ nonsense: 1 })).toBeNull()
     expect(rederiveReadinessFromStored(null)).toBeNull()
