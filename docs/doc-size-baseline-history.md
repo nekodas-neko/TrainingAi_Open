@@ -18,13 +18,29 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
-## 2026-09-18 — backlog → 23776, `projectOverview.md` → 11729 (LA-118, the set-counting three)
+## 2026-09-18 — backlog → 23915 (TN-47/48/49, the tuning calibration sweep)
+
+**+144 from 23771.** Three entries off one review. TN-48 is the long one and earns it: the
+body-composition decomposition has to carry its guardrails inline, because the finding is that the
+undecomposed lean-mass number is *misleading in exactly the situation a user most wants it*, and an
+implementer who reads the table without the water column repeats the error the entry exists to stop.
+TN-47 carries the measured "moves 0.4 points" line for the same reason — without it the entry reads
+as a re-score, which it is not.
+
+---
+
+## 2026-09-18 — backlog → 23920, `projectOverview.md` → 11729 (LA-118, the set-counting three)
 
 **Backlog +5 on an entry that SHIPPED**, which is the shape worth noting rather than the number. The
 entry did not leave the queue: `muscle-tonnage-trend` was deliberately out of scope for the first
 pass, so LA-118 stays with a `Keep:` and is rewritten around what shipped instead of being deleted.
 What it loses in problem statement it gains in the record of which decisions are now parameters and
 what the tonnage fold will have to preserve.
+
+**Re-read as 23920 on the re-merge**, +5 on TN-47/48/49's 23915 rather than on the 23771 this note
+was first written against. The delta is the measurement; the absolute is a reading of whatever
+`main` happened to be when the branch was re-merged, which on this repo is never the number the note
+was drafted with.
 
 The overview's +14 is a paragraph on a change with no user-visible effect, which normally would not
 earn one. It earns it here because the extraction made a silent failure mode **easier**: changing a
@@ -93,6 +109,7 @@ out or it reads as alarmism. The four options carry their own trade-offs per **D
 Back To Me**, and that section does not compress well.
 
 ---
+
 
 ## 2026-09-17 — backlog → 23365 (four owner decisions + the Q-506 re-measurement)
 
