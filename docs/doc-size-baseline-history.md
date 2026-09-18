@@ -18,7 +18,7 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
-## 2026-09-18 — backlog → 23871, `projectOverview.md` → 11852 (RV-61 shipped)
+## 2026-09-18 — backlog → 23838, `projectOverview.md` → 11866 (RV-61 shipped)
 
 **Backlog −17** for one small entry. The overview paragraph is longer than the diff because two of
 the three things worth remembering are **refusals**: the check calls a fifteen-query function on
@@ -29,6 +29,25 @@ will reasonably ask why, and the answer is not in the diff.
 The third is the pre-flight check — that all 16 `unlockedBy` values resolve — which is there because
 this fix's failure mode is locking a user out of a title they earned, and nothing in CI would catch a
 requirement that silently does not resolve.
+
+---
+
+## 2026-09-18 — backlog → 23855, `projectOverview.md` → 11855 (RV-58/59/60, the last sweep-50 batch)
+
+**Backlog −33, which is −55 for the three entries and +22 for one new one.** All three sweep-50
+batches are now out of the batch list. −55 for three is the batching argument in one number: they
+shared a verification surface, so they cost one test file and one gate rather than three of each.
+
+The +22 is **LA-119**, filed rather than fixed: RV-59's refusal to total a mixed-unit day now renders
+identically to an amountless tick, in a `components/nutrition/` file that belongs to Lane B. A queue
+entry is the honest cost of a finding that lands outside the lane that found it — the alternative
+shapes are crossing the boundary or dropping the finding, and both are worse than 22 lines.
+
+The overview paragraph leads with what each defect *did* rather than what changed, because two of the
+three were unreachable today and the temptation on re-reading will be to wonder why they were worth a
+PR. The answer is in the reachability lines: nothing constrains the next producer, and
+`recommendWalkPattern` has no caller yet — which is the cheapest moment to fix it, not a reason to
+wait.
 
 ---
 
