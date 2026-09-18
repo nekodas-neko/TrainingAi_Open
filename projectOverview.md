@@ -26,8 +26,22 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.457.12 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.457.13 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-18.
+
+**The streak counted the API's window, not the training (BF-176, v1.457.13).** The owner asked why it
+went **90 → 89 on a day he trained**; his real streak is **102 days**, unbroken since 2026-06-08.
+`app/api/streak-data/route.ts` sent 90 days of `trainedDays` while the consuming loop walked back
+365, and a missing day reads as a **rest day** rather than as missing data — so past day 90 three
+lookups broke the streak and the count was pinned to the window edge. **The mechanism is worth
+stating because it is counter-intuitive: once the real streak exceeds the window, the number tracks
+where the edge lands, not what the lifter did.** It dropped because the edge slid off a rest day onto
+a trained one. `STREAK_LOOKBACK_DAYS` (`packages/shared/src/workout/streak-window.ts`) is now shared
+by both sides, because they have to agree and nothing made them. **The card may show the old number
+until the `streak-data` cache turns over** (`TTL_LONG`, also stamped optimistically on workout
+completion). **Filed not fixed: LA-117** — the leaderboard's `allTimeStreak` has the same defect over
+its own 90-day window, and the two streak implementations count *different quantities* (training days
+vs calendar days spanned), so they must not be unified to make them agree.
 
 **The only illness band that ever fires now says what moved (TN-45, v1.457.12 — engine half only).**
 `watch` has fired **2 days in 72**; `elevated` and `fever` have fired **zero** times, so the illness
