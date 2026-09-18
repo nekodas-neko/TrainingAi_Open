@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { isCalendarDate } from '@trainingai/shared/date-utils'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
@@ -15,8 +16,15 @@ const VialBody = z.object({
   waterMl:           z.number().finite().positive().max(1_000),
   syringeUnitsPerMl: z.number().finite().positive().max(1_000).default(100),
   // Both separators: the client's `localDateString()` emits YYYY/MM/DD.
-  openedOn:          z.string().regex(/^\d{4}[-/]\d{2}[-/]\d{2}$/),
-  id:                z.string().uuid().optional(),
+  // RV-56 — shape is not calendar validity; see the sibling routes.
+  openedOn:          z.string().regex(/^\d{4}[-/]\d{2}[-/]\d{2}$/).refine(isCalendarDate, 'Not a real calendar date'),
+  // RV-55 — `id` used to be accepted here and inserted unguarded. The PARENT is ownership-checked;
+  // the id was not, so re-posting another user's vial UUID raised a 23505 and answered 500 with an
+  // empty body plus an `error_events` row: an existence oracle and fault-table noise for what is a
+  // client error. **Dropped rather than conflict-scoped**, because nothing sends it — the only
+  // caller posts `{ ...draft, openedOn }` (`vial-sheet.tsx`) where `draft` is three numbers, and
+  // the local vial mirror is read-only with no outbox push, so no replay needs to choose an id.
+  // Removing the field removes the oracle; scoping the conflict would only change its status code.
 }).strict()
 
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {

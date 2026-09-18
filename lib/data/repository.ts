@@ -1136,7 +1136,7 @@ export interface WorkoutRepository {
   listSupplementVials(userId: string, supplementId: string): Promise<import('@trainingai/shared/types/supplement').SupplementVial[]>
   /** The sticky default the log screen offers — the newest un-deleted vial, or null. */
   currentSupplementVial(userId: string, supplementId: string): Promise<import('@trainingai/shared/types/supplement').SupplementVial | null>
-  createSupplementVial(userId: string, data: Omit<import('@trainingai/shared/types/supplement').SupplementVial, 'id' | 'userId' | 'createdAt'> & { id?: string }): Promise<import('@trainingai/shared/types/supplement').SupplementVial>
+  createSupplementVial(userId: string, data: Omit<import('@trainingai/shared/types/supplement').SupplementVial, 'id' | 'userId' | 'createdAt'>): Promise<import('@trainingai/shared/types/supplement').SupplementVial>
   updateSupplementVial(id: string, userId: string, patch: Partial<Omit<import('@trainingai/shared/types/supplement').SupplementVial, 'id' | 'userId' | 'supplementId' | 'createdAt'>>): Promise<import('@trainingai/shared/types/supplement').SupplementVial>
   /** True when a vial was removed. Editing or deleting a vial never touches logs stamped from it. */
   deleteSupplementVial(id: string, userId: string): Promise<boolean>
