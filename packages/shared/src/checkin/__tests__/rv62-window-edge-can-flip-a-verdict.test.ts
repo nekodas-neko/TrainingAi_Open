@@ -20,7 +20,7 @@
 import { describe, it, expect } from 'vitest'
 import { computeMuscleRecovery } from '@trainingai/shared/ai-periodization/muscle-recovery'
 import { suggestedSoreMuscles, RECOVERED_PCT } from '@trainingai/shared/checkin/suggested-soreness'
-import type { WorkoutSession } from '@trainingai/shared/types/workout'
+import type { WorkoutSession } from '@trainingai/shared/types/log'
 
 const NOW = Date.UTC(2026, 8, 18, 12, 0, 0)
 const HOUR = 3_600_000

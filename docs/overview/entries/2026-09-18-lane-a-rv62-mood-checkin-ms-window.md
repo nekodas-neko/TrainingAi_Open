@@ -70,6 +70,26 @@ the ratio fell back to 1, tau was flat at 24, and the test reported 81 in both c
 exact mechanism it was written to show. The assertion was right and the fixture was wrong; I fixed
 the fixture.
 
+## A gate my local routine was missing
+
+CI's **Build** job failed on this PR while `tsc --noEmit -p tsconfig.json` was clean locally. The
+failing step is `scripts/check-test-typecheck.js`, which typechecks **test files** against
+`tsconfig.tests.json` and a per-file baseline — a different project from the one the app typecheck
+uses, so test-only type errors are invisible to it.
+
+The error was a wrong import path in the new unit test: `WorkoutSession` comes from
+`@trainingai/shared/types/log`, not `.../types/workout`. Vitest ran the file happily because the
+import is `import type`, erased at runtime — so a green test run proves nothing about it.
+
+Fixed by correcting the import, **not** by raising the baseline: the baseline exists for files that
+legitimately grew, and this file is new and had no entry. The gate now reports 320 errors across 90
+files, none above baseline.
+
+**The routine changes:** `npx tsc --noEmit -p tsconfig.tests.json` (or `node
+scripts/check-test-typecheck.js`) belongs in the local gate alongside `pnpm check:rules` whenever a
+PR adds or edits a test file. `pnpm check:rules` does not cover it — the step lives in the Build job,
+not Custom Rules.
+
 ## Verification
 
 `tsc --noEmit` clean · Custom Rules **75 of 75** · the pre-existing BF-173 suite
