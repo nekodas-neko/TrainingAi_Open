@@ -18,6 +18,21 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-18 — backlog → 23898, `projectOverview.md` → 11900 (LA-110: two refutations)
+
+**Backlog +33 for two NEGATIVE results and no fix**, which is the unusual trade and the one worth
+defending. A refuted candidate is normally deleted; both of these are kept because each is what the
+next reader will reach for first. The baseline hypothesis produces the observed fingerprint by
+design, and BF-148 lands inside the window and touches the same flag — someone will find them, and
+finding them a second time costs the same hour it cost here.
+
+The ⛔ line is the highest-value part: `session_periodization` keeps no history, so the window cannot
+be reconstructed by query at all. Without it the next session runs the same SQL and reaches the same
+dead end before realising the table cannot answer.
+
+---
+
+
 ## 2026-09-18 — backlog → 23865, `projectOverview.md` → 11889 (LA-100 closed, 40 entries folded)
 
 **Backlog −62: an entry removed, not amended.** LA-100's two claims — no target file for the sweep,
@@ -13827,7 +13842,7 @@ they differ by one, and the direction is the safe one (the loop never asks for a
 lacks, which is BF-176 inverted). Reasoning in the journal entry; deliberately not "fixed", since
 widening the loop would make a constant named `STREAK_LOOKBACK_DAYS = 365` drive a 366-day walk.
 
-## 2026-09-18 — `docs/implementation-backlog.md` 23876 → 23896 (Lane B, LB-121 + two un-parked entries)
+## 2026-09-18 — `docs/implementation-backlog.md` 23909 → 23929 (Lane B, LB-121 + two un-parked entries)
 
 **+20.** Two edits, and the smaller one is the repair.
 
