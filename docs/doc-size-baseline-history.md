@@ -18,6 +18,21 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-18 — backlog → 23987, `docs/agents/state/tuning.md` → 685 (TN-50 + two method traps)
+
+**+58 and +21.** TN-50 records that the owner has not logged better than "ok" in seven weeks and
+`pumped` has never been chosen in the app's life — a seven-week slide in the one signal he reports
+himself, invisible because the contributor consumes today's value and nothing reads the series. It
+carries two ⚠ guards inline because the obvious "fix" (re-map the energy scale so 100 is reachable)
+would hide the finding rather than address it.
+
+The baton grows for the first time with a **Method** section rather than state. Two traps cost this
+agent a finding each in one session, and both are one mistake: rebuilding the app's logic in an
+ad-hoc query instead of replaying the shipped function. A baton that carries only "where I got to"
+lets the next session repeat the how.
+
+---
+
 ## 2026-09-18 — backlog → 23898, `projectOverview.md` → 11900 (LA-110: two refutations)
 
 **Backlog +33 for two NEGATIVE results and no fix**, which is the unusual trade and the one worth

@@ -506,6 +506,56 @@ below threshold and left in place for next time.
   The recompute is correct; it is the conflict that should not exist.
 - **Branch:** _unassigned_
 
+### [readiness][app-shell] TN-50 — the owner has not reported feeling better than "ok" for seven weeks, and nothing says so 🔴 LIVE
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-18 · Tuning agent, measuring why the `checkin`
+  contributor under-delivers (TN-47).
+- **Lane: A** then B — the trend derivation is engine, the surface that says it is Lane B.
+- **Review:** [`what the score can and cannot say`](reviews/2026-09-18-what-the-score-can-and-cannot-say.md) §2.
+
+**Measured over the whole history of `mood_logs`:**
+
+| energy | n | share | last logged |
+|---|---:|---:|---|
+| `ok` | 46 | 44.7% | 2026-09-11 |
+| `good` | 34 | 33.0% | **2026-07-30** |
+| `low` | 17 | 16.5% | 2026-09-14 |
+| `drained` | 6 | 5.8% | 2026-09-17 |
+| **`pumped`** | **0** | **0%** | **never** |
+
+**Last 30 days: `low` 13, `ok` 11, `drained` 4 — and zero `good`, zero `pumped`.** `low` is now the
+modal answer. The owner has not logged better than `ok` since **2026-07-30**, seven weeks ago.
+
+**The UI is not the constraint.** `components/mood-checkin-sheet.tsx:32` offers Pumped ⚡ and it
+renders in three surfaces. The option is there and has never been chosen in the app's life.
+
+**Two consequences, and the second is the one that matters.**
+
+1. **Readiness cannot reach 100.** `CHECKIN_ENERGY_SCORE` maps `good` → 88 and `pumped` → 100, and
+   the 2026-07-22 rebalance made room for the `checkin` term specifically so *"a genuinely great day
+   can reach a true 100"*. With the top option never used, the observed ceiling is 88 on this term
+   and **87 on readiness across 65 days**. The design goal is unreachable in practice.
+2. **A seven-week slide in the one signal the user reports himself is invisible.** The contributor
+   consumes today's value and nothing looks at the series. It corroborates the objective picture —
+   HRV 62 → 19 ms, resting HR +13 — from a completely independent source, which is exactly what
+   makes it worth surfacing rather than inferring.
+
+**What to build:** a trailing trend over `energy_level` (share of days at each level over 30 days
+vs the prior 30), surfaced when it moves. The sentence is the deliverable: *"you have not logged
+better than 'ok' in seven weeks — previously 33% of days were 'good'."*
+
+**⚠ Do NOT re-map `CHECKIN_ENERGY_SCORE` to make 100 reachable.** The mapping is not the defect —
+the scale is being used honestly and the top of it is genuinely not being reached. Compressing the
+scale so an `ok` day scores higher would hide the finding, not fix it. **Any change here is a
+`Gate: owner` calibration question**, because it re-scores every day he ever logged.
+
+**⚠ Do not read this as a mood diagnosis.** It is a report of what he typed, and the useful form is
+the observation handed back to him, not a conclusion drawn for him.
+
+**Pass test:** a sustained shift in self-reported energy is stated on a surface the owner sees,
+naming the window and the previous level, without changing any stored score.
+
+
 ### [body][nutrition] TN-48 — the body-composition suite is collected daily, interpreted nowhere, and the one reading that frightens is the one the app can already defuse 🔴 LIVE
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-18 · Tuning agent, from the owner's ask: *"we want the
@@ -2911,6 +2961,14 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
   agreement. **Paired per night, it separates the two live hypotheses outright:** if both instruments
   show the drop it is real physiology, and if only the ring does it is sensor drift. That is a clean
   discriminator and it exists only while the baseline still remembers the pre-drug normal.
+- **⚑ MEASURED 2026-09-18 — the window has NOT started, and the strap has never once recorded
+  overnight.** Binned by hour in Brisbane time over the whole history of `rr_intervals`, the
+  chest-strap source has **zero samples between 22:00 and 05:00** — its mass sits 07:00–11:00 (peak
+  53,685 samples at 08:00). It is a morning-workout device today. The last chest-strap sample of any
+  kind is **2026-09-15**, two days before the decision was recorded. So night one is still owed.
+  **⚠ A UTC read of the same table looks like overnight coverage and is not** — `at` is UTC, Brisbane
+  is +10, so a span printed as `00:00 → 02:04` is 10:00 → 12:04 local, midday. Bin in the user's
+  timezone or this reads backwards.
 - **⚠ Do not start the clock until the first night is actually in the table.** The window is seven
   nights with **both** a ring `0x5d rmssd_ms` and Polar `rr_intervals` covering the same sleep span —
   not seven calendar days from the decision. Confirm night one landed before counting.
