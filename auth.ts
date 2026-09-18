@@ -8,6 +8,8 @@ import { clientIp } from "@trainingai/shared/http/client-ip"
 import type { JWT } from "next-auth/jwt"
 import type { Session } from "next-auth"
 import { refreshIsActiveClaim } from "@/lib/auth/is-active-refresh"
+import { bearerSession } from "@/lib/auth/bearer-session"
+import { headers } from "next/headers"
 
 const nextAuth = NextAuth({
   ...authConfig,
@@ -174,9 +176,36 @@ export const { handlers, signIn, signOut } = nextAuth
  * throws, the claim stands and nobody is signed out by an outage.
  *
  * `handlers` is deliberately NOT wrapped — those routes are how a session comes to exist.
+ *
+ * ── Q-1a: the bearer fallback ────────────────────────────────────────────────────────────────
+ *
+ * A native client on a different origin has no cookie to send, so it presents the same session JWT
+ * as `Authorization: Bearer`. That is resolved HERE rather than in a helper each route calls,
+ * because this wrapper is the single point at which identity is established — 222 route files
+ * import it and none build their own NextAuth — and the entry's precondition is that `isActive`
+ * must be enforced wherever identity is established. `middleware.ts`'s 403 reads `req.auth`, the
+ * cookie session, and structurally cannot see a bearer; the `isActive === false` line below can,
+ * which is what keeps a deactivated bearer holder from being served.
+ *
+ * The fallback runs only when the cookie path yielded nothing, so browser requests are unchanged.
+ * A `headers()` call outside a request scope throws, which is why it is guarded rather than
+ * assumed — `auth()` is also called from places that are not handling an HTTP request.
  */
 export const auth = (async (...args: Parameters<typeof nextAuth.auth>) => {
   const session = await (nextAuth.auth as (...a: unknown[]) => Promise<Session | null>)(...args)
-  if (session?.isActive === false) return null
-  return session
+  if (session) return session.isActive === false ? null : session
+
+  let bearer: Session | null = null
+  try {
+    bearer = await bearerSession(await headers(), async (userId) => {
+      const repo = await getRepositoryAsync()
+      return repo.getUserById(userId)
+    })
+  } catch {
+    // No request scope, or an unreadable header. Not signed in is the correct answer and the one
+    // every caller already handles — never a throw out of the app's auth chokepoint.
+    return null
+  }
+  if (bearer?.isActive === false) return null
+  return bearer
 }) as typeof nextAuth.auth

@@ -18,6 +18,20 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-18 — backlog → 23928, `projectOverview.md` → 11866 (Q-1a server half)
+
+**Backlog +32 and nothing removed**, which is the honest shape for a partial: Q-1a stays queued
+because most of its scope — the client — has not shipped, and the entry now carries what DID ship, the
+two corrections to its own ⚠, and a `Gate: owner` on the remainder.
+
+The bulk of those 32 lines is the **corrections**, not the changelog. An entry read cold in three
+months will otherwise send the next implementer to build enforcement that PS-24 already built, and to
+hand-write token parsing that `@auth/core` already does — both of which this session started to do
+before measuring. The overview paragraph carries the same two, for the same reason.
+
+---
+
+
 ## 2026-09-18 — backlog → 23855, `projectOverview.md` → 11855 (RV-58/59/60, the last sweep-50 batch)
 
 **Backlog −33, which is −55 for the three entries and +22 for one new one.** All three sweep-50
