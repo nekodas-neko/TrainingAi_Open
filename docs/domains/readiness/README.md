@@ -359,6 +359,28 @@ Live at the time of writing (2026-07-30):
 
 ## Gotchas specific to this domain
 
+- **⚑ `mood_logs.energy_level` BEFORE 2026-09-19 MAY BE AUTO-FILLED; FROM 2026-09-19 IT IS AN ANSWER
+  (TN-50).** This is the documented cutoff, and it is deliberately a dated line rather than a stored
+  flag. Until that date `mood-checkin-sheet.tsx` pre-selected the level by running
+  `readinessToEnergy(readiness)`, so readiness set the default, the default usually went unchanged,
+  and the check-in then scored **10% of that same readiness** — a loop closing inside one day.
+  Measured over the 62 days carrying both: the saved level was exactly what the auto-fill would have
+  picked on **45 of them (73%)**, against roughly 20–25% by chance.
+  **Consequences for anyone reading that column:**
+  - **Do not read a pre-cutoff distribution as self-report.** TN-50's own first draft did, and
+    concluded the owner "had not felt better than ok for seven weeks" — not supportable.
+  - **Do not fit any readiness weight against pre-cutoff `checkin` history.** On ~73% of those days
+    the term is not independent of the score it feeds. TN-47's measured 6.5%-of-movement figure for
+    `checkin` is affected and wants re-measuring on post-cutoff days.
+  - **`pumped` is absent before the cutoff because it was unreachable**, not because it was never
+    felt: `readinessToEnergy` had no branch returning it, and `CHECKIN_ENERGY_SCORE.pumped = 100` is
+    the only path to a readiness of 100 — which is why the observed ceiling was 87 across 65 days.
+  - **A flag could not have labelled the history.** Whether any individual past row was auto-filled
+    is a statistical inference (the 73%), never a per-row fact, so a column added now would be empty
+    exactly where the ambiguity lives. The cutoff carries what a column would, for the rows that
+    need it, with no migration.
+  ([`2026-09-19-fix-tn50-checkin-not-inferred.md`](../../overview/entries/2026-09-19-fix-tn50-checkin-not-inferred.md))
+
 - **An absent contributor key is not a score disagreement (TN-49).** `READINESS_WEIGHTS` has nine
   members summing to exactly **1.00**, so anything that walks the stored contributor map and skips a
   key it does not find drops that key's weight and reads low by about `weight × 50`. That is a

@@ -67,6 +67,17 @@ days later it was offered as next-up and re-derived, because prose cannot reach 
 fields; its Lever 2 needs a quiet window and a structural decision, both the owner's. Lane A's READY
 list went **12 → 9**.
 
+**TN-50 SHIPPED — the check-in no longer answers itself (2026-09-19, v1.459.0).** Nothing is
+pre-selected; Save waits for a tap; `readinessToEnergy` is deleted. **A fixed default could not have
+worked**, and the reason is the finding: the middle option `ok` scores 72, the only level scoring the
+documented NEUTRAL 50 is `low` (unusable as a daily default), and `MoodLog.energyLevel` is
+non-nullable — so "unanswered" had to mean *no log*, which already scores 50. Item 3 is discharged as
+the documented cutoff in [`docs/domains/readiness/README.md`](docs/domains/readiness/README.md):
+`mood_logs.energy_level` before 2026-09-19 may be auto-filled, after it is an answer. ⚠ **Expect the
+readiness line to step down** — 36 of 62 days stored `ok` at 72. Owed: the S25 check (the extra tap
+in the morning flow; the revert is one line) and Tuning's re-measure of TN-47's 6.5% `checkin`
+figure, which was fitted against auto-filled days.
+
 **TN-50 re-laned to B, and the check-in auto-fill is a +22 bias rather than a neutral one
 (2026-09-19).** Its central number re-verified independently against production — **62 days, 45
 matching the auto-fill, `pumped` 0** — so the entry is sound. The sharpening: `CHECKIN_ENERGY_SCORE.ok`
