@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.459.1",
+    date: "2026-09-19",
+    changes: [
+      "\"kcal left\" now updates the moment you log food, instead of waiting for you to switch tabs and come back. The ring and the macros were already moving instantly; the number beside them was the server's subtraction against what you had eaten BEFORE the meal, and nothing asked it for a fresh one. Editing a logged item and deleting one had the same gap \u2014 all three update now. The figure lands a moment after the ring, because the budget half genuinely comes from the server.",
+    ],
+  },
+  {
     version: "1.459.0",
     date: "2026-09-19",
     changes: [
