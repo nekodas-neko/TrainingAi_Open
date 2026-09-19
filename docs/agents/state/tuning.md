@@ -88,7 +88,27 @@ run/treadmill sessions, newest 2026-07-24 — too thin to fit five boundaries to
 sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workouts ✅ · heart-rate 🟡 · nutrition ✅.
 **So do not go looking for a pillar to measure.** The useful work is re-measuring after a fix lands.
 
-## Method — two traps that cost this agent a finding each
+## Method — three traps, and the third is the expensive one
+
+**Suspect the deriving code before concluding the data is wrong — and treat a disagreement set that
+matches a structural property of the rows as proof that you are the one who is wrong.** TN-49 was
+filed on 2026-09-18 claiming seven stored readiness scores contradicted their own contributors by 4–6
+points. They did not. The recomputation summed `w * score` over the keys **present** in the stored
+map — `if k in c` — which drops an absent key's weight from a sum whose weights are defined to total
+exactly 1.00. The seven rows are precisely the seven that store **eight** contributors instead of
+nine (no `checkin`, weight 0.10), so each came out low by `0.10 x 50 = 5`. The key-count histogram is
+`{8: 7, 9: 58}`, a 1:1 match with the "disagreements" — that exact correspondence was the tell, and
+it was visible in the first sample row read, which showed `checkin` carrying `gap: 'no_input'`.
+**The prescribed fix — rewrite those seven rows from their contributors — would have written the
+5-point error INTO production.** Lane A caught it, found the same defect in
+`rederiveReadinessFromStored`, and fixed it with no data write. An absent key must contribute the
+model's own NEUTRAL 50, not vanish from the weighted sum.
+
+Note this is NOT covered by "replay the shipped function" below: the shipped function had the same
+bug. What catches this class is checking whether the disagreeing set has a *structure* — same
+length, same missing field, same date range — before believing the data is at fault.
+
+## Method — two traps that cost this agent a finding each (the SQL/timezone pair)
 
 Both are the same mistake: **reconstructing the app's own logic in an ad-hoc SQL query** instead of
 running the code that ships.

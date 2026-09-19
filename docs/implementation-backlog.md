@@ -544,8 +544,11 @@ below threshold and left in place for next time.
   available metrics/data."*
 - **Lane: A** — a derivation over `body_metrics`, then a surface. Engine half first.
 - **Review:** [`what the score can and cannot say`](reviews/2026-09-18-what-the-score-can-and-cannot-say.md) §4.
-- **Needs: TN-46** for the medication overlay only — the decomposition below stands alone and should
-  not wait for it.
+- **Reference: TN-46** for the medication overlay. **This was `Needs: TN-46` and that was wrong** —
+  `Needs:` is a hard park, so a dependency the entry itself called optional (*"the decomposition
+  stands alone and should not wait for it"*) removed this entry from Lane A's ready list entirely,
+  while the same entry recommended doing it first. A soft dependency belongs in prose or
+  `Reference:`, never in `Needs:`.
 
 **What is already on disk, every day, unused.** `body_metrics` carries `skeletal_muscle_pct`,
 `muscle_mass_kg`, `fat_free_mass_kg`, `visceral_fat_index`, `body_water_pct`, `bone_mass_kg`,
