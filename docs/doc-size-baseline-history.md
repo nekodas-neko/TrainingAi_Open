@@ -13923,11 +13923,24 @@ expected *downward* step in a visible number before the owner sees it, names the
 the extra daily tap is unwelcome, and points at the dated cutoff in the readiness pillar index rather
 than restating it. The measurement paragraph Lane A wrote the day before stays — it is the evidence
 this one rests on.
+
+## 2026-09-19 — `docs/implementation-backlog.md` → 24047
+
+**BF-177** — "kcal left" renders the server's subtraction against a pre-log intake, so it holds still
+while the ring beside it moves.
+
+The lines worth defending are the two that argue *against* the obvious fix. The owner proposed a
+cache bust and it is already implemented, so the entry has to say that first or the fix gets written
+twice. And deriving `remaining` client-side is a genuine trap: it shares `deviationKcal` with the
+zone label, colour and bar, so the one-liner would leave the number live and the verdict stale.
+Both are cheaper to write down once than to discover in review.
 ---
 
 ---
 
-## 2026-09-11 — `docs/implementation-backlog.md` → 23958 (RV-42 shipped)
+---
+
+## 2026-09-11 — `docs/implementation-backlog.md` → 24022 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 
@@ -13948,9 +13961,9 @@ reading of a moving number, and a PR that waits will re-read it once per merge t
 Recomputed by `pnpm fix:baselines` after each merge, which is the only thing that makes the
 subtraction mean anything.
 
-**Recomputed again 2026-09-18/19** (→ 23958 — ten times across that day and the next, as a journal
+**Recomputed again 2026-09-18/19** (→ 24022 — twelve times across that day and the next, as a journal
 fold and six other merges each moved the file), and the rewrite count derived the same way the note
-defines it — first-parent commits on this branch touching this file — last read **61**, on
+defines it — first-parent commits on this branch touching this file — last read **62**, on
 2026-09-19 before that pass's merge. **⚠ It must be measured BEFORE merging `origin/main` in, and
 this pass proved why:** measured afterwards, `git merge-base origin/main HEAD` is the merge you just
 made, so the span is empty and the command returns **0**. Walking the whole branch instead returns
