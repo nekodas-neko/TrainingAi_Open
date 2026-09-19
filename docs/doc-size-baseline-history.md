@@ -52,6 +52,21 @@ lets the next session repeat the how.
 
 ---
 
+## 2026-09-19 — backlog → 24045, `docs/agents/state/tuning.md` → 705 (TN-49's lesson, TN-48 unparked)
+
+**+28 and +20.** TN-49 was a false finding: the recomputation dropped an absent contributor's weight
+from a sum defined to total 1.00, so the seven rows "contradicting" their own breakdown were the seven
+storing eight keys instead of nine. Lane A caught it before any data write and fixed the same defect
+in `rederiveReadinessFromStored`. The baton's Method section grows to three traps, because the two
+already there do not cover it — the shipped function had the same bug, so "replay it" was no defence;
+what catches this class is noticing that the disagreeing set has a structure.
+
+TN-48 also loses a `Needs:` it should never have carried. The entry called the dependency optional in
+its own prose and then put it in the hard-park field, which removed the entry Tuning had recommended
+doing first from Lane A's ready list.
+
+---
+
 ## 2026-09-18 — backlog → 23898, `projectOverview.md` → 11900 (LA-110: two refutations)
 
 **Backlog +33 for two NEGATIVE results and no fix**, which is the unusual trade and the one worth
@@ -83,7 +98,7 @@ history files are dated) rather than with the sweep, because the sweep is a chor
 measurement is the thing a future reader would otherwise re-derive before daring to run it.
 ---
 
-## 2026-09-18 — backlog → 24074, `projectOverview.md` → 11920 (Q-1a server half)
+## 2026-09-18 — backlog → 24077, `projectOverview.md` → 11920 (Q-1a server half)
 
 **Backlog +32 and nothing removed**, which is the honest shape for a partial: Q-1a stays queued
 because most of its scope — the client — has not shipped, and the entry now carries what DID ship, the
