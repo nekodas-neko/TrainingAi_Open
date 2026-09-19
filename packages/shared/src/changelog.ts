@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.459.0",
+    date: "2026-09-19",
+    changes: [
+      "The morning check-in no longer fills in your energy level for you. It used to open with one already picked, chosen from your readiness score \u2014 and then that answer fed 10% of the same readiness score straight back in. Over 62 days your saved level was exactly what the app would have picked on 45 of them, so most of what looked like your own reading was the score talking to itself. Now nothing is pre-selected and Save waits for you to tap one. Skipping the check-in entirely counts as neutral, which is what it always did. Two things follow: \u26a1 Pumped is finally reachable \u2014 the old auto-fill had no way to choose it, which is why it has never once been logged \u2014 and your readiness will read a little lower on days you would have left the default alone, because that default was sitting 22 points above neutral.",
+    ],
+  },
+  {
     version: "1.458.0",
     date: "2026-09-18",
     changes: [
