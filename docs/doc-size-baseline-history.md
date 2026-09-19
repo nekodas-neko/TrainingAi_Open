@@ -13981,3 +13981,19 @@ returning through a status its fix did not name, and warn off the obvious patch 
 `prescriptionDrivesLoad` already rejects `dismissed`, so tightening it changes nothing. It also
 records, rather than guesses, the one mechanism still open: the card renders pending-only copy for a
 row the database says is dismissed, and the two candidates need different fixes.
+
+## 2026-09-20 — `docs/implementation-backlog.md` → 24297
+
+**BF-180** (a session-level deload stores no pre-deload block, so declining it serves the static
+program) and **BF-181** (nine exercises in the active program have no progression style, one whole
+session none at all).
+
+BF-180 carries its alternatives with reasons because the owner asked a design question — *"some sort
+of catch to make sure its always ai derived"* — and the obvious answer, regenerate on tap, is the
+one to reject as primary: a round trip at the moment he is standing in a gym, failing offline. The
+recommended fix is honestly costed as a generation change rather than plumbing, because the full
+intensities are not computed on that path today.
+
+BF-181's table is the sweep that was run BEFORE filing, and it changed the entry from a one-row data
+fix into a missing write-time constraint. Filing the narrow version would have shipped a fix for one
+exercise and left a leg session with no programming.

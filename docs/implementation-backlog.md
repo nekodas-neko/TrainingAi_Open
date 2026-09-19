@@ -506,6 +506,122 @@ below threshold and left in place for next time.
   The recompute is correct; it is the conflict that should not exist.
 - **Branch:** _unassigned_
 
+### [workouts] BF-180 — a session-level deload stores no "what full would have been", so declining it drops to the STATIC program, not an AI full
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-20 (BugFix intake). Owner, after overriding the
+  BF-179 deload: *"I declined deload; and now I have full - but im guessing its the default full-
+  and not the ai prescribed full (as it was usually 2 sets now its 4). So we need some sort of catch
+  to make sure its always ai derived right?"* **His diagnosis is correct and is measured below.**
+- **Lane: A** — `packages/shared/src/ai-periodization/reconcile-prescription.ts:223-236` is the
+  cause; `components/workout/utils.ts:206-254` is where it surfaces.
+- **Measured in production 2026-09-20. All five Upper exercises are identical and none carries a
+  `preDeload` block:**
+
+  ```json
+  { "pct": 52, "reps": 8, "sets": 2, "deloaded": true, "name": "Incline Bench Press" }
+  ```
+
+  So `deloadOverrideBlocked` returns **all five**, `deloadRevertNames` returns **empty**, and
+  `deloadOverrideOutcome` returns **`nothing-to-revert`**. The override has nothing AI-derived to
+  revert *to*, and the session falls through to each exercise's stored progression style:
+
+  | exercise | static style | sets | pct |
+  |---|---|---|---|
+  | Incline Bench Press | Powerbuilding | **4** | 80 |
+  | Chest-Supported Dumbbell Row | Hypertrophy Plus | **4** | 70 |
+  | Chin-Up | Hypertrophy 3-set | 3 | 65 |
+  | Dumbbell Lateral Raise | Hypertrophy 3-set | 3 | 65 |
+  | Barbell Skull Crusher | **none** | **0** | — |
+
+  **His "usually 2 sets, now 4" is Incline Bench's static Powerbuilding style exactly.** And
+  Skull Crusher has **no progression style at all**, so the static fallback has nothing for it
+  either — a second hole the same tap exposes.
+- **Root cause: `preDeload` is only written on the PER-EXERCISE deload path.**
+  `reconcile-prescription.ts:224` builds `preDeloadById` by iterating `params.deloadedIds` — the
+  soreness-driven per-exercise override — capturing each target's pre-deload values before
+  overwriting them. **A session-level deload never enters that loop.** Its low percentages are
+  produced directly at generation, so "what full would have been" is never computed and never
+  stored. The exercises are flagged `deloaded: true` with nothing behind the flag.
+- **⚠ The repo already half-knows this and described the OTHER half.** `utils.ts:216-231` (LB-47)
+  documents `nothing-to-revert` for the case where a session-level deload carries **no**
+  `deloaded` flag at all. This is the sibling it did not name: the flag IS set, the `preDeload` is
+  not, and the outcome collapses to the same branch — so the card names five blocked exercises and
+  the bar quietly serves the static program. BF-8's *"I was under the assumption I was doing my full
+  session"* is the same complaint from a third side.
+- **Recommended fix — store the full-intensity block at generation, for session-level deloads too.**
+  Extend the session-level path to compute the phase's normal progression targets and persist them
+  as `preDeload` beside the deloaded values, exactly as the per-exercise path already does. The
+  override then reverts locally and instantly, with no network call at the moment the lifter is
+  standing in a gym, and `deloadOverrideOutcome` starts returning `all` instead of
+  `nothing-to-revert` with no change to the card. **⚠ The information is not currently computed on
+  that path** — the model is asked for a deload prescription — so this is a generation change, not
+  a plumbing one. That is the work.
+- **Alternatives, with what each is better at:**
+  - **Regenerate a full prescription when the override is tapped.** Better in that it needs no
+    generation change and fixes prescriptions *already stored* without the block — including his
+    current one. Worse as the primary: it is a round trip at the worst possible moment, needs a
+    loading state, and fails offline where the whole app is meant to work. **Keep it as the
+    fallback for pre-existing prescriptions**, not as the answer.
+  - **Fall back to the last non-deload prescription for that session.** Cheapest, and genuinely
+    better than the static style. Rejected as primary because it is silently stale — it can be weeks
+    old and predate a phase change, which is the Q-229 failure this pillar has already had twice.
+- **Reversal cost is low:** `preDeload` is an additive field in a stored JSON blob that the
+  consuming code already reads and already treats as optional.
+- **Needs: BF-179** — his current prescription is the dismissed, expired one. Fixing the expiry
+  first means the fixture this entry is verified against is a live prescription rather than a ghost.
+- **Verification:** a unit test asserting a session-level deload prescription carries a `preDeload`
+  block for every deloaded exercise, and that `deloadOverrideOutcome` returns `all` for it.
+  **Device look owed:** the owner must see 4 sets become the AI's number rather than Powerbuilding's.
+- **⚠ Separate finding, do NOT fix here:** **Barbell Skull Crusher has no progression style.** It
+  is invisible while the AI prescribes every set, and it is why the static fallback is not a safe
+  net. Worth its own entry rather than a silent default inside this one.
+
+### [workouts] BF-181 — NINE exercises in the active program have no progression style, and one whole session has none at all
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-20 (BugFix intake). Found tracing BF-180; the owner
+  did not report it and would not have, because it is invisible while the AI prescribes every set.
+- **Lane: A** — the data is `session_exercises.style_id`; whether the fix is a migration, a
+  generation guard or a UI block is the entry's open question.
+- **Measured in production 2026-09-20**, the active program `Bankai`, session `Upper`:
+
+  | exercise | style | sets |
+  |---|---|---|
+  | Incline Bench Press | Powerbuilding | 4 |
+  | Chest-Supported Dumbbell Row | Hypertrophy Plus | 4 |
+  | Chin-Up | Hypertrophy 3-set | 3 |
+  | Dumbbell Lateral Raise | Hypertrophy 3-set | 3 |
+  | **Barbell Skull Crusher** | **NULL** | **0** |
+
+- **Why it has not bitten yet:** the AI prescription supplies sets/reps/pct for every exercise, so
+  the missing style is never consulted. It becomes load-bearing the moment anything falls back to
+  the static program — which is exactly what BF-180 found the Full override doing, and what happens
+  for any session with no live prescription.
+- **⚠ The sweep was run before filing and it is systematic, not an orphan. Measured 2026-09-20:
+  14 rows with `style_id IS NULL`, NINE of them in the ACTIVE program:**
+
+  | program | session | exercises with no style |
+  |---|---|---|
+  | **Bankai (active)** | Push | Cable Chest Dips |
+  | | Pull | Face Pull |
+  | | Legs | Cable Lying Leg Curl |
+  | | Upper | Barbell Skull Crusher |
+  | | **Lower** | **all five — Hip Thrust, Bulgarian Split Squat, Calf Raise, Seated Leg Curl, Hanging Leg Raise** |
+  | Main (inactive) | 5 sessions | one each, all the lead compound |
+
+  **`Lower` has no static programming whatsoever.** Every session in the active program has at
+  least one, so this is a missing constraint at write time rather than a handful of bad rows — and
+  the inactive `Main` program shows the same shape, which rules out a one-off.
+- **The fix is an owner-facing choice and should be presented as one:** a style cannot be invented
+  for him — 3 sets at 65% is a guess about how he wants to train that exercise, and guessing it for
+  nine exercises including a whole leg session is worse than leaving them empty. Either the program
+  editor refuses to save an exercise with no style (prevents recurrence, does nothing for the rows
+  on disk), or he is walked through assigning styles to the nine (fixes today, prevents nothing).
+  Both, and the constraint first so the backfill cannot regress.
+- **Needs: BF-180** — that entry is where the missing style first has consequences, and its fix
+  decides whether the static fallback still matters.
+- **Verification:** query for remaining `style_id IS NULL` rows in the active program and confirm
+  zero; then confirm `Lower` renders sets with no active prescription. Browser is enough.
+
 ### [workouts] BF-179 — a DISMISSED prescription that expired three days ago is still prescribing today's deload
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-20 (BugFix intake). Owner, on a session screen
