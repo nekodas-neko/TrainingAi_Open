@@ -96,6 +96,18 @@ check's name is that something grew.
 The `projectOverview.md` paragraph leads with the measurement that retired the entry (28 of 32
 history files are dated) rather than with the sweep, because the sweep is a chore that recurs and the
 measurement is the thing a future reader would otherwise re-derive before daring to run it.
+---
+
+## 2026-09-18 — backlog → 24095, `projectOverview.md` → 11927 (Q-1a server half)
+
+**Backlog +32 and nothing removed**, which is the honest shape for a partial: Q-1a stays queued
+because most of its scope — the client — has not shipped, and the entry now carries what DID ship, the
+two corrections to its own ⚠, and a `Gate: owner` on the remainder.
+
+The bulk of those 32 lines is the **corrections**, not the changelog. An entry read cold in three
+months will otherwise send the next implementer to build enforcement that PS-24 already built, and to
+hand-write token parsing that `@auth/core` already does — both of which this session started to do
+before measuring. The overview paragraph carries the same two, for the same reason.
 
 ---
 

@@ -117,6 +117,16 @@ and the planned fields descend from the same `ex.progressionStyle`. **A null `st
 signature:** 09-17 is a clean day where all five logs have one. **No cause is recorded**, because
 three hypotheses fit and none was tested — the entry has already been filed with a wrong diagnosis
 twice, and a third is worse than none.
+**`Authorization: Bearer` now resolves a session, server side only (Q-1a server half, 2026-09-18).**
+A native client on a different origin has no cookie to send, so it presents the same NextAuth session
+JWT as a bearer. It is resolved **inside `auth()`** — the wrapper all 222 route files import and none
+bypass — so every route gains it with no route change, and `isActive` is enforced at the point
+identity is established rather than in the cookie-keyed middleware gate that cannot see a bearer.
+**The entry's stated failure mode was half wrong:** a deactivated holder does not reach routes with a
+200, because PS-24 already put `isActive === false → null` in that wrapper; the answer is 401. And
+`getToken` already reads the header, so this was wiring rather than crypto. **The client half is now
+`Gate: owner`** — returning the JWT in the exchange response takes a 30-day credential from httpOnly
+into JS, and there is no consumer yet (the APK is same-origin on cookies; Q-1b is deferred).
 
 **Three shared modules whose contract and behaviour had drifted (RV-58/59/60, 2026-09-18 — one PR,
 the last sweep-50 batch).** **RV-58** — `equipmentEligible` folded case on the exercise side and

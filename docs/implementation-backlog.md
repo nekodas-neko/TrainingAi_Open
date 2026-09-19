@@ -21973,6 +21973,38 @@ describing a safety net that no longer exists.
 - **Scope:** the bearer-token client + an `apiUrl()` indirection so every fetch can target either
   origin. **Not** the workspace split, **not** `output: 'export'` — those are Q-1b.
 
+- **✅ THE SERVER HALF SHIPPED 2026-09-18**, unversioned, nothing user-visible: `lib/auth/bearer-session.ts`
+  plus a fallback inside `auth()` (`auth.ts`). A request with no cookie but an
+  `Authorization: Bearer <session jwt>` now resolves to a session, through the **same** wrapper the
+  222 route files already import, so every route gains it with no route change.
+  - **Two corrections to the ⚠ above, both checked against `main` that day.** (a) Its stated failure
+    mode — a deactivated bearer holder reaching "every `/api` route" — is half wrong. The 403 does
+    not fire, but **PS-24 moved the real enforcement into `auth()`**, which returns `null` for
+    `isActive === false` after re-reading the row, so the answer is 401 and not 200 *provided the
+    bearer resolves through that wrapper*. Resolving it anywhere else is what would produce the
+    bypass. (b) `getToken` from `@auth/core/jwt` **already reads `Authorization: Bearer`**
+    (`jwt.js:92-94`), prefers the cookie, and returns null rather than throwing on a bad token — so
+    the server half is a wiring job, not a crypto one.
+  - **`isActive` is enforced by running the same `refreshIsActiveClaim`**, and a mutation confirms
+    it: removing that one call fails 4 of the 18 cases, including the deactivated-holder case.
+  - **The salt is the cookie NAME**, so `secureCookie` must track `NODE_ENV` exactly as
+    `exchange-mobile-token` does. Get it wrong and every valid token reads as invalid — a test
+    mints under the other salt and asserts the refusal, because that failure is silent otherwise.
+
+- **Gate: owner** — added 2026-09-18 for the REMAINDER, which is the client half. The step that
+  unblocks it is **the exchange route returning the session JWT in its response body**, and that is
+  a real change in exposure rather than plumbing: the token is httpOnly today, so XSS in the WebView
+  can act as the user but cannot *take* a 30-day credential; once it is in JS and in Capacitor
+  storage, it can. **And there is no consumer yet** — the APK is a WebView on the same origin using
+  cookies, and Q-1b (the separate origin that makes a bearer necessary) is the half the owner
+  deferred. The server half above stands on its own and adds no exposure, because sending a bearer
+  requires already holding the JWT, which today means reading an httpOnly cookie.
+  **What lifts it:** the owner saying the native client should hold a token, at which point the
+  remaining work is the exchange response, Capacitor secure storage, and `apiUrl()` across the fetch
+  sites — mostly Lane B, and device-verified.
+  - **`apiUrl()` was deliberately NOT added as part of the server half.** It is an indirection for
+    client fetch sites; shipping it with no callers is dead code that reads as done.
+
 ### [app-shell] Q-1b — native ("Swift-like") feel: Phase 3 (bundle the shell into the APK) — HELD by the owner, who has now seen the measurement
 
 - **⏸ DEFERRED A THIRD TIME, 2026-09-15 — and this one comes with a trigger, which the previous two
