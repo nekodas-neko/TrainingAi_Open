@@ -2997,6 +2997,62 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
   is a product/UX decision about what "connect a data source" promises the user, not a technical
   blocker.
 
+### [devices][heart-rate] TN-51 — overnight strap wear lands in ambient mode, which discards 29 of every 30 seconds of beats, so PS-44's HRV comparison cannot be made from it 🔴 LIVE
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-19 · Tuning agent, checked the night the owner said
+  he would sleep in the strap — **before** the night was spent rather than after.
+- **Lane: A** — `android/.../polar/PolarStrapService.kt` is Kotlin, so this needs an **APK rebuild**.
+- **Needs:** — nothing. **Blocks the HRV half of PS-44.**
+- **Gate: device** — nothing BLE verifies in the sandbox.
+
+**`PolarStrapService` is built for all-day wear and will run overnight.** Its own header says it
+*"holds the all-day chest-strap connection so the strap streams HR even with the screen off / app
+backgrounded"*. No session start, no workout requirement, no time gating. Wearing the strap to bed
+does produce data. **The problem is which data.**
+
+**`ambient` defaults to `true` (line 82) and `flush()` runs `thinAmbient()` on every batch**, which
+keeps one buffered `Sample` per `AMBIENT_GAP_MS` (30 s) and **drops the rest whole — each discarded
+sample carrying its own `rr` list**. Full 1 Hz is workout-mode only.
+
+**Measured against production, restricted to genuine ambient wear (15:00–21:00 Brisbane, non-workout
+hours):**
+
+| inter-sample gap | share |
+|---|---:|
+| beat-to-beat (< 2 s) | 57.4% |
+| **25–40 s (the ambient thin)** | **40.7%** |
+| > 40 s | 1.8% |
+
+So ambient wear yields **islands of ~2–3 consecutive beats separated by 30-second holes**. Across
+the strap's whole history the figure looks healthier — 92.1% beat-to-beat — but that is dominated by
+workout-mode wear at 07:00–11:00, which is exactly the window that is *not* representative of a night.
+
+**⚠ Why this blocks PS-44 rather than merely degrading it.** PS-44 exists to compare `rmssdFromRr`
+over the strap's intervals against the ring's own `0x5d rmssd_ms`. rMSSD is the root-mean-square of
+**successive** differences over a contiguous window; sampling 2–3 beats per 30 s gives a large *count*
+of differences (~1,900 a night) but they are not a contiguous series, and ectopic-beat rejection needs
+neighbouring context that is not there. **A disagreement measured this way would not distinguish "the
+ring is drifting" from "the two devices sampled differently", which is the entire question.**
+
+**⚠ Do NOT simply set `ambient = false` overnight.** The thinning exists for a stated reason — *"so
+all-day 1 Hz doesn't bloat `oura_heartrate`"*. Full-rate persistence for 8 h/night is the cost this
+constant was chosen to avoid, and `rr_intervals` already spans 60 days at 23 MB.
+
+**First action, in preference order.** (1) **Thin the HR samples but keep every RR interval** — the
+`rr` list is the only part rMSSD needs and is far cheaper than the 1 Hz bpm series it rides on; this
+keeps the bloat argument intact and unblocks the comparison. (2) Failing that, a bounded
+full-rate overnight window (a fixed 01:00–05:00 local band) rather than all night. (3) Do not
+attempt the comparison on thinned data and report the result as if it settled anything.
+
+**⚠ What tonight IS still worth, and it is not nothing.** Ambient mode persists overnight **HR** at
+1 sample/30 s, which independently checks the **resting-HR** half of the owner's question (his RHR
+rose ~13 bpm; see TN-46). That half needs no beat-to-beat data. So the night is worth wearing for the
+RHR check even though the HRV check has to wait for the fix above.
+
+**Pass test:** a night of ambient wear yields a contiguous beat-to-beat RR series over the core sleep
+window, and `rmssdFromRr` over it is comparable to the ring's figure for the same night.
+
+
 ### [devices][heart-rate] PS-44 — compute nightly/readiness HRV from raw beat intervals instead of trusting the ring's own figure
 
 - **Lane:** A — `packages/shared/src/health/rmssd.ts` — domain math, and it changes a stored input. (Assigned 2026-09-15, OR-116 lane sweep.)
@@ -3014,6 +3070,10 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
   agreement. **Paired per night, it separates the two live hypotheses outright:** if both instruments
   show the drop it is real physiology, and if only the ring does it is sensor drift. That is a clean
   discriminator and it exists only while the baseline still remembers the pre-drug normal.
+- **⚠ TN-51 — a thinned night does NOT count toward this window.** Overnight wear runs in the
+  service's ambient mode, which keeps one sample per 30 s and discards the intervening beats, so the
+  nights it produces cannot support an rMSSD comparison. **The HRV half of this entry is blocked on
+  TN-51**; the resting-HR half is not, and ambient nights do serve that.
 - **✅ OWNER CONFIRMED, 2026-09-18 — wearing it overnight from tonight.** So night one should appear
   in `rr_intervals` for 2026-09-19. **Verify it landed before counting the window** — the binning
   note below is how, and the last three days produced nothing.
