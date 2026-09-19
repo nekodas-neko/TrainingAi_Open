@@ -18,6 +18,23 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-18 — backlog → 24017, `docs/agents/state/tuning.md` → 685 (TN-50 + two method traps)
+
+**+88 and +21.** TN-50 went through two drafts in one sitting and the entry carries both, because
+the correction is the finding. The first read the stored `energy_level` column as a self-report and
+concluded a seven-week slide; the owner replied that he never chooses the value. The sheet seeds it
+from `readinessToEnergy(readiness)` and the same day's mood scores into the same day's readiness, so
+~10% of the readiness weight is a re-reading of readiness on 73% of days. The wrong draft stays
+visible in the entry because anything else reading that column will make the same mistake. Three
+other owner decisions land in the same PR (TN-47's gate, Q-506's sequencing, PS-44's start).
+
+The baton grows for the first time with a **Method** section rather than state. Two traps cost this
+agent a finding each in one session, and both are one mistake: rebuilding the app's logic in an
+ad-hoc query instead of replaying the shipped function. A baton that carries only "where I got to"
+lets the next session repeat the how.
+
+---
+
 ## 2026-09-18 — backlog → 23898, `projectOverview.md` → 11900 (LA-110: two refutations)
 
 **Backlog +33 for two NEGATIVE results and no fix**, which is the unusual trade and the one worth
@@ -13859,7 +13876,7 @@ while quoting another warning's name. Knowing the rule is not enough to follow i
 argument for the one-clause code fix over more prose.
 ---
 
-## 2026-09-11 — `docs/implementation-backlog.md` → 23904 (RV-42 shipped)
+## 2026-09-11 — `docs/implementation-backlog.md` → 23992 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 
@@ -13880,9 +13897,9 @@ reading of a moving number, and a PR that waits will re-read it once per merge t
 Recomputed by `pnpm fix:baselines` after each merge, which is the only thing that makes the
 subtraction mean anything.
 
-**Recomputed again 2026-09-18** (→ 23904 — four times in one day, as a journal fold and three
-other merges each moved the file), and the rewrite count derived the same way the note
-defines it — first-parent commits on this branch touching this file — now reads **55**. The *merge*
+**Recomputed again 2026-09-18/19** (→ 23992 — six times across that day and the next, as a journal
+fold and five other merges each moved the file), and the rewrite count derived the same way the note
+defines it — first-parent commits on this branch touching this file — now reads **58**. The *merge*
 count is deliberately NOT re-derived: `git merge-base` against `main` no longer finds the original
 branch point, because this branch has absorbed `main` dozens of times, so the figure it returns
 (21) answers a different question. Quoting it as "merges that overtook this PR" would be the same

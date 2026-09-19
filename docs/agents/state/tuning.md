@@ -88,6 +88,27 @@ run/treadmill sessions, newest 2026-07-24 — too thin to fit five boundaries to
 sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workouts ✅ · heart-rate 🟡 · nutrition ✅.
 **So do not go looking for a pillar to measure.** The useful work is re-measuring after a fix lands.
 
+## Method — two traps that cost this agent a finding each
+
+Both are the same mistake: **reconstructing the app's own logic in an ad-hoc SQL query** instead of
+running the code that ships.
+
+- **Replay the shipped function; do not re-derive it in SQL.** Rebuilding the illness-radar z-scores
+  by hand on 2026-09-17 got **four things wrong at once** — `rhr_avg_bpm` where the code reads
+  `rhr_low_bpm`, `temp_dev_c` where it reads `temp_mean_c × 100`, raw rpm where it reads rpm×10, and
+  the *same* night's baseline where `illnessZScores` uses the **prior** night's. It produced a
+  temperature z of **−25** and looked like a live defect. Bundling the real module and feeding it
+  stored rows reproduced the recorded score exactly, first try:
+  `node_modules/.bin/esbuild <script>.ts --bundle --platform=node --format=cjs --outfile=<out>.cjs && node <out>.cjs`,
+  importing from `/home/user/TrainingAi_Open/packages/shared/src/...`. Do that first. A number that
+  matches the stored one is the proof the replay is faithful; a hand-rolled query has no such check.
+- **Bin by hour in the USER's timezone, not UTC — including in throwaway queries.** `rr_intervals.at`
+  is UTC and Brisbane is +10, so a chest-strap span printed as `00:00 → 02:04` reads as overnight and
+  is **10:00 → 12:04, midday**. That nearly became "the overnight strap window has already started"
+  in a report to the owner; an hour histogram in Brisbane time showed **zero samples between 22:00
+  and 05:00 in the table's whole history**. The repo's timezone rule is usually read as applying to
+  shipped code — it applies just as hard to the query you are about to draw a conclusion from.
+
 ## Do not re-litigate
 
 - **The threshold sweep is DONE (2026-08-25) — do not re-run it.** 246 constants → 42 guards, 8

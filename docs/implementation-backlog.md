@@ -506,6 +506,74 @@ below threshold and left in place for next time.
   The recompute is correct; it is the conflict that should not exist.
 - **Branch:** _unassigned_
 
+### [readiness][app-shell] TN-50 — the "self-report" that scores 10% of readiness is auto-filled FROM readiness, and `pumped` is unreachable 🔴 LIVE
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-18 · Tuning agent. Found measuring why the `checkin`
+  contributor under-delivers (TN-47); **re-scoped the same day by the owner**, who said he does not
+  choose the value: *"I dont really choose them; I let it auto select … It should choose neutral by
+  default. This was more a way to tune based on my response. Not infer."*
+- **Lane: A, then B** — `readinessToEnergy` lives in `components/mood-checkin-sheet.tsx:35` (Lane B)
+  but the circularity and the `CHECKIN_ENERGY_SCORE` mapping are `packages/shared` (Lane A). Engine
+  half first.
+- **✅ OWNER DECISION, 2026-09-18 — default to NEUTRAL, do not infer.** The term exists to tune on
+  his response; auto-filling it from a score makes it infer instead. Gate cleared for that change.
+
+**⚠ THIS ENTRY'S FIRST DRAFT WAS WRONG AND THE CORRECTION IS THE FINDING.** It read the stored
+`energy_level` distribution as a self-report and concluded the owner had "not felt better than ok for
+seven weeks". **That conclusion is not supportable** — most of those values were auto-selected, not
+reported. Kept visible because the same mistake is available to anything else that reads this column.
+
+**The mechanism.** `mood-checkin-sheet.tsx:86` seeds the energy state from
+`readinessToEnergy(readiness)` — the sheet's own prop comment says *"Oura readiness score — sets
+energy default"* — and `readiness-payload.ts:492` then scores **today's** mood into **today's**
+readiness via `checkinScoreFromEnergy`. The loop closes inside one day:
+
+```
+readiness → readinessToEnergy() → energy default → (unchanged) → checkin contributor (10%) → readiness
+```
+
+**Measured over the 62 days carrying both a check-in and a readiness score: the saved
+`energy_level` is exactly what `readinessToEnergy(readiness)` would have auto-selected on
+45 of them — 73%.** Against roughly 20–25% by chance. **So ~10% of the readiness weight is a
+re-reading of readiness itself on about three days in four.** *(Approximate by construction: the seed
+used the readiness at sheet-open time and the stored score may have been recomputed since. The
+73%-vs-chance gap is far too large for that to explain it.)*
+
+**`pumped` has never been logged because the mapping cannot produce it.** `readinessToEnergy` returns
+only `good`/`ok`/`low`/`drained` — there is no branch that returns `pumped`, and `null` readiness
+returns `ok`. So the first draft's "the option is there and has never been chosen" was doubly wrong:
+it is unreachable by default, and reaching it needs a deliberate override the owner does not make.
+`CHECKIN_ENERGY_SCORE.pumped = 100` is the only path to a readiness of 100, which is why the observed
+ceiling is **87 across 65 days**.
+
+**The 27% he DID override is the only real signal in the column, and it disagrees in both
+directions** — 2026-07-21 readiness 37 (auto `drained`) saved as `good`; 2026-08-08 readiness 65
+(auto `ok`) saved as `drained`. That is exactly the independent subjective reading the contributor is
+meant to carry, and the default drowns it out on the other three days in four.
+
+**What to do.**
+1. **Default to neutral** (the owner's decision). An unanswered check-in should contribute the
+   documented `NEUTRAL` 50 — which `plainScore(null)` already does when there is no log at all — not
+   a value inferred from the score it is about to feed.
+2. **Make `pumped` reachable** by leaving the top of the scale to the user rather than adding a
+   `>= 90` branch. Adding one would re-close the loop at the top end.
+3. **Distinguish "auto-filled" from "answered" in storage**, so the 73% is never again read as a
+   self-report. Without this, the column stays ambiguous for every future reader — and this entry is
+   the proof that it gets misread.
+
+**⚠ Do NOT re-map `CHECKIN_ENERGY_SCORE` to make 100 easier to reach.** The scores are fine; the
+*seeding* is the defect. Compressing the scale would hide the circularity rather than remove it.
+
+**⚠ Do NOT re-tune any readiness weight against the stored `checkin` history.** On ~73% of days that
+term is not independent of the score it feeds, so any fit against it is partly fitting readiness to
+itself. TN-47's measured 6.5%-of-movement figure for `checkin` is affected by this and should be
+re-measured after the seeding changes.
+
+**Pass test:** an unanswered check-in contributes the neutral 50 rather than a readiness-derived
+value; `pumped` is selectable and reachable; and a stored check-in can be told apart from an
+auto-filled one.
+
+
 ### [body][nutrition] TN-48 — the body-composition suite is collected daily, interpreted nowhere, and the one reading that frightens is the one the app can already defuse 🔴 LIVE
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-18 · Tuning agent, from the owner's ask: *"we want the
@@ -566,8 +634,9 @@ lean effectively flat* rather than as a lean-mass loss.
 - **Branch:** _unassigned_ · **Added:** 2026-09-18 · Tuning agent.
 - **Lane: A** — `packages/shared/src/health/personal-baseline.ts` (the denominator) and
   `readiness-composite.ts` (the slope).
-- **Gate: owner** — it changes what the readiness breakdown says about his own health, and the
-  honest framing of the change is a judgement call (see the ⚠ below).
+- **✅ OWNER DECISION, 2026-09-18 — fix the denominators.** Asked whether to put the four baseline
+  contributors on one honest scale knowing the headline moves a mean of 0.4 points, the owner chose
+  yes. Gate cleared; build to the first action below.
 - **Review:** [`what the score can and cannot say`](reviews/2026-09-18-what-the-score-can-and-cannot-say.md) §1–2.
 - **Needs: Q-506** for temperature specifically — that baseline is broken separately and much worse.
 
@@ -610,8 +679,12 @@ broken input, which is the mistake Q-504 already made and reverted.
 - **The two activity terms carry 15% of the weight and supply 7.4% of the score's movement.**
   `prevDayActivity` has never scored below 57 in 65 days and `activityBalance` never below 51. They
   are a floor with a label rather than a reading of this person's day.
-- **`checkin` has never exceeded 88 of 100**, so the 2026-07-22 rebalance's stated goal — that a
-  genuinely great day can reach a true 100 — is unreachable in practice on this user's logging.
+- **`checkin` has never exceeded 88 of 100 — and TN-50 found out why: the value is auto-filled from
+  readiness and the mapping cannot return `pumped`.** So the 2026-07-22 rebalance's goal of a
+  reachable 100 is blocked by the seeding, not by the owner's logging. **⚠ This also means
+  `checkin`'s measured 6.5%-of-movement share above is not independent of the score it feeds on ~73%
+  of days — re-measure it after TN-50 changes the seeding, and do not fit any weight to it before
+  then.**
 
 **Pass test:** no contributor rails on more than ~a third of days, and the composite over the
 existing 65 days moves by less than 5 points on every one of them.
@@ -2911,6 +2984,17 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
   agreement. **Paired per night, it separates the two live hypotheses outright:** if both instruments
   show the drop it is real physiology, and if only the ring does it is sensor drift. That is a clean
   discriminator and it exists only while the baseline still remembers the pre-drug normal.
+- **✅ OWNER CONFIRMED, 2026-09-18 — wearing it overnight from tonight.** So night one should appear
+  in `rr_intervals` for 2026-09-19. **Verify it landed before counting the window** — the binning
+  note below is how, and the last three days produced nothing.
+- **⚑ MEASURED 2026-09-18 — the window has NOT started, and the strap has never once recorded
+  overnight.** Binned by hour in Brisbane time over the whole history of `rr_intervals`, the
+  chest-strap source has **zero samples between 22:00 and 05:00** — its mass sits 07:00–11:00 (peak
+  53,685 samples at 08:00). It is a morning-workout device today. The last chest-strap sample of any
+  kind is **2026-09-15**, two days before the decision was recorded. So night one is still owed.
+  **⚠ A UTC read of the same table looks like overnight coverage and is not** — `at` is UTC, Brisbane
+  is +10, so a span printed as `00:00 → 02:04` is 10:00 → 12:04 local, midday. Bin in the user's
+  timezone or this reads backwards.
 - **⚠ Do not start the clock until the first night is actually in the table.** The window is seven
   nights with **both** a ring `0x5d rmssd_ms` and Polar `rr_intervals` covering the same sleep span —
   not seven calendar days from the decision. Confirm night one landed before counting.
@@ -16856,6 +16940,10 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   against a true **35.87**. Thirty nights moved the deviation 196 → 166, which extrapolates to
   **~450 more nights — about fifteen months** before the EMA gets there on its own. Waiting is not a
   plan, and TN-6's readiness penalty is charged daily until it is run.
+- **✅ OWNER DECISION, 2026-09-18 — re-scale the threshold FIRST, then he fires the re-derive.**
+  Asked how to sequence it, he chose to have Lane A fix `FEVER_TEMP_Z` before the admin run rather
+  than accept the false fevers. So the threshold work is now the blocking half and the run waits on
+  it; BF-13's `Keep:` still records the run itself as his to fire.
 - **⚠ DO NOT RUN IT WITHOUT RE-SCALING `FEVER_TEMP_Z` IN THE SAME PR.** Replaying the fold cold with
   `seedOrUpdateBaseline` over all 67 nights and re-running the real `computeIllnessRadar` per night:
   the corrected baseline is **mean 35.86 °C, dev 0.077 °C**, and the 60 mature nights come out
