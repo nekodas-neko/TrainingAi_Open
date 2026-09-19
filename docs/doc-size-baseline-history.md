@@ -98,7 +98,7 @@ history files are dated) rather than with the sweep, because the sweep is a chor
 measurement is the thing a future reader would otherwise re-derive before daring to run it.
 ---
 
-## 2026-09-18 — backlog → 24047, `projectOverview.md` → 11931 (Q-1a server half)
+## 2026-09-18 — backlog → 24095, `projectOverview.md` → 11927 (Q-1a server half)
 
 **Backlog +32 and nothing removed**, which is the honest shape for a partial: Q-1a stays queued
 because most of its scope — the client — has not shipped, and the entry now carries what DID ship, the
@@ -13961,3 +13961,23 @@ What the entry keeps is what the code cannot say: that the sweep found a **third
 entry did not name (the delete), that the control run printed `kcal left went 1810 → 1810` with the
 fix removed — the owner's report reproduced exactly — and that **two further `energy-balance:`
 readers were seen and deliberately not swept**, recorded rather than left as an implied clean sweep.
+
+## 2026-09-19 — BF-100's cause moved from hypothesis to measurement
+
+`docs/implementation-backlog.md` **24015 → 24063** and `projectOverview.md` **11921 → 11917**
+(`fix/bf100-touch-cancels-pending-restore`).
+
+The backlog grew by 48 lines, all of it inside BF-100, and the growth is the point: the entry had
+carried a *candidate* cause for five days, plus a probe whose null result the entry itself warned
+must not be read as a refutation. What replaces that is measurement — the 182 ms window between the
+takeover listeners attaching and the restore landing, the reproduction
+(`restored to 0 against a reachable 1019`), and the reason the earlier probe could never have worked
+(`page.goBack()` does not resolve until after the restore, so the window is unreachable from the test
+side at all). A later session that re-derives any of those pays for them twice; this entry has
+already been mis-read twice, which is what the lines are buying against.
+
+`projectOverview.md` went **down** by four. Its BF-100 block held three stale claims — that the entry
+*"now prints READY"*, that *"the fix is deliberately not built"*, and that
+`scroll-restoration.spec.ts` still asserts an exact offset (fixed 2026-09-17). Replacing all three
+with the current state came out shorter than the speculation it retired, which is the usual direction
+when a question stops being open.

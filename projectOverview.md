@@ -458,43 +458,39 @@ and an unreported one costs none. Next: one blank resume in normal use, then rea
 `bf110 resume recheck%` — **`stuck` means native, `resized` means render timing.** No fix before that
 row exists ([journal](docs/overview/history-2026-09-16-folded-1.md#2026-09-14-bf110-second-viewport-log)).
 
-**BF-100 is failing on the S25, not awaiting a check — and it read as the latter for a day.** Owner,
-2026-09-13: *"Checked on more - and still doesnt work"*, its **second** failure. That was recorded
-inside **RV-36's** body, an entry that had already shipped (2026-09-11) and been S25-verified
-(2026-09-13), while BF-100 itself still carried `Keep:` + `Verify: device` and printed under
-*"shipped; a look is owed, nothing is blocked"*. RV-36 is removed; BF-100 is a plain buildable entry
-and now prints READY. **It is a device-only failure and the harness contradicts it** — `/more` →
-Profile details → back restores **840** in Playwright — so a green `scroll-restoration.spec.ts` is
-not evidence, which is how it could be declared fixed a third time.
+**BF-100's `touchstart` cause is CONFIRMED in the harness and FIXED; the S25 pass is what is left
+(2026-09-19).** Owner, 2026-09-13: *"Checked on more - and still doesnt work"* — its second failure.
+Twice before, this entry read as *"shipped, a look is owed"* while the look had already been taken and
+failed; it is back under `Verify: device` now only because the device has **never seen this change**,
+and its `Keep:` states the reversal condition outright so a third failure cannot hide there.
 
-**⚠ There is now a candidate cause and a ONE-TAP experiment that settles it, and it has never been
-tried** (2026-09-14, #1189 — the detail lives in BF-100's backlog entry). `use-scroll-restoration.ts`
-attaches its user-takeover to **`touchstart`**, and the takeover sets `done` with no re-arm — so a
-single touch abandons the pending restore for good. **The S25's system back gesture IS a touch;
-`page.goBack()` fires none**, which explains the harness/device split that no earlier hypothesis did.
-**The test:** come back from *Profile details* with a **UI back control** instead of the gesture. If
-the offset restores that way, the cause is settled. Every device pass so far has used the gesture,
-because this entry's own verification step says to. **The fix is deliberately not built** — it
-changes takeover behaviour on every screen, and must not ship on a hypothesis when one tap decides it.
+**What was measured, which is what makes this different from the two earlier passes.** Instrumenting
+`addEventListener` and `sessionStorage` on a live `/more` back-navigation: the takeover listeners
+attach at 15681 ms and the restore lands at 15863 ms — a **182 ms window with `done` still false and
+the listeners live**. Nothing had established the window was non-empty before. Then, with a target
+seeded beyond the container's reach so the window widens to the whole of `RESTORE_WINDOW_MS`, the
+cancellation reproduces outright against the unfixed hook: **`restored to 0 against a reachable
+1019`**. `use-scroll-restoration.ts` took its takeover from **`touchstart`**, and `stop` latches
+`done` with no re-arm — so one finger-down abandoned a pending restore permanently. It is now
+`touchmove`: still an input event (trap 4 intact), but a finger that never moved has scrolled nothing.
 
-**⚠ PROBED IN THE HARNESS 2026-09-15, AND THE RESULT IS INCONCLUSIVE — the obvious probe does not
-work, so do not re-run it.** The `/more` push-and-back was driven twice in one test with equal settle
-windows, once plain and once dispatching a synthetic `touchstart` on the scroll container right after
-`goBack()`. **The control restored. The touch arm restored too, to 840.** That **refutes the probe,
-not the hypothesis**: the element was picked as *"first node taller than its client height"*, which
-need not be the `ref` the hook listens on, and the dispatch fires as soon as the URL settles, which
-may be after the restore has already landed. The next attempt must confirm **which element carries
-the listener** and that the event arrives **inside `RESTORE_WINDOW_MS`** before reading anything into
-the outcome. **The one-tap device experiment above is still the thing that settles it.**
+**This reverses *"the fix is deliberately not built — it must not ship on a hypothesis when one tap
+decides it"*, and the reason is that it is no longer a hypothesis.** The mechanism is demonstrated,
+both directions are pinned by `e2e/bf100-touch-does-not-cancel-pending-restore.spec.ts` (both arms
+proven red pre-fix), and the blast radius is the three screens using `PullToSync`. **What is still
+unconfirmed is causation on the device** — the harness fires no touch on a back navigation, so it
+cannot say whether the S25's gesture delivers one into that window. **The one-tap experiment survives
+as the fallback:** if the gesture still lands at the top, come back with a **UI back control** instead
+— if that restores, the cause is elsewhere in the gesture path, and this is buildable work again.
 
-**⚠ And a finding about the spec rather than the bug:** `scroll-restoration.spec.ts` asserts an
-**exact** offset (`toBe(before)`). Measured locally against clean `main` it restored to **1019**
-against a saved **778** and went red — the content grows on revalidation between save and restore.
-Restoration was working; the assertion was not. It survives in CI, so this is a local/CI divergence
-rather than a live regression, but **an exact-offset assertion cannot tell _cancelled_ from
-_imprecise_** — which is the exact distinction BF-100 turns on. A probe for this class needs a coarse
-measure (*did it move off the top at all*), not equality.
-([journal](docs/overview/history-2026-09-17-folded-1.md#2026-09-15-bf100-touchstart-probe-inconclusive))
+**The 2026-09-15 probe's null result is explained and should not be re-run.** Not the element and not
+the dispatch site: `page.goBack()` does not resolve until *after* the mount and restore, and arming
+the dispatcher earlier does not help either, because the container only matches a selector once it has
+mounted — the same instant the restore lands. **The 182 ms window cannot be hit from the test side at
+all.** Reading that null as evidence against the hypothesis would have been wrong. (The separate
+exact-offset finding from that run — `scroll-restoration.spec.ts` asserting `toBe(before)`, which
+cannot tell *cancelled* from *imprecise* — was **fixed 2026-09-17**; both assertions go through
+`expectRestoredNear`, a floor at 90% of the saved offset.)
 
 A second owner request found in
 the same body had **no entry anywhere** and is now **LB-107**: back on a tab with nothing to pop

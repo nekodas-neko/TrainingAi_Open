@@ -47,6 +47,16 @@ split is "does it feel slow" vs "is it actually slow at the source".
   the entry, and is now gone from both. **A screen that scrolls its own container gets no restoration
   from being inside the shell — check the call, not the layout.** `/health/day`'s scroller had no
   bottom padding at all. Both owe **one** device pass; RV-37 has still never been observed.
+- [`2026-09-19-fix-bf100-touch-cancels-pending-restore`](../../overview/entries/2026-09-19-fix-bf100-touch-cancels-pending-restore.md)
+  — **BF-100's `touchstart` cause CONFIRMED and fixed, 2026-09-19.** Supersedes the inconclusive
+  probe below. Instrumenting a live `/more` back-navigation showed the takeover listeners attach
+  **182 ms before** the restore lands, and seeding an unreachable target — which widens that window
+  to the whole of `RESTORE_WINDOW_MS` — reproduces the cancellation outright:
+  `restored to 0 against a reachable 1019`. Fixed by taking takeover from **`touchmove`** rather than
+  `touchstart` (a finger that never moved has scrolled nothing; trap 4 intact, takeover is still an
+  input event). **The device half is still open** — the harness fires no touch on a back navigation,
+  so whether the S25's gesture lands in that window only the device can say, and the one-tap
+  UI-back-control experiment survives as the fallback.
 - [`2026-09-15-bf100-touchstart-probe-inconclusive`](../../overview/history-2026-09-17-folded-1.md#2026-09-15-bf100-touchstart-probe-inconclusive)
   — **BF-100's `touchstart` candidate probed in the harness, INCONCLUSIVE (2026-09-15).** The
   mechanism is real in source (`stop()` latches `done`, no re-arm, registered for
@@ -56,6 +66,9 @@ split is "does it feel slow" vs "is it actually slow at the source".
   `RESTORE_WINDOW_MS`. **Instrument before re-running.** Also here: the spec's `toBe(before)` is an
   exact-offset assertion that went red locally at 1019-against-778 while restoration was working —
   it cannot tell *cancelled* from *imprecise*, which is the distinction BF-100 turns on.
+  **⚑ Both halves are now closed (see the 2026-09-19 entry above):** the spec moved to a 90% floor on
+  2026-09-17, and the probe's null result turned out to be neither stated reason — `page.goBack()`
+  does not resolve until after the restore, so the window is unreachable from the test side at all.
 - [`2026-09-15-bf166-back-closes-overlay`](../../overview/history-2026-09-17-folded-1.md#2026-09-15-bf166-back-closes-overlay)
   — **The back listener ignored the overlay stack the app already had (BF-166), 2026-09-15.**
   **Read this before adding any overlay/back machinery:** the registry exists — `sheet-back-stack.ts`
