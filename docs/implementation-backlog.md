@@ -506,6 +506,70 @@ below threshold and left in place for next time.
   The recompute is correct; it is the conflict that should not exist.
 - **Branch:** _unassigned_
 
+### [workouts] BF-182 — warm the next prescription when Home renders, not at completion and not at tab-open
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-20 (BugFix intake). Owner: *"when you select the ai
+  generated workout plan it should be able to auto create workout as soon as your one is completed
+  right? The only factors would be if you choose deload or quicker one right? Is there a way we can
+  optimize this?"*
+- **Lane: A** — the trigger lives beside `app/api/workout-data/route.ts:569-572`; the warm call
+  would be a client fetch from the Home surface (Lane B) against an existing Lane A route. Engine
+  half first per the lane rule.
+- **⚠ GENERATE-AT-COMPLETION WAS ASKED FOR AND REJECTED BY THE OWNER ALREADY — do not implement it.**
+  `app/api/complete-workout/route.ts:47-51` records it verbatim: *"The next prescription for this
+  session is intentionally NOT generated here — it is generated on demand when the session is next
+  opened, so it is never more than a few minutes stale and never sits waiting for a decision for
+  days (**owner ask 2026-07-31**: generation should happen right before the workout, not at the end
+  of the previous one)."* He is now asking for the reverse. **Surface the earlier decision before
+  building either way.**
+- **BF-179 is live evidence the 2026-07-31 call was right.** A prescription generated early and left
+  sitting is exactly what went stale: dismissed, expired 2026-09-17, still serving 52% on 2026-09-20.
+  Moving generation *earlier* widens that window rather than narrowing it.
+- **His "only two factors" is nearly right, and the distinction is what decides the design.** Deload
+  and duration are not filters applied to a finished prescription — **both are INPUTS to
+  generation**:
+  - `durationPreset` (`'short' | 'standard' | 'long'`) reaches
+    `generatePrescriptionForSession` and sets `budgetOverrideMin` via `budgetForPreset`
+    (`generate-prescription.ts:204-207`), which changes how much work is prescribed. The prescribe
+    route calls it *"a today-only time-budget choice from the pre-workout screen"*.
+  - The deload decision reads the day's readiness signals at generation time.
+
+  So a prescription built at completion would be keyed to **yesterday's readiness** and to a guessed
+  duration, and picking Quick or Long would regenerate it anyway. Pre-generating does not remove the
+  wait; it moves it and adds a stale answer.
+- **What is actually slow, measured by reading the trigger chain:** nothing warms the prescription
+  before the workout tab opens. `isAiPrescriptionPending` fires
+  `regeneratePrescriptionInBackground` from `workout-data` **on tab-open**
+  (`route.ts:569-572`), and the client paints *"preparing your AI workout"* while it lands.
+  `/api/next-session/prescription` — the only other reader, used by the done-screen's next-workout
+  card — is **explicitly read-only and fires no `/prescribe`** (`route.ts:38-43`). So the first
+  thing that ever asks for the prescription is the screen the lifter is waiting on.
+- **Recommended: warm it when Home renders the recommendation card, same day, `standard` preset.**
+  Home already knows which session is recommended. Firing the idempotent `/prescribe` there means
+  generation starts seconds-to-minutes before the tap instead of at it, while keeping every property
+  the 2026-07-31 decision bought: same-day readiness, no multi-day sit, no decision waiting. If he
+  then picks Quick or Long, regenerate — that is a deliberate choice where a visible wait is
+  honest.
+- **Alternatives, with what each is better at:**
+  - **Generate at completion (his proposal).** Better in one way: the prescription is ready even if
+    he opens the app cold and trains immediately. Rejected because it reverses a decision made for
+    stated reasons, uses yesterday's readiness for today's deload, and BF-179 shows what an early
+    prescription left sitting becomes.
+  - **Leave it at tab-open.** Better in that it is the freshest possible and already works.
+    Rejected only because it puts the whole generation latency in front of the lifter.
+- **Reversal cost: low.** The warm is one idempotent call from one surface; deleting it restores
+  today's behaviour exactly. `regenerate-in-background` is already single-flighted (`workout-data`
+  route comment at :73 records the ~3s poll storm it exists to prevent), so a warm that races
+  tab-open collapses into one generation rather than two.
+- **⚠ Check the single-flight actually covers cross-surface before shipping.** The dedupe was built
+  for a poll on one screen; a Home warm plus a tab-open trigger is a different shape, and two
+  concurrent generations for one session is the failure worth avoiding here.
+- **Gate: owner** — he made the 2026-07-31 call and this revisits it. Needs his yes on *warm
+  earlier* versus *generate at completion*, with the staleness argument in front of him.
+- **Verification:** open Home, wait a beat, open the workout tab, and confirm the AI card paints
+  without the preparing state. **Device look owed** — the whole point is perceived latency, which
+  the sandbox cannot measure.
+
 ### [workouts] BF-180 — a session-level deload stores no "what full would have been", so declining it drops to the STATIC program, not an AI full
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-20 (BugFix intake). Owner, after overriding the
