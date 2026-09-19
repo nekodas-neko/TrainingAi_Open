@@ -13934,13 +13934,26 @@ cache bust and it is already implemented, so the entry has to say that first or 
 twice. And deriving `remaining` client-side is a genuine trap: it shares `deviationKcal` with the
 zone label, colour and bar, so the one-liner would leave the number live and the verdict stale.
 Both are cheaper to write down once than to discover in review.
----
+
+## 2026-09-19 — `docs/implementation-backlog.md` 24047 → 24015 (ratchet down, BF-177)
+
+**−32.** BF-177 shipped, so 64 lines of diagnosis become 32 of residue. The diagnosis was unusually
+good and most of it is now redundant with the code: the hook `use-energy-balance-refetch.ts` carries
+why the refetch is balance-only and why deriving `remainingKcal` client-side is a trap, right where
+the next reader will be standing.
+
+What the entry keeps is what the code cannot say: that the sweep found a **third** write path the
+entry did not name (the delete), that the control run printed `kcal left went 1810 → 1810` with the
+fix removed — the owner's report reproduced exactly — and that **two further `energy-balance:`
+readers were seen and deliberately not swept**, recorded rather than left as an implied clean sweep.
 
 ---
 
 ---
 
-## 2026-09-11 — `docs/implementation-backlog.md` → 24022 (RV-42 shipped)
+---
+
+## 2026-09-11 — `docs/implementation-backlog.md` → 23990 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 
@@ -14013,3 +14026,7 @@ note was added to this file — the eighth day this PR has waited on its owner d
 count is quoted, per the paragraph above: the clone was deepened again this morning to reconnect the
 histories for this very merge, which is exactly the operation that moved the last three derivations.
 The figure is `pnpm fix:baselines` on the merged tree and nothing else.
+
+**Recomputed again 2026-09-19** (→ 23990), after #1323 (BF-177) landed — one commit on `main`, and
+the backlog still moved 32 lines, because that PR removed the entry it finished. Ninth day waiting on
+the owner decision. No rewrite count, per the paragraph above.
