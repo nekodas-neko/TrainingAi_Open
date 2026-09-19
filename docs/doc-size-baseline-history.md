@@ -98,7 +98,7 @@ history files are dated) rather than with the sweep, because the sweep is a chor
 measurement is the thing a future reader would otherwise re-derive before daring to run it.
 ---
 
-## 2026-09-18 — backlog → 24079, `projectOverview.md` → 11931 (Q-1a server half)
+## 2026-09-18 — backlog → 24047, `projectOverview.md` → 11931 (Q-1a server half)
 
 **Backlog +32 and nothing removed**, which is the honest shape for a partial: Q-1a stays queued
 because most of its scope — the client — has not shipped, and the entry now carries what DID ship, the
@@ -13949,3 +13949,15 @@ cache bust and it is already implemented, so the entry has to say that first or 
 twice. And deriving `remaining` client-side is a genuine trap: it shares `deviationKcal` with the
 zone label, colour and bar, so the one-liner would leave the number live and the verdict stale.
 Both are cheaper to write down once than to discover in review.
+
+## 2026-09-19 — `docs/implementation-backlog.md` 24047 → 24015 (ratchet down, BF-177)
+
+**−32.** BF-177 shipped, so 64 lines of diagnosis become 32 of residue. The diagnosis was unusually
+good and most of it is now redundant with the code: the hook `use-energy-balance-refetch.ts` carries
+why the refetch is balance-only and why deriving `remainingKcal` client-side is a trap, right where
+the next reader will be standing.
+
+What the entry keeps is what the code cannot say: that the sweep found a **third** write path the
+entry did not name (the delete), that the control run printed `kcal left went 1810 → 1810` with the
+fix removed — the owner's report reproduced exactly — and that **two further `energy-balance:`
+readers were seen and deliberately not swept**, recorded rather than left as an implied clean sweep.

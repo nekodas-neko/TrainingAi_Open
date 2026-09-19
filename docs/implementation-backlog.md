@@ -508,67 +508,35 @@ below threshold and left in place for next time.
 
 ### [nutrition] BF-177 — "kcal left" is the server's subtraction against a stale intake, so it sits still while the ring moves
 
-- **Branch:** _unassigned_ · **Added:** 2026-09-19 (BugFix intake). Owner: *"The kcal left in the top
-  right; doesnt load on the same page: it requires page switching to show. Probs needs some sort of
-  cache bust after logging food so it updates"*.
-- **Lane: B** — `app/nutrition/nutrition-content.tsx:298-305` is the fix site;
-  `components/nutrition/energy-card.tsx:79` is where the choice is made.
-- **⚠ The cache bust he proposes already exists, and that is the finding.** `logFoodEntries`
-  (`packages/shared/src/nutrition/log-food.ts:296,329`) calls `invalidateNutritionWrite()`, and that
-  group clears `energy-balance:` (`lib/cache-groups.ts:534-535`). **The key is evicted correctly on
-  every food log.** This is the Q-402 shape that CLAUDE.md already names — *"Invalidating a key and
-  re-rendering the component that reads it are two different things"* — and adding another
-  invalidation would change nothing.
-- **What actually happens.** The sheet calls `onLogged(log)` per entry, which lands here:
-
-  ```ts
-  const handleFoodLogged = useCallback((newLog?: FoodLogWithItem) => {
-    if (newLog) {
-      if (newLog.date && newLog.date !== selectedDateRef.current) return
-      setLogs(prev => [...prev, newLog])      // ← ring + macros update instantly
-    } else {
-      fetchData(selectedDateRef.current)      // ← the ONLY branch that refetches energy-balance
-    }
-  }, [fetchData])
-  ```
-
-  The optimistic branch appends to `logs` and returns. `energyBalance` still holds the object
-  fetched before the meal, so the card renders a live ring against a pre-log payload.
-- **And the card prefers the payload over the two live numbers it is already holding:**
-
-  ```ts
-  const remaining = b ? b.remainingKcal : goal != null ? Math.round(goal - calories) : null
-  ```
-
-  `remainingKcal` is `budgetKcal − intakeKcal` computed server-side
-  (`calorie-balance.ts:132-140`), so it is the same subtraction — against the server's snapshot of
-  intake. The fallback expression beside it is live and correct, and is only reached when there is
-  no balance at all.
-- **Why switching pages fixes it:** the tab change re-runs `fetchData`, which refetches
-  `energy-balance` — now a miss, because the write did evict it — and the fresh payload carries the
-  new subtraction.
-- **Fix: refetch the balance in the optimistic branch. Do NOT derive `remaining` client-side.**
-  Deriving looks like the one-line fix and is a trap: `remainingKcal` is `-deviationKcal`, and
-  **`zoneLabel`, `zoneColor` and the bar all come off that same `deviationKcal`**
-  (`calorie-balance.ts:131-138`). Make the number live without the rest and the card reads
-  *"871 kcal left"* beside a *"Well under so far"* band and a bar that have not moved — one visible
-  disagreement traded for a subtler one. `calorie-balance.ts:111` is explicit that every "left" /
-  "over" reading comes off one number, which is what LB-100 exists to hold.
-- **⚠ Refetch the BALANCE, not `fetchData`.** `fetchData` also calls `loadFoodLogs`, which would
-  re-fetch the list that was just appended to optimistically and can clobber or flicker the row the
-  user is looking at. Fetch `energy-balance:<date>` alone and leave `logs` to the optimistic append.
-- **Accepted consequence, state it rather than design around it:** the ring updates instantly and
-  "kcal left" lands a round trip later. That is correct — the budget half genuinely comes from the
-  server — and it is a far smaller gap than the current one, which persists until the tab changes.
-- **Sibling sweep:** every surface reading `energy-balance:` behind a hand-rolled fetch has the same
-  exposure. `handleQuickEditSaved` (`:307`) is the obvious twin — it edits a logged row's calories
-  and updates `logs` only. Check the Home energy-balance card too; Q-402 was that exact component,
-  and `useCachedValue` (which subscribes to invalidation) is the shape that does not have this
-  problem.
-- **Verification:** log a food item on the Nutrition tab **without leaving the screen** and confirm
-  "kcal left", the zone label and the bar all move together. Browser at ≤640px is enough for the
-  arithmetic; **the device look is owed** because the optimistic-append timing is what makes the
-  round trip feel instant or not.
+- **Lane: B** — `app/nutrition/nutrition-content.tsx`, `app/nutrition/use-energy-balance-refetch.ts`.
+- **Added:** 2026-09-19 (BugFix intake) · owner: *"requires page switching to show"*.
+- **✅ SHIPPED 2026-09-19** (`fix/bf177-kcal-left-stale-after-log`, v1.459.1). A balance-only refetch
+  now runs on every write that changes intake. The entry's diagnosis was exactly right and is worth
+  keeping: **the cache bust the owner proposed already existed** — `logFoodEntries` clears
+  `energy-balance:` — and this was the Q-402 shape, where evicting a key and re-rendering the
+  component that reads it are two different things.
+- **⚠ THREE SITES, NOT TWO. The sweep found one the entry did not name.** It flagged
+  `handleFoodLogged`'s optimistic branch and `handleQuickEditSaved`; the **delete** path's
+  `refreshAffected` refreshes the log list and the weekly summary and *not* the balance, so deleting
+  a food entry left the same number stale. All three now refetch.
+- **The trap the entry warned about was real and is avoided:** `remainingKcal` is `-deviationKcal`,
+  and `zoneLabel`, `zoneColor` and the bar all read that same number. Deriving only the figure
+  client-side would have printed a live "kcal left" beside an unmoved band and bar.
+- **Extracted, not appended.** The reasoning lives in `use-energy-balance-refetch.ts` because
+  inlining it took `nutrition-content.tsx` to **811 lines against the hard 800 limit**; it is 789 now.
+- **Pinned by `e2e/bf177-kcal-left-updates-after-log.spec.ts`**, which logs a 250 kcal item and reads
+  the card **without navigating** — anything that leaves the screen re-runs `fetchData` and passes
+  against the unfixed component. Control run: with the refetch removed the spec reports
+  **`kcal left went 1810 → 1810`**, which is the owner's report reproduced exactly.
+- **⚠ Keep:** ① **the device look**, and only that — the entry's own reason stands: the
+  optimistic-append timing is what decides whether the round trip *feels* instant, and the browser
+  can only show the arithmetic. ② **Two further `energy-balance:` readers were seen and NOT swept**
+  — `app/health/day/day-detail-content.tsx:122` and
+  `components/nutrition/end-of-day/day-read-through-section.tsx:37`, both hand-rolled `cachedFetch`.
+  Neither is mounted during a Nutrition-tab log, so neither is this report; they are recorded here
+  rather than claimed clean. Home is genuinely clean — `useEnergyBalanceToday` uses
+  `useCachedValue`, which subscribes to invalidation (Q-402's fix).
+- **Branch:** `fix/bf177-kcal-left-stale-after-log`
 
 ### [readiness][app-shell] TN-50 — the "self-report" that scores 10% of readiness is auto-filled FROM readiness, and `pumped` is unreachable
 
