@@ -741,23 +741,6 @@ existing 65 days moves by less than 5 points on every one of them.
   every row carries a model stamp. **Currently: 62 of 65 reproduce** (58 nine-key + 4 of the seven),
   three are 1 point out, and 25 of 65 are stamped.
 
-### [app-shell] RV-61 — any signed-in user can equip an achievement title they have not unlocked
-
-- **Lane:** A — `app/api/user/equipped-title/route.ts:26-29`. **Added:** 2026-09-18 · Review sweep 50.
-- The only gate is catalogue membership (`hasOwnProperty.call(TITLES, titleId)`); unlock state is
-  never consulted. The filter is **client-side only**
-  (`components/more/title-picker-sheet.tsx:17` takes `unlockedAchievementIds` and filters the list).
-  Live: a user at `bestStreak: 9` equipped `iron_will` (`unlockedBy: 'streak_60'`) → 200, read back
-  from Postgres as stored, and it renders on `friend-leaderboard.tsx:106`, `friend-feed.tsx:16` and
-  `app/profile/[userId]/page.tsx:34`. Control: `"iron_will_x"` → 400 with the stored value intact, so
-  the refusal tracks catalogue membership specifically.
-- **⚠ Pre-existing, not introduced in this window — and this diff *hardened* the same line**,
-  replacing a truthy `TITLES[titleId]` lookup that let `constructor`/`__proto__` through. It is filed
-  here because the sweep found it, not because it regressed.
-- **Low priority on its merits:** cosmetic, no data or permission is gained, and on a single-owner
-  deployment there may be no adversary. The reason to do it is that the server is the only place the
-  unlock rule can live, and the achievements payload the picker already reads is the input.
-
 ### [readiness][devices][platform] TN-46 — correlate vitals against dose: the app holds both halves and joins neither 🔴 LIVE
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-17 · owner: *"The idea was to be able to correlate
