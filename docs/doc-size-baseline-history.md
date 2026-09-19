@@ -18,6 +18,23 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-19 — backlog → 24042, `projectOverview.md` → 11910 (TN-50 re-laned and sharpened)
+
+**Backlog +25 on someone else's entry, with no code.** Three additions, and the ordering is the
+point: the re-verification first (its central number reproduces — 45 of 62 — which an entry whose
+first draft was wrong has to earn rather than assume), then the +22 sharpening, then the re-lane.
+
+The sharpening is the line that will matter later. `ok` scores 72 against a NEUTRAL of 50, so
+"default to neutral" *lowers* the contributor on most days. Without that written down, the readiness
+line stepping down after the fix reads as a regression rather than the intended effect.
+
+Item 3's recommendation is deliberately NOT a decision. It is Tuning's entry, and the argument
+against the storage flag — that it can only label rows written after item 1 removes the ambiguity —
+is strong enough to record and weak enough to be wrong if the implementer knows something I do not.
+
+---
+
+
 ## 2026-09-18 — backlog → 24017, `docs/agents/state/tuning.md` → 685 (TN-50 + two method traps)
 
 **+88 and +21.** TN-50 went through two drafts in one sitting and the entry carries both, because
@@ -66,7 +83,7 @@ history files are dated) rather than with the sweep, because the sweep is a chor
 measurement is the thing a future reader would otherwise re-derive before daring to run it.
 ---
 
-## 2026-09-18 — backlog → 24049, `projectOverview.md` → 11910 (Q-1a server half)
+## 2026-09-18 — backlog → 24074, `projectOverview.md` → 11920 (Q-1a server half)
 
 **Backlog +32 and nothing removed**, which is the honest shape for a partial: Q-1a stays queued
 because most of its scope — the client — has not shipped, and the entry now carries what DID ship, the
