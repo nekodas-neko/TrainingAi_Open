@@ -506,6 +506,124 @@ below threshold and left in place for next time.
   The recompute is correct; it is the conflict that should not exist.
 - **Branch:** _unassigned_
 
+### [workouts] BF-179 — a DISMISSED prescription that expired three days ago is still prescribing today's deload
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-20 (BugFix intake). Owner, on a session screen
+  showing every exercise at 52% with a Deload chip: *"and reccomend deload?"* — asked against an
+  explain screen reading **100/100 STRONG FIT**, training streak **0 days**, sore muscles **None**,
+  energy **OK**, HRV **well above your usual**.
+- **Lane: A** — `packages/shared/src/ai-periodization/reevaluate.ts:104-110`.
+- **First, the two deloads are different systems and the screens do not say so.** The explain
+  screen's signals feed `computeDeloadStrength` (`ai-dynamic.ts`), which gates on
+  `consecutiveTrainingDays < 3` and with his **0** returns `{ recommended: false }`. It is not the
+  source. The workout screen's banner is `prescription.phaseAction === 'deload_recommended'`
+  (`ai-prescription-card.tsx:123`) — the **periodization prescription**, which has its own lifecycle
+  and never consulted today's signals. So *"why does it say deload when every signal says I'm
+  fine"* has a real answer: nothing on that explain screen is what produced it.
+- **Second, and this is the defect. Measured in production 2026-09-20:**
+
+  | field | value |
+  |---|---|
+  | `prescription_status` | **`dismissed`** |
+  | `prescription_generated_at` | 2026-09-16 21:25 |
+  | `prescription_expires_at` | **2026-09-17 21:25** |
+  | `phaseAction` | `deload_recommended` |
+  | `deload` | `true` |
+
+  **Dismissed, and expired three days before the screenshot** — still rendering as a live
+  prescription and still setting every working set to 52%.
+- **The ageing-out check does not cover this status:**
+
+  ```ts
+  if (
+    (state.prescriptionStatus === 'auto_applied' || state.prescriptionStatus === 'accepted' ||
+      state.prescriptionStatus === 'consumed') &&
+    state.prescriptionExpiresAt != null && state.prescriptionExpiresAt <= now
+  ) {
+    return { prescription, changed: false, needsRegenerate: true }
+  }
+  ```
+
+  `dismissed` is in neither the applied set nor the deliberate `pending` carve-out. So
+  `needsRegenerate` never fires, and `workout-data/route.ts:550-556` takes the `else` branch —
+  which **re-stamps the stale prescription and writes it back** through
+  `updatePrescriptionExercisesCache`. The expired offer is not merely tolerated, it is refreshed.
+- **⚠ This is Q-229 returning through a status its fix did not name, and the file says the symptom
+  out loud.** Its own comment: *"a session type left unused for longer than its own window kept
+  replaying its last AI-computed pct/sets/reps … The owner hit it on 2026-08-14: an **8-day-old
+  deload-era 52%** served on a live Intensification day."* **His screenshot is 52% across all five
+  exercises.** Q-229 closed the applied statuses and left this one open.
+- **Fix: age out on expiry regardless of status, except `pending`.** The `pending` carve-out is
+  deliberate and documented — its expiry is owned by the emergency-deload suppression — so widen the
+  condition to include `dismissed` rather than dropping the status test. **Do not "fix" this by
+  making `prescriptionDrivesLoad` reject `dismissed`:** it already does
+  (`apply-prescription.ts:21-28` returns false for it), which is exactly why the mechanism below
+  needs settling before a patch.
+- **⚠ ONE THING IS NOT PINNED DOWN — settle it before writing the fix.** `prescriptionDrivesLoad`
+  returns **false** for `dismissed`, and the card's *"· Deload recommended"* copy is gated on
+  `isPending` (`:219`). Both say a dismissed prescription should neither drive load nor print that
+  line — yet the device shows both. Two candidates, and they need different fixes:
+  1. **A stale client cache.** The `?tab=all` batch path is read-only and seeds every
+     `workout-card:<id>` key (`workout-data/route.ts:138-145`), so a payload cached while the
+     prescription was still pending would render exactly this. Test by clearing the cache and
+     reopening the tab.
+  2. **A status divergence** — the client holding a different status than the row. Test by reading
+     what `/api/workout-data?session=<id>` returns for `prescriptionStatus` right now against the
+     DB row above.
+
+  The expiry gap is real either way and is worth fixing on its own; which of these explains the
+  *pending-looking card* decides whether a second fix is needed.
+- **Verification:** with the fix in, a prescription past `prescription_expires_at` must regenerate
+  on tab-open whatever its status bar `pending`. Assert it in a unit test on `reevaluatePrescription`
+  with a `dismissed` + expired fixture — **derive the timestamps from the clock, never hardcode
+  them**, per this repo's rolling-window test rule. **The device look is owed**: the 52% is what the
+  owner sees, and only the APK proves it is gone.
+
+### [readiness] BF-178 — the readiness signal is OUR composite, and three surfaces still credit it to Oura
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-20 (BugFix intake). Owner, on the *Why Upper?*
+  screen: *"Still called oura readiness"*.
+- **Lane: A** — `packages/shared/src/session-explain/group-signals.ts:47`,
+  `app/api/session-explain/insight/route.ts:46`,
+  `packages/shared/src/health/weekly-digest-metrics.ts:111`.
+- **The number is not Oura's and has not been since the 2026-07-07 re-key.**
+  `liveReadinessForDay` (`packages/shared/src/health/live-readiness.ts`) returns
+  `oura_daily_derived.readiness_score` where `readiness_source === 'ble-derived'` — the app's own
+  composite. The frozen Cloud column is a fallback **only** for pre-re-key days, gated on
+  `isPreRekey(date)`. That file's own header says it: *"Since the 2026-07-07 ring re-key the Oura
+  Cloud gets no new data, so `oura_daily.readiness_score` is frozen; the app's own composite is
+  persisted to `oura_daily_derived.readiness_score`."*
+- **Measured in production 2026-09-20** — the day of his screenshot:
+
+  | day | readiness_score | readiness_source |
+  |---|---|---|
+  | 2026-09-20 | **46** | `ble-derived` |
+  | 2026-09-19 | 74 | `ble-derived` |
+  | 2026-09-18 | 36 | `ble-derived` |
+
+  The 46 he is looking at is ours. Every recent row is.
+- **It is also internally inconsistent, which is what makes it a bug rather than a quibble.** The
+  Home header calls the same number **"Readiness"**; the explain screen calls it **"Oura
+  readiness"**. One screen apart, same value, two provenances implied — and the Oura one is false.
+- **⚠ The AI route matters more than the two labels.** `session-explain/insight/route.ts:46` feeds
+  the model `- Oura readiness: ${sig.ouraReadiness}`, so the *prose* says it too — his screenshot
+  reads *"Despite your Oura readiness of 46"*. A label is a rename; a prompt line teaches the model
+  to attribute the app's own composite to a third party in generated text, which is the half that
+  cannot be spotted by reading the UI.
+- **Fix: call it "Readiness" everywhere, matching Home.** Do not invent a new name — Home already
+  has the right one and a third vocabulary is how this recurs. Rename the label, the prompt line and
+  the digest string in one PR; the field name `ouraReadiness` can stay or be renamed with it, but if
+  it stays it needs a comment saying the value is ble-derived, because the field name is what taught
+  every one of these three call sites to write "Oura".
+- **Sibling sweep:** `grep -rn "Oura readiness"` — the three above are the live ones. Test files and
+  `changelog.ts` are history and must NOT be rewritten; a changelog entry describing what shipped
+  then is accurate as a record.
+- **⚠ Not in scope, and worth saying so:** whether **46 is a good score** on a day with HRV *well
+  above* baseline is a calibration question, not this entry. The readiness baseline has open Tuning
+  work (TN-6, BF-13). This entry is only about what the number is called.
+- **Verification:** open *Why <session>?* and confirm the row reads "Readiness", and that the AI
+  paragraph above it no longer says "Oura readiness". Browser is enough.
+
 ### [nutrition] BF-177 — "kcal left" is the server's subtraction against a stale intake, so it sits still while the ring moves
 
 - **Lane: B** — `app/nutrition/nutrition-content.tsx`, `app/nutrition/use-energy-balance-refetch.ts`.

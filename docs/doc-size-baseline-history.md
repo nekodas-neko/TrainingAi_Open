@@ -98,7 +98,7 @@ history files are dated) rather than with the sweep, because the sweep is a chor
 measurement is the thing a future reader would otherwise re-derive before daring to run it.
 ---
 
-## 2026-09-18 — backlog → 24095, `projectOverview.md` → 11927 (Q-1a server half)
+## 2026-09-18 — backlog → 24213, `projectOverview.md` → 11927 (Q-1a server half)
 
 **Backlog +32 and nothing removed**, which is the honest shape for a partial: Q-1a stays queued
 because most of its scope — the client — has not shipped, and the entry now carries what DID ship, the
@@ -13981,3 +13981,15 @@ already been mis-read twice, which is what the lines are buying against.
 `scroll-restoration.spec.ts` still asserts an exact offset (fixed 2026-09-17). Replacing all three
 with the current state came out shorter than the speculation it retired, which is the usual direction
 when a question stops being open.
+
+## 2026-09-20 — `docs/implementation-backlog.md` → 24181
+
+**BF-179** (a dismissed, three-day-expired prescription still setting today's loads) and **BF-178**
+(the readiness composite credited to Oura on three surfaces).
+
+BF-179 is long because a shorter version gets fixed wrongly. It has to separate the two deload
+systems before the defect makes sense, quote the `reevaluate.ts` comment showing this is Q-229
+returning through a status its fix did not name, and warn off the obvious patch —
+`prescriptionDrivesLoad` already rejects `dismissed`, so tightening it changes nothing. It also
+records, rather than guesses, the one mechanism still open: the card renders pending-only copy for a
+row the database says is dismissed, and the two candidates need different fixes.
