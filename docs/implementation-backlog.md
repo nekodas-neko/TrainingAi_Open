@@ -512,9 +512,25 @@ below threshold and left in place for next time.
   contributor under-delivers (TN-47); **re-scoped the same day by the owner**, who said he does not
   choose the value: *"I dont really choose them; I let it auto select … It should choose neutral by
   default. This was more a way to tune based on my response. Not infer."*
-- **Lane: A, then B** — `readinessToEnergy` lives in `components/mood-checkin-sheet.tsx:35` (Lane B)
-  but the circularity and the `CHECKIN_ENERGY_SCORE` mapping are `packages/shared` (Lane A). Engine
-  half first.
+- **Lane: B — re-laned 2026-09-19 by Lane A, which reached this entry as next-up and found it has no
+  engine half.** It was filed `A, then B` on the reasoning that *"the circularity and the
+  `CHECKIN_ENERGY_SCORE` mapping are `packages/shared`"*. Checked against the code: the circularity is
+  **not** in shared — both seed sites are `components/mood-checkin-sheet.tsx:86` (initial state) and
+  `:177` (reset), one Lane B file — and this entry's own instruction is *"do NOT re-map
+  `CHECKIN_ENERGY_SCORE`"*. So items 1 and 2 are a single-file Lane B change, and item 3 is the only
+  Lane A piece (see the ⚠ on it below).
+
+- **⚠ SHARPENED 2026-09-19 (Lane A): the auto-fill is not only circular, it biases the term UPWARD.**
+  `CHECKIN_ENERGY_SCORE.ok = 72` (`readiness-composite.ts:122`) while the documented `NEUTRAL` is
+  **50** (`:106`), and `readinessToEnergy(null)` returns `"ok"`. So a saved-but-unanswered check-in
+  contributes **72, not 50** — **+22 above neutral**, on the **36 of 62 days** that stored `ok`.
+  "Default to neutral" therefore *lowers* the contributor on most days rather than leaving it
+  unchanged, which is worth stating before the change lands and the readiness line visibly steps
+  down. The owner's decision is unaffected; the expected effect is now quantified.
+
+- **✅ INDEPENDENTLY RE-VERIFIED 2026-09-19 (Lane A), because this entry's first draft was wrong
+  once.** Re-running the match against production: **62 days, 45 matching the auto-fill (72.6%),
+  `pumped` 0, `ok` 36, `good` 4.** Every figure reproduces. *(The owner's rows only.)*
 - **✅ OWNER DECISION, 2026-09-18 — default to NEUTRAL, do not infer.** The term exists to tune on
   his response; auto-filling it from a score makes it infer instead. Gate cleared for that change.
 
@@ -560,6 +576,15 @@ meant to carry, and the default drowns it out on the other three days in four.
 3. **Distinguish "auto-filled" from "answered" in storage**, so the 73% is never again read as a
    self-report. Without this, the column stays ambiguous for every future reader — and this entry is
    the proof that it gets misread.
+   - **⚠ Lane A's recommendation, 2026-09-19: make this a DOCUMENTED CUTOFF rather than a column,
+     and it is a recommendation rather than a decision because this is Tuning's entry.** A storage
+     flag solves the problem *going forward*, which is exactly the window item 1 eliminates — once
+     the sheet stops seeding from readiness, every stored value is an answer and the column is no
+     longer ambiguous. What stays ambiguous is the **history**, and a flag added now cannot label it,
+     because whether any past row was auto-filled is a statistical inference (the 73%), never a
+     per-row fact. A dated line saying "rows before <the fix> may be auto-filled; rows after are
+     answers" carries everything a column would, applies to the rows that need it, and costs no
+     migration — and a migration ships alone, so the column would delay items 1 and 2 behind it.
 
 **⚠ Do NOT re-map `CHECKIN_ENERGY_SCORE` to make 100 easier to reach.** The scores are fine; the
 *seeding* is the defect. Compressing the scale would hide the circularity rather than remove it.
