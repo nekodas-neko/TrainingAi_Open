@@ -13967,13 +13967,25 @@ already been mis-read twice, which is what the lines are buying against.
 with the current state came out shorter than the speculation it retired, which is the usual direction
 when a question stops being open.
 
----
+## 2026-09-20 — `docs/implementation-backlog.md` → 24181
+
+**BF-179** (a dismissed, three-day-expired prescription still setting today's loads) and **BF-178**
+(the readiness composite credited to Oura on three surfaces).
+
+BF-179 is long because a shorter version gets fixed wrongly. It has to separate the two deload
+systems before the defect makes sense, quote the `reevaluate.ts` comment showing this is Q-229
+returning through a status its fix did not name, and warn off the obvious patch —
+`prescriptionDrivesLoad` already rejects `dismissed`, so tightening it changes nothing. It also
+records, rather than guesses, the one mechanism still open: the card renders pending-only copy for a
+row the database says is dismissed, and the two candidates need different fixes.
 
 ---
 
 ---
 
-## 2026-09-11 — `docs/implementation-backlog.md` → 24038 (RV-42 shipped)
+---
+
+## 2026-09-11 — `docs/implementation-backlog.md` → 24156 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 
@@ -14047,8 +14059,8 @@ count is quoted, per the paragraph above: the clone was deepened again this morn
 histories for this very merge, which is exactly the operation that moved the last three derivations.
 The figure is `pnpm fix:baselines` on the merged tree and nothing else.
 
-**Recomputed again 2026-09-19** (→ 24038, via 23990 an hour earlier), after #1323 (BF-177), then
-#1324 and #1325 landed — three commits on `main` inside ninety minutes, and the backlog moved twice
-in opposite directions: −32 when BF-177 removed the entry it finished, +48 when BF-100's entry
-absorbed its measurement. Ninth day waiting on the owner decision. No rewrite count, per the
-paragraph above.
+**Recomputed again 2026-09-19** (→ 24156, via 23990 and 24038 earlier the same day), after #1323
+(BF-177), #1324, #1325 and #1328 landed — four commits on `main` in a day, and the backlog moved in
+both directions: −32 when BF-177 removed the entry it finished, +48 when BF-100's entry absorbed its
+measurement, +118 when BF-179 and BF-178 were filed. Ninth day waiting on the owner decision. No
+rewrite count, per the paragraph above.
