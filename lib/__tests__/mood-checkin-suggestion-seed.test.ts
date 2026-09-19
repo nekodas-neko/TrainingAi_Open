@@ -20,9 +20,15 @@ import { join } from 'node:path'
 
 const SRC = readFileSync(join(process.cwd(), 'components/mood-checkin-sheet.tsx'), 'utf8')
 
-/** The `else` arm of the initialLog effect — the fresh-check-in reset. */
+/** The `else` arm of the initialLog effect — the fresh-check-in reset.
+ *
+ *  Re-anchored 2026-09-19 (TN-50): this used to find the arm by
+ *  `setEnergy(readinessToEnergy(readiness))`, and that call is gone — the readiness seed was the
+ *  circularity TN-50 removed. The `found the reset arm` case below is what caught it: without that
+ *  meta-assertion the slice would have been empty and every Q-226 case would have passed on
+ *  absence. Keep both the anchor and that check honest together. */
 const resetArm = () => {
-  const start = SRC.indexOf('setEnergy(readinessToEnergy(readiness))')
+  const start = SRC.indexOf('setEnergy(null)')
   const end = SRC.indexOf('}, [initialLog, open])', start)
   expect(start).toBeGreaterThan(-1)
   expect(end).toBeGreaterThan(start)

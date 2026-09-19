@@ -506,98 +506,36 @@ below threshold and left in place for next time.
   The recompute is correct; it is the conflict that should not exist.
 - **Branch:** _unassigned_
 
-### [readiness][app-shell] TN-50 — the "self-report" that scores 10% of readiness is auto-filled FROM readiness, and `pumped` is unreachable 🔴 LIVE
+### [readiness][app-shell] TN-50 — the "self-report" that scores 10% of readiness is auto-filled FROM readiness, and `pumped` is unreachable
 
-- **Branch:** _unassigned_ · **Added:** 2026-09-18 · Tuning agent. Found measuring why the `checkin`
-  contributor under-delivers (TN-47); **re-scoped the same day by the owner**, who said he does not
-  choose the value: *"I dont really choose them; I let it auto select … It should choose neutral by
-  default. This was more a way to tune based on my response. Not infer."*
-- **Lane: B — re-laned 2026-09-19 by Lane A, which reached this entry as next-up and found it has no
-  engine half.** It was filed `A, then B` on the reasoning that *"the circularity and the
-  `CHECKIN_ENERGY_SCORE` mapping are `packages/shared`"*. Checked against the code: the circularity is
-  **not** in shared — both seed sites are `components/mood-checkin-sheet.tsx:86` (initial state) and
-  `:177` (reset), one Lane B file — and this entry's own instruction is *"do NOT re-map
-  `CHECKIN_ENERGY_SCORE`"*. So items 1 and 2 are a single-file Lane B change, and item 3 is the only
-  Lane A piece (see the ⚠ on it below).
-
-- **⚠ SHARPENED 2026-09-19 (Lane A): the auto-fill is not only circular, it biases the term UPWARD.**
-  `CHECKIN_ENERGY_SCORE.ok = 72` (`readiness-composite.ts:122`) while the documented `NEUTRAL` is
-  **50** (`:106`), and `readinessToEnergy(null)` returns `"ok"`. So a saved-but-unanswered check-in
-  contributes **72, not 50** — **+22 above neutral**, on the **36 of 62 days** that stored `ok`.
-  "Default to neutral" therefore *lowers* the contributor on most days rather than leaving it
-  unchanged, which is worth stating before the change lands and the readiness line visibly steps
-  down. The owner's decision is unaffected; the expected effect is now quantified.
-
-- **✅ INDEPENDENTLY RE-VERIFIED 2026-09-19 (Lane A), because this entry's first draft was wrong
-  once.** Re-running the match against production: **62 days, 45 matching the auto-fill (72.6%),
-  `pumped` 0, `ok` 36, `good` 4.** Every figure reproduces. *(The owner's rows only.)*
-- **✅ OWNER DECISION, 2026-09-18 — default to NEUTRAL, do not infer.** The term exists to tune on
-  his response; auto-filling it from a score makes it infer instead. Gate cleared for that change.
-
-**⚠ THIS ENTRY'S FIRST DRAFT WAS WRONG AND THE CORRECTION IS THE FINDING.** It read the stored
-`energy_level` distribution as a self-report and concluded the owner had "not felt better than ok for
-seven weeks". **That conclusion is not supportable** — most of those values were auto-selected, not
-reported. Kept visible because the same mistake is available to anything else that reads this column.
-
-**The mechanism.** `mood-checkin-sheet.tsx:86` seeds the energy state from
-`readinessToEnergy(readiness)` — the sheet's own prop comment says *"Oura readiness score — sets
-energy default"* — and `readiness-payload.ts:492` then scores **today's** mood into **today's**
-readiness via `checkinScoreFromEnergy`. The loop closes inside one day:
-
-```
-readiness → readinessToEnergy() → energy default → (unchanged) → checkin contributor (10%) → readiness
-```
-
-**Measured over the 62 days carrying both a check-in and a readiness score: the saved
-`energy_level` is exactly what `readinessToEnergy(readiness)` would have auto-selected on
-45 of them — 73%.** Against roughly 20–25% by chance. **So ~10% of the readiness weight is a
-re-reading of readiness itself on about three days in four.** *(Approximate by construction: the seed
-used the readiness at sheet-open time and the stored score may have been recomputed since. The
-73%-vs-chance gap is far too large for that to explain it.)*
-
-**`pumped` has never been logged because the mapping cannot produce it.** `readinessToEnergy` returns
-only `good`/`ok`/`low`/`drained` — there is no branch that returns `pumped`, and `null` readiness
-returns `ok`. So the first draft's "the option is there and has never been chosen" was doubly wrong:
-it is unreachable by default, and reaching it needs a deliberate override the owner does not make.
-`CHECKIN_ENERGY_SCORE.pumped = 100` is the only path to a readiness of 100, which is why the observed
-ceiling is **87 across 65 days**.
-
-**The 27% he DID override is the only real signal in the column, and it disagrees in both
-directions** — 2026-07-21 readiness 37 (auto `drained`) saved as `good`; 2026-08-08 readiness 65
-(auto `ok`) saved as `drained`. That is exactly the independent subjective reading the contributor is
-meant to carry, and the default drowns it out on the other three days in four.
-
-**What to do.**
-1. **Default to neutral** (the owner's decision). An unanswered check-in should contribute the
-   documented `NEUTRAL` 50 — which `plainScore(null)` already does when there is no log at all — not
-   a value inferred from the score it is about to feed.
-2. **Make `pumped` reachable** by leaving the top of the scale to the user rather than adding a
-   `>= 90` branch. Adding one would re-close the loop at the top end.
-3. **Distinguish "auto-filled" from "answered" in storage**, so the 73% is never again read as a
-   self-report. Without this, the column stays ambiguous for every future reader — and this entry is
-   the proof that it gets misread.
-   - **⚠ Lane A's recommendation, 2026-09-19: make this a DOCUMENTED CUTOFF rather than a column,
-     and it is a recommendation rather than a decision because this is Tuning's entry.** A storage
-     flag solves the problem *going forward*, which is exactly the window item 1 eliminates — once
-     the sheet stops seeding from readiness, every stored value is an answer and the column is no
-     longer ambiguous. What stays ambiguous is the **history**, and a flag added now cannot label it,
-     because whether any past row was auto-filled is a statistical inference (the 73%), never a
-     per-row fact. A dated line saying "rows before <the fix> may be auto-filled; rows after are
-     answers" carries everything a column would, applies to the rows that need it, and costs no
-     migration — and a migration ships alone, so the column would delay items 1 and 2 behind it.
-
-**⚠ Do NOT re-map `CHECKIN_ENERGY_SCORE` to make 100 easier to reach.** The scores are fine; the
-*seeding* is the defect. Compressing the scale would hide the circularity rather than remove it.
-
-**⚠ Do NOT re-tune any readiness weight against the stored `checkin` history.** On ~73% of days that
-term is not independent of the score it feeds, so any fit against it is partly fitting readiness to
-itself. TN-47's measured 6.5%-of-movement figure for `checkin` is affected by this and should be
-re-measured after the seeding changes.
-
-**Pass test:** an unanswered check-in contributes the neutral 50 rather than a readiness-derived
-value; `pumped` is selectable and reachable; and a stored check-in can be told apart from an
-auto-filled one.
-
+- **Lane: B** — `components/mood-checkin-sheet.tsx`. Re-laned from A on 2026-09-19 by Lane A, which
+  found the entry has no engine half: both seed sites were in that one file.
+- **Added:** 2026-09-18 · Tuning agent · owner decision 2026-09-18 (*"It should choose neutral by
+  default… Not infer."*).
+- **✅ ITEMS 1 AND 2 SHIPPED 2026-09-19** (`fix/tn50-checkin-not-inferred-from-readiness`, v1.459.0).
+  `readinessToEnergy` is deleted, nothing pre-selects the level, and Save is disabled until one is
+  chosen. `pumped` is reachable by tapping it, which is all item 2 ever needed.
+- **⚠ THE ENTRY'S OWN TWO INSTRUCTIONS COULD NOT BOTH BE MET BY A DEFAULT, and that is worth keeping.**
+  It asked to *"default to neutral"* AND for an unanswered check-in to contribute *"the documented
+  NEUTRAL 50"*. The middle option `ok` scores **72**; the only level scoring **50** is `low`, which
+  cannot be pre-selected every morning without the app telling the owner he is Low; and
+  `MoodLog.energyLevel` is non-nullable in `packages/shared`, so "unanswered" is not a storable
+  value. Resolved by pre-selecting **nothing**: unanswered means no log, which
+  `checkinScoreFromEnergy(null)` already scores as 50. A fixed default would have written a value
+  the owner never chose and left the column exactly as unreadable.
+- **✅ ITEM 3 DISCHARGED as the documented cutoff Lane A recommended**, in
+  [`docs/domains/readiness/README.md`](domains/readiness/README.md) §Gotchas: rows before
+  2026-09-19 may be auto-filled, rows after are answers, plus the three consequences (do not read a
+  pre-cutoff distribution as self-report; do not fit a weight against pre-cutoff `checkin`; `pumped`
+  is absent because it was unreachable).
+- **⚠ Keep:** ① **the device check** — the sheet is a daily native surface and this changes what it
+  shows on open; on the S25, confirm no level is lit on a fresh check-in, that Save is dead until one
+  is tapped, and that the extra tap is acceptable in the morning flow. **If it is not, say so — the
+  revert is one line** and a fixed default is the fallback. ② **Tuning's re-measure**: TN-47's
+  6.5%-of-movement figure for `checkin` was fitted against auto-filled days and wants redoing once
+  post-cutoff days accumulate. ③ Expect the readiness line to **step down** — 36 of 62 days stored
+  `ok` at 72 and an unanswered day is now 50. That is the correction, not a regression.
+- **Branch:** `fix/tn50-checkin-not-inferred-from-readiness`
 
 ### [body][nutrition] TN-48 — the body-composition suite is collected daily, interpreted nowhere, and the one reading that frightens is the one the app can already defuse 🔴 LIVE
 

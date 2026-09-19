@@ -32,14 +32,6 @@ const ENERGY_OPTIONS: { value: EnergyLevel; emoji: string; label: string }[] = [
   { value: "pumped",  emoji: "⚡", label: "Pumped" },
 ]
 
-function readinessToEnergy(score: number | null | undefined): EnergyLevel {
-  if (score == null) return "ok"
-  if (score >= 80) return "good"
-  if (score >= 60) return "ok"
-  if (score >= 40) return "low"
-  return "drained"
-}
-
 // Issues that are neither muscle soreness nor an energy level — both of those now have their
 // own section, so "Heavy Legs" (soreness) and "Low Motivation" (energy) were removed here as
 // duplicate ways to say the same thing (owner call 2026-07-29). The BodyState union keeps them
@@ -56,7 +48,9 @@ interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   userId?: string
-  readiness?: number | null        // Oura readiness score — sets energy default
+  /** Shown beside the picker for context. It must NEVER set the default again (TN-50): doing so
+   *  made 10% of readiness a re-reading of readiness. */
+  readiness?: number | null
   sessionName?: string
   sessionMuscles?: string[]
   /** Per-exercise main/secondary muscle assignments for today's session (Q-115-followup) — lets
@@ -83,7 +77,15 @@ export function MoodCheckInSheet({
   onOptimisticSave, initialLog,
   sessionId, sessionBudgetMin,
 }: Props) {
-  const [energy, setEnergy]           = useState<EnergyLevel>(() => readinessToEnergy(readiness))
+  // TN-50. Starts UNSET, and nothing may seed it. This used to open on
+  // `readinessToEnergy(readiness)`, which closed a loop inside a single day: readiness set the
+  // default, the default went unchanged, and the check-in then scored 10% of that same readiness.
+  // Measured over 62 days, the saved level was exactly what the auto-fill would have picked on 45
+  // of them (73%, against ~20-25% by chance), so most of the contributor was a re-reading of the
+  // score it feeds. Seeding a FIXED level instead would not fix it — the value would still be one
+  // the lifter did not choose, and the column would stay impossible to read. Unanswered now means
+  // no log, which `checkinScoreFromEnergy(null)` already scores as the documented NEUTRAL 50.
+  const [energy, setEnergy]           = useState<EnergyLevel | null>(null)
   const [soreMuscles, setSoreMuscles] = useState<string[]>([])
   const [issues, setIssues]           = useState<BodyState[]>([])
   const [saving, setSaving]           = useState(false)
@@ -174,7 +176,7 @@ export function MoodCheckInSheet({
       setIssues(filteredIssues)
       setIssuesOpen(filteredIssues.length > 0)
     } else {
-      setEnergy(readinessToEnergy(readiness))
+      setEnergy(null)
       // A fresh check-in starts from the suggestions — but this effect must NOT be what seeds them
       // (Q-226). It has no `suggested` dependency, so it closed over whatever that state was left at
       // by the *previous* time the sheet was open: this sheet is rendered unconditionally with `open`
@@ -189,9 +191,10 @@ export function MoodCheckInSheet({
       setIssues([])
       setIssuesOpen(false)
     }
-    // `readiness` is deliberately absent: energy resets from it on open, and re-running mid-open
-    // would overwrite a level the lifter had just changed.
-  }, [initialLog, open]) // eslint-disable-line react-hooks/exhaustive-deps
+    // The dep list is now complete, and that is the tell: this effect used to read `readiness` and
+    // needed an exhaustive-deps suppression to keep it out. Energy resets to UNSET on open, so
+    // nothing is omitted any more and the directive is gone (TN-50).
+  }, [initialLog, open])
 
   // Suggestions can land after the sheet opens (cache miss → network). Only ever ADD them to an
   // untouched fresh check-in; never re-add a muscle the lifter has already deselected.
@@ -219,6 +222,11 @@ export function MoodCheckInSheet({
   const sickSelected = issues.includes('sick')
 
   async function handleSave() {
+    // `MoodLog.energyLevel` is non-nullable, so "unanswered" cannot be a stored value — it is the
+    // ABSENCE of a log, which already scores NEUTRAL 50. The button below is disabled until a level
+    // is picked; this guard is what lets TypeScript narrow, and what stops a programmatic call
+    // writing a level nobody chose.
+    if (energy === null) return
     setSaving(true)
     try {
       const date = todayInTz(tz)
@@ -465,7 +473,7 @@ export function MoodCheckInSheet({
           <button
             type="button"
             onClick={handleSave}
-            disabled={saving}
+            disabled={saving || energy === null}
             className="w-full rounded-xl py-3.5 text-sm font-bold transition hover:opacity-90 active:scale-95 disabled:opacity-50"
             style={{ background: "var(--color-brand)", color: "var(--brand-foreground)" }}
           >

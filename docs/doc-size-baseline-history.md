@@ -13906,9 +13906,28 @@ its lines because the trap has now fired four times (LB-116, TN-3b, TN-25, OR-11
 afternoon, by the same author, on the same day the baton warned about it, once inside backticks
 while quoting another warning's name. Knowing the rule is not enough to follow it, which is the
 argument for the one-clause code fix over more prose.
+
+## 2026-09-19 — backlog 24045 → 23983 (ratchet down, TN-50); projectOverview 11910 → 11921
+
+**Backlog −62.** TN-50's items 1 and 2 shipped and item 3 was discharged, so 93 lines of measurement
+and argument come down to 31 of residue. What survives is the part a future session cannot re-derive:
+that the entry's two instructions — *"default to neutral"* and *"contribute the documented NEUTRAL
+50"* — **could not both be met by any default**, because the middle option `ok` scores 72, the only
+level scoring 50 is `low` (unusable as a daily pre-selection), and `MoodLog.energyLevel` is
+non-nullable in `packages/shared`. Pre-selecting nothing is what satisfies both. Kept, not struck:
+the S25 check on a daily native surface, Tuning's re-measure of TN-47's 6.5% `checkin` figure (fitted
+against auto-filled days), and the warning that the readiness line will step down.
+
+**projectOverview +11.** One status paragraph, and it is the kind that earns its lines: it states the
+expected *downward* step in a visible number before the owner sees it, names the one-line revert if
+the extra daily tap is unwelcome, and points at the dated cutoff in the readiness pillar index rather
+than restating it. The measurement paragraph Lane A wrote the day before stays — it is the evidence
+this one rests on.
 ---
 
-## 2026-09-11 — `docs/implementation-backlog.md` → 24020 (RV-42 shipped)
+---
+
+## 2026-09-11 — `docs/implementation-backlog.md` → 23958 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 
@@ -13929,9 +13948,9 @@ reading of a moving number, and a PR that waits will re-read it once per merge t
 Recomputed by `pnpm fix:baselines` after each merge, which is the only thing that makes the
 subtraction mean anything.
 
-**Recomputed again 2026-09-18/19** (→ 24020 — eight times across that day and the next, as a journal
+**Recomputed again 2026-09-18/19** (→ 23958 — ten times across that day and the next, as a journal
 fold and six other merges each moved the file), and the rewrite count derived the same way the note
-defines it — first-parent commits on this branch touching this file — last read **60**, on
+defines it — first-parent commits on this branch touching this file — last read **61**, on
 2026-09-19 before that pass's merge. **⚠ It must be measured BEFORE merging `origin/main` in, and
 this pass proved why:** measured afterwards, `git merge-base origin/main HEAD` is the merge you just
 made, so the span is empty and the command returns **0**. Walking the whole branch instead returns
