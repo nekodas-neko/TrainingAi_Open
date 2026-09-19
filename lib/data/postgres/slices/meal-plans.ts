@@ -5,8 +5,16 @@
 // prove ownership — and for meals that join is TWO levels deep. That extra level is exactly where
 // the check gets skipped, so every write in this file goes through `assertPlanOwned` or a
 // user-scoped predicate; none of them trust an id from the request.
+//
+// That paragraph was true of the PLAN id and false of the ids a meal POINTS AT (RV-42). A meal
+// carries `meal_type_id` and `saved_meal_id`, both client-supplied, both reaching tables whose FK
+// proves only that the row exists. Three write paths took them straight from the request, so one
+// account could point its plan at another's rows — and since both columns are ON DELETE SET NULL,
+// the owner deleting their own saved meal silently nulled a stranger's plan meal. Every path now
+// goes through `assertOwnedMealRefs`.
 
 import { eq, and, asc, desc, inArray, isNull, sql } from 'drizzle-orm'
+import { UserFacingError } from '@trainingai/shared/errors'
 import type { getDb } from '../client'
 import * as s from '../schema'
 import type {
@@ -111,6 +119,39 @@ async function ownedPlan(db: Db, planId: string, userId: string) {
 }
 
 /** The plan id owning a variant, or null when the variant is missing or owned by someone else. */
+/**
+ * Ownership-verify the ids a plan meal POINTS AT. `meal_plan_meals` has no `user_id`, and its FKs
+ * prove only that the meal type and saved meal exist — not whose they are. Same check, and the same
+ * reason, as `writeSavedMeal`'s (CLAUDE.md, write-path ownership discipline (c)).
+ *
+ * Takes `Pick<Db, 'select'>` so the three callers can pass either the pool or an open transaction —
+ * two of them must run this inside the transaction that does the insert.
+ */
+async function assertOwnedMealRefs(
+  db: Pick<Db, 'select'>, userId: string,
+  refs: { mealTypeId?: string | null; savedMealId?: string | null }[],
+): Promise<void> {
+  const mealTypeIds = [...new Set(refs.map(r => r.mealTypeId).filter((v): v is string => !!v))]
+  const savedMealIds = [...new Set(refs.map(r => r.savedMealId).filter((v): v is string => !!v))]
+
+  if (mealTypeIds.length > 0) {
+    // Soft-deleted types are excluded, matching writeSavedMeal — a deleted type is not one the user
+    // can still choose. `saved_meals` has no `deleted_at`, so its check below has no such clause.
+    const owned = await db.select({ id: s.mealTypes.id }).from(s.mealTypes)
+      .where(and(
+        eq(s.mealTypes.userId, userId), inArray(s.mealTypes.id, mealTypeIds),
+        isNull(s.mealTypes.deletedAt),
+      ))
+    if (owned.length !== mealTypeIds.length) throw new UserFacingError('Unknown meal type')
+  }
+
+  if (savedMealIds.length > 0) {
+    const owned = await db.select({ id: s.savedMeals.id }).from(s.savedMeals)
+      .where(and(eq(s.savedMeals.userId, userId), inArray(s.savedMeals.id, savedMealIds)))
+    if (owned.length !== savedMealIds.length) throw new UserFacingError('Unknown saved meal')
+  }
+}
+
 async function ownedVariantPlanId(db: Db, variantId: string, userId: string): Promise<string | null> {
   const [row] = await db.select({ planId: s.mealPlanVariants.mealPlanId })
     .from(s.mealPlanVariants)
@@ -190,6 +231,9 @@ export async function getActiveMealPlan(db: Db, userId: string): Promise<MealPla
 
 export async function createMealPlan(db: Db, userId: string, input: CreateMealPlanInput): Promise<MealPlan> {
   const planId = await db.transaction(async tx => {
+    // RV-42. Inside the transaction and before the first insert, so a refusal writes nothing.
+    await assertOwnedMealRefs(tx, userId, input.variants.flatMap(v => v.meals))
+
     // The partial unique index makes two active plans impossible; clearing the old one inside the
     // same transaction is what stops that index turning a normal activation into an error.
     if (input.activate) {
@@ -342,6 +386,10 @@ export async function updateMealPlanMeal(
   if (!existing) return null
   if (!(await ownedVariantPlanId(db, existing.variantId, userId))) return null
 
+  // RV-42. Only what the caller actually sent: `undefined` means "not mentioned", and an explicit
+  // `null` clears the reference, which needs no ownership check.
+  await assertOwnedMealRefs(db, userId, [{ mealTypeId: input.mealTypeId, savedMealId: input.savedMealId }])
+
   const set: Record<string, unknown> = {}
   if (input.name !== undefined) set.name = input.name
   if (input.notes !== undefined) set.notes = input.notes
@@ -392,6 +440,9 @@ export async function replaceMealPlanStructure(
   if (!owned) return null
 
   await db.transaction(async tx => {
+    // RV-42. Before the delete below, so a refused request does not destroy the existing structure.
+    await assertOwnedMealRefs(tx, userId, input.variants.flatMap(v => v.meals))
+
     await tx.update(s.mealPlans).set({
       mealsPerDay: input.mealsPerDay,
       trainingTime: input.trainingTime,

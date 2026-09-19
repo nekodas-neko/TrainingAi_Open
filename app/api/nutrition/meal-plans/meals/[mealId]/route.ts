@@ -5,7 +5,7 @@ import { getRepository } from '@/lib/data'
 import { NutritionIngredientsSchema } from '@trainingai/shared/validators/nutrition-ingredient'
 import { scaleWithTopUp } from '@/lib/nutrition/meal-top-up'
 import type { NutritionIngredient } from '@trainingai/shared/types/nutrition'
-import { invalidBodyResponse, invalidUuidResponse } from '@/lib/api/route-errors'
+import { invalidBodyResponse, invalidUuidResponse, routeErrorResponse } from '@/lib/api/route-errors'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 
 // One meal with its ingredient snapshot.
@@ -80,7 +80,14 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ mealId
     )
   }
 
-  const meal = await repo.updateMealPlanMeal(mealId, userId, input)
+  // RV-42's ownership refusal is a UserFacingError, which without this mapper reaches Next's
+  // default handler as a 500 and lands in error_events.
+  let meal
+  try {
+    meal = await repo.updateMealPlanMeal(mealId, userId, input)
+  } catch (err) {
+    return routeErrorResponse(err)
+  }
   if (!meal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   return NextResponse.json(meal)
 }
