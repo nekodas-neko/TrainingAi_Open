@@ -18,6 +18,23 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-19 — backlog → 24042, `projectOverview.md` → 11910 (TN-50 re-laned and sharpened)
+
+**Backlog +25 on someone else's entry, with no code.** Three additions, and the ordering is the
+point: the re-verification first (its central number reproduces — 45 of 62 — which an entry whose
+first draft was wrong has to earn rather than assume), then the +22 sharpening, then the re-lane.
+
+The sharpening is the line that will matter later. `ok` scores 72 against a NEUTRAL of 50, so
+"default to neutral" *lowers* the contributor on most days. Without that written down, the readiness
+line stepping down after the fix reads as a regression rather than the intended effect.
+
+Item 3's recommendation is deliberately NOT a decision. It is Tuning's entry, and the argument
+against the storage flag — that it can only label rows written after item 1 removes the ambiguity —
+is strong enough to record and weak enough to be wrong if the implementer knows something I do not.
+
+---
+
+
 ## 2026-09-18 — backlog → 24017, `docs/agents/state/tuning.md` → 685 (TN-50 + two method traps)
 
 **+88 and +21.** TN-50 went through two drafts in one sitting and the entry carries both, because
@@ -99,7 +116,7 @@ widening rather than rewriting, and `keep.js`'s own comments argue the opposite 
 enough that a future session will re-open it. Without the count it would have to re-measure.
 ---
 
-## 2026-09-18 — backlog → 24000, `projectOverview.md` → 11910 (RV-61 shipped)
+## 2026-09-18 — backlog → 24025, `projectOverview.md` → 11920 (RV-61 shipped)
 
 **Backlog −17** for one small entry. The overview paragraph is longer than the diff because two of
 the three things worth remembering are **refusals**: the check calls a fifteen-query function on

@@ -67,6 +67,16 @@ days later it was offered as next-up and re-derived, because prose cannot reach 
 fields; its Lever 2 needs a quiet window and a structural decision, both the owner's. Lane A's READY
 list went **12 → 9**.
 
+**TN-50 re-laned to B, and the check-in auto-fill is a +22 bias rather than a neutral one
+(2026-09-19).** Its central number re-verified independently against production — **62 days, 45
+matching the auto-fill, `pumped` 0** — so the entry is sound. The sharpening: `CHECKIN_ENERGY_SCORE.ok`
+is **72** against a documented `NEUTRAL` of **50**, and `readinessToEnergy(null)` returns `ok`, so a
+saved-but-unanswered check-in contributes **+22 above neutral** on the 36 of 62 days that stored `ok`
+— "default to neutral" will visibly *lower* the readiness line, not leave it flat. It also has **no
+Lane A engine half**: both seed sites are in one Lane B file and the entry forbids re-mapping the
+scores. Item 3's storage flag is recommended as a **documented cutoff** instead — a flag can only
+label rows written after item 1 removes the ambiguity, and never the history that actually needs it.
+
 **LA-110: two candidates tested and refuted, mechanism named, cause still open (2026-09-18).** A
 **baseline block** would produce the exact fingerprint — `isBaselinePhase` forces `aiPrescription` to
 null and an AMRAP baseline is one set with no pct — but every `session_periodization` row reads
