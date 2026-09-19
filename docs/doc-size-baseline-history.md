@@ -13997,3 +13997,14 @@ intensities are not computed on that path today.
 BF-181's table is the sweep that was run BEFORE filing, and it changed the entry from a one-row data
 fix into a missing write-time constraint. Filing the narrow version would have shipped a fix for one
 exercise and left a leg session with no programming.
+
+## 2026-09-20 (second) — `docs/implementation-backlog.md` → 24361
+
+**BF-182** — warm the next prescription when Home renders, rather than at completion (which the
+owner asked for and which he himself rejected on 2026-07-31) or at tab-open (which is where the
+latency he is complaining about lives).
+
+The quoted `complete-workout` comment is the entry's most important line: without it an
+implementer reads a direct owner request and builds the thing that was deliberately not built,
+with no way to know. The input-versus-filter distinction earns its space for the same reason — the
+proposal only sounds free if you think duration and deload are applied after generation.
