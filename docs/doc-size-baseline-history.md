@@ -13947,13 +13947,33 @@ entry did not name (the delete), that the control run printed `kcal left went 18
 fix removed — the owner's report reproduced exactly — and that **two further `energy-balance:`
 readers were seen and deliberately not swept**, recorded rather than left as an implied clean sweep.
 
----
+## 2026-09-19 — BF-100's cause moved from hypothesis to measurement
+
+`docs/implementation-backlog.md` **24015 → 24063** and `projectOverview.md` **11921 → 11917**
+(`fix/bf100-touch-cancels-pending-restore`).
+
+The backlog grew by 48 lines, all of it inside BF-100, and the growth is the point: the entry had
+carried a *candidate* cause for five days, plus a probe whose null result the entry itself warned
+must not be read as a refutation. What replaces that is measurement — the 182 ms window between the
+takeover listeners attaching and the restore landing, the reproduction
+(`restored to 0 against a reachable 1019`), and the reason the earlier probe could never have worked
+(`page.goBack()` does not resolve until after the restore, so the window is unreachable from the test
+side at all). A later session that re-derives any of those pays for them twice; this entry has
+already been mis-read twice, which is what the lines are buying against.
+
+`projectOverview.md` went **down** by four. Its BF-100 block held three stale claims — that the entry
+*"now prints READY"*, that *"the fix is deliberately not built"*, and that
+`scroll-restoration.spec.ts` still asserts an exact offset (fixed 2026-09-17). Replacing all three
+with the current state came out shorter than the speculation it retired, which is the usual direction
+when a question stops being open.
 
 ---
 
 ---
 
-## 2026-09-11 — `docs/implementation-backlog.md` → 23990 (RV-42 shipped)
+---
+
+## 2026-09-11 — `docs/implementation-backlog.md` → 24038 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 
@@ -14027,6 +14047,8 @@ count is quoted, per the paragraph above: the clone was deepened again this morn
 histories for this very merge, which is exactly the operation that moved the last three derivations.
 The figure is `pnpm fix:baselines` on the merged tree and nothing else.
 
-**Recomputed again 2026-09-19** (→ 23990), after #1323 (BF-177) landed — one commit on `main`, and
-the backlog still moved 32 lines, because that PR removed the entry it finished. Ninth day waiting on
-the owner decision. No rewrite count, per the paragraph above.
+**Recomputed again 2026-09-19** (→ 24038, via 23990 an hour earlier), after #1323 (BF-177), then
+#1324 and #1325 landed — three commits on `main` inside ninety minutes, and the backlog moved twice
+in opposite directions: −32 when BF-177 removed the entry it finished, +48 when BF-100's entry
+absorbed its measurement. Ninth day waiting on the owner decision. No rewrite count, per the
+paragraph above.

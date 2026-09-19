@@ -7394,8 +7394,56 @@ feature and not a deletion like LB-41:
 
 - **Lane:** B — `lib/hooks/use-scroll-restoration.ts` and `components/pull-to-sync.tsx` — reached only from `components/**`, and it stores nothing. (Assigned 2026-09-15, OR-116 lane sweep.)
 
-- **❌ FAILED ON THE S25 TWICE — most recently 2026-09-13.** Owner: *"Checked on more - and still
-  doesnt work"*. **This is buildable work, not a pending check**, and the `Keep:`/`Verify: device`
+- **Verify:** device
+- **Keep:** the S25 pass, and it is the whole of what is left *if the fix holds*. Press back from a
+  scrolled `/more` onto *Profile details* and back again, and read whether the offset returns.
+  **If it still lands at the top, this is buildable work again** — say so plainly rather than
+  re-filing it as a check, because that mis-filing is what hid this entry for a day once already.
+  **The one-tap experiment survives as the fallback and is still the thing that settles causation:**
+  come back from *Profile details* with a **UI back control** instead of the gesture. If that
+  restores while the gesture does not, the cause is elsewhere in the gesture path.
+
+- **⚑ THE `touchstart` CANDIDATE IS NOW CONFIRMED AS A REAL, REPRODUCIBLE MECHANISM, AND FIXED —
+  2026-09-19, `fix/bf100-touch-cancels-pending-restore`.** It was a source reading before this; it is
+  a measurement now.
+  **What was measured.** Instrumenting `addEventListener` and `sessionStorage` on a live `/more`
+  back-navigation: the takeover listeners attach at 15681 ms and the restore lands at 15863 ms — a
+  **182 ms window in which `done` is false and the listeners are live.** The window is real and
+  non-empty, which nothing had established before.
+  **Why the 2026-09-15 probe came back null, settled.** Not the element and not the dispatch site —
+  `page.goBack()` does not resolve until *after* the mount and the restore, so any touch dispatched
+  after it is on the wrong side of the window by construction. Arming the dispatcher *before*
+  `goBack()` does not help either: the container only matches a selector once it has mounted, which
+  is the same instant the restore lands. **The 182 ms window cannot be hit from the test side at
+  all** — that is a limit of the instrument, and reading the null result as evidence against the
+  hypothesis would have been wrong.
+  **What made it testable.** Seeding an offset the container can never reach widens the pending
+  window from 182 ms to the whole of `RESTORE_WINDOW_MS`, because `attempt()` never lands and the
+  restore stays pending until the timer fires at `min(target, gap)`. The touch then places trivially.
+  Against the unfixed hook that reproduces the cancellation outright:
+  `restored to 0 against a reachable 1019`.
+  **The fix** is the takeover event, `touchstart` → **`touchmove`**, via a single `TAKEOVER_EVENTS`
+  constant so the add and remove lists cannot drift apart. `stop` latches `done = true` and clears
+  the timer with **no re-arm**, so whichever event is listed abandons a pending restore permanently —
+  and a finger going down has scrolled nothing. Trap (4) is intact: takeover is still an **input
+  event**, not a scroll delta. `e2e/bf100-touch-does-not-cancel-pending-restore.spec.ts` pins both
+  directions and **both arms were proven red against the pre-fix hook** — `touchstart` cancelled when
+  it should not have, and `touchmove` was not listened for so it failed to cancel when it should.
+  All three existing `scroll-restoration.spec.ts` cases stay green.
+  **⚠ This is NOT confirmed as the S25 symptom, and must not be read as one.** The harness fires no
+  touch on a back navigation, so it cannot say whether the S25's gesture delivers one into that
+  window — only the device can. What is now established is that *if* it does, this was fatal, and it
+  no longer is.
+  **Why `Verify: device` is the right field here when it was the wrong one before.** Until
+  2026-09-14 this entry carried a check while the check had **already been taken and failed** with
+  nothing new since — work filed as *"nothing is blocked"*. The device has never seen this change,
+  so the field now says what it means. The `Keep:` above states the reversal condition outright so a
+  second failure cannot hide behind it again.
+
+- **❌ FAILED ON THE S25 TWICE — most recently 2026-09-13** (both *before* the 2026-09-19 fix above;
+  neither pass saw it). Owner: *"Checked on more - and still
+  doesnt work"*. **This was buildable work rather than a pending check, and stayed so until
+  2026-09-19**, and the `Keep:`/`Verify: device`
   this entry carried until 2026-09-14 said the opposite — it printed under *"shipped; a look is owed,
   nothing is blocked"* while the look had already been taken and failed. That is the trap the
   `Verify:` field's own documentation names (OR-105), and it hid this for a day.
