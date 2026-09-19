@@ -854,9 +854,21 @@ scoring. The same machinery answers "what did X do to me" for anything logged.
 transient, spanning a dose change, is the worst possible calibration sample. It is evidence about
 the system's blindness, not about where `ILLNESS_WATCH_SCORE` or the readiness weights belong.
 
-**⚠ Not a scoring matter, and the dose framing is corrected above.** A resting HR ~+13 bpm and HRV
-down roughly two thirds at **1 mg**, with titration presumably continuing, is worth mentioning to
-whoever prescribes and monitors this — the more so because the dose is low. This entry records what
+**⚠ CORRECTED 2026-09-20 — the magnitudes below were SINGLE-DAY EXTREMES, not the sustained shift,
+and this agent repeated them several times.** *"Resting HR +13 bpm, HRV down two thirds"* described
+2026-09-16/17 alone. Measured as window means instead — 28 pre-dose nights (Aug 10 → Sep 06) against
+14 on the drug (Sep 07 → 20):
+
+| | pre-dose | on reta | change |
+|---|---:|---:|---|
+| resting HR | 52.3 | 56.2 | **+3.9 bpm** |
+| HRV | 58.8 ms | 44.6 ms | **−14.2 ms (−24%)** |
+
+The 65 bpm and 19 ms readings were a two-day excursion that has since returned to 54–57 and 45–47.
+**The real sustained change is about a quarter of what was reported.** It is still a genuine shift —
++3.9 bpm is 1.2× this owner's own pre-drug nightly sd of 3.15 bpm — but "down two thirds" was wrong.
+**A +3.9 bpm / −24% shift at 1 mg remains worth mentioning to whoever prescribes and monitors this,
+stated at that size and not the inflated one.** Nothing here is medical advice. This entry records what
 is in the app; it is not medical advice and nothing here is a clinical judgement.
 
 **Pass test:** the pre-intervention baseline is still recoverable after 60 nights, a flagged day
@@ -2999,9 +3011,10 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
 - **What the window is FOR, stated now so it is not re-derived later.** Two questions, and the second
   is the one that matters this week: **(a)** does `rmssdFromRr` over the strap's intervals agree with
   the ring's own figure, which is what this entry proposes to replace; and **(b)** *is the ring
-  telling the truth right now* — the owner's nightly HRV has fallen **62 → 19 ms** over two weeks
-  with resting HR up ~9 bpm (see TN-45), and nothing in the app can currently separate real
-  physiology from sensor drift. A second instrument is the only thing that can. **Design the
+  telling the truth right now* — the owner's nightly HRV has fallen from a pre-dose mean of
+  **58.8 ms to 44.6 ms (−24%)** with resting HR up **+3.9 bpm** (window means, corrected 2026-09-20;
+  the single-night 19 ms and +13 bpm figures this once quoted were a two-day excursion), and nothing
+  in the app can currently separate real physiology from sensor drift. A second instrument is the only thing that can. **Design the
   comparison per-night and paired**, not as two averages: a mean over a window where one device is
   drifting hides exactly the thing being looked for.
 - **Added:** 2026-09-14 (one-off session; owner asked directly whether any Oura-computed value could
@@ -12343,6 +12356,83 @@ behaviour, and TN-6's own pass test (deviation mean within ±0.05 °C of zero) i
   re-derivation lifts it with **no deploy**. Thresholds untouched.
 - **Keep:** a **suppression, not a fix** — TN-6 retires it (its ±0.05 °C pass test is what does), and
   nothing was observed in production.
+### [readiness][heart-rate][body] TN-52 — thresholds are set in bpm and fixed fractions, so they break when the user changes; define them in units of the user's own variability instead 🔴 LIVE
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-20 · owner: *"How can we make the tuning dynamic so
+  it works on reta and off reta?"*
+- **Lane: A** — `packages/shared/src/health/*`. A convention plus a check, then per-threshold work.
+- **Reference: TN-2, TN-47, Q-506, TN-46.** This is the shape those four share; it is filed so the
+  fifth instance is recognised instead of re-investigated.
+- **No gate** for the convention and the check. Each individual threshold it re-derives is a separate
+  `Gate: owner` calibration, because each re-scores history.
+
+**The question behind this entry is the right one and the obvious answer is wrong.** "Detect the
+medication and switch constants" needs a flag, needs the app to know the drug, generalises to nothing,
+and would not have caught the four instances below — none of which involved a medication when they
+broke.
+
+**⚠ The premise has to be corrected first: the owner's physiology moved much LESS than this agent
+reported.** Window means, 28 pre-dose nights against 14 on the drug: resting HR **52.3 → 56.2
+(+3.9 bpm)**, HRV **58.8 → 44.6 ms (−24%)**. The *"+13 bpm, HRV down two thirds"* figures repeated
+earlier were 2026-09-16/17 alone.
+
+**So the app is not fragile because the owner changed a lot. It is fragile because the windows are
+narrower than his ordinary night-to-night noise.** Measured over 59 pre-drug nights:
+
+| | |
+|---|---|
+| his nightly resting-HR standard deviation | **3.15 bpm** |
+| his mean night-to-night change | **2.40 bpm** |
+| Body Battery's charge window (5% of reserve) | **~6 bpm = 1.9 sd** |
+| the sustained shift on Retatrutide | **+3.9 bpm = 1.2 sd** |
+
+**A 1.2 sd shift closed a 1.9 sd window.** It did not need to be a big shift. Any of illness, a week
+of poor sleep, detraining, altitude or alcohol would have done the same — which is why "on reta / off
+reta" is the wrong axis to build on.
+
+**The same shape, four times, three of them with no medication involved:**
+
+| entry | the threshold | how it failed |
+|---|---|---|
+| **TN-2** | charge below `restingHr + 0.05 × reserve` | window ~6 bpm; closed when resting HR *fell* |
+| **Q-506** | `FEVER_TEMP_Z ≥ 2.5` on a baseline dev 17× too wide | unreachable; 40% of the radar's weight inert |
+| **TN-47** | contributors rail at `±1.5σ` on a MAD-based z | HRV reads 0 or 100 on 46% of days |
+| **TN-46** | `checkin` seeded from readiness | circular, and biased +22 vs neutral |
+
+**The proposal — three rules, in the order they pay off.**
+
+1. **Define a threshold as a QUANTILE of the quantity it gates, not as an offset or a fraction of a
+   reserve.** *"Charge below your own 10th-percentile waking HR over the trailing 28 days"* **cannot
+   close**, by construction — 10% of waking time is always below it. It follows the owner on and off
+   any drug with no flag, no drug knowledge, and **no fit**. For TN-2 specifically this is the
+   durable form of its accepted direction *and* it removes the fitted offset — which is what TN-2 is
+   currently blocked on, since the fit needs the daytime-stress constants that do not exist outside
+   the Railway runtime. **A quantile needs no bracket, no replay and no owner sign-off on a number.**
+2. **Size every window in units of the user's own sd, and refuse to ship one narrower than ~2 sd.**
+   A threshold whose window is narrower than the noise of the signal it gates will flicker or close;
+   that is arithmetic, not judgement. Cheap to check and it would have caught all four rows above.
+   **This is the rule worth writing down even if nothing else here is built.**
+3. **Detect REGIME CHANGES, not medications.** A changepoint on the baseline series is general —
+   illness, altitude, detraining, alcohol, a new drug. On a confirmed step change: annotate the
+   period (TN-46's decision), keep the pre-change reference for reporting (already on disk per night,
+   per Lane A's TN-46 correction), and consider letting the EMA adapt faster. **The medication table
+   then labels a regime rather than driving any maths** — which is the difference between a feature
+   that works for one drug and one that works for whatever happens next.
+
+**⚠ Do NOT convert every constant to a quantile.** Some thresholds are deliberately absolute and must
+stay: max HR from a maximal test (TN-30), a fever temperature, anything anchored to an external
+clinical meaning. A quantile of the user's own distribution cannot express "this is abnormal for a
+human" — only "this is unusual for you". **Each conversion is its own decision; this entry supplies
+the rule for telling them apart, not a licence to sweep.**
+
+**⚠ Do NOT fit anything against the current window.** The owner is 14 days into a titration and
+waking rest is still moving. Fit against 2026-06-30 → 2026-09-06 and validate forward.
+
+**Pass test:** no shipped threshold gates a signal with a window narrower than ~2× that signal's own
+measured sd for this user, and the Body Battery's charge window is non-empty across both the pre-dose
+and on-drug periods without either being refitted.
+
+
 ### [readiness][heart-rate] TN-2 — the Body Battery charge window has closed, so the tank only drains
 - **Lane:** A — engine only: packages/shared, app/api.
 

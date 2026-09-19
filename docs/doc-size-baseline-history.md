@@ -18,6 +18,19 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-20 — backlog → 24153 (TN-52, and a correction to the owner's own numbers)
+
+**+111 on a 24042 base.** The owner asked how to make the tuning work on and off the medication.
+Answering it required correcting the premise first: this agent had repeated *"resting HR +13 bpm, HRV
+down two thirds"* from a two-day excursion, where the window means are **+3.9 bpm** and **−24%**. That
+correction is what makes the entry useful — the app is not fragile because he changed a lot, it is
+fragile because its windows are narrower than his ordinary night-to-night noise (a ~6 bpm charge
+window against a 3.15 bpm nightly sd). So the axis is not "on reta / off reta" but "define thresholds
+in units of the user's own variability", and the same shape has now appeared four times, three of them
+with no drug involved. TN-46's medical aside is restated at the corrected size.
+
+---
+
 ## 2026-09-19 — backlog → 24042, `projectOverview.md` → 11910 (TN-50 re-laned and sharpened)
 
 **Backlog +25 on someone else's entry, with no code.** Three additions, and the ordering is the
