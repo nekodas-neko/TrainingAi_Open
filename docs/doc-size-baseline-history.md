@@ -98,7 +98,7 @@ history files are dated) rather than with the sweep, because the sweep is a chor
 measurement is the thing a future reader would otherwise re-derive before daring to run it.
 ---
 
-## 2026-09-18 — backlog → 24015, `projectOverview.md` → 11931 (Q-1a server half)
+## 2026-09-18 — backlog → 24079, `projectOverview.md` → 11931 (Q-1a server half)
 
 **Backlog +32 and nothing removed**, which is the honest shape for a partial: Q-1a stays queued
 because most of its scope — the client — has not shipped, and the entry now carries what DID ship, the
@@ -13938,3 +13938,14 @@ expected *downward* step in a visible number before the owner sees it, names the
 the extra daily tap is unwelcome, and points at the dated cutoff in the readiness pillar index rather
 than restating it. The measurement paragraph Lane A wrote the day before stays — it is the evidence
 this one rests on.
+
+## 2026-09-19 — `docs/implementation-backlog.md` → 24047
+
+**BF-177** — "kcal left" renders the server's subtraction against a pre-log intake, so it holds still
+while the ring beside it moves.
+
+The lines worth defending are the two that argue *against* the obvious fix. The owner proposed a
+cache bust and it is already implemented, so the entry has to say that first or the fix gets written
+twice. And deriving `remaining` client-side is a genuine trap: it shares `deviationKcal` with the
+zone label, colour and bar, so the one-liner would leave the number live and the verdict stale.
+Both are cheaper to write down once than to discover in review.
