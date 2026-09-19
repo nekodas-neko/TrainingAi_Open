@@ -52,6 +52,21 @@ lets the next session repeat the how.
 
 ---
 
+## 2026-09-19 — backlog → 24045, `docs/agents/state/tuning.md` → 705 (TN-49's lesson, TN-48 unparked)
+
+**+28 and +20.** TN-49 was a false finding: the recomputation dropped an absent contributor's weight
+from a sum defined to total 1.00, so the seven rows "contradicting" their own breakdown were the seven
+storing eight keys instead of nine. Lane A caught it before any data write and fixed the same defect
+in `rederiveReadinessFromStored`. The baton's Method section grows to three traps, because the two
+already there do not cover it — the shipped function had the same bug, so "replay it" was no defence;
+what catches this class is noticing that the disagreeing set has a structure.
+
+TN-48 also loses a `Needs:` it should never have carried. The entry called the dependency optional in
+its own prose and then put it in the hard-park field, which removed the entry Tuning had recommended
+doing first from Lane A's ready list.
+
+---
+
 ## 2026-09-18 — backlog → 23898, `projectOverview.md` → 11900 (LA-110: two refutations)
 
 **Backlog +33 for two NEGATIVE results and no fix**, which is the unusual trade and the one worth
@@ -13893,7 +13908,7 @@ while quoting another warning's name. Knowing the rule is not enough to follow i
 argument for the one-clause code fix over more prose.
 ---
 
-## 2026-09-11 — `docs/implementation-backlog.md` → 24017 (RV-42 shipped)
+## 2026-09-11 — `docs/implementation-backlog.md` → 24020 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 
@@ -13914,9 +13929,15 @@ reading of a moving number, and a PR that waits will re-read it once per merge t
 Recomputed by `pnpm fix:baselines` after each merge, which is the only thing that makes the
 subtraction mean anything.
 
-**Recomputed again 2026-09-18/19** (→ 24017 — seven times across that day and the next, as a journal
+**Recomputed again 2026-09-18/19** (→ 24020 — eight times across that day and the next, as a journal
 fold and six other merges each moved the file), and the rewrite count derived the same way the note
-defines it — first-parent commits on this branch touching this file — now reads **59**. The *merge*
+defines it — first-parent commits on this branch touching this file — last read **60**, on
+2026-09-19 before that pass's merge. **⚠ It must be measured BEFORE merging `origin/main` in, and
+this pass proved why:** measured afterwards, `git merge-base origin/main HEAD` is the merge you just
+made, so the span is empty and the command returns **0**. Walking the whole branch instead returns
+**449**, which counts every commit on `main` that touched the file. Neither is the figure this note
+means. So the rewrite count now has the same limit as the merge count below — derivable only at the
+right moment, and quietly wrong at any other. The *merge*
 count is deliberately NOT re-derived: `git merge-base` against `main` no longer finds the original
 branch point, because this branch has absorbed `main` dozens of times, so the figure it returns
 (21) answers a different question. Quoting it as "merges that overtook this PR" would be the same
