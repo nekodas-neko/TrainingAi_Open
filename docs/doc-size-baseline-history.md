@@ -18,6 +18,23 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-19 — backlog → 24042, `projectOverview.md` → 11910 (TN-50 re-laned and sharpened)
+
+**Backlog +25 on someone else's entry, with no code.** Three additions, and the ordering is the
+point: the re-verification first (its central number reproduces — 45 of 62 — which an entry whose
+first draft was wrong has to earn rather than assume), then the +22 sharpening, then the re-lane.
+
+The sharpening is the line that will matter later. `ok` scores 72 against a NEUTRAL of 50, so
+"default to neutral" *lowers* the contributor on most days. Without that written down, the readiness
+line stepping down after the fix reads as a regression rather than the intended effect.
+
+Item 3's recommendation is deliberately NOT a decision. It is Tuning's entry, and the argument
+against the storage flag — that it can only label rows written after item 1 removes the ambiguity —
+is strong enough to record and weak enough to be wrong if the implementer knows something I do not.
+
+---
+
+
 ## 2026-09-18 — backlog → 24017, `docs/agents/state/tuning.md` → 685 (TN-50 + two method traps)
 
 **+88 and +21.** TN-50 went through two drafts in one sitting and the entry carries both, because
@@ -13876,7 +13893,7 @@ while quoting another warning's name. Knowing the rule is not enough to follow i
 argument for the one-clause code fix over more prose.
 ---
 
-## 2026-09-11 — `docs/implementation-backlog.md` → 23992 (RV-42 shipped)
+## 2026-09-11 — `docs/implementation-backlog.md` → 24017 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 
@@ -13897,9 +13914,9 @@ reading of a moving number, and a PR that waits will re-read it once per merge t
 Recomputed by `pnpm fix:baselines` after each merge, which is the only thing that makes the
 subtraction mean anything.
 
-**Recomputed again 2026-09-18/19** (→ 23992 — six times across that day and the next, as a journal
-fold and five other merges each moved the file), and the rewrite count derived the same way the note
-defines it — first-parent commits on this branch touching this file — now reads **58**. The *merge*
+**Recomputed again 2026-09-18/19** (→ 24017 — seven times across that day and the next, as a journal
+fold and six other merges each moved the file), and the rewrite count derived the same way the note
+defines it — first-parent commits on this branch touching this file — now reads **59**. The *merge*
 count is deliberately NOT re-derived: `git merge-base` against `main` no longer finds the original
 branch point, because this branch has absorbed `main` dozens of times, so the figure it returns
 (21) answers a different question. Quoting it as "merges that overtook this PR" would be the same
