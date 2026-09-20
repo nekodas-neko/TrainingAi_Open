@@ -14247,11 +14247,12 @@ superseded reading visible rather than rewriting it away — the 45-logs-all-bre
 is simultaneously the evidence for the new model and the reason the old one failed, and deleting it
 would lose the argument.
 
-## 2026-09-20 — `docs/implementation-backlog.md` +356 (24804 → 25160) (Review sweep 51)
+## 2026-09-20 — `docs/implementation-backlog.md` +449 (24804 → 25253) (Review sweep 51)
 
-Sixteen entries (**RV-64…RV-79**) from the owner's efficiency review — logic-over-AI, caching and
+Twenty entries (**RV-64…RV-83**) from the owner's efficiency review — logic-over-AI, caching and
 saving speed, runtime efficiency, and animation/UI feel — at ~22 lines each, the ratio this file
-already carries.
+already carries. The last four arrived after the PR was open and were folded into it rather than
+split off, per the one-PR rule.
 
 Three entries are longer than their fix and deliberately so, because in each case the fix is not the
 hard part. **RV-65** could be stated in a line ("stop asking the model for numbers the guards

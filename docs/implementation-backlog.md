@@ -443,6 +443,99 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [readiness][platform] RV-80 — a date formatter is constructed once per heart-rate row, on a path warmed at every app launch
+
+- **Lane:** A — `packages/shared/src/health/hourly-movement.ts:47-50`. **Added:** 2026-09-20 ·
+  Review sweep 51.
+- **A two-line fix with the best measured win in the sweep.** `computeMovedHours` does
+  `for (const row of hrRows) { const local = new Intl.DateTimeFormat('en-CA', {…}).formatToParts(...) }`
+  — the constructor is **inside** the loop and its options are loop-invariant (`tz` is a function
+  input).
+- **Measured twice, independently.** Reproduced by the coordinator on a real day's volume (2,831
+  rows, 3 warm-ups): **228.8 ms construct-in-loop → 21.9 ms hoisted, 10.4×**. The lane measured
+  11.6–17.4× across 400/2,170/5,606 rows. Absolute ms on Railway will differ from this sandbox; the
+  ratio will not.
+- **The row counts are real, not hypothetical.** Production `oura_heartrate` per local day over the
+  last 10 days: **5,606 / 3,496 / 2,831 / 2,691** on training days (owner's rows).
+- **And it is hot:** called from `lib/health/readiness-payload.ts:402` (`/api/readiness-score`),
+  which `components/sync-provider.tsx:69` warms on **every app launch** at `READINESS_SCORE_TTL =
+  TTL_SHORT` (5 min) — so up to 12 recomputes an hour per active device.
+- **Fix:** hoist the formatter above the loop, or call `formatInTimeZone` like every sibling does.
+  **No behaviour change** — the options are already constant per call.
+- **Worth knowing, and it is what makes this one stand out:** `formatInTimeZone` called in a loop at
+  18 other sites benchmarks at ~11 µs per call, because `date-fns-tz` caches its formatter
+  internally. Those 18 sites are **not** worth changing. This site is ~7× worse than the repo's own
+  normal idiom purely because the constructor is not hoisted.
+- **Not established:** the real route was not run against a 5,606-row day, and
+  `score-audit/build-day-audit.ts:138` (the other caller) was not checked for being on a hot path.
+
+### [workouts][app-shell] RV-81 — the program editor renders the whole exercise catalogue once per exercise row, and rebuilds it on every keystroke
+
+- **Lane:** B — `components/config/program-editor-sheet.tsx:778-782`. **Added:** 2026-09-20 ·
+  Review sweep 51.
+- The `<datalist>` sits **inside** `sess.exercises.map((ex, ei) …)`, so there is one full copy of the
+  catalogue per exercise row, and its content is byte-identical for every row. It is the **only
+  `<datalist>` in the codebase**.
+- **Production scale: 25 active exercises × 156 library rows = 3,900 `<option>` elements**, against
+  156 if the list were shared.
+- **The multiplier is that it rebuilds while typing.** Editor state is lifted to the parent —
+  `selectExerciseName` (`:228`) calls `onProgramSessionsChange(...)` — so every keystroke in any
+  exercise-name input re-renders the sheet and recreates all 3,900 elements. There is no `useMemo`
+  and no memo boundary (the file imports only `useRef, useState`).
+- **Fix:** hoist one `<datalist id="ex-lib">` outside both maps, point every input's `list` at it,
+  and `useMemo` the options on `[exerciseLibrary]`. **`datalist` ids are document-global and the
+  content is identical per row, so a single shared list is exactly equivalent** — this is not a
+  behaviour trade.
+- **Not established — and it is why this is not higher in the queue.** Nothing here can drive a
+  Samsung WebView, so how many milliseconds of input lag this is worth is **unknown**. It is filed
+  as an element-count finding (3,900 → 156), not a measured latency one.
+- **⚠ Neither existing check covers this shape** — `check-memo-prop-stability.js` reports OK (93
+  memoised components, 0 defeated call sites) and `check-component-size.js` flags nothing. Do not
+  read a green gate as evidence against it.
+
+### [platform] RV-82 — two routes fetch the active program twice inside a single request
+
+- **Lane:** A — `app/api/next-session/prescription/route.ts:57`,
+  `app/api/progress-summary/route.ts:35,37`. **Added:** 2026-09-20 · Review sweep 51.
+- Both call `repo.getActiveProgram(userId)` in the same `Promise.all` as `getNextSession`, and
+  `getNextSession` calls `getActiveProgram` itself (`lib/data/postgres/adapter.ts:1730`).
+  `getActiveProgram` is a fixed **5-query composite** (programs → program_sessions + schedules →
+  session_exercises + schedule_days).
+- **Measured on the wire** (local dev Postgres, `log_statement='all'`, idle baseline 0 statements in
+  25 s): `/api/next-session/prescription` = **22 statements**, of which `programs`,
+  `program_sessions`, `schedules`, `schedule_days` and `session_exercises` each appear exactly
+  **twice** — 5 wasted. `/api/progress-summary` = **19 statements**, same doubling.
+- **Fix, and keep it to this:** have `getNextSession` accept an already-fetched program, or have
+  those two routes call `getNextSession` alone and read the program off its result. Risk-free —
+  same data, same request.
+- **⛔ Do NOT add a per-user memo of `getActiveProgram` as part of this.** The same launch reads the
+  program 8 times across 22 warm routes (~30 of 132 statements), and collapsing that is tempting —
+  but it trades directly against config-save freshness, which is a decision, not a cleanup. If it is
+  wanted, it is its own entry with that trade stated.
+- **Not established:** no latency figure. Dev wall times were a flat ~350 ms/route regardless of
+  query count (dev-mode compile overhead), so the cost against Railway's private network is
+  unmeasured. On a single-user app this is server work the owner will not feel directly — filed as
+  shape, not as a latency emergency.
+
+### [readiness][platform] RV-83 — `/api/readiness-score` does three sequential writes on a GET, usually two to the same row
+
+- **Lane:** A — `lib/health/readiness-payload.ts:667,688,711`. **Added:** 2026-09-20 ·
+  Review sweep 51.
+- Three separately-`await`ed `repo.upsertOuraDailyDerived(...)` calls run one after another on a read
+  path with a 5-minute TTL. Confirmed on the wire: one `GET /api/readiness-score` logged **21
+  statements ending in two `insert into "oura_daily_derived"`**. The readiness block keys on
+  `latestSummary?.date ?? todayIso` and the activity block on `todayIso` — **the same `(user_id,
+  day)` row whenever the summary is current**, which is the normal case.
+- **Fix:** at minimum `Promise.all` the three so they are one round-trip wave instead of three.
+- **⚠ Merging them into one upsert is the tempting version and needs a check first.** The comments
+  at `:663-666`, `:685` and `:706` claim each block deliberately writes **only its own columns** to
+  avoid clobbering, and `model_versions` is merged with `||` inside the statement. The column sets
+  look disjoint (readiness_* / sleep_* / activity_*) but **that invariant must be re-read at source
+  before a merge ships** — this is the same "the comment says the right thing" class the rest of
+  this sweep is built on.
+- **Not established:** whether the third block fires in production at all (its gate was not met on
+  the local dataset), and the COALESCE semantics were not verified.
+
 ### [platform] LA-122 — Reference: the five owner decisions Lane A is currently blocked on
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-20 (Lane A, filed for the Orchestrator at the owner's request).

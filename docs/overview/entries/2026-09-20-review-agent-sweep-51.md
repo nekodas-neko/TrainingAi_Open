@@ -2,7 +2,7 @@
 
 **Branch:** `review/sweep-51-efficiency` · docs-only · Review Agent.
 **Write-up:** [`docs/reviews/2026-09-20-sweep-51-efficiency.md`](../../reviews/2026-09-20-sweep-51-efficiency.md).
-**Filed:** RV-64 … RV-79 (16 entries, three batches).
+**Filed:** RV-64 … RV-83 (20 entries, three batches).
 
 The owner asked for a full efficiency review across four lenses: use logic where possible rather
 than AI, speed up caching and saving, prioritise app efficiency, and use animation/UI to improve
@@ -68,6 +68,26 @@ layout property that reflows siblings, where `scaleX` composites; 26 more snap (
 hero's number counts up while its ring snaps (RV-74). Sheets open in 500 ms against the app's own
 deliberately-tuned 180 ms tabs (RV-75). All four batch as `motion-polish` — batched on the device,
 which is the scarce resource, not on CI.
+
+## The runtime lane reported last and found the cheapest fix in the sweep
+
+`computeMovedHours` constructs a `new Intl.DateTimeFormat(...)` **inside** its per-row loop with
+loop-invariant options. Reproduced independently at **228.8 ms → 21.9 ms (10.4×)** on a real
+2,831-row day; production HR volume peaks at **5,606 rows/day** and the path is warmed on every app
+launch at a 5-minute TTL. Two lines, no behaviour change (RV-80). The contrast is what makes it a
+finding: `formatInTimeZone` in a loop at 18 other sites costs ~11 µs a call because `date-fns-tz`
+caches internally — **those 18 are not worth touching.**
+
+Also RV-81 (the program editor renders the 156-row catalogue once per exercise row — 3,900 `<option>`
+elements — and rebuilds them on every keystroke), RV-82 (two routes fetch the active program twice
+per request), RV-83 (three sequential writes on a GET).
+
+**One measured finding was deliberately not filed.** `/api/sync/pull` runs 26 statements every 5
+minutes even when empty, and a watermark column would make it ~2 — but every table it touches is in
+the hundreds of rows, and a watermark is a new write-path invariant every mutation must maintain.
+Same for the missing `(user_id, updated_at)` indexes: the repo already dropped
+`oura_heartrate_user_updated` in migration 249 after measuring **21 MB at `idx_scan` 0**. Filing
+either would have been a web-scale fix for a single-user app.
 
 ## Clean, verified, do not re-sweep
 

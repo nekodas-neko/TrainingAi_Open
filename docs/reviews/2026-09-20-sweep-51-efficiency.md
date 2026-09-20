@@ -77,6 +77,44 @@ can make the chart 429 itself. `cardio-week` compounds it by calling `resolveHrP
 issuing two more `getHrForWindow` pulls whose windows are subsets of the one just materialised
 (RV-73).
 
+## The cheapest fix in the sweep, and the most expensive habit (RV-80…RV-83)
+
+The runtime lane reported last and found the best ratio in the review. `computeMovedHours`
+(`hourly-movement.ts:47`) constructs a `new Intl.DateTimeFormat(...)` **inside** its per-row loop,
+with loop-invariant options. Measured twice independently — the coordinator reproduced it on a real
+day's volume at **228.8 ms → 21.9 ms (10.4×)** for 2,831 rows; the lane measured 11.6–17.4× across
+400/2,170/5,606. Production HR volume per local day over the last ten days peaks at **5,606**, and
+the path is warmed on **every app launch** at a 5-minute TTL. It is a two-line change with no
+behaviour difference.
+
+What makes it a finding rather than a nit is the contrast the lane found while checking it:
+`formatInTimeZone` is called in loops at 18 other sites and benchmarks at ~11 µs a call, because
+`date-fns-tz` caches its formatter internally. **Those 18 are not worth touching.** This one is ~7×
+worse than the repo's own idiom purely because a constructor was not hoisted.
+
+Alongside it: the program editor renders the whole 156-row catalogue as a `<datalist>` **once per
+exercise row** — 3,900 `<option>` elements at production scale against 156 — and rebuilds all of
+them on every keystroke, because editor state is lifted to the parent and there is no memo boundary
+(RV-81). Two routes fetch the active program twice in one request, each wasting 5 of ~20 statements
+(RV-82). And `/api/readiness-score` does three sequential writes on a GET, usually two to the same
+row (RV-83).
+
+## A measured finding deliberately NOT filed
+
+`/api/sync/pull` issues **26 statements every 5 minutes even when the delta is empty** — ~312
+queries/hour per active device to usually return nothing — and a watermark column would collapse it
+to ~2. It is not in the queue, on the lane's own recommendation and the coordinator's agreement:
+every table it touches is tiny in production (`set_logs` 1,351, `food_logs` 679, `workout_sessions`
+134), 26 indexed queries at that size are genuinely cheap, and a watermark is **a new write-path
+invariant every mutation must maintain**. That is a web-scale fix for a single-user app, and the
+cost of getting it wrong is a sync bug.
+
+The same judgement applies to the **missing `(user_id, updated_at)` indexes** on ~16 of 21
+sync-delta tables. The repo already has the counter-precedent recorded: `docs/module-map.md:166`
+notes `oura_heartrate_user_updated` was **dropped in migration 249** after measuring **21 MB at
+`idx_scan` 0**. Adding eight more of that shape would repeat it. Revisit only if `food_logs` reaches
+tens of thousands.
+
 ## A wrong comment is licensing ~10 needless round-trips per tab entry (RV-67)
 
 `app/health/health-content.tsx:338`: *"cachedFetch dedups in flight and **honours its TTL**, so
@@ -118,7 +156,7 @@ Instant-paint seeding is essentially complete (one gap, RV-78). Seeds are in eff
 main screens is already deliberate (`Promise.all`, `runWithConcurrency`). `complete-workout` is the
 reference save path and holds up — optimistic stamping, local write, fire-and-forget POST with
 outbox fallback, in-flight guard. `mood-checkin-sheet` is the correct save shape. No TTL divergence.
-No N+1 in the data layer. Every migration 267–277 query pattern is indexed. No new dependency needed
+No N+1 in the data layer — a brace-tracking scan of every awaited DB call inside a loop across `lib/data`, `lib/` and `app/api` found **no read-path N+1**; every hit is a batched `inArray`, a chunked bulk insert, a one-off admin repair, or the sync-push loop that is serial on purpose. **The `users` SELECT on every authenticated request is intentional** — it looks like a broken 24-hour throttle, and `lib/auth/__tests__/is-active-refresh.test.ts:111` asserts the behaviour by name as load-bearing for PS-24's deactivation guarantee. **Do not "fix" it.** Its doc comment at `is-active-refresh.ts:45-47` still justifies a throttle that never engages, which is how a reader would come to the wrong conclusion. Bundle is healthy: shared First Load JS **193 kB**, tab routes 453 kB, chart.js absent from both shared chunks, admin code behind its own routes. Production **does** gzip (dev's missing `content-encoding` is a `next dev` artefact). Every migration 267–277 query pattern is indexed. No new dependency needed
 for anything proposed here.
 
 ## Not established

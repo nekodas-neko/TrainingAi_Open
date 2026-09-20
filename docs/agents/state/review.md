@@ -6,7 +6,7 @@
 > flips itself to 🔴 as the last step of its handoff, after the baton and every PR have landed.
 
 **Updated:** 2026-09-20 · **By:** forty-nine sweeps (2026-08-17 ×2, 2026-08-18 ×37, 2026-08-20 ×1,
-2026-09-03 ×6, 2026-09-05 ×2, 2026-09-06 ×1, 2026-09-18 ×1, 2026-09-20 ×1) · **Next ID: `RV-80`.**
+2026-09-03 ×6, 2026-09-05 ×2, 2026-09-06 ×1, 2026-09-18 ×1, 2026-09-20 ×1) · **Next ID: `RV-84`.**
 
 > **Sweep 40's run is closed and nothing is owed from it** — RV-32, RV-33, RV-34 all shipped, verified
 > in source rather than taken from the closure note, and their `projectOverview.md` row is in
@@ -37,11 +37,11 @@ From sweeps 29–39
 worker claims the page). **Q-556 was listed here and is CLOSED** — it shipped on
 `/api/activity-logs`, which now answers 404, verified live in sweep 47. From sweeps 41-42: **RV-37** and **RV-39**, both needing the device.
 
-## Now — sweep 51 filed (2026-09-20). **Next ID: `RV-80`.**
+## Now — sweep 51 filed (2026-09-20). **Next ID: `RV-84`.**
 
 **Sweep 51 was the owner's efficiency review** — logic over AI, faster caching/saving, app
 efficiency, animation/UI for feel; four lanes, every load-bearing claim re-verified.
-[Write-up](../../reviews/2026-09-20-sweep-51-efficiency.md) · **RV-64…RV-79** · batches
+[Write-up](../../reviews/2026-09-20-sweep-51-efficiency.md) · **RV-64…RV-83** · batches
 `hr-window-aggregate` (2), `ai-degrade-and-bound` (2), `motion-polish` (4).
 
 **RV-64 is the headline and is NOT an AI finding.** `/api/hr-profile` pulls **128,734** production
