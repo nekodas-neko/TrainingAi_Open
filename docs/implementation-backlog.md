@@ -87,6 +87,14 @@ silently misdirecting the next session. Update them in the same PR that consumes
 >   same mistake later the same day, by a session that had read BF-45's warning** — which is why the
 >   rule now lives here, where entries are written, rather than only inside the entry that found it.
 >
+>   **Neither field fits unbuilt work that will need a device check, and reaching for the nearer one
+>   misfiles it either way** (found 2026-09-20, filing TN-51/TN-54 — with `Gate: device`, the
+>   mistake this very bullet names). `Gate: device` parks it as unstartable; `Verify: device` prints
+>   it under a heading that reads *shipped*. Startable Kotlin/native work carries **neither**: state
+>   the owed check as prose (`**Device check owed on merge:** …`) and let the entry sit in READY,
+>   where an implementer can pick it up. Write it as prose and not as `**Verify:**` inline — the
+>   inline-field guard fails on that.
+>
 > - **`Verify: owner` / `Verify: device`** — **shipped, and awaiting a look.** Same two values as
 >   `Gate:`, and the difference from it is the point: a gate says *do not build this yet*; a
 >   `Verify:` says *this is done, see it on the phone when convenient.* `next-item.js` prints these
@@ -490,6 +498,200 @@ below threshold and left in place for next time.
 
 - **Keep:** this entry until all five are answered. Strike each item as it resolves; remove the
   entry when the last one goes.
+
+### [devices][heart-rate] TN-54 — the chest strap has been dark for five days and nothing server-side records that, so PS-44's window cannot be counted 🔴 LIVE
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-20 · found answering the owner's *"I slept with the
+  strap on last night. Can you check it recorded what we needed"* — **it did not, and neither of us
+  could tell why.**
+- **Lane: A** — `android/.../polar/PolarStrapService.kt` plus an ingest/read path for status. **APK.**
+- **No `Gate:` and no `Verify:` — this is startable today, and both structured fields would be
+  wrong.** The Kotlin can be written and compile-gated in the sandbox; the S25 and the strap are
+  needed only to confirm the fix works. `Gate: device` would park it as unstartable (the BF-45 /
+  LB-26 mistake, and this entry was filed with it); `Verify: device` prints under a heading that
+  reads *shipped*, which it is not. **Device check owed on merge:** wear the strap one night and
+  confirm from the stored status, not from sample presence.
+- **Blocks PS-44's window management** (and TN-51 is the separate reason its HRV half needs an APK).
+
+**Measured 2026-09-20.** The owner wore the strap overnight. Across `rr_intervals` **and**
+`oura_heartrate`, the last chest-strap sample of any kind is **2026-09-15 23:11 UTC — 09:11 Brisbane
+on the 16th.** Five days, both tables, zero rows.
+
+**The ingest path is healthy, so this is strap-specific.** The same night the ring wrote **455 HR
+samples, 104 of them in core sleep (01:00–05:00 Brisbane)**. Phone, app, network and
+`/api/hr-ingest` all worked; only the strap contributed nothing.
+
+**⚠ AND THERE IS NO SERVER-SIDE TRACE OF WHY. That is the entry.**
+
+| | ring | chest strap |
+|---|---:|---|
+| battery readings persisted | **11,758** (latest today, 76%) | **0 — memory only** |
+| connection/status rows | present | **none** |
+| faults in `error_events` (48 h) | — | **none** |
+
+`PolarStrapService` holds `battery` in a `private var` written once per connection and never
+persisted, and its give-up path — `stopSelf()` after `MAX_CONSECUTIVE_FAILURES = 6`, logged as
+*"giving up after N consecutive failures — strap not reachable"* — reaches `onLog` and **no table**.
+So a strap that dies, runs flat, or never connects is indistinguishable from a strap that was not worn,
+from any surface except opening the app while it is happening.
+
+**Why that is worse than a missing night.** PS-44 needs **seven** nights of paired data and the entry
+already says not to count a night until it is in the table. With no status signal the owner cannot
+know in the morning whether the night counted, and the only way to find out is this query. A
+seven-night window managed that way will take far longer than seven nights — it has already cost one.
+
+**First action — persist what the ring already persists.** A strap status row per connection attempt
+carrying `battery_percent`, `state` (connected / retrying / gave-up) and `last_sample_at`, written by
+the same native HTTP path that already posts samples. `oura_ble_battery_poll` is the shape to copy;
+this is not new infrastructure.
+
+**⚠ Do NOT solve this with a phone notification alone.** A `LOW_BATTERY_CHANNEL_ID` channel already
+exists in the service and did not prevent five silent days — a notification is not a record, and the
+question *"did last night count"* is asked the next morning, not at the moment of failure.
+
+**✅ DIAGNOSED LIVE, 2026-09-20 06:03 Brisbane — it is NOT the battery and NOT the link.** The owner
+sent a screenshot of the Devices screen reading **"Polar H10 · Connected · on your chest"**, and rows
+began arriving **in the same minute**:
+
+| Brisbane | rr_ms | gap from previous |
+|---|---:|---:|
+| 06:03:28 | 802 | — |
+| 06:03:58 | 1247 | **30.2 s** |
+| 06:04:29 | 715 | **30.2 s** |
+| 06:04:59 | 790 | **30.7 s** |
+
+**Opening the app is what started it.** Nothing had arrived for five days; ingestion resumed the
+minute the Devices screen was opened and has continued since. So the strap, its cell, the BLE link
+and the whole ingest path are all fine — **the service simply was not running**, and the most likely
+reason is its own give-up path (`stopSelf()` after `MAX_CONSECUTIVE_FAILURES = 6`), which nothing
+restarts until the app is launched.
+
+**That makes the observability gap the entire bug rather than half of it.** A service that stops
+itself and needs a manual app launch to come back is survivable if it *says so*; this one is
+indistinguishable from a working strap, and the Devices screen shows **"Connected"** with no battery
+figure at all (the ring beside it shows 75%) — so the one surface the owner checked actively
+reassured him.
+
+**⚑ OWNER, 2026-09-20: *"lets get this sorted before my next trial as that was a waste of night …
+We need to see if we can get an accurate battery indicator as it just says 100% on the home screen
+all the time."*** Two findings follow, and the first says not to build what was asked for.
+
+**1. An accurate battery percentage is NOT achievable, and this repo already says so.** The H10 runs
+a **CR2025** — a primary lithium coin cell with a near-flat discharge curve that holds voltage until
+it collapses. `PolarStrapService` line 239 carries the comment *"a dying cell presents as flaky
+connections long before it presents as a dead strap"*, and the Polar knowledge base says the same.
+**A constant 100% is the cell behaving normally, not the indicator being broken.** Chasing a truer
+percentage would spend an APK cycle on a number that cannot give warning.
+**What to surface instead is `last_sample_at` and connection reliability** — those move days before
+the percentage does. Keep the low-battery notifier as a floor, but stop treating % as the signal.
+
+**2. The live indicator ALREADY EXISTS and is deliberately invisible.** The service runs a foreground
+notification reading **"Connected · N% battery"**, **"Strap unreachable — retrying in Ns"**, or absent
+when it is not running at all — but its channel is **`IMPORTANCE_MIN`** (line 155), which Android
+collapses into the silent section of the shade with no status-bar icon.
+
+**So there is a check that works TODAY, before any code ships:** pull down the shade, expand the
+silent section, and look for *"Chest strap"*. Present and reading "Connected" → the service is up.
+**Absent → it is not running, and no night will record.** That is the check the owner needed on
+2026-09-19 and could not find.
+
+**⚠ The fix is not "make the notification loud".** `IMPORTANCE_MIN` was chosen so an all-day service
+does not sit in the status bar, and that is right for all-day wear. **Raise it only for a declared
+sleep session** — see the pass test — or mirror the same state into the app where it can be checked
+deliberately.
+
+**⚠ Revised ask, sharper than the original.** Persist the status row *and* surface **last-sample-at**
+on the Devices card. "Connected" is not the useful fact; **"last sample 5 days ago"** is, and the app
+has it.
+
+**⚠ Do not read the five-day gap as a device fault.** The most likely causes are a flat CR2025
+(141,745 RR intervals of use, and the Polar notes say a dying cell presents as flaky connections), the
+service having given up and never been restarted, or Bluetooth being off. **This entry is about not
+being able to tell which** — it deliberately does not claim to know.
+
+**Pass test, revised for the owner's actual need — a night that records or tells him it will not:**
+1. Before sleep, one surface states **"recording — last sample N seconds ago"**, not "Connected".
+2. A service that has given up is **visibly** distinguishable from one that is running, without
+   opening the app and without expanding a silent notification section.
+3. The next morning, a query answers whether the night counted — **from stored status, not inference
+   from sample presence**, so "no rows" can be told apart from "worn, service dead".
+4. `last_sample_at` is on the Devices card beside "Connected".
+
+
+### [devices][heart-rate] TN-51 — overnight strap wear lands in ambient mode, which discards 29 of every 30 seconds of beats, so PS-44's HRV comparison cannot be made from it 🔴 LIVE
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-19 · Tuning agent, checked the night the owner said
+  he would sleep in the strap — **before** the night was spent rather than after.
+- **Lane: A** — `android/.../polar/PolarStrapService.kt` is Kotlin, so this needs an **APK rebuild**.
+- **Needs:** _nothing_.
+- **No `Gate:` and no `Verify:` — this is startable today, and both structured fields would be
+  wrong.** The Kotlin can be written and compile-gated in the sandbox; the S25 and the strap are
+  needed only to confirm the fix works. `Gate: device` would park it as unstartable (the BF-45 /
+  LB-26 mistake, and this entry was filed with it); `Verify: device` prints under a heading that
+  reads *shipped*, which it is not. **Device check owed on merge:** wear the strap one night and
+  confirm from the stored status, not from sample presence.
+- **Blocks** the HRV half of PS-44 (stated here as prose on purpose: any entry ID on a
+  `Needs:` line is read as a dependency by `scripts/next-item.js`, and the dependency runs the
+  other way — this entry blocks that one).
+
+**`PolarStrapService` is built for all-day wear and will run overnight.** Its own header says it
+*"holds the all-day chest-strap connection so the strap streams HR even with the screen off / app
+backgrounded"*. No session start, no workout requirement, no time gating. Wearing the strap to bed
+does produce data. **The problem is which data.**
+
+**`ambient` defaults to `true` (line 82) and `flush()` runs `thinAmbient()` on every batch**, which
+keeps one buffered `Sample` per `AMBIENT_GAP_MS` (30 s) and **drops the rest whole — each discarded
+sample carrying its own `rr` list**. Full 1 Hz is workout-mode only.
+
+**Measured against production, restricted to genuine ambient wear (15:00–21:00 Brisbane, non-workout
+hours):**
+
+| inter-sample gap | share |
+|---|---:|
+| beat-to-beat (< 2 s) | 57.4% |
+| **25–40 s (the ambient thin)** | **40.7%** |
+| > 40 s | 1.8% |
+
+So ambient wear yields **islands of ~2–3 consecutive beats separated by 30-second holes**. Across
+the strap's whole history the figure looks healthier — 92.1% beat-to-beat — but that is dominated by
+workout-mode wear at 07:00–11:00, which is exactly the window that is *not* representative of a night.
+
+**✅ CONFIRMED LIVE IN PRODUCTION, 2026-09-20 06:03–06:05 Brisbane — and it is WORSE than this entry
+estimated.** With the strap connected and the service in ambient mode, consecutive stored RR rows sit
+**30.2 s, 30.2 s and 30.7 s apart** — `AMBIENT_GAP_MS` exactly, and **one single RR interval per
+kept sample**, not the "islands of 2–3 beats" estimated from historical gaps.
+
+**With one interval per island there are ZERO successive pairs, so rMSSD is not degraded — it is
+undefined.** rMSSD is the root-mean-square of differences between *adjacent* intervals; a lone
+interval every 30 s yields no adjacent pair at all. The historical 57.4%-of-gaps-under-2 s figure
+came from kept samples that happened to carry 2 beats; the live sample carries 1.
+
+**⚠ Why this blocks PS-44 rather than merely degrading it.** PS-44 exists to compare `rmssdFromRr`
+over the strap's intervals against the ring's own `0x5d rmssd_ms`. rMSSD is the root-mean-square of
+**successive** differences over a contiguous window; sampling 2–3 beats per 30 s gives a large *count*
+of differences (~1,900 a night) but they are not a contiguous series, and ectopic-beat rejection needs
+neighbouring context that is not there. **A disagreement measured this way would not distinguish "the
+ring is drifting" from "the two devices sampled differently", which is the entire question.**
+
+**⚠ Do NOT simply set `ambient = false` overnight.** The thinning exists for a stated reason — *"so
+all-day 1 Hz doesn't bloat `oura_heartrate`"*. Full-rate persistence for 8 h/night is the cost this
+constant was chosen to avoid, and `rr_intervals` already spans 60 days at 23 MB.
+
+**First action, in preference order.** (1) **Thin the HR samples but keep every RR interval** — the
+`rr` list is the only part rMSSD needs and is far cheaper than the 1 Hz bpm series it rides on; this
+keeps the bloat argument intact and unblocks the comparison. (2) Failing that, a bounded
+full-rate overnight window (a fixed 01:00–05:00 local band) rather than all night. (3) Do not
+attempt the comparison on thinned data and report the result as if it settled anything.
+
+**⚠ What tonight IS still worth, and it is not nothing.** Ambient mode persists overnight **HR** at
+1 sample/30 s, which independently checks the **resting-HR** half of the owner's question (his RHR
+rose **+3.9 bpm** on the window mean — not the ~13 bpm this line first quoted, which was a two-day
+excursion; see TN-46). That half needs no beat-to-beat data. So the night is worth wearing for the
+RHR check even though the HRV check has to wait for the fix above.
+
+**Pass test:** a night of ambient wear yields a contiguous beat-to-beat RR series over the core sleep
+window, and `rmssdFromRr` over it is comparable to the ring's figure for the same night.
+
 
 ### [readiness][devices] LA-121 — four readiness branches are permanently dead, and one carries a temperature ladder
 
@@ -3565,62 +3767,6 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
   is a product/UX decision about what "connect a data source" promises the user, not a technical
   blocker.
 
-### [devices][heart-rate] TN-51 — overnight strap wear lands in ambient mode, which discards 29 of every 30 seconds of beats, so PS-44's HRV comparison cannot be made from it 🔴 LIVE
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-19 · Tuning agent, checked the night the owner said
-  he would sleep in the strap — **before** the night was spent rather than after.
-- **Lane: A** — `android/.../polar/PolarStrapService.kt` is Kotlin, so this needs an **APK rebuild**.
-- **Needs:** — nothing. **Blocks the HRV half of PS-44.**
-- **Gate: device** — nothing BLE verifies in the sandbox.
-
-**`PolarStrapService` is built for all-day wear and will run overnight.** Its own header says it
-*"holds the all-day chest-strap connection so the strap streams HR even with the screen off / app
-backgrounded"*. No session start, no workout requirement, no time gating. Wearing the strap to bed
-does produce data. **The problem is which data.**
-
-**`ambient` defaults to `true` (line 82) and `flush()` runs `thinAmbient()` on every batch**, which
-keeps one buffered `Sample` per `AMBIENT_GAP_MS` (30 s) and **drops the rest whole — each discarded
-sample carrying its own `rr` list**. Full 1 Hz is workout-mode only.
-
-**Measured against production, restricted to genuine ambient wear (15:00–21:00 Brisbane, non-workout
-hours):**
-
-| inter-sample gap | share |
-|---|---:|
-| beat-to-beat (< 2 s) | 57.4% |
-| **25–40 s (the ambient thin)** | **40.7%** |
-| > 40 s | 1.8% |
-
-So ambient wear yields **islands of ~2–3 consecutive beats separated by 30-second holes**. Across
-the strap's whole history the figure looks healthier — 92.1% beat-to-beat — but that is dominated by
-workout-mode wear at 07:00–11:00, which is exactly the window that is *not* representative of a night.
-
-**⚠ Why this blocks PS-44 rather than merely degrading it.** PS-44 exists to compare `rmssdFromRr`
-over the strap's intervals against the ring's own `0x5d rmssd_ms`. rMSSD is the root-mean-square of
-**successive** differences over a contiguous window; sampling 2–3 beats per 30 s gives a large *count*
-of differences (~1,900 a night) but they are not a contiguous series, and ectopic-beat rejection needs
-neighbouring context that is not there. **A disagreement measured this way would not distinguish "the
-ring is drifting" from "the two devices sampled differently", which is the entire question.**
-
-**⚠ Do NOT simply set `ambient = false` overnight.** The thinning exists for a stated reason — *"so
-all-day 1 Hz doesn't bloat `oura_heartrate`"*. Full-rate persistence for 8 h/night is the cost this
-constant was chosen to avoid, and `rr_intervals` already spans 60 days at 23 MB.
-
-**First action, in preference order.** (1) **Thin the HR samples but keep every RR interval** — the
-`rr` list is the only part rMSSD needs and is far cheaper than the 1 Hz bpm series it rides on; this
-keeps the bloat argument intact and unblocks the comparison. (2) Failing that, a bounded
-full-rate overnight window (a fixed 01:00–05:00 local band) rather than all night. (3) Do not
-attempt the comparison on thinned data and report the result as if it settled anything.
-
-**⚠ What tonight IS still worth, and it is not nothing.** Ambient mode persists overnight **HR** at
-1 sample/30 s, which independently checks the **resting-HR** half of the owner's question (his RHR
-rose ~13 bpm; see TN-46). That half needs no beat-to-beat data. So the night is worth wearing for the
-RHR check even though the HRV check has to wait for the fix above.
-
-**Pass test:** a night of ambient wear yields a contiguous beat-to-beat RR series over the core sleep
-window, and `rmssdFromRr` over it is comparable to the ring's figure for the same night.
-
-
 ### [devices][heart-rate] PS-44 — compute nightly/readiness HRV from raw beat intervals instead of trusting the ring's own figure
 
 - **Lane:** A — `packages/shared/src/health/rmssd.ts` — domain math, and it changes a stored input. (Assigned 2026-09-15, OR-116 lane sweep.)
@@ -3638,6 +3784,10 @@ window, and `rmssdFromRr` over it is comparable to the ring's figure for the sam
   agreement. **Paired per night, it separates the two live hypotheses outright:** if both instruments
   show the drop it is real physiology, and if only the ring does it is sensor drift. That is a clean
   discriminator and it exists only while the baseline still remembers the pre-drug normal.
+- **⚠ TN-54 — and you cannot currently tell whether a night counted.** The strap has been dark since
+  2026-09-16 with no server-side trace of why; the owner wore it on 2026-09-20 and it produced nothing
+  while the ring wrote 104 core-sleep samples the same night. **Check the table each morning until
+  TN-54 lands.**
 - **⚠ TN-51 — a thinned night does NOT count toward this window.** Overnight wear runs in the
   service's ambient mode, which keeps one sample per 30 s and discards the intervening beats, so the
   nights it produces cannot support an rMSSD comparison. **The HRV half of this entry is blocked on
@@ -3710,9 +3860,20 @@ window, and `rmssdFromRr` over it is comparable to the ring's figure for the sam
 
 ### [devices][platform] PS-45 — a per-user API key/token for external programmatic health-data ingestion
 
+- **⏸ DEFERRED BY THE OWNER, 2026-09-20**, against a recommendation not to build it now.
+- **The reasoning that was put to them, kept because it is the reason to hold the line later:** this
+  is a credential living **outside the login session** that can write health data into a specific
+  account. New authentication surface is the one category where a mistake is not a bug but a breach,
+  and the reversal is asymmetric — a leaked key can be revoked, but what it wrote cannot be unwritten.
+- **The trigger to revisit: a SECOND real consumer**, not a repeat of the first request. One person
+  asking is served by the interim below; a second is evidence of a surface rather than a favour.
+- **The interim stands and costs nothing:** point anyone in that position at the existing Health
+  Connect path, which already carries data in without a new credential.
+
 - **Lane:** A — `app/api/sync-health/route.ts` plus new authentication — engine by both halves of the rule. (Assigned 2026-09-15, OR-116 lane sweep.)
 
-- **Gate:** owner — this is new authentication surface (a credential separate from the login
+- **Gate:** owner — **deferred 2026-09-20; reopens on a SECOND consumer, not a repeat of the
+  first request.** This is new authentication surface (a credential separate from the login
   session, capable of writing health data into a specific account), not a routine feature.
 - **Added:** 2026-09-14 (one-off session; a friend the owner is onboarding asked for a real API
   contract to connect his own device, and hit the actual gap: `/api/sync-health` is real and
@@ -3743,9 +3904,20 @@ window, and `rmssdFromRr` over it is comparable to the ring's figure for the sam
 
 ### [devices] PS-46 — build the Apple HealthKit connector (iOS)
 
+- **⏸ DEFERRED BY THE OWNER, 2026-09-20**, against a recommendation not to build it now — so the
+  answer and the advice agree and this is settled rather than merely unanswered.
+- **What was put to them:** the enrolment is **$99/year recurring**, and it is the small half — there
+  is no `ios/` directory and no `@capacitor/ios`, so this is adopting a **second platform target**
+  for someone who uses one Android phone.
+- **The condition that would reopen it, stated so nobody re-asks without it:** the owner wanting to
+  run the app on an iPhone. At that point the enrolment is needed anyway and stops being spent on
+  nothing. **Do not put this to them again before that.** The plan stays valid; only its premise is
+  waiting.
+
 - **Lane:** A — `lib/health-connect-sync.ts` and a new native connector. (Assigned 2026-09-15, OR-116 lane sweep.)
 
-- **Gate:** owner — this needs an Apple Developer Program enrollment ($99/year, a real recurring
+- **Gate:** owner — **deferred 2026-09-20 with a named reopening condition (above), so do not
+  re-ask; this parks until that condition holds.** It needs an Apple Developer Program enrollment ($99/year, a real recurring
   cost) and a new platform target (no `ios/` directory, no `@capacitor/ios` exists in this repo
   today), not just an implementer's time.
 - **Added:** 2026-09-14 (one-off session; the owner's friend testing device-source portability is on
@@ -10644,6 +10816,24 @@ the match. `Gate: owner` when it is next picked up.
 
 ### [nutrition][platform] BF-77 — sharing meals with a partner: copies work today, a shared library is a different product
 
+- **⏸ THE OWNER DID NOT PICK A SIZE — they asked for a design session, 2026-09-20.** Verbatim:
+  *"This requires more thought - will need a session to look into this one to see the most effecient
+  way to share a food library."*
+- **⚠ Read that as a correction to how it was asked, not just a deferral.** It was put to them as
+  three sizes (A copies · B a share code · C a group library) with a recommendation of A. They did
+  not answer in those terms — they asked for **the most efficient way to share a food library**,
+  which is a different question: the A/B/C framing assumed the mechanism was the choice, and what
+  they want examined is the mechanism itself.
+- **So this becomes a PLANNING item, per the backlog-driven rule — PR 1 is docs-only.** A session
+  reads the existing label/share machinery, the saved-meal data shape and what "library" would have
+  to mean, then writes a plan to `docs/superpowers/plans/` and files the implementation entry. **It
+  does not implement**, and it should not re-present A/B/C unless the investigation independently
+  lands there.
+- **What that session must not skip:** the scannable label already exists and its sheet already has
+  a system share button handing over a PNG — so *some* sharing works today. The plan has to say what
+  is actually inadequate about it before proposing anything larger, or it will re-derive option A
+  and call it new.
+
 - **✅ OWNER ANSWERED 2026-09-13: yes to a shared library.** Verbatim: *"yes a share 'library' option
   would be a good option too"* — "too", i.e. **alongside** the copy-a-meal sharing that already
   works, not replacing it. BF-57's two-phone test passed in the same sitting, so the copy path is
@@ -16160,6 +16350,31 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **What is owed:** start a full re-sync, leave the screen, confirm the notification arrives and
   its batch count matches the `drain complete` log line. Incremental drains deliberately do not
   notify — hourly is too often to be worth a notification, and nobody is waiting on one.
+
+### [platform] OR-121 — a Custom Rules step failed once, passed on every re-run, and the evidence was thrown away
+
+- **Lane:** O — the local gate and how it is invoked, not product code.
+- **Added:** 2026-09-20, Orchestrator, during OR-120.
+- **⚠ Filed as UNEXPLAINED, not as a flake.** `CLAUDE.md`'s own standing rule for faults that stop
+  on their own — *"something that stopped is not something that was fixed"* — is why this exists
+  rather than being waved through.
+- **What happened.** A backgrounded `pnpm ci:local` on a **docs-only** tree reported
+  `1 failed: Cache today-guards take the user's timezone` (`scripts/check-tz-aware-cache-guards.js`,
+  step 44 of 75). On the **identical tree**, that script run alone prints
+  *"OK — 9 call sites, all timezone-aware"*, a full `pnpm check:rules` reads **75 of 75**, and a
+  clean unpiped `pnpm ci:local` exits **0** with the step reading `ok 44/75`. Nothing between the
+  runs changed a source file — the branch's whole diff is markdown.
+- **Why it cannot be diagnosed now, which is the part worth fixing.** The failing run was invoked as
+  `pnpm ci:local 2>&1 | tail -5` in the background, so the log kept **seven lines** — the step name
+  and no reason. **A gate run that is piped through `tail` has discarded exactly the output you need
+  the one time it fails.** Background it whole and read the tail afterwards; never pipe it.
+- **Two candidate causes, neither confirmed, both cheap to test if it recurs:** the check races
+  something else touching the working tree (the session-start local-db hook and `pnpm install` both
+  run around the same time), or it has an ordering dependence on an earlier step in the same run.
+  The script reads source files, so a partially-written file is the shape to look for.
+- **The next occurrence settles it** — which is why this entry exists rather than a shrug. If it
+  fires again, keep the whole log and compare the named call-site count against the 9 a clean run
+  reports.
 
 ### [app-shell][platform] OR-115 — the admin surface has accumulated buttons nobody uses
 
