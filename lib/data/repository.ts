@@ -553,6 +553,23 @@ export interface DexaScanRow extends DexaScanInput {
   regions: DexaScanRegion[]
 }
 
+/** TN-54. What `PolarStrapService.status()` already carries, minus the fields that describe the
+ *  accelerometer spike rather than reachability. */
+export interface StrapStatusWrite {
+  state: string
+  batteryPercent: number | null
+  /** The strap's OWN last good sample, device-supplied — the one field here that is not
+   *  server-stamped, because it is the number that answers whether a night counted. */
+  lastSampleAt: Date | null
+  consecutiveFailures: number
+  worn: boolean | null
+}
+
+export interface StrapStatusRow extends StrapStatusWrite {
+  id: number
+  recordedAt: Date
+}
+
 export interface WorkoutRepository {
   // ── Users ──────────────────────────────────────────────────────────────────
   upsertUser(user: Omit<User, 'id' | 'createdAt' | 'isActive' | 'isAdmin'>, forceActive?: boolean): Promise<User>
@@ -1070,6 +1087,15 @@ export interface WorkoutRepository {
    *  captured only while the app holds the BLE link. measured_at is server-stamped. */
   insertOuraBatteryPoll(userId: string, percent: number, charging: boolean | null): Promise<void>
   getOuraBatteryPolls(userId: string, from: Date, to: Date): Promise<Array<{ tsMs: number; percent: number; charging: boolean | null }>>
+  /** TN-54. One row per chest-strap connection attempt or state change (migration 278). The
+   *  service knew all of this already and kept it in memory, so a strap that died was
+   *  indistinguishable from one that was not worn. `recordedAt` is server-stamped. */
+  insertStrapStatus(userId: string, status: StrapStatusWrite): Promise<void>
+  /** The newest row, which is the one that answers "was the strap reachable last night". Null
+   *  when the device has never reported — which is itself the pre-TN-54 state, not an error. */
+  getLatestStrapStatus(userId: string): Promise<StrapStatusRow | null>
+  /** The recent series behind that latest row, newest first. */
+  listStrapStatus(userId: string, since: Date, limit: number): Promise<StrapStatusRow[]>
   /** Re-run the event decoders over stored body_hex (new/fixed decoders backfill
    *  retroactively without re-syncing the ring). Returns scan/update counts. */
   /** `restamped` counts rows whose `measured_at` actually CHANGED. It must fall to ~0 on a second

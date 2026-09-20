@@ -1513,6 +1513,23 @@ export const ouraBleBatteryPoll = pgTable('oura_ble_battery_poll', {
   charging:   boolean('charging'),
 })
 
+// TN-54 (migration 278). One row per `PolarStrapService` connection attempt or state change.
+// The service already knows its battery, state and failure count and kept all of it in memory —
+// `status()` goes to the Capacitor event sink, so a strap that died was indistinguishable from one
+// that was not worn unless the app happened to be open. `recorded_at` is server-stamped because
+// every row describes a state the service is in as it posts; `lastSampleAt` is the device's own
+// last good sample, which is the figure that answers "did last night count".
+export const strapStatus = pgTable('strap_status', {
+  id:                  bigserial('id', { mode: 'number' }).primaryKey(),
+  userId:              uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  recordedAt:          timestamp('recorded_at', { withTimezone: true }).notNull().defaultNow(),
+  state:               text('state').notNull(),
+  batteryPercent:      integer('battery_percent'),
+  lastSampleAt:        timestamp('last_sample_at', { withTimezone: true }),
+  consecutiveFailures: integer('consecutive_failures').notNull().default(0),
+  worn:                boolean('worn'),
+})
+
 // One (anchor_ds ↔ anchor_utc) correspondence per ring-clock epoch (migration 115).
 // A ring reset (re-key / dead battery) starts a new epoch → a new row; older rows
 // keep dating their epoch's samples via created_at ordering.
