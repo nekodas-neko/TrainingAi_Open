@@ -547,6 +547,20 @@ below threshold and left in place for next time.
 - **A `Gate:` or `Needs:` already overrides the marker; a `Keep:` does not**, and that asymmetry is
   the whole bug. The script's own comment says *"a structured field is authoritative"* — `Keep:` is
   a structured field.
+
+- **⚑ IT HAS NOW COST A SHIPPABLE ITEM, measured 2026-09-20.** **OR-118 sat startable and invisible
+  for four days.** Its engine half landed 2026-09-18, its `Needs:` was empty and the entry said in
+  words that it was *"now startable"* — and it printed under PARKED the whole time, because a `⛔`
+  three bullets up was emphasising a corrected premise. Lane B's READY read **0** across five
+  consecutive queue checks while a buildable card waited. It shipped the day someone read PARKED
+  instead of trusting READY.
+- **Two more are parked this way RIGHT NOW** — found in the same sweep, neither touched:
+  - **TN-3b** — its marker line is itself an argument that the entry should be UNparked
+    (*"the parking rationale was right for a score and is wrong for a chart"*).
+  - **Q-305** — marker reads *"the push:pull half is not done, deliberately"*, a note about scope
+    rather than a blocker. That half is what became OR-118 and is now shipped.
+  Whoever fixes the parser should re-run `next-item.js --lane B` immediately afterwards: the real
+  READY list on 2026-09-20 was not 0, and nobody could see it.
 - **Recommendation: let `Keep:` override the legacy marker, exactly as `Gate:` and `Needs:` do.**
   One clause at `next-item.js:135`. It cannot hide a genuine block, because an entry whose residue
   really is gated states `Gate:` in the `Keep:` line and that path already parks it.
@@ -16707,12 +16721,18 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   program target still wins over the reference range. No Lane A change was needed: `workout-data:meta`
   already carries `program.trainingGoal` and Health already fetches that key.
   [`journal`](overview/history-2026-09-10-folded-3.md#2026-08-25-volume-landmarks-surfaced).
-- **⛔ THE PUSH:PULL HALF IS NOT DONE, deliberately.** This entry says to do it on the same surface
-  "rather than as two cards", and doing it here would mean inventing a muscle → movement-pattern
-  taxonomy inside a component. **There is no push/pull grouping anywhere in the repo** (checked). It
-  is domain math and belongs in `packages/shared` beside `normalizeMuscle`/`MUSCLE_LANDMARKS` under
-  One Formula One Place — which is **Lane A's**. A private second copy in `components/` to satisfy
-  "together" would be the wrong trade.
+- **✅ THE PUSH:PULL HALF SHIPPED 2026-09-20 as OR-118** (v1.460.0) — the Training list's
+  **Movement Balance** card, 60 days across push / pull / legs / other. **Both reasons this bullet
+  gave for deferring it are now spent**, and they are recorded rather than deleted because the
+  deferral was correct at the time:
+  - *"There is no push/pull grouping anywhere in the repo"* — true when written, **false now**:
+    `movementPattern()` landed in `packages/shared/src/muscles.ts` as **LB-103** on 2026-09-13,
+    exactly where this bullet said it belonged, and OR-118 is its first caller. No private copy in
+    `components/` was needed, which was the trade this bullet refused to make.
+  - *"do it on the same surface rather than as two cards"* — it shipped as its own card, and the
+    shared-treatment question below is **still open and still this entry's**. OR-118 was written to
+    stay cheap to fold in if that design lands.
+  **What this entry keeps is the design question and the device look, not the build.**
 - **Still open:** the push:pull half above, and the design question of whether Q-278 / Q-302 / Q-305
   want one shared treatment for "computed and discarded" — untouched, because answering it inside one
   card would have prejudged it.
@@ -16735,67 +16755,50 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   is the second time an inline gate inside a Keep has done it (the first was BF-46).
 
 
-### [workouts] OR-118 — the push:pull balance card, split out of Q-305 (engine half missing; see below)
+### [workouts] OR-118 — the push:pull balance card, split out of Q-305
 
-- **✅ THE ENGINE HALF SHIPPED 2026-09-18** (`lane-a/lb111-muscle-sets-window`), unversioned — nothing
-  calls it yet, so nothing user-visible changed. **`GET /api/muscle-sets?from=&to=`** returns
-  `{ from, to, muscles: [{ muscle, sets }] }`, canonical muscle keys, secondary muscles at 0.5,
-  sorted by sets. Both params optional — the default is the trailing **90 days** ending today in the
-  user's timezone — both accept slashes or dashes, `to` is **inclusive**, and the cap is 400 days.
-  A date-shaped non-day (`2026-02-31`) answers **400**, not a driver 500.
-  - **The `programId` question below is ANSWERED: it counts across programme changes**, per this
-    entry's own recommendation and LB-111's. Pinned by a test that runs the same fixture through both
-    reads — `getWeeklySetsByMuscleGroup` returns **3**, the new one returns **7** — so the reason for
-    a separate method is measured rather than argued.
-  - **⚠ LB-111's premise was wrong in one place, and it is the place that decides the shape.** It
-    said `weekly-muscle-sets` *calls* `getWeeklySetsByMuscleGroup` and throws its date arguments
-    away. It does not call it at all: it carries its own inline SQL, and so does
-    `muscle-tonnage-trend`, so there were **three** copies of the muscle-attribution query
-    disagreeing on the date column and on programme scoping. That is why this is a new method rather
-    than a `from`/`to` on `weekly-muscle-sets` — see **LA-118** for the duplication itself.
-- **⛔ THE "EVERY NUMBER ALREADY EXISTS" PREMISE IS FALSE, checked 2026-09-16 before building.** The
-  *grouping* exists — `movementPattern()` shipped as LB-103 and has **no callers yet**, so this card
-  would be its first. The *numbers* do not: *"legs 481 · push 433 · pull 333 · other 168 over 60
-  days"* came from a direct query, and **no client-reachable route serves sets by muscle over any
-  window but the current one.** Verified, not assumed:
-  - `GET /api/weekly-muscle-sets` — `GET()`, no params, computes this Monday server-side.
-  - `GET /api/ai-periodization/weekly-volume` — same, `startOfWeekInTz(tz)` + 6 days, hardcoded.
-  - `GET /api/muscle-tonnage-trend` — 6 weeks, but **tonnage, not sets**. Not a substitute: legs move
-    far heavier loads, so a tonnage share overstates them and would hide the pull-set deficit this
-    card exists to show. Rendering it under a set-balance label would be a false claim.
-  - `grep -rn '60.*day' app/api/*/route.ts` — nothing.
-- **The derivation is already there and windowed, which is why the engine half is small.**
-  `getWeeklySetsByMuscleGroup(userId, programId, weekStart, weekEnd, tz)` takes **arbitrary** start
-  and end dates despite its name (`lib/data/postgres/slices/periodization.ts:518`, on the repository
-  interface). What is missing is the **exposure**, and a route under `app/api/**` is Lane A's by the
-  path rule — *both halves → Lane A, engine half first*. Filed as **LB-111**, and **shipped
-  2026-09-18** — but not by widening that method, for the reason recorded at the top of this entry.
-- **⚠ Its `programId` argument was the one real design question and is now ANSWERED** (see the top of
-  this entry): the card counts sets across programmes. `getWeeklySetsByMuscleGroup` scopes to one and
-  stays that way for its own two callers, which grade a week against *that* programme's targets.
-- **Lane:** B — `components/health/` (the Training surface), reading shared helpers only. No storage
-  and no derivation change **in this half**. The window it reads shipped on 2026-09-18, so this is
-  now startable: fetch `/api/muscle-sets?from=…&to=…` and group the rows with `movementPattern`.
+- **✅ SHIPPED 2026-09-20** (`feat/or118-movement-balance-card`, **v1.460.0**). The card is the
+  Training list's `movementBalance` section: `components/health/movement-balance-card.tsx` fetches
+  `/api/muscle-sets` over a trailing **60 days** and groups the rows with `movementPattern`, and
+  `components/health/movement-balance.ts` holds the fold as a pure function.
+- **Verify:** device
+- **Keep:** the S25 look, and only that — the pattern word sits beside a set count and a bar on a
+  narrow row, which is the thing a 412 px harness screenshot argues about and the phone settles.
+
+- **It was STARTABLE for four days and invisible, which is the finding worth keeping.** Nothing
+  blocked it after the engine half landed on 2026-09-18: `Needs:` was already empty and the entry
+  said so in words. It did not print in READY because a `⛔` used for **emphasis** in the body is
+  read by `next-item.js` as the legacy prose blocker. That is **LB-121**, and this is its first
+  measured cost. Two more Lane B entries are parked the same way right now — **TN-3b** and
+  **Q-305** — recorded on LB-121 rather than here.
+
+- **The engine half** (`lane-a/lb111-muscle-sets-window`, 2026-09-18) is `GET /api/muscle-sets?from=&to=`
+  → `{ from, to, muscles: [{ muscle, sets }] }`, canonical keys, secondary muscles at 0.5, both
+  params optional, `to` inclusive, 400-day cap, a date-shaped non-day answering 400 rather than a
+  driver 500. **It counts across programme changes** — deliberate, and the reason it is a separate
+  read rather than a `from`/`to` on `weekly-muscle-sets`: the card's claim is about the lifter's
+  balance, not one programme's adherence.
+- **Why not `muscle-tonnage-trend`, which was already windowed:** it reports tonnage. Legs move far
+  heavier loads, so a tonnage share overstates them and would hide the pull deficit the card exists
+  to show. Rendering it under a set-balance label would be a false claim.
+- **The classification is `movementPattern`'s and must not be re-derived** — `shoulders` is **push**
+  and `lower back` is **other**, both argued in `packages/shared/src/muscles.ts`. LB-103's first
+  caller is this card.
+- **No verdict, no target, and that is a decision.** There is no defensible universal push:pull
+  ratio; the owner asked to see the split, not be graded on it. The four rows always render,
+  including zeros — **an empty pull column IS the finding**, so dropping empty rows would hide
+  exactly the case worth seeing.
+- **Verification.** `components/health/__tests__/movement-balance.test.ts`, 11 cases, killed by four
+  mutations (ignore the classifier · drop zero rows · sort by size · drop the non-finite guard).
+  `e2e/or118-movement-balance-card.spec.ts` proves it is mounted and renders all four patterns, and
+  goes red with the section unregistered. It **refuses the empty state**: `seed.sql` logs nine chest
+  sets at 2/3/5 days ago, so a fresh CI database lands in-window with one pattern populated and
+  three at zero — which exercises the drawing path and the zero-row case together. Accepting "no
+  data" would have been the LB-98 trap.
+- **Q-305's shared-treatment question is still open and still Q-305's** — Q-305, Q-278 and Q-302 are
+  all "computed and never surfaced". This card was shipped plainly and stays cheap to fold in.
 - **Added:** 2026-09-16, Orchestrator — split from **Q-305**, whose `Keep:` had been describing this
-  as *"Lane B's and now unblocked"* since 2026-09-13 while parking it. See Q-305 for why that
-  happened; the lesson is the entry's, the work is this one's.
-- **Needs:** — nothing. **The dependency cleared on 2026-09-13:** `movementPattern(muscle)` shipped in
-  `packages/shared/src/muscles.ts` as **LB-103**, giving push / pull / legs / other with the
-  catalogue's whole vocabulary asserted against the database.
-- **⚠ Read LB-103's journal before rendering it.** `shoulders` counts as **push** and `lower back` as
-  **neither** — both deliberate, both argued there. Re-deriving either from intuition changes the
-  ratio this card exists to show.
-- **The measurement it renders, over 60 days:** legs 481 (33%) · push 433 (30%) · pull 333 (23%) ·
-  other 168 (11%). The pull deficit is the finding; the card's job is to make it visible without the
-  owner running a query.
-- **Do not invent a third bespoke card.** Q-305's own shared-treatment question is still open —
-  Q-305, Q-278 and Q-302 are all "computed and never surfaced". If that design lands first, this card
-  uses it. If it does not, ship this one plainly and keep it cheap to fold in later.
-- **Verification** (a line, deliberately NOT a `Verify:` field): once built, look at it on the S25 —
-  the band word sits beside a set count on a narrow row. **`Verify:` would have been wrong here and
-  was written and corrected in the same sitting:** that field means SHIPPED, so it files unbuilt work
-  under *"shipped; a look is owed, nothing is blocked"*, which is the OR-105 trap. Unbuilt work gets
-  this line; the field goes on when the code lands.
+  as *"Lane B's and now unblocked"* since 2026-09-13 while parking it.
 
 ### [workouts][platform] LA-118 — the muscle-attribution query exists FOUR times and the copies disagree
 
