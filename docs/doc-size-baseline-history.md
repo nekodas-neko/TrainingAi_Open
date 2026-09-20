@@ -49,6 +49,25 @@ system against a steady-state expectation — with something that can only fail 
 
 ---
 
+## 2026-09-20 — CLAUDE.md → 816 (+38, the claude_ro twin rule and a claim that was wrong)
+
+Thirty-eight lines is a lot for one rule, and it buys the retraction rather than the rule.
+
+TN-54's migration added a table and CI went red on two tests that a 956-file local suite had
+reported green, because both had SKIPPED inside it. Migration 277's header — and the Lane A
+routine — say those two *"skip locally even with a DATABASE_URL, because local dev creates no
+`claude_readonly` role"*, i.e. that CI is structurally the only place they can fire. **It is not
+true.** The test provisions the role itself; what it needs is a TCP `DATABASE_URL`, because it
+reconnects as `claude_readonly` by rewriting the URL's credentials and the socket form
+`setup.sh` writes silently reconnects as the superuser. The test file's own header says so.
+
+Measured with the twin applied: 2 files, 27 tests, all passed, none skipped. So the rule is not
+"remember to regenerate the views and hope CI catches you" — it is a command you can run in three
+seconds before pushing, and the belief that no such command existed is what made a red run feel
+unavoidable. That belief is worth 38 lines to kill.
+
+---
+
 ## 2026-09-20 — backlog → 25086 (TN-54's recording half shipped, +15)
 
 TN-54 stays queued, so this is a raise rather than the usual removal. The entry arrived at 20:23 as

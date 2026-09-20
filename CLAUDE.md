@@ -558,6 +558,44 @@ domain, a native plugin, safe-area, gestures, or notifications, the merge gate i
 smoke run (`docs/device-smoke-checklist.md`) — or, when no device is available in-session, an
 explicit Known-Issues row in `projectOverview.md` marking the change NOT verified on device.
 
+## Migrations that add a table or column — the `claude_ro` twin, and the two tests that catch it
+
+`claude_ro` is **default-deny**: a table with no view is unreadable, and the generator emits an
+explicit column list, so a new column on a covered table is invisible to `/api/admin/db-query`
+until the views are rebuilt. Every migration that adds a table or a column therefore ships its
+regenerated twin **in the same PR**:
+
+```
+CLAUDE_RO_OWNER_USER_ID=<uuid> node scripts/generate-claude-ro-views.js \
+  > lib/data/postgres/migrations/<NEXT-FREE>_claude_ro_views_<reason>.sql
+```
+
+Always a NEW number (`ensureSchema` tracks by filename, so an edited applied migration is skipped
+forever), and diff it against the previous one to confirm only the intended views moved. **The
+owner's id must not appear in the output** (Q-456) — the views scope on
+`current_setting('app.claude_ro_owner', true)`.
+
+**⚠ The two tests that catch a missed twin are NOT "CI-only", and believing they were cost a red
+run on 2026-09-20 (TN-54).** `claude-ro-readonly-role.test.ts` and `db-snapshot-integration.test.ts`
+skip under the full suite, but **not** because local dev lacks the `claude_readonly` role — the
+first one provisions that role itself. They need a **TCP** `DATABASE_URL`: the test reconnects as
+`claude_readonly` by rewriting the URL's credentials, and on the Unix-socket URL that
+`scripts/local-db/setup.sh` writes, the rewrite silently reconnects as the superuser, so the file
+skips loudly rather than reporting 20 false failures. Its own header says so.
+
+**So run them before pushing any migration that adds a table or column:**
+
+```
+DATABASE_URL='postgresql://postgres:postgres@localhost:5433/trainingai_dev' \
+  npx vitest run lib/data/postgres/__tests__/claude-ro-readonly-role.test.ts \
+                 lib/export/__tests__/db-snapshot-integration.test.ts
+```
+
+Measured that day: 2 files, **27 tests, all passed, none skipped**. A green 956-file local suite had
+said nothing, because both had skipped inside it.
+
+---
+
 ## Package Management
 
 - **Always use `pnpm` to install packages** — Railway deploys with `pnpm install --frozen-lockfile`, so using `npm install` will update `package.json` but not `pnpm-lock.yaml`, causing the build to fail.

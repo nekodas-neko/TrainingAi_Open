@@ -84,12 +84,40 @@ The third matters most: a stale `connected` is precisely the reading that reassu
 indexed calls (LB-62, would have failed the Build job's typecheck after merge), and the backlog's
 next-free-migration pointer, which I had not advanced.
 
+## CI caught two things the local suite could not — and one of them is a documented claim being wrong
+
+`Tests` went red on a branch whose local suite read 956 files / 9061 tests / 0 failed:
+
+- `db-snapshot-integration.test.ts` — *"Snapshot drift: table strap_status has no claude_ro view"*
+- `claude-ro-readonly-role.test.ts` — *"expected 96 to be 97"*
+
+`claude_ro` is default-deny, so a NEW table is unreadable through `/api/admin/db-query` until the
+views are rebuilt. Migration **279** is the regenerated twin; diffed against 277 it adds exactly one
+view and nothing else, and the owner's id appears **zero** times (Q-456).
+
+**The interesting half is why the local suite missed it.** Migration 277's header — and the Lane A
+routine — say these two tests *"skip locally even with a DATABASE_URL, because local dev creates no
+`claude_readonly` role"*, i.e. that CI is structurally the only place they can fire. **That is
+wrong.** `claude-ro-readonly-role.test.ts` provisions the role itself. What it needs is a **TCP**
+`DATABASE_URL`: it reconnects as `claude_readonly` by rewriting the URL's credentials, and on the
+Unix-socket URL `scripts/local-db/setup.sh` writes, that rewrite silently reconnects as the
+superuser — so the file skips loudly instead of reporting twenty false failures. Its own header
+says so, and nobody had read it against the claim.
+
+Measured, with 279 applied: `DATABASE_URL='postgresql://postgres:postgres@localhost:5433/…'` →
+**2 files, 27 tests, all passed, none skipped.** So this class IS catchable before pushing, one URL
+form away. Written into CLAUDE.md as a rule for the next migration that adds a table or column,
+because the belief that it was CI-only is what made a red run feel unavoidable.
+
 ## Not exercised — and one of these is load-bearing
 
-- **No line of the Kotlin has been executed.** There is no Android SDK in the sandbox, Gradle is
-  proxy-blocked, and CI has no Kotlin compile step. The native half is **review-only** — including
-  the `onDestroy` drain, which is the part I am least willing to call proven. The device check is
-  owed and is in the entry's `Keep:`.
+- **The Kotlin COMPILES, and I was wrong to say CI could not check it.** I claimed CI has no
+  Kotlin step; it has an `Android (Kotlin tests + debug APK)` job, it ran on this PR and it
+  **passed**, so the native half builds and its unit tests are green. What is still unexercised is
+  the only thing that matters here: **no part of it has RUN against a strap.** The `onDestroy`
+  drain in particular is the piece I am least willing to call proven — compiling proves the
+  executor call is well-formed, not that the give-up row survives a real `stopSelf()`. The device
+  check is owed and is in the entry's `Keep:`.
 - **Nothing renders this yet.** The Devices screen still shows *"Connected"* with no battery figure
   and no last-sample time — the surface that actively reassured the owner. That is the Lane B half
   and it is what makes this visible to a human; until it lands, the data exists and nobody sees it.
