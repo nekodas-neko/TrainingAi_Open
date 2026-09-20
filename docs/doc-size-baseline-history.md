@@ -18,7 +18,7 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
-## 2026-09-20 — backlog → 24404 (TN-51, caught before the night was spent)
+## 2026-09-20 — backlog → 24434 (TN-51, caught before the night was spent)
 
 **+62.** The owner said he would sleep in the strap tonight; checking the capture path
 first showed the service runs overnight but in ambient mode, which keeps one sample per 30 s and
@@ -26,6 +26,17 @@ discards the intervening beats — so the night cannot support the rMSSD compari
 make. Filed with the measurement that matters (41% of gaps in genuine ambient wear are the 30 s thin,
 against 92% beat-to-beat across the whole history, which is workout-dominated and misleading here)
 and with what the night IS still worth: the resting-HR half needs no beat-to-beat data.
+
+---
+
+## 2026-09-20 — backlog → 24374 (TN-2 re-measured on the owner's "useless" report)
+
+**+18.** The owner called the Body Battery useless; it is, it was already diagnosed as
+such in TN-2, and the honest outcome of the review was an amendment rather than a new entry. What is
+additive: the damage is dated (charging collapsed 23x the week the charge ceiling crossed below his
+quietest waking hour) and there is a new fitting hazard TN-2 could not have known — the medication
+started 2026-09-07 has moved waking rest itself, which is the quantity TN-2's accepted fix anchors
+to. Fitting it now would bake a drug transient into a constant that re-scores every stored day.
 
 ---
 

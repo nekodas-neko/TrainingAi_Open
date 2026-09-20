@@ -12779,6 +12779,36 @@ one — the "treadmill" the activity-goal volume lane already removed (Q-190).
     100 and 137, **and it is immune to `hrMax` re-estimation while the fraction form is not** —
     reproduced against the 2026-08-05 step (187 → 168) that caused this. So the calibration PR is a
     constant plus a `v6` bump, not a rewrite.
+- **⚑ RE-MEASURED 2026-09-20, on the owner's report that the battery is *"pretty much useless at this
+  point"*. It has got materially worse since this entry was filed, and there is now a NEW hazard for
+  the fit.** Nothing below changes the diagnosis — it confirms it and dates the damage.
+
+  | | 2026-08-24 (this entry) | 2026-09-20 |
+  |---|---|---|
+  | points charged/day | 0–6 last week | **1.0** (last 13 days) |
+  | days ending at 0 | 5 of last 8 | **9 of last 13** |
+  | mean anchor → mean end | — | **43.4 → 6.2** |
+
+  Split across the three regimes, the window closes exactly where the sign flips:
+
+  | period | charge ceiling | his 5th-pct waking HR | gap | charged/day |
+  |---|---:|---:|---:|---:|
+  | 2026-06-30 → 08-19 | 65.8 bpm | 64.0 bpm | **−1.8** | **23.1** |
+  | 2026-08-20 → 09-06 | 57.9 bpm | 64.0 bpm | **+6.1** | **2.2** |
+  | 2026-09-07 → 09-19 | 58.7 bpm | 68.0 bpm | **+9.3** | **1.0** |
+
+  Charging collapsed **23×** the moment the ceiling crossed below his quietest waking hour, which
+  is this entry's mechanism observed happening rather than predicted.
+
+- **⚠ NEW FITTING HAZARD — do not fit the waking-rest offset against data after 2026-09-07.** This
+  entry's accepted direction is to anchor the rest boundary to *waking rest*. The owner started
+  **Retatrutide on 2026-09-07** (TN-46), and his 5th-percentile waking HR moved **64.0 → 68.0 bpm**
+  in two weeks while resting HR rose ~13. **Waking rest is currently a moving, medicated target.** An
+  offset fitted to it now encodes a pharmacological transient into a constant that re-scores every
+  stored Body Battery day — the exact "fitted to one bad period" failure the Tuning rules exist to
+  prevent. Fit against **2026-06-30 → 2026-09-06** and validate forward, or wait for the vitals to
+  settle. This was not knowable when the entry was written.
+
 - ⛔ **THE FIT CANNOT BE DONE FROM AN AGENT SANDBOX — measured 2026-08-24, not assumed. Read this
   before attempting it, or you will rediscover it.** The entry requires the fit to include the
   stress term. `buildDaytimeStressSeriesFromModel` needs `DaytimeStressConstants`, which are
