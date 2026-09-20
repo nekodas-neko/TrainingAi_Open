@@ -491,26 +491,41 @@ below threshold and left in place for next time.
 - **Keep:** this entry until all five are answered. Strike each item as it resolves; remove the
   entry when the last one goes.
 
-### [readiness][devices] LA-121 — the readiness availability branch still reads the frozen Cloud column
+### [readiness][devices] LA-121 — four readiness branches are permanently dead, and one carries a temperature ladder
 
-- **Branch:** _unassigned_ · **Added:** 2026-09-20 (found while shipping BF-178, not investigated).
-- **Lane: A** — `lib/health/readiness-payload.ts:749-752`.
-- **The observation, and only the observation.** That branch decides `ScoreAvailability` with
-  `ouraToday?.readinessScore != null`, and its comment explains why: *"An Oura readiness score is a
-  whole-picture number by construction, so it reports as full regardless of which of our own inputs
-  happen to be present today."* Both are correct about a REAL Oura Cloud score. But
-  `oura_daily.readiness_score` has been frozen since the 2026-07-07 re-key, so for every post-re-key
-  day the condition is presumably false and the branch falls through to `scoreAvailability(...)`.
-- **⚠ Nothing here is measured, and the entry must not be built as if it were.** Not checked: whether
-  `ouraToday` is even the Cloud row at this call site; whether the fallback produces a correct
-  answer (it may well — it is the path that reasons from our own inputs); or whether any user-visible
-  confidence/limited flag differs. It is equally possible this is dead-but-harmless.
-- **First step is a query, not a patch:** read `oura_daily.readiness_score` for the last 30 days and
-  confirm it is null/frozen, then read what `availability.confidence` actually resolves to on those
-  days. If the fallback is right, close this with a comment saying the branch is pre-re-key-only.
-- **Why it is filed at all:** BF-178 renamed three labels that credited our composite to Oura, and
-  this is the one remaining *Oura* reference that is genuinely about Cloud data. Leaving it
-  unrecorded would mean the next reader re-derives whether it was missed or deliberate.
+- **Branch:** _unassigned_ · **Added:** 2026-09-20 (found while shipping BF-178) · **MEASURED 2026-09-20**, which changed the entry.
+- **Lane: A** — `lib/health/readiness-payload.ts:580, 610, 614, 751`.
+- **What was filed was one branch and a guess. The measurement found four, and answered the guess.**
+  - `oura_daily.readiness_score` is **NULL on 35 of 35 days** in the last five weeks — the frozen
+    Cloud column, exactly as the re-key implies.
+  - `buildReadinessPayload(userId, tz)` takes **no date**: `ouraToday` is
+    `ouraRows.find(r => r.date === todayIso)`. There is no historical path, so this is not
+    "pre-re-key-only" as the first draft guessed — it is **unreachable, permanently**, on every call
+    since 2026-07-07.
+  - Four sites share the condition `ouraToday?.readinessScore != null`: the score/source choice
+    (580), `readinessDisplayScore` (610), `hasSufficientData` (614) and `ScoreAvailability` (751).
+- **✅ Every fallback is correct, which is the reason this is not urgent.** Each live arm reasons
+  from our own inputs, which is right when the score IS our composite: source becomes `'custom'`,
+  the display score requires a real recovery signal, `hasSufficientData` requires sleep plus one,
+  and availability comes from `scoreAvailability({sleep, hrv, rhr, temperature, activity, checkin})`.
+  **Nothing user-visible is wrong today.** Do not "fix" this expecting a behaviour change.
+- **⚠ The one live question, and it is a calibration question, not a cleanup one.**
+  `computeBlendedScore` has exactly ONE production call site — the dead arm at 580 — plus
+  `lib/health/__tests__/temp-penalty-suspension.test.ts`, which exercises it directly. That function
+  carries a **temperature penalty LADDER** (measured in its test: dev 0.4 → 70, 0.7 → 60, 1.2 → 40
+  from a base of 80). **That ladder no longer runs in production.**
+  **Checked before writing this down, because it is the claim that would matter:** temperature has
+  NOT disappeared from readiness — `computeReadinessComposite` takes `tempZ` and the composite is
+  the live path. So the ladder and the `tempZ` contributor are two different mechanisms and only the
+  second survives. Whether losing the first is a loss is **TN-6/BF-13 territory** and is explicitly
+  not decided here.
+- **What to do, in order.** (1) Ask the owner whether the temperature ladder should be ported onto
+  the composite path or is superseded by `tempZ` — a scoring decision, so not an implementer's.
+  (2) Only then remove the four dead arms and, if the ladder is superseded, `computeBlendedScore`
+  with them. **Not before:** four branches and a helper in the scoring path is a diff whose mistakes
+  silently re-score every stored day, and it buys nothing until (1) is answered.
+- **Do NOT delete `temp-penalty-suspension.test.ts` as part of any cleanup.** It is the only record
+  of what the ladder did, and answering (1) needs it.
 
 ### [platform] LB-121 — the queue parser's "blocked" marker is the same glyph the repo uses for emphasis
 
