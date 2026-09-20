@@ -625,7 +625,29 @@ below threshold and left in place for next time.
   Manage. Batched on the verification, per this file's rule. No migration in either.
 - **Branch:** _unassigned_ · **Added:** 2026-09-20 (BugFix intake). Owner: *"In that attempt i
   unclicked the button then re clicked it so check if that caused double recording or so."*
-- **Lane: B** — the dose toggle in `components/nutrition/supplements-section.tsx`.
+- **⚠ LANE CORRECTED TO A, 2026-09-20 (Lane B, before building) — the stated cause is wrong and
+  the fix is not in the toggle.** The toggle never sends a timestamp. `taken_at` is stamped
+  server-side at **`lib/data/postgres/adapter.ts:6756`**, `takenAt: dose?.takenAt != null ? new
+  Date(dose.takenAt) : new Date()`, which is `lib/data/**` — Lane A by the path rule.
+- **⚠ AND THE RE-STAMP IS DELIBERATE AND DOCUMENTED, so this entry asks to REVERSE a decision, not
+  to fix an oversight.** The comment above the upsert says it outright: *"Re-logging re-stamps
+  because the row is one act of taking it: if the dose was corrected between the untick and the
+  re-tick, the second value is the true one."* That reasoning is coherent — it is just wrong for
+  the case BF-184 needs, where the stamp feeds a dose-timing correlation. **Whoever takes this must
+  argue against that comment rather than delete it**, and the nearby `LA-97` note is a warning from
+  the same ground: a correct fallback behind a caller that never supplies a value is
+  indistinguishable from no fallback at all.
+- **The Lane B half exists but is second.** The server already honours an explicit `takenAt`, so an
+  editable-time control can send one — but it is pointless until the re-stamp stops, because the
+  next re-tick would wipe the edit. **Engine half first**, per the both-lanes rule.
+- **The owner decision the entry names is still open and is now the gating one:** preserving the
+  stamp removes today's only path to correcting a wrong time. Editable is the entry's own
+  recommendation and this lane agrees — it separates *"I mis-tapped"* from *"I dosed at a different
+  time"*, which the toggle cannot distinguish and should not try to.
+- **Batch `supplement-dose-surface` is SPLIT.** BF-186 shipped alone on 2026-09-20; a cross-lane
+  batch cannot be one PR. The device pass can still cover both when BF-185 lands.
+- **Lane: A** — `lib/data/postgres/adapter.ts` (the stamp) and `lib/local-store/**` (the offline
+  mirror, `sqlite-backend.ts:2847`). Re-laned from B by Lane B after reading the write path.
 - **✅ NO DOUBLE RECORDING — checked including soft-deleted rows.** `supplement_logs` for
   Retatrutide still holds exactly **3 rows, none with `deleted_at` set**, one per dose. The toggle
   correctly upserts the day's row rather than inserting a second.
@@ -660,46 +682,30 @@ below threshold and left in place for next time.
   unchanged. Then confirm an intentional edit is still possible by whatever path the fix chooses.
   **Device look owed** — the toggle is the surface and the timing is what is being measured.
 
-### [nutrition] BF-186 — the vial sheet sends you to "Manage supplements", which is a 10 px "Manage" link on another screen
+### [nutrition] BF-186 — the vial sheet sent you to "Manage supplements", which is a 10 px "Manage" link on another screen
 
-- **Batch:** `supplement-dose-surface` — ships with **BF-185**, same area and same device pass.
-- **Branch:** _unassigned_ · **Added:** 2026-09-20 (BugFix intake). Owner, after being told by the
-  app where to change his saved dose: *"I dont see a manage supplements section to change the
-  default to 1mg."*
-- **Lane: B** — `components/nutrition/supplements-section.tsx:131-133` (the control) and the vial
-  sheet's hint copy.
-- **The instruction names something that does not exist by that name.** The vial sheet reads
-  *"Your saved dose is 0.5 mg, changed in **Manage supplements**, under Amount."* The actual control
-  is labelled **"Manage"**, alone, in the Supplements section header of the Nutrition tab:
+- **✅ SHIPPED 2026-09-20** (`fix/bf186-manage-supplements-reachable`, **v1.460.4**). The note stopped
+  naming a destination and became one: *"Your saved dose is 0.5 mg. **Change it**"*, where "Change
+  it" closes the vial sheet and opens the manage sheet. The words that named nothing are gone.
+- **Verify:** device
+- **Keep:** the 44 px tap target on the header **Manage** control, which is the half a browser
+  cannot check. It now carries `.tap-target-44` — a `::before` hit box, so the header still reads as
+  a header — but `domClick` bypasses hit-testing entirely, so the spec proves the wiring and the
+  words and **not** the target. Thumb it on the S25.
 
-  ```tsx
-  <button type="button" onClick={() => setManageOpen(true)}
-    className="text-[10px] text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
-    <SettingsIcon className="h-3 w-3" /> Manage
-  </button>
-  ```
-
-- **Three things stack to make it unfindable**, which is why a search for the literal phrase fails:
-  1. **The words differ** — the hint says "Manage supplements", the control says "Manage".
-  2. **It is 10 px, muted, with a 12 px icon** — styled as a section-header affordance, not a
-     destination, next to a `text-[10px]` "SUPPLEMENTS" label it visually matches.
-  3. **It is on a different screen from the sheet giving the instruction.** The hint appears in the
-     vial sheet; the control is behind it in the Nutrition tab's supplements section.
-- **⚠ The tap target is under the floor and that is a separate defect in the same line.** No padding
-  on a 10 px text button gives roughly a 12–14 px hit area against this repo's 44 px rule. Fix both
-  in the same edit — the repo's own rule puts tap-target floors in the shared button component, not
-  in a bare element, so this should become a `Button` variant rather than a styled `<button>`.
-- **Fix, in order of value:** make the hint itself the control — *"Your saved dose is 0.5 mg. **Change
-  it**"* opening the manage sheet directly, which removes the navigation entirely. Failing that,
-  match the words exactly and give the control a real target.
-- **⚠ The hint is also the reason this matters rather than being a nit.** It appears because his
-  saved default (0.5 mg) no longer matches what he takes (1 mg). The app is correctly telling him
-  about a stale default and then pointing at a door he cannot find — so the default stays stale, and
-  a hurried tap on the dose prompt logs 0.5 mg. That is most likely how dose 1 came to be recorded
-  at 0.5 with no time.
-- **Verification:** from the vial sheet, follow the instruction as written and reach the Amount
-  field. **Device look owed** — discoverability and tap target are both physical properties of the
-  S25 screen.
+- **Why the note became the door rather than the wording being matched.** Three things stacked, and
+  fixing only the words fixes one of them: the note said "Manage supplements" where the control says
+  "Manage"; the control is a 10 px muted affordance beside a 10 px label it matches; and it is on
+  the screen *behind* the sheet giving the instruction. Making the note the control removes the
+  navigation instead of describing it.
+- **Closing one sheet and opening another in the same tick is deliberate, not a hazard.** That is
+  the sibling sequence `lib/hooks/sheet-back-stack.ts` handles — `pendingSelfPops` is module-level
+  for exactly this case (BF-34), with unit tests. Checked before wiring it.
+- **Verification.** `e2e/bf186-saved-dose-note-is-the-door.spec.ts` creates a mg-dosed supplement,
+  opens the vial sheet, taps the note, and asserts the manage sheet opens and the vial sheet closes;
+  it also asserts the dead phrase is absent from the rendered copy. Proven red with the callback
+  unwired: *"the saved-dose note carries no control, so the dose stays unreachable"*.
+- **Batch `supplement-dose-surface` is SPLIT — see BF-185**, which turned out not to be Lane B's.
 
 ### [body][readiness] BF-184 — the reta dose is recorded well and joins cleanly to recovery metrics; nothing surfaces that join, and dose 1 is missing its time
 

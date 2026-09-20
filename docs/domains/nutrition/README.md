@@ -27,6 +27,13 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   be excluded from aggregates rather than counted as zero. **Stage 1 shipped 2026-09-01**, so the
   unique constraint it says has to go is already gone.
 
+- [`2026-09-20-fix-bf186-saved-dose-note-is-the-door`](../../overview/entries/2026-09-20-fix-bf186-saved-dose-note-is-the-door.md)
+  — **the vial sheet's saved-dose note became its own door (BF-186), 2026-09-20.** It named
+  "Manage supplements", a screen that does not exist under that name; the control is "Manage",
+  10 px, on the screen behind. Matching the words would have fixed one of three causes, so the note
+  is the control now. Header control gained `.tap-target-44` — **the 44 px target is owed on the
+  S25**, since `domClick` bypasses hit-testing. Also here: **BF-185 was re-laned to A before
+  building** — `taken_at` is stamped server-side and the re-stamp is documented as deliberate.
 - [`2026-09-11-fix-nutrition-scroll-and-day-padding`](../../overview/history-2026-09-14-folded-1.md#2026-09-11-fix-nutrition-scroll-and-day-padding)
   — **Nutrition keeps its scroll position; `/health/day` clears the gesture bar (RV-36, RV-37),
   2026-09-11.** BF-100's restoration lives in `PullToSync` and therefore reached **three** screens,
