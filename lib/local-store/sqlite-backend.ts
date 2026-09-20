@@ -2844,9 +2844,25 @@ export class SQLiteLocalStore implements LocalStore {
     }
     // The tick's own moment when the caller gave none. Unlike the vial numbers this is always
     // filled for a new local log: a log with no time is exactly what OR-102a exists to stop.
+    //
+    // BF-185 — but only for a NEW row. `now` is the fallback for an INSERT; on a re-tick the
+    // existing stamp is kept instead (see `takenAtOnConflict` below), because an untick followed by
+    // a re-tick cannot say whether the owner mis-tapped or genuinely dosed again, and assuming the
+    // second moved a real injection's recorded time by 35 minutes.
+    const callerStatedTime = vial.takenAt != null;
     if (vial.takenAt == null) vial.takenAt = now;
 
     const source = record.source ?? 'manual';
+    // BF-185 — this is the half that fixes the APK, and the server's half alone would not. The
+    // device pushes the `taken_at` it reads back from THIS row and an explicit value wins
+    // server-side, so a local store that re-stamped would push the re-stamped time straight over
+    // the server's preserved one. Preserving here is what makes the pair agree.
+    //
+    // Only this path. `applyDelta`'s manual branch keeps `taken_at=excluded.taken_at` on purpose:
+    // it mirrors a server row the device did not author, so the server's value IS the truth there.
+    const takenAtOnConflict = callerStatedTime
+      ? 'taken_at=excluded.taken_at'
+      : 'taken_at=COALESCE(supplement_logs.taken_at, excluded.taken_at)';
     await runSQL(
       `INSERT INTO supplement_logs (id, supplement_id, log_date, amount, unit, dose_text,
          taken_at, vial_strength_mg, vial_water_ml, vial_units_per_ml,
@@ -2854,7 +2870,7 @@ export class SQLiteLocalStore implements LocalStore {
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
        ON CONFLICT(supplement_id, log_date) WHERE source = 'manual' DO UPDATE SET
          id=excluded.id, amount=excluded.amount, unit=excluded.unit, dose_text=excluded.dose_text,
-         taken_at=excluded.taken_at, vial_strength_mg=excluded.vial_strength_mg,
+         ${takenAtOnConflict}, vial_strength_mg=excluded.vial_strength_mg,
          vial_water_ml=excluded.vial_water_ml, vial_units_per_ml=excluded.vial_units_per_ml,
          source_ref=excluded.source_ref, updated_at=excluded.updated_at,
          deleted_at=excluded.deleted_at, sync_status=excluded.sync_status`,

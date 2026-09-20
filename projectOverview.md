@@ -2347,6 +2347,35 @@ reading well. ② The owner's pass test, *"the sparkline shows a gap across the 
 not worn"* — it needs production data, because the local seed holds no `hrr1` at all and the e2e
 drives `rhrBpm` through the identical component path instead.
 
+### [body][nutrition] ⚠️ A re-tick no longer rewrites a dose's time — NOT device-verified (BF-185, 2026-09-20)
+
+`supplement_logs.taken_at` followed the last tap rather than the dose. Ticking a dose, unticking and
+re-ticking it rewrote the stamp with nothing on screen saying so — measured on the owner's
+Retatrutide row 2026-09-20, **10:46:33 → 11:21:13, 35 minutes**, on an injection that happened once.
+`created_at` did not move, so the row knew when it was first written and reported the last tap
+anyway. **There was no double recording**, which is what the report suspected: the upsert correctly
+revives the day's soft-deleted row rather than inserting a second.
+
+It matters because BF-184 exists to correlate dose timing against overnight HR and HRV. A stamp that
+follows the last tap is the one field that analysis cannot tolerate drifting.
+
+**Both write paths now preserve it**, and a caller that states a time still wins. **The local one is
+load-bearing** — the device pushes the `taken_at` it reads back from its own row and an explicit
+value wins server-side, so fixing only the server would have pushed the re-stamped time straight
+over the preserved one. `applyDelta`'s manual branch deliberately still re-stamps from the server: it
+mirrors a row the device did not author.
+
+**NOT device-verified.** `getLocalStore` returns null in the sandbox, so the local path ran only as
+extracted SQL against `node:sqlite`, never through the real store on the real device. **No APK
+needed** — both halves are TypeScript and ship via Railway. **Check on device:** tick a dose, note
+the time, untick, re-tick, confirm it has not moved.
+
+**⚠ A stated regression in reach, taken deliberately.** Re-ticking was the only way to move a wrong
+time, so until Lane B's editable-time control ships, a wrong stamp cannot be corrected from the UI.
+Accepted because a silently-drifting stamp is worse for the analysis the field exists to support.
+**BF-185 stays queued** for that control and the device check; the owner decision it names
+(editable vs. a visible re-stamp) is still open and untouched.
+
 ### [cardio][devices] ⚠️ Ambient wear keeps every RR interval now — NOT device-verified (TN-51, 2026-09-20) · needs: APK
 
 `PolarStrapService` is built for all-day wear and `ambient` defaults to `true`, so a night in the

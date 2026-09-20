@@ -14627,3 +14627,24 @@ And the premise moved from inferred to measured: the last non-null `oura_daily.r
 **2026-07-07, the re-key date itself**, with 0 of the trailing 61 days carrying one while rows are
 still written daily. The entry guessed "pre-re-key-only" and then reasoned its way to "permanent";
 the column now says so directly.
+
+## 2026-09-20 — BF-185's two files were not interchangeable, and the entry read as if they were
+
+`docs/implementation-backlog.md` **25129 → 25153** · `projectOverview.md` **12001 → 12030**
+(`lane-a/bf185-retick-keeps-taken-at`).
+
+Most of both is one finding the entry did not have: the server half and the device half are not
+alternatives. The device pushes the `taken_at` it reads back from its own row and an explicit value
+wins server-side, so fixing only `adapter.ts` would have pushed the re-stamped time straight over
+the preserved one — a green suite, a truthful-sounding note, and no change on the phone. An entry
+that names two files in one breath invites exactly that, so which one is load-bearing is now stated
+rather than left to be rediscovered.
+
+The rest is a third write path nobody had named. `applyDelta`'s manual branch carries the same line
+and must **keep** it, because it mirrors a row the device did not author. Without the note the next
+sibling-surface sweep would "finish the job" and make a device ignore corrections made anywhere else.
+
+The `projectOverview.md` row also carries the trade-off in plain terms: re-ticking was the only way
+to move a wrong time, so until the Lane B control ships a wrong stamp is uncorrectable from the UI.
+That is a regression in reach, accepted on purpose, and the kind of thing that must not be
+discoverable only by reading a diff.

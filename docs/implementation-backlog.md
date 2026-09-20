@@ -932,6 +932,30 @@ window, and `rmssdFromRr` over it is comparable to the ring's figure for the sam
   distinguish and should not try to.
 - **Sibling sweep:** every supplement uses this toggle, not just the mg-dosed ones. Any dose whose
   timing matters carries the same drift.
+- **✅ ENGINE HALF SHIPPED 2026-09-20.** A re-tick preserves `taken_at` on both write paths; a
+  caller that STATES a time still wins, which is what leaves room for the editable control. The old
+  comment is argued against in place rather than deleted, per this entry's instruction.
+- **⚠ The entry names two files as if either would do, and they are NOT equivalent — the LOCAL one
+  is load-bearing.** The device pushes the `taken_at` it reads back from its own row and an explicit
+  value wins server-side, so fixing only `adapter.ts` would have pushed the re-stamped time straight
+  over the server's preserved one: a green suite, a true-sounding note, and no change on the device.
+- **⚠ A THIRD write path the entry did not name, and it must NOT be changed.** `applyDelta`'s manual
+  branch carries the same `taken_at=excluded.taken_at`. It mirrors a server row the device did not
+  author, so the server's value IS the truth there; copying the fix into it would make a device
+  ignore a correction made anywhere else. A test pins the asymmetry as deliberate.
+- **Keep — two things, and the entry stays queued for both.**
+  1. **The device check.** Tick a dose, note `taken_at`, untick, re-tick, confirm the stamp has not
+     moved. `getLocalStore` returns null in the sandbox, so the local path was exercised here only
+     as extracted SQL against `node:sqlite`, never through the real store. **No APK needed** — both
+     halves are TypeScript and reach the device through a Railway deploy.
+  2. **The Lane B editable-time control.** Preserving the stamp removes today's only way to correct
+     a wrong time, which this entry raises against itself; that regression in reach is deliberate
+     and stated, taken because a silently-drifting stamp is worse for the analysis the field exists
+     to support. The server already honours an explicit `takenAt` and a test pins that arm, so the
+     control has something to send.
+- **The owner decision above is untouched and still open.** This change is compatible with
+  *editable* — the entry's, Lane B's and Lane A's shared recommendation — and is one line to revert
+  under *keep the re-stamp and make it visible*.
 - **Verification:** tick a dose, note `taken_at`, untick, re-tick, and confirm the stamp is
   unchanged. Then confirm an intentional edit is still possible by whatever path the fix chooses.
   **Device look owed** — the toggle is the surface and the timing is what is being measured.
