@@ -561,6 +561,11 @@ below threshold and left in place for next time.
     rather than a blocker. That half is what became OR-118 and is now shipped.
   Whoever fixes the parser should re-run `next-item.js --lane B` immediately afterwards: the real
   READY list on 2026-09-20 was not 0, and nobody could see it.
+- **⚑ PRIORITY ARGUMENT, 2026-09-20.** OR-118 shipped the day someone read PARKED instead of
+  trusting READY, and the audit that found it also established that **TN-3b and Q-305 are parked by
+  the same glyph right now** — one of them (TN-3b) blocking a buildable entry. So the defect is not
+  "an entry reads oddly in PARKED": it is **Lane B reporting an empty lane while holding work**.
+  Every session that trusts READY pays this again.
 - **Recommendation: let `Keep:` override the legacy marker, exactly as `Gate:` and `Needs:` do.**
   One clause at `next-item.js:135`. It cannot hide a genuine block, because an entry whose residue
   really is gated states `Gate:` in the `Keep:` line and that path already parks it.
@@ -604,6 +609,15 @@ below threshold and left in place for next time.
   The recompute is correct; it is the conflict that should not exist.
 - **Branch:** _unassigned_
 
+- **⚑ MEASURED 2026-09-20: EIGHT drifts in roughly two hours, every one a docs-only PR.** Landing
+  OR-118 (#1333) took **six resolve-and-push cycles**, and the collision was the same three files
+  every single time: `docs/implementation-backlog.md`, `docs/doc-size-baseline-history.md` and
+  `docs/doc-size/docs/implementation-backlog.md.size`. Nothing was lost — the resolutions are
+  mechanical and entry integrity was checked after each one — but the cost is real and it is
+  structural rather than unlucky: **every agent that finishes anything writes to those three files,
+  so any two concurrent PRs conflict by construction.** The drift rate (~8–10 min) is faster than a
+  CI cycle (~7 min for the five required), so a PR can lose the race indefinitely. What broke the
+  loop was resolving and merging inside the same minute, not waiting for a sixth full run.
 ### [body][nutrition] BF-185 — un-ticking and re-ticking a dose silently rewrites the time it was taken
 
 - **Batch:** `supplement-dose-surface` — ships with **BF-186**. Both are Lane B edits in the
@@ -13446,6 +13460,19 @@ record explicitly why not.
   overlay the series on the DAY TIMELINE**, not on the HR charts. The HR-chart overlay was checked
   and is genuinely absent (`hr-day-chart.tsx` draws sleep and workout bands and no stress), so this
   is a scope question rather than a missed build.
+- **⚑ RE-CONFIRMED 2026-09-20 (Lane B), AND THE COST IS NOW NAMED: this entry is FINISHED and the
+  only thing it still does is block TN-35.** Re-read end to end while auditing the entries parked by
+  an emphasis glyph (LB-121). Every buildable claim in it is discharged — the chart shipped, the
+  past-day read is not blocked, the pass test is met 6/6. What remains is the pre-reshape prose
+  below, and that is a **scope call for the Orchestrator**, not a build:
+  **is the HR-chart overlay out of scope?** The 2026-09-10 reshape says yes — it put the overlay on
+  the **day timeline** as TN-35, and `hr-day-chart.tsx` was checked and draws sleep and workout
+  bands and no stress. If that is confirmed, strike this entry.
+  **Until it is struck, TN-35 cannot start.** Its `Needs: TN-3b` clears only when this leaves the
+  queue, and its overlay half is Lane B and buildable today — `app/api/day-timeline/route.ts`
+  already emits typed, timestamped events and `components/health/day-detail/**` renders them, so the
+  join needs no new route. **Lane B is otherwise at READY 0**, so this one strike is the difference
+  between an idle lane and a live item.
 - **⇒ TN-35 is what this parks.** Its `Needs: TN-3b` clears when this entry leaves the queue, and its
   overlay half is Lane B and buildable today: `app/api/day-timeline/route.ts` already emits typed,
   timestamped events and `components/health/day-detail/**` renders them, so the join needs no new

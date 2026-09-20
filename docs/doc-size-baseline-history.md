@@ -14302,3 +14302,21 @@ The deferral is recorded rather than deleted because it was **correct at the tim
 put a private muscle → movement-pattern taxonomy inside a component, and waiting meant the shared
 helper got built instead. A reader who finds only the outcome learns nothing; a reader who finds the
 reasoning and its expiry date learns when to re-check their own.
+
+## 2026-09-20 — three findings filed for the Orchestrator, none of them buildable by Lane B
+
+`docs/implementation-backlog.md` grows by the three blocks below (`docs/lane-b-orchestrator-findings`).
+
+All three came out of one audit: reading PARKED after READY had said 0 for five consecutive checks
+and been wrong. They are filed rather than fixed because each lands in another role's territory —
+the parser is the Orchestrator's, striking a completed entry is its sweep, and the scope call on
+TN-3b is the owner's.
+
+- **TN-3b** — finished, and the only thing it still does is block TN-35. The lines state the
+  question outright (is the HR-chart overlay out of scope?) and what a yes releases, so whoever
+  answers does not have to re-derive the 2026-09-10 reshape from the journal.
+- **LB-121** — a priority argument rather than a restatement. The defect is not cosmetic; it makes
+  a lane report itself empty while holding work.
+- **LB-120** — eight drifts in two hours, six resolve-and-push cycles for one card, the same three
+  files every time. The number is the point: it converts "this is annoying" into "the drift rate is
+  faster than a CI cycle", which is a different problem with a different fix.
