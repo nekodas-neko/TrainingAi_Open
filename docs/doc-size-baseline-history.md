@@ -14215,3 +14215,23 @@ already rejected the same shape with production numbers. The correction to BF-18
 superseded reading visible rather than rewriting it away — the 45-logs-all-breakfast protein shake
 is simultaneously the evidence for the new model and the reason the old one failed, and deleting it
 would lose the argument.
+
+## 2026-09-20 — `docs/implementation-backlog.md` +357 (24701 → 25058) (Review sweep 51)
+
+Sixteen entries (**RV-64…RV-79**) from the owner's efficiency review — logic-over-AI, caching and
+saving speed, runtime efficiency, and animation/UI feel — at ~22 lines each, the ratio this file
+already carries.
+
+Three entries are longer than their fix and deliberately so, because in each case the fix is not the
+hard part. **RV-65** could be stated in a line ("stop asking the model for numbers the guards
+overwrite") and that line would be acted on wrongly: only the reconciled prescription is stored, so
+the model's real contribution is unmeasured, and the entry spends its length arguing for the
+measurement *before* the removal — BF-110's lesson, applied ahead of the mistake instead of after
+it. **RV-67** spends its length on what NOT to do: `freshWithinTtl` looks like a one-word win at 183
+sites, and bulk-applying it converts a stale flash into hours of hard staleness. **RV-64** carries
+its production measurement (128,734 rows against a 54 ms aggregate) because the number is what makes
+a "that's just a query" reading impossible.
+
+Two entries also carry an explicit ⛔: RV-72 must not convert `calorie-progress-bar.tsx` (a clipped
+gradient ramp that `scaleX` would distort), and RV-74 must not extend to the conic-gradient rings.
+Both are the kind of exception a sweep re-files every time unless the reason is written down.
