@@ -18,6 +18,47 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-20 — backlog → 24610 (TN-51, caught before the night was spent)
+
+**+62.** The owner said he would sleep in the strap tonight; checking the capture path
+first showed the service runs overnight but in ambient mode, which keeps one sample per 30 s and
+discards the intervening beats — so the night cannot support the rMSSD comparison PS-44 exists to
+make. Filed with the measurement that matters (41% of gaps in genuine ambient wear are the 30 s thin,
+against 92% beat-to-beat across the whole history, which is workout-dominated and misleading here)
+and with what the night IS still worth: the resting-HR half needs no beat-to-beat data.
+
+---
+
+## 2026-09-20 — backlog → 24550, `docs/agents/state/tuning.md` → 714 (TN-52, and a correction to the owner's own numbers)
+
+**+111 on a 24042 base.** The owner asked how to make the tuning work on and off the medication.
+Answering it required correcting the premise first: this agent had repeated *"resting HR +13 bpm, HRV
+down two thirds"* from a two-day excursion, where the window means are **+3.9 bpm** and **−24%**. That
+correction is what makes the entry useful — the app is not fragile because he changed a lot, it is
+fragile because its windows are narrower than his ordinary night-to-night noise (a ~6 bpm charge
+window against a 3.15 bpm nightly sd). So the axis is not "on reta / off reta" but "define thresholds
+in units of the user's own variability", and the same shape has now appeared four times, three of them
+with no drug involved. TN-46's medical aside is restated at the corrected size.
+
+Rule 1 was then backtested rather than asserted, which corrected the entry a second time: the
+quantile is **stable** across regimes (61/61/62 bpm time-weighted), not tracking them — the
+"tracking" story came from a per-sample percentile that overstates the ring's quiet end by 7–10 bpm.
+That is TN-2's own warning catching this agent three times in two days, so it now heads the baton's
+Method section.
+
+---
+
+## 2026-09-20 — backlog → 24374 (TN-2 re-measured on the owner's "useless" report)
+
+**+18.** The owner called the Body Battery useless; it is, it was already diagnosed as
+such in TN-2, and the honest outcome of the review was an amendment rather than a new entry. What is
+additive: the damage is dated (charging collapsed 23x the week the charge ceiling crossed below his
+quietest waking hour) and there is a new fitting hazard TN-2 could not have known — the medication
+started 2026-09-07 has moved waking rest itself, which is the quantity TN-2's accepted fix anchors
+to. Fitting it now would bake a drug transient into a constant that re-scores every stored day.
+
+---
+
 ## 2026-09-19 — backlog → 24042, `projectOverview.md` → 11910 (TN-50 re-laned and sharpened)
 
 **Backlog +25 on someone else's entry, with no code.** Three additions, and the ordering is the
@@ -14022,6 +14063,15 @@ implementer reads a direct owner request and builds the thing that was deliberat
 with no way to know. The input-versus-filter distinction earns its space for the same reason — the
 proposal only sounds free if you think duration and deload are applied after generation.
 
+## 2026-09-20 (third) — `docs/implementation-backlog.md` → 24402
+
+**BF-183** — tag My Foods rows with the meal they are actually eaten at.
+
+The coverage table is the entry's reason for existing. "Derive it from history" sounds obviously
+right until you count: 10 of 19 rows clear a sensible threshold, 4 have never been logged at all.
+Without that split an implementer ships a guess on every row, which is the BF-172 failure again. The
+emoji-versus-lucide argument is recorded with its reason — meal types are user-created, so a fixed
+icon map cannot cover one the app did not anticipate — because it reads as taste and is not.
 ## 2026-09-20 — OR-118 shipped, and LB-121 got its measured cost
 
 `projectOverview.md` **11927 → 11931** and `docs/implementation-backlog.md` **24344 → 24341**
