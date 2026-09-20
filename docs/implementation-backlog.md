@@ -527,7 +527,75 @@ below threshold and left in place for next time.
   The recompute is correct; it is the conflict that should not exist.
 - **Branch:** _unassigned_
 
-### [nutrition] BF-183 — tag My Foods rows with the meal they are actually eaten at, using the emoji the meal type already carries
+### [body][readiness] BF-184 — the reta dose is recorded well and joins cleanly to recovery metrics; nothing surfaces that join, and dose 1 is missing its time
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-20 (BugFix intake). Owner, after his third dose:
+  *"check the reta to make sure its being recorded properly … and can be matched against other
+  metrics. So we can see (dosage night vs hr vs last day before next dose etc) so we can really see
+  how it reacts with my body."*
+- **Lane: A** — the response model belongs beside `components/nutrition/reta/weight-response.ts`
+  (shared math) with its card in Lane B.
+- **✅ RECORDING IS CORRECT. All three doses are present, measured 2026-09-20:**
+
+  | # | log_date | taken_at (Brisbane) | amount | vial |
+  |---|---|---|---|---|
+  | 1 | 2026-09-07 | **— missing —** | **0.5 mg** | none |
+  | 2 | 2026-09-13 | 20:00 | 1 mg | 10 mg / 3 mL @ 100 u/mL |
+  | 3 | 2026-09-20 | 20:46 | 1 mg | 10 mg / 3 mL @ 100 u/mL |
+
+  `log_date` and the Brisbane day of `taken_at` agree on both timed doses — no timezone drift, which
+  is the failure this repo watches for. Vial reconstitution is captured on the doses that have it.
+- **✅ THE JOIN WORKS AND THE DATA HAS NO HOLES.** Every day from 2026-09-06 to 2026-09-20 carries
+  `resting_heart_rate`, `hrv_ms`, `weight_kg` (`body_metrics`) and `readiness_score`,
+  `stress_high_minutes` (`oura_daily_derived`). A `days_since_dose` join over
+  `supplement_logs.log_date` returns 15 of 15 rows populated. **Nothing needs building to make the
+  data matchable — it already is.**
+- **⚠ THREE DATA GAPS, none fatal, all worth knowing before anyone fits a model:**
+  1. **Dose 1 has `taken_at = NULL`**, so its cycle cannot be anchored to a time of day. It also
+     predates the vial (opened 2026-09-10), so it carries no reconstitution record. **Find out why
+     the first log took the no-time path** — if the dose-prompt flow can still write a NULL
+     `taken_at`, every future first-of-vial dose loses its anchor the same way.
+  2. **Dose 1 was 0.5 mg; doses 2 and 3 were 1 mg.** Cycle 1 is a titration step and is **not**
+     comparable to cycles 2–3. Any response model must key on the dose, not just the cycle index.
+  3. **Intervals are 6 days then 7** (09-07 → 09-13 → 09-20). Close to weekly but not weekly, so
+     "day N after dose" and "day of week" are not interchangeable.
+- **What the data shows — an OBSERVATION, deliberately not a verdict.** Over cycle 2 (1 mg, dosed
+  the evening of 09-13), resting HR and HRV move together and recover:
+
+  | day after dose | 0 | 1 | 2 | **3** | **4** | 5 | 6 |
+  |---|---|---|---|---|---|---|---|
+  | RHR | 55 | 57 | 57 | **65** | **65** | 56 | 54 |
+  | HRV | 48 | 38.5 | 42 | **28** | **19** | 56 | 56 |
+
+  Cycle 1 (0.5 mg) shows the same shape with a smaller amplitude and an earlier trough — RHR 48 → 56
+  and HRV 63.5 → 39 by day 2, back by day 4. **Two cycles, one of them at a different dose, with
+  training load, sleep and daytime stress uncontrolled. That is an observation with n=2, not a
+  finding.**
+- **⚠ THE BAR FOR THIS IS ALREADY SET IN THIS FOLDER — meet it or ship nothing.**
+  `weight-response.ts` (OR-102b) rejected the owner's own two-point-delta request with production
+  numbers: the residual SD about the weight trend is 1.203 kg, so a two-reading difference carries
+  ±1.70 kg — *"more than twice the width of the entire target band … close to random while looking
+  authoritative, which is worse than no colour."* It reports a rate with a 95 % interval and
+  **withholds the verdict unless the whole interval falls one side of a boundary.** A dose-response
+  card must do the same: show the curve, state n, and refuse to call it an effect until the cycles
+  separate from the noise.
+- **Recommended: extend the existing reta response module rather than adding a second one.**
+  `components/nutrition/reta/weight-response.ts` already models dose → weight with uncertainty, and
+  `computeWeightRateFit` exists because that card needed an interval rather than a point estimate.
+  A recovery-response model is the same shape over a different series. **Do not write a third
+  estimator** — that file's own comment records two kg/week estimators already existing, one wrong,
+  as the reason the One Formula rule exists.
+- **Gate: owner** — what the card should claim is his call, and it is a health surface. The data
+  question ("is it recorded, can it be joined") is answered above and needs no gate; what a card is
+  allowed to *assert* from two cycles does.
+- **⚠ Not a medical claim and must not become one.** The rows above are this account's own
+  measurements. Nothing here interprets them clinically, and a shipped card should describe the
+  series rather than advise on dosing.
+- **Verification:** a unit test on the response model with the three real doses above as the
+  fixture, asserting that a two-cycle input yields "insufficient data" rather than a verdict. Browser
+  is enough; no device path is involved.
+
+### [nutrition] BF-183 — tag My Foods rows with which meals a food CAN be used for, feeding the meal planner
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-20 (BugFix intake). Owner: *"Can we have some sort of
   icon system to indicate which meal its good for? Maybe we could use the lucid icon pack for this.
@@ -550,8 +618,37 @@ below threshold and left in place for next time.
   🍽️; the emoji always can, because he picks it. **The mapping is already trained** — he sees these
   four glyphs every time he logs food. And **one vocabulary cannot drift from itself**; two is the
   shape this repo has cleaned up repeatedly.
-- **The signal exists and is strong enough to be worth shipping. Measured across all 19 of his saved
-  meals (dominant meal type by log count):**
+- **⚠ CORRECTED 2026-09-20, SAME DAY, BEFORE ANY WORK STARTED. The first version of this entry
+  modelled the wrong thing and the owner said so:** *"I meant it so that i could see what meal
+  timing each meal can be used for (i.e protein shake could be all 4 meals). This will tie into the
+  meal planner."* It was filed as **one glyph for the meal a food IS usually eaten at**, inferred
+  from history. He wants **every meal a food CAN be used for** — a capability, possibly all four —
+  and it is an input to the meal planner rather than a label on a list.
+- **⚠ That inverts the data question, and the measurement below is the proof.** His protein shake
+  has **45 logs, every one at breakfast, none anywhere else** — yet he names it as suitable for all
+  four. **History records where a food HAS been used, which is a floor on suitability and never the
+  set.** So history cannot be the source of truth here; at most it is a seed. Anything derived from
+  logs alone will under-tag exactly the foods he uses most consistently, which is the opposite of
+  useful.
+- **What it needs instead: a stored, multi-valued `suitableMealTypeIds` per saved meal / food item**,
+  declared rather than inferred. Sources, best first: the lifter sets it (authoritative, and the
+  planner is the thing that makes the effort pay); an AI suggestion at save time he can correct
+  (cheap, and the food's name and macros carry most of the signal); history as a pre-tick for meals
+  it has actually been logged at (never as the full set, per above).
+- **This is a schema change and therefore Lane A's to land** — a join table or a JSON array column
+  on the saved meal, plus the local-SQLite mirror. The list rendering stays Lane B.
+- **Still true from the first version, and still the recommendation: use the meal type's own
+  emoji.** It matters more now, not less: a row may show up to four glyphs, so they must be the
+  same four he already reads in the Assign-to-Meal sheet. A second lucide vocabulary shown four at
+  a time would be unreadable.
+- **His "too many meals" worry is REAL under this reading, where it was not under the first.** One
+  dominant glyph never grew; a capability set does — ten meal types could mean ten glyphs on one
+  row. **Cap the display** (show the first N plus "+2", or collapse "all four" to a single
+  all-day glyph) and decide that before building, because it is a layout question the four-meal
+  case hides.
+- **The history measurement is kept below because it is still useful — as the PRE-TICK seed, and as
+  evidence for the paragraph above. Measured across all 19 saved meals (dominant meal type by log
+  count):**
 
   | tier | count | examples |
   |---|---|---|
@@ -562,27 +659,23 @@ below threshold and left in place for next time.
 
   **53% of the list gets a confident tag today**, and the top of the list is unambiguous — a protein
   shake logged 45 times at breakfast and never anywhere else.
-- **⚠ Show NOTHING below the threshold rather than a best guess.** Four items have never been
-  logged; three have a single log. An icon derived from one log is a guess rendered as knowledge,
-  which is the exact failure BF-172 and BF-154 were filed for. **Proposed gate: ≥3 logs AND ≥60% to
-  one meal type.** Blank is honest and self-heals as he logs.
-- **His "too many meals" worry is bounded and the design should say how.** The row shows **one**
-  glyph — the dominant type — never N. So a user with ten meal types gets one emoji, same as four.
-  What degrades with more types is not the row, it is the *confidence*: the same log count spread
-  over more buckets clears 60% less often, and more rows fall to blank. That is the right failure
-  direction.
+- **⚠ The threshold reasoning survives the correction but changes job.** Under the original
+  reading it decided whether to show a glyph at all. Under this one it decides only whether a meal
+  type is **pre-ticked** when he opens the picker — four items have never been logged and three have
+  a single log, so a pre-tick from one log is a guess he then has to undo. **Proposed seed gate:
+  ≥3 logs AND ≥60%.** Below that, tick nothing and let him choose.
 - **Open question for the implementer, not for the owner:** whether the affinity is computed
   server-side (a column on the saved-meals payload) or client-side from data the sheet already
   holds. Server-side is one grouped query and keeps the threshold in one place; client-side needs
   the log history on that screen, which it may not have. **Decide by checking what
   `saved-meals-sheet` already fetches** before adding a route.
-- **Gate: owner** — two calls are his: **emoji versus lucide** (recommendation above, with reasons),
-  and whether a below-threshold row should be **blank** or show a muted "not sure yet" affordance he
-  could tap to set manually. A manual override is the natural extension and is deliberately NOT
-  specified here; it is a second entry if he wants it.
-- **Verification:** the 10 confident rows above must carry exactly the emoji named, and the 4
-  never-logged rows must carry none. Those are real fixtures from his account, so the test can
-  assert them by name. Browser at ≤640px is enough for the arithmetic; **device look owed** for
+- **Gate: owner** — **emoji versus lucide** (recommendation above), and **how a row with all four
+  meal types should read** — four glyphs, or one "any meal" glyph. The second is the question the
+  correction created and it decides the layout.
+- **Verification:** the 10 confident rows above must arrive **pre-ticked** with the emoji named and
+  the 4 never-logged rows pre-ticked with none — then both must be freely editable to any subset of
+  the four, including all four. Those are real fixtures from his account, so the test can assert
+  them by name. Browser at ≤640px is enough for the arithmetic; **device look owed** for
   glyph legibility at the row's icon size on the S25.
 
 ### [workouts] BF-182 — warm the next prescription when Home renders, not at completion and not at tab-open
