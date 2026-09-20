@@ -3559,6 +3559,60 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
   is a product/UX decision about what "connect a data source" promises the user, not a technical
   blocker.
 
+### [devices][heart-rate] TN-54 — the chest strap has been dark for five days and nothing server-side records that, so PS-44's window cannot be counted 🔴 LIVE
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-20 · found answering the owner's *"I slept with the
+  strap on last night. Can you check it recorded what we needed"* — **it did not, and neither of us
+  could tell why.**
+- **Lane: A** — `android/.../polar/PolarStrapService.kt` plus an ingest/read path for status. **APK.**
+- **Gate: device** — nothing BLE verifies in the sandbox.
+- **Blocks PS-44's window management** (and TN-51 is the separate reason its HRV half needs an APK).
+
+**Measured 2026-09-20.** The owner wore the strap overnight. Across `rr_intervals` **and**
+`oura_heartrate`, the last chest-strap sample of any kind is **2026-09-15 23:11 UTC — 09:11 Brisbane
+on the 16th.** Five days, both tables, zero rows.
+
+**The ingest path is healthy, so this is strap-specific.** The same night the ring wrote **455 HR
+samples, 104 of them in core sleep (01:00–05:00 Brisbane)**. Phone, app, network and
+`/api/hr-ingest` all worked; only the strap contributed nothing.
+
+**⚠ AND THERE IS NO SERVER-SIDE TRACE OF WHY. That is the entry.**
+
+| | ring | chest strap |
+|---|---:|---|
+| battery readings persisted | **11,758** (latest today, 76%) | **0 — memory only** |
+| connection/status rows | present | **none** |
+| faults in `error_events` (48 h) | — | **none** |
+
+`PolarStrapService` holds `battery` in a `private var` written once per connection and never
+persisted, and its give-up path — `stopSelf()` after `MAX_CONSECUTIVE_FAILURES = 6`, logged as
+*"giving up after N consecutive failures — strap not reachable"* — reaches `onLog` and **no table**.
+So a strap that dies, runs flat, or never connects is indistinguishable from a strap that was not worn,
+from any surface except opening the app while it is happening.
+
+**Why that is worse than a missing night.** PS-44 needs **seven** nights of paired data and the entry
+already says not to count a night until it is in the table. With no status signal the owner cannot
+know in the morning whether the night counted, and the only way to find out is this query. A
+seven-night window managed that way will take far longer than seven nights — it has already cost one.
+
+**First action — persist what the ring already persists.** A strap status row per connection attempt
+carrying `battery_percent`, `state` (connected / retrying / gave-up) and `last_sample_at`, written by
+the same native HTTP path that already posts samples. `oura_ble_battery_poll` is the shape to copy;
+this is not new infrastructure.
+
+**⚠ Do NOT solve this with a phone notification alone.** A `LOW_BATTERY_CHANNEL_ID` channel already
+exists in the service and did not prevent five silent days — a notification is not a record, and the
+question *"did last night count"* is asked the next morning, not at the moment of failure.
+
+**⚠ Do not read the five-day gap as a device fault yet.** The most likely causes are a flat CR2025
+(141,745 RR intervals of use, and the Polar notes say a dying cell presents as flaky connections), the
+service having given up and never been restarted, or Bluetooth being off. **This entry is about not
+being able to tell which** — it deliberately does not claim to know.
+
+**Pass test:** a morning query can say whether the strap connected last night, what its battery read,
+and why it stopped, without opening the app.
+
+
 ### [devices][heart-rate] TN-51 — overnight strap wear lands in ambient mode, which discards 29 of every 30 seconds of beats, so PS-44's HRV comparison cannot be made from it 🔴 LIVE
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-19 · Tuning agent, checked the night the owner said
@@ -3632,6 +3686,10 @@ window, and `rmssdFromRr` over it is comparable to the ring's figure for the sam
   agreement. **Paired per night, it separates the two live hypotheses outright:** if both instruments
   show the drop it is real physiology, and if only the ring does it is sensor drift. That is a clean
   discriminator and it exists only while the baseline still remembers the pre-drug normal.
+- **⚠ TN-54 — and you cannot currently tell whether a night counted.** The strap has been dark since
+  2026-09-16 with no server-side trace of why; the owner wore it on 2026-09-20 and it produced nothing
+  while the ring wrote 104 core-sleep samples the same night. **Check the table each morning until
+  TN-54 lands.**
 - **⚠ TN-51 — a thinned night does NOT count toward this window.** Overnight wear runs in the
   service's ambient mode, which keeps one sample per 30 s and discards the intervening beats, so the
   nights it produces cannot support an rMSSD comparison. **The HRV half of this entry is blocked on
