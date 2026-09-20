@@ -2330,6 +2330,23 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [heart-rate][app-shell] ⚠️ Every trend chart stopped drawing over its gaps, and no phone has seen one (TN-53, 2026-09-20, v1.460.5) · needs: device
+
+`TrendSparkline` passed `spanGaps: true`, so a run of days with no reading was drawn as a smooth
+interpolated line — the missing days looked exactly like measured ones. That is what TN-53's engine
+gate had just stopped `analyseHrRecovery` doing, so the gate changed nothing on the surface that
+shows the trend. Fixed in the shared component, which means **eleven charts**: resting HR, HRV, HR
+recovery, wear time, session duration, workout density, protein/kg, steps, water, skin temperature
+and the score details. The line now breaks at a gap, a reading with no neighbour gets its own dot
+(it would otherwise draw nothing at all), and the header states "N days missing".
+
+**Two things a browser cannot settle.** ① The S25 look — a 3 px stranded dot and a new note at
+412 px in a header that already carries a delta chip. `e2e/tn53-sparkline-does-not-span-gaps.spec.ts`
+measures that no child overflows and the page does not scroll sideways, which is not the same as it
+reading well. ② The owner's pass test, *"the sparkline shows a gap across the period the strap was
+not worn"* — it needs production data, because the local seed holds no `hrr1` at all and the e2e
+drives `rhrBpm` through the identical component path instead.
+
 ### [cardio][devices] ⚠️ Ambient wear keeps every RR interval now — NOT device-verified (TN-51, 2026-09-20) · needs: APK
 
 `PolarStrapService` is built for all-day wear and `ambient` defaults to `true`, so a night in the

@@ -13168,10 +13168,13 @@ behaviour, and TN-6's own pass test (deviation mean within ±0.05 °C of zero) i
   re-derivation lifts it with **no deploy**. Thresholds untouched.
 - **Keep:** a **suppression, not a fix** — TN-6 retires it (its ±0.05 °C pass test is what does), and
   nothing was observed in production.
-### [heart-rate][workouts] TN-53 — the HR-recovery trend has no density gate 🟡 ENGINE SHIPPED
+### [heart-rate][workouts] TN-53 — the HR-recovery trend has no density gate
 
-- **Branch:** `lane-a/tn53-hrr-density-gate` · **Added:** 2026-09-20 (Tuning) · **Engine shipped
-  2026-09-20** (Lane A).
+- **Lane:** B for what is left — `components/health/**`, by the path rule. The engine half was
+  Lane A's and is done; this entry carried no `Lane:` field at all, so it printed as UNCLASSIFIED
+  while its remaining work sat named in the body.
+- **Branch:** `lane-a/tn53-hrr-density-gate` (engine) · `feat/tn53-sparkline-gaps` (render) ·
+  **Added:** 2026-09-20 (Tuning) · **Engine shipped 2026-09-20** (Lane A).
 - **Review:** [`what we record, and what it can actually say`](reviews/2026-09-20-what-we-record-and-what-it-can-say.md) §2–3.
 - **✅ SHIPPED: the gate, in the one HRR formula.** `analyseHrRecovery` now requires the two readings
   behind `hrr1` to be **45–75 s apart** (`HRR1_SEPARATION_MIN_MS`/`MAX_MS`) and returns `null`
@@ -13190,16 +13193,40 @@ behaviour, and TN-6's own pass test (deviation mean within ±0.05 °C of zero) i
   `coverage_ok` / **111.8** readings per set; `ble` 79 / 54.4% / **7.1**; NULL 615 / 22.9% / 17.0.
   Plus a 4-row `mixed` bucket the entry did not list. Sixteen-fold density difference stands.
 
-- **⚠ Keep: THE RENDER IS NOT DONE, and it is Lane B.** The engine now emits `null` where it used to
-  emit a fabricated number, so **the HR-Recovery sparkline will gain gaps** — in particular across
-  the period since the strap went dark on 2026-09-15. Nothing has been checked about how that
-  surface draws a null run: whether it interpolates across the gap, collapses the axis, or renders
-  an empty chart that reads as broken. **A gap that looks like a bug is not an improvement over a
-  wrong number.** That check and any copy ("not enough readings to measure recovery") are the
-  remaining ask.
-- **⚠ Keep: not verified against production render.** The gate is unit-tested; nobody has loaded the
-  heart-rate page since it shipped. The owner's pass test — *"the sparkline shows a gap across the
-  period the strap was not worn"* — is unverified.
+- **✅ SHIPPED 2026-09-20: the render** (`feat/tn53-sparkline-gaps`, **v1.460.5**, Lane B). The
+  check this asked for was run and **the answer was the third possibility, which nobody listed: the
+  chart did not draw a gap at all.** `trend-sparkline.tsx` passed `spanGaps: true`, so Chart.js
+  joined the value before a run of nulls straight to the value after it and drew the missing days
+  as a smooth interpolated line. **The engine gate bought nothing on the one surface that shows the
+  trend** — it replaced a fabricated number with an honest absence, and the chart turned the
+  absence back into a fabricated line. Now `spanGaps: false`, a dot on any reading whose
+  neighbours are both absent (a lone value draws no segment, so it would otherwise render as
+  nothing at all), and an "N days missing" note beside the label.
+- **It is the SHARED sparkline, so this fixed eleven charts, not one.** `TrendSparkline` backs
+  resting HR, HRV, HR recovery, wear time, session duration, workout density, protein/kg, steps,
+  water, skin temperature and the score details. Every one of those fields is a daily measurement
+  where null means *not measured*, so the interpolation was the same claim everywhere. Fixing only
+  `hrr1Bpm` would have needed a prop and left the identical invention on ten siblings — the
+  sibling-surface sweep rule, applied literally.
+- **Verification.** `components/health/__tests__/trend-sparkline-gaps.test.ts`, 15 cases over the
+  pure `seriesShape`/`gapDataset` in `components/health/trend-sparkline-gaps.ts`, killed by five
+  mutations (always isolate · `||` for `&&` · `!== null` so undefined counts as present · `!!v` so
+  a zero drop counts as absent · print the note unconditionally). `spanGaps` is typed to the
+  literal `false` in that module so reverting it is not a one-character edit in the component.
+  `e2e/tn53-sparkline-does-not-span-gaps.spec.ts` seeds a real hole and asserts the note on
+  `/health/heart-rate`, plus that the header still fits a phone; **proven red against the pre-fix
+  component** — *"the sparkline drew the gap without disclosing it"*, received
+  `"Resting Heart Rate — 14 days"`.
+- **Keep: the device look, and the owner's pass test.** Two things a browser cannot settle. ① The
+  S25 render — a stranded 3 px dot and a "N days missing" note at 412 px beside a delta chip; the
+  spec measures that nothing overflows, which is not the same as it reading well. ② The pass test
+  — *"the sparkline shows a gap across the period the strap was not worn"* — needs production
+  data; local seed has no `hrr1` at all, so the e2e drives `rhrBpm` through the identical
+  component path instead.
+- **Note for whoever runs that check:** the e2e's fixture had to be anchored to the **user's** local
+  day, not Postgres's `CURRENT_DATE`. Written the UTC way first it failed at 21:30 UTC reading
+  `4 days missing` against an expected 3 — the window comes from `todayInTz`, and after 14:00 UTC
+  that is already tomorrow in Brisbane.
 - **⚑ Unchanged and still the durable answer:** `fitness_tests` carries a `resting_hrr` type and an
   `hrr1_bpm` column; one test ran 2026-07-19 and left `hrr1_bpm` null. A repeated HRR test controls
   the stimulus in a way neither resting HR nor ring HRV can — review §4.
