@@ -18,6 +18,17 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-20 — backlog → 24374 (TN-2 re-measured on the owner's "useless" report)
+
+**+18.** The owner called the Body Battery useless; it is, it was already diagnosed as
+such in TN-2, and the honest outcome of the review was an amendment rather than a new entry. What is
+additive: the damage is dated (charging collapsed 23x the week the charge ceiling crossed below his
+quietest waking hour) and there is a new fitting hazard TN-2 could not have known — the medication
+started 2026-09-07 has moved waking rest itself, which is the quantity TN-2's accepted fix anchors
+to. Fitting it now would bake a drug transient into a constant that re-scores every stored day.
+
+---
+
 ## 2026-09-19 — backlog → 24042, `projectOverview.md` → 11910 (TN-50 re-laned and sharpened)
 
 **Backlog +25 on someone else's entry, with no code.** Three additions, and the ordering is the
@@ -98,7 +109,7 @@ history files are dated) rather than with the sweep, because the sweep is a chor
 measurement is the thing a future reader would otherwise re-derive before daring to run it.
 ---
 
-## 2026-09-18 — backlog → 24376, `projectOverview.md` → 11939 (Q-1a server half)
+## 2026-09-18 — backlog → 24406, `projectOverview.md` → 11939 (Q-1a server half)
 
 **Backlog +32 and nothing removed**, which is the honest shape for a partial: Q-1a stays queued
 because most of its scope — the client — has not shipped, and the entry now carries what DID ship, the
