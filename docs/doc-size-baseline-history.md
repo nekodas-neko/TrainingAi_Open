@@ -14456,3 +14456,13 @@ The BF-77 note is the longest and is a correction to my own framing. It was put 
 three sizes with a recommendation; they answered in different terms — *"the most efficient way to
 share a food library"* — which means the mechanism was the question, not the scale. Recording that
 distinction is what stops the next session re-presenting A/B/C and calling it progress.
+
+### `docs/implementation-backlog.md` → 25049 (same PR, OR-121)
+
++25 for one entry recording a gate step that failed once and has passed on every run since. Filed
+under the repo's own rule that something which stopped is not something that was fixed.
+
+Most of its length is the part that is actually actionable: the run was backgrounded as
+`pnpm ci:local 2>&1 | tail -5`, so the log kept seven lines and the reason is gone. **A gate piped
+through `tail` has discarded exactly the output needed the one time it fails.** That sentence is
+why the entry is worth 25 lines rather than a shrug.

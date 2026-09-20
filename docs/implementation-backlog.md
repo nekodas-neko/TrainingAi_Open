@@ -16323,6 +16323,31 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   its batch count matches the `drain complete` log line. Incremental drains deliberately do not
   notify — hourly is too often to be worth a notification, and nobody is waiting on one.
 
+### [platform] OR-121 — a Custom Rules step failed once, passed on every re-run, and the evidence was thrown away
+
+- **Lane:** O — the local gate and how it is invoked, not product code.
+- **Added:** 2026-09-20, Orchestrator, during OR-120.
+- **⚠ Filed as UNEXPLAINED, not as a flake.** `CLAUDE.md`'s own standing rule for faults that stop
+  on their own — *"something that stopped is not something that was fixed"* — is why this exists
+  rather than being waved through.
+- **What happened.** A backgrounded `pnpm ci:local` on a **docs-only** tree reported
+  `1 failed: Cache today-guards take the user's timezone` (`scripts/check-tz-aware-cache-guards.js`,
+  step 44 of 75). On the **identical tree**, that script run alone prints
+  *"OK — 9 call sites, all timezone-aware"*, a full `pnpm check:rules` reads **75 of 75**, and a
+  clean unpiped `pnpm ci:local` exits **0** with the step reading `ok 44/75`. Nothing between the
+  runs changed a source file — the branch's whole diff is markdown.
+- **Why it cannot be diagnosed now, which is the part worth fixing.** The failing run was invoked as
+  `pnpm ci:local 2>&1 | tail -5` in the background, so the log kept **seven lines** — the step name
+  and no reason. **A gate run that is piped through `tail` has discarded exactly the output you need
+  the one time it fails.** Background it whole and read the tail afterwards; never pipe it.
+- **Two candidate causes, neither confirmed, both cheap to test if it recurs:** the check races
+  something else touching the working tree (the session-start local-db hook and `pnpm install` both
+  run around the same time), or it has an ordering dependence on an earlier step in the same run.
+  The script reads source files, so a partially-written file is the shape to look for.
+- **The next occurrence settles it** — which is why this entry exists rather than a shrug. If it
+  fires again, keep the whole log and compare the named call-site count against the 9 a clean run
+  reports.
+
 ### [app-shell][platform] OR-115 — the admin surface has accumulated buttons nobody uses
 
 - **Lane:** B — `app/admin/**`, most of it presentational.
