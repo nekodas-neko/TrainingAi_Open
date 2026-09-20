@@ -90,6 +90,15 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
 
 ## Method — three traps, and the third is the expensive one
 
+**Weight by TIME, not by sample, for anything about the ring's quiet end.** The ring power-gates its
+PPG — it samples densely when HR is high and sparsely at rest — so a per-sample percentile of waking
+HR overstates the quiet end by 7–10 bpm. Measured 2026-09-20: per-sample p10 reads 69/68/72 bpm
+across three regimes against a time-weighted 61/61/62. The per-sample version also told a *different
+story* (a threshold that "tracks" physiology) from the correct one (a threshold that is stable).
+**TN-2 wrote this warning down on 2026-08-24 and it has now caught this agent three times in two
+days** — once on the 0.99%-of-waking-time figure, once on the quantile's level, once on its
+direction. Cap the gap (15 min) and weight by it; it is three extra lines of SQL.
+
 **Suspect the deriving code before concluding the data is wrong — and treat a disagreement set that
 matches a structural property of the rows as proof that you are the one who is wrong.** TN-49 was
 filed on 2026-09-18 claiming seven stored readiness scores contradicted their own contributors by 4–6

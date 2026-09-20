@@ -18,6 +18,36 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-20 — backlog → 24610 (TN-51, caught before the night was spent)
+
+**+62.** The owner said he would sleep in the strap tonight; checking the capture path
+first showed the service runs overnight but in ambient mode, which keeps one sample per 30 s and
+discards the intervening beats — so the night cannot support the rMSSD comparison PS-44 exists to
+make. Filed with the measurement that matters (41% of gaps in genuine ambient wear are the 30 s thin,
+against 92% beat-to-beat across the whole history, which is workout-dominated and misleading here)
+and with what the night IS still worth: the resting-HR half needs no beat-to-beat data.
+
+---
+
+## 2026-09-20 — backlog → 24550, `docs/agents/state/tuning.md` → 714 (TN-52, and a correction to the owner's own numbers)
+
+**+111 on a 24042 base.** The owner asked how to make the tuning work on and off the medication.
+Answering it required correcting the premise first: this agent had repeated *"resting HR +13 bpm, HRV
+down two thirds"* from a two-day excursion, where the window means are **+3.9 bpm** and **−24%**. That
+correction is what makes the entry useful — the app is not fragile because he changed a lot, it is
+fragile because its windows are narrower than his ordinary night-to-night noise (a ~6 bpm charge
+window against a 3.15 bpm nightly sd). So the axis is not "on reta / off reta" but "define thresholds
+in units of the user's own variability", and the same shape has now appeared four times, three of them
+with no drug involved. TN-46's medical aside is restated at the corrected size.
+
+Rule 1 was then backtested rather than asserted, which corrected the entry a second time: the
+quantile is **stable** across regimes (61/61/62 bpm time-weighted), not tracking them — the
+"tracking" story came from a per-sample percentile that overstates the ring's quiet end by 7–10 bpm.
+That is TN-2's own warning catching this agent three times in two days, so it now heads the baton's
+Method section.
+
+---
+
 ## 2026-09-20 — backlog → 24374 (TN-2 re-measured on the owner's "useless" report)
 
 **+18.** The owner called the Body Battery useless; it is, it was already diagnosed as
@@ -107,6 +137,18 @@ check's name is that something grew.
 The `projectOverview.md` paragraph leads with the measurement that retired the entry (28 of 32
 history files are dated) rather than with the sweep, because the sweep is a chore that recurs and the
 measurement is the thing a future reader would otherwise re-derive before daring to run it.
+---
+
+## 2026-09-18 — backlog → 24642, `projectOverview.md` → 11939 (Q-1a server half)
+
+**Backlog +32 and nothing removed**, which is the honest shape for a partial: Q-1a stays queued
+because most of its scope — the client — has not shipped, and the entry now carries what DID ship, the
+two corrections to its own ⚠, and a `Gate: owner` on the remainder.
+
+The bulk of those 32 lines is the **corrections**, not the changelog. An entry read cold in three
+months will otherwise send the next implementer to build enforcement that PS-24 already built, and to
+hand-write token parsing that `@auth/core` already does — both of which this session started to do
+before measuring. The overview paragraph carries the same two, for the same reason.
 
 ---
 
@@ -14030,13 +14072,23 @@ implementer reads a direct owner request and builds the thing that was deliberat
 with no way to know. The input-versus-filter distinction earns its space for the same reason — the
 proposal only sounds free if you think duration and deload are applied after generation.
 
----
+## 2026-09-20 (third) — `docs/implementation-backlog.md` → 24402
+
+**BF-183** — tag My Foods rows with the meal they are actually eaten at.
+
+The coverage table is the entry's reason for existing. "Derive it from history" sounds obviously
+right until you count: 10 of 19 rows clear a sensible threshold, 4 have never been logged at all.
+Without that split an implementer ships a guess on every row, which is the BF-172 failure again. The
+emoji-versus-lucide argument is recorded with its reason — meal types are user-created, so a fixed
+icon map cannot cover one the app did not anticipate — because it reads as taste and is not.
 
 ---
 
 ---
 
-## 2026-09-11 — `docs/implementation-backlog.md` → 24349 (RV-42 shipped)
+---
+
+## 2026-09-11 — `docs/implementation-backlog.md` → 24617 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 

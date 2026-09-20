@@ -506,6 +506,64 @@ below threshold and left in place for next time.
   The recompute is correct; it is the conflict that should not exist.
 - **Branch:** _unassigned_
 
+### [nutrition] BF-183 — tag My Foods rows with the meal they are actually eaten at, using the emoji the meal type already carries
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-20 (BugFix intake). Owner: *"Can we have some sort of
+  icon system to indicate which meal its good for? Maybe we could use the lucid icon pack for this.
+  The tough part is when people add too many meals. But my standard of 4 it should go well."*
+- **Lane: B** — the list is `components/nutrition/saved-meals-sheet.tsx`. The affinity query is a
+  Lane A route if it is computed server-side; see the open question below.
+- **⚠ Recommend the existing per-meal-type EMOJI, not lucide — and this is the part worth arguing
+  before anyone writes code.** `meal_types` already has an `emoji` column, user-set, and the
+  Assign-to-Meal sheet already renders it. His four active types, measured 2026-09-20:
+
+  | sort | meal type | emoji |
+  |---|---|---|
+  | 0 | Pre Workout (Breakfast) | 🍳 |
+  | 1 | Post Workout | 🍎 |
+  | 2 | Lunch | 🥗 |
+  | 5 | Dinner | 🌙 |
+
+  Three reasons the emoji wins. **Meal types are USER-CREATED** — a fixed lucide map cannot name a
+  type the app did not anticipate, and this account has previously carried an *"Afternoon Meal"*
+  🍽️; the emoji always can, because he picks it. **The mapping is already trained** — he sees these
+  four glyphs every time he logs food. And **one vocabulary cannot drift from itself**; two is the
+  shape this repo has cleaned up repeatedly.
+- **The signal exists and is strong enough to be worth shipping. Measured across all 19 of his saved
+  meals (dominant meal type by log count):**
+
+  | tier | count | examples |
+  |---|---|---|
+  | **Confident** (≥3 logs, 100% one meal) | **10** | Protein Shake 45× 🍳 · Cruskit + PB 26× 🍳 · Ninja Creami 10× 🥗 · Wrap Pizza 6× 🌙 · Protein Pancakes 6× 🍎 |
+  | Split | 2 | Beef Mince Cube 60% 🌙 · Corn Chips 50% 🥗 |
+  | Single log | 3 | Protein Granola, Corn Block, Protein Pasta Brick |
+  | **Never logged — no signal at all** | **4** | Chicken Block, Shredded Chicken Block, Slow Cooked Shredded Beef Ragu, Pulled Pork Block |
+
+  **53% of the list gets a confident tag today**, and the top of the list is unambiguous — a protein
+  shake logged 45 times at breakfast and never anywhere else.
+- **⚠ Show NOTHING below the threshold rather than a best guess.** Four items have never been
+  logged; three have a single log. An icon derived from one log is a guess rendered as knowledge,
+  which is the exact failure BF-172 and BF-154 were filed for. **Proposed gate: ≥3 logs AND ≥60% to
+  one meal type.** Blank is honest and self-heals as he logs.
+- **His "too many meals" worry is bounded and the design should say how.** The row shows **one**
+  glyph — the dominant type — never N. So a user with ten meal types gets one emoji, same as four.
+  What degrades with more types is not the row, it is the *confidence*: the same log count spread
+  over more buckets clears 60% less often, and more rows fall to blank. That is the right failure
+  direction.
+- **Open question for the implementer, not for the owner:** whether the affinity is computed
+  server-side (a column on the saved-meals payload) or client-side from data the sheet already
+  holds. Server-side is one grouped query and keeps the threshold in one place; client-side needs
+  the log history on that screen, which it may not have. **Decide by checking what
+  `saved-meals-sheet` already fetches** before adding a route.
+- **Gate: owner** — two calls are his: **emoji versus lucide** (recommendation above, with reasons),
+  and whether a below-threshold row should be **blank** or show a muted "not sure yet" affordance he
+  could tap to set manually. A manual override is the natural extension and is deliberately NOT
+  specified here; it is a second entry if he wants it.
+- **Verification:** the 10 confident rows above must carry exactly the emoji named, and the 4
+  never-logged rows must carry none. Those are real fixtures from his account, so the test can
+  assert them by name. Browser at ≤640px is enough for the arithmetic; **device look owed** for
+  glyph legibility at the row's icon size on the S25.
+
 ### [workouts] BF-182 — warm the next prescription when Home renders, not at completion and not at tab-open
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-20 (BugFix intake). Owner: *"when you select the ai
@@ -1135,9 +1193,21 @@ scoring. The same machinery answers "what did X do to me" for anything logged.
 transient, spanning a dose change, is the worst possible calibration sample. It is evidence about
 the system's blindness, not about where `ILLNESS_WATCH_SCORE` or the readiness weights belong.
 
-**⚠ Not a scoring matter, and the dose framing is corrected above.** A resting HR ~+13 bpm and HRV
-down roughly two thirds at **1 mg**, with titration presumably continuing, is worth mentioning to
-whoever prescribes and monitors this — the more so because the dose is low. This entry records what
+**⚠ CORRECTED 2026-09-20 — the magnitudes below were SINGLE-DAY EXTREMES, not the sustained shift,
+and this agent repeated them several times.** *"Resting HR +13 bpm, HRV down two thirds"* described
+2026-09-16/17 alone. Measured as window means instead — 28 pre-dose nights (Aug 10 → Sep 06) against
+14 on the drug (Sep 07 → 20):
+
+| | pre-dose | on reta | change |
+|---|---:|---:|---|
+| resting HR | 52.3 | 56.2 | **+3.9 bpm** |
+| HRV | 58.8 ms | 44.6 ms | **−14.2 ms (−24%)** |
+
+The 65 bpm and 19 ms readings were a two-day excursion that has since returned to 54–57 and 45–47.
+**The real sustained change is about a quarter of what was reported.** It is still a genuine shift —
++3.9 bpm is 1.2× this owner's own pre-drug nightly sd of 3.15 bpm — but "down two thirds" was wrong.
+**A +3.9 bpm / −24% shift at 1 mg remains worth mentioning to whoever prescribes and monitors this,
+stated at that size and not the inflated one.** Nothing here is medical advice. This entry records what
 is in the app; it is not medical advice and nothing here is a clinical judgement.
 
 **Pass test:** the pre-intervention baseline is still recoverable after 60 nights, a flagged day
@@ -3246,6 +3316,62 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
   is a product/UX decision about what "connect a data source" promises the user, not a technical
   blocker.
 
+### [devices][heart-rate] TN-51 — overnight strap wear lands in ambient mode, which discards 29 of every 30 seconds of beats, so PS-44's HRV comparison cannot be made from it 🔴 LIVE
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-19 · Tuning agent, checked the night the owner said
+  he would sleep in the strap — **before** the night was spent rather than after.
+- **Lane: A** — `android/.../polar/PolarStrapService.kt` is Kotlin, so this needs an **APK rebuild**.
+- **Needs:** — nothing. **Blocks the HRV half of PS-44.**
+- **Gate: device** — nothing BLE verifies in the sandbox.
+
+**`PolarStrapService` is built for all-day wear and will run overnight.** Its own header says it
+*"holds the all-day chest-strap connection so the strap streams HR even with the screen off / app
+backgrounded"*. No session start, no workout requirement, no time gating. Wearing the strap to bed
+does produce data. **The problem is which data.**
+
+**`ambient` defaults to `true` (line 82) and `flush()` runs `thinAmbient()` on every batch**, which
+keeps one buffered `Sample` per `AMBIENT_GAP_MS` (30 s) and **drops the rest whole — each discarded
+sample carrying its own `rr` list**. Full 1 Hz is workout-mode only.
+
+**Measured against production, restricted to genuine ambient wear (15:00–21:00 Brisbane, non-workout
+hours):**
+
+| inter-sample gap | share |
+|---|---:|
+| beat-to-beat (< 2 s) | 57.4% |
+| **25–40 s (the ambient thin)** | **40.7%** |
+| > 40 s | 1.8% |
+
+So ambient wear yields **islands of ~2–3 consecutive beats separated by 30-second holes**. Across
+the strap's whole history the figure looks healthier — 92.1% beat-to-beat — but that is dominated by
+workout-mode wear at 07:00–11:00, which is exactly the window that is *not* representative of a night.
+
+**⚠ Why this blocks PS-44 rather than merely degrading it.** PS-44 exists to compare `rmssdFromRr`
+over the strap's intervals against the ring's own `0x5d rmssd_ms`. rMSSD is the root-mean-square of
+**successive** differences over a contiguous window; sampling 2–3 beats per 30 s gives a large *count*
+of differences (~1,900 a night) but they are not a contiguous series, and ectopic-beat rejection needs
+neighbouring context that is not there. **A disagreement measured this way would not distinguish "the
+ring is drifting" from "the two devices sampled differently", which is the entire question.**
+
+**⚠ Do NOT simply set `ambient = false` overnight.** The thinning exists for a stated reason — *"so
+all-day 1 Hz doesn't bloat `oura_heartrate`"*. Full-rate persistence for 8 h/night is the cost this
+constant was chosen to avoid, and `rr_intervals` already spans 60 days at 23 MB.
+
+**First action, in preference order.** (1) **Thin the HR samples but keep every RR interval** — the
+`rr` list is the only part rMSSD needs and is far cheaper than the 1 Hz bpm series it rides on; this
+keeps the bloat argument intact and unblocks the comparison. (2) Failing that, a bounded
+full-rate overnight window (a fixed 01:00–05:00 local band) rather than all night. (3) Do not
+attempt the comparison on thinned data and report the result as if it settled anything.
+
+**⚠ What tonight IS still worth, and it is not nothing.** Ambient mode persists overnight **HR** at
+1 sample/30 s, which independently checks the **resting-HR** half of the owner's question (his RHR
+rose ~13 bpm; see TN-46). That half needs no beat-to-beat data. So the night is worth wearing for the
+RHR check even though the HRV check has to wait for the fix above.
+
+**Pass test:** a night of ambient wear yields a contiguous beat-to-beat RR series over the core sleep
+window, and `rmssdFromRr` over it is comparable to the ring's figure for the same night.
+
+
 ### [devices][heart-rate] PS-44 — compute nightly/readiness HRV from raw beat intervals instead of trusting the ring's own figure
 
 - **Lane:** A — `packages/shared/src/health/rmssd.ts` — domain math, and it changes a stored input. (Assigned 2026-09-15, OR-116 lane sweep.)
@@ -3263,6 +3389,10 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
   agreement. **Paired per night, it separates the two live hypotheses outright:** if both instruments
   show the drop it is real physiology, and if only the ring does it is sensor drift. That is a clean
   discriminator and it exists only while the baseline still remembers the pre-drug normal.
+- **⚠ TN-51 — a thinned night does NOT count toward this window.** Overnight wear runs in the
+  service's ambient mode, which keeps one sample per 30 s and discards the intervening beats, so the
+  nights it produces cannot support an rMSSD comparison. **The HRV half of this entry is blocked on
+  TN-51**; the resting-HR half is not, and ambient nights do serve that.
 - **✅ OWNER CONFIRMED, 2026-09-18 — wearing it overnight from tonight.** So night one should appear
   in `rr_intervals` for 2026-09-19. **Verify it landed before counting the window** — the binning
   note below is how, and the last three days produced nothing.
@@ -3280,9 +3410,10 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
 - **What the window is FOR, stated now so it is not re-derived later.** Two questions, and the second
   is the one that matters this week: **(a)** does `rmssdFromRr` over the strap's intervals agree with
   the ring's own figure, which is what this entry proposes to replace; and **(b)** *is the ring
-  telling the truth right now* — the owner's nightly HRV has fallen **62 → 19 ms** over two weeks
-  with resting HR up ~9 bpm (see TN-45), and nothing in the app can currently separate real
-  physiology from sensor drift. A second instrument is the only thing that can. **Design the
+  telling the truth right now* — the owner's nightly HRV has fallen from a pre-dose mean of
+  **58.8 ms to 44.6 ms (−24%)** with resting HR up **+3.9 bpm** (window means, corrected 2026-09-20;
+  the single-night 19 ms and +13 bpm figures this once quoted were a two-day excursion), and nothing
+  in the app can currently separate real physiology from sensor drift. A second instrument is the only thing that can. **Design the
   comparison per-night and paired**, not as two averages: a mean over a window where one device is
   drifting hides exactly the thing being looked for.
 - **Added:** 2026-09-14 (one-off session; owner asked directly whether any Oura-computed value could
@@ -12599,6 +12730,111 @@ behaviour, and TN-6's own pass test (deviation mean within ±0.05 °C of zero) i
   re-derivation lifts it with **no deploy**. Thresholds untouched.
 - **Keep:** a **suppression, not a fix** — TN-6 retires it (its ±0.05 °C pass test is what does), and
   nothing was observed in production.
+### [readiness][heart-rate][body] TN-52 — thresholds are set in bpm and fixed fractions, so they break when the user changes; define them in units of the user's own variability instead 🔴 LIVE
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-20 · owner: *"How can we make the tuning dynamic so
+  it works on reta and off reta?"*
+- **Lane: A** — `packages/shared/src/health/*`. A convention plus a check, then per-threshold work.
+- **Reference: TN-2, TN-47, Q-506, TN-46.** This is the shape those four share; it is filed so the
+  fifth instance is recognised instead of re-investigated.
+- **No gate** for the convention and the check. Each individual threshold it re-derives is a separate
+  `Gate: owner` calibration, because each re-scores history.
+
+**The question behind this entry is the right one and the obvious answer is wrong.** "Detect the
+medication and switch constants" needs a flag, needs the app to know the drug, generalises to nothing,
+and would not have caught the four instances below — none of which involved a medication when they
+broke.
+
+**⚠ The premise has to be corrected first: the owner's physiology moved much LESS than this agent
+reported.** Window means, 28 pre-dose nights against 14 on the drug: resting HR **52.3 → 56.2
+(+3.9 bpm)**, HRV **58.8 → 44.6 ms (−24%)**. The *"+13 bpm, HRV down two thirds"* figures repeated
+earlier were 2026-09-16/17 alone.
+
+**So the app is not fragile because the owner changed a lot. It is fragile because the windows are
+narrower than his ordinary night-to-night noise.** Measured over 59 pre-drug nights:
+
+| | |
+|---|---|
+| his nightly resting-HR standard deviation | **3.15 bpm** |
+| his mean night-to-night change | **2.40 bpm** |
+| Body Battery's charge window (5% of reserve) | **~6 bpm = 1.9 sd** |
+| the sustained shift on Retatrutide | **+3.9 bpm = 1.2 sd** |
+
+**A 1.2 sd shift closed a 1.9 sd window.** It did not need to be a big shift. Any of illness, a week
+of poor sleep, detraining, altitude or alcohol would have done the same — which is why "on reta / off
+reta" is the wrong axis to build on.
+
+**The same shape, four times, three of them with no medication involved:**
+
+| entry | the threshold | how it failed |
+|---|---|---|
+| **TN-2** | charge below `restingHr + 0.05 × reserve` | window ~6 bpm; closed when resting HR *fell* |
+| **Q-506** | `FEVER_TEMP_Z ≥ 2.5` on a baseline dev 17× too wide | unreachable; 40% of the radar's weight inert |
+| **TN-47** | contributors rail at `±1.5σ` on a MAD-based z | HRV reads 0 or 100 on 46% of days |
+| **TN-46** | `checkin` seeded from readiness | circular, and biased +22 vs neutral |
+
+**The proposal — three rules, in the order they pay off.**
+
+1. **Define a threshold as a QUANTILE of the quantity it gates, not as an offset or a fraction of a
+   reserve.** *"Charge below your own 10th-percentile waking HR over the trailing 28 days"* **cannot
+   close**, by construction — 10% of waking time is always below it. It follows the owner on and off
+   any drug with no flag, no drug knowledge, and **no fit**. For TN-2 specifically this is the
+   durable form of its accepted direction *and* it removes the fitted offset — which is what TN-2 is
+   currently blocked on, since the fit needs the daytime-stress constants that do not exist outside
+   the Railway runtime. **A quantile needs no bracket, no replay and no owner sign-off on a number.**
+2. **Size every window in units of the user's own sd, and refuse to ship one narrower than ~2 sd.**
+   A threshold whose window is narrower than the noise of the signal it gates will flicker or close;
+   that is arithmetic, not judgement. Cheap to check and it would have caught all four rows above.
+   **This is the rule worth writing down even if nothing else here is built.**
+3. **Detect REGIME CHANGES, not medications.** A changepoint on the baseline series is general —
+   illness, altitude, detraining, alcohol, a new drug. On a confirmed step change: annotate the
+   period (TN-46's decision), keep the pre-change reference for reporting (already on disk per night,
+   per Lane A's TN-46 correction), and consider letting the EMA adapt faster. **The medication table
+   then labels a regime rather than driving any maths** — which is the difference between a feature
+   that works for one drug and one that works for whatever happens next.
+
+**✅ RULE 1 IS VALIDATED AGAINST THIS OWNER'S DATA — measured 2026-09-20, time-weighted.** The
+quantile was not assumed to work; it was backtested over the same three regimes, weighting each
+sample by its gap to the next (capped at 15 min) because the ring power-gates its PPG and a
+per-sample percentile overstates the quiet end. **That caveat is TN-2's and it bit this measurement
+too:** the per-sample p10 reads 69/68/72 bpm against a time-weighted 61/61/62 — 7–10 bpm apart, and
+the per-sample version supports a "it tracks his physiology" story that the correct one does not.
+
+| | Jun30–Aug19 | Aug20–Sep06 | Sep07–20 (reta) |
+|---|---:|---:|---:|
+| time-weighted p10 of waking HR | **61 bpm** | **61 bpm** | **62 bpm** |
+| % waking TIME under the CURRENT fixed threshold | **20.43%** | **3.34%** | **2.03%** |
+| % waking TIME under a fixed **61 bpm** | **10.41%** | **13.23%** | **7.54%** |
+| points charged/day (actual) | 23.1 | 2.2 | 1.0 |
+
+**Two results, and the second corrects this entry's own first draft.**
+
+1. **The quantile holds in every regime.** A 61 bpm anchor keeps 7.5–13% of waking time chargeable
+   throughout, where the shipped threshold collapsed **20.4% → 2.0%**, a 10× loss. A *rolling*
+   trailing-28-day p10 would hold exactly 10% by construction; the 7.54% above is a single fixed
+   61 bpm applied to all three periods, which is the harsher test and still works.
+2. **The quantile is STABLE across regimes, not tracking them** — 61 → 61 → 62 bpm. The earlier
+   framing of *"it follows him onto and off the drug"* came from the per-sample figures and is
+   withdrawn. It is the better property anyway: the threshold stays put while the broken one drifted
+   7 bpm the wrong way, and stability is what removes the need to refit.
+
+**So TN-2 can be closed without the fit it is blocked on.** Its bracket, its replay endpoint and its
+owner sign-off on a number all exist to choose an offset. A quantile has no offset to choose.
+
+**⚠ Do NOT convert every constant to a quantile.** Some thresholds are deliberately absolute and must
+stay: max HR from a maximal test (TN-30), a fever temperature, anything anchored to an external
+clinical meaning. A quantile of the user's own distribution cannot express "this is abnormal for a
+human" — only "this is unusual for you". **Each conversion is its own decision; this entry supplies
+the rule for telling them apart, not a licence to sweep.**
+
+**⚠ Do NOT fit anything against the current window.** The owner is 14 days into a titration and
+waking rest is still moving. Fit against 2026-06-30 → 2026-09-06 and validate forward.
+
+**Pass test:** no shipped threshold gates a signal with a window narrower than ~2× that signal's own
+measured sd for this user, and the Body Battery's charge window is non-empty across both the pre-dose
+and on-drug periods without either being refitted.
+
+
 ### [readiness][heart-rate] TN-2 — the Body Battery charge window has closed, so the tank only drains
 - **Lane:** A — engine only: packages/shared, app/api.
 
@@ -22258,6 +22494,38 @@ describing a safety net that no longer exists.
   middleware keyed on a cookie cannot cover a client built not to send one.
 - **Scope:** the bearer-token client + an `apiUrl()` indirection so every fetch can target either
   origin. **Not** the workspace split, **not** `output: 'export'` — those are Q-1b.
+
+- **✅ THE SERVER HALF SHIPPED 2026-09-18**, unversioned, nothing user-visible: `lib/auth/bearer-session.ts`
+  plus a fallback inside `auth()` (`auth.ts`). A request with no cookie but an
+  `Authorization: Bearer <session jwt>` now resolves to a session, through the **same** wrapper the
+  222 route files already import, so every route gains it with no route change.
+  - **Two corrections to the ⚠ above, both checked against `main` that day.** (a) Its stated failure
+    mode — a deactivated bearer holder reaching "every `/api` route" — is half wrong. The 403 does
+    not fire, but **PS-24 moved the real enforcement into `auth()`**, which returns `null` for
+    `isActive === false` after re-reading the row, so the answer is 401 and not 200 *provided the
+    bearer resolves through that wrapper*. Resolving it anywhere else is what would produce the
+    bypass. (b) `getToken` from `@auth/core/jwt` **already reads `Authorization: Bearer`**
+    (`jwt.js:92-94`), prefers the cookie, and returns null rather than throwing on a bad token — so
+    the server half is a wiring job, not a crypto one.
+  - **`isActive` is enforced by running the same `refreshIsActiveClaim`**, and a mutation confirms
+    it: removing that one call fails 4 of the 18 cases, including the deactivated-holder case.
+  - **The salt is the cookie NAME**, so `secureCookie` must track `NODE_ENV` exactly as
+    `exchange-mobile-token` does. Get it wrong and every valid token reads as invalid — a test
+    mints under the other salt and asserts the refusal, because that failure is silent otherwise.
+
+- **Gate: owner** — added 2026-09-18 for the REMAINDER, which is the client half. The step that
+  unblocks it is **the exchange route returning the session JWT in its response body**, and that is
+  a real change in exposure rather than plumbing: the token is httpOnly today, so XSS in the WebView
+  can act as the user but cannot *take* a 30-day credential; once it is in JS and in Capacitor
+  storage, it can. **And there is no consumer yet** — the APK is a WebView on the same origin using
+  cookies, and Q-1b (the separate origin that makes a bearer necessary) is the half the owner
+  deferred. The server half above stands on its own and adds no exposure, because sending a bearer
+  requires already holding the JWT, which today means reading an httpOnly cookie.
+  **What lifts it:** the owner saying the native client should hold a token, at which point the
+  remaining work is the exchange response, Capacitor secure storage, and `apiUrl()` across the fetch
+  sites — mostly Lane B, and device-verified.
+  - **`apiUrl()` was deliberately NOT added as part of the server half.** It is an indirection for
+    client fetch sites; shipping it with no callers is dead code that reads as done.
 
 ### [app-shell] Q-1b — native ("Swift-like") feel: Phase 3 (bundle the shell into the APK) — HELD by the owner, who has now seen the measurement
 
