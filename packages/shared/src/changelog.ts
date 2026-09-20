@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.459.3",
+    date: "2026-09-20",
+    changes: [
+      "Your readiness score is the app's own \u2014 worked out here from your ring's overnight data \u2014 but three places still called it \"Oura readiness\", including Home's own neighbour one tap away, which simply calls it \"Readiness\". They all say \"Readiness\" now. The one that mattered was invisible: the same wording went into the prompt behind the \"Why this session?\" explanation, so the written answer credited the number to Oura too.",
+    ],
+  },
+  {
     version: "1.459.2",
     date: "2026-09-19",
     changes: [

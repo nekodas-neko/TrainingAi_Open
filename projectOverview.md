@@ -118,6 +118,18 @@ signature:** 09-17 is a clean day where all five logs have one. **No cause is re
 three hypotheses fit and none was tested — the entry has already been filed with a wrong diagnosis
 twice, and a third is worse than none.
 
+**The readiness number is ours, and three surfaces credited it to Oura (BF-178, 2026-09-20).** The
+value is the app's own ble-derived composite — `oura_daily_derived.readiness_score`, source
+`ble-derived`, with the frozen Cloud column a fallback only for pre-re-key days. Home already called
+it **"Readiness"**; the explain row, the weekly-digest line and the session-explain **prompt** called
+it "Oura readiness". **The prompt line is why this was a bug and not a quibble:** it fed the model
+the false provenance, so the generated prose said it too (*"Despite your Oura readiness of 46"*) —
+unspottable by reading the UI. Its `'not connected'` fallback became `'no data'` for the same reason.
+The field is still `ouraReadiness`, now commented in two places, because the NAME is what taught all
+three call sites to write "Oura". Left alone deliberately: `readiness-payload.ts`'s comment, which
+correctly describes the real Cloud column — **though that availability branch still reads that frozen
+column, which is a separate unexamined question.**
+
 **The equipped title was gated on the catalogue, not on having earned it (RV-61, 2026-09-18).**
 `PATCH /api/user/equipped-title` checked only that the id existed in `TITLES`; the unlock filter lives
 in the picker sheet, which is the **client's** copy of a rule only the server can hold. A direct PATCH

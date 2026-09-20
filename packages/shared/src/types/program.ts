@@ -120,6 +120,10 @@ export interface NextSessionRecommendation {
   // Signal data for the "Why this?" explain page
   signals?: {
     muscleRecovery: Array<{ muscle: string; pct: number; hoursAgo: number }>
+    /** The app's OWN ble-derived composite (`oura_daily_derived.readiness_score`), not Oura's.
+     *  The name is historical and pre-dates the 2026-07-07 re-key; it is what taught three
+     *  separate call sites to render this value as "Oura readiness" (BF-178). Call it
+     *  "Readiness", matching Home. */
     ouraReadiness: number | null
     sleepTrend: number | null
     hrvTrend: number | null

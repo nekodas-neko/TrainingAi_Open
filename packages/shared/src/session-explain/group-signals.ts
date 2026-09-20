@@ -44,7 +44,7 @@ export function groupSignals(data: SessionExplainData): SignalGroup[] {
 
   const readiness: SignalRow[] = [
     {
-      label: 'Oura readiness',
+      label: 'Readiness',
       value: s.ouraReadiness != null ? `${s.ouraReadiness} · ${readinessBand(s.ouraReadiness)}` : 'No data',
     },
     { label: 'Sleep', value: trendPhrase(s.sleepTrend) },
