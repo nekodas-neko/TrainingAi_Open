@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { migrationTestLock } from './migration-test-lock'
+import {
+  migrationTestLock, lockPidsEverHeld, lockPidsStillHeld, LOCK_PG_LOCKS_OBJID,
+} from './migration-test-lock'
 
 /**
  * Q-171: the lock is the whole fix, so it needs to be shown holding rather than assumed. A helper
@@ -19,9 +21,22 @@ describe.skipIf(!canRun)('migrationTestLock', () => {
 
   afterAll(async () => {
     if (!canRun) return
-    // Nothing may still hold it, or the next file to take it would hang.
-    const { rows } = await pool.query(`SELECT count(*)::int AS n FROM pg_locks WHERE locktype = 'advisory'`)
-    expect(rows[0].n).toBe(0)
+    // Nothing **of ours** may still hold it, or the next file in this worker would hang.
+    //
+    // **LA-123: this used to count advisory locks across the whole cluster, which is not an
+    // invariant this file can own.** `pg_locks` is scoped to neither database, session nor process,
+    // and fifteen sibling files take this same key in parallel vitest workers against one Postgres
+    // — so the old assertion went red whenever one of them happened to be mid-migration as this
+    // file finished, which it did once on a clean tree (`1 file failed` against `0 tests failed`,
+    // the signature of a hook). Scoping to the backend pids this process actually took the lock on
+    // keeps the database evidence and drops the race: a pid is one live backend, and a backend
+    // belongs to one process's pool.
+    expect(lockPidsStillHeld(), 'a lock this file took was never released').toEqual([])
+    const { rows } = await pool.query(
+      `SELECT count(*)::int AS n FROM pg_locks
+        WHERE locktype = 'advisory' AND objid = $1 AND pid = ANY($2::int[])`,
+      [LOCK_PG_LOCKS_OBJID, lockPidsEverHeld()])
+    expect(rows[0].n, 'postgres still shows our key held on a connection we used').toBe(0)
   })
 
   it('a second holder waits until the first releases', async () => {
@@ -53,8 +68,17 @@ describe.skipIf(!canRun)('migrationTestLock', () => {
     await lock.acquire()
     // Churn the pool: if the lock rode on a returned connection, these would free it.
     await Promise.all(Array.from({ length: 5 }, () => pool.query('SELECT 1')))
-    const { rows } = await pool.query(`SELECT count(*)::int AS n FROM pg_locks WHERE locktype = 'advisory'`)
-    expect(rows[0].n).toBeGreaterThan(0)
+    // Scoped to OUR pid (LA-123). Unscoped, this passed as readily on a sibling worker's lock as
+    // on its own — weaker than it looked rather than broken, and it would have gone the same way
+    // as the hook above the moment it mattered. This is also the assertion that keeps the helper
+    // honest: a no-op that never took the lock could not produce a row here.
+    const [pid] = lockPidsStillHeld()
+    expect(pid, 'acquire must record the backend it took the lock on').toBeTypeOf('number')
+    const { rows } = await pool.query(
+      `SELECT count(*)::int AS n FROM pg_locks
+        WHERE locktype = 'advisory' AND objid = $1 AND pid = $2`,
+      [LOCK_PG_LOCKS_OBJID, pid])
+    expect(rows[0].n).toBe(1)
     await lock.release()
   })
 })

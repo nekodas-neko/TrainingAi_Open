@@ -15,6 +15,7 @@ import { CalendarWidget } from "@/components/calendar-widget";
 import { ActivityHistoryCard } from "@/components/health/activity-history-card";
 import { AiPeriodizationStatusCard } from "@/components/health/ai-periodization-status-card";
 import { WeeklyMuscleSetsCard } from "@/components/health/weekly-muscle-sets-card";
+import { MovementBalanceCard } from "@/components/health/movement-balance-card";
 import { WeekInReviewCard } from "@/components/health/week/week-in-review-card";
 import { BodyMuscleCard } from "@/components/health/body-muscle-card";
 import { EnergyBudgetPrompt } from "@/components/health/energy-budget-prompt";
@@ -690,6 +691,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
       case "aiPeriodization": return <AiPeriodizationStatusCard key="aiPeriodization" />;
       case "aiVolume":        return <AiWeeklyVolumeCard key="aiVolume" />;
       case "muscleSets":      return <WeeklyMuscleSetsCard key="muscleSets" muscles={muscleSets ?? []} loading={muscleSets === null} title="Muscle Volume This Week" trainingGoal={trainingGoal} />;
+      case "movementBalance": return <MovementBalanceCard key="movementBalance" />;
       case "muscleMap":       return <BodyMuscleCard key="muscleMap" muscleSets={muscleSets} recoveryMuscles={recoveryMuscles} />;
       case "activityHistory": return <ActivityHistoryCard key="activityHistory" userId={userId} />;
       case "workoutDensity":  return <WorkoutDensityCard key="workoutDensity" trends={healthTrends} />;

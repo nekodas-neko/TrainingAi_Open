@@ -996,6 +996,25 @@ below threshold and left in place for next time.
 - **A `Gate:` or `Needs:` already overrides the marker; a `Keep:` does not**, and that asymmetry is
   the whole bug. The script's own comment says *"a structured field is authoritative"* — `Keep:` is
   a structured field.
+
+- **⚑ IT HAS NOW COST A SHIPPABLE ITEM, measured 2026-09-20.** **OR-118 sat startable and invisible
+  for four days.** Its engine half landed 2026-09-18, its `Needs:` was empty and the entry said in
+  words that it was *"now startable"* — and it printed under PARKED the whole time, because a `⛔`
+  three bullets up was emphasising a corrected premise. Lane B's READY read **0** across five
+  consecutive queue checks while a buildable card waited. It shipped the day someone read PARKED
+  instead of trusting READY.
+- **Two more are parked this way RIGHT NOW** — found in the same sweep, neither touched:
+  - **TN-3b** — its marker line is itself an argument that the entry should be UNparked
+    (*"the parking rationale was right for a score and is wrong for a chart"*).
+  - **Q-305** — marker reads *"the push:pull half is not done, deliberately"*, a note about scope
+    rather than a blocker. That half is what became OR-118 and is now shipped.
+  Whoever fixes the parser should re-run `next-item.js --lane B` immediately afterwards: the real
+  READY list on 2026-09-20 was not 0, and nobody could see it.
+- **⚑ PRIORITY ARGUMENT, 2026-09-20.** OR-118 shipped the day someone read PARKED instead of
+  trusting READY, and the audit that found it also established that **TN-3b and Q-305 are parked by
+  the same glyph right now** — one of them (TN-3b) blocking a buildable entry. So the defect is not
+  "an entry reads oddly in PARKED": it is **Lane B reporting an empty lane while holding work**.
+  Every session that trusts READY pays this again.
 - **Recommendation: let `Keep:` override the legacy marker, exactly as `Gate:` and `Needs:` do.**
   One clause at `next-item.js:135`. It cannot hide a genuine block, because an entry whose residue
   really is gated states `Gate:` in the `Keep:` line and that path already parks it.
@@ -1038,6 +1057,98 @@ below threshold and left in place for next time.
   stale number is a red CI, and splicing the conflict hunks produces a number matching neither side.
   The recompute is correct; it is the conflict that should not exist.
 - **Branch:** _unassigned_
+
+- **⚑ MEASURED 2026-09-20: EIGHT drifts in roughly two hours, every one a docs-only PR.** Landing
+  OR-118 (#1333) took **six resolve-and-push cycles**, and the collision was the same three files
+  every single time: `docs/implementation-backlog.md`, `docs/doc-size-baseline-history.md` and
+  `docs/doc-size/docs/implementation-backlog.md.size`. Nothing was lost — the resolutions are
+  mechanical and entry integrity was checked after each one — but the cost is real and it is
+  structural rather than unlucky: **every agent that finishes anything writes to those three files,
+  so any two concurrent PRs conflict by construction.** The drift rate (~8–10 min) is faster than a
+  CI cycle (~7 min for the five required), so a PR can lose the race indefinitely. What broke the
+  loop was resolving and merging inside the same minute, not waiting for a sixth full run.
+### [body][nutrition] BF-185 — un-ticking and re-ticking a dose silently rewrites the time it was taken
+
+- **Batch:** `supplement-dose-surface` — ships with **BF-186**. Both are Lane B edits in the
+  supplements area and both are settled by one device pass: open the section, toggle a dose, reach
+  Manage. Batched on the verification, per this file's rule. No migration in either.
+- **Branch:** _unassigned_ · **Added:** 2026-09-20 (BugFix intake). Owner: *"In that attempt i
+  unclicked the button then re clicked it so check if that caused double recording or so."*
+- **Lane: B** — the dose toggle in `components/nutrition/supplements-section.tsx`.
+- **✅ NO DOUBLE RECORDING — checked including soft-deleted rows.** `supplement_logs` for
+  Retatrutide still holds exactly **3 rows, none with `deleted_at` set**, one per dose. The toggle
+  correctly upserts the day's row rather than inserting a second.
+- **⚠ But the re-tick MOVED the recorded dose time, and nothing says so.** Same row
+  (`f6a3c7b6…`), measured across two reads of production on 2026-09-20:
+
+  | field | before the re-tick | after |
+  |---|---|---|
+  | `created_at` | 10:46:35 | 10:46:35 *(unchanged)* |
+  | **`taken_at`** | **10:46:33** | **11:21:13** |
+  | `updated_at` | 10:46:35 | 11:21:13 |
+
+  **35 minutes**, 20:46 → 21:21 Brisbane. The injection happened once; the stamp now records when he
+  last touched the button.
+- **Why it matters here specifically.** BF-184 exists to correlate dose timing against overnight HR
+  and HRV — the owner's words were *"dosage night vs hr"*. A stamp that follows the last tap rather
+  than the dose is the one field that analysis cannot tolerate drifting, and it drifts **silently**:
+  nothing in the UI indicates the time changed, and the only way he found out was asking.
+- **Fix: on a re-tick of a day that already has a log, keep the existing `taken_at`.** The row is
+  being upserted already; preserve the original stamp rather than re-stamping `now`. An untick
+  followed by a re-tick is a correction of a mis-tap, not a statement that the dose happened at the
+  moment of the second tap.
+- **⚠ Decide what an intentional time change looks like, because the fix removes today's only path
+  to it.** Right now re-ticking is the *only* way to move a dose's time, so a plain "preserve it"
+  leaves a wrong stamp uncorrectable. Either make the time editable where the dose is shown, or keep
+  the re-stamp and make it visible ("time updated to 21:21"). **Editable is the better answer** —
+  it separates *"I mis-tapped"* from *"I dosed at a different time"*, which the toggle cannot
+  distinguish and should not try to.
+- **Sibling sweep:** every supplement uses this toggle, not just the mg-dosed ones. Any dose whose
+  timing matters carries the same drift.
+- **Verification:** tick a dose, note `taken_at`, untick, re-tick, and confirm the stamp is
+  unchanged. Then confirm an intentional edit is still possible by whatever path the fix chooses.
+  **Device look owed** — the toggle is the surface and the timing is what is being measured.
+
+### [nutrition] BF-186 — the vial sheet sends you to "Manage supplements", which is a 10 px "Manage" link on another screen
+
+- **Batch:** `supplement-dose-surface` — ships with **BF-185**, same area and same device pass.
+- **Branch:** _unassigned_ · **Added:** 2026-09-20 (BugFix intake). Owner, after being told by the
+  app where to change his saved dose: *"I dont see a manage supplements section to change the
+  default to 1mg."*
+- **Lane: B** — `components/nutrition/supplements-section.tsx:131-133` (the control) and the vial
+  sheet's hint copy.
+- **The instruction names something that does not exist by that name.** The vial sheet reads
+  *"Your saved dose is 0.5 mg, changed in **Manage supplements**, under Amount."* The actual control
+  is labelled **"Manage"**, alone, in the Supplements section header of the Nutrition tab:
+
+  ```tsx
+  <button type="button" onClick={() => setManageOpen(true)}
+    className="text-[10px] text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+    <SettingsIcon className="h-3 w-3" /> Manage
+  </button>
+  ```
+
+- **Three things stack to make it unfindable**, which is why a search for the literal phrase fails:
+  1. **The words differ** — the hint says "Manage supplements", the control says "Manage".
+  2. **It is 10 px, muted, with a 12 px icon** — styled as a section-header affordance, not a
+     destination, next to a `text-[10px]` "SUPPLEMENTS" label it visually matches.
+  3. **It is on a different screen from the sheet giving the instruction.** The hint appears in the
+     vial sheet; the control is behind it in the Nutrition tab's supplements section.
+- **⚠ The tap target is under the floor and that is a separate defect in the same line.** No padding
+  on a 10 px text button gives roughly a 12–14 px hit area against this repo's 44 px rule. Fix both
+  in the same edit — the repo's own rule puts tap-target floors in the shared button component, not
+  in a bare element, so this should become a `Button` variant rather than a styled `<button>`.
+- **Fix, in order of value:** make the hint itself the control — *"Your saved dose is 0.5 mg. **Change
+  it**"* opening the manage sheet directly, which removes the navigation entirely. Failing that,
+  match the words exactly and give the control a real target.
+- **⚠ The hint is also the reason this matters rather than being a nit.** It appears because his
+  saved default (0.5 mg) no longer matches what he takes (1 mg). The app is correctly telling him
+  about a stale default and then pointing at a door he cannot find — so the default stays stale, and
+  a hurried tap on the dose prompt logs 0.5 mg. That is most likely how dose 1 came to be recorded
+  at 0.5 with no time.
+- **Verification:** from the vial sheet, follow the instruction as written and reach the Amount
+  field. **Device look owed** — discoverability and tap target are both physical properties of the
+  S25 screen.
 
 ### [body][readiness] BF-184 — the reta dose is recorded well and joins cleanly to recovery metrics; nothing surfaces that join, and dose 1 is missing its time
 
@@ -3897,6 +4008,120 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
   is a product/UX decision about what "connect a data source" promises the user, not a technical
   blocker.
 
+### [devices][heart-rate] TN-54 — the chest strap has been dark for five days and nothing server-side records that, so PS-44's window cannot be counted 🔴 LIVE
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-20 · found answering the owner's *"I slept with the
+  strap on last night. Can you check it recorded what we needed"* — **it did not, and neither of us
+  could tell why.**
+- **Lane: A** — `android/.../polar/PolarStrapService.kt` plus an ingest/read path for status. **APK.**
+- **Gate: device** — nothing BLE verifies in the sandbox.
+- **Blocks PS-44's window management** (and TN-51 is the separate reason its HRV half needs an APK).
+
+**Measured 2026-09-20.** The owner wore the strap overnight. Across `rr_intervals` **and**
+`oura_heartrate`, the last chest-strap sample of any kind is **2026-09-15 23:11 UTC — 09:11 Brisbane
+on the 16th.** Five days, both tables, zero rows.
+
+**The ingest path is healthy, so this is strap-specific.** The same night the ring wrote **455 HR
+samples, 104 of them in core sleep (01:00–05:00 Brisbane)**. Phone, app, network and
+`/api/hr-ingest` all worked; only the strap contributed nothing.
+
+**⚠ AND THERE IS NO SERVER-SIDE TRACE OF WHY. That is the entry.**
+
+| | ring | chest strap |
+|---|---:|---|
+| battery readings persisted | **11,758** (latest today, 76%) | **0 — memory only** |
+| connection/status rows | present | **none** |
+| faults in `error_events` (48 h) | — | **none** |
+
+`PolarStrapService` holds `battery` in a `private var` written once per connection and never
+persisted, and its give-up path — `stopSelf()` after `MAX_CONSECUTIVE_FAILURES = 6`, logged as
+*"giving up after N consecutive failures — strap not reachable"* — reaches `onLog` and **no table**.
+So a strap that dies, runs flat, or never connects is indistinguishable from a strap that was not worn,
+from any surface except opening the app while it is happening.
+
+**Why that is worse than a missing night.** PS-44 needs **seven** nights of paired data and the entry
+already says not to count a night until it is in the table. With no status signal the owner cannot
+know in the morning whether the night counted, and the only way to find out is this query. A
+seven-night window managed that way will take far longer than seven nights — it has already cost one.
+
+**First action — persist what the ring already persists.** A strap status row per connection attempt
+carrying `battery_percent`, `state` (connected / retrying / gave-up) and `last_sample_at`, written by
+the same native HTTP path that already posts samples. `oura_ble_battery_poll` is the shape to copy;
+this is not new infrastructure.
+
+**⚠ Do NOT solve this with a phone notification alone.** A `LOW_BATTERY_CHANNEL_ID` channel already
+exists in the service and did not prevent five silent days — a notification is not a record, and the
+question *"did last night count"* is asked the next morning, not at the moment of failure.
+
+**✅ DIAGNOSED LIVE, 2026-09-20 06:03 Brisbane — it is NOT the battery and NOT the link.** The owner
+sent a screenshot of the Devices screen reading **"Polar H10 · Connected · on your chest"**, and rows
+began arriving **in the same minute**:
+
+| Brisbane | rr_ms | gap from previous |
+|---|---:|---:|
+| 06:03:28 | 802 | — |
+| 06:03:58 | 1247 | **30.2 s** |
+| 06:04:29 | 715 | **30.2 s** |
+| 06:04:59 | 790 | **30.7 s** |
+
+**Opening the app is what started it.** Nothing had arrived for five days; ingestion resumed the
+minute the Devices screen was opened and has continued since. So the strap, its cell, the BLE link
+and the whole ingest path are all fine — **the service simply was not running**, and the most likely
+reason is its own give-up path (`stopSelf()` after `MAX_CONSECUTIVE_FAILURES = 6`), which nothing
+restarts until the app is launched.
+
+**That makes the observability gap the entire bug rather than half of it.** A service that stops
+itself and needs a manual app launch to come back is survivable if it *says so*; this one is
+indistinguishable from a working strap, and the Devices screen shows **"Connected"** with no battery
+figure at all (the ring beside it shows 75%) — so the one surface the owner checked actively
+reassured him.
+
+**⚑ OWNER, 2026-09-20: *"lets get this sorted before my next trial as that was a waste of night …
+We need to see if we can get an accurate battery indicator as it just says 100% on the home screen
+all the time."*** Two findings follow, and the first says not to build what was asked for.
+
+**1. An accurate battery percentage is NOT achievable, and this repo already says so.** The H10 runs
+a **CR2025** — a primary lithium coin cell with a near-flat discharge curve that holds voltage until
+it collapses. `PolarStrapService` line 239 carries the comment *"a dying cell presents as flaky
+connections long before it presents as a dead strap"*, and the Polar knowledge base says the same.
+**A constant 100% is the cell behaving normally, not the indicator being broken.** Chasing a truer
+percentage would spend an APK cycle on a number that cannot give warning.
+**What to surface instead is `last_sample_at` and connection reliability** — those move days before
+the percentage does. Keep the low-battery notifier as a floor, but stop treating % as the signal.
+
+**2. The live indicator ALREADY EXISTS and is deliberately invisible.** The service runs a foreground
+notification reading **"Connected · N% battery"**, **"Strap unreachable — retrying in Ns"**, or absent
+when it is not running at all — but its channel is **`IMPORTANCE_MIN`** (line 155), which Android
+collapses into the silent section of the shade with no status-bar icon.
+
+**So there is a check that works TODAY, before any code ships:** pull down the shade, expand the
+silent section, and look for *"Chest strap"*. Present and reading "Connected" → the service is up.
+**Absent → it is not running, and no night will record.** That is the check the owner needed on
+2026-09-19 and could not find.
+
+**⚠ The fix is not "make the notification loud".** `IMPORTANCE_MIN` was chosen so an all-day service
+does not sit in the status bar, and that is right for all-day wear. **Raise it only for a declared
+sleep session** — see the pass test — or mirror the same state into the app where it can be checked
+deliberately.
+
+**⚠ Revised ask, sharper than the original.** Persist the status row *and* surface **last-sample-at**
+on the Devices card. "Connected" is not the useful fact; **"last sample 5 days ago"** is, and the app
+has it.
+
+**⚠ Do not read the five-day gap as a device fault.** The most likely causes are a flat CR2025
+(141,745 RR intervals of use, and the Polar notes say a dying cell presents as flaky connections), the
+service having given up and never been restarted, or Bluetooth being off. **This entry is about not
+being able to tell which** — it deliberately does not claim to know.
+
+**Pass test, revised for the owner's actual need — a night that records or tells him it will not:**
+1. Before sleep, one surface states **"recording — last sample N seconds ago"**, not "Connected".
+2. A service that has given up is **visibly** distinguishable from one that is running, without
+   opening the app and without expanding a silent notification section.
+3. The next morning, a query answers whether the night counted — **from stored status, not inference
+   from sample presence**, so "no rows" can be told apart from "worn, service dead".
+4. `last_sample_at` is on the Devices card beside "Connected".
+
+
 ### [devices][heart-rate] TN-51 — overnight strap wear lands in ambient mode, which discards 29 of every 30 seconds of beats, so PS-44's HRV comparison cannot be made from it 🔴 LIVE
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-19 · Tuning agent, checked the night the owner said
@@ -3926,6 +4151,16 @@ hours):**
 So ambient wear yields **islands of ~2–3 consecutive beats separated by 30-second holes**. Across
 the strap's whole history the figure looks healthier — 92.1% beat-to-beat — but that is dominated by
 workout-mode wear at 07:00–11:00, which is exactly the window that is *not* representative of a night.
+
+**✅ CONFIRMED LIVE IN PRODUCTION, 2026-09-20 06:03–06:05 Brisbane — and it is WORSE than this entry
+estimated.** With the strap connected and the service in ambient mode, consecutive stored RR rows sit
+**30.2 s, 30.2 s and 30.7 s apart** — `AMBIENT_GAP_MS` exactly, and **one single RR interval per
+kept sample**, not the "islands of 2–3 beats" estimated from historical gaps.
+
+**With one interval per island there are ZERO successive pairs, so rMSSD is not degraded — it is
+undefined.** rMSSD is the root-mean-square of differences between *adjacent* intervals; a lone
+interval every 30 s yields no adjacent pair at all. The historical 57.4%-of-gaps-under-2 s figure
+came from kept samples that happened to carry 2 beats; the live sample carries 1.
 
 **⚠ Why this blocks PS-44 rather than merely degrading it.** PS-44 exists to compare `rmssdFromRr`
 over the strap's intervals against the ring's own `0x5d rmssd_ms`. rMSSD is the root-mean-square of
@@ -3970,6 +4205,10 @@ window, and `rmssdFromRr` over it is comparable to the ring's figure for the sam
   agreement. **Paired per night, it separates the two live hypotheses outright:** if both instruments
   show the drop it is real physiology, and if only the ring does it is sensor drift. That is a clean
   discriminator and it exists only while the baseline still remembers the pre-drug normal.
+- **⚠ TN-54 — and you cannot currently tell whether a night counted.** The strap has been dark since
+  2026-09-16 with no server-side trace of why; the owner wore it on 2026-09-20 and it produced nothing
+  while the ring wrote 104 core-sleep samples the same night. **Check the table each morning until
+  TN-54 lands.**
 - **⚠ TN-51 — a thinned night does NOT count toward this window.** Overnight wear runs in the
   service's ambient mode, which keeps one sample per 30 s and discards the intervening beats, so the
   nights it produces cannot support an rMSSD comparison. **The HRV half of this entry is blocked on
@@ -6987,30 +7226,6 @@ metric false-positives (Q-471's contentKey fix unapplied here). (e) The model's 
 rendered as an "AI confidence" bar and decides `source` (`log-food.ts:31`) — against the CLAUDE.md
 rule's letter, honestly labelled; owner call.
 
-### [platform][workouts] LA-74 — `POST /api/workout-templates` still takes an unvalidated body
-
-- **Lane:** A — `app/api/workout-templates/route.ts`, `packages/shared/src/validation/`.
-- **Keep:** the program half. The style half shipped 2026-09-07 with a `.strict()` schema.
-- **Added:** 2026-09-07, Lane A — found while applying LA-73's name guard and unable to.
-
-The route spreads `body.program` into `repo.saveProgram`. **Not mass assignment** — the repository's
-`.set({ name, isActive, updatedAt, … })` names every column — but nothing types or bounds a value,
-and the two ownership checks it does carry (`phaseSetId`, `styleId`) read as validation while
-covering two fields. `scripts/check-strict-request-schemas.js` requires `.strict()`, and neither of
-its exemptions applies: nothing in `pushMutations` writes programs, and the poster is the WebView,
-which ships with the deploy rather than with the APK.
-
-**The enumeration is done — this is what stopped it shipping.** Two producers disagree.
-`config-screen.tsx`'s editor builds sessions **without** `programId` and exercises **without**
-`sessionId`; the activate button posts the whole stored row back (`{ ...program, isActive: true }`)
-**with** both, plus `userId`, `startedAt` and JSON date strings. So every field either producer omits
-must be `.optional()`, `schedule` is a two-variant union (`weekly` / `rotation`, or `null`), and
-`createdAt`/`updatedAt` arrive as strings against a `Date` type. One wrong key 400s the app's core
-write path, on a device this sandbox cannot drive.
-`lib/__tests__/progression-style-write-schema.test.ts` already pins the four shapes the client posts
-— start there, and keep the name unbounded: `programs.name` is `text`, so a `.max()` would 400 the
-activate of a program that was fine yesterday.
-
 ### [body][devices] LA-71 — `scale_raw_samples` still has no unique key
 
 - **⚠ PRESENT WITH THE OTHER DATA-LOSING SCHEMA CHANGES — `destructive-migration` (grouped
@@ -7037,8 +7252,9 @@ account holds a duplicate, so the migration must delete duplicates (lowest id wi
 
 - **Lane:** A — `e2e/`, and the nutrition specs reach `components/**`, which is Lane B's.
 - **Added:** 2026-09-06, found while merging OR-102a. **Rewritten 2026-09-07 against a measured run.**
-- **Keep:** the specs themselves. Two of the entry's three claims were wrong and are struck below;
-  what is left is nine real failures nobody had seen.
+- **Keep:** ONE decoder flake. **The "nine" is struck too — measured 2026-09-20 it is nine no
+  longer, and the one hard failure left was a live product bug that is fixed here.** All three of
+  this entry's original claims have now been struck by measurement.
 
 **Struck: "a Playwright or web-server startup timeout, not specs asserting and failing."** Measured
 2026-09-07 by running the suite locally under `CI=1` against the CI seed: **147 passed, 9 failed,
@@ -7056,13 +7272,35 @@ makes a silent empty artifact impossible.
 **Also fixed here:** the gate matched `^app/`, so an `app/api/**`-only change bought the full suite.
 It now drops `app/api/` lines before matching, verified against eight path shapes including mixed.
 
-**What is owed — the nine.** Seven are nutrition/meal, which is a cluster tight enough to suspect one
-shared cause: `edit-meal-batch-footer`, `meal-detail-artboard-parity`, `meal-label`,
-`meal-photo-picker`, `my-meals-artboard-parity`, `plan-rescale` (LA-67), `saved-meal-tags`. The other
-two are `first-run-empty-states` and `preferences-survive-reinstall`. **Order matters:**
-`preferences-survive-reinstall` fails twice in the full run and only goes flaky when run alone, so at
-least some of these are shared-state, not the spec's own logic. Read the artifact this PR makes real
-before assuming a local-DB artifact — that mistake has already been made once on `plan-rescale`.
+**Struck: "nine real failures".** Re-measured 2026-09-20 against `main` at `562ec1f2934`, on a
+database built the way CI builds one — `DROP`/`CREATE`, all 277 migrations, then `seed.sql`, rather
+than the session's shared dev database and its 36 accumulated accounts. Full suite under `CI=1`:
+**1 failed, 1 flaky, 1 skipped, 220 passed, 34.4 min.** Eight of the nine had been fixed by other
+work in the intervening two weeks and nobody re-ran the count — four of the nine specs had been
+edited since (`meal-photo-picker` 09-15, `first-run-empty-states` and `preferences-survive-reinstall`
+09-14, `plan-rescale` 09-11). The "one shared cause across seven nutrition specs" theory was never
+tested and is now unfalsifiable; it is noted only so it is not re-derived.
+
+**The one hard failure was a real defect, and it is fixed in this entry's PR.**
+`rv38-body-battery-no-data-badge` — written 2026-09-15, so never part of the nine — failed on both
+attempts. Root cause is NOT the spec: `batteryConfidence`'s "no verdict in the first hour awake"
+grace clause returned `sufficient: true` on `sampleCount: 0`, and the card shows its `Limited data`
+badge on `!sufficient`, so an account that has never worn anything read `Good / Steady / 50`
+unqualified — RV-38's exact defect — for the first hour after waking, every day. The spec was
+therefore **red between 00:00 and 01:00 Brisbane and green the rest of the day**, the Q-356
+clock-dependence shape. `sampleCount === 0` is now excluded from the grace window; proven by
+re-running the spec inside the failing band (red at 00:47, green at 00:48).
+
+**What is still owed — one flake.** `meal-label.spec.ts:286` (`a saved meal renders a printable
+label in every style`) failed its first attempt on the `Ingredients · centred` style and passed on
+retry. **Ink was 0.0802, so the canvas was painted** — this is a decode failure, not a render one,
+which matches LB-38's root cause (zxing cannot read certain valid QR symbols upright) that
+`decodeQrRotating` was added for and evidently does not fully cover. Not diagnosed further here and
+**not claimed fixed**. Its kept-pixels dump is written into `test-results/`, which Playwright wipes
+at the start of the next run — so a local reproduction destroys its own evidence unless the `.bin`
+is copied out first. CI's artifact upload does keep it.
+
+`1 skipped` is `training-load-day-flags.spec.ts:153`, a deliberate skip, not a failure.
 
 ### [platform] LA-77 — 60% of the lint warnings are deliberate, so the 60 real ones are invisible
 
@@ -7091,6 +7329,15 @@ present.
   the order — the reverse fails CI on debt nobody has had a chance to pay.
 - **Not urgent, and small.** Nothing is broken; the Lint job passes on warnings today and would keep
   passing. This is about whether the output can be read at all.
+- **One more line while in that file, measured 2026-09-20 (LA-63).** `playwright-report/` and
+  `test-results/` are gitignored but **not eslint-ignored**, so any local `pnpm e2e` run makes the
+  next `pnpm lint` report **256 errors** — all of them `no-this-alias` and friends inside the HTML
+  reporter's bundled JavaScript, at column 17767 of line 10. `0 errors` the moment the two
+  directories are removed. CI never sees it because Lint and E2E are separate jobs with separate
+  checkouts, so this lands only on whoever runs both locally, and it reads as 256 real errors in
+  their own change. Add both paths to the ignore list.
+- **The warning count in this entry is also stale**: 290 when written, **743** on 2026-09-20. The
+  argument is unaffected and gets stronger.
 
 ### [app-shell] PS-35b — a wrong PWA start_url, a doubled boot fetch, a dead branch and a stuck weather chip
 
@@ -7198,7 +7445,12 @@ Fix the seven verified-stale CLAUDE.md items (wrap-up 3-vs-4, fetch-once counts,
 W1 bounce file, second Gemini model, in-place struck Known Issues, the 31/33 origin story); collapse
 the duplicated Q-479 FIXED rows (:2486/:2998 — the cross-file check cannot see same-file pairs);
 decide the 13 `Needs:` edges pointing at KEEP entries (the "absent = shipped" rule can never clear
-them — OR-100's split); strike LB-27's already-decided Keep (`connectionTimeoutMillis` is 5000);
+them — OR-100's split); ~~strike LB-27's already-decided Keep (`connectionTimeoutMillis` is
+5000)~~ **— done 2026-09-20, and it went further than a strike: the whole entry is retired. The
+premise was not merely already-decided, it was never true (`connectionTimeoutMillis: 5_000` has been
+in `client.ts` since the initial public snapshot, two weeks before LB-27 was filed), and the symptom
+does not reproduce on current `main` cold or warm. See
+[`2026-09-20-lane-a-lb27-refuted`](overview/entries/2026-09-20-lane-a-lb27-refuted.md);**
 repair the 22 dead backlog paths and 43 doubled `docs/overview/overview/` labels; index the 17
 unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge candidates
 (led by `oura-ring-data-reference.md`, a retired-API reference with no retirement note).
@@ -10307,97 +10559,6 @@ deliberate choice, on a session where the absence of a Primary is the design.
   outgoing one's role, the prescribed sets and percentages are unchanged, and the session still has
   no Primary afterwards.
 
-### [platform] LB-27 — one extra request during launch strands several for over a minute, and nothing explains why
-
-- **Lane:** A
-- **Added:** 2026-08-30 · Lane B, measured while fixing Q-392's own version of this.
-- **Reference:** the symptom is written up in
-  [`2026-08-30-preferences-read-sites`](overview/history-2026-09-10-folded-4.md#2026-08-30-preferences-read-sites);
-  Q-392's mirror-effect PATCH is already fixed, so this entry is the **unexplained** half only.
-
-**The measurement.** Health's launch fires ~25 API requests in the first seven seconds. Adding one
-more — a single `PATCH /api/user/preferences` from a card's mount effect — left that PATCH **and a
-`GET` behind it pending past sixty seconds**, with nothing else in flight and no further requests
-after twenty seconds. Instrumented on a cold dev server with Playwright's `requestfinished`, so
-these are genuinely unresolved connections, not slow ones. The same PATCH fired *after* the burst
-settles answers in **340 ms**, and a burst of five answers in **641 ms**. Removing that one request
-took the page from never reaching `networkidle` to reaching it in ~19 s.
-
-**Why it matters beyond a test.** Nine e2e specs failed on `waitUntil: 'networkidle'` and none of
-them mention preferences, so the next person to add a request to a launch path gets a failure that
-names someone else's screen. And if a request really can strand for a minute on the device, that is
-a launch-time hang, not a test artefact.
-
-**Where to look, in order.** `updateUserPreferences` (`lib/data/postgres/adapter.ts`) is the only
-route in that burst that opens a **transaction with `SELECT … FOR UPDATE`** on the `users` row, and
-it holds a pool client for its duration; the pool is `max: 10` (`lib/data/postgres/client.ts`) with
-`pg`'s default `connectionTimeoutMillis: 0`, which waits **forever** for a client rather than
-erroring. A `statement_timeout` cannot fire on a query that never starts. That is a hypothesis, not
-a finding — it does not by itself explain a plain `GET` hanging beside it.
-
-- **Not reproduced in production**, and it may be dev-server-specific (route compilation under
-  concurrency). Establish that first: it changes whether this is a bug or a harness note.
-- **Keep:** whatever the cause, `connectionTimeoutMillis: 0` on a pool of 10 is worth a decision of
-  its own — a bounded wait turns a hang into an error state a card can show.
-
-### [platform] BF-55 — the database is growing ~7× its expected trend
-
-> **✅ The index half shipped 2026-09-01** (migration 249). `oura_heartrate_user_updated` —
-> `idx_scan` 0, `idx_tup_read` 0, **21 MB**, a quarter of the database's index budget — is dropped,
-> with the owner's conditional approval and both conditions re-verified against production.
-> `getOuraTimeseriesDelta` and its tests stay per Q-180; its doc comment now carries the
-> `CREATE INDEX` the restore driver must run, and a test holds that paragraph in place.
-> [journal](overview/history-2026-09-10-folded-5.md#2026-09-01-drop-unused-hr-index)
->
-> - **Keep:** the growth trend, which this did not explain.
-
-- **Lane:** A.
-- **⚑ RE-READ 2026-09-02, AS THIS ENTRY ASKS: total is now 200 MB**, down from 206 because
-  migration 249 landed on 09-01 and took the 21 MB index with it (verified: `oura_heartrate` now
-  carries exactly two indexes). [review](reviews/2026-09-02-db-growth-archive-attribution.md).
-- **⚑ ~62% OF THE EXCESS IS THE ARCHIVE, AND IT MUST NOT BE "FIXED".** `oura_raw_packed` holds
-  **1,072 rows / 18 MB**, and its FIRST PACK IS DATED **2026-08-18 — the same day as the baseline**.
-  So it has grown **18 MB in 15 days (~1.2 MB/day)** and is never pruned, because `body_hex` is the
-  archival source of truth. **The ~0.4 MB/day expectation cannot have included it:** the packing work
-  that produced the 171 MB figure created a new permanent writer on the same day, at a rate nothing
-  had yet observed. Part of the "7× trend" is an expectation that was never re-baselined.
-  The trade is working: `oura_raw_samples` is a rolling window (`ring_timestamp_ds` spans **7.58
-  days**, 189,406 rows, 73 MB) and the archive takes the overflow at about an eighth of the size —
-  ~440 MB/year, permanent, on a 5 GB volume.
-- **⚑ RE-READ 2026-09-04, which this entry asked for: user tables total 204 MB, and the remainder
-  sits at the TOP of the range below, not the bottom.** Against the 171 MB baseline of 2026-08-18
-  that is 33 MB in 17 days — but migration 249 removed 21 MB of index inside that window, so gross
-  growth is **54 MB / 17 days ≈ 3.2 MB/day**, slightly worse than the 2.9 measured on 08-30 rather
-  than better. `oura_raw_packed` accounts for ~1.06 MB/day of it (18 MB since its first pack on
-  08-18), leaving **~2.1 MB/day** against a ~0.4 MB/day expectation. Nothing has changed shape:
-  `oura_raw_samples` 74 MB (30 heap / **44 index**), `error_events` 52 MB, `oura_heartrate` 25 MB,
-  `oura_raw_packed` 18 MB, `rr_intervals` 17 MB.
-  **Compare only like with like — that trap was nearly walked into here.** `pg_database_size` reads
-  **218 MB** on the same day; the 171 / 200 / 206 / 204 series is `sum(pg_total_relation_size)` over
-  `pg_stat_user_tables`, and mixing the two turns a flat two days into an invented 9 MB/day. State
-  which measure a number is, every time.
-  ⚠ **A third instance of the `n_live_tup` trap, on the same table CLAUDE.md already names twice:**
-  it read **97** against `oura_raw_packed`'s **1,093** real rows (previously 0-vs-764 and
-  55-vs-1,051). The size columns in that same query were exact. Do not soften the rule — this table
-  is simply one autoanalyze has never reached.
-- **Keep — what is still owed is the REMAINDER, ~2.1 MB/day as re-measured above**, and the archive
-  should be excluded from the next attempt rather than counted again.
-- **What is still owed.** Total was **206 MB** against the **171 MB baseline of 2026-08-18** —
-  ~2.9 MB/day where the post-packing expectation is ~0.4 MB/day. Removing 21 MB of index and one
-  write-amplification source does not account for that; the question is what is adding ~2.5 MB/day
-  more than expected, and the answer is most likely in the highest-volume writers rather than in
-  indexes. Re-measure the total before assuming the trend still holds — it has not been read since
-  2026-08-30.
-- **⚠ Do not re-run the index audit expecting more wins, and do not reach for `idx_scan = 0`.** That
-  counter records READS, not constraint enforcement, so every PRIMARY KEY and UNIQUE index can read
-  0 while being consulted on every insert. This entry's own first draft called them drop candidates;
-  `rr_intervals_pkey` read 0 on 2026-08-30 and **5,034** a day later. The one genuine candidate has
-  now been taken.
-- **Cost check before anyone panics:** at Railway's $0.15/GB/month this whole database is about
-  **three cents a month**. The reason to act is that a 7× trend compounds, not that the bill hurts.
-- **Added:** 2026-08-30 · measured against production while checking BF-54. **These are the size
-  columns, read from the filesystem, so they are exact** — unlike the row counts BF-54 is about.
-
 ### [nutrition][platform] BF-69 — dosed substances are stored but nothing reads them; make exposure an analysable variable
 
 - **⚠ 2026-09-03 — STAGE 2 WAS SPLIT OUT AS BF-112, because this one prints under KEEP.**
@@ -13311,60 +13472,44 @@ behaviour, and TN-6's own pass test (deviation mean within ±0.05 °C of zero) i
   re-derivation lifts it with **no deploy**. Thresholds untouched.
 - **Keep:** a **suppression, not a fix** — TN-6 retires it (its ±0.05 °C pass test is what does), and
   nothing was observed in production.
-### [heart-rate][workouts] TN-53 — the HR-recovery trend has no density gate, so it partly records which device was worn 🔴 LIVE
+### [heart-rate][workouts] TN-53 — the HR-recovery trend has no density gate 🟡 ENGINE SHIPPED
 
-- **Branch:** _unassigned_ · **Added:** 2026-09-20 · Tuning agent, from the owner's ask to look across
-  every metric the app records.
-- **Lane: A** — `app/api/health/trends/route.ts` and `packages/shared/src/workout/hr-analysis.ts`.
+- **Branch:** `lane-a/tn53-hrr-density-gate` · **Added:** 2026-09-20 (Tuning) · **Engine shipped
+  2026-09-20** (Lane A).
 - **Review:** [`what we record, and what it can actually say`](reviews/2026-09-20-what-we-record-and-what-it-can-say.md) §2–3.
+- **✅ SHIPPED: the gate, in the one HRR formula.** `analyseHrRecovery` now requires the two readings
+  behind `hrr1` to be **45–75 s apart** (`HRR1_SEPARATION_MIN_MS`/`MAX_MS`) and returns `null`
+  otherwise. Every `hrr1` consumer already treated null as unknown, so no caller changed.
+- **⚠ The entry's quoted evidence was wrong in one place, and the fix is better for it.** It quoted
+  `nearestBpm(readings, target, windowMs = 90_000) // both terms`. **The second term uses 45_000**
+  (`hr-analysis.ts:73`). Re-derived: `bpmAtLog` ∈ log ± 90 s and `bpm60` ∈ log + 60 s ± 45 s, so the
+  pair spans **−75 s to +195 s**, not "150 s apart" — a wider worst case than claimed, and it
+  includes **the same reading serving both terms and reporting a drop of 0**.
+- **Implemented as a separation check rather than the proposed reading-count density gate**, because
+  the defect the entry actually names is *"no check that the two readings it differences are actually
+  60 seconds apart"*. A count is a proxy that both over-rejects (a sparse set whose two readings are
+  60 s apart genuinely can measure HRR) and under-rejects (a dense set whose readings cluster on one
+  side cannot). The density numbers remain the *reason* the gate is needed; they are not the gate.
+- **The density table reproduced exactly** (production, 2026-09-20): chest_strap 220 sets / 91.4%
+  `coverage_ok` / **111.8** readings per set; `ble` 79 / 54.4% / **7.1**; NULL 615 / 22.9% / 17.0.
+  Plus a 4-row `mixed` bucket the entry did not list. Sixteen-fold density difference stands.
 
-**Two paths compute heart-rate recovery and only one is gated.** `exercise-hr-trend.ts` filters every
-metric mean on `coverageOk` — its own comment says a censored set may contribute to the breakdown but
-not to the numbers. **`/api/health/trends` ignores `set_hr_stats` entirely** and recomputes HRR live
-from a raw `getHrForWindow`, with no coverage gate, no minimum reading count, and no check that the
-two readings it differences are actually 60 seconds apart:
-
-```
-hrr1 = bpmAtLog − bpm60          // hr-analysis.ts
-nearestBpm(readings, target, windowMs = 90_000)   // both terms
-```
-
-**Why that matters here specifically — the two sensors differ sixteen-fold in density:**
-
-| source | rows | `coverage_ok` | readings/set |
-|---|---:|---:|---:|
-| **chest_strap** | 220 | **91%** | **111.8** |
-| `ble` (ring) | 79 | **54%** | **7.1** |
-| *NULL* (unlabelled) | **615** | **23%** | 17.0 |
-
-At ~1 reading/second the 90 s tolerance is harmless. At 7 readings per set the two "readings 60 s
-apart" can be **the same reading, or 150 s apart**. The strap supplied only **24%** of the table and
-has been dark since **2026-09-15**, so the sparkline's recent span is ring-sourced.
-
-**So the HR-Recovery sparkline on the heart-rate page moves partly with sensor availability.** The
-codebase already knows this matters — `set_hr_stats` stores `coverage_ok` and `readings_count` for
-exactly this reason, and this path reads neither.
-
-**First action:** gate the live path the same way its sibling is gated — require a minimum reading
-density in the window and return `null` rather than a number when it is not met. **A null is the
-correct output here**; a sparkline gap is honest where an ungated value is not.
-
-**⚠ Do NOT fix this by widening the tolerance or interpolating.** Both would manufacture a value from
-readings that do not exist. The ring genuinely cannot measure a 60-second recovery under load, and the
-surface should say so.
-
-**⚠ Do NOT read the current HRR trend as physiology, including for the medication question.** Measured
-pre-dose vs on Retatrutide, HRR-60 runs **5.8 → 4.0 bpm** — but n = 229 against 23, sd 12.9, so that
-is **0.15 sd** and means nothing. It is quoted here to stop it being quoted as a finding elsewhere.
-
-**⚑ The better instrument already exists and is unused.** `fitness_tests` carries a `resting_hrr` test
-type **and** an `hrr1_bpm` column; one test was run (2026-07-19) and **left `hrr1_bpm` null**. A
-repeated HRR test controls the stimulus in a way neither resting HR nor ring HRV can — see the review
-§4. That is the durable answer; this entry is the correctness fix for what ships today.
-
-**Pass test:** a session with fewer than the minimum readings contributes no HRR point rather than a
-computed one, and the sparkline shows a gap across the period the strap was not worn.
-
+- **⚠ Keep: THE RENDER IS NOT DONE, and it is Lane B.** The engine now emits `null` where it used to
+  emit a fabricated number, so **the HR-Recovery sparkline will gain gaps** — in particular across
+  the period since the strap went dark on 2026-09-15. Nothing has been checked about how that
+  surface draws a null run: whether it interpolates across the gap, collapses the axis, or renders
+  an empty chart that reads as broken. **A gap that looks like a bug is not an improvement over a
+  wrong number.** That check and any copy ("not enough readings to measure recovery") are the
+  remaining ask.
+- **⚠ Keep: not verified against production render.** The gate is unit-tested; nobody has loaded the
+  heart-rate page since it shipped. The owner's pass test — *"the sparkline shows a gap across the
+  period the strap was not worn"* — is unverified.
+- **⚑ Unchanged and still the durable answer:** `fitness_tests` carries a `resting_hrr` type and an
+  `hrr1_bpm` column; one test ran 2026-07-19 and left `hrr1_bpm` null. A repeated HRR test controls
+  the stimulus in a way neither resting HR nor ring HRV can — review §4.
+- **⚠ Unchanged: do NOT read the HRR trend as physiology, including for the medication question.**
+  Pre-dose vs on Retatrutide runs 5.8 → 4.0 bpm, but n = 229 against 23 with sd 12.9 — **0.15 sd**,
+  which means nothing. Recorded here to stop it being quoted as a finding.
 
 ### [readiness][heart-rate][body] TN-52 — thresholds are set in bpm and fixed fractions, so they break when the user changes; define them in units of the user's own variability instead 🔴 LIVE
 
@@ -13456,6 +13601,39 @@ the per-sample version supports a "it tracks his physiology" story that the corr
 
 **So TN-2 can be closed without the fit it is blocked on.** Its bracket, its replay endpoint and its
 owner sign-off on a number all exist to choose an offset. A quantile has no offset to choose.
+
+**⚑ RULE 2 WAS APPLIED TO THE MEASURABLE THRESHOLDS AND CAME BACK MOSTLY CLEAN — measured
+2026-09-20. Do not re-run it as a sweep.** The 2026-08-25 threshold sweep's own stated blind spot is
+this class (*"blind to a score that moves normally and is compared against the wrong number"*), so
+the obvious next move was to re-screen its 27 decision thresholds by window-width-vs-noise instead of
+by coverage. Yield was one confirmation and no new finding:
+
+| threshold | window | input sd | width | verdict |
+|---|---|---:|---:|---|
+| `HR_REST_THRESHOLD` (charge) | ~6 bpm above resting | 3.15 bpm | **1.9 sd** | **too narrow — TN-2** |
+| `ILLNESS_WATCH → ELEVATED` | 25 points | 9.96 | **2.5 sd** | clean |
+| `FEVER_TEMP_Z` | unreachable | — | — | broken input, not width — Q-506 |
+| `ACWR_TAPER_START = 1.5` | never reached | — | — | already filed inert |
+| `chronic_stress_score` | — | NULL on 75/75 days | — | already filed, Q-525 |
+
+**So rule 2's value is as a GUARD ON NEW THRESHOLDS, not a retro-sweep.** It discriminates — the
+illness bands pass at 2.5 sd while the charge window fails at 1.9 — which is what makes it worth
+having in review, and it is cheap there. Running it over the existing surface again would repeat a
+negative result.
+
+**⚑ THE REAL BOTTLENECK IS ONE PIECE OF INFRASTRUCTURE, NOT MORE MEASUREMENT.** The August sweep
+listed **25 thresholds it could not measure at all** — 19 sleep-staging constants in one file, plus
+`APNEA_THRESHOLD`, `MET_ACTIVE_THRESHOLD`, `RANGE_THRESHOLD`, `NIGHT_BAND_*`, `CONSISTENCY_*` and
+`LOW_CONFIDENCE_THRESHOLD` — because their inputs are per-sample intermediates that are never
+persisted. **That is the largest unexamined block left on the scoring surface**, it feeds the sleep
+score and therefore readiness's heaviest contributor at 16%, and it is blocked on exactly what TN-2
+is blocked on: a context that can run the pipeline with the daytime-stress constants present.
+
+**One admin-gated, owner-triggered replay endpoint unlocks three things at once** — TN-2's offset fit,
+TN-3a/TN-4's stress term, and these 25 thresholds. TN-2 already sketches it (*"that is new work and
+is not scoped here"*). **It is Lane A work and it is the highest-leverage single item on the tuning
+front; Tuning's part is this list of what it has to expose.** Note that TN-52's rule 1 removes TN-2's
+*own* need for the endpoint — but not the other two, so the endpoint is still worth building.
 
 **⚠ Do NOT convert every constant to a quantile.** Some thresholds are deliberately absolute and must
 stay: max HR from a maximal test (TN-30), a fever temperature, anything anchored to an external
@@ -13765,6 +13943,19 @@ record explicitly why not.
   overlay the series on the DAY TIMELINE**, not on the HR charts. The HR-chart overlay was checked
   and is genuinely absent (`hr-day-chart.tsx` draws sleep and workout bands and no stress), so this
   is a scope question rather than a missed build.
+- **⚑ RE-CONFIRMED 2026-09-20 (Lane B), AND THE COST IS NOW NAMED: this entry is FINISHED and the
+  only thing it still does is block TN-35.** Re-read end to end while auditing the entries parked by
+  an emphasis glyph (LB-121). Every buildable claim in it is discharged — the chart shipped, the
+  past-day read is not blocked, the pass test is met 6/6. What remains is the pre-reshape prose
+  below, and that is a **scope call for the Orchestrator**, not a build:
+  **is the HR-chart overlay out of scope?** The 2026-09-10 reshape says yes — it put the overlay on
+  the **day timeline** as TN-35, and `hr-day-chart.tsx` was checked and draws sleep and workout
+  bands and no stress. If that is confirmed, strike this entry.
+  **Until it is struck, TN-35 cannot start.** Its `Needs: TN-3b` clears only when this leaves the
+  queue, and its overlay half is Lane B and buildable today — `app/api/day-timeline/route.ts`
+  already emits typed, timestamped events and `components/health/day-detail/**` renders them, so the
+  join needs no new route. **Lane B is otherwise at READY 0**, so this one strike is the difference
+  between an idle lane and a live item.
 - **⇒ TN-35 is what this parks.** Its `Needs: TN-3b` clears when this entry leaves the queue, and its
   overlay half is Lane B and buildable today: `app/api/day-timeline/route.ts` already emits typed,
   timestamped events and `components/health/day-detail/**` renders them, so the join needs no new
@@ -17040,12 +17231,18 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   program target still wins over the reference range. No Lane A change was needed: `workout-data:meta`
   already carries `program.trainingGoal` and Health already fetches that key.
   [`journal`](overview/history-2026-09-10-folded-3.md#2026-08-25-volume-landmarks-surfaced).
-- **⛔ THE PUSH:PULL HALF IS NOT DONE, deliberately.** This entry says to do it on the same surface
-  "rather than as two cards", and doing it here would mean inventing a muscle → movement-pattern
-  taxonomy inside a component. **There is no push/pull grouping anywhere in the repo** (checked). It
-  is domain math and belongs in `packages/shared` beside `normalizeMuscle`/`MUSCLE_LANDMARKS` under
-  One Formula One Place — which is **Lane A's**. A private second copy in `components/` to satisfy
-  "together" would be the wrong trade.
+- **✅ THE PUSH:PULL HALF SHIPPED 2026-09-20 as OR-118** (v1.460.0) — the Training list's
+  **Movement Balance** card, 60 days across push / pull / legs / other. **Both reasons this bullet
+  gave for deferring it are now spent**, and they are recorded rather than deleted because the
+  deferral was correct at the time:
+  - *"There is no push/pull grouping anywhere in the repo"* — true when written, **false now**:
+    `movementPattern()` landed in `packages/shared/src/muscles.ts` as **LB-103** on 2026-09-13,
+    exactly where this bullet said it belonged, and OR-118 is its first caller. No private copy in
+    `components/` was needed, which was the trade this bullet refused to make.
+  - *"do it on the same surface rather than as two cards"* — it shipped as its own card, and the
+    shared-treatment question below is **still open and still this entry's**. OR-118 was written to
+    stay cheap to fold in if that design lands.
+  **What this entry keeps is the design question and the device look, not the build.**
 - **Still open:** the push:pull half above, and the design question of whether Q-278 / Q-302 / Q-305
   want one shared treatment for "computed and discarded" — untouched, because answering it inside one
   card would have prejudged it.
@@ -17068,67 +17265,50 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   is the second time an inline gate inside a Keep has done it (the first was BF-46).
 
 
-### [workouts] OR-118 — the push:pull balance card, split out of Q-305 (engine half missing; see below)
+### [workouts] OR-118 — the push:pull balance card, split out of Q-305
 
-- **✅ THE ENGINE HALF SHIPPED 2026-09-18** (`lane-a/lb111-muscle-sets-window`), unversioned — nothing
-  calls it yet, so nothing user-visible changed. **`GET /api/muscle-sets?from=&to=`** returns
-  `{ from, to, muscles: [{ muscle, sets }] }`, canonical muscle keys, secondary muscles at 0.5,
-  sorted by sets. Both params optional — the default is the trailing **90 days** ending today in the
-  user's timezone — both accept slashes or dashes, `to` is **inclusive**, and the cap is 400 days.
-  A date-shaped non-day (`2026-02-31`) answers **400**, not a driver 500.
-  - **The `programId` question below is ANSWERED: it counts across programme changes**, per this
-    entry's own recommendation and LB-111's. Pinned by a test that runs the same fixture through both
-    reads — `getWeeklySetsByMuscleGroup` returns **3**, the new one returns **7** — so the reason for
-    a separate method is measured rather than argued.
-  - **⚠ LB-111's premise was wrong in one place, and it is the place that decides the shape.** It
-    said `weekly-muscle-sets` *calls* `getWeeklySetsByMuscleGroup` and throws its date arguments
-    away. It does not call it at all: it carries its own inline SQL, and so does
-    `muscle-tonnage-trend`, so there were **three** copies of the muscle-attribution query
-    disagreeing on the date column and on programme scoping. That is why this is a new method rather
-    than a `from`/`to` on `weekly-muscle-sets` — see **LA-118** for the duplication itself.
-- **⛔ THE "EVERY NUMBER ALREADY EXISTS" PREMISE IS FALSE, checked 2026-09-16 before building.** The
-  *grouping* exists — `movementPattern()` shipped as LB-103 and has **no callers yet**, so this card
-  would be its first. The *numbers* do not: *"legs 481 · push 433 · pull 333 · other 168 over 60
-  days"* came from a direct query, and **no client-reachable route serves sets by muscle over any
-  window but the current one.** Verified, not assumed:
-  - `GET /api/weekly-muscle-sets` — `GET()`, no params, computes this Monday server-side.
-  - `GET /api/ai-periodization/weekly-volume` — same, `startOfWeekInTz(tz)` + 6 days, hardcoded.
-  - `GET /api/muscle-tonnage-trend` — 6 weeks, but **tonnage, not sets**. Not a substitute: legs move
-    far heavier loads, so a tonnage share overstates them and would hide the pull-set deficit this
-    card exists to show. Rendering it under a set-balance label would be a false claim.
-  - `grep -rn '60.*day' app/api/*/route.ts` — nothing.
-- **The derivation is already there and windowed, which is why the engine half is small.**
-  `getWeeklySetsByMuscleGroup(userId, programId, weekStart, weekEnd, tz)` takes **arbitrary** start
-  and end dates despite its name (`lib/data/postgres/slices/periodization.ts:518`, on the repository
-  interface). What is missing is the **exposure**, and a route under `app/api/**` is Lane A's by the
-  path rule — *both halves → Lane A, engine half first*. Filed as **LB-111**, and **shipped
-  2026-09-18** — but not by widening that method, for the reason recorded at the top of this entry.
-- **⚠ Its `programId` argument was the one real design question and is now ANSWERED** (see the top of
-  this entry): the card counts sets across programmes. `getWeeklySetsByMuscleGroup` scopes to one and
-  stays that way for its own two callers, which grade a week against *that* programme's targets.
-- **Lane:** B — `components/health/` (the Training surface), reading shared helpers only. No storage
-  and no derivation change **in this half**. The window it reads shipped on 2026-09-18, so this is
-  now startable: fetch `/api/muscle-sets?from=…&to=…` and group the rows with `movementPattern`.
+- **✅ SHIPPED 2026-09-20** (`feat/or118-movement-balance-card`, **v1.460.0**). The card is the
+  Training list's `movementBalance` section: `components/health/movement-balance-card.tsx` fetches
+  `/api/muscle-sets` over a trailing **60 days** and groups the rows with `movementPattern`, and
+  `components/health/movement-balance.ts` holds the fold as a pure function.
+- **Verify:** device
+- **Keep:** the S25 look, and only that — the pattern word sits beside a set count and a bar on a
+  narrow row, which is the thing a 412 px harness screenshot argues about and the phone settles.
+
+- **It was STARTABLE for four days and invisible, which is the finding worth keeping.** Nothing
+  blocked it after the engine half landed on 2026-09-18: `Needs:` was already empty and the entry
+  said so in words. It did not print in READY because a `⛔` used for **emphasis** in the body is
+  read by `next-item.js` as the legacy prose blocker. That is **LB-121**, and this is its first
+  measured cost. Two more Lane B entries are parked the same way right now — **TN-3b** and
+  **Q-305** — recorded on LB-121 rather than here.
+
+- **The engine half** (`lane-a/lb111-muscle-sets-window`, 2026-09-18) is `GET /api/muscle-sets?from=&to=`
+  → `{ from, to, muscles: [{ muscle, sets }] }`, canonical keys, secondary muscles at 0.5, both
+  params optional, `to` inclusive, 400-day cap, a date-shaped non-day answering 400 rather than a
+  driver 500. **It counts across programme changes** — deliberate, and the reason it is a separate
+  read rather than a `from`/`to` on `weekly-muscle-sets`: the card's claim is about the lifter's
+  balance, not one programme's adherence.
+- **Why not `muscle-tonnage-trend`, which was already windowed:** it reports tonnage. Legs move far
+  heavier loads, so a tonnage share overstates them and would hide the pull deficit the card exists
+  to show. Rendering it under a set-balance label would be a false claim.
+- **The classification is `movementPattern`'s and must not be re-derived** — `shoulders` is **push**
+  and `lower back` is **other**, both argued in `packages/shared/src/muscles.ts`. LB-103's first
+  caller is this card.
+- **No verdict, no target, and that is a decision.** There is no defensible universal push:pull
+  ratio; the owner asked to see the split, not be graded on it. The four rows always render,
+  including zeros — **an empty pull column IS the finding**, so dropping empty rows would hide
+  exactly the case worth seeing.
+- **Verification.** `components/health/__tests__/movement-balance.test.ts`, 11 cases, killed by four
+  mutations (ignore the classifier · drop zero rows · sort by size · drop the non-finite guard).
+  `e2e/or118-movement-balance-card.spec.ts` proves it is mounted and renders all four patterns, and
+  goes red with the section unregistered. It **refuses the empty state**: `seed.sql` logs nine chest
+  sets at 2/3/5 days ago, so a fresh CI database lands in-window with one pattern populated and
+  three at zero — which exercises the drawing path and the zero-row case together. Accepting "no
+  data" would have been the LB-98 trap.
+- **Q-305's shared-treatment question is still open and still Q-305's** — Q-305, Q-278 and Q-302 are
+  all "computed and never surfaced". This card was shipped plainly and stays cheap to fold in.
 - **Added:** 2026-09-16, Orchestrator — split from **Q-305**, whose `Keep:` had been describing this
-  as *"Lane B's and now unblocked"* since 2026-09-13 while parking it. See Q-305 for why that
-  happened; the lesson is the entry's, the work is this one's.
-- **Needs:** — nothing. **The dependency cleared on 2026-09-13:** `movementPattern(muscle)` shipped in
-  `packages/shared/src/muscles.ts` as **LB-103**, giving push / pull / legs / other with the
-  catalogue's whole vocabulary asserted against the database.
-- **⚠ Read LB-103's journal before rendering it.** `shoulders` counts as **push** and `lower back` as
-  **neither** — both deliberate, both argued there. Re-deriving either from intuition changes the
-  ratio this card exists to show.
-- **The measurement it renders, over 60 days:** legs 481 (33%) · push 433 (30%) · pull 333 (23%) ·
-  other 168 (11%). The pull deficit is the finding; the card's job is to make it visible without the
-  owner running a query.
-- **Do not invent a third bespoke card.** Q-305's own shared-treatment question is still open —
-  Q-305, Q-278 and Q-302 are all "computed and never surfaced". If that design lands first, this card
-  uses it. If it does not, ship this one plainly and keep it cheap to fold in later.
-- **Verification** (a line, deliberately NOT a `Verify:` field): once built, look at it on the S25 —
-  the band word sits beside a set count on a narrow row. **`Verify:` would have been wrong here and
-  was written and corrected in the same sitting:** that field means SHIPPED, so it files unbuilt work
-  under *"shipped; a look is owed, nothing is blocked"*, which is the OR-105 trap. Unbuilt work gets
-  this line; the field goes on when the code lands.
+  as *"Lane B's and now unblocked"* since 2026-09-13 while parking it.
 
 ### [workouts][platform] LA-118 — the muscle-attribution query exists FOUR times and the copies disagree
 

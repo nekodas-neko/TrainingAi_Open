@@ -273,7 +273,11 @@ programme changes**, which is what a balance card's claim is about, and the diff
 test running one fixture through both reads: **3 sets against 7**. Checking the premise also found
 that the attribution SQL now exists **four times**, disagreeing on date column and programme scope —
 filed as **LA-118** rather than fixed here, since the extraction touches three live routes. Nothing
-renders it yet; OR-118 (Lane B) is now unblocked.
+renders it yet; OR-118 (Lane B) is now unblocked. **Shipped 2026-09-20 (v1.460.0):** the
+Training list's **Movement Balance** card is its first caller, and `movementPattern()`'s too. It
+sat startable and invisible for four days — a `⛔` used for emphasis parks an entry, so Lane B's
+READY read 0 across five checks while it waited (**LB-121**, which now carries the measured cost
+and two more entries parked the same way, TN-3b and Q-305). The S25 look is owed.
 
 **The only illness band that ever fires now says what moved (TN-45, v1.457.12 — engine half only).**
 `watch` has fired **2 days in 72**; `elevated` and `fever` have fired **zero** times, so the illness
@@ -3731,6 +3735,17 @@ card rendered **Good / Steady / 50** with a colour-coded label, a bar filled to 
 already false in both cases that deserve the badge. Proven by an e2e that runs as the zero-data
 account and asserts the **payload beside the rendered text** — a rendered 50 alone cannot tell a bug
 from a fixture — and that fails on the unfixed card.
+
+**⚑ Amended 2026-09-20 (LA-63): the treatment was NOT fully fixed in v1.456.17, and the line above
+saying the payload answers `sufficient: false` is true for twenty-three hours a day.**
+`batteryConfidence`'s "no verdict in the first hour awake" clause — which landed 2026-08-26, three
+weeks BEFORE the card fix — returned `sufficient: true` on `sampleCount: 0`, so for the first hour
+after waking the badge was still withheld and the screen still read an unqualified **Good / Steady /
+50**. The card was never at fault. Fixed in v1.460.2 by excluding `sampleCount === 0` from the grace
+window; the sparse-rate case it exists for is untouched. **The lesson is the one worth keeping: an
+hour-scoped defect passes a careful verification and a careful review, because neither knows to ask
+what time it was** — and the e2e guarding RV-38 was consequently red between 00:00 and 01:00 Brisbane
+and green the rest of the day.
 
 **⚑ The number itself is with Tuning**, handed over by the owner on 2026-09-14 (*"This requires
 tuning still"*). A Body Battery re-fit silently re-scores months of history, so it goes through a

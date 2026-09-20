@@ -18,6 +18,145 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-20 — backlog → 24984 (TN-54, the strap is dark and nothing says so)
+
+**+12.** The owner wore the strap overnight and asked whether it recorded. It did not, and the
+useful finding is that neither of us could tell why: the last chest-strap sample in either table is
+2026-09-16, there are no faults logged, and the strap's battery lives in a memory-only field while the
+ring's has 11,758 persisted polls. The ring wrote 104 core-sleep samples the same night, so the ingest
+path is fine and the fault is strap-specific. PS-44 needs seven paired nights and cannot count them
+blind, so the entry asks for the status row the ring already has rather than diagnosing the device.
+
+---
+
+## 2026-09-20 — backlog → 24856 (BF-55 answered, −58), CLAUDE.md → 778 (+3)
+
+The −58 and the +3 are the same finding moving from the queue into the file every session reads
+before it can start.
+
+BF-55 asked what was adding ~2.1 MB/day beyond a ~0.4 MB/day expectation. Measured: **227.4 MB,
+1.71 MB/day on both a 2-day and a 33-day baseline**, and the remainder is two retention windows that
+have **not finished filling**. `oura_heartrate` prunes at 180 days, not the ~90 CLAUDE.md recorded —
+the 90 belongs to `rr_intervals` — so at a 90.6-day span it is half-filled and has never reclaimed a
+row. A window below its cap reclaims nothing and grows at the full ingest rate; the ~0.4 expectation
+assumed a steady state that had not arrived.
+
+The +3 lines on CLAUDE.md buy the correction, the per-table attribution (1.47 of the 1.71 MB/day
+named), and a **falsifiable prediction**: growth steps down around late October and again around
+2026-12-19, settling near 0.96 MB/day. A step that does not arrive is the signal. That is worth more
+than the three lines because it replaces a recurring "7× trend" alarm — which compared a filling
+system against a steady-state expectation — with something that can only fail in one direction.
+
+---
+
+## 2026-09-20 — backlog → 24914 (LA-74 shipped, −24)
+
+The program write path is typed and `.strict()` at last, so the entry leaves the queue. It had sat
+three weeks behind one sentence in its sibling schema's header — *"strict there needs that
+enumeration checked against a device"* — and both halves of that sentence were wrong: no native code
+posts to that route, and there are **three** producers, not the two the entry counted. The third,
+`builder-review.tsx`, is precisely the one a schema checked against the other two would have
+rejected.
+
+The reasoning is in the code rather than in the queue, which is the argument for the −24: the
+schema's header carries the producer enumeration, the sibling's now-false paragraph is corrected in
+place, and the mapper coupling that makes this dangerous forever after is enforced by a test instead
+of by a comment.
+
+---
+
+## 2026-09-20 — backlog → 24938 (LB-27 refuted and retired, −28)
+
+Another ratchet down. LB-27's `Keep:` rested on `pg`'s default `connectionTimeoutMillis: 0` waiting
+forever for a pool client. `client.ts` has set **5000** since the initial public snapshot, two weeks
+before the entry was filed — so the decision it asked for predated the question. PS-38 had already
+noticed that much on 2026-09-06 and it sat unactioned; what retires the entry rather than one line
+of it is that the symptom does not reproduce either, cold or warm, and that `statement_timeout` and
+`idle_in_transaction_session_timeout` at 15000 make a sixty-second database-layer hang impossible
+regardless of cause.
+
+Worth the note because of what the −28 costs: a real measurement from 2026-08-30 leaves the queue.
+The journal entry keeps it, including the parts that still stand (the `FOR UPDATE` read-modify-write
+is real and correct) and the ways the re-measurement is not byte-identical to the original. A
+refutation that discards the original observation is how the same thing gets re-found in a month.
+
+---
+
+## 2026-09-20 — backlog → 24966 (LA-123 shipped the day it was filed, −41)
+
+A **ratchet down**, not a raise. LA-123 was filed that morning with a proposed patch and built the
+same afternoon, so its 42 lines left the queue intact rather than being trimmed — the entry's whole
+content was the diagnosis and the patch, and both now live in the journal and in the code's own
+comments, which is where the next reader of that hook will be standing.
+
+Worth one line because the shape is unusual here: an entry that is filed and cleared inside a day
+normally means it should not have been filed at all. This one earned the round trip — it was found
+while gating a different change, and writing it down with its proposed patch is what made it
+cheap enough to take immediately afterwards instead of losing it.
+
+---
+
+## 2026-09-20 — backlog → 25007, projectOverview → 11966 (LA-63 re-measured; RV-38 amended; LA-123 filed)
+
+**+23 on the backlog and +11 on the overview, and almost all of it is a claim being struck rather
+than work being described.**
+
+LA-63 said *"nine real failures nobody had seen"*. Measured against `main` at `562ec1f2934`, on a
+database built the way CI builds one: **1 failed, 1 flaky, 1 skipped, 220 passed**. Eight had been
+fixed by other work over two weeks and nobody re-ran the count — four of the nine specs had been
+edited since the entry was written. All three of that entry's original claims have now been struck
+by measurement, which is the third time this week an entry has been true in its measurement and
+wrong in its conclusion, so it gets written down rather than re-derived.
+
+The remaining +50 on the backlog is **LA-123 plus two lines on LA-77**, both found while gating the
+fix rather than by looking for them: a test file whose `afterAll` asserts a cluster-wide advisory-lock
+count that fifteen sibling files legitimately violate, and `playwright-report/` being gitignored but
+not eslint-ignored, which turns any local `pnpm e2e` into 256 phantom lint errors on the next
+`pnpm lint`. Neither was fixed here — both carry a proposed patch, which is what makes the lines
+worth their length.
+
+The +11 on `projectOverview.md` is an **amendment to RV-38's row**, and it is the part worth the
+lines: the row says the payload answers `sufficient: false` for the zero-data account, and that is
+true for twenty-three hours a day. The grace clause responsible landed three weeks **before**
+RV-38's fix, so RV-38 was incomplete from the day it shipped rather than regressed afterwards — it
+was verified at a time of day where the remaining hole was invisible. A `✅` in place of that
+paragraph would have left the next reader trusting a measured, dated, and time-scoped-wrong claim.
+
+---
+
+## 2026-09-20 — backlog → 24934 (TN-53 engine shipped, −16)
+
+**A net −16 that is really −40 of proposal replaced by +24 of what is still owed.** TN-53's
+"first action" and its evidence block are gone; what replaces them is the correction to its code
+quote, the reason the fix diverges from its proposal, and two `Keep:` lines.
+
+The Keeps are the point. The engine now returns `null` where it used to return a fabricated number,
+so **the sparkline gains gaps** — and nothing has checked how that surface draws a null run. A gap
+that renders as a broken chart is not an improvement over a wrong number, and the entry now says so
+in the place a Lane B session will read rather than in a journal nobody opens.
+
+Also recorded: the entry quoted a 90 s tolerance on **both** HRR terms; the second is 45 s, which
+makes the real worst case −75 s to +195 s — wider than claimed, and including one reading serving
+both terms for a drop of 0. Correcting an entry's evidence while confirming its conclusion is worth
+the lines; the next reader would otherwise re-derive the tolerance from the same wrong quote.
+
+---
+
+## 2026-09-20 — backlog → 24837 (rule 2's yield, and naming the real bottleneck)
+
+**+16.** Two negative results worth writing down. Rule 2 re-screened the August sweep's 27
+decision thresholds by window-width-vs-noise rather than coverage — the sweep's own stated blind spot
+— and found one confirmation and nothing new: the illness bands pass at 2.5 sd where the charge window
+fails at 1.9. So rule 2 belongs in review as a guard on new thresholds, not as a sweep, and the entry
+says so to stop it being re-run.
+
+The second is more useful: the August sweep listed 25 thresholds it could not measure at all, 19 of
+them sleep-staging constants feeding readiness's heaviest contributor. They are blocked on the same
+missing constants as TN-2's fit and TN-3a's stress term, so one admin replay endpoint unlocks three
+items. That is the highest-leverage piece of work left on the tuning front and it is Lane A's.
+
+---
+
 ## 2026-09-20 — backlog → 24804 (TN-53, from an inventory of everything recorded)
 
 **+75.** The owner asked for a sweep across every metric the app records. 99 tables; the useful
@@ -14247,7 +14386,65 @@ superseded reading visible rather than rewriting it away — the 45-logs-all-bre
 is simultaneously the evidence for the new model and the reason the old one failed, and deleting it
 would lose the argument.
 
-## 2026-09-20 — `docs/implementation-backlog.md` +449 (24804 → 25253) (Review sweep 51)
+## 2026-09-20 (fifth) — `docs/implementation-backlog.md` → 24784
+
+**BF-185** (a dose re-tick rewrites `taken_at`) and **BF-186** ("Manage supplements" is a 10 px
+"Manage" on another screen), batched as `supplement-dose-surface`.
+
+BF-185's before/after table is the entry: the owner asked about double recording, the answer is no,
+and the real finding is one field 35 minutes out that nobody would have looked for. Without the two
+reads it would have been filed as "checked, all fine". BF-186 records why it is not cosmetic — the
+hint fires because the saved default is stale, so an unfindable control keeps it stale, which is the
+likeliest explanation for dose 1 logging 0.5 mg.
+## 2026-09-20 — OR-118 shipped, and LB-121 got its measured cost
+
+`projectOverview.md` **11927 → 11931** and `docs/implementation-backlog.md` **24344 → 24341**
+(`feat/or118-movement-balance-card`).
+
+The overview grew by four lines because one of its sentences had become false: *"nothing renders it
+yet"* about `/api/muscle-sets`. Something does now, and the four lines say what, plus the thing worth
+more than the card — the entry was startable for four days while READY read 0, because a `⛔` used
+for emphasis parks an entry.
+
+The backlog **shrank by three** despite gaining that account on LB-121, because OR-118's own entry
+lost more than LB-121 gained. Most of it was planning prose that had done its job: which route to
+call, why not `muscle-tonnage-trend`, whether the window should be a parameter. Once the code exists
+the file answers those, and the entry keeps only what the code cannot say — why there is no target,
+why zero rows still render, and what the S25 still owes.
+
+## 2026-09-20 — Q-305 stops saying the thing OR-118 just falsified
+
+`docs/implementation-backlog.md` **24590 → 24596** (`feat/or118-movement-balance-card`, second pass).
+
+Six lines, and they buy the removal of a false statement. Q-305 deferred its push:pull half on two
+grounds, one of which was *"there is no push/pull grouping anywhere in the repo (checked)"*. That was
+true when written and stopped being true on 2026-09-13, when `movementPattern()` shipped as LB-103 —
+in `packages/shared`, exactly where that bullet said such a thing belonged. OR-118 shipped the card
+as its first caller today.
+
+The deferral is recorded rather than deleted because it was **correct at the time**: it refused to
+put a private muscle → movement-pattern taxonomy inside a component, and waiting meant the shared
+helper got built instead. A reader who finds only the outcome learns nothing; a reader who finds the
+reasoning and its expiry date learns when to re-check their own.
+
+## 2026-09-20 — three findings filed for the Orchestrator, none of them buildable by Lane B
+
+`docs/implementation-backlog.md` grows by the three blocks below (`docs/lane-b-orchestrator-findings`).
+
+All three came out of one audit: reading PARKED after READY had said 0 for five consecutive checks
+and been wrong. They are filed rather than fixed because each lands in another role's territory —
+the parser is the Orchestrator's, striking a completed entry is its sweep, and the scope call on
+TN-3b is the owner's.
+
+- **TN-3b** — finished, and the only thing it still does is block TN-35. The lines state the
+  question outright (is the HR-chart overlay out of scope?) and what a yes releases, so whoever
+  answers does not have to re-derive the 2026-09-10 reshape from the journal.
+- **LB-121** — a priority argument rather than a restatement. The defect is not cosmetic; it makes
+  a lane report itself empty while holding work.
+- **LB-120** — eight drifts in two hours, six resolve-and-push cycles for one card, the same three
+  files every time. The number is the point: it converts "this is annoying" into "the drift rate is
+  faster than a CI cycle", which is a different problem with a different fix.
+## 2026-09-20 — `docs/implementation-backlog.md` +449 (24984 → 25433) (Review sweep 51)
 
 Twenty entries (**RV-64…RV-83**) from the owner's efficiency review — logic-over-AI, caching and
 saving speed, runtime efficiency, and animation/UI feel — at ~22 lines each, the ratio this file

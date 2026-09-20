@@ -81,7 +81,13 @@ export function resolveBatteryHrMax(
 export const MIN_SAMPLES_PER_WAKING_HOUR = 8
 
 /** No verdict before this much of the day has elapsed — an hour after waking there is not enough
- *  time for any rate to mean anything. */
+ *  time for any rate to mean anything.
+ *
+ *  **It grants grace to a sparse rate, never to an empty one (LA-63).** The clause exists because
+ *  `2 samples / 20 minutes` is an unreadable rate, not a bad one. Zero readings is not a rate that
+ *  needs more time to settle — it is the same nothing at 00:20 as at 23:59 — so `sampleCount === 0`
+ *  is excluded from it below. Without that exclusion the clause re-opened the exact hole RV-38
+ *  closed, for the first hour after waking, every day. */
 export const MIN_WAKING_MINUTES_TO_JUDGE = 60
 
 export interface BatteryConfidence {
@@ -114,6 +120,14 @@ export interface BatteryConfidence {
  * a rate rather than a count because the same absolute number means very different things at 8am
  * and at 10pm. The rate itself is `MIN_SAMPLES_PER_WAKING_HOUR` above — read its note for why it
  * is 8 and not the ~6/hour this band table first suggested.
+ *
+ * **`sufficient` answers "is this number worth printing", not "is the data good" — and for the one
+ * consumer that reads it those come apart at zero (LA-63).** The card shows its `Limited data`
+ * badge on `!sufficient`, so a `true` returned because it is too early to judge is rendered as a
+ * measured verdict. That is survivable for a handful of readings and wrong for none of them: an
+ * account that has never worn anything read `Good / Steady / 50`, unqualified, for the first hour
+ * after waking — RV-38's defect exactly, on a one-hour daily window, which is also why the E2E
+ * spec guarding it was red between 00:00 and 01:00 Brisbane and green the rest of the day.
  */
 export function batteryConfidence(sampleCount: number, wakingMinutes: number): BatteryConfidence {
   const mins = Math.max(0, wakingMinutes)
@@ -122,6 +136,7 @@ export function batteryConfidence(sampleCount: number, wakingMinutes: number): B
     sampleCount,
     wakingMinutes: Math.round(mins),
     samplesPerHour: Math.round(samplesPerHour * 10) / 10,
-    sufficient: mins < MIN_WAKING_MINUTES_TO_JUDGE || samplesPerHour >= MIN_SAMPLES_PER_WAKING_HOUR,
+    sufficient: sampleCount > 0
+      && (mins < MIN_WAKING_MINUTES_TO_JUDGE || samplesPerHour >= MIN_SAMPLES_PER_WAKING_HOUR),
   }
 }

@@ -6,6 +6,34 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.460.3",
+    date: "2026-09-20",
+    changes: [
+      "Saving or activating a program now checks what it was sent before writing it. The route that stores your programs accepted whatever arrived and passed it to the database unexamined \u2014 a mistyped or renamed field was written as a successful save of the wrong thing rather than refused. Nothing you do in the app changes; the three screens that save programs were each checked against the new rules, and a test now fails if a future change to a program field forgets to allow it through.",
+    ],
+  },
+  {
+    version: "1.460.2",
+    date: "2026-09-20",
+    changes: [
+      "Body Battery now says \u201cLimited data\u201d straight away on a day it has no heart-rate readings at all, instead of waiting an hour first. The card holds off judging how well it is measuring you for the first hour after you wake \u2014 a reading rate worked out over twenty minutes means nothing \u2014 but that grace was being extended to days with no readings whatsoever, which no amount of waiting improves. So for the first hour of such a day the card showed a confident \u201cGood / Steady / 50\u201d with nothing marking it as unmeasured. A genuinely sparse morning is still given its hour.",
+    ],
+  },
+  {
+    version: "1.460.1",
+    date: "2026-09-20",
+    changes: [
+      "The HR-recovery figure on the heart-rate page now only appears when it was actually measured over a full minute. It is the drop in your heart rate 60 seconds after a set, but nothing checked that the two readings behind it were really 60 seconds apart \u2014 with the ring's sparser sampling a single reading could stand in for both, reporting a recovery of zero from one data point. Where the readings cannot support the number you will now see a gap instead, which is the honest answer. Expect gaps over stretches where the chest strap was not worn.",
+    ],
+  },
+  {
+    version: "1.460.0",
+    date: "2026-09-20",
+    changes: [
+      "New on the Health tab's Training list: Movement Balance, showing how your last 60 days of sets split across push, pull, legs and core. Until now that split was only reachable by running a query against the database \u2014 every other muscle view covers the current week, and the one that does span months measures tonnage, which flatters legs because they move far heavier loads and would have hidden exactly what this is for. There is no target and no verdict: there is no honest universal push-to-pull ratio, so the card shows you the numbers and leaves the judgement to you. Shoulders count as push and lower back as neither push nor legs \u2014 counting it as legs would inflate them on pull days.",
+    ],
+  },
+  {
     version: "1.459.3",
     date: "2026-09-20",
     changes: [
