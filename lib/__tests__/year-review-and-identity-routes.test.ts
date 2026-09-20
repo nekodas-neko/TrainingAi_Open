@@ -19,7 +19,10 @@
  *     as "must be a known title" with no null branch makes the choice permanent.
  *   · **An unknown title id is refused**, so the stored value is always renderable — `TITLES[id]`
  *     drives an icon component, and a missing entry is a crash on someone else's leaderboard row,
- *     not on the writer's screen.
+ *     not on the writer's screen. **Since RV-61 a KNOWN id is not enough either** — the route asks
+ *     `computeAchievements` whether the caller unlocked it, so the cases here mock that. The
+ *     refusal itself is verified in `app/api/__tests__/rv61-equipped-title-unlock.test.ts`; what
+ *     this file holds is that the gate did not break unequipping, the 400s, the 413 or the 401.
  *
  * Fixture discipline (the PS-39 note): every case fails on the ONE rule it names. Where two
  * quantities could coincide — the two timezones, the two PR candidates — the fixture forces them
@@ -38,6 +41,7 @@ const getYearReviewTotals = vi.fn(async (..._a: unknown[]) => ({
 const getYearReviewTopExercises = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const listRecentPersonalRecords = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const getSessionLoadsFrom = vi.fn(async (..._a: unknown[]) => [] as Row[])
+const computeAchievements = vi.fn(async (_u: string, _tz: string) => ({ achievements: [] }) as Row)
 
 let sessionUser: { id: string; timezone?: string } | null = { id: 'u-1' }
 vi.mock('@/auth', () => ({ auth: async () => (sessionUser ? { user: sessionUser } : null) }))
@@ -49,6 +53,9 @@ vi.mock('@/lib/data', () => {
   })
   return { getRepository: repo, getRepositoryAsync: repo }
 })
+vi.mock('@/lib/achievements', () => ({
+  computeAchievements: (u: string, tz: string) => computeAchievements(u, tz),
+}))
 
 import { GET as getYearReview } from '@/app/api/year-review/route'
 import { GET as getSeasons } from '@/app/api/seasons/route'
@@ -78,6 +85,10 @@ beforeEach(() => {
   getYearReviewTopExercises.mockResolvedValue([])
   listRecentPersonalRecords.mockResolvedValue([])
   getSessionLoadsFrom.mockResolvedValue([])
+  // `iron_will` is unlocked by `streak_60` (RV-61). Every title case below is about something other
+  // than the unlock, so the default fixture has it earned.
+  computeAchievements.mockClear()
+  computeAchievements.mockResolvedValue({ achievements: [{ id: 'streak_60', unlocked: true }] })
   sessionUser = { id: 'u-1', timezone: USER_TZ }
 })
 afterEach(() => { vi.useRealTimers() })
@@ -203,7 +214,7 @@ describe('GET /api/seasons', () => {
 })
 
 describe('PATCH /api/user/equipped-title', () => {
-  it('equips a known title and echoes what was stored', async () => {
+  it('equips a known AND unlocked title, echoing what was stored', async () => {
     const res = await patch({ titleId: 'iron_will' })
     expect(res.status).toBe(200)
     expect(updateEquippedTitle).toHaveBeenCalledWith('u-1', 'iron_will')

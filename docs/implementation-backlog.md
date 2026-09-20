@@ -506,6 +506,304 @@ below threshold and left in place for next time.
   The recompute is correct; it is the conflict that should not exist.
 - **Branch:** _unassigned_
 
+### [workouts] BF-182 — warm the next prescription when Home renders, not at completion and not at tab-open
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-20 (BugFix intake). Owner: *"when you select the ai
+  generated workout plan it should be able to auto create workout as soon as your one is completed
+  right? The only factors would be if you choose deload or quicker one right? Is there a way we can
+  optimize this?"*
+- **Lane: A** — the trigger lives beside `app/api/workout-data/route.ts:569-572`; the warm call
+  would be a client fetch from the Home surface (Lane B) against an existing Lane A route. Engine
+  half first per the lane rule.
+- **⚠ GENERATE-AT-COMPLETION WAS ASKED FOR AND REJECTED BY THE OWNER ALREADY — do not implement it.**
+  `app/api/complete-workout/route.ts:47-51` records it verbatim: *"The next prescription for this
+  session is intentionally NOT generated here — it is generated on demand when the session is next
+  opened, so it is never more than a few minutes stale and never sits waiting for a decision for
+  days (**owner ask 2026-07-31**: generation should happen right before the workout, not at the end
+  of the previous one)."* He is now asking for the reverse. **Surface the earlier decision before
+  building either way.**
+- **BF-179 is live evidence the 2026-07-31 call was right.** A prescription generated early and left
+  sitting is exactly what went stale: dismissed, expired 2026-09-17, still serving 52% on 2026-09-20.
+  Moving generation *earlier* widens that window rather than narrowing it.
+- **His "only two factors" is nearly right, and the distinction is what decides the design.** Deload
+  and duration are not filters applied to a finished prescription — **both are INPUTS to
+  generation**:
+  - `durationPreset` (`'short' | 'standard' | 'long'`) reaches
+    `generatePrescriptionForSession` and sets `budgetOverrideMin` via `budgetForPreset`
+    (`generate-prescription.ts:204-207`), which changes how much work is prescribed. The prescribe
+    route calls it *"a today-only time-budget choice from the pre-workout screen"*.
+  - The deload decision reads the day's readiness signals at generation time.
+
+  So a prescription built at completion would be keyed to **yesterday's readiness** and to a guessed
+  duration, and picking Quick or Long would regenerate it anyway. Pre-generating does not remove the
+  wait; it moves it and adds a stale answer.
+- **What is actually slow, measured by reading the trigger chain:** nothing warms the prescription
+  before the workout tab opens. `isAiPrescriptionPending` fires
+  `regeneratePrescriptionInBackground` from `workout-data` **on tab-open**
+  (`route.ts:569-572`), and the client paints *"preparing your AI workout"* while it lands.
+  `/api/next-session/prescription` — the only other reader, used by the done-screen's next-workout
+  card — is **explicitly read-only and fires no `/prescribe`** (`route.ts:38-43`). So the first
+  thing that ever asks for the prescription is the screen the lifter is waiting on.
+- **Recommended: warm it when Home renders the recommendation card, same day, `standard` preset.**
+  Home already knows which session is recommended. Firing the idempotent `/prescribe` there means
+  generation starts seconds-to-minutes before the tap instead of at it, while keeping every property
+  the 2026-07-31 decision bought: same-day readiness, no multi-day sit, no decision waiting. If he
+  then picks Quick or Long, regenerate — that is a deliberate choice where a visible wait is
+  honest.
+- **Alternatives, with what each is better at:**
+  - **Generate at completion (his proposal).** Better in one way: the prescription is ready even if
+    he opens the app cold and trains immediately. Rejected because it reverses a decision made for
+    stated reasons, uses yesterday's readiness for today's deload, and BF-179 shows what an early
+    prescription left sitting becomes.
+  - **Leave it at tab-open.** Better in that it is the freshest possible and already works.
+    Rejected only because it puts the whole generation latency in front of the lifter.
+- **Reversal cost: low.** The warm is one idempotent call from one surface; deleting it restores
+  today's behaviour exactly. `regenerate-in-background` is already single-flighted (`workout-data`
+  route comment at :73 records the ~3s poll storm it exists to prevent), so a warm that races
+  tab-open collapses into one generation rather than two.
+- **⚠ Check the single-flight actually covers cross-surface before shipping.** The dedupe was built
+  for a poll on one screen; a Home warm plus a tab-open trigger is a different shape, and two
+  concurrent generations for one session is the failure worth avoiding here.
+- **Gate: owner** — he made the 2026-07-31 call and this revisits it. Needs his yes on *warm
+  earlier* versus *generate at completion*, with the staleness argument in front of him.
+- **Verification:** open Home, wait a beat, open the workout tab, and confirm the AI card paints
+  without the preparing state. **Device look owed** — the whole point is perceived latency, which
+  the sandbox cannot measure.
+
+### [workouts] BF-180 — a session-level deload stores no "what full would have been", so declining it drops to the STATIC program, not an AI full
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-20 (BugFix intake). Owner, after overriding the
+  BF-179 deload: *"I declined deload; and now I have full - but im guessing its the default full-
+  and not the ai prescribed full (as it was usually 2 sets now its 4). So we need some sort of catch
+  to make sure its always ai derived right?"* **His diagnosis is correct and is measured below.**
+- **Lane: A** — `packages/shared/src/ai-periodization/reconcile-prescription.ts:223-236` is the
+  cause; `components/workout/utils.ts:206-254` is where it surfaces.
+- **Measured in production 2026-09-20. All five Upper exercises are identical and none carries a
+  `preDeload` block:**
+
+  ```json
+  { "pct": 52, "reps": 8, "sets": 2, "deloaded": true, "name": "Incline Bench Press" }
+  ```
+
+  So `deloadOverrideBlocked` returns **all five**, `deloadRevertNames` returns **empty**, and
+  `deloadOverrideOutcome` returns **`nothing-to-revert`**. The override has nothing AI-derived to
+  revert *to*, and the session falls through to each exercise's stored progression style:
+
+  | exercise | static style | sets | pct |
+  |---|---|---|---|
+  | Incline Bench Press | Powerbuilding | **4** | 80 |
+  | Chest-Supported Dumbbell Row | Hypertrophy Plus | **4** | 70 |
+  | Chin-Up | Hypertrophy 3-set | 3 | 65 |
+  | Dumbbell Lateral Raise | Hypertrophy 3-set | 3 | 65 |
+  | Barbell Skull Crusher | **none** | **0** | — |
+
+  **His "usually 2 sets, now 4" is Incline Bench's static Powerbuilding style exactly.** And
+  Skull Crusher has **no progression style at all**, so the static fallback has nothing for it
+  either — a second hole the same tap exposes.
+- **Root cause: `preDeload` is only written on the PER-EXERCISE deload path.**
+  `reconcile-prescription.ts:224` builds `preDeloadById` by iterating `params.deloadedIds` — the
+  soreness-driven per-exercise override — capturing each target's pre-deload values before
+  overwriting them. **A session-level deload never enters that loop.** Its low percentages are
+  produced directly at generation, so "what full would have been" is never computed and never
+  stored. The exercises are flagged `deloaded: true` with nothing behind the flag.
+- **⚠ The repo already half-knows this and described the OTHER half.** `utils.ts:216-231` (LB-47)
+  documents `nothing-to-revert` for the case where a session-level deload carries **no**
+  `deloaded` flag at all. This is the sibling it did not name: the flag IS set, the `preDeload` is
+  not, and the outcome collapses to the same branch — so the card names five blocked exercises and
+  the bar quietly serves the static program. BF-8's *"I was under the assumption I was doing my full
+  session"* is the same complaint from a third side.
+- **Recommended fix — store the full-intensity block at generation, for session-level deloads too.**
+  Extend the session-level path to compute the phase's normal progression targets and persist them
+  as `preDeload` beside the deloaded values, exactly as the per-exercise path already does. The
+  override then reverts locally and instantly, with no network call at the moment the lifter is
+  standing in a gym, and `deloadOverrideOutcome` starts returning `all` instead of
+  `nothing-to-revert` with no change to the card. **⚠ The information is not currently computed on
+  that path** — the model is asked for a deload prescription — so this is a generation change, not
+  a plumbing one. That is the work.
+- **Alternatives, with what each is better at:**
+  - **Regenerate a full prescription when the override is tapped.** Better in that it needs no
+    generation change and fixes prescriptions *already stored* without the block — including his
+    current one. Worse as the primary: it is a round trip at the worst possible moment, needs a
+    loading state, and fails offline where the whole app is meant to work. **Keep it as the
+    fallback for pre-existing prescriptions**, not as the answer.
+  - **Fall back to the last non-deload prescription for that session.** Cheapest, and genuinely
+    better than the static style. Rejected as primary because it is silently stale — it can be weeks
+    old and predate a phase change, which is the Q-229 failure this pillar has already had twice.
+- **Reversal cost is low:** `preDeload` is an additive field in a stored JSON blob that the
+  consuming code already reads and already treats as optional.
+- **Needs: BF-179** — his current prescription is the dismissed, expired one. Fixing the expiry
+  first means the fixture this entry is verified against is a live prescription rather than a ghost.
+- **Verification:** a unit test asserting a session-level deload prescription carries a `preDeload`
+  block for every deloaded exercise, and that `deloadOverrideOutcome` returns `all` for it.
+  **Device look owed:** the owner must see 4 sets become the AI's number rather than Powerbuilding's.
+- **⚠ Separate finding, do NOT fix here:** **Barbell Skull Crusher has no progression style.** It
+  is invisible while the AI prescribes every set, and it is why the static fallback is not a safe
+  net. Worth its own entry rather than a silent default inside this one.
+
+### [workouts] BF-181 — NINE exercises in the active program have no progression style, and one whole session has none at all
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-20 (BugFix intake). Found tracing BF-180; the owner
+  did not report it and would not have, because it is invisible while the AI prescribes every set.
+- **Lane: A** — the data is `session_exercises.style_id`; whether the fix is a migration, a
+  generation guard or a UI block is the entry's open question.
+- **Measured in production 2026-09-20**, the active program `Bankai`, session `Upper`:
+
+  | exercise | style | sets |
+  |---|---|---|
+  | Incline Bench Press | Powerbuilding | 4 |
+  | Chest-Supported Dumbbell Row | Hypertrophy Plus | 4 |
+  | Chin-Up | Hypertrophy 3-set | 3 |
+  | Dumbbell Lateral Raise | Hypertrophy 3-set | 3 |
+  | **Barbell Skull Crusher** | **NULL** | **0** |
+
+- **Why it has not bitten yet:** the AI prescription supplies sets/reps/pct for every exercise, so
+  the missing style is never consulted. It becomes load-bearing the moment anything falls back to
+  the static program — which is exactly what BF-180 found the Full override doing, and what happens
+  for any session with no live prescription.
+- **⚠ The sweep was run before filing and it is systematic, not an orphan. Measured 2026-09-20:
+  14 rows with `style_id IS NULL`, NINE of them in the ACTIVE program:**
+
+  | program | session | exercises with no style |
+  |---|---|---|
+  | **Bankai (active)** | Push | Cable Chest Dips |
+  | | Pull | Face Pull |
+  | | Legs | Cable Lying Leg Curl |
+  | | Upper | Barbell Skull Crusher |
+  | | **Lower** | **all five — Hip Thrust, Bulgarian Split Squat, Calf Raise, Seated Leg Curl, Hanging Leg Raise** |
+  | Main (inactive) | 5 sessions | one each, all the lead compound |
+
+  **`Lower` has no static programming whatsoever.** Every session in the active program has at
+  least one, so this is a missing constraint at write time rather than a handful of bad rows — and
+  the inactive `Main` program shows the same shape, which rules out a one-off.
+- **The fix is an owner-facing choice and should be presented as one:** a style cannot be invented
+  for him — 3 sets at 65% is a guess about how he wants to train that exercise, and guessing it for
+  nine exercises including a whole leg session is worse than leaving them empty. Either the program
+  editor refuses to save an exercise with no style (prevents recurrence, does nothing for the rows
+  on disk), or he is walked through assigning styles to the nine (fixes today, prevents nothing).
+  Both, and the constraint first so the backfill cannot regress.
+- **Needs: BF-180** — that entry is where the missing style first has consequences, and its fix
+  decides whether the static fallback still matters.
+- **Verification:** query for remaining `style_id IS NULL` rows in the active program and confirm
+  zero; then confirm `Lower` renders sets with no active prescription. Browser is enough.
+
+### [workouts] BF-179 — a DISMISSED prescription that expired three days ago is still prescribing today's deload
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-20 (BugFix intake). Owner, on a session screen
+  showing every exercise at 52% with a Deload chip: *"and reccomend deload?"* — asked against an
+  explain screen reading **100/100 STRONG FIT**, training streak **0 days**, sore muscles **None**,
+  energy **OK**, HRV **well above your usual**.
+- **Lane: A** — `packages/shared/src/ai-periodization/reevaluate.ts:104-110`.
+- **First, the two deloads are different systems and the screens do not say so.** The explain
+  screen's signals feed `computeDeloadStrength` (`ai-dynamic.ts`), which gates on
+  `consecutiveTrainingDays < 3` and with his **0** returns `{ recommended: false }`. It is not the
+  source. The workout screen's banner is `prescription.phaseAction === 'deload_recommended'`
+  (`ai-prescription-card.tsx:123`) — the **periodization prescription**, which has its own lifecycle
+  and never consulted today's signals. So *"why does it say deload when every signal says I'm
+  fine"* has a real answer: nothing on that explain screen is what produced it.
+- **Second, and this is the defect. Measured in production 2026-09-20:**
+
+  | field | value |
+  |---|---|
+  | `prescription_status` | **`dismissed`** |
+  | `prescription_generated_at` | 2026-09-16 21:25 |
+  | `prescription_expires_at` | **2026-09-17 21:25** |
+  | `phaseAction` | `deload_recommended` |
+  | `deload` | `true` |
+
+  **Dismissed, and expired three days before the screenshot** — still rendering as a live
+  prescription and still setting every working set to 52%.
+- **The ageing-out check does not cover this status:**
+
+  ```ts
+  if (
+    (state.prescriptionStatus === 'auto_applied' || state.prescriptionStatus === 'accepted' ||
+      state.prescriptionStatus === 'consumed') &&
+    state.prescriptionExpiresAt != null && state.prescriptionExpiresAt <= now
+  ) {
+    return { prescription, changed: false, needsRegenerate: true }
+  }
+  ```
+
+  `dismissed` is in neither the applied set nor the deliberate `pending` carve-out. So
+  `needsRegenerate` never fires, and `workout-data/route.ts:550-556` takes the `else` branch —
+  which **re-stamps the stale prescription and writes it back** through
+  `updatePrescriptionExercisesCache`. The expired offer is not merely tolerated, it is refreshed.
+- **⚠ This is Q-229 returning through a status its fix did not name, and the file says the symptom
+  out loud.** Its own comment: *"a session type left unused for longer than its own window kept
+  replaying its last AI-computed pct/sets/reps … The owner hit it on 2026-08-14: an **8-day-old
+  deload-era 52%** served on a live Intensification day."* **His screenshot is 52% across all five
+  exercises.** Q-229 closed the applied statuses and left this one open.
+- **Fix: age out on expiry regardless of status, except `pending`.** The `pending` carve-out is
+  deliberate and documented — its expiry is owned by the emergency-deload suppression — so widen the
+  condition to include `dismissed` rather than dropping the status test. **Do not "fix" this by
+  making `prescriptionDrivesLoad` reject `dismissed`:** it already does
+  (`apply-prescription.ts:21-28` returns false for it), which is exactly why the mechanism below
+  needs settling before a patch.
+- **⚠ ONE THING IS NOT PINNED DOWN — settle it before writing the fix.** `prescriptionDrivesLoad`
+  returns **false** for `dismissed`, and the card's *"· Deload recommended"* copy is gated on
+  `isPending` (`:219`). Both say a dismissed prescription should neither drive load nor print that
+  line — yet the device shows both. Two candidates, and they need different fixes:
+  1. **A stale client cache.** The `?tab=all` batch path is read-only and seeds every
+     `workout-card:<id>` key (`workout-data/route.ts:138-145`), so a payload cached while the
+     prescription was still pending would render exactly this. Test by clearing the cache and
+     reopening the tab.
+  2. **A status divergence** — the client holding a different status than the row. Test by reading
+     what `/api/workout-data?session=<id>` returns for `prescriptionStatus` right now against the
+     DB row above.
+
+  The expiry gap is real either way and is worth fixing on its own; which of these explains the
+  *pending-looking card* decides whether a second fix is needed.
+- **Verification:** with the fix in, a prescription past `prescription_expires_at` must regenerate
+  on tab-open whatever its status bar `pending`. Assert it in a unit test on `reevaluatePrescription`
+  with a `dismissed` + expired fixture — **derive the timestamps from the clock, never hardcode
+  them**, per this repo's rolling-window test rule. **The device look is owed**: the 52% is what the
+  owner sees, and only the APK proves it is gone.
+
+### [readiness] BF-178 — the readiness signal is OUR composite, and three surfaces still credit it to Oura
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-20 (BugFix intake). Owner, on the *Why Upper?*
+  screen: *"Still called oura readiness"*.
+- **Lane: A** — `packages/shared/src/session-explain/group-signals.ts:47`,
+  `app/api/session-explain/insight/route.ts:46`,
+  `packages/shared/src/health/weekly-digest-metrics.ts:111`.
+- **The number is not Oura's and has not been since the 2026-07-07 re-key.**
+  `liveReadinessForDay` (`packages/shared/src/health/live-readiness.ts`) returns
+  `oura_daily_derived.readiness_score` where `readiness_source === 'ble-derived'` — the app's own
+  composite. The frozen Cloud column is a fallback **only** for pre-re-key days, gated on
+  `isPreRekey(date)`. That file's own header says it: *"Since the 2026-07-07 ring re-key the Oura
+  Cloud gets no new data, so `oura_daily.readiness_score` is frozen; the app's own composite is
+  persisted to `oura_daily_derived.readiness_score`."*
+- **Measured in production 2026-09-20** — the day of his screenshot:
+
+  | day | readiness_score | readiness_source |
+  |---|---|---|
+  | 2026-09-20 | **46** | `ble-derived` |
+  | 2026-09-19 | 74 | `ble-derived` |
+  | 2026-09-18 | 36 | `ble-derived` |
+
+  The 46 he is looking at is ours. Every recent row is.
+- **It is also internally inconsistent, which is what makes it a bug rather than a quibble.** The
+  Home header calls the same number **"Readiness"**; the explain screen calls it **"Oura
+  readiness"**. One screen apart, same value, two provenances implied — and the Oura one is false.
+- **⚠ The AI route matters more than the two labels.** `session-explain/insight/route.ts:46` feeds
+  the model `- Oura readiness: ${sig.ouraReadiness}`, so the *prose* says it too — his screenshot
+  reads *"Despite your Oura readiness of 46"*. A label is a rename; a prompt line teaches the model
+  to attribute the app's own composite to a third party in generated text, which is the half that
+  cannot be spotted by reading the UI.
+- **Fix: call it "Readiness" everywhere, matching Home.** Do not invent a new name — Home already
+  has the right one and a third vocabulary is how this recurs. Rename the label, the prompt line and
+  the digest string in one PR; the field name `ouraReadiness` can stay or be renamed with it, but if
+  it stays it needs a comment saying the value is ble-derived, because the field name is what taught
+  every one of these three call sites to write "Oura".
+- **Sibling sweep:** `grep -rn "Oura readiness"` — the three above are the live ones. Test files and
+  `changelog.ts` are history and must NOT be rewritten; a changelog entry describing what shipped
+  then is accurate as a record.
+- **⚠ Not in scope, and worth saying so:** whether **46 is a good score** on a day with HRV *well
+  above* baseline is a calibration question, not this entry. The readiness baseline has open Tuning
+  work (TN-6, BF-13). This entry is only about what the number is called.
+- **Verification:** open *Why <session>?* and confirm the row reads "Readiness", and that the AI
+  paragraph above it no longer says "Oura readiness". Browser is enough.
+
 ### [nutrition] BF-177 — "kcal left" is the server's subtraction against a stale intake, so it sits still while the ring moves
 
 - **Lane: B** — `app/nutrition/nutrition-content.tsx`, `app/nutrition/use-energy-balance-refetch.ts`.
@@ -740,23 +1038,6 @@ existing 65 days moves by less than 5 points on every one of them.
 - **Pass test:** every stored `readiness_score` reproduces from its own stored contributors, and
   every row carries a model stamp. **Currently: 62 of 65 reproduce** (58 nine-key + 4 of the seven),
   three are 1 point out, and 25 of 65 are stamped.
-
-### [app-shell] RV-61 — any signed-in user can equip an achievement title they have not unlocked
-
-- **Lane:** A — `app/api/user/equipped-title/route.ts:26-29`. **Added:** 2026-09-18 · Review sweep 50.
-- The only gate is catalogue membership (`hasOwnProperty.call(TITLES, titleId)`); unlock state is
-  never consulted. The filter is **client-side only**
-  (`components/more/title-picker-sheet.tsx:17` takes `unlockedAchievementIds` and filters the list).
-  Live: a user at `bestStreak: 9` equipped `iron_will` (`unlockedBy: 'streak_60'`) → 200, read back
-  from Postgres as stored, and it renders on `friend-leaderboard.tsx:106`, `friend-feed.tsx:16` and
-  `app/profile/[userId]/page.tsx:34`. Control: `"iron_will_x"` → 400 with the stored value intact, so
-  the refusal tracks catalogue membership specifically.
-- **⚠ Pre-existing, not introduced in this window — and this diff *hardened* the same line**,
-  replacing a truthy `TITLES[titleId]` lookup that let `constructor`/`__proto__` through. It is filed
-  here because the sweep found it, not because it regressed.
-- **Low priority on its merits:** cosmetic, no data or permission is gained, and on a single-owner
-  deployment there may be no adversary. The reason to do it is that the server is the only place the
-  unlock rule can live, and the achievements payload the picker already reads is the input.
 
 ### [readiness][devices][platform] TN-46 — correlate vitals against dose: the app holds both halves and joins neither 🔴 LIVE
 
@@ -12556,6 +12837,36 @@ one — the "treadmill" the activity-goal volume lane already removed (Q-190).
     100 and 137, **and it is immune to `hrMax` re-estimation while the fraction form is not** —
     reproduced against the 2026-08-05 step (187 → 168) that caused this. So the calibration PR is a
     constant plus a `v6` bump, not a rewrite.
+- **⚑ RE-MEASURED 2026-09-20, on the owner's report that the battery is *"pretty much useless at this
+  point"*. It has got materially worse since this entry was filed, and there is now a NEW hazard for
+  the fit.** Nothing below changes the diagnosis — it confirms it and dates the damage.
+
+  | | 2026-08-24 (this entry) | 2026-09-20 |
+  |---|---|---|
+  | points charged/day | 0–6 last week | **1.0** (last 13 days) |
+  | days ending at 0 | 5 of last 8 | **9 of last 13** |
+  | mean anchor → mean end | — | **43.4 → 6.2** |
+
+  Split across the three regimes, the window closes exactly where the sign flips:
+
+  | period | charge ceiling | his 5th-pct waking HR | gap | charged/day |
+  |---|---:|---:|---:|---:|
+  | 2026-06-30 → 08-19 | 65.8 bpm | 64.0 bpm | **−1.8** | **23.1** |
+  | 2026-08-20 → 09-06 | 57.9 bpm | 64.0 bpm | **+6.1** | **2.2** |
+  | 2026-09-07 → 09-19 | 58.7 bpm | 68.0 bpm | **+9.3** | **1.0** |
+
+  Charging collapsed **23×** the moment the ceiling crossed below his quietest waking hour, which
+  is this entry's mechanism observed happening rather than predicted.
+
+- **⚠ NEW FITTING HAZARD — do not fit the waking-rest offset against data after 2026-09-07.** This
+  entry's accepted direction is to anchor the rest boundary to *waking rest*. The owner started
+  **Retatrutide on 2026-09-07** (TN-46), and his 5th-percentile waking HR moved **64.0 → 68.0 bpm**
+  in two weeks while resting HR rose ~13. **Waking rest is currently a moving, medicated target.** An
+  offset fitted to it now encodes a pharmacological transient into a constant that re-scores every
+  stored Body Battery day — the exact "fitted to one bad period" failure the Tuning rules exist to
+  prevent. Fit against **2026-06-30 → 2026-09-06** and validate forward, or wait for the vitals to
+  settle. This was not knowable when the entry was written.
+
 - ⛔ **THE FIT CANNOT BE DONE FROM AN AGENT SANDBOX — measured 2026-08-24, not assumed. Read this
   before attempting it, or you will rediscover it.** The entry requires the fit to include the
   stress term. `buildDaytimeStressSeriesFromModel` needs `DaytimeStressConstants`, which are
