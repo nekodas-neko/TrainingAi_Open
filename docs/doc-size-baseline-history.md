@@ -18,7 +18,7 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
-## 2026-09-20 — backlog → 24782 (rule 2's yield, and naming the real bottleneck)
+## 2026-09-20 — backlog → 24837 (rule 2's yield, and naming the real bottleneck)
 
 **+16.** Two negative results worth writing down. Rule 2 re-screened the August sweep's 27
 decision thresholds by window-width-vs-noise rather than coverage — the sweep's own stated blind spot
@@ -30,6 +30,22 @@ The second is more useful: the August sweep listed 25 thresholds it could not me
 them sleep-staging constants feeding readiness's heaviest contributor. They are blocked on the same
 missing constants as TN-2's fit and TN-3a's stress term, so one admin replay endpoint unlocks three
 items. That is the highest-leverage piece of work left on the tuning front and it is Lane A's.
+
+---
+
+## 2026-09-20 — backlog → 24804 (TN-53, from an inventory of everything recorded)
+
+**+75.** The owner asked for a sweep across every metric the app records. 99 tables; the useful
+output was one defect and a tiering. \`set_hr_stats\` turns out to be the best-designed and
+least-exploited table in the app — per-set heart-rate recovery, 33 columns — but only 24% of its rows
+come from the chest strap, which samples 16x denser than the ring, and the live HRR path in
+/api/health/trends applies none of the coverage gating its stored sibling does. So the sparkline the
+owner reads moves partly with which device he wore.
+
+The review also tiers what can carry an analysis at all: one DEXA scan and one measured RMR cannot
+anchor TN-48's bioimpedance numbers, \`colmi_readings\` holds 3,830 rows that no scoring module
+touches, and the blood-panel tables exist and are empty. Recorded so the next correlation is built on
+the dense tier rather than the sparse one.
 
 ---
 
