@@ -14444,3 +14444,15 @@ TN-3b is the owner's.
 - **LB-120** — eight drifts in two hours, six resolve-and-push cycles for one card, the same three
   files every time. The number is the point: it converts "this is annoying" into "the drift rate is
   faster than a CI cycle", which is a different problem with a different fix.
+
+## 2026-09-20 — `docs/implementation-backlog.md` → 25024 (OR-120, three decisions answered)
+
++40 for three answers, and the lines are mostly **reopening conditions** rather than the answers
+themselves. A deferral with no stated trigger becomes a question someone re-asks in a month; PS-46
+now says it reopens when the owner wants the app on an iPhone, and PS-45 when a *second* consumer
+appears rather than a repeat of the first request.
+
+The BF-77 note is the longest and is a correction to my own framing. It was put to the owner as
+three sizes with a recommendation; they answered in different terms — *"the most efficient way to
+share a food library"* — which means the mechanism was the question, not the scale. Recording that
+distinction is what stops the next session re-presenting A/B/C and calling it progress.
