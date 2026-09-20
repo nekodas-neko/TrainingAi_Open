@@ -5,7 +5,7 @@ import { getRepository } from '@/lib/data'
 import type { MealPlan } from '@trainingai/shared/types/nutrition'
 import { NutritionIngredientsSchema } from '@trainingai/shared/validators/nutrition-ingredient'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
-import { invalidBodyResponse } from '@/lib/api/route-errors'
+import { invalidBodyResponse, withRouteErrors } from '@/lib/api/route-errors'
 
 // A whole plan: up to 3 variants x 20 meals, each with a 2,000-char note and a snapshot of its
 // ingredients. Roughly 700 KB at the schema's own limits; 2 MB is generous past that.
@@ -103,6 +103,10 @@ export async function POST(req: Request) {
   }
 
   const repo = await getRepository()
-  const plan = await repo.createMealPlan(userId, parsed.data)
-  return NextResponse.json(plan, { status: 201 })
+  // RV-42's ownership refusal is a UserFacingError; without this it reaches Next's default handler
+  // as a 500 and lands in error_events, which is what routeErrorResponse exists to prevent.
+  return withRouteErrors(async () => {
+    const plan = await repo.createMealPlan(userId, parsed.data)
+    return NextResponse.json(plan, { status: 201 })
+  })
 }
