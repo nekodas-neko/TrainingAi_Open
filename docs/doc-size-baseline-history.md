@@ -18,7 +18,7 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
-## 2026-09-20 — backlog → 24492, `docs/agents/state/tuning.md` → 714 (TN-52, and a correction to the owner's own numbers)
+## 2026-09-20 — backlog → 24550, `docs/agents/state/tuning.md` → 714 (TN-52, and a correction to the owner's own numbers)
 
 **+111 on a 24042 base.** The owner asked how to make the tuning work on and off the medication.
 Answering it required correcting the premise first: this agent had repeated *"resting HR +13 bpm, HRV
@@ -14051,3 +14051,13 @@ The quoted `complete-workout` comment is the entry's most important line: withou
 implementer reads a direct owner request and builds the thing that was deliberately not built,
 with no way to know. The input-versus-filter distinction earns its space for the same reason — the
 proposal only sounds free if you think duration and deload are applied after generation.
+
+## 2026-09-20 (third) — `docs/implementation-backlog.md` → 24402
+
+**BF-183** — tag My Foods rows with the meal they are actually eaten at.
+
+The coverage table is the entry's reason for existing. "Derive it from history" sounds obviously
+right until you count: 10 of 19 rows clear a sensible threshold, 4 have never been logged at all.
+Without that split an implementer ships a guess on every row, which is the BF-172 failure again. The
+emoji-versus-lucide argument is recorded with its reason — meal types are user-created, so a fixed
+icon map cannot cover one the app did not anticipate — because it reads as taste and is not.
