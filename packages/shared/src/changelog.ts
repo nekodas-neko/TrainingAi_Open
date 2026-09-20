@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.460.5",
+    version: "1.460.6",
     date: "2026-09-20",
     changes: [
       "Un-ticking a logged dose and ticking it again no longer changes the time the dose is recorded at. It used to overwrite that time with the moment of the second tap \u2014 on one Retatrutide dose that moved a single injection's record by 35 minutes, and nothing on screen said it had happened. Nothing was double-recorded; the day's entry was always the one entry. Ticking a dose for the first time still stamps it then, as before. One trade-off worth knowing: re-ticking was the only way to change a recorded time, so until an editable time control is added, a wrong time cannot be corrected from the app.",
+    ],
+  },
+  {
+    version: "1.460.5",
+    date: "2026-09-20",
+    changes: [
+      "The 14-day trend charts used to draw a straight line across days they had no reading for, so a gap in the data looked exactly like a measurement. They now break the line where a day is missing, put a dot on a lone reading that would otherwise be invisible, and say how many days are missing beside the chart's title. This affects every trend chart \u2014 resting heart rate, HRV, HR recovery, wear time, session duration, workout density, protein, steps, water and skin temperature.",
     ],
   },
   {
