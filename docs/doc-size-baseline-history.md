@@ -18,6 +18,22 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-20 — backlog → 24804 (TN-53, from an inventory of everything recorded)
+
+**+75.** The owner asked for a sweep across every metric the app records. 99 tables; the useful
+output was one defect and a tiering. \`set_hr_stats\` turns out to be the best-designed and
+least-exploited table in the app — per-set heart-rate recovery, 33 columns — but only 24% of its rows
+come from the chest strap, which samples 16x denser than the ring, and the live HRR path in
+/api/health/trends applies none of the coverage gating its stored sibling does. So the sparkline the
+owner reads moves partly with which device he wore.
+
+The review also tiers what can carry an analysis at all: one DEXA scan and one measured RMR cannot
+anchor TN-48's bioimpedance numbers, \`colmi_readings\` holds 3,830 rows that no scoring module
+touches, and the blood-panel tables exist and are empty. Recorded so the next correlation is built on
+the dense tier rather than the sparse one.
+
+---
+
 ## 2026-09-20 — backlog → 24701 (LA-121 measured, +15)
 
 **+15 on an entry that was filed unmeasured four hours earlier and did not survive its own query.**
@@ -31,6 +47,21 @@ one production call site and it is the dead arm. The entry records that temperat
 readiness (`computeReadinessComposite` takes `tempZ`), because that is the claim which would have
 made this urgent and it is false — and then refuses to decide whether the ladder should be ported,
 since that is calibration and belongs to the owner.
+## 2026-09-20 — backlog → 24749 (LA-122, the owner-question ledger)
+
+**+48 for five questions that were living only in a chat transcript.** The owner asked for them
+either stated in-session or filed for the Orchestrator; a transcript ends with the session and the
+queue does not, so they are filed.
+
+**Written as ONE `Reference:` entry rather than five entries**, because they share a single blocker —
+owner attention — and five separate items would put four more unstartable things at the head of a
+queue whose READY list is already mostly things nobody can begin. `Reference:` keeps it out of the
+work list entirely; each item names the entry it unblocks so striking it is mechanical.
+
+The line worth keeping longest is item 5's aside: **`enable_pr_auto_merge` is unavailable on this
+repo** ("Protected branch rules not configured for this branch"). CLAUDE.md's CI/CD section offers
+auto-merge as a standard option, and it is not one here — better recorded once than rediscovered by
+whoever next tries to escape the rebase treadmill.
 
 ---
 
@@ -14216,7 +14247,7 @@ superseded reading visible rather than rewriting it away — the 45-logs-all-bre
 is simultaneously the evidence for the new model and the reason the old one failed, and deleting it
 would lose the argument.
 
-## 2026-09-20 — `docs/implementation-backlog.md` +357 (24701 → 25058) (Review sweep 51)
+## 2026-09-20 — `docs/implementation-backlog.md` +356 (24804 → 25160) (Review sweep 51)
 
 Sixteen entries (**RV-64…RV-79**) from the owner's efficiency review — logic-over-AI, caching and
 saving speed, runtime efficiency, and animation/UI feel — at ~22 lines each, the ratio this file

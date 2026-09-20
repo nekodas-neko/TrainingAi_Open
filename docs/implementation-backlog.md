@@ -443,6 +443,53 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [platform] LA-122 — Reference: the five owner decisions Lane A is currently blocked on
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-20 (Lane A, filed for the Orchestrator at the owner's request).
+- **Lane: A** · **Reference:** — this is a ledger other entries READ, not work to build. Nothing here
+  is implementable until the owner answers; each item names the entry it unblocks.
+- **Why it exists.** These five were each raised in-session and would otherwise live only in a chat
+  transcript that ends with the session. Four of them have blocked a specific queue item for
+  between one and nine days.
+
+**1. BF-179 — is the 52% still on screen?** (unblocks BF-179, currently READY #2)
+  The prescription that produced the screenshot regenerated at 2026-09-19 23:10, and
+  `session_periodization` keeps no history, so the pre-regeneration state cannot be read back. If
+  Upper renders normally now, BF-179 is a post-mortem; if it still reads 52%, it is live and the
+  cause is NOT the one the entry names — see the refutation recorded in BF-179 itself. **One look at
+  *Why Upper?* settles it.**
+
+**2. LA-121 — port the temperature ladder, or let `tempZ` stand?** (unblocks LA-121, READY #1)
+  `computeBlendedScore`'s penalty ladder (dev 0.4 → 70, 0.7 → 60, 1.2 → 40 from a base of 80) has
+  had no reachable call site since 2026-07-07. Temperature still reaches readiness through
+  `computeReadinessComposite`'s `tempZ`, so nothing is missing — but the ladder was the sharper
+  penalty. **Either answer re-scores stored days, which is why an implementer must not pick.**
+  Adjacent to TN-6 and BF-13, both open on the same baseline.
+
+**3. Q-28, BF-9 and BF-7 carry NO `Gate:` field.** (unblocks all three)
+  `check-backlog-pointers.js` sees them as ordinary startable work. They are held back only by an
+  exclusion list inside the Lane A routine prompt — a convention living in a scheduled prompt rather
+  than in the file every agent reads, which is exactly the kind of thing that goes stale unnoticed.
+  **Either gate them in the file or release them.** BF-7 (the 45-minute slider) is the owner's own
+  request and the cheapest of the three.
+
+**4. Q-29 Task 5 is a destructive drop of the server raw archive.** (unblocks Q-29)
+  Confirm-first per CLAUDE.md, and the entry's own gate language says so. Needs a yes on principle
+  before anyone writes it, not a review after.
+
+**5. The `.size` conflict tax — a workflow question, not a defect.**
+  Every merging PR touches `docs/doc-size/docs/implementation-backlog.md.size`, and so does every
+  Lane A PR. On 2026-09-20 `main` took a commit roughly every 8 minutes against a ~6-minute CI run,
+  and **Q-1a needed five rebases and four refused merges to land**. Cheapest fix: **BugFix batches a
+  sweep's entries into ONE PR** rather than one per entry — a convention change, no code, and the
+  entries are already written in bursts. The alternative, generating the baselines in CI rather than
+  committing them, removes the conflict class entirely but is a real change to the ratchet and wants
+  its own entry. **GitHub auto-merge is not available here** — `enable_pr_auto_merge` returns
+  *"Protected branch rules not configured for this branch"*, so the CI/CD section's auto-merge
+  option does not apply to this repo.
+
+- **Keep:** this entry until all five are answered. Strike each item as it resolves; remove the
+  entry when the last one goes.
 ### [heart-rate][platform] RV-64 — 128,734 rows are pulled and sorted in JS to produce three numbers, once per rest period
 
 - **Lane:** A — `lib/data/postgres/slices/oura.ts:801`, `packages/shared/src/health/observed-hr.ts:77`,
@@ -13171,6 +13218,61 @@ behaviour, and TN-6's own pass test (deviation mean within ±0.05 °C of zero) i
   re-derivation lifts it with **no deploy**. Thresholds untouched.
 - **Keep:** a **suppression, not a fix** — TN-6 retires it (its ±0.05 °C pass test is what does), and
   nothing was observed in production.
+### [heart-rate][workouts] TN-53 — the HR-recovery trend has no density gate, so it partly records which device was worn 🔴 LIVE
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-20 · Tuning agent, from the owner's ask to look across
+  every metric the app records.
+- **Lane: A** — `app/api/health/trends/route.ts` and `packages/shared/src/workout/hr-analysis.ts`.
+- **Review:** [`what we record, and what it can actually say`](reviews/2026-09-20-what-we-record-and-what-it-can-say.md) §2–3.
+
+**Two paths compute heart-rate recovery and only one is gated.** `exercise-hr-trend.ts` filters every
+metric mean on `coverageOk` — its own comment says a censored set may contribute to the breakdown but
+not to the numbers. **`/api/health/trends` ignores `set_hr_stats` entirely** and recomputes HRR live
+from a raw `getHrForWindow`, with no coverage gate, no minimum reading count, and no check that the
+two readings it differences are actually 60 seconds apart:
+
+```
+hrr1 = bpmAtLog − bpm60          // hr-analysis.ts
+nearestBpm(readings, target, windowMs = 90_000)   // both terms
+```
+
+**Why that matters here specifically — the two sensors differ sixteen-fold in density:**
+
+| source | rows | `coverage_ok` | readings/set |
+|---|---:|---:|---:|
+| **chest_strap** | 220 | **91%** | **111.8** |
+| `ble` (ring) | 79 | **54%** | **7.1** |
+| *NULL* (unlabelled) | **615** | **23%** | 17.0 |
+
+At ~1 reading/second the 90 s tolerance is harmless. At 7 readings per set the two "readings 60 s
+apart" can be **the same reading, or 150 s apart**. The strap supplied only **24%** of the table and
+has been dark since **2026-09-15**, so the sparkline's recent span is ring-sourced.
+
+**So the HR-Recovery sparkline on the heart-rate page moves partly with sensor availability.** The
+codebase already knows this matters — `set_hr_stats` stores `coverage_ok` and `readings_count` for
+exactly this reason, and this path reads neither.
+
+**First action:** gate the live path the same way its sibling is gated — require a minimum reading
+density in the window and return `null` rather than a number when it is not met. **A null is the
+correct output here**; a sparkline gap is honest where an ungated value is not.
+
+**⚠ Do NOT fix this by widening the tolerance or interpolating.** Both would manufacture a value from
+readings that do not exist. The ring genuinely cannot measure a 60-second recovery under load, and the
+surface should say so.
+
+**⚠ Do NOT read the current HRR trend as physiology, including for the medication question.** Measured
+pre-dose vs on Retatrutide, HRR-60 runs **5.8 → 4.0 bpm** — but n = 229 against 23, sd 12.9, so that
+is **0.15 sd** and means nothing. It is quoted here to stop it being quoted as a finding elsewhere.
+
+**⚑ The better instrument already exists and is unused.** `fitness_tests` carries a `resting_hrr` test
+type **and** an `hrr1_bpm` column; one test was run (2026-07-19) and **left `hrr1_bpm` null**. A
+repeated HRR test controls the stimulus in a way neither resting HR nor ring HRV can — see the review
+§4. That is the durable answer; this entry is the correctness fix for what ships today.
+
+**Pass test:** a session with fewer than the minimum readings contributes no HRR point rather than a
+computed one, and the sparkline shows a gap across the period the strap was not worn.
+
+
 ### [readiness][heart-rate][body] TN-52 — thresholds are set in bpm and fixed fractions, so they break when the user changes; define them in units of the user's own variability instead 🔴 LIVE
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-20 · owner: *"How can we make the tuning dynamic so
