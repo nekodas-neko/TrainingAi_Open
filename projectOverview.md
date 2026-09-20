@@ -117,6 +117,18 @@ and the planned fields descend from the same `ex.progressionStyle`. **A null `st
 signature:** 09-17 is a clean day where all five logs have one. **No cause is recorded**, because
 three hypotheses fit and none was tested — the entry has already been filed with a wrong diagnosis
 twice, and a third is worse than none.
+
+**The equipped title was gated on the catalogue, not on having earned it (RV-61, 2026-09-18).**
+`PATCH /api/user/equipped-title` checked only that the id existed in `TITLES`; the unlock filter lives
+in the picker sheet, which is the **client's** copy of a rule only the server can hold. A direct PATCH
+skipped it and the stored title renders on the friend leaderboard, the friend feed and the public
+profile. The route now resolves `unlockedBy` and asks `computeAchievements` — **the** implementation
+of unlock state, not a cheaper second one that could disagree — refusing with 403. Clearing a title is
+not gated and does not pay for it. **No rate limit added:** `/api/achievements` already runs the same
+fifteen queries on every profile paint and carries none, so gating the rarer PATCH alone would be
+theatre. Verified first that all 16 `unlockedBy` values resolve to real achievement ids — this fix's
+failure mode is locking someone out of a title they earned, not letting one through.
+
 **`Authorization: Bearer` now resolves a session, server side only (Q-1a server half, 2026-09-18).**
 A native client on a different origin has no cookie to send, so it presents the same NextAuth session
 JWT as a bearer. It is resolved **inside `auth()`** — the wrapper all 222 route files import and none

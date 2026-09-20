@@ -98,7 +98,7 @@ history files are dated) rather than with the sweep, because the sweep is a chor
 measurement is the thing a future reader would otherwise re-derive before daring to run it.
 ---
 
-## 2026-09-18 — backlog → 24393, `projectOverview.md` → 11927 (Q-1a server half)
+## 2026-09-18 — backlog → 24376, `projectOverview.md` → 11939 (Q-1a server half)
 
 **Backlog +32 and nothing removed**, which is the honest shape for a partial: Q-1a stays queued
 because most of its scope — the client — has not shipped, and the entry now carries what DID ship, the
@@ -141,6 +141,19 @@ The overview paragraph spends its length on the **measurement**, not the regex: 
 bullets already matched and all four misses were one shape. That number is the whole argument for
 widening rather than rewriting, and `keep.js`'s own comments argue the opposite case convincingly
 enough that a future session will re-open it. Without the count it would have to re-measure.
+---
+
+## 2026-09-18 — backlog → 24344, `projectOverview.md` → 11927 (RV-61 shipped)
+
+**Backlog −17** for one small entry. The overview paragraph is longer than the diff because two of
+the three things worth remembering are **refusals**: the check calls a fifteen-query function on
+purpose rather than re-deriving unlock state cheaply, and it adds no rate limit because the sibling
+GET running the same work has none. A future reader looking at a PATCH that runs `computeAchievements`
+will reasonably ask why, and the answer is not in the diff.
+
+The third is the pre-flight check — that all 16 `unlockedBy` values resolve — which is there because
+this fix's failure mode is locking a user out of a title they earned, and nothing in CI would catch a
+requirement that silently does not resolve.
 
 ---
 
