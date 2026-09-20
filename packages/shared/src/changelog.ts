@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.460.4",
+    date: "2026-09-20",
+    changes: [
+      "The vial sheet used to tell you your saved dose was \"changed in Manage supplements, under Amount\" \u2014 a screen that does not exist under that name. The control is called just \"Manage\", it is ten-pixel grey text in the Supplements header, and it sits on the screen behind the sheet telling you to find it. Searching for the words was never going to work. The note now ends \"Change it\", and tapping that takes you straight there. The Manage control also got a proper thumb-sized tap area without getting visually bigger.",
+    ],
+  },
+  {
     version: "1.460.3",
     date: "2026-09-20",
     changes: [

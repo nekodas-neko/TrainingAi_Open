@@ -128,7 +128,12 @@ export function SupplementsSection({ supplements, loading, onChanged, userId , g
       <div>
         <div className="flex items-center justify-between px-1 pb-2">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Supplements</p>
-          <button type="button" onClick={() => setManageOpen(true)} className="text-[10px] text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+          {/* BF-186. Ten-px text with a 12-px icon and no padding is roughly a 12–14 px hit area
+              against this repo's 44 px floor. `tap-target-44` is the utility for exactly this —
+              a small ISOLATED control — and it widens the hit box with a pseudo-element rather
+              than the box, so the header still reads as a header. Isolated holds here: its only
+              neighbour in the row is the non-interactive "Supplements" label. */}
+          <button type="button" onClick={() => setManageOpen(true)} className="tap-target-44 text-[10px] text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
             <SettingsIcon className="h-3 w-3" /> Manage
           </button>
         </div>
@@ -204,6 +209,7 @@ export function SupplementsSection({ supplements, loading, onChanged, userId , g
           supplementName={vialFor.name}
           defaultDoseMg={vialFor.defaultAmount ?? null}
           userId={userId}
+          onManage={() => { setVialFor(null); setManageOpen(true) }}
         />
       )}
 
