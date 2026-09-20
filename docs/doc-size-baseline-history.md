@@ -68,6 +68,25 @@ unavoidable. That belief is worth 38 lines to kill.
 
 ---
 
+## 2026-09-20 — backlog → 25105 (TN-51's first action shipped, +13)
+
+Another raise on a queued entry rather than a removal, for the same reason as TN-54 an hour
+earlier: the code half is done and the device half is not, and collapsing that into "shipped" is
+what makes a strap problem look solved when the strap has not been worn.
+
+The +13 records that **option (1) was taken and options (2) and (3) should not be built** — the
+entry listed three approaches in preference order, and a later reader finding "shipped" with no
+note would have no way to tell which. It also names the cap change (16 → 100 on `hr-ingest`'s
+per-sample `rr`), because that number is now load-bearing in two languages and a reader who lowers
+it would silently reintroduce the bug: the client splits at 100 and a lower server cap would 400
+those chunks, and the client swallows a 400 and drops the batch.
+
+What is owed is one night of wear. Gradle cannot resolve the Android plugin in this sandbox —
+verified, not assumed — so the Kotlin is covered by unit tests that only CI executes, and the radio
+is covered by nothing.
+
+---
+
 ## 2026-09-20 — backlog → 25086 (TN-54's recording half shipped, +15)
 
 TN-54 stays queued, so this is a raise rather than the usual removal. The entry arrived at 20:23 as
@@ -14573,3 +14592,38 @@ a clock, not the same clock) and the note names it so the device check does not 
 `projectOverview.md`'s +17 is the Known-Issues row, which carries the two things a browser cannot
 settle: the 412 px look, and the owner's pass test, which needs production data because the local
 seed holds no `hrr1` at all.
+
+## 2026-09-20 — TN-51's device gate is a Known Issue, not a `Keep:` line
+
+`projectOverview.md` **11966 → 12001** (`lane-a/tn51-ambient-keeps-rr`).
+
+Thirty-five lines for one entry, and the entry exists because the Canonical Runtime gate names this
+file specifically: a native change with no device available needs a Known-Issues row here, and the
+backlog `Keep:` line does not satisfy it. The PR nearly merged without one — the code, the journal
+and the backlog were all complete, and the one artefact the merge gate actually names was missing.
+
+Most of the length is the part that is not the fix: what would confirm it on the S25, and that two
+unverified native changes now stack on `PolarStrapService`, so the next night of wear exercises
+TN-54 and TN-51 at once and a bad result would not say which. That is the sentence a reader needs
+in three weeks and the only place it can live is next to both.
+
+## 2026-09-20 — LA-121 was telling every implementer to start the entry that says not to
+
+`docs/implementation-backlog.md` **25105 → 25129** (`lane-a/la121-gate-owner`).
+
+Twenty-four lines, and the `Gate: owner` that was the point is six of them. LA-121's own step (2)
+reads *"Not before"* (1) is answered, and LA-122 item 2 says outright that an implementer must not
+pick — yet with no `Gate:` field the queue tool printed it as Lane A's **READY #1**. That is LA-122
+item 3's defect (Q-28, BF-9, BF-7 held back only by a convention inside a scheduled prompt) wearing
+a different entry's name, and it cost the start of this item before the entry was read.
+
+The rest is re-verification changing the entry rather than confirming it. The dead condition has
+**five** sites, not four; the fifth is a live gate with a dead *disjunct*, so a cleanup that removed
+"the four dead arms" as filed would leave it behind. It changes no behaviour — a dead disjunct in an
+OR contributes nothing — which is why it is worth writing down rather than fixing: the next reader
+needs to know it is inert before they touch the scoring path.
+
+And the premise moved from inferred to measured: the last non-null `oura_daily.readiness_score` is
+**2026-07-07, the re-key date itself**, with 0 of the trailing 61 days carrying one while rows are
+still written daily. The entry guessed "pre-re-key-only" and then reasoned its way to "permanent";
+the column now says so directly.

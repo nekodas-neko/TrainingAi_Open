@@ -2347,6 +2347,41 @@ reading well. ② The owner's pass test, *"the sparkline shows a gap across the 
 not worn"* — it needs production data, because the local seed holds no `hrr1` at all and the e2e
 drives `rhrBpm` through the identical component path instead.
 
+### [cardio][devices] ⚠️ Ambient wear keeps every RR interval now — NOT device-verified (TN-51, 2026-09-20) · needs: APK
+
+`PolarStrapService` is built for all-day wear and `ambient` defaults to `true`, so a night in the
+strap went through `thinAmbient()`, which kept one buffered sample per 30 s and **dropped the rest
+whole — each discarded sample carrying its own `rr` list with it.** Confirmed live in production
+2026-09-20 06:03–06:05 Brisbane: consecutive stored RR rows sat 30.2 s, 30.2 s and 30.7 s apart,
+one interval per kept sample. **That does not weaken rMSSD, it makes it undefined** — the measure is
+the root-mean-square of differences between *adjacent* intervals, and one interval every 30 s has no
+adjacent pair. It is why PS-44's ring-vs-strap HRV comparison could not be run at all.
+
+**Fixed in `PolarAmbientThinner`** (a pure object extracted from the service so the logic is
+testable): the HR series is still thinned — that was never the bug — but the dropped samples' beats
+ride forward onto the next kept sample, including a carry stranded by a flush boundary. A window
+above `MAX_RR_PER_SAMPLE` **splits** into further samples rather than truncating, and
+`/api/hr-ingest`'s per-sample `rr` cap went 16 → 100, because a 30-second carry holds ~30 beats at
+rest and the old cap would have rejected the very payload that fixes this. A cross-language test
+reads both constants and fails if they drift.
+
+**NOT verified on device, and nothing in the sandbox can stand in for it.** Gradle cannot resolve the
+Android plugin here, so the Kotlin was written but never run locally; its 8 unit tests are executed
+only by CI's `Android (Kotlin tests + debug APK)` job, which is **not a required check** and passed
+on `7a534349444` (80 tests, 0 failed). That job has no Bluetooth, no Polar H10 and no radio — the
+logic is covered, the measurement is not. **Needs a new APK** (`android/**`); the `hr-ingest` half
+reaches the device through a normal Railway deploy.
+
+**What would confirm it, on the S25:** install a new APK, wear the strap one night, then check that
+`rr_intervals` holds a **contiguous** beat-to-beat series across the core sleep window and that
+`rmssdFromRr` over it is comparable to the ring's figure for the same night. **TN-51 stays in the
+backlog queue until that run happens.**
+
+**Two unverified native changes now stack.** TN-54 (`strap_status`) merged earlier in the same
+session and is also awaiting a device check. Both touch `PolarStrapService`, so the next night of wear
+exercises both at once — worth knowing when reading the result, because a bad night would not say
+which one was responsible.
+
 ### [workouts] 🟠 Two real exercises are excluded from every generated program (RV-51, 2026-09-18) · found, not fixed
 
 **Open.** `equipmentEligible` (BF-129) excludes an exercise that declares no equipment, justified in

@@ -467,12 +467,17 @@ below threshold and left in place for next time.
   cause is NOT the one the entry names — see the refutation recorded in BF-179 itself. **One look at
   *Why Upper?* settles it.**
 
-**2. LA-121 — port the temperature ladder, or let `tempZ` stand?** (unblocks LA-121, READY #1)
+**2. LA-121 — port the temperature ladder, or let `tempZ` stand?** (unblocks LA-121, now `Gate: owner`)
   `computeBlendedScore`'s penalty ladder (dev 0.4 → 70, 0.7 → 60, 1.2 → 40 from a base of 80) has
   had no reachable call site since 2026-07-07. Temperature still reaches readiness through
   `computeReadinessComposite`'s `tempZ`, so nothing is missing — but the ladder was the sharper
   penalty. **Either answer re-scores stored days, which is why an implementer must not pick.**
   Adjacent to TN-6 and BF-13, both open on the same baseline.
+  **Re-verified 2026-09-20 and LA-121 was gated then** — it had been printing as Lane A's READY #1
+  while saying in its own text not to start it, which is item 3's defect wearing this entry's name.
+  The measurement also firmed up: last non-null `readiness_score` is **2026-07-07, the re-key date
+  itself**, and the dead condition has **five** sites rather than four (the fifth a live gate with a
+  dead disjunct, so it needs different treatment from the other four).
 
 **3. Q-28, BF-9 and BF-7 carry NO `Gate:` field.** (unblocks all three)
   `check-backlog-pointers.js` sees them as ordinary startable work. They are held back only by an
@@ -639,6 +644,19 @@ being able to tell which** — it deliberately does not claim to know.
   he would sleep in the strap — **before** the night was spent rather than after.
 - **Lane: A** — `android/.../polar/PolarStrapService.kt` is Kotlin, so this needs an **APK rebuild**.
 - **Needs:** _nothing_.
+- **✅ FIRST ACTION SHIPPED 2026-09-20 — option (1), the preferred one.** Ambient thinning now
+  carries every dropped sample's RR intervals forward onto the kept one
+  (`PolarAmbientThinner`, extracted from the service so it can be unit-tested), the HR series stays
+  thinned at 1/30 s, and `hr-ingest`'s per-sample `rr` cap went 16 → 100 because a 30-second carry
+  holds ~30 beats at rest and the old cap would have rejected the very payload that fixes this. A
+  window above the cap SPLITS rather than truncates; a cross-language test pins the two caps
+  together. Options (2) and (3) are not needed and should not be built.
+- **Keep — the device check, and it is the whole remaining ask.** Wear the strap one night, then
+  confirm a **contiguous beat-to-beat RR series over the core sleep window** and that `rmssdFromRr`
+  over it is comparable to the ring's figure for the same night. That is this entry's own pass test
+  and nothing in the sandbox can stand in for it: Gradle cannot resolve the Android plugin here, so
+  the Kotlin is verified only by CI's `Android (Kotlin tests + debug APK)` job — the logic is
+  covered, the radio is not. **Needs a new APK** (`android/**`), unlike the server half.
 - **No `Gate:` and no `Verify:` — this is startable today, and both structured fields would be
   wrong.** The Kotlin can be written and compile-gated in the sandbox; the S25 and the strap are
   needed only to confirm the fix works. `Gate: device` would park it as unstartable (the BF-45 /
@@ -711,7 +729,12 @@ window, and `rmssdFromRr` over it is comparable to the ring's figure for the sam
 ### [readiness][devices] LA-121 — four readiness branches are permanently dead, and one carries a temperature ladder
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-20 (found while shipping BF-178) · **MEASURED 2026-09-20**, which changed the entry.
-- **Lane: A** — `lib/health/readiness-payload.ts:580, 610, 614, 751`.
+- **Lane: A** — `lib/health/readiness-payload.ts:581, 610, 614, 628, 751`.
+- **Gate: owner** — added 2026-09-20 on re-verification. The entry's own step (2) says *"Not
+  before"* (1) is answered, and LA-122 item 2 says an implementer must not pick. Without the
+  field this printed as Lane A's **READY #1**, so the queue tool told every implementer to
+  start the one entry that says not to. Same defect LA-122 item 3 names for Q-28/BF-9/BF-7;
+  recording what the entry already said is not the owner's call, so it was not left for them.
 - **What was filed was one branch and a guess. The measurement found four, and answered the guess.**
   - `oura_daily.readiness_score` is **NULL on 35 of 35 days** in the last five weeks — the frozen
     Cloud column, exactly as the re-key implies.
@@ -719,8 +742,22 @@ window, and `rmssdFromRr` over it is comparable to the ring's figure for the sam
     `ouraRows.find(r => r.date === todayIso)`. There is no historical path, so this is not
     "pre-re-key-only" as the first draft guessed — it is **unreachable, permanently**, on every call
     since 2026-07-07.
-  - Four sites share the condition `ouraToday?.readinessScore != null`: the score/source choice
-    (580), `readinessDisplayScore` (610), `hasSufficientData` (614) and `ScoreAvailability` (751).
+  - **FIVE sites share the condition `ouraToday?.readinessScore != null`, not four — re-verified
+    against `main` 2026-09-20.** Four are dead *branches*, whose fallback arm always runs: the
+    score/source choice (581), `readinessDisplayScore` (610), `hasSufficientData` (614) and
+    `ScoreAvailability` (751). **The fifth (628) is a different shape and needs different
+    treatment:** it is a live gate — `!inDeloadPhase && (baselineHrv != null || ouraToday?.readinessScore
+    != null) && acwr != null` — where the dead term is one *disjunct*, so the gate permanently
+    reduces to `!inDeloadPhase && baselineHrv != null && acwr != null`. Removing "the four dead arms"
+    as filed would leave it behind. **It changes no behaviour today** — a dead disjunct in an OR
+    contributes nothing either way — so the entry's "nothing user-visible is wrong" still holds; what
+    it changes is that early deload is now gated on an HRV baseline alone, where the code reads as
+    though Oura's score could also carry it.
+  - **The premise is now measured, not inferred (2026-09-20, the owner's rows).** The last non-null
+    `oura_daily.readiness_score` is **2026-07-07 — the re-key date itself**, 15 non-null rows ever,
+    and **0 of 61 days** in the trailing 60 carry one while rows are still written daily through
+    today. The column is alive and the value is permanently NULL, which is exactly what makes these
+    branches unreachable rather than merely unused.
 - **✅ Every fallback is correct, which is the reason this is not urgent.** Each live arm reasons
   from our own inputs, which is right when the score IS our composite: source becomes `'custom'`,
   the display score requires a real recovery signal, `hasSufficientData` requires sleep plus one,
