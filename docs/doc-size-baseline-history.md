@@ -13979,13 +13979,40 @@ returning through a status its fix did not name, and warn off the obvious patch 
 records, rather than guesses, the one mechanism still open: the card renders pending-only copy for a
 row the database says is dismissed, and the two candidates need different fixes.
 
----
+## 2026-09-20 — `docs/implementation-backlog.md` → 24297
+
+**BF-180** (a session-level deload stores no pre-deload block, so declining it serves the static
+program) and **BF-181** (nine exercises in the active program have no progression style, one whole
+session none at all).
+
+BF-180 carries its alternatives with reasons because the owner asked a design question — *"some sort
+of catch to make sure its always ai derived"* — and the obvious answer, regenerate on tap, is the
+one to reject as primary: a round trip at the moment he is standing in a gym, failing offline. The
+recommended fix is honestly costed as a generation change rather than plumbing, because the full
+intensities are not computed on that path today.
+
+BF-181's table is the sweep that was run BEFORE filing, and it changed the entry from a one-row data
+fix into a missing write-time constraint. Filing the narrow version would have shipped a fix for one
+exercise and left a leg session with no programming.
+
+## 2026-09-20 (second) — `docs/implementation-backlog.md` → 24361
+
+**BF-182** — warm the next prescription when Home renders, rather than at completion (which the
+owner asked for and which he himself rejected on 2026-07-31) or at tab-open (which is where the
+latency he is complaining about lives).
+
+The quoted `complete-workout` comment is the entry's most important line: without it an
+implementer reads a direct owner request and builds the thing that was deliberately not built,
+with no way to know. The input-versus-filter distinction earns its space for the same reason — the
+proposal only sounds free if you think duration and deload are applied after generation.
 
 ---
 
 ---
 
-## 2026-09-11 — `docs/implementation-backlog.md` → 24156 (RV-42 shipped)
+---
+
+## 2026-09-11 — `docs/implementation-backlog.md` → 24336 (RV-42 shipped)
 
 RV-42's 31-line entry leaves the queue with the write-path ownership fix.
 
@@ -14059,8 +14086,9 @@ count is quoted, per the paragraph above: the clone was deepened again this morn
 histories for this very merge, which is exactly the operation that moved the last three derivations.
 The figure is `pnpm fix:baselines` on the merged tree and nothing else.
 
-**Recomputed again 2026-09-19** (→ 24156, via 23990 and 24038 earlier the same day), after #1323
-(BF-177), #1324, #1325 and #1328 landed — four commits on `main` in a day, and the backlog moved in
-both directions: −32 when BF-177 removed the entry it finished, +48 when BF-100's entry absorbed its
-measurement, +118 when BF-179 and BF-178 were filed. Ninth day waiting on the owner decision. No
-rewrite count, per the paragraph above.
+**Recomputed again 2026-09-19/20** (→ 24336, via 23990, 24038 and 24156), after #1323 (BF-177),
+#1324, #1325, #1328, #1330 and #1331 landed — six commits, and the backlog moved in both directions:
+−32 when BF-177 removed the entry it finished, +48 when BF-100's entry absorbed its measurement, and
+roughly +300 across BF-178 through BF-182 as a BugFix burst filed five entries about one screen in
+twenty-five minutes. Tenth day waiting on the owner decision. No rewrite count, per the paragraph
+above.
