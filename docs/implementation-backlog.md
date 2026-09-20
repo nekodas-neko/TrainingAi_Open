@@ -12797,6 +12797,39 @@ the per-sample version supports a "it tracks his physiology" story that the corr
 **So TN-2 can be closed without the fit it is blocked on.** Its bracket, its replay endpoint and its
 owner sign-off on a number all exist to choose an offset. A quantile has no offset to choose.
 
+**⚑ RULE 2 WAS APPLIED TO THE MEASURABLE THRESHOLDS AND CAME BACK MOSTLY CLEAN — measured
+2026-09-20. Do not re-run it as a sweep.** The 2026-08-25 threshold sweep's own stated blind spot is
+this class (*"blind to a score that moves normally and is compared against the wrong number"*), so
+the obvious next move was to re-screen its 27 decision thresholds by window-width-vs-noise instead of
+by coverage. Yield was one confirmation and no new finding:
+
+| threshold | window | input sd | width | verdict |
+|---|---|---:|---:|---|
+| `HR_REST_THRESHOLD` (charge) | ~6 bpm above resting | 3.15 bpm | **1.9 sd** | **too narrow — TN-2** |
+| `ILLNESS_WATCH → ELEVATED` | 25 points | 9.96 | **2.5 sd** | clean |
+| `FEVER_TEMP_Z` | unreachable | — | — | broken input, not width — Q-506 |
+| `ACWR_TAPER_START = 1.5` | never reached | — | — | already filed inert |
+| `chronic_stress_score` | — | NULL on 75/75 days | — | already filed, Q-525 |
+
+**So rule 2's value is as a GUARD ON NEW THRESHOLDS, not a retro-sweep.** It discriminates — the
+illness bands pass at 2.5 sd while the charge window fails at 1.9 — which is what makes it worth
+having in review, and it is cheap there. Running it over the existing surface again would repeat a
+negative result.
+
+**⚑ THE REAL BOTTLENECK IS ONE PIECE OF INFRASTRUCTURE, NOT MORE MEASUREMENT.** The August sweep
+listed **25 thresholds it could not measure at all** — 19 sleep-staging constants in one file, plus
+`APNEA_THRESHOLD`, `MET_ACTIVE_THRESHOLD`, `RANGE_THRESHOLD`, `NIGHT_BAND_*`, `CONSISTENCY_*` and
+`LOW_CONFIDENCE_THRESHOLD` — because their inputs are per-sample intermediates that are never
+persisted. **That is the largest unexamined block left on the scoring surface**, it feeds the sleep
+score and therefore readiness's heaviest contributor at 16%, and it is blocked on exactly what TN-2
+is blocked on: a context that can run the pipeline with the daytime-stress constants present.
+
+**One admin-gated, owner-triggered replay endpoint unlocks three things at once** — TN-2's offset fit,
+TN-3a/TN-4's stress term, and these 25 thresholds. TN-2 already sketches it (*"that is new work and
+is not scoped here"*). **It is Lane A work and it is the highest-leverage single item on the tuning
+front; Tuning's part is this list of what it has to expose.** Note that TN-52's rule 1 removes TN-2's
+*own* need for the endpoint — but not the other two, so the endpoint is still worth building.
+
 **⚠ Do NOT convert every constant to a quantile.** Some thresholds are deliberately absolute and must
 stay: max HR from a maximal test (TN-30), a fever temperature, anything anchored to an external
 clinical meaning. A quantile of the user's own distribution cannot express "this is abnormal for a
