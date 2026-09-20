@@ -18,7 +18,7 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
-## 2026-09-20 — backlog → 24626 (rule 2's yield, and naming the real bottleneck)
+## 2026-09-20 — backlog → 24719 (rule 2's yield, and naming the real bottleneck)
 
 **+16.** Two negative results worth writing down. Rule 2 re-screened the August sweep's 27
 decision thresholds by window-width-vs-noise rather than coverage — the sweep's own stated blind spot
@@ -14202,3 +14202,15 @@ The figure is `pnpm fix:baselines` on the merged tree and nothing else.
 roughly +300 across BF-178 through BF-182 as a BugFix burst filed five entries about one screen in
 twenty-five minutes. Tenth day waiting on the owner decision. No rewrite count, per the paragraph
 above.
+
+## 2026-09-20 (fourth) — `docs/implementation-backlog.md` → 24686
+
+**BF-184** (reta dose recording verified, join verified, no surface for it) and a same-day
+correction to **BF-183** (suitability, not inferred dominance).
+
+BF-184 quotes the OR-102b weight-response reasoning at length on purpose: a dose-response card is
+exactly the surface that will otherwise ship a confident colour off two cycles, and that file
+already rejected the same shape with production numbers. The correction to BF-183 keeps the
+superseded reading visible rather than rewriting it away — the 45-logs-all-breakfast protein shake
+is simultaneously the evidence for the new model and the reason the old one failed, and deleting it
+would lose the argument.
