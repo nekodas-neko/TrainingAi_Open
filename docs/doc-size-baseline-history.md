@@ -109,7 +109,7 @@ history files are dated) rather than with the sweep, because the sweep is a chor
 measurement is the thing a future reader would otherwise re-derive before daring to run it.
 ---
 
-## 2026-09-18 — backlog → 24406, `projectOverview.md` → 11939 (Q-1a server half)
+## 2026-09-18 — backlog → 24464, `projectOverview.md` → 11939 (Q-1a server half)
 
 **Backlog +32 and nothing removed**, which is the honest shape for a partial: Q-1a stays queued
 because most of its scope — the client — has not shipped, and the entry now carries what DID ship, the
@@ -14044,3 +14044,13 @@ The quoted `complete-workout` comment is the entry's most important line: withou
 implementer reads a direct owner request and builds the thing that was deliberately not built,
 with no way to know. The input-versus-filter distinction earns its space for the same reason — the
 proposal only sounds free if you think duration and deload are applied after generation.
+
+## 2026-09-20 (third) — `docs/implementation-backlog.md` → 24402
+
+**BF-183** — tag My Foods rows with the meal they are actually eaten at.
+
+The coverage table is the entry's reason for existing. "Derive it from history" sounds obviously
+right until you count: 10 of 19 rows clear a sensible threshold, 4 have never been logged at all.
+Without that split an implementer ships a guess on every row, which is the BF-172 failure again. The
+emoji-versus-lucide argument is recorded with its reason — meal types are user-created, so a fixed
+icon map cannot cover one the app did not anticipate — because it reads as taste and is not.
