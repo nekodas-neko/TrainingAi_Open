@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.460.0",
+    date: "2026-09-20",
+    changes: [
+      "New on the Health tab's Training list: Movement Balance, showing how your last 60 days of sets split across push, pull, legs and core. Until now that split was only reachable by running a query against the database \u2014 every other muscle view covers the current week, and the one that does span months measures tonnage, which flatters legs because they move far heavier loads and would have hidden exactly what this is for. There is no target and no verdict: there is no honest universal push-to-pull ratio, so the card shows you the numbers and leaves the judgement to you. Shoulders count as push and lower back as neither push nor legs \u2014 counting it as legs would inflate them on pull days.",
+    ],
+  },
+  {
     version: "1.459.2",
     date: "2026-09-19",
     changes: [

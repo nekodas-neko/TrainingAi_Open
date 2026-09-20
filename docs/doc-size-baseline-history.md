@@ -14021,3 +14021,19 @@ The quoted `complete-workout` comment is the entry's most important line: withou
 implementer reads a direct owner request and builds the thing that was deliberately not built,
 with no way to know. The input-versus-filter distinction earns its space for the same reason — the
 proposal only sounds free if you think duration and deload are applied after generation.
+
+## 2026-09-20 — OR-118 shipped, and LB-121 got its measured cost
+
+`projectOverview.md` **11927 → 11931** and `docs/implementation-backlog.md` **24344 → 24341**
+(`feat/or118-movement-balance-card`).
+
+The overview grew by four lines because one of its sentences had become false: *"nothing renders it
+yet"* about `/api/muscle-sets`. Something does now, and the four lines say what, plus the thing worth
+more than the card — the entry was startable for four days while READY read 0, because a `⛔` used
+for emphasis parks an entry.
+
+The backlog **shrank by three** despite gaining that account on LB-121, because OR-118's own entry
+lost more than LB-121 gained. Most of it was planning prose that had done its job: which route to
+call, why not `muscle-tonnage-trend`, whether the window should be a parameter. Once the code exists
+the file answers those, and the entry keeps only what the code cannot say — why there is no target,
+why zero rows still render, and what the S25 still owes.
