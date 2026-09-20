@@ -18,6 +18,22 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-20 — backlog → 24608 (LA-121 measured, +15)
+
+**+15 on an entry that was filed unmeasured four hours earlier and did not survive its own query.**
+LA-121 said the readiness availability branch "presumably" fell through post-re-key and that its
+first step was a query. The query found the Cloud column NULL on 35 of 35 days, the same condition
+guarding **four** branches rather than one, and `buildReadinessPayload` carrying no date parameter
+at all — so "pre-re-key-only" was wrong and the arms are permanently unreachable.
+
+The lines are spent on the part that is not cleanup: `computeBlendedScore`'s temperature LADDER has
+one production call site and it is the dead arm. The entry records that temperature has not left
+readiness (`computeReadinessComposite` takes `tempZ`), because that is the claim which would have
+made this urgent and it is false — and then refuses to decide whether the ladder should be ported,
+since that is calibration and belongs to the owner.
+
+---
+
 ## 2026-09-20 — backlog → 24593, `projectOverview.md` → 11951 (BF-178 shipped, LA-121 filed)
 
 **Backlog −24, which is −45 for BF-178 and +21 for one new entry.** The removal is the whole of
