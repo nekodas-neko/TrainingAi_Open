@@ -137,6 +137,18 @@ check's name is that something grew.
 The `projectOverview.md` paragraph leads with the measurement that retired the entry (28 of 32
 history files are dated) rather than with the sweep, because the sweep is a chore that recurs and the
 measurement is the thing a future reader would otherwise re-derive before daring to run it.
+---
+
+## 2026-09-18 — backlog → 24642, `projectOverview.md` → 11939 (Q-1a server half)
+
+**Backlog +32 and nothing removed**, which is the honest shape for a partial: Q-1a stays queued
+because most of its scope — the client — has not shipped, and the entry now carries what DID ship, the
+two corrections to its own ⚠, and a `Gate: owner` on the remainder.
+
+The bulk of those 32 lines is the **corrections**, not the changelog. An entry read cold in three
+months will otherwise send the next implementer to build enforcement that PS-24 already built, and to
+hand-write token parsing that `@auth/core` already does — both of which this session started to do
+before measuring. The overview paragraph carries the same two, for the same reason.
 
 ---
 
@@ -11417,8 +11429,6 @@ the lane is device-blocked, which is the one thing a successor cannot re-derive 
 RV-44's 18-line entry leaves the queue. The nine longhand Atwater sites in `scan-totals.ts` and
 `meal-split.ts` now import `KCAL_PER_G`, which is what `atwater.ts` was created for.
 
-Written by `pnpm fix:baselines`.
-
 ## 2026-09-11 — `docs/implementation-backlog.md` 20714 → 20672 (RV-41 shipped)
 
 RV-41's 42-line entry leaves the queue. The goal bounds now live once, in
@@ -13833,7 +13843,6 @@ replaced — the three corrections to my own entries, and the two conditions a n
 
 The backlog loses 14: BF-100's second finding is struck because it shipped in this PR, replaced by
 the measurement and the proof that it now fails on a cancelled restore.
-
 ## 2026-09-17 — `docs/implementation-backlog.md` 23235 → 23755
 
 **BF-176** — the home streak counts the API's 90-day window rather than the owner's training, so it
@@ -14072,6 +14081,93 @@ right until you count: 10 of 19 rows clear a sensible threshold, 4 have never be
 Without that split an implementer ships a guess on every row, which is the BF-172 failure again. The
 emoji-versus-lucide argument is recorded with its reason — meal types are user-created, so a fixed
 icon map cannot cover one the app did not anticipate — because it reads as taste and is not.
+
+---
+
+---
+
+---
+
+## 2026-09-11 — `docs/implementation-backlog.md` → 24617 (RV-42 shipped)
+
+RV-42's 31-line entry leaves the queue with the write-path ownership fix.
+
+**This figure has been rewritten THIRTY times and the churn is the note worth leaving.**
+Eighty-nine other merges have landed on `main` while this PR waited on an owner decision, and each one
+moved the base out from under it — so the starting figure is no longer even quoted here, because it
+changed again between the last two rewrites. **Thirty rewrites of one number is the cost of a
+green PR waiting**, recorded rather than smoothed because the alternative reading — that someone kept
+getting the arithmetic wrong — is the wrong lesson. Both counts are measurements, not tallies kept by
+hand: the rewrites are the first-parent commits on this branch that touch this file, the merges are
+the first-parent commits on `main` since its branch point. The hand-kept version of the same two
+numbers read "twenty-five" and "forty-five" when they were really twenty-seven and seventy-three,
+which is its own small argument for deriving a figure rather than incrementing one. The per-file
+`.size` split (LA-33) is what keeps this to one number instead of a whole map: no other document's
+baseline has conflicted once across all thirty. Nothing was wrong with any of them — each was
+correct against the `main` of its hour. Under six concurrent lanes plus an owner gate, a baseline is a
+reading of a moving number, and a PR that waits will re-read it once per merge that overtakes it.
+Recomputed by `pnpm fix:baselines` after each merge, which is the only thing that makes the
+subtraction mean anything.
+
+**Recomputed again 2026-09-18/19** (→ 24022 — twelve times across that day and the next, as a journal
+fold and six other merges each moved the file), and the rewrite count derived the same way the note
+defines it — first-parent commits on this branch touching this file — last read **62**, on
+2026-09-19 before that pass's merge. **⚠ It must be measured BEFORE merging `origin/main` in, and
+this pass proved why:** measured afterwards, `git merge-base origin/main HEAD` is the merge you just
+made, so the span is empty and the command returns **0**. Walking the whole branch instead returns
+**449**, which counts every commit on `main` that touched the file. Neither is the figure this note
+means. So the rewrite count now has the same limit as the merge count below — derivable only at the
+right moment, and quietly wrong at any other. The *merge*
+count is deliberately NOT re-derived: `git merge-base` against `main` no longer finds the original
+branch point, because this branch has absorbed `main` dozens of times, so the figure it returns
+(21) answers a different question. Quoting it as "merges that overtook this PR" would be the same
+hand-kept error in a new costume. The 2026-09-11 measurement stands as the last one taken against
+the real branch point.
+
+**Recomputed again 2026-09-15** (→ 21535). The two counts above are left at their 2026-09-11
+measurement rather than incremented, because incrementing by hand is the exact failure this note
+already records — and the derivation no longer reproduces: repeated merges of `main` move
+`merge-base` forward, so it now returns the last re-merge rather than the original branch point.
+What can be measured cleanly is the rewrite count itself, which does not depend on `merge-base`:
+**34** first-parent commits on this branch touch this file, and this is the thirty-fifth. That is the
+one number here worth trusting — the headline figure is the live one, and the two counts above are a
+floor.
+
+**Recomputed again 2026-09-16** (→ 22828), after #1263 landed on `main`. The rewrite count is
+re-derived rather than incremented, and the derivation itself is changed: `--first-parent HEAD` was
+measured on a *shallow* clone, so it silently counted only as far back as the clone reached — it
+reads 157 once the history is deepened, against the 34 recorded above. `git rev-list --count
+origin/main..HEAD -- <the .size file>` does not depend on clone depth, because it counts only what
+this branch has that `main` does not: **46**, and this is the forty-seventh. The 34 is not wrong so
+much as unreproducible, which is the same failure as the hand-kept tally one paragraph up, arrived at
+from the opposite direction — a derivation is only better than a tally if it returns the same answer
+twice.
+
+**Recomputed again 2026-09-17** (→ see the live figure in the .size file — SIX readings this day and the count is no longer worth quoting, which is itself the finding; 23451, then 23197, 23178 after BF-171, 23143 after BF-173, 23201 before that — FIVE readings in one day, which is the churn this note exists to record rather than smooth). The jump to 23451 is not this branch: #1279 folded 40 journal entries and dropped an owner gate, which moved the backlog under it., after #1264 and #1265 landed, with `main` having moved
+twice more while this PR waits on its owner decision — now in its seventh day.
+
+**And the correction the entry above earned: `origin/main..HEAD` is NOT clone-depth independent
+either, so that claim was wrong.** It read **46** yesterday and **295** today, across two commits on
+`main` — the difference is not work, it is a `git fetch` that deepened the clone and revealed graft
+points the shallow view had hidden. Every count of this branch's own commits is a reading of how much
+history this container happens to hold. Three derivations have now been tried and all three were
+depth-dependent; the honest statement is that **the rewrite count is not measurable from a shallow
+clone at all**, and a number quoted without its depth means nothing. The live baseline figure is the
+only thing in this note worth trusting. That is the third time a count here has been asserted before
+it was checked — twice by hand, once by a derivation that looked rigorous and was not.
+
+**Recomputed again 2026-09-18** (→ 23719), after #1285, #1288 and #1289 landed and #1289's BF-176
+note was added to this file — the eighth day this PR has waited on its owner decision. No rewrite
+count is quoted, per the paragraph above: the clone was deepened again this morning to reconnect the
+histories for this very merge, which is exactly the operation that moved the last three derivations.
+The figure is `pnpm fix:baselines` on the merged tree and nothing else.
+
+**Recomputed again 2026-09-19/20** (→ 24336, via 23990, 24038 and 24156), after #1323 (BF-177),
+#1324, #1325, #1328, #1330 and #1331 landed — six commits, and the backlog moved in both directions:
+−32 when BF-177 removed the entry it finished, +48 when BF-100's entry absorbed its measurement, and
+roughly +300 across BF-178 through BF-182 as a BugFix burst filed five entries about one screen in
+twenty-five minutes. Tenth day waiting on the owner decision. No rewrite count, per the paragraph
+above.
 ## 2026-09-20 — OR-118 shipped, and LB-121 got its measured cost
 
 `projectOverview.md` **11927 → 11931** and `docs/implementation-backlog.md` **24344 → 24341**
