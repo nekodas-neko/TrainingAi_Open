@@ -18,6 +18,22 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-20 — backlog → 24914 (LA-74 shipped, −24)
+
+The program write path is typed and `.strict()` at last, so the entry leaves the queue. It had sat
+three weeks behind one sentence in its sibling schema's header — *"strict there needs that
+enumeration checked against a device"* — and both halves of that sentence were wrong: no native code
+posts to that route, and there are **three** producers, not the two the entry counted. The third,
+`builder-review.tsx`, is precisely the one a schema checked against the other two would have
+rejected.
+
+The reasoning is in the code rather than in the queue, which is the argument for the −24: the
+schema's header carries the producer enumeration, the sibling's now-false paragraph is corrected in
+place, and the mapper coupling that makes this dangerous forever after is enforced by a test instead
+of by a comment.
+
+---
+
 ## 2026-09-20 — backlog → 24938 (LB-27 refuted and retired, −28)
 
 Another ratchet down. LB-27's `Keep:` rested on `pg`'s default `connectionTimeoutMillis: 0` waiting

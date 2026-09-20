@@ -17,11 +17,14 @@ import { promptSafeLine } from '../ai/untrusted-text'
 // the GET shape carries is the fragile kind, and a style read back and posted again would carry
 // them.
 //
-// The sibling program route is NOT done here. `POST /api/workout-templates` has two producers that
-// demonstrably disagree — the editor omits `programId` on each session and `sessionId` on each
-// exercise, while the activate button posts the whole stored row back with both — plus a two-variant
-// `schedule` union. Strict there needs that enumeration checked against a device, and getting one
-// key wrong breaks the app's core write path. It stays queued.
+// The sibling program route was NOT done here, and was done on 2026-09-20 —
+// `validation/program-write.ts`. Two things this paragraph got wrong are worth keeping, because
+// both were the reason it waited three weeks: there are **three** producers, not two
+// (`workout-builder/builder-review.tsx` is the third, and the one that omits `timeBudgetMinutes`
+// and `supersetGroup`), and the enumeration did **not** need a device. No native code posts to that
+// route — the poster is the WebView, which ships with the Railway deploy — so the payloads on
+// device are byte-identical to the payloads on web, which is the same reasoning
+// `check-strict-request-schemas.js` uses to decline exempting it.
 
 /** `''` is a real value on the id fields, not a missing one: the route passes `id ?? ''` and the
  *  repository branches on `if (style.id)`. A bare `.uuid()` would reject the create case. */

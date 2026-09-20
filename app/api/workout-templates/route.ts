@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { refusalResponse, isRefusal, invalidUuidResponse } from '@/lib/api/route-errors'
+import { refusalResponse, isRefusal, invalidUuidResponse, invalidBodyResponse } from '@/lib/api/route-errors'
 import { auth } from "@/auth";
 import { getRepository } from "@/lib/data";
 import { computeDefaultVolumeTargets } from "@trainingai/shared/ai-periodization/volume-targets";
 import type { Program } from "@trainingai/shared/types";
 import { reportServerError } from '@/lib/observability'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { WorkoutTemplateWriteSchema } from '@trainingai/shared/validation/program-write'
 
 // A whole program with its sessions and exercises.
 const MAX_BODY_BYTES = 256 * 1024
@@ -33,7 +34,12 @@ export async function POST(req: NextRequest) {
       ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
       : NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
-  const body = (read.body ?? {}) as { program?: Program; linkPhaseSetOwnership?: boolean; recalibrateCycleAnchor?: boolean; programId?: string };
+  // LA-74. Typed and `.strict()` at last — see `validation/program-write.ts` for the three
+  // producers every optional below was read off, and for why the activate path makes this schema
+  // permanently coupled to `listPrograms`' mapper.
+  const parsed = WorkoutTemplateWriteSchema.safeParse(read.body ?? {});
+  if (!parsed.success) return invalidBodyResponse(parsed.error);
+  const body = parsed.data as { program?: Program; linkPhaseSetOwnership?: boolean; recalibrateCycleAnchor?: boolean; programId?: string };
 
   const repo = await getRepository();
 
