@@ -14533,3 +14533,18 @@ Most of its length is the part that is actually actionable: the run was backgrou
 `pnpm ci:local 2>&1 | tail -5`, so the log kept seven lines and the reason is gone. **A gate piped
 through `tail` has discarded exactly the output needed the one time it fails.** That sentence is
 why the entry is worth 25 lines rather than a shrug.
+
+## 2026-09-20 — BF-186 ships, BF-185 is re-laned before a line of it was written
+
+`docs/implementation-backlog.md` **25071 → 25077** (`fix/bf186-manage-supplements-reachable`).
+
+Six lines net, and almost all of it is BF-185 rather than the entry that shipped. BF-186 shrank —
+its analysis was right and is now code, so the entry keeps why the note became the door rather than
+how it was found.
+
+BF-185 grew because it was **wrong in the field that decides who builds it**. It said Lane B and
+named the toggle; `taken_at` is stamped in `lib/data/postgres/adapter.ts`, and the re-stamp is
+documented as a deliberate choice with its reasoning written next to it. An entry that asks to
+reverse a documented decision needs to say so, or the next reader deletes a comment they should be
+arguing with. The lines buy that, plus the sequencing (engine half first, because an editable time
+is worthless while the next re-tick overwrites it) and the note that the batch is now split.
