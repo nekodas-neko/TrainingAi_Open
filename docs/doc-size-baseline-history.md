@@ -18,6 +18,24 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-20 — backlog → 24734 (LA-122, the owner-question ledger)
+
+**+48 for five questions that were living only in a chat transcript.** The owner asked for them
+either stated in-session or filed for the Orchestrator; a transcript ends with the session and the
+queue does not, so they are filed.
+
+**Written as ONE `Reference:` entry rather than five entries**, because they share a single blocker —
+owner attention — and five separate items would put four more unstartable things at the head of a
+queue whose READY list is already mostly things nobody can begin. `Reference:` keeps it out of the
+work list entirely; each item names the entry it unblocks so striking it is mechanical.
+
+The line worth keeping longest is item 5's aside: **`enable_pr_auto_merge` is unavailable on this
+repo** ("Protected branch rules not configured for this branch"). CLAUDE.md's CI/CD section offers
+auto-merge as a standard option, and it is not one here — better recorded once than rediscovered by
+whoever next tries to escape the rebase treadmill.
+
+---
+
 ## 2026-09-20 — backlog → 24593, `projectOverview.md` → 11951 (BF-178 shipped, LA-121 filed)
 
 **Backlog −24, which is −45 for BF-178 and +21 for one new entry.** The removal is the whole of
