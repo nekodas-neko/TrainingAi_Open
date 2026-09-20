@@ -14567,3 +14567,17 @@ documented as a deliberate choice with its reasoning written next to it. An entr
 reverse a documented decision needs to say so, or the next reader deletes a comment they should be
 arguing with. The lines buy that, plus the sequencing (engine half first, because an editable time
 is worthless while the next re-tick overwrites it) and the note that the batch is now split.
+
+## 2026-09-20 — TN-51's device gate is a Known Issue, not a `Keep:` line
+
+`projectOverview.md` **11966 → 12001** (`lane-a/tn51-ambient-keeps-rr`).
+
+Thirty-five lines for one entry, and the entry exists because the Canonical Runtime gate names this
+file specifically: a native change with no device available needs a Known-Issues row here, and the
+backlog `Keep:` line does not satisfy it. The PR nearly merged without one — the code, the journal
+and the backlog were all complete, and the one artefact the merge gate actually names was missing.
+
+Most of the length is the part that is not the fix: what would confirm it on the S25, and that two
+unverified native changes now stack on `PolarStrapService`, so the next night of wear exercises
+TN-54 and TN-51 at once and a bad result would not say which. That is the sentence a reader needs
+in three weeks and the only place it can live is next to both.

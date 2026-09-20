@@ -40,7 +40,7 @@ is divided. A window above the cap **splits** into several samples rather than t
 
 ## The part worth copying
 
-The logic lives in **`PolarAmbientThinner`**, a pure object extracted from the service, with seven
+The logic lives in **`PolarAmbientThinner`**, a pure object extracted from the service, with eight
 unit tests — because this is the half no device check could isolate. A night of wear that produced
 good data would not tell you whether the thinning or the mode was responsible.
 
@@ -60,7 +60,9 @@ and asserts they match. Nothing else compares them, and they sit in different to
 
 - **Server half:** 5 tests — the 30-interval accept, the backwards placement, the cap boundary both
   sides, and the cross-language guard.
-- **Native half:** 7 Kotlin unit tests, run by CI's `Android (Kotlin tests + debug APK)` job.
+- **Native half:** 8 Kotlin unit tests, run by CI's `Android (Kotlin tests + debug APK)` job —
+  **green on the second push** (`7a534349444`), 80 tests completed, 0 failed. The first push
+  went red on four of these; see below.
 - Full suite, `pnpm check:rules`, lint and typecheck below.
 
 ## CI caught four of my own tests, and the cause was worth the round trip
@@ -84,19 +86,21 @@ to mean "keep the next sample".
 
 **Stated plainly: the re-verification after that fix was done by reading, not by running.** Gradle
 cannot resolve the Android plugin here, so all eight cases were traced by hand against the corrected
-loop. CI is the executor.
+loop. CI is the executor — and it since confirmed the reading: the Android job on `7a534349444`
+completed 80 tests with 0 failures. The tracing was right, but it was not what made it true.
 
 ## Not exercised
 
 - **Gradle cannot run here** — confirmed, not assumed: `./gradlew testDebugUnitTest --offline`
   fails to resolve `com.android.tools.build:gradle`, `google-services` and the Kotlin plugin,
   exactly as CLAUDE.md describes. So the Kotlin tests were **written but not run locally**; CI's
-  Android job is what executes them, and it is not a required check.
+  Android job is what executes them, and **it is not a required check** — its conclusion has to be
+  read deliberately, because six green required checks say nothing about it.
 - **No strap, no night.** The entry's own pass test — a contiguous beat-to-beat series over the core
   sleep window, with `rmssdFromRr` comparable to the ring's figure — is owed and is in the `Keep:`.
   The logic is covered; the radio is not.
 - **This needs a new APK.** Unlike the server half, `android/**` does not reach the device through a
   Railway deploy.
-- **Two unverified native changes now stack.** TN-54 shipped hours ago and is also awaiting a device
-  check. Both touch `PolarStrapService`, and the next night of wear exercises both at once — worth
+- **Two unverified native changes now stack.** TN-54 merged earlier in this same session and is also
+  awaiting a device check. Both touch `PolarStrapService`, and the next night of wear exercises both at once — worth
   knowing when reading the result, because a bad night would not say which one.
