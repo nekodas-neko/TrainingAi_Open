@@ -17,9 +17,11 @@ stay valid. **Rewritten in full, never appended** — narrative lives in the lin
 recommend"* (TN-29 then TN-27 option 3) and the three cardio decisions (**TN-30's pinned 178**,
 TN-25's varied prescribed walk, TN-31's move to Run). **Nothing carries an open owner question.**
 
-**The one thing owed by the owner is an ACTION, not a decision: run the Cooper 12-Minute Run**
-(`fitness-tests/protocols.ts`) so the pinned 178 can be replaced by a measured max. Ask once; do not
-re-derive the anchor while waiting.
+**The Cooper test is DONE — do not ask for it again.** It yielded **175**; the owner's instruction is
+to treat that as the low end of a band topped by the age-estimate and pick between. The "pinned 178"
+this baton described was never live — all 101 cached days use **187**. **Owed now are ACTIONS:** repeat
+the HRR test (`hrr1_bpm` null on the one run), a second DEXA for TN-48, and one strap night *after*
+TN-51/TN-54 ship. Hold the Q-506 re-derive until `FEVER_TEMP_Z` is rescaled — it fires six false fevers.
 
 **The owner's standing verdict, 2026-08-26:** *"Overall the pillars are not working great and not
 very useful. Requires tuning."* The queue is long because the pillars were measured.
@@ -116,6 +118,21 @@ model's own NEUTRAL 50, not vanish from the weighted sum.
 Note this is NOT covered by "replay the shipped function" below: the shipped function had the same
 bug. What catches this class is checking whether the disagreeing set has a *structure* — same
 length, same missing field, same date range — before believing the data is at fault.
+
+## Method — a filed entry is not a reachable one: run `next-item.js` after filing
+
+**Filing is not the deliverable; being picked up is.** On 2026-09-20 the two entries the owner most
+wanted (TN-51, TN-54 — blocking his sleep trial) were filed, merged, CI-green and **invisible to
+Lane A**, two ways at once: a `Needs:` line whose *prose* mentioned PS-44 was parsed as a dependency
+on it (any entry ID after `Needs:` is taken as one, so the stated "nothing blocks this" created a
+block, backwards), and `Gate: device` parked both — the mistake the backlog protocol names twice
+already, made a third time by a session that had read the warning. **`Verify: device` is not the fix
+either: it prints under a heading that reads *shipped*.** Startable native work carries neither field
+and states the owed check as prose. Full account:
+[`docs/overview/entries/2026-09-20-tuning-fix-tn51-needs-parse.md`](../../overview/entries/2026-09-20-tuning-fix-tn51-needs-parse.md).
+
+**Corollary:** queue position is the only priority signal — an urgency claim in an entry's body is
+decoration. "Before my next trial" means move it to the top of the file.
 
 ## Method — two traps that cost this agent a finding each (the SQL/timezone pair)
 
