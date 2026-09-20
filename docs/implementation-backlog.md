@@ -639,6 +639,19 @@ being able to tell which** — it deliberately does not claim to know.
   he would sleep in the strap — **before** the night was spent rather than after.
 - **Lane: A** — `android/.../polar/PolarStrapService.kt` is Kotlin, so this needs an **APK rebuild**.
 - **Needs:** _nothing_.
+- **✅ FIRST ACTION SHIPPED 2026-09-20 — option (1), the preferred one.** Ambient thinning now
+  carries every dropped sample's RR intervals forward onto the kept one
+  (`PolarAmbientThinner`, extracted from the service so it can be unit-tested), the HR series stays
+  thinned at 1/30 s, and `hr-ingest`'s per-sample `rr` cap went 16 → 100 because a 30-second carry
+  holds ~30 beats at rest and the old cap would have rejected the very payload that fixes this. A
+  window above the cap SPLITS rather than truncates; a cross-language test pins the two caps
+  together. Options (2) and (3) are not needed and should not be built.
+- **Keep — the device check, and it is the whole remaining ask.** Wear the strap one night, then
+  confirm a **contiguous beat-to-beat RR series over the core sleep window** and that `rmssdFromRr`
+  over it is comparable to the ring's figure for the same night. That is this entry's own pass test
+  and nothing in the sandbox can stand in for it: Gradle cannot resolve the Android plugin here, so
+  the Kotlin is verified only by CI's `Android (Kotlin tests + debug APK)` job — the logic is
+  covered, the radio is not. **Needs a new APK** (`android/**`), unlike the server half.
 - **No `Gate:` and no `Verify:` — this is startable today, and both structured fields would be
   wrong.** The Kotlin can be written and compile-gated in the sandbox; the S25 and the strap are
   needed only to confirm the fix works. `Gate: device` would park it as unstartable (the BF-45 /
