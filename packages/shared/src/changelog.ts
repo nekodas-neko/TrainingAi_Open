@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.460.5",
+    date: "2026-09-20",
+    changes: [
+      "Un-ticking a logged dose and ticking it again no longer changes the time the dose is recorded at. It used to overwrite that time with the moment of the second tap \u2014 on one Retatrutide dose that moved a single injection's record by 35 minutes, and nothing on screen said it had happened. Nothing was double-recorded; the day's entry was always the one entry. Ticking a dose for the first time still stamps it then, as before. One trade-off worth knowing: re-ticking was the only way to change a recorded time, so until an editable time control is added, a wrong time cannot be corrected from the app.",
+    ],
+  },
+  {
     version: "1.460.4",
     date: "2026-09-20",
     changes: [
