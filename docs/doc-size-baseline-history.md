@@ -14602,3 +14602,26 @@ And the premise moved from inferred to measured: the last non-null `oura_daily.r
 **2026-07-07, the re-key date itself**, with 0 of the trailing 61 days carrying one while rows are
 still written daily. The entry guessed "pre-re-key-only" and then reasoned its way to "permanent";
 the column now says so directly.
+
+## 2026-09-20 — BF-179's measured row was gone, and that is the useful half
+
+`docs/implementation-backlog.md` **25129 → 25154** · `projectOverview.md` **12001 → 12031**
+(`lane-a/bf179-expire-dismissed-prescription`).
+
+The entry measured a `dismissed` prescription, expired three days, still carrying
+`deload_recommended` and still pinning every set to 52%. Re-read before implementing: across all 15
+of the owner's `session_periodization` rows there is **no `dismissed` row at all** and **not one row
+anywhere carrying `deload_recommended`**. The row regenerated 2026-09-19 23:10.
+
+Deleting the entry on that basis would have been the mistake. The defect is a code gap — an
+allow-list that named 3 of 6 statuses — and it survives its data state entirely. What the re-read
+actually bought is the narrowing: the entry left two candidates for the still-visible card, and the
+server can no longer produce that banner for **any** session, so a 52% still on screen is now
+positive evidence for the stale client cache rather than an open question between two. The device
+look changed from a yes/no into something that answers either way, and that is worth the lines in
+both files.
+
+The rest is the argument for the fix's shape over its content. An allow-list with `dismissed` added
+would close this bug and guarantee the next one; a deny-list ages out by default and makes a new
+status argue for its exemption. Written down because the diff alone reads as a one-line condition
+swap.
