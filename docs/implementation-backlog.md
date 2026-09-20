@@ -460,12 +460,17 @@ below threshold and left in place for next time.
   transcript that ends with the session. Four of them have blocked a specific queue item for
   between one and nine days.
 
-**1. BF-179 — is the 52% still on screen?** (unblocks BF-179, currently READY #2)
+**1. BF-179 — is the 52% still on screen?** (BF-179's engine half shipped 2026-09-20; this is
+  now a DIAGNOSTIC look, not a blocker)
   The prescription that produced the screenshot regenerated at 2026-09-19 23:10, and
   `session_periodization` keeps no history, so the pre-regeneration state cannot be read back. If
   Upper renders normally now, BF-179 is a post-mortem; if it still reads 52%, it is live and the
   cause is NOT the one the entry names — see the refutation recorded in BF-179 itself. **One look at
   *Why Upper?* settles it.**
+  **Sharper as of 2026-09-20:** a production re-read found **no `dismissed` row at all** and **no row
+  anywhere carrying `deload_recommended`**, so the server cannot produce that banner for any session
+  now. The look is diagnostic either way — gone means post-mortem, still there means a stale client
+  cache specifically, since the only other candidate is ruled out.
 
 **2. LA-121 — port the temperature ladder, or let `tempZ` stand?** (unblocks LA-121, now `Gate: owner`)
   `computeBlendedScore`'s penalty ladder (dev 0.4 → 70, 0.7 → 60, 1.2 → 40 from a base of 80) has
@@ -1383,6 +1388,26 @@ window, and `rmssdFromRr` over it is comparable to the ring's figure for the sam
 
   The expiry gap is real either way and is worth fixing on its own; which of these explains the
   *pending-looking card* decides whether a second fix is needed.
+- **✅ THE EXPIRY GAP SHIPPED 2026-09-20.** The check is a **deny-list** now — every status ages out
+  on expiry except `pending` and `none` — rather than the allow-list with `dismissed` added, which is
+  what the entry would also have accepted. An allow-list is wrong by construction here: the check
+  named 3 of 6 statuses and the bug WAS the gap, so adding a fourth name leaves the next status added
+  to `PrescriptionStatus` as the next silent gap. Both exemptions carry their reason in the code.
+- **⚠ THE PRODUCTION STATE THIS ENTRY MEASURED NO LONGER EXISTS — re-read 2026-09-20.** Across all
+  15 of the owner's `session_periodization` rows there is **no `dismissed` row at all**, and **not
+  one row anywhere carries `deload_recommended`**: `pending` 5 (1 expired), `consumed` 5 (0 expired),
+  `auto_applied` 5 (5 expired, and those ARE covered by the old check). The row regenerated
+  2026-09-19 23:10, as LA-122 item 1 anticipated. **The defect is still real** — it is a code gap,
+  not a data state — but it cannot be reproduced from current data.
+- **✅ That narrows the entry's own open question, and answers half of LA-122 item 1.** Of the two
+  candidates for the *pending-looking card*, the server can no longer produce a deload banner for
+  any session — so **if the 52% is still on screen, candidate 1 (the stale client cache) is the
+  only one left standing**. Candidate 2 (a status divergence) is ruled out by the read above.
+- **Keep — the device look, and it is now diagnostic rather than a yes/no.** Open the session screen.
+  If the 52% and the Deload chip are GONE, this entry is a post-mortem and the shipped fix closes it.
+  If they are STILL THERE, that is positive evidence of a stale `workout-card:<id>` cache seeded by
+  the `?tab=all` batch path — clear the cache and reopen the tab to confirm. **No APK needed**; both
+  halves are TypeScript.
 - **Verification:** with the fix in, a prescription past `prescription_expires_at` must regenerate
   on tab-open whatever its status bar `pending`. Assert it in a unit test on `reevaluatePrescription`
   with a `dismissed` + expired fixture — **derive the timestamps from the clock, never hardcode

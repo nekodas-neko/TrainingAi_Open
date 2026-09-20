@@ -2411,6 +2411,36 @@ session and is also awaiting a device check. Both touch `PolarStrapService`, so 
 exercises both at once — worth knowing when reading the result, because a bad night would not say
 which one was responsible.
 
+### [workouts] ⚠️ An expired prescription ages out whatever its status — NOT device-verified (BF-179, 2026-09-20)
+
+The owner saw a session screen with **every exercise at 52% and a Deload chip**, asked against an
+explain screen reading 100/100 STRONG FIT, streak 0 days, sore muscles None, HRV well above usual.
+His *"why does it say deload when every signal says I'm fine"* had a real answer: **nothing on that
+explain screen produced it.** Those signals feed `computeDeloadStrength`, which gates on
+`consecutiveTrainingDays < 3` and returned `recommended: false`. The banner is the periodization
+prescription — a different system with its own lifecycle that never consulted today's signals.
+
+**The defect:** the ageing-out check in `reevaluatePrescriptionForToday` was an allow-list naming
+`auto_applied`/`accepted`/`consumed`. `dismissed` was in neither it nor the deliberate `pending`
+carve-out, so `needsRegenerate` never fired and `workout-data/route.ts` took the else-branch — which
+**re-stamps the stale prescription and writes it back**. The expired offer was not tolerated, it was
+refreshed. **This is Q-229 returning through a status its fix did not name.**
+
+**Fixed as a deny-list, and the shape is the point:** every status ages out on expiry except
+`pending` (whose expiry the emergency-deload suppression owns) and `none` (nothing to age out).
+The check named 3 of 6 statuses and the bug *was* the gap, so adding a fourth name would leave the
+next status added as the next silent gap.
+
+**⚠ The production state that motivated this no longer exists.** Measured 2026-09-20 across all 15
+of the owner's `session_periodization` rows: **no `dismissed` row at all**, and **not one row
+carrying `deload_recommended`**. The row regenerated 2026-09-19 23:10. The code gap is still real;
+the data state is gone.
+
+**NOT device-verified, and the look is now diagnostic rather than a yes/no.** Open the session
+screen: if the 52% and the chip are **gone**, this is a post-mortem and the fix closes it; if they
+are **still there**, that is positive evidence of a stale `workout-card:<id>` client cache, because
+the server can no longer produce that banner for any session. **No APK needed** — TypeScript only.
+
 ### [workouts] 🟠 Two real exercises are excluded from every generated program (RV-51, 2026-09-18) · found, not fixed
 
 **Open.** `equipmentEligible` (BF-129) excludes an exercise that declares no equipment, justified in

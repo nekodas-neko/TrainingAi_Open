@@ -99,11 +99,25 @@ export function reevaluatePrescriptionForToday(
   // happened to fire. The owner hit it on 2026-08-14: an 8-day-old deload-era 52% served on a live
   // Intensification day.
   //
-  // Only an applied prescription ages out here. `pending` is an *offer* whose own expiry the
-  // emergency-deload suppression below already owns, and re-deriving it here would fight that.
+  // BF-179 — this is a DENY-list on purpose, and it used to be an allow-list naming
+  // `auto_applied`/`accepted`/`consumed`. `dismissed` was in neither that set nor the `pending`
+  // carve-out, so a dismissed prescription never aged out: `needsRegenerate` never fired and
+  // `workout-data/route.ts` took the else-branch, which RE-STAMPS the stale prescription and writes
+  // it back. The expired offer was not merely tolerated, it was refreshed. Measured in production
+  // 2026-09-20: a `dismissed` row that had expired three days earlier still carried
+  // `phaseAction: 'deload_recommended'` and was still setting every working set to 52%.
+  //
+  // That is Q-229 returning through a status its fix did not name — which is the whole argument for
+  // the shape. An allow-list is wrong here by construction: the next status added to
+  // `PrescriptionStatus` joins `dismissed` as a silent gap, and nothing fails. A deny-list ages out
+  // by default and a new status has to argue for its exemption.
+  //
+  // The two exemptions, both deliberate. `pending` is an *offer* whose expiry the emergency-deload
+  // suppression below already owns, and re-deriving it here would fight that. `none` means there is
+  // no offer to age out at all, so regenerating on it would be a loop with nothing to show for it.
+  const agesOutOnExpiry = state.prescriptionStatus !== 'pending' && state.prescriptionStatus !== 'none'
   if (
-    (state.prescriptionStatus === 'auto_applied' || state.prescriptionStatus === 'accepted' ||
-      state.prescriptionStatus === 'consumed') &&
+    agesOutOnExpiry &&
     state.prescriptionExpiresAt != null && state.prescriptionExpiresAt <= now
   ) {
     return { prescription, changed: false, needsRegenerate: true }
