@@ -14581,3 +14581,24 @@ Most of the length is the part that is not the fix: what would confirm it on the
 unverified native changes now stack on `PolarStrapService`, so the next night of wear exercises
 TN-54 and TN-51 at once and a bad result would not say which. That is the sentence a reader needs
 in three weeks and the only place it can live is next to both.
+
+## 2026-09-20 — LA-121 was telling every implementer to start the entry that says not to
+
+`docs/implementation-backlog.md` **25105 → 25129** (`lane-a/la121-gate-owner`).
+
+Twenty-four lines, and the `Gate: owner` that was the point is six of them. LA-121's own step (2)
+reads *"Not before"* (1) is answered, and LA-122 item 2 says outright that an implementer must not
+pick — yet with no `Gate:` field the queue tool printed it as Lane A's **READY #1**. That is LA-122
+item 3's defect (Q-28, BF-9, BF-7 held back only by a convention inside a scheduled prompt) wearing
+a different entry's name, and it cost the start of this item before the entry was read.
+
+The rest is re-verification changing the entry rather than confirming it. The dead condition has
+**five** sites, not four; the fifth is a live gate with a dead *disjunct*, so a cleanup that removed
+"the four dead arms" as filed would leave it behind. It changes no behaviour — a dead disjunct in an
+OR contributes nothing — which is why it is worth writing down rather than fixing: the next reader
+needs to know it is inert before they touch the scoring path.
+
+And the premise moved from inferred to measured: the last non-null `oura_daily.readiness_score` is
+**2026-07-07, the re-key date itself**, with 0 of the trailing 61 days carrying one while rows are
+still written daily. The entry guessed "pre-re-key-only" and then reasoned its way to "permanent";
+the column now says so directly.
