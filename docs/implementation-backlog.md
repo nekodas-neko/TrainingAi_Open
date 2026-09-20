@@ -618,6 +618,88 @@ below threshold and left in place for next time.
   so any two concurrent PRs conflict by construction.** The drift rate (~8–10 min) is faster than a
   CI cycle (~7 min for the five required), so a PR can lose the race indefinitely. What broke the
   loop was resolving and merging inside the same minute, not waiting for a sixth full run.
+### [body][nutrition] BF-185 — un-ticking and re-ticking a dose silently rewrites the time it was taken
+
+- **Batch:** `supplement-dose-surface` — ships with **BF-186**. Both are Lane B edits in the
+  supplements area and both are settled by one device pass: open the section, toggle a dose, reach
+  Manage. Batched on the verification, per this file's rule. No migration in either.
+- **Branch:** _unassigned_ · **Added:** 2026-09-20 (BugFix intake). Owner: *"In that attempt i
+  unclicked the button then re clicked it so check if that caused double recording or so."*
+- **Lane: B** — the dose toggle in `components/nutrition/supplements-section.tsx`.
+- **✅ NO DOUBLE RECORDING — checked including soft-deleted rows.** `supplement_logs` for
+  Retatrutide still holds exactly **3 rows, none with `deleted_at` set**, one per dose. The toggle
+  correctly upserts the day's row rather than inserting a second.
+- **⚠ But the re-tick MOVED the recorded dose time, and nothing says so.** Same row
+  (`f6a3c7b6…`), measured across two reads of production on 2026-09-20:
+
+  | field | before the re-tick | after |
+  |---|---|---|
+  | `created_at` | 10:46:35 | 10:46:35 *(unchanged)* |
+  | **`taken_at`** | **10:46:33** | **11:21:13** |
+  | `updated_at` | 10:46:35 | 11:21:13 |
+
+  **35 minutes**, 20:46 → 21:21 Brisbane. The injection happened once; the stamp now records when he
+  last touched the button.
+- **Why it matters here specifically.** BF-184 exists to correlate dose timing against overnight HR
+  and HRV — the owner's words were *"dosage night vs hr"*. A stamp that follows the last tap rather
+  than the dose is the one field that analysis cannot tolerate drifting, and it drifts **silently**:
+  nothing in the UI indicates the time changed, and the only way he found out was asking.
+- **Fix: on a re-tick of a day that already has a log, keep the existing `taken_at`.** The row is
+  being upserted already; preserve the original stamp rather than re-stamping `now`. An untick
+  followed by a re-tick is a correction of a mis-tap, not a statement that the dose happened at the
+  moment of the second tap.
+- **⚠ Decide what an intentional time change looks like, because the fix removes today's only path
+  to it.** Right now re-ticking is the *only* way to move a dose's time, so a plain "preserve it"
+  leaves a wrong stamp uncorrectable. Either make the time editable where the dose is shown, or keep
+  the re-stamp and make it visible ("time updated to 21:21"). **Editable is the better answer** —
+  it separates *"I mis-tapped"* from *"I dosed at a different time"*, which the toggle cannot
+  distinguish and should not try to.
+- **Sibling sweep:** every supplement uses this toggle, not just the mg-dosed ones. Any dose whose
+  timing matters carries the same drift.
+- **Verification:** tick a dose, note `taken_at`, untick, re-tick, and confirm the stamp is
+  unchanged. Then confirm an intentional edit is still possible by whatever path the fix chooses.
+  **Device look owed** — the toggle is the surface and the timing is what is being measured.
+
+### [nutrition] BF-186 — the vial sheet sends you to "Manage supplements", which is a 10 px "Manage" link on another screen
+
+- **Batch:** `supplement-dose-surface` — ships with **BF-185**, same area and same device pass.
+- **Branch:** _unassigned_ · **Added:** 2026-09-20 (BugFix intake). Owner, after being told by the
+  app where to change his saved dose: *"I dont see a manage supplements section to change the
+  default to 1mg."*
+- **Lane: B** — `components/nutrition/supplements-section.tsx:131-133` (the control) and the vial
+  sheet's hint copy.
+- **The instruction names something that does not exist by that name.** The vial sheet reads
+  *"Your saved dose is 0.5 mg, changed in **Manage supplements**, under Amount."* The actual control
+  is labelled **"Manage"**, alone, in the Supplements section header of the Nutrition tab:
+
+  ```tsx
+  <button type="button" onClick={() => setManageOpen(true)}
+    className="text-[10px] text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+    <SettingsIcon className="h-3 w-3" /> Manage
+  </button>
+  ```
+
+- **Three things stack to make it unfindable**, which is why a search for the literal phrase fails:
+  1. **The words differ** — the hint says "Manage supplements", the control says "Manage".
+  2. **It is 10 px, muted, with a 12 px icon** — styled as a section-header affordance, not a
+     destination, next to a `text-[10px]` "SUPPLEMENTS" label it visually matches.
+  3. **It is on a different screen from the sheet giving the instruction.** The hint appears in the
+     vial sheet; the control is behind it in the Nutrition tab's supplements section.
+- **⚠ The tap target is under the floor and that is a separate defect in the same line.** No padding
+  on a 10 px text button gives roughly a 12–14 px hit area against this repo's 44 px rule. Fix both
+  in the same edit — the repo's own rule puts tap-target floors in the shared button component, not
+  in a bare element, so this should become a `Button` variant rather than a styled `<button>`.
+- **Fix, in order of value:** make the hint itself the control — *"Your saved dose is 0.5 mg. **Change
+  it**"* opening the manage sheet directly, which removes the navigation entirely. Failing that,
+  match the words exactly and give the control a real target.
+- **⚠ The hint is also the reason this matters rather than being a nit.** It appears because his
+  saved default (0.5 mg) no longer matches what he takes (1 mg). The app is correctly telling him
+  about a stale default and then pointing at a door he cannot find — so the default stays stale, and
+  a hurried tap on the dose prompt logs 0.5 mg. That is most likely how dose 1 came to be recorded
+  at 0.5 with no time.
+- **Verification:** from the vial sheet, follow the instruction as written and reach the Amount
+  field. **Device look owed** — discoverability and tap target are both physical properties of the
+  S25 screen.
 
 ### [body][readiness] BF-184 — the reta dose is recorded well and joins cleanly to recovery metrics; nothing surfaces that join, and dose 1 is missing its time
 

@@ -14261,6 +14261,17 @@ already rejected the same shape with production numbers. The correction to BF-18
 superseded reading visible rather than rewriting it away — the 45-logs-all-breakfast protein shake
 is simultaneously the evidence for the new model and the reason the old one failed, and deleting it
 would lose the argument.
+
+## 2026-09-20 (fifth) — `docs/implementation-backlog.md` → 24784
+
+**BF-185** (a dose re-tick rewrites `taken_at`) and **BF-186** ("Manage supplements" is a 10 px
+"Manage" on another screen), batched as `supplement-dose-surface`.
+
+BF-185's before/after table is the entry: the owner asked about double recording, the answer is no,
+and the real finding is one field 35 minutes out that nobody would have looked for. Without the two
+reads it would have been filed as "checked, all fine". BF-186 records why it is not cosmetic — the
+hint fires because the saved default is stale, so an unfindable control keeps it stale, which is the
+likeliest explanation for dose 1 logging 0.5 mg.
 ## 2026-09-20 — OR-118 shipped, and LB-121 got its measured cost
 
 `projectOverview.md` **11927 → 11931** and `docs/implementation-backlog.md` **24344 → 24341**
