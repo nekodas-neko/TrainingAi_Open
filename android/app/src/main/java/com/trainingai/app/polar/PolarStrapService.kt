@@ -96,6 +96,11 @@ class PolarStrapService : Service(), PolarGattClient.Listener {
     // Ambient vs full persistence. Volatile: set from the plugin thread.
     @Volatile private var ambient = true
     private var lastAmbientSentAt = 0L
+    // TN-51. Beats from samples the thinning dropped, waiting for the next kept sample. Carried
+    // across flushes: the buffer flushes on a count threshold and on a timer, neither aligned to
+    // AMBIENT_GAP_MS, so a flush that keeps nothing is ordinary — and its beats would otherwise be
+    // lost exactly as before.
+    private var pendingAmbientRr: List<Int> = emptyList()
 
     private data class Sample(val at: Long, val bpm: Int, val rr: List<Int>)
     private val buffer = ArrayList<Sample>()
@@ -365,15 +370,21 @@ class PolarStrapService : Service(), PolarGattClient.Listener {
         ingest.execute { postSamples(base, batch) }
     }
 
-    // Keep ~1 sample/AMBIENT_GAP_MS; lastAmbientSentAt carries across flushes.
+    // TN-51. Keep ~1 sample/AMBIENT_GAP_MS, and carry every dropped sample's RR intervals forward
+    // onto the kept one. The thinning stays — it exists so all-day 1 Hz does not bloat
+    // `oura_heartrate` — but the beats it used to discard are what rMSSD is computed from, and
+    // dropping them made the figure UNDEFINED rather than noisy (one interval per 30 s has no
+    // adjacent pair). Logic lives in `PolarAmbientThinner` so it can be unit-tested; this is the
+    // half no device check would isolate.
     private fun thinAmbient(samples: List<Sample>): ArrayList<Sample> {
-        val kept = ArrayList<Sample>()
-        for (s in samples) {
-            if (lastAmbientSentAt == 0L || s.at - lastAmbientSentAt >= AMBIENT_GAP_MS) {
-                kept.add(s); lastAmbientSentAt = s.at
-            }
-        }
-        return kept
+        val result = PolarAmbientThinner.thin(
+            samples.map { PolarAmbientThinner.Beat(it.at, it.bpm, it.rr) },
+            PolarAmbientThinner.State(lastAmbientSentAt, pendingAmbientRr),
+            AMBIENT_GAP_MS,
+        )
+        lastAmbientSentAt = result.state.lastSentAt
+        pendingAmbientRr = result.state.pendingRr
+        return ArrayList(result.kept.map { Sample(it.at, it.bpm, it.rr) })
     }
 
     private fun postSamples(base: String, samples: List<Sample>) {

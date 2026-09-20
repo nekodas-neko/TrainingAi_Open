@@ -68,6 +68,25 @@ unavoidable. That belief is worth 38 lines to kill.
 
 ---
 
+## 2026-09-20 — backlog → 25105 (TN-51's first action shipped, +13)
+
+Another raise on a queued entry rather than a removal, for the same reason as TN-54 an hour
+earlier: the code half is done and the device half is not, and collapsing that into "shipped" is
+what makes a strap problem look solved when the strap has not been worn.
+
+The +13 records that **option (1) was taken and options (2) and (3) should not be built** — the
+entry listed three approaches in preference order, and a later reader finding "shipped" with no
+note would have no way to tell which. It also names the cap change (16 → 100 on `hr-ingest`'s
+per-sample `rr`), because that number is now load-bearing in two languages and a reader who lowers
+it would silently reintroduce the bug: the client splits at 100 and a lower server cap would 400
+those chunks, and the client swallows a 400 and drops the batch.
+
+What is owed is one night of wear. Gradle cannot resolve the Android plugin in this sandbox —
+verified, not assumed — so the Kotlin is covered by unit tests that only CI executes, and the radio
+is covered by nothing.
+
+---
+
 ## 2026-09-20 — backlog → 25086 (TN-54's recording half shipped, +15)
 
 TN-54 stays queued, so this is a raise rather than the usual removal. The entry arrived at 20:23 as

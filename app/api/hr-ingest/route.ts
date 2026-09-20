@@ -15,6 +15,18 @@ import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 // matches the `oura-ble/samples` sibling.
 const MAX_BODY_BYTES = 512 * 1024
 
+// TN-51 raised this from 16. Ambient wear now carries every dropped sample's RR intervals forward
+// onto the kept one (`PolarAmbientThinner`), so a single 30-second sample legitimately holds ~30
+// beats at rest and ~100 at 200 bpm, where before it held one or two. 16 would reject the very
+// payload that fixes the bug.
+//
+// **It is not the DoS bound and never was.** `readJsonLimited(req, MAX_BODY_BYTES)` rejects at
+// 512 KB before parsing, so the total work is bounded by the body regardless of how it is divided
+// between `samples` and `rr`. This cap bounds one sample's share of that, and the native client
+// splits rather than truncates when a window exceeds it — truncating would be the same data loss
+// TN-51 is about. Keep the two numbers in step: `PolarAmbientThinner.MAX_RR_PER_SAMPLE`.
+const MAX_RR_PER_SAMPLE = 100
+
 // Structural validation only — value ranges are filtered per-sample below, never rejected as a
 // batch. The H10 routinely emits bpm=0 during signal acquisition at strap-on and RR artifacts
 // during poor contact; one such sample must not Zod-reject an entire 40-sample flush (the client
@@ -28,7 +40,7 @@ const BodySchema = z.object({
     // never batch-rejected (poison-pill rule G-2).
     at: z.number().int().min(0).max(8_640_000_000_000_000), // epoch ms (client receive time)
     bpm: z.number().int(),
-    rr: z.array(z.number().int()).max(16).optional(),  // ms per beat
+    rr: z.array(z.number().int()).max(MAX_RR_PER_SAMPLE).optional(),  // ms per beat
   })).min(1).max(2000),
 })
 
