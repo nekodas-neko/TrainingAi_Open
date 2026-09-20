@@ -14261,7 +14261,6 @@ already rejected the same shape with production numbers. The correction to BF-18
 superseded reading visible rather than rewriting it away — the 45-logs-all-breakfast protein shake
 is simultaneously the evidence for the new model and the reason the old one failed, and deleting it
 would lose the argument.
-<<<<<<< HEAD
 
 ## 2026-09-20 (fifth) — `docs/implementation-backlog.md` → 24784
 
@@ -14273,7 +14272,6 @@ and the real finding is one field 35 minutes out that nobody would have looked f
 reads it would have been filed as "checked, all fine". BF-186 records why it is not cosmetic — the
 hint fires because the saved default is stale, so an unfindable control keeps it stale, which is the
 likeliest explanation for dose 1 logging 0.5 mg.
-=======
 ## 2026-09-20 — OR-118 shipped, and LB-121 got its measured cost
 
 `projectOverview.md` **11927 → 11931** and `docs/implementation-backlog.md` **24344 → 24341**
@@ -14304,4 +14302,3 @@ The deferral is recorded rather than deleted because it was **correct at the tim
 put a private muscle → movement-pattern taxonomy inside a component, and waiting meant the shared
 helper got built instead. A reader who finds only the outcome learns nothing; a reader who finds the
 reasoning and its expiry date learns when to re-check their own.
->>>>>>> origin/main
