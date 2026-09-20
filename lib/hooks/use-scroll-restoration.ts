@@ -44,6 +44,29 @@ const KEY_PREFIX = 'ta_scroll:'
  */
 const RESTORE_WINDOW_MS = 15_000
 
+/**
+ * The input events that mean the user has taken the screen over, so a pending restore is abandoned.
+ *
+ * **User takeover is an INPUT event, not a scroll delta.** Comparing the offset against what we last
+ * set was the first attempt and it made the re-assert useless: the layout shift this holds against
+ * arrives as a scroll of exactly the size a real drag produces, so every settle read as the user
+ * grabbing the page and we yielded to it. A wheel, a finger or a key is the user; a scroll event is
+ * not evidence of anything. That reasoning is unchanged.
+ *
+ * **The touch event is `touchmove`, NOT `touchstart` (BF-100).** `stop` latches `done = true` and
+ * clears the timer with no re-arm, so whichever event is listed here abandons the restore
+ * *permanently* the first time it fires. A finger going down has not scrolled anything — but under
+ * `touchstart` it still killed a restore that had not landed yet, and the user stayed at the top.
+ * That window is not theoretical: instrumented on `/more`, the listeners attach 182 ms before the
+ * restore lands, and on the S25 the back gesture is itself a finger arriving as the new screen
+ * mounts. `touchmove` keeps takeover an input event while letting a touch that never moves pass.
+ *
+ * **This is not confirmed as the S25 symptom** — that needs the device, and BF-100 stays open for
+ * it. Playwright fires no touch at all on `page.goBack()`, which is why a green
+ * `e2e/scroll-restoration.spec.ts` was never going to see this either way.
+ */
+const TAKEOVER_EVENTS = ['wheel', 'touchmove', 'keydown'] as const
+
 /** Below this, restoring is indistinguishable from not bothering, and the entry is noise. */
 const MIN_OFFSET_PX = 40
 
@@ -144,24 +167,17 @@ export function useScrollRestoration(ref: RefObject<HTMLElement | null>, keySuff
     const onScroll = () => { lastTop.current = el.scrollTop }
     el.addEventListener('scroll', onScroll, { passive: true })
 
-    // **User takeover is an INPUT event, not a scroll delta.** Comparing the offset against what we
-    // last set was the first attempt and it made the re-assert useless: the layout shift this holds
-    // against arrives as a scroll of exactly the size a real drag produces, so every settle read as
-    // the user grabbing the page and we yielded to it. A wheel, a finger or a key is the user; a
-    // scroll event is not evidence of anything.
     const stop = () => {
       if (done) return
       done = true
       observer?.disconnect()
       if (timer) clearTimeout(timer)
     }
-    for (const type of ['wheel', 'touchstart', 'keydown'] as const) {
-      el.addEventListener(type, stop, { passive: true })
-    }
+    for (const type of TAKEOVER_EVENTS) el.addEventListener(type, stop, { passive: true })
 
     return () => {
       el.removeEventListener('scroll', onScroll)
-      for (const type of ['wheel', 'touchstart', 'keydown'] as const) el.removeEventListener(type, stop)
+      for (const type of TAKEOVER_EVENTS) el.removeEventListener(type, stop)
       observer?.disconnect()
       if (timer) clearTimeout(timer)
       const top = Math.round(lastTop.current)

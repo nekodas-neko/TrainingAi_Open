@@ -18,7 +18,7 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
-## 2026-09-19 — backlog → 24107 (TN-51, caught before the night was spent)
+## 2026-09-20 — backlog → 24404 (TN-51, caught before the night was spent)
 
 **+62.** The owner said he would sleep in the strap tonight; checking the capture path
 first showed the service runs overnight but in ambient mode, which keeps one sample per 30 s and
@@ -140,6 +140,19 @@ The overview paragraph spends its length on the **measurement**, not the regex: 
 bullets already matched and all four misses were one shape. That number is the whole argument for
 widening rather than rewriting, and `keep.js`'s own comments argue the opposite case convincingly
 enough that a future session will re-open it. Without the count it would have to re-measure.
+---
+
+## 2026-09-18 — backlog → 24344, `projectOverview.md` → 11927 (RV-61 shipped)
+
+**Backlog −17** for one small entry. The overview paragraph is longer than the diff because two of
+the three things worth remembering are **refusals**: the check calls a fifteen-query function on
+purpose rather than re-deriving unlock state cheaply, and it adds no rate limit because the sibling
+GET running the same work has none. A future reader looking at a PATCH that runs `computeAchievements`
+will reasonably ask why, and the answer is not in the diff.
+
+The third is the pre-flight check — that all 16 `unlockedBy` values resolve — which is there because
+this fix's failure mode is locking a user out of a title they earned, and nothing in CI would catch a
+requirement that silently does not resolve.
 
 ---
 
@@ -13948,3 +13961,74 @@ cache bust and it is already implemented, so the entry has to say that first or 
 twice. And deriving `remaining` client-side is a genuine trap: it shares `deviationKcal` with the
 zone label, colour and bar, so the one-liner would leave the number live and the verdict stale.
 Both are cheaper to write down once than to discover in review.
+
+## 2026-09-19 — `docs/implementation-backlog.md` 24047 → 24015 (ratchet down, BF-177)
+
+**−32.** BF-177 shipped, so 64 lines of diagnosis become 32 of residue. The diagnosis was unusually
+good and most of it is now redundant with the code: the hook `use-energy-balance-refetch.ts` carries
+why the refetch is balance-only and why deriving `remainingKcal` client-side is a trap, right where
+the next reader will be standing.
+
+What the entry keeps is what the code cannot say: that the sweep found a **third** write path the
+entry did not name (the delete), that the control run printed `kcal left went 1810 → 1810` with the
+fix removed — the owner's report reproduced exactly — and that **two further `energy-balance:`
+readers were seen and deliberately not swept**, recorded rather than left as an implied clean sweep.
+
+## 2026-09-19 — BF-100's cause moved from hypothesis to measurement
+
+`docs/implementation-backlog.md` **24015 → 24063** and `projectOverview.md` **11921 → 11917**
+(`fix/bf100-touch-cancels-pending-restore`).
+
+The backlog grew by 48 lines, all of it inside BF-100, and the growth is the point: the entry had
+carried a *candidate* cause for five days, plus a probe whose null result the entry itself warned
+must not be read as a refutation. What replaces that is measurement — the 182 ms window between the
+takeover listeners attaching and the restore landing, the reproduction
+(`restored to 0 against a reachable 1019`), and the reason the earlier probe could never have worked
+(`page.goBack()` does not resolve until after the restore, so the window is unreachable from the test
+side at all). A later session that re-derives any of those pays for them twice; this entry has
+already been mis-read twice, which is what the lines are buying against.
+
+`projectOverview.md` went **down** by four. Its BF-100 block held three stale claims — that the entry
+*"now prints READY"*, that *"the fix is deliberately not built"*, and that
+`scroll-restoration.spec.ts` still asserts an exact offset (fixed 2026-09-17). Replacing all three
+with the current state came out shorter than the speculation it retired, which is the usual direction
+when a question stops being open.
+
+## 2026-09-20 — `docs/implementation-backlog.md` → 24181
+
+**BF-179** (a dismissed, three-day-expired prescription still setting today's loads) and **BF-178**
+(the readiness composite credited to Oura on three surfaces).
+
+BF-179 is long because a shorter version gets fixed wrongly. It has to separate the two deload
+systems before the defect makes sense, quote the `reevaluate.ts` comment showing this is Q-229
+returning through a status its fix did not name, and warn off the obvious patch —
+`prescriptionDrivesLoad` already rejects `dismissed`, so tightening it changes nothing. It also
+records, rather than guesses, the one mechanism still open: the card renders pending-only copy for a
+row the database says is dismissed, and the two candidates need different fixes.
+
+## 2026-09-20 — `docs/implementation-backlog.md` → 24297
+
+**BF-180** (a session-level deload stores no pre-deload block, so declining it serves the static
+program) and **BF-181** (nine exercises in the active program have no progression style, one whole
+session none at all).
+
+BF-180 carries its alternatives with reasons because the owner asked a design question — *"some sort
+of catch to make sure its always ai derived"* — and the obvious answer, regenerate on tap, is the
+one to reject as primary: a round trip at the moment he is standing in a gym, failing offline. The
+recommended fix is honestly costed as a generation change rather than plumbing, because the full
+intensities are not computed on that path today.
+
+BF-181's table is the sweep that was run BEFORE filing, and it changed the entry from a one-row data
+fix into a missing write-time constraint. Filing the narrow version would have shipped a fix for one
+exercise and left a leg session with no programming.
+
+## 2026-09-20 (second) — `docs/implementation-backlog.md` → 24361
+
+**BF-182** — warm the next prescription when Home renders, rather than at completion (which the
+owner asked for and which he himself rejected on 2026-07-31) or at tab-open (which is where the
+latency he is complaining about lives).
+
+The quoted `complete-workout` comment is the entry's most important line: without it an
+implementer reads a direct owner request and builds the thing that was deliberately not built,
+with no way to know. The input-versus-filter distinction earns its space for the same reason — the
+proposal only sounds free if you think duration and deload are applied after generation.

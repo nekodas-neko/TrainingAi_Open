@@ -6,6 +6,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.459.2",
+    date: "2026-09-19",
+    changes: [
+      "Coming back to a screen no longer forgets where you were just because your finger touched it. Returning to a list restores your scroll position, but that restore waits for the page to finish loading enough content to hold it \u2014 and while it was waiting, any touch at all cancelled it for good and left you at the top. A finger resting on the screen has not scrolled anything, so only an actual drag stops it now. This is the suspected cause of back navigation still landing at the top on the phone, where the back gesture is itself a touch arriving as the new screen appears \u2014 suspected, not yet confirmed there.",
+    ],
+  },
+  {
+    version: "1.459.1",
+    date: "2026-09-19",
+    changes: [
+      "\"kcal left\" now updates the moment you log food, instead of waiting for you to switch tabs and come back. The ring and the macros were already moving instantly; the number beside them was the server's subtraction against what you had eaten BEFORE the meal, and nothing asked it for a fresh one. Editing a logged item and deleting one had the same gap \u2014 all three update now. The figure lands a moment after the ring, because the budget half genuinely comes from the server.",
+    ],
+  },
+  {
     version: "1.459.0",
     date: "2026-09-19",
     changes: [

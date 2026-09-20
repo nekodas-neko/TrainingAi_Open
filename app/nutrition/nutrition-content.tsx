@@ -59,6 +59,7 @@ const MealPlanSetupSheet = dynamic(
   { ssr: false },
 );
 import type { EnergyBalanceResponse } from "@/app/api/nutrition/energy-balance/route";
+import { useEnergyBalanceRefetch } from "./use-energy-balance-refetch";
 import { WaterLogSheet } from "@/components/profile/water-log-sheet";
 import { mealTypeForHour } from "@trainingai/shared/nutrition/log-plan-meal";
 import { NutritionActionRow } from "@/components/nutrition/nutrition-action-row";
@@ -295,18 +296,25 @@ export default function NutritionContent({ userId }: { userId?: string }) {
     } catch { /* non-fatal */ }
   }, [userId, tz]);
 
+  // BF-177. Balance-only refetch; the hook carries why it is not `fetchData` and not a
+  // client-side subtraction.
+  const refetchBalance = useEnergyBalanceRefetch(setEnergyBalance)
+
   const handleFoodLogged = useCallback((newLog?: FoodLogWithItem) => {
     if (newLog) {
       if (newLog.date && newLog.date !== selectedDateRef.current) return; // lands via cache invalidation
       setLogs(prev => [...prev, newLog])
+      refetchBalance(selectedDateRef.current)
     } else {
       fetchData(selectedDateRef.current)
     }
-  }, [fetchData])
+  }, [fetchData, refetchBalance])
 
+  // The obvious twin: an edit changes the logged calories, so the same subtraction is stale.
   const handleQuickEditSaved = useCallback((updated: FoodLogWithItem) => {
     setLogs(prev => prev.map(l => l.id === updated.id ? updated : l))
-  }, [])
+    refetchBalance(selectedDateRef.current)
+  }, [refetchBalance])
 
   useEffect(() => { fetchMountData(); }, [fetchMountData, userId]);
   useEffect(() => { fetchData(selectedDate); }, [fetchData, selectedDate]);
@@ -379,6 +387,9 @@ export default function NutritionContent({ userId }: { userId?: string }) {
     // five mount-scoped fetches (meal types, targets, adherence, body-metadata, profile).
     const refreshAffected = () => {
       loadFoodLogs(today);
+      // BF-177's third site, which that entry did not name: a delete changes intake, so the
+      // balance's subtraction is stale exactly as it is after a log or an edit.
+      refetchBalance(today);
       cachedFetch<{ date: string; calories: number; proteinG: number; carbsG: number; fatG: number }[]>(
         'nutrition-weekly-summary', '/api/nutrition/weekly-summary', TTL_MEDIUM,
         d => setWeeklyData(Array.isArray(d) ? d : []),
@@ -418,7 +429,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
     }
     await invalidateNutritionWrite();
     refreshAffected();
-  }, [confirmDeleteLogId, loadFoodLogs, userId]);
+  }, [confirmDeleteLogId, loadFoodLogs, refetchBalance, userId]);
 
   /**
    * The day's budget and macro grams, both taken from `/api/nutrition/energy-balance` (Q-417/Q-323).
