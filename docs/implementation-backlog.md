@@ -3627,6 +3627,34 @@ indistinguishable from a working strap, and the Devices screen shows **"Connecte
 figure at all (the ring beside it shows 75%) — so the one surface the owner checked actively
 reassured him.
 
+**⚑ OWNER, 2026-09-20: *"lets get this sorted before my next trial as that was a waste of night …
+We need to see if we can get an accurate battery indicator as it just says 100% on the home screen
+all the time."*** Two findings follow, and the first says not to build what was asked for.
+
+**1. An accurate battery percentage is NOT achievable, and this repo already says so.** The H10 runs
+a **CR2025** — a primary lithium coin cell with a near-flat discharge curve that holds voltage until
+it collapses. `PolarStrapService` line 239 carries the comment *"a dying cell presents as flaky
+connections long before it presents as a dead strap"*, and the Polar knowledge base says the same.
+**A constant 100% is the cell behaving normally, not the indicator being broken.** Chasing a truer
+percentage would spend an APK cycle on a number that cannot give warning.
+**What to surface instead is `last_sample_at` and connection reliability** — those move days before
+the percentage does. Keep the low-battery notifier as a floor, but stop treating % as the signal.
+
+**2. The live indicator ALREADY EXISTS and is deliberately invisible.** The service runs a foreground
+notification reading **"Connected · N% battery"**, **"Strap unreachable — retrying in Ns"**, or absent
+when it is not running at all — but its channel is **`IMPORTANCE_MIN`** (line 155), which Android
+collapses into the silent section of the shade with no status-bar icon.
+
+**So there is a check that works TODAY, before any code ships:** pull down the shade, expand the
+silent section, and look for *"Chest strap"*. Present and reading "Connected" → the service is up.
+**Absent → it is not running, and no night will record.** That is the check the owner needed on
+2026-09-19 and could not find.
+
+**⚠ The fix is not "make the notification loud".** `IMPORTANCE_MIN` was chosen so an all-day service
+does not sit in the status bar, and that is right for all-day wear. **Raise it only for a declared
+sleep session** — see the pass test — or mirror the same state into the app where it can be checked
+deliberately.
+
 **⚠ Revised ask, sharper than the original.** Persist the status row *and* surface **last-sample-at**
 on the Devices card. "Connected" is not the useful fact; **"last sample 5 days ago"** is, and the app
 has it.
@@ -3636,8 +3664,13 @@ has it.
 service having given up and never been restarted, or Bluetooth being off. **This entry is about not
 being able to tell which** — it deliberately does not claim to know.
 
-**Pass test:** a morning query can say whether the strap connected last night, what its battery read,
-and why it stopped, without opening the app.
+**Pass test, revised for the owner's actual need — a night that records or tells him it will not:**
+1. Before sleep, one surface states **"recording — last sample N seconds ago"**, not "Connected".
+2. A service that has given up is **visibly** distinguishable from one that is running, without
+   opening the app and without expanding a silent notification section.
+3. The next morning, a query answers whether the night counted — **from stored status, not inference
+   from sample presence**, so "no rows" can be told apart from "worn, service dead".
+4. `last_sample_at` is on the Devices card beside "Connected".
 
 
 ### [devices][heart-rate] TN-51 — overnight strap wear lands in ambient mode, which discards 29 of every 30 seconds of beats, so PS-44's HRV comparison cannot be made from it 🔴 LIVE

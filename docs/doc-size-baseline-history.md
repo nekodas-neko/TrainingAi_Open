@@ -18,7 +18,7 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
-## 2026-09-20 — backlog → 24951 (TN-54, the strap is dark and nothing says so)
+## 2026-09-20 — backlog → 24984 (TN-54, the strap is dark and nothing says so)
 
 **+12.** The owner wore the strap overnight and asked whether it recorded. It did not, and the
 useful finding is that neither of us could tell why: the last chest-strap sample in either table is
