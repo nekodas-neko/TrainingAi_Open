@@ -12973,60 +12973,44 @@ behaviour, and TN-6's own pass test (deviation mean within ±0.05 °C of zero) i
   re-derivation lifts it with **no deploy**. Thresholds untouched.
 - **Keep:** a **suppression, not a fix** — TN-6 retires it (its ±0.05 °C pass test is what does), and
   nothing was observed in production.
-### [heart-rate][workouts] TN-53 — the HR-recovery trend has no density gate, so it partly records which device was worn 🔴 LIVE
+### [heart-rate][workouts] TN-53 — the HR-recovery trend has no density gate 🟡 ENGINE SHIPPED
 
-- **Branch:** _unassigned_ · **Added:** 2026-09-20 · Tuning agent, from the owner's ask to look across
-  every metric the app records.
-- **Lane: A** — `app/api/health/trends/route.ts` and `packages/shared/src/workout/hr-analysis.ts`.
+- **Branch:** `lane-a/tn53-hrr-density-gate` · **Added:** 2026-09-20 (Tuning) · **Engine shipped
+  2026-09-20** (Lane A).
 - **Review:** [`what we record, and what it can actually say`](reviews/2026-09-20-what-we-record-and-what-it-can-say.md) §2–3.
+- **✅ SHIPPED: the gate, in the one HRR formula.** `analyseHrRecovery` now requires the two readings
+  behind `hrr1` to be **45–75 s apart** (`HRR1_SEPARATION_MIN_MS`/`MAX_MS`) and returns `null`
+  otherwise. Every `hrr1` consumer already treated null as unknown, so no caller changed.
+- **⚠ The entry's quoted evidence was wrong in one place, and the fix is better for it.** It quoted
+  `nearestBpm(readings, target, windowMs = 90_000) // both terms`. **The second term uses 45_000**
+  (`hr-analysis.ts:73`). Re-derived: `bpmAtLog` ∈ log ± 90 s and `bpm60` ∈ log + 60 s ± 45 s, so the
+  pair spans **−75 s to +195 s**, not "150 s apart" — a wider worst case than claimed, and it
+  includes **the same reading serving both terms and reporting a drop of 0**.
+- **Implemented as a separation check rather than the proposed reading-count density gate**, because
+  the defect the entry actually names is *"no check that the two readings it differences are actually
+  60 seconds apart"*. A count is a proxy that both over-rejects (a sparse set whose two readings are
+  60 s apart genuinely can measure HRR) and under-rejects (a dense set whose readings cluster on one
+  side cannot). The density numbers remain the *reason* the gate is needed; they are not the gate.
+- **The density table reproduced exactly** (production, 2026-09-20): chest_strap 220 sets / 91.4%
+  `coverage_ok` / **111.8** readings per set; `ble` 79 / 54.4% / **7.1**; NULL 615 / 22.9% / 17.0.
+  Plus a 4-row `mixed` bucket the entry did not list. Sixteen-fold density difference stands.
 
-**Two paths compute heart-rate recovery and only one is gated.** `exercise-hr-trend.ts` filters every
-metric mean on `coverageOk` — its own comment says a censored set may contribute to the breakdown but
-not to the numbers. **`/api/health/trends` ignores `set_hr_stats` entirely** and recomputes HRR live
-from a raw `getHrForWindow`, with no coverage gate, no minimum reading count, and no check that the
-two readings it differences are actually 60 seconds apart:
-
-```
-hrr1 = bpmAtLog − bpm60          // hr-analysis.ts
-nearestBpm(readings, target, windowMs = 90_000)   // both terms
-```
-
-**Why that matters here specifically — the two sensors differ sixteen-fold in density:**
-
-| source | rows | `coverage_ok` | readings/set |
-|---|---:|---:|---:|
-| **chest_strap** | 220 | **91%** | **111.8** |
-| `ble` (ring) | 79 | **54%** | **7.1** |
-| *NULL* (unlabelled) | **615** | **23%** | 17.0 |
-
-At ~1 reading/second the 90 s tolerance is harmless. At 7 readings per set the two "readings 60 s
-apart" can be **the same reading, or 150 s apart**. The strap supplied only **24%** of the table and
-has been dark since **2026-09-15**, so the sparkline's recent span is ring-sourced.
-
-**So the HR-Recovery sparkline on the heart-rate page moves partly with sensor availability.** The
-codebase already knows this matters — `set_hr_stats` stores `coverage_ok` and `readings_count` for
-exactly this reason, and this path reads neither.
-
-**First action:** gate the live path the same way its sibling is gated — require a minimum reading
-density in the window and return `null` rather than a number when it is not met. **A null is the
-correct output here**; a sparkline gap is honest where an ungated value is not.
-
-**⚠ Do NOT fix this by widening the tolerance or interpolating.** Both would manufacture a value from
-readings that do not exist. The ring genuinely cannot measure a 60-second recovery under load, and the
-surface should say so.
-
-**⚠ Do NOT read the current HRR trend as physiology, including for the medication question.** Measured
-pre-dose vs on Retatrutide, HRR-60 runs **5.8 → 4.0 bpm** — but n = 229 against 23, sd 12.9, so that
-is **0.15 sd** and means nothing. It is quoted here to stop it being quoted as a finding elsewhere.
-
-**⚑ The better instrument already exists and is unused.** `fitness_tests` carries a `resting_hrr` test
-type **and** an `hrr1_bpm` column; one test was run (2026-07-19) and **left `hrr1_bpm` null**. A
-repeated HRR test controls the stimulus in a way neither resting HR nor ring HRV can — see the review
-§4. That is the durable answer; this entry is the correctness fix for what ships today.
-
-**Pass test:** a session with fewer than the minimum readings contributes no HRR point rather than a
-computed one, and the sparkline shows a gap across the period the strap was not worn.
-
+- **⚠ Keep: THE RENDER IS NOT DONE, and it is Lane B.** The engine now emits `null` where it used to
+  emit a fabricated number, so **the HR-Recovery sparkline will gain gaps** — in particular across
+  the period since the strap went dark on 2026-09-15. Nothing has been checked about how that
+  surface draws a null run: whether it interpolates across the gap, collapses the axis, or renders
+  an empty chart that reads as broken. **A gap that looks like a bug is not an improvement over a
+  wrong number.** That check and any copy ("not enough readings to measure recovery") are the
+  remaining ask.
+- **⚠ Keep: not verified against production render.** The gate is unit-tested; nobody has loaded the
+  heart-rate page since it shipped. The owner's pass test — *"the sparkline shows a gap across the
+  period the strap was not worn"* — is unverified.
+- **⚑ Unchanged and still the durable answer:** `fitness_tests` carries a `resting_hrr` type and an
+  `hrr1_bpm` column; one test ran 2026-07-19 and left `hrr1_bpm` null. A repeated HRR test controls
+  the stimulus in a way neither resting HR nor ring HRV can — review §4.
+- **⚠ Unchanged: do NOT read the HRR trend as physiology, including for the medication question.**
+  Pre-dose vs on Retatrutide runs 5.8 → 4.0 bpm, but n = 229 against 23 with sd 12.9 — **0.15 sd**,
+  which means nothing. Recorded here to stop it being quoted as a finding.
 
 ### [readiness][heart-rate][body] TN-52 — thresholds are set in bpm and fixed fractions, so they break when the user changes; define them in units of the user's own variability instead 🔴 LIVE
 
