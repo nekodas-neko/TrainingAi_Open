@@ -59,6 +59,12 @@ pins it as deliberately different rather than leaving the asymmetry to be read a
   SQL is a plain string and `node:sqlite` will run it. So the test **extracts the shipped statement**
   from `sqlite-backend.ts`, substitutes each branch of the real ternary, and executes both against a
   table built from the migration's own DDL. A change to that SQL changes what the test runs.
+**Two typecheck errors the gate caught, both mine.** `check-test-typecheck` refused the pair:
+`Repository` is not an exported name (it is `WorkoutRepository` — the sibling suite carries the same
+error as baselined debt, so it was fixed here rather than baselined again), and `node:sqlite` has no
+declarations under the pinned @types/node 20. The second is now `types/node-sqlite.d.ts`, declaring
+only the members used and carrying its own deletion condition.
+
 - **Mutation pass, four mutations:**
   - server conflict clause reverted → **3 of 5 red**; the two survivors cover arms the mutation does
     not reach (explicit-wins, NULL-fill), which is correct rather than a gap.
@@ -82,6 +88,10 @@ pins it as deliberately different rather than leaving the asymmetry to be read a
   send — but until it exists, a wrong time is uncorrectable from the UI. That is a deliberate,
   stated regression in reach, taken because a silently-drifting stamp is worse for the analysis the
   field exists to support.
+- **`pnpm lint` is the CI command and exits 0.** An `npx next lint --max-warnings 0` run of my own
+  making reported a warning in `lib/walk/__tests__/segment-stats.test.ts`, a file this PR does not
+  touch; the repo tolerates warnings (749 of them) and CI does not pass that flag. Worth stating
+  because a stricter-than-CI local invocation reads exactly like a real failure.
 - **The owner decision named in the entry is untouched.** Editable-vs-visible-re-stamp is still open;
   this change is compatible with editable (the entry's, Lane B's and Lane A's shared recommendation)
   and is one line to revert under the other answer.

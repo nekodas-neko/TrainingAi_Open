@@ -22,7 +22,7 @@ const USER = '00000000-0000-4000-8000-00000000b185'
 
 describe.skipIf(!canRun)('a re-tick keeps the time the dose was taken (BF-185)', () => {
   let pool: import('pg').Pool
-  let repo: import('@/lib/data/repository').Repository
+  let repo: import('@/lib/data/repository').WorkoutRepository
 
   beforeAll(async () => {
     const { getPool } = await import('@/lib/data/postgres/client')
