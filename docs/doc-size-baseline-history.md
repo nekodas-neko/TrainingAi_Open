@@ -14445,7 +14445,7 @@ TN-3b is the owner's.
   files every time. The number is the point: it converts "this is annoying" into "the drift rate is
   faster than a CI cycle", which is a different problem with a different fix.
 
-## 2026-09-20 (sixth) — `docs/implementation-backlog.md` → 25006
+## 2026-09-20 (sixth) — `docs/implementation-backlog.md` → 25071 (after merging OR-120/OR-121)
 
 Not new entries — **TN-51 and TN-54 were unreachable and had to be re-filed**, plus the protocol
 clarification that stops the next filer repeating it. +20 lines.
@@ -14474,3 +14474,24 @@ produced this PR: an entry can be filed, merged and CI-green while being invisib
 to build it. The trap's full account is the journal entry, not the baton — the baton carries the
 two-line rule (`next-item.js` after filing; neither `Gate:` nor `Verify:` on startable native work)
 and links out, which is what keeps it from accreting further.
+## 2026-09-20 — `docs/implementation-backlog.md` → 25024 (OR-120, three decisions answered)
+
++40 for three answers, and the lines are mostly **reopening conditions** rather than the answers
+themselves. A deferral with no stated trigger becomes a question someone re-asks in a month; PS-46
+now says it reopens when the owner wants the app on an iPhone, and PS-45 when a *second* consumer
+appears rather than a repeat of the first request.
+
+The BF-77 note is the longest and is a correction to my own framing. It was put to the owner as
+three sizes with a recommendation; they answered in different terms — *"the most efficient way to
+share a food library"* — which means the mechanism was the question, not the scale. Recording that
+distinction is what stops the next session re-presenting A/B/C and calling it progress.
+
+### `docs/implementation-backlog.md` → 25049 (same PR, OR-121)
+
++25 for one entry recording a gate step that failed once and has passed on every run since. Filed
+under the repo's own rule that something which stopped is not something that was fixed.
+
+Most of its length is the part that is actually actionable: the run was backgrounded as
+`pnpm ci:local 2>&1 | tail -5`, so the log kept seven lines and the reason is gone. **A gate piped
+through `tail` has discarded exactly the output needed the one time it fails.** That sentence is
+why the entry is worth 25 lines rather than a shrug.

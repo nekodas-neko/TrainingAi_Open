@@ -3854,9 +3854,20 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
 
 ### [devices][platform] PS-45 — a per-user API key/token for external programmatic health-data ingestion
 
+- **⏸ DEFERRED BY THE OWNER, 2026-09-20**, against a recommendation not to build it now.
+- **The reasoning that was put to them, kept because it is the reason to hold the line later:** this
+  is a credential living **outside the login session** that can write health data into a specific
+  account. New authentication surface is the one category where a mistake is not a bug but a breach,
+  and the reversal is asymmetric — a leaked key can be revoked, but what it wrote cannot be unwritten.
+- **The trigger to revisit: a SECOND real consumer**, not a repeat of the first request. One person
+  asking is served by the interim below; a second is evidence of a surface rather than a favour.
+- **The interim stands and costs nothing:** point anyone in that position at the existing Health
+  Connect path, which already carries data in without a new credential.
+
 - **Lane:** A — `app/api/sync-health/route.ts` plus new authentication — engine by both halves of the rule. (Assigned 2026-09-15, OR-116 lane sweep.)
 
-- **Gate:** owner — this is new authentication surface (a credential separate from the login
+- **Gate:** owner — **deferred 2026-09-20; reopens on a SECOND consumer, not a repeat of the
+  first request.** This is new authentication surface (a credential separate from the login
   session, capable of writing health data into a specific account), not a routine feature.
 - **Added:** 2026-09-14 (one-off session; a friend the owner is onboarding asked for a real API
   contract to connect his own device, and hit the actual gap: `/api/sync-health` is real and
@@ -3887,9 +3898,20 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
 
 ### [devices] PS-46 — build the Apple HealthKit connector (iOS)
 
+- **⏸ DEFERRED BY THE OWNER, 2026-09-20**, against a recommendation not to build it now — so the
+  answer and the advice agree and this is settled rather than merely unanswered.
+- **What was put to them:** the enrolment is **$99/year recurring**, and it is the small half — there
+  is no `ios/` directory and no `@capacitor/ios`, so this is adopting a **second platform target**
+  for someone who uses one Android phone.
+- **The condition that would reopen it, stated so nobody re-asks without it:** the owner wanting to
+  run the app on an iPhone. At that point the enrolment is needed anyway and stops being spent on
+  nothing. **Do not put this to them again before that.** The plan stays valid; only its premise is
+  waiting.
+
 - **Lane:** A — `lib/health-connect-sync.ts` and a new native connector. (Assigned 2026-09-15, OR-116 lane sweep.)
 
-- **Gate:** owner — this needs an Apple Developer Program enrollment ($99/year, a real recurring
+- **Gate:** owner — **deferred 2026-09-20 with a named reopening condition (above), so do not
+  re-ask; this parks until that condition holds.** It needs an Apple Developer Program enrollment ($99/year, a real recurring
   cost) and a new platform target (no `ios/` directory, no `@capacitor/ios` exists in this repo
   today), not just an implementer's time.
 - **Added:** 2026-09-14 (one-off session; the owner's friend testing device-source portability is on
@@ -10788,6 +10810,24 @@ the match. `Gate: owner` when it is next picked up.
 
 ### [nutrition][platform] BF-77 — sharing meals with a partner: copies work today, a shared library is a different product
 
+- **⏸ THE OWNER DID NOT PICK A SIZE — they asked for a design session, 2026-09-20.** Verbatim:
+  *"This requires more thought - will need a session to look into this one to see the most effecient
+  way to share a food library."*
+- **⚠ Read that as a correction to how it was asked, not just a deferral.** It was put to them as
+  three sizes (A copies · B a share code · C a group library) with a recommendation of A. They did
+  not answer in those terms — they asked for **the most efficient way to share a food library**,
+  which is a different question: the A/B/C framing assumed the mechanism was the choice, and what
+  they want examined is the mechanism itself.
+- **So this becomes a PLANNING item, per the backlog-driven rule — PR 1 is docs-only.** A session
+  reads the existing label/share machinery, the saved-meal data shape and what "library" would have
+  to mean, then writes a plan to `docs/superpowers/plans/` and files the implementation entry. **It
+  does not implement**, and it should not re-present A/B/C unless the investigation independently
+  lands there.
+- **What that session must not skip:** the scannable label already exists and its sheet already has
+  a system share button handing over a PNG — so *some* sharing works today. The plan has to say what
+  is actually inadequate about it before proposing anything larger, or it will re-derive option A
+  and call it new.
+
 - **✅ OWNER ANSWERED 2026-09-13: yes to a shared library.** Verbatim: *"yes a share 'library' option
   would be a good option too"* — "too", i.e. **alongside** the copy-a-meal sharing that already
   works, not replacing it. BF-57's two-phone test passed in the same sitting, so the copy path is
@@ -16304,6 +16344,31 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **What is owed:** start a full re-sync, leave the screen, confirm the notification arrives and
   its batch count matches the `drain complete` log line. Incremental drains deliberately do not
   notify — hourly is too often to be worth a notification, and nobody is waiting on one.
+
+### [platform] OR-121 — a Custom Rules step failed once, passed on every re-run, and the evidence was thrown away
+
+- **Lane:** O — the local gate and how it is invoked, not product code.
+- **Added:** 2026-09-20, Orchestrator, during OR-120.
+- **⚠ Filed as UNEXPLAINED, not as a flake.** `CLAUDE.md`'s own standing rule for faults that stop
+  on their own — *"something that stopped is not something that was fixed"* — is why this exists
+  rather than being waved through.
+- **What happened.** A backgrounded `pnpm ci:local` on a **docs-only** tree reported
+  `1 failed: Cache today-guards take the user's timezone` (`scripts/check-tz-aware-cache-guards.js`,
+  step 44 of 75). On the **identical tree**, that script run alone prints
+  *"OK — 9 call sites, all timezone-aware"*, a full `pnpm check:rules` reads **75 of 75**, and a
+  clean unpiped `pnpm ci:local` exits **0** with the step reading `ok 44/75`. Nothing between the
+  runs changed a source file — the branch's whole diff is markdown.
+- **Why it cannot be diagnosed now, which is the part worth fixing.** The failing run was invoked as
+  `pnpm ci:local 2>&1 | tail -5` in the background, so the log kept **seven lines** — the step name
+  and no reason. **A gate run that is piped through `tail` has discarded exactly the output you need
+  the one time it fails.** Background it whole and read the tail afterwards; never pipe it.
+- **Two candidate causes, neither confirmed, both cheap to test if it recurs:** the check races
+  something else touching the working tree (the session-start local-db hook and `pnpm install` both
+  run around the same time), or it has an ordering dependence on an earlier step in the same run.
+  The script reads source files, so a partially-written file is the shape to look for.
+- **The next occurrence settles it** — which is why this entry exists rather than a shrug. If it
+  fires again, keep the whole log and compare the named call-site count against the 9 a clean run
+  reports.
 
 ### [app-shell][platform] OR-115 — the admin surface has accumulated buttons nobody uses
 
