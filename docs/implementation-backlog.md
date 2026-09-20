@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **278** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **280** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v39** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -505,6 +505,21 @@ below threshold and left in place for next time.
   strap on last night. Can you check it recorded what we needed"* — **it did not, and neither of us
   could tell why.**
 - **Lane: A** — `android/.../polar/PolarStrapService.kt` plus an ingest/read path for status. **APK.**
+- **✅ THE RECORDING HALF SHIPPED 2026-09-20** — migration 278 (`strap_status`),
+  `POST`/`GET /api/strap-status`, and `PolarStrapService` posting its own `status()` at every
+  transition it already emits to the event sink. A give-up now leaves a row saying so.
+- **Keep — three things, and none of them is the table.**
+  1. **The SURFACE (Lane B).** The Devices screen still shows *"Connected"* with no battery figure
+     and no last-sample time — the surface that actively reassured the owner on 2026-09-19. Per
+     finding 1 below it must show **`last_sample_at` and connection reliability**, NOT a
+     percentage. `GET /api/strap-status` returns both; nothing renders them yet.
+  2. **The RESTART (Lane A, APK).** The service still stops itself after six failures and nothing
+     brings it back until the app is launched. Recording that is not fixing it — it only means the
+     next five-day gap is visible the next morning instead of never.
+  3. **The DEVICE CHECK on what shipped.** Wear the strap one night and confirm from the stored
+     status, not from sample presence. Until then the native half is **compile-reviewed only**:
+     there is no Android SDK in the sandbox and Gradle is proxy-blocked, so no line of the Kotlin
+     has been executed.
 - **No `Gate:` and no `Verify:` — this is startable today, and both structured fields would be
   wrong.** The Kotlin can be written and compile-gated in the sandbox; the S25 and the strap are
   needed only to confirm the fix works. `Gate: device` would park it as unstartable (the BF-45 /

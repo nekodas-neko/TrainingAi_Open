@@ -49,6 +49,44 @@ system against a steady-state expectation — with something that can only fail 
 
 ---
 
+## 2026-09-20 — CLAUDE.md → 816 (+38, the claude_ro twin rule and a claim that was wrong)
+
+Thirty-eight lines is a lot for one rule, and it buys the retraction rather than the rule.
+
+TN-54's migration added a table and CI went red on two tests that a 956-file local suite had
+reported green, because both had SKIPPED inside it. Migration 277's header — and the Lane A
+routine — say those two *"skip locally even with a DATABASE_URL, because local dev creates no
+`claude_readonly` role"*, i.e. that CI is structurally the only place they can fire. **It is not
+true.** The test provisions the role itself; what it needs is a TCP `DATABASE_URL`, because it
+reconnects as `claude_readonly` by rewriting the URL's credentials and the socket form
+`setup.sh` writes silently reconnects as the superuser. The test file's own header says so.
+
+Measured with the twin applied: 2 files, 27 tests, all passed, none skipped. So the rule is not
+"remember to regenerate the views and hope CI catches you" — it is a command you can run in three
+seconds before pushing, and the belief that no such command existed is what made a red run feel
+unavoidable. That belief is worth 38 lines to kill.
+
+---
+
+## 2026-09-20 — backlog → 25086 (TN-54's recording half shipped, +15)
+
+TN-54 stays queued, so this is a raise rather than the usual removal. The entry arrived at 20:23 as
+🔴 LIVE — the owner's chest strap had been dark five days and nothing server-side recorded why — and
+the recording half shipped the same evening: migration 278, `/api/strap-status`, and the service
+posting the `status()` it had always kept in memory.
+
+The +15 is a `Keep:` naming three things, and the reason it is worth the lines is that **two of them
+could be mistaken for done.** The table records a give-up; it does not restart the service, which
+still stops itself after six failures and waits for an app launch. And nothing renders any of it —
+the Devices screen still shows *"Connected"* with no last-sample time, which is the surface that
+actively reassured the owner the morning he asked. An entry that logged only "shipped" would leave
+the next reader believing the strap problem was solved.
+
+The third is the honest one: no line of the Kotlin has been executed. No Android SDK, Gradle
+proxy-blocked, no Kotlin step in CI.
+
+---
+
 ## 2026-09-20 — backlog → 24914 (LA-74 shipped, −24)
 
 The program write path is typed and `.strict()` at last, so the entry leaves the queue. It had sat
@@ -14513,8 +14551,11 @@ is worthless while the next re-tick overwrites it) and the note that the batch i
 
 ## 2026-09-20 — TN-53's render half: +27 backlog, +17 projectOverview
 
-`docs/implementation-backlog.md` **25077 → 25104** · `projectOverview.md` **11966 → 11983**
+`docs/implementation-backlog.md` **+27** · `projectOverview.md` **11966 → 11983**
 (`feat/tn53-sparkline-gaps`).
+
+The backlog baseline lands at **25119**, not 25104: #1354 merged between this branch's push and its
+PR, adding 15 lines with no note of its own. The delta above is this PR's; the arrival figure is not.
 
 The backlog lines replace a two-bullet `Keep:` that asked a question, with the answer. The question
 listed three things the sparkline might do with a run of nulls and **it was none of them** — it drew
