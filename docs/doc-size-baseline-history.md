@@ -18,6 +18,20 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-20 — backlog → 24966 (LA-123 shipped the day it was filed, −41)
+
+A **ratchet down**, not a raise. LA-123 was filed that morning with a proposed patch and built the
+same afternoon, so its 42 lines left the queue intact rather than being trimmed — the entry's whole
+content was the diagnosis and the patch, and both now live in the journal and in the code's own
+comments, which is where the next reader of that hook will be standing.
+
+Worth one line because the shape is unusual here: an entry that is filed and cleared inside a day
+normally means it should not have been filed at all. This one earned the round trip — it was found
+while gating a different change, and writing it down with its proposed patch is what made it
+cheap enough to take immediately afterwards instead of losing it.
+
+---
+
 ## 2026-09-20 — backlog → 25007, projectOverview → 11966 (LA-63 re-measured; RV-38 amended; LA-123 filed)
 
 **+23 on the backlog and +11 on the overview, and almost all of it is a claim being struck rather
