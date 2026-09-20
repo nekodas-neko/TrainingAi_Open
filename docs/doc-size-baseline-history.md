@@ -49,6 +49,25 @@ system against a steady-state expectation — with something that can only fail 
 
 ---
 
+## 2026-09-20 — backlog → 25086 (TN-54's recording half shipped, +15)
+
+TN-54 stays queued, so this is a raise rather than the usual removal. The entry arrived at 20:23 as
+🔴 LIVE — the owner's chest strap had been dark five days and nothing server-side recorded why — and
+the recording half shipped the same evening: migration 278, `/api/strap-status`, and the service
+posting the `status()` it had always kept in memory.
+
+The +15 is a `Keep:` naming three things, and the reason it is worth the lines is that **two of them
+could be mistaken for done.** The table records a give-up; it does not restart the service, which
+still stops itself after six failures and waits for an app launch. And nothing renders any of it —
+the Devices screen still shows *"Connected"* with no last-sample time, which is the surface that
+actively reassured the owner the morning he asked. An entry that logged only "shipped" would leave
+the next reader believing the strap problem was solved.
+
+The third is the honest one: no line of the Kotlin has been executed. No Android SDK, Gradle
+proxy-blocked, no Kotlin step in CI.
+
+---
+
 ## 2026-09-20 — backlog → 24914 (LA-74 shipped, −24)
 
 The program write path is typed and `.strict()` at last, so the entry leaves the queue. It had sat

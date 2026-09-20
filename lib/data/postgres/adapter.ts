@@ -61,7 +61,7 @@ import {
 import { sleepImplausibleReason } from '@trainingai/shared/validation/plausibility'
 import { ActivityLogBody, deriveEndTime } from '@trainingai/shared/validation/activity-log'
 import { describeZodFailure } from './push-error-detail'
-import type { WorkoutRepository, UserGoals, EnsuredWorkoutSession, SessionLoad, YearReviewTotals, YearReviewTopExercise, UnitFixResult, SyncDelta, IncomingMutation, PushResult, OuraRawSampleInput, OuraRawSampleSummary, OuraRawSampleLatest, OuraRawSampleRow, FitnessTest, RunningPlan, PrescribedRun, PrescribedRunUpdate, AiCallLogInput, AiCallUsageSummary, ScaleRawSampleInput, ScalePendingSample, LastRealOneRm, BloodPanel, BloodPanelInput, BloodAnalyte } from '../repository'
+import type { WorkoutRepository, UserGoals, EnsuredWorkoutSession, SessionLoad, YearReviewTotals, YearReviewTopExercise, UnitFixResult, SyncDelta, IncomingMutation, PushResult, OuraRawSampleInput, OuraRawSampleSummary, OuraRawSampleLatest, OuraRawSampleRow, FitnessTest, RunningPlan, PrescribedRun, PrescribedRunUpdate, AiCallLogInput, AiCallUsageSummary, ScaleRawSampleInput, ScalePendingSample, LastRealOneRm, BloodPanel, BloodPanelInput, BloodAnalyte, StrapStatusWrite, StrapStatusRow } from '../repository'
 import { FitnessTestBody } from '@trainingai/shared/validation/fitness-test'
 import { PrescribedRunPatchBody } from '@trainingai/shared/validation/prescribed-run'
 import type {
@@ -331,6 +331,24 @@ const BATTERY_POLL_PRUNE_THROTTLE_MS = 24 * 60 * 60 * 1000
 // throttled + fire-and-forget like its siblings.
 let lastAccelChunkPrune = 0
 const ACCEL_CHUNK_PRUNE_THROTTLE_MS = 24 * 60 * 60 * 1000
+
+/** TN-54. One mapper for both strap-status read paths — same reason as `rowToAnalyte` below: a
+ *  field missed in a row→object map fails silently, and here it would fail as "the strap looks
+ *  fine", which is the exact reading this table exists to make impossible. */
+function rowToStrapStatus(r: {
+  id: number; recordedAt: Date; state: string; batteryPercent: number | null
+  lastSampleAt: Date | null; consecutiveFailures: number; worn: boolean | null
+}): StrapStatusRow {
+  return {
+    id: r.id,
+    recordedAt: r.recordedAt,
+    state: r.state,
+    batteryPercent: r.batteryPercent,
+    lastSampleAt: r.lastSampleAt,
+    consecutiveFailures: r.consecutiveFailures,
+    worn: r.worn,
+  }
+}
 
 /**
  * BF-1. One mapper for both read paths, per the standing rule that a missed field in a row→object
@@ -5895,6 +5913,36 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       lastBatteryPollPrune = now
       this.db.execute(sql`DELETE FROM oura_ble_battery_poll WHERE measured_at < now() - interval '90 days'`).catch(err => console.error('[prune] oura_ble_battery_poll failed:', err))
     }
+  }
+
+  // TN-54. Deliberately unpruned for now: the whole table is a handful of rows per day and its
+  // entire value is being able to look back over a window the owner did not know they would need.
+  // If it ever grows, prune it like its ring sibling rather than by shortening what it records.
+  async insertStrapStatus(userId: string, status: StrapStatusWrite): Promise<void> {
+    await this.db.insert(s.strapStatus).values({
+      userId,
+      state: status.state,
+      batteryPercent: status.batteryPercent,
+      lastSampleAt: status.lastSampleAt,
+      consecutiveFailures: status.consecutiveFailures,
+      worn: status.worn,
+    })
+  }
+
+  async getLatestStrapStatus(userId: string): Promise<StrapStatusRow | null> {
+    const [r] = await this.db.select().from(s.strapStatus)
+      .where(eq(s.strapStatus.userId, userId))
+      .orderBy(desc(s.strapStatus.recordedAt))
+      .limit(1)
+    return r ? rowToStrapStatus(r) : null
+  }
+
+  async listStrapStatus(userId: string, since: Date, limit: number): Promise<StrapStatusRow[]> {
+    const rows = await this.db.select().from(s.strapStatus)
+      .where(and(eq(s.strapStatus.userId, userId), gte(s.strapStatus.recordedAt, since)))
+      .orderBy(desc(s.strapStatus.recordedAt))
+      .limit(limit)
+    return rows.map(rowToStrapStatus)
   }
 
   async getOuraBatteryPolls(userId: string, from: Date, to: Date): Promise<Array<{ tsMs: number; percent: number; charging: boolean | null }>> {

@@ -18,6 +18,7 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 /** Holds the all-day chest-strap connection so the strap streams HR even with the
  *  screen off / app backgrounded (the WebView-based JS path is suspended in the
@@ -57,6 +58,15 @@ class PolarStrapService : Service(), PolarGattClient.Listener {
          *  of retrying at the 120s ceiling indefinitely. JS restarts it on the next app open.
          *  Matches BACKOFF_MS.size (kept a literal — array size isn't a compile-time constant). */
         private const val MAX_CONSECUTIVE_FAILURES = 6
+
+        /** TN-54. A healthy connection changes nothing for hours, so change alone would leave a
+         *  gap indistinguishable from the service being dead. This floor makes "still connected"
+         *  an observation rather than an absence of one. */
+        private const val STATUS_HEARTBEAT_MS = 15 * 60 * 1000L
+
+        /** onDestroy has a bounded window before the process can go; the give-up status and the
+         *  final flush have to fit inside it. */
+        private const val SHUTDOWN_DRAIN_SEC = 3L
     }
 
     private val main = Handler(Looper.getMainLooper())
@@ -72,6 +82,11 @@ class PolarStrapService : Service(), PolarGattClient.Listener {
     // mount. `battery` is written once per connection and never cleared, so without this the chip's
     // staleness affordance can never fire and a months-old reading is pixel-identical to a live one.
     private var batteryAt: Long? = null
+    // TN-54. The strap's own last good sample. This is the one figure in the posted status that
+    // is NOT server-stamped, because it is what answers "did last night actually record".
+    private var lastSampleAt: Long? = null
+    private var lastPostedKey: String? = null
+    private var lastStatusPostAt = 0L
     private var lowBatteryFired = false
 
     // Worn-gating (contact bit): drop posts while off the chest so the ring covers.
@@ -133,7 +148,17 @@ class PolarStrapService : Service(), PolarGattClient.Listener {
         emitStatus()
         main.removeCallbacksAndMessages(null)
         flush() // best-effort final flush
-        ingest.shutdownNow()
+        // TN-54. `shutdownNow()` alone cancels tasks that have not started, and the two queued
+        // immediately above — the give-up status and the final flush — are exactly the ones worth
+        // keeping. The give-up row is the whole point of the status table: it is the difference
+        // between "the strap was unreachable and the service stopped" and five days of silence.
+        // Bounded, so a wedged POST cannot hold the service open.
+        ingest.shutdown()
+        try {
+            if (!ingest.awaitTermination(SHUTDOWN_DRAIN_SEC, TimeUnit.SECONDS)) ingest.shutdownNow()
+        } catch (_: InterruptedException) {
+            ingest.shutdownNow()
+        }
         client?.close(); client = null
         instance = null
         super.onDestroy()
@@ -213,6 +238,10 @@ class PolarStrapService : Service(), PolarGattClient.Listener {
 
     override fun onSample(sample: PolarProtocol.HrSample) = runOnMain {
         val now = System.currentTimeMillis()
+        // Every sample, not just the ones that survive the worn gate: the question this answers is
+        // whether the strap was TALKING, and an unworn-but-connected strap is a different fault
+        // from an unreachable one.
+        lastSampleAt = now
         updateWorn(sample.contact, now)
         // Live beat to JS for the in-app readout — never thinned, emitted even if the
         // POST path is worn-gated off.
@@ -404,5 +433,73 @@ class PolarStrapService : Service(), PolarGattClient.Listener {
         .put("accFramesSeen", accFramesSeen)
         .put("accSampleRate", PolarProtocol.ACC_SAMPLE_RATE_HZ)
 
-    private fun emitStatus() { eventSink?.invoke("polarStatus", status()) }
+    private fun emitStatus() {
+        eventSink?.invoke("polarStatus", status())
+        postStatusIfChanged()
+    }
+
+    /**
+     * TN-54. Persist what `status()` has always known.
+     *
+     * Hooked to `emitStatus()` rather than to individual call sites because every transition worth
+     * recording already calls it — connect, ready, failure, battery, give-up and the final
+     * `onDestroy` — and a new transition that forgets to post is the failure mode this exists to
+     * remove. It is NOT on the sample path, so this cannot become per-beat traffic.
+     *
+     * Posts on a change of the fields that explain reachability, plus a slow heartbeat so hours of
+     * healthy connection read as evidence rather than as silence.
+     */
+    private fun postStatusIfChanged() {
+        val base = ingestUrl ?: return
+        val key = "$state|$consecutiveFailures|$battery|$worn"
+        val now = System.currentTimeMillis()
+        if (key == lastPostedKey && now - lastStatusPostAt < STATUS_HEARTBEAT_MS) return
+        lastPostedKey = key
+        lastStatusPostAt = now
+        val body = JSONObject()
+            .put("state", state)
+            .put("batteryPercent", battery ?: JSONObject.NULL)
+            .put("lastSampleAt", lastSampleAt ?: JSONObject.NULL)
+            .put("consecutiveFailures", consecutiveFailures)
+            .put("worn", worn)
+            .toString().toByteArray(Charsets.UTF_8)
+        try {
+            ingest.execute { postStatus(base, body) }
+        } catch (_: java.util.concurrent.RejectedExecutionException) {
+            // Shutting down and the drain window has closed. Nothing to recover — dropping a
+            // status must never be able to take the service down with it.
+        }
+    }
+
+    private fun postStatus(base: String, body: ByteArray) {
+        try {
+            val cookie = CookieManager.getInstance().getCookie(base)
+            if (cookie == null) {
+                // Worth a line: no cookie means the SAMPLE path is silently returning too
+                // (`postSamples` does the same), which looks identical to a dead strap.
+                log("status not posted — no session cookie for $base")
+                return
+            }
+            val conn = URL("$base/api/strap-status").openConnection() as HttpURLConnection
+            try {
+                conn.requestMethod = "POST"
+                conn.connectTimeout = 15_000
+                conn.readTimeout = 30_000
+                conn.doOutput = true
+                conn.setRequestProperty("Content-Type", "application/json")
+                conn.setRequestProperty("Cookie", cookie)
+                conn.outputStream.use { it.write(body) }
+                val code = conn.responseCode
+                // No re-buffering, unlike samples: a status is a point-in-time observation and a
+                // stale one re-sent later would be a lie about when it was true.
+                if (code < 200 || code >= 300) log("status HTTP $code")
+            } finally {
+                conn.disconnect()
+            }
+        } catch (_: InterruptedException) {
+            // shutting down
+        } catch (e: Exception) {
+            log("status post failed: ${e.message}")
+        }
+    }
 }

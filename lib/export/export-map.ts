@@ -185,6 +185,10 @@ export const EXCLUDED: Record<string, Exclusion> = {
   oura_rollup_state: { category: 'ops', reason: 'rollup cursor' },
   rate_limits: { category: 'ops', reason: 'request-timing keys that embed other users\' ids' },
   schema_migrations: { category: 'ops', reason: 'migration ledger' },
+  // TN-54. Device-connection bookkeeping, the same category as its ring sibling
+  // `oura_ble_battery_poll`: it records whether the strap was reachable, not anything the lifter
+  // did. The HR it explains is exported through `oura_heartrate` and `rr_intervals`.
+  strap_status: { category: 'ops', reason: 'chest-strap connection bookkeeping' },
 
   // ── Raw device frames. Machine input to the rollup, not user-meaningful content, and by far the
   //    largest tables (oura_raw_samples alone is 58 MB, and its rows are hex blobs). Everything
