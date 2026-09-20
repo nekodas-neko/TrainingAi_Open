@@ -18,7 +18,7 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
-## 2026-09-20 — backlog → 24734 (rule 2's yield, and naming the real bottleneck)
+## 2026-09-20 — backlog → 24782 (rule 2's yield, and naming the real bottleneck)
 
 **+16.** Two negative results worth writing down. Rule 2 re-screened the August sweep's 27
 decision thresholds by window-width-vs-noise rather than coverage — the sweep's own stated blind spot
@@ -46,6 +46,21 @@ one production call site and it is the dead arm. The entry records that temperat
 readiness (`computeReadinessComposite` takes `tempZ`), because that is the claim which would have
 made this urgent and it is false — and then refuses to decide whether the ladder should be ported,
 since that is calibration and belongs to the owner.
+## 2026-09-20 — backlog → 24749 (LA-122, the owner-question ledger)
+
+**+48 for five questions that were living only in a chat transcript.** The owner asked for them
+either stated in-session or filed for the Orchestrator; a transcript ends with the session and the
+queue does not, so they are filed.
+
+**Written as ONE `Reference:` entry rather than five entries**, because they share a single blocker —
+owner attention — and five separate items would put four more unstartable things at the head of a
+queue whose READY list is already mostly things nobody can begin. `Reference:` keeps it out of the
+work list entirely; each item names the entry it unblocks so striking it is mechanical.
+
+The line worth keeping longest is item 5's aside: **`enable_pr_auto_merge` is unavailable on this
+repo** ("Protected branch rules not configured for this branch"). CLAUDE.md's CI/CD section offers
+auto-merge as a standard option, and it is not one here — better recorded once than rediscovered by
+whoever next tries to escape the rebase treadmill.
 
 ---
 
