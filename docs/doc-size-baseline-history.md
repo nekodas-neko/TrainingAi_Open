@@ -18,6 +18,25 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-20 — backlog → 24593, `projectOverview.md` → 11951 (BF-178 shipped, LA-121 filed)
+
+**Backlog −24, which is −45 for BF-178 and +21 for one new entry.** The removal is the whole of
+BF-178; the addition is LA-121, filed for the one remaining *Oura* reference the sweep found that is
+genuinely about Cloud data — `readiness-payload.ts`'s availability branch, which still keys off the
+frozen `oura_daily.readiness_score`.
+
+**LA-121 is deliberately written as an observation with nothing measured**, and says so twice. The
+temptation after renaming three labels is to treat the fourth site as the same defect; it is not,
+its comment is correct about what it describes, and the fallback it drops to may well be right. Its
+first step is a query, not a patch. Filing it unmeasured is still better than not filing it — the
+alternative is the next reader re-deriving whether it was missed or deliberate.
+
+`projectOverview.md` +12 for the BF-178 paragraph, which carries the prompt-line point rather than
+the rename. The rename is a one-line change anyone can read off the diff; that the same wording
+reached the model and came back as prose is the part that cannot be read off it.
+
+---
+
 ## 2026-09-20 — backlog → 24610 (TN-51, caught before the night was spent)
 
 **+62.** The owner said he would sleep in the strap tonight; checking the capture path

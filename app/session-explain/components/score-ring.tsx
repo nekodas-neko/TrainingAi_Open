@@ -5,7 +5,7 @@ import { scoreBand, type ScoreBand } from '@trainingai/shared/health/score-band'
  *
  * `overallScore` is `recovery·w + balance·w + freshness·w` — **how well this session fits today**,
  * not a measurement of the lifter. It used to run through `scoreBand` and print **HIGH** in green,
- * directly above signals reading *Oura readiness 37 · Low* and *strong deload advised*. One screen,
+ * directly above signals reading *Readiness 37 · Low* and *strong deload advised*. One screen,
  * one word, two different quantities.
  *
  * **Mapped from `scoreBand`'s label rather than re-derived from the score.** CLAUDE.md bans

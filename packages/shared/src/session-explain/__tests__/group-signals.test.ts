@@ -44,7 +44,7 @@ describe('groupSignals', () => {
       ...base,
       signals: { ...base.signals, ouraReadiness: null, sleepTrend: null, hrvTrend: null, energyLevel: null, soreMuscles: [] },
     }).flatMap(g => g.rows)
-    expect(rows.find(r => r.label === 'Oura readiness')!.value).toBe('No data')
+    expect(rows.find(r => r.label === 'Readiness')!.value).toBe('No data')
     expect(rows.find(r => r.label === 'Sleep')!.value).toBe('No data')
     expect(rows.find(r => r.label === 'Energy')!.value).toBe('Not logged today')
     expect(rows.find(r => r.label === 'Sore muscles')!.value).toBe('None')

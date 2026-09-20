@@ -8,6 +8,7 @@ export interface WeightedComponents {
 
 export interface ExplainSignals {
   muscleRecovery: Array<{ muscle: string; pct: number; hoursAgo: number }>
+  /** The app's own ble-derived composite — see the note in `types/program.ts` (BF-178). */
   ouraReadiness: number | null
   sleepTrend: number | null
   hrvTrend: number | null
