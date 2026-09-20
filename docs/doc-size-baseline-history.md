@@ -18,6 +18,17 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-20 — backlog → 24984 (TN-54, the strap is dark and nothing says so)
+
+**+12.** The owner wore the strap overnight and asked whether it recorded. It did not, and the
+useful finding is that neither of us could tell why: the last chest-strap sample in either table is
+2026-09-16, there are no faults logged, and the strap's battery lives in a memory-only field while the
+ring's has 11,758 persisted polls. The ring wrote 104 core-sleep samples the same night, so the ingest
+path is fine and the fault is strap-specific. PS-44 needs seven paired nights and cannot count them
+blind, so the entry asks for the status row the ring already has rather than diagnosing the device.
+
+---
+
 ## 2026-09-20 — backlog → 24856 (BF-55 answered, −58), CLAUDE.md → 778 (+3)
 
 The −58 and the +3 are the same finding moving from the queue into the file every session reads
