@@ -3736,6 +3736,17 @@ already false in both cases that deserve the badge. Proven by an e2e that runs a
 account and asserts the **payload beside the rendered text** — a rendered 50 alone cannot tell a bug
 from a fixture — and that fails on the unfixed card.
 
+**⚑ Amended 2026-09-20 (LA-63): the treatment was NOT fully fixed in v1.456.17, and the line above
+saying the payload answers `sufficient: false` is true for twenty-three hours a day.**
+`batteryConfidence`'s "no verdict in the first hour awake" clause — which landed 2026-08-26, three
+weeks BEFORE the card fix — returned `sufficient: true` on `sampleCount: 0`, so for the first hour
+after waking the badge was still withheld and the screen still read an unqualified **Good / Steady /
+50**. The card was never at fault. Fixed in v1.460.2 by excluding `sampleCount === 0` from the grace
+window; the sparse-rate case it exists for is untouched. **The lesson is the one worth keeping: an
+hour-scoped defect passes a careful verification and a careful review, because neither knows to ask
+what time it was** — and the e2e guarding RV-38 was consequently red between 00:00 and 01:00 Brisbane
+and green the rest of the day.
+
 **⚑ The number itself is with Tuning**, handed over by the owner on 2026-09-14 (*"This requires
 tuning still"*). A Body Battery re-fit silently re-scores months of history, so it goes through a
 proposal stating how many other days it moves. Nothing in this fix touches it.

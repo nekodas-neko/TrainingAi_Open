@@ -96,6 +96,38 @@ describe('batteryConfidence', () => {
   it('does not divide by zero before waking', () => {
     const c = batteryConfidence(0, 0)
     expect(c.samplesPerHour).toBe(0)
-    expect(c.sufficient).toBe(true)
+    // This expectation was `true` until LA-63 and was changed deliberately, once. The case it
+    // names is division, and that half is unchanged; the `sufficient` line was incidental to it
+    // and was the only assertion anywhere holding the zero-sample grace window in place.
+    expect(c.sufficient).toBe(false)
+  })
+
+  // LA-63. The grace window is for an unreadable RATE, and zero readings is not one — it is the
+  // same nothing after sixteen hours as after twenty minutes. Gating it on elapsed time re-opened
+  // RV-38 (`Good / Steady / 50` with no `Limited data` badge on an account that has never worn
+  // anything) for the first hour of every day, and made the E2E spec guarding RV-38 fail between
+  // 00:00 and 01:00 Brisbane and pass the rest of the day — the Q-356 clock-dependence shape.
+  describe('zero samples is never sufficient, however early in the day it is', () => {
+    it('refuses the verdict inside the grace window, where it used to grant one', () => {
+      expect(batteryConfidence(0, 20).sufficient).toBe(false)
+      expect(batteryConfidence(0, MIN_WAKING_MINUTES_TO_JUDGE - 1).sufficient).toBe(false)
+    })
+
+    it('is the same answer on both sides of the boundary, which is the point', () => {
+      // The defect was an answer that CHANGED at 60 minutes on unchanged data. Reading the
+      // boundary from the constant keeps this true if the window ever moves.
+      const inside = batteryConfidence(0, MIN_WAKING_MINUTES_TO_JUDGE - 1).sufficient
+      const outside = batteryConfidence(0, MIN_WAKING_MINUTES_TO_JUDGE).sufficient
+      expect(inside).toBe(outside)
+      expect(inside).toBe(false)
+    })
+
+    it('still grants grace to a sparse rate, which is what the window is for', () => {
+      // One reading 20 minutes in is 3/hour — under the threshold, and far too early to hold
+      // against it. Narrowing the exclusion to exactly zero is what keeps this case intact.
+      const c = batteryConfidence(1, 20)
+      expect(c.samplesPerHour).toBeLessThan(MIN_SAMPLES_PER_WAKING_HOUR)
+      expect(c.sufficient).toBe(true)
+    })
   })
 })

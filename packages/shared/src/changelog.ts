@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.460.2",
+    date: "2026-09-20",
+    changes: [
+      "Body Battery now says \u201cLimited data\u201d straight away on a day it has no heart-rate readings at all, instead of waiting an hour first. The card holds off judging how well it is measuring you for the first hour after you wake \u2014 a reading rate worked out over twenty minutes means nothing \u2014 but that grace was being extended to days with no readings whatsoever, which no amount of waiting improves. So for the first hour of such a day the card showed a confident \u201cGood / Steady / 50\u201d with nothing marking it as unmeasured. A genuinely sparse morning is still given its hour.",
+    ],
+  },
+  {
     version: "1.460.1",
     date: "2026-09-20",
     changes: [

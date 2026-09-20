@@ -18,6 +18,34 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-20 — backlog → 25007, projectOverview → 11966 (LA-63 re-measured; RV-38 amended; LA-123 filed)
+
+**+23 on the backlog and +11 on the overview, and almost all of it is a claim being struck rather
+than work being described.**
+
+LA-63 said *"nine real failures nobody had seen"*. Measured against `main` at `562ec1f2934`, on a
+database built the way CI builds one: **1 failed, 1 flaky, 1 skipped, 220 passed**. Eight had been
+fixed by other work over two weeks and nobody re-ran the count — four of the nine specs had been
+edited since the entry was written. All three of that entry's original claims have now been struck
+by measurement, which is the third time this week an entry has been true in its measurement and
+wrong in its conclusion, so it gets written down rather than re-derived.
+
+The remaining +50 on the backlog is **LA-123 plus two lines on LA-77**, both found while gating the
+fix rather than by looking for them: a test file whose `afterAll` asserts a cluster-wide advisory-lock
+count that fifteen sibling files legitimately violate, and `playwright-report/` being gitignored but
+not eslint-ignored, which turns any local `pnpm e2e` into 256 phantom lint errors on the next
+`pnpm lint`. Neither was fixed here — both carry a proposed patch, which is what makes the lines
+worth their length.
+
+The +11 on `projectOverview.md` is an **amendment to RV-38's row**, and it is the part worth the
+lines: the row says the payload answers `sufficient: false` for the zero-data account, and that is
+true for twenty-three hours a day. The grace clause responsible landed three weeks **before**
+RV-38's fix, so RV-38 was incomplete from the day it shipped rather than regressed afterwards — it
+was verified at a time of day where the remaining hole was invisible. A `✅` in place of that
+paragraph would have left the next reader trusting a measured, dated, and time-scoped-wrong claim.
+
+---
+
 ## 2026-09-20 — backlog → 24934 (TN-53 engine shipped, −16)
 
 **A net −16 that is really −40 of proposal replaced by +24 of what is still owed.** TN-53's
