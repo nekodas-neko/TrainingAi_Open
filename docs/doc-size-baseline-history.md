@@ -18,6 +18,17 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-20 — backlog → 24610 (TN-51, caught before the night was spent)
+
+**+62.** The owner said he would sleep in the strap tonight; checking the capture path
+first showed the service runs overnight but in ambient mode, which keeps one sample per 30 s and
+discards the intervening beats — so the night cannot support the rMSSD comparison PS-44 exists to
+make. Filed with the measurement that matters (41% of gaps in genuine ambient wear are the 30 s thin,
+against 92% beat-to-beat across the whole history, which is workout-dominated and misleading here)
+and with what the night IS still worth: the resting-HR half needs no beat-to-beat data.
+
+---
+
 ## 2026-09-20 — backlog → 24550, `docs/agents/state/tuning.md` → 714 (TN-52, and a correction to the owner's own numbers)
 
 **+111 on a 24042 base.** The owner asked how to make the tuning work on and off the medication.
@@ -128,7 +139,7 @@ history files are dated) rather than with the sweep, because the sweep is a chor
 measurement is the thing a future reader would otherwise re-derive before daring to run it.
 ---
 
-## 2026-09-18 — backlog → 24582, `projectOverview.md` → 11939 (Q-1a server half)
+## 2026-09-18 — backlog → 24642, `projectOverview.md` → 11939 (Q-1a server half)
 
 **Backlog +32 and nothing removed**, which is the honest shape for a partial: Q-1a stays queued
 because most of its scope — the client — has not shipped, and the entry now carries what DID ship, the
