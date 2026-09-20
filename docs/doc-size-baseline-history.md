@@ -18,6 +18,23 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-20 — backlog → 24938 (LB-27 refuted and retired, −28)
+
+Another ratchet down. LB-27's `Keep:` rested on `pg`'s default `connectionTimeoutMillis: 0` waiting
+forever for a pool client. `client.ts` has set **5000** since the initial public snapshot, two weeks
+before the entry was filed — so the decision it asked for predated the question. PS-38 had already
+noticed that much on 2026-09-06 and it sat unactioned; what retires the entry rather than one line
+of it is that the symptom does not reproduce either, cold or warm, and that `statement_timeout` and
+`idle_in_transaction_session_timeout` at 15000 make a sixty-second database-layer hang impossible
+regardless of cause.
+
+Worth the note because of what the −28 costs: a real measurement from 2026-08-30 leaves the queue.
+The journal entry keeps it, including the parts that still stand (the `FOR UPDATE` read-modify-write
+is real and correct) and the ways the re-measurement is not byte-identical to the original. A
+refutation that discards the original observation is how the same thing gets re-found in a month.
+
+---
+
 ## 2026-09-20 — backlog → 24966 (LA-123 shipped the day it was filed, −41)
 
 A **ratchet down**, not a raise. LA-123 was filed that morning with a proposed patch and built the

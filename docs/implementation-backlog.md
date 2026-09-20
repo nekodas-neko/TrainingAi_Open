@@ -6892,7 +6892,12 @@ Fix the seven verified-stale CLAUDE.md items (wrap-up 3-vs-4, fetch-once counts,
 W1 bounce file, second Gemini model, in-place struck Known Issues, the 31/33 origin story); collapse
 the duplicated Q-479 FIXED rows (:2486/:2998 — the cross-file check cannot see same-file pairs);
 decide the 13 `Needs:` edges pointing at KEEP entries (the "absent = shipped" rule can never clear
-them — OR-100's split); strike LB-27's already-decided Keep (`connectionTimeoutMillis` is 5000);
+them — OR-100's split); ~~strike LB-27's already-decided Keep (`connectionTimeoutMillis` is
+5000)~~ **— done 2026-09-20, and it went further than a strike: the whole entry is retired. The
+premise was not merely already-decided, it was never true (`connectionTimeoutMillis: 5_000` has been
+in `client.ts` since the initial public snapshot, two weeks before LB-27 was filed), and the symptom
+does not reproduce on current `main` cold or warm. See
+[`2026-09-20-lane-a-lb27-refuted`](overview/entries/2026-09-20-lane-a-lb27-refuted.md);**
 repair the 22 dead backlog paths and 43 doubled `docs/overview/overview/` labels; index the 17
 unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge candidates
 (led by `oura-ring-data-reference.md`, a retired-API reference with no retirement note).
@@ -10000,39 +10005,6 @@ deliberate choice, on a session where the absence of a Primary is the design.
 - **Verification:** swap an exercise in a session with no Primary; the incoming exercise takes the
   outgoing one's role, the prescribed sets and percentages are unchanged, and the session still has
   no Primary afterwards.
-
-### [platform] LB-27 — one extra request during launch strands several for over a minute, and nothing explains why
-
-- **Lane:** A
-- **Added:** 2026-08-30 · Lane B, measured while fixing Q-392's own version of this.
-- **Reference:** the symptom is written up in
-  [`2026-08-30-preferences-read-sites`](overview/history-2026-09-10-folded-4.md#2026-08-30-preferences-read-sites);
-  Q-392's mirror-effect PATCH is already fixed, so this entry is the **unexplained** half only.
-
-**The measurement.** Health's launch fires ~25 API requests in the first seven seconds. Adding one
-more — a single `PATCH /api/user/preferences` from a card's mount effect — left that PATCH **and a
-`GET` behind it pending past sixty seconds**, with nothing else in flight and no further requests
-after twenty seconds. Instrumented on a cold dev server with Playwright's `requestfinished`, so
-these are genuinely unresolved connections, not slow ones. The same PATCH fired *after* the burst
-settles answers in **340 ms**, and a burst of five answers in **641 ms**. Removing that one request
-took the page from never reaching `networkidle` to reaching it in ~19 s.
-
-**Why it matters beyond a test.** Nine e2e specs failed on `waitUntil: 'networkidle'` and none of
-them mention preferences, so the next person to add a request to a launch path gets a failure that
-names someone else's screen. And if a request really can strand for a minute on the device, that is
-a launch-time hang, not a test artefact.
-
-**Where to look, in order.** `updateUserPreferences` (`lib/data/postgres/adapter.ts`) is the only
-route in that burst that opens a **transaction with `SELECT … FOR UPDATE`** on the `users` row, and
-it holds a pool client for its duration; the pool is `max: 10` (`lib/data/postgres/client.ts`) with
-`pg`'s default `connectionTimeoutMillis: 0`, which waits **forever** for a client rather than
-erroring. A `statement_timeout` cannot fire on a query that never starts. That is a hypothesis, not
-a finding — it does not by itself explain a plain `GET` hanging beside it.
-
-- **Not reproduced in production**, and it may be dev-server-specific (route compilation under
-  concurrency). Establish that first: it changes whether this is a bug or a harness note.
-- **Keep:** whatever the cause, `connectionTimeoutMillis: 0` on a pool of 10 is worth a decision of
-  its own — a bounded wait turns a hang into an error state a card can show.
 
 ### [platform] BF-55 — the database is growing ~7× its expected trend
 
