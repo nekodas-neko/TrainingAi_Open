@@ -5,9 +5,17 @@
  * style name.
  *
  * The style schema is `.strict()` because its shape has exactly one producer. **The sibling program
- * route is deliberately still unvalidated** — two producers that disagree, plus a schedule union —
- * so the first block below is a regression guard on payloads that must keep working either way, and
- * a tripwire for whoever does add that schema: these are the four shapes `config-screen.tsx` posts.
+ * route caught up on 2026-09-20** (`validation/program-write.ts`); the first block below was
+ * written as "a tripwire for whoever does add that schema", and it worked exactly as intended —
+ * all three of its program cases went red the moment the schema landed.
+ *
+ * **What they caught was this file, not the schema.** `SESSION.exercises[0]` was
+ * `{ id, name, sets, styleId }`; a `SessionExercise` has `exerciseName` and no `sets` at all, and
+ * both real producers (`config-screen.tsx`, `builder-review.tsx`) send `exerciseName`. The fixture
+ * was never wrong in a way anything could notice, because until the schema existed nothing looked
+ * at it — the assertions here are about passthrough, which a nonsense key satisfies as well as a
+ * real one. Corrected below, once and deliberately, and noted so it is not read as the schema being
+ * loosened to fit a test.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
@@ -52,7 +60,9 @@ const SESSION = {
   name: 'Upper A',
   position: 0,
   timeBudgetMinutes: 60,
-  exercises: [{ id: '00000000-0000-4000-8000-00000000c001', name: 'Bench Press', sets: 3, styleId: null }],
+  // `exerciseName`, not `name`, and no `sets` — see the header. This is the shape both producers
+  // build and the shape `listPrograms` maps.
+  exercises: [{ id: '00000000-0000-4000-8000-00000000c001', exerciseName: 'Bench Press', styleId: null }],
 }
 
 /** What GET returns and the activate button posts straight back — dates as JSON strings, and every
@@ -85,8 +95,11 @@ describe('the shapes the app actually posts still save', () => {
     })
     expect(res.status).toBe(200)
     expect(saveProgram).toHaveBeenCalledTimes(1)
-    // Passthrough: the keys the schema does not name have to survive, or the save writes a
-    // different program than the one the user activated.
+    // Passthrough: every key the stored row carries has to survive the parse, or the save writes a
+    // different program than the one the user activated. Under `.strict()` this is a stronger
+    // statement than it was — a key the schema failed to name is now a 400 rather than a silent
+    // drop, which is the whole reason the schema names `startedAt` and `earlyDeloadWeekStart`
+    // despite no producer setting them by hand.
     expect(saveProgram.mock.calls[0][1]).toMatchObject({
       startedAt: '2026-08-01', userId: 'u-1', sessions: [expect.objectContaining({ exercises: expect.any(Array) })],
     })

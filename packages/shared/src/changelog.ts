@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.460.3",
+    date: "2026-09-20",
+    changes: [
+      "Saving or activating a program now checks what it was sent before writing it. The route that stores your programs accepted whatever arrived and passed it to the database unexamined \u2014 a mistyped or renamed field was written as a successful save of the wrong thing rather than refused. Nothing you do in the app changes; the three screens that save programs were each checked against the new rules, and a test now fails if a future change to a program field forgets to allow it through.",
+    ],
+  },
+  {
     version: "1.460.2",
     date: "2026-09-20",
     changes: [
