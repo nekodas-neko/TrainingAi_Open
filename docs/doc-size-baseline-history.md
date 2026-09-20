@@ -14202,3 +14202,18 @@ lost more than LB-121 gained. Most of it was planning prose that had done its jo
 call, why not `muscle-tonnage-trend`, whether the window should be a parameter. Once the code exists
 the file answers those, and the entry keeps only what the code cannot say — why there is no target,
 why zero rows still render, and what the S25 still owes.
+
+## 2026-09-20 — Q-305 stops saying the thing OR-118 just falsified
+
+`docs/implementation-backlog.md` **24590 → 24596** (`feat/or118-movement-balance-card`, second pass).
+
+Six lines, and they buy the removal of a false statement. Q-305 deferred its push:pull half on two
+grounds, one of which was *"there is no push/pull grouping anywhere in the repo (checked)"*. That was
+true when written and stopped being true on 2026-09-13, when `movementPattern()` shipped as LB-103 —
+in `packages/shared`, exactly where that bullet said such a thing belonged. OR-118 shipped the card
+as its first caller today.
+
+The deferral is recorded rather than deleted because it was **correct at the time**: it refused to
+put a private muscle → movement-pattern taxonomy inside a component, and waiting meant the shared
+helper got built instead. A reader who finds only the outcome learns nothing; a reader who finds the
+reasoning and its expiry date learns when to re-check their own.

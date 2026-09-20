@@ -16394,12 +16394,18 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   program target still wins over the reference range. No Lane A change was needed: `workout-data:meta`
   already carries `program.trainingGoal` and Health already fetches that key.
   [`journal`](overview/history-2026-09-10-folded-3.md#2026-08-25-volume-landmarks-surfaced).
-- **⛔ THE PUSH:PULL HALF IS NOT DONE, deliberately.** This entry says to do it on the same surface
-  "rather than as two cards", and doing it here would mean inventing a muscle → movement-pattern
-  taxonomy inside a component. **There is no push/pull grouping anywhere in the repo** (checked). It
-  is domain math and belongs in `packages/shared` beside `normalizeMuscle`/`MUSCLE_LANDMARKS` under
-  One Formula One Place — which is **Lane A's**. A private second copy in `components/` to satisfy
-  "together" would be the wrong trade.
+- **✅ THE PUSH:PULL HALF SHIPPED 2026-09-20 as OR-118** (v1.460.0) — the Training list's
+  **Movement Balance** card, 60 days across push / pull / legs / other. **Both reasons this bullet
+  gave for deferring it are now spent**, and they are recorded rather than deleted because the
+  deferral was correct at the time:
+  - *"There is no push/pull grouping anywhere in the repo"* — true when written, **false now**:
+    `movementPattern()` landed in `packages/shared/src/muscles.ts` as **LB-103** on 2026-09-13,
+    exactly where this bullet said it belonged, and OR-118 is its first caller. No private copy in
+    `components/` was needed, which was the trade this bullet refused to make.
+  - *"do it on the same surface rather than as two cards"* — it shipped as its own card, and the
+    shared-treatment question below is **still open and still this entry's**. OR-118 was written to
+    stay cheap to fold in if that design lands.
+  **What this entry keeps is the design question and the device look, not the build.**
 - **Still open:** the push:pull half above, and the design question of whether Q-278 / Q-302 / Q-305
   want one shared treatment for "computed and discarded" — untouched, because answering it inside one
   card would have prejudged it.
