@@ -6699,8 +6699,9 @@ account holds a duplicate, so the migration must delete duplicates (lowest id wi
 
 - **Lane:** A — `e2e/`, and the nutrition specs reach `components/**`, which is Lane B's.
 - **Added:** 2026-09-06, found while merging OR-102a. **Rewritten 2026-09-07 against a measured run.**
-- **Keep:** the specs themselves. Two of the entry's three claims were wrong and are struck below;
-  what is left is nine real failures nobody had seen.
+- **Keep:** ONE decoder flake. **The "nine" is struck too — measured 2026-09-20 it is nine no
+  longer, and the one hard failure left was a live product bug that is fixed here.** All three of
+  this entry's original claims have now been struck by measurement.
 
 **Struck: "a Playwright or web-server startup timeout, not specs asserting and failing."** Measured
 2026-09-07 by running the suite locally under `CI=1` against the CI seed: **147 passed, 9 failed,
@@ -6718,13 +6719,35 @@ makes a silent empty artifact impossible.
 **Also fixed here:** the gate matched `^app/`, so an `app/api/**`-only change bought the full suite.
 It now drops `app/api/` lines before matching, verified against eight path shapes including mixed.
 
-**What is owed — the nine.** Seven are nutrition/meal, which is a cluster tight enough to suspect one
-shared cause: `edit-meal-batch-footer`, `meal-detail-artboard-parity`, `meal-label`,
-`meal-photo-picker`, `my-meals-artboard-parity`, `plan-rescale` (LA-67), `saved-meal-tags`. The other
-two are `first-run-empty-states` and `preferences-survive-reinstall`. **Order matters:**
-`preferences-survive-reinstall` fails twice in the full run and only goes flaky when run alone, so at
-least some of these are shared-state, not the spec's own logic. Read the artifact this PR makes real
-before assuming a local-DB artifact — that mistake has already been made once on `plan-rescale`.
+**Struck: "nine real failures".** Re-measured 2026-09-20 against `main` at `562ec1f2934`, on a
+database built the way CI builds one — `DROP`/`CREATE`, all 277 migrations, then `seed.sql`, rather
+than the session's shared dev database and its 36 accumulated accounts. Full suite under `CI=1`:
+**1 failed, 1 flaky, 1 skipped, 220 passed, 34.4 min.** Eight of the nine had been fixed by other
+work in the intervening two weeks and nobody re-ran the count — four of the nine specs had been
+edited since (`meal-photo-picker` 09-15, `first-run-empty-states` and `preferences-survive-reinstall`
+09-14, `plan-rescale` 09-11). The "one shared cause across seven nutrition specs" theory was never
+tested and is now unfalsifiable; it is noted only so it is not re-derived.
+
+**The one hard failure was a real defect, and it is fixed in this entry's PR.**
+`rv38-body-battery-no-data-badge` — written 2026-09-15, so never part of the nine — failed on both
+attempts. Root cause is NOT the spec: `batteryConfidence`'s "no verdict in the first hour awake"
+grace clause returned `sufficient: true` on `sampleCount: 0`, and the card shows its `Limited data`
+badge on `!sufficient`, so an account that has never worn anything read `Good / Steady / 50`
+unqualified — RV-38's exact defect — for the first hour after waking, every day. The spec was
+therefore **red between 00:00 and 01:00 Brisbane and green the rest of the day**, the Q-356
+clock-dependence shape. `sampleCount === 0` is now excluded from the grace window; proven by
+re-running the spec inside the failing band (red at 00:47, green at 00:48).
+
+**What is still owed — one flake.** `meal-label.spec.ts:286` (`a saved meal renders a printable
+label in every style`) failed its first attempt on the `Ingredients · centred` style and passed on
+retry. **Ink was 0.0802, so the canvas was painted** — this is a decode failure, not a render one,
+which matches LB-38's root cause (zxing cannot read certain valid QR symbols upright) that
+`decodeQrRotating` was added for and evidently does not fully cover. Not diagnosed further here and
+**not claimed fixed**. Its kept-pixels dump is written into `test-results/`, which Playwright wipes
+at the start of the next run — so a local reproduction destroys its own evidence unless the `.bin`
+is copied out first. CI's artifact upload does keep it.
+
+`1 skipped` is `training-load-day-flags.spec.ts:153`, a deliberate skip, not a failure.
 
 ### [platform] LA-77 — 60% of the lint warnings are deliberate, so the 60 real ones are invisible
 
@@ -6753,6 +6776,15 @@ present.
   the order — the reverse fails CI on debt nobody has had a chance to pay.
 - **Not urgent, and small.** Nothing is broken; the Lint job passes on warnings today and would keep
   passing. This is about whether the output can be read at all.
+- **One more line while in that file, measured 2026-09-20 (LA-63).** `playwright-report/` and
+  `test-results/` are gitignored but **not eslint-ignored**, so any local `pnpm e2e` run makes the
+  next `pnpm lint` report **256 errors** — all of them `no-this-alias` and friends inside the HTML
+  reporter's bundled JavaScript, at column 17767 of line 10. `0 errors` the moment the two
+  directories are removed. CI never sees it because Lint and E2E are separate jobs with separate
+  checkouts, so this lands only on whoever runs both locally, and it reads as 256 real errors in
+  their own change. Add both paths to the ignore list.
+- **The warning count in this entry is also stale**: 290 when written, **743** on 2026-09-20. The
+  argument is unaffected and gets stronger.
 
 ### [app-shell] PS-35b — a wrong PWA start_url, a doubled boot fetch, a dead branch and a stuck weather chip
 
@@ -24603,6 +24635,47 @@ enum with more members would mean inventing a label per rung and re-deciding the
 **Done looks like:** a 45-minute session can be chosen for today, the session's own configured length
 is still what the control defaults to, the picked length is what the plan is trimmed against *and*
 what the warm-up countdown shows, and dragging the control does not fire a prescription per step.
+
+### [platform] LA-123 — one test file asserts a cluster-wide condition that fifteen sibling files legitimately violate
+
+- **Lane:** A — `lib/data/postgres/__tests__/`.
+- **Added:** 2026-09-20, Lane A, found while gating LA-63's fix.
+
+`migration-test-lock.test.ts`'s `afterAll` is:
+
+```sql
+SELECT count(*)::int AS n FROM pg_locks WHERE locktype = 'advisory'   -- expected 0
+```
+
+**`pg_locks` is not scoped to a database, a session or a process.** `migrationTestLock` is used by
+**15 other test files**, vitest runs files in parallel workers, and every one of those workers takes
+the same advisory key (`171_0164`) against the same Postgres. So this assertion is about whether
+some *other* file happens to be inside its migration at the moment this file finishes — which is
+nobody's invariant.
+
+**Observed once, on 2026-09-20:** `Test Files 1 failed | 951 passed`, `Tests 9027 passed | 0
+failed` — a file that fails while none of its tests do, which is the signature of a hook. Re-ran the
+full suite on the same tree: green. **Honesty about the cause: a second variable was present on the
+first run and not the second** (a `pnpm dev` server for an E2E reproduction, on a different database
+on the same instance), so the two cannot be separated by those two runs. The mechanism above does
+not need them separated — it is readable in the source and holds either way.
+
+**Do not "fix" this by retrying, and do not delete the check.** Q-171's own docstring forbids retry
+here, and the check exists because a helper that silently no-ops would look fixed.
+
+**Proposed patch.** The invariant this hook actually wants is *"this file released what it took"*,
+which is a property of this file and not of the cluster. The `pg_locks` evidence that keeps the
+helper honest is already carried by the third test in the same file (`holds the lock on one
+connection`, which asserts `> 0` while holding), so `afterAll` does not need to re-prove it. Give
+`MigrationLock` a `held` getter and assert the file's own locks are released. The alternative —
+filtering `pg_locks` by the connection's own backend pid — is sound too but needs the helper to
+stamp `application_name`, which is a bigger change to production-adjacent code for a test-only
+assertion.
+
+**Also worth a line while in there:** the same query shape appears in the third test as
+`toBeGreaterThan(0)`. That one is satisfied by a sibling's lock as easily as by its own, so it
+passes for the wrong reason rather than failing — weaker, not broken, but it would go the same way.
+
 
 ### [app-shell][platform] 🔵 BF-5 — the week in review is a page (both PRs shipped; the device look is what is left)
 
