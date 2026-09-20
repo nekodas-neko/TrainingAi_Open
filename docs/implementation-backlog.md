@@ -24636,47 +24636,6 @@ enum with more members would mean inventing a label per rung and re-deciding the
 is still what the control defaults to, the picked length is what the plan is trimmed against *and*
 what the warm-up countdown shows, and dragging the control does not fire a prescription per step.
 
-### [platform] LA-123 — one test file asserts a cluster-wide condition that fifteen sibling files legitimately violate
-
-- **Lane:** A — `lib/data/postgres/__tests__/`.
-- **Added:** 2026-09-20, Lane A, found while gating LA-63's fix.
-
-`migration-test-lock.test.ts`'s `afterAll` is:
-
-```sql
-SELECT count(*)::int AS n FROM pg_locks WHERE locktype = 'advisory'   -- expected 0
-```
-
-**`pg_locks` is not scoped to a database, a session or a process.** `migrationTestLock` is used by
-**15 other test files**, vitest runs files in parallel workers, and every one of those workers takes
-the same advisory key (`171_0164`) against the same Postgres. So this assertion is about whether
-some *other* file happens to be inside its migration at the moment this file finishes — which is
-nobody's invariant.
-
-**Observed once, on 2026-09-20:** `Test Files 1 failed | 951 passed`, `Tests 9027 passed | 0
-failed` — a file that fails while none of its tests do, which is the signature of a hook. Re-ran the
-full suite on the same tree: green. **Honesty about the cause: a second variable was present on the
-first run and not the second** (a `pnpm dev` server for an E2E reproduction, on a different database
-on the same instance), so the two cannot be separated by those two runs. The mechanism above does
-not need them separated — it is readable in the source and holds either way.
-
-**Do not "fix" this by retrying, and do not delete the check.** Q-171's own docstring forbids retry
-here, and the check exists because a helper that silently no-ops would look fixed.
-
-**Proposed patch.** The invariant this hook actually wants is *"this file released what it took"*,
-which is a property of this file and not of the cluster. The `pg_locks` evidence that keeps the
-helper honest is already carried by the third test in the same file (`holds the lock on one
-connection`, which asserts `> 0` while holding), so `afterAll` does not need to re-prove it. Give
-`MigrationLock` a `held` getter and assert the file's own locks are released. The alternative —
-filtering `pg_locks` by the connection's own backend pid — is sound too but needs the helper to
-stamp `application_name`, which is a bigger change to production-adjacent code for a test-only
-assertion.
-
-**Also worth a line while in there:** the same query shape appears in the third test as
-`toBeGreaterThan(0)`. That one is satisfied by a sibling's lock as easily as by its own, so it
-passes for the wrong reason rather than failing — weaker, not broken, but it would go the same way.
-
-
 ### [app-shell][platform] 🔵 BF-5 — the week in review is a page (both PRs shipped; the device look is what is left)
 
 - **Lane:** B — **reclassified 2026-09-15 when the engine half shipped.** It was A while the route
