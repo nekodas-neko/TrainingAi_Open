@@ -98,7 +98,7 @@ history files are dated) rather than with the sweep, because the sweep is a chor
 measurement is the thing a future reader would otherwise re-derive before daring to run it.
 ---
 
-## 2026-09-18 — backlog → 24213, `projectOverview.md` → 11927 (Q-1a server half)
+## 2026-09-18 — backlog → 24393, `projectOverview.md` → 11927 (Q-1a server half)
 
 **Backlog +32 and nothing removed**, which is the honest shape for a partial: Q-1a stays queued
 because most of its scope — the client — has not shipped, and the entry now carries what DID ship, the
@@ -13993,3 +13993,30 @@ returning through a status its fix did not name, and warn off the obvious patch 
 `prescriptionDrivesLoad` already rejects `dismissed`, so tightening it changes nothing. It also
 records, rather than guesses, the one mechanism still open: the card renders pending-only copy for a
 row the database says is dismissed, and the two candidates need different fixes.
+
+## 2026-09-20 — `docs/implementation-backlog.md` → 24297
+
+**BF-180** (a session-level deload stores no pre-deload block, so declining it serves the static
+program) and **BF-181** (nine exercises in the active program have no progression style, one whole
+session none at all).
+
+BF-180 carries its alternatives with reasons because the owner asked a design question — *"some sort
+of catch to make sure its always ai derived"* — and the obvious answer, regenerate on tap, is the
+one to reject as primary: a round trip at the moment he is standing in a gym, failing offline. The
+recommended fix is honestly costed as a generation change rather than plumbing, because the full
+intensities are not computed on that path today.
+
+BF-181's table is the sweep that was run BEFORE filing, and it changed the entry from a one-row data
+fix into a missing write-time constraint. Filing the narrow version would have shipped a fix for one
+exercise and left a leg session with no programming.
+
+## 2026-09-20 (second) — `docs/implementation-backlog.md` → 24361
+
+**BF-182** — warm the next prescription when Home renders, rather than at completion (which the
+owner asked for and which he himself rejected on 2026-07-31) or at tab-open (which is where the
+latency he is complaining about lives).
+
+The quoted `complete-workout` comment is the entry's most important line: without it an
+implementer reads a direct owner request and builds the thing that was deliberately not built,
+with no way to know. The input-versus-filter distinction earns its space for the same reason — the
+proposal only sounds free if you think duration and deload are applied after generation.
