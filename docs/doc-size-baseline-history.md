@@ -18,6 +18,24 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-20 — backlog → 24934 (TN-53 engine shipped, −16)
+
+**A net −16 that is really −40 of proposal replaced by +24 of what is still owed.** TN-53's
+"first action" and its evidence block are gone; what replaces them is the correction to its code
+quote, the reason the fix diverges from its proposal, and two `Keep:` lines.
+
+The Keeps are the point. The engine now returns `null` where it used to return a fabricated number,
+so **the sparkline gains gaps** — and nothing has checked how that surface draws a null run. A gap
+that renders as a broken chart is not an improvement over a wrong number, and the entry now says so
+in the place a Lane B session will read rather than in a journal nobody opens.
+
+Also recorded: the entry quoted a 90 s tolerance on **both** HRR terms; the second is 45 s, which
+makes the real worst case −75 s to +195 s — wider than claimed, and including one reading serving
+both terms for a drop of 0. Correcting an entry's evidence while confirming its conclusion is worth
+the lines; the next reader would otherwise re-derive the tolerance from the same wrong quote.
+
+---
+
 ## 2026-09-20 — backlog → 24837 (rule 2's yield, and naming the real bottleneck)
 
 **+16.** Two negative results worth writing down. Rule 2 re-screened the August sweep's 27

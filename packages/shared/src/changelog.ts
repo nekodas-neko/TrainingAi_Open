@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.460.1",
+    date: "2026-09-20",
+    changes: [
+      "The HR-recovery figure on the heart-rate page now only appears when it was actually measured over a full minute. It is the drop in your heart rate 60 seconds after a set, but nothing checked that the two readings behind it were really 60 seconds apart \u2014 with the ring's sparser sampling a single reading could stand in for both, reporting a recovery of zero from one data point. Where the readings cannot support the number you will now see a gap instead, which is the honest answer. Expect gaps over stretches where the chest strap was not worn.",
+    ],
+  },
+  {
     version: "1.460.0",
     date: "2026-09-20",
     changes: [

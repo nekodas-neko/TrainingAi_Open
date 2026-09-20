@@ -27,7 +27,9 @@ export interface SetHrStats {
 
 // Find the nearest HR reading within ±windowMs of a target timestamp. Exported so the richer
 // per-set analysis (lib/workout/set-hr-stats.ts) reuses the one nearest-reading implementation.
-export function nearestBpm(readings: HrReading[], target: Date, windowMs = 90_000): number | null {
+export function nearestReading(
+  readings: HrReading[], target: Date, windowMs = 90_000,
+): HrReading | null {
   let best: HrReading | null = null
   let bestDiff = Infinity
   for (const r of readings) {
@@ -37,8 +39,34 @@ export function nearestBpm(readings: HrReading[], target: Date, windowMs = 90_00
       bestDiff = diff
     }
   }
-  return best?.bpm ?? null
+  return best
 }
+
+export function nearestBpm(readings: HrReading[], target: Date, windowMs = 90_000): number | null {
+  return nearestReading(readings, target, windowMs)?.bpm ?? null
+}
+
+/**
+ * How far apart the two readings behind an HRR-60 may actually be (ms). TN-53.
+ *
+ * `hrr1` is defined as the drop 60 s after the set, but nothing checked that the readings picked
+ * for its two terms were 60 s apart — only that each was near its own target. `bpmAtLog` accepts
+ * ±90 s and `bpm60` accepts ±45 s around `log + 60 s`, so the pair could span anywhere from −75 s
+ * to +195 s, **including picking the same reading twice and reporting a drop of 0**.
+ *
+ * That is harmless at chest-strap density (~1 reading/s: the pair lands at ~60 s by construction)
+ * and routine at ring density. Measured in production 2026-09-20 over `set_hr_stats`:
+ * chest_strap 220 sets at 111.8 readings/set, ble 79 at **7.1**. A sixteen-fold difference means an
+ * ungated HRR-60 partly records which sensor was worn, and the strap has been dark since
+ * 2026-09-15.
+ *
+ * So the gate is on the measurement, not on a reading count: a count is a proxy that rejects sparse
+ * sets whose two readings happen to be well spaced and accepts dense ones whose readings cluster.
+ * ±15 s of the nominal 60 keeps the value within the shape of the definition; outside it, `null` is
+ * the honest output and a gap in the sparkline is the honest render.
+ */
+export const HRR1_SEPARATION_MIN_MS = 45_000
+export const HRR1_SEPARATION_MAX_MS = 75_000
 
 // Max HR in the window [target - windowMs, target + 30s]
 function peakBpmBefore(readings: HrReading[], target: Date, windowMs = 90_000): number | null {
@@ -65,13 +93,21 @@ export function analyseHrRecovery(
       return { ...set, peakBpm: null, bpmAtLog: null, hrr1: null, adequate: null }
     }
 
-    const bpmAtLog = nearestBpm(readings, set.loggedAt)
+    const atLog    = nearestReading(readings, set.loggedAt)
+    const bpmAtLog = atLog?.bpm ?? null
     const peakBpm  = peakBpmBefore(readings, set.loggedAt)
 
-    // HRR1: bpm at log time vs bpm 60 seconds later
+    // HRR1: bpm at log time vs bpm 60 seconds later — but only when the two readings behind those
+    // terms are actually ~60 s apart (TN-53). Without this the same reading can serve both terms.
     const target60 = new Date(set.loggedAt.getTime() + 60_000)
-    const bpm60 = nearestBpm(readings, target60, 45_000)
-    const hrr1 = bpmAtLog != null && bpm60 != null ? bpmAtLog - bpm60 : null
+    const at60 = nearestReading(readings, target60, 45_000)
+    const separationMs = atLog != null && at60 != null
+      ? at60.timestamp.getTime() - atLog.timestamp.getTime()
+      : null
+    const separationOk = separationMs != null
+      && separationMs >= HRR1_SEPARATION_MIN_MS
+      && separationMs <= HRR1_SEPARATION_MAX_MS
+    const hrr1 = separationOk && bpmAtLog != null && at60 != null ? bpmAtLog - at60.bpm : null
 
     // Adequate rest: HR recovered >= 15 bpm in the 60 s after the set. A missing hrr1 is `null`
     // — unknown, not adequate.
