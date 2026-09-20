@@ -63,6 +63,29 @@ and asserts they match. Nothing else compares them, and they sit in different to
 - **Native half:** 7 Kotlin unit tests, run by CI's `Android (Kotlin tests + debug APK)` job.
 - Full suite, `pnpm check:rules`, lint and typecheck below.
 
+## CI caught four of my own tests, and the cause was worth the round trip
+
+The first push went red on `Android (Kotlin tests + debug APK)`: **80 tests completed, 4 failed** —
+all four mine, the 76 existing ones green. The required checks were all passing, so merging on those
+alone would have shipped it.
+
+The cause was one line. `lastSentAt == 0L` was the "nothing sent yet" sentinel, and my fixtures use
+`at = 0` as a real timestamp — so keeping the first sample set `lastSentAt = 0`, the sentinel fired
+again on the next sample, and **every sample was kept**: the thinning silently stopped.
+
+**That is a real collision in code I was already touching, not a bad fixture.** It is unreachable in
+production because `at` is `System.currentTimeMillis()`, which is exactly why it survived — and why
+it only appeared once the logic became testable. So the fix is `Long?` with `null` meaning nothing
+sent, which cannot be confused with a timestamp, rather than changing the fixtures to dodge it.
+Production behaviour is identical; one test now pins the collision directly so it cannot come back.
+
+The service's own field moved to `Long?` with it, including the `setAmbient` reset that used `0L`
+to mean "keep the next sample".
+
+**Stated plainly: the re-verification after that fix was done by reading, not by running.** Gradle
+cannot resolve the Android plugin here, so all eight cases were traced by hand against the corrected
+loop. CI is the executor.
+
 ## Not exercised
 
 - **Gradle cannot run here** — confirmed, not assumed: `./gradlew testDebugUnitTest --offline`

@@ -44,8 +44,17 @@ object PolarAmbientThinner {
     /** What the service buffers: a receive time, a bpm, and that packet's RR intervals. */
     data class Beat(val at: Long, val bpm: Int, val rr: List<Int>)
 
-    /** Carried across flushes by the caller, exactly as `lastAmbientSentAt` was. */
-    data class State(val lastSentAt: Long = 0L, val pendingRr: List<Int> = emptyList())
+    /**
+     * Carried across flushes by the caller.
+     *
+     * **`lastSentAt` is nullable, and that is not cosmetic.** It was `0L`-means-never, which is a
+     * sentinel that collides with a real value: a sample whose `at` is 0 sets `lastSentAt = 0`, the
+     * sentinel fires again on the next sample, and EVERY sample is kept — the thinning silently
+     * stops. Production never sees it because `at` is `System.currentTimeMillis()`, so the
+     * collision is unreachable there and was invisible until this logic became testable. `null`
+     * says "nothing sent yet" and cannot be confused with a timestamp.
+     */
+    data class State(val lastSentAt: Long? = null, val pendingRr: List<Int> = emptyList())
 
     data class Result(val kept: List<Beat>, val state: State)
 
@@ -60,11 +69,12 @@ object PolarAmbientThinner {
      */
     fun thin(samples: List<Beat>, state: State, gapMs: Long): Result {
         val kept = ArrayList<Beat>()
-        var lastSentAt = state.lastSentAt
+        var lastSentAt: Long? = state.lastSentAt
         var carry = ArrayList(state.pendingRr)
 
         for (s in samples) {
-            if (lastSentAt == 0L || s.at - lastSentAt >= gapMs) {
+            val since = lastSentAt
+            if (since == null || s.at - since >= gapMs) {
                 val all = ArrayList<Int>(carry.size + s.rr.size)
                 all.addAll(carry)
                 all.addAll(s.rr)

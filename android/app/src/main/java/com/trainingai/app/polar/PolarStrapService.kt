@@ -95,7 +95,9 @@ class PolarStrapService : Service(), PolarGattClient.Listener {
 
     // Ambient vs full persistence. Volatile: set from the plugin thread.
     @Volatile private var ambient = true
-    private var lastAmbientSentAt = 0L
+    // TN-51: null means "nothing sent yet", replacing a 0L sentinel that a real timestamp of 0
+    // could collide with. See PolarAmbientThinner.State.
+    private var lastAmbientSentAt: Long? = null
     // TN-51. Beats from samples the thinning dropped, waiting for the next kept sample. Carried
     // across flushes: the buffer flushes on a count threshold and on a timer, neither aligned to
     // AMBIENT_GAP_MS, so a flush that keeps nothing is ordinary — and its beats would otherwise be
@@ -171,7 +173,7 @@ class PolarStrapService : Service(), PolarGattClient.Listener {
 
     fun setIngestUrl(url: String) { ingestUrl = url }
     fun setAmbient(a: Boolean) {
-        if (a && !ambient) lastAmbientSentAt = 0L
+        if (a && !ambient) lastAmbientSentAt = null
         ambient = a
     }
 

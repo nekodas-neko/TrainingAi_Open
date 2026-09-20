@@ -40,6 +40,8 @@ class PolarAmbientThinnerTest {
     fun `carried intervals stay in chronological order, ahead of the kept sample's own`() {
         // The server walks `rr` BACKWARDS from sample.at, so order is not cosmetic — it decides
         // the timestamp each beat is stored at.
+        // A real previous send, not a sentinel: `lastSentAt` is nullable precisely so a test does
+        // not have to reach for a negative timestamp to mean "long enough ago".
         val r = PolarAmbientThinner.thin(
             listOf(beat(0, 60, 900), beat(1_000, 60, 910), beat(30_000, 60, 920)),
             PolarAmbientThinner.State(lastSentAt = -GAP), GAP,
@@ -91,6 +93,20 @@ class PolarAmbientThinnerTest {
             PolarAmbientThinner.State(), GAP)
         assertEquals(1, r.kept.size)
         assertEquals(listOf(1100), allRr(r))
+    }
+
+    @Test
+    fun `a timestamp of zero is a timestamp, not "nothing sent yet"`() {
+        // The `0L`-means-never sentinel this replaced collided with a real value: keeping a sample
+        // at t=0 set lastSentAt=0, the sentinel fired again, and the thinning silently stopped.
+        // Unreachable in production (`at` is System.currentTimeMillis()) and the reason it survived
+        // until the logic was testable — which is the argument for extracting it.
+        val r = PolarAmbientThinner.thin(
+            listOf(beat(0, 60, 1000), beat(1_000, 60, 1001), beat(2_000, 60, 1002)),
+            PolarAmbientThinner.State(), GAP,
+        )
+        assertEquals("only the first sample is inside a gap of one", listOf(0L), r.kept.map { it.at })
+        assertEquals(listOf(1001, 1002), r.state.pendingRr)
     }
 
     @Test
