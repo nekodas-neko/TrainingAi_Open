@@ -18,6 +18,26 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-20 — backlog → 24856 (BF-55 answered, −58), CLAUDE.md → 778 (+3)
+
+The −58 and the +3 are the same finding moving from the queue into the file every session reads
+before it can start.
+
+BF-55 asked what was adding ~2.1 MB/day beyond a ~0.4 MB/day expectation. Measured: **227.4 MB,
+1.71 MB/day on both a 2-day and a 33-day baseline**, and the remainder is two retention windows that
+have **not finished filling**. `oura_heartrate` prunes at 180 days, not the ~90 CLAUDE.md recorded —
+the 90 belongs to `rr_intervals` — so at a 90.6-day span it is half-filled and has never reclaimed a
+row. A window below its cap reclaims nothing and grows at the full ingest rate; the ~0.4 expectation
+assumed a steady state that had not arrived.
+
+The +3 lines on CLAUDE.md buy the correction, the per-table attribution (1.47 of the 1.71 MB/day
+named), and a **falsifiable prediction**: growth steps down around late October and again around
+2026-12-19, settling near 0.96 MB/day. A step that does not arrive is the signal. That is worth more
+than the three lines because it replaces a recurring "7× trend" alarm — which compared a filling
+system against a steady-state expectation — with something that can only fail in one direction.
+
+---
+
 ## 2026-09-20 — backlog → 24914 (LA-74 shipped, −24)
 
 The program write path is typed and `.strict()` at last, so the entry leaves the queue. It had sat
