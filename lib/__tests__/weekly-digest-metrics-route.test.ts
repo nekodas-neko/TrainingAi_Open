@@ -11,6 +11,12 @@
  * transcribed by hand: it was captured by running THIS fixture against `origin/main`'s route and
  * again against the rewritten one, and diffing. Anything that changes the wording fails here.
  *
+ * **The frozen string was updated once, deliberately, on 2026-09-20 (BF-178).** One line moved
+ * from "Oura readiness" to "Readiness": the number is the app's own ble-derived composite and
+ * crediting it to Oura in the text fed to the model was the defect. That is the only sanctioned
+ * reason to touch this string — it exists to catch the change nobody meant to make, so a diff
+ * here should be argued for, never absorbed.
+ *
  * Runs in a NON-default timezone deliberately — in Brisbane a window assertion passes against a
  * route that hardcodes DEFAULT_TZ and proves nothing.
  */
@@ -211,7 +217,7 @@ The week before that: 1 sessions, 5000 kg volume
 Sets per muscle that week (weighted): chest 1.5, triceps 1.5, quads 1.0
 PRs that week: Bench 103kg est. 1RM, Squat 142kg est. 1RM
 Overnight HRV: 60 ms avg that week (week before 52 ms)
-Oura readiness: 66/100 avg that week (week before 71/100)
+Readiness: 66/100 avg that week (week before 71/100)
 Illness radar (vs personal baseline): watch — tempC z +1.8, rhr z -0.6
 Daytime stress: high for ~51 min/day avg that week (week before ~44 min/day)
 Stress resilience: adequate (level 3/5, as of 2026-09-01)
