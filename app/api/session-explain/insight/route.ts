@@ -43,7 +43,7 @@ Key signals:
 - Muscle recovery: ${wc.recovery.score}% (weight ${Math.round(wc.recovery.weight * 100)}%)
 - Session balance (how overdue): ${wc.balance.score}% (weight ${Math.round(wc.balance.weight * 100)}%)
 - Freshness: ${wc.freshness.score}% (weight ${Math.round(wc.freshness.weight * 100)}%)
-- Oura readiness: ${sig.ouraReadiness != null ? sig.ouraReadiness : 'not connected'}
+- Readiness: ${sig.ouraReadiness != null ? sig.ouraReadiness : 'no data'}
 - Sleep trend vs baseline: ${sig.sleepTrend != null ? `${Math.round(sig.sleepTrend * 100)}%` : 'no data'}
 - HRV trend vs baseline: ${sig.hrvTrend != null ? `${Math.round(sig.hrvTrend * 100)}%` : 'no data'}
 - Energy level: ${sig.energyLevel ?? 'not logged today'}

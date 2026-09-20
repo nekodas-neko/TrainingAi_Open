@@ -443,6 +443,27 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [readiness][devices] LA-121 — the readiness availability branch still reads the frozen Cloud column
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-20 (found while shipping BF-178, not investigated).
+- **Lane: A** — `lib/health/readiness-payload.ts:749-752`.
+- **The observation, and only the observation.** That branch decides `ScoreAvailability` with
+  `ouraToday?.readinessScore != null`, and its comment explains why: *"An Oura readiness score is a
+  whole-picture number by construction, so it reports as full regardless of which of our own inputs
+  happen to be present today."* Both are correct about a REAL Oura Cloud score. But
+  `oura_daily.readiness_score` has been frozen since the 2026-07-07 re-key, so for every post-re-key
+  day the condition is presumably false and the branch falls through to `scoreAvailability(...)`.
+- **⚠ Nothing here is measured, and the entry must not be built as if it were.** Not checked: whether
+  `ouraToday` is even the Cloud row at this call site; whether the fallback produces a correct
+  answer (it may well — it is the path that reasons from our own inputs); or whether any user-visible
+  confidence/limited flag differs. It is equally possible this is dead-but-harmless.
+- **First step is a query, not a patch:** read `oura_daily.readiness_score` for the last 30 days and
+  confirm it is null/frozen, then read what `availability.confidence` actually resolves to on those
+  days. If the fallback is right, close this with a comment saying the branch is pre-re-key-only.
+- **Why it is filed at all:** BF-178 renamed three labels that credited our composite to Oura, and
+  this is the one remaining *Oura* reference that is genuinely about Cloud data. Leaving it
+  unrecorded would mean the next reader re-derives whether it was missed or deliberate.
+
 ### [platform] LB-121 — the queue parser's "blocked" marker is the same glyph the repo uses for emphasis
 
 - **Lane: O** — `scripts/next-item.js:97` (and `lib/queue-buckets.js` for the ordering).
@@ -816,51 +837,6 @@ below threshold and left in place for next time.
   with a `dismissed` + expired fixture — **derive the timestamps from the clock, never hardcode
   them**, per this repo's rolling-window test rule. **The device look is owed**: the 52% is what the
   owner sees, and only the APK proves it is gone.
-
-### [readiness] BF-178 — the readiness signal is OUR composite, and three surfaces still credit it to Oura
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-20 (BugFix intake). Owner, on the *Why Upper?*
-  screen: *"Still called oura readiness"*.
-- **Lane: A** — `packages/shared/src/session-explain/group-signals.ts:47`,
-  `app/api/session-explain/insight/route.ts:46`,
-  `packages/shared/src/health/weekly-digest-metrics.ts:111`.
-- **The number is not Oura's and has not been since the 2026-07-07 re-key.**
-  `liveReadinessForDay` (`packages/shared/src/health/live-readiness.ts`) returns
-  `oura_daily_derived.readiness_score` where `readiness_source === 'ble-derived'` — the app's own
-  composite. The frozen Cloud column is a fallback **only** for pre-re-key days, gated on
-  `isPreRekey(date)`. That file's own header says it: *"Since the 2026-07-07 ring re-key the Oura
-  Cloud gets no new data, so `oura_daily.readiness_score` is frozen; the app's own composite is
-  persisted to `oura_daily_derived.readiness_score`."*
-- **Measured in production 2026-09-20** — the day of his screenshot:
-
-  | day | readiness_score | readiness_source |
-  |---|---|---|
-  | 2026-09-20 | **46** | `ble-derived` |
-  | 2026-09-19 | 74 | `ble-derived` |
-  | 2026-09-18 | 36 | `ble-derived` |
-
-  The 46 he is looking at is ours. Every recent row is.
-- **It is also internally inconsistent, which is what makes it a bug rather than a quibble.** The
-  Home header calls the same number **"Readiness"**; the explain screen calls it **"Oura
-  readiness"**. One screen apart, same value, two provenances implied — and the Oura one is false.
-- **⚠ The AI route matters more than the two labels.** `session-explain/insight/route.ts:46` feeds
-  the model `- Oura readiness: ${sig.ouraReadiness}`, so the *prose* says it too — his screenshot
-  reads *"Despite your Oura readiness of 46"*. A label is a rename; a prompt line teaches the model
-  to attribute the app's own composite to a third party in generated text, which is the half that
-  cannot be spotted by reading the UI.
-- **Fix: call it "Readiness" everywhere, matching Home.** Do not invent a new name — Home already
-  has the right one and a third vocabulary is how this recurs. Rename the label, the prompt line and
-  the digest string in one PR; the field name `ouraReadiness` can stay or be renamed with it, but if
-  it stays it needs a comment saying the value is ble-derived, because the field name is what taught
-  every one of these three call sites to write "Oura".
-- **Sibling sweep:** `grep -rn "Oura readiness"` — the three above are the live ones. Test files and
-  `changelog.ts` are history and must NOT be rewritten; a changelog entry describing what shipped
-  then is accurate as a record.
-- **⚠ Not in scope, and worth saying so:** whether **46 is a good score** on a day with HRV *well
-  above* baseline is a calibration question, not this entry. The readiness baseline has open Tuning
-  work (TN-6, BF-13). This entry is only about what the number is called.
-- **Verification:** open *Why <session>?* and confirm the row reads "Readiness", and that the AI
-  paragraph above it no longer says "Oura readiness". Browser is enough.
 
 ### [nutrition] BF-177 — "kcal left" is the server's subtraction against a stale intake, so it sits still while the ring moves
 

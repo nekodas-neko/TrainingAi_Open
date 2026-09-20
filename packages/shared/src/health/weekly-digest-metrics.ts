@@ -108,7 +108,7 @@ export function buildWeeklyDigestContext(m: WeeklyDigestMetrics): string {
     : null
 
   const readinessLine = m.readiness.week != null
-    ? `Oura readiness: ${m.readiness.week}/100 avg that week${m.readiness.priorWeek != null ? ` (week before ${m.readiness.priorWeek}/100)` : ''}`
+    ? `Readiness: ${m.readiness.week}/100 avg that week${m.readiness.priorWeek != null ? ` (week before ${m.readiness.priorWeek}/100)` : ''}`
     : null
 
   const illnessZs = m.illness?.biomarkers && m.illness.flag !== 'normal'
