@@ -443,6 +443,54 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [platform] LA-122 — Reference: the five owner decisions Lane A is currently blocked on
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-20 (Lane A, filed for the Orchestrator at the owner's request).
+- **Lane: A** · **Reference:** — this is a ledger other entries READ, not work to build. Nothing here
+  is implementable until the owner answers; each item names the entry it unblocks.
+- **Why it exists.** These five were each raised in-session and would otherwise live only in a chat
+  transcript that ends with the session. Four of them have blocked a specific queue item for
+  between one and nine days.
+
+**1. BF-179 — is the 52% still on screen?** (unblocks BF-179, currently READY #2)
+  The prescription that produced the screenshot regenerated at 2026-09-19 23:10, and
+  `session_periodization` keeps no history, so the pre-regeneration state cannot be read back. If
+  Upper renders normally now, BF-179 is a post-mortem; if it still reads 52%, it is live and the
+  cause is NOT the one the entry names — see the refutation recorded in BF-179 itself. **One look at
+  *Why Upper?* settles it.**
+
+**2. LA-121 — port the temperature ladder, or let `tempZ` stand?** (unblocks LA-121, READY #1)
+  `computeBlendedScore`'s penalty ladder (dev 0.4 → 70, 0.7 → 60, 1.2 → 40 from a base of 80) has
+  had no reachable call site since 2026-07-07. Temperature still reaches readiness through
+  `computeReadinessComposite`'s `tempZ`, so nothing is missing — but the ladder was the sharper
+  penalty. **Either answer re-scores stored days, which is why an implementer must not pick.**
+  Adjacent to TN-6 and BF-13, both open on the same baseline.
+
+**3. Q-28, BF-9 and BF-7 carry NO `Gate:` field.** (unblocks all three)
+  `check-backlog-pointers.js` sees them as ordinary startable work. They are held back only by an
+  exclusion list inside the Lane A routine prompt — a convention living in a scheduled prompt rather
+  than in the file every agent reads, which is exactly the kind of thing that goes stale unnoticed.
+  **Either gate them in the file or release them.** BF-7 (the 45-minute slider) is the owner's own
+  request and the cheapest of the three.
+
+**4. Q-29 Task 5 is a destructive drop of the server raw archive.** (unblocks Q-29)
+  Confirm-first per CLAUDE.md, and the entry's own gate language says so. Needs a yes on principle
+  before anyone writes it, not a review after.
+
+**5. The `.size` conflict tax — a workflow question, not a defect.**
+  Every merging PR touches `docs/doc-size/docs/implementation-backlog.md.size`, and so does every
+  Lane A PR. On 2026-09-20 `main` took a commit roughly every 8 minutes against a ~6-minute CI run,
+  and **Q-1a needed five rebases and four refused merges to land**. Cheapest fix: **BugFix batches a
+  sweep's entries into ONE PR** rather than one per entry — a convention change, no code, and the
+  entries are already written in bursts. The alternative, generating the baselines in CI rather than
+  committing them, removes the conflict class entirely but is a real change to the ratchet and wants
+  its own entry. **GitHub auto-merge is not available here** — `enable_pr_auto_merge` returns
+  *"Protected branch rules not configured for this branch"*, so the CI/CD section's auto-merge
+  option does not apply to this repo.
+
+- **Keep:** this entry until all five are answered. Strike each item as it resolves; remove the
+  entry when the last one goes.
+
 ### [readiness][devices] LA-121 — four readiness branches are permanently dead, and one carries a temperature ladder
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-20 (found while shipping BF-178) · **MEASURED 2026-09-20**, which changed the entry.
