@@ -99,6 +99,20 @@ Live at the time of writing (2026-08-05):
 
 ## History
 
+- [`2026-09-20-tn53-sparkline-gaps`](../../overview/entries/2026-09-20-tn53-sparkline-gaps.md)
+  — **TN-53's render half (2026-09-20): the 14-day trend charts were drawing over their own gaps.**
+  The engine gate made `analyseHrRecovery` return `null` for a pair of readings that cannot support
+  an `hrr1`; `trend-sparkline.tsx` then passed `spanGaps: true`, so Chart.js joined across the run
+  of nulls and drew the missing days as a smooth line. **The gate bought nothing on the one surface
+  that shows the trend.** Now `spanGaps: false`, a dot on any stranded reading (a lone value draws
+  no segment and would otherwise be invisible — the normal case for `ble` sessions at 7.1
+  readings/set against the strap's 111.8), and an "N days missing" note. The decision is a pure
+  function in `components/health/trend-sparkline-gaps.ts`. **It is the shared component, so this
+  reached eleven charts** — resting HR, HRV, HR recovery, wear time, session duration, workout
+  density, protein/kg, steps, water, skin temperature and the score details. **Still owed: the S25
+  look, and the owner's pass test** (*"a gap across the period the strap was not worn"*), which
+  needs production data — local seed carries no `hrr1`.
+
 - [`2026-09-15-tn13-closed-bare-number`](../../overview/history-2026-09-18-folded-1.md#2026-09-15-tn13-closed-bare-number)
   — **TN-13 (2026-09-15): CLOSED on a decision, not a fix — the bare number stays.** The resting-HR
   delta shipped 2026-08-30 and **was never on screen**: `RING_GEOMETRY` sets `showDot: true` on 1 of

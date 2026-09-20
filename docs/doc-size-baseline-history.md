@@ -14510,3 +14510,25 @@ documented as a deliberate choice with its reasoning written next to it. An entr
 reverse a documented decision needs to say so, or the next reader deletes a comment they should be
 arguing with. The lines buy that, plus the sequencing (engine half first, because an editable time
 is worthless while the next re-tick overwrites it) and the note that the batch is now split.
+
+## 2026-09-20 — TN-53's render half: +27 backlog, +17 projectOverview
+
+`docs/implementation-backlog.md` **25077 → 25104** · `projectOverview.md` **11966 → 11983**
+(`feat/tn53-sparkline-gaps`).
+
+The backlog lines replace a two-bullet `Keep:` that asked a question, with the answer. The question
+listed three things the sparkline might do with a run of nulls and **it was none of them** — it drew
+a smooth line across the gap, so the engine gate that had just replaced a fabricated number with an
+honest absence bought nothing on the surface that shows the trend. Recording that is worth more
+lines than recording a fix, because the next person to write a `Keep:` asking "check how X renders"
+should know the answer can be outside the list.
+
+The rest is the blast radius and one trap. The component is shared, so this reached **eleven
+charts** and not the one the entry names — a reader who greps for `hrr1` will not find the other ten.
+And the e2e was written against Postgres's `CURRENT_DATE` while the route builds its window from
+`todayInTz`, so it failed at 21:30 UTC reading one day extra; that is Q-356's shape (both sides from
+a clock, not the same clock) and the note names it so the device check does not re-derive it.
+
+`projectOverview.md`'s +17 is the Known-Issues row, which carries the two things a browser cannot
+settle: the 412 px look, and the owner's pass test, which needs production data because the local
+seed holds no `hrr1` at all.
