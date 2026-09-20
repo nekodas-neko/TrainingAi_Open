@@ -12419,6 +12419,34 @@ reta" is the wrong axis to build on.
    then labels a regime rather than driving any maths** — which is the difference between a feature
    that works for one drug and one that works for whatever happens next.
 
+**✅ RULE 1 IS VALIDATED AGAINST THIS OWNER'S DATA — measured 2026-09-20, time-weighted.** The
+quantile was not assumed to work; it was backtested over the same three regimes, weighting each
+sample by its gap to the next (capped at 15 min) because the ring power-gates its PPG and a
+per-sample percentile overstates the quiet end. **That caveat is TN-2's and it bit this measurement
+too:** the per-sample p10 reads 69/68/72 bpm against a time-weighted 61/61/62 — 7–10 bpm apart, and
+the per-sample version supports a "it tracks his physiology" story that the correct one does not.
+
+| | Jun30–Aug19 | Aug20–Sep06 | Sep07–20 (reta) |
+|---|---:|---:|---:|
+| time-weighted p10 of waking HR | **61 bpm** | **61 bpm** | **62 bpm** |
+| % waking TIME under the CURRENT fixed threshold | **20.43%** | **3.34%** | **2.03%** |
+| % waking TIME under a fixed **61 bpm** | **10.41%** | **13.23%** | **7.54%** |
+| points charged/day (actual) | 23.1 | 2.2 | 1.0 |
+
+**Two results, and the second corrects this entry's own first draft.**
+
+1. **The quantile holds in every regime.** A 61 bpm anchor keeps 7.5–13% of waking time chargeable
+   throughout, where the shipped threshold collapsed **20.4% → 2.0%**, a 10× loss. A *rolling*
+   trailing-28-day p10 would hold exactly 10% by construction; the 7.54% above is a single fixed
+   61 bpm applied to all three periods, which is the harsher test and still works.
+2. **The quantile is STABLE across regimes, not tracking them** — 61 → 61 → 62 bpm. The earlier
+   framing of *"it follows him onto and off the drug"* came from the per-sample figures and is
+   withdrawn. It is the better property anyway: the threshold stays put while the broken one drifted
+   7 bpm the wrong way, and stability is what removes the need to refit.
+
+**So TN-2 can be closed without the fit it is blocked on.** Its bracket, its replay endpoint and its
+owner sign-off on a number all exist to choose an offset. A quantile has no offset to choose.
+
 **⚠ Do NOT convert every constant to a quantile.** Some thresholds are deliberately absolute and must
 stay: max HR from a maximal test (TN-30), a fever temperature, anything anchored to an external
 clinical meaning. A quantile of the user's own distribution cannot express "this is abnormal for a

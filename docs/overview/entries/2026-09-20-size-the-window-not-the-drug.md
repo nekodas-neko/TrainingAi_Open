@@ -51,6 +51,29 @@ With a guard against sweeping: max HR from a maximal test, a fever temperature a
 external clinical meaning must stay absolute, because a quantile of your own distribution can only
 say *"unusual for you"*, never *"abnormal for a human"*.
 
+## Rule 1 backtested, and it corrected this entry too
+
+The quantile was not left as an assertion. Backtested time-weighted over the same three regimes
+(weighting each sample by its gap to the next, because the ring power-gates its PPG):
+
+| | Jun30–Aug19 | Aug20–Sep06 | Sep07–20 |
+|---|---:|---:|---:|
+| time-weighted p10 of waking HR | **61 bpm** | **61 bpm** | **62 bpm** |
+| % waking time under the shipped threshold | **20.43%** | **3.34%** | **2.03%** |
+| % waking time under a fixed 61 bpm | **10.41%** | **13.23%** | **7.54%** |
+
+A 61 bpm anchor keeps 7.5–13% of waking time chargeable throughout, where the shipped threshold
+collapsed 10×.
+
+**And it corrected the entry's own framing.** The per-sample p10 reads 69/68/72 bpm — 7–10 bpm above
+the time-weighted 61/61/62 — and supports a *"the quantile follows him onto and off the drug"* story
+that the correct measurement does not. The quantile is **stable** across regimes, not tracking. That
+is the better property: it stays put while the broken threshold drifted 7 bpm the wrong way, and
+stability is exactly what removes the need to refit.
+
+This is TN-2's own per-sample-vs-time-weighted warning biting a third time in two days. It is now the
+first thing in the Tuning baton's Method section.
+
 ## What was not exercised
 
 Reads of stored production rows in the sandbox. No code changed, no scoring touched, no device, no UI.
