@@ -18,6 +18,21 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-20 — backlog → 24837 (rule 2's yield, and naming the real bottleneck)
+
+**+16.** Two negative results worth writing down. Rule 2 re-screened the August sweep's 27
+decision thresholds by window-width-vs-noise rather than coverage — the sweep's own stated blind spot
+— and found one confirmation and nothing new: the illness bands pass at 2.5 sd where the charge window
+fails at 1.9. So rule 2 belongs in review as a guard on new thresholds, not as a sweep, and the entry
+says so to stop it being re-run.
+
+The second is more useful: the August sweep listed 25 thresholds it could not measure at all, 19 of
+them sleep-staging constants feeding readiness's heaviest contributor. They are blocked on the same
+missing constants as TN-2's fit and TN-3a's stress term, so one admin replay endpoint unlocks three
+items. That is the highest-leverage piece of work left on the tuning front and it is Lane A's.
+
+---
+
 ## 2026-09-20 — backlog → 24804 (TN-53, from an inventory of everything recorded)
 
 **+75.** The owner asked for a sweep across every metric the app records. 99 tables; the useful
