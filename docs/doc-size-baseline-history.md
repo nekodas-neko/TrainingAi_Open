@@ -18,7 +18,8 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
-## 2026-09-20 — backlog → 24719 (rule 2's yield, and naming the real bottleneck)
+<<<<<<< HEAD
+## 2026-09-20 — backlog → 24734 (rule 2's yield, and naming the real bottleneck)
 
 **+16.** Two negative results worth writing down. Rule 2 re-screened the August sweep's 27
 decision thresholds by window-width-vs-noise rather than coverage — the sweep's own stated blind spot
@@ -30,6 +31,21 @@ The second is more useful: the August sweep listed 25 thresholds it could not me
 them sleep-staging constants feeding readiness's heaviest contributor. They are blocked on the same
 missing constants as TN-2's fit and TN-3a's stress term, so one admin replay endpoint unlocks three
 items. That is the highest-leverage piece of work left on the tuning front and it is Lane A's.
+=======
+## 2026-09-20 — backlog → 24701 (LA-121 measured, +15)
+
+**+15 on an entry that was filed unmeasured four hours earlier and did not survive its own query.**
+LA-121 said the readiness availability branch "presumably" fell through post-re-key and that its
+first step was a query. The query found the Cloud column NULL on 35 of 35 days, the same condition
+guarding **four** branches rather than one, and `buildReadinessPayload` carrying no date parameter
+at all — so "pre-re-key-only" was wrong and the arms are permanently unreachable.
+
+The lines are spent on the part that is not cleanup: `computeBlendedScore`'s temperature LADDER has
+one production call site and it is the dead arm. The entry records that temperature has not left
+readiness (`computeReadinessComposite` takes `tempZ`), because that is the claim which would have
+made this urgent and it is false — and then refuses to decide whether the ladder should be ported,
+since that is calibration and belongs to the owner.
+>>>>>>> origin/main
 
 ---
 
