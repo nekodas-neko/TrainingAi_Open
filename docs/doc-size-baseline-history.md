@@ -14261,3 +14261,33 @@ already rejected the same shape with production numbers. The correction to BF-18
 superseded reading visible rather than rewriting it away — the 45-logs-all-breakfast protein shake
 is simultaneously the evidence for the new model and the reason the old one failed, and deleting it
 would lose the argument.
+## 2026-09-20 — OR-118 shipped, and LB-121 got its measured cost
+
+`projectOverview.md` **11927 → 11931** and `docs/implementation-backlog.md` **24344 → 24341**
+(`feat/or118-movement-balance-card`).
+
+The overview grew by four lines because one of its sentences had become false: *"nothing renders it
+yet"* about `/api/muscle-sets`. Something does now, and the four lines say what, plus the thing worth
+more than the card — the entry was startable for four days while READY read 0, because a `⛔` used
+for emphasis parks an entry.
+
+The backlog **shrank by three** despite gaining that account on LB-121, because OR-118's own entry
+lost more than LB-121 gained. Most of it was planning prose that had done its job: which route to
+call, why not `muscle-tonnage-trend`, whether the window should be a parameter. Once the code exists
+the file answers those, and the entry keeps only what the code cannot say — why there is no target,
+why zero rows still render, and what the S25 still owes.
+
+## 2026-09-20 — Q-305 stops saying the thing OR-118 just falsified
+
+`docs/implementation-backlog.md` **24590 → 24596** (`feat/or118-movement-balance-card`, second pass).
+
+Six lines, and they buy the removal of a false statement. Q-305 deferred its push:pull half on two
+grounds, one of which was *"there is no push/pull grouping anywhere in the repo (checked)"*. That was
+true when written and stopped being true on 2026-09-13, when `movementPattern()` shipped as LB-103 —
+in `packages/shared`, exactly where that bullet said such a thing belonged. OR-118 shipped the card
+as its first caller today.
+
+The deferral is recorded rather than deleted because it was **correct at the time**: it refused to
+put a private muscle → movement-pattern taxonomy inside a component, and waiting meant the shared
+helper got built instead. A reader who finds only the outcome learns nothing; a reader who finds the
+reasoning and its expiry date learns when to re-check their own.

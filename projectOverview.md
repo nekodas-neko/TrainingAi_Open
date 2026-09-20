@@ -273,7 +273,11 @@ programme changes**, which is what a balance card's claim is about, and the diff
 test running one fixture through both reads: **3 sets against 7**. Checking the premise also found
 that the attribution SQL now exists **four times**, disagreeing on date column and programme scope —
 filed as **LA-118** rather than fixed here, since the extraction touches three live routes. Nothing
-renders it yet; OR-118 (Lane B) is now unblocked.
+renders it yet; OR-118 (Lane B) is now unblocked. **Shipped 2026-09-20 (v1.460.0):** the
+Training list's **Movement Balance** card is its first caller, and `movementPattern()`'s too. It
+sat startable and invisible for four days — a `⛔` used for emphasis parks an entry, so Lane B's
+READY read 0 across five checks while it waited (**LB-121**, which now carries the measured cost
+and two more entries parked the same way, TN-3b and Q-305). The S25 look is owed.
 
 **The only illness band that ever fires now says what moved (TN-45, v1.457.12 — engine half only).**
 `watch` has fired **2 days in 72**; `elevated` and `fever` have fired **zero** times, so the illness
