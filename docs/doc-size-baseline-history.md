@@ -18,6 +18,25 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-20 — backlog → 24550, `docs/agents/state/tuning.md` → 714 (TN-52, and a correction to the owner's own numbers)
+
+**+111 on a 24042 base.** The owner asked how to make the tuning work on and off the medication.
+Answering it required correcting the premise first: this agent had repeated *"resting HR +13 bpm, HRV
+down two thirds"* from a two-day excursion, where the window means are **+3.9 bpm** and **−24%**. That
+correction is what makes the entry useful — the app is not fragile because he changed a lot, it is
+fragile because its windows are narrower than his ordinary night-to-night noise (a ~6 bpm charge
+window against a 3.15 bpm nightly sd). So the axis is not "on reta / off reta" but "define thresholds
+in units of the user's own variability", and the same shape has now appeared four times, three of them
+with no drug involved. TN-46's medical aside is restated at the corrected size.
+
+Rule 1 was then backtested rather than asserted, which corrected the entry a second time: the
+quantile is **stable** across regimes (61/61/62 bpm time-weighted), not tracking them — the
+"tracking" story came from a per-sample percentile that overstates the ring's quiet end by 7–10 bpm.
+That is TN-2's own warning catching this agent three times in two days, so it now heads the baton's
+Method section.
+
+---
+
 ## 2026-09-20 — backlog → 24374 (TN-2 re-measured on the owner's "useless" report)
 
 **+18.** The owner called the Body Battery useless; it is, it was already diagnosed as
