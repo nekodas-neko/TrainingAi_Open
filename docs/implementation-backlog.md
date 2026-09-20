@@ -506,6 +506,64 @@ below threshold and left in place for next time.
   The recompute is correct; it is the conflict that should not exist.
 - **Branch:** _unassigned_
 
+### [nutrition] BF-183 — tag My Foods rows with the meal they are actually eaten at, using the emoji the meal type already carries
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-20 (BugFix intake). Owner: *"Can we have some sort of
+  icon system to indicate which meal its good for? Maybe we could use the lucid icon pack for this.
+  The tough part is when people add too many meals. But my standard of 4 it should go well."*
+- **Lane: B** — the list is `components/nutrition/saved-meals-sheet.tsx`. The affinity query is a
+  Lane A route if it is computed server-side; see the open question below.
+- **⚠ Recommend the existing per-meal-type EMOJI, not lucide — and this is the part worth arguing
+  before anyone writes code.** `meal_types` already has an `emoji` column, user-set, and the
+  Assign-to-Meal sheet already renders it. His four active types, measured 2026-09-20:
+
+  | sort | meal type | emoji |
+  |---|---|---|
+  | 0 | Pre Workout (Breakfast) | 🍳 |
+  | 1 | Post Workout | 🍎 |
+  | 2 | Lunch | 🥗 |
+  | 5 | Dinner | 🌙 |
+
+  Three reasons the emoji wins. **Meal types are USER-CREATED** — a fixed lucide map cannot name a
+  type the app did not anticipate, and this account has previously carried an *"Afternoon Meal"*
+  🍽️; the emoji always can, because he picks it. **The mapping is already trained** — he sees these
+  four glyphs every time he logs food. And **one vocabulary cannot drift from itself**; two is the
+  shape this repo has cleaned up repeatedly.
+- **The signal exists and is strong enough to be worth shipping. Measured across all 19 of his saved
+  meals (dominant meal type by log count):**
+
+  | tier | count | examples |
+  |---|---|---|
+  | **Confident** (≥3 logs, 100% one meal) | **10** | Protein Shake 45× 🍳 · Cruskit + PB 26× 🍳 · Ninja Creami 10× 🥗 · Wrap Pizza 6× 🌙 · Protein Pancakes 6× 🍎 |
+  | Split | 2 | Beef Mince Cube 60% 🌙 · Corn Chips 50% 🥗 |
+  | Single log | 3 | Protein Granola, Corn Block, Protein Pasta Brick |
+  | **Never logged — no signal at all** | **4** | Chicken Block, Shredded Chicken Block, Slow Cooked Shredded Beef Ragu, Pulled Pork Block |
+
+  **53% of the list gets a confident tag today**, and the top of the list is unambiguous — a protein
+  shake logged 45 times at breakfast and never anywhere else.
+- **⚠ Show NOTHING below the threshold rather than a best guess.** Four items have never been
+  logged; three have a single log. An icon derived from one log is a guess rendered as knowledge,
+  which is the exact failure BF-172 and BF-154 were filed for. **Proposed gate: ≥3 logs AND ≥60% to
+  one meal type.** Blank is honest and self-heals as he logs.
+- **His "too many meals" worry is bounded and the design should say how.** The row shows **one**
+  glyph — the dominant type — never N. So a user with ten meal types gets one emoji, same as four.
+  What degrades with more types is not the row, it is the *confidence*: the same log count spread
+  over more buckets clears 60% less often, and more rows fall to blank. That is the right failure
+  direction.
+- **Open question for the implementer, not for the owner:** whether the affinity is computed
+  server-side (a column on the saved-meals payload) or client-side from data the sheet already
+  holds. Server-side is one grouped query and keeps the threshold in one place; client-side needs
+  the log history on that screen, which it may not have. **Decide by checking what
+  `saved-meals-sheet` already fetches** before adding a route.
+- **Gate: owner** — two calls are his: **emoji versus lucide** (recommendation above, with reasons),
+  and whether a below-threshold row should be **blank** or show a muted "not sure yet" affordance he
+  could tap to set manually. A manual override is the natural extension and is deliberately NOT
+  specified here; it is a second entry if he wants it.
+- **Verification:** the 10 confident rows above must carry exactly the emoji named, and the 4
+  never-logged rows must carry none. Those are real fixtures from his account, so the test can
+  assert them by name. Browser at ≤640px is enough for the arithmetic; **device look owed** for
+  glyph legibility at the row's icon size on the S25.
+
 ### [workouts] BF-182 — warm the next prescription when Home renders, not at completion and not at tab-open
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-20 (BugFix intake). Owner: *"when you select the ai
