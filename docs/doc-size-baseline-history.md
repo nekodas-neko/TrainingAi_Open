@@ -14445,6 +14445,35 @@ TN-3b is the owner's.
   files every time. The number is the point: it converts "this is annoying" into "the drift rate is
   faster than a CI cycle", which is a different problem with a different fix.
 
+## 2026-09-20 (sixth) — `docs/implementation-backlog.md` → 25071 (after merging OR-120/OR-121)
+
+Not new entries — **TN-51 and TN-54 were unreachable and had to be re-filed**, plus the protocol
+clarification that stops the next filer repeating it. +20 lines.
+
+TN-51 carried `Needs: PS-44` that nobody wrote: the line read `- **Needs:** — nothing. **Blocks the
+HRV half of PS-44.**`, and `next-item.js` takes *any* entry ID anywhere after `Needs:` as a
+dependency. So the prose said "nothing blocks this" and the parser read the exact inverse of the
+real direction. Both entries additionally carried `Gate: device`, which parks them — the mistake the
+`Gate:` bullet in the backlog protocol names twice (BF-45, LB-26) and which this filing made a third
+time, having read it.
+
+The part worth keeping is that **`Verify: device` is not the fix either**, which is what the
+protocol implied and what was tried first: it prints under a heading that reads *shipped*, and these
+are unbuilt. Neither structured field describes startable native work that will owe a device check,
+so the protocol bullet now says to carry neither and state the check as prose. Both entries moved to
+the top of the queue — the owner's *"lets get this sorted before my next trial"* is a priority
+statement, and priority here is queue position.
+
+## 2026-09-20 — `docs/agents/state/tuning.md` → 731
+
++17, and the paragraph it replaces was actively misleading: the baton told a successor the one thing
+owed by the owner was to run the Cooper test. He has run it — it yielded 175 — and the "pinned 178"
+the same paragraph described was never live (all 101 cached days use 187). So the raise buys a
+correction plus the three owner actions that *are* outstanding, and a Method section on the trap that
+produced this PR: an entry can be filed, merged and CI-green while being invisible to the lane meant
+to build it. The trap's full account is the journal entry, not the baton — the baton carries the
+two-line rule (`next-item.js` after filing; neither `Gate:` nor `Verify:` on startable native work)
+and links out, which is what keeps it from accreting further.
 ## 2026-09-20 — `docs/implementation-backlog.md` → 25024 (OR-120, three decisions answered)
 
 +40 for three answers, and the lines are mostly **reopening conditions** rather than the answers
