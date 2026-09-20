@@ -3604,7 +3604,34 @@ this is not new infrastructure.
 exists in the service and did not prevent five silent days — a notification is not a record, and the
 question *"did last night count"* is asked the next morning, not at the moment of failure.
 
-**⚠ Do not read the five-day gap as a device fault yet.** The most likely causes are a flat CR2025
+**✅ DIAGNOSED LIVE, 2026-09-20 06:03 Brisbane — it is NOT the battery and NOT the link.** The owner
+sent a screenshot of the Devices screen reading **"Polar H10 · Connected · on your chest"**, and rows
+began arriving **in the same minute**:
+
+| Brisbane | rr_ms | gap from previous |
+|---|---:|---:|
+| 06:03:28 | 802 | — |
+| 06:03:58 | 1247 | **30.2 s** |
+| 06:04:29 | 715 | **30.2 s** |
+| 06:04:59 | 790 | **30.7 s** |
+
+**Opening the app is what started it.** Nothing had arrived for five days; ingestion resumed the
+minute the Devices screen was opened and has continued since. So the strap, its cell, the BLE link
+and the whole ingest path are all fine — **the service simply was not running**, and the most likely
+reason is its own give-up path (`stopSelf()` after `MAX_CONSECUTIVE_FAILURES = 6`), which nothing
+restarts until the app is launched.
+
+**That makes the observability gap the entire bug rather than half of it.** A service that stops
+itself and needs a manual app launch to come back is survivable if it *says so*; this one is
+indistinguishable from a working strap, and the Devices screen shows **"Connected"** with no battery
+figure at all (the ring beside it shows 75%) — so the one surface the owner checked actively
+reassured him.
+
+**⚠ Revised ask, sharper than the original.** Persist the status row *and* surface **last-sample-at**
+on the Devices card. "Connected" is not the useful fact; **"last sample 5 days ago"** is, and the app
+has it.
+
+**⚠ Do not read the five-day gap as a device fault.** The most likely causes are a flat CR2025
 (141,745 RR intervals of use, and the Polar notes say a dying cell presents as flaky connections), the
 service having given up and never been restarted, or Bluetooth being off. **This entry is about not
 being able to tell which** — it deliberately does not claim to know.
@@ -3642,6 +3669,16 @@ hours):**
 So ambient wear yields **islands of ~2–3 consecutive beats separated by 30-second holes**. Across
 the strap's whole history the figure looks healthier — 92.1% beat-to-beat — but that is dominated by
 workout-mode wear at 07:00–11:00, which is exactly the window that is *not* representative of a night.
+
+**✅ CONFIRMED LIVE IN PRODUCTION, 2026-09-20 06:03–06:05 Brisbane — and it is WORSE than this entry
+estimated.** With the strap connected and the service in ambient mode, consecutive stored RR rows sit
+**30.2 s, 30.2 s and 30.7 s apart** — `AMBIENT_GAP_MS` exactly, and **one single RR interval per
+kept sample**, not the "islands of 2–3 beats" estimated from historical gaps.
+
+**With one interval per island there are ZERO successive pairs, so rMSSD is not degraded — it is
+undefined.** rMSSD is the root-mean-square of differences between *adjacent* intervals; a lone
+interval every 30 s yields no adjacent pair at all. The historical 57.4%-of-gaps-under-2 s figure
+came from kept samples that happened to carry 2 beats; the live sample carries 1.
 
 **⚠ Why this blocks PS-44 rather than merely degrading it.** PS-44 exists to compare `rmssdFromRr`
 over the strap's intervals against the ring's own `0x5d rmssd_ms`. rMSSD is the root-mean-square of

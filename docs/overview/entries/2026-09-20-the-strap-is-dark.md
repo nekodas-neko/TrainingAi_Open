@@ -46,6 +46,31 @@ which, and says so rather than guessing.
 prevent five silent days. A notification is not a record, and *"did last night count"* is asked the
 next morning.
 
+## Diagnosed live, an hour later
+
+The owner replied with a screenshot of the Devices screen reading **"Polar H10 · Connected · on your
+chest"** — and rows began arriving in the same minute, 06:03 Brisbane. Consecutive stored RR rows:
+
+| Brisbane | rr_ms | gap |
+|---|---:|---:|
+| 06:03:28 | 802 | — |
+| 06:03:58 | 1247 | **30.2 s** |
+| 06:04:29 | 715 | **30.2 s** |
+| 06:04:59 | 790 | **30.7 s** |
+
+**Opening the app is what started it.** Not the cell, not the link, not the ingest path — the service
+was not running, and nothing restarts it until the app is launched. Its own give-up path
+(`stopSelf()` after six failures) is the likely cause.
+
+That makes the observability gap the whole bug. The Devices card showed **"Connected"** with no
+battery figure while the ring beside it showed 75% — so the one surface checked actively reassured
+him. The revised ask is smaller and sharper: surface **last-sample-at**, which the app already has.
+"Connected" is not the useful fact; *"last sample 5 days ago"* is.
+
+**And it confirmed TN-51 is worse than estimated.** 30-second gaps with **one** RR interval per kept
+sample, not the islands of 2–3 inferred from history. With one interval per island there are no
+adjacent pairs, so rMSSD is not degraded — it is **undefined**.
+
 ## What was not exercised
 
 Stored production reads plus a source read, in the sandbox. No code changed, no device, no APK, no UI.
