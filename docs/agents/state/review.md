@@ -5,8 +5,8 @@
 > 🔴 handed on) and is the only part that moves. A session self-titles 🟢 on its first instruction and
 > flips itself to 🔴 as the last step of its handoff, after the baton and every PR have landed.
 
-**Updated:** 2026-09-18 · **By:** forty-eight sweeps (2026-08-17 ×2, 2026-08-18 ×37, 2026-08-20 ×1,
-2026-09-03 ×6, 2026-09-05 ×2, 2026-09-06 ×1, 2026-09-18 ×1) · **Next ID: `RV-64`.**
+**Updated:** 2026-09-20 · **By:** forty-nine sweeps (2026-08-17 ×2, 2026-08-18 ×37, 2026-08-20 ×1,
+2026-09-03 ×6, 2026-09-05 ×2, 2026-09-06 ×1, 2026-09-18 ×1, 2026-09-20 ×1) · **Next ID: `RV-84`.**
 
 > **Sweep 40's run is closed and nothing is owed from it** — RV-32, RV-33, RV-34 all shipped, verified
 > in source rather than taken from the closure note, and their `projectOverview.md` row is in
@@ -37,41 +37,41 @@ From sweeps 29–39
 worker claims the page). **Q-556 was listed here and is CLOSED** — it shipped on
 `/api/activity-logs`, which now answers 404, verified live in sweep 47. From sweeps 41-42: **RV-37** and **RV-39**, both needing the device.
 
-## Now — sweep 50 filed (2026-09-18). **Next ID: `RV-64`.**
+## Now — sweep 51 filed (2026-09-20). **Next ID: `RV-84`.**
 
-**Sweep 50 was the owner's twelve-day catch-up** — base `3e47f03f`, 50 commits, 671 code files,
-across safety/logic/performance/efficiency; four read-only lanes, **every finding re-verified at
-source before filing**. [Write-up](../../reviews/2026-09-18-sweep-50-twelve-days.md) · filed
-**RV-51…RV-63**, with `projectOverview.md` rows for RV-51 and RV-62.
+**Sweep 51 was the owner's efficiency review** — logic over AI, faster caching/saving, app
+efficiency, animation/UI for feel; four lanes, every load-bearing claim re-verified.
+[Write-up](../../reviews/2026-09-20-sweep-51-efficiency.md) · **RV-64…RV-83** · batches
+`hr-window-aggregate` (2), `ai-degrade-and-bound` (2), `motion-polish` (4).
 
-**RV-51 is the only live user-affecting one** — production holds **2 of 156** `exercise_library`
-rows with `equipment = []`, which `equipmentEligible`'s `.some()` makes invisible to every selection
-including `full_gym`. Its header says an empty list "should not occur". It occurs.
+**RV-64 is the headline and is NOT an AI finding.** `/api/hr-profile` pulls **128,734** production
+rows into JS and sorts them for two order statistics and a mean; the aggregate is **one row in 54
+ms**. `LiveHrChart` remounts it **once per rest period** — ~20 scans per workout, same pool as
+`log-exercise`, and its own 20/60s limit can 429 it.
 
-**The transferable finding, and the lens for sweep 51:** every other defect is *a rule written down
-correctly and then half-applied* — a contract-constant imported by one of its two files, a
-case-insensitive compare that lowercases one side, cache keys in zero groups beside siblings in
-four. **A reader cannot catch this class: the comment says the right thing.** What does catch it —
-treat a module header's claim as a *hypothesis* and go find its counter-example in production data
-or at the other end of the contract.
+**Reframe the AI question first: 49 LLM calls in 14 days.** Cost is not the argument; latency,
+offline and correctness are. Ranking that work by spend produces a list not worth doing.
 
-**BF-110's reading is IN and DECISIVE — native-layer** (3 rows `stuck h1=667 h2=667`, 12 healthy at
-826, 0 `resized`/`dom-lost`, 09-15→09-16); on its entry, with two telemetry corrections — `stuck`
-fires on healthy resumes too, and **only the height discriminates** (`w=384` is on every row).
-**Two `CLAUDE.md` session-start numbers corrected**: `error_events`' 52 MB is TOAST bloat behind 115
-live rows, not payload; growth is 1.71 MB/day, not ~0.4 (bounded — watch the shape).
+**RV-65 asks for a MEASUREMENT, not a removal.** The prescription prompt tells the model a
+deterministic layer will overwrite its numbers, and it does — but only the reconciled output is
+stored, so the model's contribution is unknowable. BF-110's lesson applied *before* the fix. **An
+early framing of mine was wrong, not filed:** that path is not a per-open 2.2s block (dedup cache,
+30s cooldown, once-per-episode guard, 1–7 day TTL).
 
-**Clean, do not re-sweep:** admin auth on both new admin routes (proved by revocation), ownership
-rules (a)/(b)/(c) on vials, zero N+1s in the added data layer, every migration 267–277 query pattern
-indexed, no new dependency in 671 files, all four cache/render gate scripts exit 0. **Not exercised:**
-anything device; the new vials domain's offline-first half; `rederive-baselines`' write path;
-the ~33 *changed* formula files.
+**RV-67 is the one a reader cannot find:** a comment says `cachedFetch` honours its TTL; the gate is
+opt-in. **191 read sites, 8 flags.** Do not bulk-apply it — each key needs its invalidation proof.
 
-**Sweeps 47/48/49 are closed** — see their write-ups; RV-49 landed and RV-50 resolved as
-not-a-defect (pinned in `lib/__tests__/cache-groups.test.ts:227-236`), both verified in source this
-sweep. **The rules they left:** a 4xx is not evidence the guard fired, so read which field it names
-(48 had five rejected on the wrong one); pair every refusal with a one-field control; `claude_ro` is
-**the owner's rows only**. **Owed:** RV-37/39 device; RV-38/41/43 owner decision.
+**TWO CORRECTIONS, so nobody re-files them:** reduced motion **is** handled globally
+(`MotionConfig reducedMotion="user"`, `app/layout.tsx:153`) — counting hook sites misses it; every
+bare `pb-safe` is permitted page-level scroll padding — **no safe-area violation exists.**
+
+**The lens that worked, and the one for sweep 52:** treat a claim in a comment or a prompt as a
+*hypothesis* and find its counter-example — it produced RV-67, RV-65, and sweep 50's RV-57/58.
+
+**Sweeps 47–50 closed** (50: 12 of 13 shipped, RV-61 queued; RV-51 misdiagnosed by me — its journal
+entry has it). **Their durable rules:** a 4xx is not evidence the guard fired, so read which field it
+names; pair every refusal with a one-field control; `claude_ro` is **the owner's rows only**.
+**Owed:** RV-37/39 device; RV-38/41/43 owner decision.
 
 ## Carried from sweep 40 ([write-up](../../reviews/2026-08-20-non-workout-write-surface-ownership.md))
 
