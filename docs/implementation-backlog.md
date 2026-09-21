@@ -1756,29 +1756,6 @@ window, and `rmssdFromRr` over it is comparable to the ring's figure for the sam
   them by name. Browser at ≤640px is enough for the arithmetic; **device look owed** for
   glyph legibility at the row's icon size on the S25.
 
-### [body][app-shell] LA-124 — the stress chart builds a date formatter once per bucket, the same shape RV-80 just removed
-
-- **Lane:** B — `components/body-battery/stress-day.ts:44-52`. **Added:** 2026-09-21 · found by
-  sweeping for RV-80's siblings, not reported.
-- `minutesIntoDay(t, tz)` constructs a `new Intl.DateTimeFormat` on every call, and `toSegments`
-  calls it once per bucket in a `.map`. Identical to the defect RV-80 fixed in
-  `computeMovedHours`, and it is the **only** other raw `Intl.DateTimeFormat` construction in
-  `lib/`, `packages/`, `app/` or `components/` — the sweep is complete, this is the whole
-  remainder.
-- **It is small, and the number is the point of filing it rather than fixing it inside RV-80.**
-  Measured on a full day's 48 buckets: **3.19 ms → 0.16 ms**, a 20× ratio worth **3 ms per chart
-  render**. RV-80's site ran 2,831–5,606 times per call on a path warmed at every app launch; this
-  one runs 48 times when a chart draws. Same shape, three orders of magnitude apart in what it
-  costs.
-- **Fix:** hoist the formatter into `toSegments` and pass it down, or memoise per `tz`. Note that
-  `minutesIntoDay` is **exported and directly tested** (`__tests__/stress-day.test.ts:16,17,23`,
-  including an `Etc/GMT+5` case), so its public signature has to keep working per-call — a
-  module-scope hoist would bind the first caller's zone and break exactly that test. That is the
-  mutation RV-80 added a test for; here the existing test already catches it.
-- **Why it is Lane B:** `components/**`. Lane A found it and is not touching it.
-- **⚠ Do not batch this with a device-gated item** — it needs no APK and no owner check, so it
-  should not inherit one.
-
 ### [workouts] BF-182 — warm the next prescription when Home renders, not at completion and not at tab-open
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-20 (BugFix intake). Owner: *"when you select the ai
