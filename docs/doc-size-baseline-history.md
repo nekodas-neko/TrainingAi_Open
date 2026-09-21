@@ -14985,7 +14985,33 @@ member device-gated, one invisible to the runner.
 `projectOverview.md`'s +16 is the Known-Issues row, which carries the device sitting the whole batch
 exists for plus the sibling `transition-all` sites deliberately left unswept.
 
-## 2026-09-21 — `docs/implementation-backlog.md` +20 (RV-72 shipped with residue)
+## 2026-09-21 — RV-66 left the queue and three findings took its place
+
+`docs/implementation-backlog.md` **25962 → 25998** · `projectOverview.md` **12170 → 12198**
+(`lane-a/rv66-baseline-is-the-recommendation`) —
+RV-66 out, **LA-125, LA-126 and LA-127 in**. The document grew by shipping an entry, which is worth
+the note.
+
+The entry's unmeasured question — *how far does the model stray inside the clamp's band* — turned out
+not to be answerable from stored rows at all, because the baseline is never persisted beside the
+recommendation. Reconstructed from the owner's profile instead, the answer is that "strays inside the
+band" understates it: the last applied recommendation carried a **5,000** step goal where
+`STEP_GOAL_BY_ACTIVITY` can only ever return 7,000 / 8,500 / 10,000 / 12,000, and the clamp altered
+nothing.
+
+The three new entries are the cost of measuring rather than assuming. **LA-126** is the one that
+matters: the owner's live nutrition targets are still a model's numbers, +250 kcal and +35 g protein
+over the formula, and correcting them is his call rather than a fix. **LA-125** is the honest
+asterisk on this PR's own claim — the recommendation is the baseline *made safe*, and fat and carbs
+differ. **LA-127** is why the measurement above carries a caveat at all: two tables have no
+`claude_ro` twin.
+
+## 2026-09-21 — RV-72 shipped with residue, on top of RV-66's rebaseline
+
+`docs/implementation-backlog.md` **25998 → 26018** · `projectOverview.md` **12198 → 12205**
+(`fix/rv72-progress-bar-scalex`) — both baselines were raised by RV-66 while this branch was open,
+so these are the +20/+7 measured against the merged file rather than against the number this branch
+started from.
 
 RV-72's entry stays queued rather than being deleted, so the lines are a `✅ SHIPPED` record plus a
 `Keep:` naming what is genuinely still owed: the `motion-polish` device pass, the
@@ -14996,7 +15022,7 @@ One line is a correction rather than a description: the `⛔` that opened the ca
 bullet was emphasis, not a blocker, and it is what parked the entry (LB-121's fourth instance). It
 is gone, so the entry is now visible to `next-item.js` for whoever takes the residue.
 
-`projectOverview.md`'s +6 is the same `motion-polish` Known-Issues row rather than a second one —
+The +7 on `projectOverview.md` is the same `motion-polish` Known-Issues row rather than a second one —
 RV-72 shares RV-71 and RV-75's batch and its one device sitting, so a separate row would have
 claimed a separate check that does not exist. The added lines are what is carried, not fixed: the
 `transition-all`-over-inline-`width` sites, the 26 untransitioned bars, and why the calorie bar

@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.463.1",
+    version: "1.464.1",
     date: "2026-09-21",
     changes: [
       "Progress bars now glide instead of stuttering. The contributor bars, the walk pacer, the meal macro rows and the workout time bar all animated their width, which makes the phone re-lay-out the whole row on every frame \u2014 and nudges the labels and numbers beside them. They now scale instead, which the GPU handles on its own. The calorie bar is deliberately unchanged: its fill is a colour ramp, and scaling it would change which colour the leading edge shows.",
+    ],
+  },
+  {
+    version: "1.464.0",
+    date: "2026-09-21",
+    changes: [
+      "Your recommended calorie, protein, carb, fat, water and step targets are now calculated from your own measurements \u2014 body composition, your measured resting rate, and your goal \u2014 instead of being chosen by the AI. It was already calculating all six and then asking the model for its own numbers on top; the last recommendation you applied suggested 5,000 steps where the calculation said 10,000, and 150g of protein where it said 115g. The AI now explains the targets and still flags when your logged training suggests a different activity level, which recalculates them. Your currently saved targets are unchanged \u2014 re-run the recommendation to see the calculated ones.",
     ],
   },
   {
