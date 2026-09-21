@@ -99,6 +99,20 @@ Live at the time of writing (2026-08-05):
 
 ## History
 
+- [`2026-09-21-tn3b-stress-on-hr-chart`](../../overview/entries/2026-09-21-tn3b-stress-on-hr-chart.md)
+  — **TN-3b's HR-chart overlay (2026-09-21): stress drawn against heart rate on one clock.** The
+  day's stress series now renders on `hr-day-chart.tsx` on a hidden second scale fixed to [−1,+1],
+  on `/health/heart-rate` and the Health tab's HR card; Home's compact widget is deliberately
+  excluded. Drawn as the measured series rather than shaded bands — thresholding into "stressed"
+  windows would mean inventing a calibration, which is Tuning's and the owner's. Gaps break the
+  line by reusing `body-battery/stress-day.ts`'s `toSegments`. **The entry had been recommended for
+  striking as leftover prose and the owner said no** — the 2026-09-10 reshape *added* the
+  day-timeline overlay (TN-35) without withdrawing this one, and an expanding decision reads
+  identically to a replacing one. `lib/hooks/use-stress-day.ts` now owns the `stress-day:` key for
+  every reader. Fixed in passing: the heart-rate page keyed its whole day to `DEFAULT_TZ`.
+  **Still owed: the S25 look** (four things in one chart), and the cross-day aggregate, which the
+  owner was *not* asked about.
+
 - [`2026-09-20-tn53-sparkline-gaps`](../../overview/entries/2026-09-20-tn53-sparkline-gaps.md)
   — **TN-53's render half (2026-09-20): the 14-day trend charts were drawing over their own gaps.**
   The engine gate made `analyseHrRecovery` return `null` for a pair of readings that cannot support

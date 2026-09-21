@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.461.0",
+    date: "2026-09-21",
+    changes: [
+      "The heart-rate charts now draw your stress for the day over the top of your heart rate, on the same clock. You asked to be able to match a stressed stretch to what you were doing at the time \u2014 now you can read it against your heart rate, your sleep block and your workouts in one place. Where the ring stopped sampling the stress line breaks rather than guessing across the gap.",
+    ],
+  },
+  {
     version: "1.460.7",
     date: "2026-09-20",
     changes: [

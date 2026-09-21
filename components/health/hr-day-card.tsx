@@ -6,6 +6,7 @@ import { todayInTz } from '@trainingai/shared/date-utils'
 import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { HrDayChart } from './hr-day-chart'
+import { useStressDay } from '@/lib/hooks/use-stress-day'
 import type { HrSleepWindow } from '@trainingai/shared/health/hr-sleep-band'
 
 interface HrReading { timestamp: string; bpm: number; source: string | null }
@@ -22,6 +23,9 @@ export function HrDayCard() {
   const [hrReadings, setHrReadings] = useState<HrReading[]>([])
   const [sleepWindow, setSleepWindow] = useState<HrSleepWindow | null>(null)
   const [workoutSessions, setWorkoutSessions] = useState<WorkoutSession[]>([])
+  // TN-3b — the owner wants stress readable against heart rate on the same clock. Same key the
+  // standalone strip uses, so `cachedFetch` de-dupes and this costs no extra request.
+  const { data: stress } = useStressDay(today)
 
   // Seed synchronously from cache before paint (never in a useState lazy initializer — hydration).
   useLayoutEffect(() => {
@@ -50,7 +54,7 @@ export function HrDayCard() {
     <div className="rounded-2xl bg-muted/30 border border-border/50 p-4 space-y-3">
       <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Heart Rate · Today</p>
       {hrReadings.length > 0 ? (
-        <HrDayChart readings={hrReadings} date={today} workoutSessions={workoutSessions} sleepWindow={sleepWindow} />
+        <HrDayChart readings={hrReadings} date={today} workoutSessions={workoutSessions} sleepWindow={sleepWindow} stressSeries={stress?.series} stressTimezone={tz} />
       ) : (
         <p className="text-xs text-muted-foreground">No HR captured yet today — the ring records periodically while worn.</p>
       )}
