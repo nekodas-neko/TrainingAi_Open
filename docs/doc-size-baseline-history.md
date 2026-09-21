@@ -14730,3 +14730,26 @@ hypothetical. Recorded rather than fixed by editing the field, because unparking
 the shape the lane is explicitly warned about — and because the choice between "clear when the
 buildable work is done" and "stop counting a residue-only entry as a blocker" is the Orchestrator's,
 not a lane's.
+
+## 2026-09-21 — TN-35's overlay half, and how it came to be startable
+
+`docs/implementation-backlog.md` **25292 → 25329** (+37) · `projectOverview.md` **12093 → 12109**
+(+16) (`feat/tn35-stress-against-events`).
+
+The backlog lines are mostly two things that would otherwise be lost.
+
+**How the entry unparked.** Its `Needs: TN-3b` was satisfied and still blocking, because `Needs:`
+clears only when its target leaves the queue and TN-3b stays for a `Keep:`. That was filed as #1362
+rather than edited away; the owner then said to continue with the backlog, and that is the
+authorisation this build ran on. Recording it matters because the next reader would otherwise find
+a `Needs:` beside a shipped entry and conclude the field can be ignored. **It cannot** — the
+structural question is still open and still the Orchestrator's.
+
+**What is still missing.** The marker half is Lane A's and unbuilt, so the feature attributes stress
+to training, food, walks and sleep only. Meetings, commutes and arguments — most of what the owner
+means by "events" — remain invisible. An entry that looks shipped and is half a feature needs to say
+which half.
+
+`projectOverview.md`'s +16 is the Known-Issues row, which carries the same split plus the two owed
+checks: the 412 px look, and the pass test only the owner can run — including that *"it does not
+match anything"* is a valid result and the one that would retire the metric.

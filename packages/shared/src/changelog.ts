@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.462.0",
+    date: "2026-09-21",
+    changes: [
+      "Open any past day and the stress chart now lists what you were doing, with the stress reading beside each workout, meal, walk and sleep. Where the ring recorded nothing at that moment it says \"no reading\" rather than showing a zero \u2014 on an average day only about half your day is measured, so the list also tells you how many of the day's events actually carry a reading.",
+    ],
+  },
+  {
     version: "1.461.0",
     date: "2026-09-21",
     changes: [
