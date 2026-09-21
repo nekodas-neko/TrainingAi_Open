@@ -14926,3 +14926,23 @@ A future reader hitting a genuinely empty library would have been sent to the wr
 No `projectOverview.md` row: there is nothing owed. No visual change, no device check, no pending
 question — the only thing NOT established is the millisecond cost, and that is stated in the entry
 and the journal rather than filed as an open issue.
+
+## 2026-09-21 — RV-64's aggregate was measured rather than assumed, and rewritten rather than removed
+
+`docs/implementation-backlog.md` **25986 → 25992** (`lane-a/rv64-order-statistics-selection`) — RV-64
+grew rather than left the queue, which is the point of the note.
+
+The entry asked for the HR reduction to move into SQL, citing a 54 ms aggregate against a 130k-row
+pull. Built and measured, that aggregate **answers differently** — `getHrForWindow` returns
+`preferStrapBuckets(rows)`, which the entry flagged as unread, and dropping its 1,350 merged-away
+rows moves the k-th lowest from 37 to 36 — and a merge-correct version is **266.2 ms against the
+pull's 197.9 ms**, a wash rather than a win.
+
+So the entry is rewritten in place rather than struck: the engine half that shipped is 30 ms in the
+reduction (60.8 → 30.4 ms, identical output), the *order of magnitude* is the once-per-rest-period
+remount, and that is `components/**`. RV-64 is re-laned to B with the remount as its `Keep:`, and
+RV-73's `Batch:` and `Needs: RV-64` are removed because both named a shared SQL fix that will not
+exist.
+
+The six lines are what it costs to stop the next session re-proposing the aggregate and re-measuring
+its way back to the same answer.
