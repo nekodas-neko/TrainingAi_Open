@@ -14688,3 +14688,27 @@ six accumulated. Writing the list down is the only move available.
 The sharper point is that this had been noticed in an earlier session and recorded **nowhere in the
 repo**, so it had to be re-derived from the PR list and a test run. That is precisely the failure
 LA-122 was created to stop, which is now said in its own header rather than left implicit.
+
+## 2026-09-21 — TN-3b ships after the owner overruled a recommendation to strike it
+
+`docs/implementation-backlog.md` **+50** (landing at 25276) · `projectOverview.md` **+16**
+(12077 → 12093) (`feat/tn3b-stress-on-hr-chart`).
+
+Most of the backlog's 50 lines are two records that would otherwise exist only in a chat log.
+
+**TN-3b**: three sessions read its remaining text as leftover prose and filed it as a scope call,
+and I put it to the owner recommending a strike. He said no. The entry now records both the answer
+and **why the recommendation was wrong** — the 2026-09-10 reshape *added* the day-timeline overlay
+without withdrawing the HR-chart one, and an expanding decision reads identically to a replacing one
+from inside the entry. That is worth more lines than the fix, because the next reader of a
+finished-looking entry will make the same call. It also carries a `Keep:` warning that the cross-day
+aggregate was **not** part of the answer, so nobody builds it on the strength of this one.
+
+**BF-185**: the owner chose an editable time control, and the entry gained the reason Lane B still
+cannot build it. Its own premise — *"the server already honours an explicit `takenAt`"* — is true of
+the repository and false of `SupplementLogSchema`, which is `.strict()` with three fields and no
+`takenAt`. That is the second time this entry has been wrong in the field that decides who builds
+it, so the lines buy the sequencing plus the general form: read the schema, not the repository.
+
+`projectOverview.md`'s +16 is the Known-Issues row, whose device check is unusually specific because
+the chart now carries four things at 412 px.

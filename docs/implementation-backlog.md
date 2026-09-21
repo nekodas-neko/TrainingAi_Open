@@ -920,6 +920,28 @@ window, and `rmssdFromRr` over it is comparable to the ring's figure for the sam
 - **The Lane B half exists but is second.** The server already honours an explicit `takenAt`, so an
   editable-time control can send one — but it is pointless until the re-stamp stops, because the
   next re-tick would wipe the edit. **Engine half first**, per the both-lanes rule.
+- **✅ OWNER ANSWERED 2026-09-21: an EDITABLE TIME CONTROL.** Put to him as three options once the
+  engine half (#1358) had shipped and, by its own admission, removed the only way to correct a
+  wrong time. He chose the entry's own recommendation, which Lane A and Lane B had both independently
+  reached. The alternatives — a read-only re-stamp indicator, or no correction path at all — are
+  closed.
+- **⚠ STILL NOT STARTABLE BY LANE B, AND THE REASON IS THE SAME FIELD THAT WAS WRONG LAST TIME
+  (checked 2026-09-21, before building).** This entry says *"the server already honours an explicit
+  `takenAt`, so an editable-time control can send one"*. **That is true of the repository and false
+  of the route in front of it.** `SupplementLogSchema`
+  (`packages/shared/src/validation/supplement.ts:68`) is `.strict()` with exactly three fields —
+  `amount`, `unit`, `doseText` — and **no `takenAt`**, so a client sending one gets a **400 Invalid
+  body before the handler runs**. Building the control today would ship a UI that cannot save.
+  **So the remaining work is cross-lane again and the engine part is still first:**
+  - **Lane A:** add `takenAt` to `SupplementLogSchema` (`packages/shared/**`) and pass it through
+    `app/api/supplements/[id]/log/route.ts` (`app/api/**`). Check the outbox push payload in
+    `lib/local-store/**` carries it too, or the device's edit will not reach the server.
+  - **Lane B, after that:** the control itself, in the supplements surface.
+  **This is the second time this entry's premise has been wrong in the field that decides who
+  builds it** — the first sent it to Lane B on a cause that lived in `adapter.ts`. The lesson is
+  not about this entry: *"the server honours X"* is a claim about a repository method, and the
+  thing a client talks to is the route's schema. Read the schema, not the repository, before
+  believing a UI can send a field.
 - **The owner decision the entry names is still open and is now the gating one:** preserving the
   stamp removes today's only path to correcting a wrong time. Editable is the entry's own
   recommendation and this lane agrees — it separates *"I mis-tapped"* from *"I dosed at a different
@@ -13711,19 +13733,47 @@ record explicitly why not.
   overlay the series on the DAY TIMELINE**, not on the HR charts. The HR-chart overlay was checked
   and is genuinely absent (`hr-day-chart.tsx` draws sleep and workout bands and no stress), so this
   is a scope question rather than a missed build.
-- **⚑ RE-CONFIRMED 2026-09-20 (Lane B), AND THE COST IS NOW NAMED: this entry is FINISHED and the
-  only thing it still does is block TN-35.** Re-read end to end while auditing the entries parked by
-  an emphasis glyph (LB-121). Every buildable claim in it is discharged — the chart shipped, the
-  past-day read is not blocked, the pass test is met 6/6. What remains is the pre-reshape prose
-  below, and that is a **scope call for the Orchestrator**, not a build:
-  **is the HR-chart overlay out of scope?** The 2026-09-10 reshape says yes — it put the overlay on
-  the **day timeline** as TN-35, and `hr-day-chart.tsx` was checked and draws sleep and workout
-  bands and no stress. If that is confirmed, strike this entry.
-  **Until it is struck, TN-35 cannot start.** Its `Needs: TN-3b` clears only when this leaves the
-  queue, and its overlay half is Lane B and buildable today — `app/api/day-timeline/route.ts`
-  already emits typed, timestamped events and `components/health/day-detail/**` renders them, so the
-  join needs no new route. **Lane B is otherwise at READY 0**, so this one strike is the difference
-  between an idle lane and a live item.
+- **✅ OWNER ANSWERED 2026-09-21, AND THE ANSWER WAS "NO" — the HR-chart overlay is IN scope.**
+  Asked as a scope call with a recommendation to strike (the 2026-09-10 reshape had moved the
+  overlay to the day timeline as TN-35, and it looked like leftover prose). The owner wants stress
+  on the HR charts as well. **So this was never leftover prose and the recommendation was wrong** —
+  worth recording, because the read that produced it was "the reshape supersedes the original ask",
+  and the original ask was still live.
+- **✅ SHIPPED 2026-09-21: the HR-chart overlay** (`feat/tn3b-stress-on-hr-chart`, **v1.461.0**,
+  Lane B). The day's stress series is drawn on `hr-day-chart.tsx` against the same clock as the
+  heart rate, on a **hidden second scale** fixed to [−1,+1].
+  - **Drawn as the measured series, NOT as "stressed" bands.** Thresholding the level into shaded
+    windows reads better and would mean inventing the number that decides what counts as stressed.
+    That is a calibration; calibration is Tuning's and the owner's. The line states the measurement.
+  - **Gaps are `toSegments`', not a second copy** — the runs are re-joined with an explicit `null`
+    so Chart.js breaks the line. Coverage averages 13.3 of 24 hours and one measured day jumps
+    06:45 → 13:15; a joined line would draw a stress level for six hours nobody recorded. (Same
+    defect class as TN-53, fixed hours earlier on the trend sparklines.)
+  - **The axis is hidden and fixed, not fitted.** A tick reading `−0.4` beside one reading `62 bpm`
+    invites two scales to be compared as if they shared units, and fitting to the day would stretch
+    a flat ±0.1 day into violent swings.
+  - **Surfaces: the two full-size charts** — `/health/heart-rate` and `hr-day-card.tsx`. **Home's
+    compact widget is deliberately excluded**: its legend is hidden in compact mode, so the line
+    would be an unexplained second stroke on a glance card, and it would add a GET to Home's first
+    paint. Revisit if the owner wants it there.
+  - **`lib/hooks/use-stress-day.ts`** now owns the key/URL/TTL, and the standalone strip was swept
+    onto it in the same PR — two readers of `stress-day:` had been two copies of the same three
+    constants.
+  - **Fixed in passing, because the feature needs it:** `app/health/heart-rate/page.tsx` derived its
+    whole day from `todayInTz(DEFAULT_TZ)`, keying the page to Brisbane for every user. Placing
+    buckets in one zone while asking for another's date is the exact split that renders a Brisbane
+    morning as an afternoon.
+  - **Verification.** `components/health/__tests__/hr-stress-overlay.test.ts`, 10 cases (local
+    minute-of-day, the real 06:45 → 13:15 hole, a 60-minute tolerance under the 75 threshold, no
+    leading/trailing null, out-of-order back-fill, level 0 is a reading not a gap).
+    `e2e/tn3b-stress-on-hr-chart.spec.ts` seeds both series and asserts the legend on
+    `/health/heart-rate`; **proven red with the props unwired, failing at the stress assertion with
+    the chart still rendering** — *"the HR chart did not pick up the day's stress series"*.
+- **Keep:** ① **the device look** — an amber stress line over the HR line with sleep and workout
+  bands behind both, at 412 px on the S25. Four things in one chart is the thing a browser cannot
+  judge. ② **the cross-day aggregate**, which is the OTHER pre-reshape promise in this entry and was
+  NOT part of the owner's answer — he was asked about the HR-chart overlay only. Do not assume it is
+  wanted; ask before building it.
 - **⇒ TN-35 is what this parks.** Its `Needs: TN-3b` clears when this entry leaves the queue, and its
   overlay half is Lane B and buildable today: `app/api/day-timeline/route.ts` already emits typed,
   timestamped events and `components/health/day-detail/**` renders them, so the join needs no new

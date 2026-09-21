@@ -1,12 +1,10 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
-import { useCachedValue } from '@/lib/hooks/use-cached-value'
+import { useStressDay } from '@/lib/hooks/use-stress-day'
 import { todayInTz, msToHHMMInTz } from '@trainingai/shared/date-utils'
-import { BODY_BATTERY_TTL } from '@trainingai/shared/cache-ttl'
 import { toSegments, coveredMinutes } from './stress-day'
-import type { StressDayResponse } from '@/app/api/body-battery/stress-day/route'
 
 /**
  * A day's stress against a clock (TN-3b).
@@ -68,18 +66,11 @@ const HOUR_TICKS = [0, 6, 12, 18, 24]
  */
 export function StressDayChart({ date, className }: { date?: string; className?: string } = {}) {
   const tz = useUserTimezone()
-  const [failed, setFailed] = useState(false)
   const today = todayInTz(tz)
   const day = date ?? today
-  // Date in the key, not a today-scoped variant, so the chart re-fetches by itself across midnight
-  // instead of holding yesterday's shape in the persistent tab shell.
-  const data = useCachedValue<StressDayResponse>(
-    `stress-day:${day}`,
-    `/api/body-battery/stress-day?date=${day}`,
-    // Same cadence as the card around it; a second name for the same number is what drifts.
-    BODY_BATTERY_TTL,
-    { onError: () => setFailed(true) },
-  )
+  // The key, URL and TTL moved into `useStressDay` when the HR chart became a second reader
+  // (TN-3b) — three things that have to agree across call sites, now stated once.
+  const { data, failed } = useStressDay(day)
 
   const series = data?.series
   const segments = useMemo(() => toSegments(series ?? [], tz), [series, tz])

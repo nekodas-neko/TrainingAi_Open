@@ -2330,6 +2330,22 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [heart-rate][readiness] ⚠️ Stress is drawn on the heart-rate charts now, and no phone has seen it (TN-3b, 2026-09-21, v1.461.0) · needs: device
+
+The owner asked to read a stressed stretch against what he was doing at the time. The day's stress
+series now draws on `hr-day-chart.tsx` on the same clock as the heart rate, on a hidden second scale
+fixed to [−1,+1] — `/health/heart-rate` and the Health tab's HR card. Home's compact widget is
+deliberately excluded (no legend in compact mode, and it would add a GET to Home's first paint).
+Drawn as the measured series rather than shaded "stressed" bands, because thresholding would mean
+inventing the number that decides what counts as stressed, and that is a calibration. Gaps break the
+line via `toSegments`.
+
+**The device check is the whole of what is owed, and it is a crowded chart:** an amber stress line
+over the HR line, with sleep and workout bands behind both, at 412 px on the S25. Four things in one
+chart is what a browser cannot judge. **Also still open: the cross-day stress aggregate**, the other
+pre-reshape promise in TN-3b — the owner was asked about the HR-chart overlay only, so do not assume
+the aggregate is wanted.
+
 ### [heart-rate][app-shell] ⚠️ Every trend chart stopped drawing over its gaps, and no phone has seen one (TN-53, 2026-09-20, v1.460.5) · needs: device
 
 `TrendSparkline` passed `spanGaps: true`, so a run of days with no reading was drawn as a smooth
