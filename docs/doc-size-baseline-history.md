@@ -14773,6 +14773,26 @@ The rest is the distinction that makes it a data change rather than a rename, wh
 once where the next reader will find it: **the labels are relative and the numbers are absolute.** On
 the 60-minute sessions everyone tests with, `'short'` and `30` are the same thing. On a 45-minute
 session — the one the owner asked for — `'short'` is 15 and `30` is 30.
+## 2026-09-20 — `docs/implementation-backlog.md` +449 (25452 → 25901) (Review sweep 51)
+
+Twenty entries (**RV-64…RV-83**) from the owner's efficiency review — logic-over-AI, caching and
+saving speed, runtime efficiency, and animation/UI feel — at ~22 lines each, the ratio this file
+already carries. The last four arrived after the PR was open and were folded into it rather than
+split off, per the one-PR rule.
+
+Three entries are longer than their fix and deliberately so, because in each case the fix is not the
+hard part. **RV-65** could be stated in a line ("stop asking the model for numbers the guards
+overwrite") and that line would be acted on wrongly: only the reconciled prescription is stored, so
+the model's real contribution is unmeasured, and the entry spends its length arguing for the
+measurement *before* the removal — BF-110's lesson, applied ahead of the mistake instead of after
+it. **RV-67** spends its length on what NOT to do: `freshWithinTtl` looks like a one-word win at 183
+sites, and bulk-applying it converts a stale flash into hours of hard staleness. **RV-64** carries
+its production measurement (128,734 rows against a 54 ms aggregate) because the number is what makes
+a "that's just a query" reading impossible.
+
+Two entries also carry an explicit ⛔: RV-72 must not convert `calorie-progress-bar.tsx` (a clipped
+gradient ramp that `scaleX` would distort), and RV-74 must not extend to the conic-gradient rings.
+Both are the kind of exception a sweep re-files every time unless the reason is written down.
 
 ## 2026-09-21 — TN-20's destructive write turned out to be a GET
 
