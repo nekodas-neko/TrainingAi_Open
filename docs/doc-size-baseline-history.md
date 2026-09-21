@@ -14926,3 +14926,20 @@ A future reader hitting a genuinely empty library would have been sent to the wr
 No `projectOverview.md` row: there is nothing owed. No visual change, no device check, no pending
 question — the only thing NOT established is the millisecond cost, and that is stated in the entry
 and the journal rather than filed as an open issue.
+
+## 2026-09-21 — RV-73's windows were contained by construction, not by luck
+
+`docs/implementation-backlog.md` **25986 → 25968** (`lane-a/rv73-slice-contained-hr-windows`).
+
+The entry asked that its own unknown be settled first — *"how `hrRows`/`priorHrRows` are consumed
+further down the route was not read … establish that before assuming"*. Settled: they feed
+`computeObservedHr` and nothing else in the route's 145 lines, so a reduced shape fits.
+
+Its hedge did not survive either, in the direction that helps. It said the prior window is *"almost
+entirely inside"* the 90-day pull because *"prod data spans 88 days"* — reasoning from data span,
+which is the wrong quantity. `[t−60, t−30]` inside `[t−90, now]` is exact and follows from the
+constants.
+
+The sibling sweep the entry asked for closed with nothing to file: neither `cardio-trends` nor
+`zone-minutes` calls `getHrForWindow`, and `getZoneMinutesRange` is cache-backed with a concurrent
+cold path rather than the N+1 it could have been.

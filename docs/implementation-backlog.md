@@ -640,24 +640,6 @@ below threshold and left in place for next time.
   window (assert against a stored response), and a workout with N rest periods issues one
   `hr-profile` request rather than N.
 
-### [cardio] RV-73 — `/api/cardio-week` pulls the heaviest query in the app two and a half times
-
-- **Lane:** A — `app/api/cardio-week/route.ts:42,56-57`. **Added:** 2026-09-20 · Review sweep 51.
-- **Batch:** `hr-window-aggregate`
-- **Needs:** RV-64
-- The route calls `resolveHrProfile` (RV-64's 90-day, ~128,700-row pull) and then, in the same
-  `Promise.all`, issues `getHrForWindow(observedFrom, observedTo)` and
-  `getHrForWindow(priorFrom, priorTo)` with its own `OBSERVED_WINDOW_DAYS = 30`. The current 30-day
-  window is **wholly contained** in the 90-day window already materialised, and prod data spans 88
-  days so the prior window is almost entirely inside it too.
-- **Fix:** once RV-64 moves the reduction into SQL, give this the same treatment — one aggregate per
-  window. If the raw rows are genuinely needed downstream, have `resolveHrProfile` optionally return
-  the rows it already fetched and slice in memory.
-- **Not established:** how `hrRows`/`priorHrRows` are consumed further down the route was not read,
-  so whether an aggregate suffices is unverified — **establish that before assuming the aggregate
-  fits**. `cardio-trends` and `zone-minutes` also call `resolveHrProfile` and were not checked for
-  the same duplication.
-
 ### [platform] RV-67 — a comment states the TTL gate exists, the gate is opt-in, and 183 of 191 reads hit the network unconditionally
 
 - **Lane:** B — `app/health/health-content.tsx:338`, plus the read sites it licenses.
