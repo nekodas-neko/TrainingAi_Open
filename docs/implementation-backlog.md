@@ -4840,6 +4840,22 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
 - **Branch:** _unassigned_ · **Added:** 2026-09-10 · owner: *"I'd like to get stress metric to be a usable value to determine what events stress me."*
 - **Lane: B** for the overlay (`app/api/day-timeline/route.ts` already assembles the events; `components/health/day-detail/**` renders them). **Lane A** for the marker's storage — a timestamped row is a migration.
 - **Needs: TN-3b** — the chart is this entry's first half; do not build the join before the axis exists.
+- **⚠ THE DEPENDENCY IS DISCHARGED IN SUBSTANCE AND THE FIELD STILL BLOCKS — Orchestrator's call
+  (recorded 2026-09-21, Lane B).** *"Do not build the join before the axis exists"* is satisfied
+  twice over: TN-3b's day chart shipped 2026-09-13, and its HR-chart overlay shipped 2026-09-21
+  (#1361) after the owner said he wanted it. What keeps TN-3b in the queue is a `Keep:` — a device
+  look at the chart, and a cross-day aggregate nobody has asked him about. **Neither is something
+  this entry waits on.** `Needs:` clears when its target LEAVES THE QUEUE, and an entry that
+  legitimately stays for residue therefore blocks its dependents indefinitely.
+  **Not unparked here on purpose.** Editing another entry's `Needs:` to hand myself work is the
+  exact shape the lane is warned about (Q-254). But the effect is real: **Lane B has read READY 0
+  for eight consecutive checks**, and TN-35's overlay half is buildable today with no new route.
+  **The general shape is worth more than this instance:** `Keep:` was introduced so a finished entry
+  could record what it still owes instead of being deleted, and it silently acquired a second
+  effect — permanently blocking every `Needs:` pointed at it. Either `Needs:` should clear when the
+  target's buildable work is done rather than when the heading disappears, or an entry kept only for
+  residue should stop counting as a blocker. `check-backlog-pointers.js` could see this: a `Needs:`
+  whose target carries only a `Keep:` is the detectable case.
 - **Reference:** [`review`](reviews/2026-09-10-stress-status.md) §9.
 
 **The owner's goal is attribution, not display.** A chart answers *when*; *what* needs the series
