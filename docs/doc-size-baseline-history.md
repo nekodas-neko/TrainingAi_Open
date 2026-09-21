@@ -15071,7 +15071,7 @@ could act on.
 
 Worth the note because the near-miss is asymmetric. Its sibling **LA-126** was filed in the same
 edit with the same mistake and `check-backlog-pointers.js` caught it within a minute — there the
-words `**Gate:** owner` sat inline on a bullet the checker recognises and warns about. LA-125 never
+field name sat mid-bullet where the checker looks for it, and it warned. LA-125 never
 wrote the words at all, so there was nothing to detect: **the check finds a gate in the wrong place,
 not a gate that is missing.** Catching one and not the other reads like the checker working, which
 is how the second one survived.

@@ -693,8 +693,9 @@ below threshold and left in place for next time.
   ships"*, and that sentence was prose. `Gate:` is a FIELD; written inline it is ignored, so this sat
   at **READY position 1** describing its own owner gate in a form nothing reads. Its sibling LA-126
   was filed the same hour with the same mistake and `check-backlog-pointers.js` caught that one,
-  because there the words `**Gate:** owner` appeared inline on a bullet it could recognise. Here the
-  gate was never written as a field at all, so nothing had anything to catch.
+  because there the field name appeared mid-bullet where the checker looks for it. Here it was never
+  written at all, so there was nothing to catch: **the check finds a gate in the wrong place, not a
+  gate that is missing.**
 - `calculateBaseline` sets `fatG = round(calories * 0.25 / 9)`. `clampRecommendation` floors fat at
   `round(0.6 * weightKg)`. For the owner those are **39 g and 42 g**, so the clamp raises fat and
   carbs fall out of the remainder at **143 instead of 150**.
