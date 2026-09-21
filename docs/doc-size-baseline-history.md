@@ -14793,3 +14793,23 @@ a "that's just a query" reading impossible.
 Two entries also carry an explicit ⛔: RV-72 must not convert `calorie-progress-bar.tsx` (a clipped
 gradient ramp that `scaleX` would distort), and RV-74 must not extend to the conic-gradient rings.
 Both are the kind of exception a sweep re-files every time unless the reason is written down.
+
+## 2026-09-21 — `docs/implementation-backlog.md` +336 (25901 → 26237) (Review sweep 52)
+
+Nineteen entries (**RV-84…RV-102**) from a visual sweep — formatting drift, 384px layout,
+empty/zero/error states, colour semantics and contrast — at ~18 lines each, below this file's own
+average, because the evidence is unusually compact: a measured width against a measured content
+length, or a computed contrast ratio, says in one line what prose would take five to argue.
+
+**Three entries spend their length on what NOT to do**, which is the part a one-line version would
+lose. RV-89 carries an explicit ⛔ against using `mround125` for display, because that exact
+substitution already shipped BF-127 — the banner that told the owner to load 82.5 kg on a pull-up.
+RV-99 carries one against migrating the 173 hard-coded band-colour literals blind, since some are
+legitimate identity tints and a sweep would recolour them. RV-92 carries the opposite note — it is
+the *only* `truncate`-on-a-flex-container site in non-admin code, so the sweep must not widen.
+
+**Four entries record a cheaper check before the work**, so nobody sizes them wrong: RV-94 asks
+whether the grey secondary line already disambiguates the colliding food rows, RV-100 asks whether
+both deload surfaces are even reachable in one session, RV-93 notes the injury-chip collision is
+proven only for the geometry and not for a specific exercise, and RV-84 asks for a check script
+rather than a repeatable sweep.
