@@ -124,13 +124,23 @@ function SheetContent({
    */
   surface?: "default" | "page";
 }) {
+  /*
+   * RV-75 — 500 ms was the stock shadcn default, never tuned. 47 files render a Sheet, making it the
+   * app's dominant modal surface, while the tab transition was deliberately cut to 180 ms with the
+   * comment "the whole point of this app is to feel instant" and route transitions to 200 ms. The
+   * sheet was 2.5x the route transition for a shallower interaction.
+   *
+   * The curve is the one `globals.css` already uses for tabs and routes — M3's emphasized-decelerate
+   * — rather than a second easing invented here, so a sheet moves like everything else.
+   * `slide-in-from-bottom` is transform-only, so nothing about what is animated changes.
+   */
   return (
     <SheetPortal>
       <SheetOverlay />
       <SheetPrimitive.Content
         data-slot="sheet-content"
         className={cn(
-          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out fixed z-50 flex flex-col gap-4 shadow-lg transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500",
+          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out fixed z-50 flex flex-col gap-4 shadow-lg transition ease-[cubic-bezier(0.05,0.7,0.1,1)] data-[state=closed]:duration-[250ms] data-[state=open]:duration-300 motion-reduce:transition-none motion-reduce:data-[state=open]:duration-0 motion-reduce:data-[state=closed]:duration-0",
           side === "right" &&
             "data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right inset-y-0 right-0 h-full w-3/4 border-l sm:max-w-sm",
           side === "left" &&

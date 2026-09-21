@@ -6,10 +6,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.464.0",
+    date: "2026-09-21",
+    changes: [
+      "Your recommended calorie, protein, carb, fat, water and step targets are now calculated from your own measurements \u2014 body composition, your measured resting rate, and your goal \u2014 instead of being chosen by the AI. It was already calculating all six and then asking the model for its own numbers on top; the last recommendation you applied suggested 5,000 steps where the calculation said 10,000, and 150g of protein where it said 115g. The AI now explains the targets and still flags when your logged training suggests a different activity level, which recalculates them. Your currently saved targets are unchanged \u2014 re-run the recommendation to see the calculated ones.",
+    ],
+  },
+  {
     version: "1.463.0",
     date: "2026-09-21",
     changes: [
-      "Your recommended calorie, protein, carb, fat, water and step targets are now calculated from your own measurements \u2014 body composition, your measured resting rate, and your goal \u2014 instead of being chosen by the AI. It was already calculating all six and then asking the model for its own numbers on top; the last recommendation you applied suggested 5,000 steps where the calculation said 10,000, and 150g of protein where it said 115g. The AI now explains the targets and still flags when your logged training suggests a different activity level, which recalculates them.",
+      "Buttons now respond to a press. The shared button had no pressed state at all on a touch-only app \u2014 it only had a hover state, which a finger cannot produce and which Android can leave stuck on after a tap. It now dips very slightly under your thumb.",
+      "Sheets open in 300ms instead of 500ms, on the same motion curve as the tabs and page transitions. The 500ms was a library default nobody had tuned, and it was two and a half times slower than moving between pages.",
     ],
   },
   {
