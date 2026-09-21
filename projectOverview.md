@@ -2427,6 +2427,26 @@ session and is also awaiting a device check. Both touch `PolarStrapService`, so 
 exercises both at once — worth knowing when reading the result, because a bad night would not say
 which one was responsible.
 
+### [workouts] ⚠️ The duration ladder takes minutes; the control that sends 45 is not built yet (BF-7, 2026-09-21)
+
+The owner asked on 2026-08-23 for *"the ability to choose a 45min session"*, anchored to the
+session's own configured length. The engine half is in: `DurationPreset` is a number of minutes, the
+prescription decides "is this the default?" by comparing the requested budget against the session's
+rather than testing for the word `'standard'`, and the route accepts a bounded integer.
+
+**⚠ The plan said this was cheap because nothing is persisted. `durationPreset` IS persisted** — it
+is a field on `AiPrescription`, which lives in `session_periodization.prescription`, and 10 of 10
+production rows carried one. So the three old labels stay legal beside the numbers rather than being
+replaced by them, and `DURATION_PRESET_DELTA_MIN` survives as their decoder instead of being deleted
+as the plan instructed. The labels are **relative** and the numbers **absolute**: they agree on a
+60-minute session and disagree on a 45-minute one, which is what made this a data change.
+
+**Nothing is user-visible yet, deliberately.** No control can send 45 until Lane B builds it
+(`session-duration-picker.tsx` and four siblings), so this half only makes 45 expressible and
+correct when it arrives. **BF-7 stays queued** for that control, which must commit on release rather
+than per detent — a prescription averages 2,445 ms and the preset path deliberately bypasses the
+cooldown. **Not device-verified; no APK needed** (TypeScript only, ships via Railway).
+
 ### [workouts] ⚠️ An expired prescription ages out whatever its status — NOT device-verified (BF-179, 2026-09-20)
 
 The owner saw a session screen with **every exercise at 52% and a Deload chip**, asked against an
