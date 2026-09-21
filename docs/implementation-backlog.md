@@ -812,12 +812,32 @@ below threshold and left in place for next time.
   primitive changes. With `main` landing a PR every ~8 minutes against a ~7-minute check cycle, a
   large diff is the one most likely never to land (#1365 took six merge attempts). **Take it next,
   and it still wants the same device pass as the rest of the batch.**
-- **⛔ Deliberately exclude `calorie-progress-bar.tsx`** — it clips a gradient ramp with a
+- **Deliberately excluded: `calorie-progress-bar.tsx`** — it clips a gradient ramp with a
   hand-computed `backgroundSize`, and `scaleX` would squash the ramp and change what the chart says.
-  Leave it on `transition-[width]` **with a comment saying why**, or the next sweep files it again.
+  Left on `transition-[width]` **with a comment saying why**, or the next sweep files it again.
+  (The emphasis glyph that used to open this bullet is what parked the entry — see LB-121 above.)
 - **Watch:** `scaleX` also scales the fill's border-radius horizontally, so a rounded cap goes oval
   at small percentages — put the radius on the track with `overflow-hidden` and leave the fill
   square, which most of these already do.
+- **✅ SHIPPED 2026-09-21** (`fix/rv72-progress-bar-scalex`, **v1.463.1**). New
+  `components/ui/progress-fill.tsx` renders the fill alone at `transform: scaleX(pct)` with
+  `origin-left` and `transition-transform motion-reduce:transition-none`; the five solid-fill
+  `transition-[width]` sites now use it (`contributor-chart.tsx`, `time-summary-card.tsx`,
+  `meal-macro-bars.tsx`, `meal-plan-section.tsx`, `walk-pacer-bar.tsx`), and
+  `calorie-progress-bar.tsx` carries the exclusion comment. **It renders the fill, not the track** —
+  every track already owns its `role="progressbar"`, ARIA values, background, a height from 1.5 to
+  2.5 and in one case an absolutely-positioned tick, so swallowing them would have meant a prop
+  each. `e2e/rv72-progress-bars-composite.spec.ts` asserts **computed style, not class strings**
+  (`duration-250` compiled to nothing on the previous PR and would have shipped as a silent no-op);
+  the exclusion is pinned in `e2e/calorie-progress-bar.spec.ts` instead, because that is the only
+  spec whose fixture gives the gradient fill a non-zero intake — it does not render at all at 0 kcal,
+  so a guard living in the RV-72 spec passed vacuously.
+- **Keep:** ① **the device pass**, shared with the rest of `motion-polish` — no sandbox drives a
+  Samsung WebView, and frame timing on that device is the entire payoff of a compositing change.
+  ② **the `transition-all`-over-inline-`width` sites this entry names** (`metric-tiles-card.tsx:108`,
+  `recommendation-card.tsx:224`, `goal-progress-bar.tsx:7`) and ③ **the 26 bars with no transition
+  at all** are NOT converted. Both are separate files with separate risk and were left rather than
+  swept blind; the primitive they would use now exists.
 
 ### [readiness][app-shell] RV-74 — the health hero's number counts up while its ring snaps
 

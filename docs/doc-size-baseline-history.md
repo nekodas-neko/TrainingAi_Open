@@ -14984,3 +14984,20 @@ member device-gated, one invisible to the runner.
 
 `projectOverview.md`'s +16 is the Known-Issues row, which carries the device sitting the whole batch
 exists for plus the sibling `transition-all` sites deliberately left unswept.
+
+## 2026-09-21 — `docs/implementation-backlog.md` +20 (RV-72 shipped with residue)
+
+RV-72's entry stays queued rather than being deleted, so the lines are a `✅ SHIPPED` record plus a
+`Keep:` naming what is genuinely still owed: the `motion-polish` device pass, the
+`transition-all`-over-inline-`width` sites the entry lists, and the 26 bars with no transition at
+all. None of those was swept blind, and the primitive they would use now exists.
+
+One line is a correction rather than a description: the `⛔` that opened the calorie-bar exclusion
+bullet was emphasis, not a blocker, and it is what parked the entry (LB-121's fourth instance). It
+is gone, so the entry is now visible to `next-item.js` for whoever takes the residue.
+
+`projectOverview.md`'s +6 is the same `motion-polish` Known-Issues row rather than a second one —
+RV-72 shares RV-71 and RV-75's batch and its one device sitting, so a separate row would have
+claimed a separate check that does not exist. The added lines are what is carried, not fixed: the
+`transition-all`-over-inline-`width` sites, the 26 untransitioned bars, and why the calorie bar
+stays on `width` by design.

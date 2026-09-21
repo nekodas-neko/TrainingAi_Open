@@ -124,6 +124,19 @@ test('the bar fills toward the goal notch, not around a centred marker', async (
   // The goal is not at the centre — that was the old gauge, and it is what a half-converted bar
   // would still look like.
   expect(Number(await bar.getAttribute('data-notch-pct'))).toBeGreaterThan(60)
+
+  // RV-72 converted every other progress bar in the app from `transition-[width]` to
+  // `transform: scaleX()`, which composites rather than forcing layout. **This one is deliberately
+  // left on width**, and the exclusion is pinned here rather than in that PR's own spec because
+  // this file is the only place the gradient fill is guaranteed to exist: it renders only when
+  // intake > 0, and the seeded day is empty. The fill clips the ramp with a hand-computed
+  // `backgroundSize`, so scaling it would squash the ramp and change which colour the leading edge
+  // shows — i.e. what the bar SAYS about the day, not just how it moves.
+  const fillTransition = await bar.locator('[style*="background-size"]').first()
+    .evaluate(el => getComputedStyle(el).transitionProperty)
+  expect(fillTransition,
+    'the gradient calorie fill was converted to scaleX — that squashes the ramp; see its comment')
+    .toContain('width')
 })
 
 test('Home\'s nutrition ring says how much is left, not what the macros were', async ({ page }) => {
