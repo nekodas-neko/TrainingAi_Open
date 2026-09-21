@@ -604,26 +604,6 @@ below threshold and left in place for next time.
 - **Not established:** the route could not be authenticated against in production, so its end-to-end
   wall time is still inferred from the component timings above rather than measured on the wire.
 
-### [cardio] RV-73 — `/api/cardio-week` pulls the heaviest query in the app two and a half times
-
-- **Lane:** A — `app/api/cardio-week/route.ts:42,56-57`. **Added:** 2026-09-20 · Review sweep 51.
-- **Batch and `Needs: RV-64` both removed 2026-09-21.** They rested on RV-64 moving the reduction
-  into SQL — measured and rejected (see RV-64), so there is no shared fix to ship in one PR and
-  nothing here to wait for. This entry stands on its own and is Lane A's.
-- The route calls `resolveHrProfile` (RV-64's 90-day, ~128,700-row pull) and then, in the same
-  `Promise.all`, issues `getHrForWindow(observedFrom, observedTo)` and
-  `getHrForWindow(priorFrom, priorTo)` with its own `OBSERVED_WINDOW_DAYS = 30`. The current 30-day
-  window is **wholly contained** in the 90-day window already materialised, and prod data spans 88
-  days so the prior window is almost entirely inside it too.
-- **Fix:** have `resolveHrProfile` optionally return the rows it already fetched and slice the two
-  contained windows in memory. **This is now the ONLY fix on the table** — the aggregate half is
-  measured and rejected under RV-64, and slicing was always the better half of this entry anyway,
-  because the 30-day windows are *wholly contained* in the 90-day pull that already happened.
-- **Not established:** how `hrRows`/`priorHrRows` are consumed further down the route was not read,
-  so whether an aggregate suffices is unverified — **establish that before assuming the aggregate
-  fits**. `cardio-trends` and `zone-minutes` also call `resolveHrProfile` and were not checked for
-  the same duplication.
-
 ### [platform] RV-67 — a comment states the TTL gate exists, the gate is opt-in, and 183 of 191 reads hit the network unconditionally
 
 - **Lane:** B — `app/health/health-content.tsx:338`, plus the read sites it licenses.

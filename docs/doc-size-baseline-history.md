@@ -14947,9 +14947,27 @@ exist.
 The six lines are what it costs to stop the next session re-proposing the aggregate and re-measuring
 its way back to the same answer.
 
+## 2026-09-21 — RV-73's windows were contained by construction, not by luck
+
+`docs/implementation-backlog.md` **25992 → 25972** (`lane-a/rv73-slice-contained-hr-windows`) —
+recomputed against main after RV-64 landed and rewrote its own entry in flight.
+
+The entry asked that its own unknown be settled first — *"how `hrRows`/`priorHrRows` are consumed
+further down the route was not read … establish that before assuming"*. Settled: they feed
+`computeObservedHr` and nothing else in the route's 145 lines, so a reduced shape fits.
+
+Its hedge did not survive either, in the direction that helps. It said the prior window is *"almost
+entirely inside"* the 90-day pull because *"prod data spans 88 days"* — reasoning from data span,
+which is the wrong quantity. `[t−60, t−30]` inside `[t−90, now]` is exact and follows from the
+constants.
+
+The sibling sweep the entry asked for closed with nothing to file: neither `cardio-trends` nor
+`zone-minutes` calls `getHrForWindow`, and `getZoneMinutesRange` is cache-backed with a concurrent
+cold path rather than the N+1 it could have been.
+
 ## 2026-09-21 — motion-polish (RV-71 + RV-75): the backlog SHRANK
 
-`docs/implementation-backlog.md` **−10**, landing at **25982** · `projectOverview.md` **12154 → 12170**
+`docs/implementation-backlog.md` **−10**, landing at **25962** · `projectOverview.md` **12154 → 12170**
 (+16) (`fix/motion-polish-button-and-sheet`).
 
 A net shrink despite three entries gaining shipped records, because **RV-81 was deleted**. It had
