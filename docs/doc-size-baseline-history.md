@@ -14964,3 +14964,23 @@ constants.
 The sibling sweep the entry asked for closed with nothing to file: neither `cardio-trends` nor
 `zone-minutes` calls `getHrForWindow`, and `getZoneMinutesRange` is cache-backed with a concurrent
 cold path rather than the N+1 it could have been.
+
+## 2026-09-21 — motion-polish (RV-71 + RV-75): the backlog SHRANK
+
+`docs/implementation-backlog.md` **−10**, landing at **25962** · `projectOverview.md` **12154 → 12170**
+(+16) (`fix/motion-polish-button-and-sheet`).
+
+A net shrink despite three entries gaining shipped records, because **RV-81 was deleted**. It had
+shipped with nothing owed, and I had annotated it `✅ SHIPPED` instead of removing it — so it printed
+as the top of READY on the next scan. `check-backlog-pointers.js` did not catch it: the check looks
+at headings and my ✅ was in a bullet. The protocol is that a finished entry with nothing owed leaves
+the queue, and that is worth more than the ten lines it cost.
+
+The lines that went in are two corrections rather than descriptions. **`duration-250` is not a
+Tailwind class** — not in the default scale, so it compiled to nothing and left the stock 300 ms in
+place, a silent no-op that reads as a shipped fix and fails no gate. And **RV-72 is parked by its own
+emphasis glyph** (LB-121's fourth instance), which is why a four-entry batch shipped as two: one
+member device-gated, one invisible to the runner.
+
+`projectOverview.md`'s +16 is the Known-Issues row, which carries the device sitting the whole batch
+exists for plus the sibling `transition-all` sites deliberately left unswept.

@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.463.0",
+    date: "2026-09-21",
+    changes: [
+      "Buttons now respond to a press. The shared button had no pressed state at all on a touch-only app \u2014 it only had a hover state, which a finger cannot produce and which Android can leave stuck on after a tap. It now dips very slightly under your thumb.",
+      "Sheets open in 300ms instead of 500ms, on the same motion curve as the tabs and page transitions. The 500ms was a library default nobody had tuned, and it was two and a half times slower than moving between pages.",
+    ],
+  },
+  {
     version: "1.462.1",
     date: "2026-09-21",
     changes: [

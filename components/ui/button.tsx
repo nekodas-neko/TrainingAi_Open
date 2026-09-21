@@ -4,8 +4,29 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@trainingai/shared/utils";
 
+/**
+ * RV-71 — the press state, and why `transition-all` was the wrong half of the fix.
+ *
+ * This primitive is imported by 129 files and had **no `active:` anywhere**: every variant was
+ * `hover:`-only. On a touch-only product that is the most-tapped control in the app giving no
+ * feedback at all — and on Android WebView `hover:` either never resolves or **sticks after a tap**,
+ * so a button could be left looking permanently highlighted. Meanwhile 45 files hand-roll
+ * `active:scale` (`set-card.tsx` at 0.90, `streak-card.tsx` at 0.95), so the pattern was already the
+ * house style and the shared control was the one missing it.
+ *
+ * **`transition-all` is narrowed in the same change, and that is not tidying.** It animates `width`,
+ * `height`, `padding` and `margin` too, so any Button whose size changes — a label swapping to a
+ * spinner, a count appearing — silently got a layout animation nobody asked for. The list here is
+ * the properties a button actually changes.
+ *
+ * `motion-reduce:` opts both out. `MotionConfig reducedMotion="user"` at `app/layout.tsx` covers
+ * Framer Motion components; a CSS transition is not one, so it needs saying here.
+ *
+ * **Not established:** nothing was measured on device. The sticking-`hover:` behaviour is a
+ * documented Android WebView trait, not something reproduced in this sandbox.
+ */
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[transform,background-color,opacity,border-color,box-shadow] duration-100 active:scale-[0.97] motion-reduce:active:scale-100 motion-reduce:transition-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
   {
     variants: {
       variant: {
