@@ -48,6 +48,27 @@ does not matter. Under the module-scope mutation it is the only thing that fails
 hour from one pass and `formatToParts` gives both. The 18 sibling sites that call it in a loop are
 fine — `date-fns-tz` caches internally, ~11 µs a call — and are deliberately left alone.
 
+## The sibling sweep found exactly one, and it is Lane B's (LA-124)
+
+`new Intl.DateTimeFormat` appears in a loop in exactly **two** places across `lib/`, `packages/`,
+`app/` and `components/`, and the second is `minutesIntoDay` in
+`components/body-battery/stress-day.ts:44`, called once per bucket from `toSegments`. Same defect,
+same one-line fix.
+
+**Measured rather than assumed, because the number decides what to do with it:** a full day is 48
+buckets, and hoisting takes that from **3.19 ms to 0.16 ms** — a 20× ratio worth **3 ms per chart
+render**. RV-80's site runs 2,831–5,606 times on a path warmed at every app launch; this one runs 48
+times when a chart draws. Three orders of magnitude apart in what it costs.
+
+So it is filed as **LA-124** rather than folded in here, for two reasons and the second is the
+binding one: it is worth 3 ms, and it lives in `components/**`, which is **Lane B's** under the lane
+rule. Filed at mid-queue priority, which reflects its value rather than its kinship with this item.
+
+Worth noting for whoever takes it: `minutesIntoDay` is exported and directly tested across two
+timezones (`__tests__/stress-day.test.ts:16-17`), so the module-scope over-hoist that this entry had
+to write a new test to catch is **already caught** there. The blindness was specific to
+`hourly-movement.ts`, not general.
+
 ## Verification
 
 - **12 tests**: the 10 existing ones unchanged (the behaviour-preservation proof) plus 2 new.

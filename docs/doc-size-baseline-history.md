@@ -14833,3 +14833,21 @@ and blocks a legitimate downward correction. The entry already contains the argu
 And the two things still owed: the four days are rebuildable from raw samples that still exist but
 need a backfill that does not exist and is a production write, and the condition that made those
 reads see nothing is still unidentified.
+
+## 2026-09-21 — RV-80's speedup figure is not a constant
+
+`docs/implementation-backlog.md` **25955 → 25952** (`lane-a/rv80-hoist-hr-formatter`) — RV-80 out
+(−26) and **LA-124 in (+23)**, its only surviving sibling, filed rather than fixed because it lives
+in `components/**` and belongs to Lane B.
+
+The entry measured 10.4×. Re-measured here it is **7.6× at 2,831 rows and 11.4× at 5,606** — the
+ratio grows with row count, because the hoisted `Intl.DateTimeFormat` construction is the per-row
+cost and the remaining work is not. A single figure therefore understates exactly the days that
+matter most, which are the long ones.
+
+The part worth carrying past the diff is the test, not the hoist. Hoisting one level further, to
+module scope, binds the first caller's timezone for the life of the process — and **all ten existing
+tests pass under that mutation**, because no test in the file calls `computeMovedHours` in two
+timezones within one process. The suite that covered the function was structurally blind to the way
+this particular optimisation goes wrong. The added test calls it in two zones and then re-asks the
+first.
