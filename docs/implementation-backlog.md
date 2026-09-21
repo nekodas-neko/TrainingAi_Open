@@ -464,32 +464,6 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
-### [readiness][platform] RV-80 — a date formatter is constructed once per heart-rate row, on a path warmed at every app launch
-
-- **Lane:** A — `packages/shared/src/health/hourly-movement.ts:47-50`. **Added:** 2026-09-20 ·
-  Review sweep 51.
-- **A two-line fix with the best measured win in the sweep.** `computeMovedHours` does
-  `for (const row of hrRows) { const local = new Intl.DateTimeFormat('en-CA', {…}).formatToParts(...) }`
-  — the constructor is **inside** the loop and its options are loop-invariant (`tz` is a function
-  input).
-- **Measured twice, independently.** Reproduced by the coordinator on a real day's volume (2,831
-  rows, 3 warm-ups): **228.8 ms construct-in-loop → 21.9 ms hoisted, 10.4×**. The lane measured
-  11.6–17.4× across 400/2,170/5,606 rows. Absolute ms on Railway will differ from this sandbox; the
-  ratio will not.
-- **The row counts are real, not hypothetical.** Production `oura_heartrate` per local day over the
-  last 10 days: **5,606 / 3,496 / 2,831 / 2,691** on training days (owner's rows).
-- **And it is hot:** called from `lib/health/readiness-payload.ts:402` (`/api/readiness-score`),
-  which `components/sync-provider.tsx:69` warms on **every app launch** at `READINESS_SCORE_TTL =
-  TTL_SHORT` (5 min) — so up to 12 recomputes an hour per active device.
-- **Fix:** hoist the formatter above the loop, or call `formatInTimeZone` like every sibling does.
-  **No behaviour change** — the options are already constant per call.
-- **Worth knowing, and it is what makes this one stand out:** `formatInTimeZone` called in a loop at
-  18 other sites benchmarks at ~11 µs per call, because `date-fns-tz` caches its formatter
-  internally. Those 18 sites are **not** worth changing. This site is ~7× worse than the repo's own
-  normal idiom purely because the constructor is not hoisted.
-- **Not established:** the real route was not run against a 5,606-row day, and
-  `score-audit/build-day-audit.ts:138` (the other caller) was not checked for being on a hot path.
-
 ### [workouts][app-shell] RV-81 — the program editor renders the whole exercise catalogue once per exercise row, and rebuilds it on every keystroke
 
 - **Lane:** B — `components/config/program-editor-sheet.tsx:778-782`. **Added:** 2026-09-20 ·
