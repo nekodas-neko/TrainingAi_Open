@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.462.1",
+    date: "2026-09-21",
+    changes: [
+      "The program editor built a full copy of the exercise catalogue for every exercise row \u2014 around 3,900 hidden list entries on a 25-exercise program, rebuilt from scratch on every keystroke while you typed an exercise name. It now builds one shared list.",
+    ],
+  },
+  {
     version: "1.462.0",
     date: "2026-09-21",
     changes: [

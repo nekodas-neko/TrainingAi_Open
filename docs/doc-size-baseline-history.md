@@ -14905,3 +14905,24 @@ and merging beats it by another 1.79× on one.
 Also settled, both of the entry's stated unknowns: the third block **does** fire in production, and
 all three pillars land on **one** row on every one of the last twelve days. The wasteful shape is the
 usual case, not an edge.
+
+## 2026-09-21 — RV-81 ships, +16
+
+`docs/implementation-backlog.md` **+16**, landing at **25986** (`fix/rv81-shared-exercise-datalist`) — the
+arrival figure differs from the delta because another PR landed while this was in flight.
+
+Sixteen lines for a fix that deleted more code than it added, and most of them are two corrections
+to my own first attempt rather than a description of the change.
+
+The fix was hoisted in place first, which pushed `program-editor-sheet.tsx` from 956 to 984 lines
+and failed `check-component-size.js` against a 963 baseline on a file it names a hotspot. Extracting
+instead left it at 953. Recording that is worth more than recording the hoist: the ratchet was not
+an obstacle to route around, it pointed at the better home for a document-global element.
+
+The second is that the e2e's control failed with the wrong reason before it failed with the right
+one — *"the library did not reach the sheet"* where the truth is that no shared list existed at all.
+A future reader hitting a genuinely empty library would have been sent to the wrong place.
+
+No `projectOverview.md` row: there is nothing owed. No visual change, no device check, no pending
+question — the only thing NOT established is the millisecond cost, and that is stated in the entry
+and the journal rather than filed as an open issue.

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@trainingai/shared/utils";
 import { EXERCISE_ROLES, EXERCISE_ROLE_LABEL } from "@/components/workout/exercise-role-labels";
+import { ExerciseLibraryDatalist, EXERCISE_LIBRARY_LIST_ID } from "@/components/config/exercise-library-datalist";
 import { getPaletteEntry } from "@trainingai/shared/session-palette";
 import { SortableRow } from "@/components/config/sortable-row";
 import { SessionHeaderRow } from "@/components/config/session-header-row";
@@ -342,6 +343,7 @@ export function ProgramEditorSheet({
 
   return (
     <>
+    <ExerciseLibraryDatalist exerciseLibrary={exerciseLibrary} />
     <Sheet open={open} onOpenChange={isOpen => { if (!isOpen) setLastDeleted(null); onOpenChange(isOpen); }}>
       <SheetContent side="bottom" className="max-h-[90dvh] flex flex-col">
         <SheetHeader className="flex-none">
@@ -729,7 +731,7 @@ export function ProgramEditorSheet({
                                       </span>
                                     )}
                                     <input
-                                      list={`ex-lib-${si}-${ei}`}
+                                      list={EXERCISE_LIBRARY_LIST_ID}
                                       value={ex.name}
                                       onChange={e => selectExerciseName(si, ei, e.target.value)}
                                       placeholder={`Exercise ${ei + 1}`}
@@ -775,11 +777,6 @@ export function ProgramEditorSheet({
                                         </button>
                                       )}
                                     </div>
-                                    <datalist id={`ex-lib-${si}-${ei}`}>
-                                      {exerciseLibrary.filter(l => !l.mergedInto).map(l => (
-                                        <option key={l.id} value={l.name} />
-                                      ))}
-                                    </datalist>
                                     {phaseMode === 'manual' && (
                                       <>
                                         <select

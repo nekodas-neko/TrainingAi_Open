@@ -477,10 +477,26 @@ below threshold and left in place for next time.
   `selectExerciseName` (`:228`) calls `onProgramSessionsChange(...)` — so every keystroke in any
   exercise-name input re-renders the sheet and recreates all 3,900 elements. There is no `useMemo`
   and no memo boundary (the file imports only `useRef, useState`).
-- **Fix:** hoist one `<datalist id="ex-lib">` outside both maps, point every input's `list` at it,
-  and `useMemo` the options on `[exerciseLibrary]`. **`datalist` ids are document-global and the
-  content is identical per row, so a single shared list is exactly equivalent** — this is not a
-  behaviour trade.
+- **✅ SHIPPED 2026-09-21** (`fix/rv81-shared-exercise-datalist`, **v1.462.1**, Lane B). One
+  `<datalist id="ex-lib">` for the document, `useMemo`d on `[exerciseLibrary]`, every input's `list`
+  pointing at it. **3,900 `<option>` elements → 145** on the seeded library (146 rows, 1 merged).
+  - **Extracted rather than hoisted in place.** The first pass put the memo and the element in
+    `program-editor-sheet.tsx` and pushed it from 956 to **984** lines — `check-component-size.js`
+    failed it against a 963-line baseline on a file it calls a known hotspot, saying *"extract, do
+    not append"*. It now lives in `components/config/exercise-library-datalist.tsx` and the sheet is
+    **953**, below where it started. The gate was right and the first instinct was wrong.
+  - **`EXERCISE_LIBRARY_LIST_ID` is exported** so a second autocomplete over this library points at
+    the same list instead of rendering a rival copy — the shape this entry existed to remove.
+  - **Verification.** `e2e/rv81-one-exercise-datalist.spec.ts` opens the editor straight from
+    `/program?new=program`, adds three exercise rows, and asserts exactly one `<datalist>`, that
+    every `input[list]` targets it, that no orphaned options exist elsewhere, and that the input's
+    `list` PROPERTY resolves to a populated element — sharing an id is only equivalent if the
+    binding still resolves. **Proven red against the per-row shape.**
+  - **The control's first message was wrong and was fixed.** A single combined wait reported the
+    pre-fix code as *"the library did not reach the sheet"* when the real cause is that no `#ex-lib`
+    exists at all. Split into two assertions so the red names the right thing.
+  - **Still not established, exactly as filed:** the millisecond cost. Nothing here drives a Samsung
+    WebView. This shipped as an element-count fix and is not evidence about input latency.
 - **Not established — and it is why this is not higher in the queue.** Nothing here can drive a
   Samsung WebView, so how many milliseconds of input lag this is worth is **unknown**. It is filed
   as an element-count finding (3,900 → 156), not a measured latency one.
