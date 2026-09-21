@@ -367,7 +367,7 @@ Live at the time of writing (2026-07-30):
   to hide a merged row**: that was excluding only two of production's four merged rows, and the other
   two were being offered beside the canonical rows they were merged into. A merged row with equipment
   is the shape a test fixture needs; an unlabelled one passes against a broken filter.
-  ([`2026-09-18-lane-a-rv51-merged-duplicate-exclusion.md`](../../overview/entries/2026-09-18-lane-a-rv51-merged-duplicate-exclusion.md))
+  ([`2026-09-18-lane-a-rv51-merged-duplicate-exclusion.md`](../../overview/history-2026-09-21-folded-1.md#2026-09-18-lane-a-rv51-merged-duplicate-exclusion))
 - **A missing day in `trainedDays` reads as a REST day, not as missing data (BF-176).** The streak
   loop walks back 365 days; if the supplier sends fewer, every day past its window looks like rest
   and three of them break the streak. The failure is not an under-count by the difference — **the
@@ -378,7 +378,7 @@ Live at the time of writing (2026-07-30):
   (`lib/achievements.ts`) counts **training days** with a `maxRestGap`; the home loop counts
   **calendar days spanned** (`1 + consecutiveRest`). Do not unify them to make them agree — it
   silently changes what the number means.
-  ([`2026-09-18-lane-a-bf176-streak-window.md`](../../overview/entries/2026-09-18-lane-a-bf176-streak-window.md))
+  ([`2026-09-18-lane-a-bf176-streak-window.md`](../../overview/history-2026-09-21-folded-1.md#2026-09-18-lane-a-bf176-streak-window))
 - **The leaderboard's streaks are deliberately UNBOUNDED, and must stay that way (LA-117).**
   `app/api/friends/leaderboard/route.ts` reads every trained day with no day filter, because
   `allTimeStreak` promises all-time and any window caps it — 365 would cap it just as the old 90
@@ -387,7 +387,7 @@ Live at the time of writing (2026-07-30):
   133 rows / 96 kB whole-database, indexed on `(user_id, started_at)`). If the app ever grows a real
   user base, bound it on **rows** and rename the field rather than reinstating a day window under a
   name that promises all-time.
-  ([`2026-09-18-lane-a-la117-leaderboard-all-time-streak.md`](../../overview/entries/2026-09-18-lane-a-la117-leaderboard-all-time-streak.md))
+  ([`2026-09-18-lane-a-la117-leaderboard-all-time-streak.md`](../../overview/history-2026-09-21-folded-1.md#2026-09-18-lane-a-la117-leaderboard-all-time-streak))
 - **One query counts sets per muscle — go through it (LA-118).** `weightedSetsByMuscle` in
   `lib/data/postgres/slices/periodization.ts` takes `{ from, toExclusive, dateColumn, programId? }`,
   and those last two are parameters because they are what four separate copies used to disagree
@@ -399,7 +399,7 @@ Live at the time of writing (2026-07-30):
   `GET /api/muscle-sets?from=&to=`. **`muscle-tonnage-trend` is still a separate copy** — it sums
   tonnage and buckets by a local-date string, so it shares the attribution half and nothing else;
   LA-118 is queued for it.
-  ([`2026-09-18-lane-a-lb111-muscle-sets-window.md`](../../overview/entries/2026-09-18-lane-a-lb111-muscle-sets-window.md))
+  ([`2026-09-18-lane-a-lb111-muscle-sets-window.md`](../../overview/history-2026-09-21-folded-1.md#2026-09-18-lane-a-lb111-muscle-sets-window))
 - **Muscle names are matched through `muscles.ts`, never compared raw (BF-171).** `normalizeMuscle`
   folds synonyms (`core` → `abs`, `quadriceps` → `quads`) and `moodMuscleMatches` expands a broad
   check-in pill to the catalogue muscles it covers — **`Back` is a pill and is not a muscle**; the
@@ -409,7 +409,7 @@ Live at the time of writing (2026-07-30):
   a synonym mismatch is indistinguishable from a fully rested muscle. Before adding a seventh
   comparison, check `muscles.ts` — its own header records cleaning up a hand-rolled synonym list once
   already.
-  ([`2026-09-17-lane-a-bf171-muscle-name-matching.md`](../../overview/entries/2026-09-17-lane-a-bf171-muscle-name-matching.md))
+  ([`2026-09-17-lane-a-bf171-muscle-name-matching.md`](../../overview/history-2026-09-21-folded-1.md#2026-09-17-lane-a-bf171-muscle-name-matching))
 - **A pre-selected check-in answer is not evidence, and the scorer must not treat it as such
   (BF-173).** `suggestedSoreMuscles` pre-ticks any muscle trained within 48 h and under
   `RECOVERED_PCT` — it reads the recovery model. `sessionRecoveryScore` reads that same model, so
@@ -421,7 +421,7 @@ Live at the time of writing (2026-07-30):
   accepts the pre-selection produces no lifter-added ticks, and the recovery pct already carries the
   fact. The soreness-driven deload is a separate path: `computePerExerciseDeload` reads
   `soreMusclesInSession` straight from the mood log and never touches the clamp.
-  ([`2026-09-17-lane-a-bf173-sore-provenance.md`](../../overview/entries/2026-09-17-lane-a-bf173-sore-provenance.md))
+  ([`2026-09-17-lane-a-bf173-sore-provenance.md`](../../overview/history-2026-09-21-folded-1.md#2026-09-17-lane-a-bf173-sore-provenance))
 - **Bodyweight exercises have bitten repeatedly** — two incommensurable 1RM eras produced a
   phantom +40% Pull-Up PR; sets counted as zero volume; a prescription was recorded that was never
   given. Any load maths must ask whether the exercise is bodyweight.
