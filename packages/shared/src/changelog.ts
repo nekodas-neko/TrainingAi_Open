@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.464.1",
+    date: "2026-09-21",
+    changes: [
+      "Progress bars now glide instead of stuttering. The contributor bars, the walk pacer, the meal macro rows and the workout time bar all animated their width, which makes the phone re-lay-out the whole row on every frame \u2014 and nudges the labels and numbers beside them. They now scale instead, which the GPU handles on its own. The calorie bar is deliberately unchanged: its fill is a colour ramp, and scaling it would change which colour the leading edge shows.",
+    ],
+  },
+  {
     version: "1.464.0",
     date: "2026-09-21",
     changes: [

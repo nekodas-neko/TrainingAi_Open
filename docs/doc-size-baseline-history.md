@@ -15021,13 +15021,41 @@ the session-167 re-prompt bug. A probe proved it (`onData` fired twice, `readCac
 carries. An entry that is wrong about its own fix is worth the space to correct in place, because
 the next reader starts from it.
 
-## 2026-09-21 — `docs/implementation-backlog.md` 26040 → 26017 (LA-124 left the queue)
+## 2026-09-21 — RV-72 shipped with residue, on top of RV-66's rebaseline
 
-Recomputed after merging `main`, not picked from either side of the conflict. LA-124 shipped and
-was removed whole — nothing is owed on it, the entry says so itself — while the same file had just
-gained LB-123 and RV-79's correction from #1378. The net is −23.
+`docs/implementation-backlog.md` **26017 → 26061** · `projectOverview.md` **12198 → 12205**
+(`fix/rv72-progress-bar-scalex`) — recomputed after re-merging `main` twice while this branch was
+open, so these are measured against the merged file rather than against the number the branch
+started from. The backlog's +44 is RV-72's own +20 plus **+24 of LB-119 evidence**: this PR's own
+E2E lost `diary-nested-meal:231` to the chromium `SIGSEGV`, at fault address `0x1b0` — the same
+address, and the same spec line, as the #1280 run already in that entry's table. A row was added
+there rather than the failure being waved off, because the whole point of that entry is that the
+sightings accumulate into a case.
 
-The conflict was in the `.size` file alone; the backlog itself auto-merged, because one side deleted
+RV-72's entry stays queued rather than being deleted, so the lines are a `✅ SHIPPED` record plus a
+`Keep:` naming what is genuinely still owed: the `motion-polish` device pass, the
+`transition-all`-over-inline-`width` sites the entry lists, and the 26 bars with no transition at
+all. None of those was swept blind, and the primitive they would use now exists.
+
+One line is a correction rather than a description: the `⛔` that opened the calorie-bar exclusion
+bullet was emphasis, not a blocker, and it is what parked the entry (LB-121's fourth instance). It
+is gone, so the entry is now visible to `next-item.js` for whoever takes the residue.
+
+The +7 on `projectOverview.md` is the same `motion-polish` Known-Issues row rather than a second one —
+RV-72 shares RV-71 and RV-75's batch and its one device sitting, so a separate row would have
+claimed a separate check that does not exist. The added lines are what is carried, not fixed: the
+`transition-all`-over-inline-`width` sites, the 26 untransitioned bars, and why the calorie bar
+stays on `width` by design.
+
+## 2026-09-21 — `docs/implementation-backlog.md` 26061 → 26038 (LA-124 left the queue)
+
+Recomputed after merging `main` twice — RV-72 (#1377) landed underneath while this branch was open,
+which is why the starting number here is not the one this branch was cut from. Not picked from
+either side of the conflict. LA-124 shipped and was removed whole — nothing is owed on it, the
+entry says so itself — while the same file gained LB-123 and RV-79's correction (#1378) and then
+RV-72's `Keep:` and an LB-119 sighting row (#1377). The net of this branch's own edit is −23.
+
+The `.size` file conflicted; the backlog itself auto-merged both times, because one side deleted
 an entry and the other added one somewhere else. That is the benign shape. The dangerous one is two
 *deletions*, where "keep both" resurrects two shipped entries — checked here by grepping for all
 three ids rather than reading the diff.

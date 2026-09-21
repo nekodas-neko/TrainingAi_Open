@@ -6,6 +6,7 @@ import { formatTime } from "./utils";
 import type { SessionTimingResponse, ExerciseTiming } from "@/app/api/workout-sessions/[id]/timing/route";
 import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache";
 import { WORKOUT_TIMING_TTL } from "@trainingai/shared/cache-ttl";
+import { ProgressFill } from "@/components/ui/progress-fill";
 
 // "25 min" / "1m 30s" for headline totals; bars use formatTime (M:SS).
 function fmtMin(sec: number): string {
@@ -154,7 +155,7 @@ function TimeBar({ actualSec, expectedSec, kind }: { actualSec: number; expected
   const fill = over ? (kind === "rest" ? "var(--accent-amber, #f59e0b)" : "#0ea5e9") : "var(--color-brand)";
   return (
     <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-muted/60">
-      <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${actualPct}%`, background: fill }} />
+      <ProgressFill pct={actualPct} color={fill} />
       {/* planned-time target tick */}
       <div className="absolute top-0 bottom-0 w-0.5 bg-foreground/55" style={{ left: `calc(${expectedPct}% - 1px)` }} aria-hidden />
     </div>

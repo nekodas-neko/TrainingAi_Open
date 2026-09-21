@@ -6,6 +6,7 @@ import { ScoreBandLegend } from '@/components/health/score-band-legend'
 import { labelFor } from '@/lib/oura/contributors'
 import { guideFor } from '@trainingai/shared/health/contributor-guide'
 import { ContributorDetails, factorAnchorId } from '@/components/health/contributor-details'
+import { ProgressFill } from "@/components/ui/progress-fill";
 
 /**
  * Contributor graph for a health score — one labelled, band-coloured bar per contributor,
@@ -89,7 +90,7 @@ export function FactorBar({
         {linked && <ChevronRightIcon className="h-3 w-3 flex-none text-muted-foreground/60" />}
       </span>
       <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-muted/60">
-        <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${value}%`, background: color }} />
+        <ProgressFill pct={value} color={color} />
       </div>
       <span
         className={`w-8 flex-none text-right text-[11px] font-semibold tabular-nums${muted ? ' text-muted-foreground' : ''}`}

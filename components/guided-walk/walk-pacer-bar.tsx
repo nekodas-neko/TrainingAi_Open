@@ -3,6 +3,7 @@
 import { memo, useEffect, useState } from 'react'
 import type { CadenceTracker, CadenceTrackerSnapshot } from '@/lib/activity/cadence-tracker'
 import { readPacer, bandColor, type PacerInput, type TargetPair } from '@/lib/walk/walk-pacer'
+import { ProgressFill } from "@/components/ui/progress-fill";
 
 /**
  * The live pacing verdict and its bar (Q-410).
@@ -47,10 +48,7 @@ export const WalkPacerBar = memo(function WalkPacerBar({
         aria-valuenow={Math.round(reading.progress * 100)}
         aria-label={reading.message}
       >
-        <div
-          className="h-full rounded-full transition-[width] duration-500"
-          style={{ width: `${reading.progress * 100}%`, background: color }}
-        />
+        <ProgressFill pct={reading.progress * 100} color={color} />
       </div>
       {/* The mark and the sentence are not decoration — the band is also carried by colour, and
           colour alone is not allowed to be the whole message. */}
