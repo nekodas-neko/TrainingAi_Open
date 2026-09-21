@@ -464,46 +464,6 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
-### [workouts][app-shell] RV-81 — the program editor renders the whole exercise catalogue once per exercise row, and rebuilds it on every keystroke
-
-- **Lane:** B — `components/config/program-editor-sheet.tsx:778-782`. **Added:** 2026-09-20 ·
-  Review sweep 51.
-- The `<datalist>` sits **inside** `sess.exercises.map((ex, ei) …)`, so there is one full copy of the
-  catalogue per exercise row, and its content is byte-identical for every row. It is the **only
-  `<datalist>` in the codebase**.
-- **Production scale: 25 active exercises × 156 library rows = 3,900 `<option>` elements**, against
-  156 if the list were shared.
-- **The multiplier is that it rebuilds while typing.** Editor state is lifted to the parent —
-  `selectExerciseName` (`:228`) calls `onProgramSessionsChange(...)` — so every keystroke in any
-  exercise-name input re-renders the sheet and recreates all 3,900 elements. There is no `useMemo`
-  and no memo boundary (the file imports only `useRef, useState`).
-- **✅ SHIPPED 2026-09-21** (`fix/rv81-shared-exercise-datalist`, **v1.462.1**, Lane B). One
-  `<datalist id="ex-lib">` for the document, `useMemo`d on `[exerciseLibrary]`, every input's `list`
-  pointing at it. **3,900 `<option>` elements → 145** on the seeded library (146 rows, 1 merged).
-  - **Extracted rather than hoisted in place.** The first pass put the memo and the element in
-    `program-editor-sheet.tsx` and pushed it from 956 to **984** lines — `check-component-size.js`
-    failed it against a 963-line baseline on a file it calls a known hotspot, saying *"extract, do
-    not append"*. It now lives in `components/config/exercise-library-datalist.tsx` and the sheet is
-    **953**, below where it started. The gate was right and the first instinct was wrong.
-  - **`EXERCISE_LIBRARY_LIST_ID` is exported** so a second autocomplete over this library points at
-    the same list instead of rendering a rival copy — the shape this entry existed to remove.
-  - **Verification.** `e2e/rv81-one-exercise-datalist.spec.ts` opens the editor straight from
-    `/program?new=program`, adds three exercise rows, and asserts exactly one `<datalist>`, that
-    every `input[list]` targets it, that no orphaned options exist elsewhere, and that the input's
-    `list` PROPERTY resolves to a populated element — sharing an id is only equivalent if the
-    binding still resolves. **Proven red against the per-row shape.**
-  - **The control's first message was wrong and was fixed.** A single combined wait reported the
-    pre-fix code as *"the library did not reach the sheet"* when the real cause is that no `#ex-lib`
-    exists at all. Split into two assertions so the red names the right thing.
-  - **Still not established, exactly as filed:** the millisecond cost. Nothing here drives a Samsung
-    WebView. This shipped as an element-count fix and is not evidence about input latency.
-- **Not established — and it is why this is not higher in the queue.** Nothing here can drive a
-  Samsung WebView, so how many milliseconds of input lag this is worth is **unknown**. It is filed
-  as an element-count finding (3,900 → 156), not a measured latency one.
-- **⚠ Neither existing check covers this shape** — `check-memo-prop-stability.js` reports OK (93
-  memoised components, 0 defeated call sites) and `check-component-size.js` flags nothing. Do not
-  read a green gate as evidence against it.
-
 ### [platform] RV-82 — two routes fetch the active program twice inside a single request
 
 - **Lane:** A — `app/api/next-session/prescription/route.ts:57`,
@@ -825,8 +785,18 @@ below threshold and left in place for next time.
 - **Same `transition-all` issue** at `components/workout/set-card.tsx:305` and
   `pre-workout-screen.tsx:342,351`; `transition-[padding]` at `components/home-sortable-section.tsx:26`
   animates a layout property and should animate the child's `translateX` instead.
-- **Not established:** nothing was seen running. The sticking-`hover:` behaviour is a documented
-  Android WebView trait, not something reproduced here.
+- **✅ SHIPPED 2026-09-21** (`fix/motion-polish-button-and-sheet`, **v1.463.0**). `active:scale-[0.97]`
+  on the cva base, `transition-all` narrowed to
+  `transition-[transform,background-color,opacity,border-color,box-shadow]` at `duration-100`, and
+  `motion-reduce:` opting both out — `MotionConfig reducedMotion="user"` covers Framer Motion
+  components and a CSS transition is not one.
+- **Keep:** ① **the device look and feel**, which is the whole of what is owed and what the batch
+  exists for: a 0.97 press on the S25, and whether the sticking-`hover:` this guards against was
+  ever real. ② **the sibling `transition-all` sites this entry lists** — `set-card.tsx:305`,
+  `pre-workout-screen.tsx:342,351` and `home-sortable-section.tsx:26`'s `transition-[padding]` — are
+  NOT done. They are separate files with separate risk and were left rather than swept blind.
+- **Not established, unchanged:** nothing was seen running. The sticking-`hover:` behaviour is a
+  documented Android WebView trait, not something reproduced here.
 
 ### [app-shell] RV-72 — about ten progress bars animate `width`, a layout property, and twenty-six more snap
 
@@ -845,6 +815,17 @@ below threshold and left in place for next time.
   `transform: scaleX(pct)` with `transform-origin: left` and
   `transition-transform duration-500 motion-reduce:transition-none`. The repo's own "a pattern at ≥2
   sites gets extracted" rule applies at ~33. Convert solid-fill bars first.
+- **⚠ THIS ENTRY IS PARKED BY ITS OWN EMPHASIS GLYPH AND IS STARTABLE (found 2026-09-21, Lane B).**
+  It carries no `Gate:` and no `Needs:` — the `⛔` below is used for emphasis, which `next-item.js`
+  reads as the legacy prose blocker. **That is LB-121, and this is its fourth measured instance**
+  (OR-118, TN-25, OR-116, now RV-72). It printed under PARKED while RV-71 and RV-75 of the same
+  batch printed under READY, which is how the batch came to ship in two pieces.
+- **Deliberately NOT bundled with RV-71/RV-75 despite the shared batch.** RV-74 is genuinely
+  `Gate: device`, so `motion-polish` could not ship whole in one PR regardless; and this entry is a
+  new shared primitive plus ~33 conversions, which is a far larger diff than the two one-line
+  primitive changes. With `main` landing a PR every ~8 minutes against a ~7-minute check cycle, a
+  large diff is the one most likely never to land (#1365 took six merge attempts). **Take it next,
+  and it still wants the same device pass as the rest of the batch.**
 - **⛔ Deliberately exclude `calorie-progress-bar.tsx`** — it clips a gradient ramp with a
   hand-computed `backgroundSize`, and `scaleX` would squash the ramp and change what the chart says.
   Leave it on `transition-[width]` **with a comment saying why**, or the next sweep files it again.
@@ -887,8 +868,17 @@ below threshold and left in place for next time.
   `transition ease-in-out` for the M3 emphasized-decelerate `cubic-bezier(0.05,0.7,0.1,1)` already
   used for tabs and routes, so sheets move on the same curve as everything else.
   `slide-in-from-bottom` is already transform-only, so nothing else changes.
-- **Watch:** a faster sheet gives its content less time to paint, so a sheet that fetches on open
-  gets slightly more visible about doing so. That is the instant-paint rule's job (seed from
+- **✅ SHIPPED 2026-09-21** (`fix/motion-polish-button-and-sheet`, **v1.463.0**). Open 500 → 300 ms,
+  close 300 → 250 ms, on the M3 emphasized-decelerate curve `globals.css` already uses for tabs and
+  routes rather than a second easing invented for sheets. `motion-reduce:` collapses both.
+- **⚠ `duration-250` IS NOT A TAILWIND CLASS** and was written first. It is not in the default scale
+  (75/100/150/200/300/500/700/1000), so it compiled to nothing and left the stock 300 ms close in
+  place — a silent no-op that reads as a shipped fix. `duration-[250ms]`. **This is why the spec
+  asserts computed style rather than class strings**, and it is worth carrying: a typo'd Tailwind
+  class does not fail anything.
+- **Keep:** the device feel, with the rest of `motion-polish`.
+- **Watch, unchanged:** a faster sheet gives its content less time to paint, so a sheet that fetches
+  on open gets slightly more visible about doing so. That is the instant-paint rule's job (seed from
   `readCacheSync`) and a sheet ignoring it is a separate finding, not a reason to keep 500 ms.
 
 ### [nutrition][platform] RV-77 — meal-plan generation can fire the same top-up model call twice for one meal
