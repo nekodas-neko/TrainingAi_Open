@@ -44,7 +44,8 @@ describe.skipIf(!canRun)('an empty snapshot never flattens a populated day (TN-2
   })
 
   /** The shape the route writes. `count: 0` is the destructive form. */
-  const snapshot = (count: number, over: Record<string, unknown> = {}) => ({
+  type Row = import('@/lib/data/repository').BodyBatteryDailyRow
+  const snapshot = (count: number, over: Partial<Row> = {}): Row => ({
     date: DATE,
     anchor: 55,
     anchorSource: 'readiness',
@@ -57,7 +58,7 @@ describe.skipIf(!canRun)('an empty snapshot never flattens a populated day (TN-2
     hrMax: 190,
     hrMaxObserved: count === 0 ? null : 165,
     hrSampleCount: count,
-    modelVersion: 1,
+    modelVersion: '1',
     ...over,
   })
 

@@ -13063,8 +13063,42 @@ shape as **Q-528** (`replaceOuraDailySummary`) and any `fullHistory` path — a 
 clearing and then writes nothing when its input query returns empty. **Nothing stores the prior
 value**, so this is only visible by comparing against the raw tables.
 
+**✅ THE GUARD SHIPPED 2026-09-21** (`lane-a/tn20-empty-snapshot-guard`). `upsertBodyBatteryDaily`
+now refuses populated → empty in its `ON CONFLICT` clause, atomically rather than read-modify-write.
+
+**⚠ THE FIRST ACTION'S SUSPECT DOES NOT EXIST — there is no recompute and no delete.**
+`body_battery_daily` has exactly ONE writer: **`GET /api/body-battery`**, which snapshots the row on
+every read by design (*"Every read updates today's row, so the last read of the day captures the
+end-of-day value"*). A read whose waking-hours query came back empty computed a day of nothing and
+wrote it over a correct row. **The destructive write is a GET**, which is why nothing looked
+suspicious. The entry's *"do not re-run the recompute"* warning aimed at a path that is not there —
+the caution was right for a different reason: here a read IS a write.
+
+**⚠ TWO CORRECTIONS, measured 2026-09-21 over all 84 days.** It is **4 days, not "3 of the last
+11"** — 2026-07-26 (272 raw) predates the entry, alongside 08-22 (265), 08-26 (1,954), 08-31 (3,767).
+And it is **NOT "losing days now"**: the newest is 2026-08-31, three weeks earlier. The guard did not
+exist until this change, so per CLAUDE.md's `error_events` rule — *something that stopped is not
+something that was fixed* — it stopped firing and stayed possible.
+
+**Not monotonic, deliberately.** `excluded >= stored` is the obvious alternative and is wrong twice:
+it freezes a day at a bad value and blocks a legitimate downward correction. This entry draws the
+line itself — a healthy day's stored count sits *slightly below* raw from waking-hours windowing, and
+zero-against-thousands is a different failure. A mutation pins it: the monotonic version fails the
+control test.
+
+**Keep — two things, and the entry stays queued for both.**
+1. **The four damaged days are NOT repaired.** The route only ever writes `todayIso`, so nothing
+   re-reaches a past date. The raw samples still exist, so they are rebuildable — but that needs a
+   backfill path that does not exist and is **a production data write, so confirm-first and the
+   owner's**. The guard heals only the current day.
+2. **The triggering condition is unidentified.** This fixes what an empty read DOES, not what made
+   a read see no waking samples on those four days. First place to look is `walkBodyBattery`'s
+   `samples.filter(s => s.tsMs >= p.wakeTime)` (measured under TN-55) — a wrong or late `wakeTime`
+   would produce exactly this.
+
 **Pass test:** re-running the recompute on 2026-08-31 restores drain ≈113 from the 3,815 stored
-samples, and no day whose raw HR count is non-zero stores `hr_sample_count = 0`.
+samples, and no day whose raw HR count is non-zero stores `hr_sample_count = 0`. **The second half is
+now enforced going forward by the guard; the first half is the owed backfill.**
 
 ### [readiness] TN-22 — the stored `stress_high_minutes` disagrees with the model's own buckets on 8 of 9 days, and that is Q-507
 

@@ -14773,3 +14773,29 @@ The rest is the distinction that makes it a data change rather than a rename, wh
 once where the next reader will find it: **the labels are relative and the numbers are absolute.** On
 the 60-minute sessions everyone tests with, `'short'` and `30` are the same thing. On a 45-minute
 session — the one the owner asked for — `'short'` is 15 and `30` is 30.
+
+## 2026-09-21 — TN-20's destructive write turned out to be a GET
+
+`docs/implementation-backlog.md` **25452 → 25486** · `projectOverview.md` **12113 → 12138**
+(`lane-a/tn20-empty-snapshot-guard`).
+
+The entry's first action named a suspect — *"the same delete-before-guard shape as Q-528 … a
+recompute that starts by clearing and then writes nothing"* — and there is no recompute and no
+delete anywhere near this table. `body_battery_daily` has exactly one writer and it is
+`GET /api/body-battery`, which snapshots the row on every read by design. That is the whole finding,
+and it is worth the lines because the next reader would otherwise spend the same time looking for a
+recompute that does not exist.
+
+Two measured corrections follow it. **4 damaged days, not "3 of the last 11"** — one predates the
+entry — and **not "losing days now"**: the newest is three weeks old. The second matters more than it
+looks, because the guard did not exist until this change, so the table went quiet on its own. Left
+unsaid, a future reader finds a calm table and a shipped fix and concludes the fix worked.
+
+The rest is the fix that was rejected, which is the part a diff cannot carry: a monotonic
+`excluded >= stored` is the obvious alternative and is wrong twice — it freezes a day at a bad value
+and blocks a legitimate downward correction. The entry already contains the argument against it
+(*"zero against thousands is a different failure"*), and a control test now fails under it.
+
+And the two things still owed: the four days are rebuildable from raw samples that still exist but
+need a backfill that does not exist and is a production write, and the condition that made those
+reads see nothing is still unidentified.
