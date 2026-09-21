@@ -74,7 +74,10 @@ export interface AiPrescription {
   // configured timeBudgetMinutes. Set when the lifter explicitly asked for a shorter or
   // longer session today, so the pre-workout control can show which one is live — the
   // choice itself is never persisted on the program, only here, on the plan it produced.
-  durationPreset?: 'short' | 'standard' | 'long'
+  // BF-7 PR 2b: minutes now, with the three labels still legal because THIS FIELD IS WHERE THEY
+  // WERE STORED — 10 of 10 production prescriptions carried one on 2026-09-21. `DurationPreset`
+  // resolves both in one place (`requestedBudgetMin`), so nothing that reads this needs to care.
+  durationPreset?: import('@trainingai/shared/workout/duration-model').DurationPreset
   // Fingerprint of the inputs consumption-day re-evaluation
   // (lib/ai-periodization/reevaluate.ts) last ran against — see reevaluationKey(). Lets
   // workout-data skip re-running it on every fetch while still re-running the moment the

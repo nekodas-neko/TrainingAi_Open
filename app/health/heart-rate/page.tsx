@@ -5,7 +5,9 @@ import dynamic from "next/dynamic";
 import { HeartIcon, HistoryIcon } from "lucide-react";
 import { cachedFetch, cachedFetchToday, readCacheSync, readTodayCacheSync } from "@/lib/sqlite/cache";
 import { HEALTH_TRENDS_SUMMARY_TTL, READINESS_SCORE_TTL, TTL_MEDIUM } from '@trainingai/shared/cache-ttl';
-import { todayInTz, DEFAULT_TZ, formatDayShort } from "@trainingai/shared/date-utils";
+import { todayInTz, formatDayShort } from "@trainingai/shared/date-utils";
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
+import { useStressDay } from "@/lib/hooks/use-stress-day";
 import type { ReadinessScoreResponse } from "@/app/api/readiness-score/route";
 import type { HealthTrendsResponse } from "@/app/api/health/trends/route";
 import { DetailHero, usePageGradient, useHeroColorScheme } from "@/components/health/detail-hero";
@@ -21,7 +23,13 @@ const HrDayChart = dynamic(() => import("@/components/health/hr-day-chart").then
 interface HrReading { timestamp: string; bpm: number; source: string | null }
 
 export default function HeartRateDetailPage() {
-  const today = todayInTz(DEFAULT_TZ);
+  // Was `todayInTz(DEFAULT_TZ)`, which keys this page's whole day to Brisbane for every user. Fixed
+  // here rather than filed because TN-3b's overlay needs the user's day to be the day it fetches
+  // stress for — placing the buckets in one zone while asking for another's date is the exact split
+  // that put a Brisbane morning on screen as an afternoon.
+  const tz = useUserTimezone();
+  const today = todayInTz(tz);
+  const { data: stress } = useStressDay(today);
   const [data, setData] = useState<ReadinessScoreResponse | null>(null);
   const [trends, setTrends] = useState<HealthTrendsResponse | null>(null);
   const [hrReadings, setHrReadings] = useState<HrReading[]>([]);
@@ -133,7 +141,7 @@ export default function HeartRateDetailPage() {
         <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-3">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">24h Heart Rate</p>
           {hrReadings.length > 0 ? (
-            <HrDayChart readings={hrReadings} date={today} sleepWindow={sleepWindow} />
+            <HrDayChart readings={hrReadings} date={today} sleepWindow={sleepWindow} stressSeries={stress?.series} stressTimezone={tz} />
           ) : (
             <p className="text-xs text-muted-foreground">No HR captured yet today — the ring records periodically while worn.</p>
           )}

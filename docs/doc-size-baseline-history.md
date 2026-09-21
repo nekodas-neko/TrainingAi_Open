@@ -49,6 +49,63 @@ system against a steady-state expectation — with something that can only fail 
 
 ---
 
+## 2026-09-20 — CLAUDE.md → 816 (+38, the claude_ro twin rule and a claim that was wrong)
+
+Thirty-eight lines is a lot for one rule, and it buys the retraction rather than the rule.
+
+TN-54's migration added a table and CI went red on two tests that a 956-file local suite had
+reported green, because both had SKIPPED inside it. Migration 277's header — and the Lane A
+routine — say those two *"skip locally even with a DATABASE_URL, because local dev creates no
+`claude_readonly` role"*, i.e. that CI is structurally the only place they can fire. **It is not
+true.** The test provisions the role itself; what it needs is a TCP `DATABASE_URL`, because it
+reconnects as `claude_readonly` by rewriting the URL's credentials and the socket form
+`setup.sh` writes silently reconnects as the superuser. The test file's own header says so.
+
+Measured with the twin applied: 2 files, 27 tests, all passed, none skipped. So the rule is not
+"remember to regenerate the views and hope CI catches you" — it is a command you can run in three
+seconds before pushing, and the belief that no such command existed is what made a red run feel
+unavoidable. That belief is worth 38 lines to kill.
+
+---
+
+## 2026-09-20 — backlog → 25105 (TN-51's first action shipped, +13)
+
+Another raise on a queued entry rather than a removal, for the same reason as TN-54 an hour
+earlier: the code half is done and the device half is not, and collapsing that into "shipped" is
+what makes a strap problem look solved when the strap has not been worn.
+
+The +13 records that **option (1) was taken and options (2) and (3) should not be built** — the
+entry listed three approaches in preference order, and a later reader finding "shipped" with no
+note would have no way to tell which. It also names the cap change (16 → 100 on `hr-ingest`'s
+per-sample `rr`), because that number is now load-bearing in two languages and a reader who lowers
+it would silently reintroduce the bug: the client splits at 100 and a lower server cap would 400
+those chunks, and the client swallows a 400 and drops the batch.
+
+What is owed is one night of wear. Gradle cannot resolve the Android plugin in this sandbox —
+verified, not assumed — so the Kotlin is covered by unit tests that only CI executes, and the radio
+is covered by nothing.
+
+---
+
+## 2026-09-20 — backlog → 25086 (TN-54's recording half shipped, +15)
+
+TN-54 stays queued, so this is a raise rather than the usual removal. The entry arrived at 20:23 as
+🔴 LIVE — the owner's chest strap had been dark five days and nothing server-side recorded why — and
+the recording half shipped the same evening: migration 278, `/api/strap-status`, and the service
+posting the `status()` it had always kept in memory.
+
+The +15 is a `Keep:` naming three things, and the reason it is worth the lines is that **two of them
+could be mistaken for done.** The table records a give-up; it does not restart the service, which
+still stops itself after six failures and waits for an app launch. And nothing renders any of it —
+the Devices screen still shows *"Connected"* with no last-sample time, which is the surface that
+actively reassured the owner the morning he asked. An entry that logged only "shipped" would leave
+the next reader believing the strap problem was solved.
+
+The third is the honest one: no line of the Kotlin has been executed. No Android SDK, Gradle
+proxy-blocked, no Kotlin step in CI.
+
+---
+
 ## 2026-09-20 — backlog → 24914 (LA-74 shipped, −24)
 
 The program write path is typed and `.strict()` at last, so the entry leaves the queue. It had sat
@@ -14444,7 +14501,279 @@ TN-3b is the owner's.
 - **LB-120** — eight drifts in two hours, six resolve-and-push cycles for one card, the same three
   files every time. The number is the point: it converts "this is annoying" into "the drift rate is
   faster than a CI cycle", which is a different problem with a different fix.
-## 2026-09-20 — `docs/implementation-backlog.md` +449 (24984 → 25433) (Review sweep 51)
+
+## 2026-09-20 (sixth) — `docs/implementation-backlog.md` → 25071 (after merging OR-120/OR-121)
+
+Not new entries — **TN-51 and TN-54 were unreachable and had to be re-filed**, plus the protocol
+clarification that stops the next filer repeating it. +20 lines.
+
+TN-51 carried `Needs: PS-44` that nobody wrote: the line read `- **Needs:** — nothing. **Blocks the
+HRV half of PS-44.**`, and `next-item.js` takes *any* entry ID anywhere after `Needs:` as a
+dependency. So the prose said "nothing blocks this" and the parser read the exact inverse of the
+real direction. Both entries additionally carried `Gate: device`, which parks them — the mistake the
+`Gate:` bullet in the backlog protocol names twice (BF-45, LB-26) and which this filing made a third
+time, having read it.
+
+The part worth keeping is that **`Verify: device` is not the fix either**, which is what the
+protocol implied and what was tried first: it prints under a heading that reads *shipped*, and these
+are unbuilt. Neither structured field describes startable native work that will owe a device check,
+so the protocol bullet now says to carry neither and state the check as prose. Both entries moved to
+the top of the queue — the owner's *"lets get this sorted before my next trial"* is a priority
+statement, and priority here is queue position.
+
+## 2026-09-20 — `docs/agents/state/tuning.md` → 731
+
++17, and the paragraph it replaces was actively misleading: the baton told a successor the one thing
+owed by the owner was to run the Cooper test. He has run it — it yielded 175 — and the "pinned 178"
+the same paragraph described was never live (all 101 cached days use 187). So the raise buys a
+correction plus the three owner actions that *are* outstanding, and a Method section on the trap that
+produced this PR: an entry can be filed, merged and CI-green while being invisible to the lane meant
+to build it. The trap's full account is the journal entry, not the baton — the baton carries the
+two-line rule (`next-item.js` after filing; neither `Gate:` nor `Verify:` on startable native work)
+and links out, which is what keeps it from accreting further.
+## 2026-09-20 — `docs/implementation-backlog.md` → 25024 (OR-120, three decisions answered)
+
++40 for three answers, and the lines are mostly **reopening conditions** rather than the answers
+themselves. A deferral with no stated trigger becomes a question someone re-asks in a month; PS-46
+now says it reopens when the owner wants the app on an iPhone, and PS-45 when a *second* consumer
+appears rather than a repeat of the first request.
+
+The BF-77 note is the longest and is a correction to my own framing. It was put to the owner as
+three sizes with a recommendation; they answered in different terms — *"the most efficient way to
+share a food library"* — which means the mechanism was the question, not the scale. Recording that
+distinction is what stops the next session re-presenting A/B/C and calling it progress.
+
+### `docs/implementation-backlog.md` → 25049 (same PR, OR-121)
+
++25 for one entry recording a gate step that failed once and has passed on every run since. Filed
+under the repo's own rule that something which stopped is not something that was fixed.
+
+Most of its length is the part that is actually actionable: the run was backgrounded as
+`pnpm ci:local 2>&1 | tail -5`, so the log kept seven lines and the reason is gone. **A gate piped
+through `tail` has discarded exactly the output needed the one time it fails.** That sentence is
+why the entry is worth 25 lines rather than a shrug.
+
+## 2026-09-20 — BF-186 ships, BF-185 is re-laned before a line of it was written
+
+`docs/implementation-backlog.md` **25071 → 25077** (`fix/bf186-manage-supplements-reachable`).
+
+Six lines net, and almost all of it is BF-185 rather than the entry that shipped. BF-186 shrank —
+its analysis was right and is now code, so the entry keeps why the note became the door rather than
+how it was found.
+
+BF-185 grew because it was **wrong in the field that decides who builds it**. It said Lane B and
+named the toggle; `taken_at` is stamped in `lib/data/postgres/adapter.ts`, and the re-stamp is
+documented as a deliberate choice with its reasoning written next to it. An entry that asks to
+reverse a documented decision needs to say so, or the next reader deletes a comment they should be
+arguing with. The lines buy that, plus the sequencing (engine half first, because an editable time
+is worthless while the next re-tick overwrites it) and the note that the batch is now split.
+
+## 2026-09-20 — TN-53's render half: +27 backlog, +17 projectOverview
+
+`docs/implementation-backlog.md` **+27** · `projectOverview.md` **11966 → 11983**
+(`feat/tn53-sparkline-gaps`).
+
+The backlog baseline lands at **25119**, not 25104: #1354 merged between this branch's push and its
+PR, adding 15 lines with no note of its own. The delta above is this PR's; the arrival figure is not.
+
+The backlog lines replace a two-bullet `Keep:` that asked a question, with the answer. The question
+listed three things the sparkline might do with a run of nulls and **it was none of them** — it drew
+a smooth line across the gap, so the engine gate that had just replaced a fabricated number with an
+honest absence bought nothing on the surface that shows the trend. Recording that is worth more
+lines than recording a fix, because the next person to write a `Keep:` asking "check how X renders"
+should know the answer can be outside the list.
+
+The rest is the blast radius and one trap. The component is shared, so this reached **eleven
+charts** and not the one the entry names — a reader who greps for `hrr1` will not find the other ten.
+And the e2e was written against Postgres's `CURRENT_DATE` while the route builds its window from
+`todayInTz`, so it failed at 21:30 UTC reading one day extra; that is Q-356's shape (both sides from
+a clock, not the same clock) and the note names it so the device check does not re-derive it.
+
+`projectOverview.md`'s +17 is the Known-Issues row, which carries the two things a browser cannot
+settle: the 412 px look, and the owner's pass test, which needs production data because the local
+seed holds no `hrr1` at all.
+
+## 2026-09-20 — TN-51's device gate is a Known Issue, not a `Keep:` line
+
+`projectOverview.md` **11966 → 12001** (`lane-a/tn51-ambient-keeps-rr`).
+
+Thirty-five lines for one entry, and the entry exists because the Canonical Runtime gate names this
+file specifically: a native change with no device available needs a Known-Issues row here, and the
+backlog `Keep:` line does not satisfy it. The PR nearly merged without one — the code, the journal
+and the backlog were all complete, and the one artefact the merge gate actually names was missing.
+
+Most of the length is the part that is not the fix: what would confirm it on the S25, and that two
+unverified native changes now stack on `PolarStrapService`, so the next night of wear exercises
+TN-54 and TN-51 at once and a bad result would not say which. That is the sentence a reader needs
+in three weeks and the only place it can live is next to both.
+
+## 2026-09-20 — LA-121 was telling every implementer to start the entry that says not to
+
+`docs/implementation-backlog.md` **25105 → 25129** (`lane-a/la121-gate-owner`).
+
+Twenty-four lines, and the `Gate: owner` that was the point is six of them. LA-121's own step (2)
+reads *"Not before"* (1) is answered, and LA-122 item 2 says outright that an implementer must not
+pick — yet with no `Gate:` field the queue tool printed it as Lane A's **READY #1**. That is LA-122
+item 3's defect (Q-28, BF-9, BF-7 held back only by a convention inside a scheduled prompt) wearing
+a different entry's name, and it cost the start of this item before the entry was read.
+
+The rest is re-verification changing the entry rather than confirming it. The dead condition has
+**five** sites, not four; the fifth is a live gate with a dead *disjunct*, so a cleanup that removed
+"the four dead arms" as filed would leave it behind. It changes no behaviour — a dead disjunct in an
+OR contributes nothing — which is why it is worth writing down rather than fixing: the next reader
+needs to know it is inert before they touch the scoring path.
+
+And the premise moved from inferred to measured: the last non-null `oura_daily.readiness_score` is
+**2026-07-07, the re-key date itself**, with 0 of the trailing 61 days carrying one while rows are
+still written daily. The entry guessed "pre-re-key-only" and then reasoned its way to "permanent";
+the column now says so directly.
+
+## 2026-09-20 — BF-185's two files were not interchangeable, and the entry read as if they were
+
+`docs/implementation-backlog.md` **25129 → 25153** · `projectOverview.md` **12001 → 12030**
+(`lane-a/bf185-retick-keeps-taken-at`).
+
+Most of both is one finding the entry did not have: the server half and the device half are not
+alternatives. The device pushes the `taken_at` it reads back from its own row and an explicit value
+wins server-side, so fixing only `adapter.ts` would have pushed the re-stamped time straight over
+the preserved one — a green suite, a truthful-sounding note, and no change on the phone. An entry
+that names two files in one breath invites exactly that, so which one is load-bearing is now stated
+rather than left to be rediscovered.
+
+The rest is a third write path nobody had named. `applyDelta`'s manual branch carries the same line
+and must **keep** it, because it mirrors a row the device did not author. Without the note the next
+sibling-surface sweep would "finish the job" and make a device ignore corrections made anywhere else.
+
+The `projectOverview.md` row also carries the trade-off in plain terms: re-ticking was the only way
+to move a wrong time, so until the Lane B control ships a wrong stamp is uncorrectable from the UI.
+That is a regression in reach, accepted on purpose, and the kind of thing that must not be
+discoverable only by reading a diff.
+## 2026-09-20 — BF-179's measured row was gone, and that is the useful half
+
+`docs/implementation-backlog.md` **25129 → 25154** · `projectOverview.md` **12001 → 12031**
+(`lane-a/bf179-expire-dismissed-prescription`).
+
+The entry measured a `dismissed` prescription, expired three days, still carrying
+`deload_recommended` and still pinning every set to 52%. Re-read before implementing: across all 15
+of the owner's `session_periodization` rows there is **no `dismissed` row at all** and **not one row
+anywhere carrying `deload_recommended`**. The row regenerated 2026-09-19 23:10.
+
+Deleting the entry on that basis would have been the mistake. The defect is a code gap — an
+allow-list that named 3 of 6 statuses — and it survives its data state entirely. What the re-read
+actually bought is the narrowing: the entry left two candidates for the still-visible card, and the
+server can no longer produce that banner for **any** session, so a 52% still on screen is now
+positive evidence for the stale client cache rather than an open question between two. The device
+look changed from a yes/no into something that answers either way, and that is worth the lines in
+both files.
+
+The rest is the argument for the fix's shape over its content. An allow-list with `dismissed` added
+would close this bug and guarantee the next one; a deny-list ages out by default and makes a new
+status argue for its exemption. Written down because the diff alone reads as a one-line condition
+swap.
+
+## 2026-09-21 — the ledger's own case for existing: a dead PR nobody had written down
+
+`docs/implementation-backlog.md` **25205 → 25226** (`lane-a/la122-record-stale-prs`).
+
+Twenty-one lines for LA-122 item 6, which records that six PRs are open and that #1250 — Lane A's
+own, from 2026-09-16 — is verifiably dead: it exists to drop `Q-305:device` from
+`keep-gate-set-off.test.ts`, that string is already gone from the file on `main`, and the test passes
+8 of 8. The PR contains nothing.
+
+It earns the lines because of *why* it could not simply be closed. CLAUDE.md exempts pushing,
+opening and merging-when-green from confirm-first and deliberately does not exempt **closing**. So an
+agent can prove a PR dead and cannot clear it — correct as a rule, and also the mechanism by which
+six accumulated. Writing the list down is the only move available.
+
+The sharper point is that this had been noticed in an earlier session and recorded **nowhere in the
+repo**, so it had to be re-derived from the PR list and a test run. That is precisely the failure
+LA-122 was created to stop, which is now said in its own header rather than left implicit.
+
+## 2026-09-21 — TN-3b ships after the owner overruled a recommendation to strike it
+
+`docs/implementation-backlog.md` **+50** (landing at 25276) · `projectOverview.md` **+16**
+(12077 → 12093) (`feat/tn3b-stress-on-hr-chart`).
+
+Most of the backlog's 50 lines are two records that would otherwise exist only in a chat log.
+
+**TN-3b**: three sessions read its remaining text as leftover prose and filed it as a scope call,
+and I put it to the owner recommending a strike. He said no. The entry now records both the answer
+and **why the recommendation was wrong** — the 2026-09-10 reshape *added* the day-timeline overlay
+without withdrawing the HR-chart one, and an expanding decision reads identically to a replacing one
+from inside the entry. That is worth more lines than the fix, because the next reader of a
+finished-looking entry will make the same call. It also carries a `Keep:` warning that the cross-day
+aggregate was **not** part of the answer, so nobody builds it on the strength of this one.
+
+**BF-185**: the owner chose an editable time control, and the entry gained the reason Lane B still
+cannot build it. Its own premise — *"the server already honours an explicit `takenAt`"* — is true of
+the repository and false of `SupplementLogSchema`, which is `.strict()` with three fields and no
+`takenAt`. That is the second time this entry has been wrong in the field that decides who builds
+it, so the lines buy the sequencing plus the general form: read the schema, not the repository.
+
+`projectOverview.md`'s +16 is the Known-Issues row, whose device check is unusually specific because
+the chart now carries four things at 412 px.
+
+## 2026-09-21 — TN-35: a `Needs:` blocked by residue rather than by a dependency
+
+`docs/implementation-backlog.md` **25276 → 25292** (`docs/tn35-needs-blocked-by-residue`), +16.
+
+TN-35's `Needs: TN-3b` says *"do not build the join before the axis exists"*. The axis exists twice
+over — TN-3b's day chart shipped 2026-09-13 and its HR-chart overlay on 2026-09-21. What keeps
+TN-3b in the queue is a `Keep:`: a device look, and a question nobody has put to the owner. Neither
+is something TN-35 waits on.
+
+The lines are not about TN-35. `Keep:` was introduced so a finished entry could record what it still
+owes instead of being deleted, and it quietly acquired a second effect nobody chose: because
+`Needs:` clears only when its target leaves the queue, **an entry kept for residue blocks every
+dependent indefinitely.** With Lane B at READY 0 for eight consecutive checks, that is not
+hypothetical. Recorded rather than fixed by editing the field, because unparking my own next item is
+the shape the lane is explicitly warned about — and because the choice between "clear when the
+buildable work is done" and "stop counting a residue-only entry as a blocker" is the Orchestrator's,
+not a lane's.
+
+## 2026-09-21 — `docs/implementation-backlog.md` → 25428
+
++136 for two entries and one protocol rule, and the two entries are the point rather than the size.
+
+**TN-55** replaces a recommendation the owner had already approved. He signed off on "widen the Body
+Battery charge threshold"; measured against 84 days of production, the threshold is not the binding
+constraint — 220 minutes below it produced **zero** charge, because the walk excludes sleep and the
+charge ramp reaches full rate only at resting HR, where he logs ~0 minutes. The real defect is a rate
+balance netting **−29.8 points/day**. Most of the entry's length is the three measurements that
+overturn the old framing, because TN-2 and TN-52 both still carry it and an implementer will read one
+of them first.
+
+**TN-56** is an extraction, not new material: TN-52 already called the replay endpoint *"the
+highest-leverage single item on the tuning front"* while filing it as a paragraph inside a
+`Reference:` entry, which prints under *read, do not build*.
+
+The **calibration-period rule** is the owner's *"ideally it has a calibration period — do what's
+best"* turned into something checkable: fit 21 days after the last dose change, require ≥28 days,
+state the window's start date. Without the last clause a fit cannot be re-checked when the next
+change lands, which is the failure it exists to prevent.
+## 2026-09-21 — BF-7's plan called the type change free because nothing was persisted
+
+`docs/implementation-backlog.md` **25292 → 25316** · `projectOverview.md` **12093 → 12113**
+(`lane-a/bf7-duration-minutes`).
+
+Most of both lines is one correction. The plan's §5, *"What makes this unusually cheap"*, concluded
+*"there is no stored value to be compatible with"* and told the implementer to delete
+`DURATION_PRESET_DELTA_MIN`. Its evidence was real — no `duration_preset` column in Postgres, the
+local store or the sync tables — and it reached past what that evidence covers: `durationPreset` is
+a field on `AiPrescription`, which is stored whole inside `session_periodization.prescription`.
+Production carried one on **10 of 10** rows.
+
+It earns the space because the failure would have been quiet and the diff would have looked right.
+The mutation says it plainly: dropping the labels as instructed fails **16 of 29** tests including
+the pre-existing suite — but only because the labels were still being tested. Nothing about the
+*type* change would have complained, and a stored `'short'` reaching code expecting a number is the
+kind of thing that surfaces weeks later on one screen.
+
+The rest is the distinction that makes it a data change rather than a rename, which is worth stating
+once where the next reader will find it: **the labels are relative and the numbers are absolute.** On
+the 60-minute sessions everyone tests with, `'short'` and `30` are the same thing. On a 45-minute
+session — the one the owner asked for — `'short'` is 15 and `30` is 30.
+## 2026-09-20 — `docs/implementation-backlog.md` +449 (25452 → 25901) (Review sweep 51)
 
 Twenty entries (**RV-64…RV-83**) from the owner's efficiency review — logic-over-AI, caching and
 saving speed, runtime efficiency, and animation/UI feel — at ~22 lines each, the ratio this file

@@ -170,7 +170,11 @@ test('the sheet names the vial in use, and says the dose field is not saved', as
   await expect(sheet.getByRole('heading', { name: 'Work out the units' })).toBeVisible()
   await expect(sheet.getByLabel('Try a dose (mg)')).toBeVisible()
   await expect(sheet.getByText(/Not saved — this only works out what to draw/)).toBeVisible()
-  await expect(sheet.getByText(/Your saved dose is 0.5 mg, changed in Manage supplements, under Amount/)).toBeVisible()
+  await expect(sheet.getByText(/Your saved dose is 0.5 mg\./)).toBeVisible()
+  // BF-186 turned the tail of that sentence — "changed in Manage supplements, under Amount" — into
+  // the control it was describing. The pointer is still asserted here, because a note that names
+  // the saved dose and then leaves it unreachable is the defect BF-153 was written against.
+  await expect(sheet.getByRole('button', { name: 'Change it' })).toBeVisible()
 
   // The destructive case, said before the press. A second vial restarts the response window and
   // cannot be undone by dating a third one earlier — it would sort below.

@@ -37,9 +37,20 @@ interface Props {
   defaultDoseMg?: number | null
   /** Reads `body_metrics` from the local store for the weight-response card. */
   userId?: string
+  /**
+   * Opens the manage-supplements sheet, making the saved-dose note its own control (BF-186).
+   *
+   * The note used to end *"changed in Manage supplements, under Amount"* and name nothing that
+   * exists: the control is labelled **Manage**, alone, and it sits on the screen *behind* this
+   * sheet. Sending the reader to a different word on a different screen is what made the saved
+   * dose unfindable, so the words are gone and the note is the door.
+   *
+   * Optional because the caller owns that sheet; without it the note simply states the dose.
+   */
+  onManage?: () => void
 }
 
-export function VialSheet({ open, onOpenChange, supplementId, supplementName, defaultDoseMg, userId }: Props) {
+export function VialSheet({ open, onOpenChange, supplementId, supplementName, defaultDoseMg, userId, onManage }: Props) {
   const tz = useUserTimezone()
   const today = todayInTz(tz)
   const [failed, setFailed] = useState(false)
@@ -186,11 +197,30 @@ export function VialSheet({ open, onOpenChange, supplementId, supplementName, de
                 silently re-set every future prompt. */}
             <h3 className="text-sm font-semibold">Work out the units</h3>
             <NumField id="dose-mg" label="Try a dose" unit="mg" value={doseMg} onChange={setDoseMg} />
+            {/* BF-186. The note names a destination, so it IS the destination — three things
+                stacked to make the old wording unfollowable: it said "Manage supplements" where
+                the control says "Manage", the control is a 10 px header affordance, and it lives
+                on the screen behind this sheet. A reader searching for the literal phrase found
+                nothing. Closing this sheet and opening the next in the same tick is the sibling
+                sequence `sheet-back-stack` handles deliberately (BF-34) — `pendingSelfPops` is
+                module-level for exactly that. */}
             <p className="text-xs text-muted-foreground">
               Not saved — this only works out what to draw.{' '}
               {defaultDoseMg == null
-                ? 'You have no saved dose yet; set one in Manage supplements, under Amount.'
-                : `Your saved dose is ${round(defaultDoseMg)} mg, changed in Manage supplements, under Amount.`}
+                ? 'You have no saved dose yet.'
+                : `Your saved dose is ${round(defaultDoseMg)} mg.`}
+              {onManage && (
+                <>
+                  {' '}
+                  <button
+                    type="button"
+                    onClick={onManage}
+                    className="text-foreground underline underline-offset-2"
+                  >
+                    {defaultDoseMg == null ? 'Set one' : 'Change it'}
+                  </button>
+                </>
+              )}
             </p>
             {working && (
               <p className="text-sm tabular-nums text-muted-foreground">{working}</p>

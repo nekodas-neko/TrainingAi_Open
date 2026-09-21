@@ -2330,6 +2330,153 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [heart-rate][readiness] ⚠️ Stress is drawn on the heart-rate charts now, and no phone has seen it (TN-3b, 2026-09-21, v1.461.0) · needs: device
+
+The owner asked to read a stressed stretch against what he was doing at the time. The day's stress
+series now draws on `hr-day-chart.tsx` on the same clock as the heart rate, on a hidden second scale
+fixed to [−1,+1] — `/health/heart-rate` and the Health tab's HR card. Home's compact widget is
+deliberately excluded (no legend in compact mode, and it would add a GET to Home's first paint).
+Drawn as the measured series rather than shaded "stressed" bands, because thresholding would mean
+inventing the number that decides what counts as stressed, and that is a calibration. Gaps break the
+line via `toSegments`.
+
+**The device check is the whole of what is owed, and it is a crowded chart:** an amber stress line
+over the HR line, with sleep and workout bands behind both, at 412 px on the S25. Four things in one
+chart is what a browser cannot judge. **Also still open: the cross-day stress aggregate**, the other
+pre-reshape promise in TN-3b — the owner was asked about the HR-chart overlay only, so do not assume
+the aggregate is wanted.
+
+### [heart-rate][app-shell] ⚠️ Every trend chart stopped drawing over its gaps, and no phone has seen one (TN-53, 2026-09-20, v1.460.5) · needs: device
+
+`TrendSparkline` passed `spanGaps: true`, so a run of days with no reading was drawn as a smooth
+interpolated line — the missing days looked exactly like measured ones. That is what TN-53's engine
+gate had just stopped `analyseHrRecovery` doing, so the gate changed nothing on the surface that
+shows the trend. Fixed in the shared component, which means **eleven charts**: resting HR, HRV, HR
+recovery, wear time, session duration, workout density, protein/kg, steps, water, skin temperature
+and the score details. The line now breaks at a gap, a reading with no neighbour gets its own dot
+(it would otherwise draw nothing at all), and the header states "N days missing".
+
+**Two things a browser cannot settle.** ① The S25 look — a 3 px stranded dot and a new note at
+412 px in a header that already carries a delta chip. `e2e/tn53-sparkline-does-not-span-gaps.spec.ts`
+measures that no child overflows and the page does not scroll sideways, which is not the same as it
+reading well. ② The owner's pass test, *"the sparkline shows a gap across the period the strap was
+not worn"* — it needs production data, because the local seed holds no `hrr1` at all and the e2e
+drives `rhrBpm` through the identical component path instead.
+
+### [body][nutrition] ⚠️ A re-tick no longer rewrites a dose's time — NOT device-verified (BF-185, 2026-09-20)
+
+`supplement_logs.taken_at` followed the last tap rather than the dose. Ticking a dose, unticking and
+re-ticking it rewrote the stamp with nothing on screen saying so — measured on the owner's
+Retatrutide row 2026-09-20, **10:46:33 → 11:21:13, 35 minutes**, on an injection that happened once.
+`created_at` did not move, so the row knew when it was first written and reported the last tap
+anyway. **There was no double recording**, which is what the report suspected: the upsert correctly
+revives the day's soft-deleted row rather than inserting a second.
+
+It matters because BF-184 exists to correlate dose timing against overnight HR and HRV. A stamp that
+follows the last tap is the one field that analysis cannot tolerate drifting.
+
+**Both write paths now preserve it**, and a caller that states a time still wins. **The local one is
+load-bearing** — the device pushes the `taken_at` it reads back from its own row and an explicit
+value wins server-side, so fixing only the server would have pushed the re-stamped time straight
+over the preserved one. `applyDelta`'s manual branch deliberately still re-stamps from the server: it
+mirrors a row the device did not author.
+
+**NOT device-verified.** `getLocalStore` returns null in the sandbox, so the local path ran only as
+extracted SQL against `node:sqlite`, never through the real store on the real device. **No APK
+needed** — both halves are TypeScript and ship via Railway. **Check on device:** tick a dose, note
+the time, untick, re-tick, confirm it has not moved.
+
+**⚠ A stated regression in reach, taken deliberately.** Re-ticking was the only way to move a wrong
+time, so until Lane B's editable-time control ships, a wrong stamp cannot be corrected from the UI.
+Accepted because a silently-drifting stamp is worse for the analysis the field exists to support.
+**BF-185 stays queued** for that control and the device check; the owner decision it names
+(editable vs. a visible re-stamp) is still open and untouched.
+
+### [cardio][devices] ⚠️ Ambient wear keeps every RR interval now — NOT device-verified (TN-51, 2026-09-20) · needs: APK
+
+`PolarStrapService` is built for all-day wear and `ambient` defaults to `true`, so a night in the
+strap went through `thinAmbient()`, which kept one buffered sample per 30 s and **dropped the rest
+whole — each discarded sample carrying its own `rr` list with it.** Confirmed live in production
+2026-09-20 06:03–06:05 Brisbane: consecutive stored RR rows sat 30.2 s, 30.2 s and 30.7 s apart,
+one interval per kept sample. **That does not weaken rMSSD, it makes it undefined** — the measure is
+the root-mean-square of differences between *adjacent* intervals, and one interval every 30 s has no
+adjacent pair. It is why PS-44's ring-vs-strap HRV comparison could not be run at all.
+
+**Fixed in `PolarAmbientThinner`** (a pure object extracted from the service so the logic is
+testable): the HR series is still thinned — that was never the bug — but the dropped samples' beats
+ride forward onto the next kept sample, including a carry stranded by a flush boundary. A window
+above `MAX_RR_PER_SAMPLE` **splits** into further samples rather than truncating, and
+`/api/hr-ingest`'s per-sample `rr` cap went 16 → 100, because a 30-second carry holds ~30 beats at
+rest and the old cap would have rejected the very payload that fixes this. A cross-language test
+reads both constants and fails if they drift.
+
+**NOT verified on device, and nothing in the sandbox can stand in for it.** Gradle cannot resolve the
+Android plugin here, so the Kotlin was written but never run locally; its 8 unit tests are executed
+only by CI's `Android (Kotlin tests + debug APK)` job, which is **not a required check** and passed
+on `7a534349444` (80 tests, 0 failed). That job has no Bluetooth, no Polar H10 and no radio — the
+logic is covered, the measurement is not. **Needs a new APK** (`android/**`); the `hr-ingest` half
+reaches the device through a normal Railway deploy.
+
+**What would confirm it, on the S25:** install a new APK, wear the strap one night, then check that
+`rr_intervals` holds a **contiguous** beat-to-beat series across the core sleep window and that
+`rmssdFromRr` over it is comparable to the ring's figure for the same night. **TN-51 stays in the
+backlog queue until that run happens.**
+
+**Two unverified native changes now stack.** TN-54 (`strap_status`) merged earlier in the same
+session and is also awaiting a device check. Both touch `PolarStrapService`, so the next night of wear
+exercises both at once — worth knowing when reading the result, because a bad night would not say
+which one was responsible.
+
+### [workouts] ⚠️ The duration ladder takes minutes; the control that sends 45 is not built yet (BF-7, 2026-09-21)
+
+The owner asked on 2026-08-23 for *"the ability to choose a 45min session"*, anchored to the
+session's own configured length. The engine half is in: `DurationPreset` is a number of minutes, the
+prescription decides "is this the default?" by comparing the requested budget against the session's
+rather than testing for the word `'standard'`, and the route accepts a bounded integer.
+
+**⚠ The plan said this was cheap because nothing is persisted. `durationPreset` IS persisted** — it
+is a field on `AiPrescription`, which lives in `session_periodization.prescription`, and 10 of 10
+production rows carried one. So the three old labels stay legal beside the numbers rather than being
+replaced by them, and `DURATION_PRESET_DELTA_MIN` survives as their decoder instead of being deleted
+as the plan instructed. The labels are **relative** and the numbers **absolute**: they agree on a
+60-minute session and disagree on a 45-minute one, which is what made this a data change.
+
+**Nothing is user-visible yet, deliberately.** No control can send 45 until Lane B builds it
+(`session-duration-picker.tsx` and four siblings), so this half only makes 45 expressible and
+correct when it arrives. **BF-7 stays queued** for that control, which must commit on release rather
+than per detent — a prescription averages 2,445 ms and the preset path deliberately bypasses the
+cooldown. **Not device-verified; no APK needed** (TypeScript only, ships via Railway).
+
+### [workouts] ⚠️ An expired prescription ages out whatever its status — NOT device-verified (BF-179, 2026-09-20)
+
+The owner saw a session screen with **every exercise at 52% and a Deload chip**, asked against an
+explain screen reading 100/100 STRONG FIT, streak 0 days, sore muscles None, HRV well above usual.
+His *"why does it say deload when every signal says I'm fine"* had a real answer: **nothing on that
+explain screen produced it.** Those signals feed `computeDeloadStrength`, which gates on
+`consecutiveTrainingDays < 3` and returned `recommended: false`. The banner is the periodization
+prescription — a different system with its own lifecycle that never consulted today's signals.
+
+**The defect:** the ageing-out check in `reevaluatePrescriptionForToday` was an allow-list naming
+`auto_applied`/`accepted`/`consumed`. `dismissed` was in neither it nor the deliberate `pending`
+carve-out, so `needsRegenerate` never fired and `workout-data/route.ts` took the else-branch — which
+**re-stamps the stale prescription and writes it back**. The expired offer was not tolerated, it was
+refreshed. **This is Q-229 returning through a status its fix did not name.**
+
+**Fixed as a deny-list, and the shape is the point:** every status ages out on expiry except
+`pending` (whose expiry the emergency-deload suppression owns) and `none` (nothing to age out).
+The check named 3 of 6 statuses and the bug *was* the gap, so adding a fourth name would leave the
+next status added as the next silent gap.
+
+**⚠ The production state that motivated this no longer exists.** Measured 2026-09-20 across all 15
+of the owner's `session_periodization` rows: **no `dismissed` row at all**, and **not one row
+carrying `deload_recommended`**. The row regenerated 2026-09-19 23:10. The code gap is still real;
+the data state is gone.
+
+**NOT device-verified, and the look is now diagnostic rather than a yes/no.** Open the session
+screen: if the 52% and the chip are **gone**, this is a post-mortem and the fix closes it; if they
+are **still there**, that is positive evidence of a stale `workout-card:<id>` client cache, because
+the server can no longer produce that banner for any session. **No APK needed** — TypeScript only.
+
 ### [workouts] 🟠 Two real exercises are excluded from every generated program (RV-51, 2026-09-18) · found, not fixed
 
 **Open.** `equipmentEligible` (BF-129) excludes an exercise that declares no equipment, justified in

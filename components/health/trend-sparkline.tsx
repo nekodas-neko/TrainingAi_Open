@@ -10,6 +10,7 @@ import {
 import type { HealthTrendDay } from "@/app/api/health/trends/route";
 import { useHeroColorScheme } from "./detail-hero";
 import { resolveColor } from "@trainingai/shared/chart-colors";
+import { gapDataset } from "./trend-sparkline-gaps";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler);
 
@@ -62,15 +63,21 @@ function TrendSparklineBase({ trends, field, label, color, unit }: TrendSparklin
     return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getDay()];
   });
 
+  const gaps = gapDataset(values);
   const chip = deltaChip(trends, field);
   const lineColor = resolveColor(color);
   const areaColor = fillColor(lineColor);
 
   return (
     <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-2">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-x-2">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
           {label} — 14 days
+          {gaps.coverage && (
+            <span className="ml-1.5 font-normal normal-case tracking-normal opacity-70">
+              {gaps.coverage}
+            </span>
+          )}
         </p>
         {chip && (
           <span className={`text-[10px] font-semibold ${chip.colorClass}`}>{chip.text}</span>
@@ -86,9 +93,9 @@ function TrendSparklineBase({ trends, field, label, color, unit }: TrendSparklin
               backgroundColor: areaColor,
               fill: true,
               tension: 0.4,
-              pointRadius: values.map((_, i) => i === values.length - 1 ? 3 : 0),
+              pointRadius: gaps.pointRadius,
               pointBackgroundColor: lineColor,
-              spanGaps: true,
+              spanGaps: gaps.spanGaps,
             }],
           }}
           options={{

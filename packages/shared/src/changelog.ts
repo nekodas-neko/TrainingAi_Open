@@ -6,6 +6,41 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.461.0",
+    date: "2026-09-21",
+    changes: [
+      "The heart-rate charts now draw your stress for the day over the top of your heart rate, on the same clock. You asked to be able to match a stressed stretch to what you were doing at the time \u2014 now you can read it against your heart rate, your sleep block and your workouts in one place. Where the ring stopped sampling the stress line breaks rather than guessing across the gap.",
+    ],
+  },
+  {
+    version: "1.460.7",
+    date: "2026-09-20",
+    changes: [
+      "A deload prescription you had already dismissed could keep setting every working set to 52 percent long after it expired. Opening the session re-stamped the stale one instead of replacing it, so it never aged out and the Deload chip kept appearing on days your own readiness said you were fine \u2014 which is why the explain screen could read 100/100 STRONG FIT beside it. Those are two separate systems and only one of them was stuck. An expired prescription is now replaced whatever state it was left in, except a pending offer, which has its own timer.",
+    ],
+  },
+  {
+    version: "1.460.6",
+    date: "2026-09-20",
+    changes: [
+      "Un-ticking a logged dose and ticking it again no longer changes the time the dose is recorded at. It used to overwrite that time with the moment of the second tap \u2014 on one Retatrutide dose that moved a single injection's record by 35 minutes, and nothing on screen said it had happened. Nothing was double-recorded; the day's entry was always the one entry. Ticking a dose for the first time still stamps it then, as before. One trade-off worth knowing: re-ticking was the only way to change a recorded time, so until an editable time control is added, a wrong time cannot be corrected from the app.",
+    ],
+  },
+  {
+    version: "1.460.5",
+    date: "2026-09-20",
+    changes: [
+      "The 14-day trend charts used to draw a straight line across days they had no reading for, so a gap in the data looked exactly like a measurement. They now break the line where a day is missing, put a dot on a lone reading that would otherwise be invisible, and say how many days are missing beside the chart's title. This affects every trend chart \u2014 resting heart rate, HRV, HR recovery, wear time, session duration, workout density, protein, steps, water and skin temperature.",
+    ],
+  },
+  {
+    version: "1.460.4",
+    date: "2026-09-20",
+    changes: [
+      "The vial sheet used to tell you your saved dose was \"changed in Manage supplements, under Amount\" \u2014 a screen that does not exist under that name. The control is called just \"Manage\", it is ten-pixel grey text in the Supplements header, and it sits on the screen behind the sheet telling you to find it. Searching for the words was never going to work. The note now ends \"Change it\", and tapping that takes you straight there. The Manage control also got a proper thumb-sized tap area without getting visually bigger.",
+    ],
+  },
+  {
     version: "1.460.3",
     date: "2026-09-20",
     changes: [

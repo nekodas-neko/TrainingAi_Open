@@ -61,7 +61,7 @@ import {
 import { sleepImplausibleReason } from '@trainingai/shared/validation/plausibility'
 import { ActivityLogBody, deriveEndTime } from '@trainingai/shared/validation/activity-log'
 import { describeZodFailure } from './push-error-detail'
-import type { WorkoutRepository, UserGoals, EnsuredWorkoutSession, SessionLoad, YearReviewTotals, YearReviewTopExercise, UnitFixResult, SyncDelta, IncomingMutation, PushResult, OuraRawSampleInput, OuraRawSampleSummary, OuraRawSampleLatest, OuraRawSampleRow, FitnessTest, RunningPlan, PrescribedRun, PrescribedRunUpdate, AiCallLogInput, AiCallUsageSummary, ScaleRawSampleInput, ScalePendingSample, LastRealOneRm, BloodPanel, BloodPanelInput, BloodAnalyte } from '../repository'
+import type { WorkoutRepository, UserGoals, EnsuredWorkoutSession, SessionLoad, YearReviewTotals, YearReviewTopExercise, UnitFixResult, SyncDelta, IncomingMutation, PushResult, OuraRawSampleInput, OuraRawSampleSummary, OuraRawSampleLatest, OuraRawSampleRow, FitnessTest, RunningPlan, PrescribedRun, PrescribedRunUpdate, AiCallLogInput, AiCallUsageSummary, ScaleRawSampleInput, ScalePendingSample, LastRealOneRm, BloodPanel, BloodPanelInput, BloodAnalyte, StrapStatusWrite, StrapStatusRow } from '../repository'
 import { FitnessTestBody } from '@trainingai/shared/validation/fitness-test'
 import { PrescribedRunPatchBody } from '@trainingai/shared/validation/prescribed-run'
 import type {
@@ -331,6 +331,24 @@ const BATTERY_POLL_PRUNE_THROTTLE_MS = 24 * 60 * 60 * 1000
 // throttled + fire-and-forget like its siblings.
 let lastAccelChunkPrune = 0
 const ACCEL_CHUNK_PRUNE_THROTTLE_MS = 24 * 60 * 60 * 1000
+
+/** TN-54. One mapper for both strap-status read paths — same reason as `rowToAnalyte` below: a
+ *  field missed in a row→object map fails silently, and here it would fail as "the strap looks
+ *  fine", which is the exact reading this table exists to make impossible. */
+function rowToStrapStatus(r: {
+  id: number; recordedAt: Date; state: string; batteryPercent: number | null
+  lastSampleAt: Date | null; consecutiveFailures: number; worn: boolean | null
+}): StrapStatusRow {
+  return {
+    id: r.id,
+    recordedAt: r.recordedAt,
+    state: r.state,
+    batteryPercent: r.batteryPercent,
+    lastSampleAt: r.lastSampleAt,
+    consecutiveFailures: r.consecutiveFailures,
+    worn: r.worn,
+  }
+}
 
 /**
  * BF-1. One mapper for both read paths, per the standing rule that a missed field in a row→object
@@ -5897,6 +5915,36 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     }
   }
 
+  // TN-54. Deliberately unpruned for now: the whole table is a handful of rows per day and its
+  // entire value is being able to look back over a window the owner did not know they would need.
+  // If it ever grows, prune it like its ring sibling rather than by shortening what it records.
+  async insertStrapStatus(userId: string, status: StrapStatusWrite): Promise<void> {
+    await this.db.insert(s.strapStatus).values({
+      userId,
+      state: status.state,
+      batteryPercent: status.batteryPercent,
+      lastSampleAt: status.lastSampleAt,
+      consecutiveFailures: status.consecutiveFailures,
+      worn: status.worn,
+    })
+  }
+
+  async getLatestStrapStatus(userId: string): Promise<StrapStatusRow | null> {
+    const [r] = await this.db.select().from(s.strapStatus)
+      .where(eq(s.strapStatus.userId, userId))
+      .orderBy(desc(s.strapStatus.recordedAt))
+      .limit(1)
+    return r ? rowToStrapStatus(r) : null
+  }
+
+  async listStrapStatus(userId: string, since: Date, limit: number): Promise<StrapStatusRow[]> {
+    const rows = await this.db.select().from(s.strapStatus)
+      .where(and(eq(s.strapStatus.userId, userId), gte(s.strapStatus.recordedAt, since)))
+      .orderBy(desc(s.strapStatus.recordedAt))
+      .limit(limit)
+    return rows.map(rowToStrapStatus)
+  }
+
   async getOuraBatteryPolls(userId: string, from: Date, to: Date): Promise<Array<{ tsMs: number; percent: number; charging: boolean | null }>> {
     const rows = await this.db
       .select({ measuredAt: s.ouraBleBatteryPoll.measuredAt, percent: s.ouraBleBatteryPoll.percent, charging: s.ouraBleBatteryPoll.charging })
@@ -6744,6 +6792,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // `resolveLoggedDose`, shared with the offline store so the two write paths cannot drift. It
     // used to be three expressions here and a different rule (all-or-nothing) over there; see that
     // function for what diverged and why per-field is the half that was kept.
+    // BF-185 — "did the caller state a time?" is now asked once and reused by the conflict clause
+    // below, because the two arms need different answers: an explicit time wins everywhere, an
+    // absent one means `now` on an INSERT and the row's existing stamp on a RE-TICK.
+    const explicitTakenAt = dose?.takenAt != null ? new Date(dose.takenAt) : null
+
     const stamped = {
       ...resolveLoggedDose(dose, { defaultAmount: owns.defaultAmount, unit: owns.unit, dose: owns.dose }),
       // An explicit `takenAt` wins; otherwise the moment of the tick, which is what the owner
@@ -6753,7 +6806,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       // nothing ever SUPPLIED a `takenAt`: the payload did not carry one and the local mapper did
       // not read one back. A correct fallback behind a caller that never calls is indistinguishable
       // from no fallback at all, which is why the fix is in the three steps before this line.
-      takenAt: dose?.takenAt != null ? new Date(dose.takenAt) : new Date(),
+      takenAt: explicitTakenAt ?? new Date(),
       vialStrengthMg: vial?.strengthMg ?? null,
       vialWaterMl: vial?.waterMl ?? null,
       vialUnitsPerMl: vial?.unitsPerMl ?? null,
@@ -6767,14 +6820,32 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // soft-deleted manual row rather than duplicating it — a double-tap or a replayed outbox
     // mutation re-stamps instead of recording the dose twice.
     //
-    // Re-logging re-stamps because the row is one act of taking it: if the dose was corrected
-    // between the untick and the re-tick, the second value is the true one.
+    // BF-185 — re-logging NO LONGER re-stamps `taken_at`, reversing the decision this comment used
+    // to record. The old reasoning was that the row is one act of taking it, so a dose corrected
+    // between the untick and the re-tick makes the second value the true one. That holds for the
+    // DOSE, which still re-stamps and should. It does not hold for the TIME, because the two things
+    // a re-tick can mean are indistinguishable from the toggle: "I mis-tapped" and "I took it just
+    // now" produce the same two taps, and the old rule silently assumed the second. Measured on the
+    // owner's Retatrutide row 2026-09-20, an untick and re-tick moved `taken_at` 10:46:33 → 11:21:13
+    // — 35 minutes — on an injection that happened once, with nothing on screen saying so.
+    //
+    // A caller that STATES a time still wins, which is what leaves room for an editable control to
+    // express "I dosed at a different time" deliberately (the Lane B half, still owed). The
+    // COALESCE keeps a row that predates the column fillable rather than pinning it NULL forever.
+    //
+    // This half alone does not fix the owner's case. The device sends an explicit `takenAt` read
+    // back from its local row, so a local store that re-stamps would push the re-stamped value and
+    // win here — `lib/local-store/sqlite-backend.ts` carries the mirror of this fix, and it is the
+    // load-bearing one on the APK.
     await this.db.insert(s.supplementLogs)
       .values({ supplementId, userId, logDate: date, source: 'manual', ...stamped })
       .onConflictDoUpdate({
         target: [s.supplementLogs.supplementId, s.supplementLogs.logDate],
         targetWhere: eq(s.supplementLogs.source, 'manual'),
-        set: { deletedAt: null, updatedAt: new Date(), ...stamped },
+        set: {
+          deletedAt: null, updatedAt: new Date(), ...stamped,
+          takenAt: explicitTakenAt ?? sql`COALESCE(${s.supplementLogs.takenAt}, excluded.taken_at)`,
+        },
         setWhere: eq(s.supplementLogs.userId, userId),
       })
   }
