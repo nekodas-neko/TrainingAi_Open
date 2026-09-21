@@ -958,6 +958,31 @@ below threshold and left in place for next time.
 - **Not established:** neither query was timed, so on a dataset this size the saving may be
   single-digit milliseconds. Filed for the shape, not a measured win.
 
+### [platform] LB-123 — `cachedFetch` caches any 2xx body, so a route that can answer `null` cannot use it
+
+- **Lane: A** — `lib/sqlite/cache.ts:366`. **Added:** 2026-09-21 · found by Lane B while taking
+  RV-79. The `LB-` letter records who found it, not who ships it.
+- `cachedFetchCore` ends a successful fetch with `await setCached(key, toStored(data), ttlSeconds)`
+  — **unconditional**, outside every null check. `onData` runs before it and cannot veto it, and
+  the only opts are `freshWithinTtl` and `onError`. So a caller cannot say *"paint this, but do not
+  persist it"*.
+- **Why that matters beyond style.** `setCached` writes sessionStorage, localStorage **and**
+  SQLite, and `readCacheSync` parses a stored `"null"` back to `null` rather than treating it as a
+  miss. A route that legitimately answers `null` therefore **overwrites a good cached value with an
+  absence**, and every `readCacheSync` seed downstream reads that absence as fact.
+- **Measured 2026-09-21, not read off the source.** Seed `mood:<date>` with a log, run `cachedFetch`
+  against a stubbed 200 returning `null`: `onData` fires twice (`[{…}, null]`) and
+  `readCacheSync` then reads `null`. That is the session-167 mood re-prompt bug, reachable through
+  the helper the standing cache rule tells every client GET to use.
+- **Fix:** `opts.shouldCache?: (data: T) => boolean`, defaulting to always, threaded into
+  `cachedFetchCore` to guard that one `setCached` call. Additive — every existing caller is
+  unaffected — and it lands for **any** nullable-payload key, not just mood. A narrower `skipNull`
+  boolean also works; the predicate is preferred because the next case will not be `null` (an empty
+  array reads the same way to a seed).
+- **Unblocks RV-79**, which is currently a rule violation that cannot be fixed without it.
+- **Not established:** how many other GET routes can answer `null` or `[]` was not swept — this was
+  found from one call site. A sweep is worth doing when the option lands, and is not a blocker for it.
+
 ### [workouts][platform] RV-79 — Home reads today's mood with a bare `fetch`, against the standing rule
 
 - **Lane:** B — `app/session-select/session-select-content.tsx:613`. **Added:** 2026-09-20 ·
@@ -968,10 +993,27 @@ below threshold and left in place for next time.
   function already **writes** `mood:<date>` via `setCached` on both branches — it just never reads
   through the cache layer, so it cannot join `cachedFetch`'s in-flight dedup with the mood sheet's
   own reads of the same key.
-- **Fix:** route the API branch through `cachedFetch('mood:'+today, …, MOOD_TTL, …)`. **Preserve the
-  existing null-guard** — never cache a null over an optimistic local save — by applying it in the
-  `onData` callback rather than dropping it. That guard is load-bearing: it is the mood-checkin
-  re-prompt bug.
+- **~~Fix:~~ route the API branch through `cachedFetch('mood:'+today, …, MOOD_TTL, …)`,
+  ~~preserving the existing null-guard in the `onData` callback~~.**
+  **THAT FIX REINTRODUCES THE BUG THE SAME BULLET CALLS LOAD-BEARING. Measured 2026-09-21,
+  Lane B.** `onData` has no power over the write:
+  `cachedFetchCore` (`lib/sqlite/cache.ts:366`) calls `await setCached(key, toStored(data),
+  ttlSeconds)` **unconditionally** after any 2xx, outside every null check, and `toStored` is
+  identity for `cachedFetch`. There is no `shouldCache`/`skipNull` option — the only opts are
+  `freshWithinTtl` and `onError`.
+- **Proven, not read off the source.** A probe seeded `mood:<date>` with an optimistic log, then
+  ran `cachedFetch` against a stubbed 200 returning `null`:
+  - `onData` fired **twice** — `[{logDate…, energyLevel:'high'}, null]`, so React state is clobbered
+    too, not only the cache.
+  - `readCacheSync('mood:<date>')` afterwards read **`null`**. `setCached` writes sessionStorage,
+    localStorage *and* SQLite, and `readCacheSync` parses a stored `"null"` back to `null` rather
+    than treating it as a miss — so the seeds at `session-select-content.tsx:211` and `:319` call
+    `setMoodLog(null)` on the next visit and **the check-in card re-prompts**. That is the
+    session-167 bug exactly.
+- **Needs: LB-123** — the enabling change is in `lib/sqlite/**`, which is Lane A's. Converting
+  `loadTodayMood` is one line once that option exists, and **this entry stays Lane B**.
+- **Do NOT convert this call site before then.** The bare `fetch` is the rule violation; caching
+  the null is a live bug. Trading the first for the second is a loss.
 - **Not established:** on the APK the local-store branch short-circuits before this fetch, so how
   often it fires on device is unmeasured. Filed for the rule as much as the cost.
 
