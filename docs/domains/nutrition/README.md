@@ -326,7 +326,7 @@ Live at the time of writing (2026-07-30):
   `?? 2000` fallback under it. Both now receive the page's one resolved value. **The lesson for the
   next sweep of this class: a cache-key grep cannot see a budget passed as a prop** — follow
   `targets` down the render tree as well. **Not device-verified** (the bar's green/orange flip at
-  S25 width) — [`journal`](../../overview/entries/2026-09-17-bf175-assign-step-day-budget.md).
+  S25 width) — [`journal`](../../overview/history-2026-09-21-folded-1.md#2026-09-17-bf175-assign-step-day-budget).
 
 - **Offline saved-meal create/edit/delete** is a new sync domain and is **not device-verified**.
 - **Offline food search** is APK-only and unverified on device.

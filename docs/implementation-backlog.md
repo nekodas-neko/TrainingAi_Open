@@ -2493,7 +2493,7 @@ line must name **what moved** (resting HR and HRV off baseline), never imply inf
 ### [workouts][app-shell] LB-116 — the check-in sheet knows which sore ticks it suggested and throws it away (fixed; device check owed)
 
 - **✅ SHIPPED 2026-09-17 (v1.457.10)** (`fix/lb116-checkin-sends-suggested-sore`, #1274).
-  [Journal](overview/entries/2026-09-17-fix-lb116-checkin-sends-suggested-sore.md), which carries the
+  [Journal](overview/history-2026-09-21-folded-1.md#2026-09-17-fix-lb116-checkin-sends-suggested-sore), which carries the
   reasoning, the Lane A schema edit it needed, and why its e2e was deleted rather than shipped green.
 - **Lane:** B — `components/mood-checkin-sheet.tsx`
 - **Gate: device** — the residue below is the gate: the offline path cannot be staged off the APK.
@@ -25780,7 +25780,7 @@ with the recap week visibly compared against the one before it.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-18 · found by Lane A while shipping RV-59.
 - **Lane: B** — `components/nutrition/` only; the shared derivation already carries the flag.
-- **Reference:** [`2026-09-18-lane-a-rv58-60-shared-module-drift.md`](overview/entries/2026-09-18-lane-a-rv58-60-shared-module-drift.md).
+- **Reference:** [`2026-09-18-lane-a-rv58-60-shared-module-drift.md`](overview/history-2026-09-21-folded-1.md#2026-09-18-lane-a-rv58-60-shared-module-drift).
 
 RV-59 made `summariseSupplementDay` refuse to total a day whose contributions name **different**
 units, because `unit` is free text (`ml`, "1 scoop") and there is no conversion. Such a day now
