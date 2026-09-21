@@ -15,7 +15,7 @@ import { capLoadToAnchor } from '@trainingai/shared/ai-periodization/role-plausi
 import { resolveMeasuredRestSec } from '@trainingai/shared/workout/time-profile'
 import { normalizeMuscle } from '@trainingai/shared/muscles'
 import { volumeLandmarks } from '@trainingai/shared/ai-periodization/volume-targets'
-import { budgetForPreset, durationDirection, type DurationPreset } from '@trainingai/shared/workout/duration-model'
+import { budgetForPreset, durationDirection, requestedBudgetMin, type DurationPreset } from '@trainingai/shared/workout/duration-model'
 import { applyAutoregulation, clampPrescribedPct } from '@trainingai/shared/ai-periodization/autoregulation'
 import { shouldTriggerEmergencyDeload } from '@trainingai/shared/ai-periodization/emergency-deload'
 import { computePerExerciseDeload } from '@trainingai/shared/ai-periodization/per-exercise-deload'
@@ -202,7 +202,15 @@ async function runPrescriptionGeneration(
     return { ok: false, error: 'Baseline not complete', status: 400 }
   }
 
-  const budgetOverrideMin = durationPreset != null && durationPreset !== 'standard'
+  // BF-7 PR 2b — "is this the default?" is now a comparison, not a label test. `!== 'standard'` was
+  // the same question while the only way to say "the session's own length" was that word; a number
+  // equal to the anchor means it too, and must produce no override for the same reason. Reading the
+  // REQUESTED budget (not the clamped one) keeps a session at `MIN_PRESET_BUDGET_MIN` honest — the
+  // same trap PR 2a's `requestedBudgetMin` was split out for.
+  const requestedMin = durationPreset != null
+    ? requestedBudgetMin(validSession.timeBudgetMinutes, durationPreset)
+    : undefined
+  const budgetOverrideMin = requestedMin != null && requestedMin !== validSession.timeBudgetMinutes
     ? budgetForPreset(validSession.timeBudgetMinutes, durationPreset)
     : undefined
   const signals = await aggregateSignals(userId, programSessionId, repo, tz, excludeSessionId, budgetOverrideMin)

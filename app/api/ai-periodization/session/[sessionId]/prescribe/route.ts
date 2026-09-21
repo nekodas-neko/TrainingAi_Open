@@ -13,9 +13,24 @@ const MAX_BODY_BYTES = 16 * 1024
 
 export const maxDuration = 30
 
+// BF-7 PR 2b — the ladder is minutes now (30/45/60/90 around the session's own length), so this
+// accepts a number. The three labels stay legal: they are what older clients send and what stored
+// prescriptions carry, and `requestedBudgetMin` is the single place that resolves either form.
+//
+// The bounds are a request guard, not the model's floor. `MIN_PRESET_BUDGET_MIN` still clamps what
+// is achievable inside `budgetForPreset`; what these stop is a nonsense minute count reaching the
+// planner at all. The ceiling is a day, which no session is, and the floor is one minute rather
+// than the model's 20 so that an under-floor request is CLAMPED with its direction intact rather
+// than 400'd — dropping it would tell a lifter at the floor that their choice was malformed.
+const MIN_REQUESTED_SESSION_MIN = 1
+const MAX_REQUESTED_SESSION_MIN = 1440
+
 const PrescribeBodySchema = z.object({
   excludeSessionId: z.string().optional(),
-  durationPreset: z.enum(['short', 'standard', 'long']).optional(),
+  durationPreset: z.union([
+    z.number().int().min(MIN_REQUESTED_SESSION_MIN).max(MAX_REQUESTED_SESSION_MIN),
+    z.enum(['short', 'standard', 'long']),
+  ]).optional(),
 }).strict()
 
 export async function POST(
