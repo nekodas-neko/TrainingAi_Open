@@ -13,6 +13,7 @@
  * that happens at most once a day; every later read on either route hits the stored row.
  */
 import { getRepository } from '@/lib/data'
+import type { OuraDailyDerivedPatch } from '@/lib/data/repository'
 import { todayInTz, todayMidnightUtc, toAestDay, ageFromDob } from '@trainingai/shared/date-utils'
 import { getCurrentPhase } from '@trainingai/shared/phase-engine'
 import { computeVolumeAcwr, ACWR_THRESHOLDS } from '@trainingai/shared/ai-periodization/acwr'
@@ -54,7 +55,7 @@ export interface DerivedPersist {
   day: string
   /** Names the block this patch came from, so a failed write says which pillars went down with it. */
   pillar: string
-  patch: import('@/lib/data/repository').OuraDailyDerivedPatch
+  patch: OuraDailyDerivedPatch
 }
 
 /**
