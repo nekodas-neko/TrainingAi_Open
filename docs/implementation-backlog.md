@@ -464,32 +464,6 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
-### [readiness][platform] RV-80 — a date formatter is constructed once per heart-rate row, on a path warmed at every app launch
-
-- **Lane:** A — `packages/shared/src/health/hourly-movement.ts:47-50`. **Added:** 2026-09-20 ·
-  Review sweep 51.
-- **A two-line fix with the best measured win in the sweep.** `computeMovedHours` does
-  `for (const row of hrRows) { const local = new Intl.DateTimeFormat('en-CA', {…}).formatToParts(...) }`
-  — the constructor is **inside** the loop and its options are loop-invariant (`tz` is a function
-  input).
-- **Measured twice, independently.** Reproduced by the coordinator on a real day's volume (2,831
-  rows, 3 warm-ups): **228.8 ms construct-in-loop → 21.9 ms hoisted, 10.4×**. The lane measured
-  11.6–17.4× across 400/2,170/5,606 rows. Absolute ms on Railway will differ from this sandbox; the
-  ratio will not.
-- **The row counts are real, not hypothetical.** Production `oura_heartrate` per local day over the
-  last 10 days: **5,606 / 3,496 / 2,831 / 2,691** on training days (owner's rows).
-- **And it is hot:** called from `lib/health/readiness-payload.ts:402` (`/api/readiness-score`),
-  which `components/sync-provider.tsx:69` warms on **every app launch** at `READINESS_SCORE_TTL =
-  TTL_SHORT` (5 min) — so up to 12 recomputes an hour per active device.
-- **Fix:** hoist the formatter above the loop, or call `formatInTimeZone` like every sibling does.
-  **No behaviour change** — the options are already constant per call.
-- **Worth knowing, and it is what makes this one stand out:** `formatInTimeZone` called in a loop at
-  18 other sites benchmarks at ~11 µs per call, because `date-fns-tz` caches its formatter
-  internally. Those 18 sites are **not** worth changing. This site is ~7× worse than the repo's own
-  normal idiom purely because the constructor is not hoisted.
-- **Not established:** the real route was not run against a 5,606-row day, and
-  `score-audit/build-day-audit.ts:138` (the other caller) was not checked for being on a hot path.
-
 ### [workouts][app-shell] RV-81 — the program editor renders the whole exercise catalogue once per exercise row, and rebuilds it on every keystroke
 
 - **Lane:** B — `components/config/program-editor-sheet.tsx:778-782`. **Added:** 2026-09-20 ·
@@ -1772,6 +1746,29 @@ window, and `rmssdFromRr` over it is comparable to the ring's figure for the sam
   the four, including all four. Those are real fixtures from his account, so the test can assert
   them by name. Browser at ≤640px is enough for the arithmetic; **device look owed** for
   glyph legibility at the row's icon size on the S25.
+
+### [body][app-shell] LA-124 — the stress chart builds a date formatter once per bucket, the same shape RV-80 just removed
+
+- **Lane:** B — `components/body-battery/stress-day.ts:44-52`. **Added:** 2026-09-21 · found by
+  sweeping for RV-80's siblings, not reported.
+- `minutesIntoDay(t, tz)` constructs a `new Intl.DateTimeFormat` on every call, and `toSegments`
+  calls it once per bucket in a `.map`. Identical to the defect RV-80 fixed in
+  `computeMovedHours`, and it is the **only** other raw `Intl.DateTimeFormat` construction in
+  `lib/`, `packages/`, `app/` or `components/` — the sweep is complete, this is the whole
+  remainder.
+- **It is small, and the number is the point of filing it rather than fixing it inside RV-80.**
+  Measured on a full day's 48 buckets: **3.19 ms → 0.16 ms**, a 20× ratio worth **3 ms per chart
+  render**. RV-80's site ran 2,831–5,606 times per call on a path warmed at every app launch; this
+  one runs 48 times when a chart draws. Same shape, three orders of magnitude apart in what it
+  costs.
+- **Fix:** hoist the formatter into `toSegments` and pass it down, or memoise per `tz`. Note that
+  `minutesIntoDay` is **exported and directly tested** (`__tests__/stress-day.test.ts:16,17,23`,
+  including an `Etc/GMT+5` case), so its public signature has to keep working per-call — a
+  module-scope hoist would bind the first caller's zone and break exactly that test. That is the
+  mutation RV-80 added a test for; here the existing test already catches it.
+- **Why it is Lane B:** `components/**`. Lane A found it and is not touching it.
+- **⚠ Do not batch this with a device-gated item** — it needs no APK and no owner check, so it
+  should not inherit one.
 
 ### [workouts] BF-182 — warm the next prescription when Home renders, not at completion and not at tab-open
 

@@ -14863,3 +14863,23 @@ which half.
 `projectOverview.md`'s +16 is the Known-Issues row, which carries the same split plus the two owed
 checks: the 412 px look, and the pass test only the owner can run — including that *"it does not
 match anything"* is a valid result and the one that would retire the metric.
+
+## 2026-09-21 — RV-80's speedup figure is not a constant
+
+`docs/implementation-backlog.md` **25992 → 25989** (`lane-a/rv80-hoist-hr-formatter`) — RV-80 out
+(−26) and **LA-124 in (+23)**, its only surviving sibling, filed rather than fixed because it lives
+in `components/**` and belongs to Lane B. The pair is **−3 net**; the branch was cut when the
+baseline read 25955 and TN-35 moved it to 25992 while this was in flight, so the number above is
+recomputed against main rather than carried from the branch.
+
+The entry measured 10.4×. Re-measured here it is **7.6× at 2,831 rows and 11.4× at 5,606** — the
+ratio grows with row count, because the hoisted `Intl.DateTimeFormat` construction is the per-row
+cost and the remaining work is not. A single figure therefore understates exactly the days that
+matter most, which are the long ones.
+
+The part worth carrying past the diff is the test, not the hoist. Hoisting one level further, to
+module scope, binds the first caller's timezone for the life of the process — and **all ten existing
+tests pass under that mutation**, because no test in the file calls `computeMovedHours` in two
+timezones within one process. The suite that covered the function was structurally blind to the way
+this particular optimisation goes wrong. The added test calls it in two zones and then re-asks the
+first.
