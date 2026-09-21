@@ -14670,3 +14670,21 @@ The rest is the argument for the fix's shape over its content. An allow-list wit
 would close this bug and guarantee the next one; a deny-list ages out by default and makes a new
 status argue for its exemption. Written down because the diff alone reads as a one-line condition
 swap.
+
+## 2026-09-21 — the ledger's own case for existing: a dead PR nobody had written down
+
+`docs/implementation-backlog.md` **25205 → 25226** (`lane-a/la122-record-stale-prs`).
+
+Twenty-one lines for LA-122 item 6, which records that six PRs are open and that #1250 — Lane A's
+own, from 2026-09-16 — is verifiably dead: it exists to drop `Q-305:device` from
+`keep-gate-set-off.test.ts`, that string is already gone from the file on `main`, and the test passes
+8 of 8. The PR contains nothing.
+
+It earns the lines because of *why* it could not simply be closed. CLAUDE.md exempts pushing,
+opening and merging-when-green from confirm-first and deliberately does not exempt **closing**. So an
+agent can prove a PR dead and cannot clear it — correct as a rule, and also the mechanism by which
+six accumulated. Writing the list down is the only move available.
+
+The sharper point is that this had been noticed in an earlier session and recorded **nowhere in the
+repo**, so it had to be re-derived from the PR list and a test run. That is precisely the failure
+LA-122 was created to stop, which is now said in its own header rather than left implicit.

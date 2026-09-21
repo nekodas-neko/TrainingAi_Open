@@ -451,14 +451,16 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
-### [platform] LA-122 — Reference: the five owner decisions Lane A is currently blocked on
+### [platform] LA-122 — Reference: the six owner decisions Lane A is currently blocked on
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-20 (Lane A, filed for the Orchestrator at the owner's request).
 - **Lane: A** · **Reference:** — this is a ledger other entries READ, not work to build. Nothing here
   is implementable until the owner answers; each item names the entry it unblocks.
-- **Why it exists.** These five were each raised in-session and would otherwise live only in a chat
+- **Why it exists.** These were each raised in-session and would otherwise live only in a chat
   transcript that ends with the session. Four of them have blocked a specific queue item for
-  between one and nine days.
+  between one and nine days. **Item 6 is the clearest case for the ledger existing at all:** the dead
+  PR it names had been noticed in an earlier session, was recorded nowhere in the repo, and had to be
+  re-derived from scratch.
 
 **1. BF-179 — is the 52% still on screen?** (BF-179's engine half shipped 2026-09-20; this is
   now a DIAGNOSTIC look, not a blocker)
@@ -506,7 +508,26 @@ below threshold and left in place for next time.
   *"Protected branch rules not configured for this branch"*, so the CI/CD section's auto-merge
   option does not apply to this repo.
 
-- **Keep:** this entry until all five are answered. Strike each item as it resolves; remove the
+**6. Six PRs are open and at least one is verifiably dead — closing a PR is confirm-first, so none
+  of them can be cleared by an agent.** (added 2026-09-21)
+  **[#1250](https://github.com/nekodas-neko/TrainingAi_Open/pull/1250) is Lane A's and is
+  superseded.** It was opened 2026-09-16 to unblock a red `main` by dropping `Q-305:device` from
+  `keep-gate-set-off.test.ts`. Verified against `main` 2026-09-21: **that string is already gone from
+  the file and the test passes 8 of 8**, so the fix landed another way and the PR now contains
+  nothing. Its base is 20+ commits stale. **Recommendation: close it unmerged**, no revert needed.
+  The other five belong to other lanes or to the migration sessions and are 3–5 weeks old —
+  [#1341](https://github.com/nekodas-neko/TrainingAi_Open/pull/1341) (Review, 2026-09-20, live),
+  [#608](https://github.com/nekodas-neko/TrainingAi_Open/pull/608) (Lane B, 2026-08-30),
+  [#265](https://github.com/nekodas-neko/TrainingAi_Open/pull/265) (Lane B, 2026-08-20, whose own
+  title says *do not merge yet*), [#10](https://github.com/nekodas-neko/TrainingAi_Open/pull/10) and
+  [#6](https://github.com/nekodas-neko/TrainingAi_Open/pull/6) (migration, 2026-08-17). **A stale-PR
+  sweep is the Orchestrator's**, not Lane A's; this item exists so the list is written down rather
+  than rediscovered.
+  **Why it is here rather than done:** CLAUDE.md exempts pushing, opening and merging-when-green from
+  confirm-first, and deliberately does not exempt **closing**. So an agent that finds a dead PR can
+  prove it dead and cannot clear it — which is correct, and is also how six of them accumulated.
+
+- **Keep:** this entry until all **six** are answered. Strike each item as it resolves; remove the
   entry when the last one goes.
 
 ### [devices][heart-rate] TN-54 — the chest strap has been dark for five days and nothing server-side records that, so PS-44's window cannot be counted 🔴 LIVE
