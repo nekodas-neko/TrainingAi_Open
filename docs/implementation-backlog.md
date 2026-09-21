@@ -837,11 +837,14 @@ below threshold and left in place for next time.
   `transform: scaleX(pct)` with `transform-origin: left` and
   `transition-transform duration-500 motion-reduce:transition-none`. The repo's own "a pattern at ≥2
   sites gets extracted" rule applies at ~33. Convert solid-fill bars first.
-- **⚠ THIS ENTRY IS PARKED BY ITS OWN EMPHASIS GLYPH AND IS STARTABLE (found 2026-09-21, Lane B).**
-  It carries no `Gate:` and no `Needs:` — the `⛔` below is used for emphasis, which `next-item.js`
-  reads as the legacy prose blocker. **That is LB-121, and this is its fourth measured instance**
-  (OR-118, TN-25, OR-116, now RV-72). It printed under PARKED while RV-71 and RV-75 of the same
-  batch printed under READY, which is how the batch came to ship in two pieces.
+- **⚠ THIS ENTRY PARKED ITSELF TWICE, THE SECOND TIME ON THIS VERY BULLET (2026-09-21, Lane B).**
+  It carries no `Gate:` and no `Needs:`. The first cause was a no-entry glyph used for **emphasis**
+  on the calorie-bar exclusion below, which `next-item.js` reads as the legacy prose blocker — that
+  is LB-121, fourth measured instance (OR-118, TN-25, OR-116, RV-72), and it is why the
+  `motion-polish` batch shipped in two pieces while RV-71 and RV-75 printed under READY. Removing it
+  was not enough: **this bullet had quoted the character while explaining it**, so the entry stayed
+  parked on its own documentation and its `Keep:` residue stayed invisible to every scan. The
+  character is now named rather than printed. **Do not paste it back in to illustrate the point.**
 - **Deliberately NOT bundled with RV-71/RV-75 despite the shared batch.** RV-74 is genuinely
   `Gate: device`, so `motion-polish` could not ship whole in one PR regardless; and this entry is a
   new shared primitive plus ~33 conversions, which is a far larger diff than the two one-line
