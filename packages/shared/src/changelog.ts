@@ -6,6 +6,42 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.464.1",
+    date: "2026-09-21",
+    changes: [
+      "Progress bars now glide instead of stuttering. The contributor bars, the walk pacer, the meal macro rows and the workout time bar all animated their width, which makes the phone re-lay-out the whole row on every frame \u2014 and nudges the labels and numbers beside them. They now scale instead, which the GPU handles on its own. The calorie bar is deliberately unchanged: its fill is a colour ramp, and scaling it would change which colour the leading edge shows.",
+    ],
+  },
+  {
+    version: "1.464.0",
+    date: "2026-09-21",
+    changes: [
+      "Your recommended calorie, protein, carb, fat, water and step targets are now calculated from your own measurements \u2014 body composition, your measured resting rate, and your goal \u2014 instead of being chosen by the AI. It was already calculating all six and then asking the model for its own numbers on top; the last recommendation you applied suggested 5,000 steps where the calculation said 10,000, and 150g of protein where it said 115g. The AI now explains the targets and still flags when your logged training suggests a different activity level, which recalculates them. Your currently saved targets are unchanged \u2014 re-run the recommendation to see the calculated ones.",
+    ],
+  },
+  {
+    version: "1.463.0",
+    date: "2026-09-21",
+    changes: [
+      "Buttons now respond to a press. The shared button had no pressed state at all on a touch-only app \u2014 it only had a hover state, which a finger cannot produce and which Android can leave stuck on after a tap. It now dips very slightly under your thumb.",
+      "Sheets open in 300ms instead of 500ms, on the same motion curve as the tabs and page transitions. The 500ms was a library default nobody had tuned, and it was two and a half times slower than moving between pages.",
+    ],
+  },
+  {
+    version: "1.462.1",
+    date: "2026-09-21",
+    changes: [
+      "The program editor built a full copy of the exercise catalogue for every exercise row \u2014 around 3,900 hidden list entries on a 25-exercise program, rebuilt from scratch on every keystroke while you typed an exercise name. It now builds one shared list.",
+    ],
+  },
+  {
+    version: "1.462.0",
+    date: "2026-09-21",
+    changes: [
+      "Open any past day and the stress chart now lists what you were doing, with the stress reading beside each workout, meal, walk and sleep. Where the ring recorded nothing at that moment it says \"no reading\" rather than showing a zero \u2014 on an average day only about half your day is measured, so the list also tells you how many of the day's events actually carry a reading.",
+    ],
+  },
+  {
     version: "1.461.0",
     date: "2026-09-21",
     changes: [

@@ -60,15 +60,45 @@ const RESTING_HR_DEFAULT = 60
  * range and bakes the shifting bands into the `daily_zone_minutes` cache (review J-2).
  */
 export async function resolveHrProfile(repo: WorkoutRepository, userId: string, tz: string): Promise<HrProfile> {
+  return (await resolveHrProfileWithWindow(repo, userId, tz)).profile
+}
+
+/**
+ * The same resolver, also handing back the HR rows it already fetched and the window they cover.
+ *
+ * RV-73 — `/api/cardio-week` needs order statistics over a rolling 30-day window and the 30 days
+ * before it, and was issuing two more `getHrForWindow` calls for them. Both windows are **wholly
+ * contained** in the 90 days this resolver has already pulled, so the rows were being fetched,
+ * materialised and thrown away twice over: a second and third pass of the heaviest query in the app
+ * for data already in memory.
+ *
+ * The rows are returned from a SEPARATE export rather than added to `HrProfile`, deliberately.
+ * `/api/hr-profile` serialises that interface straight into its response and ten other call sites
+ * read it — putting a 130,000-row array on it would ship the whole window to the client.
+ *
+ * **Slicing this is equivalent to re-querying, with one boundary caveat worth stating rather than
+ * discovering.** `getHrForWindow` applies `preferStrapBuckets`, which drops a ring row when a chest
+ * strap row shares its 10-second bucket. Merging over 90 days and then cutting can therefore drop a
+ * ring row whose bucket-mate sits just outside the caller's window, where a fresh 30-day query
+ * would have kept it — at most the rows in the single bucket straddling each boundary, and always
+ * in the direction of dropping a ring reading the strap already covered. Measured against
+ * production on 2026-09-21 over the owner's current 30-day window, both paths return **57,998 rows,
+ * mean 86, k-th highest 175, k-th lowest 37** — identical.
+ */
+export async function resolveHrProfileWithWindow(
+  repo: WorkoutRepository, userId: string, tz: string,
+): Promise<{ profile: HrProfile; hrRows: { timestamp: Date; bpm: number; source: string | null }[]; from: Date; to: Date }> {
   const todayIso = todayInTz(tz)
   const midnight = todayMidnightUtc(tz)
   const from28dIso = toAestDay(new Date(midnight.getTime() - RESTING_HR_WINDOW_DAYS * 86_400_000), tz)
   const observedFrom = new Date(midnight.getTime() - OBSERVED_WINDOW_DAYS * 86_400_000)
 
+  const observedTo = new Date()
+
   const [user, bodyMetrics, hrRows] = await Promise.all([
     repo.getUserById(userId),
     repo.listBodyMetrics(userId, from28dIso, todayIso),
-    repo.getHrForWindow(userId, observedFrom, new Date()).catch(() => []),
+    repo.getHrForWindow(userId, observedFrom, observedTo).catch(() => []),
   ])
 
   const rhrRows = bodyMetrics.filter(m => m.restingHeartRate != null && m.restingHeartRate > 0)
@@ -82,13 +112,18 @@ export async function resolveHrProfile(repo: WorkoutRepository, userId: string, 
   const observedMax = observed.isReliable ? observed.max : null
 
   return {
-    maxHr: resolved.maxUsed,
-    targetAnchorMax: observedMax ?? estimatedMax,
-    restingHr,
-    restingHrSource: rhrRows.length ? 'measured' : 'default',
-    estimatedMax,
-    observedMax,
-    maxHrSource: resolved.source,
-    observed,
+    profile: {
+      maxHr: resolved.maxUsed,
+      targetAnchorMax: observedMax ?? estimatedMax,
+      restingHr,
+      restingHrSource: rhrRows.length ? 'measured' : 'default',
+      estimatedMax,
+      observedMax,
+      maxHrSource: resolved.source,
+      observed,
+    },
+    hrRows,
+    from: observedFrom,
+    to: observedTo,
   }
 }

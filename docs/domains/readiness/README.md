@@ -291,6 +291,17 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- [`2026-09-21-tn35-stress-against-events`](../../overview/entries/2026-09-21-tn35-stress-against-events.md)
+  — **TN-35's overlay half (2026-09-21): a past day now says what you were doing when stress
+  spiked.** `/health/day?date=` places the day timeline's typed, timestamped events on the stress
+  chart's axis and prints the measured level beside each. **An event with no bucket prints
+  `no reading`, never `0.00`** — coverage averages 13.3 of 24 hours, so that is the common case, and
+  the header states `N of M with a reading`. No verdict is computed (TN-16's shape stays parked) and
+  the dead `tag` lane is excluded in code. **The marker half is Lane A's and unbuilt** — a
+  timestamped moment row is a migration — so meetings, commutes and arguments are still invisible.
+  The entry unparked because the owner said to continue, not because its `Needs:` cleared; the
+  structural question is #1362 and still open. Still owed: the 412 px look, and the pass test only
+  the owner can run.
 
 - **[`../../reviews/2026-09-03-acwr-ewma-day-shift.md`](../../reviews/2026-09-03-acwr-ewma-day-shift.md)**
   — 🆕 **Q-279: what the uncoupled-EWMA switch would actually change, measured before writing it.**
@@ -391,7 +402,7 @@ Live at the time of writing (2026-07-30):
   non-empty**; the audit used to, printing a reproducibility claim beside a number that contradicted
   it, and an entry was filed from that sentence proposing a production rewrite that would have
   corrupted seven rows. Seven production rows (2026-07-16 → 07-22) are missing `checkin`.
-  ([`2026-09-18-lane-a-tn49-rederivation-missing-key.md`](../../overview/entries/2026-09-18-lane-a-tn49-rederivation-missing-key.md))
+  ([`2026-09-18-lane-a-tn49-rederivation-missing-key.md`](../../overview/history-2026-09-21-folded-1.md#2026-09-18-lane-a-tn49-rederivation-missing-key))
 - **`watch` is the only illness band that has ever fired, and it is advisory-only by design
   (TN-45).** 2 days in 72; `elevated` and `fever` are at **zero**, so the illness banner has never
   rendered. Two consequences worth knowing before touching this area. **(1) Do not "fix" it by
@@ -402,7 +413,7 @@ Live at the time of writing (2026-07-30):
   appeared. `illnessAdvisory(flag, biomarkers?)` names the top one or two contributors by
   **contribution**, not raw z — temperature holds 40% of the weight, so a small z can out-rank a
   larger one.
-  ([`2026-09-18-lane-a-tn45-watch-names-what-moved.md`](../../overview/entries/2026-09-18-lane-a-tn45-watch-names-what-moved.md))
+  ([`2026-09-18-lane-a-tn45-watch-names-what-moved.md`](../../overview/history-2026-09-21-folded-1.md#2026-09-18-lane-a-tn45-watch-names-what-moved))
 - **The personal baselines are CHECKPOINTED PER NIGHT, so they cannot be erased by drift (TN-46).**
   `oura_daily_summary` stores `hrv_baseline_mean_x8`, `rhr_baseline_mean_x8` and the other four
   alongside `n_history`, **one set per row**. The live baseline does adapt fast — `updateBaseline`
@@ -413,7 +424,7 @@ Live at the time of writing (2026-07-30):
   To ask "what did X do to me", read the baseline off the row before X started; do not add storage to
   snapshot a value the table already writes down with a date on it. Nothing prunes this table —
   `shouldPrune` is `error_events`.
-  ([`2026-09-17-lane-a-tn46-baseline-already-retained.md`](../../overview/entries/2026-09-17-lane-a-tn46-baseline-already-retained.md))
+  ([`2026-09-17-lane-a-tn46-baseline-already-retained.md`](../../overview/history-2026-09-21-folded-1.md#2026-09-17-lane-a-tn46-baseline-already-retained))
 - **The Body Battery anchor is frozen once readiness-derived** (`app/api/body-battery/anchor.ts`).
   Re-picking it on every read is what made the whole day's curve jump mid-morning; a later
   readiness *recompute* must not move it either, or the same bug returns through a smaller door.

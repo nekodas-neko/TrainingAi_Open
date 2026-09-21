@@ -5,6 +5,7 @@ import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 import { useStressDay } from '@/lib/hooks/use-stress-day'
 import { todayInTz, msToHHMMInTz } from '@trainingai/shared/date-utils'
 import { toSegments, coveredMinutes } from './stress-day'
+import { placeEvents, measuredCount, type DayEvent } from './stress-at-events'
 
 /**
  * A day's stress against a clock (TN-3b).
@@ -64,7 +65,9 @@ const HOUR_TICKS = [0, 6, 12, 18, 24]
  *   the root rather than a wrapper at the call site: this renders nothing on a day with no readings,
  *   and a wrapper would leave an empty frame behind.
  */
-export function StressDayChart({ date, className }: { date?: string; className?: string } = {}) {
+export function StressDayChart(
+  { date, className, events }: { date?: string; className?: string; events?: DayEvent[] } = {},
+) {
   const tz = useUserTimezone()
   const today = todayInTz(tz)
   const day = date ?? today
@@ -75,6 +78,10 @@ export function StressDayChart({ date, className }: { date?: string; className?:
   const series = data?.series
   const segments = useMemo(() => toSegments(series ?? [], tz), [series, tz])
   const covered = useMemo(() => coveredMinutes(segments), [segments])
+  // TN-35 — the day's events placed on the same axis. The owner's goal is attribution: the chart
+  // answers WHEN a stressed window happened, and this answers what was happening then.
+  const placed = useMemo(() => placeEvents(events ?? [], segments, tz), [events, segments, tz])
+  const withReading = measuredCount(placed)
 
   // `cachedFetch` swallows `!res.ok`, this route's own rate limit included — without this the chart
   // would vanish on a failed request and read as "no stress recorded".
@@ -140,6 +147,21 @@ export function StressDayChart({ date, className }: { date?: string; className?:
             vectorEffect="non-scaling-stroke"
           />
         ))}
+        {/* TN-35 — where each event sits on the clock. Marks only: this viewBox is stretched to the
+            container with `preserveAspectRatio="none"`, so any TEXT inside it would be drawn
+            horizontally distorted. The labels are HTML beneath, where they stay legible. */}
+        {placed.map((e, i) => (
+          <line
+            key={`ev-${i}`}
+            x1={e.x} x2={e.x} y1={0} y2={VIEW_H}
+            stroke="var(--color-muted-foreground)"
+            strokeWidth={1}
+            opacity={e.level === null ? 0.25 : 0.5}
+            strokeDasharray={e.level === null ? '3 5' : undefined}
+            vectorEffect="non-scaling-stroke"
+          />
+        ))}
+
         {/* A run of one has no line to draw, and dropping it would hide a real reading. */}
         {segments.filter(s => s.length === 1).map((seg, i) => (
           <circle key={`dot-${i}`} cx={seg[0].x} cy={y(seg[0].level)} r={3} fill={amber} vectorEffect="non-scaling-stroke" />
@@ -172,6 +194,33 @@ export function StressDayChart({ date, className }: { date?: string; className?:
 
           It names the threshold itself rather than pointing at "the reading above": the strip is
           only above this on the Home card, and on the day screen there is nothing there. */}
+      {placed.length > 0 && (
+        <div className="space-y-1 pt-1">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+            What was happening
+            {/* The denominator is not decoration. With 13.3 of 24 hours measured on an average day,
+                most events routinely have no reading, and a list that did not say so would read as
+                a day on which nothing was stressful. */}
+            <span className="ml-1.5 font-normal normal-case tracking-normal opacity-70">
+              {withReading} of {placed.length} with a reading
+            </span>
+          </p>
+          <ul className="space-y-0.5">
+            {placed.map((e, i) => (
+              <li key={`row-${i}`} className="flex items-baseline gap-2 text-[10px]">
+                <span className="w-14 shrink-0 tabular-nums text-muted-foreground">{e.time}</span>
+                <span className="min-w-0 flex-1 truncate text-foreground">{e.title}</span>
+                {/* Absent, never calm. A missing bucket is not a level of zero, and printing one
+                    would invent the single number the owner would act on. */}
+                <span className="shrink-0 tabular-nums text-muted-foreground">
+                  {e.level === null ? 'no reading' : e.level.toFixed(2)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <p className="text-[10px] leading-relaxed text-muted-foreground">
         Higher means more stress; above the top line counts as
         <span className="font-semibold"> High</span>. Shaded hours are overnight, which runs

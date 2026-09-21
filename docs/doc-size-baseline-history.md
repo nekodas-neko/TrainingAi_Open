@@ -14751,6 +14751,20 @@ The **calibration-period rule** is the owner's *"ideally it has a calibration pe
 best"* turned into something checkable: fit 21 days after the last dose change, require ≥28 days,
 state the window's start date. Without the last clause a fit cannot be re-checked when the next
 change lands, which is the failure it exists to prevent.
+
+## 2026-09-21 (second) — `docs/implementation-backlog.md` → 25921 (after merging concurrent PRs)
+
++20 on TN-55, and the entry got shorter in substance while growing in lines: the "three levers, fit
+them jointly" speculation is gone, replaced by a pointer to a plan and the measured result.
+
+The lines worth the raise are the two warnings. **61% of the Body Battery's drain is the stress
+term** (−0.61 correlation with the day's end value), so the number the owner reads is mostly a
+rendering of a metric whose sign TN-33 says is unvalidated — which makes the proposed
+`STRESS_DRAIN_RATE` a de-weighting of an untrusted input rather than a calibration, and that
+distinction is exactly what a future session would otherwise "fix" by raising it back. The second is
+that **no replay endpoint was needed**: TN-2 asserted the fit could not be done outside the server,
+and `walkBodyBattery` has been a pure function since LA extracted it, so the fit ran offline. Leaving
+that unrecorded would have left TN-56 looking like this entry's blocker when it is not.
 ## 2026-09-21 — BF-7's plan called the type change free because nothing was persisted
 
 `docs/implementation-backlog.md` **25292 → 25316** · `projectOverview.md` **12093 → 12113**
@@ -14794,7 +14808,279 @@ Two entries also carry an explicit ⛔: RV-72 must not convert `calorie-progress
 gradient ramp that `scaleX` would distort), and RV-74 must not extend to the conic-gradient rings.
 Both are the kind of exception a sweep re-files every time unless the reason is written down.
 
-## 2026-09-21 — `docs/implementation-backlog.md` +336 (25901 → 26237) (Review sweep 52)
+## 2026-09-21 — TN-20's destructive write turned out to be a GET
+
+`docs/implementation-backlog.md` **25452 → 25486** · `projectOverview.md` **12113 → 12138**
+(`lane-a/tn20-empty-snapshot-guard`).
+
+The entry's first action named a suspect — *"the same delete-before-guard shape as Q-528 … a
+recompute that starts by clearing and then writes nothing"* — and there is no recompute and no
+delete anywhere near this table. `body_battery_daily` has exactly one writer and it is
+`GET /api/body-battery`, which snapshots the row on every read by design. That is the whole finding,
+and it is worth the lines because the next reader would otherwise spend the same time looking for a
+recompute that does not exist.
+
+Two measured corrections follow it. **4 damaged days, not "3 of the last 11"** — one predates the
+entry — and **not "losing days now"**: the newest is three weeks old. The second matters more than it
+looks, because the guard did not exist until this change, so the table went quiet on its own. Left
+unsaid, a future reader finds a calm table and a shipped fix and concludes the fix worked.
+
+The rest is the fix that was rejected, which is the part a diff cannot carry: a monotonic
+`excluded >= stored` is the obvious alternative and is wrong twice — it freezes a day at a bad value
+and blocks a legitimate downward correction. The entry already contains the argument against it
+(*"zero against thousands is a different failure"*), and a control test now fails under it.
+
+And the two things still owed: the four days are rebuildable from raw samples that still exist but
+need a backfill that does not exist and is a production write, and the condition that made those
+reads see nothing is still unidentified.
+
+
+
+## 2026-09-21 — TN-35's overlay half, and how it came to be startable
+
+`docs/implementation-backlog.md` **+37** · `projectOverview.md` **12093 → 12109** (+16)
+(`feat/tn35-stress-against-events`).
+
+The backlog baseline lands at **25992** and `projectOverview.md` at **12154**, nowhere near what the
+deltas imply: **#1363, #1364, #1341, #1367 and #1366 all merged while this branch was in flight** — five
+drifts, one of them a review sweep filing twenty entries. The deltas above are this PR's; the
+arrival figures are not, and reading them as one change would attribute RV-64…RV-83 to a chart.
+
+The backlog lines are mostly two things that would otherwise be lost.
+
+**How the entry unparked.** Its `Needs: TN-3b` was satisfied and still blocking, because `Needs:`
+clears only when its target leaves the queue and TN-3b stays for a `Keep:`. That was filed as #1362
+rather than edited away; the owner then said to continue with the backlog, and that is the
+authorisation this build ran on. Recording it matters because the next reader would otherwise find
+a `Needs:` beside a shipped entry and conclude the field can be ignored. **It cannot** — the
+structural question is still open and still the Orchestrator's.
+
+**What is still missing.** The marker half is Lane A's and unbuilt, so the feature attributes stress
+to training, food, walks and sleep only. Meetings, commutes and arguments — most of what the owner
+means by "events" — remain invisible. An entry that looks shipped and is half a feature needs to say
+which half.
+
+`projectOverview.md`'s +16 is the Known-Issues row, which carries the same split plus the two owed
+checks: the 412 px look, and the pass test only the owner can run — including that *"it does not
+match anything"* is a valid result and the one that would retire the metric.
+
+## 2026-09-21 — RV-80's speedup figure is not a constant
+
+`docs/implementation-backlog.md` **25992 → 25989** (`lane-a/rv80-hoist-hr-formatter`) — RV-80 out
+(−26) and **LA-124 in (+23)**, its only surviving sibling, filed rather than fixed because it lives
+in `components/**` and belongs to Lane B. The pair is **−3 net**; the branch was cut when the
+baseline read 25955 and TN-35 moved it to 25992 while this was in flight, so the number above is
+recomputed against main rather than carried from the branch.
+
+The entry measured 10.4×. Re-measured here it is **7.6× at 2,831 rows and 11.4× at 5,606** — the
+ratio grows with row count, because the hoisted `Intl.DateTimeFormat` construction is the per-row
+cost and the remaining work is not. A single figure therefore understates exactly the days that
+matter most, which are the long ones.
+
+The part worth carrying past the diff is the test, not the hoist. Hoisting one level further, to
+module scope, binds the first caller's timezone for the life of the process — and **all ten existing
+tests pass under that mutation**, because no test in the file calls `computeMovedHours` in two
+timezones within one process. The suite that covered the function was structurally blind to the way
+this particular optimisation goes wrong. The added test calls it in two zones and then re-asks the
+first.
+
+## 2026-09-21 — RV-83's own proposed fix was the second-best one
+
+`docs/implementation-backlog.md` **25989 → 25970** (`lane-a/rv83-merge-derived-persists`).
+
+The entry asked for `Promise.all` "at minimum" over three sequential upserts on a read path, and
+flagged merging them into one as the tempting version needing a check first. Both halves turned out
+slightly wrong in the same direction.
+
+The check passes: `upsertOuraDailyDerived` builds its column list from the keys the patch actually
+carries, so the three blocks' "writes only its own columns" comments are structurally true rather
+than a promise, and `model_versions` — the one column with `||` merge semantics — is written by one
+block only. Merging is safe by construction.
+
+And `Promise.all` is not the floor it reads as. Measured: **2.38 ms sequential, 1.17 ms
+`Promise.all`, 0.66 ms merged**. It is a real 2× — I had expected row-lock contention to erase it
+and was wrong — but it buys that with three pool connections on a pool CLAUDE.md calls load-bearing,
+and merging beats it by another 1.79× on one.
+
+Also settled, both of the entry's stated unknowns: the third block **does** fire in production, and
+all three pillars land on **one** row on every one of the last twelve days. The wasteful shape is the
+usual case, not an edge.
+
+## 2026-09-21 — RV-81 ships, +16
+
+`docs/implementation-backlog.md` **+16**, landing at **25986** (`fix/rv81-shared-exercise-datalist`) — the
+arrival figure differs from the delta because another PR landed while this was in flight.
+
+Sixteen lines for a fix that deleted more code than it added, and most of them are two corrections
+to my own first attempt rather than a description of the change.
+
+The fix was hoisted in place first, which pushed `program-editor-sheet.tsx` from 956 to 984 lines
+and failed `check-component-size.js` against a 963 baseline on a file it names a hotspot. Extracting
+instead left it at 953. Recording that is worth more than recording the hoist: the ratchet was not
+an obstacle to route around, it pointed at the better home for a document-global element.
+
+The second is that the e2e's control failed with the wrong reason before it failed with the right
+one — *"the library did not reach the sheet"* where the truth is that no shared list existed at all.
+A future reader hitting a genuinely empty library would have been sent to the wrong place.
+
+No `projectOverview.md` row: there is nothing owed. No visual change, no device check, no pending
+question — the only thing NOT established is the millisecond cost, and that is stated in the entry
+and the journal rather than filed as an open issue.
+
+## 2026-09-21 — RV-64's aggregate was measured rather than assumed, and rewritten rather than removed
+
+`docs/implementation-backlog.md` **25986 → 25992** (`lane-a/rv64-order-statistics-selection`) — RV-64
+grew rather than left the queue, which is the point of the note.
+
+The entry asked for the HR reduction to move into SQL, citing a 54 ms aggregate against a 130k-row
+pull. Built and measured, that aggregate **answers differently** — `getHrForWindow` returns
+`preferStrapBuckets(rows)`, which the entry flagged as unread, and dropping its 1,350 merged-away
+rows moves the k-th lowest from 37 to 36 — and a merge-correct version is **266.2 ms against the
+pull's 197.9 ms**, a wash rather than a win.
+
+So the entry is rewritten in place rather than struck: the engine half that shipped is 30 ms in the
+reduction (60.8 → 30.4 ms, identical output), the *order of magnitude* is the once-per-rest-period
+remount, and that is `components/**`. RV-64 is re-laned to B with the remount as its `Keep:`, and
+RV-73's `Batch:` and `Needs: RV-64` are removed because both named a shared SQL fix that will not
+exist.
+
+The six lines are what it costs to stop the next session re-proposing the aggregate and re-measuring
+its way back to the same answer.
+
+## 2026-09-21 — RV-73's windows were contained by construction, not by luck
+
+`docs/implementation-backlog.md` **25992 → 25972** (`lane-a/rv73-slice-contained-hr-windows`) —
+recomputed against main after RV-64 landed and rewrote its own entry in flight.
+
+The entry asked that its own unknown be settled first — *"how `hrRows`/`priorHrRows` are consumed
+further down the route was not read … establish that before assuming"*. Settled: they feed
+`computeObservedHr` and nothing else in the route's 145 lines, so a reduced shape fits.
+
+Its hedge did not survive either, in the direction that helps. It said the prior window is *"almost
+entirely inside"* the 90-day pull because *"prod data spans 88 days"* — reasoning from data span,
+which is the wrong quantity. `[t−60, t−30]` inside `[t−90, now]` is exact and follows from the
+constants.
+
+The sibling sweep the entry asked for closed with nothing to file: neither `cardio-trends` nor
+`zone-minutes` calls `getHrForWindow`, and `getZoneMinutesRange` is cache-backed with a concurrent
+cold path rather than the N+1 it could have been.
+
+## 2026-09-21 — motion-polish (RV-71 + RV-75): the backlog SHRANK
+
+`docs/implementation-backlog.md` **−10**, landing at **25962** · `projectOverview.md` **12154 → 12170**
+(+16) (`fix/motion-polish-button-and-sheet`).
+
+A net shrink despite three entries gaining shipped records, because **RV-81 was deleted**. It had
+shipped with nothing owed, and I had annotated it `✅ SHIPPED` instead of removing it — so it printed
+as the top of READY on the next scan. `check-backlog-pointers.js` did not catch it: the check looks
+at headings and my ✅ was in a bullet. The protocol is that a finished entry with nothing owed leaves
+the queue, and that is worth more than the ten lines it cost.
+
+The lines that went in are two corrections rather than descriptions. **`duration-250` is not a
+Tailwind class** — not in the default scale, so it compiled to nothing and left the stock 300 ms in
+place, a silent no-op that reads as a shipped fix and fails no gate. And **RV-72 is parked by its own
+emphasis glyph** (LB-121's fourth instance), which is why a four-entry batch shipped as two: one
+member device-gated, one invisible to the runner.
+
+`projectOverview.md`'s +16 is the Known-Issues row, which carries the device sitting the whole batch
+exists for plus the sibling `transition-all` sites deliberately left unswept.
+
+## 2026-09-21 — RV-66 left the queue and three findings took its place
+
+`docs/implementation-backlog.md` **25962 → 25998** · `projectOverview.md` **12170 → 12198**
+(`lane-a/rv66-baseline-is-the-recommendation`) —
+RV-66 out, **LA-125, LA-126 and LA-127 in**. The document grew by shipping an entry, which is worth
+the note.
+
+The entry's unmeasured question — *how far does the model stray inside the clamp's band* — turned out
+not to be answerable from stored rows at all, because the baseline is never persisted beside the
+recommendation. Reconstructed from the owner's profile instead, the answer is that "strays inside the
+band" understates it: the last applied recommendation carried a **5,000** step goal where
+`STEP_GOAL_BY_ACTIVITY` can only ever return 7,000 / 8,500 / 10,000 / 12,000, and the clamp altered
+nothing.
+
+The three new entries are the cost of measuring rather than assuming. **LA-126** is the one that
+matters: the owner's live nutrition targets are still a model's numbers, +250 kcal and +35 g protein
+over the formula, and correcting them is his call rather than a fix. **LA-125** is the honest
+asterisk on this PR's own claim — the recommendation is the baseline *made safe*, and fat and carbs
+differ. **LA-127** is why the measurement above carries a caveat at all: two tables have no
+`claude_ro` twin.
+
+## 2026-09-21 — `docs/implementation-backlog.md` +42 (RV-79 could not be built as written)
+
+`docs/implementation-backlog.md` **25998 → 26040** (`docs/rv79-cachedfetch-caches-null`). Two
+entries grew: RV-79's fix bullet was struck and replaced with why it cannot be applied, and a new
+**LB-123** was filed for the enabling change.
+
+The lines are a measurement rather than a description, which is why there are this many of them.
+RV-79 said to route a bare `fetch` through `cachedFetch` while "preserving the null-guard in the
+`onData` callback"; `cachedFetchCore` calls `setCached` unconditionally after any 2xx, so `onData`
+cannot veto the write, and doing it would have cached a `null` over an optimistically-saved mood —
+the session-167 re-prompt bug. A probe proved it (`onData` fired twice, `readCacheSync` then read
+`null`) rather than the source being read and trusted, and the probe's output is what the entry now
+carries. An entry that is wrong about its own fix is worth the space to correct in place, because
+the next reader starts from it.
+
+## 2026-09-21 — RV-72 shipped with residue, on top of RV-66's rebaseline
+
+`docs/implementation-backlog.md` **26017 → 26061** · `projectOverview.md` **12198 → 12205**
+(`fix/rv72-progress-bar-scalex`) — recomputed after re-merging `main` twice while this branch was
+open, so these are measured against the merged file rather than against the number the branch
+started from. The backlog's +44 is RV-72's own +20 plus **+24 of LB-119 evidence**: this PR's own
+E2E lost `diary-nested-meal:231` to the chromium `SIGSEGV`, at fault address `0x1b0` — the same
+address, and the same spec line, as the #1280 run already in that entry's table. A row was added
+there rather than the failure being waved off, because the whole point of that entry is that the
+sightings accumulate into a case.
+
+RV-72's entry stays queued rather than being deleted, so the lines are a `✅ SHIPPED` record plus a
+`Keep:` naming what is genuinely still owed: the `motion-polish` device pass, the
+`transition-all`-over-inline-`width` sites the entry lists, and the 26 bars with no transition at
+all. None of those was swept blind, and the primitive they would use now exists.
+
+One line is a correction rather than a description: the `⛔` that opened the calorie-bar exclusion
+bullet was emphasis, not a blocker, and it is what parked the entry (LB-121's fourth instance). It
+is gone, so the entry is now visible to `next-item.js` for whoever takes the residue.
+
+The +7 on `projectOverview.md` is the same `motion-polish` Known-Issues row rather than a second one —
+RV-72 shares RV-71 and RV-75's batch and its one device sitting, so a separate row would have
+claimed a separate check that does not exist. The added lines are what is carried, not fixed: the
+`transition-all`-over-inline-`width` sites, the 26 untransitioned bars, and why the calorie bar
+stays on `width` by design.
+
+## 2026-09-21 — `docs/implementation-backlog.md` 26061 → 26038 (LA-124 left the queue)
+
+Recomputed after merging `main` twice — RV-72 (#1377) landed underneath while this branch was open,
+which is why the starting number here is not the one this branch was cut from. Not picked from
+either side of the conflict. LA-124 shipped and was removed whole — nothing is owed on it, the
+entry says so itself — while the same file gained LB-123 and RV-79's correction (#1378) and then
+RV-72's `Keep:` and an LB-119 sighting row (#1377). The net of this branch's own edit is −23.
+
+The `.size` file conflicted; the backlog itself auto-merged both times, because one side deleted
+an entry and the other added one somewhere else. That is the benign shape. The dangerous one is two
+*deletions*, where "keep both" resurrects two shipped entries — checked here by grepping for all
+three ids rather than reading the diff.
+
+## 2026-09-21 — `docs/implementation-backlog.md` +3 (RV-72 stopped parking itself)
+
+RV-72 was parked by LB-121 twice. The first cause was a no-entry glyph used for emphasis on its
+calorie-bar exclusion, removed when the entry shipped. That was not enough: **the bullet explaining
+the glyph had quoted the character**, so the entry went on parking itself on its own documentation
+and its `Keep:` residue — the `transition-all`-over-inline-`width` sites and 26 untransitioned bars,
+both buildable Lane B work — stayed invisible to every `next-item.js` scan. The character is now
+named rather than printed, and the bullet says not to paste it back.
+
+The three lines are the second instance written down. An entry that hides its own residue is worth
+more than three lines, and the shape recurs: `next-item.js` reads the character anywhere in a line,
+including inside backticks and including in prose whose whole subject is that the character parks
+things.
+
+**Two others are still parked this way and were deliberately NOT touched.** RV-67's *"do not
+bulk-apply the flag"* and TN-35's *"do not compute a verdict yet"* both read as real prohibitions
+rather than emphasis, and both belong to other roles — TN-35 carries a second glyph besides the one
+a sweep would notice, and its residue is only a device check, so unparking it would surface nothing.
+Judging another role's emphasis is not this lane's call; the parser fix is LB-121 and the
+Orchestrator's.
+## 2026-09-21 — `docs/implementation-backlog.md` +336 (26041 → 26377) (Review sweep 52)
 
 Nineteen entries (**RV-84…RV-102**) from a visual sweep — formatting drift, 384px layout,
 empty/zero/error states, colour semantics and contrast — at ~18 lines each, below this file's own

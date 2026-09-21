@@ -2330,6 +2330,73 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [app-shell] ⚠️ Buttons press, sheets open at 300 ms and progress bars composite — nothing has been felt (RV-71, RV-72, RV-75, 2026-09-21, v1.464.1) · needs: device
+
+The shared `Button` had **no `active:` state at all** across 129 importers on a touch-only product —
+hover only, which a finger cannot produce and which Android WebView can leave stuck after a tap. It
+now dips to 0.97, and `transition-all` is narrowed so a Button that changes size no longer animates
+its own layout. Sheets open in 300 ms instead of shadcn's untouched 500 ms default, on the same
+curve as tabs and routes. Five progress bars that transitioned `width` — a layout property, which
+also reflows the label and numbers beside them — now scale via the new
+`components/ui/progress-fill.tsx`.
+
+**The device check is the whole point of the `motion-polish` batch** — these are felt-quality
+changes and nothing here drives a Samsung WebView, so frame timing, the entire payoff of a
+compositing change, is unmeasured. **RV-74** shares the batch and the sitting and is `Gate: device`.
+
+**Carried, not fixed:** the sibling `transition-all` sites RV-71 lists — `set-card.tsx`,
+`pre-workout-screen.tsx`, `home-sortable-section.tsx` — were left rather than swept blind, as were
+RV-72's `transition-all`-over-inline-`width` sites (`metric-tiles-card.tsx`,
+`recommendation-card.tsx`, `goal-progress-bar.tsx`) and its 26 bars with no transition at all.
+`nutrition/calorie-progress-bar.tsx` stays on `width` **by design** — its fill clips a gradient ramp
+with a hand-computed `backgroundSize`, so scaling it would change which colour the leading edge
+shows.
+
+### [nutrition][body] 🔴 Your nutrition targets are still numbers the AI invented — changing them is your call (LA-126, 2026-09-21, v1.464.0) · needs: owner
+
+**What shipped (RV-66).** `/api/nutrition-goals/recommend` was computing your calorie, protein, carb,
+fat, water and step targets from your own measurements — body composition, your measured resting rate
+of 1,325 kcal, your goal — and then asking the model to return *its own* six numbers instead. Those
+were shown to you as the recommendation and written into your goals on Apply. From this version the
+model returns no numbers at all; it explains the calculated ones, and still flags when your logged
+training suggests a different activity level, which recalculates them.
+
+**What is still live, and it is a decision rather than a bug.** Your `nutrition_targets` today read
+**1,660 kcal / 150 g protein / 141 g carbs / 55 g fat** — exactly the recommendation from
+**2026-08-31**, which the model wrote. The calculation for your current profile says **1,410 / 115 /
+143 / 42**, so you have been eating to targets **+250 kcal and +30% protein** above it for three
+weeks. **Nothing has been changed for you**: rewriting stored goals is a production data write, and
+which of those two numbers you want is genuinely yours to pick. Re-running the recommendation will
+now offer the calculated figures.
+
+**How far off the invented numbers were.** The last one you applied (2026-09-14) suggested **5,000
+steps** where the calculation said **10,000** — and `STEP_GOAL_BY_ACTIVITY` can only ever return
+7,000 / 8,500 / 10,000 / 12,000, so 5,000 is not a number the formula can produce at all. Across 13
+stored recommendations the model produced six different step goals and **four of them were
+impossible**. The safety clamp changed none of it, because it is a band, not a derivation.
+
+**Two smaller things came out of measuring it**, both queued: `calculateBaseline` and the clamp
+disagree about fat (25% of calories vs 0.6 g/kg — 39 g against 42 g for you), so the recommendation
+is the baseline *made safe* rather than the baseline exactly (LA-125); and `user_goals` and
+`body_fat_calibration` have no `claude_ro` view, so your steps goal could not be read at all while
+measuring this (LA-127).
+
+### [readiness] ⚠️ A past day now says what you were doing when stress spiked — the marker half is unbuilt (TN-35, 2026-09-21, v1.462.0) · needs: device
+
+`/health/day?date=` places the day timeline's typed, timestamped events on the stress chart's axis
+and prints the measured level beside each workout, meal, walk and sleep. **An event with no bucket
+prints `no reading`, never `0.00`** — coverage averages 13.3 of 24 hours, so that is the common case,
+and the list header states `N of M with a reading` so a sparse day cannot read as an uneventful one.
+No verdict is computed; ranking causes is TN-16's shape and stays parked.
+
+**What is still missing is half the feature.** There is no way to mark a moment: meetings, commutes,
+arguments, caffeine and screens are invisible to the app, and they are most of what the owner means
+by "events". A timestamped marker row is a migration, so that half is **Lane A's and unbuilt**.
+
+**Two checks owed.** The device look — a list of the day's events under the chart at 412 px. And the
+pass test, which only the owner can run: open a past day and say whether a stressed window matches
+what he was doing, **or say it does not** — the result that would retire the metric.
+
 ### [heart-rate][readiness] ⚠️ Stress is drawn on the heart-rate charts now, and no phone has seen it (TN-3b, 2026-09-21, v1.461.0) · needs: device
 
 The owner asked to read a stressed stretch against what he was doing at the time. The day's stress
@@ -2426,6 +2493,31 @@ backlog queue until that run happens.**
 session and is also awaiting a device check. Both touch `PolarStrapService`, so the next night of wear
 exercises both at once — worth knowing when reading the result, because a bad night would not say
 which one was responsible.
+
+### [readiness][body][devices] ⚠️ A sample-less read can no longer flatten a day — four damaged days still owed (TN-20, 2026-09-21)
+
+`body_battery_daily` has exactly one writer and **it is a `GET`**. `/api/body-battery` snapshots the
+row on every read by design, so the last read of the day lands as the end-of-day record — and a read
+whose waking-hours HR query came back empty computed a whole day of nothing (`hr_sample_count` 0,
+charged 0, drained 0, `end_value` back at the anchor) and wrote it over a correct row. The owner's
+screenshot had shown *"−113 drained"* hours before one such row was flattened.
+
+**Fixed** by refusing populated → empty in the `ON CONFLICT` clause, atomically. Deliberately *not*
+a monotonic `excluded >= stored`, which would freeze a day at a bad value and block legitimate
+downward corrections — on healthy days a stored count sits slightly below raw from waking-hours
+windowing, and zero-against-thousands is the distinct failure. It also repairs: a later read that
+does see samples heals a day flattened that morning.
+
+**⚠ Two corrections to the entry, measured over all 84 days.** It is **4 damaged days, not "3 of the
+last 11"** (2026-07-26 predates it), and it is **not "losing days now"** — the newest is 2026-08-31,
+three weeks before the fix. The guard never existed, so it stopped firing rather than being fixed.
+
+**⚠ STILL OWED, and neither is assumed.** ① The four days store 0 against 272 / 265 / 1,954 / 3,767
+raw samples and are **not repaired** — the route only writes today, so rebuilding them needs a
+backfill that does not exist and is a production data write, **confirm-first**. ② The **triggering
+condition is unidentified**: this fixes what an empty read does, not what made those reads see
+nothing. `walkBodyBattery`'s `>= wakeTime` filter is the first suspect. **Server-side only — no APK,
+no device check.**
 
 ### [workouts] ⚠️ The duration ladder takes minutes; the control that sends 45 is not built yet (BF-7, 2026-09-21)
 

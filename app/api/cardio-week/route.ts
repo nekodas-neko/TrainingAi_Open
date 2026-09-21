@@ -3,7 +3,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { DEFAULT_TZ, todayInTz, startOfWeekInTz, todayMidnightUtc, toAestDay, ageFromDob } from '@trainingai/shared/date-utils'
-import { resolveHrProfile } from '@trainingai/shared/health/hr-profile'
+import { resolveHrProfileWithWindow } from '@trainingai/shared/health/hr-profile'
 import { computeObservedHr } from '@trainingai/shared/health/observed-hr'
 import { getDailyGoals } from '@trainingai/shared/health/daily-goals'
 import { resolveFitnessSnapshot } from '@trainingai/shared/running/fitness-snapshot'
@@ -39,7 +39,10 @@ export async function GET() {
   const { from, to } = weekWindow(today, startOfWeekInTz(tz))
   const from28dIso = toAestDay(new Date(todayMidnightUtc(tz).getTime() - WEIGHT_LOOKBACK_DAYS * 86_400_000), tz)
 
-  const profile = await resolveHrProfile(repo, userId, tz)
+  // RV-73 — the profile's own 90-day pull is the heaviest query in the app, and both windows this
+  // route reports on sit inside it, so the rows come back with it rather than being fetched twice
+  // more. See `resolveHrProfileWithWindow` for why slicing is equivalent to re-querying.
+  const { profile, hrRows: profileHrRows } = await resolveHrProfileWithWindow(repo, userId, tz)
 
   const observedTo = new Date()
   const observedFrom = new Date(todayMidnightUtc(tz).getTime() - OBSERVED_WINDOW_DAYS * 86_400_000)
@@ -51,10 +54,17 @@ export async function GET() {
   const priorWindowFromIso = toAestDay(priorFrom, tz)
   const priorWindowToIso = toAestDay(priorTo, tz)
 
-  const [days, hrRows, priorHrRows, user, weekMetrics, lookbackMetrics, currentRestingMetrics, priorRestingMetrics, plan, dayExercises, todayActivityLogs] = await Promise.all([
+  // Inclusive at both ends, matching `getHrForWindow`'s `gte`/`lte` — including that a reading
+  // landing exactly on `observedFrom` counts in BOTH windows, which is what the two queries did.
+  const inWindow = (f: Date, t: Date) => profileHrRows.filter(r => {
+    const ms = r.timestamp.getTime()
+    return ms >= f.getTime() && ms <= t.getTime()
+  })
+  const hrRows = inWindow(observedFrom, observedTo)
+  const priorHrRows = inWindow(priorFrom, priorTo)
+
+  const [days, user, weekMetrics, lookbackMetrics, currentRestingMetrics, priorRestingMetrics, plan, dayExercises, todayActivityLogs] = await Promise.all([
     repo.getZoneMinutesRange(userId, from, to, tz, profile).catch(() => []),
-    repo.getHrForWindow(userId, observedFrom, observedTo).catch(() => []),
-    repo.getHrForWindow(userId, priorFrom, priorTo).catch(() => []),
     repo.getUserById(userId),
     repo.listBodyMetrics(userId, from, to).catch(() => []),
     // Wider window for weight resolution — weight isn't logged daily, so the week window
