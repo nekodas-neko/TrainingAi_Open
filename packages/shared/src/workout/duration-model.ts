@@ -88,12 +88,34 @@ export function workingBudgetMin(
 // work" / "it's Saturday, I've got two hours". Deliberately NOT stored on the program —
 // it's a choice about today, so it lives only on the prescription it produced. 'standard'
 // means the session's own timeBudgetMinutes, whatever the user configured it to.
-export type DurationPreset = 'short' | 'standard' | 'long'
+export type LegacyDurationPreset = 'short' | 'standard' | 'long'
+
+/**
+ * A choice of minutes for today, or one of the three labels that preceded it (BF-7 PR 2b).
+ *
+ * **The labels are kept because they are PERSISTED, which this entry's plan said they were not.**
+ * The plan's "unusually cheap" section reads *"there is no stored value to be compatible with"* —
+ * true of the program, the local store and the sync tables, and false of the prescription itself:
+ * `durationPreset` is a field on `AiPrescription`, which lives in `session_periodization.prescription`.
+ * Measured in production 2026-09-21: **10 of 10 stored prescriptions carry it.** Narrowing this to
+ * `number` would have made every one of them unreadable by the code that reads them back.
+ *
+ * So a number is the canonical form and the labels stay legal on the way in. They are resolved in
+ * exactly one place — `requestedBudgetMin` — which is why nothing downstream needs to know that two
+ * forms exist.
+ */
+export type DurationPreset = number | LegacyDurationPreset
 
 // Short/long are RELATIVE to whatever the session is configured for (owner call 2026-07-29:
 // "30 mins +/- the routine's chosen amount"), not fixed 30/90 clocks. For the current 60-min
 // sessions the numbers are identical either way — but a 45-min session's "short" is 15 min of
 // squeeze, not a 30-min *increase*, which is what an absolute floor would have quietly done.
+//
+// BF-7 PR 2b: the plan said to DELETE this once the ladder took minutes, on the grounds that it
+// loses its role as the step. It keeps a different one — it is how the three stored labels are
+// still read — so deleting it would strand the prescriptions that carry them. The owner's 2026-08-23
+// call ("anchor to session") is what the number form implements; this constant is now only the
+// legacy decoder, and it can go when no stored prescription carries a label.
 export const DURATION_PRESET_DELTA_MIN = 30
 
 // Absolute floor on a shortened session. Below this the warmup carve-out and two-set role
@@ -137,6 +159,10 @@ export function budgetForPreset(sessionBudgetMin: number, preset: DurationPreset
  * trimming sets. The request is the intent; the clamp is what is achievable.
  */
 export function requestedBudgetMin(sessionBudgetMin: number, preset: DurationPreset | undefined): number {
+  // A number IS the request, in absolute minutes — that is the whole of BF-7. The session's own
+  // budget stays the anchor because the control defaults to it and the direction below is measured
+  // against it, not because the request is expressed relative to it.
+  if (typeof preset === 'number') return Number.isFinite(preset) ? preset : sessionBudgetMin
   if (preset == null || preset === 'standard') return sessionBudgetMin
   if (preset === 'long') return sessionBudgetMin + DURATION_PRESET_DELTA_MIN
   return sessionBudgetMin - DURATION_PRESET_DELTA_MIN

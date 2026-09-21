@@ -25094,6 +25094,30 @@ sessions rely on. The plan takes the minutes number and selects the algorithm by
 `sign(chosen − anchor)`, which reproduces all three exactly and extends to 45 with no new rule. An
 enum with more members would mean inventing a label per rung and re-deciding the algorithm for each.
 
+- **✅ PR 2b ENGINE HALF SHIPPED 2026-09-21** (`lane-a/bf7-duration-minutes`). `DurationPreset` takes
+  minutes, the prescription's "is this the default?" test became a comparison instead of
+  `!== 'standard'`, and the route's Zod accepts a bounded integer. **Lane A, not B as the plan said:**
+  PR 2b widens the route schema, and `app/api/**` is Lane A by the path rule — the control really is
+  Lane B and is what remains.
+- **⚠ THE PLAN'S "UNUSUALLY CHEAP" CLAIM IS WRONG, and it is the one the type change rested on.** §5
+  says *"there is no stored value to be compatible with"* and instructs deleting
+  `DURATION_PRESET_DELTA_MIN`. True of the program, the local store and the sync tables; **false of
+  the prescription** — `durationPreset` is a field on `AiPrescription`, stored whole in
+  `session_periodization.prescription`, and **10 of 10 production rows carried one on 2026-09-21**.
+  Narrowing to `number` would have made every stored prescription's duration unreadable. Shipped as
+  a union instead; the delta constant survives as the legacy decoder with the condition for its
+  removal written next to it. **A mutation proving the point: dropping the labels as the plan
+  instructed fails 16 of 29 tests, the pre-existing suite among them.**
+- **The labels are RELATIVE, the numbers ABSOLUTE** — they agree on a 60-minute session, which is why
+  it is easy to miss, and disagree on a 45-minute one (`'short'` = 15, `30` = 30). That is what makes
+  dropping them a data change rather than a rename.
+- **Keep — the Lane B control, and it is the whole remaining ask.** `session-duration-picker.tsx`,
+  `use-duration-preset.ts`, `pre-workout-screen.tsx`, `workout-screen.tsx`, `mood-checkin-sheet.tsx`:
+  offer 30/45/60/90 around the session's anchor, default to the anchor, and **commit on release, not
+  per detent** (finding 3 — a prescription averages 2,445 ms and the cooldown is deliberately
+  bypassed for preset changes). Nothing in the UI can send 45 until then; this half only makes 45
+  expressible and correct when it arrives. **No APK needed** — TypeScript only.
+
 **Done looks like:** a 45-minute session can be chosen for today, the session's own configured length
 is still what the control defaults to, the picked length is what the plan is trimmed against *and*
 what the warm-up countdown shows, and dragging the control does not fire a prescription per step.

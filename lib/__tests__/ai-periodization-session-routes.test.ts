@@ -172,6 +172,39 @@ describe('POST …/session/[sessionId]/prescribe', () => {
     expect(generatePrescriptionForSession).not.toHaveBeenCalled()
   })
 
+  // BF-7 PR 2b — the ladder is minutes now. These exercise the real handler and the real schema,
+  // which is what makes them the route's verification rather than the model's.
+  it('forwards a chosen number of minutes', async () => {
+    await prescribePost({ durationPreset: 45 })
+    expect(generatePrescriptionForSession.mock.calls[0][5]).toBe(45)
+  })
+
+  it('still accepts the three stored labels, because prescriptions carry them', async () => {
+    for (const label of ['short', 'standard', 'long'] as const) {
+      generatePrescriptionForSession.mockClear()
+      freshUser()
+      await prescribePost({ durationPreset: label })
+      expect(generatePrescriptionForSession.mock.calls[0][5]).toBe(label)
+    }
+  })
+
+  it('rejects a minute count that is out of range or not whole', async () => {
+    for (const bad of [0, -30, 1441, 45.5]) {
+      generatePrescriptionForSession.mockClear()
+      freshUser()
+      expect((await prescribePost({ durationPreset: bad })).status).toBe(400)
+      expect(generatePrescriptionForSession).not.toHaveBeenCalled()
+    }
+  })
+
+  // CONTROL — the bounds are a REQUEST guard, not the model's floor. A request below
+  // MIN_PRESET_BUDGET_MIN is legal and gets clamped downstream with its direction intact; 400ing it
+  // would tell a lifter at the floor that their choice was malformed.
+  it('accepts an under-floor request rather than refusing it', async () => {
+    await prescribePost({ durationPreset: 5 })
+    expect(generatePrescriptionForSession.mock.calls[0][5]).toBe(5)
+  })
+
   it('refuses an oversized body', async () => {
     expect((await prescribePost({ excludeSessionId: 'x'.repeat(32 * 1024) })).status).toBe(413)
   })
