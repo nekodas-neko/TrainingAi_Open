@@ -14712,3 +14712,21 @@ it, so the lines buy the sequencing plus the general form: read the schema, not 
 
 `projectOverview.md`'s +16 is the Known-Issues row, whose device check is unusually specific because
 the chart now carries four things at 412 px.
+
+## 2026-09-21 — TN-35: a `Needs:` blocked by residue rather than by a dependency
+
+`docs/implementation-backlog.md` **25276 → 25292** (`docs/tn35-needs-blocked-by-residue`), +16.
+
+TN-35's `Needs: TN-3b` says *"do not build the join before the axis exists"*. The axis exists twice
+over — TN-3b's day chart shipped 2026-09-13 and its HR-chart overlay on 2026-09-21. What keeps
+TN-3b in the queue is a `Keep:`: a device look, and a question nobody has put to the owner. Neither
+is something TN-35 waits on.
+
+The lines are not about TN-35. `Keep:` was introduced so a finished entry could record what it still
+owes instead of being deleted, and it quietly acquired a second effect nobody chose: because
+`Needs:` clears only when its target leaves the queue, **an entry kept for residue blocks every
+dependent indefinitely.** With Lane B at READY 0 for eight consecutive checks, that is not
+hypothetical. Recorded rather than fixed by editing the field, because unparking my own next item is
+the shape the lane is explicitly warned about — and because the choice between "clear when the
+buildable work is done" and "stop counting a residue-only entry as a blocker" is the Orchestrator's,
+not a lane's.
