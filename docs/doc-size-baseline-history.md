@@ -15006,12 +15006,31 @@ asterisk on this PR's own claim — the recommendation is the baseline *made saf
 differ. **LA-127** is why the measurement above carries a caveat at all: two tables have no
 `claude_ro` twin.
 
+## 2026-09-21 — `docs/implementation-backlog.md` +42 (RV-79 could not be built as written)
+
+`docs/implementation-backlog.md` **25998 → 26040** (`docs/rv79-cachedfetch-caches-null`). Two
+entries grew: RV-79's fix bullet was struck and replaced with why it cannot be applied, and a new
+**LB-123** was filed for the enabling change.
+
+The lines are a measurement rather than a description, which is why there are this many of them.
+RV-79 said to route a bare `fetch` through `cachedFetch` while "preserving the null-guard in the
+`onData` callback"; `cachedFetchCore` calls `setCached` unconditionally after any 2xx, so `onData`
+cannot veto the write, and doing it would have cached a `null` over an optimistically-saved mood —
+the session-167 re-prompt bug. A probe proved it (`onData` fired twice, `readCacheSync` then read
+`null`) rather than the source being read and trusted, and the probe's output is what the entry now
+carries. An entry that is wrong about its own fix is worth the space to correct in place, because
+the next reader starts from it.
+
 ## 2026-09-21 — RV-72 shipped with residue, on top of RV-66's rebaseline
 
-`docs/implementation-backlog.md` **25998 → 26018** · `projectOverview.md` **12198 → 12205**
-(`fix/rv72-progress-bar-scalex`) — both baselines were raised by RV-66 while this branch was open,
-so these are the +20/+7 measured against the merged file rather than against the number this branch
-started from.
+`docs/implementation-backlog.md` **26017 → 26061** · `projectOverview.md` **12198 → 12205**
+(`fix/rv72-progress-bar-scalex`) — recomputed after re-merging `main` twice while this branch was
+open, so these are measured against the merged file rather than against the number the branch
+started from. The backlog's +44 is RV-72's own +20 plus **+24 of LB-119 evidence**: this PR's own
+E2E lost `diary-nested-meal:231` to the chromium `SIGSEGV`, at fault address `0x1b0` — the same
+address, and the same spec line, as the #1280 run already in that entry's table. A row was added
+there rather than the failure being waved off, because the whole point of that entry is that the
+sightings accumulate into a case.
 
 RV-72's entry stays queued rather than being deleted, so the lines are a `✅ SHIPPED` record plus a
 `Keep:` naming what is genuinely still owed: the `motion-polish` device pass, the
