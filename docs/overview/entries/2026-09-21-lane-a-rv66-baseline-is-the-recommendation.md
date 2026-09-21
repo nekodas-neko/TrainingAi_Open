@@ -121,6 +121,22 @@ had asserted it in a comment before asserting it in code.
   checked, not assumed.
 - Full suite, `check:rules` and `check-test-typecheck` below.
 
+## A gotcha this item explained, belonging to no item
+
+Earlier today RV-83's entry recorded `pnpm check:rules` failing once on `memo() call sites pass
+stable props`, while the full suite ran concurrently, and filed it as unexplained. It is explained,
+and the explanation was sitting in this run's working tree: `set-card.tsx` showed as modified with a
+`// const X = memo(Y); <X style={{a:1}} />` line appended that I had not written.
+
+`scripts/__tests__/check-comment-blindness.test.ts` proves each rule script actually *detects* its
+violation by **appending that violation to a REAL source file** and restoring it in a `finally`.
+Two files are used, `components/workout/set-card.tsx` and `app/api/user/goals/route.ts`. Run
+`check:rules` inside that window and it reads a genuine violation the suite planted seconds earlier.
+
+**So: do not run `pnpm check:rules` concurrently with the full suite.** It also explains the rule
+script output that turns up inside vitest logs, which reads alarmingly like real violations in files
+you never touched. RV-83's entry has been amended rather than left saying "unexplained".
+
 ## Not exercised
 
 - **The model was never called.** `generateObject` is mocked throughout; what a real Gemini response

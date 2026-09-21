@@ -95,10 +95,17 @@ that block persistently too.
 - **Production was read, not written.** The twelve-day check is `claude_ro`, which is row-scoped to
   the owner — it says all three pillars land on one row *for the owner*, not for every account.
 
-## One unexplained observation
+## One observation, recorded here as unexplained and explained later the same day
 
 `pnpm check:rules` reported `memo() call sites pass stable props` as failing **once**, while the full
-suite was running concurrently. `node scripts/check-memo-prop-stability.js` passes standalone and the
-full `check:rules` passes on re-run (`Ran 75 of 75`). Recorded as unexplained rather than fixed — it
-changed nothing about this diff, and a gate that fails once under load is worth someone recognising
-rather than re-diagnosing.
+suite was running concurrently; the check passed standalone and `check:rules` passed on re-run.
+
+**Cause found while shipping RV-66, and amended here rather than left wrong:** it is not a flake and
+not load. `scripts/__tests__/check-comment-blindness.test.ts` proves each rule script actually
+*detects* its violation by **appending the violation to a REAL source file** — `set-card.tsx` and
+`app/api/user/goals/route.ts` — and restoring it in a `finally`. Run `check:rules` inside that
+window and it reads a genuine violation that the suite put there seconds earlier.
+
+So: **do not run `pnpm check:rules` concurrently with the full suite.** A failure from that overlap
+is real in the sense that the file really does contain a violation, and false in every sense that
+matters. The same overlap explains the stray rule-script output that appears inside vitest logs.
