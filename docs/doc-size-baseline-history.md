@@ -15020,3 +15020,29 @@ the session-167 re-prompt bug. A probe proved it (`onData` fired twice, `readCac
 `null`) rather than the source being read and trusted, and the probe's output is what the entry now
 carries. An entry that is wrong about its own fix is worth the space to correct in place, because
 the next reader starts from it.
+
+## 2026-09-21 — RV-72 shipped with residue, on top of RV-66's rebaseline
+
+`docs/implementation-backlog.md` **26017 → 26061** · `projectOverview.md` **12198 → 12205**
+(`fix/rv72-progress-bar-scalex`) — recomputed after re-merging `main` twice while this branch was
+open, so these are measured against the merged file rather than against the number the branch
+started from. The backlog's +44 is RV-72's own +20 plus **+24 of LB-119 evidence**: this PR's own
+E2E lost `diary-nested-meal:231` to the chromium `SIGSEGV`, at fault address `0x1b0` — the same
+address, and the same spec line, as the #1280 run already in that entry's table. A row was added
+there rather than the failure being waved off, because the whole point of that entry is that the
+sightings accumulate into a case.
+
+RV-72's entry stays queued rather than being deleted, so the lines are a `✅ SHIPPED` record plus a
+`Keep:` naming what is genuinely still owed: the `motion-polish` device pass, the
+`transition-all`-over-inline-`width` sites the entry lists, and the 26 bars with no transition at
+all. None of those was swept blind, and the primitive they would use now exists.
+
+One line is a correction rather than a description: the `⛔` that opened the calorie-bar exclusion
+bullet was emphasis, not a blocker, and it is what parked the entry (LB-121's fourth instance). It
+is gone, so the entry is now visible to `next-item.js` for whoever takes the residue.
+
+The +7 on `projectOverview.md` is the same `motion-polish` Known-Issues row rather than a second one —
+RV-72 shares RV-71 and RV-75's batch and its one device sitting, so a separate row would have
+claimed a separate check that does not exist. The added lines are what is carried, not fixed: the
+`transition-all`-over-inline-`width` sites, the 26 untransitioned bars, and why the calorie bar
+stays on `width` by design.

@@ -8,6 +8,7 @@ import type { MealPlan, MealPlanVariant, MealPlanMeal, MealPlanDayType, MealType
 import { fillableMeals } from './plan-day-fill'
 import { rescaleRemaining } from './plan-rescale'
 import { PlanMealRow } from './plan-meal-row'
+import { ProgressFill } from "@/components/ui/progress-fill";
 
 interface Props {
   plan: MealPlan | null
@@ -329,10 +330,7 @@ function MacroRow(
         aria-valuemin={0}
         aria-valuemax={Math.round(target)}
       >
-        <div
-          className="h-full rounded-full transition-[width] duration-300"
-          style={{ width: `${pct}%`, backgroundColor: color }}
-        />
+        <ProgressFill pct={pct} color={color} durationMs={300} />
       </div>
       <span className={cn(
         'w-16 shrink-0 text-right text-[11px] tabular-nums',

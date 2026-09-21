@@ -43,6 +43,12 @@ export const CalorieProgressBar = memo(function CalorieProgressBar({
       {/* The same ramp at full strength, clipped to today's intake. `backgroundSize` keeps the
           gradient spanning the WHOLE track rather than being squeezed into the fill, which is what
           makes the fill's leading edge the true colour for that position. */}
+      {/* RV-72 converted every other progress bar in the app to `transform: scaleX()`, which
+          composites instead of forcing layout. **This one is deliberately left on `width`.** The
+          fill is not a solid colour: it clips the ramp above with a hand-computed `backgroundSize`,
+          so the leading edge shows the true colour for that position. `scaleX` would scale the
+          background with the element, squashing the ramp horizontally and changing what the bar
+          SAYS about the day rather than only how it moves. Do not "finish the sweep" here. */}
       {fillWidth > 0 && (
         <div
           className="absolute inset-y-0 left-0 transition-[width] duration-500 ease-out motion-reduce:transition-none"

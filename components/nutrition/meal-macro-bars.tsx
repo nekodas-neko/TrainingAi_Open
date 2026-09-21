@@ -7,6 +7,7 @@ import {
   mealFit,
   type MacroFit,
 } from '@trainingai/shared/nutrition/meal-macro-fit'
+import { ProgressFill } from '@/components/ui/progress-fill'
 
 /**
  * A meal's actual food against the macros it was planned for, as four bars.
@@ -36,10 +37,7 @@ function Bar({ fit, label, color }: {
     <div className="flex items-center gap-2">
       <span className="w-8 shrink-0 text-[10px] font-semibold text-muted-foreground">{label}</span>
       <div className="h-1.5 flex-1 rounded-full overflow-hidden" style={{ backgroundColor: `${color}26` }}>
-        <div
-          className="h-full rounded-full transition-[width] duration-300 motion-reduce:transition-none"
-          style={{ width: `${pct}%`, backgroundColor: color }}
-        />
+        <ProgressFill pct={pct} color={color} durationMs={300} />
       </div>
       <span className="w-[5.5rem] shrink-0 text-right text-[10px] tabular-nums text-muted-foreground">
         {Math.round(fit.actual).toLocaleString()}/{Math.round(fit.target).toLocaleString()}

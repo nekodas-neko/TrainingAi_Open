@@ -848,12 +848,32 @@ below threshold and left in place for next time.
   primitive changes. With `main` landing a PR every ~8 minutes against a ~7-minute check cycle, a
   large diff is the one most likely never to land (#1365 took six merge attempts). **Take it next,
   and it still wants the same device pass as the rest of the batch.**
-- **⛔ Deliberately exclude `calorie-progress-bar.tsx`** — it clips a gradient ramp with a
+- **Deliberately excluded: `calorie-progress-bar.tsx`** — it clips a gradient ramp with a
   hand-computed `backgroundSize`, and `scaleX` would squash the ramp and change what the chart says.
-  Leave it on `transition-[width]` **with a comment saying why**, or the next sweep files it again.
+  Left on `transition-[width]` **with a comment saying why**, or the next sweep files it again.
+  (The emphasis glyph that used to open this bullet is what parked the entry — see LB-121 above.)
 - **Watch:** `scaleX` also scales the fill's border-radius horizontally, so a rounded cap goes oval
   at small percentages — put the radius on the track with `overflow-hidden` and leave the fill
   square, which most of these already do.
+- **✅ SHIPPED 2026-09-21** (`fix/rv72-progress-bar-scalex`, **v1.464.1**). New
+  `components/ui/progress-fill.tsx` renders the fill alone at `transform: scaleX(pct)` with
+  `origin-left` and `transition-transform motion-reduce:transition-none`; the five solid-fill
+  `transition-[width]` sites now use it (`contributor-chart.tsx`, `time-summary-card.tsx`,
+  `meal-macro-bars.tsx`, `meal-plan-section.tsx`, `walk-pacer-bar.tsx`), and
+  `calorie-progress-bar.tsx` carries the exclusion comment. **It renders the fill, not the track** —
+  every track already owns its `role="progressbar"`, ARIA values, background, a height from 1.5 to
+  2.5 and in one case an absolutely-positioned tick, so swallowing them would have meant a prop
+  each. `e2e/rv72-progress-bars-composite.spec.ts` asserts **computed style, not class strings**
+  (`duration-250` compiled to nothing on the previous PR and would have shipped as a silent no-op);
+  the exclusion is pinned in `e2e/calorie-progress-bar.spec.ts` instead, because that is the only
+  spec whose fixture gives the gradient fill a non-zero intake — it does not render at all at 0 kcal,
+  so a guard living in the RV-72 spec passed vacuously.
+- **Keep:** ① **the device pass**, shared with the rest of `motion-polish` — no sandbox drives a
+  Samsung WebView, and frame timing on that device is the entire payoff of a compositing change.
+  ② **the `transition-all`-over-inline-`width` sites this entry names** (`metric-tiles-card.tsx:108`,
+  `recommendation-card.tsx:224`, `goal-progress-bar.tsx:7`) and ③ **the 26 bars with no transition
+  at all** are NOT converted. Both are separate files with separate risk and were left rather than
+  swept blind; the primitive they would use now exists.
 
 ### [readiness][app-shell] RV-74 — the health hero's number counts up while its ring snaps
 
@@ -3911,13 +3931,14 @@ composite reports which of its inputs were inferred.
   **`0x1b0`**, same stack, in `chromium_headless_shell-1234`. Whatever was on that worker then fails
   with `browser.newContext: Target page, context or browser has been closed` — **no test body runs**,
   so the report names a spec that was never executed.
-- **Observed three times, on two different days:**
+- **Observed four times, on three different days:**
 
   | run | lost to it | outcome elsewhere |
   |---|---|---|
   | #1264, 2026-09-16 | `bf5-week-in-review-page:106`, `nutrition-day-navigation:92`, `one-calorie-budget:135` | all passed on retry |
   | #1280 run 1, 14:01 UTC | `diary-nested-meal:231`, `:207` | both passed in run 2 |
   | #1280 run 2, 14:40 UTC | `forced-dark-theme:67`, `preferences-survive-reinstall:37`, `recent-all-buckets:17` | all passed on retry |
+  | #1377, 2026-09-21 15:45 UTC | `diary-nested-meal:231` (**the same line as #1280 run 1**), plus 9 flaky, mostly nutrition | the 9 passed on retry; `:231` did not, and passes locally on that branch — 7 of 7 |
 
 - **⚠ It also produces failures that do NOT look like a crash, which is the expensive part.**
   `la109-back-from-subroute.spec.ts:87` failed run 1 on a real 30-second `toBeVisible` timeout with a

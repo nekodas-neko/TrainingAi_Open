@@ -2330,21 +2330,28 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
-### [app-shell] ⚠️ Buttons have a press state and sheets open at 300 ms — nothing has been felt (RV-71, RV-75, 2026-09-21, v1.463.0) · needs: device
+### [app-shell] ⚠️ Buttons press, sheets open at 300 ms and progress bars composite — nothing has been felt (RV-71, RV-72, RV-75, 2026-09-21, v1.464.1) · needs: device
 
 The shared `Button` had **no `active:` state at all** across 129 importers on a touch-only product —
 hover only, which a finger cannot produce and which Android WebView can leave stuck after a tap. It
 now dips to 0.97, and `transition-all` is narrowed so a Button that changes size no longer animates
 its own layout. Sheets open in 300 ms instead of shadcn's untouched 500 ms default, on the same
-curve as tabs and routes.
+curve as tabs and routes. Five progress bars that transitioned `width` — a layout property, which
+also reflows the label and numbers beside them — now scale via the new
+`components/ui/progress-fill.tsx`.
 
 **The device check is the whole point of the `motion-polish` batch** — these are felt-quality
-changes and nothing here drives a Samsung WebView. Also owed: **RV-72** (~33 progress bars animating
-`width` instead of `scaleX`) and **RV-74**, which share the batch and the sitting; RV-72 is
-startable, RV-74 is `Gate: device`.
+changes and nothing here drives a Samsung WebView, so frame timing, the entire payoff of a
+compositing change, is unmeasured. **RV-74** shares the batch and the sitting and is `Gate: device`.
 
 **Carried, not fixed:** the sibling `transition-all` sites RV-71 lists — `set-card.tsx`,
-`pre-workout-screen.tsx`, `home-sortable-section.tsx` — were left rather than swept blind.
+`pre-workout-screen.tsx`, `home-sortable-section.tsx` — were left rather than swept blind, as were
+RV-72's `transition-all`-over-inline-`width` sites (`metric-tiles-card.tsx`,
+`recommendation-card.tsx`, `goal-progress-bar.tsx`) and its 26 bars with no transition at all.
+`nutrition/calorie-progress-bar.tsx` stays on `width` **by design** — its fill clips a gradient ramp
+with a hand-computed `backgroundSize`, so scaling it would change which colour the leading edge
+shows.
+
 ### [nutrition][body] 🔴 Your nutrition targets are still numbers the AI invented — changing them is your call (LA-126, 2026-09-21, v1.464.0) · needs: owner
 
 **What shipped (RV-66).** `/api/nutrition-goals/recommend` was computing your calorie, protein, carb,
