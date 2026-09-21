@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.463.0",
+    date: "2026-09-21",
+    changes: [
+      "Your recommended calorie, protein, carb, fat, water and step targets are now calculated from your own measurements \u2014 body composition, your measured resting rate, and your goal \u2014 instead of being chosen by the AI. It was already calculating all six and then asking the model for its own numbers on top; the last recommendation you applied suggested 5,000 steps where the calculation said 10,000, and 150g of protein where it said 115g. The AI now explains the targets and still flags when your logged training suggests a different activity level, which recalculates them.",
+    ],
+  },
+  {
     version: "1.462.1",
     date: "2026-09-21",
     changes: [

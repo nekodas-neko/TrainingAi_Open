@@ -725,30 +725,66 @@ below threshold and left in place for next time.
   exercise's zone, which was not run — so "the model contributes nothing numerically" is argued from
   the code path, **not** from stored output. That is exactly what the measurement above would settle.
 
-### [nutrition] RV-66 — a model invents calorie and macro targets beside a function that already computed them, and the sheet writes its numbers into the user's goals
+### [body][nutrition] LA-126 — the owner's live nutrition targets are numbers a model invented 🔴 LIVE
 
-- **Lane:** A — `app/api/nutrition-goals/recommend/route.ts:25-35,266`. **Added:** 2026-09-20 ·
-  Review sweep 51.
-- `:266` computes `calculateBaseline(...)` — Katch-McArdle/Mifflin, measured RMR via `personalRmr`,
-  goal offsets, lean-mass protein dosing, activity-scaled water and steps. The route then quotes that
-  baseline to the model and asks it to return its **own** `recommendedCalories`, `ProteinG`,
-  `CarbsG`, `FatG`, `WaterMl`, `StepsGoal`.
-- **`clampRecommendation` is a safety band, not a derivation.** Probed against the shipped module:
-  against a baseline of 1,942 kcal, `1200 → 1785`, `1800 → 1800`, `2200 → 2200`, `2600 → 2330`. So
-  the model may return anything inside a **545 kcal band** and whatever it picks is displayed.
-- **And applied:** `components/profile/goal-recommendation-sheet.tsx:135-138` writes
-  `rec.recommended.calories/proteinG/carbsG/fatG` into the targets patch on Apply.
-- **This breaks one CLAUDE.md rule twice over** — *no LLM self-reported number may gate an automatic
-  action **or be shown to the user as fact***. It is both.
-- **Fix:** present `baseline` directly as the recommendation and keep the model for
-  `reasoning`/`insights` prose only. **Drop `recommendedCarbsG` from the schema entirely** — it is
-  already discarded unconditionally (`goal-recommendation.ts:276`, `carbsFromRemainder`). The
-  activity-level *suggestion* is the one genuinely judgemental output; it can stay, or become the
-  rule the prompt already spells out as a threshold.
-- **Win beyond correctness:** the displayed number becomes the same number every other surface
-  computes (One Formula, One Place), and ~1.9 s comes off the sheet.
-- **Not established:** stored `goal_recommendations` rows were not diffed against the baseline they
-  came from, so how far the model typically strays inside that band in practice is unmeasured.
+- **Lane:** A — production data, `nutrition_targets`. **Added:** 2026-09-21 (Lane A, while shipping
+  RV-66).
+- **Gate:** owner
+- **Measured 2026-09-21.** `claude_ro.nutrition_targets` holds **1,660 kcal / 150 g protein / 141 g
+  carbs / 55 g fat**, which is *exactly* the `goal_recommendations` row from **2026-08-31** — a row
+  the model wrote and the sheet applied. The computed baseline for the owner's current profile
+  (70.35 kg, 25.7% BF, measured RMR 1,325 @ 51.5 kg FFM, recomp, moderate) is **1,410 / 115 / 143 /
+  42**. So the live targets run **+250 kcal (+18%)** and **+35 g protein (+30%)** above the formula.
+- RV-66 stops any *future* recommendation being model-invented. It does not touch what is already
+  stored, and it must not: rewriting a user's goals is a production data write.
+- **What the owner has to decide**, and it is genuinely a choice rather than a correction: the
+  targets he has been eating to for three weeks are higher than the formula says. Re-running the
+  recommendation after RV-66 ships will offer him the computed figures; applying them is a real
+  change to his intake, not a bug fix. **Do not run this for him.**
+- **Verification:** after the owner applies a post-RV-66 recommendation, `nutrition_targets` matches
+  `calculateBaseline` for his profile, clamp floors included.
+
+### [nutrition][platform] LA-125 — two formulas disagree about fat, so the recommendation is not the baseline it claims to be
+
+- **Lane:** A — `packages/shared/src/nutrition/goal-recommendation.ts:205,262-268`.
+  **Added:** 2026-09-21 (Lane A, found while shipping RV-66).
+- `calculateBaseline` sets `fatG = round(calories * 0.25 / 9)`. `clampRecommendation` floors fat at
+  `round(0.6 * weightKg)`. For the owner those are **39 g and 42 g**, so the clamp raises fat and
+  carbs fall out of the remainder at **143 instead of 150**.
+- **Why it matters now.** RV-66 made the recommendation deterministic, and its stated win was One
+  Formula, One Place — the displayed number being the same number every other surface computes. That
+  is true for calories, protein, water and steps and **false for fat and carbs**: a surface reading
+  `calculateBaseline` directly gets 39/150, this route serves 42/143.
+- **⚠ Do not close this by deleting the clamp.** `CALORIE_ADJUSTMENT_BY_GOAL` subtracts 500 for
+  `lose_weight`, and `bmr × 1.2 − 500 < bmr` for any BMR under **2,500** — most people — so its
+  calorie floor is load-bearing for every cutting user. `rv66-baseline-is-the-recommendation.test.ts`
+  pins both the floor and this fat disagreement, the latter explicitly as current-behaviour-not-
+  endorsed.
+- **Fix:** decide which fat rule is the real one and make the other defer to it — most likely by
+  moving the 0.6 g/kg floor *into* `calculateBaseline` so the baseline is already safe and the clamp
+  becomes the no-op it reads as. **That changes the computed fat target for real users**, so it
+  wants the owner's eye on the number before it ships.
+- **Verification:** the route's response equals `calculateBaseline` field-for-field, and the
+  `lose_weight` floor test still passes.
+
+### [platform] LA-127 — two tables have no `claude_ro` twin, so they are invisible to every read
+
+- **Lane:** A — `lib/data/postgres/migrations/`, `scripts/generate-claude-ro-views.js`.
+  **Added:** 2026-09-21 (Lane A, found while measuring RV-66).
+- `claude_ro.user_goals` and `claude_ro.body_fat_calibration` both return *relation does not exist*.
+  `claude_ro` is default-deny, so a table with no view is unreadable rather than partially readable.
+- **What it cost in one session:** the RV-66 measurement could not read the owner's steps goal at all
+  (`user_goals`), and could not reproduce `correctBodyFatPct` (`body_fat_calibration`), so the
+  lean-mass-derived half of that comparison had to be stated as approximate. The step-goal half
+  survived only because it happens not to depend on body fat.
+- **Not established:** whether these are deliberate omissions (the generator has an exclusion list)
+  or drift from a migration that shipped without its twin. **Read the generator's exclusions before
+  regenerating** — if they are deliberate, this entry becomes a docs fix naming the reason.
+- **Fix:** regenerate the views per CLAUDE.md's twin rule, as a NEW migration number, diffing against
+  the previous one to confirm only the intended views moved. The owner's id must not appear in the
+  output (Q-456).
+- **Verification:** both tables answer a `SELECT` through `/api/admin/db-query`;
+  `claude-ro-readonly-role.test.ts` and `db-snapshot-integration.test.ts` pass on a TCP `DATABASE_URL`.
 
 ### [nutrition][app-shell] RV-68 — the supplement tick paints only after three awaited local writes and a native call
 

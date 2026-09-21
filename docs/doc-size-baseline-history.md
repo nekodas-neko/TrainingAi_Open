@@ -14946,3 +14946,24 @@ exist.
 
 The six lines are what it costs to stop the next session re-proposing the aggregate and re-measuring
 its way back to the same answer.
+
+## 2026-09-21 — RV-66 left the queue and three findings took its place
+
+`docs/implementation-backlog.md` **25992 → 26028** · `projectOverview.md` **12154 → 12183**
+(`lane-a/rv66-baseline-is-the-recommendation`) —
+RV-66 out, **LA-125, LA-126 and LA-127 in**. The document grew by shipping an entry, which is worth
+the note.
+
+The entry's unmeasured question — *how far does the model stray inside the clamp's band* — turned out
+not to be answerable from stored rows at all, because the baseline is never persisted beside the
+recommendation. Reconstructed from the owner's profile instead, the answer is that "strays inside the
+band" understates it: the last applied recommendation carried a **5,000** step goal where
+`STEP_GOAL_BY_ACTIVITY` can only ever return 7,000 / 8,500 / 10,000 / 12,000, and the clamp altered
+nothing.
+
+The three new entries are the cost of measuring rather than assuming. **LA-126** is the one that
+matters: the owner's live nutrition targets are still a model's numbers, +250 kcal and +35 g protein
+over the formula, and correcting them is his call rather than a fix. **LA-125** is the honest
+asterisk on this PR's own claim — the recommendation is the baseline *made safe*, and fat and carbs
+differ. **LA-127** is why the measurement above carries a caveat at all: two tables have no
+`claude_ro` twin.

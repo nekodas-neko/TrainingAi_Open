@@ -22,13 +22,29 @@ import { correctBodyFatPct } from '@trainingai/shared/health/body-fat-calibratio
 // An optional source marker; the body is normally absent.
 const MAX_BODY_BYTES = 4 * 1024
 
+/**
+ * RV-66 — the model no longer returns any of the numbers.
+ *
+ * It used to return its own `recommendedCalories`/`ProteinG`/`CarbsG`/`FatG`/`WaterMl`/`StepsGoal`
+ * beside a `calculateBaseline(...)` that had already computed every one of them from
+ * Katch-McArdle/Mifflin, a measured RMR, goal offsets and lean-mass protein dosing — and those
+ * invented numbers were both shown to the user as fact and written into their goals on Apply.
+ * CLAUDE.md forbids exactly that, twice over: *no LLM self-reported number may gate an automatic
+ * action or be shown to the user as fact.*
+ *
+ * `clampRecommendation` did not save it, because it is a safety band rather than a derivation.
+ * Measured against the owner's applied 2026-09-14 recommendation: baseline 1,410 kcal / 115 g
+ * protein / 39 g fat / 10,000 steps against a stored-and-applied 1,618 / 150 / 55 / **5,000**, and
+ * the clamp altered none of it. `STEP_GOAL_BY_ACTIVITY` can only ever return 7,000 / 8,500 / 10,000
+ * / 12,000, so a 5,000 step goal is not a value the formula can produce at all — the model halved
+ * it and the sheet wrote it in.
+ *
+ * `recommendedActivityLevel` STAYS, and is the one thing here that should be a judgement: it is a
+ * category, not a number, and the figures that follow from it are recomputed in code below. The
+ * model choosing "your logged frequency says `active`, not `light`" is the question it is actually
+ * equipped to answer.
+ */
 const recommendationSchema = z.object({
-  recommendedStepsGoal: z.number(),
-  recommendedCalories: z.number(),
-  recommendedProteinG: z.number(),
-  recommendedCarbsG: z.number(),
-  recommendedFatG: z.number(),
-  recommendedWaterMl: z.number(),
   recommendedActivityLevel: z.enum(ACTIVITY_LEVELS).nullable(),
   reasoning: z.string(),
   insights: z.string(),
@@ -280,18 +296,18 @@ export async function POST(req: Request) {
       model: aiModel(),
       schema: recommendationSchema,
       maxRetries: 0,
-      prompt: `You are a sports nutrition and training coach. Based on the data below, recommend DAILY targets for steps, calories, protein, carbs, fat, and water.
+      prompt: `You are a sports nutrition and training coach. The DAILY targets below have already been calculated from this person's measurements. Your job is to EXPLAIN them and to judge one thing: whether their stated activity level still matches how much they actually train.
 
 ${context}
 
 Instructions:
-- Stay close to the baseline numbers; only deviate meaningfully when the trend data justifies it, and explain why in "reasoning".
-- Only suggest a different "recommendedActivityLevel" if the logged workout frequency clearly doesn't match the current activity level (e.g. 4+ sessions/week while set to "sedentary" or "light"). Otherwise set it to null. If you do suggest a change, base all the other numbers on the new activity level's TDEE, not the current one.
+- You do NOT set the numbers. Steps, calories, protein, carbs, fat and water are computed from measured body composition, a measured or predicted resting rate, and the goal offset. Never state a target that differs from the baseline figures above, and never suggest the person aim for a different number.
+- "reasoning": explain what the baseline figures are built from and what in the recent trend supports or complicates them. Quote the figures exactly as given if you mention them.
+- Only suggest a different "recommendedActivityLevel" if the logged workout frequency clearly doesn't match the current activity level (e.g. 4+ sessions/week while set to "sedentary" or "light"). Otherwise set it to null. This is the ONE number-affecting judgement you make, and the targets are recalculated from it — so say plainly in "reasoning" why the logged frequency justifies the change.
 - "insights": look for sleep-duration vs mood/energy patterns and mention any personal records achieved in this window. If body fat % data is available, factor it alongside the weight trend (e.g. weight stable but body fat dropping suggests recomposition). If there's too little data (fewer than 3 days logged), say so explicitly instead of guessing — do not fabricate trends.
 - If the active program is currently in a "deload" or "testing" phase, expect reduced training volume, intensity, and possibly step counts — do not interpret this as a declining trend or sign of reduced effort.
-- Program phase can inform your numeric suggestions within reason: e.g. a "peak" or high-volume phase may justify a modest increase to calories/protein/steps over baseline, while a "deload" phase may justify holding steady or a slight reduction. Mention this reasoning explicitly when it influences a number.
-- "dataQualityNote": briefly note if the recommendation is baseline-only due to sparse data, otherwise return an empty string.
-- All step/calorie/water values must be DAILY figures, not weekly.
+- Program phase is context for your explanation, not a reason to propose different targets: a deload week explains lower output, it does not change what the calculated intake should be.
+- "dataQualityNote": briefly note if the inputs were sparse enough that the trend commentary is thin, otherwise return an empty string.
 
 ${PROSE_FIELD_GUARDS}`,
     }))
@@ -311,7 +327,25 @@ ${PROSE_FIELD_GUARDS}`,
       })
     }
 
-    clamped = clampRecommendation(ai, clampBaseline, latestWeight)
+    // The recommendation IS the baseline — recomputed above when the model proposes a different
+    // activity level, which is the only way its judgement reaches a number, and it reaches it
+    // through the formula rather than around it.
+    //
+    // `clampRecommendation` is kept even though it can no longer be protecting against a model
+    // guess, because it is not only that: `CALORIE_ADJUSTMENT_BY_GOAL` subtracts 500 for
+    // `lose_weight`, and on a small enough BMR that can put the baseline's own calorie figure under
+    // the `max(1200, bmr)` floor. It is a no-op on a baseline that is already safe, and when it is
+    // not a no-op it says so in `dataQualityNote`.
+    clamped = clampRecommendation({
+      recommendedStepsGoal: clampBaseline.stepsGoal,
+      recommendedCalories: clampBaseline.calories,
+      recommendedProteinG: clampBaseline.proteinG,
+      recommendedCarbsG: clampBaseline.carbsG,
+      recommendedFatG: clampBaseline.fatG,
+      recommendedWaterMl: clampBaseline.waterMl,
+      recommendedActivityLevel: ai.recommendedActivityLevel,
+      dataQualityNote: ai.dataQualityNote,
+    }, clampBaseline, latestWeight)
 
     rec = await repo.createGoalRecommendation(userId, {
       source,
