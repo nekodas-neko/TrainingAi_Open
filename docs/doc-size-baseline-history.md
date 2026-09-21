@@ -14731,10 +14731,34 @@ the shape the lane is explicitly warned about — and because the choice between
 buildable work is done" and "stop counting a residue-only entry as a blocker" is the Orchestrator's,
 not a lane's.
 
+## 2026-09-21 — `docs/implementation-backlog.md` → 25428
+
++136 for two entries and one protocol rule, and the two entries are the point rather than the size.
+
+**TN-55** replaces a recommendation the owner had already approved. He signed off on "widen the Body
+Battery charge threshold"; measured against 84 days of production, the threshold is not the binding
+constraint — 220 minutes below it produced **zero** charge, because the walk excludes sleep and the
+charge ramp reaches full rate only at resting HR, where he logs ~0 minutes. The real defect is a rate
+balance netting **−29.8 points/day**. Most of the entry's length is the three measurements that
+overturn the old framing, because TN-2 and TN-52 both still carry it and an implementer will read one
+of them first.
+
+**TN-56** is an extraction, not new material: TN-52 already called the replay endpoint *"the
+highest-leverage single item on the tuning front"* while filing it as a paragraph inside a
+`Reference:` entry, which prints under *read, do not build*.
+
+The **calibration-period rule** is the owner's *"ideally it has a calibration period — do what's
+best"* turned into something checkable: fit 21 days after the last dose change, require ≥28 days,
+state the window's start date. Without the last clause a fit cannot be re-checked when the next
+change lands, which is the failure it exists to prevent.
+
 ## 2026-09-21 — TN-35's overlay half, and how it came to be startable
 
-`docs/implementation-backlog.md` **25292 → 25329** (+37) · `projectOverview.md` **12093 → 12109**
-(+16) (`feat/tn35-stress-against-events`).
+`docs/implementation-backlog.md` **+37** · `projectOverview.md` **12093 → 12109** (+16)
+(`feat/tn35-stress-against-events`).
+
+The backlog baseline lands at **25465**, not 25329: #1363 merged between this branch's push and
+its PR. The delta above is this PR's; the arrival figure is not.
 
 The backlog lines are mostly two things that would otherwise be lost.
 
