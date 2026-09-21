@@ -596,20 +596,40 @@ quantile moves it from 60.1 → 61 bpm and buys **2.8% → 3.7%** of the day. It
    ceiling adds time at the *bottom* of this multiplier, which is why it buys so little.
 3. **`DRAIN_RATE` is 3× `CHARGE_RATE`** (0.60 vs 0.20 points/min per unit reserve) on top of both.
 
-**The proposal: calibrate so a median day nets ≈ 0.** That is what makes the number readable as
-"today versus your normal" instead of a countdown. Three levers, cheapest first — **an implementer
-should fit them jointly rather than picking one**:
-- let sleep charge (the anchor sets the *start* value; intraday charge is a separate term, so this
-  is not double-counting — but check that claim against `anchor_source` before relying on it);
-- flatten or re-foot the ramp so it reaches full rate at the low edge of the *observed waking*
-  distribution rather than at resting HR;
-- rebalance `CHARGE_RATE` / `DRAIN_RATE`.
+**✅ THE FIT IS DONE — the plan is
+[`2026-09-21-body-battery-rate-balance.md`](superpowers/plans/2026-09-21-body-battery-rate-balance.md)
+and the harness is committed** at `scripts/tuning/body-battery-replay.cjs`. This entry is now
+*implement the plan*, not *investigate*. Measured over 64 days, full-day replay of the shipped
+`walkBodyBattery`:
 
-**How many other days this moves — all of them, and that is the point.** Every one of the 84 days
-carries the −30 net, so any fix re-scores the entire history. The pass test is distributional, not
-per-day: **median daily net within ±5 of zero, days-ending-at-zero under ~10%, and the day-to-day
-spread preserved** (a fix that flattens every day to 50 has destroyed the signal instead of
-calibrating it).
+| | shipped | proposed |
+|---|---:|---:|
+| median daily net | −85.1 | **−0.2** |
+| mean end value | 14.8 | **59.2** |
+| sd of end value (spread) | 26.4 | **28.0** |
+| days ending at 0 | **66%** | **5%** |
+
+**⚠ THE BIGGEST FINDING IS NOT ARITHMETIC: 61% of all drain is the STRESS term**, it exceeds HR drain
+on **49 of 65 days**, and it correlates **−0.61** with the day's end value. The Body Battery is mostly
+a rendering of the daytime-stress metric — whose **sign is unvalidated** (TN-33, TN-21, TN-22), and
+which the owner declined to validate on 2026-09-21. The plan's `STRESS_DRAIN_RATE = 0.05` is a
+deliberate **de-weighting of an untrusted input**, not a calibration of a trusted one. Do not raise it
+back until TN-33 settles the sign.
+
+**⚠ NO REPLAY ENDPOINT WAS NEEDED, and TN-2 was wrong that one would be.** `walkBodyBattery` is
+already a pure function of its inputs (LA extracted it for exactly this), so the fit runs offline
+against production reads. TN-56 is still worth building for the 25 sleep-staging constants, whose
+inputs are never persisted — but it does **not** gate this entry.
+
+**⚠ THE CONSTANTS CANNOT BE FINALISED BEFORE 2026-10-04.** The dose stepped 0.5 mg → 1 mg on
+**2026-09-13**, so the calibration-period rule at the head of this file puts the earliest honest fit
+three weeks after that. The four **structural** changes do not depend on the window and can ship now;
+re-run the sweep afterwards and adjust the single gain dial.
+
+**How many other days this moves — all 84, and that is the point.** Any fix re-scores the whole
+history (the owner chose recompute over freeze, 2026-08-26). The pass test is distributional:
+**median net within ±5 of zero, days-at-zero under ~10%, and the spread preserved** — a fix that
+flattens every day to 50 has destroyed the signal rather than calibrated it.
 
 **⚠ Fit against a window that excludes the titration ramp-up.** The owner confirmed 2026-09-21 that
 the dose is now stable at 1 mg. Use data from **21 days after the last dose change onward**, and

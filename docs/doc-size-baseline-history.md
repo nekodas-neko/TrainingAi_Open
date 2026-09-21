@@ -14751,3 +14751,17 @@ The **calibration-period rule** is the owner's *"ideally it has a calibration pe
 best"* turned into something checkable: fit 21 days after the last dose change, require ≥28 days,
 state the window's start date. Without the last clause a fit cannot be re-checked when the next
 change lands, which is the failure it exists to prevent.
+
+## 2026-09-21 (second) — `docs/implementation-backlog.md` → 25448
+
++20 on TN-55, and the entry got shorter in substance while growing in lines: the "three levers, fit
+them jointly" speculation is gone, replaced by a pointer to a plan and the measured result.
+
+The lines worth the raise are the two warnings. **61% of the Body Battery's drain is the stress
+term** (−0.61 correlation with the day's end value), so the number the owner reads is mostly a
+rendering of a metric whose sign TN-33 says is unvalidated — which makes the proposed
+`STRESS_DRAIN_RATE` a de-weighting of an untrusted input rather than a calibration, and that
+distinction is exactly what a future session would otherwise "fix" by raising it back. The second is
+that **no replay endpoint was needed**: TN-2 asserted the fit could not be done outside the server,
+and `walkBodyBattery` has been a pure function since LA extracted it, so the fit ran offline. Leaving
+that unrecorded would have left TN-56 looking like this entry's blocker when it is not.
