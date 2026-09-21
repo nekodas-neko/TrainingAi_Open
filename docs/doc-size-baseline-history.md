@@ -14841,7 +14841,7 @@ reads see nothing is still unidentified.
 `docs/implementation-backlog.md` **+37** · `projectOverview.md` **12093 → 12109** (+16)
 (`feat/tn35-stress-against-events`).
 
-The backlog baseline lands at **25958** and `projectOverview.md` at **12154**, nowhere near what the
+The backlog baseline lands at **25992** and `projectOverview.md` at **12154**, nowhere near what the
 deltas imply: **#1363, #1364, #1341, #1367 and #1366 all merged while this branch was in flight** — five
 drifts, one of them a review sweep filing twenty entries. The deltas above are this PR's; the
 arrival figures are not, and reading them as one change would attribute RV-64…RV-83 to a chart.
