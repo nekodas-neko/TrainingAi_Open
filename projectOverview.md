@@ -2345,6 +2345,34 @@ startable, RV-74 is `Gate: device`.
 
 **Carried, not fixed:** the sibling `transition-all` sites RV-71 lists — `set-card.tsx`,
 `pre-workout-screen.tsx`, `home-sortable-section.tsx` — were left rather than swept blind.
+### [nutrition][body] 🔴 Your nutrition targets are still numbers the AI invented — changing them is your call (LA-126, 2026-09-21, v1.464.0) · needs: owner
+
+**What shipped (RV-66).** `/api/nutrition-goals/recommend` was computing your calorie, protein, carb,
+fat, water and step targets from your own measurements — body composition, your measured resting rate
+of 1,325 kcal, your goal — and then asking the model to return *its own* six numbers instead. Those
+were shown to you as the recommendation and written into your goals on Apply. From this version the
+model returns no numbers at all; it explains the calculated ones, and still flags when your logged
+training suggests a different activity level, which recalculates them.
+
+**What is still live, and it is a decision rather than a bug.** Your `nutrition_targets` today read
+**1,660 kcal / 150 g protein / 141 g carbs / 55 g fat** — exactly the recommendation from
+**2026-08-31**, which the model wrote. The calculation for your current profile says **1,410 / 115 /
+143 / 42**, so you have been eating to targets **+250 kcal and +30% protein** above it for three
+weeks. **Nothing has been changed for you**: rewriting stored goals is a production data write, and
+which of those two numbers you want is genuinely yours to pick. Re-running the recommendation will
+now offer the calculated figures.
+
+**How far off the invented numbers were.** The last one you applied (2026-09-14) suggested **5,000
+steps** where the calculation said **10,000** — and `STEP_GOAL_BY_ACTIVITY` can only ever return
+7,000 / 8,500 / 10,000 / 12,000, so 5,000 is not a number the formula can produce at all. Across 13
+stored recommendations the model produced six different step goals and **four of them were
+impossible**. The safety clamp changed none of it, because it is a band, not a derivation.
+
+**Two smaller things came out of measuring it**, both queued: `calculateBaseline` and the clamp
+disagree about fat (25% of calories vs 0.6 g/kg — 39 g against 42 g for you), so the recommendation
+is the baseline *made safe* rather than the baseline exactly (LA-125); and `user_goals` and
+`body_fat_calibration` have no `claude_ro` view, so your steps goal could not be read at all while
+measuring this (LA-127).
 
 ### [readiness] ⚠️ A past day now says what you were doing when stress spiked — the marker half is unbuilt (TN-35, 2026-09-21, v1.462.0) · needs: device
 
