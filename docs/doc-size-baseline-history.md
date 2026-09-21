@@ -14751,6 +14751,20 @@ The **calibration-period rule** is the owner's *"ideally it has a calibration pe
 best"* turned into something checkable: fit 21 days after the last dose change, require ≥28 days,
 state the window's start date. Without the last clause a fit cannot be re-checked when the next
 change lands, which is the failure it exists to prevent.
+
+## 2026-09-21 (second) — `docs/implementation-backlog.md` → 25921 (after merging concurrent PRs)
+
++20 on TN-55, and the entry got shorter in substance while growing in lines: the "three levers, fit
+them jointly" speculation is gone, replaced by a pointer to a plan and the measured result.
+
+The lines worth the raise are the two warnings. **61% of the Body Battery's drain is the stress
+term** (−0.61 correlation with the day's end value), so the number the owner reads is mostly a
+rendering of a metric whose sign TN-33 says is unvalidated — which makes the proposed
+`STRESS_DRAIN_RATE` a de-weighting of an untrusted input rather than a calibration, and that
+distinction is exactly what a future session would otherwise "fix" by raising it back. The second is
+that **no replay endpoint was needed**: TN-2 asserted the fit could not be done outside the server,
+and `walkBodyBattery` has been a pure function since LA extracted it, so the fit ran offline. Leaving
+that unrecorded would have left TN-56 looking like this entry's blocker when it is not.
 ## 2026-09-21 — BF-7's plan called the type change free because nothing was persisted
 
 `docs/implementation-backlog.md` **25292 → 25316** · `projectOverview.md` **12093 → 12113**
@@ -14773,6 +14787,27 @@ The rest is the distinction that makes it a data change rather than a rename, wh
 once where the next reader will find it: **the labels are relative and the numbers are absolute.** On
 the 60-minute sessions everyone tests with, `'short'` and `30` are the same thing. On a 45-minute
 session — the one the owner asked for — `'short'` is 15 and `30` is 30.
+## 2026-09-20 — `docs/implementation-backlog.md` +449 (25452 → 25901) (Review sweep 51)
+
+Twenty entries (**RV-64…RV-83**) from the owner's efficiency review — logic-over-AI, caching and
+saving speed, runtime efficiency, and animation/UI feel — at ~22 lines each, the ratio this file
+already carries. The last four arrived after the PR was open and were folded into it rather than
+split off, per the one-PR rule.
+
+Three entries are longer than their fix and deliberately so, because in each case the fix is not the
+hard part. **RV-65** could be stated in a line ("stop asking the model for numbers the guards
+overwrite") and that line would be acted on wrongly: only the reconciled prescription is stored, so
+the model's real contribution is unmeasured, and the entry spends its length arguing for the
+measurement *before* the removal — BF-110's lesson, applied ahead of the mistake instead of after
+it. **RV-67** spends its length on what NOT to do: `freshWithinTtl` looks like a one-word win at 183
+sites, and bulk-applying it converts a stale flash into hours of hard staleness. **RV-64** carries
+its production measurement (128,734 rows against a 54 ms aggregate) because the number is what makes
+a "that's just a query" reading impossible.
+
+Two entries also carry an explicit ⛔: RV-72 must not convert `calorie-progress-bar.tsx` (a clipped
+gradient ramp that `scaleX` would distort), and RV-74 must not extend to the conic-gradient rings.
+Both are the kind of exception a sweep re-files every time unless the reason is written down.
+
 
 
 ## 2026-09-21 — TN-35's overlay half, and how it came to be startable
@@ -14780,9 +14815,10 @@ session — the one the owner asked for — `'short'` is 15 and `30` is 30.
 `docs/implementation-backlog.md` **+37** · `projectOverview.md` **12093 → 12109** (+16)
 (`feat/tn35-stress-against-events`).
 
-The backlog baseline lands at **25489** and `projectOverview.md` at **12129**, not the figures the
-deltas imply: **#1363 and #1364 both merged between this branch's push and its PR**. The deltas
-above are this PR's; the arrival figures are not.
+The backlog baseline lands at **25958** and `projectOverview.md` at **12129**, nowhere near what the
+deltas imply: **#1363, #1364, #1341 and #1367 all merged while this branch was in flight** — four
+drifts, one of them a review sweep filing twenty entries. The deltas above are this PR's; the
+arrival figures are not, and reading them as one change would attribute RV-64…RV-83 to a chart.
 
 The backlog lines are mostly two things that would otherwise be lost.
 
