@@ -80,9 +80,21 @@ had asserted it in a comment before asserting it in code.
 
 ## Verification
 
-- **6 new tests**, behavioural and handler-importing. The route's only existing test was a
-  **source-grep over its own text** — which is why deleting six fields from the response schema
-  changed nothing about it, and why this file exists.
+- **6 new tests**, behavioural and handler-importing, in the route's own `__tests__/`.
+
+  **A correction worth carrying, because it changed what this PR had to do.** I first concluded the
+  route's only test was a source-grep over its own text (`prompt-tdee-not-activity-scaled.test.ts`),
+  on the strength of looking only under `app/api/nutrition-goals/**`. That was wrong: PS-39 had
+  already written a 22-case behavioural suite at **`lib/__tests__/nutrition-goals-recommend-route.ts`**,
+  under the heading *"the model never sets a number"* — the exact property this entry is about. It
+  surfaced as **8 failures in the full suite**, not in any targeted run I had done.
+
+  Those 8 are correct failures. That suite pinned the property via `clampRecommendation`: the model's
+  number reached the route and was bounded. It no longer reaches the route, so every
+  "model said 400 kcal → clamped to 1,780" case now reads "model said 400 kcal → 2,136, the
+  baseline". **The property survived and the mechanism moved one layer earlier**, so the block was
+  rewritten rather than deleted — the fixtures still hand back the old numeric shape on purpose, as
+  proof the route ignores it.
   - the response equals the computed baseline, not the figures that were actually shipped;
   - **numeric fields are ignored even when the model volunteers them** (the load-bearing one: a
     schema is exactly what a later edit re-adds "for completeness");
@@ -100,6 +112,11 @@ had asserted it in a comment before asserting it in code.
     fixture's 1,410, so it was an *equivalent* mutation wearing a wrong-looking diff. It passed, I
     read that as a coverage gap, and the gap was real but different: nothing tested the floor. The
     floor test came from that, and only then did a real "drop the clamp" mutation fail.
+- **PS-39's 22-case suite rewritten, not dropped**, plus one case in its "failure and context"
+  block that used the protein clamp ceiling as a proxy for *which logged weight was used*: the
+  property is unchanged, the proxy is now the baseline's own dosing, and it is derived from
+  `calculateBaseline` and checked against the two weights it must not have picked so it cannot pass
+  by coincidence.
 - Response and stored-row shapes are unchanged, so `goal-recommendation-sheet.tsx` needs no change —
   checked, not assumed.
 - Full suite, `check:rules` and `check-test-typecheck` below.
