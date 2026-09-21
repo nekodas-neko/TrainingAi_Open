@@ -14793,6 +14793,7 @@ a "that's just a query" reading impossible.
 Two entries also carry an explicit ⛔: RV-72 must not convert `calorie-progress-bar.tsx` (a clipped
 gradient ramp that `scaleX` would distort), and RV-74 must not extend to the conic-gradient rings.
 Both are the kind of exception a sweep re-files every time unless the reason is written down.
+<<<<<<< HEAD
 
 ## 2026-09-21 — `docs/implementation-backlog.md` +336 (25901 → 26237) (Review sweep 52)
 
@@ -14813,3 +14814,5 @@ whether the grey secondary line already disambiguates the colliding food rows, R
 both deload surfaces are even reachable in one session, RV-93 notes the injury-chip collision is
 proven only for the geometry and not for a specific exercise, and RV-84 asks for a check script
 rather than a repeatable sweep.
+=======
+>>>>>>> origin/main

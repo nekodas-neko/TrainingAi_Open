@@ -5,8 +5,13 @@
 > 🔴 handed on) and is the only part that moves. A session self-titles 🟢 on its first instruction and
 > flips itself to 🔴 as the last step of its handoff, after the baton and every PR have landed.
 
+<<<<<<< HEAD
 **Updated:** 2026-09-21 · **By:** fifty sweeps (2026-08-17 ×2, 2026-08-18 ×37, 2026-08-20 ×1,
 2026-09-03 ×6, 2026-09-05 ×2, 2026-09-06 ×1, 2026-09-18 ×1, 2026-09-20 ×1, 2026-09-21 ×1) · **Next ID: `RV-103`.**
+=======
+**Updated:** 2026-09-20 · **By:** forty-nine sweeps (2026-08-17 ×2, 2026-08-18 ×37, 2026-08-20 ×1,
+2026-09-03 ×6, 2026-09-05 ×2, 2026-09-06 ×1, 2026-09-18 ×1, 2026-09-20 ×1) · **Next ID: `RV-84`.**
+>>>>>>> origin/main
 
 > **Sweep 40's run is closed and nothing is owed from it** — RV-32, RV-33, RV-34 all shipped, verified
 > in source rather than taken from the closure note, and their `projectOverview.md` row is in
@@ -37,6 +42,7 @@ From sweeps 29–39
 worker claims the page). **Q-556 was listed here and is CLOSED** — it shipped on
 `/api/activity-logs`, which now answers 404, verified live in sweep 47. From sweeps 41-42: **RV-37** and **RV-39**, both needing the device.
 
+<<<<<<< HEAD
 ## Now — sweep 52 filed (2026-09-21). **Next ID: `RV-103`.**
 
 **Sweep 52 was a visual sweep, angles self-chosen** — formatting drift, 384px layout,
@@ -72,6 +78,43 @@ applied. Read the headings; keep mine plus their newer version.
 **Sweeps 47–51 closed.** **Their durable rules:** a 4xx is not evidence the guard fired (read which
 field it names); pair every refusal with a one-field control; `claude_ro` is **the owner's rows
 only**. **Owed:** RV-37/39 device; RV-38/41/43 owner decision.
+=======
+## Now — sweep 51 filed (2026-09-20). **Next ID: `RV-84`.**
+
+**Sweep 51 was the owner's efficiency review** — logic over AI, faster caching/saving, app
+efficiency, animation/UI for feel; four lanes, every load-bearing claim re-verified.
+[Write-up](../../reviews/2026-09-20-sweep-51-efficiency.md) · **RV-64…RV-83** · batches
+`hr-window-aggregate` (2), `ai-degrade-and-bound` (2), `motion-polish` (4).
+
+**RV-64 is the headline and is NOT an AI finding.** `/api/hr-profile` pulls **128,734** production
+rows into JS and sorts them for two order statistics and a mean; the aggregate is **one row in 54
+ms**. `LiveHrChart` remounts it **once per rest period** — ~20 scans per workout, same pool as
+`log-exercise`, and its own 20/60s limit can 429 it.
+
+**Reframe the AI question first: 49 LLM calls in 14 days.** Cost is not the argument; latency,
+offline and correctness are. Ranking that work by spend produces a list not worth doing.
+
+**RV-65 asks for a MEASUREMENT, not a removal.** The prescription prompt tells the model a
+deterministic layer will overwrite its numbers, and it does — but only the reconciled output is
+stored, so the model's contribution is unknowable. BF-110's lesson applied *before* the fix. **An
+early framing of mine was wrong, not filed:** that path is not a per-open 2.2s block (dedup cache,
+30s cooldown, once-per-episode guard, 1–7 day TTL).
+
+**RV-67 is the one a reader cannot find:** a comment says `cachedFetch` honours its TTL; the gate is
+opt-in. **191 read sites, 8 flags.** Do not bulk-apply it — each key needs its invalidation proof.
+
+**TWO CORRECTIONS, so nobody re-files them:** reduced motion **is** handled globally
+(`MotionConfig reducedMotion="user"`, `app/layout.tsx:153`) — counting hook sites misses it; every
+bare `pb-safe` is permitted page-level scroll padding — **no safe-area violation exists.**
+
+**The lens that worked, and the one for sweep 52:** treat a claim in a comment or a prompt as a
+*hypothesis* and find its counter-example — it produced RV-67, RV-65, and sweep 50's RV-57/58.
+
+**Sweeps 47–50 closed** (50: 12 of 13 shipped, RV-61 queued; RV-51 misdiagnosed by me — its journal
+entry has it). **Their durable rules:** a 4xx is not evidence the guard fired, so read which field it
+names; pair every refusal with a one-field control; `claude_ro` is **the owner's rows only**.
+**Owed:** RV-37/39 device; RV-38/41/43 owner decision.
+>>>>>>> origin/main
 
 ## Carried from sweep 40 ([write-up](../../reviews/2026-08-20-non-workout-write-surface-ownership.md))
 
