@@ -15060,9 +15060,30 @@ an entry and the other added one somewhere else. That is the benign shape. The d
 *deletions*, where "keep both" resurrects two shipped entries — checked here by grepping for all
 three ids rather than reading the diff.
 
+## 2026-09-21 — `docs/implementation-backlog.md` +3 (RV-72 stopped parking itself)
+
+RV-72 was parked by LB-121 twice. The first cause was a no-entry glyph used for emphasis on its
+calorie-bar exclusion, removed when the entry shipped. That was not enough: **the bullet explaining
+the glyph had quoted the character**, so the entry went on parking itself on its own documentation
+and its `Keep:` residue — the `transition-all`-over-inline-`width` sites and 26 untransitioned bars,
+both buildable Lane B work — stayed invisible to every `next-item.js` scan. The character is now
+named rather than printed, and the bullet says not to paste it back.
+
+The three lines are the second instance written down. An entry that hides its own residue is worth
+more than three lines, and the shape recurs: `next-item.js` reads the character anywhere in a line,
+including inside backticks and including in prose whose whole subject is that the character parks
+things.
+
+**Two others are still parked this way and were deliberately NOT touched.** RV-67's *"do not
+bulk-apply the flag"* and TN-35's *"do not compute a verdict yet"* both read as real prohibitions
+rather than emphasis, and both belong to other roles — TN-35 carries a second glyph besides the one
+a sweep would notice, and its residue is only a device check, so unparking it would surface nothing.
+Judging another role's emphasis is not this lane's call; the parser fix is LB-121 and the
+Orchestrator's.
+
 ## 2026-09-21 — LA-125 described its own owner gate in a form nothing reads
 
-`docs/implementation-backlog.md` **+8 lines** (`lane-a/la125-gate-the-fat-formula-change`).
+`docs/implementation-backlog.md` **26041 → 26049** (`lane-a/la125-gate-the-fat-formula-change`).
 
 Filed hours earlier with the sentence *"that changes the computed fat target for real users, so it
 wants the owner's eye on the number before it ships"* — as **prose**. `Gate:` is a field, and written
