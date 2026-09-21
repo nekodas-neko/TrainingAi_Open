@@ -14752,7 +14752,7 @@ best"* turned into something checkable: fit 21 days after the last dose change, 
 state the window's start date. Without the last clause a fit cannot be re-checked when the next
 change lands, which is the failure it exists to prevent.
 
-## 2026-09-21 (second) — `docs/implementation-backlog.md` → 25448
+## 2026-09-21 (second) — `docs/implementation-backlog.md` → 25472 (after merging #1364)
 
 +20 on TN-55, and the entry got shorter in substance while growing in lines: the "three levers, fit
 them jointly" speculation is gone, replaced by a pointer to a plan and the measured result.
@@ -14765,3 +14765,25 @@ distinction is exactly what a future session would otherwise "fix" by raising it
 that **no replay endpoint was needed**: TN-2 asserted the fit could not be done outside the server,
 and `walkBodyBattery` has been a pure function since LA extracted it, so the fit ran offline. Leaving
 that unrecorded would have left TN-56 looking like this entry's blocker when it is not.
+## 2026-09-21 — BF-7's plan called the type change free because nothing was persisted
+
+`docs/implementation-backlog.md` **25292 → 25316** · `projectOverview.md` **12093 → 12113**
+(`lane-a/bf7-duration-minutes`).
+
+Most of both lines is one correction. The plan's §5, *"What makes this unusually cheap"*, concluded
+*"there is no stored value to be compatible with"* and told the implementer to delete
+`DURATION_PRESET_DELTA_MIN`. Its evidence was real — no `duration_preset` column in Postgres, the
+local store or the sync tables — and it reached past what that evidence covers: `durationPreset` is
+a field on `AiPrescription`, which is stored whole inside `session_periodization.prescription`.
+Production carried one on **10 of 10** rows.
+
+It earns the space because the failure would have been quiet and the diff would have looked right.
+The mutation says it plainly: dropping the labels as instructed fails **16 of 29** tests including
+the pre-existing suite — but only because the labels were still being tested. Nothing about the
+*type* change would have complained, and a stored `'short'` reaching code expecting a number is the
+kind of thing that surfaces weeks later on one screen.
+
+The rest is the distinction that makes it a data change rather than a rename, which is worth stating
+once where the next reader will find it: **the labels are relative and the numbers are absolute.** On
+the 60-minute sessions everyone tests with, `'short'` and `30` are the same thing. On a 45-minute
+session — the one the owner asked for — `'short'` is 15 and `30` is 30.
