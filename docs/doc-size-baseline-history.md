@@ -14834,11 +14834,43 @@ And the two things still owed: the four days are rebuildable from raw samples th
 need a backfill that does not exist and is a production write, and the condition that made those
 reads see nothing is still unidentified.
 
+
+
+## 2026-09-21 — TN-35's overlay half, and how it came to be startable
+
+`docs/implementation-backlog.md` **+37** · `projectOverview.md` **12093 → 12109** (+16)
+(`feat/tn35-stress-against-events`).
+
+The backlog baseline lands at **25992** and `projectOverview.md` at **12154**, nowhere near what the
+deltas imply: **#1363, #1364, #1341, #1367 and #1366 all merged while this branch was in flight** — five
+drifts, one of them a review sweep filing twenty entries. The deltas above are this PR's; the
+arrival figures are not, and reading them as one change would attribute RV-64…RV-83 to a chart.
+
+The backlog lines are mostly two things that would otherwise be lost.
+
+**How the entry unparked.** Its `Needs: TN-3b` was satisfied and still blocking, because `Needs:`
+clears only when its target leaves the queue and TN-3b stays for a `Keep:`. That was filed as #1362
+rather than edited away; the owner then said to continue with the backlog, and that is the
+authorisation this build ran on. Recording it matters because the next reader would otherwise find
+a `Needs:` beside a shipped entry and conclude the field can be ignored. **It cannot** — the
+structural question is still open and still the Orchestrator's.
+
+**What is still missing.** The marker half is Lane A's and unbuilt, so the feature attributes stress
+to training, food, walks and sleep only. Meetings, commutes and arguments — most of what the owner
+means by "events" — remain invisible. An entry that looks shipped and is half a feature needs to say
+which half.
+
+`projectOverview.md`'s +16 is the Known-Issues row, which carries the same split plus the two owed
+checks: the 412 px look, and the pass test only the owner can run — including that *"it does not
+match anything"* is a valid result and the one that would retire the metric.
+
 ## 2026-09-21 — RV-80's speedup figure is not a constant
 
-`docs/implementation-backlog.md` **25955 → 25952** (`lane-a/rv80-hoist-hr-formatter`) — RV-80 out
+`docs/implementation-backlog.md` **25992 → 25989** (`lane-a/rv80-hoist-hr-formatter`) — RV-80 out
 (−26) and **LA-124 in (+23)**, its only surviving sibling, filed rather than fixed because it lives
-in `components/**` and belongs to Lane B.
+in `components/**` and belongs to Lane B. The pair is **−3 net**; the branch was cut when the
+baseline read 25955 and TN-35 moved it to 25992 while this was in flight, so the number above is
+recomputed against main rather than carried from the branch.
 
 The entry measured 10.4×. Re-measured here it is **7.6× at 2,831 rows and 11.4× at 5,606** — the
 ratio grows with row count, because the hoisted `Intl.DateTimeFormat` construction is the per-row
