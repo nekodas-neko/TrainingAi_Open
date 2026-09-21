@@ -2443,6 +2443,31 @@ session and is also awaiting a device check. Both touch `PolarStrapService`, so 
 exercises both at once — worth knowing when reading the result, because a bad night would not say
 which one was responsible.
 
+### [readiness][body][devices] ⚠️ A sample-less read can no longer flatten a day — four damaged days still owed (TN-20, 2026-09-21)
+
+`body_battery_daily` has exactly one writer and **it is a `GET`**. `/api/body-battery` snapshots the
+row on every read by design, so the last read of the day lands as the end-of-day record — and a read
+whose waking-hours HR query came back empty computed a whole day of nothing (`hr_sample_count` 0,
+charged 0, drained 0, `end_value` back at the anchor) and wrote it over a correct row. The owner's
+screenshot had shown *"−113 drained"* hours before one such row was flattened.
+
+**Fixed** by refusing populated → empty in the `ON CONFLICT` clause, atomically. Deliberately *not*
+a monotonic `excluded >= stored`, which would freeze a day at a bad value and block legitimate
+downward corrections — on healthy days a stored count sits slightly below raw from waking-hours
+windowing, and zero-against-thousands is the distinct failure. It also repairs: a later read that
+does see samples heals a day flattened that morning.
+
+**⚠ Two corrections to the entry, measured over all 84 days.** It is **4 damaged days, not "3 of the
+last 11"** (2026-07-26 predates it), and it is **not "losing days now"** — the newest is 2026-08-31,
+three weeks before the fix. The guard never existed, so it stopped firing rather than being fixed.
+
+**⚠ STILL OWED, and neither is assumed.** ① The four days store 0 against 272 / 265 / 1,954 / 3,767
+raw samples and are **not repaired** — the route only writes today, so rebuilding them needs a
+backfill that does not exist and is a production data write, **confirm-first**. ② The **triggering
+condition is unidentified**: this fixes what an empty read does, not what made those reads see
+nothing. `walkBodyBattery`'s `>= wakeTime` filter is the first suspect. **Server-side only — no APK,
+no device check.**
+
 ### [workouts] ⚠️ The duration ladder takes minutes; the control that sends 45 is not built yet (BF-7, 2026-09-21)
 
 The owner asked on 2026-08-23 for *"the ability to choose a 45min session"*, anchored to the
