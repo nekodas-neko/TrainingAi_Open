@@ -24,7 +24,7 @@
  *   · **The trend curves see runs only**, filtered before the maths rather than inside it.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { todayInTz } from '@trainingai/shared/date-utils'
+import { todayInTz, todayMidnightUtc } from '@trainingai/shared/date-utils'
 import { MIN_RELIABLE_SAMPLES, CORROBORATION } from '@trainingai/shared/health/observed-hr'
 
 type Row = Record<string, unknown>
@@ -32,7 +32,7 @@ type Day = { day: string; seconds: [number, number, number, number, number] }
 
 const getZoneMinutesRange = vi.fn(async (..._a: unknown[]) => [] as Day[])
 const listActivityLogs = vi.fn(async (..._a: unknown[]) => [] as Row[])
-const getHrForWindow = vi.fn(async (..._a: unknown[]) => [] as { bpm: number }[])
+const getHrForWindow = vi.fn(async (..._a: unknown[]) => [] as { bpm: number; timestamp: Date; source: string | null }[])
 const getUserById = vi.fn(async (_u: string) => ({ dateOfBirth: '1990-01-01', heightCm: 180, sex: 'male', activityLevel: 'moderate' }) as Row | null)
 const listBodyMetrics = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const getActiveRunningPlan = vi.fn(async (_u: string) => null as Row | null)
@@ -79,18 +79,25 @@ const corroboratedButUnreliable = (bpm: number) =>
   Array.from({ length: CORROBORATION + 5 }, () => ({ bpm }))
 
 /**
- * Answer `getHrForWindow` by WHICH window is asked for, never by call order.
+ * Place each reading in TIME, because the route no longer asks for its windows separately.
  *
- * `resolveHrProfile` calls it too, before the route's own two, so a `mockResolvedValueOnce` chain
- * feeds the profile the value meant for the current window and shifts everything after it. Keying
- * on the window's start date is also what the real repository does.
+ * RV-73 — `cardio-week` used to issue two `getHrForWindow` calls of its own on top of the one
+ * `resolveHrProfile` makes, and this helper answered them by which window was asked for. Both of
+ * those windows sit inside the profile's 90 days, so the route now slices the rows it was already
+ * given and there is exactly ONE call to answer. A fixture that returns bare `{ bpm }` cannot
+ * survive that, which is the honest signal: the split moved from the query to the timestamps.
+ *
+ * Anchored on the user's local midnight, the same base the route derives its windows from — 15
+ * days back is inside the current 30-day window, 45 is inside the prior one, and neither is near a
+ * boundary where an inclusive/exclusive end could decide the test.
  */
 const hrByWindow = ({ current, prior }: { current: { bpm: number }[]; prior: { bpm: number }[] }) => {
-  const cutoff = Date.now() - 45 * 86_400_000  // between the 30-day current and 60-day prior starts
-  getHrForWindow.mockImplementation(async (..._a: unknown[]) => {
-    const from = _a[1] as Date
-    return from.getTime() < cutoff ? prior : current
-  })
+  const midnight = todayMidnightUtc(TZ).getTime()
+  const at = (daysBack: number) => new Date(midnight - daysBack * 86_400_000)
+  getHrForWindow.mockResolvedValue([
+    ...prior.map(r => ({ ...r, timestamp: at(45), source: null })),
+    ...current.map(r => ({ ...r, timestamp: at(15), source: null })),
+  ])
 }
 
 beforeEach(() => {
@@ -167,6 +174,63 @@ describe('/api/cardio-week', () => {
   it('reports the max-HR delta when both windows are corroborated', async () => {
     hrByWindow({ current: reliableBpms(180), prior: reliableBpms(174) })
     expect((await (await getWeek()).json()).heart.maxHrDeltaBpm).toBe(6)
+  })
+
+  // RV-73. The route reported on two 30-day windows that both sit inside the 90 days
+  // `resolveHrProfile` had already pulled, and fetched each of them again — three passes of the
+  // heaviest query in the app for rows already in memory.
+  it('asks for the HR window ONCE, not once per window it reports on', async () => {
+    hrByWindow({ current: reliableBpms(180), prior: reliableBpms(174) })
+    await getWeek()
+
+    expect(getHrForWindow).toHaveBeenCalledTimes(1)
+    // And the one call is the profile's 90-day window, not either of the reported ones.
+    const [, from, to] = getHrForWindow.mock.calls[0] as [string, Date, Date]
+    const spanDays = Math.round((to.getTime() - from.getTime()) / 86_400_000)
+    expect(spanDays).toBe(90)
+  })
+
+  it('slices the two windows out of that one pull rather than merging them', async () => {
+    // Distinct values per window, so a slice that took the wrong rows shows up as a wrong delta
+    // rather than as a plausible-looking number.
+    hrByWindow({ current: reliableBpms(180), prior: reliableBpms(150) })
+    const body = await (await getWeek()).json()
+
+    expect(body.heart.avgHr).toBe(180)
+    expect(body.heart.avgHrDeltaBpm).toBe(30)
+    expect(body.heart.maxHrDeltaBpm).toBe(30)
+  })
+
+  it('keeps a reading landing exactly on the window boundary in BOTH windows', async () => {
+    // `getHrForWindow` was inclusive at both ends (`gte`/`lte`), and `priorTo === observedFrom`, so
+    // the two queries both returned a reading sitting exactly on that instant. The slice preserves
+    // that rather than quietly tightening one end — behaviour pinned, not endorsed.
+    const boundary = new Date(todayMidnightUtc(TZ).getTime() - 30 * 86_400_000)
+    getHrForWindow.mockResolvedValue(
+      Array.from({ length: MIN_RELIABLE_SAMPLES }, () => ({ bpm: 160, timestamp: boundary, source: null })),
+    )
+    const body = await (await getWeek()).json()
+
+    // Both windows saw the same readings, so every delta is exactly zero — which is only possible
+    // if the boundary reading landed in both.
+    expect(body.heart.avgHr).toBe(160)
+    expect(body.heart.avgHrDeltaBpm).toBe(0)
+    expect(body.heart.maxHrDeltaBpm).toBe(0)
+  })
+
+  it('drops readings older than the prior window instead of folding them in', async () => {
+    // Inside the profile's 90 days but outside both reported windows: the old code never saw these
+    // rows at all, because it asked for narrower windows. The slice has to exclude them.
+    const old = new Date(todayMidnightUtc(TZ).getTime() - 75 * 86_400_000)
+    getHrForWindow.mockResolvedValue([
+      ...Array.from({ length: MIN_RELIABLE_SAMPLES }, () => ({ bpm: 200, timestamp: old, source: null })),
+      ...Array.from({ length: MIN_RELIABLE_SAMPLES }, () => ({ bpm: 120, timestamp: new Date(todayMidnightUtc(TZ).getTime() - 15 * 86_400_000), source: null })),
+    ])
+    const body = await (await getWeek()).json()
+
+    expect(body.heart.avgHr).toBe(120)
+    // Nothing in the prior window, so there is no baseline to compare against.
+    expect(body.heart.avgHrDeltaBpm).toBeNull()
   })
 
   // Measuring three days of a week against a seven-day goal always reads as failure.
