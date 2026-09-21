@@ -49,6 +49,52 @@ import { isTemperatureBaselineCentred } from '@trainingai/shared/health/temperat
 export const EARLY_DELOAD_SCORE_MAX = 45
 export const EARLY_DELOAD_ACWR_MIN = ACWR_THRESHOLDS.elevatedMin
 
+/** One pillar's contribution to the `oura_daily_derived` write at the end of a readiness computation. */
+export interface DerivedPersist {
+  day: string
+  /** Names the block this patch came from, so a failed write says which pillars went down with it. */
+  pillar: string
+  patch: import('@/lib/data/repository').OuraDailyDerivedPatch
+}
+
+/**
+ * Group the pillars' patches by day so each distinct day is one upsert instead of one per pillar
+ * (RV-83).
+ *
+ * The three producers in `buildReadinessPayload` write `readiness_*` + `model_versions`, `sleep_*`
+ * and `activity_*`, and in the normal case at least two of them address the SAME `(user_id, day)`
+ * row — `latestSummary.date`, `lastSleep.date` and `todayIso` all resolve to today whenever the
+ * rollup is current, which production confirms: every row of the last twelve days carries all three
+ * scores.
+ *
+ * Merging is safe because `upsertOuraDailyDerived` writes only the keys whose value is not
+ * `undefined` and the three key sets are disjoint, so the merged patch writes exactly the union with
+ * every column still sourced from exactly one pillar. `model_versions` — the one column with `||`
+ * merge semantics rather than COALESCE — appears in one patch only, so grouping cannot change how it
+ * combines with what is stored.
+ *
+ * **That disjointness is an invariant, not an observation, which is why a collision throws.** If a
+ * later pillar starts writing a key another one already writes, a silent `Object.assign` would pick
+ * a winner and drop the other, and nothing would ever say so. The caller's catch turns the throw
+ * into a logged failed persist — the read is served either way, and the write it drops is
+ * recomputed on the next request.
+ */
+export function mergeDerivedPersists(entries: DerivedPersist[]): { day: string; pillars: string[]; patch: DerivedPersist['patch'] }[] {
+  const byDay = new Map<string, { day: string; pillars: string[]; patch: Record<string, unknown> }>()
+  for (const e of entries) {
+    const group = byDay.get(e.day) ?? { day: e.day, pillars: [], patch: {} }
+    for (const key of Object.keys(e.patch)) {
+      if (key in group.patch) {
+        throw new Error(`mergeDerivedPersists: '${key}' written by both '${group.pillars.join("'/'")}' and '${e.pillar}' on ${e.day}`)
+      }
+    }
+    Object.assign(group.patch, e.patch)
+    group.pillars.push(e.pillar)
+    byDay.set(e.day, group)
+  }
+  return [...byDay.values()] as { day: string; pillars: string[]; patch: DerivedPersist['patch'] }[]
+}
+
 /** Why the early-deload card is showing — the two values that tripped it, and what they had to beat. */
 export interface EarlyDeloadReason {
   score: number
@@ -638,6 +684,11 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     }
   }
 
+  // RV-83 — the three persists below used to be three separately-awaited upserts on a read path,
+  // two of them usually to the same row. They collect here and drain as one statement per distinct
+  // day; see `mergeDerivedPersists` for why merging them is safe by construction.
+  const derivedPersists: DerivedPersist[] = []
+
   // Persist our own composite readiness in completed form for later analysis (compute-and-persist).
   // The composite already blends every signal (RHR / HRV / temperature / sleep balance / previous
   // night's sleep score / prev-day activity / recovery index / activity balance), so we record it
@@ -651,28 +702,24 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   // from being empty every day (Q-43). It only ever back-fills forward: days before this shipped
   // stay null, since nothing recorded them at the time.
   if (ownComposite && (latestSummary || genericComposite)) {
-    try {
-      // `model_versions` is one shared JSONB across every pillar on this row, and the upsert writes a
-      // provided column wholesale — so it is MERGED with what is already stored rather than replaced.
-      // Writing `{ readiness: ... }` alone would drop bodyBattery's stamp and any other pillar's.
-      //
-      // Stamped from 2026-08-18 (Q-273): without it, the range calibration that shipped the same day
-      // leaves an unmarked step in the readiness trend where old and new model scores meet, and no
-      // later correlation can tell an input change from a model change. Sleep shipped without one and
-      // has exactly that problem.
-      // Writes only its own key: `upsertOuraDailyDerived` merges `model_versions` with `||` inside
-      // the statement, so this no longer has to read the row and spread it back. That read-merge was
-      // a two-statement race against any other pillar stamping the same day, and it read a value
-      // that could already be stale (Q-273).
-      await repo.upsertOuraDailyDerived(userId, latestSummary?.date ?? todayIso, {
-        readinessScore: ownComposite.score,
-        readinessContributors: ownComposite.contributors,
-        readinessSource: latestSummary ? 'ble-derived' : 'generic-derived',
-        modelVersions: { readiness: READINESS_MODEL_VERSION },
-      })
-    } catch (err) {
-      console.error('[readiness-score] readiness persist failed (read still served):', err)
-    }
+    // `model_versions` is one shared JSONB across every pillar on this row, and the upsert writes a
+    // provided column wholesale — so it is MERGED with what is already stored rather than replaced.
+    // Writing `{ readiness: ... }` alone would drop bodyBattery's stamp and any other pillar's.
+    //
+    // Stamped from 2026-08-18 (Q-273): without it, the range calibration that shipped the same day
+    // leaves an unmarked step in the readiness trend where old and new model scores meet, and no
+    // later correlation can tell an input change from a model change. Sleep shipped without one and
+    // has exactly that problem.
+    // Writes only its own key: `upsertOuraDailyDerived` merges `model_versions` with `||` inside
+    // the statement, so this no longer has to read the row and spread it back. That read-merge was
+    // a two-statement race against any other pillar stamping the same day, and it read a value
+    // that could already be stale (Q-273).
+    derivedPersists.push({ day: latestSummary?.date ?? todayIso, pillar: 'readiness', patch: {
+      readinessScore: ownComposite.score,
+      readinessContributors: ownComposite.contributors,
+      readinessSource: latestSummary ? 'ble-derived' : 'generic-derived',
+      modelVersions: { readiness: READINESS_MODEL_VERSION },
+    } })
   }
 
   // Persist our own sleep score + contributor breakdown (S6 — data-efficiency review §1.3).
@@ -684,14 +731,10 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   // persist). COALESCE means a later recompute with richer inputs overwrites with the better value.
   // Best-effort: a persist failure must never fail the read.
   if (sleepScoreResult && lastSleep) {
-    try {
-      await repo.upsertOuraDailyDerived(userId, lastSleep.date, {
-        sleepScore: sleepScoreResult.score,
-        sleepContributors: ownSleepContributors,
-      })
-    } catch (err) {
-      console.error('[readiness-score] sleep-score persist failed (read still served):', err)
-    }
+    derivedPersists.push({ day: lastSleep.date, pillar: 'sleep', patch: {
+      sleepScore: sleepScoreResult.score,
+      sleepContributors: ownSleepContributors,
+    } })
   }
 
   // Persist the Activity Score (Q-7). It was computed here on every call and then discarded, while
@@ -707,43 +750,65 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   // only the activity_* columns — never the shared source/model_versions, which the upsert replaces
   // wholesale — and best-effort, so a persist failure never fails the read.
   if (activityBlend.final != null) {
-    try {
-      await repo.upsertOuraDailyDerived(userId, todayIso, {
-        activityScore: Math.round(activityBlend.final),
-        // Q-526 — the six component sub-scores go in beside the blend wrapper, because the wrapper
-        // alone cannot answer what the score was made of.
-        //
-        // `components` is already in memory on this request (the same object is served to the client
-        // as `activityContributors`); it was simply never written. Without it, asking "what did
-        // strengthFreq score on 2026-08-02?" means rebuilding every contributor from raw inputs at
-        // TODAY's goals — and `strengthFreqGoal` went 3 → 5 and the volume target changed basis on
-        // 2026-08-11, so the answer is not recoverable. Sleep, readiness and illness all store their
-        // breakdown; activity was the only score that did not. Measured 2026-08-26: all 30 rows
-        // carrying this column hold `{base, adjustment, trained}` and not one component key.
-        //
-        // The wrapper stays — the entry asks for a merge, not a replacement, and `trained` is the one
-        // bit the components cannot re-derive. Worth knowing what the other two are currently worth:
-        // on all 30 rows `adjustment` is 0 and `base` equals `activity_score`, because the blend only
-        // adjusts an Oura *Cloud* activity score and no such row has existed since the BLE re-key.
-        // They are kept for the pre-re-key shape and for any reader, not because they carry anything
-        // today.
-        //
-        // `preTaper` and `acwr` are what make the stored score re-derivable rather than merely
-        // itemised: the components reproduce `preTaper` under the model's weights renormalised over
-        // whichever keys are present, and `acwr` is the taper's only input, so
-        // `score = round(preTaper × (1 − taper(acwr)))` closes the loop from the row alone.
-        activityContributors: {
-          ...(activityResult?.components ?? {}),
-          preTaper: activityResult?.preTaperScore ?? null,
-          acwr: acwr ?? null,
-          base: activityBlend.base,
-          adjustment: activityBlend.adjustment,
-          trained: activityBlend.trained ? 1 : 0,
-        },
-      })
-    } catch (err) {
-      console.error('[readiness-score] activity-score persist failed (read still served):', err)
+    derivedPersists.push({ day: todayIso, pillar: 'activity', patch: {
+      activityScore: Math.round(activityBlend.final),
+      // Q-526 — the six component sub-scores go in beside the blend wrapper, because the wrapper
+      // alone cannot answer what the score was made of.
+      //
+      // `components` is already in memory on this request (the same object is served to the client
+      // as `activityContributors`); it was simply never written. Without it, asking "what did
+      // strengthFreq score on 2026-08-02?" means rebuilding every contributor from raw inputs at
+      // TODAY's goals — and `strengthFreqGoal` went 3 → 5 and the volume target changed basis on
+      // 2026-08-11, so the answer is not recoverable. Sleep, readiness and illness all store their
+      // breakdown; activity was the only score that did not. Measured 2026-08-26: all 30 rows
+      // carrying this column hold `{base, adjustment, trained}` and not one component key.
+      //
+      // The wrapper stays — the entry asks for a merge, not a replacement, and `trained` is the one
+      // bit the components cannot re-derive. Worth knowing what the other two are currently worth:
+      // on all 30 rows `adjustment` is 0 and `base` equals `activity_score`, because the blend only
+      // adjusts an Oura *Cloud* activity score and no such row has existed since the BLE re-key.
+      // They are kept for the pre-re-key shape and for any reader, not because they carry anything
+      // today.
+      //
+      // `preTaper` and `acwr` are what make the stored score re-derivable rather than merely
+      // itemised: the components reproduce `preTaper` under the model's weights renormalised over
+      // whichever keys are present, and `acwr` is the taper's only input, so
+      // `score = round(preTaper × (1 − taper(acwr)))` closes the loop from the row alone.
+      activityContributors: {
+        ...(activityResult?.components ?? {}),
+        preTaper: activityResult?.preTaperScore ?? null,
+        acwr: acwr ?? null,
+        base: activityBlend.base,
+        adjustment: activityBlend.adjustment,
+        trained: activityBlend.trained ? 1 : 0,
+      },
+    } })
+  }
+
+  // Best-effort exactly as before: a persist failure must never fail the read, and each day's group
+  // is independent of the others. The log names the pillars in the group rather than a single
+  // pillar, because one merged statement that fails takes all of them with it and the line has to
+  // say which.
+  //
+  // Sequential rather than `Promise.all`: measured on local Postgres at 2.38 ms for the old three
+  // sequential upserts, 1.17 ms for `Promise.all`, and 0.66 ms for one merged statement. The entry
+  // proposed `Promise.all` and it is a real 2x, but it spends three pool connections to get it on a
+  // pool CLAUDE.md keeps deliberately small, and merging beats it by 1.79x on one. In the normal
+  // case this loop runs once.
+  //
+  // The outer catch is what keeps the merge itself inside the best-effort contract:
+  // `mergeDerivedPersists` REFUSES a key claimed by two pillars, and that refusal must be a lost
+  // write and a loud log line, never a failed read.
+  try {
+    for (const group of mergeDerivedPersists(derivedPersists)) {
+      try {
+        await repo.upsertOuraDailyDerived(userId, group.day, group.patch)
+      } catch (err) {
+        console.error(`[readiness-score] derived persist failed for ${group.day} (${group.pillars.join('+')}) — read still served:`, err)
+      }
     }
+  } catch (err) {
+    console.error('[readiness-score] derived persist merge refused (read still served):', err)
   }
 
   // An Oura readiness score is a whole-picture number by construction, so it reports as full

@@ -14883,3 +14883,25 @@ tests pass under that mutation**, because no test in the file calls `computeMove
 timezones within one process. The suite that covered the function was structurally blind to the way
 this particular optimisation goes wrong. The added test calls it in two zones and then re-asks the
 first.
+
+## 2026-09-21 — RV-83's own proposed fix was the second-best one
+
+`docs/implementation-backlog.md` **25989 → 25970** (`lane-a/rv83-merge-derived-persists`).
+
+The entry asked for `Promise.all` "at minimum" over three sequential upserts on a read path, and
+flagged merging them into one as the tempting version needing a check first. Both halves turned out
+slightly wrong in the same direction.
+
+The check passes: `upsertOuraDailyDerived` builds its column list from the keys the patch actually
+carries, so the three blocks' "writes only its own columns" comments are structurally true rather
+than a promise, and `model_versions` — the one column with `||` merge semantics — is written by one
+block only. Merging is safe by construction.
+
+And `Promise.all` is not the floor it reads as. Measured: **2.38 ms sequential, 1.17 ms
+`Promise.all`, 0.66 ms merged**. It is a real 2× — I had expected row-lock contention to erase it
+and was wrong — but it buys that with three pool connections on a pool CLAUDE.md calls load-bearing,
+and merging beats it by another 1.79× on one.
+
+Also settled, both of the entry's stated unknowns: the third block **does** fire in production, and
+all three pillars land on **one** row on every one of the last twelve days. The wasteful shape is the
+usual case, not an edge.

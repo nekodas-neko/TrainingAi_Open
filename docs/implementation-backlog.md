@@ -512,25 +512,6 @@ below threshold and left in place for next time.
   unmeasured. On a single-user app this is server work the owner will not feel directly — filed as
   shape, not as a latency emergency.
 
-### [readiness][platform] RV-83 — `/api/readiness-score` does three sequential writes on a GET, usually two to the same row
-
-- **Lane:** A — `lib/health/readiness-payload.ts:667,688,711`. **Added:** 2026-09-20 ·
-  Review sweep 51.
-- Three separately-`await`ed `repo.upsertOuraDailyDerived(...)` calls run one after another on a read
-  path with a 5-minute TTL. Confirmed on the wire: one `GET /api/readiness-score` logged **21
-  statements ending in two `insert into "oura_daily_derived"`**. The readiness block keys on
-  `latestSummary?.date ?? todayIso` and the activity block on `todayIso` — **the same `(user_id,
-  day)` row whenever the summary is current**, which is the normal case.
-- **Fix:** at minimum `Promise.all` the three so they are one round-trip wave instead of three.
-- **⚠ Merging them into one upsert is the tempting version and needs a check first.** The comments
-  at `:663-666`, `:685` and `:706` claim each block deliberately writes **only its own columns** to
-  avoid clobbering, and `model_versions` is merged with `||` inside the statement. The column sets
-  look disjoint (readiness_* / sleep_* / activity_*) but **that invariant must be re-read at source
-  before a merge ships** — this is the same "the comment says the right thing" class the rest of
-  this sweep is built on.
-- **Not established:** whether the third block fires in production at all (its gate was not met on
-  the local dataset), and the COALESCE semantics were not verified.
-
 ### [platform] LA-122 — Reference: the six owner decisions Lane A is currently blocked on
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-20 (Lane A, filed for the Orchestrator at the owner's request).
