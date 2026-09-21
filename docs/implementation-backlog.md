@@ -119,6 +119,19 @@ silently misdirecting the next session. Update them in the same PR that consumes
 >   did the same. Write the check as **prose** in the body while the entry is open, and add the field
 >   in the PR that merges the code.
 >
+> - **The calibration-period rule — never fit a constant against a window the owner's physiology was
+>   still moving through.** Set 2026-09-21, the owner's call being *"dose will not change; but ideally
+>   it has a calibration period"*. A fitted threshold becomes the definition of the user's normal, so
+>   fitting it mid-change bakes in a transient and then reads the settled state as abnormal. **The
+>   rule: fit only on data from 21 days after the last dose or protocol change onward, and require at
+>   least 28 days in the window.** Twenty-one days is where the measured drift flattens
+>   (resting HR +3.9 bpm and HRV −24% on the window means across the 0.5 mg → 1 mg step); 28 is the
+>   shortest window that survives a bad week. State the window's start date in the proposal — a fit
+>   that does not say what it was fitted to cannot be re-checked when the next change lands.
+>   **Self-referencing thresholds are exempt**, and that is the argument for preferring them: a
+>   trailing quantile of the user's own distribution has no offset to choose, so it needs no
+>   calibration period and no refit (TN-52 rule 1).
+>
 > - **`Lane: O`** — the **Orchestrator's** lane, added 2026-09-06 (`OR-103`). For work in neither
 >   implementer's paths: `.github/workflows/**`, `playwright.config.ts`, repository settings and
 >   rulesets, and the queue tooling itself. **It exists because §3's path rule cannot answer those** —
@@ -529,6 +542,113 @@ below threshold and left in place for next time.
 
 - **Keep:** this entry until all **six** are answered. Strike each item as it resolves; remove the
   entry when the last one goes.
+
+### [readiness][body][heart-rate] TN-55 — Body Battery loses 30 points a day net, so it is a countdown rather than a battery; the threshold is not what is wrong with it 🔴 LIVE
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-21 · Tuning, measured against production while
+  writing up an owner-approved change that this measurement then overturned.
+- **Lane: A** — `app/api/body-battery/route.ts` (the constants), `packages/shared/src/health/body-battery-walk.ts`.
+- **Owner sign-off: RECEIVED 2026-09-21 for the direction** (the owner approved "fix the charge
+  threshold"; the threshold turned out not to be the binding constraint — see below — so the
+  *direction* stands and the *mechanism* is replaced). **The final rate constants are a scoring
+  change and need his sign-off on the numbers before they ship.**
+- **Supersedes the blocked half of TN-2** and demotes TN-52's quantile from "the fix" to "worth
+  having anyway". Both stay queued; neither is the answer to *"it's pretty much useless"*.
+
+**Measured on production, 2026-09-21, 84 days of `body_battery_daily`:**
+
+| | value |
+|---|---|
+| mean charge/day | **14.3** |
+| mean drain/day | **44.1** |
+| **mean net/day** | **−29.8** |
+| days ending at exactly 0 | **24 of 84 (29%)** |
+| days that charged *nothing* | **17 of 84 (20%)** |
+
+**A battery that nets −30/day is not a battery.** Nothing about it is informative: it is pinned to
+the floor on a third of days, and the only reason it is not always zero is the daily re-anchor at
+wake. That is the whole of the owner's report, and it is a *rate-balance* defect.
+
+**⚠ THE THRESHOLD IS NOT THE BINDING CONSTRAINT, AND THIS ENTRY EXISTS BECAUSE THAT WAS ASSUMED.**
+TN-2 and TN-52 both frame the problem as the charge ceiling (`HR_REST_THRESHOLD = 0.05` of reserve)
+sitting below the owner's quietest waking hour. Measured, time-weighted, binned in
+`Australia/Brisbane`:
+
+| date | mins below ceiling | of which awake | charge stored |
+|---|---:|---:|---:|
+| 2026-09-18 | 220 | 104 | **0** |
+| 2026-09-19 | 255 | 55 | 5 |
+| 2026-09-13 | 105 | 37 | 3 |
+
+**220 minutes below the charge ceiling produced zero charge.** Widening the ceiling to TN-52's p10
+quantile moves it from 60.1 → 61 bpm and buys **2.8% → 3.7%** of the day. It is not the lever.
+
+**The three multiplicative losses, in order of size.** Each was measured, not reasoned:
+
+1. **Sleep is excluded entirely.** `walkBodyBattery()` opens with
+   `samples.filter(s => s.tsMs >= p.wakeTime)`, so the longest low-HR stretch of the day cannot
+   charge. Modelled charge over the whole day vs waking-only, same formula: **12.7 → 6.1** on
+   2026-09-18. Roughly half the loss.
+2. **The charge ramp zeroes at the ceiling.** `delta = chargeRate × (1 − hrr/restThreshold) × dt`
+   reaches full rate only at or below resting HR — and the owner logs **0 minutes below his own
+   resting HR** on almost every day, which is near-tautological given how resting HR is derived. The
+   time-weighted mean multiplier is **0.30–0.50**, so the ramp costs about another 3×. Widening the
+   ceiling adds time at the *bottom* of this multiplier, which is why it buys so little.
+3. **`DRAIN_RATE` is 3× `CHARGE_RATE`** (0.60 vs 0.20 points/min per unit reserve) on top of both.
+
+**The proposal: calibrate so a median day nets ≈ 0.** That is what makes the number readable as
+"today versus your normal" instead of a countdown. Three levers, cheapest first — **an implementer
+should fit them jointly rather than picking one**:
+- let sleep charge (the anchor sets the *start* value; intraday charge is a separate term, so this
+  is not double-counting — but check that claim against `anchor_source` before relying on it);
+- flatten or re-foot the ramp so it reaches full rate at the low edge of the *observed waking*
+  distribution rather than at resting HR;
+- rebalance `CHARGE_RATE` / `DRAIN_RATE`.
+
+**How many other days this moves — all of them, and that is the point.** Every one of the 84 days
+carries the −30 net, so any fix re-scores the entire history. The pass test is distributional, not
+per-day: **median daily net within ±5 of zero, days-ending-at-zero under ~10%, and the day-to-day
+spread preserved** (a fix that flattens every day to 50 has destroyed the signal instead of
+calibrating it).
+
+**⚠ Fit against a window that excludes the titration ramp-up.** The owner confirmed 2026-09-21 that
+the dose is now stable at 1 mg. Use data from **21 days after the last dose change onward**, and
+require ≥28 days — see the calibration-period rule at the head of this file.
+
+**⚠ Do not "fix" this by raising the anchor.** A higher start value hides the net drain for a few
+more hours and makes the same countdown read better, which is worse than the current state because
+it is no longer visibly broken.
+
+### [readiness][platform] TN-56 — one admin-gated replay endpoint is the only thing standing between Tuning and 25 unmeasurable thresholds
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-21 · extracted from TN-52, where it sat as a
+  paragraph inside a `Reference:` entry and therefore printed under *read, do not build*.
+- **Lane: A** — a new admin-only route under `app/api/admin/`, owner-triggered, no schedule.
+- **Background reading:** TN-52 carries the argument, TN-2 the original sketch (*"that is new work
+  and is not scoped here"*). Written as prose, not a `Reference:` field — that field marks an entry
+  other entries READ rather than build, and this one is to be built.
+
+**The 2026-08-25 threshold sweep listed 25 constants it could not measure at all** — 19 sleep-staging
+constants in one file, plus `APNEA_THRESHOLD`, `MET_ACTIVE_THRESHOLD`, `RANGE_THRESHOLD`,
+`NIGHT_BAND_*`, `CONSISTENCY_*` and `LOW_CONFIDENCE_THRESHOLD`. They are unmeasurable because their
+inputs are per-sample intermediates that are never persisted, so nothing outside the running
+pipeline can see them. **This is the largest unexamined block on the scoring surface**, and it feeds
+the sleep score, which is readiness's heaviest contributor at 16%.
+
+**What it has to expose** (this list is Tuning's part; the implementation is Lane A's):
+1. Run a named scoring function server-side across a **bracket of parameter values** over a date
+   range, with the daytime-stress constants present.
+2. Return the resulting distribution — not a verdict — so the caller can compare brackets.
+3. **Write nothing.** It is a read-and-compute endpoint; a replay that persists is a history
+   rewrite, and that is a separate owner decision every time.
+4. Admin-gated and owner-triggered, matching `/api/admin/db-query`'s auth.
+
+**What it unblocks:** the 25 thresholds above, TN-3a/TN-4's stress term, and TN-55's rate fit.
+**It does NOT unblock TN-2's offset fit** — TN-52's rule 1 removed that need, and TN-55 replaces the
+framing entirely.
+
+**⚠ Not a general-purpose "run arbitrary code" endpoint.** It takes a named function and a bracket,
+not a script. The `db-query` endpoint is read-only for the same reason and is the shape to copy.
 
 ### [devices][heart-rate] TN-54 — the chest strap has been dark for five days and nothing server-side records that, so PS-44's window cannot be counted 🔴 LIVE
 
@@ -1644,7 +1764,7 @@ existing 65 days moves by less than 5 points on every one of them.
 - **Branch:** `lane-a/tn49-rederivation-missing-key` · **Added:** 2026-09-18 · Tuning agent.
 - **Lane: A** — `packages/shared/src/health/**`, plus a possible back-fill over `oura_daily_derived`.
 - **Review:** [`what the score can and cannot say`](reviews/2026-09-18-what-the-score-can-and-cannot-say.md) §3.
-- **⛔ THE PRESCRIBED FIRST ACTION WAS WRONG AND WOULD HAVE CORRUPTED PRODUCTION.** This entry said
+- **⚠ THE PRESCRIBED FIRST ACTION WAS WRONG AND WOULD HAVE CORRUPTED PRODUCTION.** This entry said
   *"recompute and rewrite the seven rows from their stored contributors"*. Doing that would have
   overwritten seven **correct** scores with values **4 to 6 points too low** — writing into the
   database exactly the defect the entry exists to remove. The measurement was right; the diagnosis
@@ -1747,7 +1867,7 @@ way that avoids the downside of each.
 - **Plot it with a lag.** The peak is 2–4 days after a dose, so a same-day correlation finds nothing
   and would read as "no effect" on data that plainly shows one.
 
-**⛔ CORRECTION 2026-09-17 (Lane A, verified against production before any code was written) — THE
+**⚠ CORRECTION 2026-09-17 (Lane A, verified against production before any code was written) — THE
 SNAPSHOT IS UNNECESSARY AND THERE IS NO DEADLINE. The entry's arithmetic is right and its conclusion
 does not follow.**
 
@@ -3125,7 +3245,9 @@ from `rr_intervals`, with no change to any ring-derived series.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-15 · from the same audit as TN-39.
 - **Lane: A** — `lib/oura-ble/decode.ts` · `lib/oura-ble/rollup-consumed-tags.ts`.
-- **Gate: owner** — `0x73` cannot be decoded from this repository; see below.
+- **Gate: owner** — `0x73` cannot be decoded from this repository; see below. **The owner committed
+  to retrieving the captures on 2026-09-21**, so this gate is expected to clear shortly; it stays a
+  gate until they are actually in hand, because a promise is not a capture.
 - **Reference:** [`audit`](reviews/2026-09-15-what-else-our-data-could-tell-us.md).
 
 `body_hex` is kept permanently, so a decoder added later back-fills. Four tags never reach the rollup:
@@ -3486,7 +3608,7 @@ composite reports which of its inputs were inferred.
 - **Lane: A** for tasks B–D; **task A is docs-only and unblocks the rest.**
 - **Plan:** [`2026-09-15-normalised-inputs-and-source-aware-scoring.md`](superpowers/plans/2026-09-15-normalised-inputs-and-source-aware-scoring.md).
 - **Reference:** [`review`](reviews/2026-09-15-pillars-against-the-connector-guide.md) · contract is [`data-source-connector-guide.md`](data-source-connector-guide.md) §3–§6.
-- **Sibling of TN-37** (which found §5.4's invariant false) and of **PS-40** (the connector registry). **⛔ Not a redesign** — the architecture is written; this finishes it.
+- **Sibling of TN-37** (which found §5.4's invariant false) and of **PS-40** (the connector registry). **⚠ Not a redesign** — the architecture is written; this finishes it.
 
 **A second source is live TODAY, not hypothetical.** Over 45 days `oura_heartrate` holds **74,860
 chest-strap samples against 12,673 ring samples** — the strap outnumbers the ring **six to one**.
@@ -3547,7 +3669,7 @@ resolution; derived rows have one writer.**
   looks from here"*), adjustments run roughly **−20 to +8** and are weighted toward deduction, and
   the night above lands on 74 either way (core 92, adjustments −18). 100 then means *confirmed good
   by everything visible*; 92 means *nothing visible is wrong, and little is visible*.
-  **⛔ Do NOT cap the core far below 100** (e.g. sleep core 0–55 with adjustments filling the rest) —
+  **⚠ Do NOT cap the core far below 100** (e.g. sleep core 0–55 with adjustments filling the rest) —
   a phone-only user pinned at 55 reads as *"you sleep badly"* when the truth is *"we cannot see"*.
 - **⚠ RETRACTED, 2026-09-15, same day: the "core tops out at ~92" shape above is WRONG and the owner
   found why.** A permanent ceiling for not owning hardware is a penalty, not honesty. **The design is
@@ -3556,7 +3678,7 @@ resolution; derived rows have one writer.**
   every other design gets two of three) by removing its cause, a score with holes in it. Connecting a
   sensor then moves the score only where the measurement differs from the estimate, which is a fact
   about the body rather than the hardware.
-- **⛔ INFER CONDITIONALLY — inserting the population-typical pattern is measured to FAIL.** The
+- **⚠ INFER CONDITIONALLY — inserting the population-typical pattern is measured to FAIL.** The
   owner's first formulation was to split the known duration into the most commonly seen stage pattern,
   *"nothing good or bad"*. A neutral value stops being neutral once it carries **72 of sleep's 110
   points**: a textbook night falls to **80** and a poor night rises to **66**, collapsing the scale to
@@ -3564,7 +3686,7 @@ resolution; derived rows have one writer.**
   hours predicts better-than-average stages, not average) restores the full range — **100 / 78 / 57
   today vs 92 / 75 / 52 conditional**.
 - **Three rules that ship with it:** every value carries a `measured | inferred` flag **and an
-  uncertainty**, surfaced in the UI (the owner asked for the flag unprompted); **⛔ an inferred value
+  uncertainty**, surfaced in the UI (the owner asked for the flag unprompted); **⚠ an inferred value
   must NEVER trigger an action** — no deload off an estimated contributor, same class as CLAUDE.md's
   rule on model-reported numbers; and inference needs something to infer FROM — a user with sensor
   history is estimated from their own baselines (`personal-baseline.ts` already maintains exactly this
@@ -3660,7 +3782,7 @@ general rule"* — singular. This is a second, larger instance.
 1. ✅ **DONE 2026-09-16** (`lane-a/tn37-connector-guide-invariant`). §5.4 names the readiness read
    list and what each store contributes; §5.5's *"the concrete, fixable instance"* is corrected to
    *"a"*, since it asserted PS-41 was the only one.
-2. **⛔ CORRECTED — DO NOT DROP THESE READS. Both are load-bearing; this step as originally written
+2. **⚠ CORRECTED — DO NOT DROP THESE READS. Both are load-bearing; this step as originally written
    would have caused a regression.** The entry's own ⚠ said to re-verify rather than trust the
    snapshot, and doing so is what caught it (2026-09-16):
    - **`getOuraDaily` is NOT dead.** Every *Cloud-scored* column is NULL — 35 of 35 rows since
@@ -4898,6 +5020,8 @@ metric.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-10 · owner: *"give me the update on our stress reading/calculation… how can we test it works?"*
 - **Lane: A** for the level-2 test harness; the level-3 blocker is an owner action, not code.
+- **Gate: owner** — the sign cannot be validated without the owner's own daily rating alongside it,
+  and he declined the three-week log on 2026-09-21. Recorded, not re-litigated.
 - **Amends TN-22** — whose defect was real and shipped, and whose sign claim does not survive ten more days.
 - **Reference:** [`review`](reviews/2026-09-10-stress-status.md).
 
@@ -4926,7 +5050,12 @@ signal looks like** — and that is harder than a backwards sign, which would at
 **This is the THIRD mechanism proposed for Q-507 and the third to fail; all three were fitted on
 fewer than ten days.**
 
-**⛔ AND IT CANNOT BE VALIDATED TODAY — this is the real blocker, not the sample size.** Readiness
+**⚠ THE OWNER DECLINED THE THREE-WEEK LOG ON 2026-09-21, so this stays blocked and the whole stress
+branch stays blocked behind it** — TN-16's warning, TN-34's re-wire and TN-21's sign all wait on a
+validated sign. That is his call and it is recorded, not re-litigated; the entry carries `Gate: owner`
+rather than a prose marker so it parks honestly. Re-offer only if he raises stress himself.
+
+**⚠ AND IT CANNOT BE VALIDATED TODAY — this is the real blocker, not the sample size.** Readiness
 shares its overnight autonomic input with the stress model's baseline, so it is partly circular. The
 independent target has no variance: **`perceived_recovery` is `3` on all 17 days**, and across 29
 check-ins since 2026-08-24 **`perceived_recovery_touched` is 0** — never touched, every value the
@@ -5414,7 +5543,7 @@ Three separate places tell the user something the zone engine does not do:
 3. **Zone names are typed twice.** `HR_ZONE_META` (`hr-zones.ts:48`) and `ZONE_LABELS`
    (`session-picker.ts:85`) are identical today and unlinked. One-line fix; the cheapest of the three.
 
-**⛔ Do not resolve (1) by changing the zone fractions.** The bands are conventional and shared; the
+**⚠ Do not resolve (1) by changing the zone fractions.** The bands are conventional and shared; the
 prose is what is wrong. Same principle as TN-25's — the target is right and the copy is wrong.
 
 **Pass test:** every user-visible sentence describing a zone states the same basis the engine uses,
@@ -5735,7 +5864,7 @@ having once the two cheap fixes prove the shape of the problem.
    `logging_too_sparse` and hold the formula baseline. Cheapest of the three, and it alone would have
    put this owner within ~150 kcal instead of 550 out.
 
-**⛔ Do not widen the mean by counting part-logged days.** Every day with any food logged gives
+**⚠ Do not widen the mean by counting part-logged days.** Every day with any food logged gives
 **1,495** at 28 days and **1,954** at 14 — worse both ways, and the exact failure Q-387 documented.
 The completion flag is working; the window selection is not.
 
@@ -5784,7 +5913,7 @@ lets the app learn *this surface, this control → this HR* and offer a better s
 time. It is a convenience layer over the HR loop, not a second prescription, and it does not gate
 TN-25.
 
-**⛔ Do not derive a speed prescription from the two indoor points that exist.** 2 km/h → 90.7 bpm
+**⚠ Do not derive a speed prescription from the two indoor points that exist.** 2 km/h → 90.7 bpm
 and 4 km/h → 98.5 bpm gives ≈3.9 bpm/km/h, which extrapolates 70% reserve to **~12.9 km/h** —
 obviously wrong. The slope was measured in the flattest part of the curve; the response steepens
 sharply toward the walk/run transition at ~7–8 km/h. The owner's proposed tweak (slow 90→100 spm,
@@ -5833,7 +5962,7 @@ between a treadmill walk and an outdoor walk without any surface-specific adjust
 - **Lane: A** — the reported metric, not the zone constants.
 - **Supplies the mechanism for Q-523** (`zoneMinutes` floored at 0 on 53 of 59 days, cause never established).
 - **Reference:** [`review`](reviews/2026-09-08-walk-intensity-calibration.md).
-- **⛔ Do NOT fix this by lowering the zone boundaries.** The Karvonen fractions are conventional and the max is genuine; moving Z2 down would make the label mean something different from every other use of it and would silently re-score history. **Change what the app reports, not where the boundaries sit.**
+- **⚠ Do NOT fix this by lowering the zone boundaries.** The Karvonen fractions are conventional and the max is genuine; moving Z2 down would make the label mean something different from every other use of it and would silently re-score history. **Change what the app reports, not where the boundaries sit.**
 
 `hr-zones.ts:38` builds zones as fractions of heart-rate reserve with **Z1 spanning 0.0 → 0.6**. For
 this owner **Z1 is 52–132 bpm — 81 bpm wide, 60% of the usable range in one bucket.** Sitting still
@@ -5862,7 +5991,7 @@ Extrapolated, averaging 133 bpm (the Zone-2 floor) needs **≈238 spm** — a ru
 after the owner pushed back).** The slope is fitted over 88 blocks spanning **76–132 spm**, so 238
 extrapolates **106 spm beyond anything observed** — more than doubling the range. Its own 95%
 interval puts the answer anywhere from **176 to 369 spm**; r is **0.512** and the residual sd is
-**8.1 bpm**, so a single block is ±16. **This is the same error this review's own ⛔ line flags on the
+**8.1 bpm**, so a single block is ±16. **This is the same error this review's own ⚠ line flags on the
 treadmill speed curve** (two points extrapolating 70% reserve to ~12.9 km/h), committed one addendum
 later against cadence instead of speed.
 
@@ -5885,7 +6014,7 @@ because it never considered time. See addendum 7.
 it collapsed after set 1 because the slow blocks stopped recovering: by set 4 the "slow" block sat at
 **108 bpm, above the historical FAST average of 98.5**. The session became a continuous brisk walk
 with a ripple, which is what produced the gain — evidence for the continuous option in TN-25, arrived
-at empirically. **⛔ One session that changed three variables at once; the duration term is
+at empirically. **⚠ One session that changed three variables at once; the duration term is
 established as large, its shape is not.**
 
 **Grade and carried load remain untested.**
@@ -5912,7 +6041,7 @@ session giving back what the other half earned.
 **For the goal as actually targeted (68–97 bpm, conversational), the intensity is already right and
 DURATION is the correct lever** — that is what an easy aerobic session is. **Raising cadence would
 move the session away from its own target.** Energy return is **≈2.29 kcal/min net**, so +15 min ≈
-+34 net kcal: real, linear, modest. **⛔ The session is not bad** — it is a good easy-aerobic session
++34 net kcal: real, linear, modest. **⚠ The session is not bad** — it is a good easy-aerobic session
 that is inefficient only against a "Zone-2" label walking cannot satisfy.
 
 **What to build, in order:**
@@ -12463,7 +12592,7 @@ Review: [`docs/reviews/2026-08-25-threshold-sweep.md`](reviews/2026-08-25-thresh
   test. This entry predicted that trap and it still caught an attempt. Both folds call the wrapper,
   so **all six** baselines are protected. Four existing tests were pinning the bug (the breathing
   baseline asserted `meanX8: 580` — exactly half of 1160).
-- **⛔ KEEP — THE DATA HALF IS NOT DONE, AND IT IS ONE BUTTON.** Stored baselines are still
+- **⚠ KEEP — THE DATA HALF IS NOT DONE, AND IT IS ONE BUTTON.** Stored baselines are still
   zero-folded. **No new code needed:** `run.ts:917` null-seeds the fold under `fullHistory` and the
   **Redecode** endpoint already sets it, so one Redecode run re-derives all six from the untouched
   raw nightly values. **Could not be run from a sandbox** (needs the vendored constants Q-49
@@ -12564,7 +12693,7 @@ apart with no new overnight data — which the check-in half alone does not achi
 - **Best honest model: resting HR + last night's sleep, LOO R² = 0.293.** Adding predictors raises
   in-sample R² and *lowers* out-of-sample: all eight contributors reach R² 0.541 with **LOO R²
   0.047**.
-- **⛔ Do NOT impute the check-in on unlogged days.** That is the obvious next idea and the numbers
+- **⚠ Do NOT impute the check-in on unlogged days.** That is the obvious next idea and the numbers
   refuse it — a model explaining 5% of out-of-sample variance is a fabricated value with a model's
   authority. Keep the neutral/exclusion path.
 - **This CORRECTS this entry's original reasoning.** It said the check-in "tracks the objective
@@ -12599,7 +12728,7 @@ restfulness 95, and `hrv` **42** / `hr` **58**. Both are computed correctly — 
 1.035, which `HR_RATIO` maps to 58. **Neither is a bug.** Together they drag the blend **12.7 points**
 of the 24 it is below 100.
 
-**⛔ Do NOT fix this by deleting one contributor.** Both curves are sound, and the combined signal is
+**⚠ Do NOT fix this by deleting one contributor.** Both curves are sound, and the combined signal is
 the strongest recovery evidence the score has — the [check-in lookback](reviews/2026-08-26-checkin-lookback.md)
 found resting HR the single best predictor of the owner's felt state. **The fix is to stop paying
 twice:** collapse them into one autonomic contributor at roughly the weight of one, or down-weight the
@@ -12645,7 +12774,7 @@ either — that plan is the only record of what the shape was meant to be.
 **Worked example, the owner's 2026-08-26 night:** 7.75 h scored **73.5** on this contributor against
 a comment implying ~89. Blend 73.15 → displayed **57** (reproduced exactly from the stored value).
 
-**⛔ Do not fix this by raising the curve to match the comment without reading that plan.** A duration
+**⚠ Do not fix this by raising the curve to match the comment without reading that plan.** A duration
 curve that reaches the 90s at 8 h is a different product decision from one that needs 9 h, and the
 current shape may be the deliberate one — the file's own header says the recalibration was meant to
 make a good night *"land in the 80s"*, which the curve does and the comment does not.
@@ -12681,7 +12810,7 @@ hours holding data**:
 657 hours over 45 days is **14.6 of the 15-hour window**, so the numerator is effectively "hours the
 ring recorded anything" and the ratio is ~1 by construction.
 
-**⛔ TN-2 does not fix this, and that is the point worth carrying.** Both read `HR_REST_THRESHOLD`,
+**⚠ TN-2 does not fix this, and that is the point worth carrying.** Both read `HR_REST_THRESHOLD`,
 but they ask different questions — TN-2 needs the boundary between *resting and not*, this needs the
 boundary between *sedentary and moving*. At TN-2's most generous proposed offset it is still 97.6%.
 **Do not close this as a side effect of TN-2**, and do not fix it by pushing `HR_REST_THRESHOLD`
@@ -12904,7 +13033,7 @@ one matches the "without" version.
 - **Branch:** _unassigned_ · **Added:** 2026-09-01 · owner: *"is the battery + stress system working correctly?"*
 - **Lane: A** — the writer, not the model. `body_battery_daily` and `oura_daily_derived`.
 - **Do not batch.** This is data integrity, not calibration, and it is losing days now.
-- **⛔ Do not "fix" this by re-running the recompute** until the mechanism is identified — the recompute *is* what destroys the day.
+- **⚠ Do not "fix" this by re-running the recompute** until the mechanism is identified — the recompute *is* what destroys the day.
 
 **Observed in both states within 24 hours**, which is what makes it provable:
 
@@ -12990,7 +13119,7 @@ buckets are right"* rests on their producing the correct sign, not on independen
 *higher* readiness, and the size of the effect swings with the window — which is the signature of a
 metric carrying little signal rather than one with an inverted sign.
 
-**⛔ The obvious explanation was tested and is FALSE.** LA-112 (#1256, 2026-09-16) found 41% of stress
+**⚠ The obvious explanation was tested and is FALSE.** LA-112 (#1256, 2026-09-16) found 41% of stress
 buckets were recorded during sleep, so sleep contamination looked like the cause. It is not:
 **corr(`stress_high_minutes`, hours slept) = −0.133** over the same 29 days. Stress minutes do not
 rise with sleep, so removing sleep buckets will not flip this on its own.
@@ -13580,6 +13709,13 @@ one — the "treadmill" the activity-goal volume lane already removed (Q-190).
   prevent. Fit against **2026-06-30 → 2026-09-06** and validate forward, or wait for the vitals to
   settle. This was not knowable when the entry was written.
 
+- **⚠ SUPERSEDED IN ITS CENTRAL CLAIM BY TN-55 (2026-09-21).** This entry frames the Body Battery's
+  failure as the charge *ceiling* sitting too low. Measured on 84 days of production, the ceiling is
+  not the binding constraint: 220 minutes below it produced **zero** charge, because sleep is
+  excluded from the walk and the charge ramp reaches full rate only at resting HR. The real defect is
+  a rate balance that nets **−29.8 points/day**. Read TN-55 before doing anything here; what survives
+  of this entry is the history-recompute policy and the owner's 2026-08-26 decision to recompute
+  rather than freeze.
 - ⛔ **THE FIT CANNOT BE DONE FROM AN AGENT SANDBOX — measured 2026-08-24, not assumed. Read this
   before attempting it, or you will rediscover it.** The entry requires the fit to include the
   stress term. `buildDaytimeStressSeriesFromModel` needs `DaytimeStressConstants`, which are
@@ -13804,7 +13940,7 @@ record explicitly why not.
 - **⚠ TN-3a's persistence SHIPPED** (verified: 478 buckets over 18 days), so this entry's stated blocker is gone. **And the Q-507 parking no longer applies to the chart half** — see below.
 - **Reference:** [`review`](reviews/2026-09-10-stress-status.md) §6, level 2.
 
-**⛔ THE PARKING RATIONALE WAS RIGHT FOR A SCORE AND IS WRONG FOR A CHART.** TN-3b was parked because
+**⚠ THE PARKING RATIONALE WAS RIGHT FOR A SCORE AND IS WRONG FOR A CHART.** TN-3b was parked because
 surfacing a metric whose sign cannot be explained converts a silent doubt into a demonstrated one
 (TN-19's lesson). **But the owner is not asking for a score, a verdict or a warning — he is asking to
 see the raw series against a clock so he can check it against his own memory of the day.** A chart of
@@ -13837,14 +13973,14 @@ waking-only one would be informative.
 **Design constraints, each from the measured data:**
 1. **Local-time axis at 30-minute resolution.** The existing `stress-strip.tsx` is a **sparkline with
    no time axis** — it shows the shape and cannot answer "when", which is the whole request.
-2. **⛔ Render gaps as gaps, never interpolate.** Coverage averages **26.6 buckets/day = 13.3 of 24
+2. **⚠ Render gaps as gaps, never interpolate.** Coverage averages **26.6 buckets/day = 13.3 of 24
    hours** (range 23–32), and 2026-09-08 jumps **06:45 → 13:15**, a 6.5-hour hole. A joined line there
    would invent stress that was never measured.
 3. **Shade the night band.** Night is structurally positive; without the band a reader takes it as a
    judgement about their sleep rather than a property of the series.
 4. **Mark zero and ±0.5.** "High" should be visible from the shape, not only from a label.
 5. **Past days reachable** — buckets exist from 2026-08-24 forward.
-6. **⛔ No score, no verdict, no advice on this surface.** That is exactly what keeps it shippable
+6. **⚠ No score, no verdict, no advice on this surface.** That is exactly what keeps it shippable
    while Q-507 is open, and what separates it from **TN-16**, which stays parked.
 
 **Pass test:** the owner opens a past day, reads a stressed window off the axis, and can say whether
@@ -13906,7 +14042,7 @@ drop, so it does not lift the scale back toward its old mean — Q-511 stays sat
 **Re-verify that firing rate against the shipped TypeScript rather than trusting this line** — the
 standing rule is that a threshold on a display scale is calibrated to that scale's distribution.
 
-**⛔ This is NOT a fix for the volatility that prompted it, and must not be sold as one.** The baton's
+**⚠ This is NOT a fix for the volatility that prompted it, and must not be sold as one.** The baton's
 standing advice was to flatten the 74–85 segment if the spread read as jitter. **That was tested and
 it fails**: the curve must climb 0 → 100 across the blend's range, so flattening one segment steepens
 another and total movement is conserved. Measured night-to-night mean |Δ| goes **13.53 → 13.75** — it
