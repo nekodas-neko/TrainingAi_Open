@@ -688,6 +688,13 @@ below threshold and left in place for next time.
 
 - **Lane:** A — `packages/shared/src/nutrition/goal-recommendation.ts:205,262-268`.
   **Added:** 2026-09-21 (Lane A, found while shipping RV-66).
+- **Gate:** owner — **added 2026-09-21 as a correction.** The entry always said the fix *"changes
+  the computed fat target for real users, so it wants the owner's eye on the number before it
+  ships"*, and that sentence was prose. `Gate:` is a FIELD; written inline it is ignored, so this sat
+  at **READY position 1** describing its own owner gate in a form nothing reads. Its sibling LA-126
+  was filed the same hour with the same mistake and `check-backlog-pointers.js` caught that one,
+  because there the words `**Gate:** owner` appeared inline on a bullet it could recognise. Here the
+  gate was never written as a field at all, so nothing had anything to catch.
 - `calculateBaseline` sets `fatG = round(calories * 0.25 / 9)`. `clampRecommendation` floors fat at
   `round(0.6 * weightKg)`. For the owner those are **39 g and 42 g**, so the clamp raises fat and
   carbs fall out of the remainder at **143 instead of 150**.

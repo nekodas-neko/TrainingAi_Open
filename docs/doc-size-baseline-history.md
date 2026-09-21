@@ -15059,3 +15059,19 @@ The `.size` file conflicted; the backlog itself auto-merged both times, because 
 an entry and the other added one somewhere else. That is the benign shape. The dangerous one is two
 *deletions*, where "keep both" resurrects two shipped entries — checked here by grepping for all
 three ids rather than reading the diff.
+
+## 2026-09-21 — LA-125 described its own owner gate in a form nothing reads
+
+`docs/implementation-backlog.md` **+8 lines** (`lane-a/la125-gate-the-fat-formula-change`).
+
+Filed hours earlier with the sentence *"that changes the computed fat target for real users, so it
+wants the owner's eye on the number before it ships"* — as **prose**. `Gate:` is a field, and written
+any other way it is ignored, so the entry sat at **READY position 1** advertising a gate that nothing
+could act on.
+
+Worth the note because the near-miss is asymmetric. Its sibling **LA-126** was filed in the same
+edit with the same mistake and `check-backlog-pointers.js` caught it within a minute — there the
+words `**Gate:** owner` sat inline on a bullet the checker recognises and warns about. LA-125 never
+wrote the words at all, so there was nothing to detect: **the check finds a gate in the wrong place,
+not a gate that is missing.** Catching one and not the other reads like the checker working, which
+is how the second one survived.
