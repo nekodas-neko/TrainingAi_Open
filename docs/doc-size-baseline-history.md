@@ -15080,3 +15080,21 @@ rather than emphasis, and both belong to other roles — TN-35 carries a second 
 a sweep would notice, and its residue is only a device check, so unparking it would surface nothing.
 Judging another role's emphasis is not this lane's call; the parser fix is LB-121 and the
 Orchestrator's.
+
+## 2026-09-21 (third) — `docs/implementation-backlog.md` → 26150
+
++109 for TN-57 and TN-58, which between them answer the owner's question about why tuning is not
+accurate: the self-report that is the app's only candidate ground truth has **never once been
+answered** — 0 of 96 rows touched, 2 distinct values, sd 0.29 — and three consumers read the
+unanswered neutral default as data, including a calibration route and a user-facing correlation.
+
+Two blocks earn the length. The first is the correction: this was drafted as *circularity* (the
+control pre-filled from readiness) and that is false — it seeds from a neutral constant, and the
+circular one is a different sheet (TN-50). Left unwritten, an implementer opens the wrong file. The
+second is the **no-data-write** instruction with its reason: the `*_touched` flag already separates
+answered from unanswered, so backfilling the 77 rows buys nothing and destroys the evidence of how
+long this ran. Both are the kind of thing a later session reverses by reasonable-sounding accident.
+
+TN-58 also records that the owner declined a three-week daily log the same morning, which makes the
+decline a design constraint rather than a blocker — that context is why the entry proposes three taps
+instead of re-asking.
