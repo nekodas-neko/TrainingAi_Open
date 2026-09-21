@@ -15046,3 +15046,16 @@ RV-72 shares RV-71 and RV-75's batch and its one device sitting, so a separate r
 claimed a separate check that does not exist. The added lines are what is carried, not fixed: the
 `transition-all`-over-inline-`width` sites, the 26 untransitioned bars, and why the calorie bar
 stays on `width` by design.
+
+## 2026-09-21 — `docs/implementation-backlog.md` 26061 → 26038 (LA-124 left the queue)
+
+Recomputed after merging `main` twice — RV-72 (#1377) landed underneath while this branch was open,
+which is why the starting number here is not the one this branch was cut from. Not picked from
+either side of the conflict. LA-124 shipped and was removed whole — nothing is owed on it, the
+entry says so itself — while the same file gained LB-123 and RV-79's correction (#1378) and then
+RV-72's `Keep:` and an LB-119 sighting row (#1377). The net of this branch's own edit is −23.
+
+The `.size` file conflicted; the backlog itself auto-merged both times, because one side deleted
+an entry and the other added one somewhere else. That is the benign shape. The dangerous one is two
+*deletions*, where "keep both" resurrects two shipped entries — checked here by grepping for all
+three ids rather than reading the diff.

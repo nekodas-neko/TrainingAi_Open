@@ -40,15 +40,31 @@ export type StressSegment = PlacedPoint[]
  */
 const GAP_MINUTES = 75
 
-/** Local minutes-since-midnight for an instant, in the user's zone rather than the device's. */
-export function minutesIntoDay(t: number, tz: string): number {
-  const parts = new Intl.DateTimeFormat('en-GB', {
+/**
+ * The clock formatter, built per CALL and never at module scope (LA-124, the same shape as RV-80).
+ *
+ * Constructing one is the expensive part — `toSegments` did it once per bucket, 3.19 ms against
+ * 0.16 ms on a full day's 48 buckets. Lifting it one level further, to a module constant, would
+ * bind the first caller's zone for the lifetime of the process; `minutesIntoDay`'s `Etc/GMT+5` case
+ * is what fails if anyone does, and `toSegments` has its own control for the same mutation.
+ */
+function clockFormat(tz: string): Intl.DateTimeFormat {
+  return new Intl.DateTimeFormat('en-GB', {
     timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false,
-  }).formatToParts(new Date(t))
+  })
+}
+
+function minutesFrom(fmt: Intl.DateTimeFormat, t: number): number {
+  const parts = fmt.formatToParts(new Date(t))
   const hour = Number(parts.find(p => p.type === 'hour')?.value ?? '0')
   const minute = Number(parts.find(p => p.type === 'minute')?.value ?? '0')
   // 24:00 is a legal `en-GB` rendering of midnight and would place a point past the axis.
   return (hour % 24) * 60 + minute
+}
+
+/** Local minutes-since-midnight for an instant, in the user's zone rather than the device's. */
+export function minutesIntoDay(t: number, tz: string): number {
+  return minutesFrom(clockFormat(tz), t)
 }
 
 /**
@@ -58,8 +74,9 @@ export function minutesIntoDay(t: number, tz: string): number {
  * has no such guarantee, and an out-of-order point would draw a line doubling back on itself.
  */
 export function toSegments(buckets: StressBucket[], tz: string): StressSegment[] {
+  const fmt = clockFormat(tz)
   const placed = buckets
-    .map(b => ({ x: minutesIntoDay(b.t, tz), level: b.level }))
+    .map(b => ({ x: minutesFrom(fmt, b.t), level: b.level }))
     .sort((a, b) => a.x - b.x)
 
   const segments: StressSegment[] = []
