@@ -2330,6 +2330,22 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [readiness] ⚠️ A past day now says what you were doing when stress spiked — the marker half is unbuilt (TN-35, 2026-09-21, v1.462.0) · needs: device
+
+`/health/day?date=` places the day timeline's typed, timestamped events on the stress chart's axis
+and prints the measured level beside each workout, meal, walk and sleep. **An event with no bucket
+prints `no reading`, never `0.00`** — coverage averages 13.3 of 24 hours, so that is the common case,
+and the list header states `N of M with a reading` so a sparse day cannot read as an uneventful one.
+No verdict is computed; ranking causes is TN-16's shape and stays parked.
+
+**What is still missing is half the feature.** There is no way to mark a moment: meetings, commutes,
+arguments, caffeine and screens are invisible to the app, and they are most of what the owner means
+by "events". A timestamped marker row is a migration, so that half is **Lane A's and unbuilt**.
+
+**Two checks owed.** The device look — a list of the day's events under the chart at 412 px. And the
+pass test, which only the owner can run: open a past day and say whether a stressed window matches
+what he was doing, **or say it does not** — the result that would retire the metric.
+
 ### [heart-rate][readiness] ⚠️ Stress is drawn on the heart-rate charts now, and no phone has seen it (TN-3b, 2026-09-21, v1.461.0) · needs: device
 
 The owner asked to read a stressed stretch against what he was doing at the time. The day's stress

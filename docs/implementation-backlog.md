@@ -5430,7 +5430,44 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-10 · owner: *"I'd like to get stress metric to be a usable value to determine what events stress me."*
 - **Lane: B** for the overlay (`app/api/day-timeline/route.ts` already assembles the events; `components/health/day-detail/**` renders them). **Lane A** for the marker's storage — a timestamped row is a migration.
-- **Needs: TN-3b** — the chart is this entry's first half; do not build the join before the axis exists.
+- **✅ THE OVERLAY HALF SHIPPED 2026-09-21** (`feat/tn35-stress-against-events`, **v1.462.0**, Lane B).
+  The day screen (`/health/day?date=`) places the day timeline's typed, timestamped events on the
+  stress chart's axis and prints the measured level beside each one.
+  - **Unparked by the OWNER, not by this lane.** The `Needs: TN-3b` was discharged in substance
+    (the chart shipped 2026-09-13, the HR-chart overlay 2026-09-21) but still blocking, because
+    `Needs:` clears only when its target leaves the queue and TN-3b stays for a `Keep:` — filed as
+    #1362 rather than edited away. The owner then said to continue with the backlog, which is the
+    go-ahead this took. **The structural question in #1362 is still open and still the
+    Orchestrator's**; this entry is not the answer to it.
+  - **Absent, never calm — the entry's instruction, and the assertion the spec leads on.** An event
+    with no bucket within half a bucket-width prints `no reading`, never `0.00`. Coverage averages
+    13.3 of 24 hours, so this is the common case rather than an edge, and the list header states
+    `N of M with a reading` so a sparse day cannot read as an uneventful one.
+  - **The `tag` lane is excluded in code, with the reason next to it.** `oura_tags` holds zero rows
+    and its feed was removed on 2026-08-13; rendering it would promise a marker mechanism that does
+    not exist.
+  - **No verdict, per the entry.** The list states times, titles and levels. Ranking causes needs
+    many marked instances per event type and is TN-16's shape.
+  - **The cache key is the load-bearing detail.** `lib/hooks/use-day-timeline.ts` builds
+    `home-day-timeline:<date>` — a CHILD of the bare prefix six write groups already clear, because
+    `invalidateCache` matches `key LIKE 'prefix%'`. A fresh `day-timeline:` prefix would have been a
+    second invalidation contract all six writers had to remember, and the day one forgot, a deleted
+    meal would sit beside a stress reading looking like data. Pinned by
+    `stress-day-timeline-key.test.ts`, which fails if either half changes.
+  - **Verification.** `components/body-battery/__tests__/stress-at-events.test.ts`, 14 cases, killed
+    by six mutations (drop the gap guard · first-match instead of nearest · absence reads as 0 ·
+    render the `tag` lane · unsorted · a measured zero counted as absent). The nearest-bucket
+    mutation SURVIVED the first draft — 30-minute spacing puts at most one bucket in a ±15 window,
+    so the test had to use irregular spacing to exercise the rule at all.
+    `e2e/tn35-stress-against-events.spec.ts` drives a **past** day, which is this entry's own pass
+    test; proven red with the prop unwired at the join assertion.
+- **Keep:** ① **the marker half, which is Lane A's and unbuilt** — a timestamped moment row is a
+  migration. Everything below about *"there is no way to mark a moment"* still stands: meetings,
+  commutes and arguments remain invisible, and this half attributes stress only to training, food,
+  walks and sleep. ② **the device look** — a list of the day's events under the chart at 412 px.
+  ③ **the pass test itself**, which only the owner can run: open a past day and say whether a
+  stressed window matches what he was doing — *or say it does not*, which is the result that would
+  retire the metric.
 - **⚠ THE DEPENDENCY IS DISCHARGED IN SUBSTANCE AND THE FIELD STILL BLOCKS — Orchestrator's call
   (recorded 2026-09-21, Lane B).** *"Do not build the join before the axis exists"* is satisfied
   twice over: TN-3b's day chart shipped 2026-09-13, and its HR-chart overlay shipped 2026-09-21

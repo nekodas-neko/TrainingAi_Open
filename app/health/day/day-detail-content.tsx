@@ -16,6 +16,7 @@ import type { EnergyBalanceResponse } from "@/app/api/nutrition/energy-balance/r
 import type { FoodLogWithItem } from "@trainingai/shared/types/nutrition";
 import type { ActivityLog, ActivityType } from "@trainingai/shared/types";
 import { useCachedValue } from "@/lib/hooks/use-cached-value";
+import { useDayTimeline } from "@/lib/hooks/use-day-timeline";
 import { useDayEntryMutations } from "@/lib/hooks/use-day-entry-mutations";
 import { DayOverlayDialogs } from "@/components/health/day-overlay-dialogs";
 import { ExerciseHistorySheet } from "@/components/exercise-history-sheet";
@@ -96,6 +97,10 @@ export function DayDetailContent({ initialDate, tz, userId }: { initialDate: str
   const [selectedActivity, setSelectedActivity] = useState<ActivityLog | null>(null);
   // Only for the detail sheet's icon — not read by any section here. Same key and TTL as its four
   // other call sites, per the one-canonical-TTL rule.
+  // TN-35 — the day's events, to read the stress series against. The key, URL and TTL live in the
+  // hook; its header explains why the key sits under Home's existing prefix.
+  const timeline = useDayTimeline(selectedDate);
+
   const activityTypes = useCachedValue<{ activityTypes: ActivityType[] }>(
     'activity-types', '/api/activity-types', TTL_LONG,
   );
@@ -258,6 +263,7 @@ export function DayDetailContent({ initialDate, tz, userId }: { initialDate: str
                 Renders nothing on a day the ring recorded no stress for. */}
             <StressDayChart
               date={selectedDate}
+              events={timeline?.events}
               className="rounded-2xl border border-white/10 bg-white/[0.04] p-3.5"
             />
           </motion.div>

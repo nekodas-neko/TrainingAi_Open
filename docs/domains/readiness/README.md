@@ -291,6 +291,17 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- [`2026-09-21-tn35-stress-against-events`](../../overview/entries/2026-09-21-tn35-stress-against-events.md)
+  — **TN-35's overlay half (2026-09-21): a past day now says what you were doing when stress
+  spiked.** `/health/day?date=` places the day timeline's typed, timestamped events on the stress
+  chart's axis and prints the measured level beside each. **An event with no bucket prints
+  `no reading`, never `0.00`** — coverage averages 13.3 of 24 hours, so that is the common case, and
+  the header states `N of M with a reading`. No verdict is computed (TN-16's shape stays parked) and
+  the dead `tag` lane is excluded in code. **The marker half is Lane A's and unbuilt** — a
+  timestamped moment row is a migration — so meetings, commutes and arguments are still invisible.
+  The entry unparked because the owner said to continue, not because its `Needs:` cleared; the
+  structural question is #1362 and still open. Still owed: the 412 px look, and the pass test only
+  the owner can run.
 
 - **[`../../reviews/2026-09-03-acwr-ewma-day-shift.md`](../../reviews/2026-09-03-acwr-ewma-day-shift.md)**
   — 🆕 **Q-279: what the uncoupled-EWMA switch would actually change, measured before writing it.**
