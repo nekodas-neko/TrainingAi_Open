@@ -15005,3 +15005,18 @@ over the formula, and correcting them is his call rather than a fix. **LA-125** 
 asterisk on this PR's own claim — the recommendation is the baseline *made safe*, and fat and carbs
 differ. **LA-127** is why the measurement above carries a caveat at all: two tables have no
 `claude_ro` twin.
+
+## 2026-09-21 — `docs/implementation-backlog.md` +42 (RV-79 could not be built as written)
+
+`docs/implementation-backlog.md` **25998 → 26040** (`docs/rv79-cachedfetch-caches-null`). Two
+entries grew: RV-79's fix bullet was struck and replaced with why it cannot be applied, and a new
+**LB-123** was filed for the enabling change.
+
+The lines are a measurement rather than a description, which is why there are this many of them.
+RV-79 said to route a bare `fetch` through `cachedFetch` while "preserving the null-guard in the
+`onData` callback"; `cachedFetchCore` calls `setCached` unconditionally after any 2xx, so `onData`
+cannot veto the write, and doing it would have cached a `null` over an optimistically-saved mood —
+the session-167 re-prompt bug. A probe proved it (`onData` fired twice, `readCacheSync` then read
+`null`) rather than the source being read and trusted, and the probe's output is what the entry now
+carries. An entry that is wrong about its own fix is worth the space to correct in place, because
+the next reader starts from it.
