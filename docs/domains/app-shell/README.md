@@ -19,6 +19,7 @@ split is "does it feel slow" vs "is it actually slow at the source".
 
 ## Reference docs
 
+- [`docs/device-agent-probe-checklist.md`](../../device-agent-probe-checklist.md) — **what the device-verification agent should instrument, and what to send back (2026-09-22).** Ten probes for the things only CDP can answer, which is exactly what every Review sweep ends on (*nothing was rendered or reproduced*): counting requests after a write to decide the Q-402 shape mechanically (P1), a `window.fetch` census over a fixed walk to find which effects never re-run inside the persistent shell (P2), the local-store write path that `getLocalStore` returning null makes untestable in the sandbox (P3), computed-style enumeration at 384 px (P4), transition frame capture for RV-113/114/115 (P5), and an offline pass (P8). **Its contract is that every probe returns a number, a list or an artifact** — "looks fine" cannot be filed as an entry. Complements the owner's tap-list in `device-verification-queue.md` rather than repeating it.
 - [`docs/superpowers/plans/2026-09-15-week-in-review-page.md`](../../superpowers/plans/2026-09-15-week-in-review-page.md)
   — **BF-5, the week in review as a page.** The engine half shipped 2026-09-15:
   `/api/weekly-digest` now returns `WeeklyDigestMetrics` alongside the prose instead of flattening

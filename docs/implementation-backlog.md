@@ -473,6 +473,131 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [nutrition][app-shell] RV-124 — DEVICE PROBE: does a write repaint the surfaces that show it, without a tab switch?
+
+- **Verify:** device — **and there is no build half.** This entry's entire work is the measurement;
+  nothing is waiting to be implemented and nothing is blocked on it. Method: **P1** in
+  [`docs/device-agent-probe-checklist.md`](device-agent-probe-checklist.md).
+- **The falsifiable claim:** for each of the seven write→surface rows in P1, the surface issues at
+  least one request for its endpoint within 3 s of the write, **before any navigation**. FAILED on
+  any row where the count is zero before a tab switch and non-zero after — that is the Q-402 shape,
+  decided mechanically rather than reasoned from source.
+- **Why it is worth a sitting:** missed invalidation is this project's most repeated bug class (12+
+  incidents, sessions 5→176), and every sweep finds it by *reading* code, which cannot tell an
+  evicted-but-never-refetched key from a working one. One run settles RV-103, RV-104, RV-106,
+  RV-107 and RV-109 and tells RV-105 which shapes actually matter.
+- **⚠ Production writes on the owner's real data** — get his go-ahead per write type, prefer the
+  reversible rows (log then delete a food), and record a refused row as COULD NOT CHECK.
+
+### [platform][app-shell] RV-125 — DEVICE PROBE: which fetch-once effects never re-run inside the persistent shell?
+
+- **Verify:** device — no build half; the measurement is the work. Method: **P2**.
+- **The falsifiable claim:** over a fixed 5-minute walk (Home → Nutrition → Health → Workout → More,
+  twice round, one write per tab), every `/api/*` endpoint belonging to a revisited tab shows a
+  request count **greater than one**. FAILED for any endpoint fetched exactly once on a tab visited
+  four times — name the component.
+- `check-fetch-once-effects.js` freezes 36 sites and calls 19 of them "permanently mounted and can
+  bite". **That split was reasoned, never observed.** The script also cannot see
+  `useEffect(…, [userId])` — a dep array that never changes inside a shell that never unmounts —
+  which is how four of sweep 53's findings got past it.
+- Needs a `window.fetch` wrapper installed at app start; that is a harness change under
+  `scripts/device/**`, which the role owns.
+
+### [body][devices] RV-126 — DEVICE PROBE: the local-store write path, which no sandbox can execute
+
+- **Verify:** device — no build half. Method: **P3**.
+- **The falsifiable claim, three parts.** (a) A weigh-in evicts the body-metric cache keys **and**
+  `invalidateBiometrics` fires from the `pushMutations` → `pullDelta` round trip on the device that
+  wrote it — **RV-108 turns entirely on this.** (b) For each offline-first domain (food,
+  supplements, activity, mood, body metrics, injuries) the local row holds everything needed to
+  **render** it offline, not just a foreign key. (c) Every delete in those domains writes a
+  tombstone rather than hard-deleting.
+- **This is the project's largest blind spot and it is structural:** `getLocalStore` returns null in
+  the web sandbox, so *every* local-first write path is untested by construction in `pnpm dev`. The
+  food-disappearing bug was exactly (b) — a `food_item_id` with no name or macros.
+- **⚠ Production writes** — owner go-ahead per domain; a refused domain is COULD NOT CHECK.
+
+### [app-shell][platform] RV-127 — DEVICE PROBE: computed-style sweep at the real viewport
+
+- **Verify:** device — no build half. Method: **P4**. `tour.js` already emits part of this digest.
+- **The falsifiable claims:** no element overflows horizontally at 384 px (`scrollWidth >
+  clientWidth`); no interactive element renders under 44 × 44 px; no element carrying `truncate`
+  computes to `display: flex` (the class does nothing there — RV-92 is one, the question is whether
+  the source grep missed others applied conditionally); no `button`/`a` contains another.
+- **⚠ The clearance half is BLOCKED and must not be reported as passing.** The baton records the
+  phone on **three-button navigation**, where the inset is generous and a broken floored utility
+  passes anyway. Until the owner switches to gesture nav, clearance is COULD NOT CHECK; the four
+  claims above are unaffected and can run today.
+
+### [app-shell] RV-128 — DEVICE PROBE: does the tab switch drop a frame showing neither panel?
+
+- **Verify:** device — no build half. Method: **P5**; `record.js --tap` is the instrument.
+- **The falsifiable claim:** across a tab switch, no captured compositor frame shows **neither** the
+  outgoing nor the incoming panel. Report the count and duration of any such frames, and separately
+  what `bg-page` resolves to mid-switch — **if it is transparent the blink shows the wallpaper**,
+  which is a different severity from showing the page colour.
+- **These are RV-113's two stated open questions**, and it says outright that they decide whether the
+  work is worth doing at all. Also covers RV-114 (the gap in ms for six untransitioned pushed
+  routes) and RV-115 (whether More's Profile ↔ Friends swap inherits the other view's scroll).
+- While there: toggle the OS reduce-motion setting and confirm `MotionConfig reducedMotion="user"`
+  actually takes effect.
+
+### [app-shell] RV-129 — DEVICE PROBE: is a warm visit ever painting a skeleton?
+
+- **Verify:** device — no build half. Method: **P6**.
+- **The falsifiable claim:** on a tab already visited this session, no skeleton is painted between
+  navigation and first real content. FAILED anywhere one is — that means the synchronous
+  `readCacheSync` seed is missing, or is in a `useState` initializer rather than a `useEffect`.
+  Report ms-to-first-real-content per tab, warm and cold.
+- **The repo's own rule is that a skeleton flash on a repeat visit is a bug**, and it has never been
+  measured. RV-39 claims the `/more/devices` ring card does it — confirm or kill that claim.
+
+### [platform][app-shell] RV-130 — DEVICE PROBE: the console, and what `bf110 resume dom-intact` is actually recording
+
+- **Verify:** device — no build half. Method: **P7**.
+- **The falsifiable claim:** a full walk produces no repeated console error, and no `/api/*` request
+  returns non-2xx. Send the **grouped counts**, not a summary — a warning firing 400 times is a
+  different finding from one firing once. `cachedFetch` swallows `!res.ok` unless the caller passes
+  `onError`, so these are invisible on screen by design.
+- **The part only this phone can answer:** production `error_events` carries `bf110 resume
+  dom-intact` rows by URL — **Home 22 · Nutrition 14 · Health 11 · More 7 · Workout 2**. Background
+  the app on each of those screens for 30 s, 5 min and 30 min, and report what the DOM looks like on
+  return. The counts say Home is where this bites and **nobody has ever watched it happen.**
+
+### [platform][nutrition] RV-131 — DEVICE PROBE: the offline mode the whole architecture is built for
+
+- **Verify:** device — no build half. Method: **P8**. Use CDP's network override rather than
+  airplane mode, so it can flip mid-action.
+- **The falsifiable claims:** an offline write renders immediately and **survives a force-stop and
+  reopen while still offline**; no surface goes **blank** offline (stale is acceptable and blank is
+  not — `cachedFetch` cannot revalidate offline, so anything needing a fresh payload is a hole); on
+  reconnect every row reconciles and **none flickers away and returns** (the outbox-versus-server
+  race in BF-47); the offline shell serves every route, not only ones visited that session.
+- Offline-first is the architecture's central claim and **no instrumented offline pass has ever
+  been run.** Pair with RV-126 — same writes, network flipped.
+
+### [app-shell] RV-132 — DEVICE PROBE: route census on a fresh install
+
+- **Verify:** device — no build half. Method: **P9**; `tour.js` already walks routes.
+- **The falsifiable claim:** every route in the build is reachable **by tapping only**, from a fresh
+  install and from a warm one, and no picker or menu label names a different metric from what its
+  target screen shows. RV-121 says `/collection` fails the first half and one widget label fails the
+  second — confirm both and find the rest.
+- **⚠ Never uninstall to get a fresh install** — an uninstall destroys the Oura ring's BLE key,
+  which nothing in this repo, the server or any log can recover. Use a fresh profile or clear app
+  data **only** if the owner confirms the ring key is not at stake; otherwise report the warm half
+  and mark the fresh half COULD NOT CHECK.
+
+### [platform][app-shell] RV-133 — DEVICE PROBE: what the shell accumulates over a long session
+
+- **Verify:** device — no build half. Method: **P10**.
+- **The falsifiable claim:** across the 5-minute walk and then 30 minutes idle, JS heap, listener
+  count by type, and live `setInterval`/`setTimeout` handles all **stabilise rather than only
+  rising**. A count that only ever rises is the finding; report all three at start, after the walk,
+  and after the idle period.
+- The tab shell never unmounts, so anything registering without cleanup accumulates for the life of
+  the app — and the app is resumed far more often than it is cold-started (see RV-130's numbers).
+
 ### [platform] TN-61 — `next-item.js` prints ten rows of a thirty-one-row bucket and says nothing about the rest
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-23 · Tuning · **Lane: O** — `scripts/next-item.js:54`

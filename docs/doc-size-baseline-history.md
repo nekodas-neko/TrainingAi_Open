@@ -15607,6 +15607,25 @@ device gesture was the only thing it still owed, and it was verified on the S25 
 **New baseline: `docs/agents/state/device-verification.md` at 66**, its size on creation. A seventh
 role's baton joins the six already ratcheted; the same rule applies from its first line — it only
 comes down.
+
+## 2026-09-22 — `docs/implementation-backlog.md` +125 (26664 → 26789) (Review: DV probe entries)
+
+Ten entries (**RV-124…RV-133**) filing the probes in
+[`docs/device-agent-probe-checklist.md`](device-agent-probe-checklist.md) as queue work now that the
+Device Verification role exists (#1417), at ~12 lines each.
+
+**They are the first entries whose ONLY work is the device check**, and the filing took three tries
+to get right, which is worth recording because the next one will hit it too. `Gate: device` parks an
+entry as unstartable *and* is not selected by `--sittings`, so it would have hidden them from the one
+agent that can run them. `Verify: device` reads as *shipped* — the protocol warns about exactly this
+misuse twice — but it is the only field `--sittings` selects on, and the warning is aimed at unbuilt
+work that still needs implementing. These have **no build half at all**, so nothing is hidden and
+nothing is blocked; each entry says so in its first bullet so no later reader mistakes it for shipped
+code. Verified rather than assumed: 10 of 10 reach `--sittings`, 0 leak into either lane's READY.
+
+**Two were parked by their own emphasis glyph** — `next-item.js` treats `⛔ …block` within 40
+characters as the legacy blocked marker, and *"⛔ The clearance half is BLOCKED"* matches it exactly.
+Same trap as sweep 52's eight parked entries. Swapped to `⚠`.
 ## 2026-09-22 — `projectOverview.md` 12399 → 12413, backlog 26690 → 26682 (RV-103/RV-104)
 
 The fourteen lines on `projectOverview.md` are one Known-Issues entry, and it is there for the half
@@ -15622,9 +15641,9 @@ the split that keeps this file from regrowing.
 First draft of that entry ran 21 lines over the baseline and was cut to 14 rather than granted the
 space — the detail belongs in `docs/overview/entries/`, and the index carries the warning only.
 
-Both recorded figures move **down** on arithmetic and are not this branch's doing alone: the final
-numbers are 26655 and 12376, after TN-61, DV-1 and #1417's archiving sweep all landed from `main`
-across two re-merges while this branch was open. What this branch contributed is −8 to the backlog
+Both recorded figures move on arithmetic that is not this branch's doing alone: the final numbers
+are 26780 and 12376, after TN-61, DV-1, #1417's archiving sweep and #1418's RV-124…RV-133 all
+landed from `main` across three re-merges while this branch was open. What this branch contributed is −8 to the backlog
 — RV-104 shipped whole and left the queue, and RV-103 came back shorter as a `Keep:` entry, against
 the new LB-128 filed for Lane A — and +14 to `projectOverview.md` for the one Known-Issues entry
 above. The ratchet only ever records where a file ended up; this paragraph is so the eight lines
