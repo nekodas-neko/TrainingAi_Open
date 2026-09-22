@@ -5,6 +5,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const insertAiCallLog = vi.fn(async () => {})
 vi.mock('@/lib/data', () => ({
   getRepository: async () => ({ insertAiCallLog }),
+  // `reportServerError` reaches for this on the give-up path, and it calls it synchronously — an
+  // undefined export would throw from inside the retry and replace the error being reported.
+  getRepositoryAsync: async () => ({ insertErrorEvent: async () => {} }),
 }))
 
 import { aiFingerprint, contentKey, AI_MODEL_ID, withAiLogging, loggedGenerateObject } from '../instrument'
@@ -146,5 +149,60 @@ describe('loggedGenerateObject', () => {
     expect(r.object.ok).toBe(true)
     await flush()
     expect(insertAiCallLog).toHaveBeenCalledWith(expect.objectContaining({ section: 'obj-sec', totalTokens: 42, ok: true }))
+  })
+})
+
+/**
+ * RV-70 — the budget the chokepoint applies is TOTAL, across the retry.
+ *
+ * This is the assertion that a per-attempt timeout would fail. Both are "the call has a timeout";
+ * only one of them bounds the call the user is waiting on, because `withAiRetry` runs a second
+ * attempt after a jittered backoff and a fresh ceiling per attempt makes the worst case two
+ * ceilings plus the backoff — which is what the entry measured as the doubling.
+ */
+describe('withAiLogging — the total budget (RV-70)', () => {
+  const never = () => new Promise<never>(() => {})
+
+  it('answers within the budget even though the call never resolves', async () => {
+    const started = Date.now()
+    await expect(
+      withAiLogging({ section: 'bounds-test' }, never, () => false, 25),
+    ).rejects.toMatchObject({ name: 'AiTimeoutError' })
+    expect(Date.now() - started).toBeLessThan(500)
+  })
+
+  it('logs the failed call, so a timed-out call is visible in ai_call_log', async () => {
+    await expect(withAiLogging({ section: 'bounds-log' }, never, () => false, 15)).rejects.toThrow()
+    await flush()
+    expect(insertAiCallLog).toHaveBeenCalledWith(expect.objectContaining({ section: 'bounds-log', ok: false }))
+  })
+
+  /**
+   * Two hanging attempts, one budget. With a per-attempt ceiling this finishes at ~2x the budget
+   * plus the backoff; with a total one the second attempt inherits what is left of the first's.
+   */
+  it('does not give the retry a fresh budget', async () => {
+    // The real doubling: a first attempt that fails retryably and cheaply, the shared ~1-1.5s
+    // backoff, then a second attempt that hangs. Under a TOTAL budget the second gets what is left
+    // and the call settles at the budget; under a per-attempt ceiling it gets a fresh one and the
+    // call settles at backoff + budget. 2s apart, which is what this measures.
+    const attempts = vi.fn()
+      .mockRejectedValueOnce(new Error('transient'))
+      .mockImplementation(never)
+    const started = Date.now()
+    await expect(
+      withAiLogging({ section: 'bounds-retry' }, attempts, () => true, 2_000),
+    ).rejects.toMatchObject({ name: 'AiTimeoutError' })
+    const elapsed = Date.now() - started
+    expect(attempts).toHaveBeenCalledTimes(2)
+    expect(elapsed).toBeLessThan(2_600)
+  }, 10_000)
+
+  it('hands the attempt a signal it can be cancelled by', async () => {
+    let seen: AbortSignal | undefined
+    await expect(
+      withAiLogging({ section: 'bounds-signal' }, signal => { seen = signal; return never() }, () => false, 15),
+    ).rejects.toThrow()
+    expect(seen?.aborted).toBe(true)
   })
 })

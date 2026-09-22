@@ -56,7 +56,11 @@ export function InjuryChip({ muscles, onSwap }: { muscles: string[]; onSwap?: ()
       {onSwap && <span className="text-[11px] font-semibold text-amber-400 underline shrink-0">Swap</span>}
     </>
   );
-  const shell = "flex items-center gap-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 px-2 py-1 max-w-[11rem]";
+  // RV-93: `shrink-0` at `max-w-[11rem]` claimed 176 of 352px whatever the title needed, so
+  // "Single Leg Romanian Deadlift" rendered as "Single Leg Roma…" mid-set — and that pairing is
+  // real, not hypothetical: the one unresolved injury is `lower back`, which that exercise carries
+  // as a secondary muscle. The chip yields first now; its own label truncates instead.
+  const shell = "flex min-w-0 items-center gap-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 px-2 py-1 max-w-[11rem]";
 
   return onSwap ? (
     <button
@@ -65,12 +69,12 @@ export function InjuryChip({ muscles, onSwap }: { muscles: string[]; onSwap?: ()
       // The muscles alone read as a body-part label; the accessible name has to carry that this is a
       // warning and that activating it swaps the exercise, neither of which the visible text says.
       aria-label={`Injury active: ${label} — swap this exercise`}
-      className={`${shell} shrink-0`}
+      className={shell}
     >
       {body}
     </button>
   ) : (
-    <div role="status" aria-label={`Injury active: ${label}`} className={`${shell} shrink-0`}>
+    <div role="status" aria-label={`Injury active: ${label}`} className={shell}>
       {body}
     </div>
   );

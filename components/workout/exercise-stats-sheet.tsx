@@ -66,10 +66,10 @@ export function ExerciseStatsSheet({ exercise, isDoneToday, onClose, onRedo }: E
     void cachedFetch<{ entries: ExerciseHistoryEntry[] } | null>(
       `exercise-history:${exercise.name}`, `/api/exercise-history?name=${encodeURIComponent(exercise.name)}`, EXERCISE_HISTORY_TTL,
       d => setEntries(d?.entries ?? []),
-    ).catch(() => {
-      setError(true);
-      setEntries([]);
-    }).finally(() => setLoading(false));
+      // RV-84: the error branch was chained as `.catch`, which `cachedFetch` can never reach, so
+      // this sheet showed an empty history rather than its error state on a failed load.
+      { onError: () => { setError(true); setEntries([]); } },
+    ).finally(() => setLoading(false));
   }, [exercise?.name]);
 
   if (!exercise) return null;
@@ -175,7 +175,7 @@ export function ExerciseStatsSheet({ exercise, isDoneToday, onClose, onRedo }: E
               {allTime1rm != null && (
                 <div className="flex items-center gap-1.5 text-xs mb-1.5" style={{ color: "var(--accent-amber)" }}>
                   <TrophyIcon className="w-3 h-3" />
-                  <span>All-time: <strong>{isBodyweight ? displayOneRm(allTime1rm, "bodyweight").text : `${allTime1rm.toFixed(1)} kg`}</strong></span>
+                  <span>All-time: <strong>{displayOneRm(allTime1rm, exercise.exerciseType).text}</strong></span>
                 </div>
               )}
               {rmTargets.map(t => (

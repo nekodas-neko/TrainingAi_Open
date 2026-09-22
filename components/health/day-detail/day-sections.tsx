@@ -10,6 +10,8 @@ import { shortSessionName } from "@trainingai/shared/utils";
 import type { EnergyBalanceResponse } from "@/app/api/nutrition/energy-balance/route";
 import { energyDaySummary, type SessionKcal } from "@/components/health/day-detail/energy-summary";
 import { displayBodyFat } from "@/components/health/body-fat-display";
+import { formatHoursMinutes } from '@trainingai/shared/format/units'
+import { formatKg } from '@trainingai/shared/format/units'
 
 /** Section heading — letterspaced micro-caps, matching the treatment chosen for the day screen. */
 export function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -220,9 +222,15 @@ export const TrainingSection = memo(function TrainingSection(
   );
 });
 
-/** `1h 05m` past the hour, `47m` below it — a walk and a long ride shouldn't share a format. */
+/**
+ * `1h 05m` past the hour, `47m` below it — a walk and a long ride shouldn't share a format.
+ *
+ * RV-90: this comment described the contract the shared helper now holds for every surface. It was
+ * the most considered of the five hand-rolled variants, which is why it is the one they converged
+ * on rather than the other way round.
+ */
 function durationLabel(min: number): string {
-  return min >= 60 ? `${Math.floor(min / 60)}h ${String(Math.round(min % 60)).padStart(2, "0")}m` : `${Math.round(min)}m`;
+  return formatHoursMinutes(min);
 }
 
 function paceLabel(secPerKm: number): string {
@@ -410,7 +418,7 @@ export const BodySection = memo(function BodySection({ body }: { body: DayBodyMe
         {body.weightKg != null && (
           <div className="flex items-baseline gap-2 border-b border-white/10 pb-2.5">
             <Scale className="h-4 w-4 flex-none self-center text-muted-foreground" />
-            <span className="text-[2.2rem] font-light leading-none tabular-nums">{body.weightKg.toFixed(1)}</span>
+            <span className="text-[2.2rem] font-light leading-none tabular-nums">{formatKg(body.weightKg, { unit: false })}</span>
             <span className="text-[12px] text-muted-foreground">kg</span>
           </div>
         )}

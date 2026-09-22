@@ -5,7 +5,7 @@ import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { CalculatorIcon, ChevronLeftIcon, DumbbellIcon, ListIcon, SkipForwardIcon, ZapIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { WorkoutExercise, PhaseStatus } from "@/app/api/workout-data/route";
-import { formatSheetDate, mround125, mroundStep, mroundStepUp, weightStepFor, plateBreakdown } from "./utils";
+import { formatSheetDate, mroundStep, mroundStepUp, weightStepFor, plateBreakdown } from "./utils";
 import { ActiveSetCard } from "./active-set-card";
 import { SetsGrid } from "./sets-grid";
 import { Live1rmReadout } from "./live-1rm-readout";
@@ -238,7 +238,7 @@ export function ActiveWorkoutScreen({
           <p className="text-xs font-semibold text-muted-foreground truncate">
             {sessionName ?? (soloMode ? "Solo log" : "Workout")}
           </p>
-          <p className="text-[10px] text-muted-foreground/60 truncate">
+          <p className="text-[10px] text-muted-foreground/70 truncate">
             {sessionContext}
             {soloMode ? "Solo" : `Ex ${exerciseIndex + 1}/${totalExercises}`}
             {timerStarted && <ExerciseClock startMs={exerciseStartMs} />}
@@ -305,9 +305,10 @@ export function ActiveWorkoutScreen({
                     <div className="flex-shrink-0 text-center">
                       <p className="text-[9px] text-muted-foreground font-bold">{isBodyweight ? "REP MAX" : "1RM"}</p>
                       <p className="text-base font-black" style={{ color: "var(--color-brand)" }}>
-                        {isBodyweight
-                          ? displayOneRm(exercise.estimated1rm, "bodyweight").text
-                          : `${mround125(exercise.estimated1rm)} kg`}
+                        {/* RV-89: `mround125` is a PRESCRIPTION rounder (1.25 plate grid, clamped
+                            5–250) and was rounding the displayed 1RM to 92.5 where the stored value
+                            is 92.25. It is what printed "load 82.5 kg" on a pull-up in BF-127. */}
+                        {displayOneRm(exercise.estimated1rm, exercise.exerciseType).text}
                       </p>
                     </div>
                   )}

@@ -9,12 +9,11 @@ import { TTL_MEDIUM, HEALTH_TRENDS_SUMMARY_TTL } from '@trainingai/shared/cache-
 import type { OuraStatsResponse } from '@/app/api/oura/stats/route'
 import type { HealthTrendsResponse } from '@/app/api/health/trends/route'
 import { TrendSparkline } from './trend-sparkline-lazy'
+import { formatHoursMinutes } from '@trainingai/shared/format/units'
 
 function fmtMin(sec: number | null | undefined) {
   if (sec == null) return null
-  const h = Math.floor(sec / 3600)
-  const m = Math.floor((sec % 3600) / 60)
-  return h > 0 ? `${h}h ${m}m` : `${m}m`
+  return formatHoursMinutes(sec / 60)
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -165,7 +164,7 @@ export const OuraSection = memo(function OuraSection({ trends: trendsProp }: Pro
       {/* Readiness contributors — detail on dedicated page */}
       <button
         onClick={() => router.push('/health/readiness')}
-        className="text-[10px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+        className="text-[10px] text-muted-foreground/70 hover:text-muted-foreground transition-colors"
       >
         Readiness contributors →
       </button>
@@ -173,7 +172,7 @@ export const OuraSection = memo(function OuraSection({ trends: trendsProp }: Pro
       {/* Sleep contributors — detail on dedicated page */}
       <button
         onClick={() => router.push('/health/sleep')}
-        className="text-[10px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+        className="text-[10px] text-muted-foreground/70 hover:text-muted-foreground transition-colors"
       >
         Sleep contributors →
       </button>

@@ -26,8 +26,179 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.457.14 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-09-18.
+**Version:** v1.465.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-09-22.
+
+**Opacity-modified text was below AA and the contrast check could not see it (RV-98, v1.465.3).**
+`check-contrast.js` validated ten BARE token pairs and had no opacity handling, so everything from
+`text-muted-foreground/60` down was unguarded: over `--card`, 70% opacity gives 4.64:1 and passes,
+60% gives 3.73, 50% 2.97, 40% 2.34, 30% 1.83 — against 4.5:1 for body text. **45 call sites raised
+to 70%**, four exempted with written reasons (an inactive future day, two ring *tracks* where the
+class is a fill colour rather than text, a separator glyph). The calendar's `rest` marker went to
+**full** opacity rather than the floor: it is `text-[7px]` and the only thing distinguishing a past
+rest day from a past untracked one. The check now composites alpha **in gamma-encoded sRGB** —
+blending the linear values put 40% at 3.93:1 instead of 2.34:1, and a wrong number in an error
+message is worse than no number. **RV-98's own measurements reproduced independently to ±0.01**,
+which given this sweep's record with entry claims is worth recording.
+
+**A doc comment was quoted as evidence of what a screen rendered; it was wrong, and so was its
+neighbour (LB-125).** `formatDateDisplay`'s header claimed `'short'` gave `Jan 5` and `'long'` gave
+`Monday, 5 January`; `en-AU` produces **`15 Sept`** and **`Tuesday 15 September`**. The entry did not
+catch that `formatDayShort` directly below made the same two errors against its own example
+(`Jul 6` → really **`6 July`**) off a byte-identical option bag — it is now an alias that delegates.
+Three `en-AU` properties are pinned in tests because none is guessable: it is day-first,
+`month: 'short'` is **four** characters for June/July/Sept so label columns are ragged-width, and it
+emits a comma after a **short** weekday but not a long one (`Tue, 15 Sept` vs `Tuesday 15 Sept`) —
+which is the likeliest origin of the comma in the old comment. Three weekday styles added.
+**The entry's open question is answered rather than deferred:** the style stays device-local and
+takes no `tz`, because its input is an already-resolved calendar day, so an explicit `timeZone`
+would reintroduce Q-130 on a device ahead of that zone. **Two counts corrected for Lane B (LB-126):**
+two sites are a bare `{ weekday: 'short' }`, not three, and `calendar-widget.tsx` is a month-and-year
+label built from numbers that the helper cannot take at all — so that entry is four sites, not five.
+No user-visible change, so no version bump.
+
+
+**One weigh-in printed four ways; now one helper decides rounding and spacing (RV-90, v1.465.2).**
+`packages/shared/src/format/units.ts` holds `formatKg` / `formatMinutes` / `formatHoursMinutes`, and
+pace keeps `formatPace` / `formatPaceValue` in `vdot.ts`. **The entry's "seven sites, five ways"
+overstates it** — the tree holds three body-weight renders that genuinely disagreed plus six already
+agreeing on `.toFixed(1)`, so most of this was latent drift awaiting a >1dp value from Health Connect
+or a hand-log. **The bug that was actually live is the one nobody filed:** every pace formatter split
+minutes from seconds *before* rounding, so `[5:59.5, 6:00)` printed the literal **`5:60`** — fixed in
+the shared helper by rounding the total first. `formatKg` rounds by exponential shift, not `toFixed`,
+which gave `1.00` for `1.005`. **One documented exception:** `hypnogram.tsx` keeps its own `h/m`,
+because a chart stage label reads better as `2h` than the helper's padded `2h 00m`. ⚠ **The rendered
+output was NOT observed** — the e2e seed user has no weight data, so no kg path was painted in a
+browser; unit-tested only, and not device-verified.
+
+
+**The morning check-in asks a comparative question now (TN-58, v1.465.0).** The absolute 1–5
+produced **two distinct values across 96 check-ins**, sd 0.29, none of them touched — a question
+with no variance cannot be a target, which is what blocks TN-33. *Better / about the same / worse
+than yesterday*, three taps above the two scales, **no default and no pre-selection**: the column
+has no default for the same reason, since a neutral stored as an answer is the TN-57 defect under a
+new name. **Added rather than replacing the absolute scale**, despite the entry saying "replace" in
+one line: `perceivedRecovery` feeds `signals.morningCheckin` and shapes the prescription, so
+retiring its control silently changes what the engine receives. ⚠ **A two-week pass test is owed**
+— ≥3 distinct values and a touched-rate above zero, or the finding is that self-report is not
+available from this owner at all. It is the backlog `Keep:` on TN-58, and **not device-verified**.
+
+**The ACWR number was painted the "High" colour in every band (RV-97, v1.464.9).** The headline was
+a hard-coded `#f59e0b`, which is exactly what `acwrBand()` reserves for `high`, while the band WORD
+beside it came from the real `interpretation` — so a 1.05 rendered *"✓ Optimal zone"* in warning
+amber, directly above body copy calling 0.8–1.3 the green zone. `acwrBandByKey()` had existed for
+this caller since it was written. **The entry's one-line fix does not compile:** the route's
+`interpretation` is a SIX-key union and that helper takes four, and the card's two guards are
+booleans rather than type predicates, so the key is narrowed explicitly and the unreachable arm
+inherits the text colour instead of inventing one.
+
+
+**Home's score row said nothing when it failed to load (RV-85, v1.464.9).** `{readiness && <row>}`
+gated the whole row — and with it the illness advisory and the early-deload banner — so a failed
+fetch rendered **nothing at all**: no row, no skeleton (`showHomeSkeleton` requires `refreshing`)
+and no message, on the owner's most-used screen. `/api/readiness-score` has no null-payload path, so
+an absent value there is always a failure rather than "nothing to say". **The helper meant to
+prevent this is the one that permitted it**: `fetchWithRetry` exists, by its own header, to stop a
+blip *"leaving the readiness/sleep widgets blank until the app is restarted"* — it retries three
+times and then gave up silently, landing on exactly that. It now reports exhaustion, and the row's
+slot says *"Scores didn't load — pull to refresh."* **The distinction is the feature**: an absent
+value means "still trying" until the attempts are spent, so the message cannot appear under a
+request that is about to succeed. The retry ladder is unchanged. The helper had **no tests at all**;
+it has nine now, and an e2e that fails the route persistently, asserts the slot stays empty partway
+through the ladder, and carries a control case — a test that only checked the message appears would
+pass against a build that showed it always.
+
+**The comparative check-in now has a column to write to (LB-124, v1.464.8).** TN-58 asks *"is today
+better or worse than yesterday?"* instead of an absolute 1-5, because the absolute scale produced
+two distinct values in 81 days. The field did not exist anywhere, and the route's `Body` is not
+`.strict()`, so a control built first would have posted **201 and stored nothing** — which is why
+Lane B filed this rather than attempting it. `day_checkins.vs_yesterday` now exists (migration 280,
+`claude_ro` twin 281, local SQLite v40): `better` | `same` | `worse`, **nullable with no default**,
+carried by both write paths, all three row mappers, the local store and the pull-delta, and counted
+by `dayCheckinHasAnswers` so a check-in whose only answer is this one saves rather than reading as
+empty. Text rather than a signed integer because every other scale on this table stores 1 = best …
+5 = worst, and a `+1 = better` column would put two polarities in one row. **The compiler found two
+sites no test would have**: `food-logging-complete` re-saves the evening row and would have cleared
+the answer on every food-log completion, and there are three row mappers rather than two. **What
+remains is TN-58's control** — the sheet — and nothing else. `LA-128` records the `.strict()` hazard
+that made this entry necessary: LB-124 closed it for one field by making the key known, not for the
+class.
+
+**The self-report was never answered, and five readers took the seed as data (TN-57, v1.464.7).**
+The morning check-in sheet seeds `perceivedRecovery` and `sleepQualityFeel` from a neutral constant
+and records whether the lifter moved each one. Measured on production 2026-09-22 over 97 morning
+check-ins: **78 carry a `perceived_recovery` and 0 of them were ever touched** — two distinct values,
+standard deviation 0.286 — which is what the owner said unprompted (*"I dont really choose them; I
+let it auto select"*). The row was always honest; the readers were not, and the schema had said so
+since the columns were added (Q-113). A calibration route was fitting to 78 values nobody gave, a
+user-facing correlation was plotting them, the score audit was displaying them, and the periodization
+prompt was telling the model the lifter had reported them. All five now resolve through
+`answeredMorningScales`, and the write paths store null for an untouched scale. **No migration, no
+data write, and the 78 rows are deliberately not backfilled** — the flag already tells them apart.
+**Expect the correlations to EMPTY rather than shift**, which is correct and must not be rescued by
+relaxing the filter. **Five claims in the entry were wrong**; the load-bearing one is that its
+write-path instruction — make an untouched body count as carrying no answers — would have **stopped
+the owner's daily check-in reaching the server**, because the sheet sends nothing else that counts
+and `pushMutations` rejects such a body as a no-retry poison pill. The Q-465 guard therefore reads
+the submitted body and the nulling applies to what is stored.
+**Five places a 384px screen cut the wrong thing (`layout-384` — RV-92/93/94/95/96, v1.464.6).**
+`truncate` on a **flex container** does nothing — the text becomes an anonymous flex item at
+`min-width:auto`, so the exercise name clipped flat and took the green "done today" tick with it,
+making a logged exercise read as unlogged. The injury chip was `shrink-0` at 176 of 352px, leaving
+the mid-set title ~15 characters. The food diary cut names at 22 against 130 of 337 real items. The
+Volume tile wrapped its unit every non-zero week. The done screen cut the `· 3/4 sets` caveat off
+the longest names. **All three of the batch's "not established" questions were settled, two against
+the entries:** the injury chip does fire on the exercise RV-93 guessed at; `/api/weekly-stats` does
+round; and RV-94's secondary line *does* differ between the colliding pair (350 g vs 258 g) but only
+at the tail, which truncation removes. ⚠ **Not device-verified** — every fix is a pixel claim at
+412px.
+
+**A raw ISO date on two activity screens, and one `Cal` among 155 `kcal` (RV-91, v1.464.5).** The
+activity history row and the activity detail sheet printed `2026-09-15` on the line above a
+correctly formatted time; both now call `formatDateDisplay`, and the day detail's hand-rolled
+long-form date calls it too. **The entry quoted the helper's header comment instead of running the
+function** — it says the day detail reads *"Monday, 15 September"*, and that string exists nowhere:
+`en-AU` is day-first with no comma, so the real returns are `15 Sept` and `Tuesday 15 September`.
+The comment is in `packages/shared`, so it is filed as **LB-125** with the five remaining
+hand-rolled option bags, not edited here.
+
+**One stored 1RM printed four different numbers (RV-89, v1.464.4).** A lift stored on the 0.25 grid
+at 92.25 read as **92.5** on the ready screen, **~92** in the exercise list, **92.3** in the stats
+sheet and on the Strength Trend card, and **92.25** in the exercise summary — in one session. All
+of them now call `displayOneRm`. **The ready screen's rounder was `mround125`, the 1.25 kg plate
+grid** — a *prescription* rounder, and the one that told the owner to load 82.5 kg onto a pull-up in
+BF-127; its import is gone from that file, while the stats sheet's two remaining calls are genuine
+prescription weights. **The Strength Trend card held three of the sites, not the one the entry
+named** (headline, 90-day low, peak), and both of the entry's open questions are answered in the
+negative: the `~` was not a deliberate approximation signal, and no site reads a pre-rounded server
+field.
+
+**AI calls are bounded, and the prose routes answer with their own facts when the model fails
+(RV-69 + RV-70, v1.464.3).** Four routes — the daily and weekly digests, the health insight and the
+workout recap — assemble a complete fact block from the user's logs *before* calling the model, and
+threw all of it away on the catch path (502, or 500 for the recap). They now return it with
+`degraded: true` and status 200, the shape `running-plan/explain` already used. **Nothing degraded is
+stored**: the insight cache keys on a context hash that does not move, so a persisted fallback would
+be served ahead of every later attempt, and the three clients that cache are guarded (`cachedFetch`
+gained a `shouldCache` predicate — a response can be worth painting and not worth keeping).
+Separately, **no AI call carried a wall-clock ceiling** — every route passes `maxRetries: 0`, which
+takes the SDK's own timeout handling out of the picture, and nothing replaced it. One **30 s total
+budget** now applies at the chokepoint, across the shared retry rather than per attempt, sized
+against a slowest-call-ever-recorded of **4,786 ms**. **Four claims in the two entries were wrong and
+are corrected in the journal**, the load-bearing one being that the chokepoint wraps a *thunk*, so
+the "one-place `abortSignal`" fix the entry described was not possible as written; 17 call sites now
+pass the signal, and the deadline also races the attempt so a site that ignores it is still bounded.
+**The degraded path has not been seen in production** — the model has not failed since the logging
+existed — so it is verified by tests at all four routes, not by observation.
+**A failed read is no longer painted as a measured zero (RV-86 + RV-87, v1.464.2).** Home's Streak
+card rendered `calendarDays`'s `{}` initial value as "0 sessions this week" with an empty progress
+bar, and the Profile tab rendered a row of `?? 0` defaults as a genuine *Level 1 · Novice · 0 XP*
+with an all-zero lifetime, **best streak included** — both reached on a first launch after a
+reinstall, offline, or any failed fetch past the cache seed. Each screen now carries a gate raised
+only by a successful read, and shows "—" until it is. **Two of the entries' own claims were wrong
+and the fix went where the defect actually was:** the streak *number* already degraded to "—", and
+the rest-day banner comes from `/api/next-session`, not from the streak fetch. Held by e2e specs
+that were run against the unfixed components as a control, not only against the fix.
 
 **The streak counted the API's window, not the training (BF-176, v1.457.13).** The owner asked why it
 went **90 → 89 on a day he trained**; his real streak is **102 days**, unbroken since 2026-06-08.
@@ -1590,7 +1761,6 @@ would have missed it ([journal](docs/overview/history-2026-09-10-folded-4.md#202
 **A logged meal stops breaking apart, and two nutrition controls stop meaning the wrong thing (BF-72/73/74/76).** The owner's *"it starts as the meal with the image, then breaks into its ingredients"* was the diary hydrating from the server and **omitting `savedMealId`/`mealGroupId`** — a local upsert overwrites every column it is given, so the screen stripped its own grouping and then rendered the stripped copy. There are exactly two `applyDelta` callers and the sync engine's was already correct, so this was the one site BF-39's audit did not reach. The meal photo's ✕ **sat where the sheet's close button would be** — and the sheet passes `hideCloseButton`, so it was the only ✕ on screen: a reach for dismiss deleted the photo. It is a bin at the bottom-right now, with undo. Capture tiles went **60 px → 79 px** and `New` now outranks a small delete bin. **Two findings came out of it that outlive the batch.** `min-h-[Npx]` **does nothing on a `<button>`** — a bare `button { min-height: 48px }` in `globals.css` beats the utility (measured: 48 px on a button, 84 px on a div), so BF-50's documented "62 px" tile actually measured 60; filed as LB-32. And **BF-76's safe-area sweep found the opposite of what it expected** — nothing in nutrition is under-padded, three sheets are *over*-padded by declaring the inset on both the content and the footer, and the `vh`→`dvh` hypothesis is not the mechanism at all, since a bottom sheet is `fixed bottom-0` and its height moves only its top edge. No padding changed: every available fix costs more than the 12–24 px it saves ([journal](docs/overview/history-2026-09-10-folded-4.md#2026-08-31-nutrition-uplift)).
 
 
-
 **A red check took an hour to prove innocent, and the hour is the finding (LB-31).** `body-battery`'s anchor-precedence test failed on CI in code this branch does not touch. It did **not** reproduce: the failed job re-run on the identical commit passed, and the full suite passes locally against a freshly migrated database — so it is a flaky test, **not** the red `main` the first reading suggested. The mechanism is still worth fixing: those three assertions are cumulative on one user, and the route under test calls `buildReadinessPayload`, **which persists**, so step 2's own sleep insert can land the readiness step 3 is meant to establish. The durable half is that `ci.yml` has no `push: [main]` trigger — correctly, and for reasons written into the workflow — so nothing verifies the *combination* after several independently-green PRs land together, and there is no signal that separates "flaky test" from "main is broken". That is what cost the hour.
 
 **CI caught the defect LB-30 was filed to describe, on the exact line the fix was already written for.** `food-log-swipe-delete`'s *"the first tap on Delete opens the confirmation, **even mid-animation**"* went red: the spec read `boundingBox()` while the row was still sliding to its resting offset, then dispatched a CDP touch at that coordinate — and `Input.dispatchTouchEvent` performs none of the actionability checks `locator.tap()` does. **It passes three times over locally without the fix, which is the race's signature rather than a reason to dismiss it**; the window only opens when the runner is slow enough for the animation to outlast the read. `stableBox` is exported now with `tapCentre` beside it. The audit that came with it corrects the entry's own framing: of 32 coordinate taps, **21 sit inside a `toPass` retry and are safe**, 11 had a single measure, and **6 more feed a geometry *assertion*** — a class the entry did not cover, and worse, because a moving box gives a wrong verdict rather than a missed tap ([journal](docs/overview/history-2026-09-10-folded-4.md#2026-08-31-stable-box-coordinate-reads)).
@@ -2374,6 +2544,13 @@ steps** where the calculation said **10,000** — and `STEP_GOAL_BY_ACTIVITY` ca
 7,000 / 8,500 / 10,000 / 12,000, so 5,000 is not a number the formula can produce at all. Across 13
 stored recommendations the model produced six different step goals and **four of them were
 impossible**. The safety clamp changed none of it, because it is a band, not a derivation.
+
+**Corrected 2026-09-22, in the direction that matters.** Your **steps goal itself** still reads
+**5,000** — that impossible number is not just in a stored recommendation, it is your live goal. And
+the body-fat correction makes the intake gap bigger, not smaller: your DEXA reads **28.5%** against
+the scale's 25.7%, which lowers lean mass and so lowers the calculated targets to **1,359 kcal /
+111 g protein**. Against the 1,660 / 150 you are eating to, that is **+19% calories and +35%
+protein**, not the +18%/+30% first written here.
 
 **Two smaller things came out of measuring it**, both queued: `calculateBaseline` and the clamp
 disagree about fat (25% of calories vs 0.6 g/kg — 39 g against 42 g for you), so the recommendation

@@ -1,0 +1,56 @@
+/**
+ * RV-69 — the shape of the degraded answer.
+ *
+ * The routes that use this had already assembled a complete fact block before calling the model and
+ * threw it away on the catch path. What matters here is what replaces it: one sentence, on one
+ * line, that says plainly it is not the written summary.
+ */
+import { describe, it, expect } from 'vitest'
+import { degradedFromFacts } from '@/lib/ai/degrade'
+
+describe('degradedFromFacts', () => {
+  it('joins the fact lines into one line, so a plain <p> cannot collapse them into a run-on', () => {
+    const out = degradedFromFacts('here is the day as recorded', 'Trained today: Upper\nSteps: 8000/10000 today')
+    expect(out).not.toContain('\n')
+    expect(out).toContain('Trained today: Upper')
+    expect(out).toContain('Steps: 8000/10000 today')
+    expect(out).toContain(' · ')
+  })
+
+  it('says it is not the written summary', () => {
+    expect(degradedFromFacts('here is the week as recorded', 'Sessions: 4')).toMatch(/could not be generated/i)
+  })
+
+  /**
+   * A lead with nothing after it is worse than the error state it would replace, so the caller
+   * keeps its existing failure response. Every route checks for null rather than assuming a string.
+   */
+  it('returns null when there are no facts at all', () => {
+    expect(degradedFromFacts('here is the day as recorded', '')).toBeNull()
+    expect(degradedFromFacts('here is the day as recorded', '\n  \n')).toBeNull()
+  })
+
+  /**
+   * A bare noun in this slot produced "here is the readings" on the one section whose subject is
+   * plural — found by running the route locally, not by any test, which is why one exists now.
+   */
+  it('lets a plural subject carry its own verb', () => {
+    expect(degradedFromFacts('here are the readings as recorded', 'Resting heart rate: 48 bpm'))
+      .toContain('so here are the readings as recorded: Resting heart rate: 48 bpm')
+  })
+
+  it('drops blank lines rather than printing empty separators', () => {
+    expect(degradedFromFacts('here is the session as recorded', 'Duration: 45 min\n\nTotal volume: 8200 kg'))
+      .toContain('Duration: 45 min · Total volume: 8200 kg')
+  })
+
+  /**
+   * Only figures the app computed. Nothing here may invent, round, or re-band a number — the lines
+   * arrive already formatted by the route that will also hand them to the model, so the degraded
+   * answer and the prompt agree by construction.
+   */
+  it('reproduces the fact lines verbatim', () => {
+    const facts = 'Readiness: 80/100 avg that week (week before 74/100)'
+    expect(degradedFromFacts('here is the week as recorded', facts)).toContain(facts)
+  })
+})

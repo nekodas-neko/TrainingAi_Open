@@ -24,7 +24,9 @@ export function LatestBaselineCard({ userId }: { userId?: string }) {
       await cachedFetch<{ fitnessTests: LocalFitnessTest[] }>(
         'fitness-tests', '/api/fitness-tests', FITNESS_TESTS_TTL,
         (d) => { if (!cancelled) setRows(d.fitnessTests) },
-      ).catch(() => { if (!cancelled) setRows([]) })
+        // RV-84: `.catch` never fires on a non-ok response — `cachedFetch` resolves a boolean.
+        { onError: () => { if (!cancelled) setRows([]) } },
+      )
     }
     load()
     return () => { cancelled = true }

@@ -27,7 +27,7 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   be excluded from aggregates rather than counted as zero. **Stage 1 shipped 2026-09-01**, so the
   unique constraint it says has to go is already gone.
 
-- [`2026-09-20-fix-bf186-saved-dose-note-is-the-door`](../../overview/entries/2026-09-20-fix-bf186-saved-dose-note-is-the-door.md)
+- [`2026-09-20-fix-bf186-saved-dose-note-is-the-door`](../../overview/history-2026-09-22-folded-1.md#2026-09-20-fix-bf186-saved-dose-note-is-the-door)
   — **the vial sheet's saved-dose note became its own door (BF-186), 2026-09-20.** It named
   "Manage supplements", a screen that does not exist under that name; the control is "Manage",
   10 px, on the screen behind. Matching the words would have fixed one of three causes, so the note

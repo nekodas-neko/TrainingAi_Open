@@ -17,6 +17,7 @@ import { startRunClockChip, updateRunTextChip, stopRunChip } from '@/lib/native/
 import { ActivityElapsedClock } from './activity-elapsed-clock'
 import { CadenceReadout } from './cadence-readout'
 import { RunHrZoneHero } from './run-hr-zone-hero'
+import { formatPace } from '@trainingai/shared/health/vdot'
 
 const ActivityRouteMap = dynamic(
   () => import('./activity-route-map').then(m => m.ActivityRouteMap),
@@ -82,8 +83,8 @@ export function RunActiveScreen() {
   const elevationSoFar = useMemo(() => computeElevationChange(rawPoints), [rawPoints])
 
   const paceLabel = currentPaceSecPerKm
-    ? `${Math.floor(currentPaceSecPerKm / 60)}:${String(Math.round(currentPaceSecPerKm % 60)).padStart(2, '0')} /km`
-    : '--:-- /km'
+    ? formatPace(currentPaceSecPerKm)
+    : '--:--/km'
 
   const prescription = plan?.prescription ?? null
   const chipMode = useMemo(() => chooseRunChipMode(prescription), [prescription])

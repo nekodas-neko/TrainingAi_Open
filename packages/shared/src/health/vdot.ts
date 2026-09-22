@@ -99,9 +99,24 @@ export function predictRaceTime(
   return Math.round(fromTimeSec * Math.pow(toDistanceM / fromDistanceM, RIEGEL_EXPONENT))
 }
 
+/**
+ * Format a pace (sec/km) as `m:ss`, WITHOUT the unit.
+ *
+ * RV-90: three functions called `formatPace` existed with three different contracts — this file's
+ * returned `5:12/km`, `pace-bar-chart.tsx`'s returned `5:12`, and `activity-detail-sheet.tsx`'s
+ * returned `5:12 /km`. Same name, three meanings, and two different renderings on screen. Splitting
+ * value from unit is what makes one of them enough: an axis tick wants the bare value, a stat tile
+ * wants the unit, and neither has to re-derive the arithmetic to get it.
+ */
+export function formatPaceValue(secPerKm: number): string {
+  // Round the TOTAL before splitting. Rounding the remainder instead — which this function and both
+  // of the copies it replaces used to do — turns any pace in [5:59.5, 6:00) into the literal
+  // "5:60", because Math.floor takes the minute before Math.round carries into it.
+  const total = Math.round(secPerKm)
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`
+}
+
 /** Format a pace (sec/km) as "m:ss/km". */
 export function formatPace(secPerKm: number): string {
-  const m = Math.floor(secPerKm / 60)
-  const s = Math.round(secPerKm % 60)
-  return `${m}:${String(s).padStart(2, '0')}/km`
+  return `${formatPaceValue(secPerKm)}/km`
 }

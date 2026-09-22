@@ -230,27 +230,71 @@ export function daysBetweenDateStrs(fromStr: string, toStr: string): number {
   return Math.round((to - from) / 86_400_000)
 }
 
-// Display formatter for a raw 'YYYY-MM-DD' or 'YYYY/MM/DD' date string — 'short' gives
-// "Jan 5" (sheet/card labels), 'long' gives "Monday, 5 January" (detail headers). Returns
-// the raw input unchanged if it doesn't parse as a date.
-export function formatDateDisplay(raw: string, style: 'short' | 'long' = 'short'): string {
-  // Component-wise, for the reason formatDayShort below states and this function used to ignore:
-  // `new Date('2026-07-06')` parses as UTC midnight, so west of UTC it renders the previous day
-  // (Q-130). Correct on the owner's Brisbane device, off by one everywhere behind UTC.
+export type DateDisplayStyle =
+  | 'short'
+  | 'long'
+  | 'weekday'
+  | 'weekday-date'
+  | 'weekday-date-long'
+
+// The option bag for each style, in one place so a call site never spells its own (LB-125).
+const DATE_DISPLAY_OPTIONS: Record<DateDisplayStyle, Intl.DateTimeFormatOptions> = {
+  short: { month: 'short', day: 'numeric' },
+  long: { weekday: 'long', day: 'numeric', month: 'long' },
+  weekday: { weekday: 'short' },
+  'weekday-date': { weekday: 'short', day: 'numeric', month: 'short' },
+  'weekday-date-long': { weekday: 'long', day: 'numeric', month: 'short' },
+}
+
+/**
+ * Display formatter for a raw 'YYYY-MM-DD' or 'YYYY/MM/DD' date string. Returns the raw input
+ * unchanged if it doesn't parse as a date.
+ *
+ * **The strings below are measured, not described** — every one is pinned in
+ * `__tests__/date-utils.test.ts`, because the previous version of this comment claimed `'short'`
+ * gave "Jan 5" and `'long'` gave "Monday, 5 January", and a review quoted it as evidence of what
+ * a screen rendered (LB-125). `en-AU` produces neither. For 2026-09-15, a Tuesday:
+ *
+ * - `short`             → `15 Sept`            — sheet/card labels
+ * - `long`              → `Tuesday 15 September` — detail headers
+ * - `weekday`           → `Tue`
+ * - `weekday-date`      → `Tue, 15 Sept`
+ * - `weekday-date-long` → `Tuesday 15 Sept`
+ *
+ * Three things about `en-AU` that are easy to get wrong from memory. It is **day-first**, so the
+ * month never leads. Its `month: 'short'` is **not** a uniform three-letter abbreviation — June,
+ * July and Sept are four characters, so these labels are ragged-width in a column. And it emits a
+ * comma after a **short** weekday but not after a long one, which is the likeliest origin of the
+ * "Monday, 5 January" that was in this comment for months.
+ *
+ * **Deliberately device-local, with no timezone parameter.** The input is a date *string* — a
+ * calendar day already resolved in the user's timezone by whoever produced it — not an instant, so
+ * there is nothing left to convert. Re-rendering the local Date below under an explicit `timeZone`
+ * would reintroduce Q-130 rather than prevent it: on a device ahead of that zone, local midnight
+ * falls on the previous day there.
+ */
+export function formatDateDisplay(raw: string, style: DateDisplayStyle = 'short'): string {
+  // Component-wise, for the reason this function used to ignore: `new Date('2026-07-06')` parses
+  // as UTC midnight, so west of UTC it renders the previous day (Q-130). Correct on the owner's
+  // Brisbane device, off by one everywhere behind UTC.
   const m = /^(\d{4})[-/](\d{2})[-/](\d{2})$/.exec(raw)
   if (!m) return raw
   const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
   if (isNaN(d.getTime())) return raw
-  return style === 'long'
-    ? d.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' })
-    : d.toLocaleDateString('en-AU', { month: 'short', day: 'numeric' })
+  return d.toLocaleDateString('en-AU', DATE_DISPLAY_OPTIONS[style])
 }
 
-/** 'YYYY-MM-DD' → 'Jul 6'. Component-wise construction — never `new Date(isoDay)`,
- *  which parses as UTC midnight and shifts the day in AEST. */
+/**
+ * 'YYYY-MM-DD' → `6 July`. **Not "Jul 6"** — that is what this comment claimed until LB-125, and
+ * the string is unreachable: see `formatDateDisplay` above for why `en-AU` renders neither that
+ * order nor that abbreviation.
+ *
+ * Kept as a named alias rather than a second implementation: it carried a byte-identical copy of
+ * the `'short'` option bag, which is the duplication this entry is about. Delegating also means it
+ * now accepts slash-separated input and passes a non-date through, as `formatDateDisplay` does.
+ */
 export function formatDayShort(isoDay: string): string {
-  const [y, m, d] = isoDay.split('-').map(Number)
-  return new Date(y, m - 1, d).toLocaleDateString('en-AU', { month: 'short', day: 'numeric' })
+  return formatDateDisplay(isoDay, 'short')
 }
 
 /** Whole years from a 'YYYY-MM-DD' date of birth to `now`. null when unknown or

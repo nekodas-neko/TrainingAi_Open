@@ -7,6 +7,7 @@ import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache"
 import { DAY_LOG_TTL } from "@trainingai/shared/cache-ttl"
 import type { DayLogResult, DayExercise } from "@/app/api/day-log/route"
 import { displayBodyFat } from "@/components/health/body-fat-display"
+import { formatKg } from '@trainingai/shared/format/units'
 
 function formatOverlayDate(dateKey: string): string {
   const [y, m, d] = dateKey.split("/").map(Number)
@@ -35,7 +36,10 @@ export function WeekDaySheet({ date, onClose, onExerciseTap }: WeekDaySheetProps
     cachedFetch<DayLogResult>(
       `day-log:${date}`, `/api/day-log?date=${encodeURIComponent(date)}`, DAY_LOG_TTL,
       (d) => { if (!cancelled) { setData(d); setLoading(false) } },
-    ).catch(() => { if (!cancelled) setLoading(false) })
+      // RV-84: `cachedFetch` resolves a boolean and never rejects, so a `.catch` here never ran and
+      // a failed load spun forever. `onError` is the only channel that fires on a non-ok response.
+      { onError: () => { if (!cancelled) setLoading(false) } },
+    )
     return () => { cancelled = true }
   }, [date])
 
@@ -75,7 +79,7 @@ export function WeekDaySheet({ date, onClose, onExerciseTap }: WeekDaySheetProps
             }
 
             const metaChips = [
-              bodyMeta?.weightKg != null   && { Icon: WeightIcon,      text: `${bodyMeta.weightKg}kg` },
+              bodyMeta?.weightKg != null   && { Icon: WeightIcon,      text: formatKg(bodyMeta.weightKg) },
               bodyMeta?.steps != null      && { Icon: FootprintsIcon,  text: bodyMeta.steps.toLocaleString() },
               bodyMeta?.calories != null   && { Icon: FlameIcon,       text: `${bodyMeta.calories} kcal` },
               bodyMeta?.protein != null    && { Icon: BeefIcon,        text: `${bodyMeta.protein}g` },

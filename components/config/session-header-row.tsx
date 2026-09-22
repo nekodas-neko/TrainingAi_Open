@@ -42,7 +42,7 @@ export function SessionHeaderRow({
         className="cursor-grab active:cursor-grabbing touch-none flex-none"
         aria-label="Reorder session"
       >
-        <GripVertical className="h-4 w-4 text-muted-foreground/40" />
+        <GripVertical className="h-4 w-4 text-muted-foreground/70" />
       </button>
       <div className="relative flex-none">
         <button

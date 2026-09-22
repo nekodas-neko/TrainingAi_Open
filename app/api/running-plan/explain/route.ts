@@ -42,8 +42,13 @@ export async function POST(req: NextRequest) {
   try {
     const { text } = await loggedGenerateText(
       { section: 'running-plan-explain', userId, fingerprint: { type, durationMin } },
-      () => generateText({
+      signal => generateText({
         model: aiModel(),
+        // RV-70 found this route without `maxRetries: 0`, alone among the AI call sites — so the
+        // SDK's own default retries were multiplying with the shared one-retry policy instead of
+        // deferring to it.
+        maxRetries: 0,
+        abortSignal: signal,
         prompt: `You are a supportive running coach. In ONE encouraging sentence (no numbers you invent, no medical claims), restate why today's run is a "${type}" run${durationMin ? ` of about ${durationMin} minutes` : ''}. Base it ONLY on this reasoning: ${[rationale, ...gateReasons].join(' ')}
 
 ${PROSE_GUARDS}`,

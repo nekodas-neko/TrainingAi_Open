@@ -47,7 +47,7 @@ split is "does it feel slow" vs "is it actually slow at the source".
   the entry, and is now gone from both. **A screen that scrolls its own container gets no restoration
   from being inside the shell — check the call, not the layout.** `/health/day`'s scroller had no
   bottom padding at all. Both owe **one** device pass; RV-37 has still never been observed.
-- [`2026-09-19-fix-bf100-touch-cancels-pending-restore`](../../overview/entries/2026-09-19-fix-bf100-touch-cancels-pending-restore.md)
+- [`2026-09-19-fix-bf100-touch-cancels-pending-restore`](../../overview/history-2026-09-22-folded-1.md#2026-09-19-fix-bf100-touch-cancels-pending-restore)
   — **BF-100's `touchstart` cause CONFIRMED and fixed, 2026-09-19.** Supersedes the inconclusive
   probe below. Instrumenting a live `/more` back-navigation showed the takeover listeners attach
   **182 ms before** the restore lands, and seeding an unreachable target — which widens that window
@@ -454,6 +454,19 @@ Live at the time of writing (2026-07-30):
   screens; NOT device-verified).
 
 ## Gotchas specific to this domain
+
+- **`{value && <Row …>}` is a failure-vanish whenever the route has no null-payload path (RV-85).**
+  Home gated its whole score row — plus the illness advisory and the early-deload banner — on
+  `readiness`, and `/api/readiness-score` answers a payload or an error status, never a null
+  payload. So an absent value was always a failure, and the screen rendered **nothing**: no row, no
+  skeleton (`showHomeSkeleton` requires `refreshing`) and no message, on the owner's most-used
+  screen. Before gating a row on a fetched value, check whether its route can legitimately answer
+  "nothing" — if it cannot, the falsy branch needs a message, not an empty slot.
+- **`fetchWithRetry` retries three times and then gives up; pass `opts.onExhausted` or it gives up
+  silently.** The helper's own header says it exists to stop a blank widget, and without that
+  channel it produced one for every persistent failure. **Before it fires, an absent value means
+  in-flight; after, it means failed** — so a message driven by anything earlier would sit under a
+  request that was about to succeed.
 
 - **A dead WebView render process is FATAL by default, not silent (BF-80).** Capacitor's
   `BridgeWebViewClient` already forwards `onRenderProcessGone` to its `WebViewListener`s, and

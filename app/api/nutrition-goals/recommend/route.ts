@@ -292,10 +292,11 @@ export async function POST(req: Request) {
     // instead of the SDK's default retry that also skips observability.
     const result = await loggedGenerateObject(
       { section: 'nutrition-goals-recommend', userId, fingerprint: context },
-      () => generateObject({
+      signal => generateObject({
       model: aiModel(),
       schema: recommendationSchema,
       maxRetries: 0,
+      abortSignal: signal,
       prompt: `You are a sports nutrition and training coach. The DAILY targets below have already been calculated from this person's measurements. Your job is to EXPLAIN them and to judge one thing: whether their stated activity level still matches how much they actually train.
 
 ${context}

@@ -15130,6 +15130,25 @@ Containing the key is not the proof. The proof is that **every writer of the pay
 group, and live BLE samples land in the profile's own 90-day window during the workout with nothing
 in `lib/live-hr/**` invalidating anything. The flag would have pinned a stale profile for six hours
 across workouts to fix a twenty-call loop inside one.
+
+## 2026-09-22 — `docs/implementation-backlog.md` → 26586 (after merging review sweep 52)
+
+TN-59 and TN-60, filed the morning after the queue produced a fresh instance of the defect TN-59
+describes.
+
+**TN-60** is a variance decomposition of the readiness composite over 69 stored days, and it is new
+because it measures the **output** — TN-47 argues the same case from the inputs. The finding: the
+declared weights are not the effective ones (`hrvBalance` carries 22.8% of all movement against a
+0.15 weight), and the mechanism is the ±1.5σ rail, which clips `hrvBalance` on **38% of days** and
+renders z of −1.63 and z of −4.37 as the same zero. Most of its length is the two warnings — do not
+fix it by lowering the weight, and do not conflate it with the MAD-denominator inflation, which is a
+separate entry and does not explain a −4.37.
+
+**TN-59** asks for a check because the 2026-09-20 hand sweep did not hold: 28 entries are still
+parked by a prose marker alone, and LB-124 was filed and parked the same morning, taking Lane B's
+READY list to zero. Its own first draft was parked by writing the marker character inside backticks,
+and then filed under REFERENCE by using that field for background reading — both recorded in the
+entry, because they are the argument for the check rather than embarrassments to leave out.
 ## 2026-09-21 — `docs/implementation-backlog.md` +335 (26149 → 26484) (Review sweep 52)
 
 Nineteen entries (**RV-84…RV-102**) from a visual sweep — formatting drift, 384px layout,
@@ -15150,7 +15169,264 @@ both deload surfaces are even reachable in one session, RV-93 notes the injury-c
 proven only for the geometry and not for a specific exercise, and RV-84 asks for a check script
 rather than a repeatable sweep.
 
-## 2026-09-22 — `docs/implementation-backlog.md` +360 (26484 → 26844) (Review sweep 53)
+
+## 2026-09-21 — LA-125 described its own owner gate in a form nothing reads
+
+`docs/implementation-backlog.md` **26150 → 26158** (`lane-a/la125-gate-the-fat-formula-change`) —
+recomputed against main on the third re-merge while this waited.
+
+Filed hours earlier with the sentence *"that changes the computed fat target for real users, so it
+wants the owner's eye on the number before it ships"* — as **prose**. `Gate:` is a field, and written
+any other way it is ignored, so the entry sat at **READY position 1** advertising a gate that nothing
+could act on.
+
+Worth the note because the near-miss is asymmetric. Its sibling **LA-126** was filed in the same
+edit with the same mistake and `check-backlog-pointers.js` caught it within a minute — there the
+field name sat mid-bullet where the checker looks for it, and it warned. LA-125 never
+wrote the words at all, so there was nothing to detect: **the check finds a gate in the wrong place,
+not a gate that is missing.** Catching one and not the other reads like the checker working, which
+is how the second one survived.
+
+## 2026-09-22 — LA-127 was filed against two tables that do not exist
+
+`docs/implementation-backlog.md` **26187** · `projectOverview.md` **12205 → 12212**
+(`lane-a/la125-gate-the-fat-formula-change`, folded in).
+
+LA-127 claimed `user_goals` and `body_fat_calibration` had no `claude_ro` twin. Neither is a table.
+`getUserGoals` reads **columns on `users`**; `getBodyFatCalibration` derives its answer from
+**`dexa_scans`** in TypeScript and stores nothing. The generator's `DENIED` set holds only
+`invited_emails` and `rate_limits`, so there was no policy exclusion either — and no drift, because
+there is nothing to generate a view for. Retired rather than built.
+
+**The retraction makes the finding it came from stronger, which is why it is worth the lines.** That
+entry existed to excuse a gap in RV-66's measurement. With the right relations read:
+`claude_ro.users.steps_goal` is **5,000** — so the impossible step goal is the owner's *live* goal,
+not only a stored recommendation — and `claude_ro.dexa_scans` holds **28.5%** against the scale's
+25.7%, which lowers lean mass and takes the computed baseline to **1,359 kcal / 111 g protein**. The
+gap against what he is eating to is **+19% / +35%**, not the +18% / +30% first filed. A caveat that
+read as "this number might be softer than stated" was hiding a number that was harder.
+
+## 2026-09-22 — `docs/implementation-backlog.md` → 26551 (RV-84 and RV-88 left the queue)
+
+Both shipped and were removed whole — a net −35 from this branch. The number above is higher than
+the one it started from because sweep 52 (#1368) and another entry landed while this was open; it is
+recomputed against the merged file, not spliced.
+
+Worth carrying out of them: **RV-84's count was wrong three ways**, and the correction is the useful
+part. It said 16 chained `.catch`es on `cachedFetch`; there are **81**, of which 68 are harmless
+`.catch(() => {})`, 4 are redundant because `onError` is already wired beside them — including the
+file the entry names as its own reference — and **9** were genuinely broken. A site is only a defect
+when it has a handler *and* no `onError`, which is the distinction the count missed. Two naive greps
+answered 8 and 59 before a balanced-paren pass gave 81, which is why the number is in the entry's
+test rather than only in prose.
+
+## 2026-09-22 — RV-86 + RV-87 (`fix/rv86-rv87-absence-not-zero`)
+
+`docs/implementation-backlog.md` 26551 → 26522 → 26575 → **26619** across two re-merges: RV-86 and RV-87 shipped
+together and left the queue; #1390 then landed with a net +53 and #1393 with a further +44 while
+this PR waited on CI. The number here is the merged one — recomputed with `--fix` on each
+re-merge, never spliced from either side. They are not batched in the file — neither carries a `Batch:` slug — but they share one
+verification (absence must render as "—", not a confident zero) and touch disjoint files, and the
+protocol assigns batches when an entry is next touched.
+
+`projectOverview.md` 12212 → **12222**: ten lines at the top of Current Status for that fix. The
+version line had been reading v1.457.14 against a `package.json` on 1.464.1 — four days and several
+merges behind — so it is corrected here too rather than left to the next sweep.
+## 2026-09-22 — `docs/implementation-backlog.md` → 26604 (OR-122: LA-49 out, OR-123 in, six blocks lifted into fields)
+
+Net +52 across a removal and an addition, recomputed after merging review sweep 52 rather than spliced. **Out:** LA-49, whose two steps both shipped in this PR.
+**In:** OR-123, the WebView rollup consumer — filed because Q-538's bound was *"blocked, and not by
+anything in this queue"*, held by a `⛔` because the target had no entry to point a `Needs:` at.
+Filing the target is what converts a prose block into a field.
+
+The rest is six blocks that existed only as prose being written as `Gate:`/`Needs:`/`Reference:`
+lines — TN-2, Q-49, Q-72, Q-85, Q-1b, Q-538, Q-252, BF-14, LA-57. Each costs three or four lines
+and buys the thing the queue actually reads.
+
+Worth carrying: **LA-49 sat for three weeks because it was parked by the bug it described.** It
+measured, on 2026-09-01, that 34 entries carried a `⛔` and only 7 meant blocked — and it quotes
+three of those emphasis markers as evidence, so the detector parked it too. Nothing about the
+measurement decayed; it simply never printed in a READY list. That is the second circular gate
+found this week (BF-165's *"ungate it the moment the fix lands"* was the first), and both have the
+same shape: **a condition for becoming visible that can only be met by someone who can already see
+it.** When writing a park of any kind, check that something outside the entry can lift it.
+
+## 2026-09-22 — `docs/implementation-backlog.md` 26604 → 26648 (OR-124: TN-59 reconciled, `--sittings` documented)
+
+Two additions, no removal. **TN-59** was at the top of READY and its premise had been superseded
+hours earlier by #1390 — it specified a Custom Rules check against a 28-entry backlog of
+prose-parked entries, and that backlog is **0** on this commit. Reconciled in place rather than
+removed: the preventive half still earns its keep, at a fraction of the size, with an empty
+baseline. The rest is the `--sittings` view documented where an implementer reads about the tool.
+
+Worth carrying: **TN-59 and OR-122 are the same finding, reached independently on the same day from
+opposite directions** — Tuning from having swept 17 markers by hand and watched a new one arrive,
+the Orchestrator from Lane B having nothing to start. Neither saw the other, and the common cause
+was LA-49, which had measured the whole thing three weeks earlier and was parked by the bug it
+described. A self-parking finding does not stay found; it gets re-found, and each re-finding pays
+the investigation again. That is the argument for the check TN-59 still proposes, more than the
+count it was written against.
+
+## 2026-09-22 — RV-89 (`fix/rv89-one-rm-display-helper`)
+
+`docs/implementation-backlog.md` 26619 → 26598 → **26562** on re-merge: RV-89 shipped and left the
+queue, and #1394 then landed while this PR waited on CI.
+
+`projectOverview.md` 12222 → 12233 → **12250** on re-merge: eleven lines at the top of Current
+Status, plus #1394's own paragraph, which is kept above this one rather than spliced with it. The entry named
+five surfaces; the Strength Trend card turned out to hold three sites rather than one, and the
+`mround125` half is worth the space because it is the same rounder behind BF-127.
+## 2026-09-22 — `projectOverview.md` → 12239, `docs/implementation-backlog.md` → 26583 (RV-69 + RV-70)
+
+The backlog shrank by the two entries the batch `ai-degrade-and-bound` shipped, less a five-line
+cross-reference added to the ai-periodization prescription entry — which has the same catch-path
+shape and is deliberately **not** in scope, because it would degrade to a prescription the user
+trains on rather than to text. Naming that there is what stops the next session reading the shipped
+sibling and "finishing the job".
+
+Both numbers are recomputed against the merged file, not spliced: RV-84/RV-88 and RV-86/RV-87 landed
+while this branch was open, so the backlog started from a higher figure than it did when this work
+began. `projectOverview.md` grew by one Current Status block. It is longer than a status note usually is
+because three of its sentences are corrections: the chokepoint wraps a thunk rather than SDK params,
+so RV-70's "one-place `abortSignal`" fix was not possible as written; the recap answered 500 rather
+than the 502 RV-69 recorded, from a handler-wide catch; and `running-plan/explain` — the route both
+entries held up as the reference — was the one site missing `maxRetries: 0`. A status note that said
+only "shipped" would leave all three to be rediscovered.
+
+## 2026-09-22 — RV-91 (`fix/rv91-raw-iso-date-and-cal-label`)
+
+`projectOverview.md` 12250 → **12259**: nine lines at the top of Current Status.
+
+`docs/implementation-backlog.md` does not move: RV-91 left the queue and **LB-125 took its place**,
+filed out of the "also noted, not filed" line RV-91 closes with. A finding that leaves with its
+entry is a dropped finding, and this one had already been carried once.
+
+## 2026-09-22 — `layout-384` batch (`feat/layout-384-truncation-batch`)
+
+`projectOverview.md` 12259 → **12271**: twelve lines for the five-entry batch, carrying the three
+"not established" questions it settled — two of them against the entries — because a batch that
+shipped without device verification needs its arithmetic on the record where the next session reads.
+
+`docs/implementation-backlog.md` 26570 → **26500**: five entries out, and LB-125 split into LB-125
+(Lane A, the helper) plus LB-126 (Lane B, the call sites, parked on it). One entry spanning two
+lanes prints as READY to whichever lane cannot start it, which is what it did within the hour.
+
+## 2026-09-22 — RV-97 (`fix/rv97-acwr-band-colour`)
+
+`projectOverview.md` 12271 → 12280 → **12316** on re-merge with #1399: nine lines at the top of
+Current Status, carrying why the
+entry's one-line fix does not compile — a six-key union into a four-key helper — because that is
+the part a future session would otherwise rediscover.
+
+`docs/agents/state/implementation-lane-b.md` stays at **65**, rewritten in full rather than
+appended. It had fallen four merged PRs behind. Two lessons were merged to make room: the
+vacuous-guard rule folded into the control rule it is a case of, and the Morning Check-in modal
+into the Playwright-mechanics bullet beside it.
+## 2026-09-22 — `docs/implementation-backlog.md` → 26431, `projectOverview.md` → 12288 (TN-57)
+
+The backlog lost TN-57 whole, which was a long entry: it carried the production measurement table,
+the correction of its own first draft (the defect is not circularity — that is TN-50, a different
+sheet), and the argument for why this blocks TN-33/TN-16/TN-34. None of that is owed any more, so
+none of it was kept.
+
+`projectOverview.md` grew by one Current Status block, and most of it is a correction rather than a
+summary: the entry's write-path instruction would have stopped the owner's daily check-in reaching
+the server, because the morning sheet sends nothing else the Q-465 guard counts and `pushMutations`
+rejects such a body with no retry. A note saying only "readers now check the flag" would leave the
+next session to rediscover that by shipping it.
+
+## 2026-09-22 — `docs/implementation-backlog.md` → 26427, `projectOverview.md` up one block (LB-124 out, LA-128 in)
+
+Nearly a wash, and the two halves are worth naming separately. LB-124 left whole — it was a long
+entry because it argued its own case for being filed rather than attempted, and that argument is
+spent now that the column exists. In its place LA-128 records the shape LB-124 was really about: the
+check-in route strips an unknown key instead of rejecting it, so the next field added ahead of its
+server half lands silently too. LB-124 closed that for one field by making the key known, not for
+the class.
+
+TN-58 grew by a few lines rather than shrinking: its `Needs:` cleared, and its inline claim that
+TN-57 was the engine half was wrong and is corrected in place. A cleared dependency that leaves a
+false sentence behind is worse than one that never cleared.
+
+`projectOverview.md` takes one Current Status block. Longer than "column added" because two of its
+sentences are the findings: the compiler caught a re-save path that would have cleared the answer on
+every food-log completion, and the type choice (text, not `-1/0/+1`) turns on this table already
+storing 1 = best … 5 = worst — both things the next person to touch this column needs and neither
+recoverable from the diff.
+
+## 2026-09-22 — TN-58 (`feat/tn58-vs-yesterday-control`)
+
+`projectOverview.md` 12316 → **12327**: eleven lines. Longer than a control change warrants because
+two things must survive to the next session — that the absolute scale was **added beside, not
+replaced**, and why; and that a **two-week pass test** is running, whose failure is a finding rather
+than a defect to fix.
+
+`docs/implementation-backlog.md` does not shrink: TN-58 stays in the queue as a `Keep:` for that
+pass test, per the rule that an entry still owing a check states what is owed rather than being
+deleted.
+## 2026-09-22 — `docs/implementation-backlog.md` → 26356, `projectOverview.md` → 12343 (RV-85)
+
+RV-85 left whole. `projectOverview.md` takes one Current Status block, and the sentence worth the
+lines is the one about `fetchWithRetry`: the helper that exists to stop a blank widget was producing
+one, because it retried three times and then gave up with no way to say so. That is the kind of
+thing a "fixed the blank score row" note would lose, and it generalises — the app-shell domain index
+now carries it as a gotcha, since any `{value && <Row …>}` over a route with no null-payload path is
+the same shape.
+
+## 2026-09-22 — `docs/implementation-backlog.md` → 26335, `projectOverview.md` → 12358 (RV-90)
+
+The backlog shrinks by RV-90's whole entry; nothing is owed, so no `Keep:` remains. `projectOverview.md`
+grows by one Current Status block, and the lines it spends are on the two things the entry could not
+have known. The first is a correction — "seven sites, five ways" is three genuine disagreements plus
+six sites already agreeing, so the work was mostly against latent drift, and a future sweep reading
+the entry alone would over-rate it. The second is the defect that was actually live and was never
+filed: every pace formatter in the tree split minutes from seconds before rounding and printed the
+literal `5:60`. That one is worth the lines precisely because it was found by testing the helper
+rather than by the entry that sent me, and the shape — round the total, then split — is reusable.
+
+## 2026-09-22 — `docs/implementation-backlog.md` → 26326, `projectOverview.md` → 12375 (LB-125)
+
+The backlog barely moves: LB-125's entry is removed, but most of those lines go straight back in as
+corrections to **LB-126**, the Lane B half that inherited its counts. That trade is the point — the
+successor entry said three sites were a bare `{ weekday: 'short' }` when two are, and listed a fifth
+site (`calendar-widget.tsx`) the helper structurally cannot take, being a month-and-year label built
+from numbers rather than a date string. Letting Lane B discover that mid-PR costs more than the
+lines do.
+
+`projectOverview.md` spends its block on the `en-AU` facts rather than on "fixed a comment", because
+the comment being wrong is not the reusable part. That the locale is day-first, that `month: 'short'`
+is four characters for three months of the year, and that a comma follows a short weekday but not a
+long one are each things a future session would otherwise write from memory and get wrong — which is
+exactly how the original comment came to exist.
+
+## 2026-09-22 — journal compaction: 61 foldable entries → 27 (`history-2026-09-22-folded-1.md`)
+
+`check-doc-index-size` assigns the sweep to whoever adds the entry that crosses 60, and this branch
+was it. Forty entries folded; six held back because an agent baton cites them, which the script
+refuses to rewrite on purpose — one lane editing another's live state file races whatever that lane
+is doing, and batons are rewritten wholesale at handover anyway.
+
+Folded 40 rather than the two that would technically clear the limit. At the rates this README
+records, clearing to the threshold would put the same failure in front of the next lane's PR within
+the day, for a reason unrelated to their diff — which is the exact complaint that made the guard
+attribute itself in the first place. `check-doc-links` (818 files) and `check-index-doc-paths`
+(1,163 paths) both clean afterwards; the README is emphatic that one is not a substitute for the
+other, since a citation whose link *text* is also a path passes the first and fails the second.
+
+## 2026-09-22 — RV-98 (`fix/rv98-opacity-contrast`)
+
+`docs/implementation-backlog.md` → **26306**: RV-98 left the queue.
+
+`projectOverview.md` → **12382**: twelve lines for the sweep, **minus four duplicate header lines
+that were already on `main`**. Current Status opened with three stacked `**Version:**` lines
+(v1.465.2, v1.465.1, v1.465.0) and carried a stray `**Version:** v1.464.8` + `**Last updated:**`
+pair buried mid-section. They are conflict-resolution residue, and the recipe in this lane's baton
+is how they got there: *"keep BOTH Current Status paragraphs"* is right about the paragraphs and
+wrong if it also keeps the header above them. The baton now says to fix the version line
+explicitly. This is the file every session reads first to orient, so three contradictory version
+numbers at the top of it is worse than a stale one.
+
+## 2026-09-22 — `docs/implementation-backlog.md` +369 (26306 → 26675) (Review sweep 53)
 
 Twenty entries (**RV-103…RV-122**) from the sweep the owner scoped himself — animations and page
 swaps, caching, and what should merge — at ~18 lines each.

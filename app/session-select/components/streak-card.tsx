@@ -10,6 +10,11 @@ interface StreakCardProps {
   weekSessionCount: number;
   weeklyTarget: number;
   calendarDays: Record<string, string[]>;
+  /** False while the streak history is genuinely unknown — a failed or not-yet-arrived
+   *  `/api/streak-data` with no cache seed. Every history-derived cell renders "—" rather than a
+   *  zero it cannot stand behind (RV-86). `weeklyTarget` comes from the program, not from that
+   *  fetch, so it keeps rendering either way. */
+  loaded: boolean;
   cardColors: Record<string, string>;
   sectionEditMode: boolean;
   dayKey: (daysAgo?: number) => string;
@@ -27,6 +32,7 @@ function StreakCardComponent({
   weekSessionCount,
   weeklyTarget,
   calendarDays,
+  loaded,
   cardColors,
   sectionEditMode,
   dayKey,
@@ -79,7 +85,7 @@ function StreakCardComponent({
           Streak
         </p>
         <p className="text-2xl font-bold tabular-nums leading-none" style={{ color: "var(--color-brand)" }}>
-          {streak > 0 ? streak : "—"}
+          {loaded && streak > 0 ? streak : "—"}
           <span className="text-xs font-normal text-muted-foreground ml-1">days</span>
         </p>
         <div className="flex gap-0.5 mt-2">
@@ -90,9 +96,11 @@ function StreakCardComponent({
                 key={i}
                 className="h-2 w-2 rounded-[2px]"
                 style={{
-                  background: trained
-                    ? "var(--color-brand)"
-                    : "color-mix(in oklch, var(--color-brand) 14%, transparent)",
+                  background: !loaded
+                    ? "var(--color-muted)"
+                    : trained
+                      ? "var(--color-brand)"
+                      : "color-mix(in oklch, var(--color-brand) 14%, transparent)",
                 }}
               />
             );
@@ -113,7 +121,7 @@ function StreakCardComponent({
           This Week
         </p>
         <p className="text-2xl font-bold tabular-nums leading-none">
-          {weekSessionCount}
+          {loaded ? weekSessionCount : "—"}
           {!isAiDynamic && (
             <span className="text-xs font-normal text-muted-foreground ml-1">/ {weeklyTarget}</span>
           )}
@@ -126,7 +134,7 @@ function StreakCardComponent({
               <div
                 className="h-full rounded-full"
                 style={{
-                  width: `${Math.min((weekSessionCount / weeklyTarget) * 100, 100)}%`,
+                  width: loaded ? `${Math.min((weekSessionCount / weeklyTarget) * 100, 100)}%` : "0%",
                   background:
                     "linear-gradient(90deg, var(--color-brand), color-mix(in oklch, var(--color-brand) 60%, #00d4ff))",
                 }}

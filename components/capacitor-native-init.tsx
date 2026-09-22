@@ -9,6 +9,7 @@ import { MEAL_REMINDERS_CHANNEL } from '@/lib/meal-reminders';
 import { SUPPLEMENT_REMINDERS_CHANNEL } from '@/lib/supplement-reminders';
 import { DAY_REVIEW_CHANNEL } from '@/lib/day-review-reminders';
 import type { ScaleBlePlugin } from '@/lib/scale-ble/plugin';
+import { formatKg } from '@trainingai/shared/format/units'
 
 // Ceiling for the live scale weigh-in toast — see its use below for why.
 const SCALE_WEIGH_IN_TOAST_MAX_MS = 60_000;
@@ -303,7 +304,7 @@ export function CapacitorNativeInit() {
               toast.custom(() => (
                 <ScaleWeighInResultToast
                   variant="success"
-                  title={`${result.weightKg?.toFixed(1)} kg logged`}
+                  title={`${formatKg(result.weightKg ?? 0)} logged`}
                   description={result.isAdditionalReadingToday ? 'Additional reading today' : undefined}
                 />
               ), { id: 'scale-weigh-in' });
@@ -311,7 +312,7 @@ export function CapacitorNativeInit() {
               toast.custom(() => (
                 <ScaleWeighInResultToast
                   variant="success"
-                  title={`${result.weightKg?.toFixed(1)} kg logged`}
+                  title={`${formatKg(result.weightKg ?? 0)} logged`}
                   description="Body composition skipped — stand barefoot on the plates"
                 />
               ), { id: 'scale-weigh-in' });
@@ -319,7 +320,7 @@ export function CapacitorNativeInit() {
               toast.custom(() => (
                 <ScaleWeighInResultToast
                   variant="warning"
-                  title={`${result.weightKg?.toFixed(1)} kg — looks different from usual`}
+                  title={`${formatKg(result.weightKg ?? 0)} — looks different from usual`}
                   description="Confirm it’s you in Settings › Scale"
                 />
               ), { id: 'scale-weigh-in' });

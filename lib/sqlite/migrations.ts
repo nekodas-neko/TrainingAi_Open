@@ -309,6 +309,7 @@ export const RECONCILE_COLUMNS: { table: string; column: string; ddl: string }[]
   { table: 'day_checkins',     column: 'illness_context',            ddl: `ALTER TABLE day_checkins ADD COLUMN illness_context TEXT` },
   { table: 'day_checkins',     column: 'perceived_recovery_touched', ddl: `ALTER TABLE day_checkins ADD COLUMN perceived_recovery_touched INTEGER NOT NULL DEFAULT 0` },
   { table: 'day_checkins',     column: 'sleep_quality_feel_touched', ddl: `ALTER TABLE day_checkins ADD COLUMN sleep_quality_feel_touched INTEGER NOT NULL DEFAULT 0` },
+  { table: 'day_checkins',     column: 'vs_yesterday',               ddl: `ALTER TABLE day_checkins ADD COLUMN vs_yesterday TEXT` },
   // Supersets — additive, delivered via reconcile per the Batch F pattern above
   // (no versioned ALTER needed; reconcileSchema runs after every open).
   { table: 'session_exercises', column: 'superset_group', ddl: `ALTER TABLE session_exercises ADD COLUMN superset_group INTEGER` },
@@ -823,6 +824,10 @@ const CREATE_DAY_CHECKINS = `CREATE TABLE IF NOT EXISTS day_checkins (
   -- Q-387. A column added to a CREATE TABLE IF NOT EXISTS body reaches FRESH INSTALLS ONLY, so it
   -- also needs the v27 ALTER below and its RECONCILE_COLUMNS row — see the migrations rule.
   food_logging_completed_at TEXT,
+  -- LB-124 / TN-58. Same three-part rule as the line above: this body reaches FRESH INSTALLS ONLY,
+  -- so it also needs the v40 ALTER below and its RECONCILE_COLUMNS row. No DEFAULT — NULL means
+  -- "not answered", and a neutral stored as an answer is the bug this question exists to escape.
+  vs_yesterday        TEXT,
   updated_at          TEXT NOT NULL,
   deleted_at          TEXT,
   sync_status         TEXT NOT NULL DEFAULT 'pending',
@@ -1567,6 +1572,15 @@ export const MIGRATIONS: UpgradeStatement[] = [
       // CREATE_MOOD_LOGS above so fresh installs already have it, this ALTER reaches every upgraded
       // device, and the RECONCILE_COLUMNS row is the authority if it half-applies.
       `ALTER TABLE mood_logs ADD COLUMN suggested_sore_muscles TEXT`,
+    ],
+  },
+  {
+    toVersion: 40,
+    statements: [
+      // LB-124, mirroring Postgres migration 280. Same shape as v35-v39: the column is in
+      // CREATE_DAY_CHECKINS above so fresh installs already have it, this ALTER reaches every
+      // upgraded device, and the RECONCILE_COLUMNS row is the authority if it half-applies.
+      `ALTER TABLE day_checkins ADD COLUMN vs_yesterday TEXT`,
     ],
   },
 ];

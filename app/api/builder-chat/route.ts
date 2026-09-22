@@ -193,12 +193,13 @@ When responding, mention if a change improves or worsens weekly volume balance. 
   try {
     const { object: raw } = await loggedGenerateObject(
       { section: 'builder-chat', userId, fingerprint: message },
-      () => generateObject({
+      signal => generateObject({
         model: aiModel(),
         schema: BuilderChatObjectSchema,
         system: `${systemPrompt}\n\n${PROSE_FIELD_GUARDS}`,
         prompt: userPrompt,
         maxRetries: 0,
+        abortSignal: signal,
       }),
     )
 

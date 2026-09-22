@@ -28,6 +28,7 @@ const CollectionCard = dynamic(() => import('@/components/home/collection-card')
 // Type-only, so the cycle with `home-prefs` (which imports `CardSectionKey` back from here) is
 // erased at compile time and never exists at runtime.
 import type { CardWidgetKey } from '@/lib/home/home-prefs'
+import { formatKg } from '@trainingai/shared/format/units'
 
 export type CardSectionKey = `card_${CardWidgetKey}`
 
@@ -106,7 +107,7 @@ export const HomeCardWidget = React.memo(function HomeCardWidget(props: HomeCard
           <div role="button" tabIndex={0} onClick={() => { if (!sectionEditMode) navigateWithTransition(router, pathname, '/health?tab=body'); }} className={cn("w-full rounded-2xl p-4 flex items-center gap-4 text-left active:scale-95 transition cursor-pointer", sectionEditMode && "pointer-events-none")} style={accentCardStyle(_wColor)}>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-1">Body Weight</p>
-              <p className="text-2xl font-bold tabular-nums">{metaLoading ? "…" : currentWeight != null ? `${currentWeight} kg` : "—"}</p>
+              <p className="text-2xl font-bold tabular-nums">{metaLoading ? "…" : currentWeight != null ? formatKg(currentWeight) : "—"}</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">Last {weightLookback} days</p>
             </div>
             <div className="flex-none">{points.length >= 2 ? <Sparkline values={points} width={110} height={44} /> : <span className="text-xs text-muted-foreground">No data</span>}</div>

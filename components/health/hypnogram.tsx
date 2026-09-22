@@ -23,6 +23,16 @@ function fmtHourLabel(iso: string, tz: string) {
   return formatTimeOfDay(iso, tz);
 }
 
+/**
+ * Deliberately NOT `formatHoursMinutes` (RV-90), and this is the one exception among the five.
+ *
+ * The shared helper pads the minutes — `2h 00m` — which is right in the `tabular-nums` columns the
+ * other four sit in. These are stage labels on a chart, where an exact two hours reads better as
+ * `2h` than as `2h 00m`, and the zero-minute case is common because stages are rounded to the
+ * minute. Routing it through the helper would change a chart label to satisfy a consistency rule
+ * that exists to stop the SAME quantity rendering two ways on adjacent cards; this quantity does
+ * not appear on those cards.
+ */
 function fmtDuration(min: number) {
   const h = Math.floor(min / 60);
   const m = Math.round(min % 60);

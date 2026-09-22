@@ -446,6 +446,14 @@ Live at the time of writing (2026-07-30):
 - **Never weaken the `pg` Pool config** (error handler + statement timeouts) — both took production
   down in session 165.
 - **Security fails closed** — a missing signature header or signing key is a rejection, never a skip.
+- **A degraded AI answer must never be stored** (RV-69). The prose routes answer 200 with their own
+  facts when the model fails; the insight cache keys on a context hash that does not move, and the
+  clients cache for 6–24h, so a persisted or client-cached fallback is served ahead of every later
+  attempt. A response can be worth painting and not worth keeping — `cachedFetch`'s `shouldCache`.
+- **Every AI call is bounded at the chokepoint, not the call site** (`lib/ai/deadline.ts`, RV-70).
+  The budget is TOTAL across the shared retry; a per-attempt ceiling is the doubling it exists to
+  stop. The thunk takes an `AbortSignal` — but the bound holds by racing, so a call site that
+  ignores it is still bounded.
 
 ## Handoffs
 
