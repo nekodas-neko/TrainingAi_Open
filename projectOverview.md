@@ -26,8 +26,18 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.465.4 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.465.5 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-22.
+
+**A training phase was painted in the state colours (RV-100, v1.465.5).** `PHASE_COLORS` had
+`realisation` — the PEAK-output phase — as `text-red-500`, the app's failure colour, and `deload` as
+`text-green-500` while Home's banner paints a deload *recommendation* amber or red. **Both are live,
+which the entry asked to establish before sizing the work:** the active program is `ai_dynamic` and
+production carries 2 sessions in each of those phases. The five phases now use a cool ramp, leaving
+green/amber/red for state. **The entry's suggested source was wrong** — `SESSION_PALETTE` is indexed
+by session position and contains green and red itself, so borrowing it would have re-randomised the
+collision. Home's banner also had a third amber of its own; it takes `--accent-amber` now, and the
+hex baseline drops 3 → 2.
 
 **Four more date labels moved onto the shared formatter (LB-126, v1.465.4).** LB-125 (#1404, Lane A)
 gave `formatDateDisplay` the `weekday`, `weekday-date` and `weekday-date-long` styles; these are the
