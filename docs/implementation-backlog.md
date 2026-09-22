@@ -716,6 +716,8 @@ below threshold and left in place for next time.
 
 - **Lane:** B — `components/home/home-nutrition-card.tsx:48`,
   `components/home/home-energy-balance-card.tsx:14`. **Added:** 2026-09-22 · Review sweep 53.
+- **Gate: owner** — a large visible change to a screen the owner uses daily; **show a mockup and
+  get a yes before writing code** (see CLAUDE.md, *Large UI changes are mocked up first*).
 - **Batch:** `home-ia-merge`
 - Both call `useEnergyBalanceToday()` — same hook, same `energy-balance:${today}` key — and both are
   offered independently in the widget picker. Enabled together they stack the same number twice
@@ -735,6 +737,8 @@ below threshold and left in place for next time.
 
 - **Lane:** B — `app/health/health-sections.tsx:544-604` and `:646-648`. **Added:** 2026-09-22 ·
   Review sweep 53.
+- **Gate: owner** — a large visible change to a screen the owner uses daily; **show a mockup and
+  get a yes before writing code** (see CLAUDE.md, *Large UI changes are mocked up first*).
 - **Batch:** `health-ia-merge`
 - The "Balance" tile renders `netKcal` `vs TDEE est.` in group **Body**; `CalorieBalanceBar` renders
   `remainingKcal` + zone band in group **Activity & intake**. Same payload, two different numbers,
@@ -751,6 +755,8 @@ below threshold and left in place for next time.
 
 - **Lane:** B — `app/health/health-sections.tsx:544-573` (Body) and `:713-763` (Progress).
   **Added:** 2026-09-22 · Review sweep 53.
+- **Gate: owner** — a large visible change to a screen the owner uses daily; **show a mockup and
+  get a yes before writing code** (see CLAUDE.md, *Large UI changes are mocked up first*).
 - **Batch:** `health-ia-merge`
 - Body has a "Trend" tile with the kg/wk regression slope and **no chart**; Progress has a card
   **titled "Weight Trend"** with a sparkline and two goal bars and **no slope number**. One question
@@ -767,6 +773,8 @@ below threshold and left in place for next time.
 
 - **Lane:** B — `app/session-select/session-select-content.tsx:1128-1193`. **Added:** 2026-09-22 ·
   Review sweep 53.
+- **Gate: owner** — a large visible change to a screen the owner uses daily; **show a mockup and
+  get a yes before writing code** (see CLAUDE.md, *Large UI changes are mocked up first*).
 - **Batch:** `home-ia-merge`
 - Illness advisory · exercise-detected · early-deload · APK download · goals check-in · day-review ·
   weekly recap. Each self-hides and each is individually correct; **the failure is cumulative.** On

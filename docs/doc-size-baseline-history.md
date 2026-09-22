@@ -15186,3 +15186,20 @@ carrying only their *durable rules* — read which field a 4xx names, pair a ref
 control, `claude_ro` is the owner's rows only, rank visual findings by the resume telemetry — and
 the narrative lives in each sweep's own write-up, which the pillar indexes already link. State, not
 history, which is what the baton is for.
+
+## 2026-09-22 — `CLAUDE.md` 816 → 825, and the backlog +8 (Review sweep 53, owner decision)
+
+Nine lines for one standing instruction: **large UI changes are mocked up before they are built.**
+The owner asked for it directly after seeing four consolidation entries (RV-116…RV-119) that were
+technically unblocked and would still have rearranged the screen he opens most.
+
+It earns the space in `CLAUDE.md` rather than a reference doc because it changes *when* work starts,
+not how it is done — a rule that only fires at the moment an implementer would otherwise begin
+coding has to be in the file every agent reads first. The eight backlog lines are the matching
+`Gate: owner` on those four entries, so the queue enforces it rather than relying on the rule being
+remembered.
+
+The distinction the rule draws is the part worth keeping exact: restyling a component or fixing a
+layout bug does not need a mockup; merging a card, collapsing a banner stack, or moving a card
+between tabs does. The test is whether the owner would notice the screen is *arranged* differently,
+not whether it looks different.
