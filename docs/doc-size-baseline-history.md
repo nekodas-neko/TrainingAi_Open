@@ -15608,6 +15608,25 @@ device gesture was the only thing it still owed, and it was verified on the S25 
 role's baton joins the six already ratcheted; the same rule applies from its first line — it only
 comes down.
 
+## 2026-09-22 — `docs/implementation-backlog.md` +125 (26664 → 26789) (Review: DV probe entries)
+
+Ten entries (**RV-124…RV-133**) filing the probes in
+[`docs/device-agent-probe-checklist.md`](device-agent-probe-checklist.md) as queue work now that the
+Device Verification role exists (#1417), at ~12 lines each.
+
+**They are the first entries whose ONLY work is the device check**, and the filing took three tries
+to get right, which is worth recording because the next one will hit it too. `Gate: device` parks an
+entry as unstartable *and* is not selected by `--sittings`, so it would have hidden them from the one
+agent that can run them. `Verify: device` reads as *shipped* — the protocol warns about exactly this
+misuse twice — but it is the only field `--sittings` selects on, and the warning is aimed at unbuilt
+work that still needs implementing. These have **no build half at all**, so nothing is hidden and
+nothing is blocked; each entry says so in its first bullet so no later reader mistakes it for shipped
+code. Verified rather than assumed: 10 of 10 reach `--sittings`, 0 leak into either lane's READY.
+
+**Two were parked by their own emphasis glyph** — `next-item.js` treats `⛔ …block` within 40
+characters as the legacy blocked marker, and *"⛔ The clearance half is BLOCKED"* matches it exactly.
+Same trap as sweep 52's eight parked entries. Swapped to `⚠`.
+
 
 ## 2026-09-22 — `CLAUDE.md` → 836 and `docs/implementation-backlog.md` → 26772 (OR-125: six owner answers)
 

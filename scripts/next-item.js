@@ -12,7 +12,7 @@
 //
 // Usage:
 //   node scripts/next-item.js                 both lanes
-//   node scripts/next-item.js --lane A        one lane
+//   node scripts/next-item.js --lane A        one lane — A · B · O · DV
 //   node scripts/next-item.js --all           do not truncate READY
 //   node scripts/next-item.js --sittings      owed device checks, grouped by domain
 //
@@ -136,11 +136,18 @@ const inQueue = new Set(entries.map((e) => e.id));
 // An absent target means shipped — the protocol removes a completed entry from the queue.
 const unmetNeeds = (e) => e.needs.filter((n) => inQueue.has(n));
 
+// `O` and `DV` see only what is tagged for them; `A` and `B` also see the untagged.
+//
+// The asymmetry follows from what an unstated lane MEANS: "the path rule in docs/agents/README.md
+// §3 answers it" — and that rule resolves to an implementer, always. So showing an untagged entry
+// to both implementer lanes is the safe failure it was designed as, while showing the same entry to
+// the Orchestrator or the device agent is noise: their work is ASSIGNED, never derived from a path.
+// With 400+ entries untagged, the few genuinely theirs would be unfindable.
+const ASSIGNED_ONLY = new Set(['O', 'DV']);
 const wantLane = (e) => {
   if (!laneArg) return true;
   if (e.lane === laneArg) return true;
-  // No lane stated means the path rule in docs/agents/README.md §3 answers it, so it stays visible
-  // to both lanes rather than being hidden from the one that might own it.
+  if (ASSIGNED_ONLY.has(laneArg)) return false;
   return e.lane === null || e.lane === '?';
 };
 
@@ -225,12 +232,20 @@ if (sittingsOnly) {
   }
   const batched = owed.filter((e) => e.batch).length;
   console.log(`\nDEVICE CHECKS OWED (${owed.length}) — ${batched} already in a batch, ${owed.length - batched} loose`);
-  console.log('Grouped by primary domain tag. A group is a candidate sitting, not an assignment:');
-  console.log('per CLAUDE.md a `Batch:` is written when the entry is next touched, never in a sweep.\n');
+  console.log('Grouped by primary domain tag, groups in QUEUE ORDER — the first group holds the');
+  console.log('best-placed entry, so moving one entry up promotes its whole sitting. A group is a');
+  console.log('candidate sitting, not an assignment: per CLAUDE.md a `Batch:` is written when the');
+  console.log('entry is next touched, never in a sweep.\n');
+  // Entries arrive in queue order, which IS priority order — so a group's first member is its
+  // best-placed entry, and ordering groups by that makes the sitting list obey the same rule
+  // everything else here does. **The Orchestrator promotes a whole sitting by moving ONE entry up.**
+  // Ordering by size instead meant the biggest pile always led, which is the opposite of a priority
+  // signal: nobody could say "do the back-gesture one next" without editing the tool.
+  const rank = new Map(owed.map((e, i) => [e.id, i]));
   [...groups.entries()]
-    .sort((a, b) => b[1].length - a[1].length)
+    .sort((a, b) => rank.get(a[1][0].id) - rank.get(b[1][0].id))
     .forEach(([tag, es]) => {
-      console.log(`  ${tag} (${es.length})`);
+      console.log(`  ${tag} (${es.length})  — best queue position: ${es[0].id}`);
       es.forEach((e) => {
         const lane = e.lane ? `Lane ${e.lane}` : 'lane unstated';
         console.log(`      ${e.id.padEnd(8)} ${lane.padEnd(14)}${e.batch ? `batch \`${e.batch}\`` : ''}`);
