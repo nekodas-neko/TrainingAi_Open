@@ -479,7 +479,7 @@ below threshold and left in place for next time.
   does nothing: `energyBalance` keeps the object fetched **before** the meal, "kcal left" and the
   macro targets stay stale, **nothing on screen says so, and there is no retry**. A page swap
   re-runs `fetchData`, which is exactly the recovery the owner describes — both times.
-- **⛔ Do not add another cache bust.** BF-177 establishes eviction was never the problem:
+- **⚠ Do not add another cache bust.** BF-177 establishes eviction was never the problem:
   `invalidateNutritionWrite()` clears `energy-balance:` and always has. This is the Q-402 shape.
 - **Fix:** pass `onError` and render a retry affordance, or reuse `fetchWithRetry` — but see RV-85,
   which is the same "retries then gives up silently" gap in that helper, so fix the helper first or
@@ -675,7 +675,7 @@ below threshold and left in place for next time.
 - **Fix, one line, and try this before the elaborate version:** drop the opacity ramp and keep the
   settle — `from { transform: scale(0.97) } to { transform: none }`. The content is already painted,
   so there is nothing to hide and the blink cannot happen.
-- **⛔ The true cross-dissolve costs more than it looks.** It keeps a second full-screen tree
+- **⚠ The true cross-dissolve costs more than it looks.** It keeps a second full-screen tree
   composited for ~90ms and needs `tab-panel-idle`/`content-visibility` held **off** the outgoing
   panel for that time — which is exactly the pause-when-hidden behaviour `globals.css:811-839`
   protects, added after a device profile attributed 21.3% of main-thread time to `animationiteration`.
@@ -772,7 +772,7 @@ below threshold and left in place for next time.
   weekly recap. Each self-hides and each is individually correct; **the failure is cumulative.** On
   a Monday after a detected walk with an early-deload flag, the owner scrolls past five cards to
   reach the recommendation — which is why he opens Home.
-- **⛔ Do NOT collapse all seven.** The illness advisory and early-deload are things he should see
+- **⚠ Do NOT collapse all seven.** The illness advisory and early-deload are things he should see
   *today*; putting them in a dismissible strip beside an APK banner makes them easy to miss. Split
   by severity: those two stay full-width, the other five collapse.
 - **The APK banner should simply go** — the canonical runtime *is* the APK, and the same download
@@ -1067,7 +1067,7 @@ at all — which is itself a finding worth having, and it costs a fortnight to g
 - **The telling detail:** four of those five call `displayOneRm(...)` for the **bodyweight** branch of
   the same ternary and hand-roll the weighted branch. The shared helper is already imported and half
   used.
-- **⛔ `mround125` must not do display duty — this has already shipped a live bug.**
+- **⚠ `mround125` must not do display duty — this has already shipped a live bug.**
   `components/workout/utils.ts:47` rounds to a 1.25 barbell-plate grid clamped 5–250; it is a
   *prescription* rounder. `projectOverview.md` records **BF-127**, where the baseline banner told the
   owner to load **82.5 kg on a pull-up** because `mround125` was applied to a bodyweight 1RM index.
@@ -1246,7 +1246,7 @@ at all — which is itself a finding worth having, and it costs a fortnight to g
 - **Fix:** make `scoreBand()` return the tokens (the only half that can follow the theme) and have the
   hex sites import it. **Chart.js callers must pass the result through the existing `resolveColor()`**
   (`packages/shared/src/chart-colors.ts`) — canvas cannot resolve `var()` and silently paints black.
-- **⛔ Do not migrate blind.** Not all 173 are band colours: `accentCardStyle('#22c55e')` as a card's
+- **⚠ Do not migrate blind.** Not all 173 are band colours: `accentCardStyle('#22c55e')` as a card's
   identity tint, `rarity-colors.ts`, and `hr-zones.ts`'s deliberate blue→red ramp are legitimate
   one-off uses. Audit before replacing, then a check script banning the three literals outside
   `score-band.ts` holds it.
@@ -1320,7 +1320,7 @@ at all — which is itself a finding worth having, and it costs a fortnight to g
 - **Fix, and keep it to this:** have `getNextSession` accept an already-fetched program, or have
   those two routes call `getNextSession` alone and read the program off its result. Risk-free —
   same data, same request.
-- **⛔ Do NOT add a per-user memo of `getActiveProgram` as part of this.** The same launch reads the
+- **⚠ Do NOT add a per-user memo of `getActiveProgram` as part of this.** The same launch reads the
   program 8 times across 22 warm routes (~30 of 132 statements), and collapsing that is tempting —
   but it trades directly against config-save freshness, which is a decision, not a cleanup. If it is
   wanted, it is its own entry with that trade stated.
@@ -1421,7 +1421,7 @@ at all — which is itself a finding worth having, and it costs a fortnight to g
   3 more fetches) and `fetchActiveTabHealthData()` believing they are cache hits. Home does the same.
 - **This is the Q-262 rule read in the direction nobody wrote down:** the TTL constants govern how
   long a *seed* survives, not how often the app touches the network.
-- **⛔ Do not bulk-apply the flag.** `freshWithinTtl: true` converts a stale flash into hours of hard
+- **⚠ Do not bulk-apply the flag.** `freshWithinTtl: true` converts a stale flash into hours of hard
   staleness if any writer is missed, and CLAUDE.md requires a **written invalidation proof** per key:
   list every write that changes the payload and show each one's group contains the key. Candidates,
   all already `TTL_LONG` and already in a group: `workout-data:meta`, `muscle-recovery`,
@@ -4796,7 +4796,7 @@ composite reports which of its inputs were inferred.
   data**, and the two are not the same state — `hasData: false` and `anchorSource: "default"` both say
   so in the same payload. **Recommended:** `sufficient` is false when `sampleCount === 0`, whatever
   the window; keep the grace for a genuinely young day that has *some* readings. One condition.
-- **⛔ Do NOT fix this by loosening the spec.** RV-38's assertion is the correct one — an account with
+- **⚠ Do NOT fix this by loosening the spec.** RV-38's assertion is the correct one — an account with
   nothing must qualify the 50 it prints — and it is the whole point of the entry. The card
   (`components/body-battery-card.tsx`) is also correct and unchanged since #1214: its guard is
   `conf != null && !conf.sufficient`, which is right; it is being told `true`.
