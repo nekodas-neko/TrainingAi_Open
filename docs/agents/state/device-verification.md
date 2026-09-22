@@ -9,8 +9,8 @@
 
 ## For the Orchestrator — read this part
 
-- **I take every device check you scope.** Put a sitting in a `Batch:` and it is mine to run; tell
-  the owner only what needs a human (wearing, weighing, feel, a production write he has not OK'd).
+- **Assign me work with `Lane: DV`** (OR-129); I read `--lane DV` first, then `--sittings`. Tell the
+  owner only what needs a human (wearing, weighing, feel, a production write he has not OK'd).
 - **The phone is on GESTURE navigation now** (owner, 2026-09-23; `probe.js` reads mode 2, bottom
   inset **15px**). Safe-area checks are valid from here on.
 - **`back-gesture-sitting` is done on the device side.** All five checks answered; what remains in
