@@ -57,9 +57,14 @@ describe('RV-91 — a date string reaches the screen through the shared formatte
 describe('RV-91 — one energy label', () => {
   it('no rendered copy says "Cal" where the rest of the app says "kcal"', () => {
     // `git ls-files` rather than a glob, so a new untracked scratch file cannot fail this.
+    // **Tests are excluded, and that is not a convenience.** This assertion is about RENDERED
+    // COPY, and a test that states the rule has to quote the banned word to state it — this file
+    // says "Cal" four times. It passed locally while untracked and went red on the first CI run
+    // that saw it committed, which is the sharpest possible demonstration that a repo-wide source
+    // scan must exclude the file making the claim.
     const files = execFileSync('git', ['ls-files', 'app', 'components', '--', '*.tsx'], {
       cwd: ROOT, encoding: 'utf8',
-    }).split('\n').filter(Boolean)
+    }).split('\n').filter(Boolean).filter(f => !f.includes('__tests__'))
 
     const offenders = files.filter(f => /\bCal\b/.test(code(read(f))))
     expect(offenders, `"Cal" is a food calorie and so is "kcal" — the defect is the disagreement`)
