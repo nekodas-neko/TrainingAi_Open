@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.464.10",
+    version: "1.465.1",
     date: "2026-09-22",
     changes: [
       "Home now tells you when your scores failed to load instead of just leaving a gap. The whole row \u2014 readiness, sleep, the illness note and the deload banner \u2014 disappeared if the request failed, with no spinner and no message, so it looked like a day with nothing to show. It now says \u201cScores didn't load \u2014 pull to refresh\u201d, but only after it has quietly retried three times, so a slow morning still just looks slow.",
+    ],
+  },
+  {
+    version: "1.465.0",
+    date: "2026-09-22",
+    changes: [
+      "The morning check-in now asks whether today is better, about the same, or worse than yesterday \u2014 three taps at the top of the sheet. The 1-to-5 recovery scale below it has produced exactly two different numbers in 81 days and you have never once moved the slider, which is the normal fate of an absolute self-rating: comparing two days is a much easier question to answer than scoring one. Nothing is pre-selected and skipping it stores nothing, on purpose. The old scale is unchanged and still there.",
     ],
   },
   {

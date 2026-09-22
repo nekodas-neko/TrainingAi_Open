@@ -610,55 +610,23 @@ the structured fields exist to replace; a heuristic that sorts "do not fix this 
 cannot start" would be a third convention to maintain. The check reports the *shape* — parked, with
 nothing structured saying why — and a human decides.
 
-### [readiness][app-shell] TN-58 — ask whether today is better or worse than yesterday, because an absolute 1–5 has produced two distinct values in 81 days
+### [readiness][app-shell] TN-58 — the comparative check-in: KEEP, the two-week pass test is owed
 
-- **Branch:** _unassigned_ · **Added:** 2026-09-21 · Tuning · **owner asked for this direction**
-  2026-09-21 (*"yes go for it"*) after declining a three-week daily log the same morning — that
-  decline is the design constraint, not an obstacle.
-- **Lane: B** — `components/morning-checkin-sheet.tsx` and its sheet siblings. This one changes what
-  is asked.
-- **The engine half SHIPPED 2026-09-22 (LB-124).** `day_checkins.vs_yesterday` exists (migration
-  280, `claude_ro` twin 281, local SQLite v40), stores `better` | `same` | `worse` with **no
-  default**, and is carried by both write paths, all three row mappers, the local store and the
-  pull-delta. It is in the Zod schema, so the silent-strip this entry feared is gone: an invalid
-  value is a 400 rather than a 201-that-stores-nothing. It also counts in `dayCheckinHasAnswers`,
-  so a check-in whose ONLY answer is this one saves rather than being rejected as empty.
-  **TN-57 was never that engine half** despite the line below saying so — it shipped no migration.
-- **What is left for this entry is the CONTROL** (`components/morning-checkin-sheet.tsx` and its
-  siblings) and nothing else. Post `vsYesterday` as one of the three strings, or omit it for a
-  skip; never send a neutral placeholder, which is the whole reason the column has no default.
+- **Lane:** B — control shipped 2026-09-22 (`components/checkin/vs-yesterday-picker.tsx`,
+  `components/morning-checkin-sheet.tsx`). Engine half was LB-124. **Added:** 2026-09-21 · Tuning.
+- **Keep:** the **pass test, which cannot be run for a fortnight.** After two weeks of the control
+  being on the sheet, `day_checkins.vs_yesterday` must show **≥3 distinct values and a touched-rate
+  materially above zero**. Query it with the `claude_ro` view; the absolute scale's baseline to beat
+  is 2 distinct values in 81 days at sd 0.29.
+- **If it fails, that is the finding, not a defect:** self-report is not available from this owner
+  at all, which settles TN-33/TN-16/TN-34/TN-55 by a different route. Do not quietly re-tune the
+  control and restart the clock.
+- **Do not remove `perceived_recovery` or its scale on a hunch before then.** The comparative
+  question was added ABOVE the absolute one rather than replacing it: the entry scoped this to "the
+  control and nothing else", and `perceivedRecovery` feeds `signals.morningCheckin` and shapes the
+  prescription, so retiring the control silently changes what the engine receives. **Retiring it is
+  a separate entry, conditional on this pass test** — file it then, with the measurement in hand.
 
-**The control asks for an absolute rating and gets the middle of the scale.** Measured 2026-09-21:
-**2 distinct values across 96 check-ins, sd 0.29, and zero of them touched** (full table in TN-57).
-An absolute self-rating invites pegging to the centre; that is the well-known failure of the form,
-not a quirk of this owner.
-
-**The proposal: replace the absolute scale with a comparative one — *better / same / worse than
-yesterday*.** Three taps, **no default and no pre-selection**, on a sheet he already sees.
-
-**Why comparative rather than absolute, framed a year out.** Two reasons, and the second is the one
-that matters:
-1. People are reliably better at ordering two things than at scoring one, so it produces variance by
-   construction rather than by asking harder.
-2. **Pairwise orderings are sufficient to validate a metric's sign and ranking**, which is the whole
-   of what TN-33 is blocked on. Calibrated absolute values are not needed for that — so the cheaper
-   question buys the expensive answer.
-
-**What it unblocks, in order:** TN-33's sign → TN-16's prolonged-stress warning → TN-34's re-wire →
-TN-55's stress weight (61% of Body Battery drain, currently de-weighted precisely because the sign is
-unknown).
-
-**⚠ A skipped answer must store NULL, not a neutral.** The entire finding in TN-57 is a neutral
-default stored as though it were an answer. A redesign that ships a default recreates it under a new
-name. An empty control the owner skips is *more* useful than a filled one he accepts.
-
-**⚠ Do not remove the absolute scale's column.** Keep `perceived_recovery` as-is and add the
-comparative field beside it; the 77 untouched rows are evidence, and the absolute question may still
-be worth asking occasionally once there is something to anchor it against.
-
-**Pass test:** after two weeks, the comparative field has **≥3 distinct values** and a touched-rate
-materially above zero. If it does not, the answer is that self-report is not available from this owner
-at all — which is itself a finding worth having, and it costs a fortnight to get.
 ### [body][platform] RV-90 — body weight renders five ways across seven sites, and no shared formatter exists
 
 - **Lane:** A — a new helper in `packages/shared/src/`, then the call sites.
