@@ -114,7 +114,7 @@ Live at the time of writing (2026-08-05):
   **Still owed: the S25 look** (four things in one chart), and the cross-day aggregate, which the
   owner was *not* asked about.
 
-- [`2026-09-20-tn53-sparkline-gaps`](../../overview/entries/2026-09-20-tn53-sparkline-gaps.md)
+- [`2026-09-20-tn53-sparkline-gaps`](../../overview/history-2026-09-22-folded-1.md#2026-09-20-tn53-sparkline-gaps)
   — **TN-53's render half (2026-09-20): the 14-day trend charts were drawing over their own gaps.**
   The engine gate made `analyseHrRecovery` return `null` for a pair of readings that cannot support
   an `hrr1`; `trend-sparkline.tsx` then passed `spanGaps: true`, so Chart.js joined across the run

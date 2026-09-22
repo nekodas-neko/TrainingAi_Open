@@ -31,6 +31,23 @@
 **Version:** v1.465.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-22.
 
+**A doc comment was quoted as evidence of what a screen rendered; it was wrong, and so was its
+neighbour (LB-125).** `formatDateDisplay`'s header claimed `'short'` gave `Jan 5` and `'long'` gave
+`Monday, 5 January`; `en-AU` produces **`15 Sept`** and **`Tuesday 15 September`**. The entry did not
+catch that `formatDayShort` directly below made the same two errors against its own example
+(`Jul 6` → really **`6 July`**) off a byte-identical option bag — it is now an alias that delegates.
+Three `en-AU` properties are pinned in tests because none is guessable: it is day-first,
+`month: 'short'` is **four** characters for June/July/Sept so label columns are ragged-width, and it
+emits a comma after a **short** weekday but not a long one (`Tue, 15 Sept` vs `Tuesday 15 Sept`) —
+which is the likeliest origin of the comma in the old comment. Three weekday styles added.
+**The entry's open question is answered rather than deferred:** the style stays device-local and
+takes no `tz`, because its input is an already-resolved calendar day, so an explicit `timeZone`
+would reintroduce Q-130 on a device ahead of that zone. **Two counts corrected for Lane B (LB-126):**
+two sites are a bare `{ weekday: 'short' }`, not three, and `calendar-widget.tsx` is a month-and-year
+label built from numbers that the helper cannot take at all — so that entry is four sites, not five.
+No user-visible change, so no version bump.
+
+
 **One weigh-in printed four ways; now one helper decides rounding and spacing (RV-90, v1.465.2).**
 `packages/shared/src/format/units.ts` holds `formatKg` / `formatMinutes` / `formatHoursMinutes`, and
 pace keeps `formatPace` / `formatPaceValue` in `vdot.ts`. **The entry's "seven sites, five ways"

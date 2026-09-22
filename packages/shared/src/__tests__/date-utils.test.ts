@@ -189,9 +189,54 @@ describe('formatDateDisplay (Q-130)', () => {
     expect(formatDateDisplay('2026/07/06')).toBe(formatDayShort('2026-07-06'))
   })
 
+  // LB-125 folded formatDayShort into this function rather than leaving a byte-identical copy of
+  // the 'short' option bag beside it. These are what that delegation newly buys; the equality
+  // assertion above is what it must not break.
+  it('formatDayShort now takes slashes and passes a non-date through', () => {
+    expect(formatDayShort('2026/07/06')).toBe('6 July')
+    expect(formatDayShort('not-a-date')).toBe('not-a-date')
+  })
+
   it('names the right weekday in long form', () => {
-    // 2026-07-06 is a Monday.
-    expect(formatDateDisplay('2026-07-06', 'long')).toContain('Monday')
+    // 2026-07-06 is a Monday. Asserted whole rather than with toContain: the loose version passed
+    // happily while this function's own header comment claimed it produced "Monday, 5 January",
+    // and a review then quoted that comment as evidence of what a screen rendered (LB-125).
+    expect(formatDateDisplay('2026-07-06', 'long')).toBe('Monday 6 July')
+  })
+
+  // LB-125. Every style's exact output, so the doc comment above the function can be checked
+  // against something that runs. A comment that gets quoted as evidence is worse than none, and
+  // that is precisely what happened to the old one.
+  it('pins the exact string of every style', () => {
+    const tue = '2026-09-15' // a Tuesday
+    expect(formatDateDisplay(tue, 'short')).toBe('15 Sept')
+    expect(formatDateDisplay(tue, 'long')).toBe('Tuesday 15 September')
+    expect(formatDateDisplay(tue, 'weekday')).toBe('Tue')
+    expect(formatDateDisplay(tue, 'weekday-date')).toBe('Tue, 15 Sept')
+    expect(formatDateDisplay(tue, 'weekday-date-long')).toBe('Tuesday 15 Sept')
+  })
+
+  it('emits a comma after a short weekday but not after a long one', () => {
+    // Surprising, and worth its own case: this asymmetry is the likeliest source of the
+    // "Monday, 5 January" that sat in the doc comment. en-AU really does produce a comma here.
+    expect(formatDateDisplay('2026-09-15', 'weekday-date')).toContain(', ')
+    expect(formatDateDisplay('2026-09-15', 'weekday-date-long')).not.toContain(',')
+    expect(formatDateDisplay('2026-09-15', 'long')).not.toContain(',')
+  })
+
+  it('is day-first, and month:short is not uniformly three letters', () => {
+    // June, July and Sept are four characters in en-AU, so a column of these labels is
+    // ragged-width. The old comment's "Jan 5" was wrong about the order AND unreachable for
+    // three months of the year.
+    expect(formatDateDisplay('2026-01-05', 'short')).toBe('5 Jan')
+    expect(formatDateDisplay('2026-06-05', 'short')).toBe('5 June')
+    expect(formatDateDisplay('2026-07-05', 'short')).toBe('5 July')
+    expect(formatDateDisplay('2026-09-05', 'short')).toBe('5 Sept')
+  })
+
+  it('every style passes a non-date through unchanged', () => {
+    const styles = ['short', 'long', 'weekday', 'weekday-date', 'weekday-date-long'] as const
+    for (const style of styles) expect(formatDateDisplay('not-a-date', style)).toBe('not-a-date')
   })
 
   it('returns the raw input unchanged when it is not a date string', () => {

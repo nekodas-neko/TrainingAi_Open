@@ -47,7 +47,7 @@ split is "does it feel slow" vs "is it actually slow at the source".
   the entry, and is now gone from both. **A screen that scrolls its own container gets no restoration
   from being inside the shell — check the call, not the layout.** `/health/day`'s scroller had no
   bottom padding at all. Both owe **one** device pass; RV-37 has still never been observed.
-- [`2026-09-19-fix-bf100-touch-cancels-pending-restore`](../../overview/entries/2026-09-19-fix-bf100-touch-cancels-pending-restore.md)
+- [`2026-09-19-fix-bf100-touch-cancels-pending-restore`](../../overview/history-2026-09-22-folded-1.md#2026-09-19-fix-bf100-touch-cancels-pending-restore)
   — **BF-100's `touchstart` cause CONFIRMED and fixed, 2026-09-19.** Supersedes the inconclusive
   probe below. Instrumenting a live `/more` back-navigation showed the takeover listeners attach
   **182 ms before** the restore lands, and seeding an unreachable target — which widens that window
