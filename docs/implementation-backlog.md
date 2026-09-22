@@ -464,6 +464,108 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [readiness] TN-60 — the ±1.5σ rail clips 38% of HRV days, so a z of −1.63 and a z of −4.37 both score zero 🔴 LIVE
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-22 · Tuning, from a variance decomposition of the
+  stored composite over 69 days (2026-07-16 → 2026-09-22). Measured on the **output**, which is what
+  makes it new: TN-47 argues the same thing from the inputs.
+- **Lane: A** — `packages/shared/src/health/readiness-composite.ts`.
+- **Gate: owner** — this is a scoring change and re-scores history, so it needs sign-off on the shape
+  before Lane A builds it. The measurement below does not.
+
+**What the composite's weights actually are, versus what they say.** Weighted standard deviation of
+each contributor's stored score, as a share of all the movement in the final number:
+
+| contributor | declared weight | sd | share of movement |
+|---|---:|---:|---:|
+| **hrvBalance** | 0.15 | **35.8** | **22.8%** |
+| previousNight | 0.16 | 23.6 | 16.0% |
+| restingHeartRate | 0.15 | 24.7 | 15.7% |
+| sleepBalance | 0.10 | 32.6 | 13.8% |
+| recoveryIndex | 0.09 | 28.0 | 10.7% |
+| temperature | 0.10 | 16.6 | 7.0% |
+| checkin | 0.10 | 15.2 | 6.5% |
+| prevDayActivity | 0.09 | 12.1 | 4.6% |
+| activityBalance | 0.06 | 11.1 | 2.8% |
+
+Readiness itself: mean 62.2, sd 15.3, range 25–87.
+
+**The declared weights are not the effective ones**, because the contributors are measured on rulers
+of different widths. `hrvBalance` carries **half again** the influence its 0.15 says it does;
+`activityBalance` carries half of its 0.06. Nobody chose that distribution.
+
+**⚠ THE RAIL IS THE MECHANISM, AND IT IS WHERE THE INFORMATION GOES.** `Z_POINTS_PER_UNIT = 50/1.5`
+puts the score's floor and ceiling at **z = ±1.5**. Measured:
+
+- `hrvBalance` is **railed on 26 of 69 days — 38%** (16 at 100, 10 at 0).
+- The z values landing on **score 0** span **−1.63 to −4.37**. A 2.7σ spread is rendered as one number.
+- The z values landing on **score 100** span 2.28 to 2.37.
+
+So on more than a third of days the largest contributor to readiness reports "as bad as possible" or
+"as good as possible" and cannot say which kind of bad. A mildly low HRV night and the worst night in
+the record are the same score.
+
+**Options, with a recommendation.**
+1. **Recommended — replace the hard clip with a compressive tail.** Keep the linear region as it is,
+   so the middle of the range and every shipped expectation about it are unchanged, and let scores
+   beyond ±1.5σ keep *ordering* as they saturate toward 0/100. Nothing needs re-fitting, it is a
+   shape change rather than a constant change, and it restores resolution exactly where it is lost.
+2. **Per-contributor rail width, set from each contributor's own trailing quantiles.** Strictly
+   better at making the declared weights the effective ones — the table above would flatten — and it
+   is self-referencing, so the calibration-period rule at the head of this file does not apply. It
+   lost on blast radius: it changes all nine contributors at once and re-scores everything.
+3. **Widen `Z_POINTS_PER_UNIT` globally.** Cheapest, and wrong: it dilutes the contributors that are
+   correctly scaled in order to fix the one that is not.
+
+**⚠ Do NOT fix this by lowering hrvBalance's weight.** The weight is not what is wrong. Dropping it
+would reduce HRV's influence on the 62% of days where it is working correctly, in order to mask the
+38% where it is saturated.
+
+**⚠ The MAD denominator makes these z values run hot, and that is a separate entry (TN-47).** The
+baselines use mean absolute deviation, which is ≈0.798σ for normal data, so every z here is roughly
+1.25× inflated. That inflation is part of *why* the rail is hit so often — but widening the rail and
+fixing the denominator are independent fixes and must not be conflated. **A −4.37 stays extreme even
+after deflating to ≈−3.5.**
+
+**Pass test:** on the same 69 days, the share of `hrvBalance` days at a rail falls below ~10%, the
+ordering of the ten worst HRV days is preserved rather than tied, and the share-of-movement table
+above moves toward the declared weights.
+
+### [platform] TN-59 — an entry parked only by a prose marker is invisible, and the queue is still producing new ones
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-22 · Tuning · **Lane: O** — `scripts/`, the queue
+  tooling, which §3's path rule does not reach.
+- **Background:** the 2026-09-20 sweep that converted 17 of these by hand, and its journal entry.
+  (Written as prose, not a `Reference:` field — that field files an entry under *read, do not build*,
+  and this one is to be built. Third field-semantics slip in this filer's day; see TN-59's own point.)
+
+**`next-item.js` parks any entry containing the no-entry sign (U+26D4) when no structured field
+explains it — spelled by codepoint here on purpose, because writing the character even inside
+backticks parks the entry that describes it, as the first draft of this one discovered.** The marker is
+doing two jobs across the file — *"this cannot start"* and *"do not implement it this way"* — and the
+second is far commoner. A sweep on 2026-09-20 read all 25 marker lines across 19 parked tuning
+entries and found **17 were cautions**; converting them took the queue's READY list from 6 to 21.
+
+**This is not a cleared backlog, which is the reason to build the check rather than sweep again.**
+Measured 2026-09-22: **28 entries are still parked by a prose marker alone** — and **LB-124 was filed
+that same morning and parked immediately**, taking Lane B's entire READY list to zero, because its
+marker reads *"the failure mode is SILENT, which is why this is filed rather than attempted"* — an
+explanation of why it was written up, not a statement that it cannot begin. The rule was in the file
+and the sweep was two days old.
+
+**What to build.** A Custom Rules check that fails when an entry's **only** block is a prose marker —
+mechanically detectable, and always a human judgement to resolve: either it is genuinely blocked and
+wants a `Gate:`/`Needs:`, or the marker is a caution and should carry a warning sign instead.
+**The check must exempt its own entry and any doc that discusses the convention**, which is the same
+self-reference trap. Baseline the existing
+**28 shrink-only**, exactly as `check-fetch-once-effects.js` freezes its 36 sites, so the debt is
+visible and a new one fails.
+
+**⚠ Do not make the check guess which kind of marker it is reading.** Prose detection is the thing
+the structured fields exist to replace; a heuristic that sorts "do not fix this by…" from "this
+cannot start" would be a third convention to maintain. The check reports the *shape* — parked, with
+nothing structured saying why — and a human decides.
+
 ### [readiness][platform] TN-57 — the self-report has never once been answered, and three consumers read the unanswered default as data 🔴 LIVE
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-21 · Tuning, answering the owner's *"what is your
@@ -546,7 +648,7 @@ row whose flag is false.
   migration and no data write. The column that distinguishes answered from unanswered already
   exists"* — it fixes three consumers that read an unanswered default as data. Shipping TN-57 leaves
   TN-58 exactly as blocked. **Read TN-57's scope rather than TN-58's description of it.**
-- **⛔ The failure mode is SILENT, which is why this is filed rather than attempted.** `Body` in the
+- **⚠ The failure mode is SILENT, which is why this is filed rather than attempted.** `Body` in the
   route is **not** `.strict()`, so Zod strips an unknown key instead of rejecting it: a sheet posting
   `vsYesterday` would get **201** and write nothing. A control that looks like it works and stores
   nothing is worse than a 400, and worse than the neutral-default bug TN-57 exists to fix — it would
@@ -1078,11 +1180,22 @@ at all — which is itself a finding worth having, and it costs a fortnight to g
 - **Lane:** A — production data, `nutrition_targets`. **Added:** 2026-09-21 (Lane A, while shipping
   RV-66).
 - **Gate:** owner
-- **Measured 2026-09-21.** `claude_ro.nutrition_targets` holds **1,660 kcal / 150 g protein / 141 g
-  carbs / 55 g fat**, which is *exactly* the `goal_recommendations` row from **2026-08-31** — a row
-  the model wrote and the sheet applied. The computed baseline for the owner's current profile
-  (70.35 kg, 25.7% BF, measured RMR 1,325 @ 51.5 kg FFM, recomp, moderate) is **1,410 / 115 / 143 /
-  42**. So the live targets run **+250 kcal (+18%)** and **+35 g protein (+30%)** above the formula.
+- **Measured 2026-09-21, and CORRECTED 2026-09-22 — the gap is wider than first filed, and it is not
+  only the nutrition targets.** `claude_ro.nutrition_targets` holds **1,660 kcal / 150 g protein /
+  141 g carbs / 55 g fat**, *exactly* the `goal_recommendations` row from **2026-08-31** — a row the
+  model wrote and the sheet applied.
+- **The steps goal is a model number too, and it is the impossible one.**
+  `claude_ro.users.steps_goal` reads **5,000** — the value from the 2026-09-14 recommendation, which
+  `STEP_GOAL_BY_ACTIVITY` cannot produce at all (it returns only 7,000 / 8,500 / 10,000 / 12,000,
+  and the owner is `moderate` → 10,000). The original filing said this could not be read; that was
+  wrong, and the reason is recorded under the retired LA-127: it was looked for in a `user_goals`
+  table, and the goals are columns on `users`.
+- **The body-fat correction widens the gap rather than excusing it.** `claude_ro.dexa_scans` holds a
+  real DEXA at **28.5%** against the scale's 25.7%, and `correctBodyFatPct` moves body fat toward the
+  scan — which lowers lean mass, and with it protein and calories. Baseline at the scale reading is
+  **1,410 / 115 / 143 / 42**; at the DEXA reading it is **1,359 / 111 / 143 / 38**. So the live
+  targets run **+259 kcal (+19%)** and **+39 g protein (+35%)** above the formula, not the +18%/+30%
+  first filed.
 - RV-66 stops any *future* recommendation being model-invented. It does not touch what is already
   stored, and it must not: rewriting a user's goals is a production data write.
 - **What the owner has to decide**, and it is genuinely a choice rather than a correction: the
@@ -1096,6 +1209,14 @@ at all — which is itself a finding worth having, and it costs a fortnight to g
 
 - **Lane:** A — `packages/shared/src/nutrition/goal-recommendation.ts:205,262-268`.
   **Added:** 2026-09-21 (Lane A, found while shipping RV-66).
+- **Gate:** owner — **added 2026-09-21 as a correction.** The entry always said the fix *"changes
+  the computed fat target for real users, so it wants the owner's eye on the number before it
+  ships"*, and that sentence was prose. `Gate:` is a FIELD; written inline it is ignored, so this sat
+  at **READY position 1** describing its own owner gate in a form nothing reads. Its sibling LA-126
+  was filed the same hour with the same mistake and `check-backlog-pointers.js` caught that one,
+  because there the field name appeared mid-bullet where the checker looks for it. Here it was never
+  written at all, so there was nothing to catch: **the check finds a gate in the wrong place, not a
+  gate that is missing.**
 - `calculateBaseline` sets `fatG = round(calories * 0.25 / 9)`. `clampRecommendation` floors fat at
   `round(0.6 * weightKg)`. For the owner those are **39 g and 42 g**, so the clamp raises fat and
   carbs fall out of the remainder at **143 instead of 150**.
@@ -1114,25 +1235,6 @@ at all — which is itself a finding worth having, and it costs a fortnight to g
   wants the owner's eye on the number before it ships.
 - **Verification:** the route's response equals `calculateBaseline` field-for-field, and the
   `lose_weight` floor test still passes.
-
-### [platform] LA-127 — two tables have no `claude_ro` twin, so they are invisible to every read
-
-- **Lane:** A — `lib/data/postgres/migrations/`, `scripts/generate-claude-ro-views.js`.
-  **Added:** 2026-09-21 (Lane A, found while measuring RV-66).
-- `claude_ro.user_goals` and `claude_ro.body_fat_calibration` both return *relation does not exist*.
-  `claude_ro` is default-deny, so a table with no view is unreadable rather than partially readable.
-- **What it cost in one session:** the RV-66 measurement could not read the owner's steps goal at all
-  (`user_goals`), and could not reproduce `correctBodyFatPct` (`body_fat_calibration`), so the
-  lean-mass-derived half of that comparison had to be stated as approximate. The step-goal half
-  survived only because it happens not to depend on body fat.
-- **Not established:** whether these are deliberate omissions (the generator has an exclusion list)
-  or drift from a migration that shipped without its twin. **Read the generator's exclusions before
-  regenerating** — if they are deliberate, this entry becomes a docs fix naming the reason.
-- **Fix:** regenerate the views per CLAUDE.md's twin rule, as a NEW migration number, diffing against
-  the previous one to confirm only the intended views moved. The owner's id must not appear in the
-  output (Q-456).
-- **Verification:** both tables answer a `SELECT` through `/api/admin/db-query`;
-  `claude-ro-readonly-role.test.ts` and `db-snapshot-integration.test.ts` pass on a TCP `DATABASE_URL`.
 
 ### [nutrition][app-shell] RV-68 — the supplement tick paints only after three awaited local writes and a native call
 

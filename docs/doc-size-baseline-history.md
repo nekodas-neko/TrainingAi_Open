@@ -15130,6 +15130,25 @@ Containing the key is not the proof. The proof is that **every writer of the pay
 group, and live BLE samples land in the profile's own 90-day window during the workout with nothing
 in `lib/live-hr/**` invalidating anything. The flag would have pinned a stale profile for six hours
 across workouts to fix a twenty-call loop inside one.
+
+## 2026-09-22 — `docs/implementation-backlog.md` → 26586 (after merging review sweep 52)
+
+TN-59 and TN-60, filed the morning after the queue produced a fresh instance of the defect TN-59
+describes.
+
+**TN-60** is a variance decomposition of the readiness composite over 69 stored days, and it is new
+because it measures the **output** — TN-47 argues the same case from the inputs. The finding: the
+declared weights are not the effective ones (`hrvBalance` carries 22.8% of all movement against a
+0.15 weight), and the mechanism is the ±1.5σ rail, which clips `hrvBalance` on **38% of days** and
+renders z of −1.63 and z of −4.37 as the same zero. Most of its length is the two warnings — do not
+fix it by lowering the weight, and do not conflate it with the MAD-denominator inflation, which is a
+separate entry and does not explain a −4.37.
+
+**TN-59** asks for a check because the 2026-09-20 hand sweep did not hold: 28 entries are still
+parked by a prose marker alone, and LB-124 was filed and parked the same morning, taking Lane B's
+READY list to zero. Its own first draft was parked by writing the marker character inside backticks,
+and then filed under REFERENCE by using that field for background reading — both recorded in the
+entry, because they are the argument for the check rather than embarrassments to leave out.
 ## 2026-09-21 — `docs/implementation-backlog.md` +335 (26149 → 26484) (Review sweep 52)
 
 Nineteen entries (**RV-84…RV-102**) from a visual sweep — formatting drift, 384px layout,
@@ -15150,10 +15169,48 @@ both deload surfaces are even reachable in one session, RV-93 notes the injury-c
 proven only for the geometry and not for a specific exercise, and RV-84 asks for a check script
 rather than a repeatable sweep.
 
-## 2026-09-22 — `docs/implementation-backlog.md` 26484 → 26449 (RV-84 and RV-88 left the queue)
 
-Both shipped and were removed whole. The baseline had just risen with sweep 52's nineteen new
-entries; this is the first two coming back off.
+## 2026-09-21 — LA-125 described its own owner gate in a form nothing reads
+
+`docs/implementation-backlog.md` **26150 → 26158** (`lane-a/la125-gate-the-fat-formula-change`) —
+recomputed against main on the third re-merge while this waited.
+
+Filed hours earlier with the sentence *"that changes the computed fat target for real users, so it
+wants the owner's eye on the number before it ships"* — as **prose**. `Gate:` is a field, and written
+any other way it is ignored, so the entry sat at **READY position 1** advertising a gate that nothing
+could act on.
+
+Worth the note because the near-miss is asymmetric. Its sibling **LA-126** was filed in the same
+edit with the same mistake and `check-backlog-pointers.js` caught it within a minute — there the
+field name sat mid-bullet where the checker looks for it, and it warned. LA-125 never
+wrote the words at all, so there was nothing to detect: **the check finds a gate in the wrong place,
+not a gate that is missing.** Catching one and not the other reads like the checker working, which
+is how the second one survived.
+
+## 2026-09-22 — LA-127 was filed against two tables that do not exist
+
+`docs/implementation-backlog.md` **26187** · `projectOverview.md` **12205 → 12212**
+(`lane-a/la125-gate-the-fat-formula-change`, folded in).
+
+LA-127 claimed `user_goals` and `body_fat_calibration` had no `claude_ro` twin. Neither is a table.
+`getUserGoals` reads **columns on `users`**; `getBodyFatCalibration` derives its answer from
+**`dexa_scans`** in TypeScript and stores nothing. The generator's `DENIED` set holds only
+`invited_emails` and `rate_limits`, so there was no policy exclusion either — and no drift, because
+there is nothing to generate a view for. Retired rather than built.
+
+**The retraction makes the finding it came from stronger, which is why it is worth the lines.** That
+entry existed to excuse a gap in RV-66's measurement. With the right relations read:
+`claude_ro.users.steps_goal` is **5,000** — so the impossible step goal is the owner's *live* goal,
+not only a stored recommendation — and `claude_ro.dexa_scans` holds **28.5%** against the scale's
+25.7%, which lowers lean mass and takes the computed baseline to **1,359 kcal / 111 g protein**. The
+gap against what he is eating to is **+19% / +35%**, not the +18% / +30% first filed. A caveat that
+read as "this number might be softer than stated" was hiding a number that was harder.
+
+## 2026-09-22 — `docs/implementation-backlog.md` → 26551 (RV-84 and RV-88 left the queue)
+
+Both shipped and were removed whole — a net −35 from this branch. The number above is higher than
+the one it started from because sweep 52 (#1368) and another entry landed while this was open; it is
+recomputed against the merged file, not spliced.
 
 Worth carrying out of them: **RV-84's count was wrong three ways**, and the correction is the useful
 part. It said 16 chained `.catch`es on `cachedFetch`; there are **81**, of which 68 are harmless
