@@ -15353,3 +15353,14 @@ sentences are the findings: the compiler caught a re-save path that would have c
 every food-log completion, and the type choice (text, not `-1/0/+1`) turns on this table already
 storing 1 = best … 5 = worst — both things the next person to touch this column needs and neither
 recoverable from the diff.
+
+## 2026-09-22 — TN-58 (`feat/tn58-vs-yesterday-control`)
+
+`projectOverview.md` 12316 → **12327**: eleven lines. Longer than a control change warrants because
+two things must survive to the next session — that the absolute scale was **added beside, not
+replaced**, and why; and that a **two-week pass test** is running, whose failure is a finding rather
+than a defect to fix.
+
+`docs/implementation-backlog.md` does not shrink: TN-58 stays in the queue as a `Keep:` for that
+pass test, per the rule that an entry still owing a check states what is owed rather than being
+deleted.

@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.0",
+    date: "2026-09-22",
+    changes: [
+      "The morning check-in now asks whether today is better, about the same, or worse than yesterday \u2014 three taps at the top of the sheet. The 1-to-5 recovery scale below it has produced exactly two different numbers in 81 days and you have never once moved the slider, which is the normal fate of an absolute self-rating: comparing two days is a much easier question to answer than scoring one. Nothing is pre-selected and skipping it stores nothing, on purpose. The old scale is unchanged and still there.",
+    ],
+  },
+  {
     version: "1.464.9",
     date: "2026-09-22",
     changes: [
